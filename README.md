@@ -2,7 +2,7 @@
 
 Early pass at a modern control layer for Ultimate++ – starting with a single, over-engineered button and a style system it probably doesn’t deserve (yet).
 
-> Snapshot goes here once things stop moving so much:
+> Snapshots:
 
 ![UiButton demo screenshot](snapshot-UiButton.png)
 
@@ -30,7 +30,6 @@ Early pass at a modern control layer for Ultimate++ – starting with a single, 
 
 This is **not** a drop-in replacement for CtrlLib but I will slowly work through all the controls. 
 The concept presented here is how I feel the front facing API specifically for design and animation should feel , this is not random thoughts but carefully considered each aspect of it so that this particular button class is well conceived, I've added additional cleanup and re-factoring, trying to maintain some of the existing CtrlLib concepts especially in regards to chameleon styling and trying to unify SetMinSize().
-
 
 ---
 
@@ -85,25 +84,25 @@ If your U++ setup already builds the standard examples, this should behave the s
 A few knobs worth trying:
 
 - **Semantic styles**
-  ```cpp
+```cpp
   btn.SetAccentStyle();   // blue-ish, CTA style
   btn.SetSubtleStyle();   // border-only, quieter text
   btn.SetLinkStyle();     // underline, highlight ink, no frame
-````
+```
 
 * **Icon layout**
 
-  ```cpp
+```cpp
   btn.SetImage(icon);
   btn.SetImageLayout(UIIMAGE_LEFT);   // or UIIMAGE_RIGHT / TOP / BOTTOM
-  ```
+```
 
 * **Direct styling**
 
-  ```cpp
+```cpp
   btn.SetBaseColors(SColorHighlight(), SColorHighlight(), SColorText())
      .SetRadius(DPI(20));             // pill button
-  ```
+```
 
 * **Animation (demo)**
   In the demo, the animated column shows:
