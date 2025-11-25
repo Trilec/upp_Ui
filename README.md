@@ -1,6 +1,6 @@
 # U++ UI Controls (experimental)
 
-Early pass at a modern control layer for Ultimate++ – starting with a single, over-engineered button and a style system it probably doesn’t deserve (yet).
+Early pass at a modern control layer for Ultimate++ – starting with a single, UiButton class to flush out API and concept.
 
 > Snapshots:
 
