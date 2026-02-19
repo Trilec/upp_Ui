@@ -217,7 +217,7 @@ private:
     Point drag_start_screen_   = Point(0, 0);
     StaticRect drag_marker_;
 
-    enum { ANIM_CB_ID = 2026101 };
+    enum { ANIM_CB_ID = 1 };
 };
 
 }

@@ -59,6 +59,7 @@ const UiRadioButton::Style& UiRadioButton::StyleList()
         s.visual = UIRADIOVIS_LIST;
         s.indicator_metrics.frame_enabled = false;
         s.indicator_metrics.face_enabled = false;
+        s.metrics.content_padding = Rect(DPI(4), DPI(0), DPI(0), DPI(0));
     }
     return s;
 }
@@ -130,6 +131,21 @@ UiRadioButton& UiRadioButton::SetIndicatorSide(UiAlign side)
     return *this;
 }
 
+UiRadioButton& UiRadioButton::SetIndicatorRadius(int px)
+{
+    style_.indicator_metrics.radius = max(0, px);
+    Refresh();
+    return *this;
+}
+
+UiRadioButton& UiRadioButton::SetIndicatorRoundness(int percent)
+{
+    percent = clamp(percent, 0, 100);
+    int side = max(DPI(10), style_.indicator_size);
+    int r = (side * percent) / 2 / 100;
+    return SetIndicatorRadius(r);
+}
+
 Rect UiRadioButton::GetIndicatorRect(const Rect& r) const
 {
     int side = max(DPI(10), style_.indicator_size);
@@ -167,11 +183,60 @@ void UiRadioButton::Paint(Draw& w)
     Rect ind = layout_cache_.support;
     Rect text_r = layout_cache_.main;
 
+    auto PaintSelectionMark = [&](const Rect& outer_ind) {
+        Rect mark_area = outer_ind;
+        int inset = max(DPI(2), style_.indicator_metrics.frame_width + DPI(1));
+        if(style_.visual == UIRADIOVIS_LIST)
+            inset = max(inset, DPI(3));
+        mark_area = mark_area.Deflated(inset, inset);
+        if(mark_area.IsEmpty())
+            return;
+
+        int mark_side = min(mark_area.GetWidth(), mark_area.GetHeight());
+        int dot = max(DPI(8), (mark_side * 76) / 100);
+        dot = min(dot, mark_side);
+
+        double cx = mark_area.left + mark_area.GetWidth() * 0.5;
+        double cy = mark_area.top + mark_area.GetHeight() * 0.5;
+        double x = cx - dot * 0.5;
+        double y = cy - dot * 0.5;
+
+        Color c = style_.indicator_palette.ink[st];
+        if(IsNull(c)) c = SColorHighlight();
+        RGBA rc = c;
+
+        int outer_side = max(1, min(outer_ind.GetWidth(), outer_ind.GetHeight()));
+        int outer_half = max(1, outer_side / 2);
+        int outer_radius = max(0, style_.indicator_metrics.radius);
+        int pct = min(100, (outer_radius * 100) / outer_half);
+
+        ImageBuffer ib(max(1, dot + 4), max(1, dot + 4));
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Clear(RGBAZero());
+        if(pct >= 95) {
+            p.Circle(ib.GetWidth() * 0.5, ib.GetHeight() * 0.5, dot * 0.5);
+        }
+        else {
+            double rr = max(0.0, dot * pct / 200.0);
+            p.RoundedRectangle((ib.GetWidth() - dot) * 0.5,
+                               (ib.GetHeight() - dot) * 0.5,
+                               dot,
+                               dot,
+                               rr);
+        }
+        p.Fill(rc);
+
+        int dx = fround(x) - 2;
+        int dy = fround(y) - 2;
+        w.DrawImage(dx, dy, Image(ib));
+    };
+
     if(style_.visual == UIRADIOVIS_LIST) {
         if(checked_) {
-            Color c = style_.indicator_palette.ink[st];
-            if(IsNull(c)) c = SColorHighlight();
-            w.DrawEllipse(ind, c);
+            PaintSelectionMark(ind);
         }
     }
     else {
@@ -184,15 +249,8 @@ void UiRadioButton::Paint(Draw& w)
         else {
             UiPaintFaceFrameDash(w, ind, style_.indicator_palette, style_.indicator_metrics, st);
         }
-        if(checked_) {
-            int dot = max(DPI(6), ind.GetWidth() / 2);
-            Rect d = RectC(ind.left + (ind.GetWidth() - dot) / 2,
-                           ind.top + (ind.GetHeight() - dot) / 2,
-                           dot, dot);
-            Color c = style_.indicator_palette.ink[st];
-            if(IsNull(c)) c = SColorHighlight();
-            w.DrawEllipse(d, c);
-        }
+        if(checked_)
+            PaintSelectionMark(ind);
     }
 
     Color ink = style_.palette.ink[st];

@@ -71,6 +71,8 @@ public:
 
     UiRadioButton& SetVisual(UiRadioVisual vis);
     UiRadioButton& SetIndicatorSide(UiAlign side);
+    UiRadioButton& SetIndicatorRadius(int px);
+    UiRadioButton& SetIndicatorRoundness(int percent);
 
     UiRadioButton& SetSizeMin(Size sz)        { SetMinSize(sz); return *this; }
     UiRadioButton& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }

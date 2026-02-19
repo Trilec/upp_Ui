@@ -1,0 +1,10 @@
+description "U++ Animation & Easing Engine (Bezier + helpers)\377";
+
+uses
+	Core,
+	CtrlLib;
+
+file
+	Animation.h,
+	Animation.cpp;
+

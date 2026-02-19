@@ -474,7 +474,7 @@ private:
     void SetupCompactAccordion()
     {
         UiAccordion::Style st = UiAccordion::StyleDefault();
-        st.single_open = false;
+        st.single_open = true;
         st.header_height = DPI(39);
         st.section_gap = 0;
         st.header_body_gap = 0;
@@ -758,9 +758,21 @@ private:
         const int nested_body1 = DPI(108);
         brutal_nested.SetSectionBodyHeight(n0, nested_body0).SetSectionBodyHeight(n1, nested_body1);
 
+        auto ClampBodyHeight = [=](int desired) {
+            int h = max(DPI(96), desired);
+            const UiAccordion::Style gs = gradient_acc.GetStyle();
+            int avail = gradient_acc.GetSize().cy;
+            if(avail > 0) {
+                int reserved = gs.header_height + gs.section_gap + gs.header_height + gs.header_body_gap;
+                int max_body = max(DPI(96), avail - reserved - DPI(12));
+                h = min(h, max_body);
+            }
+            return h;
+        };
+
         auto SyncUtilityHeight = [=] {
             int h = brutal_nested.GetMinSize().cy + DPI(10) + DPI(18);
-            h = max(h, DPI(200));
+            h = ClampBodyHeight(h);
 
             gradient_acc.SetSectionBodyHeight(b, h);
             RefreshLayout();
@@ -768,7 +780,7 @@ private:
         };
         brutal_nested.WhenSectionToggled = [=](int, bool) { SyncUtilityHeight(); };
 
-        gradient_acc.SetSectionBodyHeight(a, DPI(220));
+        gradient_acc.SetSectionBodyHeight(a, ClampBodyHeight(DPI(180)));
         SyncUtilityHeight();
 
         auto ApplyChevronScale = [=] {

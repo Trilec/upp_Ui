@@ -1,1 +1,4 @@
-snapshot-UiButton.png
+*.svg
+*.exe
+scripts/*
+UPP_GUIDES/*

@@ -89,6 +89,8 @@ public:
     UiCheckVisual GetVisual() const { return style_.visual; }
 
     UiCheckBox& SetIndicatorSide(UiAlign side);
+    UiCheckBox& SetIndicatorRadius(int px);
+    UiCheckBox& SetIndicatorRoundness(int percent);
 
     UiCheckBox& SetSizeMin(Size sz)        { SetMinSize(sz); return *this; }
     UiCheckBox& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }

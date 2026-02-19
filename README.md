@@ -4,7 +4,11 @@ Modern, style-first controls for Ultimate++.
 
 This is intentionally forward-looking work: new `Ui*` controls designed to coexist with CtrlLib (not replace it overnight). The code is optimized for a clean, consistent styling surface (palette/metrics/skin), predictable layout (icon+text blocks with per-block margins), and optional animation hooks.
 
-![UiButton demo screenshot](snapshot-UiButton.png)
+![UiButton demo screenshot](Snapshot_Button.jpg)
+
+![General UI demo screenshot](Snapshot_Controls.jpg)
+
+![UiAccordion demo screenshot](Snapshot_Accordion.jpg)
 
 ## Quick links
 
@@ -17,7 +21,6 @@ This is intentionally forward-looking work: new `Ui*` controls designed to coexi
 
 - `Ui/` - the `Ui` package (controls + styling and drawing helpers)
 - `examples/` - demo packages (these act as a manual regression suite)
-- `UPP_GUIDES/` and `UPP_SOURCE_EXAMPLES/` - reference material / source-of-truth snippets
 
 ## What currently builds in the `Ui` package
 
@@ -39,7 +42,7 @@ As of today, `Ui/Ui.upp` compiles these controls:
 
 Dependencies used by `Ui/Ui.upp` include `Painter` and `Animation`.
 
-Note: `Animation/` in this repo is a vendored copy of the animation/easing package from `E:\apps\github\upp_AnimationEasing`.
+Note: `Animation/` in this repo is a copy of the animation/easing package from `E:\apps\github\upp_AnimationEasing`.
 
 ## Build from CLI (umk)
 

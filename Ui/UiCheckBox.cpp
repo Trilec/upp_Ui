@@ -188,6 +188,21 @@ UiCheckBox& UiCheckBox::SetIndicatorSide(UiAlign side)
     return *this;
 }
 
+UiCheckBox& UiCheckBox::SetIndicatorRadius(int px)
+{
+    style_.indicator_metrics.radius = max(0, px);
+    Refresh();
+    return *this;
+}
+
+UiCheckBox& UiCheckBox::SetIndicatorRoundness(int percent)
+{
+    percent = clamp(percent, 0, 100);
+    int side = max(DPI(10), style_.indicator_size);
+    int r = (side * percent) / 2 / 100;
+    return SetIndicatorRadius(r);
+}
+
 Rect UiCheckBox::GetIndicatorRect(const Rect& r) const
 {
     int side = max(DPI(10), style_.indicator_size);
