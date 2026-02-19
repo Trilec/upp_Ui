@@ -2,31 +2,6 @@
 
 namespace Upp {
 
-static Image MakePasswordEyeIcon_(bool crossed)
-{
-    const int sz = DPI(16);
-    ImageDraw iw(sz, sz);
-    iw.DrawRect(0, 0, sz, sz, Null);
-
-    Color ink = SColorText();
-    int l = DPI(2);
-    int t = DPI(4);
-    int w = sz - DPI(4);
-    int h = sz - DPI(8);
-
-    iw.DrawEllipse(l, t, w, h, Null, DPI(1), ink);
-
-    int pr = max(1, DPI(2));
-    int cx = sz / 2;
-    int cy = sz / 2;
-    iw.DrawEllipse(cx - pr, cy - pr, pr * 2, pr * 2, ink, 0, ink);
-
-    if(crossed)
-        iw.DrawLine(DPI(2), sz - DPI(3), sz - DPI(3), DPI(2), DPI(2), ink);
-
-    return iw;
-}
-
 // ============================================================================
 //  UiPasswordEdit
 // ============================================================================
@@ -55,7 +30,7 @@ UiPasswordEdit::UiPasswordEdit()
     bs.metrics.face_enabled  = false;
 
     // Use margins instead of padding: keep a small inset around the icon.
-    bs.icon_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+    bs.icon_margin = Rect(DPI(2), DPI(2), DPI(4), DPI(2));
     bs.text_margin = Rect(0, 0, 0, 0);
 
     // Transparent background so the edit's face shows through.
@@ -64,13 +39,16 @@ UiPasswordEdit::UiPasswordEdit()
     eye_button_.SetStyle(bs);
     eye_button_.SetText(String());   // icon-only
     eye_button_.SetIcon(Image());     // start with null icon
-    eye_button_.SetIconScale(false);
+    eye_button_.SetIconScale(true);
     eye_button_.ClickFocus(false);    // don't steal focus from the edit
+    eye_button_.SetMinSize(Size(DPI(18), DPI(18)));
 
     // Behaviour: clicking the eye toggles plain-text visibility.
     eye_button_.WhenAction = [this] {
         SetPlainTextVisible(!plain_visible_);
     };
+
+    SyncEyeButtonIconColor_();
 
     // Icon is opt-in; user calls EnableVisibilityIcon(true).
     eye_button_.Hide();
@@ -121,6 +99,8 @@ UiPasswordEdit& UiPasswordEdit::EnableVisibilityIcon(bool on)
     visibility_icon_enabled_ = on;
 
     if(on) {
+        SyncEyeButtonIconColor_();
+
         // Ensure we have icons – use built-in defaults if none supplied.
         if(IsNull(visible_icon_))
             visible_icon_ = EyeVisibleIcon();
@@ -132,7 +112,7 @@ UiPasswordEdit& UiPasswordEdit::EnableVisibilityIcon(bool on)
 
         // Lazily add the eye button to the right flank the first time.
         if(eye_flank_id_ < 0) {
-            SideHandle sh = AddToSide(eye_button_, UiAlign::RIGHT);
+            SideHandle sh = AddToSide(eye_button_, UiAlign::RIGHT, Size(DPI(26), 0), UiDirection::H);
             eye_flank_id_ = sh.GetId();
         }
 
@@ -164,16 +144,34 @@ UiPasswordEdit& UiPasswordEdit::SetVisibilityIcons(const Image& visible,
     return *this;
 }
 
+UiPasswordEdit& UiPasswordEdit::SetStyle(const UiBaseEdit::Style& s)
+{
+    UiLineEdit::SetStyle(s);
+    SyncEyeButtonIconColor_();
+    return *this;
+}
+
+void UiPasswordEdit::SyncEyeButtonIconColor_()
+{
+    UiButton::Style bs = eye_button_.GetStyle();
+    for(int i = 0; i < 4; i++) {
+        Color c = UiResolveIconColor(style_.palette, (StyledState)i);
+        bs.palette.icon[i] = c;
+        bs.palette.ink[i] = c;
+    }
+    eye_button_.SetStyle(bs);
+}
+
 // Built-in eye icons (48px) – wrappers over UiIcons helpers.
 
 Image UiPasswordEdit::EyeVisibleIcon()
 {
-    return MakePasswordEyeIcon_(false);
+    return ICON_ACTION_OUTLINED_VISIBILITY_48();
 }
 
 Image UiPasswordEdit::EyeHiddenIcon()
 {
-    return MakePasswordEyeIcon_(true);
+    return ICON_ACTION_OUTLINED_VISIBILITY_OFF_48();
 }
 
 // ---------------------------------------------------------------------------

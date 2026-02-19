@@ -43,6 +43,7 @@ public:
         Rect text_margin = Rect(DPI(2), 0, 0, 0);
 
         Image icon_images[4];
+        bool  icon_tint_mono = true;
 
         bool underline        = false;
         int  underline_width  = DPI(1);
@@ -58,6 +59,8 @@ public:
 
             for(int i = 0; i < 4; i++)
                 s % icon_images[i];
+
+            s % icon_tint_mono;
 
             s % underline % underline_width % underline_offset;
         }
@@ -126,6 +129,13 @@ public:
 
     UiButton& SetIconScale(bool on = true) { icon_scale_ = on; Refresh(); return *this; }
     bool      GetIconScale() const { return icon_scale_; }
+    UiButton& SetIconTintMono(bool on = true) { style_.icon_tint_mono = on; Refresh(); return *this; }
+    bool      GetIconTintMono() const { return style_.icon_tint_mono; }
+    UiButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
+    {
+        CtrlStyled<UiButton>::SetIconColor(base, hot_pct, press_pct);
+        return *this;
+    }
 
     UiButton& SetIconLayout(UiAlign layout);
 

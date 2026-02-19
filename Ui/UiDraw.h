@@ -208,7 +208,7 @@ inline void UiPaintStyledIcon(Draw& w,
     if(scale && (dst_w != src_sz.cx || dst_h != src_sz.cy))
         draw_img = CachedRescale(img, Size(dst_w, dst_h));
 
-    if(mono && enabled)
+    if(mono && !IsNull(ink))
         w.DrawImage(img_x, img_y, draw_img, ink);
     else
         w.DrawImage(img_x, img_y, draw_img);

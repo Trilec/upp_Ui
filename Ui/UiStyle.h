@@ -273,14 +273,24 @@ struct StyledPalette {
     UiFill face[4];
     Color  frame[4];
     Color  ink[4];
+    Color  icon[4];
 
     void Serialize(Stream& s)
     {
         for(int i = 0; i < 4; i++) face[i].Serialize(s);
         for(int i = 0; i < 4; i++) s % frame[i];
         for(int i = 0; i < 4; i++) s % ink[i];
+        for(int i = 0; i < 4; i++) s % icon[i];
     }
 };
+
+inline Color UiResolveIconColor(const StyledPalette& p, StyledState st)
+{
+    Color c = p.icon[st];
+    if(IsNull(c))
+        c = p.ink[st];
+    return c;
+}
 
 struct StyledShadow {
     bool  enabled  = false;
@@ -878,6 +888,17 @@ public:
         p.ink[ST_HOT]      = hot_pct   ? LtColor(base, hot_pct)    : base;
         p.ink[ST_PRESSED]  = press_pct ? DkColor(base, press_pct)  : base;
         p.ink[ST_DISABLED] = DisabledColor(base);
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
+    {
+        StyledPalette& p = StyledPaletteRef();
+        p.icon[ST_NORMAL]   = base;
+        p.icon[ST_HOT]      = hot_pct   ? LtColor(base, hot_pct)    : base;
+        p.icon[ST_PRESSED]  = press_pct ? DkColor(base, press_pct)  : base;
+        p.icon[ST_DISABLED] = DisabledColor(base);
         OnStyleChanged();
         return Self();
     }

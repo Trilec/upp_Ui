@@ -140,6 +140,12 @@ public:
     }
     bool IsIconScaled() const { return icon_scale_; }
 
+    UiLabel& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
+    {
+        CtrlStyled<UiLabel>::SetIconColor(base, hot_pct, press_pct);
+        return *this;
+    }
+
     // Styling
     UiLabel&       SetStyle(const Style& s);
     const Style&   GetStyle() const { return style_; }

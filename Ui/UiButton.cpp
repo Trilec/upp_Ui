@@ -727,6 +727,9 @@ void UiButton::Paint(Draw& w)
         font = StdFont();
 
     Color ink = AdjustInk(p.ink[st], st);
+    Color icon_ink = UiResolveIconColor(p, st);
+    if(IsNull(icon_ink))
+        icon_ink = ink;
 
     Rect icon_r = layout_.support;
     Rect text_r = layout_.main;
@@ -742,8 +745,8 @@ void UiButton::Paint(Draw& w)
                           icon_r,
                           icon_img,
                           icon_scale_,
-                          false,
-                          ink,
+                          style_.icon_tint_mono,
+                          icon_ink,
                           enabled);
     }
 

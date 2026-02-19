@@ -37,21 +37,14 @@ public:
         pass_custom_char.SetTip("Mask character changed via SetPasswordChar('*').");
 
         // -----------------------------------------------------------------
-        // 3. Toggle visibility (right-side icon, plus/minus for now)
+        // 3. Toggle visibility (right-side visibility icons)
         // -----------------------------------------------------------------
         lbl_toggle_right.SetText("Toggle visibility:");
-        pass_toggle_right.SetPlaceholder("Click + / - to show / hide");
-
-        // Use CtrlImg plus/minus as stand-in icons
-        pass_toggle_right
-            .SetVisibilityIcons(
-                CtrlImg::plus(),   // visible state
-                CtrlImg::minus())  // hidden state
-            .EnableVisibilityIcon(true);
+        pass_toggle_right.SetPlaceholder("Click eye icon to show / hide");
+        pass_toggle_right.EnableVisibilityIcon(true);
 
         pass_toggle_right.SetTip(
-            "Visibility toggle using SetVisibilityIcons(plus, minus) + "
-            "EnableVisibilityIcon(true)."
+            "Visibility toggle using built-in design visibility icons."
         );
 
         // -----------------------------------------------------------------
@@ -71,12 +64,9 @@ public:
 
         pass_login.SetPlaceholder("Password");
 
-        // a) Use plus/minus as the visibility toggle icons
+        // a) Use built-in visibility icons
         pass_login
-            .SetVisibilityIcons(
-                CtrlImg::plus(),
-                CtrlImg::minus())
-            .EnableVisibilityIcon(true);
+             .EnableVisibilityIcon(true);
 
         pass_login.SetTip(
             "Styled login field: rounded, dark background, inline visibility toggle "
@@ -124,7 +114,7 @@ public:
             UiButton::Style bs = UiButton::StyleDefault();
 
             // Match background + frame as closely as possible
-            Color face  = Color(30, 50, 80);
+            Color face  = Color(38, 58, 88);
             Color frame = Color(90, 130, 170);
             Color ink   = Color(235, 240, 245);
 
@@ -144,13 +134,14 @@ public:
             bs.palette.ink[ST_DISABLED] = SColorDisabled();
 
             bs.metrics.radius      = DPI(4);
-            bs.metrics.frame_width = DPI(1);
+            bs.metrics.frame_width = DPI(0);
 
             bs.metrics.content_padding = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
 
             login_submit_btn.SetStyle(bs);
             login_submit_btn.SetText(String());             // icon-only
             login_submit_btn.SetIcon(CtrlImg::go_forward());
+            login_submit_btn.SetIconTintMono(false);
             login_submit_btn.ClickFocus(false);             // keep focus on edit
             login_submit_btn.SetMinSize(Size(DPI(32), 0));  // width ~= height
 

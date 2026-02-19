@@ -1108,9 +1108,12 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 				UiPaintFaceFrameDashAlpha(w, ar, ar_pal, style_.arrow_metrics, st, alpha);
 			}
 
-			Color ink = ar_pal.ink[st];
-			if(IsNull(ink)) ink = ar_pal.frame[st];
-			if(IsNull(ink)) ink = SColorText();
+            Color ink = ar_pal.ink[st];
+            if(IsNull(ink)) ink = ar_pal.frame[st];
+            if(IsNull(ink)) ink = SColorText();
+            Color icon_ink = UiResolveIconColor(ar_pal, st);
+            if(IsNull(icon_ink))
+                icon_ink = ink;
 
 			Image ico;
 			if(style_.arrow_icons) {
@@ -1122,11 +1125,11 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 
 			Rect icon_r = UiStyledInnerRect(ar, style_.arrow_metrics, style_.arrow_skin);
 			if(style_.arrow_icons && !IsNull(ico) && !icon_r.IsEmpty()) {
-				if(alpha < 255)
-					ico = UiImageMultiplyAlpha(ico, alpha);
-				UiPaintStyledIcon(w, icon_r, ico, style_.arrow_icon_scale,
-				                  style_.arrow_icon_mono, ink, enabled);
-			}
+                if(alpha < 255)
+                    ico = UiImageMultiplyAlpha(ico, alpha);
+                UiPaintStyledIcon(w, icon_r, ico, style_.arrow_icon_scale,
+                                  style_.arrow_icon_mono, icon_ink, enabled);
+            }
 			else {
 				Point pts[3];
 				if(dir_ == UiDirection::V) {

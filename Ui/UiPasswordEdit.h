@@ -135,6 +135,8 @@ public:
     // the currently displayed icon to match the current visibility.
     UiPasswordEdit& SetVisibilityIcons(const Image& visible, const Image& hidden);
 
+    UiPasswordEdit& SetStyle(const UiBaseEdit::Style& s);
+
     // Built-in eye icons backed by UiIcons.h (48px).
     // These are convenience helpers; you can also pass your own icons.
     static Image EyeVisibleIcon();  // "eye open"
@@ -151,6 +153,8 @@ protected:
     virtual WString GetDisplayLine(int i) const override;
 
 private:
+    void SyncEyeButtonIconColor_();
+
     // Masking
     wchar password_char_ = 0x2022; // default mask: '•'
     bool  plain_visible_ = false;  // false => masked, true => show plain text

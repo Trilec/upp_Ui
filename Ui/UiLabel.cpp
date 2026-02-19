@@ -551,6 +551,9 @@ void UiLabel::Paint(Draw& w)
         fnt = StdFont();
 
     Color ink = p.ink[st];
+    Color icon_ink = UiResolveIconColor(p, st);
+    if(IsNull(icon_ink))
+        icon_ink = ink;
 
     if(!IsNull(icon_) && !layout_.support.IsEmpty()) {
         UiPaintStyledIcon(w,
@@ -558,7 +561,7 @@ void UiLabel::Paint(Draw& w)
                           icon_,
                           icon_scale_,
                           mono_icon_,
-                          ink,
+                          icon_ink,
                           enabled);
     }
 
