@@ -1,0 +1,9 @@
+uses
+	Core,
+	Draw,
+	plugin/png,
+	Painter;
+
+file
+	MakeIconFromSVG.h,
+	MakeIconFromSVG.cpp;

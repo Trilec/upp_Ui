@@ -1,8 +1,9 @@
-description "U++ Control library system\377";
+description "U++ Ui Control library system\377";
 
 uses
 	Core,
 	Draw,
+	Painter,
 	CtrlCore,
 	Animation,
 	CtrlLib;
@@ -10,8 +11,49 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiIcons.h,
+	UiLabel.h,
+	UiLabel.cpp,
+	UiCheckBox.h,
+	UiCheckBox.cpp,
+	UiRadioButton.h,
+	UiRadioButton.cpp,
+	UiToggle.h,
+	UiToggle.cpp,
+	UiPanel.h,
+	UiPanel.cpp,
+	UiAccordion.h,
+	UiAccordion.cpp,
+	UiScrollPanel.h,
+	UiScrollPanel.cpp,
+	UiTitleCard.h,
+	UiTitleCard.cpp,
+	UiGridLayout.h,
+	UiGridLayout.cpp,
+	UiBoxLayout.h,
+	UiBoxLayout.cpp,
 	UiButton.h,
-	UiButton.cpp;
+	UiButton.cpp,
+	UiBaseEdit.h,
+	UiBaseEdit.cpp,
+	UiLineEdit.h,
+	UiLineEdit.cpp,
+	UiIntEdit.h,
+	UiIntEdit.cpp,
+	UiFloatEdit.h,
+	UiFloatEdit.cpp,
+	UiPasswordEdit.h,
+	UiPasswordEdit.cpp,
+	UiMultiEdit.h,
+	UiMultiEdit.cpp,
+	UiMaskEdit.h,
+	UiMaskEdit.cpp,
+	UiSlider.h,
+	UiSlider.cpp,
+	UiSliderEdit.h,
+	UiSliderEdit.cpp,
+	UiScrollBar.h,
+	UiScrollBar.cpp;
 
 mainconfig
 	"" = "";

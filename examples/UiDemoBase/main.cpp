@@ -12,6 +12,11 @@ public:
         Title("Ui – Generic UI Demo");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(900), DPI(600));
+
+        Font body = SansSerifZ(11);
+        placeholder_ = "Ui* Controls Area\n"
+                       "(UiButton, UiLabel, UiCheckBox, UiSlider, etc.)";
+        placeholder_size_ = GetTextSize(placeholder_, body);
     }
 
     virtual void Paint(Draw& w) override
@@ -101,15 +106,15 @@ public:
                    1, controls_area.GetHeight(), frame);
 
         // Placeholder caption centered
-        String placeholder = "Ui* Controls Area\n"
-                             "(UiButton, UiLabel, UiCheckBox, UiSlider, etc.)";
+        int tx = controls_area.CenterPoint().x - placeholder_size_.cx / 2;
+        int ty = controls_area.CenterPoint().y - placeholder_size_.cy / 2;
 
-        Size text_sz = GetTextSize(placeholder, body);
-        int  tx = controls_area.CenterPoint().x - text_sz.cx / 2;
-        int  ty = controls_area.CenterPoint().y - text_sz.cy / 2;
-
-        w.DrawText(tx, ty, placeholder, body, SColorDisabled());
+        w.DrawText(tx, ty, placeholder_, body, SColorDisabled());
     }
+
+private:
+    String placeholder_;
+    Size   placeholder_size_ = Size(0, 0);
 };
 
 GUI_APP_MAIN

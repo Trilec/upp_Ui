@@ -4,6 +4,43 @@
 namespace Upp {
 
 // ------------------------------------------------------------
+// Helper: resolve icon for a given visual state
+// ------------------------------------------------------------
+Image UiButton::ResolveIconForState(StyledState st) const
+{
+    const Image* icons = style_.icon_images;
+
+    const Image& normal = icons[ST_NORMAL];
+
+    if(!IsNull(normal)) {
+        const Image& specific = icons[st];
+        return IsNull(specific) ? normal : specific;
+    }
+
+    for(int i = 0; i < 4; i++) {
+        if(!IsNull(icons[i]))
+            return icons[i];
+    }
+
+    return Image();
+}
+
+// Stable icon size across all states (prevents min-size/layout jitter)
+Size UiButton::GetStableIconSize() const
+{
+    Size best(0, 0);
+    for(int i = 0; i < 4; i++) {
+        const Image& img = style_.icon_images[i];
+        if(!IsNull(img)) {
+            Size s = img.GetSize();
+            best.cx = max(best.cx, s.cx);
+            best.cy = max(best.cy, s.cy);
+        }
+    }
+    return best;
+}
+
+// ------------------------------------------------------------
 // StyleDefault: Chameleon-aware default look
 // ------------------------------------------------------------
 
@@ -11,31 +48,26 @@ const UiButton::Style& UiButton::StyleDefault()
 {
     static UiButton::Style s;
     ONCELOCK {
-        // Base semantic colors from Chameleon
         Color face  = SColorFace();
         Color text  = SColorText();
         Color frame = SColorShadow();
         Color dis   = SColorDisabled();
 
-        // Face states – slightly stronger hover
-        s.palette.face[ST_NORMAL]   = DkColor(face, 2);
-        s.palette.face[ST_HOT]      = DkColor(face, 10); 
-        s.palette.face[ST_PRESSED]  = DkColor(face, 12);
-        s.palette.face[ST_DISABLED] = Blend(face, dis, 200);
+        s.palette.face[ST_NORMAL]   = UiFill::Solid(DkColor(face, 2));
+        s.palette.face[ST_HOT]      = UiFill::Solid(DkColor(face, 12));
+        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 20));
+        s.palette.face[ST_DISABLED] = UiFill::Solid(DisabledColor(face));
 
-        // Frame states
         s.palette.frame[ST_NORMAL]   = frame;
         s.palette.frame[ST_HOT]      = LtColor(frame, 20);
         s.palette.frame[ST_PRESSED]  = DkColor(frame, 10);
         s.palette.frame[ST_DISABLED] = DisabledColor(frame);
 
-        // Ink states – small hover/pressed modulation
         s.palette.ink[ST_NORMAL]   = text;
-        s.palette.ink[ST_HOT]      = LtColor(text, 8);   // slightly lighter on hover
-        s.palette.ink[ST_PRESSED]  = DkColor(text, 8);   // slightly darker on press
+        s.palette.ink[ST_HOT]      = LtColor(text, 8);
+        s.palette.ink[ST_PRESSED]  = DkColor(text, 8);
         s.palette.ink[ST_DISABLED] = dis;
 
-        // Metrics
         s.metrics.radius        = DPI(4);
         s.metrics.frame_width   = DPI(1);
         s.metrics.frame_enabled = true;
@@ -45,17 +77,28 @@ const UiButton::Style& UiButton::StyleDefault()
         s.metrics.text_font     = StdFont();
         s.metrics.use_text_font = false;
 
-        // Skin off by default
         s.skin.enabled        = false;
-        s.skin.includes_frame = false;
-        s.skin.inset          = Rect(0, 0, 0, 0);
+        s.skin.content_inset  = Rect(0, 0, 0, 0);
 
-        // Control-specific extras
         s.press_offset = Point(1, 1);
         s.focus_margin = DPI(2);
         s.overpaint    = DPI(2);
         s.font         = StdFont();
         s.transparent  = false;
+
+        s.align_h     = UiAlign::CENTER;
+        s.align_v     = UiAlign::CENTER;
+        s.icon_layout = UiAlign::LEFT;
+
+        s.icon_margin = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
+        s.text_margin = Rect(DPI(2), 0, 0, 0);
+
+        for(int i = 0; i < 4; i++)
+            s.icon_images[i] = Image();
+
+        s.underline        = false;
+        s.underline_width  = DPI(1);
+        s.underline_offset = DPI(1);
     }
     return s;
 }
@@ -64,27 +107,22 @@ const UiButton::Style& UiButton::StyleAccent()
 {
     static Style s;
     ONCELOCK {
-        s = StyleDefault();
+        s = Style(StyleDefault());
 
-        // Slightly lighter than raw SColorHighlight for the base state,
-        // but clearly distinct from the neutral default.
         Color face  = LtColor(SColorHighlight(), 12);
         Color frame = DkColor(face, 20);
-        Color ink   = SColorHighlightText(); // usually white
+        Color ink   = SColorHighlightText();
 
-        // Face
-        s.palette.face[ST_NORMAL]   = DkColor(face, 2);
-        s.palette.face[ST_HOT]      = DkColor(face, 12);
-        s.palette.face[ST_PRESSED]  = DkColor(face, 20);
-        s.palette.face[ST_DISABLED] = DisabledColor(face);
+        s.palette.face[ST_NORMAL]   = UiFill::Solid(DkColor(face, 2));
+        s.palette.face[ST_HOT]      = UiFill::Solid(DkColor(face, 12));
+        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 20));
+        s.palette.face[ST_DISABLED] = UiFill::Solid(DisabledColor(face));
 
-        // Frame
         s.palette.frame[ST_NORMAL]   = frame;
         s.palette.frame[ST_HOT]      = LtColor(frame, 20);
         s.palette.frame[ST_PRESSED]  = DkColor(frame, 10);
         s.palette.frame[ST_DISABLED] = DisabledColor(frame);
 
-        // Ink
         s.palette.ink[ST_NORMAL]   = ink;
         s.palette.ink[ST_HOT]      = ink;
         s.palette.ink[ST_PRESSED]  = ink;
@@ -99,22 +137,18 @@ const UiButton::Style& UiButton::StyleSubtle()
 {
     static Style s;
     ONCELOCK {
-        s = StyleDefault();
+        s = Style(StyleDefault());
 
-        // Subtle: no fill, lighter border, slightly lighter text.
-        Color frame = LtColor(SColorShadow(), 15);   // ~10–15% lighter
-        Color ink  = LtColor(SColorText(), 15);     // softer text
+        Color frame = LtColor(SColorShadow(), 15);
+        Color ink   = LtColor(SColorText(), 15);
 
-        // No face fill
         s.metrics.face_enabled = false;
 
-        // Light frame
         s.palette.frame[ST_NORMAL]   = frame;
         s.palette.frame[ST_HOT]      = DkColor(frame, 10);
         s.palette.frame[ST_PRESSED]  = DkColor(frame, 20);
         s.palette.frame[ST_DISABLED] = DisabledColor(frame);
 
-        // Ink: soft by default, but still clearly clickable on hover
         s.palette.ink[ST_NORMAL]   = ink;
         s.palette.ink[ST_HOT]      = LtColor(ink, 10);
         s.palette.ink[ST_PRESSED]  = DkColor(ink, 5);
@@ -125,81 +159,242 @@ const UiButton::Style& UiButton::StyleSubtle()
     return s;
 }
 
-
-const UiButton::Style& UiButton::StyleLink()
+const UiButton::Style& UiButton::StyleIcon()
 {
     static Style s;
     ONCELOCK {
-        s = StyleSubtle();
+        s = Style(StyleSubtle());
 
-        // Link: no frame, no fill, strong highlight ink.
-        s.metrics.frame_enabled = false;
-        s.metrics.face_enabled  = false;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius      = DPI(1);
 
-        Color link = SColorHighlight();
+        s.icon_margin = Rect(DPI(0), DPI(0), DPI(0), DPI(0));
+        s.text_margin = Rect(0, 0, 0, 0);
 
-        s.palette.ink[ST_NORMAL]   = link;
-        s.palette.ink[ST_HOT]      = LtColor(link, 25);   // bright on hover
-        s.palette.ink[ST_PRESSED]  = DkColor(link, 20);
+        s.palette.ink[ST_NORMAL]   = White();
+        s.palette.ink[ST_HOT]      = White();
+        s.palette.ink[ST_PRESSED]  = White();
         s.palette.ink[ST_DISABLED] = SColorDisabled();
 
-        s.underline        = true;
-        s.underline_width  = DPI(1);
-        s.underline_offset = DPI(1);
+        s.metrics.face_enabled = false;
 
-        s.focus_margin = 1;
+        s.align_h = UiAlign::CENTER;
+        s.align_v = UiAlign::CENTER;
+        s.icon_layout = UiAlign::LEFT;
     }
     return s;
 }
-
 
 // ------------------------------------------------------------
 // Constructor & style wiring
 // ------------------------------------------------------------
 
 UiButton::UiButton()
+    : style_(StyleDefault())
 {
-    style_ = StyleDefault();
+    BackPaint();
+    WantFocus();
 
-    NoTransparent();      // we paint our own background
-    WantFocus();          // tab-focusable
-
-    // a sane default minimum size; overridden by user MinSize if set
     user_min_size_ = Size(DPI(70), DPI(24));
+
+    RebuildTextLines();
+    minsize_dirty_  = true;
+    layout_dirty_   = true;
+    layout_content_ = Rect(0, 0, 0, 0);
 }
 
 UiButton& UiButton::SetStyle(const Style& s)
 {
-    style_ = s;
+    style_ = Style(s);
     OnStyleChanged();
     return *this;
 }
 
 void UiButton::OnStyleChanged()
 {
-    // We keep everything internal – paint and layout read fonts from style_
+    if(style_.transparent)
+        Transparent();
+    else
+        BackPaint();
+
+    RebuildTextLines();
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+
     RefreshLayout();
     Refresh();
 }
 
 // ------------------------------------------------------------
+// Multiline & layout helpers
+// ------------------------------------------------------------
+
+void UiButton::RebuildTextLines()
+{
+    lines_.Clear();
+    line_sizes_.Clear();
+
+    if(text_.IsEmpty())
+        return;
+
+    Font fnt = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
+    if(IsNull(fnt))
+        fnt = StdFont();
+
+    UiBuildStyledTextLines(text_, fnt, lines_, line_sizes_);
+}
+
+Size UiButton::GetTextBlockSize() const
+{
+    return UiMeasureStyledTextBlock(line_sizes_);
+}
+
+// Compute natural OUTER size (content + chrome), without user_min_size_
+Size UiButton::ComputeNaturalSize() const
+{
+    Size text_block = GetTextBlockSize();
+    bool have_text  = !lines_.IsEmpty();
+
+    Size icon_sz   = GetStableIconSize();
+    bool have_icon = icon_sz.cx > 0 && icon_sz.cy > 0;
+
+    UiAlign stack_dir = style_.icon_layout;
+    if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
+       stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
+        stack_dir = UiAlign::LEFT;
+
+    Size content = UiMeasureBlocksContent(icon_sz,
+                                          text_block,
+                                          style_.icon_margin,
+                                          style_.text_margin,
+                                          stack_dir,
+                                          have_icon,
+                                          have_text,
+                                          DPI(40), // empty_w
+                                          DPI(20), // empty_h
+                                          DPI(16)  // min_support_side
+                                          );
+
+    return UiStyledOuterSizeFromContent(content, style_.metrics, style_.skin);
+}
+
+void UiButton::UpdateLayout(const Rect& content) const
+{
+    layout_ = UiBlocksLayout();
+
+    if(content.IsEmpty()) {
+        layout_dirty_ = false;
+        return;
+    }
+
+    Size text_block = GetTextBlockSize();
+    bool have_text  = !lines_.IsEmpty();
+
+    Size icon_sz   = GetStableIconSize();
+    bool have_icon = icon_sz.cx > 0 && icon_sz.cy > 0;
+
+    UiAlign stack_dir = style_.icon_layout;
+    if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
+       stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
+        stack_dir = UiAlign::LEFT;
+
+    // UiComputeBlocksLayout already applies margins via UiApplyMarginRect internally.
+    layout_ = UiComputeBlocksLayout(content,
+                                    have_icon ? icon_sz : Size(0, 0),
+                                    have_text ? text_block : Size(0, 0),
+                                    style_.align_h,
+                                    style_.align_v,
+                                    stack_dir,
+                                    style_.icon_margin,
+                                    style_.text_margin,
+                                    DPI(16));
+
+    layout_dirty_ = false;
+}
+
+// ------------------------------------------------------------
 // API
 // ------------------------------------------------------------
+
 UiButton& UiButton::SetUnderline(bool on, int thickness, int offset)
 {
     style_.underline        = on;
     style_.underline_width  = max(thickness, 0);
     style_.underline_offset = offset;
-    OnStyleChanged();
+    Refresh();
     return *this;
 }
 
-
-UiButton& UiButton::SetLabel(const String& text)
+UiButton& UiButton::SetIconLayout(UiAlign layout)
 {
-    // Extract '&X' access key and normalize label_ (similar to CtrlLib::Pusher)
-    label_.Clear();
+    if(layout != UiAlign::LEFT && layout != UiAlign::RIGHT &&
+       layout != UiAlign::TOP  && layout != UiAlign::BOTTOM)
+        layout = UiAlign::LEFT;
+
+    style_.icon_layout = layout;
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetAlign(UiAlign h, UiAlign v)
+{
+    style_.align_h = h;
+    style_.align_v = v;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetAlignH(UiAlign h)
+{
+    style_.align_h = h;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetAlignV(UiAlign v)
+{
+    style_.align_v = v;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetIconMargin(const Rect& m)
+{
+    style_.icon_margin = m;
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetTextMargin(const Rect& m)
+{
+    style_.text_margin = m;
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetText(const String& text)
+{
+    text_.Clear();
     accesskey_ = 0;
+    has_access_mnemonic_ = false;
+
+    String raw;
+    raw.Reserve(text.GetCount());
 
     for(int i = 0; i < text.GetCount(); i++) {
         int c = text[i];
@@ -208,49 +403,101 @@ UiButton& UiButton::SetLabel(const String& text)
             int n = text[i + 1];
 
             if(n == '&') {
-                // Escaped ampersand "&&" -> literal '&'
-                label_.Cat('&');
-                i++; // skip second '&'
+                raw.Cat('&');
+                i++;
             }
             else {
-                // "&X" => set access key to X and omit '&' from label_
-                accesskey_ = ToUpper((wchar)n);
-                label_.Cat(n);
-                i++; // skip the key char (already appended)
+                if(!has_access_mnemonic_) {
+                    accesskey_ = ToUpper((wchar)n);
+                    has_access_mnemonic_ = true;
+                }
+                raw.Cat(n);
+                i++;
             }
         }
         else {
-            label_.Cat(c);
+            raw.Cat(c);
         }
     }
 
+    text_.Reserve(raw.GetCount());
+
+    for(int i = 0; i < raw.GetCount(); i++) {
+        int c = raw[i];
+        if(c == '\t') {
+            const int TAB_SPACES = 4;
+            for(int k = 0; k < TAB_SPACES; k++)
+                text_.Cat(' ');
+        }
+        else {
+            text_.Cat(c);
+        }
+    }
+
+    RebuildTextLines();
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+
     RefreshLayout();
     Refresh();
     return *this;
 }
 
 
-UiButton& UiButton::SetImage(const Image& img)
+// ------------------------------------------------------------
+// Icon API (state-aware)
+// ------------------------------------------------------------
+
+UiButton& UiButton::SetIcon(const Image& img)
 {
-    image_ = img;
-    mono_image_ = false;
+    for(int i = 0; i < 4; i++)
+        style_.icon_images[i] = img;
+
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
     RefreshLayout();
     Refresh();
     return *this;
 }
 
-UiButton& UiButton::SetImageLayout(UiImageLayout layout)
+UiButton& UiButton::SetIconState(const Image& img, StyledState state)
 {
-    style_.image_layout = layout;
-    OnStyleChanged();
+    if(state < ST_NORMAL || state > ST_DISABLED)
+        return *this;
+
+    style_.icon_images[state] = img;
+
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
     return *this;
 }
 
-
-UiButton& UiButton::SetMonoImage(const Image& img)
+UiButton& UiButton::SetIcons(const Image& normal,
+                             const Image& hot,
+                             const Image& pressed,
+                             const Image& disabled)
 {
-    image_ = img;
-    mono_image_ = true; // reserved; currently drawn same as SetImage
+    style_.icon_images[ST_NORMAL]   = normal;
+    style_.icon_images[ST_HOT]      = IsNull(hot)      ? normal : hot;
+    style_.icon_images[ST_PRESSED]  = IsNull(pressed)  ? normal : pressed;
+    style_.icon_images[ST_DISABLED] = IsNull(disabled) ? normal : disabled;
+
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::ClearIcon()
+{
+    for(int i = 0; i < 4; i++)
+        style_.icon_images[i] = Image();
+
+    minsize_dirty_ = true;
+    layout_dirty_  = true;
     RefreshLayout();
     Refresh();
     return *this;
@@ -262,67 +509,104 @@ UiButton& UiButton::SetMonoImage(const Image& img)
 
 void UiButton::UpdateVisualState()
 {
-    bool enabled = IsEnabled();
-    bool hot     = mouse_over_;   // hover only, not focus
-    bool pressed = pressed_;
+    const bool enabled = IsEnabled();
 
-    visual_state_ = ResolveStyledState(enabled, hot, pressed);
+    if(!enabled) {
+        visual_state_ = ST_DISABLED;
+        return;
+    }
+
+    if(pressed_) {
+        visual_state_ = ST_PRESSED;
+        return;
+    }
+
+    // Checked is a persistent "pressed" look.
+    if(checkable_ && checked_) {
+        visual_state_ = ST_PRESSED;
+        return;
+    }
+
+    visual_state_ = mouse_over_ ? ST_HOT : ST_NORMAL;
 }
 
+UiButton& UiButton::SetCheckable(bool on)
+{
+    checkable_ = on;
+    if(!checkable_)
+        checked_ = false;
+    UpdateVisualState();
+    Refresh();
+    return *this;
+}
+
+UiButton& UiButton::SetChecked(bool on)
+{
+    if(!checkable_)
+        return *this;
+
+    if(checked_ == on)
+        return *this;
+
+    checked_ = on;
+    UpdateVisualState();
+    Refresh();
+    return *this;
+}
+
+void UiButton::Activate_()
+{
+    if(!IsEnabled())
+        return;
+
+    if(checkable_)
+        checked_ = !checked_;
+
+    UpdateVisualState();
+    Refresh();
+
+    WhenPush();
+    WhenAction();
+}
 
 Size UiButton::GetMinSize() const
 {
-    Font f = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
-    if(IsNull(f))
-        f = StdFont();
+    if(!minsize_dirty_)
+        return cached_minsize_;
 
-    Size text_sz(0, 0);
-    if(!label_.IsEmpty())
-        text_sz = GetTextSize(label_, f);
+    Size natural = ComputeNaturalSize();
 
-    Size img_sz(0, 0);
-    if(!IsNull(image_))
-        img_sz = image_.GetSize();
+    int w = natural.cx;
+    int h = natural.cy;
 
-    int gap = (!IsNull(image_) && !label_.IsEmpty()) ? style_.image_gap : 0;
+    if(user_min_size_.cx > 0)
+        w = max(w, user_min_size_.cx);
+    if(user_min_size_.cy > 0)
+        h = max(h, user_min_size_.cy);
 
-    Size content(0, 0);
+    cached_minsize_ = Size(w, h);
+    minsize_dirty_  = false;
 
-    switch(style_.image_layout) {
-    case UIIMAGE_TOP:
-    case UIIMAGE_BOTTOM:
-        content.cx = max(img_sz.cx, text_sz.cx);
-        content.cy = img_sz.cy + gap + text_sz.cy;
-        break;
-
-    case UIIMAGE_RIGHT:
-    case UIIMAGE_LEFT:
-    default:
-        content.cx = img_sz.cx + gap + text_sz.cx;
-        content.cy = max(img_sz.cy, text_sz.cy);
-        break;
-    }
-
-    Size sz;
-    sz.cx = content.cx + 2 * style_.padding_h + 2 * style_.metrics.frame_width;
-    sz.cy = content.cy + 2 * style_.padding_v + 2 * style_.metrics.frame_width;
-
-    // Baseline safety minima
-    sz.cx = max(sz.cx, DPI(40));
-    sz.cy = max(sz.cy, DPI(20));
-
-    // Respect user-set min size
-    sz.cx = max(sz.cx, user_min_size_.cx);
-    sz.cy = max(sz.cy, user_min_size_.cy);
-
-    return sz;
+    return cached_minsize_;
 }
-
 
 void UiButton::SetMinSize(Size sz)
 {
     user_min_size_ = sz;
+    minsize_dirty_ = true;
     RefreshLayout();
+}
+
+void UiButton::Layout()
+{
+    Rect outer   = GetSize();
+    Rect content = UiStyledInnerRect(outer, style_.metrics, style_.skin);
+
+    if(!layout_dirty_ && content == layout_content_)
+        return;
+
+    layout_content_ = content;
+    UpdateLayout(content);
 }
 
 // ------------------------------------------------------------
@@ -342,7 +626,7 @@ void UiButton::MouseLeave()
 
     if(pressed_) {
         pressed_ = false;
-        ReleaseCapture(); // only if we were actually in pressed / captured state
+        ReleaseCapture();
     }
 
     UpdateVisualState();
@@ -367,10 +651,8 @@ void UiButton::LeftUp(Point p, dword)
     UpdateVisualState();
     Refresh();
 
-    if(was_pressed && IsEnabled() && Rect(GetSize()).Contains(p)) {
-        WhenPush();
-        WhenAction();
-    }
+    if(was_pressed && Rect(GetSize()).Contains(p))
+        Activate_();
 }
 
 void UiButton::GotFocus()
@@ -393,342 +675,134 @@ UiButton& UiButton::ClickFocus(bool on)
 
 void UiButton::CancelMode()
 {
-    // We are being asked to cancel current interaction (e.g. mouse capture lost).
-    // DO NOT call ReleaseCapture() here ... will go recursive, an da shit we dont want
-    
     if(pressed_ || mouse_over_) {
         pressed_    = false;
         mouse_over_ = false;
         UpdateVisualState();
         Refresh();
     }
-
-    // well...Optional: call base version (currently Ctrl::CancelMode() is basically empty,
-    // but this documents intent and keeps future compatibility)...(will see if anyone uses this )
     Ctrl::CancelMode();
 }
 
-bool UiButton::Key(dword key, int count)
+bool UiButton::Key(dword key, int)
 {
-    if(!IsEnabled())
-        return false;
-
     switch(key) {
     case K_SPACE:
     case K_ENTER:
-        // Simple, predictable behaviour: fire a click. :)
-        WhenPush();
-        WhenAction();
+        Activate_();
         return true;
-
     default:
         break;
     }
-
-    // Do NOT intercept Tab / arrows / etc. – let Ctrl handle focus traversal.
-    return Ctrl::Key(key, count);
+    return Ctrl::Key(key, 1);
 }
 
+// ------------------------------------------------------------
+// Paint
+// ------------------------------------------------------------
 
-// ------------------------------------------------------------
-// Paint (follows our spec painting order, and 9-slice
-// ------------------------------------------------------------
 void UiButton::Paint(Draw& w)
 {
-    Rect r = GetSize();
+    Rect outer = GetSize();
+    if(outer.IsEmpty())
+        return;
 
     UpdateVisualState();
-    StyledState st = visual_state_;
+
+    bool        enabled   = IsEnabled();
+    bool        has_focus = HasFocus();
+    StyledState st        = visual_state_;
 
     StyledPalette& p = style_.palette;
     StyledMetrics& m = style_.metrics;
     StyledSkin&    s = style_.skin;
 
-    Rect outer = r;
-
-    // 1) Background hook
     if(WhenPaintBackground)
-        WhenPaintBackground(w, outer, st);
+        WhenPaintBackground(w, outer, p, m, s, st, has_focus);
+    else
+        UiPaintStyledBackground(w, outer, p, m, s, st, has_focus);
 
-    // 2) Skin (9-slice) or Face
-    bool skin_drawn = false;
-    if(s.enabled && !IsNull(s.base)) {
-        if(s.inset.IsEmpty()) {
-            // No inset => simple stretch
-            w.DrawImage(outer, s.base);
-        }
-        else {
-            // Use UiDraw9Slice (from UiStyle / Draw9Slice helper)
-            UiDraw9Slice(w,
-                         outer,
-                         s.base,
-                         s.inset.TopLeft(),
-                         s.inset.BottomRight());
-        }
-        skin_drawn = true;
+    Font font = m.use_text_font ? m.text_font : style_.font;
+    if(IsNull(font))
+        font = StdFont();
+
+    Color ink = AdjustInk(p.ink[st], st);
+
+    Rect icon_r = layout_.support;
+    Rect text_r = layout_.main;
+    // Physical press offset only (checked should not shift content).
+    if(pressed_) {
+        icon_r.Offset(style_.press_offset);
+        text_r.Offset(style_.press_offset);
     }
 
-    // 3) Face + Frame via shared helper, respecting skin's overrides
-    StyledMetrics mm = m; // local copy so we can tweak flags
-
-    if(skin_drawn) {
-        mm.face_enabled = false;             // skin owns the background
-        if(s.includes_frame)
-            mm.frame_enabled = false;        // skin also owns the frame
+    Image icon_img = ResolveIconForState(st);
+    if(!IsNull(icon_img) && !icon_r.IsEmpty()) {
+        UiPaintStyledIcon(w,
+                          icon_r,
+                          icon_img,
+                          icon_scale_,
+                          false,
+                          ink,
+                          enabled);
     }
 
-    UiPaintFaceFrameDash(w, outer, p, mm, st);
-
-    // 4) Content (label + optional image)
-    Rect content = outer;
-
-    // Keep content inside padding + frame width, so icons/text never touch the frame.
-    int fw = max(m.frame_width, 0);
-    content.Deflate(style_.padding_h + fw,
-                    style_.padding_v + fw);
-    if(content.IsEmpty())
-        return;
-
-    Font f = m.use_text_font ? m.text_font : style_.font;
-    if(IsNull(f))
-        f = StdFont();
-
-    String txt = label_;
-    Size   text_sz(0, 0);
-    if(!txt.IsEmpty())
-        text_sz = GetTextSize(txt, f);
-
-    Size img_sz(0, 0);
-    if(!IsNull(image_))
-        img_sz = image_.GetSize();
-
-    int gap = (!IsNull(image_) && !txt.IsEmpty()) ? style_.image_gap : 0;
-
-    // Block height: vertical centering is always done for the combined block
-    int block_h = 0;
-    switch(style_.image_layout) {
-    case UIIMAGE_TOP:
-    case UIIMAGE_BOTTOM:
-        block_h = img_sz.cy + gap + text_sz.cy;
-        break;
-    case UIIMAGE_LEFT:
-    case UIIMAGE_RIGHT:
-    default:
-        block_h = max(img_sz.cy, text_sz.cy);
-        break;
+    if(!lines_.IsEmpty() && !text_r.IsEmpty()) {
+        UiPaintStyledText(w,
+                          text_r,
+                          lines_,
+                          line_sizes_,
+                          style_.align_h,
+                          style_.align_v,
+                          font,
+                          ink,
+                          has_access_mnemonic_ ? accesskey_ : 0,
+                          style_.underline,
+                          style_.underline_width,
+                          style_.underline_offset);
     }
 
-    Point offset = (st == ST_PRESSED ? style_.press_offset : Point(0, 0));
-
-    // Vertically center the whole content block in 'content'
-    int block_y0 = content.top + (content.GetHeight() - block_h) / 2 + offset.y;
-    int cx       = content.CenterPoint().x; // used for top/bottom centering
-
-    Color ink          = p.ink[st];
-    bool  enabled      = IsEnabled();
-    bool  hot_or_press = (st == ST_HOT || st == ST_PRESSED);
-
-    // Web-like link behavior: visited links use a distinct color.
-    // We only apply this to "linky" styles (underline on, no face/frame).
-    if(visited_ && style_.underline && !style_.metrics.face_enabled ) {
-        // A purple-ish "visited link" tone (similar to HTML default #551A8B)
-        ink = Color(85, 26, 139);
-    }
-    
-    int text_x = 0;
-    int text_y = 0;
-    int img_x  = 0;
-    int img_y  = 0;
-
-    // Extra inset so the icon's own border does not kiss the button frame
-    const int icon_inset = DPI(1);
-
-    // Compute text/image positions based on layout
-    if(IsNull(image_)) {
-        // No image -> just center text in content
-        if(!txt.IsEmpty()) {
-            int ty = content.top + (content.GetHeight() - text_sz.cy) / 2 + offset.y;
-            int tx = content.left + (content.GetWidth() - text_sz.cx) / 2 + offset.x;
-            text_x = tx;
-            text_y = ty;
-        }
+    if(WhenPaintForeground) {
+        WhenPaintForeground(w, outer, p, m, s, st, has_focus);
     }
     else {
-        switch(style_.image_layout) {
-        case UIIMAGE_LEFT: {
-            // Icon anchored to left padding; text flows right from it.
-            img_x = content.left + offset.x + icon_inset;
-            img_y = block_y0 + (block_h - img_sz.cy) / 2 + icon_inset;
-
-            text_x = img_x + img_sz.cx + gap;
-            text_y = block_y0 + (block_h - text_sz.cy) / 2;
-            break;
-        }
-        case UIIMAGE_RIGHT: {
-            // Icon anchored to right padding; text flows left towards it.
-            img_x = content.right - img_sz.cx + offset.x - icon_inset;
-            img_y = block_y0 + (block_h - img_sz.cy) / 2 + icon_inset;
-
-            text_x = img_x - gap - text_sz.cx;
-            text_y = block_y0 + (block_h - text_sz.cy) / 2;
-            break;
-        }
-        case UIIMAGE_TOP: {
-            // Icon + text block centered horizontally
-            int block_w  = max(img_sz.cx, text_sz.cx);
-            int block_x0 = content.left + (content.GetWidth() - block_w) / 2 + offset.x;
-
-            img_x = block_x0 + (block_w - img_sz.cx) / 2;
-            img_y = block_y0 + icon_inset;
-
-            text_x = block_x0 + (block_w - text_sz.cx) / 2;
-            text_y = img_y + img_sz.cy + gap;
-            break;
-        }
-        case UIIMAGE_BOTTOM: {
-            int block_w  = max(img_sz.cx, text_sz.cx);
-            int block_x0 = content.left + (content.GetWidth() - block_w) / 2 + offset.x;
-
-            text_x = block_x0 + (block_w - text_sz.cx) / 2;
-            text_y = block_y0;
-
-            img_x = block_x0 + (block_w - img_sz.cx) / 2;
-            img_y = text_y + text_sz.cy + gap + icon_inset;
-            break;
-        }
-        default:
-            break;
-        }
+        UiPaintStyledForeground(w, outer, p, m, s, st, has_focus, style_.focus_margin, SColorHighlight());
     }
-
-    // Draw image (if any)
-    if(!IsNull(image_)) {
-        if(!enabled) {
-            // Disabled glyph
-            w.DrawImage(img_x, img_y, DisabledImage(image_, true));
-        }
-        else if(mono_image_) {
-            // Monochrome: tint with current ink (state + theme aware)
-            w.DrawImage(img_x, img_y, image_, ink);
-        }
-        else if(hot_or_press) {
-            // Hover/pressed highlight
-            DrawHighlightImage(w, img_x, img_y, image_, true, true);
-        }
-        else {
-            w.DrawImage(img_x, img_y, image_);
-        }
-    }
-
-    // Draw text (if any)
-    if(!txt.IsEmpty()) {
-        int ty = text_y;
-        w.DrawText(text_x, ty, txt, f, ink);
-
-        if(style_.underline) {
-            // Baseline under the text
-            int baseline = ty + text_sz.cy + style_.underline_offset;
-            
-            // ---- Thickness & color -----------------------------------------
-            int   underline_h = max(style_.underline_width, DPI(1));
-            Color line_ink    = ink;
-
-            // ---- Horizontal extension (stacking focus + hover + pressed) ----
-            int base_extend = DPI(3);   // “unit” extension per side
-
-            int extend = 0;
-			if(HasFocus()) {
-				extend += base_extend;      // focused: +3
-				line_ink = DkColor(line_ink, 11);
-			}
-            if(st == ST_PRESSED) {
-                extend += base_extend;      // pressed: +3
-                underline_h += 2;           // pressed: thicker
-                line_ink    = DkColor(line_ink, 11);          // pressed: slightly lighter ink
-            }
-            if(st == ST_HOT) {
-                extend += base_extend;      // hover: +3
-                line_ink    = LtColor(line_ink, 12); 
-            }
-        
-            // Start/end x (clamped to content so we don't hit the frame)
-            int left  = text_x - extend;
-            int right = text_x + text_sz.cx + extend;
-
-            left  = max(left, content.left);
-            right = min(right, content.right);
-
-            if(right > left)
-                w.DrawRect(left, baseline, right - left, underline_h, line_ink);
-        }
-    }
-
-
-
-    // 5) Focus outline – rounded & AA via UiPaintFocusRing
-    if(HasFocus() && style_.focus_margin > 0) {
-        UiPaintFocusRing(w,
-                         outer,
-                         style_.palette,
-                         style_.metrics,
-                         st,
-                         style_.focus_margin,
-                         SColorHighlight()); // overide but could use Null to use palette.ink[st]
-    }
-
-
-
-    // 6) Foreground hook
-    if(WhenPaintForeground)
-        WhenPaintForeground(w, outer, st);
 }
-
 
 // ------------------------------------------------------------
 // Accessibility & access keys
 // ------------------------------------------------------------
 
-static dword UiButtonAccessKeyMask(wchar chr)
-{ 
-    chr = ToUpper(chr);
-    if(chr >= 'A' && chr <= 'Z')
-        return 1u << (chr - 'A');
-    return 0;
-}
-
 String UiButton::GetDesc() const
 {
-    if(!label_.IsEmpty())
-        return label_;
+    if(!text_.IsEmpty())
+        return text_;
     return t_("Button");
 }
 
-
 dword UiButton::GetAccessKeys() const
 {
-    // Mirror CtrlLib::Pusher: single access key → single bit mask
-    return AccessKeyBit(accesskey_);
+    return accesskey_ ? Ctrl::AccessKeyBit(accesskey_) : 0;
 }
 
 void UiButton::AssignAccessKeys(dword used)
 {
-    // If label already provided an explicit '&X', just mark it as used.
-    if(accesskey_) {
-        used |= AccessKeyBit(accesskey_);
+    if(has_access_mnemonic_ && accesskey_) {
+        used |= Ctrl::AccessKeyBit(accesskey_);
         Ctrl::AssignAccessKeys(used);
         return;
     }
 
-    // No explicit '&' → auto-choose first free key from label text.
-    // This approximates ChooseAccessKey(label, used) using AccessKeyBit.
-    WString w = label_.ToWString();
-    for(int i = 0; i < w.GetCount(); i++) {
-        wchar c = w[i];
-        dword bit = AccessKeyBit(c);
+    // Optional: auto-assign ONLY when there was no '&' markup.
+    // This runs rarely, so scanning text_ here is fine.
+    WString wtxt = text_.ToWString();
+    for(int i = 0; i < wtxt.GetCount(); i++) {
+        wchar c = wtxt[i];
+        dword bit = Ctrl::AccessKeyBit(c);
         if(bit && !(used & bit)) {
             accesskey_ = ToUpper(c);
             used |= bit;
-            Refresh();
             break;
         }
     }
@@ -736,5 +810,10 @@ void UiButton::AssignAccessKeys(dword used)
     Ctrl::AssignAccessKeys(used);
 }
 
+
+void UiButton::RebuildLook()
+{
+    // reserved
+}
 
 } // namespace Upp
