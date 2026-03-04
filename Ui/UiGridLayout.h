@@ -110,6 +110,11 @@ public:
     /** Read current style. */
     const Style&  GetStyle() const                  { return style; }
 
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
+
 	// Cluster visual hooks (gallery-friendly)
 	Event<Draw&, const Rect&, StyledState>           WhenPaintBackground;
 	Event<Draw&, const Rect&, StyledState, int>      WhenPaintClusterHeader;

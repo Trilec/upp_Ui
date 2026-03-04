@@ -39,19 +39,46 @@ const UiSlider::Style& UiSlider::StyleDefault()
     return s;
 }
 
-const UiSlider::Style& UiSlider::StyleAccent()
+const UiSlider::Style& UiSlider::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiSlider::Style& UiSlider::StyleSoft()
 {
     static Style s;
     ONCELOCK {
         s = StyleDefault();
         for(int st = 0; st < 4; st++) {
-            s.track_palette.face[st] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 225));
-            s.track_palette.frame[st] = Blend(SColorHighlight(), SColorShadow(), 140);
-            s.thumb_palette.face[st] = UiFill::Solid(SColorHighlight());
-            s.thumb_palette.frame[st] = DkColor(SColorHighlight(), 30);
+            s.track_palette.face[st] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 210));
+            s.track_palette.frame[st] = Blend(SColorShadow(), SColorPaper(), 140);
+            s.thumb_palette.face[st] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 185));
+            s.thumb_palette.frame[st] = Blend(SColorShadow(), SColorHighlight(), 150);
         }
     }
     return s;
+}
+
+const UiSlider::Style& UiSlider::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color base = SColorHighlight();
+        for(int st = 0; st < 4; st++) {
+            s.track_palette.face[st] = UiFill::Solid(Blend(base, SColorPaper(), 220));
+            s.track_palette.frame[st] = DkColor(base, 20);
+            s.thumb_palette.face[st] = UiFill::Solid(base);
+            s.thumb_palette.frame[st] = DkColor(base, 35);
+            s.thumb_palette.ink[st] = SColorHighlightText();
+        }
+    }
+    return s;
+}
+
+const UiSlider::Style& UiSlider::StyleAccent()
+{
+    return StyleStrong();
 }
 
 const UiSlider::Style& UiSlider::StyleMinimal()

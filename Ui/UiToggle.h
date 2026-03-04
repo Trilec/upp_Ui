@@ -20,6 +20,11 @@ public:
     bool      IsOn() const { return IsChecked(); }
 
     UiToggle& SetVisualSwitch() { SetStyle(UiCheckBox::StyleSwitch()); return *this; }
+
+    UiToggle& SetStandardStyle() { SetStyle(UiCheckBox::StyleStandard()); return *this; }
+    UiToggle& SetMinimalStyle()  { SetStyle(UiCheckBox::StyleMinimal());  return *this; }
+    UiToggle& SetSoftStyle()     { SetStyle(UiCheckBox::StyleSoft());     return *this; }
+    UiToggle& SetStrongStyle()   { SetStyle(UiCheckBox::StyleStrong());   return *this; }
 };
 
 }

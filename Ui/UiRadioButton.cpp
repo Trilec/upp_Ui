@@ -10,7 +10,66 @@ static StyledState UiRadioToStyledState_(bool enabled, bool pressed, bool hover)
     return ST_NORMAL;
 }
 
-const UiRadioButton::Style& UiRadioButton::StyleDefault() { return StyleClassic(); }
+const UiRadioButton::Style& UiRadioButton::StyleDefault() { return StyleStandard(); }
+
+const UiRadioButton::Style& UiRadioButton::StyleStandard() { return StyleClassic(); }
+
+const UiRadioButton::Style& UiRadioButton::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleClassic();
+        s.metrics.frame_enabled = false;
+        s.metrics.face_enabled = false;
+        s.indicator_palette.face[ST_NORMAL] = UiFill::Solid(Null);
+        s.indicator_palette.face[ST_HOT] = UiFill::Solid(Null);
+        s.indicator_palette.face[ST_PRESSED] = UiFill::Solid(Null);
+        s.indicator_palette.frame[ST_NORMAL] = Blend(SColorShadow(), SColorPaper(), 130);
+        s.indicator_palette.frame[ST_HOT] = DkColor(s.indicator_palette.frame[ST_NORMAL], 10);
+        s.indicator_palette.frame[ST_PRESSED] = DkColor(s.indicator_palette.frame[ST_NORMAL], 20);
+    }
+    return s;
+}
+
+const UiRadioButton::Style& UiRadioButton::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleClassic();
+        for(int st = 0; st < 4; st++) {
+            s.palette.face[st] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 220));
+            s.palette.frame[st] = Blend(SColorShadow(), SColorPaper(), 140);
+        }
+        s.metrics.frame_enabled = true;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(6);
+        s.metrics.content_padding = Rect(DPI(6), DPI(3), DPI(6), DPI(3));
+    }
+    return s;
+}
+
+const UiRadioButton::Style& UiRadioButton::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleClassic();
+        Color base = SColorHighlight();
+        Color ink = SColorHighlightText();
+        for(int st = 0; st < 4; st++) {
+            s.palette.face[st] = UiFill::Solid(base);
+            s.palette.frame[st] = DkColor(base, 30);
+            s.palette.ink[st] = ink;
+            s.indicator_palette.face[st] = UiFill::Solid(Blend(White(), base, 205));
+            s.indicator_palette.frame[st] = DkColor(base, 15);
+            s.indicator_palette.ink[st] = DkColor(base, 35);
+        }
+        s.metrics.frame_enabled = true;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(6);
+        s.metrics.content_padding = Rect(DPI(6), DPI(3), DPI(6), DPI(3));
+    }
+    return s;
+}
 
 const UiRadioButton::Style& UiRadioButton::StyleClassic()
 {

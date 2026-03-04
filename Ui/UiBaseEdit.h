@@ -129,6 +129,10 @@ public:
     };
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
 
 protected:
     // ------------------------------------------------------------------------
@@ -386,6 +390,10 @@ public:
     
     void    SetText(const WString& s);
     WString GetText() const;
+    // Explicit UTF-8 text API for app-level string handling.
+    // Prefer these over GetData().ToString() for textual controls.
+    UiBaseEdit& SetTextUtf8(const String& s) { SetText(ToUtf32(s)); return *this; }
+    String      GetTextUtf8() const          { return ToUtf8(GetText()); }
     void    Clear();
     bool    IsEmpty() const { return total_wchars_ == 0; }
     bool    IsDirty() const { return dirty_; }

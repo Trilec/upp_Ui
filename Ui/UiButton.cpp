@@ -105,58 +105,12 @@ const UiButton::Style& UiButton::StyleDefault()
 
 const UiButton::Style& UiButton::StyleAccent()
 {
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-
-        Color face  = LtColor(SColorHighlight(), 12);
-        Color frame = DkColor(face, 20);
-        Color ink   = SColorHighlightText();
-
-        s.palette.face[ST_NORMAL]   = UiFill::Solid(DkColor(face, 2));
-        s.palette.face[ST_HOT]      = UiFill::Solid(DkColor(face, 12));
-        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 20));
-        s.palette.face[ST_DISABLED] = UiFill::Solid(DisabledColor(face));
-
-        s.palette.frame[ST_NORMAL]   = frame;
-        s.palette.frame[ST_HOT]      = LtColor(frame, 20);
-        s.palette.frame[ST_PRESSED]  = DkColor(frame, 10);
-        s.palette.frame[ST_DISABLED] = DisabledColor(frame);
-
-        s.palette.ink[ST_NORMAL]   = ink;
-        s.palette.ink[ST_HOT]      = ink;
-        s.palette.ink[ST_PRESSED]  = ink;
-        s.palette.ink[ST_DISABLED] = SColorDisabled();
-
-        s.metrics.radius = DPI(4);
-    }
-    return s;
+    return StyleStrong();
 }
 
 const UiButton::Style& UiButton::StyleSubtle()
 {
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-
-        Color frame = LtColor(SColorShadow(), 15);
-        Color ink   = LtColor(SColorText(), 15);
-
-        s.metrics.face_enabled = false;
-
-        s.palette.frame[ST_NORMAL]   = frame;
-        s.palette.frame[ST_HOT]      = DkColor(frame, 10);
-        s.palette.frame[ST_PRESSED]  = DkColor(frame, 20);
-        s.palette.frame[ST_DISABLED] = DisabledColor(frame);
-
-        s.palette.ink[ST_NORMAL]   = ink;
-        s.palette.ink[ST_HOT]      = LtColor(ink, 10);
-        s.palette.ink[ST_PRESSED]  = DkColor(ink, 5);
-        s.palette.ink[ST_DISABLED] = SColorDisabled();
-
-        s.metrics.radius = DPI(4);
-    }
-    return s;
+    return StyleMinimal();
 }
 
 const UiButton::Style& UiButton::StyleIcon()
@@ -528,6 +482,70 @@ void UiButton::UpdateVisualState()
     }
 
     visual_state_ = mouse_over_ ? ST_HOT : ST_NORMAL;
+}
+
+const UiButton::Style& UiButton::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiButton::Style& UiButton::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style(StyleDefault());
+        s.metrics.face_enabled = false;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(4);
+        Color frame = Blend(SColorShadow(), SColorPaper(), 150);
+        Color ink = Blend(SColorText(), SColorPaper(), 60);
+        for(int i = 0; i < 4; i++) {
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = ink;
+        }
+        s.palette.frame[ST_HOT] = DkColor(frame, 8);
+        s.palette.frame[ST_PRESSED] = DkColor(frame, 14);
+    }
+    return s;
+}
+
+const UiButton::Style& UiButton::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style(StyleDefault());
+        Color base = Blend(SColorFace(), SColorPaper(), 195);
+        Color frame = Blend(SColorShadow(), SColorPaper(), 125);
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(base);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = SColorText();
+        }
+        s.palette.face[ST_HOT] = UiFill::Solid(LtColor(base, 4));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(DkColor(base, 6));
+        s.metrics.radius = DPI(8);
+    }
+    return s;
+}
+
+const UiButton::Style& UiButton::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style(StyleDefault());
+        Color base = SColorHighlight();
+        Color frame = DkColor(base, 30);
+        Color ink = SColorHighlightText();
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(base);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = ink;
+        }
+        s.palette.face[ST_HOT] = UiFill::Solid(LtColor(base, 10));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(DkColor(base, 10));
+        s.metrics.radius = DPI(6);
+    }
+    return s;
 }
 
 UiButton& UiButton::SetCheckable(bool on)

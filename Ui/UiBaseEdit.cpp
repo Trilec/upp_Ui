@@ -100,12 +100,12 @@ UiBaseEdit::UiBaseEdit()
 
 void UiBaseEdit::UndoRec::SetText(const WString& text)
 {
-    data = FastCompress(text.ToString());
+    data = FastCompress(ToUtf8(text));
 }
 
 WString UiBaseEdit::UndoRec::GetText() const
 {
-    return FastDecompress(data).ToWString();
+    return ToUtf32(FastDecompress(data));
 }
 
 // --------------------------------------------------------------------
@@ -153,7 +153,12 @@ WString UiBaseEdit::GetText() const
 
 void UiBaseEdit::SetData(const Value& v)
 {
-    SetText(WString(v));
+    if(v.Is<WString>())
+        SetText((WString)v);
+    else if(v.Is<String>())
+        SetText(ToUtf32((String)v));
+    else
+        SetText(WString(v));
 }
 
 Value UiBaseEdit::GetData() const
@@ -200,9 +205,7 @@ WString UiBaseEdit::GetW(int64 pos, int64 size) const
     if(end > total_wchars_)
         end = total_wchars_;
 
-    // Pre-allocate up to 1 MB of chars, like your original.
-    int64 alloc = min<int64>(size, (int64)1024 * 1024);
-    WStringBuffer w((int)alloc);
+    WString w;
 
     int line_idx = GetLine(pos);
     if(line_idx < 0)
@@ -254,6 +257,63 @@ void UiBaseEdit::SetLine(int i, const WString& w)
         lin_[i].len  = w.GetCount();
         line_metrics_dirty_ = true;
     }
+}
+
+const UiBaseEdit::Style& UiBaseEdit::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiBaseEdit::Style& UiBaseEdit::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_enabled = true;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(3);
+        for(int i = 0; i < 4; i++) {
+            s.palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 145);
+        }
+        s.palette.frame[ST_HOT] = DkColor(s.palette.frame[ST_NORMAL], 8);
+        s.palette.frame[ST_PRESSED] = DkColor(s.palette.frame[ST_NORMAL], 15);
+    }
+    return s;
+}
+
+const UiBaseEdit::Style& UiBaseEdit::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = Blend(SColorFace(), SColorPaper(), 205);
+        for(int i = 0; i < 4; i++)
+            s.palette.face[i] = UiFill::Solid(face);
+        s.palette.face[ST_HOT] = UiFill::Solid(LtColor(face, 3));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(DkColor(face, 4));
+        s.metrics.radius = DPI(6);
+    }
+    return s;
+}
+
+const UiBaseEdit::Style& UiBaseEdit::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = Blend(SColorHighlight(), SColorPaper(), 230);
+        Color frame = DkColor(SColorHighlight(), 25);
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(face);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = SColorText();
+        }
+        s.palette.frame[ST_HOT] = LtColor(frame, 8);
+        s.palette.frame[ST_PRESSED] = DkColor(frame, 8);
+        s.metrics.radius = DPI(6);
+    }
+    return s;
 }
 
 WString UiBaseEdit::BuildFullText() const

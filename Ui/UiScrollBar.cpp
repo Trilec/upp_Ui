@@ -109,7 +109,7 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 		s.arrow_palette = s.thumb_palette;
 		s.arrow_metrics = s.thumb_metrics;
 
-		s.arrow_icons      = false;
+        s.arrow_icons      = true;
 		s.arrow_icon_scale = true;
 		s.arrow_icon_mono  = true;
 		s.arrow_icon_prev_h = ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48();
@@ -153,6 +153,82 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 		s.grip_color        = Null;
 		s.grip_image        = Image();
 		s.thumb_inset       = Rect(0, 0, 0, 0);
+	}
+	return s;
+}
+
+const UiScrollBar::Style& UiScrollBar::StyleStandard()
+{
+	return StyleDefault();
+}
+
+const UiScrollBar::Style& UiScrollBar::StyleMinimal()
+{
+	static Style s;
+	ONCELOCK {
+		s = StyleDefault();
+		s.track_metrics.face_enabled = true;
+		s.track_metrics.frame_width = DPI(1);
+		s.track_metrics.radius = DPI(999);
+		s.thumb_metrics.frame_width = DPI(1);
+		s.thumb_metrics.radius = DPI(999);
+		s.arrow_metrics.radius = DPI(999);
+		s.thin_idle = false;
+		s.animate_expand = false;
+		s.fade_idle = false;
+		s.thick_px = DPI(12);
+		s.track_paint_px_idle = DPI(12);
+		s.track_paint_px_hot = DPI(12);
+		s.thumb_paint_px_idle = DPI(12);
+		s.thumb_paint_px_hot = DPI(12);
+		s.show_arrows = false;
+		Color frame = Blend(SColorShadow(), SColorPaper(), 140);
+		Color face = Blend(SColorFace(), SColorPaper(), 220);
+		Color thumb = Blend(SColorText(), SColorPaper(), 190);
+		for(int i = 0; i < 4; i++) {
+			s.track_palette.face[i] = UiFill::Solid(face);
+			s.track_palette.frame[i] = frame;
+			s.thumb_palette.face[i] = UiFill::Solid(thumb);
+			s.thumb_palette.frame[i] = DkColor(frame, 20);
+		}
+	}
+	return s;
+}
+
+const UiScrollBar::Style& UiScrollBar::StyleSoft()
+{
+	static Style s;
+	ONCELOCK {
+		s = StyleDefault();
+		for(int i = 0; i < 4; i++) {
+			s.track_palette.face[i] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 210));
+			s.track_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 140);
+			s.thumb_palette.face[i] = UiFill::Solid(Blend(SColorPaper(), SColorFace(), 175));
+			s.thumb_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 115);
+		}
+		s.track_metrics.radius = DPI(8);
+		s.thumb_metrics.radius = DPI(8);
+	}
+	return s;
+}
+
+const UiScrollBar::Style& UiScrollBar::StyleStrong()
+{
+	static Style s;
+	ONCELOCK {
+		s = StyleDefault();
+		Color base = SColorHighlight();
+		for(int i = 0; i < 4; i++) {
+			s.track_palette.face[i] = UiFill::Solid(Blend(base, SColorPaper(), 230));
+			s.track_palette.frame[i] = DkColor(base, 25);
+			s.thumb_palette.face[i] = UiFill::Solid(base);
+			s.thumb_palette.frame[i] = DkColor(base, 35);
+			s.arrow_palette.face[i] = UiFill::Solid(base);
+			s.arrow_palette.frame[i] = DkColor(base, 35);
+			s.arrow_palette.ink[i] = SColorHighlightText();
+		}
+		s.show_arrows = true;
+		s.arrows_layout = UIARROWS_GROUP_END;
 	}
 	return s;
 }
@@ -1116,69 +1192,17 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
                 icon_ink = ink;
 
 			Image ico;
-			if(style_.arrow_icons) {
-				if(dir_ == UiDirection::V)
-					ico = (i == 0) ? style_.arrow_icon_prev_v : style_.arrow_icon_next_v;
-				else
-					ico = (i == 0) ? style_.arrow_icon_prev_h : style_.arrow_icon_next_h;
-			}
+			if(dir_ == UiDirection::V)
+				ico = (i == 0) ? style_.arrow_icon_prev_v : style_.arrow_icon_next_v;
+			else
+				ico = (i == 0) ? style_.arrow_icon_prev_h : style_.arrow_icon_next_h;
 
 			Rect icon_r = UiStyledInnerRect(ar, style_.arrow_metrics, style_.arrow_skin);
-			if(style_.arrow_icons && !IsNull(ico) && !icon_r.IsEmpty()) {
-                if(alpha < 255)
-                    ico = UiImageMultiplyAlpha(ico, alpha);
-                UiPaintStyledIcon(w, icon_r, ico, style_.arrow_icon_scale,
-                                  style_.arrow_icon_mono, icon_ink, enabled);
-            }
-			else {
-				Point pts[3];
-				if(dir_ == UiDirection::V) {
-					int cx  = ar.left + ar.GetWidth() / 2;
-					int pad = max(DPI(3), ar.GetWidth() / 4);
-					if(i == 0) {
-						pts[0] = Point(cx, ar.top + pad);
-						pts[1] = Point(ar.right - pad, ar.bottom - pad);
-						pts[2] = Point(ar.left + pad, ar.bottom - pad);
-					}
-					else {
-						pts[0] = Point(cx, ar.bottom - pad);
-						pts[1] = Point(ar.right - pad, ar.top + pad);
-						pts[2] = Point(ar.left + pad, ar.top + pad);
-					}
-				}
-				else {
-					int cy  = ar.top + ar.GetHeight() / 2;
-					int pad = max(DPI(3), ar.GetHeight() / 4);
-					if(i == 0) {
-						pts[0] = Point(ar.left + pad, cy);
-						pts[1] = Point(ar.right - pad, ar.top + pad);
-						pts[2] = Point(ar.right - pad, ar.bottom - pad);
-					}
-					else {
-						pts[0] = Point(ar.right - pad, cy);
-						pts[1] = Point(ar.left + pad, ar.top + pad);
-						pts[2] = Point(ar.left + pad, ar.bottom - pad);
-					}
-				}
-				// AA arrow glyph with true alpha (paint into an alpha image).
-				Size asz = ar.GetSize();
-				if(asz.cx > 0 && asz.cy > 0) {
-					ImageBuffer ib(asz);
-					ib.SetKind(IMAGE_ALPHA);
-					Fill(~ib, RGBAZero(), ib.GetLength());
-					BufferPainter p(ib, MODE_ANTIALIASED);
-					p.Begin();
-					Pointf p0(pts[0].x - ar.left, pts[0].y - ar.top);
-					Pointf p1(pts[1].x - ar.left, pts[1].y - ar.top);
-					Pointf p2(pts[2].x - ar.left, pts[2].y - ar.top);
-					p.Move(p0);
-					p.Line(p1);
-					p.Line(p2);
-					p.Close();
-					p.Fill(alpha * ink);
-					p.End();
-					w.DrawImage(ar.left, ar.top, ib);
-				}
+			if(!IsNull(ico) && !icon_r.IsEmpty()) {
+				if(alpha < 255)
+					ico = UiImageMultiplyAlpha(ico, alpha);
+				UiPaintStyledIcon(w, icon_r, ico, style_.arrow_icon_scale,
+				                  style_.arrow_icon_mono, icon_ink, enabled);
 			}
 
 			if(WhenPaintArrow)

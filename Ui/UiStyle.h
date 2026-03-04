@@ -132,11 +132,12 @@ inline Image MakeQuadGradientTile(int size,
 // ---------------------------------------------------------------------------
 
 enum class UiAlign : byte {
-    LEFT   = 0,
-    CENTER = 1,
-    RIGHT  = 2,
-    TOP    = 3,
-    BOTTOM = 4,
+    DEFAULT= 0,
+    LEFT   = 1,
+    CENTER = 2,
+    RIGHT  = 3,
+    TOP    = 4,
+    BOTTOM = 5,
 };
 
 inline Stream& operator%(Stream& s, UiAlign& a)
@@ -293,6 +294,7 @@ inline Color UiResolveIconColor(const StyledPalette& p, StyledState st)
 }
 
 struct StyledShadow {
+    // Legacy fields (kept for backward style-stream compatibility).
     bool  enabled  = false;
     int   offset_x = 0;
     int   offset_y = DPI(2);
@@ -301,10 +303,62 @@ struct StyledShadow {
     int   alpha    = 90;
     Color color    = Black();
 
+    // Unified shadow controls.
+    UiSpan size      = SMALL;    // NONE/SMALL/MEDIUM/LARGE
+    int    distance  = DPI(4);   // Px from shape center along angle
+    int    angle_deg = 135;      // Photoshop-like angle in degrees
+    int    hardness  = 40;       // 0 soft .. 100 hard
+    bool   inset     = false;    // Draw inside the face bounds
+
+    struct Layer : Moveable<Layer> {
+        bool  enabled   = false;
+        UiSpan size     = SMALL;
+        int   distance  = DPI(4);
+        int   angle_deg = 135;
+        int   hardness  = 40;
+        int   opacity   = 90;
+        Color color     = Black();
+        bool  inset     = false;
+
+        void Serialize(Stream& s)
+        {
+            int span = (int)size;
+            s % enabled % span % distance % angle_deg % hardness % opacity % color % inset;
+            if(s.IsLoading())
+                size = (UiSpan)span;
+            hardness = clamp(hardness, 0, 100);
+            opacity = clamp(opacity, 0, 255);
+        }
+    };
+
+    int layer_count = 0;
+    Layer layers[3];
+
     void Serialize(Stream& s)
     {
         s % enabled % offset_x % offset_y % blur % spread % alpha % color;
+        int span = (int)size;
+        s % span % distance % angle_deg % hardness % inset;
+        s % layer_count;
+        layer_count = min(max(layer_count, 0), 3);
+        for(int i = 0; i < layer_count; i++)
+            layers[i].Serialize(s);
+        if(s.IsLoading())
+            size = (UiSpan)span;
+        hardness = clamp(hardness, 0, 100);
+        alpha = clamp(alpha, 0, 255);
+        if(s.IsLoading()) {
+            for(int i = layer_count; i < 3; i++)
+                layers[i] = Layer();
+        }
     }
+};
+
+struct UiShadowDetail {
+    int   distance = DPI(4);
+    int   opacity  = 90;
+    Color color    = Black();
+    bool  inset    = false;
 };
 
 struct StyledHighlight {
@@ -924,6 +978,139 @@ public:
     T& EnableDash(bool on = true)  { StyledMetricsRef().dashed = on; StyledMetricsRef().frame_enabled = on; OnStyleChanged(); return Self(); }
     T& SetDashPattern(const String& p) { StyledMetricsRef().dash_pattern = p; OnStyleChanged(); return Self(); }
     T& HighContrast(bool on = true){ StyledMetricsRef().high_contrast = on; OnStyleChanged(); return Self(); }
+
+    // Shadow convenience API -------------------------------------------------
+    T& SetShadow(UiSpan span)
+    {
+        StyledShadow& sh = StyledMetricsRef().shadow;
+        sh.size = span;
+        sh.enabled = span != NONE;
+        if(span == NONE) {
+            sh.layer_count = 0;
+            sh.alpha = 0;
+        }
+        else if(sh.alpha <= 0) {
+            sh.alpha = 90;
+        }
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& EnableShadow(bool on = true)
+    {
+        StyledMetricsRef().shadow.enabled = on;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& ClearShadow()
+    {
+        StyledMetricsRef().shadow = StyledShadow();
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowSize(UiSpan span)
+    {
+        return SetShadow(span);
+    }
+
+    T& SetShadowDetail(const UiShadowDetail& d)
+    {
+        StyledShadow& sh = StyledMetricsRef().shadow;
+        sh.distance = max(0, d.distance);
+        sh.alpha = clamp(d.opacity, 0, 255);
+        sh.inset = d.inset;
+        if(!IsNull(d.color))
+            sh.color = d.color;
+        if(sh.size == NONE)
+            sh.size = SMALL;
+        sh.enabled = sh.alpha > 0 && sh.size != NONE;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowDetail(int distance, int opacity, Color color = Null, bool inset = false)
+    {
+        UiShadowDetail d;
+        d.distance = distance;
+        d.opacity = opacity;
+        d.color = color;
+        d.inset = inset;
+        return SetShadowDetail(d);
+    }
+
+    T& SetShadowDistance(int px)
+    {
+        StyledMetricsRef().shadow.distance = max(0, px);
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowAngle(int deg)
+    {
+        StyledMetricsRef().shadow.angle_deg = deg;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowHardness(int pct)
+    {
+        StyledMetricsRef().shadow.hardness = clamp(pct, 0, 100);
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowOpacity(int alpha)
+    {
+        StyledMetricsRef().shadow.alpha = clamp(alpha, 0, 255);
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowColor(Color c)
+    {
+        if(!IsNull(c))
+            StyledMetricsRef().shadow.color = c;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowInset(bool on = true)
+    {
+        StyledMetricsRef().shadow.inset = on;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowLayerCount(int n)
+    {
+        n = min(max(n, 0), 3);
+        StyledMetricsRef().shadow.layer_count = n;
+        for(int i = 0; i < n; i++)
+            StyledMetricsRef().shadow.layers[i].enabled = true;
+        StyledMetricsRef().shadow.enabled = n > 0;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowLayer(int index, const StyledShadow::Layer& layer)
+    {
+        if(index < 0 || index >= 3)
+            return Self();
+        StyledShadow& sh = StyledMetricsRef().shadow;
+        sh.layer_count = max(sh.layer_count, index + 1);
+        sh.layers[index] = layer;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
 
     // Skin
     T& SetFill9Slice(const Image& img, const Rect& slice, bool settheframe = false)

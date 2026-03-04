@@ -11,6 +11,8 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiDataModels.h,
+	UiDataModels.cpp,
 	UiIcons.h,
 	UiLabel.h,
 	UiLabel.cpp,
@@ -26,6 +28,8 @@ file
 	UiAccordion.cpp,
 	UiScrollPanel.h,
 	UiScrollPanel.cpp,
+	UiTab.h,
+	UiTab.cpp,
 	UiTitleCard.h,
 	UiTitleCard.cpp,
 	UiGridLayout.h,
@@ -53,7 +57,11 @@ file
 	UiSliderEdit.h,
 	UiSliderEdit.cpp,
 	UiScrollBar.h,
-	UiScrollBar.cpp;
+	UiScrollBar.cpp,
+	UiDoc/UiDoc.h,
+	UiDoc/UiDoc.cpp,
+	UiDropdown.h,
+	UiDropdown.cpp;
 
 mainconfig
 	"" = "";

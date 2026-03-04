@@ -28,6 +28,57 @@ const UiTitleCard::Style& UiTitleCard::StyleDefault()
     return s;
 }
 
+const UiTitleCard::Style& UiTitleCard::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiTitleCard::Style& UiTitleCard::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(6);
+        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
+        for(int i = 0; i < 4; i++)
+            s.palette.frame[i] = frame;
+    }
+    return s;
+}
+
+const UiTitleCard::Style& UiTitleCard::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = Blend(SColorFace(), SColorPaper(), 205);
+        for(int i = 0; i < 4; i++)
+            s.palette.face[i] = UiFill::Solid(face);
+        s.metrics.radius = DPI(12);
+    }
+    return s;
+}
+
+const UiTitleCard::Style& UiTitleCard::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = SColorHighlight();
+        Color frame = DkColor(face, 30);
+        Color ink = SColorHighlightText();
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(face);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = ink;
+        }
+        s.metrics.radius = DPI(8);
+    }
+    return s;
+}
+
 const UiTitleCard::Style& UiTitleCard::StyleSquare()
 {
     static Style s;

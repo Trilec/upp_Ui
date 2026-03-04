@@ -167,6 +167,10 @@ public:
     UiButton& SetStyle(const Style& s);
     const Style& GetStyle() const { return style_; }
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
 
     static const Style& StyleAccent();
     static const Style& StyleSubtle();

@@ -57,6 +57,10 @@ public:
 
     // Preset styles
     static const Style& StyleDefault(); // light card / panel
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
     static const Style& StyleDark();    // dark card
     static const Style& StyleFlat();    // flat, square-edged panel
 

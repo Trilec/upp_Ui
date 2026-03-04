@@ -181,6 +181,7 @@ public:
 
         SetupGrid();
         StartPulse();
+        SetTimeCallback(180, [=] { UpdateConsoleProgress(); }, 3001);
     }
 
     virtual void Paint(Draw& w) override
@@ -473,17 +474,37 @@ private:
         // -----------------------------------------------------------------
         // Row 5: Animation + misc
         // -----------------------------------------------------------------
-        cell[5][0].SetStyle(UiLabel::StyleDefault())
-                  .SetText("Pulse ink")
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        cell[5][0].SetStyle(UiLabel::StyleSoft())
+                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
+                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
+                  .EnableRich(true)
+                  .ClearSpans()
+                  .AddBulletSpan(Color(52, 211, 153), DPI(8))
+                  .AddTextSpan("  OK ", Color(52, 211, 153), true)
+                  .AddIconSpan(icon16, false)
+                  .AddTextSpan("  runtime healthy", SColorText());
 
-        cell[5][1].SetStyle(UiLabel::StyleDefault())
-                  .SetText("Underline")
-                  .SetUnderline(true, DPI(1), DPI(1));
+        String ansi;
+        ansi << (char)27 << "[32mINFO" << (char)27 << "[0m  "
+             << (char)27 << "[33mWARN" << (char)27 << "[0m  "
+             << (char)27 << "[31mERROR" << (char)27 << "[0m";
 
-        cell[5][2].SetStyle(UiLabel::StyleDefault())
-                  .SetText("Hi-contrast")
-                  .HighContrast(true);
+        cell[5][1].SetStyle(UiLabel::StyleSoft())
+                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
+                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
+                  .SetAnsiText(ansi);
+
+        cell[5][2].SetStyle(UiLabel::StyleSoft())
+                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
+                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
+                  .EnableRich(true)
+                  .ClearSpans()
+                  .AddTextSpan("Build ", SColorText(), true)
+                  .AddTextSpan("[..........]", Color(56, 189, 248), false, false, true)
+                  .AddTextSpan(" 0%", SColorText());
+
+        progress_bar_span_ = 1;
+        progress_pct_span_ = 2;
 
         // SetMonoIcon takes Image (not bool) — demo uses the same icon as mono source
         cell[5][3].SetStyle(UiLabel::StyleDefault())
@@ -561,11 +582,36 @@ private:
         a.Play();
     }
 
+    void UpdateConsoleProgress()
+    {
+        progress_ = (progress_ + 1) % 11;
+        String bar = "[";
+        for(int i = 0; i < 10; i++)
+            bar.Cat(i < progress_ ? '#' : '.');
+        bar.Cat(']');
+
+        if(progress_bar_span_ >= 0 && progress_bar_span_ < cell[5][2].GetSpanCount()) {
+            UiLabel::Span s = cell[5][2].GetSpan(progress_bar_span_);
+            s.text = bar;
+            cell[5][2].SetSpan(progress_bar_span_, s);
+        }
+        if(progress_pct_span_ >= 0 && progress_pct_span_ < cell[5][2].GetSpanCount()) {
+            UiLabel::Span s = cell[5][2].GetSpan(progress_pct_span_);
+            s.text = Format(" %d%%", progress_ * 10);
+            cell[5][2].SetSpan(progress_pct_span_, s);
+        }
+
+        SetTimeCallback(180, [=] { UpdateConsoleProgress(); }, 3001);
+    }
+
 private:
     Image icon16, icon20, icon24, icon32, icon48, icon64;
     Image skinRaised, skinInset;
 
     UiLabel cell[6][6];
+    int progress_ = 0;
+    int progress_bar_span_ = -1;
+    int progress_pct_span_ = -1;
 
     One<Animation> pulse;
 };

@@ -46,6 +46,10 @@ public:
     };
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
     static const Style& StyleClassic();
     static const Style& StylePills();
     static const Style& StyleList();

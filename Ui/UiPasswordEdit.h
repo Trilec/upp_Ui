@@ -136,6 +136,10 @@ public:
     UiPasswordEdit& SetVisibilityIcons(const Image& visible, const Image& hidden);
 
     UiPasswordEdit& SetStyle(const UiBaseEdit::Style& s);
+    UiPasswordEdit& SetStandardStyle() { return SetStyle(UiBaseEdit::StyleStandard()); }
+    UiPasswordEdit& SetMinimalStyle()  { return SetStyle(UiBaseEdit::StyleMinimal()); }
+    UiPasswordEdit& SetSoftStyle()     { return SetStyle(UiBaseEdit::StyleSoft()); }
+    UiPasswordEdit& SetStrongStyle()   { return SetStyle(UiBaseEdit::StyleStrong()); }
 
     // Built-in eye icons backed by UiIcons.h (48px).
     // These are convenience helpers; you can also pass your own icons.

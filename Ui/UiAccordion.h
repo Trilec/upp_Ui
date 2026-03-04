@@ -118,6 +118,10 @@ public:
     virtual ~UiAccordion();
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
 
     UiAccordion& SetStyle(const Style& s);
     const Style& GetStyle() const { return style_; }

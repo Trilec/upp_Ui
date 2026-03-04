@@ -75,6 +75,10 @@ public:
     UiTitleCard();
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
     static const Style& StyleSquare();
 
     UiTitleCard& SetStyle(const Style& s);

@@ -10,7 +10,7 @@ public:
     {
         Title("Ui All Controls Demo (Baseline)");
         Sizeable().Zoomable();
-        SetRect(0, 0, DPI(980), DPI(780));
+        SetRect(0, 0, DPI(1100), DPI(1080));
 
         Add(title_lbl);
         Add(line);
@@ -36,6 +36,47 @@ public:
         Add(grid_probe);
         Add(scroll_probe);
         Add(box_probe);
+        Add(style_title);
+        Add(h_standard);
+        Add(h_minimal);
+        Add(h_soft);
+        Add(h_strong);
+        Add(r_button);
+        Add(r_edit);
+        Add(r_check);
+        Add(r_radio);
+        Add(r_slider);
+        Add(r_panel);
+
+        Add(b_std);
+        Add(b_min);
+        Add(b_soft);
+        Add(b_strong);
+        Add(e_std);
+        Add(e_min);
+        Add(e_soft);
+        Add(e_strong);
+        Add(c_std);
+        Add(c_min);
+        Add(c_soft);
+        Add(c_strong);
+        Add(rb_std);
+        Add(rb_min);
+        Add(rb_soft);
+        Add(rb_strong);
+        Add(s_std);
+        Add(s_min);
+        Add(s_soft);
+        Add(s_strong);
+        Add(p_std);
+        Add(p_min);
+        Add(p_soft);
+        Add(p_strong);
+
+        p_std.Add(pl_std.SizePos());
+        p_min.Add(pl_min.SizePos());
+        p_soft.Add(pl_soft.SizePos());
+        p_strong.Add(pl_strong.SizePos());
 
         scroll_probe.Content().Add(sp_a);
         scroll_probe.Content().Add(sp_b);
@@ -122,6 +163,53 @@ public:
         box_probe.Add(box_a).Expand(1).MinHeight(DPI(30));
         box_probe.Add(box_b).Expand(1).MinHeight(DPI(30));
         box_probe.Add(box_c).Expand(1).MinHeight(DPI(30));
+
+        style_title.SetText("Unified Style Set: Standard / Minimal / Soft / Strong")
+                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        h_standard.SetText("Standard").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        h_minimal.SetText("Minimal").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        h_soft.SetText("Soft").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        h_strong.SetText("Strong").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        r_button.SetText("UiButton").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        r_edit.SetText("UiLineEdit").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        r_check.SetText("UiCheckBox").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        r_radio.SetText("UiRadioButton").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        r_slider.SetText("UiSlider").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        r_panel.SetText("UiPanel").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+
+        b_std.SetText("Button").SetStyle(UiButton::StyleStandard());
+        b_min.SetText("Button").SetStyle(UiButton::StyleMinimal());
+        b_soft.SetText("Button").SetStyle(UiButton::StyleSoft());
+        b_strong.SetText("Button").SetStyle(UiButton::StyleStrong());
+
+        e_std.SetPlaceholder("Standard").SetStyle(UiBaseEdit::StyleStandard());
+        e_min.SetPlaceholder("Minimal").SetStyle(UiBaseEdit::StyleMinimal());
+        e_soft.SetPlaceholder("Soft").SetStyle(UiBaseEdit::StyleSoft());
+        e_strong.SetPlaceholder("Strong").SetStyle(UiBaseEdit::StyleStrong());
+
+        c_std.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleStandard());
+        c_min.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleMinimal());
+        c_soft.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleSoft());
+        c_strong.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleStrong());
+
+        rb_std.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleStandard());
+        rb_min.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleMinimal());
+        rb_soft.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleSoft());
+        rb_strong.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleStrong());
+
+        s_std.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleStandard());
+        s_min.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleMinimal());
+        s_soft.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleSoft());
+        s_strong.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleStrong());
+
+        p_std.SetStyle(UiPanel::StyleStandard());
+        p_min.SetStyle(UiPanel::StyleMinimal());
+        p_soft.SetStyle(UiPanel::StyleSoft());
+        p_strong.SetStyle(UiPanel::StyleStrong());
+        pl_std.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        pl_min.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        pl_soft.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        pl_strong.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
     virtual void Layout() override
@@ -186,6 +274,37 @@ public:
         sp_a.SetRect(sx, sy, sw, DPI(30));
         sp_b.SetRect(sx, sy + DPI(36), sw, DPI(30));
         sp_c.SetRect(sx, sy + DPI(72), sw, DPI(30));
+
+        int y3 = y2 + DPI(150) + DPI(18);
+        int row_lbl_w = DPI(110);
+        int col_gap = g;
+        int cell_w = (r.GetWidth() - m * 2 - row_lbl_w - 4 * col_gap) / 4;
+        int x0 = m + row_lbl_w + col_gap;
+
+        style_title.SetRect(m, y3, r.GetWidth() - m * 2, DPI(26));
+        y3 += DPI(30);
+
+        h_standard.SetRect(x0 + (cell_w + col_gap) * 0, y3, cell_w, DPI(24));
+        h_minimal.SetRect(x0 + (cell_w + col_gap) * 1, y3, cell_w, DPI(24));
+        h_soft.SetRect(x0 + (cell_w + col_gap) * 2, y3, cell_w, DPI(24));
+        h_strong.SetRect(x0 + (cell_w + col_gap) * 3, y3, cell_w, DPI(24));
+        y3 += DPI(30);
+
+        auto Row = [&](UiLabel& lbl, Ctrl& a, Ctrl& b, Ctrl& c, Ctrl& d, int h) {
+            lbl.SetRect(m, y3, row_lbl_w, h);
+            a.SetRect(x0 + (cell_w + col_gap) * 0, y3, cell_w, h);
+            b.SetRect(x0 + (cell_w + col_gap) * 1, y3, cell_w, h);
+            c.SetRect(x0 + (cell_w + col_gap) * 2, y3, cell_w, h);
+            d.SetRect(x0 + (cell_w + col_gap) * 3, y3, cell_w, h);
+            y3 += h + DPI(8);
+        };
+
+        Row(r_button, b_std, b_min, b_soft, b_strong, DPI(34));
+        Row(r_edit, e_std, e_min, e_soft, e_strong, DPI(34));
+        Row(r_check, c_std, c_min, c_soft, c_strong, DPI(34));
+        Row(r_radio, rb_std, rb_min, rb_soft, rb_strong, DPI(34));
+        Row(r_slider, s_std, s_min, s_soft, s_strong, DPI(36));
+        Row(r_panel, p_std, p_min, p_soft, p_strong, DPI(58));
     }
 
 private:
@@ -229,6 +348,52 @@ private:
     UiButton    box_a;
     UiButton    box_b;
     UiButton    box_c;
+
+    UiLabel style_title;
+    UiLabel h_standard;
+    UiLabel h_minimal;
+    UiLabel h_soft;
+    UiLabel h_strong;
+    UiLabel r_button;
+    UiLabel r_edit;
+    UiLabel r_check;
+    UiLabel r_radio;
+    UiLabel r_slider;
+    UiLabel r_panel;
+
+    UiButton b_std;
+    UiButton b_min;
+    UiButton b_soft;
+    UiButton b_strong;
+
+    UiLineEdit e_std;
+    UiLineEdit e_min;
+    UiLineEdit e_soft;
+    UiLineEdit e_strong;
+
+    UiCheckBox c_std;
+    UiCheckBox c_min;
+    UiCheckBox c_soft;
+    UiCheckBox c_strong;
+
+    UiRadioButton rb_std;
+    UiRadioButton rb_min;
+    UiRadioButton rb_soft;
+    UiRadioButton rb_strong;
+
+    UiSlider s_std;
+    UiSlider s_min;
+    UiSlider s_soft;
+    UiSlider s_strong;
+
+    UiPanel p_std;
+    UiPanel p_min;
+    UiPanel p_soft;
+    UiPanel p_strong;
+    UiLabel pl_std;
+    UiLabel pl_min;
+    UiLabel pl_soft;
+    UiLabel pl_strong;
 };
 
 GUI_APP_MAIN

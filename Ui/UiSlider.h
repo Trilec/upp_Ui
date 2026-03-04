@@ -45,6 +45,9 @@ public:
     };
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
     static const Style& StyleAccent();
     static const Style& StyleMinimal();
 

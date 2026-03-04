@@ -61,7 +61,7 @@ public:
 		StyledMetrics arrow_metrics;
 		StyledSkin    arrow_skin;
 
-		// Arrow icons (optional). If enabled and icons are set, replaces polygon arrows.
+		// Arrow icons. Icon-only rendering path (no polygon fallback).
 		bool  arrow_icons      = false;
 		bool  arrow_icon_scale = true;
 		bool  arrow_icon_mono  = true;
@@ -245,6 +245,10 @@ public:
 	UiScrollBar& SetStyle(const Style& s);
 	const Style& GetStyle() const { return style_; }
 	static const Style& StyleDefault();
+	static const Style& StyleStandard();
+	static const Style& StyleMinimal();
+	static const Style& StyleSoft();
+	static const Style& StyleStrong();
 	static const Style& StyleThin();
 	static const Style& StyleRounded();
 

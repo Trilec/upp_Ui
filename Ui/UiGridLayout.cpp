@@ -10,6 +10,58 @@ static int FindInt(const Vector<int>& v, int x)
     return -1;
 }
 
+const UiGridLayout::Style& UiGridLayout::StyleStandard()
+{
+    return Style::StyleDefault();
+}
+
+const UiGridLayout::Style& UiGridLayout::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style::StyleDefault();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(4);
+        s.cluster_box_default = false;
+        for(int i = 0; i < 4; i++)
+            s.palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 145);
+    }
+    return s;
+}
+
+const UiGridLayout::Style& UiGridLayout::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style::StyleDefault();
+        Color face = Blend(SColorFace(), SColorPaper(), 205);
+        for(int i = 0; i < 4; i++)
+            s.palette.face[i] = UiFill::Solid(face);
+        s.metrics.radius = DPI(10);
+        s.cluster_box_default = true;
+    }
+    return s;
+}
+
+const UiGridLayout::Style& UiGridLayout::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = Style::StyleDefault();
+        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
+        Color frame = DkColor(SColorHighlight(), 28);
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(face);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = SColorText();
+        }
+        s.metrics.radius = DPI(8);
+        s.cluster_box_default = true;
+    }
+    return s;
+}
+
 //==============================================================================
 // Construction / public surface
 //==============================================================================
@@ -2087,7 +2139,27 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) {
         line_h = 0;
     };
 
+    auto LineHeader = [&](const Item& it)->int {
+        if(!(style.group_header && style.group_header_h > 0))
+            return 0;
+        if(it.cluster < 0 || it.cluster >= clusters.GetCount())
+            return 0;
+        const Cluster& cl = clusters[it.cluster];
+        bool show = (cl.header >= 0) ? (cl.header != 0)
+                                    : default_cluster_header;
+        return show ? (style.group_header_h + HeaderGapPx()) : 0;
+    };
+
+    auto CommitLine = [&](int& x, int& y, int& line_h, int line_header) {
+        y += line_header + line_h;
+        if(y > 0)
+            y += style.spacing;
+        x = 0;
+        line_h = 0;
+    };
+
     int x = 0, y = 0, line_h = 0;
+    int line_header = 0;
 
     for(int i = 0; i < items.GetCount(); ++i) {
         const Item& it = items[i];
@@ -2095,7 +2167,8 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) {
             continue;
         if(it.kind == Kind::Break) {
             if(x > 0 || line_h > 0)
-                Newline(x, y, line_h);
+                CommitLine(x, y, line_h, line_header);
+            line_header = 0;
             continue;
         }
 
@@ -2117,7 +2190,8 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) {
                 j++;
             }
             if(wrap && x > 0 && x + cw > inner_w)
-                Newline(x, y, line_h);
+                CommitLine(x, y, line_h, line_header);
+            line_header = max(line_header, LineHeader(it));
             x      += cw;
             line_h  = max(line_h, ch);
             i       = j - 1;
@@ -2133,7 +2207,8 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) {
                 : NaturalItemSize(it).cy;
 
         if(wrap && x > 0 && x + wneed > inner_w)
-            Newline(x, y, line_h);
+            CommitLine(x, y, line_h, line_header);
+        line_header = max(line_header, LineHeader(it));
         x      += wneed;
         line_h  = max(line_h, hneed);
         if(x < inner_w)
@@ -2141,8 +2216,8 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) {
     }
 
     if(line_h > 0)
-        y += line_h;
-    return y + inset_.top + inset_.bottom + header_extra;
+        y += line_header + line_h;
+    return y + inset_.top + inset_.bottom;
 }
 
 

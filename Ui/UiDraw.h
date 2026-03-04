@@ -2,11 +2,265 @@
 #define _Ui_UiDraw_h_
 
 #include <Painter/Painter.h>
+#include <cmath>
 //#include <CtrlCore/CtrlCore.h>   // AccessKeyBit
 #include <CtrlLib/CtrlLib.h>     // DrawSmartText, DisabledImage, DPI, etc.
 #include <Ui/UiStyle.h>
 
 namespace Upp {
+
+enum UiCapShape : byte {
+    UICAP_FLAT_OPEN = 0,
+    UICAP_FLAT_CLOSED,
+    UICAP_OPEN,
+    UICAP_CLOSED,
+    UICAP_LINE,
+    UICAP_LINE_OPPOSITE,
+    UICAP_NONE,
+};
+
+inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
+                                 const StyledPalette& palette,
+                                 const StyledMetrics& m,
+                                 StyledState st);
+
+inline UiAlign UiCapOpenSide(UiAlign tab_side)
+{
+    switch(tab_side) {
+    case UiAlign::TOP: return UiAlign::BOTTOM;
+    case UiAlign::BOTTOM: return UiAlign::TOP;
+    case UiAlign::LEFT: return UiAlign::RIGHT;
+    case UiAlign::RIGHT: return UiAlign::LEFT;
+    default: return UiAlign::BOTTOM;
+    }
+}
+
+inline void UiPaintStyledCap(Draw& w,
+                             const Rect& outer,
+                             const StyledPalette& palette,
+                             const StyledMetrics& metrics,
+                             StyledState st,
+                             UiAlign tab_side,
+                             UiCapShape shape)
+{
+    if(outer.IsEmpty() || shape == UICAP_NONE)
+        return;
+
+    Color edge = palette.frame[st];
+    const UiFill& ff = palette.face[st];
+    Color face = ff.IsSolid() ? ff.color : Null;
+    int fw = max(1, metrics.frame_width);
+    int radius = max(0, metrics.radius);
+
+    if(shape == UICAP_LINE || shape == UICAP_LINE_OPPOSITE) {
+        if(IsNull(edge))
+            return;
+        int th = max(1, fw);
+        UiAlign line_side = (shape == UICAP_LINE) ? UiCapOpenSide(tab_side) : tab_side;
+        switch(line_side) {
+        case UiAlign::TOP:    w.DrawRect(outer.left, outer.top, outer.GetWidth(), th, edge); break;
+        case UiAlign::BOTTOM: w.DrawRect(outer.left, outer.bottom - th, outer.GetWidth(), th, edge); break;
+        case UiAlign::LEFT:   w.DrawRect(outer.left, outer.top, th, outer.GetHeight(), edge); break;
+        case UiAlign::RIGHT:  w.DrawRect(outer.right - th, outer.top, th, outer.GetHeight(), edge); break;
+        default: break;
+        }
+        return;
+    }
+
+    if(shape == UICAP_CLOSED) {
+        StyledMetrics m = metrics;
+        UiPaintFaceFrameDash(w, outer, palette, m, st);
+        return;
+    }
+
+    if(shape == UICAP_FLAT_CLOSED) {
+        if(!IsNull(face))
+            w.DrawRect(outer, face);
+        if(IsNull(edge))
+            return;
+
+        UiAlign open = UiCapOpenSide(tab_side);
+        int rr = max(0, min(radius, min(outer.GetWidth(), outer.GetHeight()) / 2 - 1));
+        int l = outer.left;
+        int t = outer.top;
+        int r = outer.right;
+        int b = outer.bottom;
+
+        if(open == UiAlign::BOTTOM) {
+            w.DrawRect(l + rr, t, max(0, outer.GetWidth() - rr * 2), fw, edge);
+            w.DrawRect(l, t + rr, fw, max(0, outer.GetHeight() - rr), edge);
+            w.DrawRect(r - fw, t + rr, fw, max(0, outer.GetHeight() - rr), edge);
+            w.DrawRect(l, b - fw, outer.GetWidth(), fw, edge);
+            for(int x = 0; x < rr; x++) {
+                double q = (double)x / max(1, rr - 1);
+                int y = t + (int)((1.0 - q) * (1.0 - q) * (rr - 1));
+                w.DrawRect(l + x, y, 1, 1, edge);
+                w.DrawRect(r - 1 - x, y, 1, 1, edge);
+            }
+            return;
+        }
+        if(open == UiAlign::TOP) {
+            w.DrawRect(l + rr, b - fw, max(0, outer.GetWidth() - rr * 2), fw, edge);
+            w.DrawRect(l, t, fw, max(0, outer.GetHeight() - rr), edge);
+            w.DrawRect(r - fw, t, fw, max(0, outer.GetHeight() - rr), edge);
+            w.DrawRect(l, t, outer.GetWidth(), fw, edge);
+            for(int x = 0; x < rr; x++) {
+                double q = (double)x / max(1, rr - 1);
+                int y = b - 1 - (int)((1.0 - q) * (1.0 - q) * (rr - 1));
+                w.DrawRect(l + x, y, 1, 1, edge);
+                w.DrawRect(r - 1 - x, y, 1, 1, edge);
+            }
+            return;
+        }
+        if(open == UiAlign::RIGHT) {
+            w.DrawRect(l, t + rr, fw, max(0, outer.GetHeight() - rr * 2), edge);
+            w.DrawRect(l, t, max(0, outer.GetWidth() - rr), fw, edge);
+            w.DrawRect(l, b - fw, max(0, outer.GetWidth() - rr), fw, edge);
+            w.DrawRect(r - fw, t, fw, outer.GetHeight(), edge);
+            for(int y = 0; y < rr; y++) {
+                double q = (double)y / max(1, rr - 1);
+                int x = l + (int)((1.0 - q) * (1.0 - q) * (rr - 1));
+                w.DrawRect(x, t + y, 1, 1, edge);
+                w.DrawRect(x, b - 1 - y, 1, 1, edge);
+            }
+            return;
+        }
+        if(open == UiAlign::LEFT) {
+            w.DrawRect(r - fw, t + rr, fw, max(0, outer.GetHeight() - rr * 2), edge);
+            w.DrawRect(l + rr, t, max(0, outer.GetWidth() - rr), fw, edge);
+            w.DrawRect(l + rr, b - fw, max(0, outer.GetWidth() - rr), fw, edge);
+            w.DrawRect(l, t, fw, outer.GetHeight(), edge);
+            for(int y = 0; y < rr; y++) {
+                double q = (double)y / max(1, rr - 1);
+                int x = r - 1 - (int)((1.0 - q) * (1.0 - q) * (rr - 1));
+                w.DrawRect(x, t + y, 1, 1, edge);
+                w.DrawRect(x, b - 1 - y, 1, 1, edge);
+            }
+            return;
+        }
+    }
+
+    int rr = max(0, min(radius, min(outer.GetWidth(), outer.GetHeight()) / 2 - 1));
+    int ext = rr;
+
+    bool vertical = (tab_side == UiAlign::LEFT || tab_side == UiAlign::RIGHT);
+    int base_w = outer.GetWidth();
+    int base_h = outer.GetHeight();
+    int mw = (vertical ? base_h : base_w) + ext * 2;
+    int mh = (vertical ? base_w : base_h) + ext * 2;
+
+    double L = ext;
+    double T = ext;
+    double R = L + (vertical ? base_h : base_w) - 1;
+    double B = T + (vertical ? base_w : base_h) - 1;
+    double rad = min<double>(rr, min(R - L, B - T) * 0.5);
+
+    auto AddArc = [&](Vector<Pointf>& out, double cx, double cy, double a0, double a1) {
+        if(rad <= 0)
+            return;
+        int steps = max(6, (int)rad * 2);
+        for(int i = 1; i <= steps; i++) {
+            double q = (double)i / steps;
+            double a = a0 + (a1 - a0) * q;
+            out.Add(Pointf(cx + cos(a) * rad, cy + sin(a) * rad));
+        }
+    };
+
+    Vector<Pointf> fill_poly;
+    fill_poly.Add(Pointf(L + rad, T));
+    fill_poly.Add(Pointf(R - rad, T));
+    AddArc(fill_poly, R - rad, T + rad, -M_PI * 0.5, 0.0);
+
+    if(shape == UICAP_OPEN && rad > 0) {
+        fill_poly.Add(Pointf(R, B - rad));
+        AddArc(fill_poly, R + rad, B - rad, M_PI, M_PI * 0.5);
+        fill_poly.Add(Pointf(L - rad, B));
+        AddArc(fill_poly, L - rad, B - rad, M_PI * 0.5, 0.0);
+        fill_poly.Add(Pointf(L, T + rad));
+    }
+    else {
+        fill_poly.Add(Pointf(R, B));
+        fill_poly.Add(Pointf(R + rad, B));
+        fill_poly.Add(Pointf(L - rad, B));
+        fill_poly.Add(Pointf(L, B));
+        fill_poly.Add(Pointf(L, T + rad));
+    }
+    AddArc(fill_poly, L + rad, T + rad, M_PI, M_PI * 1.5);
+
+    Vector<Pointf> border_poly;
+    if(shape == UICAP_OPEN && rad > 0) {
+        border_poly.Add(Pointf(L - rad, B));
+        AddArc(border_poly, L - rad, B - rad, M_PI * 0.5, 0.0);
+        border_poly.Add(Pointf(L, T + rad));
+        AddArc(border_poly, L + rad, T + rad, M_PI, M_PI * 1.5);
+        border_poly.Add(Pointf(R - rad, T));
+        AddArc(border_poly, R - rad, T + rad, -M_PI * 0.5, 0.0);
+        border_poly.Add(Pointf(R, B - rad));
+        AddArc(border_poly, R + rad, B - rad, M_PI, M_PI * 0.5);
+    }
+    else {
+        border_poly.Add(Pointf(L - rad, B));
+        border_poly.Add(Pointf(L, B));
+        border_poly.Add(Pointf(L, T + rad));
+        AddArc(border_poly, L + rad, T + rad, M_PI, M_PI * 1.5);
+        border_poly.Add(Pointf(R - rad, T));
+        AddArc(border_poly, R - rad, T + rad, -M_PI * 0.5, 0.0);
+        border_poly.Add(Pointf(R, B));
+        border_poly.Add(Pointf(R + rad, B));
+    }
+
+    auto Map = [&](double u, double v) -> Pointf {
+        double x = u;
+        double y = v;
+        switch(tab_side) {
+        case UiAlign::TOP:
+            break;
+        case UiAlign::BOTTOM:
+            y = (mh - 1) - v;
+            break;
+        case UiAlign::LEFT:
+            x = v;
+            y = (mw - 1) - u;
+            break;
+        case UiAlign::RIGHT:
+            x = (mh - 1) - v;
+            y = u;
+            break;
+        default:
+            break;
+        }
+        return Pointf(x, y);
+    };
+
+    int tw = base_w + ext * 2;
+    int th = base_h + ext * 2;
+    ImageBuffer ib(tw, th);
+    ib.SetKind(IMAGE_ALPHA);
+    Fill(~ib, RGBAZero(), ib.GetLength());
+
+    BufferPainter p(ib, MODE_ANTIALIASED);
+
+    if(!IsNull(face)) {
+        p.Begin();
+        p.Move(Map(fill_poly[0].x, fill_poly[0].y));
+        for(int i = 1; i < fill_poly.GetCount(); i++)
+            p.Line(Map(fill_poly[i].x, fill_poly[i].y));
+        p.Close();
+        p.Fill(face);
+        p.End();
+    }
+
+    if(!IsNull(edge)) {
+        p.Begin();
+        p.Move(Map(border_poly[0].x, border_poly[0].y));
+        for(int i = 1; i < border_poly.GetCount(); i++)
+            p.Line(Map(border_poly[i].x, border_poly[i].y));
+        p.Stroke((double)fw, edge);
+        p.End();
+    }
+
+    w.DrawImage(outer.left - ext, outer.top - ext, ib);
+}
 
 // -------------------------------------------------------------------------
 // Image alpha helper
@@ -375,13 +629,90 @@ inline void UiPaintStyledBackground(Draw& w,
 
     (void)focus;
 
-    auto PaintSoftShadow = [&](const StyledShadow& sh) {
-        if(!sh.enabled || sh.alpha <= 0)
+    auto ResolveSpanPx = [&](UiSpan span) -> int {
+        switch(span) {
+        case SMALL:  return DPI(5);
+        case MEDIUM: return DPI(10);
+        case LARGE:  return DPI(20);
+        case NONE:
+        default:     return 0;
+        }
+    };
+
+    auto OffsetFromAngle = [&](int distance, int angle_deg) -> Point {
+        const double PI = 3.14159265358979323846;
+        double a = (double)angle_deg * (PI / 180.0);
+        int dx = (int)std::round(std::cos(a) * distance);
+        int dy = (int)std::round(std::sin(a) * distance);
+        return Point(dx, dy);
+    };
+
+    auto PaintShadowLayer = [&](const StyledShadow::Layer& ly) {
+        if(!ly.enabled || ly.opacity <= 0)
             return;
 
-        int blur = max(0, sh.blur);
-        int spread = max(0, sh.spread);
-        int pad = blur + spread + max(abs(sh.offset_x), abs(sh.offset_y)) + 2;
+        int size_px = ResolveSpanPx(ly.size);
+        if(size_px <= 0)
+            return;
+
+        int hard = clamp(ly.hardness, 0, 100);
+        Point off = OffsetFromAngle(max(0, ly.distance), ly.angle_deg);
+
+        if(ly.inset) {
+            Rect r = outer;
+            w.Clip(outer);
+            for(int i = 0; i < size_px; i++) {
+                int alpha = ly.opacity;
+                if(hard < 100) {
+                    int soft_start = (size_px * hard) / 100;
+                    if(i >= soft_start) {
+                        int rem = max(1, size_px - soft_start);
+                        alpha = (ly.opacity * max(0, rem - (i - soft_start))) / rem;
+                    }
+                }
+                alpha = clamp(alpha, 0, 255);
+                if(alpha <= 0)
+                    continue;
+
+                Rect rr = r;
+                rr.Deflate(i, i);
+                rr.Offset(off);
+                if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
+                    break;
+
+                int rad = max(0, metrics.radius - i);
+                if(rad <= 0) {
+                    RGBA c = ly.color;
+                    c.a = (byte)alpha;
+                    w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, c);
+                    w.DrawRect(rr.left, rr.bottom - 1, rr.GetWidth(), 1, c);
+                    w.DrawRect(rr.left, rr.top, 1, rr.GetHeight(), c);
+                    w.DrawRect(rr.right - 1, rr.top, 1, rr.GetHeight(), c);
+                }
+                else {
+                    Size sz = rr.GetSize();
+                    ImageBuffer ib(sz);
+                    ib.SetKind(IMAGE_ALPHA);
+                    Fill(~ib, RGBAZero(), ib.GetLength());
+                    {
+                        BufferPainter p(ib, MODE_ANTIALIASED);
+                        p.Begin();
+                        p.RoundedRectangle(0.5, 0.5, sz.cx - 1.0, sz.cy - 1.0, max(0, min(rad, min(sz.cx, sz.cy) / 2)));
+                        RGBA c = ly.color;
+                        c.a = (byte)alpha;
+                        p.Stroke(1.0, c);
+                        p.End();
+                    }
+                    w.DrawImage(rr.left, rr.top, Image(ib));
+                }
+            }
+            w.End();
+            return;
+        }
+
+        int spread = max(0, (size_px * hard) / 100);
+        int blur = max(0, size_px - spread);
+        int pad = blur + spread + max(abs(off.x), abs(off.y)) + 2;
 
         Size osz = outer.GetSize();
         Size sz(osz.cx + pad * 2, osz.cy + pad * 2);
@@ -395,8 +726,8 @@ inline void UiPaintStyledBackground(Draw& w,
         {
             BufferPainter p(ib, MODE_ANTIALIASED);
             int rr = max(0, metrics.radius + spread);
-            int x = pad + sh.offset_x - spread;
-            int y = pad + sh.offset_y - spread;
+            int x = pad + off.x - spread;
+            int y = pad + off.y - spread;
             int cx = osz.cx + spread * 2;
             int cy = osz.cy + spread * 2;
 
@@ -406,8 +737,8 @@ inline void UiPaintStyledBackground(Draw& w,
             else
                 p.Rectangle(x, y, cx, cy);
 
-            RGBA c = sh.color;
-            c.a = (byte)clamp(sh.alpha, 0, 255);
+            RGBA c = ly.color;
+            c.a = (byte)clamp(ly.opacity, 0, 255);
             p.Fill(c);
             p.End();
         }
@@ -416,6 +747,45 @@ inline void UiPaintStyledBackground(Draw& w,
             FastBlur(ib, blur);
 
         w.DrawImage(outer.left - pad, outer.top - pad, Image(ib));
+    };
+
+    auto PaintShadowStack = [&](const StyledShadow& sh, bool inset_only) {
+        bool has_layers = sh.layer_count > 0;
+        if(has_layers) {
+            for(int i = 0; i < sh.layer_count; i++) {
+                const StyledShadow::Layer& ly = sh.layers[i];
+                if(ly.inset == inset_only)
+                    PaintShadowLayer(ly);
+            }
+            return;
+        }
+
+        if(!sh.enabled || sh.alpha <= 0)
+            return;
+
+        StyledShadow::Layer one;
+        one.enabled = true;
+        one.size = sh.size;
+        one.distance = sh.distance;
+        one.angle_deg = sh.angle_deg;
+        one.hardness = sh.hardness;
+        one.opacity = sh.alpha;
+        one.color = sh.color;
+        one.inset = sh.inset;
+
+        // Backward compatibility path for legacy direct offsets / blur.
+        if(sh.offset_x != 0 || sh.offset_y != DPI(2) || sh.blur != DPI(6) || sh.spread != 0) {
+            one.distance = (int)std::sqrt((double)sh.offset_x * sh.offset_x + (double)sh.offset_y * sh.offset_y);
+            one.angle_deg = (int)std::round(std::atan2((double)sh.offset_y, (double)sh.offset_x) * 180.0 / 3.14159265358979323846);
+            int legacy_span = max(0, sh.blur + sh.spread);
+            if(legacy_span <= DPI(6)) one.size = SMALL;
+            else if(legacy_span <= DPI(12)) one.size = MEDIUM;
+            else one.size = LARGE;
+            one.hardness = legacy_span > 0 ? clamp((100 * sh.spread) / legacy_span, 0, 100) : 0;
+        }
+
+        if(one.inset == inset_only)
+            PaintShadowLayer(one);
     };
 
     auto PaintHighlight = [&](const StyledHighlight& hl) {
@@ -449,7 +819,7 @@ inline void UiPaintStyledBackground(Draw& w,
         }
     };
 
-    PaintSoftShadow(metrics.shadow);
+    PaintShadowStack(metrics.shadow, false);
 
     Rect r = outer;
     bool          skin_drawn = false;
@@ -466,6 +836,7 @@ inline void UiPaintStyledBackground(Draw& w,
     }
 
     UiPaintFaceFrameDash(w, r, palette, mm, st);
+    PaintShadowStack(metrics.shadow, true);
     PaintHighlight(metrics.highlight);
 }
 
@@ -825,6 +1196,86 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, const StyledMetrics& m,
                          Color color, int alpha)
 {
     UiPaintFlash(w, outer, max(m.radius, 0), color, alpha);
+}
+
+// -------------------------------------------------------------------------
+// Rounded popup compositor (single-call internal draw path)
+// -------------------------------------------------------------------------
+inline void UiPaintRoundedPopupComposited(Draw& w,
+                                          const Rect& outer,
+                                          const Image& src,
+                                          int radius,
+                                          Color matte,
+                                          int frame_width = 0,
+                                          Color frame_color = Null)
+{
+    if(outer.IsEmpty() || IsNull(src))
+        return;
+
+    Size sz = src.GetSize();
+    if(sz.cx <= 0 || sz.cy <= 0)
+        return;
+
+    radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
+
+    if(radius <= 0) {
+        w.DrawImage(outer.left, outer.top, src);
+    }
+    else {
+        ImageBuffer out(sz);
+        ImageBuffer mask(sz);
+        mask.SetKind(IMAGE_ALPHA);
+        Fill(~mask, RGBAZero(), mask.GetLength());
+
+        {
+            BufferPainter p(mask, MODE_ANTIALIASED);
+            p.Begin();
+            p.RoundedRectangle(0.5, 0.5, sz.cx - 1.0, sz.cy - 1.0, radius);
+            p.Fill(White());
+            p.End();
+        }
+
+        if(IsNull(matte))
+            matte = SColorPaper();
+
+        const RGBA* sp = ~src;
+        RGBA* dp = ~out;
+        RGBA* mp = ~mask;
+        int n = out.GetLength();
+        for(int i = 0; i < n; i++) {
+            int a = int(mp[i].a);
+            dp[i].r = (byte)((int(sp[i].r) * a + int(matte.GetR()) * (255 - a) + 127) / 255);
+            dp[i].g = (byte)((int(sp[i].g) * a + int(matte.GetG()) * (255 - a) + 127) / 255);
+            dp[i].b = (byte)((int(sp[i].b) * a + int(matte.GetB()) * (255 - a) + 127) / 255);
+            dp[i].a = 255;
+        }
+
+        w.DrawImage(outer.left, outer.top, Image(out));
+    }
+
+    if(frame_width > 0 && !IsNull(frame_color)) {
+        ImageBuffer fb(sz);
+        fb.SetKind(IMAGE_ALPHA);
+        Fill(~fb, RGBAZero(), fb.GetLength());
+
+        BufferPainter p(fb, MODE_ANTIALIASED);
+        double fw = max(1, frame_width);
+        double x = fw * 0.5;
+        double y = fw * 0.5;
+        double cx = max(1.0, sz.cx - fw);
+        double cy = max(1.0, sz.cy - fw);
+        double rad = max(0.0, (double)radius - fw * 0.5);
+
+        p.Begin();
+        if(radius > 0)
+            p.RoundedRectangle(x, y, cx, cy, rad);
+        else
+            p.Rectangle(x, y, cx, cy);
+        p.Stroke(fw, frame_color);
+        p.End();
+
+        w.DrawImage(outer.left, outer.top, Image(fb));
+    }
 }
 
 // -------------------------------------------------------------------------

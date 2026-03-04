@@ -28,6 +28,29 @@ class UiLabel : public Ctrl, public CtrlStyled<UiLabel> {
 public:
     typedef UiLabel CLASSNAME;
 
+    struct Span : Moveable<Span> {
+        enum Kind {
+            TEXT,
+            ICON,
+            BULLET,
+            NEWLINE
+        } kind = TEXT;
+
+        String text;
+        Image  icon;
+        bool   mono_icon = false;
+
+        Color  ink;
+        Color  bg;
+        Font   font;
+        bool   bold = false;
+        bool   italic = false;
+        bool   underline = false;
+
+        int    bullet_size = DPI(6);
+        Color  bullet_color;
+    };
+
     // ------------------------------------------------------------------------
     // Style
     // ------------------------------------------------------------------------
@@ -97,11 +120,26 @@ private:
     // Cached content rect used to build layout_
     mutable Rect layout_content_ = Rect(0, 0, 0, 0);
 
+    bool selectable_text_ = false;
+    int  sel_anchor_ = -1;
+    int  sel_caret_ = -1;
+    bool all_selected_ = false;
+    bool selecting_drag_ = false;
+
+    bool rich_enabled_ = false;
+    Vector<Span> spans_;
+
     // Internal helpers
     void RebuildTextLines();
+    String BuildPlainTextFromSpans() const;
     Size ComputeNaturalSize() const;
     Size GetTextBlockSize() const;
     void UpdateLayout(const Rect& content) const;
+    void CopySelectionToClipboard() const;
+    bool HasSelection() const;
+    int  SelFrom() const;
+    int  SelTo() const;
+    int  HitTestTextPos(Point p) const;
 
 public:
     UiLabel();
@@ -109,6 +147,24 @@ public:
     // Content
     UiLabel&       SetText(const String& text);
     const String&  GetText() const { return text_; }
+
+    UiLabel& EnableRich(bool on = true);
+    bool     IsRichEnabled() const { return rich_enabled_; }
+
+    UiLabel& SetSpans(const Vector<Span>& spans);
+    UiLabel& ClearSpans();
+    UiLabel& AddSpan(const Span& span);
+    UiLabel& SetSpan(int i, const Span& span);
+    int      GetSpanCount() const { return spans_.GetCount(); }
+    const Span& GetSpan(int i) const { return spans_[i]; }
+
+    UiLabel& AddTextSpan(const String& text, Color ink = Null, bool bold = false, bool italic = false, bool underline = false);
+    UiLabel& AddIconSpan(const Image& icon, bool mono = false);
+    UiLabel& AddBulletSpan(Color color = Null, int size = DPI(6));
+    UiLabel& AddNewlineSpan();
+
+    UiLabel& SetAnsiText(const String& ansi);
+    UiLabel& AppendAnsiText(const String& ansi);
 
     UiLabel& SetIcon(const Image& img);
     UiLabel& SetMonoIcon(const Image& img);
@@ -151,6 +207,10 @@ public:
     const Style&   GetStyle() const { return style_; }
 
     static const Style& StyleDefault();
+    static const Style& StyleStandard();
+    static const Style& StyleMinimal();
+    static const Style& StyleSoft();
+    static const Style& StyleStrong();
     static const Style& StyleHeadline();
     static const Style& StyleSubheadline();
     static const Style& StyleTitle();
@@ -159,6 +219,8 @@ public:
     static const Style& StyleFootnote();
 
     UiLabel& SetUnderline(bool on = true, int thickness = DPI(1), int offset = 0);
+    UiLabel& SetSelectable(bool on = true);
+    bool     IsSelectable() const { return selectable_text_; }
 
     // CtrlStyled (CRTP) interface
     StyledPalette& StyledPaletteRef() { return style_.palette; }
@@ -188,6 +250,12 @@ public:
 
     // Ctrl overrides
     void   Paint(Draw& w) override;
+    void   LeftDown(Point p, dword flags) override;
+    void   MouseMove(Point p, dword flags) override;
+    void   LeftUp(Point p, dword flags) override;
+    bool   Key(dword key, int count) override;
+    void   GotFocus() override;
+    void   LostFocus() override;
 
     String GetDesc() const override;
     dword  GetAccessKeys() const override;

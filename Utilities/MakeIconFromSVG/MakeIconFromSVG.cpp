@@ -4,6 +4,28 @@
 
 namespace Upp {
 
+static bool IsHelpArg(const String& s)
+{
+    String t = ToLower(TrimBoth(s));
+    return t == "-h" || t == "--help" || t == "help" || t == "/?" || t == "-?";
+}
+
+static void PrintHelp()
+{
+    Cout() << "MakeIconFromSVG\n";
+    Cout() << "Convert SVG/PNG (and other StreamRaster formats) to UiMakeIcon header data.\n\n";
+    Cout() << "Usage:\n";
+    Cout() << "  MakeIconFromSVG <input.(svg|png|...)> [output.h] [symbol_token] [size|WIDTHxHEIGHT]\n\n";
+    Cout() << "Arguments:\n";
+    Cout() << "  input         Source image path (.svg recommended, raster also supported).\n";
+    Cout() << "  output.h      Output header path. Default: <input_dir>/<input_name>_icon.h\n";
+    Cout() << "  symbol_token  Base token used for DATA_/ICON_ symbol names.\n";
+    Cout() << "  size          Target icon size, e.g. 24 or 48x48.\n\n";
+    Cout() << "Examples:\n";
+    Cout() << "  MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h CUSTOM_SEARCH_48 48x48\n";
+    Cout() << "  MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/newlogo_v4_icon.h CUSTOM_NEWLOGO_V4_48 48x48\n";
+}
+
 static String UpperToken(String s)
 {
     String out;
@@ -357,13 +379,19 @@ using namespace Upp;
 CONSOLE_APP_MAIN
 {
     const Vector<String>& args = CommandLine();
+
+    if(args.IsEmpty() || IsHelpArg(args[0])) {
+        PrintHelp();
+        return;
+    }
+
     SvgIconJob job;
     String error;
 
     if(!ParseSvgIconJob(args, job, error)) {
-        Cout() << "MakeIconFromSVG\n";
         Cout() << error << "\n";
-        Cout() << "example: MakeIconFromSVG designs/drag_indicator.svg Ui/GeneratedDragIcon.h NAVIGATION_OUTLINED_DRAG_INDICATOR_48 24x24\n";
+        Cout() << "\n";
+        PrintHelp();
         SetExitCode(1);
         return;
     }

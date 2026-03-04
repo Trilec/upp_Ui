@@ -1,0 +1,16 @@
+description "UiDropdown Demo\377";
+
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Painter,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
+

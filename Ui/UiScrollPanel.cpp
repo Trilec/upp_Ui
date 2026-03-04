@@ -26,6 +26,56 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
     return s;
 }
 
+const UiScrollPanel::Style& UiScrollPanel::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiScrollPanel::Style& UiScrollPanel::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.radius = DPI(4);
+        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
+        for(int i = 0; i < 4; i++)
+            s.palette.frame[i] = frame;
+    }
+    return s;
+}
+
+const UiScrollPanel::Style& UiScrollPanel::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = Blend(SColorFace(), SColorPaper(), 205);
+        for(int i = 0; i < 4; i++)
+            s.palette.face[i] = UiFill::Solid(face);
+        s.metrics.radius = DPI(10);
+    }
+    return s;
+}
+
+const UiScrollPanel::Style& UiScrollPanel::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
+        Color frame = DkColor(SColorHighlight(), 28);
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(face);
+            s.palette.frame[i] = frame;
+            s.palette.ink[i] = SColorText();
+        }
+        s.metrics.radius = DPI(8);
+    }
+    return s;
+}
+
 const UiScrollPanel::Style& UiScrollPanel::StyleFlat()
 {
     static Style s;

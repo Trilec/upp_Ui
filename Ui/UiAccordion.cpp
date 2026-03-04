@@ -119,6 +119,53 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
     return s;
 }
 
+const UiAccordion::Style& UiAccordion::StyleStandard()
+{
+    return StyleDefault();
+}
+
+const UiAccordion::Style& UiAccordion::StyleMinimal()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_width = DPI(1);
+        s.header_style = UiTitleCard::StyleMinimal();
+        s.body_style = UiPanel::StyleMinimal();
+    }
+    return s;
+}
+
+const UiAccordion::Style& UiAccordion::StyleSoft()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.header_style = UiTitleCard::StyleSoft();
+        s.body_style = UiPanel::StyleSoft();
+        s.metrics.radius = DPI(10);
+    }
+    return s;
+}
+
+const UiAccordion::Style& UiAccordion::StyleStrong()
+{
+    static Style s;
+    ONCELOCK {
+        s = StyleDefault();
+        s.header_style = UiTitleCard::StyleStrong();
+        s.body_style = UiPanel::StyleStrong();
+        Color frame = DkColor(SColorHighlight(), 28);
+        for(int i = 0; i < 4; i++) {
+            s.palette.frame[i] = frame;
+            s.palette.face[i] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 225));
+        }
+        s.metrics.radius = DPI(8);
+    }
+    return s;
+}
+
 UiAccordion::UiAccordion()
     : style_(StyleDefault())
 {
