@@ -2,3 +2,5 @@
 *.exe
 scripts/*
 UPP_GUIDES/*
+/designs
+/build
