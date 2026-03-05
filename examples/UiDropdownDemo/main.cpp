@@ -44,47 +44,13 @@ public:
         SetupTerminal(drop8);
         SetupMaterial(drop9);
 
-        SetupCaption(cap10, "Model-Bound (Live UiListModel)");
+        SetupCaption(cap10, "Icon Catalog (UiIcons)");
         cap10.SetAlign(ALIGN_LEFT);
         SetupModelBound(drop10);
 
         Add(model_info);
         model_info.SetAlign(ALIGN_LEFT);
-        model_info.SetLabel("External model is bound to this dropdown. Use buttons to mutate model live.");
-
-        Add(btn_model_add);
-        Add(btn_model_update);
-        Add(btn_model_remove);
-        Add(btn_model_reset);
-        Add(model_input);
-
-        btn_model_add.SetText("Add");
-        btn_model_update.SetText("Update First");
-        btn_model_remove.SetText("Remove Last");
-        btn_model_reset.SetText("Reset");
-        model_input.SetPlaceholder("Type item label for Add/Update...");
-
-        btn_model_add.WhenAction = [=] {
-            String typed = TrimBoth(model_input.GetTextUtf8());
-            int id = ++model_seq_;
-            String label = typed.IsEmpty() ? Format("Dynamic %d", id) : typed;
-            live_model_.Add(label, id, true);
-        };
-        btn_model_update.WhenAction = [=] {
-            if(live_model_.GetCount() <= 0)
-                return;
-            String typed = TrimBoth(model_input.GetTextUtf8());
-            UiModelItem it = live_model_.Get(0);
-            it.text = typed.IsEmpty() ? Format("Updated %d", ++model_seq_) : typed;
-            it.data = model_seq_;
-            live_model_.Set(0, it);
-        };
-        btn_model_remove.WhenAction = [=] {
-            int n = live_model_.GetCount();
-            if(n > 0)
-                live_model_.Remove(n - 1);
-        };
-        btn_model_reset.WhenAction = [=] { ResetLiveModel(); };
+        model_info.SetLabel("Bound from UiIconListModel(): each row uses icon name + image from UiIcons.h");
 
         Add(footer);
         footer.SetAlign(ALIGN_CENTER);
@@ -183,14 +149,6 @@ public:
         cap10.SetRect(grid.left, model_y, DPI(420), DPI(22));
         drop10.SetRect(grid.left, model_y + DPI(30), DPI(420), DPI(48));
         model_info.SetRect(grid.left + DPI(432), model_y + DPI(8), r.GetWidth() - DPI(456), DPI(22));
-        int bx = grid.left + DPI(432);
-        int by = model_y + DPI(36);
-        model_input.SetRect(bx, by, DPI(280), DPI(38));
-        btn_model_add.SetRect(bx + DPI(292), by, DPI(90), DPI(38));
-        btn_model_update.SetRect(bx + DPI(394), by, DPI(124), DPI(38));
-        btn_model_remove.SetRect(bx + DPI(530), by, DPI(124), DPI(38));
-        btn_model_reset.SetRect(bx + DPI(666), by, DPI(92), DPI(38));
-
         footer.SetRect(r.left, r.bottom - DPI(58), r.GetWidth(), DPI(22));
     }
 
@@ -559,26 +517,17 @@ private:
         };
     }
 
-    void ResetLiveModel()
-    {
-        live_model_.Clear();
-        live_model_.Add("Stable", "stable", true);
-        live_model_.Add("Beta", "beta", true);
-        live_model_.Add("Canary", "canary", true);
-        live_model_.Add("Nightly", "nightly", true);
-    }
-
     void SetupModelBound(UiDropdown& d)
     {
         Add(d);
         MakeOpaque(d);
         d.SetRadius(DPI(10));
         d.SetFrameWidth(DPI(1));
-        d.SetPadding(DPI(14), DPI(8), DPI(14), DPI(8));
+        d.SetPadding(DPI(8), DPI(4), DPI(8), DPI(4));
         d.SetPopupItemHeight(DPI(36));
         d.SetPopupMaxItems(10);
-        d.SetModel(&live_model_);
-        ResetLiveModel();
+        icon_model_ = UiIconListModel();
+        d.SetModel(&icon_model_);
         d.Select(0);
     }
 
@@ -694,10 +643,6 @@ private:
         drop10.SetInkColor(Color(241, 245, 249));
         drop10.SetIconColor(Color(241, 245, 249));
 
-        model_input.SetFaceColor(Color(30, 41, 59));
-        model_input.SetFrameColor(Color(71, 85, 105));
-        model_input.SetInkColor(Color(241, 245, 249));
-
         footer.SetInk(footer_ink);
         model_info.SetInk(caption_ink);
         for(Label* l : Vector<Label*>{&cap1, &cap2, &cap3, &cap4, &cap5, &cap6, &cap7, &cap8, &cap9, &cap10})
@@ -780,10 +725,6 @@ private:
         drop10.SetInkColor(Color(30, 41, 59));
         drop10.SetIconColor(Color(30, 41, 59));
 
-        model_input.SetFaceColor(Color(241, 245, 249));
-        model_input.SetFrameColor(Color(203, 213, 225));
-        model_input.SetInkColor(Color(30, 41, 59));
-
         footer.SetInk(footer_ink);
         model_info.SetInk(caption_ink);
         for(Label* l : Vector<Label*>{&cap1, &cap2, &cap3, &cap4, &cap5, &cap6, &cap7, &cap8, &cap9, &cap10})
@@ -802,17 +743,13 @@ private:
 
     int terminal_pulse_ = 10;
     bool terminal_pulse_dir_ = true;
-    int model_seq_ = 1000;
-
-    UiListModel live_model_;
+    UiListModel icon_model_;
 
     Label cap1, cap2, cap3, cap4, cap5, cap6, cap7, cap8, cap9, cap10;
     UiDropdown drop1, drop2, drop3, drop4, drop5, drop6, drop7, drop8, drop9, drop10;
-    UiLineEdit model_input;
     Label model_info;
     Label footer;
     UiButton toggle_theme;
-    UiButton btn_model_add, btn_model_update, btn_model_remove, btn_model_reset;
 };
 
 GUI_APP_MAIN

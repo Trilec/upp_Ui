@@ -22,8 +22,8 @@ static void PrintHelp()
     Cout() << "  symbol_token  Base token used for DATA_/ICON_ symbol names.\n";
     Cout() << "  size          Target icon size, e.g. 24 or 48x48.\n\n";
     Cout() << "Examples:\n";
-    Cout() << "  MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h CUSTOM_SEARCH_48 48x48\n";
-    Cout() << "  MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/newlogo_v4_icon.h CUSTOM_NEWLOGO_V4_48 48x48\n";
+    Cout() << "  MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h ACTION_SEARCH_48 48x48\n";
+    Cout() << "  MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/upplogo2_icon.h BRAND_UPPLOGO2_48 48x48\n";
 }
 
 static String UpperToken(String s)

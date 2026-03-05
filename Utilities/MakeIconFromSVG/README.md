@@ -40,13 +40,13 @@ Arguments:
 Generate from SVG:
 
 ```bat
-build\MakeIconFromSVG_tools.exe designs\search.svg Ui\newicons\search_icon.h CUSTOM_SEARCH_48 48x48
+build\MakeIconFromSVG_tools.exe designs\search.svg Ui\newicons\search_icon.h ACTION_SEARCH_48 48x48
 ```
 
 Generate from PNG:
 
 ```bat
-build\MakeIconFromSVG_tools.exe designs\NewLogo_v4.png Ui\newicons\newlogo_v4_icon.h CUSTOM_NEWLOGO_V4_48 48x48
+build\MakeIconFromSVG_tools.exe designs\NewLogo_v4.png Ui\newicons\upplogo2_icon.h BRAND_UPPLOGO2_48 48x48
 ```
 
 Show help:

@@ -1398,7 +1398,7 @@ void UiDropdown::Paint(Draw& w)
     }
 
     if(selected_vis_item && !IsNull(selected_vis_item->icon) && !label_rect.IsEmpty()) {
-        int side = min(max(DPI(12), label_rect.GetHeight() - DPI(4)), DPI(16));
+        int side = min(max(DPI(14), label_rect.GetHeight() - DPI(2)), DPI(20));
         Rect ir(label_rect.left,
                 label_rect.top + (label_rect.GetHeight() - side) / 2,
                 label_rect.left + side,

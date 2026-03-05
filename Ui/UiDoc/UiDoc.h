@@ -258,6 +258,11 @@ public:
         BULLET_DASH
     };
 
+    enum GutterSide : byte {
+        GUTTER_LEFT,
+        GUTTER_RIGHT
+    };
+
     struct Style : ChStyle<Style> {
         StyledPalette palette;
         StyledMetrics metrics;
@@ -349,6 +354,9 @@ private:
     bool bullet_mode_ = false;
     bool numbered_mode_ = false;
     BulletStyle bullet_style_ = BULLET_CIRCLE;
+    GutterSide gutter_side_ = GUTTER_LEFT;
+    bool show_line_numbers_ = false;
+    bool show_metadata_markers_ = true;
     int next_table_id_ = 1;
 
     Vector<UiDocAnnotation> annotations_;
@@ -362,6 +370,7 @@ private:
     int    active_table_row_ = 0;
     int    active_table_col_ = 0;
     int    active_table_cell_pos_ = 0;
+    bool   active_table_cell_selected_ = false;
     CharStyle typing_style_;
     bool insert_tab_as_spaces_ = false;
 
@@ -378,8 +387,10 @@ private:
     mutable Vector<int> line_lengths_;
     mutable Vector<int> line_widths_;
     mutable Vector<int> line_heights_;
+    mutable Vector<int> line_text_heights_;
     mutable Vector<int> line_tops_;
     mutable Vector< Vector<int> > line_prefix_x_;
+    mutable Vector<int> line_table_embed_ix_;
     mutable Vector<int> paragraph_margin_steps_;
     mutable Vector<UiDocBlockMeta> block_meta_;
     mutable VectorMap<int64, int> char_width_cache_;
@@ -498,11 +509,20 @@ private:
     int  FindActiveTableEmbedIndex() const;
     int  FindTableEmbedIndexAtPos(int pos) const;
     bool GetTableModelByEmbedIndex(int embed_ix, TableModel& out, int* table_id = nullptr) const;
-    ValueMap TableModelToPayload(int table_id, const TableModel& model, const ValueMap* table_style = nullptr) const;
+    ValueMap TableModelToPayload(int table_id,
+                                 const TableModel& model,
+                                 const ValueMap* table_style = nullptr,
+                                 const ValueMap* existing_payload = nullptr) const;
     bool PayloadToTableModel(const ValueMap& payload, TableModel& out) const;
+    bool GetTableLineVisual(int line, int embed_ix, Rect& table_rc, int& cols, int& rows, int& cell_w, int& cell_h) const;
+    bool HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& caret_off) const;
+    bool GetActiveTableCellRect(Rect& out) const;
+    int  MeasureCellCaretFromX(const WString& cell, int rel_x, const Font& f) const;
+    int  GetGutterLaneWidth() const;
     void CopyTableModel(const TableModel& src, TableModel& dst) const;
     bool MoveTableCell(bool reverse);
     bool ReplaceInActiveTableCell(UiDocRange range, const WString& txt);
+    bool InsertImageRunInActiveTableCell(const String& resource_key, int width, int height);
 
     void RecomputeSearchMatches();
     bool PosInRanges(int pos, const Vector<UiDocRange>& rr) const;
@@ -595,6 +615,12 @@ public:
     int GetTabSize() const { return style_.tab_size; }
     void SetInsertTabAsSpaces(bool b) { insert_tab_as_spaces_ = b; }
     bool IsInsertTabAsSpaces() const { return insert_tab_as_spaces_; }
+    void SetGutterSide(GutterSide side) { gutter_side_ = side; InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
+    GutterSide GetGutterSide() const { return gutter_side_; }
+    void ShowLineNumbers(bool b) { show_line_numbers_ = b; InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
+    bool IsLineNumbersShown() const { return show_line_numbers_; }
+    void ShowMetadataMarkers(bool b) { show_metadata_markers_ = b; InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
+    bool IsMetadataMarkersShown() const { return show_metadata_markers_; }
 
     void SetSearchQuery(const String& q);
     String GetSearchQuery() const { return search_query_; }

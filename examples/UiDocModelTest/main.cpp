@@ -994,6 +994,79 @@ static void Case38_TableOpsKeepActiveContext(TestCtx& t)
     t.EndCase();
 }
 
+static void Case39_TableCellImageRun(TestCtx& t)
+{
+    t.BeginCase("Table Cell Image Run", "Insert image run into active cell and verify payload + undo/redo.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("\n");
+    d.SetSelection(UiDocRange(0, 0));
+    d.InsertTable(2, 2);
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    t.Expect(!key.IsEmpty(), "resource key created");
+
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("width", 24);
+    add.Add("height", 20);
+    t.Expect(d.ExecuteCommand("table.cell.image.insert", add), "insert image run command succeeds");
+
+    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
+    t.Expect(ee.GetCount() == 1, "table embed exists");
+    if(!ee.IsEmpty()) {
+        ValueMap p = ee[0].payload;
+        t.Expect(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>(), "cell_runs present");
+        if(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>()) {
+            ValueArray rows = p["cell_runs"];
+            t.Expect(rows.GetCount() >= 1 && rows[0].Is<ValueArray>(), "rows in cell_runs");
+            if(rows.GetCount() >= 1 && rows[0].Is<ValueArray>()) {
+                ValueArray row0 = rows[0];
+                t.Expect(row0.GetCount() >= 1 && row0[0].Is<ValueArray>(), "cell run list exists");
+                if(row0.GetCount() >= 1 && row0[0].Is<ValueArray>()) {
+                    ValueArray runs = row0[0];
+                    bool has_image = false;
+                    for(int i = 0; i < runs.GetCount(); i++) {
+                        if(!runs[i].Is<ValueMap>())
+                            continue;
+                        ValueMap rm = runs[i];
+                        if(rm.Find("type") >= 0 && AsString(rm["type"]) == "image") {
+                            has_image = (rm.Find("resource_key") >= 0 && AsString(rm["resource_key"]) == key);
+                            break;
+                        }
+                    }
+                    t.Expect(has_image, "image run present in active cell");
+                }
+            }
+        }
+    }
+
+    t.Expect(d.Undo(), "undo image run insert");
+    Vector<UiDocEmbedBlock> eu = d.QueryEmbeds(nullptr, "table");
+    t.Expect(eu.GetCount() == 1, "table remains after undo");
+    if(!eu.IsEmpty() && eu[0].payload.Find("cell_runs") >= 0 && eu[0].payload["cell_runs"].Is<ValueArray>()) {
+        ValueArray rows = eu[0].payload["cell_runs"];
+        bool has_image = false;
+        if(rows.GetCount() > 0 && rows[0].Is<ValueArray>()) {
+            ValueArray row0 = rows[0];
+            if(row0.GetCount() > 0 && row0[0].Is<ValueArray>()) {
+                ValueArray runs = row0[0];
+                for(int i = 0; i < runs.GetCount(); i++) {
+                    if(runs[i].Is<ValueMap>() && ((ValueMap)runs[i]).Find("type") >= 0 && AsString(((ValueMap)runs[i])["type"]) == "image")
+                        has_image = true;
+                }
+            }
+        }
+        t.Expect(!has_image, "image run removed on undo");
+    }
+
+    t.Expect(d.Redo(), "redo image run insert");
+    Vector<UiDocEmbedBlock> er = d.QueryEmbeds(nullptr, "table");
+    t.Expect(er.GetCount() == 1, "table remains after redo");
+    t.EndCase();
+}
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
@@ -1038,6 +1111,7 @@ CONSOLE_APP_MAIN
     Case36_SvgEmbedUndoRedo(t);
     Case37_SvgEmbedRoundTrip(t);
     Case38_TableOpsKeepActiveContext(t);
+    Case39_TableCellImageRun(t);
 
     Cout() << "\n=== Summary ===\n";
     Cout() << "Cases : " << t.cases << "\n";

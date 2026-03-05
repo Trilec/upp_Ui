@@ -22,8 +22,8 @@ namespace Upp {
 //   MakeIconFromSVG <input.(svg|png|...)> [output.h] [symbol_token] [size|WIDTHxHEIGHT]
 //
 // Examples:
-//   MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h CUSTOM_SEARCH_48 48x48
-//   MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/newlogo_v4_icon.h CUSTOM_NEWLOGO_V4_48 48x48
+//   MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h ACTION_SEARCH_48 48x48
+//   MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/upplogo2_icon.h BRAND_UPPLOGO2_48 48x48
 //
 // Help:
 //   MakeIconFromSVG --help

@@ -66,17 +66,20 @@ public:
         const int cl_table = toolbar_.NewCluster();
         const int cl_embed = toolbar_.NewCluster();
         const int cl_find = toolbar_.NewCluster();
+        const int cl_view = toolbar_.NewCluster();
         toolbar_.SetClusterDecor(cl_format, true, true)
                 .SetClusterDecor(cl_structure, true, true)
                 .SetClusterDecor(cl_table, true, true)
                 .SetClusterDecor(cl_embed, true, true)
-                .SetClusterDecor(cl_find, true, true);
+                .SetClusterDecor(cl_find, true, true)
+                .SetClusterDecor(cl_view, true, true);
         toolbar_.WhenClusterText([=](int id) -> String {
             if(id == cl_format) return "Formatting";
             if(id == cl_structure) return "Structure";
             if(id == cl_table) return "Table";
             if(id == cl_embed) return "Embed";
             if(id == cl_find) return "Find";
+            if(id == cl_view) return "View";
             return String();
         });
 
@@ -100,58 +103,62 @@ public:
         comment_delete_.Disable();
         comment_close_.Disable();
 
-        bold_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_BOLD_48());
-        italic_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_ITALIC_48());
-        underline_.SetText("").SetIcon(ICON_CUSTOM_SERIF_48());
-        strike_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_STRIKETHROUGH_48());
+        bold_.SetText("").SetIcon(ICON_EDITOR_FORMAT_BOLD_48());
+        italic_.SetText("").SetIcon(ICON_EDITOR_FORMAT_ITALIC_48());
+        underline_.SetText("").SetIcon(ICON_EDITOR_SERIF_48());
+        strike_.SetText("").SetIcon(ICON_EDITOR_FORMAT_STRIKETHROUGH_48());
         upper_.SetText("").SetIcon(ICON_DESIGN_UPPERCASE_48());
         lower_.SetText("").SetIcon(ICON_DESIGN_LOWERCASE_48());
-        titlecase_.SetText("").SetIcon(ICON_CUSTOM_TITLECASE_48());
+        titlecase_.SetText("").SetIcon(ICON_EDITOR_TITLECASE_48());
         size_up_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         size_down_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
-        comment_.SetText("").SetIcon(ICON_CUSTOM_COMMENT_48());
+        comment_.SetText("").SetIcon(ICON_COMMUNICATION_COMMENT_48());
 
-        bullet_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_LIST_BULLETED_48());
-        numbered_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_LIST_NUMBERED_RTL_48());
+        bullet_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48());
+        numbered_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LIST_NUMBERED_RTL_48());
         bullet_circle_.SetText("").SetIcon(ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48());
         bullet_dash_.SetText("").SetIcon(ICON_NAVIGATION_OUTLINED_MENU_48());
 
-        h1_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_H1_48());
-        h2_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_H2_48());
-        h3_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_H3_48());
-        indent_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_INDENT_INCREASE_48());
-        outdent_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_INDENT_DECREASE_48());
-        quote_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_QUOTE_48());
-        code_.SetText("").SetIcon(ICON_CUSTOM_CLARIFY_48());
+        h1_.SetText("").SetIcon(ICON_EDITOR_FORMAT_H1_48());
+        h2_.SetText("").SetIcon(ICON_EDITOR_FORMAT_H2_48());
+        h3_.SetText("").SetIcon(ICON_EDITOR_FORMAT_H3_48());
+        indent_.SetText("").SetIcon(ICON_EDITOR_FORMAT_INDENT_INCREASE_48());
+        outdent_.SetText("").SetIcon(ICON_EDITOR_FORMAT_INDENT_DECREASE_48());
+        quote_.SetText("").SetIcon(ICON_EDITOR_FORMAT_QUOTE_48());
+        code_.SetText("").SetIcon(ICON_EDITOR_CLARIFY_48());
 
-        table_.SetText("").SetIcon(ICON_CUSTOM_TABLE_48());
+        table_.SetText("").SetIcon(ICON_EDITOR_TABLE_48());
         table_row_add_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_CIRCLE_OUTLINE_48());
         table_row_del_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_CIRCLE_OUTLINE_48());
         table_col_add_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         table_col_del_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
         table_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
-        hr_.SetText("").SetIcon(ICON_CUSTOM_FORMAT_LINE_SPACING_48());
+        hr_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LINE_SPACING_48());
         image_ins_.SetText("").SetIcon(ICON_DESIGN_IMAGE_48());
+        image_file_ins_.SetText("").SetIcon(ICON_DESIGN_FOLDER_48());
         svg_ins_.SetText("</>").SetIcon(ICON_NAVIGATION_OUTLINED_APPS_48());
         embed_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
 
-        note_.SetText("").SetIcon(ICON_CUSTOM_NOTES_48());
+        note_.SetText("").SetIcon(ICON_EDITOR_NOTES_48());
         find_prev_.SetText("").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48());
-        find_.SetText("").SetIcon(ICON_CUSTOM_SEARCH_48());
+        find_.SetText("").SetIcon(ICON_ACTION_SEARCH_48());
+        view_gutter_side_.SetText("").SetIcon(ICON_EDITOR_BORDER_LEFT_48());
+        view_line_numbers_.SetText("Ln").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
+        view_meta_markers_.SetText("").SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48());
         search_.SetPlaceholder("Search text...");
         insp_margin_plus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         insp_margin_minus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
-        insp_margin_reset_.SetText("").SetIcon(ICON_CUSTOM_MARGIN_48());
+        insp_margin_reset_.SetText("").SetIcon(ICON_EDITOR_MARGIN_48());
         insp_lead_plus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         insp_lead_minus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
         insp_track_plus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         insp_track_minus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
         insp_tab_plus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         insp_tab_minus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
-        insp_tab_mode_.SetText("Tabs=spaces").SetIcon(ICON_CUSTOM_MODE_OFF_ON_48());
+        insp_tab_mode_.SetText("Tabs=spaces").SetIcon(ICON_EDITOR_MODE_OFF_ON_48());
         insp_tab_mode_.SetCheckable();
-        insp_tx_check_.SetText("").SetIcon(ICON_CUSTOM_CLARIFY_48());
-        insp_map_check_.SetText("").SetIcon(ICON_CUSTOM_CHECK_CIRCLE_48());
+        insp_tx_check_.SetText("").SetIcon(ICON_EDITOR_CLARIFY_48());
+        insp_map_check_.SetText("").SetIcon(ICON_ACTION_CHECK_CIRCLE_48());
         insp_accept_check_.SetText("ACPT");
         inspector_checks_.SetReadOnly();
         inspector_checks_.SetText("Checks: idle");
@@ -194,11 +201,15 @@ public:
         setup_icon_button(table_del_);
         setup_icon_button(hr_);
         setup_icon_button(image_ins_);
+        setup_icon_button(image_file_ins_);
         setup_icon_button(svg_ins_);
         setup_icon_button(embed_del_);
         setup_icon_button(note_);
         setup_icon_button(find_prev_);
         setup_icon_button(find_);
+        setup_icon_button(view_gutter_side_);
+        setup_icon_button(view_line_numbers_);
+        setup_icon_button(view_meta_markers_);
         setup_icon_button(insp_margin_plus_);
         setup_icon_button(insp_margin_minus_);
         setup_icon_button(insp_margin_reset_);
@@ -240,13 +251,17 @@ public:
         table_col_del_.Tip("Remove current table column (inside table).");
         table_del_.Tip("Delete current table at caret.");
         hr_.Tip("Insert horizontal rule embed.");
-        image_ins_.Tip("Insert sample image embed (resource-backed).");
+        image_ins_.Tip("Insert U++ logo into active table cell.");
+        image_file_ins_.Tip("Insert image file (PNG/JPEG) into active table cell.");
         svg_ins_.Tip("Insert sample SVG embed.");
         embed_del_.Tip("Delete embed at caret (image/svg/hr/table embed ref).");
         note_.Tip("Attach metadata comment to selected text.");
         search_.Tip("Type search query (supports * and ? wildcards).");
         find_prev_.Tip("Find previous match.");
         find_.Tip("Find next match. Highlights all matches.");
+        view_gutter_side_.Tip("Toggle gutter side (left/right).");
+        view_line_numbers_.Tip("Toggle line numbers in gutter.");
+        view_meta_markers_.Tip("Toggle metadata markers in gutter.");
         insp_margin_plus_.Tip("Increase paragraph margin steps.");
         insp_margin_minus_.Tip("Decrease paragraph margin steps.");
         insp_margin_reset_.Tip("Reset paragraph margin steps to zero.");
@@ -297,18 +312,25 @@ public:
 
         toolbar_.Add(hr_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(image_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(image_file_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(svg_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(embed_del_, cl_embed, false, Size(DPI(34), DPI(30)));
 
         toolbar_.Add(search_, cl_find, false, Size(DPI(240), DPI(30)));
         toolbar_.Add(find_prev_, cl_find, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(find_, cl_find, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(view_gutter_side_, cl_view, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(view_line_numbers_, cl_view, false, Size(DPI(40), DPI(30)));
+        toolbar_.Add(view_meta_markers_, cl_view, false, Size(DPI(34), DPI(30)));
 
         bullet_.SetCheckable();
         numbered_.SetCheckable();
         bullet_circle_.SetCheckable();
         bullet_dash_.SetCheckable();
+        view_line_numbers_.SetCheckable();
+        view_meta_markers_.SetCheckable();
         bullet_circle_.SetChecked(true);
+        view_meta_markers_.SetChecked(true);
 
         bold_.WhenAction = [=] { doc_.ExecuteCommand("mark.bold"); doc_.SetFocus(); };
         italic_.WhenAction = [=] { doc_.ExecuteCommand("mark.italic"); doc_.SetFocus(); };
@@ -366,19 +388,49 @@ public:
         table_del_.WhenAction = [=] { doc_.ExecuteCommand("table.delete"); doc_.SetFocus(); };
         hr_.WhenAction = [=] { doc_.ExecuteCommand("embed.hr.insert"); doc_.SetFocus(); };
         image_ins_.WhenAction = [=] {
-            ImageBuffer ib(Size(10, 10));
-            for(int y = 0; y < 10; y++)
-                for(int x = 0; x < 10; x++)
-                    ib[x][y] = RGBA{(byte)(x * 20), (byte)(y * 20), (byte)180, 255};
-            String png = PNGEncoder().SaveString((Image)ib);
-            String key = doc_.AddResource("image", png, "image/png", "demo-inline.png", 10, 10, true);
+            Image logo = ICON_BRAND_UPPLOGO2_48();
+            String png = PNGEncoder().SaveString(logo);
+            Size sz = logo.GetSize();
+            String key = doc_.AddResource("image", png, "image/png", "DATA_CUSTOM_UPPLOGO2_48", sz.cx, sz.cy, true);
             if(!key.IsEmpty()) {
                 ValueMap add;
                 add.Add("resource_key", key);
-                add.Add("pos", doc_.GetSelection().caret);
-                add.Add("width", 10);
-                add.Add("height", 10);
-                doc_.ExecuteCommand("embed.image.insert", add);
+                add.Add("width", sz.cx);
+                add.Add("height", sz.cy);
+                doc_.ExecuteCommand("table.cell.image.insert", add);
+            }
+            doc_.SetFocus();
+        };
+        image_file_ins_.WhenAction = [=] {
+            FileSel fs;
+            fs.Type("Image files", "*.png *.jpg *.jpeg");
+            if(!fs.ExecuteOpen()) {
+                doc_.SetFocus();
+                return;
+            }
+            String path = ~fs;
+            String bytes = LoadFile(path);
+            if(bytes.IsEmpty()) {
+                doc_.SetFocus();
+                return;
+            }
+            String ext = ToLower(GetFileExt(path));
+            String mime = (ext == ".jpg" || ext == ".jpeg") ? "image/jpeg" : "image/png";
+            Image img = StreamRaster::LoadFileAny(path);
+            int w = 48;
+            int h = 48;
+            if(!img.IsEmpty()) {
+                Size isz = img.GetSize();
+                w = max(12, isz.cx);
+                h = max(12, isz.cy);
+            }
+            String key = doc_.AddResource("image", bytes, mime, GetFileName(path), w, h, true);
+            if(!key.IsEmpty()) {
+                ValueMap add;
+                add.Add("resource_key", key);
+                add.Add("width", min(96, w));
+                add.Add("height", min(64, h));
+                doc_.ExecuteCommand("table.cell.image.insert", add);
             }
             doc_.SetFocus();
         };
@@ -711,6 +763,22 @@ public:
         };
         search_.WhenAction = find_.WhenAction;
 
+        view_gutter_side_.WhenAction = [=] {
+            UiDoc::GutterSide side = doc_.GetGutterSide();
+            bool to_right = (side == UiDoc::GUTTER_LEFT);
+            doc_.SetGutterSide(to_right ? UiDoc::GUTTER_RIGHT : UiDoc::GUTTER_LEFT);
+            view_gutter_side_.SetIcon(to_right ? ICON_EDITOR_BORDER_RIGHT_48() : ICON_EDITOR_BORDER_LEFT_48());
+            doc_.SetFocus();
+        };
+        view_line_numbers_.WhenAction = [=] {
+            doc_.ShowLineNumbers(view_line_numbers_.IsChecked());
+            doc_.SetFocus();
+        };
+        view_meta_markers_.WhenAction = [=] {
+            doc_.ShowMetadataMarkers(view_meta_markers_.IsChecked());
+            doc_.SetFocus();
+        };
+
         doc_.WhenSelection = [=] {
             selection_evt_count_++;
             RefreshListButtons();
@@ -731,6 +799,10 @@ public:
             find_status_ = "Find '" + q + "': " + AsString(doc_.GetSearchMatchCount()) + " matches";
             RefreshInspector();
         };
+
+        doc_.SetGutterSide(UiDoc::GUTTER_LEFT);
+        doc_.ShowLineNumbers(false);
+        doc_.ShowMetadataMarkers(true);
 
         doc_.SetText(
             "UiDoc demo controls:\n"
@@ -1012,6 +1084,7 @@ private:
     UiButton   table_del_;
     UiButton   hr_;
     UiButton   image_ins_;
+    UiButton   image_file_ins_;
     UiButton   svg_ins_;
     UiButton   embed_del_;
 
@@ -1019,6 +1092,9 @@ private:
     UiLineEdit search_;
     UiButton   find_prev_;
     UiButton   find_;
+    UiButton   view_gutter_side_;
+    UiButton   view_line_numbers_;
+    UiButton   view_meta_markers_;
     UiLabel    inspector_title_;
     UiLineEdit inspector_state_;
     UiLineEdit inspector_modes_;
