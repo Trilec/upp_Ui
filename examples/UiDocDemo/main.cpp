@@ -3,6 +3,9 @@
 
 using namespace Upp;
 
+// UiDocDemo intentionally routes mutating actions through command execution
+// to mirror production transaction semantics and undo/redo behavior.
+
 static String NormalizeFindInput(String s)
 {
     s = TrimBoth(s);
@@ -132,16 +135,22 @@ public:
         table_row_del_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_CIRCLE_OUTLINE_48());
         table_col_add_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         table_col_del_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
+        table_decor_.SetText("Frame");
         table_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
         hr_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LINE_SPACING_48());
-        image_ins_.SetText("").SetIcon(ICON_DESIGN_IMAGE_48());
         image_file_ins_.SetText("").SetIcon(ICON_DESIGN_FOLDER_48());
+        image_flow_demo_.SetText("T+L+T").SetIcon(ICON_DESIGN_IMAGE_48());
+        image_align_left_.SetText("").SetIcon(ICON_EDITOR_BORDER_LEFT_48());
+        image_align_center_.SetText("C").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
+        image_align_right_.SetText("").SetIcon(ICON_EDITOR_BORDER_RIGHT_48());
         svg_ins_.SetText("</>").SetIcon(ICON_NAVIGATION_OUTLINED_APPS_48());
         embed_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
 
         note_.SetText("").SetIcon(ICON_EDITOR_NOTES_48());
         find_prev_.SetText("").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48());
         find_.SetText("").SetIcon(ICON_ACTION_SEARCH_48());
+        find_ignore_case_.SetText("Aa");
+        find_whole_word_.SetText("W");
         view_gutter_side_.SetText("").SetIcon(ICON_EDITOR_BORDER_LEFT_48());
         view_line_numbers_.SetText("Ln").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
         view_meta_markers_.SetText("").SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48());
@@ -200,13 +209,18 @@ public:
         setup_icon_button(table_col_del_);
         setup_icon_button(table_del_);
         setup_icon_button(hr_);
-        setup_icon_button(image_ins_);
         setup_icon_button(image_file_ins_);
+        setup_icon_button(image_flow_demo_);
+        setup_icon_button(image_align_left_);
+        setup_icon_button(image_align_center_);
+        setup_icon_button(image_align_right_);
         setup_icon_button(svg_ins_);
         setup_icon_button(embed_del_);
         setup_icon_button(note_);
         setup_icon_button(find_prev_);
         setup_icon_button(find_);
+        setup_icon_button(find_ignore_case_);
+        setup_icon_button(find_whole_word_);
         setup_icon_button(view_gutter_side_);
         setup_icon_button(view_line_numbers_);
         setup_icon_button(view_meta_markers_);
@@ -249,16 +263,22 @@ public:
         table_row_del_.Tip("Remove current table row (inside table).");
         table_col_add_.Tip("Add table column to the right (inside table).");
         table_col_del_.Tip("Remove current table column (inside table).");
+        table_decor_.Tip("Toggle frame/grid decorations for active table.");
         table_del_.Tip("Delete current table at caret.");
         hr_.Tip("Insert horizontal rule embed.");
-        image_ins_.Tip("Insert U++ logo into active table cell.");
-        image_file_ins_.Tip("Insert image file (PNG/JPEG) into active table cell.");
-        svg_ins_.Tip("Insert sample SVG embed.");
+        image_flow_demo_.Tip("Insert text + logo + text (table cell if active, otherwise paragraph). ");
+        image_file_ins_.Tip("Insert PNG/JPEG from file (table cell if active, otherwise paragraph). ");
+        image_align_left_.Tip("Align selected block image left.");
+        image_align_center_.Tip("Align selected block image center.");
+        image_align_right_.Tip("Align selected block image right.");
+        svg_ins_.Tip("Insert SVG embed placeholder (marker on the right). Rendering is a lightweight embed demo.");
         embed_del_.Tip("Delete embed at caret (image/svg/hr/table embed ref).");
         note_.Tip("Attach metadata comment to selected text.");
         search_.Tip("Type search query (supports * and ? wildcards).");
         find_prev_.Tip("Find previous match.");
         find_.Tip("Find next match. Highlights all matches.");
+        find_ignore_case_.Tip("Toggle case-insensitive matching.");
+        find_whole_word_.Tip("Toggle whole-word matching.");
         view_gutter_side_.Tip("Toggle gutter side (left/right).");
         view_line_numbers_.Tip("Toggle line numbers in gutter.");
         view_meta_markers_.Tip("Toggle metadata markers in gutter.");
@@ -307,18 +327,24 @@ public:
         toolbar_.Add(table_row_del_, cl_table, false, Size(DPI(40), DPI(30)));
         toolbar_.Add(table_col_add_, cl_table, false, Size(DPI(40), DPI(30)));
         toolbar_.Add(table_col_del_, cl_table, false, Size(DPI(40), DPI(30)));
+        toolbar_.Add(table_decor_, cl_table, false, Size(DPI(54), DPI(30)));
         toolbar_.Add(table_del_, cl_table, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(note_, cl_table, false, Size(DPI(34), DPI(30)));
 
         toolbar_.Add(hr_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(image_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(image_flow_demo_, cl_embed, false, Size(DPI(52), DPI(30)));
         toolbar_.Add(image_file_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(image_align_left_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(image_align_center_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(image_align_right_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(svg_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(embed_del_, cl_embed, false, Size(DPI(34), DPI(30)));
 
         toolbar_.Add(search_, cl_find, false, Size(DPI(240), DPI(30)));
         toolbar_.Add(find_prev_, cl_find, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(find_, cl_find, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(find_ignore_case_, cl_find, false, Size(DPI(40), DPI(30)));
+        toolbar_.Add(find_whole_word_, cl_find, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(view_gutter_side_, cl_view, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(view_line_numbers_, cl_view, false, Size(DPI(40), DPI(30)));
         toolbar_.Add(view_meta_markers_, cl_view, false, Size(DPI(34), DPI(30)));
@@ -329,8 +355,11 @@ public:
         bullet_dash_.SetCheckable();
         view_line_numbers_.SetCheckable();
         view_meta_markers_.SetCheckable();
+        find_ignore_case_.SetCheckable();
+        find_whole_word_.SetCheckable();
         bullet_circle_.SetChecked(true);
         view_meta_markers_.SetChecked(true);
+        find_ignore_case_.SetChecked(true);
 
         bold_.WhenAction = [=] { doc_.ExecuteCommand("mark.bold"); doc_.SetFocus(); };
         italic_.WhenAction = [=] { doc_.ExecuteCommand("mark.italic"); doc_.SetFocus(); };
@@ -385,22 +414,9 @@ public:
         table_row_del_.WhenAction = [=] { doc_.ExecuteCommand("table.row.remove"); doc_.SetFocus(); };
         table_col_add_.WhenAction = [=] { doc_.ExecuteCommand("table.col.add"); doc_.SetFocus(); };
         table_col_del_.WhenAction = [=] { doc_.ExecuteCommand("table.col.remove"); doc_.SetFocus(); };
+        table_decor_.WhenAction = [=] { doc_.ExecuteCommand("table.decor.toggle"); doc_.SetFocus(); };
         table_del_.WhenAction = [=] { doc_.ExecuteCommand("table.delete"); doc_.SetFocus(); };
         hr_.WhenAction = [=] { doc_.ExecuteCommand("embed.hr.insert"); doc_.SetFocus(); };
-        image_ins_.WhenAction = [=] {
-            Image logo = ICON_BRAND_UPPLOGO2_48();
-            String png = PNGEncoder().SaveString(logo);
-            Size sz = logo.GetSize();
-            String key = doc_.AddResource("image", png, "image/png", "DATA_CUSTOM_UPPLOGO2_48", sz.cx, sz.cy, true);
-            if(!key.IsEmpty()) {
-                ValueMap add;
-                add.Add("resource_key", key);
-                add.Add("width", sz.cx);
-                add.Add("height", sz.cy);
-                doc_.ExecuteCommand("table.cell.image.insert", add);
-            }
-            doc_.SetFocus();
-        };
         image_file_ins_.WhenAction = [=] {
             FileSel fs;
             fs.Type("Image files", "*.png *.jpg *.jpeg");
@@ -430,10 +446,51 @@ public:
                 add.Add("resource_key", key);
                 add.Add("width", min(96, w));
                 add.Add("height", min(64, h));
-                doc_.ExecuteCommand("table.cell.image.insert", add);
+                if(!doc_.ExecuteCommand("table.cell.image.insert", add)) {
+                    add.Add("pos", doc_.GetSelection().caret);
+                    doc_.ExecuteCommand("embed.image.inline.insert", add);
+                }
             }
             doc_.SetFocus();
         };
+        image_flow_demo_.WhenAction = [=] {
+            Image logo = Unmultiply(ICON_BRAND_UPPLOGO2_48());
+            String png = PNGEncoder().SaveString(logo);
+            Size sz = logo.GetSize();
+            String key = doc_.AddResource("image", png, "image/png", "DATA_BRAND_UPPLOGO2_48", sz.cx, sz.cy, true);
+            if(!key.IsEmpty()) {
+                bool in_table = false;
+                ValueMap add;
+                add.Add("resource_key", key);
+                add.Add("width", min(28, max(12, sz.cx)));
+                add.Add("height", min(28, max(12, sz.cy)));
+                if(doc_.ExecuteCommand("table.cell.image.insert", add)) {
+                    in_table = true;
+                    const char* a = "Before ";
+                    for(int i = 0; a[i]; i++)
+                        doc_.Key(a[i], 1);
+                    doc_.ExecuteCommand("table.cell.image.insert", add);
+                    const char* b = " After";
+                    for(int i = 0; b[i]; i++)
+                        doc_.Key(b[i], 1);
+                }
+                if(!in_table) {
+                    int pos = doc_.GetSelection().caret;
+                    ValueMap rep;
+                    rep.Add("from", pos);
+                    rep.Add("to", pos);
+                    rep.Add("text", "Before After");
+                    doc_.ExecuteCommand("doc.replace", rep);
+                    add.Add("pos", pos + 7);
+                    doc_.ExecuteCommand("embed.image.inline.insert", add);
+                    doc_.SetSelection(UiDocRange(pos + 12, pos + 12));
+                }
+            }
+            doc_.SetFocus();
+        };
+        image_align_left_.WhenAction = [=] { doc_.ExecuteCommand("embed.image.align.set", "left"); doc_.SetFocus(); };
+        image_align_center_.WhenAction = [=] { doc_.ExecuteCommand("embed.image.align.set", "center"); doc_.SetFocus(); };
+        image_align_right_.WhenAction = [=] { doc_.ExecuteCommand("embed.image.align.set", "right"); doc_.SetFocus(); };
         svg_ins_.WhenAction = [=] {
             ValueMap add;
             add.Add("svg_xml", "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='18'><rect x='1' y='1' width='46' height='16' fill='none' stroke='black'/><text x='8' y='13' font-size='10'>SVG</text></svg>");
@@ -762,6 +819,16 @@ public:
             doc_.SetFocus();
         };
         search_.WhenAction = find_.WhenAction;
+        find_ignore_case_.WhenAction = [=] {
+            doc_.SetSearchIgnoreCase(find_ignore_case_.IsChecked());
+            find_.WhenAction();
+            doc_.SetFocus();
+        };
+        find_whole_word_.WhenAction = [=] {
+            doc_.SetSearchWholeWord(find_whole_word_.IsChecked());
+            find_.WhenAction();
+            doc_.SetFocus();
+        };
 
         view_gutter_side_.WhenAction = [=] {
             UiDoc::GutterSide side = doc_.GetGutterSide();
@@ -1081,10 +1148,14 @@ private:
     UiButton   table_row_del_;
     UiButton   table_col_add_;
     UiButton   table_col_del_;
+    UiButton   table_decor_;
     UiButton   table_del_;
     UiButton   hr_;
-    UiButton   image_ins_;
     UiButton   image_file_ins_;
+    UiButton   image_flow_demo_;
+    UiButton   image_align_left_;
+    UiButton   image_align_center_;
+    UiButton   image_align_right_;
     UiButton   svg_ins_;
     UiButton   embed_del_;
 
@@ -1092,6 +1163,8 @@ private:
     UiLineEdit search_;
     UiButton   find_prev_;
     UiButton   find_;
+    UiButton   find_ignore_case_;
+    UiButton   find_whole_word_;
     UiButton   view_gutter_side_;
     UiButton   view_line_numbers_;
     UiButton   view_meta_markers_;

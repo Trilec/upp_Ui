@@ -4,6 +4,11 @@
 
 namespace Upp {
 
+// Helpers below keep table-cell run editing lightweight:
+// - TextRun + ImageRun only
+// - image bytes remain in resource table (resource_key references)
+// - payload write paths remain transaction-driven via Dispatch(tx)
+
 static WString TrimWs(const WString& s)
 {
     int b = 0;
@@ -37,6 +42,533 @@ static ValueMap UiDocMakeTextRun(const WString& text)
     run.Add("type", "text");
     run.Add("text", text.ToString());
     return run;
+}
+
+static bool UiDocIsTextRun(const Value& v)
+{
+    if(!v.Is<ValueMap>())
+        return false;
+    ValueMap m = v;
+    return m.Find("type") >= 0 && AsString(m["type"]) == "text";
+}
+
+static bool UiDocIsImageRun(const Value& v)
+{
+    if(!v.Is<ValueMap>())
+        return false;
+    ValueMap m = v;
+    return m.Find("type") >= 0 && AsString(m["type"]) == "image";
+}
+
+static ValueArray UiDocNormalizeCellRuns(const ValueArray& in)
+{
+    ValueArray out;
+    String pending;
+    for(int i = 0; i < in.GetCount(); i++) {
+        if(UiDocIsTextRun(in[i])) {
+            ValueMap rm = in[i];
+            pending << (rm.Find("text") >= 0 ? AsString(rm["text"]) : String());
+            continue;
+        }
+        if(!pending.IsEmpty()) {
+            out.Add(UiDocMakeTextRun(pending.ToWString()));
+            pending.Clear();
+        }
+        out.Add(in[i]);
+    }
+    if(!pending.IsEmpty())
+        out.Add(UiDocMakeTextRun(pending.ToWString()));
+    if(out.IsEmpty())
+        out.Add(UiDocMakeTextRun(WString()));
+    return out;
+}
+
+static int UiDocCellRunUnits(const ValueArray& runs)
+{
+    int n = 0;
+    for(int i = 0; i < runs.GetCount(); i++) {
+        if(UiDocIsTextRun(runs[i])) {
+            ValueMap rm = runs[i];
+            n += AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString().GetCount();
+        }
+        else if(UiDocIsImageRun(runs[i]))
+            n += 1;
+    }
+    return n;
+}
+
+static WString UiDocCellTextFromRunsArr(const ValueArray& runs)
+{
+    WString out;
+    for(int i = 0; i < runs.GetCount(); i++) {
+        if(!UiDocIsTextRun(runs[i]))
+            continue;
+        ValueMap rm = runs[i];
+        if(rm.Find("text") >= 0)
+            out << AsString(rm["text"]).ToWString();
+    }
+    return out;
+}
+
+static ValueArray UiDocEnsureCellRunsPayload(const ValueMap& payload, int row, int col)
+{
+    int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+    int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+    rows = max(1, rows);
+    cols = max(1, cols);
+    row = ::clamp(row, 0, rows - 1);
+    col = ::clamp(col, 0, cols - 1);
+
+    if(payload.Find("cell_runs") >= 0 && payload["cell_runs"].Is<ValueArray>()) {
+        ValueArray rr = payload["cell_runs"];
+        if(row < rr.GetCount() && rr[row].Is<ValueArray>()) {
+            ValueArray row_runs = rr[row];
+            if(col < row_runs.GetCount() && row_runs[col].Is<ValueArray>())
+                return UiDocNormalizeCellRuns((ValueArray)row_runs[col]);
+        }
+    }
+
+    WString txt;
+    if(payload.Find("cells") >= 0 && payload["cells"].Is<ValueArray>()) {
+        ValueArray rowsv = payload["cells"];
+        if(row < rowsv.GetCount() && rowsv[row].Is<ValueArray>()) {
+            ValueArray rowv = rowsv[row];
+            if(col < rowv.GetCount())
+                txt = AsString(rowv[col]).ToWString();
+        }
+    }
+    ValueArray out;
+    out.Add(UiDocMakeTextRun(txt));
+    return out;
+}
+
+static void UiDocWriteCellRunsAndCells(ValueMap& payload, int row, int col, const ValueArray& new_runs)
+{
+    int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+    int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+    rows = max(1, rows);
+    cols = max(1, cols);
+    row = ::clamp(row, 0, rows - 1);
+    col = ::clamp(col, 0, cols - 1);
+
+    ValueArray old_cells;
+    if(payload.Find("cells") >= 0 && payload["cells"].Is<ValueArray>())
+        old_cells = payload["cells"];
+    ValueArray old_runs;
+    if(payload.Find("cell_runs") >= 0 && payload["cell_runs"].Is<ValueArray>())
+        old_runs = payload["cell_runs"];
+
+    ValueArray out_cells;
+    ValueArray out_runs;
+    for(int r = 0; r < rows; r++) {
+        ValueArray row_cells;
+        ValueArray row_runs;
+
+        ValueArray src_cells;
+        if(r < old_cells.GetCount() && old_cells[r].Is<ValueArray>())
+            src_cells = old_cells[r];
+        ValueArray src_runs_row;
+        if(r < old_runs.GetCount() && old_runs[r].Is<ValueArray>())
+            src_runs_row = old_runs[r];
+
+        for(int c = 0; c < cols; c++) {
+            ValueArray runs;
+            if(r == row && c == col)
+                runs = UiDocNormalizeCellRuns(new_runs);
+            else if(c < src_runs_row.GetCount() && src_runs_row[c].Is<ValueArray>())
+                runs = UiDocNormalizeCellRuns((ValueArray)src_runs_row[c]);
+            else {
+                WString txt;
+                if(c < src_cells.GetCount())
+                    txt = AsString(src_cells[c]).ToWString();
+                runs.Add(UiDocMakeTextRun(txt));
+            }
+            row_runs.Add(runs);
+            row_cells.Add(UiDocCellTextFromRunsArr(runs).ToString());
+        }
+        out_runs.Add(row_runs);
+        out_cells.Add(row_cells);
+    }
+
+    payload.GetAdd("cell_runs") = out_runs;
+    payload.GetAdd("cells") = out_cells;
+}
+
+static ValueArray UiDocInsertTextRunsAt(const ValueArray& src, int pos, const WString& txt)
+{
+    ValueArray out;
+    int at = 0;
+    bool inserted = false;
+    for(int i = 0; i < src.GetCount(); i++) {
+        Value v = src[i];
+        if(UiDocIsTextRun(v)) {
+            ValueMap rm = v;
+            WString t = AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString();
+            int len = t.GetCount();
+            if(!inserted && pos <= at + len) {
+                int off = ::clamp(pos - at, 0, len);
+                WString l = t.Left(off);
+                WString r = t.Mid(off);
+                if(!l.IsEmpty()) out.Add(UiDocMakeTextRun(l));
+                if(!txt.IsEmpty()) out.Add(UiDocMakeTextRun(txt));
+                if(!r.IsEmpty()) out.Add(UiDocMakeTextRun(r));
+                inserted = true;
+            }
+            else {
+                out.Add(v);
+            }
+            at += len;
+        }
+        else if(UiDocIsImageRun(v)) {
+            if(!inserted && pos == at) {
+                if(!txt.IsEmpty()) out.Add(UiDocMakeTextRun(txt));
+                inserted = true;
+            }
+            out.Add(v);
+            at += 1;
+        }
+        else {
+            out.Add(v);
+        }
+    }
+    if(!inserted && !txt.IsEmpty())
+        out.Add(UiDocMakeTextRun(txt));
+    return UiDocNormalizeCellRuns(out);
+}
+
+static ValueArray UiDocInsertImageRunAt(const ValueArray& src, int pos, const ValueMap& image_run)
+{
+    ValueArray out;
+    int at = 0;
+    bool inserted = false;
+    for(int i = 0; i < src.GetCount(); i++) {
+        Value v = src[i];
+        if(UiDocIsTextRun(v)) {
+            ValueMap rm = v;
+            WString t = AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString();
+            int len = t.GetCount();
+            if(!inserted && pos <= at + len) {
+                int off = ::clamp(pos - at, 0, len);
+                WString l = t.Left(off);
+                WString r = t.Mid(off);
+                if(!l.IsEmpty()) out.Add(UiDocMakeTextRun(l));
+                out.Add(image_run);
+                if(!r.IsEmpty()) out.Add(UiDocMakeTextRun(r));
+                inserted = true;
+            }
+            else {
+                out.Add(v);
+            }
+            at += len;
+        }
+        else if(UiDocIsImageRun(v)) {
+            if(!inserted && pos == at) {
+                out.Add(image_run);
+                inserted = true;
+            }
+            out.Add(v);
+            at += 1;
+        }
+        else {
+            out.Add(v);
+        }
+    }
+    if(!inserted)
+        out.Add(image_run);
+    return UiDocNormalizeCellRuns(out);
+}
+
+struct UiDocInlineBox : Moveable<UiDocInlineBox> {
+    byte   kind = 0; // 1=text, 2=image
+    int    from = 0;
+    int    to = 0;
+    int    x = 0;
+    int    y = 0;
+    int    w = 0;
+    int    h = 0;
+    wchar  ch = 0;
+    String key;
+};
+
+struct UiDocInlineLayout {
+    Vector<UiDocInlineBox> boxes;
+    Vector<int> line_from;
+    Vector<int> line_to;
+    Vector<int> line_y;
+    Vector<int> line_h;
+    int units = 0;
+    int width = 0;
+    int height = 0;
+};
+
+static UiDocInlineLayout UiDocLayoutInlineRuns(const ValueArray& runs, const Font& f, int max_w, bool wrap, bool image_counts_as_unit = true)
+{
+    UiDocInlineLayout out;
+    max_w = max(DPI(12), max_w);
+    int base_h = max(DPI(14), f.GetHeight() + DPI(2));
+    int x = 0;
+    int y = 0;
+    int lh = base_h;
+    int line_from = 0;
+
+    auto EndLine = [&]() {
+        out.line_from.Add(line_from);
+        out.line_to.Add(out.units);
+        out.line_y.Add(y);
+        out.line_h.Add(lh);
+        y += lh;
+        x = 0;
+        lh = base_h;
+        line_from = out.units;
+    };
+
+    for(int i = 0; i < runs.GetCount(); i++) {
+        if(!runs[i].Is<ValueMap>())
+            continue;
+        ValueMap run = runs[i];
+        String type = (run.Find("type") >= 0 ? AsString(run["type"]) : String());
+
+        if(type == "text") {
+            WString txt = AsString(run.Find("text") >= 0 ? run["text"] : Value()).ToWString();
+            for(int k = 0; k < txt.GetCount(); k++) {
+                wchar ch = txt[k];
+                if(ch == '\r')
+                    continue;
+                if(ch == '\n') {
+                    out.units++;
+                    EndLine();
+                    continue;
+                }
+                WString one;
+                one.Cat(ch);
+                int cw = max(1, GetTextSize(one.ToString(), f).cx);
+                if(wrap && x > 0 && x + cw > max_w)
+                    EndLine();
+                UiDocInlineBox b;
+                b.kind = 1;
+                b.from = out.units;
+                b.to = out.units + 1;
+                b.x = x;
+                b.y = y;
+                b.w = cw;
+                b.h = base_h;
+                b.ch = ch;
+                out.boxes.Add(b);
+                out.units++;
+                x += cw;
+                out.width = max(out.width, x);
+            }
+            continue;
+        }
+
+        if(type == "image" && run.Find("resource_key") >= 0) {
+            int iw = (run.Find("width") >= 0 ? (int)run["width"] : DPI(24));
+            int ih = (run.Find("height") >= 0 ? (int)run["height"] : DPI(24));
+            iw = ::clamp(iw, DPI(10), max(DPI(10), max_w));
+            ih = ::clamp(ih, DPI(10), DPI(320));
+            if(wrap && x > 0 && x + iw > max_w)
+                EndLine();
+            lh = max(lh, ih + DPI(2));
+            UiDocInlineBox b;
+            b.kind = 2;
+            b.from = out.units;
+            b.to = out.units + 1;
+            b.x = x;
+            b.y = y;
+            b.w = iw;
+            b.h = ih;
+            b.key = AsString(run["resource_key"]);
+            out.boxes.Add(b);
+            if(image_counts_as_unit)
+                out.units++;
+            x += iw + DPI(2);
+            out.width = max(out.width, x);
+        }
+    }
+
+    out.line_from.Add(line_from);
+    out.line_to.Add(out.units);
+    out.line_y.Add(y);
+    out.line_h.Add(lh);
+    out.height = y + lh;
+    return out;
+}
+
+static int UiDocInlineHitCaret(const UiDocInlineLayout& lo, int relx, int rely)
+{
+    int li = 0;
+    for(int i = 0; i < lo.line_y.GetCount(); i++) {
+        if(lo.line_y[i] <= rely && rely < lo.line_y[i] + lo.line_h[i]) {
+            li = i;
+            break;
+        }
+        if(rely >= lo.line_y[i])
+            li = i;
+    }
+
+    int at = (li < lo.line_from.GetCount() ? lo.line_from[li] : 0);
+    int line_to = (li < lo.line_to.GetCount() ? lo.line_to[li] : lo.units);
+    for(int i = 0; i < lo.boxes.GetCount(); i++) {
+        const UiDocInlineBox& b = lo.boxes[i];
+        if(!(at <= b.from && b.from < line_to))
+            continue;
+        if(relx < b.x + b.w / 2)
+            return b.from;
+        at = b.to;
+    }
+    return at;
+}
+
+static Point UiDocInlineCaretPoint(const UiDocInlineLayout& lo, int at)
+{
+    at = ::clamp(at, 0, lo.units);
+    int x = 0;
+    int y = 0;
+    for(int i = 0; i < lo.boxes.GetCount(); i++) {
+        const UiDocInlineBox& b = lo.boxes[i];
+        if(at <= b.from)
+            return Point(b.x, b.y);
+        x = b.x + b.w + (b.kind == 2 ? DPI(2) : 0);
+        y = b.y;
+    }
+    if(!lo.line_y.IsEmpty()) {
+        int li = lo.line_y.GetCount() - 1;
+        y = lo.line_y[li];
+    }
+    return Point(x, y);
+}
+
+static ValueArray UiDocBuildParagraphInlineRuns(const WString& text,
+                                                int start,
+                                                int len,
+                                                const Vector<UiDocEmbedBlock>& embeds)
+{
+    ValueArray runs;
+    Vector<int> img_off;
+    Vector<ValueMap> img_payload;
+    for(int i = 0; i < embeds.GetCount(); i++) {
+        const UiDocEmbedBlock& e = embeds[i];
+        if(e.embed_type != "image")
+            continue;
+        String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+        if(mode != "inline")
+            continue;
+        if(!(start <= e.range.from && e.range.from <= start + len))
+            continue;
+        ValueMap im;
+        im.Add("type", "image");
+        if(e.payload.Find("resource_key") >= 0)
+            im.Add("resource_key", AsString(e.payload["resource_key"]));
+        if(e.payload.Find("width") >= 0)
+            im.Add("width", (int)e.payload["width"]);
+        if(e.payload.Find("height") >= 0)
+            im.Add("height", (int)e.payload["height"]);
+        img_off.Add(::clamp(e.range.from - start, 0, len));
+        img_payload.Add(im);
+    }
+
+    for(int i = 0; i < len; i++) {
+        for(int j = 0; j < img_off.GetCount(); j++)
+            if(img_off[j] == i)
+                runs.Add(img_payload[j]);
+        ValueMap tr;
+        tr.Add("type", "text");
+        WString one;
+        one.Cat(text[start + i]);
+        tr.Add("text", one.ToString());
+        runs.Add(tr);
+    }
+    for(int j = 0; j < img_off.GetCount(); j++)
+        if(img_off[j] == len)
+            runs.Add(img_payload[j]);
+
+    return runs;
+}
+
+static void UiDocComputeTableRowMetrics(const ValueMap& payload,
+                                        int rows,
+                                        int base_cell_h,
+                                        int cell_w,
+                                        Vector<int>& row_heights,
+                                        Vector<int>& row_tops,
+                                        int& table_h)
+{
+    row_heights.SetCount(rows, max(1, base_cell_h));
+    int text_line_h = max(DPI(14), base_cell_h - DPI(4));
+    int right_w = max(DPI(12), cell_w - DPI(8));
+    if(payload.Find("cell_runs") >= 0 && payload["cell_runs"].Is<ValueArray>()) {
+        ValueArray all_rows = payload["cell_runs"];
+        for(int r = 0; r < rows && r < all_rows.GetCount(); r++) {
+            if(!all_rows[r].Is<ValueArray>())
+                continue;
+            ValueArray rr = all_rows[r];
+            int row_max_h = text_line_h + DPI(4);
+            for(int c = 0; c < rr.GetCount(); c++) {
+                if(!rr[c].Is<ValueArray>())
+                    continue;
+                ValueArray runs = rr[c];
+                int x = 0;
+                int y = 0;
+                int cur_h = text_line_h;
+                int max_h = cur_h;
+                for(int i = 0; i < runs.GetCount(); i++) {
+                    if(!runs[i].Is<ValueMap>())
+                        continue;
+                    ValueMap run = runs[i];
+                    if(run.Find("type") >= 0 && AsString(run["type"]) == "text" && run.Find("text") >= 0) {
+                        WString txt = AsString(run["text"]).ToWString();
+                        for(int k = 0; k < txt.GetCount(); k++) {
+                            wchar ch = txt[k];
+                            if(ch == '\r')
+                                continue;
+                            if(ch == '\n') {
+                                y += cur_h;
+                                x = 0;
+                                cur_h = text_line_h;
+                                max_h = max(max_h, y + cur_h);
+                                continue;
+                            }
+                            WString one;
+                            one.Cat(ch);
+                            int cw = max(1, GetTextSize(one.ToString(), StdFont()).cx);
+                            if(x > 0 && x + cw > right_w) {
+                                y += cur_h;
+                                x = 0;
+                                cur_h = text_line_h;
+                            }
+                            x += cw;
+                            max_h = max(max_h, y + cur_h);
+                        }
+                        continue;
+                    }
+                    if(run.Find("type") >= 0 && AsString(run["type"]) == "image") {
+                        int ih = (run.Find("height") >= 0 ? (int)run["height"] : DPI(24));
+                        int iw = (run.Find("width") >= 0 ? (int)run["width"] : DPI(24));
+                        ih = ::clamp(ih, DPI(10), DPI(96));
+                        iw = ::clamp(iw, DPI(10), max(DPI(10), right_w));
+                        if(x > 0 && x + iw > right_w) {
+                            y += cur_h;
+                            x = 0;
+                            cur_h = text_line_h;
+                        }
+                        cur_h = max(cur_h, ih + DPI(2));
+                        x += iw + DPI(2);
+                        max_h = max(max_h, y + cur_h);
+                    }
+                }
+                row_max_h = max(row_max_h, max_h + DPI(2));
+            }
+            row_heights[r] = max(row_heights[r], row_max_h);
+        }
+    }
+
+    row_tops.SetCount(rows, 0);
+    int y = 0;
+    for(int r = 0; r < rows; r++) {
+        row_tops[r] = y;
+        y += row_heights[r];
+    }
+    table_h = y + 1;
 }
 
 const UiDoc::Style& UiDoc::StyleDefault()
@@ -500,8 +1032,43 @@ void UiDoc::RebuildLayoutCache() const
             w += max(1, cx);
             pref[j + 1] = w;
         }
+
+        Vector<int> inline_off;
+        Vector<int> inline_w;
+        Vector<int> inline_h;
+        int max_inline_h = 0;
+        for(int ei = 0; ei < embeds_.GetCount(); ei++) {
+            const UiDocEmbedBlock& e = embeds_[ei];
+            if(e.embed_type != "image")
+                continue;
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "inline")
+                continue;
+            if(!(ls <= e.range.from && e.range.from <= ls + len))
+                continue;
+
+            int iw = 0, ih = 0;
+            if(!GetImageDisplaySize(e, max(DPI(16), text_rect_.GetWidth() - DPI(24)), iw, ih))
+                continue;
+            inline_off.Add(::clamp(e.range.from - ls, 0, len));
+            inline_w.Add(iw);
+            inline_h.Add(ih);
+            max_inline_h = max(max_inline_h, ih);
+        }
+
+        for(int j = 0; j <= len; j++) {
+            int add = 0;
+            for(int k = 0; k < inline_off.GetCount(); k++)
+                if(inline_off[k] <= j)
+                    add += inline_w[k];
+            pref[j] += add;
+        }
+        if(len >= 0)
+            w = pref[len];
         line_widths_[line] = w;
         int lh = max(DPI(16), line_font_h + max(style_.line_gap + line_leading, 0));
+        if(max_inline_h > 0)
+            lh = max(lh, max_inline_h + DPI(4));
         line_text_heights_[line] = lh;
 
         int line_from = ls;
@@ -521,26 +1088,36 @@ void UiDoc::RebuildLayoutCache() const
             TableModel tm;
             if(PayloadToTableModel(embeds_[table_embed_ix].payload, tm) && !tm.rows.IsEmpty() && tm.cols > 0) {
                 int cell_h = max(DPI(22), base.GetHeight() + DPI(8));
-                int table_h = tm.rows.GetCount() * cell_h + 1;
+                int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
+                int gutter_right = (gutter_side_ == GUTTER_RIGHT ? GetGutterLaneWidth() : 0);
+                int avail_w = text_rect_.GetWidth() - style_.metrics.content_padding.left - style_.metrics.content_padding.right - gutter_left - gutter_right - DPI(8);
+                avail_w = max(DPI(120), avail_w);
+                int cell_w = max(DPI(56), avail_w / tm.cols);
+                Vector<int> row_heights;
+                Vector<int> row_tops;
+                int table_h = 0;
+                UiDocComputeTableRowMetrics(embeds_[table_embed_ix].payload, tm.rows.GetCount(), cell_h, cell_w, row_heights, row_tops, table_h);
                 int gap = (len > 0 ? DPI(4) : DPI(2));
                 lh += gap + table_h + DPI(2);
             }
         }
 
-        int image_h = 0;
+        int image_extra = 0;
         for(int ei = 0; ei < embeds_.GetCount(); ei++) {
             const UiDocEmbedBlock& e = embeds_[ei];
             if(e.embed_type != "image")
                 continue;
             if(!(line_from <= e.range.from && e.range.from <= line_to))
                 continue;
-            int h = (e.payload.Find("height") >= 0 ? (int)e.payload["height"] : DPI(48));
-            image_h = max(image_h, ::clamp(h, DPI(16), DPI(96)));
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "block")
+                continue;
+            int disp_w = 0, disp_h = 0;
+            if(!GetImageDisplaySize(e, max(DPI(120), text_rect_.GetWidth() - DPI(24)), disp_w, disp_h))
+                continue;
+            image_extra += max(0, (len > 0 ? DPI(4) : DPI(2)) + disp_h + DPI(2));
         }
-        if(image_h > 0) {
-            int gap = (len > 0 ? DPI(4) : DPI(2));
-            lh += gap + image_h + DPI(2);
-        }
+        lh += image_extra;
         line_heights_[line] = lh;
         max_line_h = max(max_line_h, lh);
     }
@@ -601,20 +1178,27 @@ int UiDoc::GetLineHeight(int line) const
 
 int UiDoc::GetGutterLaneWidth() const
 {
-    int w = 0;
-    if(show_metadata_markers_)
-        w = max(w, DPI(10));
+    int w_numbers = 0;
+    int w_markers = 0;
     if(show_line_numbers_) {
         int lines = max(1, line_starts_.GetCount());
         int digits = AsString(lines).GetCount();
         String probe;
         for(int i = 0; i < digits; i++)
             probe.Cat('8');
-        w = max(w, GetTextSize(probe, GetBaseFont()).cx + DPI(8));
+        w_numbers = GetTextSize(probe, GetBaseFont()).cx + DPI(8);
     }
+    if(show_metadata_markers_) {
+        int sz = max(DPI(6), GetBaseFont().GetHeight() - DPI(2));
+        sz = min(sz, DPI(10));
+        w_markers = sz * 3 + DPI(2) * 2 + DPI(4);
+    }
+    int w = max(w_numbers, w_markers);
+    if(show_line_numbers_ && show_metadata_markers_)
+        w = w_numbers + w_markers + DPI(2);
     if(w <= 0)
         return 0;
-    return w + DPI(6);
+    return w + DPI(4);
 }
 
 int UiDoc::HitTestLineByY(int y_doc) const
@@ -699,47 +1283,31 @@ int UiDoc::PosToX(int line, int col) const
     EnsureLayoutCache();
     line = ::clamp(line, 0, line_starts_.GetCount() - 1);
     col  = ::clamp(col, 0, line_lengths_[line]);
-    const Vector<int>& p = line_prefix_x_[line];
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
     int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
-    return left + indent * max(1, style_.margin_step) + prefix + p[col];
+    int start = line_starts_[line];
+    int len = line_lengths_[line];
+    ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
+    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+    Point cp = UiDocInlineCaretPoint(lo, col);
+    return left + indent * max(1, style_.margin_step) + prefix + cp.x;
 }
 
 int UiDoc::XToColumn(int line, int x) const
 {
     EnsureLayoutCache();
     line = ::clamp(line, 0, line_starts_.GetCount() - 1);
-    const Vector<int>& p = line_prefix_x_[line];
-
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
     int rel = x - (text_rect_.left + style_.metrics.content_padding.left + gutter_left + indent * max(1, style_.margin_step) + prefix);
-    if(rel <= 0)
-        return 0;
-
+    int start = line_starts_[line];
     int len = line_lengths_[line];
-    int lo = 0;
-    int hi = len;
-    while(lo < hi) {
-        int mid = (lo + hi) >> 1;
-        if(p[mid] < rel)
-            lo = mid + 1;
-        else
-            hi = mid;
-    }
-
-    int i = lo;
-    if(i <= 0)
-        return 0;
-    if(i >= len)
-        return len;
-
-    int a = p[i - 1];
-    int b = p[i];
-    return (rel - a < b - rel) ? (i - 1) : i;
+    ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
+    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+    return ::clamp(UiDocInlineHitCaret(lo, rel, max(0, lo.height / 2)), 0, len);
 }
 
 int UiDoc::PosAtPointInternal(Point p) const
@@ -1494,6 +2062,7 @@ void UiDoc::SetSelection(const UiDocSelection& s)
     anchor_pos_ = ClampPos(s.anchor);
     caret_pos_  = ClampPos(s.caret);
     active_table_cell_selected_ = false;
+    active_image_embed_id_.Clear();
     preferred_x_ = -1;
     Refresh();
     WhenSelection();
@@ -1505,6 +2074,7 @@ void UiDoc::SetSelection(const UiDocRange& r)
     anchor_pos_ = n.from;
     caret_pos_  = n.to;
     active_table_cell_selected_ = false;
+    active_image_embed_id_.Clear();
     preferred_x_ = -1;
     Refresh();
     WhenSelection();
@@ -1981,6 +2551,16 @@ ValueMap UiDoc::TableModelToPayload(int table_id,
         cell_runs_rows.Add(out_row);
     }
     p.Add("cell_runs", cell_runs_rows);
+    bool show_frame = true;
+    bool show_grid = true;
+    if(existing_payload) {
+        if(existing_payload->Find("show_frame") >= 0)
+            show_frame = (int)(*existing_payload)["show_frame"] != 0;
+        if(existing_payload->Find("show_grid") >= 0)
+            show_grid = (int)(*existing_payload)["show_grid"] != 0;
+    }
+    p.Add("show_frame", (int)show_frame);
+    p.Add("show_grid", (int)show_grid);
 
     ValueMap ts;
     if(table_style)
@@ -2033,7 +2613,15 @@ bool UiDoc::PayloadToTableModel(const ValueMap& payload, TableModel& out) const
     return !out.rows.IsEmpty();
 }
 
-bool UiDoc::GetTableLineVisual(int line, int embed_ix, Rect& table_rc, int& cols, int& rows, int& cell_w, int& cell_h) const
+bool UiDoc::GetTableLineVisual(int line,
+                               int embed_ix,
+                               Rect& table_rc,
+                               int& cols,
+                               int& rows,
+                               int& cell_w,
+                               int& cell_h,
+                               Vector<int>* row_heights,
+                               Vector<int>* row_tops) const
 {
     EnsureLayoutCache();
     if(line < 0 || line >= line_starts_.GetCount())
@@ -2063,35 +2651,19 @@ bool UiDoc::GetTableLineVisual(int line, int embed_ix, Rect& table_rc, int& cols
     avail_w = max(DPI(120), avail_w);
     cell_w = max(DPI(56), avail_w / cols);
     cell_h = max(DPI(22), GetBaseFont().GetHeight() + DPI(8));
-    if(embeds_[embed_ix].payload.Find("cell_runs") >= 0 && embeds_[embed_ix].payload["cell_runs"].Is<ValueArray>()) {
-        ValueArray all_rows = embeds_[embed_ix].payload["cell_runs"];
-        int max_img_h = 0;
-        for(int r = 0; r < all_rows.GetCount(); r++) {
-            if(!all_rows[r].Is<ValueArray>())
-                continue;
-            ValueArray rr = all_rows[r];
-            for(int c = 0; c < rr.GetCount(); c++) {
-                if(!rr[c].Is<ValueArray>())
-                    continue;
-                ValueArray runs = rr[c];
-                for(int i = 0; i < runs.GetCount(); i++) {
-                    if(!runs[i].Is<ValueMap>())
-                        continue;
-                    ValueMap run = runs[i];
-                    if(run.Find("type") >= 0 && AsString(run["type"]) == "image") {
-                        int ih = (run.Find("height") >= 0 ? (int)run["height"] : DPI(24));
-                        max_img_h = max(max_img_h, ::clamp(ih, DPI(10), DPI(64)));
-                    }
-                }
-            }
-        }
-        if(max_img_h > 0)
-            cell_h = max(cell_h, max_img_h + DPI(6));
-    }
+
+    Vector<int> local_row_heights;
+    Vector<int> local_row_tops;
+    int table_h = 0;
+    UiDocComputeTableRowMetrics(embeds_[embed_ix].payload, rows, cell_h, cell_w, local_row_heights, local_row_tops, table_h);
 
     int w = cols * cell_w + 1;
-    int h = rows * cell_h + 1;
+    int h = table_h;
     table_rc = RectC(x, y, w, h);
+    if(row_heights)
+        *row_heights = clone(local_row_heights);
+    if(row_tops)
+        *row_tops = clone(local_row_tops);
     return true;
 }
 
@@ -2128,22 +2700,34 @@ bool UiDoc::HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& ca
 
     Rect tr;
     int cols = 0, rows = 0, cell_w = 0, cell_h = 0;
-    if(!GetTableLineVisual(line, ei, tr, cols, rows, cell_w, cell_h) || !tr.Contains(p))
+    Vector<int> row_heights;
+    Vector<int> row_tops;
+    if(!GetTableLineVisual(line, ei, tr, cols, rows, cell_w, cell_h, &row_heights, &row_tops))
         return false;
 
-    int rel_x = p.x - tr.left;
-    int rel_y = p.y - tr.top;
+    Rect hit = tr.Inflated(DPI(4), DPI(4));
+    if(!hit.Contains(p))
+        return false;
+
+    int rel_x = ::clamp(p.x - tr.left, 0, max(0, tr.GetWidth() - 1));
+    int rel_y = ::clamp(p.y - tr.top, 0, max(0, tr.GetHeight() - 1));
     col = ::clamp(rel_x / max(1, cell_w), 0, cols - 1);
-    row = ::clamp(rel_y / max(1, cell_h), 0, rows - 1);
+    row = 0;
+    for(int r = 0; r < row_tops.GetCount(); r++) {
+        int y0 = row_tops[r];
+        int y1 = y0 + row_heights[r];
+        if(y0 <= rel_y && rel_y < y1) {
+            row = r;
+            break;
+        }
+    }
 
-    TableModel model;
-    if(!PayloadToTableModel(embeds_[ei].payload, model))
-        return false;
-
-    WString cell = model.rows[row][col];
+    ValueArray runs = UiDocEnsureCellRunsPayload(embeds_[ei].payload, row, col);
     Font f = GetBaseFont();
+    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, f, max(DPI(12), cell_w - DPI(8)), true);
     int tx = tr.left + col * cell_w + DPI(4);
-    caret_off = MeasureCellCaretFromX(cell, p.x - tx, f);
+    int ty = tr.top + row_tops[row] + DPI(3);
+    caret_off = UiDocInlineHitCaret(lo, max(0, p.x - tx), max(0, p.y - ty));
 
     embed_ix = ei;
     return true;
@@ -2167,13 +2751,181 @@ bool UiDoc::GetActiveTableCellRect(Rect& out) const
 
     Rect tr;
     int cols = 0, rows = 0, cell_w = 0, cell_h = 0;
-    if(!GetTableLineVisual(line, embed_ix, tr, cols, rows, cell_w, cell_h))
+    Vector<int> row_heights;
+    Vector<int> row_tops;
+    if(!GetTableLineVisual(line, embed_ix, tr, cols, rows, cell_w, cell_h, &row_heights, &row_tops))
         return false;
 
     int row = ::clamp(active_table_row_, 0, rows - 1);
     int col = ::clamp(active_table_col_, 0, cols - 1);
-    out = RectC(tr.left + col * cell_w, tr.top + row * cell_h, cell_w, cell_h);
+    int y0 = (row < row_tops.GetCount() ? row_tops[row] : row * cell_h);
+    int rh = (row < row_heights.GetCount() ? row_heights[row] : cell_h);
+    out = RectC(tr.left + col * cell_w, tr.top + y0, cell_w, rh);
     return true;
+}
+
+bool UiDoc::GetImageDisplaySize(const UiDocEmbedBlock& e, int avail_w, int& out_w, int& out_h) const
+{
+    if(e.embed_type != "image")
+        return false;
+
+    UiDocResource rr;
+    if(e.payload.Find("resource_key") < 0 || !GetResource(AsString(e.payload["resource_key"]), rr))
+        return false;
+
+    bool keep = (e.payload.Find("keep_aspect") >= 0 ? (bool)e.payload["keep_aspect"] : true);
+    int rw = max(1, rr.width);
+    int rh = max(1, rr.height);
+
+    bool has_w = (e.payload.Find("width") >= 0);
+    bool has_h = (e.payload.Find("height") >= 0);
+    int w = (has_w ? (int)e.payload["width"] : rw);
+    int h = (has_h ? (int)e.payload["height"] : rh);
+
+    if(keep && rw > 0 && rh > 0) {
+        if(has_w && !has_h)
+            h = max(1, (int)((int64)w * rh / rw));
+        else if(!has_w && has_h)
+            w = max(1, (int)((int64)h * rw / rh));
+    }
+
+    w = ::clamp(w, DPI(12), max(DPI(12), avail_w));
+    h = ::clamp(h, DPI(12), DPI(320));
+    if(keep && rw > 0 && rh > 0 && w > avail_w) {
+        w = max(DPI(12), avail_w);
+        h = max(DPI(12), (int)((int64)w * rh / rw));
+    }
+    if(keep && w > avail_w) {
+        double s = (double)avail_w / (double)max(1, w);
+        w = max(DPI(12), (int)(w * s));
+        h = max(DPI(12), (int)(h * s));
+    }
+
+    out_w = w;
+    out_h = h;
+    return true;
+}
+
+bool UiDoc::HitTestBlockImage(Point p, String& embed_id) const
+{
+    EnsureLayoutCache();
+    embed_id.Clear();
+
+    int gutter_w = GetGutterLaneWidth();
+    int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
+    int gutter_right = (gutter_side_ == GUTTER_RIGHT ? gutter_w : 0);
+    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
+    int right_content_edge = text_rect_.right - style_.metrics.content_padding.right - gutter_right;
+    int top_base = text_rect_.top + style_.metrics.content_padding.top - scroll_y_;
+
+    for(int line = 0; line < line_starts_.GetCount(); line++) {
+        int y = top_base + GetLineTopY(line);
+        int text_lh = (line < line_text_heights_.GetCount() ? line_text_heights_[line] : GetLineHeight(line));
+        int start = line_starts_[line];
+        int len = line_lengths_[line];
+        int indent = (line < paragraph_margin_steps_.GetCount() ? paragraph_margin_steps_[line] : 0) * max(1, style_.margin_step);
+        int prefixw = GetLineVisualPrefixWidth(line);
+        int line_left = left + indent;
+        int line_from = start;
+        int line_to = start + max(1, len);
+        int block_y = y + max(0, text_lh + DPI(2));
+
+        for(int ei = 0; ei < embeds_.GetCount(); ei++) {
+            const UiDocEmbedBlock& e = embeds_[ei];
+            if(e.embed_type != "image")
+                continue;
+            if(!(line_from <= e.range.from && e.range.from <= line_to))
+                continue;
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "block")
+                continue;
+
+            int avail_w = max(DPI(120), right_content_edge - (line_left + prefixw) - DPI(8));
+            int iw = 0, ih = 0;
+            if(!GetImageDisplaySize(e, avail_w, iw, ih))
+                continue;
+
+            String align = (e.payload.Find("align") >= 0 ? ToLower(AsString(e.payload["align"])) : String("left"));
+            int x = line_left + prefixw;
+            if(align == "center")
+                x = line_left + prefixw + max(0, (avail_w - iw) / 2);
+            else if(align == "right")
+                x = line_left + prefixw + max(0, avail_w - iw);
+
+            Rect rc = RectC(x, block_y, iw, ih);
+            if(rc.Inflated(DPI(4), DPI(4)).Contains(p)) {
+                embed_id = e.embed_id;
+                return true;
+            }
+            block_y += ih + DPI(4);
+        }
+    }
+    return false;
+}
+
+bool UiDoc::HitTestInlineImage(Point p, String& embed_id) const
+{
+    EnsureLayoutCache();
+    embed_id.Clear();
+
+    int gutter_w = GetGutterLaneWidth();
+    int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
+    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
+    int top_base = text_rect_.top + style_.metrics.content_padding.top - scroll_y_;
+
+    for(int line = 0; line < line_starts_.GetCount(); line++) {
+        int y = top_base + GetLineTopY(line);
+        int text_lh = (line < line_text_heights_.GetCount() ? line_text_heights_[line] : GetLineHeight(line));
+        int start = line_starts_[line];
+        int len = line_lengths_[line];
+        int indent = (line < paragraph_margin_steps_.GetCount() ? paragraph_margin_steps_[line] : 0) * max(1, style_.margin_step);
+        int prefixw = GetLineVisualPrefixWidth(line);
+        int line_left = left + indent;
+        const Vector<int>& pref = line_prefix_x_[line];
+
+        Vector<int> off, ww, hh;
+        Vector<String> ids;
+        for(int ei = 0; ei < embeds_.GetCount(); ei++) {
+            const UiDocEmbedBlock& e = embeds_[ei];
+            if(e.embed_type != "image")
+                continue;
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "inline")
+                continue;
+            if(!(start <= e.range.from && e.range.from <= start + len))
+                continue;
+
+            int iw = 0, ih = 0;
+            if(!GetImageDisplaySize(e, max(DPI(16), text_rect_.GetWidth() - DPI(24)), iw, ih))
+                continue;
+            off.Add(::clamp(e.range.from - start, 0, len));
+            ww.Add(iw);
+            hh.Add(ih);
+            ids.Add(e.embed_id);
+        }
+
+        for(int i = 0; i < off.GetCount(); i++) {
+            int total_at = 0;
+            int before = 0;
+            for(int j = 0; j < off.GetCount(); j++) {
+                if(off[j] == off[i])
+                    total_at += ww[j];
+                if(j < i && off[j] == off[i])
+                    before += ww[j];
+            }
+            int x = line_left + prefixw + pref[off[i]] - total_at + before;
+            int iw = ww[i];
+            int ih = hh[i];
+            int yimg = y + max(0, (text_lh - ih) / 2);
+            if(ih > text_lh)
+                yimg = y;
+            if(RectC(x, yimg, iw, ih).Inflated(DPI(3), DPI(3)).Contains(p)) {
+                embed_id = ids[i];
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void UiDoc::CopyTableModel(const TableModel& src, TableModel& dst) const
@@ -2228,7 +2980,7 @@ bool UiDoc::MoveTableCell(bool reverse)
     active_table_embed_id_ = embeds_[embed_ix].embed_id;
     active_table_row_ = row;
     active_table_col_ = col;
-    active_table_cell_pos_ = min(active_table_cell_pos_, model.rows[row][col].GetCount());
+    active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col)));
     active_table_cell_selected_ = true;
     RLOG("UiDoc::MoveTableCell reverse=" << reverse << " row=" << row << " col=" << col);
     return true;
@@ -2240,44 +2992,33 @@ bool UiDoc::ReplaceInActiveTableCell(UiDocRange range, const WString& txt)
     if(!active_table_cell_selected_)
         return false;
     int embed_ix = FindActiveTableEmbedIndex();
-    TableModel model;
-    int table_id = -1;
-    if(!GetTableModelByEmbedIndex(embed_ix, model, &table_id))
+    if(embed_ix < 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, max(0, model.rows.GetCount() - 1));
-    int col = ::clamp(active_table_col_, 0, max(0, model.cols - 1));
+    ValueMap payload = clone(embeds_[embed_ix].payload);
+    int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+    int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+    if(rows <= 0 || cols <= 0)
+        return false;
+
+    int row = ::clamp(active_table_row_, 0, rows - 1);
+    int col = ::clamp(active_table_col_, 0, cols - 1);
 
     WString in = txt;
     for(int i = 0; i < in.GetCount(); i++)
-        if(in[i] == '\n' || in[i] == '\r')
-            in.Set(i, ' ');
+        if(in[i] == '\r')
+            in.Set(i, '\n');
 
-    WString cell = model.rows[row][col];
-    int at = ::clamp(active_table_cell_pos_, 0, cell.GetCount());
-    if(in.IsEmpty()) {
-        if(at > 0) {
-            cell.Remove(at - 1, 1);
-            at--;
-        }
-    }
-    else {
-        cell.Insert(at, in);
-        at += in.GetCount();
-    }
-    model.rows[row][col] = cell;
-
-    ValueMap style_keep;
-    ValueMap* tstyle = nullptr;
-    if(embeds_[embed_ix].payload.Find("table_style") >= 0 && embeds_[embed_ix].payload["table_style"].Is<ValueMap>()) {
-        style_keep = embeds_[embed_ix].payload["table_style"];
-        tstyle = &style_keep;
-    }
+    ValueArray runs = UiDocEnsureCellRunsPayload(payload, row, col);
+    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(runs));
+    runs = UiDocInsertTextRunsAt(runs, at, in);
+    at += in.GetCount();
+    UiDocWriteCellRunsAndCells(payload, row, col, runs);
 
     UiDocChange eup;
     eup.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
     eup.embed_id = embeds_[embed_ix].embed_id;
-    eup.embed_payload_delta = TableModelToPayload(table_id, model, tstyle, &embeds_[embed_ix].payload);
+    eup.embed_payload_delta = payload;
     UiDocTransaction tx;
     tx.add_to_history = true;
     tx.changes.Add(pick(eup));
@@ -2286,6 +3027,91 @@ bool UiDoc::ReplaceInActiveTableCell(UiDocRange range, const WString& txt)
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_cell_pos_ = at;
         active_table_cell_selected_ = true;
+    }
+    return ok;
+}
+
+bool UiDoc::DeleteInActiveTableCell(bool forward)
+{
+    if(!active_table_cell_selected_)
+        return false;
+
+    int embed_ix = FindActiveTableEmbedIndex();
+    if(embed_ix < 0)
+        return false;
+
+    ValueMap payload = clone(embeds_[embed_ix].payload);
+    int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+    int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+    if(rows <= 0 || cols <= 0)
+        return false;
+
+    int row = ::clamp(active_table_row_, 0, rows - 1);
+    int col = ::clamp(active_table_col_, 0, cols - 1);
+
+    ValueArray src = UiDocEnsureCellRunsPayload(payload, row, col);
+    ValueArray dst;
+    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(src));
+
+    bool changed = false;
+    int target = (!forward ? at - 1 : at);
+    if(target >= 0 && target < UiDocCellRunUnits(src)) {
+        int u = 0;
+        for(int i = 0; i < src.GetCount(); i++) {
+            Value v = src[i];
+            if(UiDocIsTextRun(v)) {
+                ValueMap rm = v;
+                WString t = AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString();
+                int len = t.GetCount();
+                if(target < u + len) {
+                    int off = target - u;
+                    t.Remove(off, 1);
+                    if(!t.IsEmpty())
+                        dst.Add(UiDocMakeTextRun(t));
+                    for(int j = i + 1; j < src.GetCount(); j++)
+                        dst.Add(src[j]);
+                    changed = true;
+                    break;
+                }
+                dst.Add(v);
+                u += len;
+            }
+            else if(UiDocIsImageRun(v)) {
+                if(target == u) {
+                    for(int j = i + 1; j < src.GetCount(); j++)
+                        dst.Add(src[j]);
+                    changed = true;
+                    break;
+                }
+                dst.Add(v);
+                u += 1;
+            }
+            else
+                dst.Add(v);
+        }
+    }
+
+    if(!changed)
+        return false;
+
+    dst = UiDocNormalizeCellRuns(dst);
+    UiDocWriteCellRunsAndCells(payload, row, col, dst);
+    if(!forward && at > 0)
+        at--;
+    at = ::clamp(at, 0, UiDocCellRunUnits(dst));
+
+    UiDocChange ch;
+    ch.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
+    ch.embed_id = embeds_[embed_ix].embed_id;
+    ch.embed_payload_delta = payload;
+    UiDocTransaction tx;
+    tx.add_to_history = true;
+    tx.changes.Add(pick(ch));
+    bool ok = Dispatch(tx);
+    if(ok) {
+        active_table_embed_id_ = embeds_[embed_ix].embed_id;
+        active_table_cell_selected_ = true;
+        active_table_cell_pos_ = at;
     }
     return ok;
 }
@@ -2300,56 +3126,27 @@ bool UiDoc::InsertImageRunInActiveTableCell(const String& resource_key, int widt
         return false;
 
     int embed_ix = FindActiveTableEmbedIndex();
-    TableModel model;
-    int table_id = -1;
-    if(!GetTableModelByEmbedIndex(embed_ix, model, &table_id))
+    if(embed_ix < 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, max(0, model.rows.GetCount() - 1));
-    int col = ::clamp(active_table_col_, 0, max(0, model.cols - 1));
-
-    ValueMap payload = TableModelToPayload(table_id, model, nullptr, &embeds_[embed_ix].payload);
-    ValueArray rows;
-    if(payload.Find("cell_runs") >= 0 && payload["cell_runs"].Is<ValueArray>())
-        rows = payload["cell_runs"];
-    if(rows.GetCount() != model.rows.GetCount())
-        return false;
-    if(!rows[row].Is<ValueArray>())
-        return false;
-    ValueArray row_runs = rows[row];
-    if(row_runs.GetCount() != model.cols)
+    ValueMap payload = clone(embeds_[embed_ix].payload);
+    int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+    int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+    if(rows <= 0 || cols <= 0)
         return false;
 
-    ValueArray cell_runs;
-    if(row_runs[col].Is<ValueArray>())
-        cell_runs = row_runs[col];
+    int row = ::clamp(active_table_row_, 0, rows - 1);
+    int col = ::clamp(active_table_col_, 0, cols - 1);
+    ValueArray cell_runs = UiDocEnsureCellRunsPayload(payload, row, col);
+    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(cell_runs));
 
     ValueMap img;
     img.Add("type", "image");
     img.Add("resource_key", resource_key);
     img.Add("width", ::clamp(width, DPI(12), DPI(96)));
     img.Add("height", ::clamp(height, DPI(12), DPI(96)));
-    cell_runs.Add(img);
-    ValueArray out_rows;
-    for(int r = 0; r < rows.GetCount(); r++) {
-        ValueArray out_row;
-        ValueArray src_row;
-        if(rows[r].Is<ValueArray>())
-            src_row = rows[r];
-        for(int c = 0; c < model.cols; c++) {
-            if(r == row && c == col)
-                out_row.Add(cell_runs);
-            else if(c < src_row.GetCount())
-                out_row.Add(src_row[c]);
-            else {
-                ValueArray fallback;
-                fallback.Add(UiDocMakeTextRun(WString()));
-                out_row.Add(fallback);
-            }
-        }
-        out_rows.Add(out_row);
-    }
-    payload.GetAdd("cell_runs") = out_rows;
+    cell_runs = UiDocInsertImageRunAt(cell_runs, at, img);
+    UiDocWriteCellRunsAndCells(payload, row, col, cell_runs);
 
     UiDocChange ch;
     ch.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
@@ -2363,6 +3160,7 @@ bool UiDoc::InsertImageRunInActiveTableCell(const String& resource_key, int widt
     if(ok) {
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_cell_selected_ = true;
+        active_table_cell_pos_ = min(UiDocCellRunUnits(cell_runs), at + 1);
     }
     return ok;
 }
@@ -2657,10 +3455,7 @@ void UiDoc::InsertTable(int cols, int rows)
     TableModel model;
     model.cols = cols;
     model.rows.SetCount(max(1, rows));
-    model.rows[0].SetCount(cols);
-    for(int c = 0; c < cols; c++)
-        model.rows[0][c] = WString(String().Cat() << "Col " << (c + 1));
-    for(int r = 1; r < model.rows.GetCount(); r++)
+    for(int r = 0; r < model.rows.GetCount(); r++)
         model.rows[r].SetCount(cols);
 
     UiDocTransaction tx;
@@ -2718,7 +3513,7 @@ bool UiDoc::AddTableRowBelow()
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_row_ = row;
         active_table_col_ = min(active_table_col_, max(0, model.cols - 1));
-        active_table_cell_pos_ = min(active_table_cell_pos_, model.rows[active_table_row_][active_table_col_].GetCount());
+        active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, active_table_row_, active_table_col_)));
         active_table_cell_selected_ = true;
     }
     return ok;
@@ -2761,7 +3556,7 @@ bool UiDoc::RemoveTableRow()
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_row_ = min(row, model.rows.GetCount() - 1);
         active_table_col_ = min(active_table_col_, max(0, model.cols - 1));
-        active_table_cell_pos_ = min(active_table_cell_pos_, model.rows[active_table_row_][active_table_col_].GetCount());
+        active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, active_table_row_, active_table_col_)));
         active_table_cell_selected_ = true;
     }
     return ok;
@@ -2799,7 +3594,7 @@ bool UiDoc::AddTableColumnRight()
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_col_ = col;
         active_table_row_ = min(active_table_row_, max(0, model.rows.GetCount() - 1));
-        active_table_cell_pos_ = min(active_table_cell_pos_, model.rows[active_table_row_][active_table_col_].GetCount());
+        active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, active_table_row_, active_table_col_)));
         active_table_cell_selected_ = true;
     }
     return ok;
@@ -2839,7 +3634,7 @@ bool UiDoc::RemoveTableColumn()
         active_table_embed_id_ = embeds_[embed_ix].embed_id;
         active_table_col_ = min(col, max(0, model.cols - 1));
         active_table_row_ = min(active_table_row_, max(0, model.rows.GetCount() - 1));
-        active_table_cell_pos_ = min(active_table_cell_pos_, model.rows[active_table_row_][active_table_col_].GetCount());
+        active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, active_table_row_, active_table_col_)));
         active_table_cell_selected_ = true;
     }
     return ok;
@@ -2850,6 +3645,26 @@ void UiDoc::SetSearchQuery(const String& q)
     search_query_ = TrimBoth(q);
     RecomputeSearchMatches();
     search_match_index_ = -1;
+    Refresh();
+    WhenSearch(search_query_);
+}
+
+void UiDoc::SetSearchIgnoreCase(bool b)
+{
+    if(search_ignore_case_ == b)
+        return;
+    search_ignore_case_ = b;
+    RecomputeSearchMatches();
+    Refresh();
+    WhenSearch(search_query_);
+}
+
+void UiDoc::SetSearchWholeWord(bool b)
+{
+    if(search_whole_word_ == b)
+        return;
+    search_whole_word_ = b;
+    RecomputeSearchMatches();
     Refresh();
     WhenSearch(search_query_);
 }
@@ -2927,12 +3742,23 @@ int UiDoc::MatchGlobFrom(const WString& text, int start, const WString& pattern,
             out = MatchGlobFrom(text, start + 1, pattern, pi + 1, memo);
     }
     else {
-        if(start < tn && ToUpper(text[start]) == ToUpper(pattern[pi]))
+        wchar a = (start < tn ? text[start] : 0);
+        wchar b = pattern[pi];
+        if(search_ignore_case_) {
+            a = ToUpper(a);
+            b = ToUpper(b);
+        }
+        if(start < tn && a == b)
             out = MatchGlobFrom(text, start + 1, pattern, pi + 1, memo);
     }
 
     memo.Add(key, out);
     return out;
+}
+
+bool UiDoc::IsWordChar(wchar ch) const
+{
+    return IsAlpha(ch) || IsDigit(ch) || ch == '_';
 }
 
 void UiDoc::RecomputeSearchMatches()
@@ -2958,24 +3784,44 @@ void UiDoc::RecomputeSearchMatches()
         for(int i = 0; i < tn; i++) {
             VectorMap<int64, int> memo;
             int end = MatchGlobFrom(t, i, q, 0, memo);
-            if(end > i)
+            if(end > i) {
+                if(search_whole_word_) {
+                    bool left_ok = (i <= 0 || !IsWordChar(t[i - 1]));
+                    bool right_ok = (end >= tn || !IsWordChar(t[end]));
+                    if(!(left_ok && right_ok))
+                        continue;
+                }
                 search_matches_.Add(UiDocRange(i, end));
+            }
         }
     }
     else {
         for(int i = 0; i + qn <= tn; i++) {
             bool ok = true;
             for(int j = 0; j < qn; j++) {
-                if(ToUpper(t[i + j]) != ToUpper(q[j])) {
+                wchar a = t[i + j];
+                wchar b = q[j];
+                if(search_ignore_case_) {
+                    a = ToUpper(a);
+                    b = ToUpper(b);
+                }
+                if(a != b) {
                     ok = false;
                     break;
                 }
             }
-            if(ok)
+            if(ok) {
+                if(search_whole_word_) {
+                    bool left_ok = (i <= 0 || !IsWordChar(t[i - 1]));
+                    bool right_ok = (i + qn >= tn || !IsWordChar(t[i + qn]));
+                    if(!(left_ok && right_ok))
+                        continue;
+                }
                 search_matches_.Add(UiDocRange(i, i + qn));
+            }
         }
 
-        if(search_matches_.IsEmpty()) {
+        if(search_ignore_case_ && search_matches_.IsEmpty()) {
             String ss = ToUpper(text_.ToString());
             String qq = ToUpper(search_query_);
             for(int p = ss.Find(qq); p >= 0; p = ss.Find(qq, p + 1))
@@ -3396,6 +4242,13 @@ bool UiDoc::ApplyEmbedDeleteInternal(const String& embed_id)
 
     Vector<UiDocEmbedBlock> before = clone(embeds_);
     embeds_.Remove(ii);
+    if(active_image_embed_id_ == embed_id)
+        active_image_embed_id_.Clear();
+    if(active_table_embed_id_ == embed_id) {
+        active_table_embed_id_.Clear();
+        active_table_row_ = active_table_col_ = active_table_cell_pos_ = 0;
+        active_table_cell_selected_ = false;
+    }
     Vector<UiDocEmbedBlock> after = clone(embeds_);
 
     if(batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty())
@@ -3856,24 +4709,32 @@ bool UiDoc::Dispatch(const UiDocTransaction& tx)
             break;
         case UiDocChange::EMBED_INSERT:
             if(ApplyEmbedInsertInternal(c.embed)) {
+                InvalidateLayoutCache();
+                pending_refresh_layout_ = true;
                 pending_change_event_ = true;
                 pending_refresh_ = true;
             }
             break;
         case UiDocChange::EMBED_DELETE:
             if(ApplyEmbedDeleteInternal(c.embed_id)) {
+                InvalidateLayoutCache();
+                pending_refresh_layout_ = true;
                 pending_change_event_ = true;
                 pending_refresh_ = true;
             }
             break;
         case UiDocChange::EMBED_UPDATE_PAYLOAD:
             if(ApplyEmbedPayloadUpdateInternal(c.embed_id, c.embed_payload_delta)) {
+                InvalidateLayoutCache();
+                pending_refresh_layout_ = true;
                 pending_change_event_ = true;
                 pending_refresh_ = true;
             }
             break;
         case UiDocChange::EMBED_UPDATE_LAYOUT:
             if(ApplyEmbedLayoutUpdateInternal(c.embed_id, c.embed_layout_delta)) {
+                InvalidateLayoutCache();
+                pending_refresh_layout_ = true;
                 pending_change_event_ = true;
                 pending_refresh_ = true;
             }
@@ -4074,6 +4935,7 @@ void UiDoc::MoveCaret(int pos, bool keep_selection)
         anchor_pos_ = p;
     caret_pos_ = p;
     active_table_cell_selected_ = false;
+    active_image_embed_id_.Clear();
     preferred_x_ = -1;
     ScrollSelectionIntoView();
     Refresh();
@@ -4154,6 +5016,36 @@ bool UiDoc::DeleteSelection()
 
     UiDocRange r = CurrentSelectionRange();
 
+    if(active_table_cell_selected_) {
+        int embed_ix = FindActiveTableEmbedIndex();
+        if(embed_ix >= 0) {
+            ValueMap payload = clone(embeds_[embed_ix].payload);
+            int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
+            int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
+            if(rows > 0 && cols > 0) {
+                int row = ::clamp(active_table_row_, 0, rows - 1);
+                int col = ::clamp(active_table_col_, 0, cols - 1);
+                ValueArray cleared;
+                cleared.Add(UiDocMakeTextRun(WString()));
+                UiDocWriteCellRunsAndCells(payload, row, col, cleared);
+
+                UiDocChange ch;
+                ch.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
+                ch.embed_id = embeds_[embed_ix].embed_id;
+                ch.embed_payload_delta = payload;
+
+                UiDocTransaction tx;
+                tx.add_to_history = true;
+                tx.changes.Add(pick(ch));
+                bool ok = Dispatch(tx);
+                if(ok) {
+                    active_table_cell_pos_ = 0;
+                    return true;
+                }
+            }
+        }
+    }
+
     if(ReplaceInActiveTableCell(r, WString()))
         return true;
 
@@ -4169,6 +5061,28 @@ bool UiDoc::DeleteSelection()
 
     UiDocTransaction tx;
     tx.add_to_history = true;
+
+    for(int i = 0; i < embeds_.GetCount(); i++) {
+        const UiDocEmbedBlock& e = embeds_[i];
+        if(e.embed_type != "image")
+            continue;
+        String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+        if(mode != "inline")
+            continue;
+        bool hit = false;
+        if(e.range.from == e.range.to)
+            hit = (r.from <= e.range.from && e.range.from < r.to);
+        else
+            hit = !(e.range.to <= r.from || e.range.from >= r.to);
+        if(!hit)
+            continue;
+
+        UiDocChange del;
+        del.type = UiDocChange::EMBED_DELETE;
+        del.embed_id = e.embed_id;
+        tx.changes.Add(pick(del));
+    }
+
     tx.changes.Add(pick(rep));
     tx.changes.Add(pick(sel));
     Dispatch(tx);
@@ -4353,6 +5267,31 @@ void UiDoc::RegisterBuiltinCommands()
         int w = (m.Find("width") >= 0 ? (int)m["width"] : rr.width);
         int h = (m.Find("height") >= 0 ? (int)m["height"] : rr.height);
         return d.InsertImageRunInActiveTableCell(key, w, h);
+    });
+    RegisterCommand("table.decor.toggle", [](UiDoc& d, const Value& v) {
+        int embed_ix = d.FindActiveTableEmbedIndex();
+        if(embed_ix < 0)
+            return false;
+        UiDocEmbedBlock e = d.embeds_[embed_ix];
+        bool show = true;
+        if(e.payload.Find("show_frame") >= 0)
+            show = (int)e.payload["show_frame"] == 0;
+        if(v.Is<ValueMap>()) {
+            ValueMap m = v;
+            if(m.Find("show") >= 0)
+                show = (bool)m["show"];
+        }
+        ValueMap payload = clone(e.payload);
+        payload.GetAdd("show_frame") = (int)show;
+        payload.GetAdd("show_grid") = (int)show;
+        UiDocChange ch;
+        ch.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
+        ch.embed_id = e.embed_id;
+        ch.embed_payload_delta = payload;
+        UiDocTransaction tx;
+        tx.add_to_history = true;
+        tx.changes.Add(pick(ch));
+        return d.Dispatch(tx);
     });
     RegisterCommand("table.delete", [](UiDoc& d, const Value&) {
         int embed_ix = d.FindActiveTableEmbedIndex();
@@ -4590,15 +5529,79 @@ void UiDoc::RegisterBuiltinCommands()
         if(!d.GetResource(key, r))
             return false;
 
+        String mode = (m.Find("display_mode") >= 0 ? AsString(m["display_mode"]) : String("block"));
         int pos = (m.Find("pos") >= 0 ? (int)m["pos"] : d.GetSelection().caret);
+        if(mode == "block") {
+            d.EnsureLayoutCache();
+            int line = d.GetLineIndexFromPos(pos);
+            line = ::clamp(line, 0, max(0, d.line_starts_.GetCount() - 1));
+            pos = d.line_starts_[line] + d.line_lengths_[line];
+        }
         ValueMap payload;
         payload.Add("resource_key", key);
         payload.Add("resource_type", r.resource_type);
         payload.Add("mime", r.mime);
         payload.Add("width", (m.Find("width") >= 0 ? (int)m["width"] : r.width));
         payload.Add("height", (m.Find("height") >= 0 ? (int)m["height"] : r.height));
+        payload.Add("display_mode", mode);
+        payload.Add("align", (m.Find("align") >= 0 ? AsString(m["align"]) : String("left")));
+        payload.Add("keep_aspect", (m.Find("keep_aspect") >= 0 ? (bool)m["keep_aspect"] : true));
 
-        return !d.InsertEmbed(pos, "image", payload).IsEmpty();
+        String id = d.InsertEmbed(pos, "image", payload);
+        if(id.IsEmpty())
+            return false;
+        d.active_image_embed_id_ = id;
+        return true;
+    });
+    RegisterCommand("embed.image.inline.insert", [](UiDoc& d, const Value& v) {
+        if(!v.Is<ValueMap>())
+            return false;
+        ValueMap m = v;
+        String key = (m.Find("resource_key") >= 0 ? AsString(m["resource_key"]) : String());
+        if(key.IsEmpty())
+            return false;
+        UiDocResource r;
+        if(!d.GetResource(key, r))
+            return false;
+        int pos = (m.Find("pos") >= 0 ? (int)m["pos"] : d.GetSelection().caret);
+        ValueMap payload;
+        payload.Add("resource_key", key);
+        payload.Add("resource_type", r.resource_type);
+        payload.Add("mime", r.mime);
+        payload.Add("display_mode", "inline");
+        payload.Add("keep_aspect", true);
+        payload.Add("width", (m.Find("width") >= 0 ? (int)m["width"] : min(32, max(12, r.width))));
+        payload.Add("height", (m.Find("height") >= 0 ? (int)m["height"] : min(32, max(12, r.height))));
+        String id = d.InsertEmbed(pos, "image", payload);
+        if(id.IsEmpty())
+            return false;
+        d.active_image_embed_id_ = id;
+        d.SetSelection(UiDocRange(pos, pos));
+        return true;
+    });
+    RegisterCommand("embed.image.align.set", [](UiDoc& d, const Value& v) {
+        String align = ToLower(AsString(v));
+        if(align != "left" && align != "center" && align != "right")
+            return false;
+
+        String id = d.active_image_embed_id_;
+        if(id.IsEmpty()) {
+            int pos = d.GetSelection().caret;
+            for(int i = 0; i < d.embeds_.GetCount(); i++) {
+                const UiDocEmbedBlock& e = d.embeds_[i];
+                if(e.embed_type == "image" && e.range.from == pos) {
+                    id = e.embed_id;
+                    break;
+                }
+            }
+        }
+        if(id.IsEmpty())
+            return false;
+
+        ValueMap delta;
+        delta.Add("align", align);
+        delta.Add("display_mode", "block");
+        return d.UpdateEmbedPayload(id, delta);
     });
     RegisterCommand("embed.svg.insert", [](UiDoc& d, const Value& v) {
         if(!v.Is<ValueMap>())
@@ -4629,14 +5632,15 @@ Rect UiDoc::GetCaretRect() const
             if(GetActiveTableCellRect(cell_rc)) {
                 int row = ::clamp(active_table_row_, 0, model.rows.GetCount() - 1);
                 int col = ::clamp(active_table_col_, 0, model.cols - 1);
-                WString cell = model.rows[row][col];
-                int at = ::clamp(active_table_cell_pos_, 0, cell.GetCount());
+                ValueArray runs = UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col);
                 Font f = GetBaseFont();
-                int x = cell_rc.left + DPI(4);
-                if(at > 0)
-                    x += GetTextSize(cell.Left(at).ToString(), f).cx;
-                int y = cell_rc.top + DPI(3);
-                return RectC(x, y, max(1, style_.caret_width), max(DPI(14), f.GetHeight()));
+                UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, f, max(DPI(12), cell_rc.GetWidth() - DPI(8)), true);
+                int at = ::clamp(active_table_cell_pos_, 0, lo.units);
+                Point cp = UiDocInlineCaretPoint(lo, at);
+                return RectC(cell_rc.left + DPI(4) + cp.x,
+                             cell_rc.top + DPI(3) + cp.y,
+                             max(1, style_.caret_width),
+                             max(DPI(14), f.GetHeight()));
             }
         }
     }
@@ -4793,10 +5797,19 @@ void UiDoc::Paint(Draw& w)
 
         if(gutter_w > 0) {
             int lane_x = (gutter_side_ == GUTTER_LEFT ? lane_left : lane_right);
+            int lane_l = lane_x;
+            int lane_r = lane_x + gutter_w;
+            int numbers_w = 0;
             if(show_line_numbers_) {
                 Font gf = GetBaseFont();
                 String ln = AsString(line + 1);
-                int nx = lane_x + gutter_w - DPI(4) - GetTextSize(ln, gf).cx;
+                int lines = max(1, line_starts_.GetCount());
+                int digits = AsString(lines).GetCount();
+                String probe;
+                for(int i = 0; i < digits; i++)
+                    probe.Cat('8');
+                numbers_w = GetTextSize(probe, gf).cx + DPI(8);
+                int nx = lane_l + DPI(2);
                 int ny = y + (text_lh - gf.GetHeight()) / 2;
                 w.DrawText(nx, ny, ln, gf, SColorDisabled());
             }
@@ -4804,14 +5817,27 @@ void UiDoc::Paint(Draw& w)
             if(show_metadata_markers_) {
                 bool has_comment = (line < block_meta_.GetCount() && block_meta_[line].commented);
                 bool has_table = (line < block_meta_.GetCount() && block_meta_[line].table_id >= 0) || (line < line_table_embed_ix_.GetCount() && line_table_embed_ix_[line] >= 0);
-                int mx = lane_x + DPI(2);
-                int my = y + max(0, (text_lh - DPI(6)) / 2);
+                int sz = max(DPI(6), text_lh - DPI(2));
+                sz = min(sz, DPI(10));
+                int gap = DPI(2);
+                int cluster_w = sz * 3 + gap * 2;
+                int mx = lane_r - DPI(2) - cluster_w;
+                if(show_line_numbers_)
+                    mx = max(mx, lane_l + numbers_w + DPI(2));
+                int my = y + max(0, (text_lh - sz) / 2);
                 if(line_has_ann)
-                    w.DrawRect(mx, my, DPI(6), DPI(6), Color(225, 153, 58));
+                    w.DrawEllipse(RectC(mx, my, sz, sz), Blend(SColorHighlight(), SColorPaper(), 120));
                 if(has_table)
-                    w.DrawRect(mx + DPI(8), my, DPI(6), DPI(6), Color(77, 122, 212));
-                if(has_comment)
-                    w.DrawRect(mx + DPI(16), my, DPI(6), DPI(2), Color(120, 130, 140));
+                    w.DrawRect(mx + sz + gap, my, sz, sz, SColorHighlight());
+                if(has_comment) {
+                    int tx = mx + (sz + gap) * 2;
+                    int ty = my;
+                    for(int i = 0; i < sz; i++) {
+                        int left = tx + (sz - i - 1) / 2;
+                        int width = i + 1;
+                        w.DrawRect(left, ty + i, width, 1, SColorDisabled());
+                    }
+                }
             }
         }
 
@@ -4821,7 +5847,44 @@ void UiDoc::Paint(Draw& w)
             svg_idx++;
         while(table_idx < table_embeds.GetCount() && table_embeds[table_idx].range.from < line_from)
             table_idx++;
+
+        Vector<int> inl_off;
+        Vector<int> inl_w;
+        Vector<int> inl_h;
+        Vector<int> inl_embed_ix;
+        for(int ii = image_idx; ii < image_embeds.GetCount(); ii++) {
+            const UiDocEmbedBlock& e = image_embeds[ii];
+            if(e.range.from > line_to)
+                break;
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "inline")
+                continue;
+            int iw = 0, ih = 0;
+            if(!GetImageDisplaySize(e, max(DPI(16), right_content_edge - (line_left + prefixw) - DPI(8)), iw, ih))
+                continue;
+            int off = ::clamp(e.range.from - start, 0, len);
+            int ei = -1;
+            for(int k = 0; k < embeds_.GetCount(); k++)
+                if(embeds_[k].embed_id == e.embed_id) {
+                    ei = k;
+                    break;
+                }
+            inl_off.Add(off);
+            inl_w.Add(iw);
+            inl_h.Add(ih);
+            inl_embed_ix.Add(ei);
+        }
+
+        Vector<byte> inl_break;
+        inl_break.SetCount(len + 1, 0);
+        for(int ii = 0; ii < inl_off.GetCount(); ii++)
+            if(0 <= inl_off[ii] && inl_off[ii] <= len)
+                inl_break[inl_off[ii]] = 1;
+
+        // Inline images are drawn after text (later in this line pass).
+
         int image_slot = 0;
+        int image_block_y = y + max(0, text_lh + DPI(2));
         for(int ii = image_idx; ii < image_embeds.GetCount(); ii++) {
             const UiDocEmbedBlock& e = image_embeds[ii];
             if(e.range.from > line_to)
@@ -4833,19 +5896,31 @@ void UiDoc::Paint(Draw& w)
             if(!GetResource(key, rr))
                 continue;
 
-            int iw = (e.payload.Find("width") >= 0 ? (int)e.payload["width"] : rr.width);
-            int ih = (e.payload.Find("height") >= 0 ? (int)e.payload["height"] : rr.height);
-            iw = ::clamp(iw, DPI(12), DPI(96));
-            ih = ::clamp(ih, DPI(12), DPI(96));
-            int mx = max(text_rect_.left + DPI(14), right_content_edge - DPI(8) - iw - image_slot * (iw + DPI(6)));
-            int my = y + max(0, (line < line_text_heights_.GetCount() ? line_text_heights_[line] : 0) + DPI(2));
-            w.DrawRect(mx - 1, my - 1, iw + 2, ih + 2, Color(70, 70, 70));
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "block")
+                continue;
+
+            int avail_w = max(DPI(120), right_content_edge - (line_left + prefixw) - DPI(8));
+            int iw = 0, ih = 0;
+            if(!GetImageDisplaySize(e, avail_w, iw, ih))
+                continue;
+
+            String align = (e.payload.Find("align") >= 0 ? ToLower(AsString(e.payload["align"])) : String("left"));
+            int mx = line_left + prefixw;
+            if(align == "center")
+                mx = line_left + prefixw + max(0, (avail_w - iw) / 2);
+            else if(align == "right")
+                mx = line_left + prefixw + max(0, avail_w - iw);
+
+            int my = image_block_y;
+            Color bc = (active_image_embed_id_ == e.embed_id ? SColorHighlight() : SColorText());
+            w.DrawRect(mx - 1, my - 1, iw + 2, ih + 2, bc);
             Image img = StreamRaster::LoadStringAny(rr.bytes);
             if(!img.IsEmpty())
                 w.DrawImage(RectC(mx, my, iw, ih), img);
             else
-                w.DrawRect(mx, my, iw, ih, Color(170, 170, 170));
-            image_slot++;
+                w.DrawRect(mx, my, iw, ih, SColorFace());
+            image_block_y += ih + DPI(4);
         }
 
         int svg_slot = 0;
@@ -4857,10 +5932,10 @@ void UiDoc::Paint(Draw& w)
             int side = min(DPI(16), lh - DPI(2));
             int mx = max(text_rect_.left + DPI(14), right_content_edge - DPI(8) - side - (image_slot + svg_slot) * (side + DPI(3)));
             int my = y + (lh - side) / 2;
-            w.DrawRect(mx - 1, my - 1, side + 2, side + 2, Color(50, 50, 50));
-            w.DrawRect(mx, my, side, side, Color(200, 206, 216));
+            w.DrawRect(mx - 1, my - 1, side + 2, side + 2, SColorText());
+            w.DrawRect(mx, my, side, side, SColorFace());
             Font ff = SansSerif(max(8, side - 6)).Bold();
-            w.DrawText(mx + DPI(2), my + max(0, (side - ff.GetHeight()) / 2), "S", ff, Color(40, 50, 70));
+            w.DrawText(mx + DPI(2), my + max(0, (side - ff.GetHeight()) / 2), "S", ff, SColorText());
             svg_slot++;
         }
 
@@ -4880,86 +5955,73 @@ void UiDoc::Paint(Draw& w)
 
             Rect tr;
             int tcols = 0, trows = 0, cell_w = 0, cell_h = 0;
-            if(!GetTableLineVisual(line, ei, tr, tcols, trows, cell_w, cell_h))
+            Vector<int> row_heights;
+            Vector<int> row_tops;
+            if(!GetTableLineVisual(line, ei, tr, tcols, trows, cell_w, cell_h, &row_heights, &row_tops))
                 continue;
 
             TableModel model;
             if(!PayloadToTableModel(e.payload, model))
                 continue;
 
-            w.DrawRect(tr, Color(252, 253, 255));
-            w.DrawRect(tr.left, tr.top, tr.GetWidth(), 1, Color(95, 112, 132));
-            w.DrawRect(tr.left, tr.bottom - 1, tr.GetWidth(), 1, Color(95, 112, 132));
-            w.DrawRect(tr.left, tr.top, 1, tr.GetHeight(), Color(95, 112, 132));
-            w.DrawRect(tr.right - 1, tr.top, 1, tr.GetHeight(), Color(95, 112, 132));
+            bool show_frame = true;
+            bool show_grid = true;
+            if(e.payload.Find("show_frame") >= 0)
+                show_frame = (int)e.payload["show_frame"] != 0;
+            if(e.payload.Find("show_grid") >= 0)
+                show_grid = (int)e.payload["show_grid"] != 0;
 
-            for(int c = 1; c < tcols; c++) {
-                int gx = tr.left + c * cell_w;
-                w.DrawRect(gx, tr.top, 1, tr.GetHeight(), Color(155, 171, 191));
+            w.DrawRect(tr, SColorPaper());
+            if(show_frame) {
+                Color frame = Blend(SColorText(), SColorPaper(), 160);
+                w.DrawRect(tr.left, tr.top, tr.GetWidth(), 1, frame);
+                w.DrawRect(tr.left, tr.bottom - 1, tr.GetWidth(), 1, frame);
+                w.DrawRect(tr.left, tr.top, 1, tr.GetHeight(), frame);
+                w.DrawRect(tr.right - 1, tr.top, 1, tr.GetHeight(), frame);
             }
-            for(int r = 1; r < trows; r++) {
-                int gy = tr.top + r * cell_h;
-                w.DrawRect(tr.left, gy, tr.GetWidth(), 1, Color(155, 171, 191));
+
+            if(show_grid) {
+                for(int c = 1; c < tcols; c++) {
+                    int gx = tr.left + c * cell_w;
+                    w.DrawRect(gx, tr.top, 1, tr.GetHeight(), Blend(SColorText(), SColorPaper(), 210));
+                }
+                for(int r = 1; r < trows; r++) {
+                    int gy = tr.top + row_tops[r];
+                    w.DrawRect(tr.left, gy, tr.GetWidth(), 1, Blend(SColorText(), SColorPaper(), 210));
+                }
             }
 
             Font tf = GetBaseFont();
             for(int r = 0; r < trows; r++) {
                 for(int c = 0; c < tcols; c++) {
-                    Rect cell = RectC(tr.left + c * cell_w, tr.top + r * cell_h, cell_w, cell_h);
+                    int y0 = (r < row_tops.GetCount() ? row_tops[r] : r * cell_h);
+                    int rh = (r < row_heights.GetCount() ? row_heights[r] : cell_h);
+                    Rect cell = RectC(tr.left + c * cell_w, tr.top + y0, cell_w, rh);
                     if(active_table_embed_id_ == e.embed_id && active_table_cell_selected_ && r == active_table_row_ && c == active_table_col_)
-                        w.DrawRect(cell.Deflated(1, 1), Color(227, 238, 255));
+                        w.DrawRect(cell.Deflated(1, 1), Blend(SColorHighlight(), SColorPaper(), 70));
 
                     if(r < model.rows.GetCount() && c < model.rows[r].GetCount()) {
-                        int tx = cell.left + DPI(4);
-                        int ty = cell.top + max(0, (cell.GetHeight() - tf.GetHeight()) / 2);
-                        bool drew_runs = false;
-
-                        if(e.payload.Find("cell_runs") >= 0 && e.payload["cell_runs"].Is<ValueArray>()) {
-                            ValueArray rows_runs = e.payload["cell_runs"];
-                            if(r < rows_runs.GetCount() && rows_runs[r].Is<ValueArray>()) {
-                                ValueArray row_runs = rows_runs[r];
-                                if(c < row_runs.GetCount() && row_runs[c].Is<ValueArray>()) {
-                                    ValueArray runs = row_runs[c];
-                                    for(int ri = 0; ri < runs.GetCount(); ri++) {
-                                        if(!runs[ri].Is<ValueMap>())
-                                            continue;
-                                        ValueMap run = runs[ri];
-                                        String type = (run.Find("type") >= 0 ? AsString(run["type"]) : String());
-                                        if(type == "text") {
-                                            String txt = (run.Find("text") >= 0 ? AsString(run["text"]) : String());
-                                            if(!txt.IsEmpty()) {
-                                                w.DrawText(tx, ty, txt, tf, Color(30, 35, 45));
-                                                tx += GetTextSize(txt, tf).cx + DPI(2);
-                                            }
-                                            drew_runs = true;
-                                        }
-                                        else if(type == "image" && run.Find("resource_key") >= 0) {
-                                            String key = AsString(run["resource_key"]);
-                                            UiDocResource rr;
-                                            if(!GetResource(key, rr))
-                                                continue;
-                                            int iw = (run.Find("width") >= 0 ? (int)run["width"] : rr.width);
-                                            int ih = (run.Find("height") >= 0 ? (int)run["height"] : rr.height);
-                                            iw = ::clamp(iw, DPI(10), max(DPI(10), cell.GetWidth() - DPI(8)));
-                                            ih = ::clamp(ih, DPI(10), max(DPI(10), cell.GetHeight() - DPI(6)));
-                                            int iy = cell.top + max(1, (cell.GetHeight() - ih) / 2);
-                                            Image img = StreamRaster::LoadStringAny(rr.bytes);
-                                            if(!img.IsEmpty())
-                                                w.DrawImage(RectC(tx, iy, iw, ih), img);
-                                            else
-                                                w.DrawRect(tx, iy, iw, ih, Color(170, 170, 170));
-                                            tx += iw + DPI(2);
-                                            drew_runs = true;
-                                        }
-                                    }
-                                }
+                        ValueArray runs = UiDocEnsureCellRunsPayload(e.payload, r, c);
+                        UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, tf, max(DPI(12), cell.GetWidth() - DPI(8)), true);
+                        int tx0 = cell.left + DPI(4);
+                        int ty0 = cell.top + DPI(3);
+                        for(int bi = 0; bi < lo.boxes.GetCount(); bi++) {
+                            const UiDocInlineBox& b = lo.boxes[bi];
+                            if(b.kind == 1) {
+                                WString one;
+                                one.Cat(b.ch);
+                                w.DrawText(tx0 + b.x, ty0 + b.y, one, tf, SColorText());
                             }
-                        }
-
-                        if(!drew_runs) {
-                            String txt = model.rows[r][c].ToString();
-                            if(!txt.IsEmpty())
-                                w.DrawText(tx, ty, txt, tf, Color(30, 35, 45));
+                            else if(b.kind == 2) {
+                                UiDocResource rr;
+                                if(!GetResource(b.key, rr))
+                                    continue;
+                                Image img = StreamRaster::LoadStringAny(rr.bytes);
+                                if(!img.IsEmpty())
+                                    w.DrawImage(RectC(tx0 + b.x, ty0 + b.y, b.w, b.h), img);
+                                else
+                                    w.DrawRect(tx0 + b.x, ty0 + b.y, b.w, b.h, SColorFace());
+                            }
                         }
                     }
                 }
@@ -4987,49 +6049,59 @@ void UiDoc::Paint(Draw& w)
 
         int block_type = (line < block_meta_.GetCount() ? block_meta_[line].block_type : (int)BLOCK_PARAGRAPH);
         bool quote_ink = (line < block_meta_.GetCount() && block_meta_[line].block_type == (int)BLOCK_QUOTE);
-        for(int i = 0; i < len;) {
-            int pos = start + i;
-            const CharStyle& cst = styles_[pos];
-
-            int j = i + 1;
-            while(j < len) {
-                const CharStyle& nst = styles_[start + j];
-                if(nst.flags != cst.flags || nst.ink != cst.ink || nst.size_delta != cst.size_delta
-                   || nst.leading_delta != cst.leading_delta || nst.tracking_delta != cst.tracking_delta)
-                    break;
-                j++;
-            }
-
-            WString run;
-            for(int k = i; k < j; k++) {
-                wchar ch = text_[start + k];
+        ValueArray pruns = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
+        UiDocInlineLayout plo = UiDocLayoutInlineRuns(pruns, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+        for(int bi = 0; bi < plo.boxes.GetCount(); bi++) {
+            const UiDocInlineBox& b = plo.boxes[bi];
+            if(b.kind == 1) {
+                int i = ::clamp(b.from, 0, max(0, len - 1));
+                int pos = start + i;
+                const CharStyle& cst = styles_[pos];
+                Font f = ApplyBlockFont(ResolveFont(cst), block_type);
+                Color ink = IsNull(cst.ink) ? style_.palette.ink[st] : cst.ink;
+                if(quote_ink)
+                    ink = Blend(ink, SColorShadow(), 80);
+                WString one;
+                wchar ch = b.ch;
                 if(ch == '\t' || ch < 32)
                     ch = ' ';
-                run.Cat(ch);
+                one.Cat(ch);
+                int x0 = line_left + prefixw + b.x;
+                int ty = y + (text_lh - f.GetHeight()) / 2;
+                w.DrawText(x0, ty, one, f, ink);
+                int x1 = x0 + max(1, b.w);
+                if(cst.flags & MARK_UNDERLINE) {
+                    int uy = y + lh - DPI(2);
+                    w.DrawRect(x0, uy, max(1, x1 - x0), 1, ink);
+                }
+                if(cst.flags & MARK_STRIKE) {
+                    int sy = y + lh / 2;
+                    w.DrawRect(x0, sy, max(1, x1 - x0), 1, ink);
+                }
             }
-
-            Font f = ApplyBlockFont(ResolveFont(cst), block_type);
-
-            Color ink = IsNull(cst.ink) ? style_.palette.ink[st] : cst.ink;
-            if(quote_ink)
-                ink = Blend(ink, SColorShadow(), 80);
-
-            int x0 = line_left + prefixw + pref[i];
-            int x1 = line_left + prefixw + pref[j];
-            int ty = y + (text_lh - f.GetHeight()) / 2;
-            if(!run.IsEmpty())
-                w.DrawText(x0, ty, run, f, ink);
-
-            if(cst.flags & MARK_UNDERLINE) {
-                int uy = y + lh - DPI(2);
-                w.DrawRect(x0, uy, max(1, x1 - x0), 1, ink);
+            else if(b.kind == 2) {
+                UiDocResource rr;
+                if(!GetResource(b.key, rr))
+                    continue;
+                int x0 = line_left + prefixw + b.x;
+                int y0 = y + max(0, (text_lh - b.h) / 2);
+                String eid;
+                int seen = 0;
+                for(int j = 0; j < inl_off.GetCount(); j++) {
+                    if(inl_off[j] == b.from) {
+                        if(seen == 0 && inl_embed_ix[j] >= 0)
+                            eid = embeds_[inl_embed_ix[j]].embed_id;
+                        seen++;
+                    }
+                }
+                if(!eid.IsEmpty() && active_image_embed_id_ == eid)
+                    w.DrawRect(x0 - 1, y0 - 1, b.w + 2, b.h + 2, SColorHighlight());
+                Image img = StreamRaster::LoadStringAny(rr.bytes);
+                if(!img.IsEmpty())
+                    w.DrawImage(RectC(x0, y0, b.w, b.h), img);
+                else
+                    w.DrawRect(x0, y0, b.w, b.h, SColorFace());
             }
-            if(cst.flags & MARK_STRIKE) {
-                int sy = y + lh / 2;
-                w.DrawRect(x0, sy, max(1, x1 - x0), 1, ink);
-            }
-
-            i = j;
         }
     }
 
@@ -5048,6 +6120,25 @@ void UiDoc::LeftDown(Point p, dword)
 {
     SetFocus();
 
+    String image_id;
+    if(HitTestInlineImage(p, image_id) || HitTestBlockImage(p, image_id)) {
+        for(int i = 0; i < embeds_.GetCount(); i++) {
+            if(embeds_[i].embed_id != image_id)
+                continue;
+            active_image_embed_id_ = image_id;
+            active_table_cell_selected_ = false;
+            anchor_pos_ = caret_pos_ = ClampPos(embeds_[i].range.from);
+            preferred_x_ = -1;
+            drag_selecting_ = false;
+            if(HasCapture())
+                ReleaseCapture();
+            ScrollSelectionIntoView();
+            Refresh();
+            WhenSelection();
+            return;
+        }
+    }
+
     int embed_ix = -1;
     int row = 0;
     int col = 0;
@@ -5058,6 +6149,7 @@ void UiDoc::LeftDown(Point p, dword)
         active_table_col_ = col;
         active_table_cell_pos_ = caret_off;
         active_table_cell_selected_ = true;
+        active_image_embed_id_.Clear();
         anchor_pos_ = caret_pos_ = ClampPos(embeds_[embed_ix].range.from);
         preferred_x_ = -1;
         drag_selecting_ = false;
@@ -5072,6 +6164,7 @@ void UiDoc::LeftDown(Point p, dword)
     int pos = PosAtPointInternal(p);
     anchor_pos_ = caret_pos_ = pos;
     active_table_cell_selected_ = false;
+    active_image_embed_id_.Clear();
     preferred_x_ = -1;
     drag_selecting_ = true;
     SetCapture();
@@ -5100,6 +6193,24 @@ void UiDoc::MouseMove(Point p, dword)
 
 void UiDoc::LeftDouble(Point p, dword)
 {
+    int embed_ix = -1;
+    int row = 0;
+    int col = 0;
+    int caret_off = 0;
+    if(HitTestTableCell(p, embed_ix, row, col, caret_off)) {
+        active_table_embed_id_ = embeds_[embed_ix].embed_id;
+        active_table_row_ = row;
+        active_table_col_ = col;
+        active_table_cell_pos_ = caret_off;
+        active_table_cell_selected_ = true;
+        anchor_pos_ = caret_pos_ = ClampPos(embeds_[embed_ix].range.from);
+        preferred_x_ = -1;
+        ScrollSelectionIntoView();
+        Refresh();
+        WhenSelection();
+        return;
+    }
+
     int pos = PosAtPointInternal(p);
     pos = ClampPos(pos);
 
@@ -5175,6 +6286,20 @@ bool UiDoc::Key(dword key, int)
         return true;
     };
 
+    auto FindInlineImageAtPos = [&](int pos)->String {
+        for(int i = 0; i < embeds_.GetCount(); i++) {
+            const UiDocEmbedBlock& e = embeds_[i];
+            if(e.embed_type != "image")
+                continue;
+            String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+            if(mode != "inline")
+                continue;
+            if(e.range.from == pos)
+                return e.embed_id;
+        }
+        return String();
+    };
+
     if(ctrl && alt) {
         switch(base) {
         case K_DOWN:  return AddTableRowBelow();
@@ -5188,6 +6313,11 @@ bool UiDoc::Key(dword key, int)
     if(!ctrl && !alt) {
         switch(base) {
         case K_LEFT:
+            if(!active_image_embed_id_.IsEmpty()) {
+                active_image_embed_id_.Clear();
+                MoveCaret(max(0, caret_pos_ - 1), shift);
+                return true;
+            }
             if(active_table_cell_selected_) {
                 int embed_ix = FindActiveTableEmbedIndex();
                 TableModel tm;
@@ -5198,27 +6328,48 @@ bool UiDoc::Key(dword key, int)
                         active_table_cell_pos_--;
                     else if(col > 0) {
                         active_table_col_ = col - 1;
-                        active_table_cell_pos_ = tm.rows[row][col - 1].GetCount();
+                        active_table_cell_pos_ = UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col - 1));
                     }
+                    Refresh();
+                    return true;
+                }
+            }
+            {
+                String iid = FindInlineImageAtPos(max(0, caret_pos_ - 1));
+                if(!iid.IsEmpty()) {
+                    active_image_embed_id_ = iid;
                     Refresh();
                     return true;
                 }
             }
             MoveCaret(caret_pos_ - 1, shift); return true;
         case K_RIGHT:
+            if(!active_image_embed_id_.IsEmpty()) {
+                active_image_embed_id_.Clear();
+                MoveCaret(min(text_.GetCount(), caret_pos_ + 1), shift);
+                return true;
+            }
             if(active_table_cell_selected_) {
                 int embed_ix = FindActiveTableEmbedIndex();
                 TableModel tm;
                 if(GetTableModelByEmbedIndex(embed_ix, tm, nullptr) && !tm.rows.IsEmpty() && tm.cols > 0) {
                     int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
                     int col = ::clamp(active_table_col_, 0, tm.cols - 1);
-                    int cell_len = tm.rows[row][col].GetCount();
+                    int cell_len = UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col));
                     if(active_table_cell_pos_ < cell_len)
                         active_table_cell_pos_++;
                     else if(col + 1 < tm.cols) {
                         active_table_col_ = col + 1;
                         active_table_cell_pos_ = 0;
                     }
+                    Refresh();
+                    return true;
+                }
+            }
+            {
+                String iid = FindInlineImageAtPos(caret_pos_);
+                if(!iid.IsEmpty()) {
+                    active_image_embed_id_ = iid;
                     Refresh();
                     return true;
                 }
@@ -5233,7 +6384,7 @@ bool UiDoc::Key(dword key, int)
                         active_table_row_--;
                     int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
                     int col = ::clamp(active_table_col_, 0, tm.cols - 1);
-                    active_table_cell_pos_ = min(active_table_cell_pos_, tm.rows[row][col].GetCount());
+                    active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col)));
                     Refresh();
                     return true;
                 }
@@ -5248,7 +6399,7 @@ bool UiDoc::Key(dword key, int)
                         active_table_row_++;
                     int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
                     int col = ::clamp(active_table_col_, 0, tm.cols - 1);
-                    active_table_cell_pos_ = min(active_table_cell_pos_, tm.rows[row][col].GetCount());
+                    active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col)));
                     Refresh();
                     return true;
                 }
@@ -5287,6 +6438,10 @@ bool UiDoc::Key(dword key, int)
         case K_HOME:   MoveCaret(0, shift); return true;
         case K_END:    MoveCaret(text_.GetCount(), shift); return true;
         case K_BACKSPACE:
+            if(active_table_cell_selected_) {
+                DeleteInActiveTableCell(false);
+                return true;
+            }
             if(HasSelection())
                 return DeleteSelection();
             {
@@ -5343,9 +6498,39 @@ bool UiDoc::Key(dword key, int)
     case K_BACKSPACE:
         if(DeleteSelection())
             return true;
-        if(caret_pos_ > 0) {
-            if(ReplaceInActiveTableCell(UiDocRange(caret_pos_ - 1, caret_pos_), WString()))
+        if(active_table_cell_selected_) {
+            DeleteInActiveTableCell(false);
+            return true;
+        }
+        if(!active_image_embed_id_.IsEmpty()) {
+            String id = active_image_embed_id_;
+            active_image_embed_id_.Clear();
+            return DeleteEmbed(id);
+        }
+        for(int pass = 0; pass < 2; pass++) {
+            int probe = (pass == 0 ? caret_pos_ : max(0, caret_pos_ - 1));
+            for(int i = embeds_.GetCount() - 1; i >= 0; i--) {
+                if(embeds_[i].embed_type != "image")
+                    continue;
+                String mode = (embeds_[i].payload.Find("display_mode") >= 0 ? AsString(embeds_[i].payload["display_mode"]) : String("block"));
+                if(mode != "inline")
+                    continue;
+                if(embeds_[i].range.from == probe) {
+                    DeleteEmbed(embeds_[i].embed_id);
+                    return true;
+                }
+            }
+        }
+        for(int i = 0; i < embeds_.GetCount(); i++) {
+            if(embeds_[i].embed_type != "image")
+                continue;
+            String mode = (embeds_[i].payload.Find("display_mode") >= 0 ? AsString(embeds_[i].payload["display_mode"]) : String("block"));
+            if(mode == "inline" && embeds_[i].range.from == max(0, caret_pos_ - 1)) {
+                DeleteEmbed(embeds_[i].embed_id);
                 return true;
+            }
+        }
+        if(caret_pos_ > 0) {
             UiDocChange rep;
             rep.type = UiDocChange::REPLACE_TEXT;
             rep.range = UiDocRange(caret_pos_ - 1, caret_pos_);
@@ -5367,9 +6552,43 @@ bool UiDoc::Key(dword key, int)
     case K_DELETE:
         if(DeleteSelection())
             return true;
-        if(caret_pos_ < text_.GetCount()) {
-            if(ReplaceInActiveTableCell(UiDocRange(caret_pos_, caret_pos_ + 1), WString()))
+        if(active_table_cell_selected_) {
+            DeleteInActiveTableCell(true);
+            return true;
+        }
+        if(!active_image_embed_id_.IsEmpty()) {
+            String id = active_image_embed_id_;
+            active_image_embed_id_.Clear();
+            return DeleteEmbed(id);
+        }
+        for(int pass = 0; pass < 2; pass++) {
+            int probe = (pass == 0 ? caret_pos_ : max(0, caret_pos_ - 1));
+            for(int i = embeds_.GetCount() - 1; i >= 0; i--) {
+                if(embeds_[i].embed_type != "image")
+                    continue;
+                String mode = (embeds_[i].payload.Find("display_mode") >= 0 ? AsString(embeds_[i].payload["display_mode"]) : String("block"));
+                if(mode != "inline")
+                    continue;
+                if(embeds_[i].range.from == probe) {
+                    DeleteEmbed(embeds_[i].embed_id);
+                    return true;
+                }
+            }
+        }
+        for(int i = 0; i < embeds_.GetCount(); i++) {
+            if(embeds_[i].range.from == caret_pos_) {
+                DeleteEmbed(embeds_[i].embed_id);
                 return true;
+            }
+            if(embeds_[i].embed_type == "image") {
+                String mode = (embeds_[i].payload.Find("display_mode") >= 0 ? AsString(embeds_[i].payload["display_mode"]) : String("block"));
+                if(mode == "inline" && embeds_[i].range.from == max(0, caret_pos_ - 1)) {
+                    DeleteEmbed(embeds_[i].embed_id);
+                    return true;
+                }
+            }
+        }
+        if(caret_pos_ < text_.GetCount()) {
             UiDocChange rep;
             rep.type = UiDocChange::REPLACE_TEXT;
             rep.range = UiDocRange(caret_pos_, caret_pos_ + 1);
@@ -5390,6 +6609,10 @@ bool UiDoc::Key(dword key, int)
 
     case K_ENTER:
     {
+        if(active_table_cell_selected_) {
+            ReplaceInActiveTableCell(UiDocRange(caret_pos_, caret_pos_), WString("\n"));
+            return true;
+        }
         EnsureLayoutCache();
         int line = GetLineIndexFromPos(caret_pos_);
         WString ls = GetLineText(line);
@@ -5444,6 +6667,14 @@ bool UiDoc::Key(dword key, int)
         return true;
     }
 
+    case K_SHIFT|K_ENTER:
+        if(active_table_cell_selected_) {
+            ReplaceInActiveTableCell(UiDocRange(caret_pos_, caret_pos_), WString("\n"));
+            return true;
+        }
+        InsertTextAtCaret(WString("\n"));
+        return true;
+
     case K_SHIFT_TAB:
         if(MoveTableCell(true))
             return true;
@@ -5476,6 +6707,28 @@ bool UiDoc::Key(dword key, int)
     }
 
     if(key >= 32 && key < 0x110000) {
+        if(!active_image_embed_id_.IsEmpty()) {
+            int pos = caret_pos_;
+            for(int i = 0; i < embeds_.GetCount(); i++) {
+                const UiDocEmbedBlock& e = embeds_[i];
+                if(e.embed_id != active_image_embed_id_)
+                    continue;
+                if(e.embed_type == "image") {
+                    String mode = (e.payload.Find("display_mode") >= 0 ? AsString(e.payload["display_mode"]) : String("block"));
+                    if(mode == "block") {
+                        EnsureLayoutCache();
+                        int line = GetLineIndexFromPos(e.range.from);
+                        line = ::clamp(line, 0, max(0, line_starts_.GetCount() - 1));
+                        pos = line_starts_[line] + line_lengths_[line];
+                        if(pos < text_.GetCount() && text_[pos] == '\n')
+                            pos++;
+                        MoveCaret(pos, false);
+                    }
+                }
+                break;
+            }
+            active_image_embed_id_.Clear();
+        }
         WString in;
         in.Cat((wchar)key);
         InsertTextAtCaret(in);

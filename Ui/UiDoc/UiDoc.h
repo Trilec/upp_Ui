@@ -1,3 +1,8 @@
+// UiDoc public model + editor API.
+//
+// Thread context: GUI thread.
+// Mutation contract: all document mutations should go through Dispatch(tx)
+// or command handlers that delegate to Dispatch(tx).
 #ifndef _Ui_UiDoc_UiDoc_h_
 #define _Ui_UiDoc_UiDoc_h_
 
@@ -351,6 +356,8 @@ private:
     String search_query_;
     Vector<UiDocRange> search_matches_;
     int search_match_index_ = -1;
+    bool search_ignore_case_ = true;
+    bool search_whole_word_ = false;
     bool bullet_mode_ = false;
     bool numbered_mode_ = false;
     BulletStyle bullet_style_ = BULLET_CIRCLE;
@@ -371,6 +378,7 @@ private:
     int    active_table_col_ = 0;
     int    active_table_cell_pos_ = 0;
     bool   active_table_cell_selected_ = false;
+    String active_image_embed_id_;
     CharStyle typing_style_;
     bool insert_tab_as_spaces_ = false;
 
@@ -514,20 +522,33 @@ private:
                                  const ValueMap* table_style = nullptr,
                                  const ValueMap* existing_payload = nullptr) const;
     bool PayloadToTableModel(const ValueMap& payload, TableModel& out) const;
-    bool GetTableLineVisual(int line, int embed_ix, Rect& table_rc, int& cols, int& rows, int& cell_w, int& cell_h) const;
+    bool GetTableLineVisual(int line,
+                            int embed_ix,
+                            Rect& table_rc,
+                            int& cols,
+                            int& rows,
+                            int& cell_w,
+                            int& cell_h,
+                            Vector<int>* row_heights = nullptr,
+                            Vector<int>* row_tops = nullptr) const;
     bool HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& caret_off) const;
     bool GetActiveTableCellRect(Rect& out) const;
     int  MeasureCellCaretFromX(const WString& cell, int rel_x, const Font& f) const;
+    bool GetImageDisplaySize(const UiDocEmbedBlock& e, int avail_w, int& out_w, int& out_h) const;
+    bool HitTestBlockImage(Point p, String& embed_id) const;
+    bool HitTestInlineImage(Point p, String& embed_id) const;
     int  GetGutterLaneWidth() const;
     void CopyTableModel(const TableModel& src, TableModel& dst) const;
     bool MoveTableCell(bool reverse);
     bool ReplaceInActiveTableCell(UiDocRange range, const WString& txt);
+    bool DeleteInActiveTableCell(bool forward);
     bool InsertImageRunInActiveTableCell(const String& resource_key, int width, int height);
 
     void RecomputeSearchMatches();
     bool PosInRanges(int pos, const Vector<UiDocRange>& rr) const;
     bool IsGlobPattern(const WString& q) const;
     int  MatchGlobFrom(const WString& text, int start, const WString& pattern, int pi, VectorMap<int64, int>& memo) const;
+    bool IsWordChar(wchar ch) const;
     void ScrollSelectionIntoView();
 
     void MoveCaret(int pos, bool keep_selection);
@@ -624,6 +645,10 @@ public:
 
     void SetSearchQuery(const String& q);
     String GetSearchQuery() const { return search_query_; }
+    void SetSearchIgnoreCase(bool b);
+    bool IsSearchIgnoreCase() const { return search_ignore_case_; }
+    void SetSearchWholeWord(bool b);
+    bool IsSearchWholeWord() const { return search_whole_word_; }
     const Vector<UiDocRange>& GetSearchMatches() const { return search_matches_; }
     int GetSearchMatchCount() const { return search_matches_.GetCount(); }
     int GetSearchMatchIndex() const { return search_match_index_; }
