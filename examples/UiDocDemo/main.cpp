@@ -95,7 +95,7 @@ public:
         inspector_margin_.SetReadOnly();
         inspector_meta_.SetReadOnly();
         inspector_keys_.SetReadOnly();
-        inspector_find_.SetText(find_status_.ToWString());
+        inspector_find_.SetText((find_status_ + " | mode: ignore-case:on, whole-word:off").ToWString());
         inspector_meta_.SetText("Meta: none");
         inspector_keys_.SetText("Mods: Ctrl off Alt off Shift off");
         comment_title_.SetText("Comment note");
@@ -143,7 +143,8 @@ public:
         image_align_left_.SetText("").SetIcon(ICON_EDITOR_BORDER_LEFT_48());
         image_align_center_.SetText("C").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
         image_align_right_.SetText("").SetIcon(ICON_EDITOR_BORDER_RIGHT_48());
-        svg_ins_.SetText("</>").SetIcon(ICON_NAVIGATION_OUTLINED_APPS_48());
+        svg_ins_.SetText("M+").SetIcon(ICON_NAVIGATION_OUTLINED_APPS_48());
+        meta_del_.SetText("M-").SetIcon(ICON_DESIGN_DELETE_48());
         embed_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
 
         note_.SetText("").SetIcon(ICON_EDITOR_NOTES_48());
@@ -215,6 +216,7 @@ public:
         setup_icon_button(image_align_center_);
         setup_icon_button(image_align_right_);
         setup_icon_button(svg_ins_);
+        setup_icon_button(meta_del_);
         setup_icon_button(embed_del_);
         setup_icon_button(note_);
         setup_icon_button(find_prev_);
@@ -271,7 +273,8 @@ public:
         image_align_left_.Tip("Align selected block image left.");
         image_align_center_.Tip("Align selected block image center.");
         image_align_right_.Tip("Align selected block image right.");
-        svg_ins_.Tip("Insert SVG embed placeholder (marker on the right). Rendering is a lightweight embed demo.");
+        svg_ins_.Tip("Attach demo metadata at caret (blue square marker).");
+        meta_del_.Tip("Delete demo metadata attached at caret.");
         embed_del_.Tip("Delete embed at caret (image/svg/hr/table embed ref).");
         note_.Tip("Attach metadata comment to selected text.");
         search_.Tip("Type search query (supports * and ? wildcards).");
@@ -338,6 +341,7 @@ public:
         toolbar_.Add(image_align_center_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(image_align_right_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(svg_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
+        toolbar_.Add(meta_del_, cl_embed, false, Size(DPI(34), DPI(30)));
         toolbar_.Add(embed_del_, cl_embed, false, Size(DPI(34), DPI(30)));
 
         toolbar_.Add(search_, cl_find, false, Size(DPI(240), DPI(30)));
@@ -492,12 +496,31 @@ public:
         image_align_center_.WhenAction = [=] { doc_.ExecuteCommand("embed.image.align.set", "center"); doc_.SetFocus(); };
         image_align_right_.WhenAction = [=] { doc_.ExecuteCommand("embed.image.align.set", "right"); doc_.SetFocus(); };
         svg_ins_.WhenAction = [=] {
+            UiDocSelection s = doc_.GetSelection();
+            int from = min(s.anchor, s.caret);
+            int to = max(s.anchor, s.caret);
+            if(from == to)
+                to = min(doc_.GetLength(), from + 1);
             ValueMap add;
-            add.Add("svg_xml", "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='18'><rect x='1' y='1' width='46' height='16' fill='none' stroke='black'/><text x='8' y='13' font-size='10'>SVG</text></svg>");
-            add.Add("pos", doc_.GetSelection().caret);
-            add.Add("width", 48);
-            add.Add("height", 18);
-            doc_.ExecuteCommand("embed.svg.insert", add);
+            add.Add("from", from);
+            add.Add("to", to);
+            add.Add("type", "meta.demo");
+            add.Add("text", "metadata attached");
+            doc_.ExecuteCommand("annot.add", add);
+            RefreshInspector();
+            doc_.SetFocus();
+        };
+        meta_del_.WhenAction = [=] {
+            int pos = doc_.GetSelection().caret;
+            UiDocRange q(pos, pos + 1);
+            Vector<UiDocAnnotation> aa = doc_.QueryAnnotations(&q);
+            for(const UiDocAnnotation& a : aa) {
+                if(a.type == "meta.demo") {
+                    doc_.ExecuteCommand("annot.remove", a.id);
+                    break;
+                }
+            }
+            RefreshInspector();
             doc_.SetFocus();
         };
         embed_del_.WhenAction = [=] { doc_.ExecuteCommand("embed.delete.at_caret"); doc_.SetFocus(); };
@@ -967,7 +990,9 @@ public:
             b = Format("Block:t%d l%d c%d tid:%d tc:%d me:%d", r.block_type, (int)r.list_kind, (int)r.commented, r.table_id, r.table_cols, mapped_edit_total_);
         }
         inspector_block_.SetText(b.ToWString());
-        inspector_find_.SetText(find_status_.ToWString());
+        String fmode = String().Cat() << "mode: ignore-case:" << (doc_.IsSearchIgnoreCase() ? "on" : "off")
+                                      << ", whole-word:" << (doc_.IsSearchWholeWord() ? "on" : "off");
+        inspector_find_.SetText((find_status_ + " | " + fmode).ToWString());
         inspector_margin_.SetText(Format("Margin:%d Lead:%d Track:%d", doc_.GetCurrentParagraphMarginSteps(), doc_.GetCurrentLeadingDelta(), doc_.GetCurrentTrackingDelta()).ToWString());
         UiDocSelection sel = doc_.GetSelection();
         UiDocRange rr(sel.anchor, sel.caret);
@@ -1157,6 +1182,7 @@ private:
     UiButton   image_align_center_;
     UiButton   image_align_right_;
     UiButton   svg_ins_;
+    UiButton   meta_del_;
     UiButton   embed_del_;
 
     UiButton   note_;

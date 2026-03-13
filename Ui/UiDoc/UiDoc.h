@@ -285,6 +285,9 @@ public:
         Color search_fill     = Color(255, 237, 158);
         Color caret_ink       = SColorText();
         Color annotation_fill = Color(255, 230, 180);
+        Color marker_annotation = SColorHighlight();
+        Color marker_table      = SColorHighlight();
+        Color marker_comment    = SColorDisabled();
     };
 
 private:
@@ -642,6 +645,12 @@ public:
     bool IsLineNumbersShown() const { return show_line_numbers_; }
     void ShowMetadataMarkers(bool b) { show_metadata_markers_ = b; InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
     bool IsMetadataMarkersShown() const { return show_metadata_markers_; }
+    void SetMarkerAnnotationColor(Color c) { style_.marker_annotation = c; Refresh(); }
+    Color GetMarkerAnnotationColor() const { return style_.marker_annotation; }
+    void SetMarkerTableColor(Color c) { style_.marker_table = c; Refresh(); }
+    Color GetMarkerTableColor() const { return style_.marker_table; }
+    void SetMarkerCommentColor(Color c) { style_.marker_comment = c; Refresh(); }
+    Color GetMarkerCommentColor() const { return style_.marker_comment; }
 
     void SetSearchQuery(const String& q);
     String GetSearchQuery() const { return search_query_; }

@@ -11,6 +11,7 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiTheme.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
 	UiIcons.h,
@@ -65,4 +66,3 @@ file
 
 mainconfig
 	"" = "";
-

@@ -6,6 +6,7 @@
 
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>

@@ -5769,6 +5769,13 @@ void UiDoc::Paint(Draw& w)
         bool line_has_ann = (line_ann_idx < ann_ranges.GetCount()
                             && ann_ranges[line_ann_idx].from < line_to
                             && ann_ranges[line_ann_idx].to > line_from);
+        int line_ann_count = 0;
+        for(const UiDocRange& ar : ann_ranges) {
+            if(ar.from >= line_to)
+                break;
+            if(ar.to > line_from)
+                line_ann_count++;
+        }
 
         if(line < block_meta_.GetCount()) {
             const UiDocBlockMeta& bm = block_meta_[line];
@@ -5825,17 +5832,19 @@ void UiDoc::Paint(Draw& w)
                 if(show_line_numbers_)
                     mx = max(mx, lane_l + numbers_w + DPI(2));
                 int my = y + max(0, (text_lh - sz) / 2);
-                if(line_has_ann)
-                    w.DrawEllipse(RectC(mx, my, sz, sz), Blend(SColorHighlight(), SColorPaper(), 120));
+                if(line_has_ann) {
+                    int blend = max(40, 120 - min(4, line_ann_count) * 18);
+                    w.DrawEllipse(RectC(mx, my, sz, sz), Blend(style_.marker_annotation, SColorPaper(), blend));
+                }
                 if(has_table)
-                    w.DrawRect(mx + sz + gap, my, sz, sz, SColorHighlight());
+                    w.DrawRect(mx + sz + gap, my, sz, sz, style_.marker_table);
                 if(has_comment) {
                     int tx = mx + (sz + gap) * 2;
                     int ty = my;
                     for(int i = 0; i < sz; i++) {
                         int left = tx + (sz - i - 1) / 2;
                         int width = i + 1;
-                        w.DrawRect(left, ty + i, width, 1, SColorDisabled());
+                        w.DrawRect(left, ty + i, width, 1, style_.marker_comment);
                     }
                 }
             }
