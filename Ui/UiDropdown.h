@@ -129,6 +129,8 @@ public:
 
 private:
     Style  style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
     String text_;                 // Current displayed text
     Image  indicator_;           // Current indicator image (open/closed state)
     
@@ -192,6 +194,10 @@ private:
     UiListModel* model_ = nullptr;
     
     // Internal helpers
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     void RebuildIndicator();
     Size ComputeNaturalSize() const;
     void OpenPopupInternal();
@@ -316,18 +322,15 @@ public:
     // Styling
     // ------------------------------------------------------------------------
     UiDropdown&       SetStyle(const Style& s);
-    const Style&      GetStyle() const { return style_; }
-    
+    UiDropdown&       ClearStyleOverride();
+    bool              HasStyleOverride() const { return has_style_override_; }
+    const Style&      GetStyle() const { return GetEffectiveStyle(); }
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
     
     // CtrlStyled (CRTP) interface
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     
     void OnStyleChanged();
     

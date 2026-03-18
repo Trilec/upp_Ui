@@ -1,34 +1,39 @@
 #include <Ui/UiTab.h>
 #include <Ui/UiIcons.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
-const UiTab::Style& UiTab::StyleClassic()
+const UiTab::Style& UiTab::StyleDefault()
 {
     static Style s;
-    ONCELOCK {
-        Color face = Blend(SColorFace(), White(), 10);
-        Color frame = Blend(SColorShadow(), Black(), 15);
-        Color ink = SColorText();
+    static bool init = false;
+    if(!init) {
+        Color face = Color(248, 250, 252);
+        Color frame = Color(226, 232, 240);
+        Color ink = Color(71, 85, 105);
 
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(face);
             s.palette.frame[i] = frame;
             s.palette.ink[i] = ink;
 
-            s.tab_palette.face[i] = UiFill::Solid(Blend(face, SColorPaper(), 150));
-            s.tab_palette.frame[i] = Blend(frame, SColorPaper(), 120);
+            s.tab_palette.face[i] = UiFill::Solid(Color(255, 255, 255));
+            s.tab_palette.frame[i] = frame;
             s.tab_palette.ink[i] = ink;
         }
 
-        s.tab_palette.face[ST_HOT] = UiFill::Solid(LtColor(Blend(face, SColorPaper(), 150), 5));
-        s.tab_palette.face[ST_PRESSED] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 220));
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
+        s.tab_palette.face[ST_HOT] = UiFill::Solid(Color(241, 245, 249));
+        s.tab_palette.face[ST_PRESSED] = UiFill::Solid(Color(255, 255, 255));
+        s.tab_palette.frame[ST_PRESSED] = Color(148, 163, 184);
+        s.tab_palette.ink[ST_HOT] = Color(30, 41, 59);
+        s.tab_palette.ink[ST_PRESSED] = Color(15, 23, 42);
+        s.tab_palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
         s.metrics.face_enabled = true;
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(8);
+        s.metrics.radius = DPI(10);
         s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
 
         s.tab_metrics.face_enabled = true;
@@ -38,181 +43,87 @@ const UiTab::Style& UiTab::StyleClassic()
         s.tab_metrics.content_padding = Rect(0, 0, 0, 0);
 
         s.tab_extent = DPI(34);
-        s.tab_gap = DPI(1);
-        s.body_gap = 0;
-        s.tab_padding = Rect(DPI(12), DPI(6), DPI(12), DPI(6));
+        s.tab_gap = DPI(6);
+        s.body_gap = DPI(6);
+        s.tab_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         s.strip_inset = Rect(0, 0, 0, 0);
         s.icon_text_gap = DPI(6);
+        s.affordance_gap = DPI(4);
+        s.affordance_size = DPI(12);
         s.min_tab_main = DPI(72);
         s.indicator_thickness = DPI(3);
         s.indicator_span = LARGE;
-        s.visual = UITAB_CLASSIC;
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleDefault()
-{
-    return StyleClassic();
-}
-
-const UiTab::Style& UiTab::StyleUnderline()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UITAB_UNDERLINE;
-        s.tab_metrics.face_enabled = false;
-        s.tab_metrics.frame_enabled = false;
-        s.tab_gap = DPI(14);
-        s.body_gap = DPI(6);
-        s.tab_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
-        s.indicator_thickness = DPI(3);
-        for(int i = 0; i < 4; i++) {
-            s.tab_palette.face[i] = UiFill::Solid(Null);
-            s.tab_palette.frame[i] = Null;
-            s.tab_palette.ink[i] = Blend(SColorText(), SColorPaper(), 45);
-        }
-        s.tab_palette.ink[ST_HOT] = SColorText();
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleSegmented()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UITAB_SEGMENTED;
-        s.tab_gap = DPI(2);
-        s.body_gap = DPI(6);
-        s.strip_inset = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
-        s.tab_padding = Rect(DPI(12), DPI(6), DPI(12), DPI(6));
         s.fill_tabs = false;
-        s.metrics.radius = DPI(10);
-        s.tab_metrics.radius = DPI(999);
-        for(int i = 0; i < 4; i++) {
-            s.tab_palette.face[i] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 185));
-            s.tab_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 140);
-            s.tab_palette.ink[i] = Blend(SColorText(), SColorPaper(), 45);
-        }
-        s.tab_palette.face[ST_PRESSED] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 220));
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleRail()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UITAB_RAIL;
-        s.tab_metrics.face_enabled = false;
-        s.tab_metrics.frame_enabled = false;
-        s.tab_gap = DPI(10);
-        s.body_gap = DPI(6);
-        s.tab_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        s.indicator_thickness = DPI(3);
-        for(int i = 0; i < 4; i++) {
-            s.tab_palette.face[i] = UiFill::Solid(Null);
-            s.tab_palette.frame[i] = Null;
-            s.tab_palette.ink[i] = Blend(SColorText(), SColorPaper(), 50);
-        }
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleDocument()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UITAB_DOCUMENT;
-        s.tab_metrics.radius = DPI(8);
-        s.tab_gap = DPI(8);
-        s.body_gap = DPI(4);
-        s.tab_padding = Rect(DPI(12), DPI(6), DPI(12), DPI(6));
-        for(int i = 0; i < 4; i++) {
-            s.tab_palette.face[i] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 190));
-            s.tab_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 130);
-            s.tab_palette.ink[i] = Blend(SColorText(), SColorPaper(), 40);
-        }
-        s.tab_palette.face[ST_PRESSED] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 230));
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleStandard() { return StyleClassic(); }
-
-const UiTab::Style& UiTab::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.metrics.face_enabled = false;
-        s.tab_metrics.face_enabled = false;
-        for(int i = 0; i < 4; i++) {
-            s.palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 145);
-            s.tab_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 140);
-            s.tab_palette.ink[i] = Blend(SColorText(), SColorPaper(), 60);
-        }
-        s.tab_palette.ink[ST_PRESSED] = SColorText();
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        Color face = Blend(SColorFace(), SColorPaper(), 205);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.tab_palette.face[i] = UiFill::Solid(Blend(face, SColorPaper(), 185));
-        }
-        s.metrics.radius = DPI(10);
-        s.tab_metrics.radius = DPI(8);
-    }
-    return s;
-}
-
-const UiTab::Style& UiTab::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        Color base = SColorHighlight();
-        Color frame = DkColor(base, 28);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(Blend(base, SColorPaper(), 230));
-            s.palette.frame[i] = frame;
-            s.tab_palette.face[i] = UiFill::Solid(Blend(base, SColorPaper(), 210));
-            s.tab_palette.frame[i] = frame;
-            s.tab_palette.ink[i] = SColorText();
-        }
-        s.tab_palette.face[ST_PRESSED] = UiFill::Solid(base);
-        s.tab_palette.ink[ST_PRESSED] = SColorHighlightText();
+        s.metrics.focus_enabled = false;
+        s.visual = UITAB_CLASSIC;
+        init = true;
     }
     return s;
 }
 
 UiTab::UiTab()
-    : style_(StyleDefault())
 {
     Ctrl::Add(pane_.SizePos());
     pane_.Transparent();
     BackPaint();
     WantFocus();
+    SyncThemeStyle();
+    OnStyleChanged();
+}
+
+void UiTab::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+}
+
+UiTab::Style& UiTab::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiTab::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    themed_style_ = UiTheme::ResolveTab(visual_);
+    theme_revision_ = revision;
+}
+
+const UiTab::Style& UiTab::GetEffectiveStyle() const
+{
+    if(has_style_override_)
+        return style_;
+
+    const_cast<UiTab*>(this)->SyncThemeStyle();
+    return themed_style_;
 }
 
 UiTab& UiTab::SetStyle(const Style& s)
 {
     style_ = s;
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiTab& UiTab::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
@@ -236,6 +147,18 @@ UiTab& UiTab::SetPlacement(UiAlign side)
     return *this;
 }
 
+UiTab& UiTab::SetVisual(UiTabVisual visual)
+{
+    if(visual < UITAB_CLASSIC || visual > UITAB_DOCUMENT)
+        visual = UITAB_CLASSIC;
+    if(visual_ == visual)
+        return *this;
+    visual_ = visual;
+    InvalidateStyleCache();
+    OnStyleChanged();
+    return *this;
+}
+
 bool UiTab::IsHorizontal() const
 {
     return placement_ == UiAlign::TOP || placement_ == UiAlign::BOTTOM;
@@ -243,7 +166,8 @@ bool UiTab::IsHorizontal() const
 
 void UiTab::RebuildTextSize(TabItem& t)
 {
-    Font f = style_.tab_font;
+    const Style& style = GetEffectiveStyle();
+    Font f = style.tab_font;
     if(IsNull(f))
         f = StdFont();
     t.text_size = t.text.IsEmpty() ? Size(0, 0) : GetTextSize(t.text, f);
@@ -450,27 +374,29 @@ Size UiTab::GetMinSize() const
             h = max(h, ms.cy);
         }
     }
-    int ex = max(DPI(24), style_.tab_extent) + style_.tab_gap;
+    const Style& style = GetEffectiveStyle();
+    int ex = max(DPI(24), style.tab_extent) + style.tab_gap;
     if(IsHorizontal())
         h += ex;
     else
         w += ex;
-    return UiStyledOuterSizeFromContent(Size(w, h), style_.metrics, style_.skin);
+    return UiStyledOuterSizeFromContent(Size(w, h), style.metrics, style.skin);
 }
 
 void UiTab::Layout()
 {
     Rect outer = GetSize();
-    Rect content = UiStyledInnerRect(outer, style_.metrics, style_.skin);
+    const Style& style = GetEffectiveStyle();
+    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
     if(content.IsEmpty()) {
         strip_rect_ = Rect(0, 0, 0, 0);
         pane_.SetRect(0, 0, 0, 0);
         return;
     }
 
-    int ex = max(DPI(24), style_.tab_extent);
+    int ex = max(DPI(24), style.tab_extent);
     Rect pane_r = content;
-    int body_gap = max(0, style_.body_gap);
+    int body_gap = max(0, style.body_gap);
 
     switch(placement_) {
     case UiAlign::BOTTOM:
@@ -493,13 +419,13 @@ void UiTab::Layout()
     }
 
     pane_.SetRect(pane_r);
-    tabs_rect_ = UiApplyThicknessRect(strip_rect_, UiNonNegativeThickness(style_.strip_inset));
+    tabs_rect_ = UiApplyThicknessRect(strip_rect_, UiNonNegativeThickness(style.strip_inset));
 
     int n = tabs_.GetCount();
     if(n <= 0)
         return;
 
-    int gap = max(0, style_.tab_gap);
+    int gap = max(0, style.tab_gap);
     bool horz = IsHorizontal();
     int avail = horz ? tabs_rect_.GetWidth() : tabs_rect_.GetHeight();
     Vector<int> pref;
@@ -508,18 +434,18 @@ void UiTab::Layout()
 
     for(int i = 0; i < n; i++) {
         const TabItem& t = tabs_[i];
-        int icon_w = IsNull(t.icon) ? 0 : (horz ? style_.tab_extent - DPI(14) : style_.tab_extent - DPI(14));
+        int icon_w = IsNull(t.icon) ? 0 : (horz ? style.tab_extent - DPI(14) : style.tab_extent - DPI(14));
         int aff_count = 0;
         if(show_drag_handles_ && t.draggable)
             aff_count++;
         if(show_close_buttons_ && t.closable)
             aff_count++;
-        int aff_w = aff_count > 0 ? (aff_count * style_.affordance_size + max(0, aff_count - 1) * style_.affordance_gap + style_.affordance_gap) : 0;
-        int main = (horz ? t.text_size.cx : t.text_size.cy) + style_.tab_padding.left + style_.tab_padding.right;
+        int aff_w = aff_count > 0 ? (aff_count * style.affordance_size + max(0, aff_count - 1) * style.affordance_gap + style.affordance_gap) : 0;
+        int main = (horz ? t.text_size.cx : t.text_size.cy) + style.tab_padding.left + style.tab_padding.right;
         if(icon_w > 0)
-            main += icon_w + style_.icon_text_gap;
+            main += icon_w + style.icon_text_gap;
         main += aff_w;
-        main = max(main, style_.min_tab_main);
+        main = max(main, style.min_tab_main);
         pref[i] = main;
         pref_sum += main;
     }
@@ -528,7 +454,7 @@ void UiTab::Layout()
     Vector<int> tab_main;
     tab_main.SetCount(n);
 
-    if(style_.fill_tabs || pref_sum + fixed_gap > avail) {
+    if(style.fill_tabs || pref_sum + fixed_gap > avail) {
         int each = max(1, (avail - fixed_gap) / n);
         for(int i = 0; i < n; i++)
             tab_main[i] = each;
@@ -545,7 +471,7 @@ void UiTab::Layout()
         else
             tabs_[i].tab_rect = Rect(tabs_rect_.left, cursor, tabs_rect_.right, cursor + tab_main[i]);
 
-        if(style_.visual == UITAB_CLASSIC) {
+        if(style.visual == UITAB_CLASSIC && (style.tab_metrics.face_enabled || style.tab_metrics.frame_enabled)) {
             Rect rr = tabs_[i].tab_rect;
             int lift = DPI(3);
             bool active = (i == active_);
@@ -579,16 +505,16 @@ void UiTab::Layout()
         tabs_[i].close_rect = Rect(0, 0, 0, 0);
         tabs_[i].drag_rect = Rect(0, 0, 0, 0);
         Rect ir = tabs_[i].tab_rect;
-        ir.left += style_.tab_padding.left;
-        ir.right -= style_.tab_padding.right;
-        ir.top += style_.tab_padding.top;
-        ir.bottom -= style_.tab_padding.bottom;
-        int a = max(DPI(10), style_.affordance_size);
+        ir.left += style.tab_padding.left;
+        ir.right -= style.tab_padding.right;
+        ir.top += style.tab_padding.top;
+        ir.bottom -= style.tab_padding.bottom;
+        int a = max(DPI(10), style.affordance_size);
         int y = ir.top + (ir.GetHeight() - a) / 2;
         int right = ir.right;
         if(show_close_buttons_ && tabs_[i].closable) {
             tabs_[i].close_rect = RectC(right - a, y, a, a);
-            right = tabs_[i].close_rect.left - style_.affordance_gap;
+            right = tabs_[i].close_rect.left - style.affordance_gap;
         }
         if(show_drag_handles_ && tabs_[i].draggable) {
             tabs_[i].drag_rect = RectC(right - a, y, a, a);
@@ -663,56 +589,55 @@ void UiTab::Paint(Draw& w)
     StyledState st = IsEnabled() ? ST_NORMAL : ST_DISABLED;
     bool has_focus = HasFocus();
 
-    UiPaintStyledBackground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+    const Style& style = GetEffectiveStyle();
+    UiPaintStyledBackground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
 
-    if(!strip_rect_.IsEmpty()) {
-        Color strip_face = style_.palette.face[st].IsSolid()
-                         ? style_.palette.face[st].color
-                         : SColorFace();
+    if(!strip_rect_.IsEmpty() && style.metrics.face_enabled && style.palette.face[st].IsSolid()) {
+        Color strip_face = style.palette.face[st].color;
         w.DrawRect(strip_rect_, Blend(strip_face, SColorPaper(), 220));
     }
 
-    Font f = style_.tab_font;
+    Font f = style.tab_font;
     if(IsNull(f))
         f = StdFont();
 
-    Color accent = style_.tab_palette.frame[ST_PRESSED];
+    Color accent = style.tab_palette.frame[ST_PRESSED];
     if(IsNull(accent))
         accent = SColorHighlight();
-    Color pane_face = style_.palette.face[st].IsSolid() ? style_.palette.face[st].color : SColorFace();
-    Color seam_edge = style_.palette.frame[st];
+    Color pane_face = style.palette.face[st].IsSolid() ? style.palette.face[st].color : SColorFace();
+    Color seam_edge = style.palette.frame[st];
     if(IsNull(seam_edge))
         seam_edge = Blend(SColorShadow(), Black(), 10);
 
     auto DrawTabContent = [&](const TabItem& t, StyledState ts) {
         Rect ir = t.tab_rect;
-        ir.left += style_.tab_padding.left;
-        ir.right -= style_.tab_padding.right;
-        ir.top += style_.tab_padding.top;
-        ir.bottom -= style_.tab_padding.bottom;
+        ir.left += style.tab_padding.left;
+        ir.right -= style.tab_padding.right;
+        ir.top += style.tab_padding.top;
+        ir.bottom -= style.tab_padding.bottom;
 
-        Color ink = style_.tab_palette.ink[ts];
+        Color ink = style.tab_palette.ink[ts];
         if(IsNull(ink))
             ink = SColorText();
         if(ts == ST_HOT)
             ink = LtColor(ink, 6);
-        Color icon_ink = UiResolveIconColor(style_.tab_palette, ts);
+        Color icon_ink = UiResolveIconColor(style.tab_palette, ts);
         if(IsNull(icon_ink))
             icon_ink = ink;
 
         int text_right = ir.right;
 
         if(!t.close_rect.IsEmpty())
-            text_right = min(text_right, t.close_rect.left - style_.affordance_gap);
+            text_right = min(text_right, t.close_rect.left - style.affordance_gap);
         if(!t.drag_rect.IsEmpty())
-            text_right = min(text_right, t.drag_rect.left - style_.affordance_gap);
+            text_right = min(text_right, t.drag_rect.left - style.affordance_gap);
 
         if(!IsNull(t.icon)) {
             int ico = max(DPI(12), min(ir.GetWidth(), ir.GetHeight()));
-            int iw = min(ico, max(DPI(12), style_.tab_extent - DPI(14)));
+            int iw = min(ico, max(DPI(12), style.tab_extent - DPI(14)));
             Rect icon_r = RectC(ir.left, ir.top + (ir.GetHeight() - iw) / 2, iw, iw);
             UiPaintStyledIcon(w, icon_r, t.icon, true, true, icon_ink, ts != ST_DISABLED);
-            ir.left = icon_r.right + style_.icon_text_gap;
+            ir.left = icon_r.right + style.icon_text_gap;
         }
 
         if(!t.drag_rect.IsEmpty()) {
@@ -740,12 +665,12 @@ void UiTab::Paint(Draw& w)
         }
     };
 
-    if(style_.visual == UITAB_SEGMENTED) {
+    if(style.visual == UITAB_SEGMENTED && style.tab_metrics.face_enabled && style.tab_palette.face[ST_NORMAL].IsSolid()) {
         Rect seg = tabs_rect_.Deflated(DPI(1), DPI(1));
-        UiPaintStyledCap(w, seg, style_.tab_palette, style_.tab_metrics, ST_NORMAL, placement_, UICAP_FLAT_CLOSED);
+        UiPaintStyledCap(w, seg, style.tab_palette, style.tab_metrics, ST_NORMAL, placement_, UICAP_FLAT_CLOSED);
     }
 
-    if(style_.visual == UITAB_DOCUMENT) {
+    if(style.visual == UITAB_DOCUMENT) {
         int th = 1;
         switch(UiCapOpenSide(placement_)) {
         case UiAlign::BOTTOM: w.DrawRect(strip_rect_.left, strip_rect_.bottom - th, strip_rect_.GetWidth(), th, seam_edge); break;
@@ -756,9 +681,9 @@ void UiTab::Paint(Draw& w)
         }
     }
 
-    if(style_.visual == UITAB_CLASSIC) {
+    if(style.visual == UITAB_CLASSIC && (style.tab_metrics.face_enabled || style.tab_metrics.frame_enabled)) {
         int th = 1;
-        int rr = max(2, style_.tab_metrics.radius);
+        int rr = max(2, style.tab_metrics.radius);
         Rect seam = strip_rect_;
         if(active_ >= 0 && active_ < tabs_.GetCount()) {
             Rect ar = tabs_[active_].tab_rect;
@@ -802,7 +727,7 @@ void UiTab::Paint(Draw& w)
         }
     }
 
-    int pass_count = (style_.visual == UITAB_CLASSIC || style_.visual == UITAB_DOCUMENT) ? 2 : 1;
+    int pass_count = (style.visual == UITAB_CLASSIC || style.visual == UITAB_DOCUMENT) ? 2 : 1;
     for(int pass = 0; pass < pass_count; pass++) {
         for(int i = 0; i < tabs_.GetCount(); i++) {
             if(pass_count == 2) {
@@ -814,7 +739,7 @@ void UiTab::Paint(Draw& w)
             const TabItem& t = tabs_[i];
             StyledState ts = !IsEnabled() || !t.enabled ? ST_DISABLED : (i == active_ ? ST_PRESSED : (i == hot_ ? ST_HOT : ST_NORMAL));
             UiCapShape shape = UICAP_NONE;
-            StyledMetrics cap_metrics = style_.tab_metrics;
+            StyledMetrics cap_metrics = style.tab_metrics;
 
             if(dragging_ && i == drag_to_) {
                 shape = UICAP_LINE;
@@ -822,15 +747,15 @@ void UiTab::Paint(Draw& w)
                 ts = ST_PRESSED;
             }
             else {
-                switch(style_.visual) {
+                switch(style.visual) {
                 case UITAB_CLASSIC:
-                    shape = (i == active_) ? UICAP_OPEN : UICAP_FLAT_CLOSED;
+                    shape = (style.tab_metrics.face_enabled || style.tab_metrics.frame_enabled) && i == active_ ? UICAP_OPEN : UICAP_FLAT_CLOSED;
                     break;
                 case UITAB_DOCUMENT:
-                    shape = (i == active_) ? UICAP_OPEN : UICAP_FLAT_CLOSED;
+                    shape = (style.tab_metrics.face_enabled || style.tab_metrics.frame_enabled) && i == active_ ? UICAP_OPEN : UICAP_FLAT_CLOSED;
                     break;
                 case UITAB_SEGMENTED:
-                    shape = UICAP_FLAT_CLOSED;
+                    shape = UICAP_CLOSED;
                     break;
                 case UITAB_UNDERLINE:
                     shape = UICAP_NONE;
@@ -845,7 +770,7 @@ void UiTab::Paint(Draw& w)
             }
 
             if(shape != UICAP_NONE) {
-                StyledPalette cap_palette = style_.tab_palette;
+                StyledPalette cap_palette = style.tab_palette;
 
                 if(ts == ST_HOT) {
                     Color base = Null;
@@ -868,18 +793,18 @@ void UiTab::Paint(Draw& w)
                 UiPaintStyledCap(w, t.tab_rect, cap_palette, cap_metrics, ts, placement_, shape);
             }
 
-            if(style_.visual == UITAB_UNDERLINE && i == active_) {
-                int icon_w = IsNull(t.icon) ? 0 : max(DPI(12), style_.tab_extent - DPI(14));
-                int content_w = t.text_size.cx + (icon_w > 0 ? (icon_w + style_.icon_text_gap) : 0) + style_.tab_padding.left + style_.tab_padding.right;
+            if(style.visual == UITAB_UNDERLINE && i == active_) {
+                int icon_w = IsNull(t.icon) ? 0 : max(DPI(12), style.tab_extent - DPI(14));
+                int content_w = t.text_size.cx + (icon_w > 0 ? (icon_w + style.icon_text_gap) : 0) + style.tab_padding.left + style.tab_padding.right;
                 int maxw = max(DPI(14), t.tab_rect.GetWidth() - DPI(8));
                 int wline = maxw;
-                if(style_.indicator_span == SMALL)
+                if(style.indicator_span == SMALL)
                     wline = max(DPI(12), maxw / 3);
-                else if(style_.indicator_span == MEDIUM)
+                else if(style.indicator_span == MEDIUM)
                     wline = max(DPI(16), maxw * 2 / 3);
                 else
                     wline = min(maxw, max(DPI(16), content_w));
-                int th = max(1, style_.indicator_thickness);
+                int th = max(1, style.indicator_thickness);
                 int x = t.tab_rect.left + (t.tab_rect.GetWidth() - wline) / 2;
                 int y = IsHorizontal() ? (t.tab_rect.bottom - th) : (t.tab_rect.top + (t.tab_rect.GetHeight() - wline) / 2);
                 if(IsHorizontal())
@@ -892,8 +817,7 @@ void UiTab::Paint(Draw& w)
         }
     }
 
-    if(style_.show_focus)
-        UiPaintStyledForeground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+    UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
 }
 
 void UiTab::LeftDown(Point p, dword)
@@ -1032,3 +956,15 @@ void UiTab::LostFocus()
 }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+

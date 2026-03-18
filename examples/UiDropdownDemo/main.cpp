@@ -239,9 +239,8 @@ private:
 
     void ApplyBrutalistShadow(UiDropdown& d)
     {
-        d.SetShadow(SMALL);
+        d.SetShadowBlur(DPI(5));
         d.SetShadowAngle(45);
-        d.SetShadowHardness(100);
         d.SetShadowDetail(DPI(5), 255, Black(), false);
     }
 
@@ -269,7 +268,7 @@ private:
 
     UiDropdown::Style RightTextStyle() const
     {
-        UiDropdown::Style s = UiDropdown::StyleStandard();
+        UiDropdown::Style s = UiDropdown::StyleDefault();
         s.align_h = UiAlign::RIGHT;
         s.align_v = UiAlign::CENTER;
         return s;
@@ -306,7 +305,7 @@ private:
         d.SetPopupUseMainSkin(false);
         d.SetPopupBackground(Color(224, 229, 236));
         d.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        d.SetShadow(NONE);
+        d.ClearShadow();
         d.Select(0);
     }
 
@@ -506,8 +505,7 @@ private:
         d.SetRadius(DPI(8));
         d.SetFrameWidth(0);
         d.SetPadding(DPI(14), DPI(10), DPI(14), DPI(10));
-        d.SetShadow(LARGE);
-        d.SetShadowHardness(0);
+        d.SetShadowBlur(DPI(20));
         d.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
         d.SelectByData("contact");
         d.WhenPaintForeground = [&](Draw& w, const Rect& rr,
@@ -599,7 +597,7 @@ private:
         drop2.SetFill9Slice(MakeNeumorphicRaisedTile(true), Rect(DPI(10), DPI(10), DPI(10), DPI(10)), false);
         drop2.SetPopupBackground(Color(224, 229, 236));
         drop2.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        drop2.SetShadow(NONE);
+        drop2.ClearShadow();
 
         drop3.SetFaceColor(White());
         drop3.SetFrameColor(Black());
@@ -633,9 +631,8 @@ private:
         drop9.SetFaceColor(Color(30, 41, 59));
         drop9.SetInkColor(White());
         drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadow(LARGE);
+        drop9.SetShadowBlur(DPI(20));
         drop9.SetShadowAngle(90);
-        drop9.SetShadowHardness(0);
         drop9.SetShadowDetail(DPI(6), 170, Color(2, 10, 30), false);
 
         drop10.SetFaceColor(Color(30, 41, 59));
@@ -681,7 +678,7 @@ private:
         drop2.SetFill9Slice(MakeNeumorphicRaisedTile(false), Rect(DPI(10), DPI(10), DPI(10), DPI(10)), false);
         drop2.SetPopupBackground(Color(224, 229, 236));
         drop2.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        drop2.SetShadow(NONE);
+        drop2.ClearShadow();
 
         drop3.SetFaceColor(White());
         drop3.SetFrameColor(Black());
@@ -715,9 +712,8 @@ private:
         drop9.SetFaceColor(White());
         drop9.SetInkColor(Color(30, 41, 59));
         drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadow(LARGE);
+        drop9.SetShadowBlur(DPI(20));
         drop9.SetShadowAngle(90);
-        drop9.SetShadowHardness(0);
         drop9.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
 
         drop10.SetFaceColor(Color(241, 245, 249));
@@ -756,3 +752,5 @@ GUI_APP_MAIN
 {
     UiDropdownDemo().Run();
 }
+
+

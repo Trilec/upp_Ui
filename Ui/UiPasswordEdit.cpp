@@ -1,4 +1,5 @@
 #include <Ui/UiPasswordEdit.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -22,7 +23,7 @@ UiPasswordEdit::UiPasswordEdit()
     //  - Transparent / frameless
     //  - No click-focus (so focus stays in the edit while you click the eye)
     //
-    UiButton::Style bs = UiButton::StyleDefault();
+    UiButton::Style bs = UiTheme::ResolveButton(UiButtonRole::Icon);
 
     // Strip frame/face so it looks like a pure glyph inside the edit.
     bs.metrics.frame_width   = 0;
@@ -101,7 +102,7 @@ UiPasswordEdit& UiPasswordEdit::EnableVisibilityIcon(bool on)
     if(on) {
         SyncEyeButtonIconColor_();
 
-        // Ensure we have icons – use built-in defaults if none supplied.
+        // Ensure we have icons ??? use built-in defaults if none supplied.
         if(IsNull(visible_icon_))
             visible_icon_ = EyeVisibleIcon();
         if(IsNull(hidden_icon_))
@@ -155,14 +156,14 @@ void UiPasswordEdit::SyncEyeButtonIconColor_()
 {
     UiButton::Style bs = eye_button_.GetStyle();
     for(int i = 0; i < 4; i++) {
-        Color c = UiResolveIconColor(style_.palette, (StyledState)i);
+        Color c = UiResolveIconColor(GetEffectiveStyle().palette, (StyledState)i);
         bs.palette.icon[i] = c;
         bs.palette.ink[i] = c;
     }
     eye_button_.SetStyle(bs);
 }
 
-// Built-in eye icons (48px) – wrappers over UiIcons helpers.
+// Built-in eye icons (48px) ??? wrappers over UiIcons helpers.
 
 Image UiPasswordEdit::EyeVisibleIcon()
 {
@@ -195,3 +196,5 @@ WString UiPasswordEdit::GetDisplayLine(int i) const
 }
 
 } // namespace Upp
+
+

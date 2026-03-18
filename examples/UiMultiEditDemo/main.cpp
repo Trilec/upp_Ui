@@ -1,6 +1,7 @@
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiMultiEdit.h>
 #include <Ui/UiButton.h>
+#include <Ui/UiTheme.h>
 
 using namespace Upp;
 
@@ -49,7 +50,7 @@ public:
         lbl_icon_left.SetText("Icon Left:");
         edit_icon_left.SetPlaceholder("Enter description...");
         edit_icon_left.SetText("Item description goes here.\nIt has an icon on the left.");
-        icon_left_btn.SetStyle(UiButton::StyleIcon());
+        icon_left_btn.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         icon_left_btn.SetIcon(CtrlImg::write());
         icon_left_btn.ClickFocus(false);
         edit_icon_left.AddToSide(icon_left_btn, UiAlign::LEFT, Size(DPI(24), DPI(24)));
@@ -104,7 +105,7 @@ public:
             "[WARN] Config file not found, using defaults.\n"
             "[INFO] Ready."
         );
-        clear_log_btn.SetStyle(UiButton::StyleIcon());
+        clear_log_btn.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         clear_log_btn.SetIcon(CtrlImg::remove());
         clear_log_btn.ClickFocus(false);
         edit_log.AddToSide(clear_log_btn, UiAlign::RIGHT, Size(DPI(24), DPI(24)));
@@ -201,3 +202,5 @@ GUI_APP_MAIN
 
     UiMultiEditDemo().Run();
 }
+
+

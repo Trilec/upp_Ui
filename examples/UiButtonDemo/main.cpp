@@ -188,14 +188,14 @@ public:
                 // Animated underline: keep the baseline close to the real text.
                 Rect tr = layout_.main;
                 if(st == ST_PRESSED)
-                    tr.Offset(style_.press_offset);
+                    tr.Offset(GetEffectiveStyle().press_offset);
 
                 Size tsz = GetTextBlockSize();
 
                 int ext = int(DPI(10) * t + 0.5);
                 int wdt = min(tr.GetWidth(), tsz.cx + ext * 2);
                 int x0  = tr.left + (tr.GetWidth() - wdt) / 2;
-                int y   = tr.bottom + style_.underline_offset;
+                int y   = tr.bottom + GetEffectiveStyle().underline_offset;
                 int h   = (t > 0.2) ? DPI(2) : DPI(1);
 
                 Color ink = Nvl(p.ink[st], SColorHighlight());
@@ -223,7 +223,7 @@ public:
 
             // Default focus ring policy is now centralized in UiPaintStyledForeground
             // (it uses UiStyledFaceRect => frame + content_inset).
-            UiPaintStyledForeground(w, outer, p, m, s, st, focus, style_.focus_margin, SColorHighlight());
+            UiPaintStyledForeground(w, outer, p, m, s, st, focus);
         };
     }
 
@@ -300,7 +300,7 @@ private:
         if(!swell_fx_ || !have_base_)
             return;
 
-        double t = clamp(fx_t_, 0.0, 1.0);
+        double t = min(max(fx_t_, 0.0), 1.0);
         double s = 1.0 + (swell_scale_ - 1.0) * t;
 
         int bw = base_rect_.GetWidth();
@@ -384,7 +384,7 @@ public:
 
         w.DrawText(DPI(28), DPI(10), "UiButton Demo", title, SColorText());
 
-        String line1 = "Showcase for UiButton: presets, icon layouts, margins/inset/dash, 9-slice skins, and animation hooks.";
+        String line1 = "Showcase for UiButton: theme roles, icon layouts, margins/inset/dash, 9-slice skins, and animation hooks.";
         w.DrawText(DPI(28), DPI(44), line1, desc, SColorText());
 
         w.DrawText(DPI(28), DPI(70), "Last action: " + last_action_, meta, SColorDisabled());
@@ -454,7 +454,7 @@ private:
         int y0 = grid_top + title_h + DPI(10);
 
         static const char* row_names[ROWS] = {
-            "Preset styles + state",
+            "Theme roles + state",
             "Icon layouts (L/R/T/B)",
             "Tool / icon-only patterns",
             "Margins / inset / dash",
@@ -493,15 +493,15 @@ private:
             }
 
         // -----------------------------------------------------------------
-        // Row 0: Presets + disabled
+        // Row 0: Theme roles + disabled
         // -----------------------------------------------------------------
         cell[0][0].SetText("Default");
 
-        cell[0][1].SetText("Accent").SetAccentStyle();
-        cell[0][2].SetText("Subtle").SetSubtleStyle();
+        cell[0][1].SetText("Accent").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
+        cell[0][2].SetText("Subtle").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
         cell[0][3].SetText("Icon");
-        cell[0][3].SetStyle(UiButton::StyleIcon())
+        cell[0][3].SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon))
                  .SetIcon(icon16)
                  .SetIconLayout(UiAlign::LEFT)
                  .ClickFocus(false);
@@ -564,7 +564,7 @@ private:
         auto ToolPlate = [&](int col, int side, const Image& img, const char* name, bool disabled = false) {
             DemoButton& b = cell[2][col];
 
-            b.SetStyle(UiButton::StyleIcon());
+            b.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
             b.SetText(String());
             b.SetIcon(img);
             b.SetIconLayout(UiAlign::LEFT);
@@ -600,7 +600,7 @@ private:
 
             // Keep focus ring clearly inside the hover frame.
             UiButton::Style st = b.GetStyle();
-            st.focus_margin = DPI(3);
+            st.metrics.focus_margin = DPI(3);
             b.SetStyle(st);
 
             if(disabled)
@@ -615,7 +615,7 @@ private:
 
         // Inline tool (icon-left) with subtle style
         cell[2][4].SetText("Refresh")
-                 .SetSubtleStyle()
+                 .SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle))
                  .SetIcon(CtrlImg::redo())
                  .SetIconLayout(UiAlign::LEFT)
                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
@@ -657,7 +657,7 @@ private:
 
         cell[3][5].SetText("Hi-contrast")
                  .HighContrast(true)
-                 .SetAccentStyle();
+                 .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
 
         // -----------------------------------------------------------------
         // Row 4: 9-slice skins (neumo pair: raised normal, inset pressed)
@@ -709,7 +709,7 @@ private:
 
         cell[5][1].SetText("Hover swell")
                   .SetRadius(DPI(10));
-        cell[5][1].SetAccentStyle();
+        cell[5][1].SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
         cell[5][1].EnableHoverFx(true, Color(80, 140, 220));
         cell[5][1].EnableSwellFx(true, 1.07);
 
@@ -722,7 +722,7 @@ private:
         cell[5][2].EnableSwellFx(true, 1.06);
 
         cell[5][3].SetText("Key: &Enter")
-                 .SetSubtleStyle();
+                 .SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
         cell[5][4].SetText("Custom FG")
                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
@@ -745,7 +745,7 @@ private:
         };
 
         cell[5][5].SetText("Disabled")
-                 .SetAccentStyle()
+                 .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent))
                  .Disable();
 
         // -----------------------------------------------------------------
@@ -760,7 +760,7 @@ private:
         };
 
         cell[6][1].SetText("Accent Off")
-                 .SetAccentStyle()
+                 .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent))
                  .SetCheckable(true);
         cell[6][1].WhenAction = [=] {
             cell[6][1].SetText(cell[6][1].IsChecked() ? "Accent On" : "Accent Off");
@@ -776,12 +776,12 @@ private:
         cell[6][2].SetIconScale(false);
         cell[6][2].ClickFocus(false);
         {
-            UiButton::Style st = UiButton::StyleIcon();
+            UiButton::Style st = UiTheme::ResolveButton(UiButtonRole::Icon);
             st.metrics.frame_enabled = true;
             st.metrics.face_enabled = true;
             st.metrics.frame_width = DPI(1);
             st.metrics.radius = DPI(10);
-            st.focus_margin = DPI(3);
+            st.metrics.focus_margin = DPI(3);
             cell[6][2].SetStyle(st);
 
             StyledPalette& pal = cell[6][2].StyledPaletteRef();
@@ -878,3 +878,5 @@ GUI_APP_MAIN
 {
     UiButtonDemoWindow().Run();
 }
+
+

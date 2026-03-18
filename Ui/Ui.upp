@@ -39,6 +39,8 @@ file
 	UiBoxLayout.cpp,
 	UiButton.h,
 	UiButton.cpp,
+	UiToolButton.h,
+	UiToolButton.cpp,
 	UiBaseEdit.h,
 	UiBaseEdit.cpp,
 	UiLineEdit.h,
@@ -59,8 +61,12 @@ file
 	UiSliderEdit.cpp,
 	UiScrollBar.h,
 	UiScrollBar.cpp,
-	UiDoc/UiDoc.h,
-	UiDoc/UiDoc.cpp,
+	UiDoc.h,
+	UiDoc.cpp,
+	UiTree.h,
+	UiTree.cpp,
+	UiList.h,
+	UiList.cpp,
 	UiDropdown.h,
 	UiDropdown.cpp;
 

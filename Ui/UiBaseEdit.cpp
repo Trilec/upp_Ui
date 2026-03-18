@@ -1,4 +1,5 @@
 #include "UiBaseEdit.h"
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -11,56 +12,144 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        s.palette.face[ST_NORMAL]   = UiFill::Solid(SColorFace());
-		s.palette.face[ST_HOT]      = UiFill::Solid(SColorFace());
-		s.palette.face[ST_PRESSED]  = UiFill::Solid(SColorFace());
-		s.palette.face[ST_DISABLED] = UiFill::Solid(SColorFace());
-        
-        s.palette.frame[ST_NORMAL]   = SColorShadow();
-        s.palette.frame[ST_HOT]      = SColorHighlight();
-        s.palette.frame[ST_PRESSED]  = SColorHighlight();
-        s.palette.frame[ST_DISABLED] = SColorShadow();
-        
-        s.palette.ink[ST_NORMAL]   = SColorText();
-        s.palette.ink[ST_HOT]      = SColorText();
-        s.palette.ink[ST_PRESSED]  = SColorText();
-        s.palette.ink[ST_DISABLED] = SColorDisabled();
-        
-        s.metrics.radius      = DPI(2);
-        s.metrics.frame_width = DPI(1);
-        s.metrics.use_text_font = false; // explicit
-        s.metrics.text_font     = StdFont();
+        const Color face_normal    = Color(255, 255, 255);
+        const Color face_pressed   = Color(248, 250, 252);
+        const Color frame_normal   = Color(209, 213, 219);
+        const Color frame_hot      = Color(148, 163, 184);
+        const Color frame_pressed  = Color(100, 116, 139);
+        const Color frame_disabled = Color(226, 232, 240);
+        const Color text_primary   = Color(17, 24, 39);
+        const Color text_muted     = Color(148, 163, 184);
 
-        s.font       = StdFont();
-        s.metrics.content_padding = Rect(DPI(4), DPI(2), DPI(4), DPI(2));
+        s.palette.face[ST_NORMAL]   = UiFill::Solid(face_normal);
+        s.palette.face[ST_HOT]      = UiFill::Solid(face_normal);
+        s.palette.face[ST_PRESSED]  = UiFill::Solid(face_pressed);
+        s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+
+        s.palette.frame[ST_NORMAL]   = frame_normal;
+        s.palette.frame[ST_HOT]      = frame_hot;
+        s.palette.frame[ST_PRESSED]  = frame_pressed;
+        s.palette.frame[ST_DISABLED] = frame_disabled;
+
+        s.palette.ink[ST_NORMAL]   = text_primary;
+        s.palette.ink[ST_HOT]      = text_primary;
+        s.palette.ink[ST_PRESSED]  = text_primary;
+        s.palette.ink[ST_DISABLED] = text_muted;
+
+        s.metrics.radius = 0;
+        s.metrics.frame_width = DPI(1);
+        s.metrics.frame_enabled = true;
+        s.metrics.face_enabled = true;
+        s.metrics.dashed = false;
+        s.metrics.high_contrast = false;
+        s.metrics.use_text_font = false;
+        s.metrics.text_font = StdFont();
+        s.metrics.content_padding = Rect(DPI(10), DPI(7), DPI(10), DPI(7));
+        s.metrics.shadow = StyledShadow();
+        s.metrics.highlight = StyledHighlight();
+
+        s.skin = StyledSkin();
+        s.font = StdFont();
         s.text_align = UiAlign::LEFT;
-        
-        s.caret_color      = SColorText();
-        s.selection_color  = SColorHighlight();
-        s.selection_ink    = SColorHighlightText();
-        s.placeholder_ink  = SColorDisabled();
-        s.whitespace_color = Blend(SColorLight, SColorHighlight);
-        s.tab_char_color   = Blend(SColorLight, SColorHighlight, 150);
+
+        s.caret_color = text_primary;
+        s.caret_width = DPI(1);
+        s.block_caret = false;
+        s.selection_color = Color(219, 234, 254);
+        s.selection_ink = text_primary;
+        s.placeholder_ink = Color(148, 163, 184);
+        s.whitespace_color = Color(148, 163, 184);
+        s.tab_char_color = Color(148, 163, 184);
+        s.tab_size = 4;
+        s.show_tabs = false;
+        s.show_spaces = false;
+        s.show_line_endings = false;
+        s.show_readonly_bg = true;
     }
     return s;
+}
+
+void UiBaseEdit::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+    text_rect_ = Rect(0, 0, 0, 0);
+    InvalidateTextMetricsCache();
+}
+
+UiBaseEdit::Style& UiBaseEdit::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiBaseEdit::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    themed_style_ = UiTheme::ResolveEdit();
+    theme_revision_ = revision;
+    text_rect_ = Rect(0, 0, 0, 0);
+    InvalidateTextMetricsCache();
+
+    Font fnt = themed_style_.metrics.use_text_font
+               ? themed_style_.metrics.text_font
+               : themed_style_.font;
+    if(IsNull(fnt))
+        fnt = StdFont();
+
+    font_size_ = GetTextSize("A", fnt);
+    if(font_size_.cx <= 0) font_size_.cx = 8;
+    if(font_size_.cy <= 0) font_size_.cy = 12;
+    caret_height_ = GetVisualLineHeight();
+    sb_.SetLine(caret_height_);
+}
+
+const UiBaseEdit::Style& UiBaseEdit::GetEffectiveStyle() const
+{
+    if(has_style_override_)
+        return style_;
+
+    const_cast<UiBaseEdit*>(this)->SyncThemeStyle();
+    return themed_style_;
 }
 
 UiBaseEdit& UiBaseEdit::SetStyle(const Style& s)
 {
     style_ = Style(s);
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiBaseEdit& UiBaseEdit::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
 
 void UiBaseEdit::OnStyleChanged()
 {
-    // Edits always draw their own background (no transparent mode).
     BackPaint();
-
     InvalidateTextMetricsCache();
-    SyncFont();  // font metrics + caret + scrollbars
-    Layout();    // sides + scrollbars
-    Refresh();   // repaint
+    text_rect_ = Rect(0, 0, 0, 0);
+    SyncFont();
+    Layout();
+    Refresh();
 }
 
 
@@ -69,15 +158,15 @@ void UiBaseEdit::OnStyleChanged()
 // --------------------------------------------------------------------
 
 UiBaseEdit::UiBaseEdit()
+    : style_(StyleDefault())
+    , themed_style_(StyleDefault())
 {
-    SetStyle(StyleDefault());
-
-    WantFocus();    // editing control should be focusable
-    BackPaint();    // we own our background
+    WantFocus();
+    BackPaint();
 
     AddFrame(sb_);
     sb_.WhenScroll << [=] { Scroll(); WhenScroll(); };
-    sb_.SetLine(DPI(16)); // SyncFont will refine this
+    sb_.SetLine(DPI(16));
     scroller_.Set(sb_);
     
     WhenBar = [=](Bar& bar) {
@@ -91,9 +180,11 @@ UiBaseEdit::UiBaseEdit()
         bar.Separator();
         bar.Add(t_("Select All"), [=] { SelectAll(); }).Key(K_CTRL_A);
     };
-    Clear(); // Initialize data model
-}
 
+    SyncThemeStyle();
+    SyncFont();
+    Clear();
+}
 // --------------------------------------------------------------------
 // Data Model (Undo)
 // --------------------------------------------------------------------
@@ -257,63 +348,6 @@ void UiBaseEdit::SetLine(int i, const WString& w)
         lin_[i].len  = w.GetCount();
         line_metrics_dirty_ = true;
     }
-}
-
-const UiBaseEdit::Style& UiBaseEdit::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiBaseEdit::Style& UiBaseEdit::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.metrics.face_enabled = false;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(3);
-        for(int i = 0; i < 4; i++) {
-            s.palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 145);
-        }
-        s.palette.frame[ST_HOT] = DkColor(s.palette.frame[ST_NORMAL], 8);
-        s.palette.frame[ST_PRESSED] = DkColor(s.palette.frame[ST_NORMAL], 15);
-    }
-    return s;
-}
-
-const UiBaseEdit::Style& UiBaseEdit::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = Blend(SColorFace(), SColorPaper(), 205);
-        for(int i = 0; i < 4; i++)
-            s.palette.face[i] = UiFill::Solid(face);
-        s.palette.face[ST_HOT] = UiFill::Solid(LtColor(face, 3));
-        s.palette.face[ST_PRESSED] = UiFill::Solid(DkColor(face, 4));
-        s.metrics.radius = DPI(6);
-    }
-    return s;
-}
-
-const UiBaseEdit::Style& UiBaseEdit::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = Blend(SColorHighlight(), SColorPaper(), 230);
-        Color frame = DkColor(SColorHighlight(), 25);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = SColorText();
-        }
-        s.palette.frame[ST_HOT] = LtColor(frame, 8);
-        s.palette.frame[ST_PRESSED] = DkColor(frame, 8);
-        s.metrics.radius = DPI(6);
-    }
-    return s;
 }
 
 WString UiBaseEdit::BuildFullText() const
@@ -640,17 +674,18 @@ void UiBaseEdit::InvalidateTextMetricsCache()
 
 void UiBaseEdit::EnsureTextMetricsCache() const
 {
+    const Style& style = GetEffectiveStyle();
     if(!line_metrics_dirty_ && !placeholder_width_dirty_)
         return;
 
-    Font fnt = style_.font;
+    Font fnt = style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
     space_width_cache_ = GetTextSize(" ", fnt).cx;
     if(space_width_cache_ <= 0)
         space_width_cache_ = 1;
-    tab_width_cache_ = space_width_cache_ * max(style_.tab_size, 1);
+    tab_width_cache_ = space_width_cache_ * max(style.tab_size, 1);
 
     VectorMap<int, int> glyph_width_cache;
 
@@ -701,17 +736,16 @@ void UiBaseEdit::EnsureTextMetricsCache() const
 
 void UiBaseEdit::SyncFont()
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::SyncFont");
 
     // Resolve font using StyledMetrics, same as UiLabel.
-    Font fnt = style_.metrics.use_text_font
-               ? style_.metrics.text_font
-               : style_.font;
+    Font fnt = style.metrics.use_text_font
+               ? style.metrics.text_font
+               : style.font;
 
     if(IsNull(fnt))
         fnt = StdFont();
-
-    style_.font = fnt; // keep in style_ for consistent use elsewhere
 
     font_size_ = GetTextSize("A", fnt);
     if(font_size_.cx <= 0) font_size_.cx = 8;
@@ -814,9 +848,10 @@ void UiBaseEdit::Scroll()
 
 Rect UiBaseEdit::GetViewRect() const
 {
+    const Style& style = GetEffectiveStyle();
     // GetView() already subtracts U++ frames (e.g. scrollbars added via AddFrame).
     // Then apply styled frame + inset + padding consistently.
-    return UiStyledInnerRect(GetView(), style_.metrics, style_.skin);
+    return UiStyledInnerRect(GetView(), style.metrics, style.skin);
 }
 
 Rect UiBaseEdit::GetTextRect() const
@@ -830,9 +865,10 @@ Rect UiBaseEdit::GetTextRect() const
 
 Point UiBaseEdit::GetContentArea() const
 {
-    Rect ci = UiNonNegativeThickness(style_.skin.content_inset);
-    Rect cp = UiNonNegativeThickness(style_.metrics.content_padding);
-    int fw  = UiResolvedFrameWidth(style_.metrics, style_.skin);
+    const Style& style = GetEffectiveStyle();
+    Rect ci = UiNonNegativeThickness(style.skin.content_inset);
+    Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
+    int fw  = UiResolvedFrameWidth(style.metrics, style.skin);
     return Point(fw + ci.left + cp.left,
                  fw + ci.top + cp.top);
 }
@@ -857,11 +893,12 @@ UiBaseEdit::SideItem* UiBaseEdit::FindSideById(int id)
 
 void UiBaseEdit::LayoutSides()
 {
+    const Style& style = GetEffectiveStyle();
     // Base rect for chrome/side controls:
     // - GetView() subtracts U++ frames like scrollbars
     // - We remove only the styled frame here (NOT text padding)
     Rect chrome = GetView();
-    int  fw     = max(0, style_.metrics.frame_width);
+    int  fw     = max(0, style.metrics.frame_width);
     chrome.Deflate(fw, fw);
 
     text_rect_ = Rect(0, 0, 0, 0);
@@ -877,7 +914,7 @@ void UiBaseEdit::LayoutSides()
     }
 
     if(sides_.IsEmpty()) {
-        Rect cp = UiNonNegativeThickness(style_.metrics.content_padding);
+        Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
         text_rect_ = UiApplyThicknessRect(chrome, cp);
         return;
     }
@@ -1194,7 +1231,7 @@ void UiBaseEdit::LayoutSides()
     layout_side_lr(right_idx, false);
 
     // Finally: compute text rect from remaining chrome area, then apply styled content padding.
-    Rect cp = UiNonNegativeThickness(style_.metrics.content_padding);
+    Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
     Rect tr = UiApplyThicknessRect(remaining, cp);
 
     // Clamp degenerate
@@ -1403,6 +1440,7 @@ void UiBaseEdit::PlaceCaret(int64 new_cursor, bool sel)
 
 void UiBaseEdit::PlaceCaret()
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::PlaceCaret()");
 
     if(GetLineCount() <= 0) {
@@ -1433,7 +1471,7 @@ void UiBaseEdit::PlaceCaret()
                         : 0;
 
     int start_x = text_r.left - spos.x; // X scroll is pixels now
-    switch(style_.text_align) {
+    switch(style.text_align) {
     case UiAlign::CENTER:
         if(line_px_width < view_w)
             start_x += (view_w - line_px_width) / 2;
@@ -1481,6 +1519,7 @@ void UiBaseEdit::ScrollToCaret()
 
 int64 UiBaseEdit::GetMousePos(Point p) const
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::GetMousePos");
     if(caret_height_ == 0)
         return 0;
@@ -1504,7 +1543,7 @@ int64 UiBaseEdit::GetMousePos(Point p) const
                        : 0;
 
     int align_offset = 0;
-    switch(style_.text_align) {
+    switch(style.text_align) {
     case UiAlign::CENTER:
         if(line_px < view_w)
             align_offset = (view_w - line_px) / 2;
@@ -1539,6 +1578,7 @@ int64 UiBaseEdit::GetMousePos(Point p) const
 
 Rect UiBaseEdit::GetCaretRect(int64 pos) const
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::GetCaretRect");
 
     Point cl   = GetColumnLine(pos);
@@ -1554,7 +1594,7 @@ Rect UiBaseEdit::GetCaretRect(int64 pos) const
                     : 0;
     int align_off = 0;
 
-    switch(style_.text_align) {
+    switch(style.text_align) {
     case UiAlign::CENTER:
         if(line_px < view_w)
             align_off = (view_w - line_px) / 2;
@@ -1585,7 +1625,7 @@ Rect UiBaseEdit::GetCaretRect(int64 pos) const
     int caret_x = base_x + align_off + prefix_px;
     int caret_y = base_y + line * caret_height_;
 
-    int cx = style_.block_caret ? font_size_.cx : max(style_.caret_width, 1);
+    int cx = style.block_caret ? font_size_.cx : max(style.caret_width, 1);
 
     return Rect(caret_x, caret_y, caret_x + cx, caret_y + caret_height_);
 }
@@ -1609,6 +1649,7 @@ void UiBaseEdit::UpdateVisualState()
 
 void UiBaseEdit::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::Paint");
 
     Rect r = GetSize();
@@ -1621,11 +1662,11 @@ void UiBaseEdit::Paint(Draw& w)
     UpdateVisualState();
     StyledState st = visual_state_;
 
-    StyledPalette paint_palette = style_.palette;
-    StyledMetrics& m            = style_.metrics;
-    StyledSkin&    skin         = style_.skin;
+    StyledPalette paint_palette = style.palette;
+    const StyledMetrics& m      = style.metrics;
+    const StyledSkin& skin      = style.skin;
 
-    if(IsReadOnly() && style_.show_readonly_bg) {
+    if(IsReadOnly() && style.show_readonly_bg) {
         UiFill ro = UiFill::Solid(SColorFace());
         paint_palette.face[ST_NORMAL]  = ro;
         paint_palette.face[ST_HOT]     = ro;
@@ -1646,7 +1687,7 @@ void UiBaseEdit::Paint(Draw& w)
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();
 
-    Font fnt = style_.font;
+    Font fnt = style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
@@ -1662,7 +1703,7 @@ void UiBaseEdit::Paint(Draw& w)
         int baseline_y = text_r.top + yoff + (caret_height_ - font_size_.cy) / 2;
 
         int px = text_r.left;
-        switch(style_.text_align) {
+        switch(style.text_align) {
         case UiAlign::CENTER:
             if(ph_w < view_w)
                 px += (view_w - ph_w) / 2;
@@ -1676,7 +1717,7 @@ void UiBaseEdit::Paint(Draw& w)
             break;
         }
 
-        w.DrawText(px, baseline_y, placeholder_text_, fnt, style_.placeholder_ink);
+        w.DrawText(px, baseline_y, placeholder_text_, fnt, style.placeholder_ink);
     }
 
     int first_line = spos.y;
@@ -1696,7 +1737,7 @@ void UiBaseEdit::Paint(Draw& w)
     if(show_caret) {
         Rect cr = GetCaretRect(cursor_);
 
-        if(!style_.block_caret && !overwrite_) {
+        if(!style.block_caret && !overwrite_) {
             int glyph_h = font_size_.cy;
             if(glyph_h <= 0)
                 glyph_h = caret_height_;
@@ -1705,15 +1746,15 @@ void UiBaseEdit::Paint(Draw& w)
             cr.bottom = top + glyph_h;
         }
 
-        if(style_.block_caret || overwrite_) {
+        if(style.block_caret || overwrite_) {
             Rect underline = cr;
             underline.top = underline.bottom - DPI(2);
-            w.DrawRect(underline, style_.caret_color);
+            w.DrawRect(underline, style.caret_color);
         }
         else {
             if(cr.Width() <= 0)
-                cr.right = cr.left + max(style_.caret_width, DPI(1));
-            w.DrawRect(cr, style_.caret_color);
+                cr.right = cr.left + max(style.caret_width, DPI(1));
+            w.DrawRect(cr, style.caret_color);
         }
     }
 
@@ -1738,6 +1779,7 @@ void UiBaseEdit::Paint(Draw& w)
 
 void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
 {
+    const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::PaintLine");
 
     WString text = GetDisplayLine(i);
@@ -1752,7 +1794,7 @@ void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
     int view_w        = clip.GetWidth();
 
     int px = x;
-    switch(style_.text_align) {
+    switch(style.text_align) {
     case UiAlign::CENTER:
         if(line_px_width < view_w)
             px += (view_w - line_px_width) / 2;
@@ -1794,25 +1836,25 @@ void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
         bool is_sel = (has_sel && j >= s1 && j < s2);
 
         if(is_sel)
-            w.DrawRect(px, y, char_w, line_height, style_.selection_color);
+            w.DrawRect(px, y, char_w, line_height, style.selection_color);
 
         if(j < len) {
             Color ink = is_sel
-                        ? style_.selection_ink
-                        : style_.palette.ink[ink_state];
+                        ? style.selection_ink
+                        : style.palette.ink[ink_state];
 
-            if(chr == ' ' && style_.show_spaces) {
-                w.DrawText(px + (char_w - font_size_.cx) / 2, text_y, ".", style_.font, style_.whitespace_color);
+            if(chr == ' ' && style.show_spaces) {
+                w.DrawText(px + (char_w - font_size_.cx) / 2, text_y, ".", style.font, style.whitespace_color);
             }
-            else if(chr == '\t' && style_.show_tabs) {
-                w.DrawText(px + (char_w - font_size_.cx) / 2, text_y, "»", style_.font, style_.tab_char_color);
+            else if(chr == '\t' && style.show_tabs) {
+                w.DrawText(px + (char_w - font_size_.cx) / 2, text_y, "?", style.font, style.tab_char_color);
             }
             else if(chr != '\t') {
-                w.DrawText(px, text_y, text.Mid(j, 1), style_.font, ink);
+                w.DrawText(px, text_y, text.Mid(j, 1), style.font, ink);
             }
         }
-        else if(style_.show_line_endings && accepts_newlines_ && i < GetLineCount() - 1) {
-            w.DrawText(px, text_y, "¶", style_.font, style_.whitespace_color);
+        else if(style.show_line_endings && accepts_newlines_ && i < GetLineCount() - 1) {
+            w.DrawText(px, text_y, "?", style.font, style.whitespace_color);
         }
 
         px += char_w;
@@ -2175,10 +2217,11 @@ void UiBaseEdit::Drop(Point p, PasteClip& d)
 
 Size UiBaseEdit::GetMinSize() const
 {
+    const Style& style = GetEffectiveStyle();
     return UiStyledOuterSizeFromContent(Size(font_size_.cx * 4,
                                             GetVisualLineHeight()),
-                                       style_.metrics,
-                                       style_.skin);
+                                       style.metrics,
+                                       style.skin);
 }
 
 // --------------------------------------------------------------------
@@ -2246,3 +2289,12 @@ SideHandle SideHandle::AddToSide(Ctrl& c,
 
 
 } // namespace Upp
+
+
+
+
+
+
+
+
+

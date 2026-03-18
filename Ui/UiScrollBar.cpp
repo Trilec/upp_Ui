@@ -3,20 +3,23 @@
 #include <Core/Core.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiIcons.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
 UiScrollBar::UiScrollBar()
 {
-	BackPaint();
-	SetStyle(StyleDefault());
+    BackPaint();
+    SyncThemeStyle();
+    OnStyleChanged();
 }
 
 UiScrollBar::UiScrollBar(UiDirection dir)
-	: dir_(dir)
+    : dir_(dir)
 {
-	BackPaint();
-	SetStyle(StyleDefault());
+    BackPaint();
+    SyncThemeStyle();
+    OnStyleChanged();
 }
 
 UiScrollBar& UiScrollBar::SetDirection(UiDirection dir)
@@ -62,11 +65,59 @@ UiScrollBar& UiScrollBar::SetPos(int pos)
 // Style Management
 // ---------------------------------------------------------------------------
 
+void UiScrollBar::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+}
+
+UiScrollBar::Style& UiScrollBar::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiScrollBar::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    style_ = UiTheme::ResolveScrollBar();
+    theme_revision_ = revision;
+}
+
+const UiScrollBar::Style& UiScrollBar::GetEffectiveStyle() const
+{
+    const_cast<UiScrollBar*>(this)->SyncThemeStyle();
+    return style_;
+}
+
 UiScrollBar& UiScrollBar::SetStyle(const Style& s)
 {
-	style_ = Style(s);
-	OnStyleChanged();
-	return *this;
+    style_ = Style(s);
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiScrollBar& UiScrollBar::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
+    SyncThemeStyle();
+    OnStyleChanged();
+    return *this;
 }
 
 const UiScrollBar::Style& UiScrollBar::StyleDefault()
@@ -157,118 +208,9 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 	return s;
 }
 
-const UiScrollBar::Style& UiScrollBar::StyleStandard()
-{
-	return StyleDefault();
-}
-
-const UiScrollBar::Style& UiScrollBar::StyleMinimal()
-{
-	static Style s;
-	ONCELOCK {
-		s = StyleDefault();
-		s.track_metrics.face_enabled = true;
-		s.track_metrics.frame_width = DPI(1);
-		s.track_metrics.radius = DPI(999);
-		s.thumb_metrics.frame_width = DPI(1);
-		s.thumb_metrics.radius = DPI(999);
-		s.arrow_metrics.radius = DPI(999);
-		s.thin_idle = false;
-		s.animate_expand = false;
-		s.fade_idle = false;
-		s.thick_px = DPI(12);
-		s.track_paint_px_idle = DPI(12);
-		s.track_paint_px_hot = DPI(12);
-		s.thumb_paint_px_idle = DPI(12);
-		s.thumb_paint_px_hot = DPI(12);
-		s.show_arrows = false;
-		Color frame = Blend(SColorShadow(), SColorPaper(), 140);
-		Color face = Blend(SColorFace(), SColorPaper(), 220);
-		Color thumb = Blend(SColorText(), SColorPaper(), 190);
-		for(int i = 0; i < 4; i++) {
-			s.track_palette.face[i] = UiFill::Solid(face);
-			s.track_palette.frame[i] = frame;
-			s.thumb_palette.face[i] = UiFill::Solid(thumb);
-			s.thumb_palette.frame[i] = DkColor(frame, 20);
-		}
-	}
-	return s;
-}
-
-const UiScrollBar::Style& UiScrollBar::StyleSoft()
-{
-	static Style s;
-	ONCELOCK {
-		s = StyleDefault();
-		for(int i = 0; i < 4; i++) {
-			s.track_palette.face[i] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 210));
-			s.track_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 140);
-			s.thumb_palette.face[i] = UiFill::Solid(Blend(SColorPaper(), SColorFace(), 175));
-			s.thumb_palette.frame[i] = Blend(SColorShadow(), SColorPaper(), 115);
-		}
-		s.track_metrics.radius = DPI(8);
-		s.thumb_metrics.radius = DPI(8);
-	}
-	return s;
-}
-
-const UiScrollBar::Style& UiScrollBar::StyleStrong()
-{
-	static Style s;
-	ONCELOCK {
-		s = StyleDefault();
-		Color base = SColorHighlight();
-		for(int i = 0; i < 4; i++) {
-			s.track_palette.face[i] = UiFill::Solid(Blend(base, SColorPaper(), 230));
-			s.track_palette.frame[i] = DkColor(base, 25);
-			s.thumb_palette.face[i] = UiFill::Solid(base);
-			s.thumb_palette.frame[i] = DkColor(base, 35);
-			s.arrow_palette.face[i] = UiFill::Solid(base);
-			s.arrow_palette.frame[i] = DkColor(base, 35);
-			s.arrow_palette.ink[i] = SColorHighlightText();
-		}
-		s.show_arrows = true;
-		s.arrows_layout = UIARROWS_GROUP_END;
-	}
-	return s;
-}
-
-const UiScrollBar::Style& UiScrollBar::StyleThin()
-{
-	static Style s;
-	ONCELOCK {
-		s = StyleDefault();
-		s.thin_idle = true;
-		s.thin_px = DPI(4);
-		s.thick_px = DPI(14);
-		s.track_paint_px_idle = DPI(4);
-		s.track_paint_px_hot = DPI(14);
-		s.thumb_paint_px_idle = DPI(8);
-		s.thumb_paint_px_hot = DPI(14);
-		s.show_arrows = false;
-		s.track_metrics.radius = DPI(999);
-		s.thumb_metrics.radius = DPI(999);
-	}
-	return s;
-}
-
-const UiScrollBar::Style& UiScrollBar::StyleRounded()
-{
-	static Style s;
-	ONCELOCK {
-		s = StyleDefault();
-		s.show_arrows = true;
-		s.arrows_layout = UIARROWS_GROUP_END;
-		s.arrow_cross = UIARROWCROSS_FILL;
-		s.track_metrics.radius = DPI(999);
-		s.thumb_metrics.radius = DPI(999);
-		s.arrow_metrics.radius = DPI(999);
-	}
-	return s;
-}
-
 void UiScrollBar::OnStyleChanged()
 {
+    const Style& style_ = GetEffectiveStyle();
 	// No font to apply (no text)
 	RebuildLook();
 
@@ -294,6 +236,7 @@ void UiScrollBar::OnStyleChanged()
 
 UiScrollBar& UiScrollBar::SetThumbColor(Color face, Color frame, Color ink)
 {
+    Style& style_ = StyleEdit();
 	StyledPalette& p = style_.thumb_palette;
 	p.face[ST_NORMAL] = face;
 	p.face[ST_HOT]    = LtColor(face, 10);
@@ -317,6 +260,7 @@ UiScrollBar& UiScrollBar::SetThumbColor(Color face, Color frame, Color ink)
 
 UiScrollBar& UiScrollBar::SetArrowColor(Color face, Color frame, Color ink)
 {
+    Style& style_ = StyleEdit();
 	StyledPalette& p = style_.arrow_palette;
 	p.face[ST_NORMAL] = face;
 	p.face[ST_HOT]    = LtColor(face, 10);
@@ -340,6 +284,7 @@ UiScrollBar& UiScrollBar::SetArrowColor(Color face, Color frame, Color ink)
 
 UiScrollBar& UiScrollBar::ShowArrows(bool on)
 {
+    Style& style_ = StyleEdit();
 	if(style_.show_arrows != on) {
 		style_.show_arrows = on;
 		RefreshLayout();
@@ -350,6 +295,7 @@ UiScrollBar& UiScrollBar::ShowArrows(bool on)
 
 UiScrollBar& UiScrollBar::SetArrowsLayout(UiScrollArrowsLayout l)
 {
+    Style& style_ = StyleEdit();
 	if(style_.arrows_layout != l) {
 		style_.arrows_layout = l;
 		RefreshLayout();
@@ -360,6 +306,7 @@ UiScrollBar& UiScrollBar::SetArrowsLayout(UiScrollArrowsLayout l)
 
 UiScrollBar& UiScrollBar::SetArrowCross(UiScrollArrowCross c)
 {
+    Style& style_ = StyleEdit();
 	if(style_.arrow_cross != c) {
 		style_.arrow_cross = c;
 		RefreshLayout();
@@ -370,6 +317,7 @@ UiScrollBar& UiScrollBar::SetArrowCross(UiScrollArrowCross c)
 
 UiScrollBar& UiScrollBar::SetThumbLenMode(UiScrollThumbLenMode m)
 {
+    Style& style_ = StyleEdit();
 	if(style_.thumb_len_mode != m) {
 		style_.thumb_len_mode = m;
 		Refresh();
@@ -379,6 +327,7 @@ UiScrollBar& UiScrollBar::SetThumbLenMode(UiScrollThumbLenMode m)
 
 UiScrollBar& UiScrollBar::SetFixedThumbLen(int px)
 {
+    Style& style_ = StyleEdit();
 	style_.fixed_thumb_len_px = max(0, px);
 	Refresh();
 	return *this;
@@ -386,6 +335,7 @@ UiScrollBar& UiScrollBar::SetFixedThumbLen(int px)
 
 UiScrollBar& UiScrollBar::SetGrip(UiScrollGrip g)
 {
+    Style& style_ = StyleEdit();
 	style_.grip = g;
 	Refresh();
 	return *this;
@@ -393,6 +343,7 @@ UiScrollBar& UiScrollBar::SetGrip(UiScrollGrip g)
 
 UiScrollBar& UiScrollBar::EnableAutoHide(bool on)
 {
+    Style& style_ = StyleEdit();
 	style_.auto_hide = on;
 	UpdateVisibility_();
 	return *this;
@@ -400,6 +351,7 @@ UiScrollBar& UiScrollBar::EnableAutoHide(bool on)
 
 UiScrollBar& UiScrollBar::EnableThinIdle(bool on)
 {
+    Style& style_ = StyleEdit();
 	style_.thin_idle = on;
 	Refresh();
 	return *this;
@@ -411,6 +363,7 @@ UiScrollBar& UiScrollBar::EnableThinIdle(bool on)
 
 Size UiScrollBar::GetMinSize() const
 {
+    const Style& style_ = GetEffectiveStyle();
 	const int thick = max(1, style_.thick_px);
 	const int arrow_side = max(0, min(thick, style_.arrow_size));
 	Size sz;
@@ -461,6 +414,7 @@ void UiScrollBar::SetMinSize(Size sz)
 
 Rect UiScrollBar::GetTrackRect() const
 {
+    const Style& style_ = GetEffectiveStyle();
 	Rect outer = Rect(GetSize());
 	Rect r = outer;
 
@@ -507,6 +461,7 @@ Rect UiScrollBar::GetTrackRect() const
 
 Rect UiScrollBar::GetThumbLaneRect_() const
 {
+    const Style& style_ = GetEffectiveStyle();
 	Rect tr = GetTrackRect();
 	if(tr.IsEmpty())
 		return tr;
@@ -553,6 +508,7 @@ static Rect UiApplyCrossInset_(Rect r, const Rect& inset, UiDirection dir)
 
 int UiScrollBar::ComputeThumbLength() const
 {
+    const Style& style_ = GetEffectiveStyle();
 	Rect lane = GetThumbLaneRect_();
 	int len = dir_ == UiDirection::V ? lane.GetHeight() : lane.GetWidth();
 	if(len <= 0)
@@ -607,6 +563,7 @@ Rect UiScrollBar::GetThumbRect() const
 
 Rect UiScrollBar::GetArrowRect(int idx) const
 {
+    const Style& style_ = GetEffectiveStyle();
 	Rect outer = Rect(GetSize());
 	if(!style_.show_arrows || style_.arrows_layout == UIARROWS_NONE)
 		return Rect(0, 0, 0, 0);
@@ -660,6 +617,7 @@ Rect UiScrollBar::GetArrowRect(int idx) const
 
 Rect UiScrollBar::GetArrowHitRect_(int idx) const
 {
+    const Style& style_ = GetEffectiveStyle();
 	Rect outer = Rect(GetSize());
 	if(!style_.show_arrows || style_.arrows_layout == UIARROWS_NONE)
 		return Rect(0, 0, 0, 0);
@@ -683,6 +641,7 @@ Rect UiScrollBar::GetArrowHitRect_(int idx) const
 
 int UiScrollBar::GetArrowSide_() const
 {
+    const Style& style_ = GetEffectiveStyle();
 	int thick = max(1, style_.thick_px);
 	if(style_.arrows_layout == UIARROWS_GROUP_START || style_.arrows_layout == UIARROWS_GROUP_END)
 		return thick;
@@ -696,6 +655,7 @@ bool UiScrollBar::PtInThumb(Point p) const
 
 bool UiScrollBar::PtInArrow(Point p, int& idx) const
 {
+    const Style& style_ = GetEffectiveStyle();
 	if(!style_.show_arrows) return false;
 	Rect r0 = GetArrowHitRect_(0);
 	Rect r1 = GetArrowHitRect_(1);
@@ -727,6 +687,7 @@ void UiScrollBar::RebuildLook()
 
 void UiScrollBar::UpdateVisibility_()
 {
+    const Style& style_ = GetEffectiveStyle();
 	if(!style_.auto_hide)
 		return;
 
@@ -741,6 +702,7 @@ void UiScrollBar::UpdateVisibility_()
 
 void UiScrollBar::UpdateAnimatedVisuals_(bool hover_now)
 {
+    const Style& style_ = GetEffectiveStyle();
 	const int thick = max(1, style_.thick_px);
 	const int thin  = clamp(style_.thin_px, 1, thick);
 
@@ -778,6 +740,7 @@ void UiScrollBar::UpdateAnimatedVisuals_(bool hover_now)
 
 void UiScrollBar::AnimateThickness_(int target)
 {
+    const Style& style_ = GetEffectiveStyle();
 	if(paint_thickness_ == target)
 		return;
 
@@ -810,6 +773,7 @@ void UiScrollBar::AnimateThickness_(int target)
 
 void UiScrollBar::AnimateFade_(double target)
 {
+    const Style& style_ = GetEffectiveStyle();
 	if(fabs(fade_t_ - target) < 0.001)
 		return;
 
@@ -1006,6 +970,7 @@ void UiScrollBar::Paint(Draw& w)
 
 void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 {
+    const Style& style_ = GetEffectiveStyle();
 	if(outer.IsEmpty())
 		return;
 	w.Clip(outer);
@@ -1224,3 +1189,7 @@ String UiScrollBar::GetDesc() const
 }
 
 } // namespace Upp
+
+
+
+

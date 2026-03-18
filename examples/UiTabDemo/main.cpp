@@ -16,16 +16,16 @@ public:
         Add(t10); Add(t11); Add(t12);
         Add(t20); Add(t21); Add(t22);
 
-        UiTab::Style classic_notched = UiTab::StyleClassic();
+        UiTab::Style classic_notched = UiTab::StyleDefault();
         classic_notched.body_gap = 0;
 
-        UiTab::Style underline_full = UiTab::StyleUnderline();
+        UiTab::Style underline_full = UiTab::StyleDefault();
         underline_full.indicator_span = LARGE;
 
-        UiTab::Style underline_medium = UiTab::StyleUnderline();
+        UiTab::Style underline_medium = UiTab::StyleDefault();
         underline_medium.indicator_span = MEDIUM;
 
-        UiTab::Style segmented_inset = UiTab::StyleSegmented();
+        UiTab::Style segmented_inset = UiTab::StyleDefault();
         segmented_inset.strip_inset = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
         segmented_inset.tab_padding = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
 
@@ -33,25 +33,28 @@ public:
         segmented_square.tab_metrics.radius = 0;
         segmented_square.metrics.radius = 0;
 
-        UiTab::Style segmented_loose = UiTab::StyleSegmented();
+        UiTab::Style segmented_loose = UiTab::StyleDefault();
         segmented_loose.strip_inset = Rect(DPI(7), DPI(7), DPI(7), DPI(7));
         segmented_loose.tab_padding = Rect(DPI(9), DPI(4), DPI(9), DPI(4));
 
-        UiTab::Style doc_drag = UiTab::StyleDocument();
+        UiTab::Style doc_drag = UiTab::StyleDefault();
         doc_drag.body_gap = 2;
 
-        SetupTab(t00, UiAlign::TOP, classic_notched, "Explorer / Connected Cap");
-        SetupTab(t01, UiAlign::TOP, underline_full, "Modern / Underline Full");
-        SetupTab(t02, UiAlign::TOP, doc_drag, "Document / Reorder");
+        SetupTab(t00, UiAlign::TOP, UITAB_CLASSIC, classic_notched, "Explorer / Connected Cap");
+        SetupTab(t01, UiAlign::TOP, UITAB_UNDERLINE, underline_full, "Modern / Underline Full");
+        SetupTab(t02, UiAlign::TOP, UITAB_DOCUMENT, doc_drag, "Document / Reorder");
         t02.SetTabText(0, "").SetTabText(1, "").SetTabText(2, "");
 
-        SetupTab(t10, UiAlign::TOP, segmented_square, "Modern / Segmented Square");
-        SetupTab(t11, UiAlign::TOP, segmented_loose, "Modern / Segmented Loose");
-        SetupTab(t12, UiAlign::LEFT, UiTab::StyleRail(), "Vertical / Rail");
+        SetupTab(t10, UiAlign::TOP, UITAB_SEGMENTED, segmented_square, "Modern / Segmented Square");
+        SetupTab(t11, UiAlign::TOP, UITAB_SEGMENTED, segmented_loose, "Modern / Segmented Loose");
+        SetupTab(t12, UiAlign::LEFT, UITAB_RAIL, UiTab::StyleDefault(), "Vertical / Rail");
 
-        SetupTab(t20, UiAlign::BOTTOM, classic_notched, "Explorer / Bottom Connected");
-        SetupTab(t21, UiAlign::TOP, underline_medium, "Modern / Underline Medium");
-        SetupTab(t22, UiAlign::TOP, UiTab::StyleSoft(), "Soft / Standardized");
+        SetupTab(t20, UiAlign::BOTTOM, UITAB_CLASSIC, classic_notched, "Explorer / Bottom Connected");
+        SetupTab(t21, UiAlign::TOP, UITAB_UNDERLINE, underline_medium, "Modern / Underline Medium");
+        UiTab::Style soft = UiTab::StyleDefault();
+        soft.metrics.radius = DPI(12);
+        soft.tab_metrics.radius = DPI(10);
+        SetupTab(t22, UiAlign::TOP, UITAB_CLASSIC, soft, "Soft / Standardized");
 
         t02.EnableDragReorder(true)
            .EnableDragHandles(true)
@@ -86,7 +89,7 @@ private:
         UiLabel c;
     };
 
-    void SetupTab(UiTab& t, UiAlign side, const UiTab::Style& st, const String& title)
+    void SetupTab(UiTab& t, UiAlign side, UiTabVisual visual, const UiTab::Style& st, const String& title)
     {
         TabPages& p = pages.Add();
 
@@ -119,3 +122,5 @@ GUI_APP_MAIN
 {
     UiTabDemoWindow().Run();
 }
+
+

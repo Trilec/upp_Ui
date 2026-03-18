@@ -13,7 +13,7 @@ This is intentionally forward-looking work: new `Ui*` controls designed to coexi
 ## Quick links
 
 - `GETTING_STARTED.md` (fast ramp-up)
-- `ARCHITECTURE.md` (style/draw/layout/9-slice/blur/animation concepts)
+- `UPP_GUIDES/README.md` (engineering guides, architecture notes, and active roadmaps)
 - `CHECKLIST.md` (living status + next steps)
 - `CHANGELOG.md`
 
@@ -69,3 +69,4 @@ b.SetText("Run")
 ## License
 
 Intended to live alongside Ultimate++.
+

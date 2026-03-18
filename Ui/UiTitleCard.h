@@ -49,7 +49,6 @@ public:
 
         bool transparent = false;
         bool hover_enabled = false;
-        bool show_focus = false;
 
         void Serialize(Stream& s)
         {
@@ -64,7 +63,7 @@ public:
               % show_rule % rs % re % rule_thickness % rule_gap_above % rule_gap_below
               % show_bottom_line % bls % ble % bottom_line_thickness % bottom_line_color
               % title_subtitle_gap % subtitle_copy_gap
-              % transparent % hover_enabled % show_focus;
+              % transparent % hover_enabled;
             rule_style = (UiLineStyle)rs;
             rule_extent = (UiSpan)re;
             bottom_line_style = (UiLineStyle)bls;
@@ -75,18 +74,15 @@ public:
     UiTitleCard();
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleSquare();
 
     UiTitleCard& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiTitleCard& ClearStyleOverride();
+    bool         HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     UiTitleCard& SetTitle(const String& s);
@@ -106,7 +102,7 @@ public:
     UiTitleCard& ShowRule(bool on = true);
     UiTitleCard& ShowBottomLine(bool on = true);
     UiTitleCard& EnableHover(bool on = true);
-    UiTitleCard& EnableFocusRing(bool on = true);
+
     UiTitleCard& SetSelectable(bool on = true);
 
     UiTitleCard& SetSizeMin(Size sz) { user_min_size_ = sz; RefreshLayout(); Refresh(); return *this; }
@@ -128,6 +124,10 @@ public:
           StyledState, bool> WhenPaintForeground;
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     void InvalidateTextCache();
     void RebuildTextCache();
 
@@ -138,6 +138,9 @@ private:
 
 private:
     Style  style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
     String title_;
     String subtitle_;
     String copy_;

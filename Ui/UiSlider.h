@@ -21,13 +21,13 @@ public:
         StyledMetrics thumb_metrics;
         StyledSkin    thumb_skin;
 
-        bool   show_ticks = false;
-        int    major_ticks = 10;
-        int    minor_ticks_per_major = 0;
-        int    tick_len_major = DPI(6);
-        int    tick_len_minor = DPI(3);
-        int    tick_gap = DPI(3);
-        Color  tick_color = SColorShadow();
+        bool    show_ticks = false;
+        int     major_ticks = 10;
+        int     minor_ticks_per_major = 0;
+        int     tick_len_major = DPI(6);
+        int     tick_len_minor = DPI(3);
+        int     tick_gap = DPI(3);
+        Color   tick_color = SColorShadow();
         UiAlign tick_side = UiAlign::BOTTOM;
 
         int thick_px = DPI(22);
@@ -45,21 +45,18 @@ public:
     };
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleAccent();
-    static const Style& StyleMinimal();
 
     UiSlider();
     UiSlider(UiDirection dir);
 
     UiSlider& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiSlider& ClearStyleOverride();
+    bool HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.track_palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.track_metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.track_skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().track_palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().track_metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().track_skin; }
     void OnStyleChanged();
 
     UiSlider& SetDirection(UiDirection dir);
@@ -109,6 +106,10 @@ public:
     virtual bool Key(dword key, int count) override;
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     Rect  GetTrackRect() const;
     Rect  GetThumbRect() const;
     int   ValueToPos(double v) const;
@@ -117,6 +118,9 @@ private:
 
 private:
     Style style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
     UiDirection dir_ = UiDirection::H;
 
     double min_ = 0.0;

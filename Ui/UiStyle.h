@@ -99,6 +99,49 @@ inline void FastBlur(ImageBuffer& ib, int radius)
     }
 }
 
+inline void FastBlurAlpha(ImageBuffer& ib, int radius)
+{
+    if(radius < 1)
+        return;
+
+    Size sz = ib.GetSize();
+    int  w  = sz.cx;
+    int  h  = sz.cy;
+
+    auto clampi = [=](int val, int max_val) -> int {
+        return min(max(val, 0), max_val - 1);
+    };
+
+    Buffer<byte> temp(w * h);
+    RGBA* src = ib;
+
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            int a = 0;
+            int count = 0;
+            for(int k = -radius; k <= radius; k++) {
+                int px = clampi(x + k, w);
+                a += src[y * w + px].a;
+                count++;
+            }
+            temp[y * w + x] = (byte)(a / count);
+        }
+    }
+
+    for(int x = 0; x < w; x++) {
+        for(int y = 0; y < h; y++) {
+            int a = 0;
+            int count = 0;
+            for(int k = -radius; k <= radius; k++) {
+                int py = clampi(y + k, h);
+                a += temp[py * w + x];
+                count++;
+            }
+            src[y * w + x].a = (byte)(a / count);
+        }
+    }
+}
+
 inline Image MakeQuadGradientTile(int size,
                                   Color tl, Color tr,
                                   Color bl, Color br,
@@ -294,71 +337,20 @@ inline Color UiResolveIconColor(const StyledPalette& p, StyledState st)
 }
 
 struct StyledShadow {
-    // Legacy fields (kept for backward style-stream compatibility).
     bool  enabled  = false;
-    int   offset_x = 0;
-    int   offset_y = DPI(2);
-    int   blur     = DPI(6);
-    int   spread   = 0;
+    int   distance = DPI(4);
+    int   angle    = 135;
+    int   blur     = DPI(5);
     int   alpha    = 90;
     Color color    = Black();
-
-    // Unified shadow controls.
-    UiSpan size      = SMALL;    // NONE/SMALL/MEDIUM/LARGE
-    int    distance  = DPI(4);   // Px from shape center along angle
-    int    angle_deg = 135;      // Photoshop-like angle in degrees
-    int    hardness  = 40;       // 0 soft .. 100 hard
-    bool   inset     = false;    // Draw inside the face bounds
-
-    struct Layer : Moveable<Layer> {
-        bool  enabled   = false;
-        UiSpan size     = SMALL;
-        int   distance  = DPI(4);
-        int   angle_deg = 135;
-        int   hardness  = 40;
-        int   opacity   = 90;
-        Color color     = Black();
-        bool  inset     = false;
-
-        void Serialize(Stream& s)
-        {
-            int span = (int)size;
-            s % enabled % span % distance % angle_deg % hardness % opacity % color % inset;
-            if(s.IsLoading())
-                size = (UiSpan)span;
-            hardness = clamp(hardness, 0, 100);
-            opacity = clamp(opacity, 0, 255);
-        }
-    };
-
-    int layer_count = 0;
-    Layer layers[3];
+    bool  inset    = false;
 
     void Serialize(Stream& s)
     {
-        s % enabled % offset_x % offset_y % blur % spread % alpha % color;
-        int span = (int)size;
-        s % span % distance % angle_deg % hardness % inset;
-        s % layer_count;
-        layer_count = min(max(layer_count, 0), 3);
-        for(int i = 0; i < layer_count; i++)
-            layers[i].Serialize(s);
-        if(s.IsLoading())
-            size = (UiSpan)span;
-        hardness = clamp(hardness, 0, 100);
+        s % enabled % distance % angle % blur % alpha % color % inset;
+        blur = max(blur, 0);
         alpha = clamp(alpha, 0, 255);
-        if(s.IsLoading()) {
-            for(int i = layer_count; i < 3; i++)
-                layers[i] = Layer();
-        }
     }
-};
-
-struct UiShadowDetail {
-    int   distance = DPI(4);
-    int   opacity  = 90;
-    Color color    = Black();
-    bool  inset    = false;
 };
 
 struct StyledHighlight {
@@ -398,6 +390,10 @@ struct StyledMetrics {
     String dash_pattern = "5,5";
 
     bool high_contrast  = false;
+    bool focus_enabled  = true;
+    int  focus_margin   = DPI(1);
+    int  focus_alpha    = 255;
+    Color focus_color;
 
     StyledShadow   shadow;
     StyledHighlight highlight;
@@ -409,7 +405,8 @@ struct StyledMetrics {
           % radius % frame_width
           % frame_enabled % face_enabled
           % dashed % dash_pattern
-          % high_contrast
+          % high_contrast % focus_enabled
+          % focus_margin % focus_alpha % focus_color
           % shadow % highlight;
     }
 };
@@ -505,35 +502,76 @@ inline int UiResolvedFrameWidth(const StyledMetrics& m, const StyledSkin& skin)
     return m.frame_width;
 }
 
+inline int UiResolveShadowExtentPx(const StyledShadow& sh)
+{
+    return max(sh.blur, 0);
+}
+
+inline Point UiResolveShadowOffset(const StyledShadow& sh)
+{
+    int distance = max(0, sh.distance);
+    if(distance <= 0)
+        return Point(0, 0);
+
+    double a = sh.angle * M_PI / 180.0;
+    int dx = (int)std::round(std::cos(a) * distance);
+    int dy = (int)std::round(std::sin(a) * distance);
+    return Point(dx, dy);
+}
+
+inline Rect UiStyledShadowMargins(const StyledMetrics& m)
+{
+    const StyledShadow& sh = m.shadow;
+    if(!sh.enabled || sh.inset || sh.alpha <= 0)
+        return Rect(0, 0, 0, 0);
+
+    int extent = UiResolveShadowExtentPx(sh);
+    if(extent <= 0)
+        return Rect(0, 0, 0, 0);
+
+    Point off = UiResolveShadowOffset(sh);
+    int left = max(0, extent - off.x);
+    int top = max(0, extent - off.y);
+    int right = max(0, extent + off.x);
+    int bottom = max(0, extent + off.y);
+    return Rect(left, top, right, bottom);
+}
+
 // ============================================================================
 // Canonical geometry helpers
 // ============================================================================
+
+inline Rect UiStyledFaceRect(const Rect& outer,
+                             const StyledMetrics& m,
+                             const StyledSkin& skin);
+
+inline Rect UiStyledSurfaceRect(const Rect& outer,
+                                const StyledMetrics& m)
+{
+    Rect r = outer;
+    if(r.IsEmpty())
+        return r;
+
+    Rect sh = UiStyledShadowMargins(m);
+    if(!UiIsZeroThicknessRect(sh))
+        r = UiApplyThicknessRect(r, sh);
+
+    return r;
+}
 
 inline Rect UiStyledInnerRect(const Rect& outer,
                               const StyledMetrics& m,
                               const StyledSkin& skin,
                               const Rect& padding = Rect(0, 0, 0, 0))
 {
-    Rect r = outer;
+    Rect r = UiStyledFaceRect(outer, m, skin);
     if(r.IsEmpty())
         return r;
 
-    // 1) frame
-    int fw = UiResolvedFrameWidth(m, skin);
-    if(fw > 0)
-        r.Deflate(fw, fw);
-
-    // 2) skin content inset (face bounds; geometry-only)
-    Rect ci = UiNonNegativeThickness(skin.content_inset);
-    if(!UiIsZeroThicknessRect(ci))
-        r = UiApplyThicknessRect(r, ci);
-
-    // 3) styled content padding (density; geometry-only)
     Rect cp = UiNonNegativeThickness(m.content_padding);
     if(!UiIsZeroThicknessRect(cp))
         r = UiApplyThicknessRect(r, cp);
 
-    // 4) optional extra padding (layout-only; may be negative)
     if(!UiIsZeroThicknessRect(padding))
         r = UiApplyThicknessRect(r, padding);
 
@@ -541,12 +579,12 @@ inline Rect UiStyledInnerRect(const Rect& outer,
 }
 
 // "Face" rect for focus rings and skin-aligned overlays.
-// Applies frame + skin.content_inset, but NOT content_padding.
+// Applies shadow margins + frame + skin.content_inset, but NOT content_padding.
 inline Rect UiStyledFaceRect(const Rect& outer,
                              const StyledMetrics& m,
                              const StyledSkin& skin)
 {
-    Rect r = outer;
+    Rect r = UiStyledSurfaceRect(outer, m);
     if(r.IsEmpty())
         return r;
 
@@ -566,7 +604,6 @@ inline Size UiStyledOuterSizeFromContent(Size content,
                                          const StyledSkin& skin,
                                          const Rect& padding = Rect(0, 0, 0, 0))
 {
-    // Option A policy: forbid negative padding in minsize math.
     ASSERT(padding.left   >= 0);
     ASSERT(padding.top    >= 0);
     ASSERT(padding.right  >= 0);
@@ -575,14 +612,15 @@ inline Size UiStyledOuterSizeFromContent(Size content,
     Rect pad = UiNonNegativeThickness(padding);
     Rect ci  = UiNonNegativeThickness(skin.content_inset);
     Rect cp  = UiNonNegativeThickness(m.content_padding);
+    Rect sh  = UiStyledShadowMargins(m);
 
     int fw = UiResolvedFrameWidth(m, skin);
 
     int w = max(content.cx, 0);
     int h = max(content.cy, 0);
 
-    w += pad.left + pad.right + ci.left + ci.right + cp.left + cp.right + 2 * fw;
-    h += pad.top  + pad.bottom + ci.top + ci.bottom + cp.top + cp.bottom + 2 * fw;
+    w += pad.left + pad.right + ci.left + ci.right + cp.left + cp.right + sh.left + sh.right + 2 * fw;
+    h += pad.top  + pad.bottom + ci.top + ci.bottom + cp.top + cp.bottom + sh.top + sh.bottom + 2 * fw;
 
     return Size(w, h);
 }
@@ -978,24 +1016,12 @@ public:
     T& EnableDash(bool on = true)  { StyledMetricsRef().dashed = on; StyledMetricsRef().frame_enabled = on; OnStyleChanged(); return Self(); }
     T& SetDashPattern(const String& p) { StyledMetricsRef().dash_pattern = p; OnStyleChanged(); return Self(); }
     T& HighContrast(bool on = true){ StyledMetricsRef().high_contrast = on; OnStyleChanged(); return Self(); }
+    T& SetShowFocus(bool on = true) { StyledMetricsRef().focus_enabled = on; OnStyleChanged(); return Self(); }
+    T& SetFocusMargin(int px) { StyledMetricsRef().focus_margin = max(px, 0); OnStyleChanged(); return Self(); }
+    T& SetFocusColor(Color c) { StyledMetricsRef().focus_color = c; OnStyleChanged(); return Self(); }
+    T& SetFocusAlpha(int a) { StyledMetricsRef().focus_alpha = clamp(a, 0, 255); OnStyleChanged(); return Self(); }
 
     // Shadow convenience API -------------------------------------------------
-    T& SetShadow(UiSpan span)
-    {
-        StyledShadow& sh = StyledMetricsRef().shadow;
-        sh.size = span;
-        sh.enabled = span != NONE;
-        if(span == NONE) {
-            sh.layer_count = 0;
-            sh.alpha = 0;
-        }
-        else if(sh.alpha <= 0) {
-            sh.alpha = 90;
-        }
-        OnStyleChanged();
-        return Self();
-    }
-
     T& EnableShadow(bool on = true)
     {
         StyledMetricsRef().shadow.enabled = on;
@@ -1010,34 +1036,19 @@ public:
         return Self();
     }
 
-    T& SetShadowSize(UiSpan span)
-    {
-        return SetShadow(span);
-    }
-
-    T& SetShadowDetail(const UiShadowDetail& d)
-    {
-        StyledShadow& sh = StyledMetricsRef().shadow;
-        sh.distance = max(0, d.distance);
-        sh.alpha = clamp(d.opacity, 0, 255);
-        sh.inset = d.inset;
-        if(!IsNull(d.color))
-            sh.color = d.color;
-        if(sh.size == NONE)
-            sh.size = SMALL;
-        sh.enabled = sh.alpha > 0 && sh.size != NONE;
-        OnStyleChanged();
-        return Self();
-    }
-
     T& SetShadowDetail(int distance, int opacity, Color color = Null, bool inset = false)
     {
-        UiShadowDetail d;
-        d.distance = distance;
-        d.opacity = opacity;
-        d.color = color;
-        d.inset = inset;
-        return SetShadowDetail(d);
+        StyledShadow& sh = StyledMetricsRef().shadow;
+        sh.distance = max(0, distance);
+        sh.alpha = clamp(opacity, 0, 255);
+        sh.inset = inset;
+        if(!IsNull(color))
+            sh.color = color;
+        if(sh.blur <= 0)
+            sh.blur = DPI(5);
+        sh.enabled = sh.alpha > 0;
+        OnStyleChanged();
+        return Self();
     }
 
     T& SetShadowDistance(int px)
@@ -1050,16 +1061,16 @@ public:
 
     T& SetShadowAngle(int deg)
     {
-        StyledMetricsRef().shadow.angle_deg = deg;
+        StyledMetricsRef().shadow.angle = deg;
         StyledMetricsRef().shadow.enabled = true;
         OnStyleChanged();
         return Self();
     }
 
-    T& SetShadowHardness(int pct)
+    T& SetShadowBlur(int px)
     {
-        StyledMetricsRef().shadow.hardness = clamp(pct, 0, 100);
-        StyledMetricsRef().shadow.enabled = true;
+        StyledMetricsRef().shadow.blur = max(px, 0);
+        StyledMetricsRef().shadow.enabled = StyledMetricsRef().shadow.enabled || px > 0;
         OnStyleChanged();
         return Self();
     }
@@ -1088,31 +1099,7 @@ public:
         OnStyleChanged();
         return Self();
     }
-
-    T& SetShadowLayerCount(int n)
-    {
-        n = min(max(n, 0), 3);
-        StyledMetricsRef().shadow.layer_count = n;
-        for(int i = 0; i < n; i++)
-            StyledMetricsRef().shadow.layers[i].enabled = true;
-        StyledMetricsRef().shadow.enabled = n > 0;
-        OnStyleChanged();
-        return Self();
-    }
-
-    T& SetShadowLayer(int index, const StyledShadow::Layer& layer)
-    {
-        if(index < 0 || index >= 3)
-            return Self();
-        StyledShadow& sh = StyledMetricsRef().shadow;
-        sh.layer_count = max(sh.layer_count, index + 1);
-        sh.layers[index] = layer;
-        StyledMetricsRef().shadow.enabled = true;
-        OnStyleChanged();
-        return Self();
-    }
-
-    // Skin
+// Skin
     T& SetFill9Slice(const Image& img, const Rect& slice, bool settheframe = false)
     {
         StyledSkin& s = StyledSkinRef();
@@ -1198,3 +1185,13 @@ public:
 } // namespace Upp
 
 #endif
+
+
+
+
+
+
+
+
+
+

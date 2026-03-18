@@ -18,7 +18,7 @@ public:
         Add(t3);
         Add(t4);
 
-        info.SetText("UiToggle is a switch-style boolean control built on UiCheckBox.")
+        info.SetText("UiToggle is a standalone boolean control with separate track and thumb styling.")
             .SetAlign(UiAlign::LEFT, UiAlign::TOP)
             .SetInkColor(SColorDisabled());
 
@@ -76,3 +76,4 @@ GUI_APP_MAIN
 {
     UiToggleDemoWindow().Run();
 }
+

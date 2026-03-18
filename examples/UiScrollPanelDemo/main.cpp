@@ -33,7 +33,7 @@ public:
 
         auto_panel.SetScrollMode(UIPANELSCROLL_AUTO).SetStyle(UiScrollPanel::StyleDefault());
         vertical_panel.SetScrollMode(UIPANELSCROLL_VERTICAL).SetStyle(UiScrollPanel::StyleDefault());
-        horizontal_panel.SetScrollMode(UIPANELSCROLL_HORIZONTAL).SetStyle(UiScrollPanel::StyleFlat());
+        horizontal_panel.SetScrollMode(UIPANELSCROLL_HORIZONTAL).SetStyle(UiScrollPanel::StyleDefault());
         none_panel.SetScrollMode(UIPANELSCROLL_NONE).SetStyle(UiScrollPanel::StyleDefault());
 
         BuildAutoContent();
@@ -91,7 +91,7 @@ private:
         for(int i = 0; i < 22; i++) {
             UiButton& b = auto_rows.Add();
             c.Add(b);
-            b.SetText(Format("Auto row %02d", i + 1)).SetSubtleStyle();
+            b.SetText(Format("Auto row %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         }
     }
 
@@ -102,9 +102,9 @@ private:
             UiButton& b = vertical_rows.Add();
             c.Add(b);
             if(i % 3 == 0)
-                b.SetText(Format("Vertical critical event %02d", i + 1)).SetAccentStyle();
+                b.SetText(Format("Vertical critical event %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
             else
-                b.SetText(Format("Vertical event %02d", i + 1)).SetSubtleStyle();
+                b.SetText(Format("Vertical event %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         }
     }
 
@@ -114,7 +114,7 @@ private:
         for(int i = 0; i < 18; i++) {
             UiButton& b = horizontal_cols.Add();
             c.Add(b);
-            b.SetText(Format("Col %02d", i + 1)).SetSubtleStyle();
+            b.SetText(Format("Col %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         }
     }
 
@@ -124,7 +124,7 @@ private:
         for(int i = 0; i < 16; i++) {
             UiButton& b = none_rows.Add();
             c.Add(b);
-            b.SetText(Format("No-scroll row %02d", i + 1)).SetSubtleStyle();
+            b.SetText(Format("No-scroll row %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         }
     }
 
@@ -193,3 +193,4 @@ GUI_APP_MAIN
 {
     UiScrollPanelDemoWindow().Run();
 }
+

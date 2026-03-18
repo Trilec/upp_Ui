@@ -26,17 +26,17 @@ public:
         r2.SetText("Classic B").SetGroup(1);
         r3.SetText("Classic C").SetGroup(1);
 
-        p1.SetText("Pill 1").SetStyle(UiRadioButton::StylePills()).SetGroup(2).SetChecked(true);
-        p2.SetText("Pill 2").SetStyle(UiRadioButton::StylePills()).SetGroup(2);
-        p3.SetText("Pill 3").SetStyle(UiRadioButton::StylePills()).SetGroup(2);
+        p1.SetText("Pill 1").SetVisual(UIRADIOVIS_PILLS).SetGroup(2).SetChecked(true);
+        p2.SetText("Pill 2").SetVisual(UIRADIOVIS_PILLS).SetGroup(2);
+        p3.SetText("Pill 3").SetVisual(UIRADIOVIS_PILLS).SetGroup(2);
         p1.SetPadding(DPI(10), DPI(6), DPI(10), DPI(6));
         p2.SetPadding(DPI(10), DPI(6), DPI(10), DPI(6));
         p3.SetPadding(DPI(10), DPI(6), DPI(10), DPI(6));
 
-        l1.SetText("List item option 1").SetStyle(UiRadioButton::StyleList()).SetGroup(3).SetChecked(true);
-        l2.SetText("List item option 2").SetStyle(UiRadioButton::StyleList()).SetGroup(3);
+        l1.SetText("List item option 1").SetVisual(UIRADIOVIS_LIST).SetGroup(3).SetChecked(true);
+        l2.SetText("List item option 2").SetVisual(UIRADIOVIS_LIST).SetGroup(3);
 
-        UiRadioButton::Style sq = UiRadioButton::StyleClassic();
+        UiRadioButton::Style sq = UiRadioButton::StyleDefault();
         sq.indicator_metrics.radius = DPI(4);
         s1.SetText("Square A").SetStyle(sq).SetGroup(4).SetChecked(true);
         s2.SetText("Square B").SetStyle(sq).SetGroup(4);
@@ -83,3 +83,4 @@ GUI_APP_MAIN
 {
     UiRadioButtonDemoWindow().Run();
 }
+

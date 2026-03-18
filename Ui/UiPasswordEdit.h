@@ -14,7 +14,7 @@ namespace Upp {
 //
 //  It uses the same styled rendering pipeline as other Ui* controls via
 //  CtrlStyled and UiStyle.h (StyledPalette / StyledMetrics / StyledSkin).
-//  The underlying text model is identical to UiLineEdit – only the way
+//  The underlying text model is identical to UiLineEdit ??? only the way
 //  text is *displayed* changes (masked vs plain).
 //
 //  Change Log:
@@ -25,7 +25,7 @@ namespace Upp {
 //  - Uses flank-based composition (preferred approach):
 //        * The visibility "eye" is now a UiButton hosted on the right flank
 //          via UiBaseEdit::AddToSide(..., UiAlign::RIGHT, ...).
-//        * No more icon fields in the edit style – composition over inheritance.
+//        * No more icon fields in the edit style ??? composition over inheritance.
 //        * Easy to extend with extra flanks later (e.g. "submit" arrow).
 //
 //  Usage Guide:
@@ -37,7 +37,7 @@ namespace Upp {
 //
 //  2. Custom mask character:
 //
-//        pass.SetPasswordChar(0x25CF); // '●' instead of default '•'
+//        pass.SetPasswordChar(0x25CF); // '???' instead of default '???'
 //
 //  3. Built-in eye icon (right side) that toggles visibility:
 //
@@ -79,7 +79,7 @@ public:
     // ------------------------------------------------------------------------
 
     // Sets the character used to mask the underlying text.
-    // Default: '•' (U+2022).
+    // Default: '???' (U+2022).
     UiPasswordEdit& SetPasswordChar(wchar ch)
     {
         password_char_ = ch;
@@ -136,10 +136,6 @@ public:
     UiPasswordEdit& SetVisibilityIcons(const Image& visible, const Image& hidden);
 
     UiPasswordEdit& SetStyle(const UiBaseEdit::Style& s);
-    UiPasswordEdit& SetStandardStyle() { return SetStyle(UiBaseEdit::StyleStandard()); }
-    UiPasswordEdit& SetMinimalStyle()  { return SetStyle(UiBaseEdit::StyleMinimal()); }
-    UiPasswordEdit& SetSoftStyle()     { return SetStyle(UiBaseEdit::StyleSoft()); }
-    UiPasswordEdit& SetStrongStyle()   { return SetStyle(UiBaseEdit::StyleStrong()); }
 
     // Built-in eye icons backed by UiIcons.h (48px).
     // These are convenience helpers; you can also pass your own icons.
@@ -160,7 +156,7 @@ private:
     void SyncEyeButtonIconColor_();
 
     // Masking
-    wchar password_char_ = 0x2022; // default mask: '•'
+    wchar password_char_ = 0x2022; // default mask: '???'
     bool  plain_visible_ = false;  // false => masked, true => show plain text
 
     // Eye button on the right flank
@@ -174,3 +170,5 @@ private:
 } // namespace Upp
 
 #endif
+
+

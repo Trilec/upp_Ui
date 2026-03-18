@@ -3,8 +3,8 @@
 // Thread context: GUI thread.
 // Mutation contract: all document mutations should go through Dispatch(tx)
 // or command handlers that delegate to Dispatch(tx).
-#ifndef _Ui_UiDoc_UiDoc_h_
-#define _Ui_UiDoc_UiDoc_h_
+#ifndef _Ui_UiDoc_h_
+#define _Ui_UiDoc_h_
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>

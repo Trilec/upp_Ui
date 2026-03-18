@@ -19,6 +19,17 @@ struct UiModelItem : Moveable<UiModelItem> {
     bool   separator_before = false;
     Color  custom_ink_color;
 
+    bool   use_custom_font = false;
+    Font   custom_font = StdFont();
+    bool   underline = false;
+    Color  underline_color;
+
+    bool   editable = false;
+    bool   lazy_children = false;
+    bool   lazy_loaded = false;
+    bool   has_metadata = false;
+    Color  metadata_color = Color(65, 167, 248);
+
     UiModelItem() {}
     UiModelItem(const String& t, const Value& d = Value(), bool en = true)
         : text(t), data(d), enabled(en) {}
@@ -105,6 +116,7 @@ public:
     int GetChildCount(UiTreeNodeRef parent) const;
     UiTreeNodeRef GetChild(UiTreeNodeRef parent, int index) const;
     UiTreeNodeRef GetParent(UiTreeNodeRef node) const;
+    int GetChildIndex(UiTreeNodeRef node) const;
 
     const UiModelItem& Get(UiTreeNodeRef node) const;
     UiModelItem& Get(UiTreeNodeRef node);
@@ -181,3 +193,4 @@ private:
 }
 
 #endif
+

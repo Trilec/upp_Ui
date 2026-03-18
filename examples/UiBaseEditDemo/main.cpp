@@ -56,10 +56,10 @@ public:
         row4_label.SetInkColor(SColorText());
 
         // ---------------------------------------------------------------------
-        // ROW 1: Modern corporate – search + password, light theme
+        // ROW 1: Modern corporate ??? search + password, light theme
         // ---------------------------------------------------------------------
         Add(r1_search);
-        r1_search.SetPlaceholder("Search clients…");
+        r1_search.SetPlaceholder("Search clients???");
         r1_search.SetRadius(DPI(4));
         r1_search.SetFrameWidth(DPI(1));
         r1_search.Tip("UiLineEdit: standard framed search field");
@@ -83,28 +83,28 @@ public:
         Add(r1_cancel);
         r1_cancel.SetText("Cancel");
         r1_cancel.SetMinSize(Size(DPI(100), DPI(30)));
-        r1_cancel.SetStyle(UiButton::StyleSubtle());
+        r1_cancel.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         r1_cancel.Tip("UiButton subtle secondary action");
 
         // ---------------------------------------------------------------------
-        // ROW 2: Soft & friendly – pill search with left/right flanks
+        // ROW 2: Soft & friendly ??? pill search with left/right flanks
         // ---------------------------------------------------------------------
         Add(r2_search);
-        r2_search.SetPlaceholder("Search products…");
+        r2_search.SetPlaceholder("Search products???");
         r2_search.SetRadius(DPI(100));       // pill
         r2_search.EnableFrame(false);
         r2_search.SetFaceColor(Blend(SColorPaper(), SColorHighlight(), 235));
         r2_search.Tip("UiLineEdit: pill search field built from UiBaseEdit");
 
         // Left search icon button (flank)
-        r2_search_icon.SetStyle(UiButton::StyleIcon());
+        r2_search_icon.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         r2_search_icon.SetIcon(CtrlImg::go_forward());
         r2_search_icon.SetMinSize(Size(DPI(24), DPI(24)));
         r2_search_icon.ClickFocus(false);
         r2_search_icon.Tip("Left flank: search icon (UiButton)");
 
         // Right clear button (flank)
-        r2_search_clear.SetStyle(UiButton::StyleIcon());
+        r2_search_clear.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         r2_search_clear.SetIcon(CtrlImg::remove());
         r2_search_clear.SetMinSize(Size(DPI(24), DPI(24)));
         r2_search_clear.ClickFocus(false);
@@ -125,7 +125,7 @@ public:
         r2_notes.Tip("UiMultiEdit with soft background / rounded corners");
 
         // ---------------------------------------------------------------------
-        // ROW 3: Dark glass login – dark background, white ink, password eye
+        // ROW 3: Dark glass login ??? dark background, white ink, password eye
         // ---------------------------------------------------------------------
         Add(r3_user);
         r3_user.SetPlaceholder("Email or username");
@@ -153,10 +153,10 @@ public:
         r3_login.Tip("Login button arranged next to password field");
 
         // ---------------------------------------------------------------------
-        // ROW 4: Technical tool – sharp corners, thick frames, log window
+        // ROW 4: Technical tool ??? sharp corners, thick frames, log window
         // ---------------------------------------------------------------------
         Add(r4_cmd);
-        r4_cmd.SetPlaceholder("Command palette…");
+        r4_cmd.SetPlaceholder("Command palette???");
         r4_cmd.SetRadius(0);
         r4_cmd.SetFrameWidth(DPI(2));
         r4_cmd.SetFrameColor(Color(20, 20, 20));
@@ -164,7 +164,7 @@ public:
         r4_cmd.Tip("Command entry (UiLineEdit) with thick technical frame");
 
         Add(r4_log);
-        r4_log.SetPlaceholder("Log output…");
+        r4_log.SetPlaceholder("Log output???");
         r4_log.SetRadius(0);
         r4_log.SetFrameWidth(DPI(2));
         r4_log.SetFrameColor(Color(30, 30, 30));
@@ -174,14 +174,14 @@ public:
         Add(r4_tool);
         r4_tool.SetText("Tool");
         r4_tool.SetMinSize(Size(DPI(70), DPI(70)));
-        r4_tool.SetStyle(UiButton::StyleIcon());
+        r4_tool.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         r4_tool.SetIcon(CtrlImg::go_forward());
         r4_tool.SetIconLayout(UiAlign::TOP);
         r4_tool.SetRadius(0);
         r4_tool.SetFrameWidth(DPI(2));
         r4_tool.SetFrameColor(Color(40, 40, 40));
         r4_tool.SetFaceColor(Color(230, 230, 230));
-        r4_tool.Tip("Icon TOP – toolbar style button");
+        r4_tool.Tip("Icon TOP ??? toolbar style button");
     }
 
     // Simple header band; everything else is done by child controls.
@@ -382,3 +382,4 @@ GUI_APP_MAIN
 {
     UiBaseEditDemoWindow().Run();
 }
+

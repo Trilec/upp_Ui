@@ -32,36 +32,26 @@ public:
         int indicator_size = DPI(18);
         int indicator_gap = DPI(8);
 
-        UiRadioVisual visual = UIRADIOVIS_CLASSIC;
-
         void Serialize(Stream& s)
         {
-            int vis = (int)visual;
             s % palette % metrics % skin
               % indicator_palette % indicator_metrics % indicator_skin
-              % font % indicator_side % indicator_size % indicator_gap
-              % vis;
-            visual = (UiRadioVisual)vis;
+              % font % indicator_side % indicator_size % indicator_gap;
         }
     };
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleClassic();
-    static const Style& StylePills();
-    static const Style& StyleList();
 
     UiRadioButton();
 
     UiRadioButton& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiRadioButton& ClearStyleOverride();
+    bool HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     UiRadioButton& SetText(const String& s);
@@ -108,17 +98,24 @@ public:
     virtual Value GetData() const override { return checked_; }
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     Size GetTextSizeCached() const;
     void RebuildLayoutCache(const Rect& content) const;
     UiRadioButton& SetCheckedInternal(bool on, bool fire_action);
 
-private:
     void UncheckSiblings_();
     Rect GetIndicatorRect(const Rect& r) const;
     Rect GetTextRect(const Rect& r, const Rect& ind) const;
 
 private:
     Style style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
+    UiRadioVisual visual_ = UIRADIOVIS_CLASSIC;
     String text_;
     bool checked_ = false;
     int  group_ = 0;

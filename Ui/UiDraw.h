@@ -24,6 +24,32 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
                                  const StyledMetrics& m,
                                  StyledState st);
 
+struct UiShadowCacheKey : Moveable<UiShadowCacheKey> {
+    int  width = 0;
+    int  height = 0;
+    int  radius = 0;
+    bool inset = false;
+    int  blur = 0;
+    int  alpha = 0;
+    Color color;
+    int  angle = 0;
+    int  distance = 0;
+
+    bool operator==(const UiShadowCacheKey& b) const
+    {
+        return width == b.width && height == b.height && radius == b.radius
+            && inset == b.inset && blur == b.blur && alpha == b.alpha
+            && color == b.color && angle == b.angle && distance == b.distance;
+    }
+};
+
+inline hash_t GetHashValue(const UiShadowCacheKey& k)
+{
+    CombineHash h;
+    h << k.width << k.height << k.radius << k.inset << k.blur << k.alpha << k.color.GetRaw() << k.angle << k.distance;
+    return h;
+}
+
 inline UiAlign UiCapOpenSide(UiAlign tab_side)
 {
     switch(tab_side) {
@@ -558,61 +584,57 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
 // -------------------------------------------------------------------------
 // Focus ring helper
 // -------------------------------------------------------------------------
-inline void UiPaintFocusRing(Draw& w, const Rect& outer, const StyledPalette& palette,
-                             const StyledMetrics& m, StyledState st, int focus_margin,
-                             Color override_color = Null)
+inline void UiPaintFocusShape(Draw& w,
+                              Rect outer,
+                              const StyledMetrics& metrics,
+                              StyledState st,
+                              Color color,
+                              int inset = 0,
+                              int outset = 0,
+                              int alpha = 255,
+                              int radius_adjust = 0,
+                              double stroke_override = 0.0)
 {
-    if(focus_margin <= 0)
+    if(IsNull(color) || alpha <= 0)
         return;
-
-    Rect r = outer;
-    r.Deflate(focus_margin, focus_margin);
-
-    const int radius = max(m.radius, 0);
-
-    Color color = IsNull(override_color) ? palette.ink[st] : override_color;
-
-    if(radius <= 0 && !m.dashed) {
-        w.DrawRect(r.left,         r.top,          r.GetWidth(), 1, color);
-        w.DrawRect(r.left,         r.bottom - 1,   r.GetWidth(), 1, color);
-        w.DrawRect(r.left,         r.top,          1,            r.GetHeight(), color);
-        w.DrawRect(r.right - 1,    r.top,          1,            r.GetHeight(), color);
+    if(inset > 0)
+        outer.Deflate(inset, inset);
+    if(outset > 0)
+        outer.Inflate(outset, outset);
+    if(outer.IsEmpty())
         return;
-    }
-
-    Size sz = r.GetSize();
+    Size sz = outer.GetSize();
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
-
     ImageBuffer ib(sz);
     Fill(~ib, RGBAZero(), ib.GetLength());
-
     {
         BufferPainter p(ib, MODE_ANTIALIASED);
-
-        double inset = 0.5;
-        double x     = inset;
-        double y     = inset;
-        double wdt   = sz.cx - 2 * inset;
-        double hgt   = sz.cy - 2 * inset;
-
-        int    max_r = min(sz.cx, sz.cy) / 2;
-        double rad   = (double)min(radius, max_r);
-
-        double stroke_w =
-            (st == ST_PRESSED ? 2.0 :
-             st == ST_HOT     ? 1.5 : 1.0);
-
+        double inset_px = 0.5;
+        double x = inset_px;
+        double y = inset_px;
+        double wdt = sz.cx - 2 * inset_px;
+        double hgt = sz.cy - 2 * inset_px;
+        int max_r = min(sz.cx, sz.cy) / 2;
+        double rad = (double)min(max(0, metrics.radius + radius_adjust), max_r);
+        double stroke_w = stroke_override > 0.0
+                        ? stroke_override
+                        : (st == ST_PRESSED ? 2.0 : (st == ST_HOT ? 1.5 : 1.0));
         p.Begin();
-        p.RoundedRectangle(x, y, wdt, hgt, rad);
-        if(m.dashed && !m.dash_pattern.IsEmpty())
-            p.Dash(m.dash_pattern, 0.0);
-        p.Stroke(stroke_w, color);
+        if(rad > 0)
+            p.RoundedRectangle(x, y, wdt, hgt, rad);
+        else
+            p.Rectangle(x, y, wdt, hgt);
+        if(metrics.dashed && !metrics.dash_pattern.IsEmpty())
+            p.Dash(metrics.dash_pattern, 0.0);
+        RGBA c = color;
+        c.a = (byte)clamp(alpha, 0, 255);
+        p.Stroke(stroke_w, c);
         p.End();
     }
-
-    w.DrawImage(r.left, r.top, ib);
+    w.DrawImage(outer.left, outer.top, ib);
 }
+
 
 // -------------------------------------------------------------------------
 // Default styled background / foreground helpers
@@ -629,163 +651,206 @@ inline void UiPaintStyledBackground(Draw& w,
 
     (void)focus;
 
-    auto ResolveSpanPx = [&](UiSpan span) -> int {
-        switch(span) {
-        case SMALL:  return DPI(5);
-        case MEDIUM: return DPI(10);
-        case LARGE:  return DPI(20);
-        case NONE:
-        default:     return 0;
+    Rect surface_outer = UiStyledSurfaceRect(outer, metrics);
+
+    static StaticMutex s_shadow_cache_mutex;
+    static Index<UiShadowCacheKey> s_shadow_cache_keys;
+    static Vector<Image> s_shadow_cache_images;
+
+    auto MakeShadowCacheKey = [&](const StyledShadow& ly, Size sz, int radius) -> UiShadowCacheKey {
+        UiShadowCacheKey key;
+        key.width = sz.cx;
+        key.height = sz.cy;
+        key.radius = radius;
+        key.inset = ly.inset;
+        key.blur = ly.blur;
+        key.alpha = ly.alpha;
+        key.color = ly.color;
+        key.angle = ly.angle;
+        key.distance = ly.distance;
+        return key;
+    };
+
+    auto PaintShadow = [&](const StyledShadow& ly) {
+        if(!ly.enabled)
+            return;
+
+        int blur = UiResolveShadowExtentPx(ly);
+        if(blur <= 0)
+            return;
+
+        Point off = UiResolveShadowOffset(ly);
+        Size osz = surface_outer.GetSize();
+        if(osz.cx <= 0 || osz.cy <= 0)
+            return;
+
+        int pad = ly.inset ? 0 : (blur + max(abs(off.x), abs(off.y)) + 2);
+        Size cache_sz = ly.inset ? osz : Size(osz.cx + pad * 2, osz.cy + pad * 2);
+        UiShadowCacheKey cache_key = MakeShadowCacheKey(ly, cache_sz, metrics.radius);
+        {
+            Mutex::Lock __(s_shadow_cache_mutex);
+            int idx = s_shadow_cache_keys.Find(cache_key);
+            if(idx >= 0) {
+                const Image& img = s_shadow_cache_images[idx];
+                if(ly.inset)
+                    w.DrawImage(surface_outer.left, surface_outer.top, img);
+                else
+                    w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
+                return;
+            }
         }
-    };
 
-    auto OffsetFromAngle = [&](int distance, int angle_deg) -> Point {
-        const double PI = 3.14159265358979323846;
-        double a = (double)angle_deg * (PI / 180.0);
-        int dx = (int)std::round(std::cos(a) * distance);
-        int dy = (int)std::round(std::sin(a) * distance);
-        return Point(dx, dy);
-    };
-
-    auto PaintShadowLayer = [&](const StyledShadow::Layer& ly) {
-        if(!ly.enabled || ly.opacity <= 0)
-            return;
-
-        int size_px = ResolveSpanPx(ly.size);
-        if(size_px <= 0)
-            return;
-
-        int hard = clamp(ly.hardness, 0, 100);
-        Point off = OffsetFromAngle(max(0, ly.distance), ly.angle_deg);
-
-        if(ly.inset) {
-            Rect r = outer;
-            w.Clip(outer);
-            for(int i = 0; i < size_px; i++) {
-                int alpha = ly.opacity;
-                if(hard < 100) {
-                    int soft_start = (size_px * hard) / 100;
-                    if(i >= soft_start) {
-                        int rem = max(1, size_px - soft_start);
-                        alpha = (ly.opacity * max(0, rem - (i - soft_start))) / rem;
-                    }
-                }
-                alpha = clamp(alpha, 0, 255);
-                if(alpha <= 0)
-                    continue;
-
-                Rect rr = r;
-                rr.Deflate(i, i);
-                rr.Offset(off);
-                if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
-                    break;
-
-                int rad = max(0, metrics.radius - i);
-                if(rad <= 0) {
+        Image img;
+                if(ly.inset) {
+            ImageBuffer ib(osz);
+            ib.SetKind(IMAGE_ALPHA);
+            Fill(~ib, RGBAZero(), ib.GetLength());
+            {
+                BufferPainter p(ib, MODE_ANTIALIASED);
+                Rect base(0, 0, osz.cx, osz.cy);
+                for(int i = 0; i < blur; i++) {
+                    int alpha = clamp((ly.alpha * (blur - i)) / max(1, blur), 0, 255);
+                    if(alpha <= 0)
+                        continue;
+                    Rect rr = base;
+                    rr.Deflate(i, i);
+                    rr.Offset(off);
+                    if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
+                        break;
+                    double rad = (double)max(0, metrics.radius - i);
                     RGBA c = ly.color;
                     c.a = (byte)alpha;
-                    w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, c);
-                    w.DrawRect(rr.left, rr.bottom - 1, rr.GetWidth(), 1, c);
-                    w.DrawRect(rr.left, rr.top, 1, rr.GetHeight(), c);
-                    w.DrawRect(rr.right - 1, rr.top, 1, rr.GetHeight(), c);
-                }
-                else {
-                    Size sz = rr.GetSize();
-                    ImageBuffer ib(sz);
-                    ib.SetKind(IMAGE_ALPHA);
-                    Fill(~ib, RGBAZero(), ib.GetLength());
-                    {
-                        BufferPainter p(ib, MODE_ANTIALIASED);
-                        p.Begin();
-                        p.RoundedRectangle(0.5, 0.5, sz.cx - 1.0, sz.cy - 1.0, max(0, min(rad, min(sz.cx, sz.cy) / 2)));
-                        RGBA c = ly.color;
-                        c.a = (byte)alpha;
-                        p.Stroke(1.0, c);
-                        p.End();
-                    }
-                    w.DrawImage(rr.left, rr.top, Image(ib));
+                    p.Begin();
+                    if(rad > 0)
+                        p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
+                    else
+                        p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                    p.Stroke(1.0, c);
+                    p.End();
                 }
             }
-            w.End();
-            return;
+            img = Image(ib);
+            w.DrawImage(surface_outer.left, surface_outer.top, img);
+        }
+        else {
+            Size sz(osz.cx + pad * 2, osz.cy + pad * 2);
+            if(sz.cx <= 0 || sz.cy <= 0)
+                return;
+            ImageBuffer seed_ib(sz);
+            seed_ib.SetKind(IMAGE_ALPHA);
+            Fill(~seed_ib, RGBAZero(), seed_ib.GetLength());
+            Rect base(pad, pad, pad + osz.cx, pad + osz.cy);
+            Rect seed = base;
+            double rad = (double)max(0, metrics.radius);
+            RGBA c = White();
+            c.a = 255;
+            {
+                BufferPainter p(seed_ib, MODE_ANTIALIASED);
+                p.Begin();
+                if(rad > 0)
+                    p.RoundedRectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0, min<double>(rad, min(seed.GetWidth(), seed.GetHeight()) / 2.0));
+                else
+                    p.Rectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0);
+                p.Fill(c);
+                p.End();
+            }
+            // Cut only the true interior so the shadow can meet the control edge cleanly.
+            ImageBuffer cutoff_ib(sz);
+            cutoff_ib.SetKind(IMAGE_ALPHA);
+            Fill(~cutoff_ib, RGBAZero(), cutoff_ib.GetLength());
+            {
+                BufferPainter p(cutoff_ib, MODE_ANTIALIASED);
+                Rect cutoff = seed;
+                cutoff.Deflate(1, 1);
+                double cutoff_rad = max(0.0, rad - 1.0);
+                if(cutoff.GetWidth() > 1 && cutoff.GetHeight() > 1) {
+                    p.Begin();
+                    if(cutoff_rad > 0)
+                        p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
+                    else
+                        p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
+                    p.Fill(c);
+                    p.End();
+                }
+            }
+            // Build a neutral ambient halo, then layer a lighter directional blur on top.
+            ImageBuffer ambient_ib(sz);
+            ambient_ib.SetKind(IMAGE_ALPHA);
+            Fill(~ambient_ib, RGBAZero(), ambient_ib.GetLength());
+            Copy(~ambient_ib, ~seed_ib, ambient_ib.GetLength());
+            FastBlurAlpha(ambient_ib, max(1, blur));
+
+            ImageBuffer dir_seed_ib(sz);
+            dir_seed_ib.SetKind(IMAGE_ALPHA);
+            Fill(~dir_seed_ib, RGBAZero(), dir_seed_ib.GetLength());
+            {
+                BufferPainter p(dir_seed_ib, MODE_ANTIALIASED);
+                Rect dir_seed = seed;
+                dir_seed.Offset(off.x / 2, off.y / 2);
+                p.Begin();
+                if(rad > 0)
+                    p.RoundedRectangle(dir_seed.left + 0.5, dir_seed.top + 0.5, dir_seed.GetWidth() - 1.0, dir_seed.GetHeight() - 1.0, min<double>(rad, min(dir_seed.GetWidth(), dir_seed.GetHeight()) / 2.0));
+                else
+                    p.Rectangle(dir_seed.left + 0.5, dir_seed.top + 0.5, dir_seed.GetWidth() - 1.0, dir_seed.GetHeight() - 1.0);
+                p.Fill(c);
+                p.End();
+            }
+            ImageBuffer dir_ib(sz);
+            dir_ib.SetKind(IMAGE_ALPHA);
+            Fill(~dir_ib, RGBAZero(), dir_ib.GetLength());
+            Copy(~dir_ib, ~dir_seed_ib, dir_ib.GetLength());
+            FastBlurAlpha(dir_ib, max(1, blur));
+
+            ImageBuffer ib(sz);
+            ib.SetKind(IMAGE_ALPHA);
+            Fill(~ib, RGBAZero(), ib.GetLength());
+            int dst_inner = clamp(ly.alpha, 0, 255);
+            RGBA* px = ib;
+            const RGBA* cutoff_px = cutoff_ib;
+            const RGBA* ambient_px = ambient_ib;
+            const RGBA* dir_px = dir_ib;
+            int count = ib.GetLength();
+            for(int i = 0; i < count; i++) {
+                int seed_alpha = (int)cutoff_px[i].a;
+                if(seed_alpha >= 250) {
+                    px[i] = RGBAZero();
+                    continue;
+                }
+                int ambient_mask = (int)ambient_px[i].a;
+                int dir_mask = (int)dir_px[i].a;
+                int mask = min(255, (ambient_mask * 3) / 5 + (dir_mask * 2) / 3);
+                if(mask <= 0) {
+                    px[i] = RGBAZero();
+                    continue;
+                }
+                int a = (dst_inner * mask) / 255;
+                px[i].r = ly.color.GetR();
+                px[i].g = ly.color.GetG();
+                px[i].b = ly.color.GetB();
+                px[i].a = (byte)clamp(a, 0, 255);
+            }
+            Premultiply(ib);
+            img = Image(ib);
+            w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
         }
 
-        int spread = max(0, (size_px * hard) / 100);
-        int blur = max(0, size_px - spread);
-        int pad = blur + spread + max(abs(off.x), abs(off.y)) + 2;
-
-        Size osz = outer.GetSize();
-        Size sz(osz.cx + pad * 2, osz.cy + pad * 2);
-        if(sz.cx <= 0 || sz.cy <= 0)
-            return;
-
-        ImageBuffer ib(sz);
-        ib.SetKind(IMAGE_ALPHA);
-        Fill(~ib, RGBAZero(), ib.GetLength());
-
-        {
-            BufferPainter p(ib, MODE_ANTIALIASED);
-            int rr = max(0, metrics.radius + spread);
-            int x = pad + off.x - spread;
-            int y = pad + off.y - spread;
-            int cx = osz.cx + spread * 2;
-            int cy = osz.cy + spread * 2;
-
-            p.Begin();
-            if(rr > 0)
-                p.RoundedRectangle(x, y, cx, cy, rr);
-            else
-                p.Rectangle(x, y, cx, cy);
-
-            RGBA c = ly.color;
-            c.a = (byte)clamp(ly.opacity, 0, 255);
-            p.Fill(c);
-            p.End();
+        Mutex::Lock __(s_shadow_cache_mutex);
+        if(s_shadow_cache_keys.GetCount() >= 128) {
+            s_shadow_cache_keys.Remove(0);
+            s_shadow_cache_images.Remove(0);
         }
-
-        if(blur > 0)
-            FastBlur(ib, blur);
-
-        w.DrawImage(outer.left - pad, outer.top - pad, Image(ib));
+        if(s_shadow_cache_keys.Find(cache_key) < 0) {
+            s_shadow_cache_keys.Add(cache_key);
+            s_shadow_cache_images.Add(img);
+        }
     };
 
     auto PaintShadowStack = [&](const StyledShadow& sh, bool inset_only) {
-        bool has_layers = sh.layer_count > 0;
-        if(has_layers) {
-            for(int i = 0; i < sh.layer_count; i++) {
-                const StyledShadow::Layer& ly = sh.layers[i];
-                if(ly.inset == inset_only)
-                    PaintShadowLayer(ly);
-            }
-            return;
-        }
-
         if(!sh.enabled || sh.alpha <= 0)
             return;
-
-        StyledShadow::Layer one;
-        one.enabled = true;
-        one.size = sh.size;
-        one.distance = sh.distance;
-        one.angle_deg = sh.angle_deg;
-        one.hardness = sh.hardness;
-        one.opacity = sh.alpha;
-        one.color = sh.color;
-        one.inset = sh.inset;
-
-        // Backward compatibility path for legacy direct offsets / blur.
-        if(sh.offset_x != 0 || sh.offset_y != DPI(2) || sh.blur != DPI(6) || sh.spread != 0) {
-            one.distance = (int)std::sqrt((double)sh.offset_x * sh.offset_x + (double)sh.offset_y * sh.offset_y);
-            one.angle_deg = (int)std::round(std::atan2((double)sh.offset_y, (double)sh.offset_x) * 180.0 / 3.14159265358979323846);
-            int legacy_span = max(0, sh.blur + sh.spread);
-            if(legacy_span <= DPI(6)) one.size = SMALL;
-            else if(legacy_span <= DPI(12)) one.size = MEDIUM;
-            else one.size = LARGE;
-            one.hardness = legacy_span > 0 ? clamp((100 * sh.spread) / legacy_span, 0, 100) : 0;
-        }
-
-        if(one.inset == inset_only)
-            PaintShadowLayer(one);
+        if(sh.inset != inset_only)
+            return;
+        PaintShadow(sh);
     };
 
     auto PaintHighlight = [&](const StyledHighlight& hl) {
@@ -819,9 +884,9 @@ inline void UiPaintStyledBackground(Draw& w,
         }
     };
 
+    Rect r = UiStyledSurfaceRect(outer, metrics);
     PaintShadowStack(metrics.shadow, false);
 
-    Rect r = outer;
     bool          skin_drawn = false;
     StyledMetrics mm         = metrics;
 
@@ -846,21 +911,29 @@ inline void UiPaintStyledForeground(Draw& w,
                                     const StyledMetrics& metrics,
                                     const StyledSkin& skin,
                                     StyledState st,
-                                    bool has_focus,
-                                    int focus_margin = DPI(1),
-                                    Color focus_color = Null)
+                                    bool has_focus)
 {
-    if(!has_focus)
+    if(!has_focus || !metrics.focus_enabled)
         return;
 
     Rect face = UiStyledFaceRect(outer, metrics, skin);
     if(face.IsEmpty())
         return;
 
+        Color focus_color = metrics.focus_color;
     if(IsNull(focus_color))
         focus_color = SColorHighlight();
 
-    UiPaintFocusRing(w, face, palette, metrics, st, focus_margin, focus_color);
+    UiPaintFocusShape(w,
+                      face,
+                      metrics,
+                      st,
+                      focus_color,
+                      metrics.focus_margin,
+                      0,
+                      metrics.focus_alpha,
+                      0,
+                      0.0);
 }
 
 // -------------------------------------------------------------------------
@@ -874,8 +947,8 @@ inline void UiPaintStyledForeground(Draw& w,
 //
 // UiPaintStyledSurface behavior:
 //  - If !background_handled: paints default styled background.
-//  - If !foreground_handled && focus_enabled: paints default styled foreground
-//    (focus ring only; still gated by has_focus internally).
+//  - If !foreground_handled: paints default styled foreground
+//    (focus ring only; still gated by metrics.focus_enabled and has_focus).
 //
 // This keeps hook precedence consistent across controls:
 //  user hooks always win, defaults fill only missing layers.
@@ -887,10 +960,7 @@ inline void UiPaintStyledSurface(Draw& w,
                                  StyledState st,
                                  bool has_focus,
                                  bool background_handled,
-                                 bool foreground_handled,
-                                 bool focus_enabled = true,
-                                 int focus_margin = DPI(1),
-                                 Color focus_color = Null)
+                                 bool foreground_handled)
 {
     if(outer.IsEmpty())
         return;
@@ -898,8 +968,8 @@ inline void UiPaintStyledSurface(Draw& w,
     if(!background_handled)
         UiPaintStyledBackground(w, outer, palette, metrics, skin, st, has_focus);
 
-    if(!foreground_handled && focus_enabled)
-        UiPaintStyledForeground(w, outer, palette, metrics, skin, st, has_focus, focus_margin, focus_color);
+    if(!foreground_handled)
+        UiPaintStyledForeground(w, outer, palette, metrics, skin, st, has_focus);
 }
 
 inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
@@ -1380,3 +1450,36 @@ inline Image UiMakeIcon(const void* data)
 } // namespace Upp
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

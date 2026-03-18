@@ -1,5 +1,5 @@
-#ifndef _Ui_UiButton_h_
-#define _Ui_UiButton_h_
+#ifndef _Ui_UiToolButton_h_
+#define _Ui_UiToolButton_h_
 
 #include <type_traits>
 
@@ -11,9 +11,9 @@
 
 namespace Upp {
 
-class UiButton : public Ctrl, public CtrlStyled<UiButton> {
+class UiToolButton : public Ctrl, public CtrlStyled<UiToolButton> {
 public:
-    typedef UiButton CLASSNAME;
+    typedef UiToolButton CLASSNAME;
 
     struct Style : ChStyle<Style> {
         StyledPalette palette;
@@ -108,65 +108,65 @@ protected:
     Image ResolveIconForState(StyledState st) const;
 
 public:
-    UiButton();
+    UiToolButton();
 
-    UiButton& SetText(const String& text);
+    UiToolButton& SetText(const String& text);
     const String& GetText() const { return text_; }
 
-    UiButton& SetIcon(const Image& img);
-    UiButton& SetIconState(const Image& img, StyledState state);
-    UiButton& SetIcons(const Image& normal,
+    UiToolButton& SetIcon(const Image& img);
+    UiToolButton& SetIconState(const Image& img, StyledState state);
+    UiToolButton& SetIcons(const Image& normal,
                        const Image& hot      = Image(),
                        const Image& pressed  = Image(),
                        const Image& disabled = Image());
-    UiButton& ClearIcon();
+    UiToolButton& ClearIcon();
 
-    UiButton& SetIconScale(bool on = true) { icon_scale_ = on; Refresh(); return *this; }
+    UiToolButton& SetIconScale(bool on = true) { icon_scale_ = on; Refresh(); return *this; }
     bool      GetIconScale() const { return icon_scale_; }
 
-    UiButton& SetIconTintMono(bool on = true) { StyleEdit().icon_tint_mono = on; Refresh(); return *this; }
+    UiToolButton& SetIconTintMono(bool on = true) { StyleEdit().icon_tint_mono = on; Refresh(); return *this; }
     bool      GetIconTintMono() const { return GetEffectiveStyle().icon_tint_mono; }
 
-    UiButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
+    UiToolButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
     {
-        CtrlStyled<UiButton>::SetIconColor(base, hot_pct, press_pct);
+        CtrlStyled<UiToolButton>::SetIconColor(base, hot_pct, press_pct);
         return *this;
     }
 
-    UiButton& SetIconLayout(UiAlign layout);
+    UiToolButton& SetIconLayout(UiAlign layout);
 
-    UiButton& SetAlign(UiAlign h, UiAlign v);
-    UiButton& SetAlignH(UiAlign h);
-    UiButton& SetAlignV(UiAlign v);
+    UiToolButton& SetAlign(UiAlign h, UiAlign v);
+    UiToolButton& SetAlignH(UiAlign h);
+    UiToolButton& SetAlignV(UiAlign v);
 
-    UiButton& SetIconMargin(const Rect& m);
-    UiButton& SetIconMargin(int l, int t, int r, int b) { return SetIconMargin(Rect(l, t, r, b)); }
-    UiButton& SetIconMargin(int all) { return SetIconMargin(all, all, all, all); }
+    UiToolButton& SetIconMargin(const Rect& m);
+    UiToolButton& SetIconMargin(int l, int t, int r, int b) { return SetIconMargin(Rect(l, t, r, b)); }
+    UiToolButton& SetIconMargin(int all) { return SetIconMargin(all, all, all, all); }
     Rect GetIconMargin() const { return GetEffectiveStyle().icon_margin; }
 
-    UiButton& SetTextMargin(const Rect& m);
-    UiButton& SetTextMargin(int l, int t, int r, int b) { return SetTextMargin(Rect(l, t, r, b)); }
-    UiButton& SetTextMargin(int all) { return SetTextMargin(all, all, all, all); }
+    UiToolButton& SetTextMargin(const Rect& m);
+    UiToolButton& SetTextMargin(int l, int t, int r, int b) { return SetTextMargin(Rect(l, t, r, b)); }
+    UiToolButton& SetTextMargin(int all) { return SetTextMargin(all, all, all, all); }
     Rect GetTextMargin() const { return GetEffectiveStyle().text_margin; }
 
-    UiButton& ClickFocus(bool on = true);
+    UiToolButton& ClickFocus(bool on = true);
 
-    UiButton& SetCheckable(bool on = true);
+    UiToolButton& SetCheckable(bool on = true);
     bool      IsCheckable() const { return checkable_; }
 
-    UiButton& SetChecked(bool on = true);
+    UiToolButton& SetChecked(bool on = true);
     bool      IsChecked() const { return checked_; }
 
-    UiButton& Toggle() { return SetChecked(!checked_); }
+    UiToolButton& Toggle() { return SetChecked(!checked_); }
 
-    UiButton& SetStyle(const Style& s);
-    UiButton& ClearStyleOverride();
+    UiToolButton& SetStyle(const Style& s);
+    UiToolButton& ClearStyleOverride();
     bool      HasStyleOverride() const { return has_style_override_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetEffectiveStyle() const;
     static const Style& StyleDefault();
 
-    UiButton& SetUnderline(bool on = true, int thickness = DPI(1), int offset = 0);
+    UiToolButton& SetUnderline(bool on = true, int thickness = DPI(1), int offset = 0);
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -178,7 +178,7 @@ public:
     StyledSkin&    StyleSkin()    { return StyleEdit().skin; }
 
     template <class T>
-    UiButton& Animate(const T& from, const T& to, int ms, Event<const T&> setter,
+    UiToolButton& Animate(const T& from, const T& to, int ms, Event<const T&> setter,
                       Easing::Fn curve = Easing::OutCubic(), Event<> on_finish = {});
 
     Event<> WhenPush;
@@ -211,7 +211,7 @@ public:
 };
 
 template <class T>
-UiButton& UiButton::Animate(const T& from, const T& to, int ms, Event<const T&> setter,
+UiToolButton& UiToolButton::Animate(const T& from, const T& to, int ms, Event<const T&> setter,
                             Easing::Fn curve, Event<> on_finish)
 {
     if(!setter)

@@ -218,7 +218,7 @@ private:
         st.header_height = DPI(72);
         st.section_gap = DPI(8);
         st.header_style.hover_enabled = true;
-        st.header_style.show_focus = false;
+        st.header_style.metrics.focus_enabled = false;
         st.header_style.show_rule = true;
         st.header_style.title_font = SansSerifZ(13).Bold();
         st.header_style.subtitle_font = SansSerifZ(10);
@@ -250,10 +250,10 @@ private:
 
         policy_single.SetText("Single open").SetChecked(true);
         policy_enforce.SetText("Enforce one").SetChecked(false);
-        policy_open_all.SetText("Open all").SetSubtleStyle();
-        policy_close_all.SetText("Close all").SetSubtleStyle();
-        policy_single.SetStyle(UiCheckBox::StyleClassic());
-        policy_enforce.SetStyle(UiCheckBox::StyleListCheck());
+        policy_open_all.SetText("Open all").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        policy_close_all.SetText("Close all").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        policy_single.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_CLASSIC));
+        policy_enforce.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_LIST));
 
         row_policy_b.SetDirection(UiDirection::H).SetGap(DPI(8));
         row_policy_b.Add(lock_open_b).Fixed(DPI(120));
@@ -261,9 +261,9 @@ private:
         row_policy_b.Add(lock_none_all).Fixed(DPI(120));
         lock_open_b.SetText("Force B open");
         lock_closed_c.SetText("Force C closed");
-        lock_none_all.SetText("Unlock all").SetSubtleStyle();
-        lock_open_b.SetStyle(UiCheckBox::StyleSwitch());
-        lock_closed_c.SetStyle(UiCheckBox::StyleClassic());
+        lock_none_all.SetText("Unlock all").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        lock_open_b.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_SWITCH));
+        lock_closed_c.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_CLASSIC));
 
         row_policy_c.SetDirection(UiDirection::H).SetGap(DPI(8));
         row_policy_c.Add(anim_enabled).Fixed(DPI(120));
@@ -271,26 +271,26 @@ private:
         row_policy_c.Add(anim_close).Expand(1);
         row_policy_c.Add(anim_value).Fixed(DPI(120));
         anim_enabled.SetText("Anim").SetChecked(true);
-        anim_enabled.SetStyle(UiCheckBox::StyleChip());
+        anim_enabled.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_CHIP));
         anim_open.SetRange(0, 250).SetStep(10).SetValue(120).SetTicks(false);
         anim_close.SetRange(0, 250).SetStep(10).SetValue(0).SetTicks(false);
-        anim_value.SetText("open 120 / close 0").SetStyle(UiLabel::StyleCaption());
+        anim_value.SetText("open 120 / close 0").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         row_policy_d.SetDirection(UiDirection::H).SetGap(DPI(8));
         row_policy_d.Add(rule_mode_lbl).Fixed(DPI(65));
         row_policy_d.Add(rule_mode).Fixed(DPI(120));
         row_policy_d.Add(rule_thickness).Expand(1);
         row_policy_d.Add(rule_value).Fixed(DPI(120));
-        rule_mode_lbl.SetText("Rule line").SetStyle(UiLabel::StyleCaption());
+        rule_mode_lbl.SetText("Rule line").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         rule_mode.Add((int)NONE, "None");
         rule_mode.Add((int)SMALL, "Small");
         rule_mode.Add((int)MEDIUM, "Medium");
         rule_mode.Add((int)LARGE, "Large");
         rule_mode.SetData((int)LARGE);
         rule_thickness.SetRange(1, 5).SetStep(1).SetValue(1).SetTicks(true, 4, 1);
-        rule_value.SetText("Large / 1px").SetStyle(UiLabel::StyleCaption());
+        rule_value.SetText("Large / 1px").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
-        policy_status.SetText("Open=1 | force-open=0 | force-closed=0").SetStyle(UiLabel::StyleCaption());
+        policy_status.SetText("Open=1 | force-open=0 | force-closed=0").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         policy_acc.Content(b).Add(policy_appearance.SizePos());
         policy_appearance.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
@@ -300,26 +300,26 @@ private:
         policy_appearance.Add(appearance_unified).Fixed(DPI(30));
         appearance_dark.SetText("Enable dark accents").SetChecked(true);
         appearance_unified.SetText("Unified header/body frame");
-        appearance_dark.SetStyle(UiCheckBox::StyleSwitch());
-        appearance_unified.SetStyle(UiCheckBox::StyleListCheck());
+        appearance_dark.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_SWITCH));
+        appearance_unified.SetStyle(UiTheme::ResolveCheckBox(UICHECKVIS_LIST));
 
         row_appearance_gradient.SetDirection(UiDirection::H).SetGap(DPI(8));
         row_appearance_gradient.Add(appearance_grad_lbl).Fixed(DPI(82));
         row_appearance_gradient.Add(appearance_grad_from).Fixed(DPI(74));
         row_appearance_gradient.Add(appearance_grad_to).Fixed(DPI(74));
         row_appearance_gradient.Add(appearance_grad_value).Expand(1);
-        appearance_grad_lbl.SetText("Header grad").SetStyle(UiLabel::StyleCaption());
+        appearance_grad_lbl.SetText("Header grad").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         appearance_grad_from.SetData(Color(66, 108, 176));
         appearance_grad_to.SetData(Color(35, 60, 102));
-        appearance_grad_value.SetText("from -> to").SetStyle(UiLabel::StyleCaption());
+        appearance_grad_value.SetText("from -> to").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         row_appearance_gap.SetDirection(UiDirection::H).SetGap(DPI(8));
         row_appearance_gap.Add(appearance_gap_lbl).Fixed(DPI(82));
         row_appearance_gap.Add(appearance_gap_slider).Expand(1);
         row_appearance_gap.Add(appearance_gap_value).Fixed(DPI(58));
-        appearance_gap_lbl.SetText("Section gap").SetStyle(UiLabel::StyleCaption());
+        appearance_gap_lbl.SetText("Section gap").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         appearance_gap_slider.SetRange(0, 20).SetStep(1).SetValue(8).SetTicks(true, 5, 1);
-        appearance_gap_value.SetText("8px").SetStyle(UiLabel::StyleCaption());
+        appearance_gap_value.SetText("8px").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         policy_acc.Content(c).Add(policy_notes.SizePos());
         policy_notes.SetText("Policy accordion demo:\n- lock open/closed\n- single-open\n- enforce-one");
@@ -514,10 +514,10 @@ private:
         int c = compact_acc.AddSection("Compact / Gamma", "header drag reorder", String(), false);
 
         Image drag_icon = ICON_DESIGN_DRAG_INDICATOR_48();
-        UiButton::Style drag_style = UiButton::StyleIcon();
+        UiButton::Style drag_style = UiTheme::ResolveButton(UiButtonRole::Icon);
         drag_style.metrics.frame_enabled = false;
         drag_style.metrics.face_enabled = false;
-        drag_style.focus_margin = 0;
+        drag_style.metrics.focus_margin = 0;
         drag_style.icon_margin = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
         compact_drag_a.SetStyle(drag_style).SetText("").SetIcon(drag_icon).SetIconScale(true).Tip("Drag handle").IgnoreMouse();
         compact_drag_b.SetStyle(drag_style).SetText("").SetIcon(drag_icon).SetIconScale(true).Tip("Drag handle").IgnoreMouse();
@@ -602,7 +602,7 @@ private:
         int b = gradient_acc.AddSection("UTILITY BLOCK", "ICON MATRIX", "STRICT FRAMES", false);
 
 
-        UiPanel::Style brutal_card = UiPanel::StyleFlat();
+        UiPanel::Style brutal_card = UiPanel::StyleDefault();
         brutal_card.metrics.frame_enabled = true;
         brutal_card.metrics.face_enabled = true;
         brutal_card.metrics.frame_width = 3;
@@ -622,11 +622,11 @@ private:
         gradient_tools.Add(gradient_note).Fixed(DPI(22));
         gradient_tools.Add(grad_scale_row).Fixed(DPI(34));
         gradient_tools.Add(grad_icons_panel).Expand(1);
-        grad_icons_panel.SetStyle(UiScrollPanel::StyleFlat());
+        grad_icons_panel.SetStyle(UiScrollPanel::StyleDefault()).SetShowFocus(false);
         grad_icons_panel.SetScrollMode(UIPANELSCROLL_NONE);
         grad_icons_panel.Content().Add(icon_grid);
 
-        gradient_note.SetText("Brutalist style via base metrics/palette (no custom paint)").SetStyle(UiLabel::StyleCaption());
+        gradient_note.SetText("Brutalist style via base metrics/palette (no custom paint)").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         grad_scale_row.SetDirection(UiDirection::H).SetGap(DPI(8));
         grad_scale_row.Add(grad_scale_toggle).Fixed(DPI(120));
@@ -634,7 +634,7 @@ private:
         grad_scale_row.Add(grad_scale_value).Fixed(DPI(64));
         grad_scale_toggle.SetText("Scale chevron").SetChecked(true);
         grad_scale_slider.SetRange(8, 32).SetStep(1).SetValue(14).SetTicks(true, 8, 1);
-        grad_scale_value.SetText("14px").SetAlign(UiAlign::RIGHT, UiAlign::CENTER).SetStyle(UiLabel::StyleCaption());
+        grad_scale_value.SetText("14px").SetAlign(UiAlign::RIGHT, UiAlign::CENTER).SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
         icon_grid.SetMode(UiGridLayout::Flow)
                  .SetDirection(UiDirection::H)
@@ -646,7 +646,7 @@ private:
         Vector<String> icon_names;
         BuildUiIconsGallery(icons, icon_names);
         int icon_count = min(icons.GetCount(), icon_names.GetCount());
-        UiButton::Style icon_style = UiButton::StyleIcon();
+        UiButton::Style icon_style = UiTheme::ResolveButton(UiButtonRole::Icon);
         icon_style.metrics.frame_enabled = false;
         icon_style.metrics.face_enabled = false;
         icon_style.metrics.radius = 0;
@@ -710,14 +710,14 @@ private:
         brutal_cfg_row_a.SetDirection(UiDirection::H).SetGap(DPI(10));
         brutal_cfg_row_a.Add(brutal_cfg_label_a).Expand(1);
         brutal_cfg_row_a.Add(brutal_cfg_toggle).Fixed(DPI(44));
-        brutal_cfg_label_a.SetText("HARDWARE BOOST").SetStyle(UiLabel::StyleCaption());
-        brutal_cfg_toggle.SetStyle(UiCheckBox::StyleSwitch()).SetText("").SetChecked(false);
+        brutal_cfg_label_a.SetText("HARDWARE BOOST").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        brutal_cfg_toggle.SetStyle(UiTheme::ResolveToggle()).SetText("").SetOn(false);
 
         brutal_cfg_row_b.SetDirection(UiDirection::H).SetGap(DPI(10));
         brutal_cfg_row_b.Add(brutal_cfg_label_b).Expand(1);
         brutal_cfg_row_b.Add(brutal_cfg_icon).Fixed(DPI(28));
-        brutal_cfg_label_b.SetText("SOLID PROTOCOL").SetStyle(UiLabel::StyleCaption());
-        UiButton::Style tiny_icon = UiButton::StyleIcon();
+        brutal_cfg_label_b.SetText("SOLID PROTOCOL").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        UiButton::Style tiny_icon = UiTheme::ResolveButton(UiButtonRole::Icon);
         tiny_icon.metrics.frame_enabled = true;
         tiny_icon.metrics.frame_width = 2;
         tiny_icon.metrics.radius = DPI(6);
@@ -738,7 +738,7 @@ private:
             .SetWrap(true)
             .SetGap(DPI(8))
             .SetInset(DPI(8));
-        UiButton::Style matrix_icon = UiButton::StyleIcon();
+        UiButton::Style matrix_icon = UiTheme::ResolveButton(UiButtonRole::Icon);
         matrix_icon.metrics.frame_enabled = false;
         matrix_icon.metrics.face_enabled = false;
         matrix_icon.metrics.radius = 0;
@@ -855,8 +855,8 @@ private:
         neo_layout.Add(neo_btn_a).Fixed(DPI(120));
         neo_layout.Add(neo_btn_b).Fixed(DPI(120));
         neo_layout.Add(neo_toggle).Fixed(DPI(110));
-        neo_btn_a.SetText("Run").SetSubtleStyle();
-        neo_btn_b.SetText("Apply").SetSubtleStyle();
+        neo_btn_a.SetText("Run").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        neo_btn_b.SetText("Apply").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         neo_toggle.SetText("Auto").SetOn(true);
 
         neo_acc.Content(b).Add(neo_text.SizePos());
@@ -950,3 +950,5 @@ GUI_APP_MAIN
 {
     UiAccordionDemoWindow().Run();
 }
+
+

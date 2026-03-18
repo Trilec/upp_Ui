@@ -197,7 +197,7 @@ public:
 
         w.DrawText(DPI(28), DPI(10), "UiLabel Demo", title, SColorText());
 
-        String line1 = "Showcase for UiLabel: styles, icon layouts, icon-only, margins/inset, gradients, 9-slice, animation.";
+        String line1 = "Showcase for UiLabel: theme roles, icon layouts, icon-only, margins/inset, gradients, 9-slice, animation.";
         w.DrawText(DPI(28), DPI(44), line1, desc, SColorText());
 
         PaintGridChrome(w, r);
@@ -259,7 +259,7 @@ private:
         int y0 = grid_top + title_h + DPI(10);
 
         static const char* row_names[6] = {
-            "Preset styles + state",
+            "Theme roles + state",
             "Icon layouts (L/R/T/B)",
             "Icon-only sizes",
             "Margins / inset / dash",
@@ -291,39 +291,39 @@ private:
             }
 
         // -----------------------------------------------------------------
-        // Row 0: Preset styles + disabled
+        // Row 0: Theme roles + disabled
         // -----------------------------------------------------------------
-        cell[0][0].SetStyle(UiLabel::StyleDefault()).SetText("Default");
-        cell[0][1].SetStyle(UiLabel::StyleCaption()).SetText("Caption");
-        cell[0][2].SetStyle(UiLabel::StyleSubheadline()).SetText("Subheadline");
-        cell[0][3].SetStyle(UiLabel::StyleFootnote()).SetText("Footnote");
+        cell[0][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body)).SetText("Default");
+        cell[0][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption)).SetText("Caption");
+        cell[0][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Subheadline)).SetText("Subheadline");
+        cell[0][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Footnote)).SetText("Footnote");
 
-        cell[0][4].SetStyle(UiLabel::StyleBadge())
+        cell[0][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
                   .SetText("Badge")
                   .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 
-        cell[0][5].SetStyle(UiLabel::StyleDefault())
+        cell[0][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Disabled")
                   .Disable();
 
         // -----------------------------------------------------------------
         // Row 1: Icon layouts (text opposite side)
         // -----------------------------------------------------------------
-        cell[1][0].SetStyle(UiLabel::StyleDefault())
+        cell[1][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Left icon")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetIconScale(true);
 
-        cell[1][1].SetStyle(UiLabel::StyleDefault())
+        cell[1][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Right icon")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::RIGHT)
                   .SetAlign(UiAlign::RIGHT, UiAlign::CENTER)
                   .SetIconScale(true);
 
-        cell[1][2].SetStyle(UiLabel::StyleDefault())
+        cell[1][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Top icon")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::TOP)
@@ -331,7 +331,7 @@ private:
                   .SetIconScale(true)
                   .SetSizeMin(Size(DPI(150), DPI(48)));
 
-        cell[1][3].SetStyle(UiLabel::StyleDefault())
+        cell[1][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Bottom")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::BOTTOM)
@@ -339,7 +339,7 @@ private:
                   .SetIconScale(true)
                   .SetSizeMin(Size(DPI(150), DPI(48)));
 
-        cell[1][4].SetStyle(UiLabel::StyleBadge())
+        cell[1][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
                   .SetText("Left\nmultiline")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
@@ -347,7 +347,7 @@ private:
                   .SetIconScale(true)
                   .SetSizeMin(Size(DPI(150), DPI(56)));
 
-        cell[1][5].SetStyle(UiLabel::StyleBadge())
+        cell[1][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
                   .SetText("Top\nmultiline")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::TOP)
@@ -360,7 +360,7 @@ private:
         // -----------------------------------------------------------------
         auto IconOnly = [&](int col, const Image& img, const String& label, int hmin = 0) {
             UiLabel& x = cell[2][col];
-            x.SetStyle(UiLabel::StyleDefault())
+            x.SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
              .SetText(label)
              .SetIcon(img)
              .SetIconLayout(UiAlign::TOP)
@@ -380,28 +380,28 @@ private:
         // -----------------------------------------------------------------
         // Row 3: Margins / inset / dash / gradients
         // -----------------------------------------------------------------
-        cell[3][0].SetStyle(UiLabel::StyleDefault())
+        cell[3][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Inset +10")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
 
-        cell[3][1].SetStyle(UiLabel::StyleDefault())
+        cell[3][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Icon margin")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetIconMargin(Rect(DPI(8), DPI(2), DPI(2), DPI(2)));
 
-        cell[3][2].SetStyle(UiLabel::StyleDefault())
+        cell[3][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Text margin")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetTextMargin(Rect(DPI(10), 0, 0, 0));
 
-        cell[3][3].SetStyle(UiLabel::StyleDefault())
+        cell[3][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Overlap")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
@@ -409,14 +409,14 @@ private:
                   .SetIconMargin(Rect(DPI(-4), 0, 0, 0))
                   .SetTextMargin(Rect(DPI(-2), 0, 0, 0));
 
-        cell[3][4].SetStyle(UiLabel::StyleDefault())
+        cell[3][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Dashed")
 				  .EnableFace(false)
 				  .SetFrameWidth(DPI(2))
 				  .EnableDash(true);
 
 
-        cell[3][5].SetStyle(UiLabel::StyleDefault())
+        cell[3][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Pill grad")
                   .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
                   .SetFaceQuadGradient(Color(243, 247, 255),
@@ -434,17 +434,17 @@ private:
 
         Rect slice = Rect(10,10,10,10);
 
-        cell[4][0].SetStyle(UiLabel::StyleDefault())
+        cell[4][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Raised skin")
                   .SetFill9Slice(skinRaised, slice, false)
                   .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
 
-        cell[4][1].SetStyle(UiLabel::StyleDefault())
+        cell[4][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Inset skin")
                   .SetFill9Slice(skinInset, slice, false)
                   .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
 
-        cell[4][2].SetStyle(UiLabel::StyleDefault())
+        cell[4][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Skin + frame")
                   .SetFill9Slice(skinRaised, slice, true)
                   .EnableFrame(true)
@@ -453,12 +453,12 @@ private:
                   .SetRadius( DPI(4) );
                   
 
-        cell[4][3].SetStyle(UiLabel::StyleDefault())
+        cell[4][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Skin no frame")
                   .SetFill9Slice(skinRaised, slice, false)
                   .EnableFrame(false);
 
-        cell[4][4].SetStyle(UiLabel::StyleDefault())
+        cell[4][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Skin + icon")
                   .SetIcon(icon24)
                   .SetIconLayout(UiAlign::LEFT)
@@ -466,7 +466,7 @@ private:
                   .SetFill9Slice(skinInset, slice, false)
                   .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
 
-        cell[4][5].SetStyle(UiLabel::StyleBadge())
+        cell[4][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
                   .SetText("Badge skin")
                   .SetFill9Slice(skinRaised, slice, false)
                   .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
@@ -474,7 +474,7 @@ private:
         // -----------------------------------------------------------------
         // Row 5: Animation + misc
         // -----------------------------------------------------------------
-        cell[5][0].SetStyle(UiLabel::StyleSoft())
+        cell[5][0].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
                   .EnableRich(true)
@@ -489,12 +489,12 @@ private:
              << (char)27 << "[33mWARN" << (char)27 << "[0m  "
              << (char)27 << "[31mERROR" << (char)27 << "[0m";
 
-        cell[5][1].SetStyle(UiLabel::StyleSoft())
+        cell[5][1].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
                   .SetAnsiText(ansi);
 
-        cell[5][2].SetStyle(UiLabel::StyleSoft())
+        cell[5][2].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                   .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
                   .EnableRich(true)
@@ -507,7 +507,7 @@ private:
         progress_pct_span_ = 2;
 
         // SetMonoIcon takes Image (not bool) — demo uses the same icon as mono source
-        cell[5][3].SetStyle(UiLabel::StyleDefault())
+        cell[5][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("Mono icon")
                   .SetIcon(icon24)
                   .SetMonoIcon(icon24)
@@ -515,7 +515,7 @@ private:
                   .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 
         // Small overlay tint demo using foreground hook
-        cell[5][4].SetStyle(UiLabel::StyleDefault())
+        cell[5][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("FG tint")
                   .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 
@@ -530,7 +530,7 @@ private:
             UiPaintStyledForeground(w, outer, p, m, s, st, has_focus);
         };
 
-        cell[5][5].SetStyle(UiLabel::StyleDefault())
+        cell[5][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
                   .SetText("PULSE")
                   .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
                   .SetRadius(DPI(10));
@@ -620,3 +620,4 @@ GUI_APP_MAIN
 {
     UiLabelDemoWindow().Run();
 }
+

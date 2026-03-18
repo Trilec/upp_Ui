@@ -91,7 +91,7 @@ struct Panel : ParentCtrl {
         Add(sb_h);
 
         title.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        title.SetStyle(UiLabel::StyleCaption());
+        title.SetInkColor(SColorDisabled());
 
         sb_v.WhenScroll = [=] { SyncCanvas(); };
         sb_h.WhenScroll = [=] { SyncCanvas(); };
@@ -184,15 +184,15 @@ struct GalleryStrip : ParentCtrl {
     {
         Add(title_sliders);
         Add(title_scrollbars);
-        title_sliders.SetText("Sliders (fixed thumb)").SetStyle(UiLabel::StyleCaption());
-        title_scrollbars.SetText("Scrollbars (proportional thumb)").SetStyle(UiLabel::StyleCaption());
+        title_sliders.SetText("Sliders (fixed thumb)").SetInkColor(SColorDisabled());
+        title_scrollbars.SetText("Scrollbars (proportional thumb)").SetInkColor(SColorDisabled());
 
         for(int i = 0; i < NSL; i++) {
             sl[i].SetDirection(UiDirection::V);
             Add(sl[i]);
             Add(sl_cap[i]);
             sl_cap[i].SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-            sl_cap[i].SetStyle(UiLabel::StyleFootnote());
+            sl_cap[i].SetInkColor(SColorDisabled());
         }
 
         for(int i = 0; i < NSB; i++) {
@@ -200,7 +200,7 @@ struct GalleryStrip : ParentCtrl {
             Add(sb[i]);
             Add(sb_cap[i]);
             sb_cap[i].SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-            sb_cap[i].SetStyle(UiLabel::StyleFootnote());
+            sb_cap[i].SetInkColor(SColorDisabled());
         }
 
         Setup();
@@ -734,3 +734,4 @@ GUI_APP_MAIN
 {
     UiScrollBarDemoWindow().Run();
 }
+

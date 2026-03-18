@@ -87,7 +87,7 @@ public:
         Add(skin_panel);
 
         // Gradient panel: light card with quad gradient.
-        grad_panel.SetStyle(UiPanel::StyleDefault())
+        grad_panel.SetStyle(UiTheme::ResolvePanel(UiPanelRole::Surface))
                   .SetSizeMin(DPI(120), DPI(80));
         grad_panel.SetFaceQuadGradient(
             Color(243, 247, 255),  // TL
@@ -98,16 +98,31 @@ public:
         grad_panel.SetRadius(DPI(12));
 
         // Dark panel: uses StyleDark().
-        dark_panel.SetStyle(UiPanel::StyleDark())
+        dark_panel.SetStyle(UiTheme::ResolvePanel(UiThemePreset::Minimal, UiThemeMode::Dark, UiPanelRole::Surface))
                   .SetSizeMin(DPI(120), DPI(80));
 
-        // Flat square panel: sharp corners, subtle frame.
-        flat_panel.SetStyle(UiPanel::StyleFlat())
+        // Flat square panel: explicit light surface with a clear lower-right shadow.
+        UiPanel::Style flat_style = UiTheme::ResolvePanel(UiThemePreset::Linear, UiThemeMode::Light, UiPanelRole::Surface);
+        flat_style.metrics.face_enabled = true;
+        flat_style.metrics.frame_enabled = true;
+        flat_style.metrics.radius = 0;
+        for(int i = 0; i < 4; i++) {
+            flat_style.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
+            flat_style.palette.frame[i] = Color(214, 223, 235);
+        }
+        flat_style.metrics.shadow.enabled = true;
+        flat_style.metrics.shadow.inset = false;
+        flat_style.metrics.shadow.distance = DPI(6);
+        flat_style.metrics.shadow.angle = 45;
+        flat_style.metrics.shadow.alpha = 120;
+        flat_style.metrics.shadow.blur = DPI(18);
+        flat_style.metrics.shadow.color = Color(48, 62, 84);
+        flat_panel.SetStyle(flat_style)
                   .SetSizeMin(DPI(120), DPI(80));
 
         // Nine-slice panel with soft-UI card skin.
         Image skin_img = MakeNineSliceSkin();
-        skin_panel.SetStyle(UiPanel::StyleFlat())
+        skin_panel.SetStyle(UiTheme::ResolvePanel(UiThemePreset::Linear, UiThemeMode::Light, UiPanelRole::Surface))
                   .SetSizeMin(DPI(120), DPI(80));
         skin_panel.SetFill9Slice(skin_img, SOFT_SKIN_MARGIN, true);
         skin_panel.EnableFace(false).EnableFrame(false); // skin owns the look
@@ -179,3 +194,10 @@ GUI_APP_MAIN
 {
     UiPanelDemo().Run();
 }
+
+
+
+
+
+
+

@@ -33,7 +33,7 @@ public:
         float_edit.SetValue(1.5);
         float_edit.SetSizeMin(DPI(220), DPI(32));
 
-        sync_btn.SetText("Copy float -> int").SetAccentStyle();
+        sync_btn.SetText("Copy float -> int").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
         sync_btn.WhenAction = [=] {
             int_edit.SetValue((int)float_edit.GetValue());
         };
@@ -74,3 +74,4 @@ GUI_APP_MAIN
 {
     UiIntFloatDemoWindow().Run();
 }
+

@@ -1,5 +1,6 @@
 #include "UiIntEdit.h"
 #include <Ui/UiDraw.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -8,7 +9,7 @@ UiIntEdit::UiIntEdit()
 {
     auto SetupSpin = [&](UiButton& b, bool up) {
         b.SetText("");
-        b.SetSubtleStyle(); // Flat look
+        b.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         b.SetMinSize(Size(DPI(16), DPI(14)));
         
         // Capture pointer to the button to avoid dangling reference to local 'b'
@@ -168,3 +169,4 @@ void UiIntEdit::MouseWheel(Point p, int zdelta, dword keyflags)
 }
 
 } // namespace Upp
+

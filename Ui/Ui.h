@@ -22,6 +22,7 @@
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiDropdown.h>
 #include <Ui/UiButton.h>
+#include <Ui/UiToolButton.h>
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiIntEdit.h>
@@ -32,8 +33,8 @@
 #include <Ui/UiSlider.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
-#include <Ui/UiDoc/UiDoc.h>
-
-
+#include <Ui/UiDoc.h>
+#include <Ui/UiTree.h>
+#include <Ui/UiList.h>
 
 #endif

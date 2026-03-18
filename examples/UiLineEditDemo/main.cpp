@@ -2,6 +2,7 @@
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiButton.h>
+#include <Ui/UiTheme.h>
 
 using namespace Upp;
 
@@ -63,7 +64,7 @@ public:
         lbl_right.SetText("Right-aligned:");
         edit_right.SetTextAlign(UiAlign::RIGHT);
         edit_right.SetData("12345.67");
-        edit_right.SetTip("Right-aligned – useful for numeric input.");
+        edit_right.SetTip("Right-aligned ??? useful for numeric input.");
 
         // 4. Placeholder
         lbl_placeholder.SetText("Placeholder:");
@@ -117,22 +118,22 @@ public:
         // NOTE: We intentionally do NOT remove frames; instead we rely on UiButton
         //       styles (Accent/Subtle/Icon) to control look.
 
-        // Left user "avatar" icon – uses a generic save icon here just to be safe.
-        btn_side_user.SetIconStyle();     // icon-only style preset
+        // Left user "avatar" icon ??? uses a generic save icon here just to be safe.
+        btn_side_user.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         btn_side_user.SetIcon(CtrlImg::save());
 
        // btn_side_user.SetMinSize(Size(DPI(20), DPI(20)));
         btn_side_user.ClickFocus(false);
 
         // Right search icon
-        btn_side_search.SetIconStyle();
+        btn_side_search.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         btn_side_search.SetIcon(CtrlImg::color_edit());
 
        // btn_side_search.SetMinSize(Size(DPI(20), DPI(20)));
         btn_side_search.ClickFocus(false);
 
         // Right clear icon (X)
-        btn_side_clear.SetIconStyle();
+        btn_side_clear.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         btn_side_clear.SetIcon(CtrlImg::remove());
        // btn_side_clear.SetMinSize(Size(DPI(20), DPI(20)));
         btn_side_clear.ClickFocus(false);
@@ -158,7 +159,7 @@ public:
         btn_side_search.WhenAction << [=] {
             String s = edit_side.GetData().ToString();
             if(IsNull(s) || s.IsEmpty()) {
-                PromptOK("Nothing to search – edit is empty.");
+                PromptOK("Nothing to search ??? edit is empty.");
             } else {
                 PromptOK(Format("Pretend we are searching for: \"%s\"", s));
             }
@@ -333,3 +334,5 @@ GUI_APP_MAIN
     Ctrl::GlobalBackPaint();
     UiLineEditDemo().Run();
 }
+
+

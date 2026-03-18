@@ -1,4 +1,5 @@
 #include <Ui/UiPanel.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -6,88 +7,112 @@ const UiPanel::Style& UiPanel::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        Color face  = Blend(SColorFace(), White(), 20);
-        Color frame = Blend(SColorShadow(), Black(), 30);
-        Color ink   = SColorText();
+        const Color face = Color(255, 255, 255);
+        const Color frame = Color(236, 239, 243);
+        const Color ink = Color(17, 24, 39);
 
         for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = UiFill::Solid(face);
+            s.palette.face[i] = UiFill::Solid(face);
             s.palette.frame[i] = frame;
-            s.palette.ink[i]   = ink;
+            s.palette.ink[i] = ink;
+            s.palette.icon[i] = Null;
         }
 
-        s.palette.face[ST_HOT]      = UiFill::Solid(LtColor(face, 5));
-        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 5));
-        s.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorDisabled(), 50));
+        s.palette.face[ST_HOT] = UiFill::Solid(Color(248, 250, 252));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(Color(241, 245, 249));
+        s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+        s.palette.frame[ST_DISABLED] = Color(241, 245, 249);
+        s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.metrics.radius        = DPI(8);
-        s.metrics.frame_width   = DPI(1);
-        s.metrics.frame_enabled = true;
-        s.metrics.face_enabled  = true;
-        s.metrics.dashed        = false;
-
-        s.skin.enabled        = false;
-        s.skin.content_inset  = Rect(0, 0, 0, 0); // correct field
-
-        s.transparent = false;
-        s.show_focus  = false;
-    }
-    return s;
-}
-
-const UiPanel::Style& UiPanel::StyleDark()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-
-        Color face  = Color(40, 40, 50);
-        Color frame = Color(70, 70, 90);
-        Color ink   = Color(220, 220, 230);
-
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i]   = ink;
-        }
-
-        s.palette.face[ST_HOT]      = UiFill::Solid(LtColor(face, 5));
-        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 5));
-        s.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorDisabled(), 50));
-
-        s.metrics.radius = DPI(8);
-    }
-    return s;
-}
-
-const UiPanel::Style& UiPanel::StyleFlat()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        s.metrics.radius      = 0;
+        s.metrics.text_font = StdFont();
+        s.metrics.use_text_font = false;
+        s.metrics.content_padding = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
+        s.metrics.radius = 0;
         s.metrics.frame_width = DPI(1);
-        s.metrics.dashed      = false;
+        s.metrics.frame_enabled = true;
+        s.metrics.face_enabled = true;
+        s.metrics.dashed = false;
+        s.metrics.high_contrast = false;
+        s.metrics.shadow = StyledShadow();
+        s.metrics.highlight = StyledHighlight();
+
+        s.skin = StyledSkin();
+        s.transparent = false;
+        s.metrics.focus_enabled = false;
     }
     return s;
 }
 
 UiPanel::UiPanel()
     : style_(StyleDefault())
+    , themed_style_(StyleDefault())
 {
     BackPaint();
+    SyncThemeStyle();
+}
+
+void UiPanel::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+}
+
+UiPanel::Style& UiPanel::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiPanel::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    themed_style_ = UiTheme::ResolvePanel();
+    theme_revision_ = revision;
 }
 
 UiPanel& UiPanel::SetStyle(const Style& s)
 {
     style_ = Style(s);
+    has_style_override_ = true;
     OnStyleChanged();
     return *this;
 }
 
+UiPanel& UiPanel::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
+    OnStyleChanged();
+    return *this;
+}
+
+const UiPanel::Style& UiPanel::GetEffectiveStyle() const
+{
+    if(has_style_override_)
+        return style_;
+
+    const_cast<UiPanel*>(this)->SyncThemeStyle();
+    return themed_style_;
+}
+
 void UiPanel::OnStyleChanged()
 {
-    if(style_.transparent)
+    const Style& style = GetEffectiveStyle();
+
+    if(style.transparent)
         Transparent();
     else
         BackPaint();
@@ -98,8 +123,9 @@ void UiPanel::OnStyleChanged()
 
 Size UiPanel::GetMinSize() const
 {
+    const Style& style = GetEffectiveStyle();
     Size base_content(DPI(40), DPI(40));
-    Size natural_outer = UiStyledOuterSizeFromContent(base_content, style_.metrics, style_.skin);
+    Size natural_outer = UiStyledOuterSizeFromContent(base_content, style.metrics, style.skin);
 
     int w = natural_outer.cx;
     int h = natural_outer.cy;
@@ -122,17 +148,18 @@ UiPanel& UiPanel::SetSizeMin(Size sz)
 
 void UiPanel::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
     if(outer.IsEmpty())
         return;
 
-    bool        enabled   = IsEnabled();
-    bool        has_focus = HasFocus();
-    StyledState st        = enabled ? ST_NORMAL : ST_DISABLED;
+    bool enabled = IsEnabled();
+    bool has_focus = HasFocus();
+    StyledState st = enabled ? ST_NORMAL : ST_DISABLED;
 
-    StyledPalette& pal  = style_.palette;
-    StyledMetrics& met  = style_.metrics;
-    StyledSkin&    skin = style_.skin;
+    const StyledPalette& pal = style.palette;
+    const StyledMetrics& met = style.metrics;
+    const StyledSkin& skin = style.skin;
 
     bool bg_handled = false;
     bool fg_handled = false;
@@ -147,59 +174,8 @@ void UiPanel::Paint(Draw& w)
         fg_handled = true;
     }
 
-    // See UiDraw.h: UiPaintStyledSurface contract (hook order + fallback).
-    UiPaintStyledSurface(w, outer, pal, met, skin, st, has_focus,
-                         bg_handled, fg_handled, style_.show_focus);
-}
-
-const UiPanel::Style& UiPanel::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiPanel::Style& UiPanel::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        s.metrics.face_enabled = false;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(5);
-        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
-        for(int i = 0; i < 4; i++)
-            s.palette.frame[i] = frame;
-    }
-    return s;
-}
-
-const UiPanel::Style& UiPanel::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        Color face = Blend(SColorFace(), SColorPaper(), 205);
-        for(int i = 0; i < 4; i++)
-            s.palette.face[i] = UiFill::Solid(face);
-        s.metrics.radius = DPI(10);
-    }
-    return s;
-}
-
-const UiPanel::Style& UiPanel::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
-        Color frame = DkColor(SColorHighlight(), 28);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = SColorText();
-        }
-        s.metrics.radius = DPI(8);
-    }
-    return s;
+    UiPaintStyledSurface(w, outer, pal, met, skin, st, has_focus, bg_handled, fg_handled);
 }
 
 } // namespace Upp
+

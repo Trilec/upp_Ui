@@ -89,8 +89,8 @@ public:
         pass.SetPlaceholder("UiPasswordEdit");
         pass.EnableVisibilityIcon(true);
 
-        btn_primary.SetText("Primary").SetAccentStyle();
-        btn_subtle.SetText("Subtle").SetSubtleStyle();
+        btn_primary.SetText("Primary").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
+        btn_subtle.SetText("Subtle").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
         check.SetText("UiCheckBox").SetChecked(true);
         radio_a.SetText("Radio A").SetGroup(1).SetChecked(true);
@@ -144,31 +144,31 @@ public:
                  .SetGap(DPI(6))
                  .SetInset(DPI(6))
                  .SetScrollMode(UiGridLayout::None);
-        grid_a.SetText("Grid A").SetSubtleStyle();
-        grid_b.SetText("Grid B").SetSubtleStyle();
-        grid_c.SetText("Grid C").SetAccentStyle();
+        grid_a.SetText("Grid A").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        grid_b.SetText("Grid B").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        grid_c.SetText("Grid C").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
         grid_probe.Add(grid_a, -1, true);
         grid_probe.Add(grid_b, -1, true);
         grid_probe.Add(grid_c, -1, true);
 
         scroll_probe.SetScrollMode(UIPANELSCROLL_AUTO).SetStyle(UiScrollPanel::StyleDefault());
-        sp_a.SetText("UiScrollPanel row 01").SetSubtleStyle();
-        sp_b.SetText("UiScrollPanel row 02").SetSubtleStyle();
-        sp_c.SetText("UiScrollPanel row 03").SetSubtleStyle();
+        sp_a.SetText("UiScrollPanel row 01").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        sp_b.SetText("UiScrollPanel row 02").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        sp_c.SetText("UiScrollPanel row 03").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
         box_probe.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(DPI(8));
-        box_a.SetText("UiBoxLayout A").SetSubtleStyle();
-        box_b.SetText("UiBoxLayout B").SetSubtleStyle();
-        box_c.SetText("UiBoxLayout C").SetAccentStyle();
+        box_a.SetText("UiBoxLayout A").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        box_b.SetText("UiBoxLayout B").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        box_c.SetText("UiBoxLayout C").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
         box_probe.Add(box_a).Expand(1).MinHeight(DPI(30));
         box_probe.Add(box_b).Expand(1).MinHeight(DPI(30));
         box_probe.Add(box_c).Expand(1).MinHeight(DPI(30));
 
-        style_title.SetText("Unified Style Set: Standard / Minimal / Soft / Strong")
+        style_title.SetText("Unified Style Set: Standard / Subtle / Accent / Strong")
                    .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         h_standard.SetText("Standard").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-        h_minimal.SetText("Minimal").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-        h_soft.SetText("Soft").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        h_minimal.SetText("Subtle").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        h_soft.SetText("Accent").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         h_strong.SetText("Strong").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         r_button.SetText("UiButton").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         r_edit.SetText("UiLineEdit").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
@@ -177,35 +177,35 @@ public:
         r_slider.SetText("UiSlider").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         r_panel.SetText("UiPanel").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 
-        b_std.SetText("Button").SetStyle(UiButton::StyleStandard());
-        b_min.SetText("Button").SetStyle(UiButton::StyleMinimal());
-        b_soft.SetText("Button").SetStyle(UiButton::StyleSoft());
-        b_strong.SetText("Button").SetStyle(UiButton::StyleStrong());
+        b_std.SetText("Button").SetStyle(UiTheme::ResolveButton(UiButtonRole::Standard));
+        b_min.SetText("Button").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        b_soft.SetText("Button").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
+        b_strong.SetText("Button").SetStyle(UiTheme::ResolveButton(UiButtonRole::Danger));
 
-        e_std.SetPlaceholder("Standard").SetStyle(UiBaseEdit::StyleStandard());
-        e_min.SetPlaceholder("Minimal").SetStyle(UiBaseEdit::StyleMinimal());
-        e_soft.SetPlaceholder("Soft").SetStyle(UiBaseEdit::StyleSoft());
-        e_strong.SetPlaceholder("Strong").SetStyle(UiBaseEdit::StyleStrong());
+        e_std.SetPlaceholder("Field").SetStyle(UiTheme::ResolveEdit(UiEditRole::Field));
+        e_min.SetPlaceholder("Subtle").SetStyle(UiTheme::ResolveEdit(UiEditRole::Subtle));
+        e_soft.SetPlaceholder("Default").SetStyle(UiBaseEdit::StyleDefault());
+        e_strong.SetPlaceholder("Strong").SetStyle(UiTheme::ResolveEdit(UiEditRole::Strong));
 
-        c_std.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleStandard());
-        c_min.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleMinimal());
-        c_soft.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleSoft());
-        c_strong.SetText("Checked").SetChecked(true).SetStyle(UiCheckBox::StyleStrong());
+        c_std.SetText("Checked").SetChecked(true);
+        c_min.SetText("Switch").SetVisual(UICHECKVIS_SWITCH).SetChecked(true);
+        c_soft.SetText("Chip").SetVisual(UICHECKVIS_CHIP).SetChecked(true);
+        c_strong.SetText("List").SetVisual(UICHECKVIS_LIST).SetChecked(true);
 
-        rb_std.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleStandard());
-        rb_min.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleMinimal());
-        rb_soft.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleSoft());
-        rb_strong.SetText("Selected").SetChecked(true).SetStyle(UiRadioButton::StyleStrong());
+        rb_std.SetText("Selected").SetChecked(true);
+        rb_min.SetText("Pill").SetVisual(UIRADIOVIS_PILLS).SetChecked(true);
+        rb_soft.SetText("List").SetVisual(UIRADIOVIS_LIST).SetChecked(true);
+        rb_strong.SetText("Rounded").SetChecked(true).SetIndicatorRoundness(40);
 
-        s_std.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleStandard());
-        s_min.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleMinimal());
-        s_soft.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleSoft());
-        s_strong.SetRange(0, 100).SetValue(64).SetStyle(UiSlider::StyleStrong());
+        s_std.SetRange(0, 100).SetValue(64);
+        s_min.SetRange(0, 100).SetValue(64).SetTicks(true, 6, 2);
+        s_soft.SetRange(0, 100).SetValue(64).SetTicks(true, 11, 4).SetTickSide(UiAlign::TOP);
+        s_strong.SetDirection(UiDirection::V).SetRange(0, 100).SetValue(64);
 
-        p_std.SetStyle(UiPanel::StyleStandard());
-        p_min.SetStyle(UiPanel::StyleMinimal());
-        p_soft.SetStyle(UiPanel::StyleSoft());
-        p_strong.SetStyle(UiPanel::StyleStrong());
+        p_std.SetStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+        p_min.SetStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+        p_soft.SetStyle(UiTheme::ResolvePanel(UiThemePreset::Layered, UiThemeMode::Light, UiPanelRole::Surface));
+        p_strong.SetStyle(UiTheme::ResolvePanel(UiPanelRole::Strong));
         pl_std.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         pl_min.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         pl_soft.SetText("Panel").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
@@ -400,3 +400,9 @@ GUI_APP_MAIN
 {
     UiAllControlsDemoWindow().Run();
 }
+
+
+
+
+
+

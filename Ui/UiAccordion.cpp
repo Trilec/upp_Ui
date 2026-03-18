@@ -1,4 +1,5 @@
 #include <Ui/UiAccordion.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -68,29 +69,30 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        Color face  = Blend(SColorFace(), White(), 12);
-        Color frame = Blend(SColorShadow(), Black(), 18);
-        Color ink   = SColorText();
+        Color face = Color(248, 250, 252);
+        Color frame = Color(226, 232, 240);
+        Color ink = Color(15, 23, 42);
 
         for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = UiFill::Solid(face);
+            s.palette.face[i] = UiFill::Solid(face);
             s.palette.frame[i] = frame;
-            s.palette.ink[i]   = ink;
+            s.palette.ink[i] = ink;
         }
-        s.palette.face[ST_HOT]      = UiFill::Solid(LtColor(face, 4));
-        s.palette.face[ST_PRESSED]  = UiFill::Solid(DkColor(face, 3));
-        s.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorDisabled(), 50));
+        s.palette.face[ST_HOT] = UiFill::Solid(Color(241, 245, 249));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(Color(226, 232, 240));
+        s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+        s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.metrics.radius        = DPI(8);
-        s.metrics.frame_width   = DPI(1);
+        s.metrics.radius = DPI(12);
+        s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
-        s.metrics.face_enabled  = true;
+        s.metrics.face_enabled = true;
         s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
 
         s.header_style = UiTitleCard::StyleDefault();
         s.header_style.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
         s.header_style.hover_enabled = true;
-        s.header_style.show_focus = false;
+        s.header_style.metrics.focus_enabled = false;
         s.header_style.show_rule = true;
 
         s.body_style = UiPanel::StyleDefault();
@@ -104,7 +106,7 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.chevron_size = 0;
 
         s.unified_section_frame = false;
-        s.unified_section_radius = DPI(7);
+        s.unified_section_radius = DPI(10);
         s.unified_section_frame_width = 1;
 
         s.body_line_extent = NONE;
@@ -119,57 +121,11 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
     return s;
 }
 
-const UiAccordion::Style& UiAccordion::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiAccordion::Style& UiAccordion::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.metrics.face_enabled = false;
-        s.metrics.frame_width = DPI(1);
-        s.header_style = UiTitleCard::StyleMinimal();
-        s.body_style = UiPanel::StyleMinimal();
-    }
-    return s;
-}
-
-const UiAccordion::Style& UiAccordion::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.header_style = UiTitleCard::StyleSoft();
-        s.body_style = UiPanel::StyleSoft();
-        s.metrics.radius = DPI(10);
-    }
-    return s;
-}
-
-const UiAccordion::Style& UiAccordion::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.header_style = UiTitleCard::StyleStrong();
-        s.body_style = UiPanel::StyleStrong();
-        Color frame = DkColor(SColorHighlight(), 28);
-        for(int i = 0; i < 4; i++) {
-            s.palette.frame[i] = frame;
-            s.palette.face[i] = UiFill::Solid(Blend(SColorHighlight(), SColorPaper(), 225));
-        }
-        s.metrics.radius = DPI(8);
-    }
-    return s;
-}
-
 UiAccordion::UiAccordion()
     : style_(StyleDefault())
 {
     BackPaint();
+    SyncThemeStyle();
     Add(drag_marker_);
     drag_marker_.Color(Color(56, 146, 255)).IgnoreMouse().Hide();
 }
@@ -180,16 +136,76 @@ UiAccordion::~UiAccordion()
     StopAllAnimations();
 }
 
+void UiAccordion::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+}
+
+UiAccordion::Style& UiAccordion::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiAccordion::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    Style resolved = StyleDefault();
+    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    resolved.palette = panel.palette;
+    resolved.metrics.radius = max(DPI(10), panel.metrics.radius);
+    resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
+    resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
+    resolved.metrics.face_enabled = panel.metrics.face_enabled;
+    resolved.header_style = UiTheme::ResolveTitleCard();
+    resolved.header_style.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
+    resolved.header_style.hover_enabled = true;
+    resolved.header_style.metrics.focus_enabled = false;
+    resolved.header_style.show_rule = true;
+    resolved.body_style = panel;
+    resolved.body_style.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    style_ = resolved;
+    theme_revision_ = revision;
+}
+
+const UiAccordion::Style& UiAccordion::GetEffectiveStyle() const
+{
+    const_cast<UiAccordion*>(this)->SyncThemeStyle();
+    return style_;
+}
+
 UiAccordion& UiAccordion::SetStyle(const Style& s)
 {
     style_ = s;
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiAccordion& UiAccordion::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
 
 void UiAccordion::OnStyleChanged()
 {
-    if(style_.transparent)
+    const Style& style = GetEffectiveStyle();
+    if(style.transparent)
         Transparent();
     else
         BackPaint();
@@ -199,14 +215,13 @@ void UiAccordion::OnStyleChanged()
 
     for(int i = 0; i < sections_.GetCount(); i++) {
         sections_[i].animating = false;
-        sections_[i].current_body_cy = sections_[i].open ? max(style_.body_min_height, sections_[i].body_height) : 0;
+        sections_[i].current_body_cy = sections_[i].open ? max(style.body_min_height, sections_[i].body_height) : 0;
         sections_[i].target_body_cy = sections_[i].current_body_cy;
     }
 
     RefreshLayout();
     Refresh();
 }
-
 int UiAccordion::AddSection(const String& title, const String& subtitle, const String& copy, bool open)
 {
     int i = sections_.GetCount();
@@ -248,30 +263,32 @@ int UiAccordion::AddSection(const String& title, bool open)
 
 void UiAccordion::ApplySectionStyle(Section& s, int)
 {
-    s.header.SetStyle(style_.header_style)
+    const Style& style = GetEffectiveStyle();
+    s.header.SetStyle(style.header_style)
             .SetTitle(s.title)
             .SetSubTitle(s.subtitle)
             .SetCopyText(s.copy)
-            .EnableHover(style_.header_style.hover_enabled)
-            .EnableFocusRing(style_.header_style.show_focus)
+            .EnableHover(style.header_style.hover_enabled)
+            .SetShowFocus(style.header_style.metrics.focus_enabled)
             .SetSelectable(true);
 
-    s.body.SetStyle(style_.body_style);
+    s.body.SetStyle(style.body_style);
     RefreshChevron(s);
 }
 
 void UiAccordion::RefreshChevron(Section& s)
 {
-    if(!style_.show_chevron) {
+    const Style& style = GetEffectiveStyle();
+    if(!style.show_chevron) {
         s.header.ClearMedia();
         return;
     }
 
     Image arrow;
-    if(s.lock != Lock::None && !IsNull(style_.glyph_lock))
-        arrow = style_.glyph_lock;
+    if(s.lock != Lock::None && !IsNull(style.glyph_lock))
+        arrow = style.glyph_lock;
     else
-        arrow = s.open ? style_.glyph_open : style_.glyph_closed;
+        arrow = s.open ? style.glyph_open : style.glyph_closed;
 
     auto PadImage = [&](const Image& src, int pad) {
         if(IsNull(src) || pad <= 0)
@@ -288,8 +305,8 @@ void UiAccordion::RefreshChevron(Section& s)
 
     Size pref = Size(DPI(14), DPI(14));
     if(!IsNull(arrow)) {
-        if(style_.chevron_scale) {
-            int px = style_.chevron_size > 0 ? style_.chevron_size : DPI(14);
+        if(style.chevron_scale) {
+            int px = style.chevron_size > 0 ? style.chevron_size : DPI(14);
             pref = Size(px, px);
             if(px <= DPI(20))
                 arrow = PadImage(arrow, 2);
@@ -304,7 +321,7 @@ void UiAccordion::RefreshChevron(Section& s)
     int reserve = max(DPI(20), pref.cx + DPI(10));
 
     s.header.SetMedia(arrow, pref)
-            .SetMediaSide(style_.chevron_side)
+            .SetMediaSide(style.chevron_side)
             .SetMediaReserve(reserve)
             .SetMediaSharePercent(0)
             .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER);
@@ -399,7 +416,8 @@ UiAccordion& UiAccordion::Open(int i, bool on)
 
     item.open = on;
 
-    if(on && style_.single_open) {
+    const Style& style = GetEffectiveStyle();
+    if(on && style.single_open) {
         for(int k = 0; k < sections_.GetCount(); k++) {
             if(k == i)
                 continue;
@@ -413,7 +431,7 @@ UiAccordion& UiAccordion::Open(int i, bool on)
         }
     }
 
-    if(!on && style_.enforce_one) {
+    if(!on && style.enforce_one) {
         bool any = false;
         for(int k = 0; k < sections_.GetCount(); k++) {
             if(sections_[k].open) {
@@ -478,7 +496,7 @@ UiAccordion& UiAccordion::OpenAll(bool on)
 
 UiAccordion& UiAccordion::SetSingleOpen(bool on)
 {
-    style_.single_open = on;
+    StyleEdit().single_open = on;
     NormalizePolicyAfterBulkChange();
     RefreshLayout();
     Refresh();
@@ -487,7 +505,7 @@ UiAccordion& UiAccordion::SetSingleOpen(bool on)
 
 UiAccordion& UiAccordion::SetEnforceOne(bool on)
 {
-    style_.enforce_one = on;
+    StyleEdit().enforce_one = on;
     NormalizePolicyAfterBulkChange();
     RefreshLayout();
     Refresh();
@@ -496,7 +514,7 @@ UiAccordion& UiAccordion::SetEnforceOne(bool on)
 
 UiAccordion& UiAccordion::ShowChevron(bool on)
 {
-    style_.show_chevron = on;
+    StyleEdit().show_chevron = on;
     for(int i = 0; i < sections_.GetCount(); i++)
         RefreshChevron(sections_[i]);
     Refresh();
@@ -506,7 +524,7 @@ UiAccordion& UiAccordion::ShowChevron(bool on)
 UiAccordion& UiAccordion::SetChevronSide(UiAlign side)
 {
     if(side == UiAlign::LEFT || side == UiAlign::RIGHT)
-        style_.chevron_side = side;
+        StyleEdit().chevron_side = side;
     for(int i = 0; i < sections_.GetCount(); i++)
         RefreshChevron(sections_[i]);
     Refresh();
@@ -515,9 +533,9 @@ UiAccordion& UiAccordion::SetChevronSide(UiAlign side)
 
 UiAccordion& UiAccordion::SetChevronGlyphs(const Image& open, const Image& closed, const Image& lock)
 {
-    style_.glyph_open = open;
-    style_.glyph_closed = closed;
-    style_.glyph_lock = lock;
+    StyleEdit().glyph_open = open;
+    StyleEdit().glyph_closed = closed;
+    StyleEdit().glyph_lock = lock;
     for(int i = 0; i < sections_.GetCount(); i++)
         RefreshChevron(sections_[i]);
     Refresh();
@@ -526,7 +544,7 @@ UiAccordion& UiAccordion::SetChevronGlyphs(const Image& open, const Image& close
 
 UiAccordion& UiAccordion::SetHeaderRuleExtent(UiSpan ex)
 {
-    style_.header_style.rule_extent = ex;
+    StyleEdit().header_style.rule_extent = ex;
     for(int i = 0; i < sections_.GetCount(); i++)
         sections_[i].header.SetRuleExtent(ex);
     RefreshLayout();
@@ -536,10 +554,10 @@ UiAccordion& UiAccordion::SetHeaderRuleExtent(UiSpan ex)
 
 UiAccordion& UiAccordion::SetBodyLine(UiSpan ex, int thickness, UiLineStyle style, Color c)
 {
-    style_.body_line_extent = ex;
-    style_.body_line_thickness = max(1, thickness);
-    style_.body_line_style = style;
-    style_.body_line_color = c;
+    StyleEdit().body_line_extent = ex;
+    StyleEdit().body_line_thickness = max(1, thickness);
+    StyleEdit().body_line_style = style;
+    StyleEdit().body_line_color = c;
     Refresh();
     return *this;
 }
@@ -556,7 +574,7 @@ UiAccordion& UiAccordion::SetLockMode(int i, Lock mode)
         it.open = true;
     else if(mode == Lock::Closed)
         it.open = false;
-    else if(style_.single_open && it.open) {
+    else if(GetEffectiveStyle().single_open && it.open) {
         for(int j = 0; j < sections_.GetCount(); j++) {
             if(j == i)
                 continue;
@@ -583,9 +601,9 @@ UiAccordion::Lock UiAccordion::GetLockMode(int i) const
 
 UiAccordion& UiAccordion::SetAnimation(bool enabled, int open_ms, int close_ms)
 {
-    style_.animation_enabled = enabled;
-    style_.anim_open_ms = max(0, open_ms);
-    style_.anim_close_ms = max(0, close_ms);
+    StyleEdit().animation_enabled = enabled;
+    StyleEdit().anim_open_ms = max(0, open_ms);
+    StyleEdit().anim_close_ms = max(0, close_ms);
 
     if(!enabled)
         StopAllAnimations();
@@ -724,7 +742,7 @@ void UiAccordion::StopAllAnimations()
     for(int i = 0; i < sections_.GetCount(); i++) {
         Section& s = sections_[i];
         s.animating = false;
-        s.current_body_cy = s.open ? max(style_.body_min_height, s.body_height) : 0;
+        s.current_body_cy = s.open ? max(GetEffectiveStyle().body_min_height, s.body_height) : 0;
         s.target_body_cy = s.current_body_cy;
         if(!s.open && s.current_body_cy == 0)
             s.body.Hide();
@@ -735,18 +753,19 @@ void UiAccordion::StartSectionAnimation(int i, bool opening)
 {
     if(i < 0 || i >= sections_.GetCount())
         return;
+    const Style& style = GetEffectiveStyle();
 
     Section& s = sections_[i];
     Rect outer = GetSize();
-    Rect content = UiStyledInnerRect(outer, style_.metrics, style_.skin);
+    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
     int target = opening ? MeasureSectionBodyHeight(s, max(1, content.GetWidth())) : 0;
 
     s.target_body_cy = target;
     if(opening)
         s.body.Show();
 
-    int dur = opening ? style_.anim_open_ms : style_.anim_close_ms;
-    if(!style_.animation_enabled || dur <= 0) {
+    int dur = opening ? style.anim_open_ms : style.anim_close_ms;
+    if(!style.animation_enabled || dur <= 0) {
         s.current_body_cy = target;
         s.animating = false;
         if(!opening && target == 0)
@@ -797,7 +816,8 @@ void UiAccordion::AnimationStep()
 
 void UiAccordion::NormalizePolicyAfterBulkChange()
 {
-    if(style_.single_open) {
+    const Style& style = GetEffectiveStyle();
+    if(style.single_open) {
         int keep_unlocked = -1;
         for(int i = 0; i < sections_.GetCount(); i++) {
             if(sections_[i].open && sections_[i].lock == Lock::None) {
@@ -813,7 +833,7 @@ void UiAccordion::NormalizePolicyAfterBulkChange()
         }
     }
 
-    if(style_.enforce_one) {
+    if(style.enforce_one) {
         bool any = false;
         for(int i = 0; i < sections_.GetCount(); i++)
             if(sections_[i].open) { any = true; break; }
@@ -855,6 +875,7 @@ void UiAccordion::NormalizePolicyAfterBulkChange()
 
 int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
 {
+    const Style& style = GetEffectiveStyle();
     if(s.body_height >= 0)
         return s.body_height;
 
@@ -877,37 +898,39 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
         measured = b.GetHeight();
 
     measured = max(measured, s.content.GetMinSize().cy);
-    measured = max(measured, style_.body_min_height);
+    measured = max(measured, style.body_min_height);
 
     Size outer = UiStyledOuterSizeFromContent(Size(max(0, width), measured),
-                                              style_.body_style.metrics,
-                                              style_.body_style.skin);
-    return max(style_.body_min_height, outer.cy);
+                                              GetEffectiveStyle().body_style.metrics,
+                                              GetEffectiveStyle().body_style.skin);
+    return max(GetEffectiveStyle().body_min_height, outer.cy);
 }
 
 Size UiAccordion::GetMinSize() const
 {
+    const Style& style = GetEffectiveStyle();
     int w = DPI(200);
     int h = 0;
 
     for(int i = 0; i < sections_.GetCount(); i++) {
         const Section& s = sections_[i];
         w = max(w, s.header.GetMinSize().cx);
-        h += max(DPI(24), style_.header_height);
+        h += max(DPI(24), style.header_height);
         if(s.open)
-            h += style_.header_body_gap + max(style_.body_min_height, s.body_height);
+            h += style.header_body_gap + max(style.body_min_height, s.body_height);
         if(i + 1 < sections_.GetCount())
-            h += style_.section_gap;
+            h += style.section_gap;
     }
 
-    Size out = UiStyledOuterSizeFromContent(Size(w, h), style_.metrics, style_.skin);
+    Size out = UiStyledOuterSizeFromContent(Size(w, h), style.metrics, style.skin);
     return out;
 }
 
 void UiAccordion::Layout()
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
-    Rect content = UiStyledInnerRect(outer, style_.metrics, style_.skin);
+    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
     if(content.IsEmpty())
         return;
 
@@ -917,12 +940,12 @@ void UiAccordion::Layout()
     for(int i = 0; i < sections_.GetCount(); i++) {
         Section& s = sections_[i];
 
-        int hh = max(DPI(24), style_.header_height);
+        int hh = max(DPI(24), style.header_height);
         s.header.SetRect(content.left, y, w, hh);
         y += hh;
 
         if(s.open || s.animating || s.current_body_cy > 0) {
-            y += style_.header_body_gap;
+            y += style.header_body_gap;
             int bh = s.animating ? s.current_body_cy : (s.open ? MeasureSectionBodyHeight(s, w) : 0);
             if(!s.animating)
                 s.current_body_cy = bh;
@@ -939,7 +962,7 @@ void UiAccordion::Layout()
         }
 
         if(i + 1 < sections_.GetCount())
-            y += style_.section_gap;
+            y += style.section_gap;
     }
 
     if(dragging_ && drag_from_ >= 0 && drag_from_ < sections_.GetCount()) {
@@ -953,7 +976,7 @@ void UiAccordion::Layout()
 
         int x = content.left + DPI(6);
         int cx = max(0, content.GetWidth() - DPI(12));
-        int cy = max(DPI(2), style_.metrics.frame_width + 2);
+        int cy = max(DPI(2), style.metrics.frame_width + 2);
         drag_marker_.SetRect(x, line_y - cy / 2, cx, cy);
         drag_marker_.Show();
     }
@@ -964,6 +987,7 @@ void UiAccordion::Layout()
 
 void UiAccordion::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
     if(outer.IsEmpty())
         return;
@@ -975,27 +999,27 @@ void UiAccordion::Paint(Draw& w)
     bool fg_handled = false;
 
     if(WhenPaintBackground) {
-        WhenPaintBackground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        WhenPaintBackground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         bg_handled = true;
     }
 
     if(WhenPaintForeground) {
-        WhenPaintForeground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         fg_handled = true;
     }
 
-    UiPaintStyledSurface(w, outer, style_.palette, style_.metrics, style_.skin,
-                         st, has_focus, bg_handled, fg_handled, style_.show_focus);
+    UiPaintStyledSurface(w, outer, style.palette, style.metrics, style.skin,
+                         st, has_focus, bg_handled, fg_handled);
 
-    if(style_.unified_section_frame) {
+    if(style.unified_section_frame) {
         StyledPalette p;
         StyledMetrics m;
         m.face_enabled = false;
         m.frame_enabled = true;
-        m.frame_width = max(1, style_.unified_section_frame_width);
-        m.radius = max(0, style_.unified_section_radius);
+        m.frame_width = max(1, style.unified_section_frame_width);
+        m.radius = max(0, style.unified_section_radius);
         for(int i = 0; i < 4; i++) {
-            p.frame[i] = style_.palette.frame[i];
+            p.frame[i] = style.palette.frame[i];
             p.face[i] = UiFill::Solid(Null);
         }
 
@@ -1010,28 +1034,28 @@ void UiAccordion::Paint(Draw& w)
     for(int i = 0; i < sections_.GetCount(); i++) {
         const Section& s = sections_[i];
 
-        if(style_.body_line_extent != NONE && s.body.IsShown() && s.body.GetRect().GetHeight() > 0) {
+        if(style.body_line_extent != NONE && s.body.IsShown() && s.body.GetRect().GetHeight() > 0) {
             Rect br = s.body.GetRect();
-            int lw = ResolveLineWidth(style_.body_line_extent, max(0, br.GetWidth() - DPI(16)));
+            int lw = ResolveLineWidth(style.body_line_extent, max(0, br.GetWidth() - DPI(16)));
             if(lw > 0) {
                 int x = br.left + (br.GetWidth() - lw) / 2;
-                int y = br.bottom - max(1, style_.body_line_thickness);
-                Color c = IsNull(style_.body_line_color)
-                              ? Blend(style_.palette.frame[ST_NORMAL], style_.palette.ink[ST_NORMAL], 72)
-                              : style_.body_line_color;
-                PaintRuleLine(w, x, y, lw, style_.body_line_thickness, style_.body_line_style, c);
+                int y = br.bottom - max(1, style.body_line_thickness);
+                Color c = IsNull(style.body_line_color)
+                              ? Blend(style.palette.frame[ST_NORMAL], style.palette.ink[ST_NORMAL], 72)
+                              : style.body_line_color;
+                PaintRuleLine(w, x, y, lw, style.body_line_thickness, style.body_line_style, c);
             }
         }
     }
 
     if(dragging_ && drag_from_ >= 0 && drag_from_ < sections_.GetCount()) {
-        Color base_face = style_.palette.face[ST_NORMAL].IsSolid() ? style_.palette.face[ST_NORMAL].color : SColorFace();
+        Color base_face = style.palette.face[ST_NORMAL].IsSolid() ? style.palette.face[ST_NORMAL].color : SColorFace();
         Rect hr = sections_[drag_from_].header.GetRect();
         if(!hr.IsEmpty()) {
-            Color shade = Blend(base_face, style_.palette.ink[ST_NORMAL], 12);
+            Color shade = Blend(base_face, style.palette.ink[ST_NORMAL], 12);
             w.DrawRect(hr, shade);
-            w.DrawRect(hr.left, hr.top, hr.GetWidth(), 1, Blend(style_.palette.ink[ST_NORMAL], White(), 20));
-            w.DrawRect(hr.left, hr.bottom - 1, hr.GetWidth(), 1, Blend(style_.palette.ink[ST_NORMAL], Black(), 20));
+            w.DrawRect(hr.left, hr.top, hr.GetWidth(), 1, Blend(style.palette.ink[ST_NORMAL], White(), 20));
+            w.DrawRect(hr.left, hr.bottom - 1, hr.GetWidth(), 1, Blend(style.palette.ink[ST_NORMAL], Black(), 20));
         }
 
         int y = 0;
@@ -1158,3 +1182,14 @@ void UiAccordion::PaintRuleLine(Draw& w, int x, int y, int cx, int thickness, Ui
 }
 
 }
+
+
+
+
+
+
+
+
+
+
+

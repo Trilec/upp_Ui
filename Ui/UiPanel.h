@@ -7,19 +7,6 @@
 
 namespace Upp {
 
-/*
-    UiPanel
-    =======
-
-    Lightweight styled background panel.
-
-    - Owns StyledPalette / StyledMetrics / StyledSkin via CtrlStyled<UiPanel>.
-    - Typically used as a visual container / card / group background.
-    - No text/icon, just background + optional focus ring/overlays.
-    - Exposes WhenPaintBackground / WhenPaintForeground hooks
-      with full palette/metrics/skin context.
-*/
-
 class UiPanel : public Ctrl, public CtrlStyled<UiPanel> {
 public:
     typedef UiPanel CLASSNAME;
@@ -29,69 +16,52 @@ public:
         StyledMetrics metrics;
         StyledSkin    skin;
 
-        // If true, panel will be Transparent() and let parent paint the background.
-        // If false, panel uses BackPaint() and draws its own.
         bool transparent = false;
-
-        // If true, default foreground pass may draw a focus ring when HasFocus().
-        bool show_focus  = false;
 
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
-              % transparent % show_focus;
+              % transparent;
         }
     };
 
 private:
     Style style_;
-    Size  user_min_size_ = Size(0, 0); // explicit outer min-size hint
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
+    Size user_min_size_ = Size(0, 0);
+
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
 
 public:
     UiPanel();
 
-    // Styling ---------------------------------------------------------------
-
     UiPanel& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiPanel& ClearStyleOverride();
+    bool HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetEffectiveStyle() const;
+    static const Style& StyleDefault();
 
-    // Preset styles
-    static const Style& StyleDefault(); // light card / panel
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleDark();    // dark card
-    static const Style& StyleFlat();    // flat, square-edged panel
-
-    // CtrlStyled integration
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin;    }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
 
     void OnStyleChanged();
-
-    // Sizing ---------------------------------------------------------------
 
     virtual Size GetMinSize() const override;
 
     UiPanel& SetSizeMin(Size sz);
     UiPanel& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
-    UiPanel& SetSizeFixed(Size sz)        { return SetSizeMin(sz); }
+    UiPanel& SetSizeFixed(Size sz) { return SetSizeMin(sz); }
     UiPanel& SetSizeFixed(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
-    // Painting hooks -------------------------------------------------------
-
-    Event<Draw&, const Rect&,
-          const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-          StyledState, bool> WhenPaintBackground;
-
-    Event<Draw&, const Rect&,
-          const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-          StyledState, bool> WhenPaintForeground;
-
-    // Ctrl overrides -------------------------------------------------------
+    Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintBackground;
+    Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintForeground;
 
     virtual void Paint(Draw& w) override;
 };

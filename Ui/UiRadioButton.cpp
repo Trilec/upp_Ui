@@ -1,4 +1,5 @@
 #include <Ui/UiRadioButton.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -10,152 +11,150 @@ static StyledState UiRadioToStyledState_(bool enabled, bool pressed, bool hover)
     return ST_NORMAL;
 }
 
-const UiRadioButton::Style& UiRadioButton::StyleDefault() { return StyleStandard(); }
-
-const UiRadioButton::Style& UiRadioButton::StyleStandard() { return StyleClassic(); }
-
-const UiRadioButton::Style& UiRadioButton::StyleMinimal()
+const UiRadioButton::Style& UiRadioButton::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        s = StyleClassic();
-        s.metrics.frame_enabled = false;
-        s.metrics.face_enabled = false;
-        s.indicator_palette.face[ST_NORMAL] = UiFill::Solid(Null);
-        s.indicator_palette.face[ST_HOT] = UiFill::Solid(Null);
-        s.indicator_palette.face[ST_PRESSED] = UiFill::Solid(Null);
-        s.indicator_palette.frame[ST_NORMAL] = Blend(SColorShadow(), SColorPaper(), 130);
-        s.indicator_palette.frame[ST_HOT] = DkColor(s.indicator_palette.frame[ST_NORMAL], 10);
-        s.indicator_palette.frame[ST_PRESSED] = DkColor(s.indicator_palette.frame[ST_NORMAL], 20);
-    }
-    return s;
-}
+        const Color text_primary = Color(17, 24, 39);
+        const Color text_muted   = Color(148, 163, 184);
+        const Color indicator_face = Color(255, 255, 255);
+        const Color indicator_hot = Color(248, 250, 252);
+        const Color indicator_down = Color(241, 245, 249);
+        const Color indicator_frame = Color(203, 213, 225);
+        const Color indicator_hot_frame = Color(148, 163, 184);
+        const Color indicator_press_frame = Color(100, 116, 139);
+        const Color accent = Color(37, 99, 235);
 
-const UiRadioButton::Style& UiRadioButton::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
         for(int st = 0; st < 4; st++) {
-            s.palette.face[st] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), 220));
-            s.palette.frame[st] = Blend(SColorShadow(), SColorPaper(), 140);
-        }
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(6);
-        s.metrics.content_padding = Rect(DPI(6), DPI(3), DPI(6), DPI(3));
-    }
-    return s;
-}
-
-const UiRadioButton::Style& UiRadioButton::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        Color base = SColorHighlight();
-        Color ink = SColorHighlightText();
-        for(int st = 0; st < 4; st++) {
-            s.palette.face[st] = UiFill::Solid(base);
-            s.palette.frame[st] = DkColor(base, 30);
-            s.palette.ink[st] = ink;
-            s.indicator_palette.face[st] = UiFill::Solid(Blend(White(), base, 205));
-            s.indicator_palette.frame[st] = DkColor(base, 15);
-            s.indicator_palette.ink[st] = DkColor(base, 35);
-        }
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(6);
-        s.metrics.content_padding = Rect(DPI(6), DPI(3), DPI(6), DPI(3));
-    }
-    return s;
-}
-
-const UiRadioButton::Style& UiRadioButton::StyleClassic()
-{
-    static Style s;
-    ONCELOCK {
-        for(int st = 0; st < 4; st++) {
-            s.palette.face[st] = UiFill::Solid(Null);
+            s.palette.face[st] = UiFill::None();
             s.palette.frame[st] = Null;
-            s.palette.ink[st] = SColorText();
-
-            s.indicator_palette.face[st] = UiFill::Solid(Blend(SColorPaper(), SColorFace(), 240));
-            s.indicator_palette.frame[st] = SColorShadow();
-            s.indicator_palette.ink[st] = SColorHighlight();
+            s.palette.ink[st] = text_primary;
+            s.indicator_palette.face[st] = UiFill::Solid(indicator_face);
+            s.indicator_palette.frame[st] = indicator_frame;
+            s.indicator_palette.ink[st] = accent;
         }
-        s.indicator_metrics.radius = DPI(999);
+
+        s.palette.ink[ST_DISABLED] = text_muted;
+        s.indicator_palette.face[ST_HOT] = UiFill::Solid(indicator_hot);
+        s.indicator_palette.face[ST_PRESSED] = UiFill::Solid(indicator_down);
+        s.indicator_palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+        s.indicator_palette.frame[ST_HOT] = indicator_hot_frame;
+        s.indicator_palette.frame[ST_PRESSED] = indicator_press_frame;
+        s.indicator_palette.frame[ST_DISABLED] = Color(226, 232, 240);
+        s.indicator_palette.ink[ST_DISABLED] = text_muted;
+
+        s.metrics = StyledMetrics();
+        s.metrics.face_enabled = false;
+        s.metrics.frame_enabled = false;
+        s.metrics.content_padding = Rect(0, 0, 0, 0);
+
+        s.indicator_metrics = StyledMetrics();
+        s.indicator_metrics.face_enabled = true;
         s.indicator_metrics.frame_enabled = true;
         s.indicator_metrics.frame_width = DPI(1);
-        s.visual = UIRADIOVIS_CLASSIC;
-    }
-    return s;
-}
+        s.indicator_metrics.radius = DPI(999);
 
-const UiRadioButton::Style& UiRadioButton::StylePills()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UIRADIOVIS_PILLS;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(999);
-        for(int st = 0; st < 4; st++) {
-            s.palette.face[st] = UiFill::Solid(Blend(SColorFace(), SColorPaper(), st == ST_PRESSED ? 170 : 210));
-            s.palette.frame[st] = Blend(SColorShadow(), SColorPaper(), 120);
-            s.palette.ink[st] = SColorText();
-        }
-    }
-    return s;
-}
-
-const UiRadioButton::Style& UiRadioButton::StyleList()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleClassic();
-        s.visual = UIRADIOVIS_LIST;
-        s.indicator_metrics.frame_enabled = false;
-        s.indicator_metrics.face_enabled = false;
-        s.metrics.content_padding = Rect(DPI(4), DPI(0), DPI(0), DPI(0));
+        s.skin = StyledSkin();
+        s.indicator_skin = StyledSkin();
+        s.font = StdFont();
+        s.indicator_side = UiAlign::LEFT;
+        s.indicator_size = DPI(18);
+        s.indicator_gap = DPI(10);
     }
     return s;
 }
 
 UiRadioButton::UiRadioButton()
+    : style_(StyleDefault())
+    , themed_style_(StyleDefault())
 {
-    SetStyle(StyleDefault());
     BackPaint();
     WantFocus();
+    SyncThemeStyle();
+}
+
+void UiRadioButton::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+    text_size_dirty_ = true;
+    layout_dirty_ = true;
+    layout_content_cache_ = Rect(0, 0, 0, 0);
+}
+
+UiRadioButton::Style& UiRadioButton::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiRadioButton::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    themed_style_ = UiTheme::ResolveRadioButton(visual_);
+    theme_revision_ = revision;
+    text_size_dirty_ = true;
+    layout_dirty_ = true;
+    layout_content_cache_ = Rect(0, 0, 0, 0);
+}
+
+const UiRadioButton::Style& UiRadioButton::GetEffectiveStyle() const
+{
+    if(has_style_override_)
+        return style_;
+
+    const_cast<UiRadioButton*>(this)->SyncThemeStyle();
+    return themed_style_;
 }
 
 UiRadioButton& UiRadioButton::SetStyle(const Style& s)
 {
     style_ = s;
-    text_size_cache_ = GetTextSize(text_, style_.font);
-    text_size_dirty_ = false;
-    layout_dirty_ = true;
-    RefreshLayout();
-    Refresh();
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiRadioButton& UiRadioButton::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
+    OnStyleChanged();
     return *this;
 }
 
 void UiRadioButton::OnStyleChanged()
 {
-    text_size_cache_ = GetTextSize(text_, style_.font);
+    const Style& style = GetEffectiveStyle();
+    text_size_cache_ = GetTextSize(text_, style.font);
     text_size_dirty_ = false;
     layout_dirty_ = true;
+    layout_content_cache_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
 }
 
 UiRadioButton& UiRadioButton::SetText(const String& s)
 {
+    const Style& style = GetEffectiveStyle();
     text_ = s;
-    text_size_cache_ = GetTextSize(text_, style_.font);
+    text_size_cache_ = GetTextSize(text_, style.font);
     text_size_dirty_ = false;
     layout_dirty_ = true;
+    layout_content_cache_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -163,8 +162,9 @@ UiRadioButton& UiRadioButton::SetText(const String& s)
 
 Size UiRadioButton::GetTextSizeCached() const
 {
+    const Style& style = GetEffectiveStyle();
     if(text_size_dirty_) {
-        text_size_cache_ = GetTextSize(text_, style_.font);
+        text_size_cache_ = GetTextSize(text_, style.font);
         text_size_dirty_ = false;
     }
     return text_size_cache_;
@@ -172,10 +172,14 @@ Size UiRadioButton::GetTextSizeCached() const
 
 UiRadioButton& UiRadioButton::SetVisual(UiRadioVisual vis)
 {
-    style_.visual = vis;
-    layout_dirty_ = true;
-    RefreshLayout();
-    Refresh();
+    if(vis < UIRADIOVIS_CLASSIC || vis > UIRADIOVIS_LIST)
+        vis = UIRADIOVIS_CLASSIC;
+    if(visual_ == vis)
+        return *this;
+
+    visual_ = vis;
+    InvalidateStyleCache();
+    OnStyleChanged();
     return *this;
 }
 
@@ -183,50 +187,51 @@ UiRadioButton& UiRadioButton::SetIndicatorSide(UiAlign side)
 {
     if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
         side = UiAlign::LEFT;
-    style_.indicator_side = side;
-    layout_dirty_ = true;
-    RefreshLayout();
-    Refresh();
+    StyleEdit().indicator_side = side;
+    OnStyleChanged();
     return *this;
 }
 
 UiRadioButton& UiRadioButton::SetIndicatorRadius(int px)
 {
-    style_.indicator_metrics.radius = max(0, px);
-    Refresh();
+    StyleEdit().indicator_metrics.radius = max(0, px);
+    OnStyleChanged();
     return *this;
 }
 
 UiRadioButton& UiRadioButton::SetIndicatorRoundness(int percent)
 {
     percent = clamp(percent, 0, 100);
-    int side = max(DPI(10), style_.indicator_size);
+    int side = max(DPI(10), GetEffectiveStyle().indicator_size);
     int r = (side * percent) / 2 / 100;
     return SetIndicatorRadius(r);
 }
 
 Rect UiRadioButton::GetIndicatorRect(const Rect& r) const
 {
-    int side = max(DPI(10), style_.indicator_size);
+    const Style& style = GetEffectiveStyle();
+    int side = max(DPI(10), style.indicator_size);
     int y = r.top + (r.GetHeight() - side) / 2;
-    int x = style_.indicator_side == UiAlign::RIGHT ? (r.right - side) : r.left;
+    int x = style.indicator_side == UiAlign::RIGHT ? (r.right - side) : r.left;
     return RectC(x, y, side, side);
 }
 
 Rect UiRadioButton::GetTextRect(const Rect& r, const Rect& ind) const
 {
+    const Style& style = GetEffectiveStyle();
     Rect t = r;
-    if(style_.visual == UIRADIOVIS_PILLS)
+    if(visual_ == UIRADIOVIS_PILLS)
         return t;
-    if(style_.indicator_side == UiAlign::RIGHT)
-        t.right = max(t.left, ind.left - style_.indicator_gap);
+    if(style.indicator_side == UiAlign::RIGHT)
+        t.right = max(t.left, ind.left - style.indicator_gap);
     else
-        t.left = min(t.right, ind.right + style_.indicator_gap);
+        t.left = min(t.right, ind.right + style.indicator_gap);
     return t;
 }
 
 void UiRadioButton::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     Rect r = GetSize();
     if(r.IsEmpty())
         return;
@@ -235,17 +240,17 @@ void UiRadioButton::Paint(Draw& w)
     bool has_focus = HasFocus();
 
     if(WhenPaintBackground)
-        WhenPaintBackground(w, r, style_.palette, style_.metrics, style_.skin, st, has_focus);
-    else if(style_.visual == UIRADIOVIS_PILLS)
-        UiPaintStyledBackground(w, r, style_.palette, style_.metrics, style_.skin, checked_ ? ST_PRESSED : st, has_focus);
+        WhenPaintBackground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
+    else if(visual_ == UIRADIOVIS_PILLS)
+        UiPaintStyledBackground(w, r, style.palette, style.metrics, style.skin, checked_ ? ST_PRESSED : st, has_focus);
 
     Rect ind = layout_cache_.support;
     Rect text_r = layout_cache_.main;
 
     auto PaintSelectionMark = [&](const Rect& outer_ind) {
         Rect mark_area = outer_ind;
-        int inset = max(DPI(2), style_.indicator_metrics.frame_width + DPI(1));
-        if(style_.visual == UIRADIOVIS_LIST)
+        int inset = max(DPI(2), style.indicator_metrics.frame_width + DPI(1));
+        if(visual_ == UIRADIOVIS_LIST)
             inset = max(inset, DPI(3));
         mark_area = mark_area.Deflated(inset, inset);
         if(mark_area.IsEmpty())
@@ -260,13 +265,13 @@ void UiRadioButton::Paint(Draw& w)
         double x = cx - dot * 0.5;
         double y = cy - dot * 0.5;
 
-        Color c = style_.indicator_palette.ink[st];
+        Color c = style.indicator_palette.ink[st];
         if(IsNull(c)) c = SColorHighlight();
         RGBA rc = c;
 
         int outer_side = max(1, min(outer_ind.GetWidth(), outer_ind.GetHeight()));
         int outer_half = max(1, outer_side / 2);
-        int outer_radius = max(0, style_.indicator_metrics.radius);
+        int outer_radius = max(0, style.indicator_metrics.radius);
         int pct = min(100, (outer_radius * 100) / outer_half);
 
         ImageBuffer ib(max(1, dot + 4), max(1, dot + 4));
@@ -293,87 +298,90 @@ void UiRadioButton::Paint(Draw& w)
         w.DrawImage(dx, dy, Image(ib));
     };
 
-    if(style_.visual == UIRADIOVIS_LIST) {
-        if(checked_) {
+    if(visual_ == UIRADIOVIS_LIST) {
+        if(checked_)
             PaintSelectionMark(ind);
-        }
     }
     else {
-        if(style_.indicator_skin.enabled) {
-            UiDraw9Slice(w, ind, style_.indicator_skin.base, style_.indicator_skin.slice);
-            StyledMetrics mm = style_.indicator_metrics;
+        if(style.indicator_skin.enabled) {
+            UiDraw9Slice(w, ind, style.indicator_skin.base, style.indicator_skin.slice);
+            StyledMetrics mm = style.indicator_metrics;
             mm.face_enabled = false;
-            UiPaintFaceFrameDash(w, ind, style_.indicator_palette, mm, st);
+            UiPaintFaceFrameDash(w, ind, style.indicator_palette, mm, st);
         }
         else {
-            UiPaintFaceFrameDash(w, ind, style_.indicator_palette, style_.indicator_metrics, st);
+            UiPaintFaceFrameDash(w, ind, style.indicator_palette, style.indicator_metrics, st);
         }
         if(checked_)
             PaintSelectionMark(ind);
     }
 
-    Color ink = style_.palette.ink[st];
+    Color ink = style.palette.ink[st];
     if(IsNull(ink)) ink = SColorText();
-    Font f = style_.font;
+    Font f = style.font;
     int ty = text_r.top + (text_r.GetHeight() - f.GetHeight()) / 2;
     DrawSmartText(w, text_r.left, ty, max(0, text_r.GetWidth()), text_, f, ink, 0);
 
     if(WhenPaintForeground)
-        WhenPaintForeground(w, r, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        WhenPaintForeground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
     else
-        UiPaintStyledForeground(w, r, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        UiPaintStyledForeground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
 }
 
 void UiRadioButton::RebuildLayoutCache(const Rect& content) const
 {
+    const Style& style = GetEffectiveStyle();
     if(!layout_dirty_ && layout_content_cache_ == content)
         return;
 
-    Size support_natural(style_.indicator_size, style_.indicator_size);
+    Size support_natural(style.indicator_size, style.indicator_size);
     Size main_natural = GetTextSizeCached();
-    Rect main_margin = style_.indicator_side == UiAlign::RIGHT
-                       ? Rect(0, 0, style_.indicator_gap, 0)
-                       : Rect(style_.indicator_gap, 0, 0, 0);
+    Rect main_margin = style.indicator_side == UiAlign::RIGHT
+                       ? Rect(0, 0, style.indicator_gap, 0)
+                       : Rect(style.indicator_gap, 0, 0, 0);
 
     layout_cache_ = UiComputeBlocksLayout(content,
                                           support_natural,
                                           main_natural,
                                           UiAlign::LEFT,
                                           UiAlign::CENTER,
-                                          style_.indicator_side,
+                                          style.indicator_side,
                                           Rect(0, 0, 0, 0),
                                           main_margin,
-                                          max(DPI(10), style_.indicator_size));
+                                          max(DPI(10), style.indicator_size));
     layout_content_cache_ = content;
     layout_dirty_ = false;
 }
 
 void UiRadioButton::Layout()
 {
-    Rect content = UiStyledInnerRect(GetSize(), style_.metrics, style_.skin);
+    const Style& style = GetEffectiveStyle();
+    Rect content = UiStyledInnerRect(GetSize(), style.metrics, style.skin);
     RebuildLayoutCache(content);
 }
 
 Size UiRadioButton::GetMinSize() const
 {
+    const Style& style = GetEffectiveStyle();
     if(user_min_size_.cx > 0 && user_min_size_.cy > 0)
         return user_min_size_;
-    Size support_natural(style_.indicator_size, style_.indicator_size);
+
+    Size support_natural(style.indicator_size, style.indicator_size);
     Size main_natural = GetTextSizeCached();
-    Rect main_margin = style_.indicator_side == UiAlign::RIGHT
-                       ? Rect(0, 0, style_.indicator_gap, 0)
-                       : Rect(style_.indicator_gap, 0, 0, 0);
+    Rect main_margin = style.indicator_side == UiAlign::RIGHT
+                       ? Rect(0, 0, style.indicator_gap, 0)
+                       : Rect(style.indicator_gap, 0, 0, 0);
     Size content = UiMeasureBlocksContent(support_natural,
-                                         main_natural,
-                                         Rect(0, 0, 0, 0),
-                                         main_margin,
-                                         style_.indicator_side,
-                                         true,
-                                         !text_.IsEmpty(),
-                                         0,
-                                         max(GetTextSize("A", style_.font).cy, style_.indicator_size),
-                                         max(DPI(10), style_.indicator_size));
-    return UiStyledOuterSizeFromContent(content, style_.metrics, style_.skin);
+                                          main_natural,
+                                          Rect(0, 0, 0, 0),
+                                          main_margin,
+                                          style.indicator_side,
+                                          true,
+                                          !text_.IsEmpty(),
+                                          0,
+                                          max(GetTextSize("A", style.font).cy, style.indicator_size),
+                                          max(DPI(10), style.indicator_size));
+    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
 }
 
 void UiRadioButton::SetMinSize(Size sz)

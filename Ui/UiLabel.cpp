@@ -1,4 +1,5 @@
 #include <Ui/UiLabel.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -100,8 +101,7 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
     for(int i = 0; i < lines.GetCount(); i++) {
         int w = 0;
         int h = max(1, base_font.GetCy());
-        const Vector<RichPiece>& ln = lines[i];
-        for(const RichPiece& p : ln) {
+        for(const RichPiece& p : lines[i]) {
             w += p.sz.cx;
             h = max(h, p.sz.cy);
         }
@@ -134,289 +134,153 @@ static Color AnsiColor(int code)
 
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const UiLabel::Style& UiLabel::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        Color face  = SColorFace();
-        Color text  = SColorText();
-        Color frame = SColorShadow();
-        Color dis   = SColorDisabled();
-        
+        const Color text_primary = Color(17, 24, 39);
+        const Color text_muted = Color(107, 114, 128);
+        const Color border_soft = Color(226, 232, 240);
+
         for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = face;
-            s.palette.frame[i] = frame;
-            s.palette.ink[i]   = text;
+            s.palette.face[i] = UiFill::None();
+            s.palette.frame[i] = border_soft;
+            s.palette.ink[i] = text_primary;
+            s.palette.icon[i] = Null;
         }
-        s.palette.ink[ST_DISABLED] = dis;
+        s.palette.ink[ST_DISABLED] = text_muted;
+        s.palette.icon[ST_NORMAL] = text_muted;
+        s.palette.icon[ST_HOT] = text_primary;
+        s.palette.icon[ST_PRESSED] = text_primary;
+        s.palette.icon[ST_DISABLED] = Blend(text_muted, SColorPaper(), 60);
 
-        s.metrics.radius        = 0;
-        s.metrics.frame_width   = 0;
-        s.metrics.frame_enabled = false;
-        s.metrics.face_enabled  = false;
-        s.metrics.dashed        = false;
-
-        s.metrics.text_font     = StdFont();
+        s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
+        s.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.metrics.radius = 0;
+        s.metrics.frame_width = 0;
+        s.metrics.frame_enabled = false;
+        s.metrics.face_enabled = false;
+        s.metrics.dashed = false;
+        s.metrics.high_contrast = false;
+        s.metrics.shadow = StyledShadow();
+        s.metrics.highlight = StyledHighlight();
 
-        s.skin.base           = Image();
-        s.skin.slice          = Rect(0, 0, 0, 0);
-        s.skin.content_inset  = Rect(0, 0, 0, 0);
-        s.skin.enabled        = false;
-
-        s.align_h     = UiAlign::CENTER;
-        s.align_v     = UiAlign::CENTER;
+        s.skin = StyledSkin();
+        s.align_h = UiAlign::LEFT;
+        s.align_v = UiAlign::CENTER;
         s.icon_layout = UiAlign::LEFT;
-
-        s.icon_margin = Rect(DPI(2), 0, DPI(4), 0);
+        s.icon_margin = Rect(0, 0, DPI(6), 0);
         s.text_margin = Rect(0, 0, 0, 0);
-
-        s.font        = StdFont();
+        s.font = StdFont();
         s.transparent = true;
-
-        s.underline        = false;
-        s.underline_width  = DPI(1);
+        s.underline = false;
+        s.underline_width = DPI(1);
         s.underline_offset = 0;
-
         s.nowrap = false;
     }
     return s;
 }
 
-const UiLabel::Style& UiLabel::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiLabel::Style& UiLabel::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        for(int i = 0; i < 4; i++) {
-            s.palette.ink[i] = Blend(SColorText(), SColorPaper(), 60);
-        }
-        s.palette.ink[ST_DISABLED] = SColorDisabled();
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = Blend(SColorFace(), SColorPaper(), 215);
-        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = SColorText();
-        }
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(6);
-        s.transparent = false;
-        s.text_margin = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = SColorHighlight();
-        Color frame = DkColor(face, 30);
-        Color ink = SColorHighlightText();
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = ink;
-        }
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(6);
-        s.transparent = false;
-        s.text_margin = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleHeadline()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.font                  = SansSerifZ(24).Bold();
-        s.metrics.text_font     = s.font;
-        s.metrics.use_text_font = true;
-        s.align_h               = UiAlign::LEFT;
-        s.align_v               = UiAlign::TOP;
-        s.text_margin           = Rect(0, 0, 0, DPI(4));
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleSubheadline()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.font                  = SansSerifZ(18).Bold();
-        s.metrics.text_font     = s.font;
-        s.metrics.use_text_font = true;
-        s.align_h               = UiAlign::LEFT;
-        s.align_v               = UiAlign::CENTER;
-        s.text_margin           = Rect(0, 0, 0, DPI(2));
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleTitle()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.font                  = SansSerifZ(16).Bold();
-        s.metrics.text_font     = s.font;
-        s.metrics.use_text_font = true;
-        s.align_h               = UiAlign::LEFT;
-        s.align_v               = UiAlign::CENTER;
-        s.transparent           = true;
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleCaption()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-
-        s.font                  = SansSerifZ(11);
-        s.metrics.text_font     = s.font;
-        s.metrics.use_text_font = true;
-
-        Color base = SColorText();
-        Color cap  = LtColor(base, 10);
-        for(int i = 0; i < 4; i++)
-            s.palette.ink[i] = cap;
-        s.palette.ink[ST_DISABLED] = SColorDisabled();
-
-        s.align_h     = UiAlign::LEFT;
-        s.align_v     = UiAlign::CENTER;
-
-        s.text_margin = Rect(0, DPI(1), 0, DPI(1));
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleFootnote()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-
-        s.font                  = SansSerifZ(DPI(9));
-        s.metrics.text_font     = s.font;
-        s.metrics.use_text_font = true;
-
-        Color muted = Blend(SColorText(), SColorPaper(), 65);
-        for(int i = 0; i < 4; i++)
-            s.palette.ink[i] = muted;
-
-        s.text_margin = Rect(0, DPI(2), 0, DPI(4));
-        s.align_v     = UiAlign::TOP;
-    }
-    return s;
-}
-
-const UiLabel::Style& UiLabel::StyleBadge()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-
-        Color face  = SColorHighlight();
-        Color frame = DkColor(face, 20);
-        Color ink   = SColorHighlightText();
-
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i]   = ink;
-        }
-        s.palette.ink[ST_DISABLED] = DisabledColor(ink);
-
-        s.metrics.face_enabled  = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width   = DPI(1);
-        s.metrics.radius        = DPI(999);
-
-        s.align_h     = UiAlign::CENTER;
-        s.align_v     = UiAlign::CENTER;
-        s.icon_layout = UiAlign::LEFT;
-
-        s.icon_margin = Rect(DPI(6), DPI(2), DPI(4), DPI(2));
-        s.text_margin = Rect(DPI(8), DPI(2), DPI(8), DPI(2));
-
-        s.transparent = false;
-    }
-    return s;
-}
-
-// ============================================================================
-// Construction & styling
-// ============================================================================
-
 UiLabel::UiLabel()
     : style_(StyleDefault())
+    , themed_style_(StyleDefault())
 {
     Transparent();
     NoWantFocus();
 
-    RebuildTextLines();
+    SyncThemeStyle();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
-    layout_dirty_  = true;
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
+}
+
+void UiLabel::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+    minsize_dirty_ = true;
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
+}
+
+UiLabel::Style& UiLabel::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiLabel::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    themed_style_ = UiTheme::ResolveLabel();
+    theme_revision_ = revision;
+    RebuildTextLinesFromStyle(themed_style_);
+    minsize_dirty_ = true;
+    layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
 UiLabel& UiLabel::SetStyle(const Style& s)
 {
     style_ = s;
+    has_style_override_ = true;
     OnStyleChanged();
     return *this;
 }
 
+UiLabel& UiLabel::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
+    OnStyleChanged();
+    return *this;
+}
+
+const UiLabel::Style& UiLabel::GetEffectiveStyle() const
+{
+    if(has_style_override_)
+        return style_;
+
+    const_cast<UiLabel*>(this)->SyncThemeStyle();
+    return themed_style_;
+}
+
 void UiLabel::OnStyleChanged()
 {
-    if(style_.transparent)
+    const Style& style = GetEffectiveStyle();
+
+    if(style.transparent)
         Transparent();
     else
         BackPaint();
 
-    RebuildTextLines();
-
-    minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    RebuildTextLinesFromStyle(style);
+    InvalidateStyleCache();
     RefreshLayout();
     Refresh();
 }
 
-// ============================================================================
-// Internal helpers (multiline text & layout)
-// ============================================================================
-
 void UiLabel::RebuildTextLines()
+{
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
+}
+
+void UiLabel::RebuildTextLinesFromStyle(const Style& style)
 {
     lines_.Clear();
     line_sizes_.Clear();
@@ -424,15 +288,14 @@ void UiLabel::RebuildTextLines()
     if(text_.IsEmpty())
         return;
 
-    Font fnt = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
+    Font fnt = style.metrics.use_text_font ? style.metrics.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
-    if(style_.nowrap) {
+    if(style.nowrap) {
         String one = text_;
         one.Replace("\r", "");
         one.Replace("\n", " ");
-
         lines_.Add(one);
         line_sizes_.Add(one.IsEmpty() ? Size(0, GetTextSize(" ", fnt).cy) : GetTextSize(one, fnt));
         return;
@@ -480,6 +343,8 @@ int UiLabel::SelTo() const
 
 int UiLabel::HitTestTextPos(Point p) const
 {
+    const Style& style = GetEffectiveStyle();
+
     if(text_.IsEmpty())
         return 0;
 
@@ -490,7 +355,7 @@ int UiLabel::HitTestTextPos(Point p) const
     if(text_r.IsEmpty())
         return 0;
 
-    Font fnt = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
+    Font fnt = style.metrics.use_text_font ? style.metrics.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
@@ -506,7 +371,7 @@ int UiLabel::HitTestTextPos(Point p) const
         total_h += gap * (count - 1);
 
     int start_y;
-    switch(style_.align_v) {
+    switch(style.align_v) {
     case UiAlign::BOTTOM:
         start_y = text_r.bottom - total_h;
         break;
@@ -528,7 +393,7 @@ int UiLabel::HitTestTextPos(Point p) const
         const Size& sz = line_sizes_[i];
 
         int line_x;
-        switch(style_.align_h) {
+        switch(style.align_h) {
         case UiAlign::CENTER:
             line_x = text_r.left + (text_r.GetWidth() - sz.cx) / 2;
             break;
@@ -578,13 +443,15 @@ int UiLabel::HitTestTextPos(Point p) const
 
 Size UiLabel::GetTextBlockSize() const
 {
+    const Style& style = GetEffectiveStyle();
+
     if(rich_enabled_ && !spans_.IsEmpty()) {
-        Font fnt = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
+        Font fnt = style.metrics.use_text_font ? style.metrics.text_font : style.font;
         if(IsNull(fnt))
             fnt = StdFont();
         Vector<Vector<RichPiece>> rl;
         Vector<Size> ls;
-        BuildRichLines(spans_, fnt, style_.palette.ink[ST_NORMAL], rl, ls);
+        BuildRichLines(spans_, fnt, style.palette.ink[ST_NORMAL], rl, ls);
         return UiMeasureStyledTextBlock(ls);
     }
     return UiMeasureStyledTextBlock(line_sizes_);
@@ -592,30 +459,33 @@ Size UiLabel::GetTextBlockSize() const
 
 Size UiLabel::ComputeNaturalSize() const
 {
+    const Style& style = GetEffectiveStyle();
+
     bool have_text = !lines_.IsEmpty();
     Size text_block = have_text ? GetTextBlockSize() : Size(0, 0);
 
     bool have_icon = !IsNull(icon_);
-    Size icon_sz   = have_icon ? icon_.GetSize() : Size(0, 0);
+    Size icon_sz = have_icon ? icon_.GetSize() : Size(0, 0);
 
     Size content = UiMeasureBlocksContent(icon_sz,
                                           text_block,
-                                          style_.icon_margin,
-                                          style_.text_margin,
-                                          style_.icon_layout,
+                                          style.icon_margin,
+                                          style.text_margin,
+                                          style.icon_layout,
                                           have_icon,
                                           have_text,
                                           DPI(16),
                                           DPI(8),
                                           DPI(16));
 
-    return UiStyledOuterSizeFromContent(content, style_.metrics, style_.skin);
+    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
 }
 
 void UiLabel::UpdateLayout(const Rect& content) const
 {
-    layout_ = UiBlocksLayout();
+    const Style& style = GetEffectiveStyle();
 
+    layout_ = UiBlocksLayout();
     if(content.IsEmpty()) {
         layout_dirty_ = false;
         return;
@@ -623,27 +493,21 @@ void UiLabel::UpdateLayout(const Rect& content) const
 
     bool have_text = !lines_.IsEmpty();
     Size text_block = have_text ? GetTextBlockSize() : Size(0, 0);
-
     bool have_icon = !IsNull(icon_);
-    Size icon_sz   = have_icon ? icon_.GetSize() : Size(0, 0);
+    Size icon_sz = have_icon ? icon_.GetSize() : Size(0, 0);
 
     layout_ = UiComputeBlocksLayout(content,
-                                   have_icon ? icon_sz : Size(0, 0),
-                                   have_text ? text_block : Size(0, 0),
-                                   style_.align_h,
-                                   style_.align_v,
-                                   style_.icon_layout,
-                                   style_.icon_margin,
-                                   style_.text_margin,
-                                   DPI(16));
+                                    have_icon ? icon_sz : Size(0, 0),
+                                    have_text ? text_block : Size(0, 0),
+                                    style.align_h,
+                                    style.align_v,
+                                    style.icon_layout,
+                                    style.icon_margin,
+                                    style.text_margin,
+                                    DPI(16));
 
     layout_dirty_ = false;
 }
-
-// ============================================================================
-// Content API
-// ============================================================================
-
 UiLabel& UiLabel::SetText(const String& text)
 {
     rich_enabled_ = false;
@@ -663,12 +527,10 @@ UiLabel& UiLabel::SetText(const String& text)
             int n = text[i + 1];
 
             if(n == '&') {
-                // Escaped literal '&'
                 raw.Cat('&');
                 i++;
             }
             else {
-                // Explicit mnemonic '&X'
                 if(!has_access_mnemonic_) {
                     accesskey_ = ToUpper((wchar)n);
                     has_access_mnemonic_ = true;
@@ -686,8 +548,7 @@ UiLabel& UiLabel::SetText(const String& text)
     for(int i = 0; i < raw.GetCount(); i++) {
         int c = raw[i];
         if(c == '\t') {
-            const int TAB_SPACES = 4;
-            for(int k = 0; k < TAB_SPACES; k++)
+            for(int k = 0; k < 4; k++)
                 text_.Cat(' ');
         }
         else {
@@ -695,14 +556,14 @@ UiLabel& UiLabel::SetText(const String& text)
         }
     }
 
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     if(text_.IsEmpty()) {
         sel_anchor_ = -1;
         sel_caret_ = -1;
     }
     minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -727,9 +588,10 @@ UiLabel& UiLabel::EnableRich(bool on)
 {
     rich_enabled_ = on;
     text_ = rich_enabled_ ? BuildPlainTextFromSpans() : text_;
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -740,9 +602,10 @@ UiLabel& UiLabel::SetSpans(const Vector<Span>& spans)
     spans_ = clone(spans);
     rich_enabled_ = true;
     text_ = BuildPlainTextFromSpans();
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -753,9 +616,10 @@ UiLabel& UiLabel::ClearSpans()
     spans_.Clear();
     rich_enabled_ = false;
     text_.Clear();
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -766,9 +630,10 @@ UiLabel& UiLabel::AddSpan(const Span& span)
     spans_.Add(span);
     rich_enabled_ = true;
     text_ = BuildPlainTextFromSpans();
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -781,9 +646,10 @@ UiLabel& UiLabel::SetSpan(int i, const Span& span)
     spans_[i] = span;
     rich_enabled_ = true;
     text_ = BuildPlainTextFromSpans();
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -912,7 +778,9 @@ UiLabel& UiLabel::AppendAnsiText(const String& ansi)
                     st.ink = AnsiColor(code);
                 }
                 else if(code == 38 && k + 4 < codes.GetCount() && codes[k + 1] == 2) {
-                    st.ink = Color(clamp(codes[k + 2], 0, 255), clamp(codes[k + 3], 0, 255), clamp(codes[k + 4], 0, 255));
+                    st.ink = Color(min(max(codes[k + 2], 0), 255),
+                                   min(max(codes[k + 3], 0), 255),
+                                   min(max(codes[k + 4], 0), 255));
                     k += 4;
                 }
             }
@@ -925,9 +793,10 @@ UiLabel& UiLabel::AppendAnsiText(const String& ansi)
 
     rich_enabled_ = true;
     text_ = BuildPlainTextFromSpans();
-    RebuildTextLines();
+    RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
     layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -948,11 +817,11 @@ void UiLabel::CopySelectionToClipboard() const
 
 UiLabel& UiLabel::SetIcon(const Image& img)
 {
-    icon_          = img;
-    mono_icon_     = false;
+    icon_ = img;
+    mono_icon_ = false;
     minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -960,11 +829,11 @@ UiLabel& UiLabel::SetIcon(const Image& img)
 
 UiLabel& UiLabel::SetMonoIcon(const Image& img)
 {
-    icon_          = img;
-    mono_icon_     = true;
+    icon_ = img;
+    mono_icon_ = true;
     minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
@@ -972,96 +841,69 @@ UiLabel& UiLabel::SetMonoIcon(const Image& img)
 
 UiLabel& UiLabel::ClearIcon()
 {
-    icon_          = Image();
-    mono_icon_     = false;
+    icon_ = Image();
+    mono_icon_ = false;
     minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     Refresh();
     return *this;
 }
 
-// ============================================================================
-// Layout / Alignment API
-// ============================================================================
-
 UiLabel& UiLabel::SetIconLayout(UiAlign where)
 {
-    style_.icon_layout = where;
-    minsize_dirty_     = true;
-    layout_dirty_      = true;
-
-    RefreshLayout();
-    Refresh();
+    StyleEdit().icon_layout = where;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetAlign(UiAlign h, UiAlign v)
 {
-    style_.align_h = h;
-    style_.align_v = v;
-    layout_dirty_  = true;
-
-    RefreshLayout();
-    Refresh();
+    Style& style = StyleEdit();
+    style.align_h = h;
+    style.align_v = v;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetAlignH(UiAlign h)
 {
-    style_.align_h = h;
-    layout_dirty_  = true;
-
-    RefreshLayout();
-    Refresh();
+    StyleEdit().align_h = h;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetAlignV(UiAlign v)
 {
-    style_.align_v = v;
-    layout_dirty_  = true;
-
-    RefreshLayout();
-    Refresh();
+    StyleEdit().align_v = v;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetIconMargin(const Rect& m)
 {
-    style_.icon_margin = m;
-    minsize_dirty_     = true;
-    layout_dirty_      = true;
-
-    RefreshLayout();
-    Refresh();
+    StyleEdit().icon_margin = m;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetTextMargin(const Rect& m)
 {
-    style_.text_margin = m;
-    minsize_dirty_     = true;
-    layout_dirty_      = true;
-
-    RefreshLayout();
-    Refresh();
+    StyleEdit().text_margin = m;
+    OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetUnderline(bool on, int thickness, int offset)
 {
-    style_.underline        = on;
-    style_.underline_width  = max(thickness, 0);
-    style_.underline_offset = offset;
-    Refresh();
+    Style& style = StyleEdit();
+    style.underline = on;
+    style.underline_width = max(thickness, 0);
+    style.underline_offset = offset;
+    OnStyleChanged();
     return *this;
 }
-
-// ============================================================================
-// Layout / Sizing
-// ============================================================================
 
 Size UiLabel::GetMinSize() const
 {
@@ -1069,7 +911,6 @@ Size UiLabel::GetMinSize() const
         return cached_minsize_;
 
     Size natural = ComputeNaturalSize();
-
     int w = natural.cx;
     int h = natural.cy;
 
@@ -1079,14 +920,15 @@ Size UiLabel::GetMinSize() const
         h = max(h, user_min_size_.cy);
 
     cached_minsize_ = Size(w, h);
-    minsize_dirty_  = false;
+    minsize_dirty_ = false;
     return cached_minsize_;
 }
 
 void UiLabel::Layout()
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
-    Rect content = UiStyledInnerRect(outer, style_.metrics, style_.skin);
+    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
 
     if(!layout_dirty_ && content == layout_content_)
         return;
@@ -1099,43 +941,38 @@ UiLabel& UiLabel::SetSizeMin(Size sz)
 {
     user_min_size_ = sz;
     Ctrl::SetMinSize(sz);
-
     minsize_dirty_ = true;
-    layout_dirty_  = true;
-
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
     return *this;
 }
-
-// ============================================================================
-// Paint
-// ============================================================================
-
 void UiLabel::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
     if(outer.IsEmpty())
         return;
 
-    bool        enabled   = IsEnabled();
-    bool        has_focus = HasFocus();
-    StyledState st        = ResolveStyledState(enabled, false, false);
+    const bool enabled = IsEnabled();
+    const bool has_focus = HasFocus();
+    const StyledState state = ResolveStyledState(enabled, false, false);
 
-    StyledPalette& p = style_.palette;
-    StyledMetrics& m = style_.metrics;
-    StyledSkin&    s = style_.skin;
+    const StyledPalette& p = style.palette;
+    const StyledMetrics& m = style.metrics;
+    const StyledSkin& s = style.skin;
 
     if(WhenPaintBackground)
-        WhenPaintBackground(w, outer, p, m, s, st, has_focus);
+        WhenPaintBackground(w, outer, p, m, s, state, has_focus);
     else
-        UiPaintStyledBackground(w, outer, p, m, s, st, has_focus);
+        UiPaintStyledBackground(w, outer, p, m, s, state, has_focus);
 
-    Font fnt = m.use_text_font ? m.text_font : style_.font;
+    Font fnt = m.use_text_font ? m.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
-    Color ink = p.ink[st];
-    Color icon_ink = UiResolveIconColor(p, st);
+    Color ink = p.ink[state];
+    Color icon_ink = UiResolveIconColor(p, state);
     if(IsNull(icon_ink))
         icon_ink = ink;
 
@@ -1152,7 +989,7 @@ void UiLabel::Paint(Draw& w)
             total_h += gap * (rich_line_sizes.GetCount() - 1);
 
         int start_y;
-        switch(style_.align_v) {
+        switch(style.align_v) {
         case UiAlign::BOTTOM:
             start_y = layout_.main.bottom - total_h;
             break;
@@ -1171,7 +1008,7 @@ void UiLabel::Paint(Draw& w)
             Size lsz = rich_line_sizes[i];
 
             int x;
-            switch(style_.align_h) {
+            switch(style.align_h) {
             case UiAlign::CENTER: x = layout_.main.left + (layout_.main.GetWidth() - lsz.cx) / 2; break;
             case UiAlign::RIGHT:  x = layout_.main.right - lsz.cx; break;
             case UiAlign::LEFT:
@@ -1224,116 +1061,115 @@ void UiLabel::Paint(Draw& w)
         bool draw_sel = HasSelection() && !layout_.main.IsEmpty() && !text_.IsEmpty();
 
         if(!draw_sel && !lines_.IsEmpty() && !layout_.main.IsEmpty()) {
-        UiPaintStyledText(w,
-                          layout_.main,
-                          lines_,
-                          line_sizes_,
-                          style_.align_h,
-                          style_.align_v,
-                          fnt,
-                          ink,
-                          has_access_mnemonic_ ? accesskey_ : 0,
-                          style_.underline,
-                          style_.underline_width,
-                          style_.underline_offset);
+            UiPaintStyledText(w,
+                              layout_.main,
+                              lines_,
+                              line_sizes_,
+                              style.align_h,
+                              style.align_v,
+                              fnt,
+                              ink,
+                              has_access_mnemonic_ ? accesskey_ : 0,
+                              style.underline,
+                              style.underline_width,
+                              style.underline_offset);
         }
         else if(draw_sel && !lines_.IsEmpty() && !layout_.main.IsEmpty()) {
-        const int gap = UiStyledTextLineGap();
-        int total_h = 0;
-        for(int i = 0; i < lines_.GetCount(); i++)
-            total_h += line_sizes_[i].cy;
-        if(lines_.GetCount() > 1)
-            total_h += gap * (lines_.GetCount() - 1);
+            const int gap = UiStyledTextLineGap();
+            int total_h = 0;
+            for(int i = 0; i < lines_.GetCount(); i++)
+                total_h += line_sizes_[i].cy;
+            if(lines_.GetCount() > 1)
+                total_h += gap * (lines_.GetCount() - 1);
 
-        int start_y;
-        switch(style_.align_v) {
-        case UiAlign::BOTTOM:
-            start_y = layout_.main.bottom - total_h;
-            break;
-        case UiAlign::CENTER:
-            start_y = layout_.main.top + (layout_.main.GetHeight() - total_h) / 2;
-            break;
-        case UiAlign::TOP:
-        default:
-            start_y = layout_.main.top;
-            break;
-        }
-
-        int y = start_y;
-        int text_ofs = 0;
-        int sf = SelFrom();
-        int st = SelTo();
-
-        for(int i = 0; i < lines_.GetCount(); i++) {
-            const String& line = lines_[i];
-            const Size& sz = line_sizes_[i];
-            int line_len = line.GetCount();
-
-            int line_x;
-            switch(style_.align_h) {
+            int start_y;
+            switch(style.align_v) {
+            case UiAlign::BOTTOM:
+                start_y = layout_.main.bottom - total_h;
+                break;
             case UiAlign::CENTER:
-                line_x = layout_.main.left + (layout_.main.GetWidth() - sz.cx) / 2;
+                start_y = layout_.main.top + (layout_.main.GetHeight() - total_h) / 2;
                 break;
-            case UiAlign::RIGHT:
-                line_x = layout_.main.right - sz.cx;
-                break;
-            case UiAlign::LEFT:
+            case UiAlign::TOP:
             default:
-                line_x = layout_.main.left;
+                start_y = layout_.main.top;
                 break;
             }
 
-            int lf = text_ofs;
-            int lt = text_ofs + line_len;
-            int hs0 = max(sf, lf);
-            int hs1 = min(st, lt);
+            int y = start_y;
+            int text_ofs = 0;
+            int sf = SelFrom();
+            int st = SelTo();
 
-            if(hs0 < hs1) {
-                int x0 = line_x;
-                int x1 = line_x + sz.cx;
-                int a = hs0 - lf;
-                int b = hs1 - lf;
-                if(a > 0)
-                    x0 = line_x + GetTextSize(line.Left(a), fnt).cx;
-                if(b < line_len)
-                    x1 = line_x + GetTextSize(line.Left(b), fnt).cx;
-                if(x1 > x0)
-                    w.DrawRect(x0, y, x1 - x0, sz.cy, SColorHighlight());
+            for(int i = 0; i < lines_.GetCount(); i++) {
+                const String& line = lines_[i];
+                const Size& sz = line_sizes_[i];
+                int line_len = line.GetCount();
 
-                String pre = line.Left(a);
-                String mid = line.Mid(a, b - a);
-                String post = line.Mid(b);
-                int x = line_x;
-                if(!pre.IsEmpty()) {
-                    w.DrawText(x, y, pre, fnt, ink);
-                    x += GetTextSize(pre, fnt).cx;
+                int line_x;
+                switch(style.align_h) {
+                case UiAlign::CENTER:
+                    line_x = layout_.main.left + (layout_.main.GetWidth() - sz.cx) / 2;
+                    break;
+                case UiAlign::RIGHT:
+                    line_x = layout_.main.right - sz.cx;
+                    break;
+                case UiAlign::LEFT:
+                default:
+                    line_x = layout_.main.left;
+                    break;
                 }
-                if(!mid.IsEmpty()) {
-                    w.DrawText(x, y, mid, fnt, SColorHighlightText());
-                    x += GetTextSize(mid, fnt).cx;
+
+                int lf = text_ofs;
+                int lt = text_ofs + line_len;
+                int hs0 = max(sf, lf);
+                int hs1 = min(st, lt);
+
+                if(hs0 < hs1) {
+                    int x0 = line_x;
+                    int x1 = line_x + sz.cx;
+                    int a = hs0 - lf;
+                    int b = hs1 - lf;
+                    if(a > 0)
+                        x0 = line_x + GetTextSize(line.Left(a), fnt).cx;
+                    if(b < line_len)
+                        x1 = line_x + GetTextSize(line.Left(b), fnt).cx;
+                    if(x1 > x0)
+                        w.DrawRect(x0, y, x1 - x0, sz.cy, SColorHighlight());
+
+                    String pre = line.Left(a);
+                    String mid = line.Mid(a, b - a);
+                    String post = line.Mid(b);
+                    int x = line_x;
+                    if(!pre.IsEmpty()) {
+                        w.DrawText(x, y, pre, fnt, ink);
+                        x += GetTextSize(pre, fnt).cx;
+                    }
+                    if(!mid.IsEmpty()) {
+                        w.DrawText(x, y, mid, fnt, SColorHighlightText());
+                        x += GetTextSize(mid, fnt).cx;
+                    }
+                    if(!post.IsEmpty())
+                        w.DrawText(x, y, post, fnt, ink);
                 }
-                if(!post.IsEmpty())
-                    w.DrawText(x, y, post, fnt, ink);
-            }
-            else {
-                if(!line.IsEmpty())
+                else if(!line.IsEmpty()) {
                     w.DrawText(line_x, y, line, fnt, ink);
-            }
+                }
 
-            text_ofs += line_len;
-            if(i + 1 < lines_.GetCount())
-                text_ofs += 1;
-            y += sz.cy;
-            if(i + 1 < lines_.GetCount())
-                y += gap;
-        }
+                text_ofs += line_len;
+                if(i + 1 < lines_.GetCount())
+                    text_ofs += 1;
+                y += sz.cy;
+                if(i + 1 < lines_.GetCount())
+                    y += gap;
+            }
         }
     }
 
     if(WhenPaintForeground)
-        WhenPaintForeground(w, outer, p, m, s, st, has_focus);
+        WhenPaintForeground(w, outer, p, m, s, state, has_focus);
     else
-        UiPaintStyledForeground(w, outer, p, m, s, st, has_focus);
+        UiPaintStyledForeground(w, outer, p, m, s, state, has_focus);
 }
 
 void UiLabel::LeftDown(Point p, dword)
@@ -1373,7 +1209,6 @@ void UiLabel::LeftUp(Point p, dword)
 
 bool UiLabel::Key(dword key, int count)
 {
-    (void)count;
     if(!selectable_text_)
         return Ctrl::Key(key, count);
 
@@ -1415,10 +1250,6 @@ void UiLabel::LostFocus()
     }
 }
 
-// ============================================================================
-// Accessibility & access keys
-// ============================================================================
-
 String UiLabel::GetDesc() const
 {
     if(!text_.IsEmpty())
@@ -1439,8 +1270,6 @@ void UiLabel::AssignAccessKeys(dword used)
         return;
     }
 
-    // Optional: auto-assign ONLY when there was no '&' markup.
-    // This runs rarely, so scanning text_ here is fine.
     WString wtxt = text_.ToWString();
     for(int i = 0; i < wtxt.GetCount(); i++) {
         wchar c = wtxt[i];
@@ -1454,6 +1283,5 @@ void UiLabel::AssignAccessKeys(dword used)
 
     Ctrl::AssignAccessKeys(used);
 }
-
 
 } // namespace Upp

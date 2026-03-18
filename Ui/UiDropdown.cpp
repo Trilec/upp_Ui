@@ -1,4 +1,5 @@
 #include <Ui/UiDropdown.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -87,68 +88,47 @@ const UiDropdown::Style& UiDropdown::StyleDefault()
     return s;
 }
 
-const UiDropdown::Style& UiDropdown::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiDropdown::Style& UiDropdown::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        s.metrics.face_enabled = false;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(5);
-        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
-        for(int i = 0; i < 4; i++)
-            s.palette.frame[i] = frame;
-        
-        s.indicator_margin = Rect(DPI(4), 0, DPI(4), 0);
-        s.label_margin     = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
-    }
-    return s;
-}
-
-const UiDropdown::Style& UiDropdown::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        Color face = Blend(SColorFace(), SColorPaper(), 205);
-        for(int i = 0; i < 4; i++)
-            s.palette.face[i] = UiFill::Solid(face);
-        s.metrics.radius = DPI(10);
-        s.popup_radius = DPI(8);
-    }
-    return s;
-}
-
-const UiDropdown::Style& UiDropdown::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style(StyleDefault());
-        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
-        Color frame = DkColor(SColorHighlight(), 28);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = SColorText();
-        }
-        s.metrics.radius = DPI(8);
-        s.popup_radius = DPI(6);
-    }
-    return s;
-}
-
 // ----------------------------------------------------------------------------
 // Constructor
 // ----------------------------------------------------------------------------
 
-UiDropdown::UiDropdown()
-    : style_(StyleDefault())
+void UiDropdown::InvalidateStyleCache()
 {
+    theme_revision_ = 0;
+}
+
+UiDropdown::Style& UiDropdown::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiDropdown::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    style_ = UiTheme::ResolveDropdown();
+    theme_revision_ = revision;
+}
+
+const UiDropdown::Style& UiDropdown::GetEffectiveStyle() const
+{
+    const_cast<UiDropdown*>(this)->SyncThemeStyle();
+    return style_;
+}
+
+UiDropdown::UiDropdown()
+{
+    SyncThemeStyle();
     Transparent();
     WantFocus();
     
@@ -166,6 +146,7 @@ UiDropdown::UiDropdown()
     SyncItemsFromModel();
     
     RebuildIndicator();
+    OnStyleChanged();
     NotifyCheckedCountIfChanged(true);
 }
 
@@ -813,6 +794,7 @@ UiDropdown& UiDropdown::SetIndicatorGlyphs(const Image& closed, const Image& ope
     style_.glyph_closed = closed;
     style_.glyph_opened = opened;
     RebuildIndicator();
+    OnStyleChanged();
     return *this;
 }
 
@@ -821,6 +803,7 @@ UiDropdown& UiDropdown::SetIndicatorScale(bool on, int size)
     style_.indicator_scale = on;
     style_.indicator_size = size;
     RebuildIndicator();
+    OnStyleChanged();
     return *this;
 }
 
@@ -950,17 +933,33 @@ UiDropdown& UiDropdown::UseInternalModel()
 UiDropdown& UiDropdown::SetStyle(const Style& s)
 {
     style_ = Style(s);
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiDropdown& UiDropdown::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
+    SyncThemeStyle();
     OnStyleChanged();
     return *this;
 }
 
 void UiDropdown::OnStyleChanged()
 {
-    if(style_.transparent)
+    const Style& style = GetEffectiveStyle();
+    if(style.transparent)
         Transparent();
     else
         BackPaint();
-    
+
+    layout_dirty_ = true;
     RebuildIndicator();
     RefreshLayout();
     Refresh();
@@ -1114,6 +1113,7 @@ void UiDropdown::OpenPopupInternal()
     
     popup_open_ = true;
     RebuildIndicator();
+    OnStyleChanged();
     UpdatePopupPosition();
     popup_.PopUp(this, true, true, false);
     popup_.SyncWindowRegion();
@@ -1136,6 +1136,7 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
     
     popup_open_ = false;
     RebuildIndicator();
+    OnStyleChanged();
     popup_.Close();
 
     if(apply_index >= 0 && apply_index != selected_index_) {
@@ -1550,7 +1551,6 @@ bool UiDropdown::PopupWindow::Key(dword key, int count)
 void UiDropdown::PopupWindow::Init(UiDropdown* dropdown_owner)
 {
     owner = dropdown_owner;
-    vscroll_.SetStyle(UiScrollBar::StyleMinimal());
     vscroll_.ShowArrows(false);
     vscroll_.EnableThinIdle(false);
     vscroll_.EnableAutoHide(false);
@@ -1651,7 +1651,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
                              bg_met,
                              owner->style_.skin,
                              ST_NORMAL,
-                             false, false, false, false);
+                             false, false, false);
     }
     else {
         StyledPalette pop_pal;
@@ -1672,6 +1672,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
         pop_met.frame_enabled = false;
         pop_met.face_enabled = true;
         pop_met.dashed = false;
+        pop_met.focus_enabled = false;
 
         StyledSkin pop_skin = owner->style_.skin;
         // Popup chrome must be independent from control 9-slice skin in this mode,
@@ -1679,7 +1680,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
         pop_skin.enabled = false;
         pop_skin.base = Null;
         UiPaintStyledSurface(w, r, pop_pal, pop_met, pop_skin, ST_NORMAL,
-                             false, false, false, false);
+                             false, false, false);
     }
     
     Font item_font = owner->style_.popup_item_style.font;
@@ -2152,3 +2153,7 @@ UiDropdown& UiDropdown::SetSizeMin(Size sz)
 }
 
 } // namespace Upp
+
+
+
+

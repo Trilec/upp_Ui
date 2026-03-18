@@ -1,4 +1,5 @@
 #include <Ui/UiScrollPanel.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -6,82 +7,25 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        Color face  = Blend(SColorFace(), White(), 16);
-        Color frame = Blend(SColorShadow(), Black(), 18);
-        Color ink   = SColorText();
+        Color face = Color(248, 250, 252);
+        Color frame = Color(226, 232, 240);
+        Color ink = Color(15, 23, 42);
 
         for(int i = 0; i < 4; i++) {
-            s.palette.face[i]  = UiFill::Solid(face);
+            s.palette.face[i] = UiFill::Solid(face);
             s.palette.frame[i] = frame;
-            s.palette.ink[i]   = ink;
+            s.palette.ink[i] = ink;
         }
-        s.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorDisabled(), 50));
+        s.palette.face[ST_HOT] = UiFill::Solid(Color(241, 245, 249));
+        s.palette.face[ST_PRESSED] = UiFill::Solid(Color(226, 232, 240));
+        s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+        s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.metrics.radius        = DPI(8);
-        s.metrics.frame_width   = DPI(1);
-        s.metrics.frame_enabled = true;
-        s.metrics.face_enabled  = true;
-        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
-    }
-    return s;
-}
-
-const UiScrollPanel::Style& UiScrollPanel::StyleStandard()
-{
-    return StyleDefault();
-}
-
-const UiScrollPanel::Style& UiScrollPanel::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.metrics.face_enabled = false;
+        s.metrics.radius = DPI(12);
         s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(4);
-        Color frame = Blend(SColorShadow(), SColorPaper(), 145);
-        for(int i = 0; i < 4; i++)
-            s.palette.frame[i] = frame;
-    }
-    return s;
-}
-
-const UiScrollPanel::Style& UiScrollPanel::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = Blend(SColorFace(), SColorPaper(), 205);
-        for(int i = 0; i < 4; i++)
-            s.palette.face[i] = UiFill::Solid(face);
-        s.metrics.radius = DPI(10);
-    }
-    return s;
-}
-
-const UiScrollPanel::Style& UiScrollPanel::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
-        Color frame = DkColor(SColorHighlight(), 28);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(face);
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = SColorText();
-        }
-        s.metrics.radius = DPI(8);
-    }
-    return s;
-}
-
-const UiScrollPanel::Style& UiScrollPanel::StyleFlat()
-{
-    static Style s;
-    ONCELOCK {
-        s = StyleDefault();
-        s.metrics.radius = 0;
+        s.metrics.frame_enabled = true;
+        s.metrics.face_enabled = true;
+        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     }
     return s;
 }
@@ -100,19 +44,74 @@ UiScrollPanel::UiScrollPanel()
     };
     sb_.WhenLeftClick << [=] { SetFocus(); };
 
+    SyncThemeStyle();
     BackPaint();
+}
+
+void UiScrollPanel::InvalidateStyleCache()
+{
+    theme_revision_ = 0;
+}
+
+UiScrollPanel::Style& UiScrollPanel::StyleEdit()
+{
+    if(!has_style_override_) {
+        style_ = GetEffectiveStyle();
+        has_style_override_ = true;
+    }
+    InvalidateStyleCache();
+    return style_;
+}
+
+void UiScrollPanel::SyncThemeStyle()
+{
+    if(has_style_override_)
+        return;
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+
+    Style resolved = StyleDefault();
+    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    resolved.palette = panel.palette;
+    resolved.metrics.radius = max(DPI(10), panel.metrics.radius);
+    resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
+    resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
+    resolved.metrics.face_enabled = panel.metrics.face_enabled;
+    resolved.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    style_ = resolved;
+    theme_revision_ = revision;
+}
+
+const UiScrollPanel::Style& UiScrollPanel::GetEffectiveStyle() const
+{
+    const_cast<UiScrollPanel*>(this)->SyncThemeStyle();
+    return style_;
 }
 
 UiScrollPanel& UiScrollPanel::SetStyle(const Style& s)
 {
     style_ = s;
+    has_style_override_ = true;
+    OnStyleChanged();
+    return *this;
+}
+
+UiScrollPanel& UiScrollPanel::ClearStyleOverride()
+{
+    if(!has_style_override_)
+        return *this;
+    has_style_override_ = false;
+    style_ = StyleDefault();
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
 
 void UiScrollPanel::OnStyleChanged()
 {
-    if(style_.transparent)
+    const Style& style = GetEffectiveStyle();
+    if(style.transparent)
         Transparent();
     else
         BackPaint();
@@ -224,7 +223,8 @@ void UiScrollPanel::ApplyScroll()
 
 void UiScrollPanel::Layout()
 {
-    Rect content_area = UiStyledInnerRect(GetSize(), style_.metrics, style_.skin);
+    const Style& style = GetEffectiveStyle();
+    Rect content_area = UiStyledInnerRect(GetSize(), style.metrics, style.skin);
     content_bounds_ = MeasureContentBounds();
 
     int logical_w = max(content_area.GetWidth(), content_bounds_.GetWidth());
@@ -237,14 +237,18 @@ void UiScrollPanel::Layout()
 
 Size UiScrollPanel::GetMinSize() const
 {
-    Size base = UiStyledOuterSizeFromContent(Size(DPI(80), DPI(60)), style_.metrics, style_.skin);
-    if(user_min_size_.cx > 0) base.cx = max(base.cx, user_min_size_.cx);
-    if(user_min_size_.cy > 0) base.cy = max(base.cy, user_min_size_.cy);
+    const Style& style = GetEffectiveStyle();
+    Size base = UiStyledOuterSizeFromContent(Size(DPI(80), DPI(60)), style.metrics, style.skin);
+    if(user_min_size_.cx > 0)
+        base.cx = max(base.cx, user_min_size_.cx);
+    if(user_min_size_.cy > 0)
+        base.cy = max(base.cy, user_min_size_.cy);
     return base;
 }
 
 void UiScrollPanel::Paint(Draw& w)
 {
+    const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
     if(outer.IsEmpty())
         return;
@@ -256,18 +260,17 @@ void UiScrollPanel::Paint(Draw& w)
     bool fg_handled = false;
 
     if(WhenPaintBackground) {
-        WhenPaintBackground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        WhenPaintBackground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         bg_handled = true;
     }
 
     if(WhenPaintForeground) {
-        WhenPaintForeground(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus);
+        WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         fg_handled = true;
     }
 
-    // See UiDraw.h: UiPaintStyledSurface contract (hook order + fallback).
-    UiPaintStyledSurface(w, outer, style_.palette, style_.metrics, style_.skin, st, has_focus,
-                         bg_handled, fg_handled, style_.show_focus);
+    UiPaintStyledSurface(w, outer, style.palette, style.metrics, style.skin, st, has_focus, bg_handled, fg_handled);
 }
 
 }
+

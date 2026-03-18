@@ -168,6 +168,13 @@ UiTreeNodeRef UiTreeModel::GetParent(UiTreeNodeRef node) const
         return UiTreeNodeRef{-1};
     return UiTreeNodeRef{nodes_[node.id].parent};
 }
+int UiTreeModel::GetChildIndex(UiTreeNodeRef node) const
+{
+    if(!IsValid(node) || node.id == root_id_)
+        return -1;
+    int parent = nodes_[node.id].parent;
+    return parent >= 0 ? FindIndex(nodes_[parent].children, node.id) : -1;
+}
 
 const UiModelItem& UiTreeModel::Get(UiTreeNodeRef node) const
 {
@@ -239,8 +246,13 @@ bool UiTreeModel::Move(UiTreeNodeRef node, UiTreeNodeRef new_parent, int pos)
     int old_parent = nodes_[node.id].parent;
     Vector<int>& old_ch = nodes_[old_parent].children;
     int old_pos = FindIndex(old_ch, node.id);
-    if(old_pos >= 0)
-        old_ch.Remove(old_pos);
+    if(old_pos < 0)
+        return false;
+    if(new_parent.id == old_parent && pos < 0)
+        pos = old_ch.GetCount() - 1;
+    if(new_parent.id == old_parent && pos > old_pos)
+        pos--;
+    old_ch.Remove(old_pos);
 
     Vector<int>& dst = nodes_[new_parent.id].children;
     pos = (pos < 0) ? dst.GetCount() : min(max(pos, 0), dst.GetCount());
@@ -470,3 +482,4 @@ UiGraphModel UiGraphModel::FromTree(const UiTreeModel& tree, UiTreeNodeRef root)
 }
 
 }
+

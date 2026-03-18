@@ -1,5 +1,6 @@
 #include "UiFloatEdit.h"
 #include <Ui/UiDraw.h>
+#include <Ui/UiTheme.h>
 #include <cmath>
 
 namespace Upp {
@@ -10,7 +11,7 @@ UiFloatEdit::UiFloatEdit()
 {
     auto SetupSpin = [&](UiButton& b, bool up) {
         b.SetText("");
-        b.SetSubtleStyle();
+        b.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         b.SetMinSize(Size(DPI(16), DPI(14)));
         
         UiButton* btn_ptr = &b;
@@ -161,3 +162,4 @@ void UiFloatEdit::MouseWheel(Point p, int zdelta, dword keyflags)
 }
 
 } // namespace Upp
+

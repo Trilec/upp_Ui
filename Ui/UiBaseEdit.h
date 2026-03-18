@@ -42,7 +42,7 @@ namespace Upp {
 class UiBaseEdit; // forward
 
 // ---------------------------------------------------------------------------
-// SideHandle - lightweight proxy for UiBaseEdit “side” items
+// SideHandle - lightweight proxy for UiBaseEdit ?side? items
 // ---------------------------------------------------------------------------
 class SideHandle {
 public:
@@ -129,10 +129,6 @@ public:
     };
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
 
 protected:
     // ------------------------------------------------------------------------
@@ -169,6 +165,9 @@ protected:
     // Internal View & State
     // ------------------------------------------------------------------------
     Style       style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool        has_style_override_ = false;
     ScrollBars  sb_;
     Scroller    scroller_;
     Size        font_size_ {0, 0};   // Cached font size
@@ -230,7 +229,10 @@ protected:
     virtual WString GetDisplayLine(int i) const { return GetWLine(i); }
     
     int          GetVisualLineHeight() const;
-    const Style& GetEffectiveStyle() const { return style_; }
+    void         InvalidateStyleCache();
+    Style&       StyleEdit();
+    void         SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     Size         GetFontCellSize() const { return font_size_; }
 
     // Core Data Ops
@@ -296,7 +298,7 @@ public:
     
     UiBaseEdit& SetPlaceholder(const String& s) {
         placeholder_text_ = s;
-        Font fnt = style_.font;
+        Font fnt = GetEffectiveStyle().font;
         if(IsNull(fnt))
             fnt = StdFont();
         placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : GetTextSize(placeholder_text_, fnt).cx;
@@ -325,8 +327,8 @@ public:
     // Layout & Alignment
     // ------------------------------------------------------------------------
     
-    UiBaseEdit& SetTextAlign(UiAlign a) { style_.text_align = a; OnStyleChanged(); return *this; }
-    UiAlign     GetTextAlign() const    { return style_.text_align; }
+    UiBaseEdit& SetTextAlign(UiAlign a) { StyleEdit().text_align = a; OnStyleChanged(); return *this; }
+    UiAlign     GetTextAlign() const    { return GetEffectiveStyle().text_align; }
 
     // ------------------------------------------------------------------------
     // Side Controls (left/right/top/bottom)
@@ -374,11 +376,13 @@ public:
     // ------------------------------------------------------------------------
     
     UiBaseEdit&     SetStyle(const Style& s);
-    const Style&    GetStyle() const { return style_; }
+    UiBaseEdit&     ClearStyleOverride();
+    bool            HasStyleOverride() const { return has_style_override_; }
+    const Style&    GetStyle() const { return GetEffectiveStyle(); }
     
-    StyledPalette&  StyledPaletteRef()  { return style_.palette; }
-    StyledMetrics&  StyledMetricsRef()  { return style_.metrics; }
-    StyledSkin&     StyledSkinRef()     { return style_.skin;    }
+    StyledPalette&  StyledPaletteRef()  { return StyleEdit().palette; }
+    StyledMetrics&  StyledMetricsRef()  { return StyleEdit().metrics; }
+    StyledSkin&     StyledSkinRef()     { return StyleEdit().skin;    }
     void            OnStyleChanged();
 
     // ------------------------------------------------------------------------
@@ -481,3 +485,4 @@ public:
 } // namespace Upp
 
 #endif
+

@@ -38,18 +38,18 @@ public:
             .SetAlign(UiAlign::LEFT, UiAlign::TOP)
             .SetInkColor(SColorDisabled());
 
-        c1.SetText("Standard Active").SetStyle(UiCheckBox::StyleClassic()).SetChecked(true);
+        c1.SetText("Standard Active").SetChecked(true);
 
-        c2.SetText("Standard Disabled").SetStyle(UiCheckBox::StyleClassic()).SetChecked(false).Disable();
+        c2.SetText("Standard Disabled").SetChecked(false).Disable();
 
-        c3.SetText("Solid Active (Filled)").SetStyle(UiCheckBox::StyleChip()).SetChecked(true);
+        c3.SetText("Solid Active (Filled)").SetVisual(UICHECKVIS_CHIP).SetChecked(true);
 
-        c4.SetText("Solid Disabled (Filled)").SetStyle(UiCheckBox::StyleChip()).SetChecked(false).Disable();
+        c4.SetText("Solid Disabled (Filled)").SetVisual(UICHECKVIS_CHIP).SetChecked(false).Disable();
         c4.SetPadding(DPI(10), DPI(6), DPI(10), DPI(6));
 
-        c5.SetText("Switch style").SetStyle(UiCheckBox::StyleSwitch()).SetChecked(true);
+        c5.SetText("Switch style").SetVisual(UICHECKVIS_SWITCH).SetChecked(true);
 
-        c6.SetText("9-slice chip").SetStyle(UiCheckBox::StyleChip()).SetChecked(true);
+        c6.SetText("9-slice chip").SetVisual(UICHECKVIS_CHIP).SetChecked(true);
         Image skin = MakeSliceSkin(24, 24, Color(180, 220, 255), Color(120, 170, 230));
         c6.SetFill9Slice(skin, Rect(6, 6, 6, 6), true).SetInset(DPI(2)).SetPadding(DPI(10), DPI(6), DPI(10), DPI(6));
     }
@@ -78,3 +78,4 @@ GUI_APP_MAIN
 {
     UiCheckBoxDemoWindow().Run();
 }
+

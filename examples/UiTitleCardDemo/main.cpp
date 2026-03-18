@@ -86,7 +86,7 @@ private:
 
     void SetupCards()
     {
-        UiTitleCard::Style hs = UiTitleCard::StyleSquare();
+        UiTitleCard::Style hs = UiTitleCard::StyleDefault();
         hs.metrics.frame_width = DPI(1);
         hs.metrics.radius = 0;
         hs.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
@@ -99,7 +99,7 @@ private:
                 .SetCopyText("Cards below: some are selectable (focus ring + hover), some are static headers/tiles.")
                 .ShowRule(false)
                 .EnableHover(false)
-                .EnableFocusRing(false)
+                .SetShowFocus(false)
                 .SetSelectable(false);
 
         Image neo_skin = MakeNeoSkin30();
@@ -120,7 +120,7 @@ private:
                 .SetMediaSharePercent(50)
                 .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
                 .SetRuleStyle(SOLID)
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
 
         UiTitleCard::Style s1 = UiTitleCard::StyleDefault();
         s1.skin.enabled = true;
@@ -137,9 +137,9 @@ private:
                 .SetMediaSide(UiAlign::TOP)
                 .SetMediaSharePercent(38)
                 .SetRuleStyle(DOTTED)
-                .EnableHover(true).EnableFocusRing(true).SetSelectable(true);
+                .EnableHover(true).SetShowFocus(true).SetSelectable(true);
 
-        UiTitleCard::Style s2 = UiTitleCard::StyleSquare();
+        UiTitleCard::Style s2 = UiTitleCard::StyleDefault();
         s2.metrics.frame_width = DPI(2);
         s2.palette.face[ST_NORMAL] = UiFill::Solid(Color(247, 244, 232));
         s2.palette.frame[ST_NORMAL] = Color(44, 44, 44);
@@ -152,7 +152,7 @@ private:
                 .SetMediaSharePercent(35)
                 .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
                 .SetRuleStyle(DASHED)
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
 
         UiTitleCard::Style s3 = UiTitleCard::StyleDefault();
         s3.metrics.content_padding = Rect(DPI(10), DPI(9), DPI(10), DPI(9));
@@ -165,7 +165,7 @@ private:
                 .SetMediaSharePercent(30)
                 .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
                 .SetRuleStyle(SOLID)
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
 
         UiTitleCard::Style s4 = UiTitleCard::StyleDefault();
         s4.metrics.face_enabled = false;
@@ -179,7 +179,7 @@ private:
                 .SetMediaSide(UiAlign::RIGHT)
                 .SetMediaSharePercent(28)
                 .SetRuleStyle(SOLID)
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
         cards[4].WhenPaintBackground = [=](Draw& w, const Rect& rr,
                                            const StyledPalette&, const StyledMetrics&, const StyledSkin&,
                                            StyledState st, bool) {
@@ -205,7 +205,7 @@ private:
                 .SetMediaSharePercent(45)
                 .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
                 .SetRuleStyle(SOLID)
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
 
         UiTitleCard::Style s6 = UiTitleCard::StyleDefault();
         s6.metrics.frame_enabled = false;
@@ -216,7 +216,7 @@ private:
                 .SetCopyText("clean typography focus")
                 .ShowRule(false)
                 .ClearMedia()
-                .EnableHover(false).EnableFocusRing(false).SetSelectable(false);
+                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
 
         for(int i = 7; i < 9; i++) {
             UiTitleCard::Style ss = UiTitleCard::StyleDefault();
@@ -233,7 +233,7 @@ private:
                     .SetMedia(CtrlImg::Dir(), Size(DPI(20), DPI(20)))
                     .SetMediaSide(i == 7 ? UiAlign::LEFT : UiAlign::RIGHT)
                     .SetMediaSharePercent(24)
-                    .EnableHover(true).EnableFocusRing(true).SetSelectable(true);
+                    .EnableHover(true).SetShowFocus(true).SetSelectable(true);
         }
     }
 
@@ -246,3 +246,4 @@ GUI_APP_MAIN
 {
     UiTitleCardDemoWindow().Run();
 }
+

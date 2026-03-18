@@ -23,29 +23,25 @@ public:
         StyledMetrics metrics;
         StyledSkin    skin;
         bool transparent = false;
-        bool show_focus  = false;
 
         void Serialize(Stream& s)
         {
-            s % palette % metrics % skin % transparent % show_focus;
+            s % palette % metrics % skin % transparent;
         }
     };
 
     UiScrollPanel();
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleFlat();
 
     UiScrollPanel& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiScrollPanel& ClearStyleOverride();
+    bool           HasStyleOverride() const { return has_style_override_; }
+    const Style&   GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     UiScrollPanel& SetScrollMode(UiScrollPanelMode m);
@@ -73,12 +69,18 @@ public:
           StyledState, bool> WhenPaintForeground;
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     Rect MeasureContentBounds() const;
     void UpdateScrollbars();
     void ApplyScroll();
 
 private:
     Style style_;
+    uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
     UiScrollPanelMode mode_ = UIPANELSCROLL_AUTO;
 
     ScrollBars sb_;

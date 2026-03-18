@@ -40,7 +40,7 @@ public:
         Image glyph_closed;
         Image glyph_lock;
         bool chevron_scale = false;
-        int  chevron_size  = 0; // px, used when chevron_scale=true (0 -> default)
+        int  chevron_size  = 0;
 
         bool unified_section_frame = false;
         int  unified_section_radius = DPI(7);
@@ -48,11 +48,10 @@ public:
 
         UiSpan body_line_extent = NONE;
         UiLineStyle body_line_style = SOLID;
-        int          body_line_thickness = 1;
-        Color        body_line_color;
+        int         body_line_thickness = 1;
+        Color       body_line_color;
 
-        bool transparent   = false;
-        bool show_focus    = false;
+        bool transparent = false;
 
         bool animation_enabled = true;
         int  anim_open_ms      = 120;
@@ -72,7 +71,7 @@ public:
               % unified_section_frame % unified_section_radius % unified_section_frame_width
               % blex % blst % body_line_thickness % body_line_color
               % animation_enabled % anim_open_ms % anim_close_ms
-              % transparent % show_focus;
+              % transparent;
 
             body_line_extent = (UiSpan)blex;
             body_line_style = (UiLineStyle)blst;
@@ -118,17 +117,15 @@ public:
     virtual ~UiAccordion();
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
 
     UiAccordion& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiAccordion& ClearStyleOverride();
+    bool         HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     int AddSection(const String& title,
@@ -182,7 +179,7 @@ public:
     virtual Value GetData() const override;
 
     Event<int, bool> WhenSectionToggled;
-    Event<int, int>  WhenReordered; // (from, before)
+    Event<int, int>  WhenReordered;
     Event<int>       WhenRemoved;
     Event<int>       WhenAdded;
 
@@ -195,6 +192,10 @@ public:
           StyledState, bool> WhenPaintForeground;
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     int  MeasureSectionBodyHeight(const Section& s, int width) const;
     void ApplySectionStyle(Section& s, int index);
     void RefreshChevron(Section& s);
@@ -209,6 +210,8 @@ private:
 
 private:
     Style style_;
+    uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
     Array<Section> sections_;
 
     bool drag_reorder_enabled_ = false;

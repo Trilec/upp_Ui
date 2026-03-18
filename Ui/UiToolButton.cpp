@@ -1,10 +1,10 @@
-#include <Ui/UiButton.h>
+#include <Ui/UiToolButton.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
 
-Image UiButton::ResolveIconForState(StyledState st) const
+Image UiToolButton::ResolveIconForState(StyledState st) const
 {
     const Style& style = GetEffectiveStyle();
     const Image* icons = style.icon_images;
@@ -23,7 +23,7 @@ Image UiButton::ResolveIconForState(StyledState st) const
     return Image();
 }
 
-Size UiButton::GetStableIconSize() const
+Size UiToolButton::GetStableIconSize() const
 {
     const Style& style = GetEffectiveStyle();
     Size best(0, 0);
@@ -38,20 +38,20 @@ Size UiButton::GetStableIconSize() const
     return best;
 }
 
-const UiButton::Style& UiButton::StyleDefault()
+const UiToolButton::Style& UiToolButton::StyleDefault()
 {
-    static UiButton::Style s;
+    static UiToolButton::Style s;
     ONCELOCK {
-        const Color text_primary   = Color(17, 24, 39);
+        const Color text_primary   = Color(48, 57, 71);
         const Color text_muted     = Color(107, 114, 128);
-        const Color border_neutral = Color(209, 213, 219);
-        const Color face_hot       = Color(243, 244, 246);
-        const Color face_pressed   = Color(229, 231, 235);
-        const Color accent         = Color(37, 99, 235);
+        const Color border_neutral = Null;
+        const Color face_hot       = Color(242, 244, 247);
+        const Color face_pressed   = Color(232, 236, 241);
+        const Color accent         = Color(112, 122, 138);
 
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::None();
-            s.palette.frame[i] = border_neutral;
+            s.palette.frame[i] = Null;
             s.palette.ink[i] = text_primary;
             s.palette.icon[i] = Null;
         }
@@ -60,9 +60,9 @@ const UiButton::Style& UiButton::StyleDefault()
         s.palette.face[ST_PRESSED]  = UiFill::Solid(face_pressed);
         s.palette.face[ST_DISABLED] = UiFill::None();
 
-        s.palette.frame[ST_HOT]      = DkColor(border_neutral, 8);
-        s.palette.frame[ST_PRESSED]  = DkColor(border_neutral, 14);
-        s.palette.frame[ST_DISABLED] = Color(229, 231, 235);
+        s.palette.frame[ST_HOT]      = Null;
+        s.palette.frame[ST_PRESSED]  = Null;
+        s.palette.frame[ST_DISABLED] = Null;
 
         s.palette.ink[ST_HOT]      = text_primary;
         s.palette.ink[ST_PRESSED]  = text_primary;
@@ -70,10 +70,10 @@ const UiButton::Style& UiButton::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
-        s.metrics.radius = 0;
+        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.radius = DPI(4);
         s.metrics.frame_width = DPI(1);
-        s.metrics.frame_enabled = true;
+        s.metrics.frame_enabled = false;
         s.metrics.face_enabled = true;
         s.metrics.dashed = false;
         s.metrics.high_contrast = false;
@@ -90,9 +90,9 @@ const UiButton::Style& UiButton::StyleDefault()
 
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
-        s.icon_layout = UiAlign::LEFT;
+        s.icon_layout = UiAlign::CENTER;
         s.icon_margin = Rect(0, 0, 0, 0);
-        s.text_margin = Rect(DPI(6), 0, 0, 0);
+        s.text_margin = Rect(0, 0, 0, 0);
         s.icon_tint_mono = true;
 
         for(int i = 0; i < 4; i++)
@@ -102,7 +102,7 @@ const UiButton::Style& UiButton::StyleDefault()
         s.underline_width = DPI(1);
         s.underline_offset = DPI(2);
 
-        s.palette.frame[ST_DISABLED] = Blend(border_neutral, SColorPaper(), 150);
+        s.palette.frame[ST_DISABLED] = Null;
         s.palette.ink[ST_DISABLED] = Blend(text_muted, SColorPaper(), 40);
         s.palette.icon[ST_NORMAL] = accent;
         s.palette.icon[ST_HOT] = accent;
@@ -112,14 +112,14 @@ const UiButton::Style& UiButton::StyleDefault()
     return s;
 }
 
-UiButton::UiButton()
+UiToolButton::UiToolButton()
     : style_(StyleDefault())
     , themed_style_(StyleDefault())
 {
     BackPaint();
     WantFocus();
 
-    user_min_size_ = Size(DPI(70), DPI(24));
+    user_min_size_ = Size(DPI(28), DPI(28));
     SyncThemeStyle();
     RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;
@@ -127,7 +127,7 @@ UiButton::UiButton()
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
-void UiButton::InvalidateStyleCache()
+void UiToolButton::InvalidateStyleCache()
 {
     theme_revision_ = 0;
     minsize_dirty_ = true;
@@ -135,7 +135,7 @@ void UiButton::InvalidateStyleCache()
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
-UiButton::Style& UiButton::StyleEdit()
+UiToolButton::Style& UiToolButton::StyleEdit()
 {
     if(!has_style_override_) {
         style_ = GetEffectiveStyle();
@@ -145,7 +145,7 @@ UiButton::Style& UiButton::StyleEdit()
     return style_;
 }
 
-void UiButton::SyncThemeStyle()
+void UiToolButton::SyncThemeStyle()
 {
     if(has_style_override_)
         return;
@@ -154,7 +154,7 @@ void UiButton::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    themed_style_ = UiTheme::ResolveButton();
+    themed_style_ = UiTheme::ResolveToolButton();
     theme_revision_ = revision;
     RebuildTextLinesFromStyle(themed_style_);
     minsize_dirty_ = true;
@@ -162,12 +162,12 @@ void UiButton::SyncThemeStyle()
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
-void UiButton::RebuildTextLines()
+void UiToolButton::RebuildTextLines()
 {
     RebuildTextLinesFromStyle(GetEffectiveStyle());
 }
 
-void UiButton::RebuildTextLinesFromStyle(const Style& st)
+void UiToolButton::RebuildTextLinesFromStyle(const Style& st)
 {
     lines_.Clear();
     line_sizes_.Clear();
@@ -182,7 +182,7 @@ void UiButton::RebuildTextLinesFromStyle(const Style& st)
     UiBuildStyledTextLines(text_, fnt, lines_, line_sizes_);
 }
 
-UiButton& UiButton::SetStyle(const Style& s)
+UiToolButton& UiToolButton::SetStyle(const Style& s)
 {
     style_ = Style(s);
     has_style_override_ = true;
@@ -190,7 +190,7 @@ UiButton& UiButton::SetStyle(const Style& s)
     return *this;
 }
 
-UiButton& UiButton::ClearStyleOverride()
+UiToolButton& UiToolButton::ClearStyleOverride()
 {
     if(!has_style_override_)
         return *this;
@@ -202,16 +202,16 @@ UiButton& UiButton::ClearStyleOverride()
     return *this;
 }
 
-const UiButton::Style& UiButton::GetEffectiveStyle() const
+const UiToolButton::Style& UiToolButton::GetEffectiveStyle() const
 {
     if(has_style_override_)
         return style_;
 
-    const_cast<UiButton*>(this)->SyncThemeStyle();
+    const_cast<UiToolButton*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-void UiButton::OnStyleChanged()
+void UiToolButton::OnStyleChanged()
 {
     const Style& style = GetEffectiveStyle();
 
@@ -226,12 +226,12 @@ void UiButton::OnStyleChanged()
     Refresh();
 }
 
-Size UiButton::GetTextBlockSize() const
+Size UiToolButton::GetTextBlockSize() const
 {
     return UiMeasureStyledTextBlock(line_sizes_);
 }
 
-Size UiButton::ComputeNaturalSize() const
+Size UiToolButton::ComputeNaturalSize() const
 {
     const Style& style = GetEffectiveStyle();
 
@@ -260,7 +260,7 @@ Size UiButton::ComputeNaturalSize() const
     return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
 }
 
-void UiButton::UpdateLayout(const Rect& content) const
+void UiToolButton::UpdateLayout(const Rect& content) const
 {
     const Style& style = GetEffectiveStyle();
 
@@ -294,7 +294,7 @@ void UiButton::UpdateLayout(const Rect& content) const
     layout_dirty_ = false;
 }
 
-UiButton& UiButton::SetUnderline(bool on, int thickness, int offset)
+UiToolButton& UiToolButton::SetUnderline(bool on, int thickness, int offset)
 {
     Style& style = StyleEdit();
     style.underline = on;
@@ -304,7 +304,7 @@ UiButton& UiButton::SetUnderline(bool on, int thickness, int offset)
     return *this;
 }
 
-UiButton& UiButton::SetIconLayout(UiAlign layout)
+UiToolButton& UiToolButton::SetIconLayout(UiAlign layout)
 {
     if(layout != UiAlign::LEFT && layout != UiAlign::RIGHT &&
        layout != UiAlign::TOP  && layout != UiAlign::BOTTOM)
@@ -315,7 +315,7 @@ UiButton& UiButton::SetIconLayout(UiAlign layout)
     return *this;
 }
 
-UiButton& UiButton::SetAlign(UiAlign h, UiAlign v)
+UiToolButton& UiToolButton::SetAlign(UiAlign h, UiAlign v)
 {
     Style& style = StyleEdit();
     style.align_h = h;
@@ -324,35 +324,35 @@ UiButton& UiButton::SetAlign(UiAlign h, UiAlign v)
     return *this;
 }
 
-UiButton& UiButton::SetAlignH(UiAlign h)
+UiToolButton& UiToolButton::SetAlignH(UiAlign h)
 {
     StyleEdit().align_h = h;
     OnStyleChanged();
     return *this;
 }
 
-UiButton& UiButton::SetAlignV(UiAlign v)
+UiToolButton& UiToolButton::SetAlignV(UiAlign v)
 {
     StyleEdit().align_v = v;
     OnStyleChanged();
     return *this;
 }
 
-UiButton& UiButton::SetIconMargin(const Rect& m)
+UiToolButton& UiToolButton::SetIconMargin(const Rect& m)
 {
     StyleEdit().icon_margin = m;
     OnStyleChanged();
     return *this;
 }
 
-UiButton& UiButton::SetTextMargin(const Rect& m)
+UiToolButton& UiToolButton::SetTextMargin(const Rect& m)
 {
     StyleEdit().text_margin = m;
     OnStyleChanged();
     return *this;
 }
 
-UiButton& UiButton::SetText(const String& text)
+UiToolButton& UiToolButton::SetText(const String& text)
 {
     text_.Clear();
     accesskey_ = 0;
@@ -406,7 +406,7 @@ UiButton& UiButton::SetText(const String& text)
     return *this;
 }
 
-UiButton& UiButton::SetIcon(const Image& img)
+UiToolButton& UiToolButton::SetIcon(const Image& img)
 {
     Style& style = StyleEdit();
     for(int i = 0; i < 4; i++)
@@ -415,7 +415,7 @@ UiButton& UiButton::SetIcon(const Image& img)
     return *this;
 }
 
-UiButton& UiButton::SetIconState(const Image& img, StyledState state)
+UiToolButton& UiToolButton::SetIconState(const Image& img, StyledState state)
 {
     if(state < ST_NORMAL || state > ST_DISABLED)
         return *this;
@@ -425,7 +425,7 @@ UiButton& UiButton::SetIconState(const Image& img, StyledState state)
     return *this;
 }
 
-UiButton& UiButton::SetIcons(const Image& normal,
+UiToolButton& UiToolButton::SetIcons(const Image& normal,
                              const Image& hot,
                              const Image& pressed,
                              const Image& disabled)
@@ -439,7 +439,7 @@ UiButton& UiButton::SetIcons(const Image& normal,
     return *this;
 }
 
-UiButton& UiButton::ClearIcon()
+UiToolButton& UiToolButton::ClearIcon()
 {
     Style& style = StyleEdit();
     for(int i = 0; i < 4; i++)
@@ -448,7 +448,7 @@ UiButton& UiButton::ClearIcon()
     return *this;
 }
 
-void UiButton::UpdateVisualState()
+void UiToolButton::UpdateVisualState()
 {
     const bool enabled = IsEnabled();
 
@@ -470,7 +470,7 @@ void UiButton::UpdateVisualState()
     visual_state_ = mouse_over_ ? ST_HOT : ST_NORMAL;
 }
 
-UiButton& UiButton::SetCheckable(bool on)
+UiToolButton& UiToolButton::SetCheckable(bool on)
 {
     checkable_ = on;
     if(!checkable_)
@@ -480,7 +480,7 @@ UiButton& UiButton::SetCheckable(bool on)
     return *this;
 }
 
-UiButton& UiButton::SetChecked(bool on)
+UiToolButton& UiToolButton::SetChecked(bool on)
 {
     if(!checkable_)
         return *this;
@@ -493,7 +493,7 @@ UiButton& UiButton::SetChecked(bool on)
     return *this;
 }
 
-void UiButton::Activate_()
+void UiToolButton::Activate_()
 {
     if(!IsEnabled())
         return;
@@ -508,7 +508,7 @@ void UiButton::Activate_()
     WhenAction();
 }
 
-Size UiButton::GetMinSize() const
+Size UiToolButton::GetMinSize() const
 {
     if(!minsize_dirty_)
         return cached_minsize_;
@@ -527,14 +527,14 @@ Size UiButton::GetMinSize() const
     return cached_minsize_;
 }
 
-void UiButton::SetMinSize(Size sz)
+void UiToolButton::SetMinSize(Size sz)
 {
     user_min_size_ = sz;
     minsize_dirty_ = true;
     RefreshLayout();
 }
 
-void UiButton::Layout()
+void UiToolButton::Layout()
 {
     const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
@@ -547,14 +547,14 @@ void UiButton::Layout()
     UpdateLayout(content);
 }
 
-void UiButton::MouseEnter(Point, dword)
+void UiToolButton::MouseEnter(Point, dword)
 {
     mouse_over_ = true;
     UpdateVisualState();
     Refresh();
 }
 
-void UiButton::MouseLeave()
+void UiToolButton::MouseLeave()
 {
     mouse_over_ = false;
 
@@ -567,7 +567,7 @@ void UiButton::MouseLeave()
     Refresh();
 }
 
-void UiButton::LeftDown(Point, dword)
+void UiToolButton::LeftDown(Point, dword)
 {
     pressed_ = true;
     SetCapture();
@@ -577,7 +577,7 @@ void UiButton::LeftDown(Point, dword)
     Refresh();
 }
 
-void UiButton::LeftUp(Point p, dword)
+void UiToolButton::LeftUp(Point p, dword)
 {
     bool was_pressed = pressed_;
     pressed_ = false;
@@ -589,25 +589,25 @@ void UiButton::LeftUp(Point p, dword)
         Activate_();
 }
 
-void UiButton::GotFocus()
+void UiToolButton::GotFocus()
 {
     UpdateVisualState();
     Refresh();
 }
 
-void UiButton::LostFocus()
+void UiToolButton::LostFocus()
 {
     UpdateVisualState();
     Refresh();
 }
 
-UiButton& UiButton::ClickFocus(bool on)
+UiToolButton& UiToolButton::ClickFocus(bool on)
 {
     click_focus_ = on;
     return *this;
 }
 
-void UiButton::CancelMode()
+void UiToolButton::CancelMode()
 {
     if(pressed_ || mouse_over_) {
         pressed_ = false;
@@ -618,7 +618,7 @@ void UiButton::CancelMode()
     Ctrl::CancelMode();
 }
 
-bool UiButton::Key(dword key, int)
+bool UiToolButton::Key(dword key, int)
 {
     switch(key) {
     case K_SPACE:
@@ -631,7 +631,7 @@ bool UiButton::Key(dword key, int)
     return Ctrl::Key(key, 1);
 }
 
-void UiButton::Paint(Draw& w)
+void UiToolButton::Paint(Draw& w)
 {
     const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
@@ -699,19 +699,19 @@ void UiButton::Paint(Draw& w)
         UiPaintStyledForeground(w, outer, p, m, s, st, has_focus);
 }
 
-String UiButton::GetDesc() const
+String UiToolButton::GetDesc() const
 {
     if(!text_.IsEmpty())
         return text_;
     return t_("Button");
 }
 
-dword UiButton::GetAccessKeys() const
+dword UiToolButton::GetAccessKeys() const
 {
     return accesskey_ ? Ctrl::AccessKeyBit(accesskey_) : 0;
 }
 
-void UiButton::AssignAccessKeys(dword used)
+void UiToolButton::AssignAccessKeys(dword used)
 {
     if(has_access_mnemonic_ && accesskey_) {
         used |= Ctrl::AccessKeyBit(accesskey_);
@@ -733,8 +733,11 @@ void UiButton::AssignAccessKeys(dword used)
     Ctrl::AssignAccessKeys(used);
 }
 
-void UiButton::RebuildLook()
+void UiToolButton::RebuildLook()
 {
 }
 
 } // namespace Upp
+
+
+

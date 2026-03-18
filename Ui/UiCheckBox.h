@@ -40,41 +40,31 @@ public:
         UiAlign indicator_side = UiAlign::LEFT;
 
         int indicator_size = DPI(18);
+        Size indicator_extent = Size(0, 0);
         int indicator_gap = DPI(8);
         int mark_thickness = DPI(2);
 
-        UiCheckVisual visual = UICHECKVIS_CLASSIC;
-
         void Serialize(Stream& s)
         {
-            int vis = (int)visual;
             s % palette % metrics % skin
               % indicator_palette % indicator_metrics % indicator_skin
               % font % align_h % align_v % indicator_side
-              % indicator_size % indicator_gap % mark_thickness
-              % vis;
-            visual = (UiCheckVisual)vis;
+              % indicator_size % indicator_extent % indicator_gap % mark_thickness;
         }
     };
 
     static const Style& StyleDefault();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
-    static const Style& StyleClassic();
-    static const Style& StyleSwitch();
-    static const Style& StyleChip();
-    static const Style& StyleListCheck();
 
     UiCheckBox();
 
     UiCheckBox& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiCheckBox& ClearStyleOverride();
+    bool HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     UiCheckBox& SetText(const String& s);
@@ -90,7 +80,7 @@ public:
     bool IsChecked() const { return state_ == UICHECK_CHECKED; }
 
     UiCheckBox& SetVisual(UiCheckVisual vis);
-    UiCheckVisual GetVisual() const { return style_.visual; }
+    UiCheckVisual GetVisual() const { return visual_; }
 
     UiCheckBox& SetIndicatorSide(UiAlign side);
     UiCheckBox& SetIndicatorRadius(int px);
@@ -126,17 +116,24 @@ public:
     virtual Value GetData() const override;
 
 private:
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     Size GetTextSizeCached() const;
     void RebuildLayoutCache(const Rect& content) const;
     UiCheckBox& SetStateInternal(UiCheckState st, bool fire_action);
 
-private:
     Rect GetIndicatorRect(const Rect& r) const;
     Rect GetTextRect(const Rect& r, const Rect& ind) const;
     void Toggle_();
 
 private:
     Style style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
+    UiCheckVisual visual_ = UICHECKVIS_CLASSIC;
     String text_;
     UiCheckState state_ = UICHECK_UNCHECKED;
     bool tri_state_ = false;
@@ -156,3 +153,6 @@ private:
 }
 
 #endif
+
+
+

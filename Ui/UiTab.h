@@ -43,7 +43,6 @@ public:
         int  indicator_thickness = DPI(3);
         UiSpan indicator_span = LARGE;
         bool fill_tabs = false;
-        bool show_focus = true;
         UiTabVisual visual = UITAB_CLASSIC;
 
         void Serialize(Stream& s)
@@ -57,7 +56,7 @@ public:
             int sp = (int)indicator_span;
             s % sp;
             indicator_span = (UiSpan)sp;
-            s % fill_tabs % show_focus;
+            s % fill_tabs;
             int vv = (int)visual;
             s % vv;
             visual = (UiTabVisual)vv;
@@ -65,30 +64,25 @@ public:
     };
 
     static const Style& StyleDefault();
-    static const Style& StyleClassic();
-    static const Style& StyleUnderline();
-    static const Style& StyleSegmented();
-    static const Style& StyleRail();
-    static const Style& StyleDocument();
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
 
     UiTab();
 
     UiTab& SetStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiTab& ClearStyleOverride();
+    bool   HasStyleOverride() const { return has_style_override_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
 
-    StyledPalette& StyledPaletteRef() { return style_.palette; }
-    StyledMetrics& StyledMetricsRef() { return style_.metrics; }
-    StyledSkin&    StyledSkinRef()    { return style_.skin; }
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
 
     UiTab& SetPlacement(UiAlign side);
     UiAlign GetPlacement() const { return placement_; }
+    UiTab& SetVisual(UiTabVisual visual);
+    UiTabVisual GetVisual() const { return visual_; }
 
-    UiTab& SetFillTabs(bool on = true) { style_.fill_tabs = on; RefreshLayout(); Refresh(); return *this; }
+    UiTab& SetFillTabs(bool on = true) { StyleEdit().fill_tabs = on; RefreshLayout(); Refresh(); return *this; }
     UiTab& EnableCloseButtons(bool on = true) { show_close_buttons_ = on; RefreshLayout(); Refresh(); return *this; }
     UiTab& EnableDragHandles(bool on = true)  { show_drag_handles_ = on; RefreshLayout(); Refresh(); return *this; }
     bool   IsCloseButtonsEnabled() const { return show_close_buttons_; }
@@ -148,6 +142,10 @@ private:
         Rect   drag_rect;
     };
 
+    void InvalidateStyleCache();
+    Style& StyleEdit();
+    void SyncThemeStyle();
+    const Style& GetEffectiveStyle() const;
     void RebuildTextSize(TabItem& t);
     void RebuildAllTextSizes();
     void SyncPages();
@@ -160,6 +158,10 @@ private:
 
 private:
     Style       style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool has_style_override_ = false;
+    UiTabVisual visual_ = UITAB_CLASSIC;
     Vector<TabItem> tabs_;
     ParentCtrl  pane_;
 
