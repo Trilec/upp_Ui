@@ -127,6 +127,11 @@ UiButton::UiButton()
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
+UiButton::Style UiButton::ResolveThemeStyle() const
+{
+    return UiTheme::ResolveButton();
+}
+
 void UiButton::InvalidateStyleCache()
 {
     theme_revision_ = 0;
@@ -154,7 +159,7 @@ void UiButton::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    themed_style_ = UiTheme::ResolveButton();
+    themed_style_ = ResolveThemeStyle();
     theme_revision_ = revision;
     RebuildTextLinesFromStyle(themed_style_);
     minsize_dirty_ = true;

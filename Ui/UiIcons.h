@@ -1,6 +1,27 @@
 #ifndef _Ui_UiIcons_h_
 #define _Ui_UiIcons_h_
 
+/*
+    UiIcons
+    =======
+
+    Purpose
+    - Public inline icon factories used by Ui controls and demos.
+
+    Intent
+    - Keep icon assets centralized and generated as lightweight inline image
+      factories instead of scattering embedded icon payloads across controls.
+
+    Thread context
+    - Thread-neutral asset access.
+
+    Usage
+    - Include alongside UiDraw.h when using generated ICON_* factories.
+
+    Changelog
+    - 2026-03: added release-standard file documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <Ui/UiDataModels.h>
 // Inline U++ icons exported from Symbols Icon Picker (v0.3)
@@ -10996,3 +11017,5 @@ inline Image UiIconFromName(const String& icon_name)
 // End icon catalog helpers
 
 #endif
+
+

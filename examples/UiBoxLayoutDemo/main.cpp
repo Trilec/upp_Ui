@@ -32,8 +32,8 @@ public:
         info.SetText("Resize window to test wrapping, spacing and expand behavior.")
             .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
             .SetInkColor(SColorDisabled());
-        action.SetText("Action").SetAccentStyle();
-        cancel.SetText("Cancel").SetSubtleStyle();
+        action.SetText("Action").SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
+        cancel.SetText("Cancel").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
         row_bottom.Add(info).Expand(1).MinHeight(DPI(34));
         row_bottom.Add(action).Fixed(DPI(120)).MinHeight(DPI(34));
@@ -61,3 +61,5 @@ GUI_APP_MAIN
 {
     UiBoxLayoutDemoWindow().Run();
 }
+
+

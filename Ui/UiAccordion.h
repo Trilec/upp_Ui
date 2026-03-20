@@ -1,6 +1,31 @@
 #ifndef _Ui_UiAccordion_h_
 #define _Ui_UiAccordion_h_
 
+/*
+    UiAccordion
+    ===========
+
+    Purpose
+    - Composite accordion control with styled headers, animated section bodies,
+      and optional drag reorder.
+
+    Intent
+    - Expose sections as a first-class composite surface while keeping header
+      and body styling delegated to shared UiTitleCard and UiPanel style types.
+    - Public accessor names are explicit: GetSectionContent(),
+      GetSectionHeader(), and GetSectionBody().
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Add sections with AddSection(...), populate GetSectionContent(i), and
+      drive open state with Open()/Toggle().
+
+    Changelog
+    - 2026-03: normalized section accessor naming for release cleanup.
+*/
+
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
@@ -138,9 +163,9 @@ public:
     void Clear();
     int  GetCount() const { return sections_.GetCount(); }
 
-    ParentCtrl&  Content(int i);
-    UiTitleCard& Header(int i);
-    UiPanel&     Body(int i);
+    ParentCtrl&  GetSectionContent(int i);
+    UiTitleCard& GetSectionHeader(int i);
+    UiPanel&     GetSectionBody(int i);
 
     UiAccordion& SetSectionText(int i, const String& title,
                                 const String& subtitle = String(),

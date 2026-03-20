@@ -525,7 +525,7 @@ private:
         d.SetPopupItemHeight(DPI(36));
         d.SetPopupMaxItems(10);
         icon_model_ = UiIconListModel();
-        d.SetModel(&icon_model_);
+        d.SetModel(icon_model_);
         d.Select(0);
     }
 

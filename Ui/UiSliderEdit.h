@@ -1,6 +1,27 @@
 #ifndef _Ui_UiSliderEdit_h_
 #define _Ui_UiSliderEdit_h_
 
+/*
+    UiSliderEdit
+    ============
+
+    Purpose
+    - Composite helper that couples UiSlider with a numeric edit field.
+
+    Intent
+    - Remain a documented composition helper rather than a separate first-class
+      style family; appearance comes from the child controls it owns.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use when a slider and direct numeric entry should stay synchronized.
+
+    Changelog
+    - 2026-03: documented as a composition helper for release cleanup.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiSlider.h>
@@ -66,3 +87,5 @@ private:
 }
 
 #endif
+
+

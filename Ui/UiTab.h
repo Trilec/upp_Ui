@@ -1,6 +1,28 @@
 #ifndef _Ui_UiTab_h_
 #define _Ui_UiTab_h_
 
+/*
+    UiTab
+    -----
+
+    Purpose
+    - Styled tab-strip and page container for the Ui control family.
+
+    Intent
+    - Public API uses explicit active-tab naming instead of generic Set/Get.
+    - SetData/GetData mirrors the active tab index for generic control binding.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Add pages with Add(...), switch with SetActiveTab(...), and observe
+      user changes with WhenAction.
+
+    Changelog
+    - 2026-03: renamed active-tab accessors for release API cleanup.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -107,8 +129,8 @@ public:
     Ctrl&       GetPage(int i);
     const Ctrl& GetPage(int i) const;
 
-    UiTab& Set(int i);
-    int    Get() const { return active_; }
+    UiTab& SetActiveTab(int i);
+    int    GetActiveTab() const { return active_; }
 
     virtual void  SetData(const Value& v) override;
     virtual Value GetData() const override;

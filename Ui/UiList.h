@@ -1,6 +1,32 @@
 #ifndef _Ui_UiList_h_
 #define _Ui_UiList_h_
 
+/*
+    UiList
+    ======
+
+    Purpose
+    - Styled list control backed by UiListModel.
+
+    Intent
+    - Keep list rows lightweight and model-driven while exposing a stable
+      control-level selection contract through SetData()/GetData().
+    - Single-selection uses one scalar Value token.
+    - Multi-selection uses a ValueArray of selection tokens.
+    - Tokens resolve to UiModelItem.data when present, otherwise to the row index.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Bind an external model with SetModel(...) or populate GetInternalModel().
+    - Observe selection changes with WhenSelection.
+
+    Changelog
+    - 2026-03: added stable SetData/GetData selection contract and standardized
+      selection event naming for release cleanup.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -124,8 +150,10 @@ public:
     virtual bool Key(dword key, int count) override;
     virtual void GotFocus() override;
     virtual void LostFocus() override;
+    virtual void SetData(const Value& v) override;
+    virtual Value GetData() const override;
 
-    Event<> WhenSel;
+    Event<> WhenSelection;
     Event<> WhenAction;
     Event<int, const String&> WhenRename;
 
@@ -151,7 +179,13 @@ private:
     void SelectSingle(int index);
     void ToggleSelection(int index);
     void SelectRangeTo(int index, bool additive);
+
+    // Selection token helpers implement the public SetData/GetData contract.
+    Value GetSelectionToken(int index) const;
+    int ResolveSelectionIndex(const Value& token) const;
     void NotifySelectionChange();
+
+    // Inline rename helpers manage the transient editor lifetime.
     bool CommitRenameIfNeeded(Point p);
     void BeginRename(int index);
     void CommitRename();

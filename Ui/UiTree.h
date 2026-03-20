@@ -1,6 +1,33 @@
 #ifndef _Ui_UiTree_h_
 #define _Ui_UiTree_h_
 
+/*
+    UiTree
+    ------
+
+    Purpose
+    - Styled tree control backed by UiTreeModel.
+    - Supports single and multi-selection, expansion, lazy loading, inline
+      rename, accessory controls, and drag/drop reparenting.
+
+    Intent
+    - Public selection/data contract uses node data when available.
+    - Single-select GetData() returns one scalar selection token.
+    - Multi-select GetData() returns a ValueArray of selection tokens.
+    - Selection token fallback is the node id when the node has null data.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Bind an external model with SetModel(...) or populate GetInternalModel().
+    - Observe selection changes with WhenSelection.
+
+    Changelog
+    - 2026-03: standardized selection event naming and added SetData/GetData
+      selection contract for release cleanup.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -172,9 +199,11 @@ public:
     virtual bool Key(dword key, int count) override;
     virtual void GotFocus() override;
     virtual void LostFocus() override;
+    virtual void SetData(const Value& v) override;
+    virtual Value GetData() const override;
 
     Event<UiTreeNodeRef> WhenLazyLoad;
-    Event<> WhenSel;
+    Event<> WhenSelection;
     Event<> WhenAction;
     Event<UiTreeNodeRef, const String&> WhenRename;
 
@@ -191,6 +220,8 @@ private:
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
     void SyncModel();
+
+    // Visible-row cache and attached child-control layout are rebuilt outside Paint().
     void RebuildVisibleRows();
     void AddVisibleSubtree(int id, int depth);
     void EnsureLazyChildren(UiTreeNodeRef node);
@@ -216,6 +247,7 @@ private:
         bool valid = false;
     };
 
+    // Selection/data helpers implement the public node-token contract.
     void PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, bool hot) const;
     void PaintRow(Draw& w, int index, const Rect& row) const;
     void MoveCursorBy(int delta);
@@ -223,6 +255,8 @@ private:
     void SelectSingle(UiTreeNodeRef node);
     void ToggleSelection(UiTreeNodeRef node);
     void SelectRangeTo(UiTreeNodeRef node, bool additive);
+    Value GetSelectionToken(UiTreeNodeRef node) const;
+    UiTreeNodeRef ResolveSelectionNode(const Value& token) const;
     void NotifySelectionChange();
     Vector<UiTreeNodeRef> GetDragNodes(UiTreeNodeRef primary) const;
     bool CanMoveNodes(const Vector<UiTreeNodeRef>& nodes, UiTreeNodeRef new_parent, int pos) const;
@@ -237,6 +271,7 @@ private:
     void CancelRename();
 
 private:
+    // Style/theme state and model revision tracking feed the visible-row cache.
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
@@ -250,6 +285,8 @@ private:
     Index<int> expanded_ids_;
     Index<int> selected_ids_;
     Index<int> loading_ids_;
+
+    // Accessory controls are owned externally; the tree only tracks safe attached pointers.
     VectorMap<int, Vector<Ptr<Ctrl>>> node_ctrls_;
     bool root_visible_ = false;
     bool dnd_enabled_ = true;
@@ -267,6 +304,7 @@ private:
     bool drop_into_ = false;
     int scroll_y_ = 0;
 
+    // Inline rename state is transient and must not outlive the active edit session.
     InlineEditor inline_editor_;
     bool editing_ = false;
     int editing_id_ = -1;
@@ -275,6 +313,7 @@ private:
 }
 
 #endif
+
 
 
 

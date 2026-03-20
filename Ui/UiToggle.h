@@ -1,5 +1,27 @@
 #ifndef _Ui_UiToggle_h_
 #define _Ui_UiToggle_h_
+
+/*
+    UiToggle
+    ========
+
+    Purpose
+    - Styled on/off switch control.
+
+    Intent
+    - Keep boolean switch behavior explicit while staying aligned with the Ui
+      family action, theme, and invalidation contracts.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetData/GetData for generic boolean binding and WhenAction for user
+      commits.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
 #include <Animation/Animation.h>
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
@@ -104,6 +126,8 @@ private:
 };
 }
 #endif
+
+
 
 
 

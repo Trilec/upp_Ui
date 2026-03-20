@@ -1,6 +1,29 @@
 #ifndef _Ui_UiCheckBox_h_
 #define _Ui_UiCheckBox_h_
 
+/*
+    UiCheckBox
+    ========== 
+
+    Purpose
+    - Styled checkbox control supporting boolean and tri-state interaction.
+
+    Intent
+    - Keep toggle behavior and indicator visuals unified with the rest of the
+      Ui control family while allowing visual modes such as classic, switch,
+      chip, and list presentation.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Bind with SetData/GetData for generic boolean or tri-state use.
+    - Observe committed user toggles with WhenAction.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -153,6 +176,8 @@ private:
 }
 
 #endif
+
+
 
 
 

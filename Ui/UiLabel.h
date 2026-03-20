@@ -1,6 +1,28 @@
 #ifndef _Ui_UiLabel_h_
 #define _Ui_UiLabel_h_
 
+/*
+    UiLabel
+    =======
+
+    Purpose
+    - Styled text and icon label for display-only content.
+
+    Intent
+    - Serve as the baseline text/content presentation control for the Ui family,
+      with cached layout and render-only painting.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetText(), SetIcon(), and SetStyle() to configure static content.
+    - Use GetData()/SetData() only for generic control binding scenarios.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -222,3 +244,5 @@ public:
 } // namespace Upp
 
 #endif
+
+

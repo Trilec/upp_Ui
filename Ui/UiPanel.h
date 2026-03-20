@@ -1,6 +1,28 @@
 #ifndef _Ui_UiPanel_h_
 #define _Ui_UiPanel_h_
 
+/*
+    UiPanel
+    =======
+
+    Purpose
+    - Styled container control for painted panel surfaces.
+
+    Intent
+    - Keep appearance separate from child layout by exposing one shared panel
+      style contract used by composite controls and demos.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use as a visual surface/container when you need painted chrome around
+      child controls.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
@@ -69,3 +91,5 @@ public:
 } // namespace Upp
 
 #endif
+
+

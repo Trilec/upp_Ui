@@ -3,20 +3,27 @@
 
 /*
     UiDropdown
-    ----------
-    Style-driven dropdown for U++ Ui package.
+    ========== 
 
-    Design goals:
-    - Keep control logic lightweight and deterministic.
-    - Support rich popup rows (icon/check/description/right-text) without embedding child controls.
-    - Preserve strict popup lifecycle safety (close -> apply selection -> notify).
-    - Keep customization centralized in style/events instead of one-off APIs.
+    Purpose
+    - Styled dropdown/select control with optional rich popup rows and
+      multi-selection support.
 
-    Changelog (high level):
-    - 2026-02: stabilized popup lifecycle and mouse/focus behavior.
-    - 2026-02: added rich-row rendering, item grouping/separators, and type-ahead search.
-    - 2026-02: added optional custom row paint hook and query-text hook.
-    - 2026-02: added optional multi-select mode and checked-item aggregation APIs.
+    Intent
+    - Keep the popup lifecycle, item rendering, and model binding explicit
+      while avoiding one-off API growth for each row decoration case.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use the internal model by default, or bind explicitly with
+      SetModel(UiListModel&) and UseInternalModel().
+    - Use SetData/GetData for generic selection binding.
+
+    Changelog
+    - 2026-03: normalized external model binding semantics and documented the
+      release-standard control contract.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -128,6 +135,7 @@ public:
     };
 
 private:
+    // Style/theme state stays local; item content can come from an external model.
     Style  style_;
     mutable uint64 theme_revision_ = 0;
     bool has_style_override_ = false;
@@ -150,14 +158,14 @@ private:
     String type_search_;
     TimeStop type_search_clock_;
     
-    // Cached layout
+    // Cached layout for the collapsed control face; popup rows are laid out separately.
     mutable bool           layout_dirty_ = true;
     mutable UiBlocksLayout layout_;
     mutable Rect           layout_content_ = Rect(0, 0, 0, 0);
     mutable Size           cached_minsize_;
     Size                   user_min_size_ = Size(0, 0);
     
-    // Popup window
+    // Popup window owns transient list interaction and scrolling while the dropdown is open.
     class PopupWindow : public TopWindow {
     public:
         UiDropdown* owner = nullptr;
@@ -192,8 +200,9 @@ private:
     PopupWindow popup_;
     UiListModel internal_model_;
     UiListModel* model_ = nullptr;
+    Vector<UiListModel*> bound_models_;
     
-    // Internal helpers
+    // Internal helpers keep theme sync, popup lifetime, and model mirroring out of Paint().
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
@@ -205,13 +214,13 @@ private:
     void UpdatePopupPosition();
     void SyncPopupSelection();
     
-    // Hit testing
+    // Hit testing and display text helpers work against the collapsed face only.
     Rect GetIndicatorRect() const;
     Rect GetLabelRect() const;
     bool IsOverIndicator(Point p) const;
     void UpdateDisplayText();
     
-    // Item management helpers
+    // Item/model helpers keep the public API explicit even when using the internal model.
     int  FindItem(const String& text, bool case_sensitive = false) const;
     int  FindItemByData(const Value& data) const;
     int  FindItemByPrefix(const String& prefix, int start_index = 0) const;
@@ -220,6 +229,7 @@ private:
     String QueryItemSearchText(const Item& it, int index) const;
     void NotifyCheckedCountIfChanged(bool force = false);
     void SyncItemsFromModel();
+    void BindModel(UiListModel& model);
     UiModelItem ToModelItem(const Item& it) const;
     Item FromModelItem(const UiModelItem& it) const;
     
@@ -312,9 +322,10 @@ public:
     UiDropdown& SetPopupAutoClose(bool on = true);
     UiDropdown& SetPopupPinned(bool on = false); // Keep open after selection
 
-    // Optional external model binding. If not set, internal model is used.
-    UiDropdown& SetModel(UiListModel* model);
+    // Explicit external model binding. Call UseInternalModel() to switch back.
+    UiDropdown& SetModel(UiListModel& model);
     UiDropdown& UseInternalModel();
+    UiListModel& GetInternalModel() { return internal_model_; }
     UiListModel& GetModel() { return *model_; }
     const UiListModel& GetModel() const { return *model_; }
     
@@ -404,3 +415,6 @@ private:
 } // namespace Upp
 
 #endif
+
+
+

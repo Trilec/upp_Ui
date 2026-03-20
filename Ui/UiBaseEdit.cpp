@@ -223,7 +223,7 @@ void UiBaseEdit::Clear()
     SyncSb();
     PlaceCaret();
     Refresh();
-    WhenSel();
+    WhenSelection();
 }
 
 void UiBaseEdit::SetText(const WString& s)
@@ -571,7 +571,7 @@ void UiBaseEdit::SetSelection(int64 l, int64 h)
     h = minmax(h, (int64)0, total_wchars_);
     PlaceCaret(l, false);
     PlaceCaret(h, true);
-    WhenSel();
+    WhenSelection();
 }
 
 bool UiBaseEdit::GetSelection(int64& l, int64& h) const
@@ -598,7 +598,7 @@ void UiBaseEdit::ClearSelection()
     if(anchor_ >= 0) {
         anchor_ = -1;
         Refresh();
-        WhenSel();
+        WhenSelection();
     }
 }
 
@@ -1431,7 +1431,7 @@ void UiBaseEdit::PlaceCaret(int64 new_cursor, bool sel)
 
     if(selection_changed) {
         Refresh();             // repaint selection + caret
-        WhenSel();
+        WhenSelection();
     }
 
     ScrollToCaret();

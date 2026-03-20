@@ -1,6 +1,27 @@
 #ifndef _Ui_UiMultiEdit_h_
 #define _Ui_UiMultiEdit_h_
 
+/*
+    UiMultiEdit
+    ===========
+
+    Purpose
+    - Multi-line plain text editor built on UiBaseEdit.
+
+    Intent
+    - Reuse the shared edit engine while enabling multiline entry and scrolling
+      without introducing a separate styling model.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use for comments, notes, logs, and other multi-line text input surfaces.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <Ui/UiBaseEdit.h>
 
 namespace Upp {
@@ -62,3 +83,4 @@ public:
 } // namespace Upp
 
 #endif
+

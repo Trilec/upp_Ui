@@ -176,9 +176,9 @@ public:
         neo_acc.SetRect(m + col_w + g, top + row_h + g, col_w, row_h);
 
         if(compact_acc.GetCount() >= 3) {
-            Rect h0 = compact_acc.Header(0).GetSize();
-            Rect h1 = compact_acc.Header(1).GetSize();
-            Rect h2 = compact_acc.Header(2).GetSize();
+            Rect h0 = compact_acc.GetSectionHeader(0).GetSize();
+            Rect h1 = compact_acc.GetSectionHeader(1).GetSize();
+            Rect h2 = compact_acc.GetSectionHeader(2).GetSize();
             int hw = DPI(24), hh = DPI(18);
             compact_drag_a.SetRect(h0.right - hw - DPI(8), (h0.GetHeight() - hh) / 2, hw, hh);
             compact_drag_b.SetRect(h1.right - hw - DPI(8), (h1.GetHeight() - hh) / 2, hw, hh);
@@ -234,7 +234,7 @@ private:
         int b = policy_acc.AddSection("Appearance", "compact section", "style toggles", false);
         int c = policy_acc.AddSection("Integrations", "service links", "mixed controls", false);
 
-        policy_acc.Content(a).Add(policy_controls.SizePos());
+        policy_acc.GetSectionContent(a).Add(policy_controls.SizePos());
         policy_controls.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
         policy_controls.Add(row_policy_a).Fixed(DPI(30));
         policy_controls.Add(row_policy_b).Fixed(DPI(34));
@@ -292,7 +292,7 @@ private:
 
         policy_status.SetText("Open=1 | force-open=0 | force-closed=0").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
-        policy_acc.Content(b).Add(policy_appearance.SizePos());
+        policy_acc.GetSectionContent(b).Add(policy_appearance.SizePos());
         policy_appearance.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
         policy_appearance.Add(appearance_dark).Fixed(DPI(30));
         policy_appearance.Add(row_appearance_gradient).Fixed(DPI(30));
@@ -321,7 +321,7 @@ private:
         appearance_gap_slider.SetRange(0, 20).SetStep(1).SetValue(8).SetTicks(true, 5, 1);
         appearance_gap_value.SetText("8px").SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
 
-        policy_acc.Content(c).Add(policy_notes.SizePos());
+        policy_acc.GetSectionContent(c).Add(policy_notes.SizePos());
         policy_notes.SetText("Policy accordion demo:\n- lock open/closed\n- single-open\n- enforce-one");
 
         policy_acc.SetSectionBodyHeight(a, DPI(204)).SetSectionBodyHeight(b, DPI(152)).SetSectionBodyHeight(c, DPI(92));
@@ -522,17 +522,17 @@ private:
         compact_drag_a.SetStyle(drag_style).SetText("").SetIcon(drag_icon).SetIconScale(true).Tip("Drag handle").IgnoreMouse();
         compact_drag_b.SetStyle(drag_style).SetText("").SetIcon(drag_icon).SetIconScale(true).Tip("Drag handle").IgnoreMouse();
         compact_drag_c.SetStyle(drag_style).SetText("").SetIcon(drag_icon).SetIconScale(true).Tip("Drag handle").IgnoreMouse();
-        compact_acc.Header(a).Add(compact_drag_a);
-        compact_acc.Header(b).Add(compact_drag_b);
-        compact_acc.Header(c).Add(compact_drag_c);
+        compact_acc.GetSectionHeader(a).Add(compact_drag_a);
+        compact_acc.GetSectionHeader(b).Add(compact_drag_b);
+        compact_acc.GetSectionHeader(c).Add(compact_drag_c);
 
-        compact_acc.Content(a).Add(compact_a.SizePos());
+        compact_acc.GetSectionContent(a).Add(compact_a.SizePos());
         compact_a.SetText("Single rectangle feel: no gap, compact header.")
                 .SetAlign(UiAlign::LEFT, UiAlign::TOP)
                 .SetInset(DPI(8));
-        compact_acc.Content(b).Add(compact_b.SizePos());
+        compact_acc.GetSectionContent(b).Add(compact_b.SizePos());
         compact_b.SetText("Body can still host controls.").SetAlign(UiAlign::LEFT, UiAlign::TOP).SetInset(DPI(8));
-        compact_acc.Content(c).Add(compact_c.SizePos());
+        compact_acc.GetSectionContent(c).Add(compact_c.SizePos());
         compact_c.SetText("Hover + drag reorder active on headers.").SetAlign(UiAlign::LEFT, UiAlign::TOP).SetInset(DPI(8));
 
         compact_acc.SetSectionBodyHeight(a, DPI(74)).SetSectionBodyHeight(b, DPI(74)).SetSectionBodyHeight(c, DPI(74));
@@ -613,7 +613,7 @@ private:
             brutal_card.palette.ink[i] = Color(64, 73, 90);
         }
 
-        gradient_acc.Content(a).Add(brutal_top_wrap.SizePos());
+        gradient_acc.GetSectionContent(a).Add(brutal_top_wrap.SizePos());
         brutal_top_wrap.SetDirection(UiDirection::V).SetGap(0).SetInset(Rect(DPI(40), DPI(10), DPI(40), DPI(12)));
         brutal_top_wrap.Add(brutal_top_panel).Expand(1);
         brutal_top_panel.SetStyle(brutal_card);
@@ -659,7 +659,7 @@ private:
             icon_grid.Add(b);
         }
 
-        gradient_acc.Content(b).Add(brutal_nested_wrap.SizePos());
+        gradient_acc.GetSectionContent(b).Add(brutal_nested_wrap.SizePos());
         brutal_nested_wrap.SetDirection(UiDirection::V).SetGap(0).SetInset(Rect(DPI(40), DPI(10), DPI(40), DPI(18)));
         brutal_nested_wrap.Add(brutal_nested).Expand(1);
 
@@ -702,7 +702,7 @@ private:
         int n0 = brutal_nested.AddSection("Configuration Set", String(), String(), true);
         int n1 = brutal_nested.AddSection("Data Lifecycle", String(), String(), false);
 
-        brutal_nested.Content(n0).Add(brutal_cfg_wrap.SizePos());
+        brutal_nested.GetSectionContent(n0).Add(brutal_cfg_wrap.SizePos());
         brutal_cfg_wrap.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
         brutal_cfg_wrap.Add(brutal_cfg_row_a).Fixed(DPI(34));
         brutal_cfg_wrap.Add(brutal_cfg_row_b).Fixed(DPI(34));
@@ -732,7 +732,7 @@ private:
             .SetIconScale(true)
             .SetMinSize(Size(DPI(24), DPI(24)));
 
-        brutal_nested.Content(n1).Add(brutal_icon_grid.SizePos());
+        brutal_nested.GetSectionContent(n1).Add(brutal_icon_grid.SizePos());
         brutal_icon_grid.SetMode(UiGridLayout::Flow)
             .SetDirection(UiDirection::H)
             .SetWrap(true)
@@ -848,9 +848,9 @@ private:
         int a = neo_acc.AddSection("Profile Settings", "Manage your personal data and visibility preferences in a soft UI environment.", String(), true);
         int b = neo_acc.AddSection("Privacy Policy", "Soft stacked cards with left action glyphs.", String(), false);
 
-        neo_acc.Header(b).ShowRule(false);
+        neo_acc.GetSectionHeader(b).ShowRule(false);
 
-        neo_acc.Content(a).Add(neo_layout.SizePos());
+        neo_acc.GetSectionContent(a).Add(neo_layout.SizePos());
         neo_layout.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(DPI(8));
         neo_layout.Add(neo_btn_a).Fixed(DPI(120));
         neo_layout.Add(neo_btn_b).Fixed(DPI(120));
@@ -859,7 +859,7 @@ private:
         neo_btn_b.SetText("Apply").SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         neo_toggle.SetText("Auto").SetOn(true);
 
-        neo_acc.Content(b).Add(neo_text.SizePos());
+        neo_acc.GetSectionContent(b).Add(neo_text.SizePos());
         neo_text.SetText("This variant demonstrates nine-slice depth without custom paint hooks.").SetInset(DPI(8));
 
         neo_acc.SetSectionBodyHeight(a, DPI(78)).SetSectionBodyHeight(b, DPI(82));

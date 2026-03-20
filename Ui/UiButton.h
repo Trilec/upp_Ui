@@ -1,6 +1,33 @@
 #ifndef _Ui_UiButton_h_
 #define _Ui_UiButton_h_
 
+/*
+    UiButton
+    ========
+
+    Purpose
+    - General-purpose clickable command control with shared styled button behavior.
+
+    Intent
+    - Own the canonical button interaction, cache, and paint pipeline used by
+      button-like controls.
+    - Keep theme resolution overridable so specializations such as UiToolButton
+      can reuse behavior without duplicating the implementation.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetText(), SetIcon(), SetCheckable(), and SetStyle() to configure
+      button behavior and appearance.
+    - Paint() stays render-only; setters and style/theme changes drive cache
+      invalidation and layout refresh.
+
+    Changelog
+    - 2026-03: hardened as the shared button behavior base for UiButton and
+      UiToolButton while preserving per-control theme resolution.
+*/
+
 #include <type_traits>
 
 #include <Animation/Animation.h>
@@ -82,23 +109,26 @@ protected:
     Vector<String> lines_;
     Vector<Size>   line_sizes_;
 
+    // Cached layout derived from text/icon blocks and styled content insets.
     mutable UiBlocksLayout layout_;
     mutable bool           minsize_dirty_ = true;
     mutable bool           layout_dirty_  = true;
     mutable Size           cached_minsize_;
-
-    Rect layout_content_;
+    Rect                   layout_content_;
 
     void UpdateVisualState();
     void RebuildLook();
     void Activate_();
 
+    // Theme/style invalidation helpers centralize cache resets for subclasses.
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
 
     virtual Color AdjustInk(Color base_ink, StyledState st) const { return base_ink; }
+    virtual Style ResolveThemeStyle() const;
 
+    // Text and block layout helpers feed GetMinSize() and Paint().
     void RebuildTextLines();
     void RebuildTextLinesFromStyle(const Style& st);
     Size GetTextBlockSize() const;

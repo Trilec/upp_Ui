@@ -56,7 +56,7 @@ public:
         tree_.AddNodeCtrl(notifications_node_, info_button_);
         tree_.AddNodeCtrl(value_node_, value_edit_);
         tree_.AddNodeCtrl(value_node_, apply_button_);
-        tree_.WhenSel = [=] { SyncInspector(); };
+        tree_.WhenSelection = [=] { SyncInspector(); };
         tree_.WhenAction = [=] {
             UiTreeNodeRef n = tree_.GetCursor();
             if(model_.IsValid(n) && (model_.GetChildCount(n) > 0 || model_.Get(n).lazy_children))

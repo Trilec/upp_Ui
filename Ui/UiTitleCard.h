@@ -1,6 +1,28 @@
 #ifndef _Ui_UiTitleCard_h_
 #define _Ui_UiTitleCard_h_
 
+/*
+    UiTitleCard
+    ===========
+
+    Purpose
+    - Styled title/header card for labeled information blocks.
+
+    Intent
+    - Provide one shared header-oriented surface for cards, accordion headers,
+      and other title/subtitle/copy compositions.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetTitle(), SetSubtitle(), SetCopy(), and media helpers to build
+      display-only header compositions.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
@@ -163,3 +185,5 @@ private:
 }
 
 #endif
+
+

@@ -1,6 +1,28 @@
 #ifndef _Ui_UiStyle_h_
 #define _Ui_UiStyle_h_
 
+/*
+    UiStyle
+    =======
+
+    Purpose
+    - Shared styling primitives and geometry rules for Ui controls.
+
+    Intent
+    - Define the canonical palette/metrics/skin vocabulary used across the Ui
+      family so controls do not author parallel styling systems.
+
+    Thread context
+    - Thread-neutral data structures; GUI thread when used with live controls.
+
+    Usage
+    - Build control-local Style structs from these primitives and preserve the
+      shared frame -> inset -> padding geometry contract.
+
+    Changelog
+    - 2026-03: promoted the primitive-style header to release-standard format.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <Draw/Draw.h>
 

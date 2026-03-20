@@ -1,20 +1,31 @@
-// UiDoc public model + editor API.
-//
-// Thread context: GUI thread.
-// Mutation contract: all document mutations should go through Dispatch(tx)
-// or command handlers that delegate to Dispatch(tx).
 #ifndef _Ui_UiDoc_h_
 #define _Ui_UiDoc_h_
+
+/*
+    UiDoc
+    =====
+
+    Purpose
+    - Public model and editor API for the rich UiDoc document surface.
+
+    Intent
+    - Separate document transactions, selection state, and editor behavior from
+      the higher-level command and rendering helpers built on top of them.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Mutate document state through Dispatch(tx) or command helpers so selection
+      and change notifications remain coherent.
+
+    Changelog
+    - 2026-03: promoted the public header comment to release-standard format.
+*/
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
-
-template <class T>
-inline T clamp(const T& v, const T& lo, const T& hi)
-{
-    return v < lo ? lo : (hi < v ? hi : v);
-}
 
 namespace Upp {
 
@@ -74,8 +85,8 @@ struct UiDocCommandState {
     Value meta;
 };
 
-    struct UiDocChange : Moveable<UiDocChange> {
-        enum Type : byte {
+struct UiDocChange : Moveable<UiDocChange> {
+    enum Type : byte {
         REPLACE_TEXT,
         SET_BOLD,
         SET_ITALIC,
@@ -87,23 +98,23 @@ struct UiDocCommandState {
         TO_TITLE,
         SET_SELECTION,
         SET_BLOCK_META_RANGE,
-            ADJUST_MARGIN_RANGE,
-            SET_MARGIN_RANGE,
-            ADJUST_TEXT_SIZE,
-            ADJUST_LEADING,
-            ADJUST_TRACKING,
-            ANNOT_ADD,
-            ANNOT_REMOVE,
-            ANNOT_UPDATE,
-            ANNOT_FLAGS,
-            RESOURCE_ADD,
-            RESOURCE_REMOVE,
-            EMBED_INSERT,
-            EMBED_DELETE,
-            EMBED_UPDATE_PAYLOAD,
-            EMBED_UPDATE_LAYOUT,
-            STYLE_ABS_RANGE
-        } type = REPLACE_TEXT;
+        ADJUST_MARGIN_RANGE,
+        SET_MARGIN_RANGE,
+        ADJUST_TEXT_SIZE,
+        ADJUST_LEADING,
+        ADJUST_TRACKING,
+        ANNOT_ADD,
+        ANNOT_REMOVE,
+        ANNOT_UPDATE,
+        ANNOT_FLAGS,
+        RESOURCE_ADD,
+        RESOURCE_REMOVE,
+        EMBED_INSERT,
+        EMBED_DELETE,
+        EMBED_UPDATE_PAYLOAD,
+        EMBED_UPDATE_LAYOUT,
+        STYLE_ABS_RANGE
+    } type = REPLACE_TEXT;
 
     UiDocRange   range;
     WString      text;
@@ -635,7 +646,7 @@ public:
 
     void SetLineGap(int px) { style_.line_gap = max(0, px); InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
     int GetLineGap() const { return style_.line_gap; }
-    void SetTabSize(int n) { style_.tab_size = ::clamp(n, 1, 16); InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
+    void SetTabSize(int n) { style_.tab_size = clamp(n, 1, 16); InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
     int GetTabSize() const { return style_.tab_size; }
     void SetInsertTabAsSpaces(bool b) { insert_tab_as_spaces_ = b; }
     bool IsInsertTabAsSpaces() const { return insert_tab_as_spaces_; }
@@ -744,3 +755,6 @@ public:
 }
 
 #endif
+
+
+

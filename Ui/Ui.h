@@ -1,6 +1,28 @@
 #ifndef _Ui_Ui_h_
 #define _Ui_Ui_h_
 
+/*
+    Ui.h
+    ====
+
+    Purpose
+    - Public umbrella include for the Ui package.
+
+    Intent
+    - Provide one stable include point for application code that wants the full
+      Ui control family plus shared styling, drawing, theme, and model support.
+
+    Thread context
+    - GUI thread for control use; value/model types follow their own semantics.
+
+    Usage
+    - Include this header in applications that want the complete Ui package.
+    - Include narrower headers directly when compile isolation matters.
+
+    Changelog
+    - 2026-03: documented as the public umbrella surface for release cleanup.
+*/
+
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
 #include <CtrlLib/CtrlLib.h>     // Chameleon, SColor*, DrawFocus, etc.
 
@@ -38,3 +60,5 @@
 #include <Ui/UiList.h>
 
 #endif
+
+

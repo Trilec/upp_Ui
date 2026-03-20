@@ -1,6 +1,28 @@
 #ifndef _Ui_UiIntEdit_h_
 #define _Ui_UiIntEdit_h_
 
+/*
+    UiIntEdit
+    ---------
+
+    Purpose
+    - Integer edit control built on UiBaseEdit with optional spin buttons.
+
+    Intent
+    - Public API follows one compact numeric vocabulary: Min, Max,
+      MinMax, Step, NotNull, Loop, SetValue, and GetValue.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetData/GetData for generic control binding.
+    - Use SetValue/GetValue for typed integer work.
+
+    Changelog
+    - 2026-03: removed redundant alias setters/getters during public API cleanup.
+*/
+
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiButton.h>
 
@@ -19,15 +41,7 @@ public:
     UiIntEdit&  Step(int n);
     UiIntEdit&  NotNull(bool b = true);
 
-    // Canonical naming aliases
-    UiIntEdit&  SetMinValue(int n) { return Min(n); }
-    UiIntEdit&  SetMaxValue(int n) { return Max(n); }
-    UiIntEdit&  SetMinMaxValue(int min, int max) { return MinMax(min, max); }
-    UiIntEdit&  SetStepValue(int n) { return Step(n); }
-    UiIntEdit&  SetNotNull(bool b = true) { return NotNull(b); }
-    int         GetMinValue() const { return min_val_; }
-    int         GetMaxValue() const { return max_val_; }
-    int         GetStepValue() const { return step_val_; }
+
     
     UiIntEdit&  ShowSpin(bool b = true);
     bool        IsSpinVisible() const { return spin_visible_; }
@@ -75,3 +89,4 @@ protected:
 } // namespace Upp
 
 #endif
+

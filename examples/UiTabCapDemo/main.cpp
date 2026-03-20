@@ -138,7 +138,7 @@ public:
         Add(side_dl); Add(shape_dl);
 
         auto InitLabel = [&](UiLabel& lbl, const char* text) {
-            lbl.SetStyle(UiLabel::StyleStrong())
+            lbl.SetStyle(UiLabel::StyleDefault())
                .SetText(text)
                .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
                .SetFaceColor(Color(42, 48, 60))
@@ -155,7 +155,7 @@ public:
         InitLabel(padding_l, "Padding");
         InitLabel(side_l, "Side");
         InitLabel(shape_l, "Active shape");
-        hint_l.SetStyle(UiLabel::StyleMinimal())
+        hint_l.SetStyle(UiLabel::StyleDefault())
              .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
              .SetText("Shape dropdown applies to TAB 2 only; TAB 3 shows hover.")
              .SetInkColor(Color(214, 220, 232));
@@ -278,3 +278,4 @@ GUI_APP_MAIN
 {
     UiTabCapDemoWindow().Run();
 }
+

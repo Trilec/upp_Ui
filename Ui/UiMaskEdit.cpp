@@ -5,7 +5,7 @@ namespace Upp {
 UiMaskEdit::UiMaskEdit()
 {
     prompt_char_ = '_';
-    OverWriteMode(true);
+    SetOverwriteMode(true);
     SetAcceptsNewlines(false);
     SetAcceptsTabs(false);
     sb_.ShowY(false);

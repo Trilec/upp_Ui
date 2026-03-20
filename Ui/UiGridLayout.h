@@ -1,6 +1,29 @@
 #ifndef _Ui_UiGridLayout_h_
 #define _Ui_UiGridLayout_h_
 
+/*
+    UiGridLayout
+    ============
+
+    Purpose
+    - Hybrid flow/grid layout control for arranging child controls in rows,
+      columns, and grouped clusters.
+
+    Intent
+    - Provide a stronger layout helper than UiBoxLayout when grid-like
+      placement, wrapping, and cluster headers are required.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use Flow or Grid mode depending on whether wrapping or fixed cell
+      structure is the primary layout concern.
+
+    Changelog
+    - 2026-03: added release-standard file documentation.
+*/
+
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
@@ -484,3 +507,5 @@ private:
 } // namespace Upp
 
 #endif
+
+

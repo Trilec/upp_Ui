@@ -1,6 +1,28 @@
 #ifndef _Ui_UiLineEdit_h_
 #define _Ui_UiLineEdit_h_
 
+/*
+    UiLineEdit
+    ==========
+
+    Purpose
+    - Single-line text editor built on UiBaseEdit.
+
+    Intent
+    - Keep the UiBaseEdit text/caret/selection pipeline while enforcing the
+      standard single-line U++ editing contract.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use for single-line textual input; Enter triggers WhenAction and Tab is
+      left to normal focus navigation.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <Ui/UiBaseEdit.h>
 
 namespace Upp {
@@ -40,3 +62,5 @@ public:
 } // namespace Upp
 
 #endif
+
+

@@ -1,6 +1,28 @@
 #ifndef _Ui_UiBaseEdit_h_
 #define _Ui_UiBaseEdit_h_
 
+/*
+    UiBaseEdit
+    ========== 
+
+    Purpose
+    - Shared styled text-edit foundation for the Ui edit control family.
+
+    Intent
+    - Centralize text model, caret/selection logic, scrolling, side-control
+      composition, and the shared edit style contract in one place.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Derive specialized edits such as UiLineEdit, UiMaskEdit, and
+      UiPasswordEdit from this base instead of re-implementing edit behavior.
+
+    Changelog
+    - 2026-03: added release-standard file documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h> // For ChStyle, ScrollBars
 #include <Ui/UiStyle.h>      // Styling engine (UiAlign, UiDirection, StyledPalette, etc.)
@@ -308,16 +330,16 @@ public:
     }
     
     UiBaseEdit& SetAcceptsNewlines(bool b) { accepts_newlines_ = b; return *this; }
-    bool        IsAcceptsNewlines() const  { return accepts_newlines_; }
+    bool        AcceptsNewlines() const    { return accepts_newlines_; }
     
     UiBaseEdit& SetAcceptsTabs(bool b)     { accepts_tabs_ = b; return *this; }
-    bool        IsAcceptsTabs() const      { return accepts_tabs_; }
+    bool        AcceptsTabs() const        { return accepts_tabs_; }
     
     UiBaseEdit& SetAcceptsDrop(bool b)     { accepts_drop_ = b; return *this; }
-    bool        IsAcceptsDrop() const      { return accepts_drop_; }
+    bool        AcceptsDrop() const        { return accepts_drop_; }
     
-    UiBaseEdit& OverWriteMode(bool b)      { overwrite_ = b; PlaceCaret(); return *this; }
-    bool        IsOverWriteMode() const    { return overwrite_; }
+    UiBaseEdit& SetOverwriteMode(bool b)   { overwrite_ = b; PlaceCaret(); return *this; }
+    bool        IsOverwriteMode() const    { return overwrite_; }
     
     UiBaseEdit& ClickFocus(bool b = true)  { click_focus_ = b; return *this; }
     
@@ -446,7 +468,7 @@ public:
 
     Event<>   WhenAction;    // Fired on Enter (for LineEdit) or special event
     Event<>   WhenChange;    // Fired on any text modification
-    Event<>   WhenSel;       // Fired on selection change
+    Event<>   WhenSelection;   // Fired on selection change
     Event<>   WhenScroll;
     Event<Bar&> WhenBar;     // Context menu
 
@@ -485,4 +507,6 @@ public:
 } // namespace Upp
 
 #endif
+
+
 

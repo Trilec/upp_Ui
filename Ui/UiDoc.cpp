@@ -2,6 +2,16 @@
 
 #include <cwctype>
 
+namespace {
+
+template <class T>
+T ClampValue(const T& v, const T& lo, const T& hi)
+{
+    return v < lo ? lo : (hi < v ? hi : v);
+}
+
+} // namespace
+
 namespace Upp {
 
 // Helpers below keep table-cell run editing lightweight:
@@ -116,8 +126,8 @@ static ValueArray UiDocEnsureCellRunsPayload(const ValueMap& payload, int row, i
     int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
     rows = max(1, rows);
     cols = max(1, cols);
-    row = ::clamp(row, 0, rows - 1);
-    col = ::clamp(col, 0, cols - 1);
+    row = ClampValue(row, 0, rows - 1);
+    col = ClampValue(col, 0, cols - 1);
 
     if(payload.Find("cell_runs") >= 0 && payload["cell_runs"].Is<ValueArray>()) {
         ValueArray rr = payload["cell_runs"];
@@ -148,8 +158,8 @@ static void UiDocWriteCellRunsAndCells(ValueMap& payload, int row, int col, cons
     int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
     rows = max(1, rows);
     cols = max(1, cols);
-    row = ::clamp(row, 0, rows - 1);
-    col = ::clamp(col, 0, cols - 1);
+    row = ClampValue(row, 0, rows - 1);
+    col = ClampValue(col, 0, cols - 1);
 
     ValueArray old_cells;
     if(payload.Find("cells") >= 0 && payload["cells"].Is<ValueArray>())
@@ -206,7 +216,7 @@ static ValueArray UiDocInsertTextRunsAt(const ValueArray& src, int pos, const WS
             WString t = AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString();
             int len = t.GetCount();
             if(!inserted && pos <= at + len) {
-                int off = ::clamp(pos - at, 0, len);
+                int off = ClampValue(pos - at, 0, len);
                 WString l = t.Left(off);
                 WString r = t.Mid(off);
                 if(!l.IsEmpty()) out.Add(UiDocMakeTextRun(l));
@@ -248,7 +258,7 @@ static ValueArray UiDocInsertImageRunAt(const ValueArray& src, int pos, const Va
             WString t = AsString(rm.Find("text") >= 0 ? rm["text"] : Value()).ToWString();
             int len = t.GetCount();
             if(!inserted && pos <= at + len) {
-                int off = ::clamp(pos - at, 0, len);
+                int off = ClampValue(pos - at, 0, len);
                 WString l = t.Left(off);
                 WString r = t.Mid(off);
                 if(!l.IsEmpty()) out.Add(UiDocMakeTextRun(l));
@@ -364,8 +374,8 @@ static UiDocInlineLayout UiDocLayoutInlineRuns(const ValueArray& runs, const Fon
         if(type == "image" && run.Find("resource_key") >= 0) {
             int iw = (run.Find("width") >= 0 ? (int)run["width"] : DPI(24));
             int ih = (run.Find("height") >= 0 ? (int)run["height"] : DPI(24));
-            iw = ::clamp(iw, DPI(10), max(DPI(10), max_w));
-            ih = ::clamp(ih, DPI(10), DPI(320));
+            iw = ClampValue(iw, DPI(10), max(DPI(10), max_w));
+            ih = ClampValue(ih, DPI(10), DPI(320));
             if(wrap && x > 0 && x + iw > max_w)
                 EndLine();
             lh = max(lh, ih + DPI(2));
@@ -421,7 +431,7 @@ static int UiDocInlineHitCaret(const UiDocInlineLayout& lo, int relx, int rely)
 
 static Point UiDocInlineCaretPoint(const UiDocInlineLayout& lo, int at)
 {
-    at = ::clamp(at, 0, lo.units);
+    at = ClampValue(at, 0, lo.units);
     int x = 0;
     int y = 0;
     for(int i = 0; i < lo.boxes.GetCount(); i++) {
@@ -463,7 +473,7 @@ static ValueArray UiDocBuildParagraphInlineRuns(const WString& text,
             im.Add("width", (int)e.payload["width"]);
         if(e.payload.Find("height") >= 0)
             im.Add("height", (int)e.payload["height"]);
-        img_off.Add(::clamp(e.range.from - start, 0, len));
+        img_off.Add(ClampValue(e.range.from - start, 0, len));
         img_payload.Add(im);
     }
 
@@ -544,8 +554,8 @@ static void UiDocComputeTableRowMetrics(const ValueMap& payload,
                     if(run.Find("type") >= 0 && AsString(run["type"]) == "image") {
                         int ih = (run.Find("height") >= 0 ? (int)run["height"] : DPI(24));
                         int iw = (run.Find("width") >= 0 ? (int)run["width"] : DPI(24));
-                        ih = ::clamp(ih, DPI(10), DPI(96));
-                        iw = ::clamp(iw, DPI(10), max(DPI(10), right_w));
+                        ih = ClampValue(ih, DPI(10), DPI(96));
+                        iw = ClampValue(iw, DPI(10), max(DPI(10), right_w));
                         if(x > 0 && x + iw > right_w) {
                             y += cur_h;
                             x = 0;
@@ -606,7 +616,7 @@ UiDoc::UiDoc()
     AddFrame(sb_);
     sb_.WhenScroll = [=] {
         int max_scroll = max(0, sb_.GetTotal() - sb_.GetPage());
-        scroll_y_ = ::clamp(sb_.Get(), 0, max_scroll);
+        scroll_y_ = ClampValue(sb_.Get(), 0, max_scroll);
         sb_.Set(scroll_y_);
         Refresh();
     };
@@ -639,7 +649,7 @@ void UiDoc::OnStyleChanged()
 
 int UiDoc::ClampPos(int pos) const
 {
-    return ::clamp(pos, 0, text_.GetCount());
+    return ClampValue(pos, 0, text_.GetCount());
 }
 
 Font UiDoc::GetBaseFont() const
@@ -707,22 +717,22 @@ void UiDoc::RebuildStylesFromRuns()
         styles_[i] = CharStyle();
 
     for(const UiDocStyleRun& r : style_runs_) {
-        int from = ::clamp(r.from, 0, styles_.GetCount());
-        int to = ::clamp(r.to, from, styles_.GetCount());
+        int from = ClampValue(r.from, 0, styles_.GetCount());
+        int to = ClampValue(r.to, from, styles_.GetCount());
         for(int i = from; i < to; i++) {
             styles_[i].flags = r.flags;
             styles_[i].ink = r.ink;
             styles_[i].size_delta = r.size_delta;
-            styles_[i].leading_delta = (int8)::clamp(r.leading_delta, -16, 48);
-            styles_[i].tracking_delta = (int8)::clamp(r.tracking_delta, -8, 16);
+            styles_[i].leading_delta = (int8)ClampValue(r.leading_delta, -16, 48);
+            styles_[i].tracking_delta = (int8)ClampValue(r.tracking_delta, -8, 16);
         }
     }
 }
 
 void UiDoc::MutateStyleRunsRange(int from, int to, Function<void(UiDocStyleRun&)> fn)
 {
-    from = ::clamp(from, 0, text_.GetCount());
-    to = ::clamp(to, 0, text_.GetCount());
+    from = ClampValue(from, 0, text_.GetCount());
+    to = ClampValue(to, 0, text_.GetCount());
     if(from >= to || !fn)
         return;
 
@@ -784,7 +794,7 @@ void UiDoc::MutateStyleRunsRange(int from, int to, Function<void(UiDocStyleRun&)
 
 void UiDoc::ReplaceStyleRunsForTextChange(int at, int old_len, const Vector<CharStyle>& inserted_styles)
 {
-    at = ::clamp(at, 0, text_.GetCount());
+    at = ClampValue(at, 0, text_.GetCount());
     old_len = max(0, old_len);
     int del_to = at + old_len;
     int ins_len = inserted_styles.GetCount();
@@ -990,7 +1000,7 @@ void UiDoc::RebuildLayoutCache() const
                     hi = mid;
             }
             match = lo - 1;
-            match = ::clamp(match, 0, old_starts.GetCount() - 1);
+            match = ClampValue(match, 0, old_starts.GetCount() - 1);
         }
         if(match >= 0 && match < old_margins.GetCount())
             paragraph_margin_steps_[i] = old_margins[match];
@@ -1050,7 +1060,7 @@ void UiDoc::RebuildLayoutCache() const
             int iw = 0, ih = 0;
             if(!GetImageDisplaySize(e, max(DPI(16), text_rect_.GetWidth() - DPI(24)), iw, ih))
                 continue;
-            inline_off.Add(::clamp(e.range.from - ls, 0, len));
+            inline_off.Add(ClampValue(e.range.from - ls, 0, len));
             inline_w.Add(iw);
             inline_h.Add(ih);
             max_inline_h = max(max_inline_h, ih);
@@ -1221,7 +1231,7 @@ int UiDoc::HitTestLineByY(int y_doc) const
         else
             return mid;
     }
-    return ::clamp(lo, 0, line_starts_.GetCount() - 1);
+    return ClampValue(lo, 0, line_starts_.GetCount() - 1);
 }
 
 void UiDoc::SyncScrollBar()
@@ -1235,7 +1245,7 @@ void UiDoc::SyncScrollBar()
     sb_.SetPage(page);
     sb_.SetLine(max(1, line_height_));
 
-    scroll_y_ = ::clamp(scroll_y_, 0, max(0, total - page));
+    scroll_y_ = ClampValue(scroll_y_, 0, max(0, total - page));
     sb_.Set(scroll_y_);
 }
 
@@ -1257,32 +1267,32 @@ int UiDoc::GetLineIndexFromPos(int pos) const
         else
             return mid;
     }
-    return ::clamp(lo, 0, line_starts_.GetCount() - 1);
+    return ClampValue(lo, 0, line_starts_.GetCount() - 1);
 }
 
 int UiDoc::GetColumnFromPos(int line, int pos) const
 {
     EnsureLayoutCache();
-    line = ::clamp(line, 0, line_starts_.GetCount() - 1);
+    line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     int s = line_starts_[line];
     int len = line_lengths_[line];
-    return ::clamp(pos - s, 0, len);
+    return ClampValue(pos - s, 0, len);
 }
 
 int UiDoc::GetPosFromLineColumn(int line, int col) const
 {
     EnsureLayoutCache();
-    line = ::clamp(line, 0, line_starts_.GetCount() - 1);
+    line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     int len = line_lengths_[line];
-    col = ::clamp(col, 0, len);
+    col = ClampValue(col, 0, len);
     return line_starts_[line] + col;
 }
 
 int UiDoc::PosToX(int line, int col) const
 {
     EnsureLayoutCache();
-    line = ::clamp(line, 0, line_starts_.GetCount() - 1);
-    col  = ::clamp(col, 0, line_lengths_[line]);
+    line = ClampValue(line, 0, line_starts_.GetCount() - 1);
+    col  = ClampValue(col, 0, line_lengths_[line]);
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
     int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
@@ -1298,7 +1308,7 @@ int UiDoc::PosToX(int line, int col) const
 int UiDoc::XToColumn(int line, int x) const
 {
     EnsureLayoutCache();
-    line = ::clamp(line, 0, line_starts_.GetCount() - 1);
+    line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
@@ -1307,7 +1317,7 @@ int UiDoc::XToColumn(int line, int x) const
     int len = line_lengths_[line];
     ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
     UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
-    return ::clamp(UiDocInlineHitCaret(lo, rel, max(0, lo.height / 2)), 0, len);
+    return ClampValue(UiDocInlineHitCaret(lo, rel, max(0, lo.height / 2)), 0, len);
 }
 
 int UiDoc::PosAtPointInternal(Point p) const
@@ -1870,7 +1880,7 @@ void UiDoc::AdjustTextSizeInternal(UiDocRange r, int delta)
 
     MutateStyleRunsRange(r.from, r.to, [=](UiDocStyleRun& sr) {
         int v = (int)sr.size_delta + delta;
-        sr.size_delta = ::clamp(v, -16, 32);
+        sr.size_delta = ClampValue(v, -16, 32);
     });
 
     bool record_history = (batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty());
@@ -1902,7 +1912,7 @@ void UiDoc::AdjustLeadingInternal(UiDocRange r, int delta)
 
     MutateStyleRunsRange(r.from, r.to, [=](UiDocStyleRun& sr) {
         int v = (int)sr.leading_delta + delta;
-        sr.leading_delta = ::clamp(v, -16, 48);
+        sr.leading_delta = ClampValue(v, -16, 48);
     });
 
     bool record_history = (batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty());
@@ -1934,7 +1944,7 @@ void UiDoc::AdjustTrackingInternal(UiDocRange r, int delta)
 
     MutateStyleRunsRange(r.from, r.to, [=](UiDocStyleRun& sr) {
         int v = (int)sr.tracking_delta + delta;
-        sr.tracking_delta = ::clamp(v, -8, 16);
+        sr.tracking_delta = ClampValue(v, -8, 16);
     });
 
     bool record_history = (batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty());
@@ -1968,7 +1978,7 @@ void UiDoc::ApplyStyleAbsInternal(UiDocRange r, bool set_ink, Color ink, bool se
         if(set_ink)
             sr.ink = ink;
         if(set_size)
-            sr.size_delta = ::clamp(size_delta, -16, 32);
+            sr.size_delta = ClampValue(size_delta, -16, 32);
     });
 
     bool record_history = (batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty());
@@ -2282,7 +2292,7 @@ void UiDoc::IncreaseSelectionFontSize()
 {
     UiDocRange r = CurrentSelectionRange();
     if(r.IsEmpty()) {
-        typing_style_.size_delta = (int8)::clamp((int)typing_style_.size_delta + DPI(1), -16, 32);
+        typing_style_.size_delta = (int8)ClampValue((int)typing_style_.size_delta + DPI(1), -16, 32);
         InvalidateLayoutCache();
         Refresh();
         return;
@@ -2301,7 +2311,7 @@ void UiDoc::DecreaseSelectionFontSize()
 {
     UiDocRange r = CurrentSelectionRange();
     if(r.IsEmpty()) {
-        typing_style_.size_delta = (int8)::clamp((int)typing_style_.size_delta - DPI(1), -16, 32);
+        typing_style_.size_delta = (int8)ClampValue((int)typing_style_.size_delta - DPI(1), -16, 32);
         InvalidateLayoutCache();
         Refresh();
         return;
@@ -2394,7 +2404,7 @@ void UiDoc::GetSelectedLineRange(int& first_line, int& last_line) const
 WString UiDoc::GetLineText(int line) const
 {
     EnsureLayoutCache();
-    line = ::clamp(line, 0, line_starts_.GetCount() - 1);
+    line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     int s = line_starts_[line];
     int n = line_lengths_[line];
     return text_.Mid(s, n);
@@ -2406,8 +2416,8 @@ void UiDoc::AdjustParagraphMarginLines(int first, int last, int delta)
     if(line_starts_.IsEmpty())
         return;
 
-    first = ::clamp(first, 0, line_starts_.GetCount() - 1);
-    last = ::clamp(last, 0, line_starts_.GetCount() - 1);
+    first = ClampValue(first, 0, line_starts_.GetCount() - 1);
+    last = ClampValue(last, 0, line_starts_.GetCount() - 1);
     if(first > last)
         Swap(first, last);
 
@@ -2421,7 +2431,7 @@ void UiDoc::AdjustParagraphMarginLines(int first, int last, int delta)
 
     for(int i = first; i <= last; i++) {
         int v = paragraph_margin_steps_[i] + delta;
-        paragraph_margin_steps_[i] = ::clamp(v, 0, 64);
+        paragraph_margin_steps_[i] = ClampValue(v, 0, 64);
     }
 
     Vector<int> after;
@@ -2439,7 +2449,7 @@ bool UiDoc::IsTableMetaLine(int line) const
 
 int UiDoc::FindTableEmbedIndexAtPos(int pos) const
 {
-    pos = ::clamp(pos, 0, text_.GetCount());
+    pos = ClampValue(pos, 0, text_.GetCount());
     for(int i = 0; i < embeds_.GetCount(); i++) {
         const UiDocEmbedBlock& e = embeds_[i];
         if(e.embed_type != "table")
@@ -2709,9 +2719,9 @@ bool UiDoc::HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& ca
     if(!hit.Contains(p))
         return false;
 
-    int rel_x = ::clamp(p.x - tr.left, 0, max(0, tr.GetWidth() - 1));
-    int rel_y = ::clamp(p.y - tr.top, 0, max(0, tr.GetHeight() - 1));
-    col = ::clamp(rel_x / max(1, cell_w), 0, cols - 1);
+    int rel_x = ClampValue(p.x - tr.left, 0, max(0, tr.GetWidth() - 1));
+    int rel_y = ClampValue(p.y - tr.top, 0, max(0, tr.GetHeight() - 1));
+    col = ClampValue(rel_x / max(1, cell_w), 0, cols - 1);
     row = 0;
     for(int r = 0; r < row_tops.GetCount(); r++) {
         int y0 = row_tops[r];
@@ -2756,8 +2766,8 @@ bool UiDoc::GetActiveTableCellRect(Rect& out) const
     if(!GetTableLineVisual(line, embed_ix, tr, cols, rows, cell_w, cell_h, &row_heights, &row_tops))
         return false;
 
-    int row = ::clamp(active_table_row_, 0, rows - 1);
-    int col = ::clamp(active_table_col_, 0, cols - 1);
+    int row = ClampValue(active_table_row_, 0, rows - 1);
+    int col = ClampValue(active_table_col_, 0, cols - 1);
     int y0 = (row < row_tops.GetCount() ? row_tops[row] : row * cell_h);
     int rh = (row < row_heights.GetCount() ? row_heights[row] : cell_h);
     out = RectC(tr.left + col * cell_w, tr.top + y0, cell_w, rh);
@@ -2789,8 +2799,8 @@ bool UiDoc::GetImageDisplaySize(const UiDocEmbedBlock& e, int avail_w, int& out_
             w = max(1, (int)((int64)h * rw / rh));
     }
 
-    w = ::clamp(w, DPI(12), max(DPI(12), avail_w));
-    h = ::clamp(h, DPI(12), DPI(320));
+    w = ClampValue(w, DPI(12), max(DPI(12), avail_w));
+    h = ClampValue(h, DPI(12), DPI(320));
     if(keep && rw > 0 && rh > 0 && w > avail_w) {
         w = max(DPI(12), avail_w);
         h = max(DPI(12), (int)((int64)w * rh / rw));
@@ -2898,7 +2908,7 @@ bool UiDoc::HitTestInlineImage(Point p, String& embed_id) const
             int iw = 0, ih = 0;
             if(!GetImageDisplaySize(e, max(DPI(16), text_rect_.GetWidth() - DPI(24)), iw, ih))
                 continue;
-            off.Add(::clamp(e.range.from - start, 0, len));
+            off.Add(ClampValue(e.range.from - start, 0, len));
             ww.Add(iw);
             hh.Add(ih);
             ids.Add(e.embed_id);
@@ -2950,8 +2960,8 @@ bool UiDoc::MoveTableCell(bool reverse)
     if(model.rows.IsEmpty() || model.cols <= 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, model.rows.GetCount() - 1);
-    int col = ::clamp(active_table_col_, 0, model.cols - 1);
+    int row = ClampValue(active_table_row_, 0, model.rows.GetCount() - 1);
+    int col = ClampValue(active_table_col_, 0, model.cols - 1);
     if(reverse) {
         if(col > 0)
             col--;
@@ -3001,8 +3011,8 @@ bool UiDoc::ReplaceInActiveTableCell(UiDocRange range, const WString& txt)
     if(rows <= 0 || cols <= 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, rows - 1);
-    int col = ::clamp(active_table_col_, 0, cols - 1);
+    int row = ClampValue(active_table_row_, 0, rows - 1);
+    int col = ClampValue(active_table_col_, 0, cols - 1);
 
     WString in = txt;
     for(int i = 0; i < in.GetCount(); i++)
@@ -3010,7 +3020,7 @@ bool UiDoc::ReplaceInActiveTableCell(UiDocRange range, const WString& txt)
             in.Set(i, '\n');
 
     ValueArray runs = UiDocEnsureCellRunsPayload(payload, row, col);
-    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(runs));
+    int at = ClampValue(active_table_cell_pos_, 0, UiDocCellRunUnits(runs));
     runs = UiDocInsertTextRunsAt(runs, at, in);
     at += in.GetCount();
     UiDocWriteCellRunsAndCells(payload, row, col, runs);
@@ -3046,12 +3056,12 @@ bool UiDoc::DeleteInActiveTableCell(bool forward)
     if(rows <= 0 || cols <= 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, rows - 1);
-    int col = ::clamp(active_table_col_, 0, cols - 1);
+    int row = ClampValue(active_table_row_, 0, rows - 1);
+    int col = ClampValue(active_table_col_, 0, cols - 1);
 
     ValueArray src = UiDocEnsureCellRunsPayload(payload, row, col);
     ValueArray dst;
-    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(src));
+    int at = ClampValue(active_table_cell_pos_, 0, UiDocCellRunUnits(src));
 
     bool changed = false;
     int target = (!forward ? at - 1 : at);
@@ -3098,7 +3108,7 @@ bool UiDoc::DeleteInActiveTableCell(bool forward)
     UiDocWriteCellRunsAndCells(payload, row, col, dst);
     if(!forward && at > 0)
         at--;
-    at = ::clamp(at, 0, UiDocCellRunUnits(dst));
+    at = ClampValue(at, 0, UiDocCellRunUnits(dst));
 
     UiDocChange ch;
     ch.type = UiDocChange::EMBED_UPDATE_PAYLOAD;
@@ -3135,16 +3145,16 @@ bool UiDoc::InsertImageRunInActiveTableCell(const String& resource_key, int widt
     if(rows <= 0 || cols <= 0)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, rows - 1);
-    int col = ::clamp(active_table_col_, 0, cols - 1);
+    int row = ClampValue(active_table_row_, 0, rows - 1);
+    int col = ClampValue(active_table_col_, 0, cols - 1);
     ValueArray cell_runs = UiDocEnsureCellRunsPayload(payload, row, col);
-    int at = ::clamp(active_table_cell_pos_, 0, UiDocCellRunUnits(cell_runs));
+    int at = ClampValue(active_table_cell_pos_, 0, UiDocCellRunUnits(cell_runs));
 
     ValueMap img;
     img.Add("type", "image");
     img.Add("resource_key", resource_key);
-    img.Add("width", ::clamp(width, DPI(12), DPI(96)));
-    img.Add("height", ::clamp(height, DPI(12), DPI(96)));
+    img.Add("width", ClampValue(width, DPI(12), DPI(96)));
+    img.Add("height", ClampValue(height, DPI(12), DPI(96)));
     cell_runs = UiDocInsertImageRunAt(cell_runs, at, img);
     UiDocWriteCellRunsAndCells(payload, row, col, cell_runs);
 
@@ -3203,8 +3213,8 @@ void UiDoc::SetBlockMetaRange(int first_line, int last_line, const UiDocBlockMet
     if(block_meta_.GetCount() != line_starts_.GetCount())
         block_meta_.SetCount(line_starts_.GetCount());
 
-    first_line = ::clamp(first_line, 0, block_meta_.GetCount() - 1);
-    last_line = ::clamp(last_line, 0, block_meta_.GetCount() - 1);
+    first_line = ClampValue(first_line, 0, block_meta_.GetCount() - 1);
+    last_line = ClampValue(last_line, 0, block_meta_.GetCount() - 1);
     if(first_line > last_line)
         Swap(first_line, last_line);
 
@@ -3257,7 +3267,7 @@ void UiDoc::SetBlockType(BlockType t)
 
 void UiDoc::IndentSelection(int spaces)
 {
-    spaces = ::clamp(spaces, 1, 16);
+    spaces = ClampValue(spaces, 1, 16);
     int first, last;
     GetSelectedLineRange(first, last);
 
@@ -3275,7 +3285,7 @@ void UiDoc::IndentSelection(int spaces)
 
 void UiDoc::OutdentSelection(int spaces)
 {
-    spaces = ::clamp(spaces, 1, 16);
+    spaces = ClampValue(spaces, 1, 16);
     int first, last;
     GetSelectedLineRange(first, last);
 
@@ -3336,7 +3346,7 @@ void UiDoc::SetParagraphMarginStepsForSelection(int steps)
     ch.type = UiDocChange::SET_MARGIN_RANGE;
     ch.line_from = first;
     ch.line_to = last;
-    ch.margin_steps = ::clamp(steps, 0, 64);
+    ch.margin_steps = ClampValue(steps, 0, 64);
 
     UiDocTransaction tx;
     tx.add_to_history = true;
@@ -3446,8 +3456,8 @@ void UiDoc::SetNumberedMode(bool on)
 
 void UiDoc::InsertTable(int cols, int rows)
 {
-    cols = ::clamp(cols, 1, 12);
-    rows = ::clamp(rows, 1, 100);
+    cols = ClampValue(cols, 1, 12);
+    rows = ClampValue(rows, 1, 100);
 
     int insert_at = ClampPos(caret_pos_);
     int table_id = next_table_id_++;
@@ -3489,7 +3499,7 @@ bool UiDoc::AddTableRowBelow()
     if(!GetTableModelByEmbedIndex(embed_ix, model, &table_id))
         return false;
 
-    int row = ::clamp(active_table_row_ + 1, 0, model.rows.GetCount());
+    int row = ClampValue(active_table_row_ + 1, 0, model.rows.GetCount());
     Vector<WString> blank;
     blank.SetCount(model.cols);
     model.rows.Insert(row, pick(blank));
@@ -3529,7 +3539,7 @@ bool UiDoc::RemoveTableRow()
     if(model.rows.GetCount() <= 1)
         return false;
 
-    int row = ::clamp(active_table_row_, 0, model.rows.GetCount() - 1);
+    int row = ClampValue(active_table_row_, 0, model.rows.GetCount() - 1);
     model.rows.Remove(row);
     if(model.rows.IsEmpty()) {
         Vector<WString> blank;
@@ -3570,7 +3580,7 @@ bool UiDoc::AddTableColumnRight()
     if(!GetTableModelByEmbedIndex(embed_ix, model, &table_id))
         return false;
 
-    int col = ::clamp(active_table_col_ + 1, 0, model.cols);
+    int col = ClampValue(active_table_col_ + 1, 0, model.cols);
     for(int r = 0; r < model.rows.GetCount(); r++)
         model.rows[r].Insert(col, WString());
     model.cols++;
@@ -3610,7 +3620,7 @@ bool UiDoc::RemoveTableColumn()
     if(model.cols <= 1)
         return false;
 
-    int col = ::clamp(active_table_col_, 0, model.cols - 1);
+    int col = ClampValue(active_table_col_, 0, model.cols - 1);
     for(int r = 0; r < model.rows.GetCount(); r++)
         model.rows[r].Remove(col);
     model.cols--;
@@ -4597,7 +4607,7 @@ bool UiDoc::Dispatch(const UiDocTransaction& tx)
                 EnsureLayoutCache();
                 if(!line_starts_.IsEmpty()) {
                     line_from = GetLineIndexFromPos(c.pos) + c.line_offset;
-                    line_from = ::clamp(line_from, 0, line_starts_.GetCount() - 1);
+                    line_from = ClampValue(line_from, 0, line_starts_.GetCount() - 1);
                     line_to = min(line_starts_.GetCount() - 1, line_from + c.line_count - 1);
                 }
             }
@@ -4629,8 +4639,8 @@ bool UiDoc::Dispatch(const UiDocTransaction& tx)
             if(paragraph_margin_steps_.GetCount() != line_starts_.GetCount())
                 paragraph_margin_steps_.SetCount(line_starts_.GetCount(), 0);
 
-            int first = ::clamp(c.line_from, 0, line_starts_.GetCount() - 1);
-            int last = ::clamp(c.line_to, 0, line_starts_.GetCount() - 1);
+            int first = ClampValue(c.line_from, 0, line_starts_.GetCount() - 1);
+            int last = ClampValue(c.line_to, 0, line_starts_.GetCount() - 1);
             if(first > last)
                 Swap(first, last);
 
@@ -4640,7 +4650,7 @@ bool UiDoc::Dispatch(const UiDocTransaction& tx)
                 before[i - first] = paragraph_margin_steps_[i];
 
             for(int i = first; i <= last; i++)
-                paragraph_margin_steps_[i] = ::clamp(c.margin_steps, 0, 64);
+                paragraph_margin_steps_[i] = ClampValue(c.margin_steps, 0, 64);
 
             Vector<int> after;
             after.SetCount(last - first + 1);
@@ -4976,7 +4986,7 @@ void UiDoc::MoveCaretVertical(int direction, bool keep_selection)
     if(preferred_x_ < 0)
         preferred_x_ = PosToX(line, col);
 
-    int nline = ::clamp(line + direction, 0, line_starts_.GetCount() - 1);
+    int nline = ClampValue(line + direction, 0, line_starts_.GetCount() - 1);
     int ncol = XToColumn(nline, preferred_x_);
     MoveCaret(GetPosFromLineColumn(nline, ncol), keep_selection);
 }
@@ -5023,8 +5033,8 @@ bool UiDoc::DeleteSelection()
             int rows = (payload.Find("rows") >= 0 ? (int)payload["rows"] : 0);
             int cols = (payload.Find("cols") >= 0 ? (int)payload["cols"] : 0);
             if(rows > 0 && cols > 0) {
-                int row = ::clamp(active_table_row_, 0, rows - 1);
-                int col = ::clamp(active_table_col_, 0, cols - 1);
+                int row = ClampValue(active_table_row_, 0, rows - 1);
+                int col = ClampValue(active_table_col_, 0, cols - 1);
                 ValueArray cleared;
                 cleared.Add(UiDocMakeTextRun(WString()));
                 UiDocWriteCellRunsAndCells(payload, row, col, cleared);
@@ -5534,7 +5544,7 @@ void UiDoc::RegisterBuiltinCommands()
         if(mode == "block") {
             d.EnsureLayoutCache();
             int line = d.GetLineIndexFromPos(pos);
-            line = ::clamp(line, 0, max(0, d.line_starts_.GetCount() - 1));
+            line = ClampValue(line, 0, max(0, d.line_starts_.GetCount() - 1));
             pos = d.line_starts_[line] + d.line_lengths_[line];
         }
         ValueMap payload;
@@ -5630,12 +5640,12 @@ Rect UiDoc::GetCaretRect() const
         if(embed_ix >= 0 && GetTableModelByEmbedIndex(embed_ix, model, nullptr) && !model.rows.IsEmpty() && model.cols > 0) {
             Rect cell_rc;
             if(GetActiveTableCellRect(cell_rc)) {
-                int row = ::clamp(active_table_row_, 0, model.rows.GetCount() - 1);
-                int col = ::clamp(active_table_col_, 0, model.cols - 1);
+                int row = ClampValue(active_table_row_, 0, model.rows.GetCount() - 1);
+                int col = ClampValue(active_table_col_, 0, model.cols - 1);
                 ValueArray runs = UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col);
                 Font f = GetBaseFont();
                 UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, f, max(DPI(12), cell_rc.GetWidth() - DPI(8)), true);
-                int at = ::clamp(active_table_cell_pos_, 0, lo.units);
+                int at = ClampValue(active_table_cell_pos_, 0, lo.units);
                 Point cp = UiDocInlineCaretPoint(lo, at);
                 return RectC(cell_rc.left + DPI(4) + cp.x,
                              cell_rc.top + DPI(3) + cp.y,
@@ -5871,7 +5881,7 @@ void UiDoc::Paint(Draw& w)
             int iw = 0, ih = 0;
             if(!GetImageDisplaySize(e, max(DPI(16), right_content_edge - (line_left + prefixw) - DPI(8)), iw, ih))
                 continue;
-            int off = ::clamp(e.range.from - start, 0, len);
+            int off = ClampValue(e.range.from - start, 0, len);
             int ei = -1;
             for(int k = 0; k < embeds_.GetCount(); k++)
                 if(embeds_[k].embed_id == e.embed_id) {
@@ -6063,7 +6073,7 @@ void UiDoc::Paint(Draw& w)
         for(int bi = 0; bi < plo.boxes.GetCount(); bi++) {
             const UiDocInlineBox& b = plo.boxes[bi];
             if(b.kind == 1) {
-                int i = ::clamp(b.from, 0, max(0, len - 1));
+                int i = ClampValue(b.from, 0, max(0, len - 1));
                 int pos = start + i;
                 const CharStyle& cst = styles_[pos];
                 Font f = ApplyBlockFont(ResolveFont(cst), block_type);
@@ -6253,7 +6263,7 @@ void UiDoc::LeftDouble(Point p, dword)
 void UiDoc::MouseWheel(Point, int zdelta, dword)
 {
     int v = sb_.Get();
-    int nv = ::clamp(v - (zdelta / 120) * line_height_ * 3, 0, max(0, sb_.GetTotal() - sb_.GetPage()));
+    int nv = ClampValue(v - (zdelta / 120) * line_height_ * 3, 0, max(0, sb_.GetTotal() - sb_.GetPage()));
     if(nv == v)
         return;
     sb_.Set(nv);
@@ -6331,8 +6341,8 @@ bool UiDoc::Key(dword key, int)
                 int embed_ix = FindActiveTableEmbedIndex();
                 TableModel tm;
                 if(GetTableModelByEmbedIndex(embed_ix, tm, nullptr) && !tm.rows.IsEmpty() && tm.cols > 0) {
-                    int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
-                    int col = ::clamp(active_table_col_, 0, tm.cols - 1);
+                    int row = ClampValue(active_table_row_, 0, tm.rows.GetCount() - 1);
+                    int col = ClampValue(active_table_col_, 0, tm.cols - 1);
                     if(active_table_cell_pos_ > 0)
                         active_table_cell_pos_--;
                     else if(col > 0) {
@@ -6362,8 +6372,8 @@ bool UiDoc::Key(dword key, int)
                 int embed_ix = FindActiveTableEmbedIndex();
                 TableModel tm;
                 if(GetTableModelByEmbedIndex(embed_ix, tm, nullptr) && !tm.rows.IsEmpty() && tm.cols > 0) {
-                    int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
-                    int col = ::clamp(active_table_col_, 0, tm.cols - 1);
+                    int row = ClampValue(active_table_row_, 0, tm.rows.GetCount() - 1);
+                    int col = ClampValue(active_table_col_, 0, tm.cols - 1);
                     int cell_len = UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col));
                     if(active_table_cell_pos_ < cell_len)
                         active_table_cell_pos_++;
@@ -6391,8 +6401,8 @@ bool UiDoc::Key(dword key, int)
                 if(GetTableModelByEmbedIndex(embed_ix, tm, nullptr) && !tm.rows.IsEmpty() && tm.cols > 0) {
                     if(active_table_row_ > 0)
                         active_table_row_--;
-                    int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
-                    int col = ::clamp(active_table_col_, 0, tm.cols - 1);
+                    int row = ClampValue(active_table_row_, 0, tm.rows.GetCount() - 1);
+                    int col = ClampValue(active_table_col_, 0, tm.cols - 1);
                     active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col)));
                     Refresh();
                     return true;
@@ -6406,8 +6416,8 @@ bool UiDoc::Key(dword key, int)
                 if(GetTableModelByEmbedIndex(embed_ix, tm, nullptr) && !tm.rows.IsEmpty() && tm.cols > 0) {
                     if(active_table_row_ + 1 < tm.rows.GetCount())
                         active_table_row_++;
-                    int row = ::clamp(active_table_row_, 0, tm.rows.GetCount() - 1);
-                    int col = ::clamp(active_table_col_, 0, tm.cols - 1);
+                    int row = ClampValue(active_table_row_, 0, tm.rows.GetCount() - 1);
+                    int col = ClampValue(active_table_col_, 0, tm.cols - 1);
                     active_table_cell_pos_ = min(active_table_cell_pos_, UiDocCellRunUnits(UiDocEnsureCellRunsPayload(embeds_[embed_ix].payload, row, col)));
                     Refresh();
                     return true;
@@ -6727,7 +6737,7 @@ bool UiDoc::Key(dword key, int)
                     if(mode == "block") {
                         EnsureLayoutCache();
                         int line = GetLineIndexFromPos(e.range.from);
-                        line = ::clamp(line, 0, max(0, line_starts_.GetCount() - 1));
+                        line = ClampValue(line, 0, max(0, line_starts_.GetCount() - 1));
                         pos = line_starts_[line] + line_lengths_[line];
                         if(pos < text_.GetCount() && text_[pos] == '\n')
                             pos++;
@@ -6765,3 +6775,6 @@ Size UiDoc::GetMinSize() const
 }
 
 }
+
+
+

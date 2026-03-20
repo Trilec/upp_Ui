@@ -1,6 +1,28 @@
 #ifndef _Ui_UiRadioButton_h_
 #define _Ui_UiRadioButton_h_
 
+/*
+    UiRadioButton
+    =============
+
+    Purpose
+    - Styled radio button control for mutually exclusive selection.
+
+    Intent
+    - Keep radio semantics explicit while sharing the same style vocabulary and
+      action/event conventions used by the rest of the Ui control family.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use in groups for exclusive choice; observe committed user toggles with
+      WhenAction.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -135,3 +157,5 @@ private:
 }
 
 #endif
+
+

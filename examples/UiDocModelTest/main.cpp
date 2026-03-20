@@ -1067,6 +1067,232 @@ static void Case39_TableCellImageRun(TestCtx& t)
     t.EndCase();
 }
 
+static void Case40_BlockImageAlignAndDelete(TestCtx& t)
+{
+    t.BeginCase("Block Image Align/Delete", "Block image embed supports alignment payload update and delete via caret key.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("p\n");
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    t.Expect(!key.IsEmpty(), "resource key created");
+
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("pos", 0);
+    add.Add("display_mode", "block");
+    add.Add("align", "left");
+    add.Add("width", 24);
+    add.Add("height", 24);
+    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert block image");
+
+    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "image");
+    t.Expect(ee.GetCount() == 1, "one image embed exists");
+    if(!ee.IsEmpty()) {
+        t.Expect(AsString(ee[0].payload["display_mode"]) == "block", "display mode is block");
+        t.Expect(AsString(ee[0].payload["align"]) == "left", "default align left");
+        d.SetSelection(UiDocRange(ee[0].range.from, ee[0].range.from));
+        t.Expect(d.ExecuteCommand("embed.image.align.set", "center"), "set center align");
+        Vector<UiDocEmbedBlock> e2 = d.QueryEmbeds(nullptr, "image");
+        t.Expect(!e2.IsEmpty() && AsString(e2[0].payload["align"]) == "center", "align updated to center");
+        t.Expect(d.Undo(), "undo align change");
+        Vector<UiDocEmbedBlock> e3 = d.QueryEmbeds(nullptr, "image");
+        t.Expect(!e3.IsEmpty() && AsString(e3[0].payload["align"]) == "left", "align undo restored left");
+        t.Expect(d.Redo(), "redo align change");
+        Vector<UiDocEmbedBlock> e4 = d.QueryEmbeds(nullptr, "image");
+        t.Expect(!e4.IsEmpty() && AsString(e4[0].payload["align"]) == "center", "align redo restored center");
+        t.Expect(d.Key(K_DELETE, 1), "delete key handled at image caret");
+        t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "image deleted by key");
+    }
+    t.EndCase();
+}
+
+static void Case41_TableInlineImageBetweenText(TestCtx& t)
+{
+    t.BeginCase("Table Inline Image Between Text", "Cell supports TextRun+ImageRun+TextRun around caret insertion.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("\n");
+    d.SetSelection(UiDocRange(0, 0));
+    d.InsertTable(1, 1);
+
+    d.Key('A', 1);
+    d.Key('B', 1);
+    d.Key(K_LEFT, 1);
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("width", 18);
+    add.Add("height", 18);
+    t.Expect(d.ExecuteCommand("table.cell.image.insert", add), "insert image at caret in cell");
+    d.Key('X', 1);
+
+    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
+    t.Expect(ee.GetCount() == 1, "table exists");
+    if(!ee.IsEmpty()) {
+        ValueMap p = ee[0].payload;
+        t.Expect(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>(), "cell_runs present");
+        if(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>()) {
+            ValueArray rows = p["cell_runs"];
+            if(rows.GetCount() >= 1 && rows[0].Is<ValueArray>()) {
+                ValueArray row0 = rows[0];
+                if(row0.GetCount() >= 1 && row0[0].Is<ValueArray>()) {
+                    ValueArray runs = row0[0];
+                    int img_ix = -1;
+                    for(int i = 0; i < runs.GetCount(); i++) {
+                        if(runs[i].Is<ValueMap>() && ((ValueMap)runs[i]).Find("type") >= 0 && AsString(((ValueMap)runs[i])["type"]) == "image")
+                            img_ix = i;
+                    }
+                    t.Expect(img_ix >= 0, "image run exists in cell runs");
+                    bool before = false, after = false;
+                    for(int i = 0; i < runs.GetCount(); i++) {
+                        if(!runs[i].Is<ValueMap>())
+                            continue;
+                        ValueMap rm = runs[i];
+                        if(rm.Find("type") < 0 || AsString(rm["type"]) != "text")
+                            continue;
+                        String txt = (rm.Find("text") >= 0 ? AsString(rm["text"]) : String());
+                        if(i < img_ix && !txt.IsEmpty())
+                            before = true;
+                        if(i > img_ix && !txt.IsEmpty())
+                            after = true;
+                    }
+                    t.Expect(before, "text appears before image run");
+                    t.Expect(after, "text appears after image run");
+                }
+            }
+        }
+        ValueArray cells = p["cells"];
+        if(cells.GetCount() >= 1 && cells[0].Is<ValueArray>()) {
+            ValueArray row0 = cells[0];
+            if(row0.GetCount() >= 1)
+                t.Expect(AsString(row0[0]) == "AXB", "flattened cell text preserves before/after typing around image");
+        }
+    }
+    t.EndCase();
+}
+
+static void Case42_ParagraphInlineImage(TestCtx& t)
+{
+    t.BeginCase("Paragraph Inline Image", "Inline paragraph image insert keeps surrounding text and supports delete at caret.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("AB");
+    d.SetSelection(UiDocRange(1, 1));
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("pos", 1);
+    add.Add("display_mode", "inline");
+    add.Add("width", 16);
+    add.Add("height", 16);
+    t.Expect(d.ExecuteCommand("embed.image.insert", add), "inline image embed inserted");
+
+    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "image");
+    t.Expect(ee.GetCount() == 1, "one inline image embed exists");
+    if(!ee.IsEmpty()) {
+        t.Expect(AsString(ee[0].payload["display_mode"]) == "inline", "display_mode inline stored");
+        t.Expect(d.GetText() == "AB", "text remains around inline image");
+        d.SetSelection(UiDocRange(1, 1));
+        t.Expect(d.Key(K_DELETE, 1), "delete key handled at inline image position");
+        t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image deleted at caret");
+        t.Expect(d.GetText() == "AB", "text preserved after inline image delete");
+    }
+    t.EndCase();
+}
+
+static void Case43_InlineImageKeyNavigation(TestCtx& t)
+{
+    t.BeginCase("Inline Image Key Nav", "Arrow navigation selects inline image as a unit and delete removes it.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("AB");
+    d.SetSelection(UiDocRange(1, 1));
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("pos", 1);
+    add.Add("display_mode", "inline");
+    add.Add("width", 16);
+    add.Add("height", 16);
+    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert inline image");
+
+    t.Expect(d.Key(K_RIGHT, 1), "right key selects/steps over inline image");
+    t.Expect(d.Key(K_RIGHT, 1), "second right steps to next text position");
+    t.Expect(d.GetSelection().caret == 2, "caret reached text position after image");
+    t.Expect(d.Key(K_LEFT, 1), "left key selects inline image from right side");
+    t.Expect(d.Key(K_DELETE, 1), "delete removes selected inline image");
+    t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image removed");
+    t.Expect(d.GetText() == "AB", "text remains stable after image navigation/delete");
+    t.EndCase();
+}
+
+static void Case44_SelectionDeletesInlineImage(TestCtx& t)
+{
+    t.BeginCase("Selection Deletes Inline Image", "Deleting a text selection crossing inline image removes both text and image embed.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("AB");
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("pos", 1);
+    add.Add("display_mode", "inline");
+    add.Add("width", 16);
+    add.Add("height", 16);
+    t.Expect(d.ExecuteCommand("embed.image.insert", add), "inline image inserted");
+    t.Expect(d.QueryEmbeds(nullptr, "image").GetCount() == 1, "image exists before selection delete");
+
+    d.SetSelection(UiDocRange(0, 2));
+    t.Expect(d.Key(K_DELETE, 1), "delete selection key handled");
+    t.Expect(d.GetText().IsEmpty(), "selected text removed");
+    t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image removed with selection");
+    t.EndCase();
+}
+
+static void Case45_ParagraphInlinePosRoundTrip(TestCtx& t)
+{
+    t.BeginCase("Paragraph Inline Pos RoundTrip", "PointAtPos/PosAtPoint round-trip stays stable near inline images.");
+    UiDoc d;
+    InitDoc(d);
+    d.SetText("ABCD");
+
+    String png = MakeTinyPng();
+    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
+    ValueMap add;
+    add.Add("resource_key", key);
+    add.Add("pos", 2);
+    add.Add("display_mode", "inline");
+    add.Add("width", 16);
+    add.Add("height", 16);
+    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert inline image in paragraph");
+
+    int prev = -1;
+    for(int pos = 0; pos <= d.GetLength(); pos++) {
+        Point pt = d.PointAtPos(pos);
+        int back = d.PosAtPoint(pt);
+        t.Expect(back >= 0 && back <= d.GetLength(), String().Cat() << "mapped pos in bounds=" << pos);
+        t.Expect(back >= prev, String().Cat() << "round-trip monotonic pos=" << pos);
+        prev = back;
+
+        Point nearp = pt;
+        nearp.x += 2;
+        int near_back = d.PosAtPoint(nearp);
+        t.Expect(near_back >= back, String().Cat() << "near-map nondecreasing pos=" << pos);
+    }
+
+    t.EndCase();
+}
+
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
@@ -1112,6 +1338,12 @@ CONSOLE_APP_MAIN
     Case37_SvgEmbedRoundTrip(t);
     Case38_TableOpsKeepActiveContext(t);
     Case39_TableCellImageRun(t);
+    Case40_BlockImageAlignAndDelete(t);
+    Case41_TableInlineImageBetweenText(t);
+    Case42_ParagraphInlineImage(t);
+    Case43_InlineImageKeyNavigation(t);
+    Case44_SelectionDeletesInlineImage(t);
+    Case45_ParagraphInlinePosRoundTrip(t);
 
     Cout() << "\n=== Summary ===\n";
     Cout() << "Cases : " << t.cases << "\n";

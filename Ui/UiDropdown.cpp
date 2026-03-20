@@ -138,11 +138,7 @@ UiDropdown::UiDropdown()
     popup_.SetFrame(NullFrame());
 
     model_ = &internal_model_;
-    Ptr<UiDropdown> self = this;
-    internal_model_.WhenChange << [self](const UiModelChange&) {
-        if(self)
-            self->SyncItemsFromModel();
-    };
+    BindModel(internal_model_);
     SyncItemsFromModel();
     
     RebuildIndicator();
@@ -905,27 +901,37 @@ UiDropdown& UiDropdown::SetPopupPinned(bool on)
     return *this;
 }
 
-UiDropdown& UiDropdown::SetModel(UiListModel* model)
+UiDropdown& UiDropdown::SetModel(UiListModel& model)
 {
-    UiListModel* m = model ? model : &internal_model_;
-    if(model_ == m)
+    if(model_ == &model)
         return *this;
 
-    model_ = m;
-    Ptr<UiDropdown> self = this;
-    model_->WhenChange << [self](const UiModelChange&) {
-        if(self)
-            self->SyncItemsFromModel();
-    };
+    model_ = &model;
+    BindModel(model);
     SyncItemsFromModel();
     return *this;
 }
 
 UiDropdown& UiDropdown::UseInternalModel()
 {
-    return SetModel(&internal_model_);
+    return SetModel(internal_model_);
 }
 
+void UiDropdown::BindModel(UiListModel& model)
+{
+    for(int i = 0; i < bound_models_.GetCount(); i++) {
+        if(bound_models_[i] == &model)
+            return;
+    }
+
+    bound_models_.Add(&model);
+    Ptr<UiDropdown> self = this;
+    UiListModel* observed = &model;
+    model.WhenChange << [self, observed](const UiModelChange&) {
+        if(self && self->model_ == observed)
+            self->SyncItemsFromModel();
+    };
+}
 // ----------------------------------------------------------------------------
 // Styling
 // ----------------------------------------------------------------------------
@@ -2153,6 +2159,10 @@ UiDropdown& UiDropdown::SetSizeMin(Size sz)
 }
 
 } // namespace Upp
+
+
+
+
 
 
 

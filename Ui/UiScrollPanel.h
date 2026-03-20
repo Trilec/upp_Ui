@@ -1,6 +1,28 @@
 #ifndef _Ui_UiScrollPanel_h_
 #define _Ui_UiScrollPanel_h_
 
+/*
+    UiScrollPanel
+    =============
+
+    Purpose
+    - Styled scrolling container with owned viewport/content handling.
+
+    Intent
+    - Wrap child content with painted panel chrome and explicit scroll policy
+      without leaking scrollbar internals into the public surface.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Add child content to the panel and choose the scroll mode that matches
+      the intended viewport behavior.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
@@ -97,3 +119,5 @@ private:
 }
 
 #endif
+
+

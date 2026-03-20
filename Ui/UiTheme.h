@@ -1,34 +1,25 @@
 /*
-    UiTheme.h
-    =========
+    UiTheme
+    =======
 
     Purpose
     - Central theme context and resolver entry points for the Ui library.
-    - Sits above UiStyle primitives and below per-control local style overrides.
-    - Provides one place to resolve preset + mode + role into concrete control styles.
 
-    Architectural intent
-    - UiStyle.h owns primitive styling vocabulary.
-    - UiTheme owns family-level visual policy and global theme context.
-    - Controls keep control-specific Style payloads and may still override locally.
+    Intent
+    - Sit above UiStyle primitives and below per-control local style overrides,
+      resolving theme context and semantic roles into concrete control styles.
 
-    Current scope
-    - Global theme context storage and normalization.
-    - Theme revision serial for future cache invalidation in controls.
-    - Button, edit, label, and panel resolver entry points.
-    - Header-only implementation until broader control integration lands.
+    Thread context
+    - Theme context changes should be made on the GUI thread when live controls
+      are observing theme revision changes.
 
-    Compact changelog
-    - 2026-03-13: Promoted from blueprint to compilable API with enums, context,
-      serialization helpers, revision tracking, and button/label resolvers.
-    - 2026-03-13: Button resolver now authors role/preset policy directly from
-      StyleDefault() instead of relying on control-local preset families.
-    - 2026-03-13: Added panel and base-edit resolver support for the current migration slices.
-    - 2026-03-13: Added checkbox, radio, and slider resolvers for theme-driven control defaults.
-    - 2026-03-13: Added scrollbar resolver support for chrome controls and popup dependencies.
-    - 2026-03-13: Added dropdown resolver support for field-plus-popup controls.
-    - 2026-03-14: Added tab resolver support with visual-mode separation from theme policy.
-    - 2026-03-13: Added public package wiring through Ui.h and Ui.upp.
+    Usage
+    - Controls call UiTheme::Resolve...() for their theme-driven defaults and
+      keep SetStyle(...) as the explicit local override path.
+
+    Changelog
+    - 2026-03: expanded to release-standard documentation during the API and
+      release-hardening pass.
 */
 #ifndef _Ui_UiTheme_h_
 #define _Ui_UiTheme_h_
@@ -1950,6 +1941,7 @@ inline UiLabel::Style MakeLabel(UiThemePreset preset, UiThemeMode mode, UiLabelR
 } // namespace Upp
 
 #endif
+
 
 
 

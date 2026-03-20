@@ -1,6 +1,29 @@
 #ifndef _Ui_UiDraw_h_
 #define _Ui_UiDraw_h_
 
+/*
+    UiDraw
+    ======
+
+    Purpose
+    - Shared drawing helpers for styled Ui controls.
+
+    Intent
+    - Centralize reusable paint primitives such as styled backgrounds, text,
+      icons, focus treatments, caps, and popup composition so controls do not
+      duplicate rendering logic.
+
+    Thread context
+    - GUI thread for live Draw use.
+
+    Usage
+    - Controls call these helpers from render-only Paint() paths after layout
+      and cache state have already been resolved.
+
+    Changelog
+    - 2026-03: added release-standard file documentation.
+*/
+
 #include <Painter/Painter.h>
 #include <cmath>
 //#include <CtrlCore/CtrlCore.h>   // AccessKeyBit
@@ -1450,6 +1473,7 @@ inline Image UiMakeIcon(const void* data)
 } // namespace Upp
 
 #endif
+
 
 
 

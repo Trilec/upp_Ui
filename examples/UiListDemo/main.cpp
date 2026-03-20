@@ -32,7 +32,7 @@ public:
 
         list_.SetModel(model_);
         list_.SetSelectionMode(UILISTSEL_MULTI);
-        list_.WhenSel = [=] { SyncInspector(); };
+        list_.WhenSelection = [=] { SyncInspector(); };
         list_.WhenAction = [=] { SyncInspector(); };
         list_.WhenRename = [=](int row, const String& text) {
             if(row >= 0 && row < model_.GetCount()) {

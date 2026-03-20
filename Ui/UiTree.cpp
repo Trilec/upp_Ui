@@ -299,6 +299,55 @@ Vector<UiTreeNodeRef> UiTree::GetSelection() const
     return out;
 }
 
+void UiTree::SetData(const Value& v)
+{
+    SyncModel();
+
+    if(IsNull(v)) {
+        ClearSelection();
+        return;
+    }
+
+    if(selection_mode_ == UITREESEL_MULTI || v.Is<ValueArray>()) {
+        selected_ids_.Clear();
+        ValueArray values;
+        if(v.Is<ValueArray>())
+            values = v;
+        else
+            values.Add(v);
+
+        for(int i = 0; i < values.GetCount(); i++) {
+            UiTreeNodeRef node = ResolveSelectionNode(values[i]);
+            if(model_ && model_->IsValid(node))
+                selected_ids_.FindAdd(node.id);
+        }
+
+        Vector<UiTreeNodeRef> selection = GetSelection();
+        anchor_id_ = selection.IsEmpty() ? -1 : selection[0].id;
+        cursor_id_ = selection.IsEmpty() ? -1 : selection.Top().id;
+        NotifySelectionChange();
+        return;
+    }
+
+    UiTreeNodeRef node = ResolveSelectionNode(v);
+    if(model_ && model_->IsValid(node))
+        SelectSingle(node);
+    else
+        ClearSelection();
+}
+
+Value UiTree::GetData() const
+{
+    if(selection_mode_ == UITREESEL_MULTI) {
+        ValueArray values;
+        Vector<UiTreeNodeRef> selection = GetSelection();
+        for(int i = 0; i < selection.GetCount(); i++)
+            values.Add(GetSelectionToken(selection[i]));
+        return values;
+    }
+
+    return (model_ && model_->IsValid(UiTreeNodeRef{cursor_id_})) ? GetSelectionToken(UiTreeNodeRef{cursor_id_}) : Value();
+}
 bool UiTree::CanMoveSelection(UiTreeNodeRef new_parent, int pos) const
 {
     return CanMoveNodes(GetSelection(), new_parent, pos);
@@ -516,8 +565,6 @@ UiTree& UiTree::SetCursor(UiTreeNodeRef node)
     cursor_id_ = new_id;
     ScrollToSelection();
     Refresh();
-    if(WhenSel)
-        WhenSel();
     return *this;
 }
 
@@ -1425,11 +1472,51 @@ void UiTree::SelectRangeTo(UiTreeNodeRef node, bool additive)
     NotifySelectionChange();
 }
 
+
+Value UiTree::GetSelectionToken(UiTreeNodeRef node) const
+{
+    if(!model_ || !model_->IsValid(node))
+        return Value();
+
+    const UiModelItem& item = model_->Get(node);
+    return IsNull(item.data) ? Value(node.id) : item.data;
+}
+
+UiTreeNodeRef UiTree::ResolveSelectionNode(const Value& token) const
+{
+    if(!model_ || !model_->IsValid(model_->Root()))
+        return UiTreeNodeRef{-1};
+
+    Vector<int> stack;
+    stack.Add(model_->Root().id);
+    while(!stack.IsEmpty()) {
+        int id = stack.Top();
+        stack.Drop();
+
+        UiTreeNodeRef node{id};
+        const UiModelItem& item = model_->Get(node);
+        if(!IsNull(item.data) && item.data == token)
+            return node;
+
+        for(int i = model_->GetChildCount(node) - 1; i >= 0; i--)
+            stack.Add(model_->GetChild(node, i).id);
+    }
+
+    if(token.Is<int>()) {
+        UiTreeNodeRef node{(int)token};
+        return model_->IsValid(node) ? node : UiTreeNodeRef{-1};
+    }
+    if(token.Is<int64>()) {
+        UiTreeNodeRef node{(int)(int64)token};
+        return model_->IsValid(node) ? node : UiTreeNodeRef{-1};
+    }
+    return UiTreeNodeRef{-1};
+}
 void UiTree::NotifySelectionChange()
 {
     Refresh();
-    if(WhenSel)
-        WhenSel();
+    if(WhenSelection)
+        WhenSelection();
 }
 
 Vector<UiTreeNodeRef> UiTree::GetDragNodes(UiTreeNodeRef primary) const

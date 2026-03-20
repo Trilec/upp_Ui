@@ -30,7 +30,8 @@ As of today, `Ui/Ui.upp` compiles these controls:
 - Layout: `UiBoxLayout`, `UiGridLayout`
 - Text/edit: `UiBaseEdit`, `UiLineEdit`, `UiPasswordEdit`, `UiMaskEdit`, `UiMultiEdit`, `UiIntEdit`, `UiFloatEdit`
 - Value/scroll: `UiSlider`, `UiSliderEdit`, `UiScrollBar`
-- Core controls: `UiLabel`, `UiButton`, `UiCheckBox`, `UiToggle`, `UiRadioButton`, `UiPanel`, `UiAccordion`, `UiScrollPanel`, `UiTitleCard`
+- Data/navigation: `UiDropdown`, `UiList`, `UiTree`, `UiTab`
+- Core controls: `UiLabel`, `UiButton`, `UiToolButton`, `UiCheckBox`, `UiToggle`, `UiRadioButton`, `UiPanel`, `UiAccordion`, `UiScrollPanel`, `UiTitleCard`
 
 ## Build and run (TheIDE)
 
@@ -54,7 +55,18 @@ Example (Windows):
 
 ## API note
 
-This is a new codebase with no backward-compat naming shims. If an API name changes, we update demos + docs to match.
+This is a new codebase with no backward-compat naming shims. If an API name changes, demos and docs move with it.
+
+Current public-surface conventions used in the demos:
+
+- Interactive selection controls expose `SetData/GetData`.
+  - `UiList`: scalar `Value` for single selection, `ValueArray` for multi-selection.
+  - `UiTree`: scalar `Value` for single selection, `ValueArray` for multi-selection.
+- Selection events use `WhenSelection`.
+- `UiTab` uses `SetActiveTab()` / `GetActiveTab()`.
+- `UiDropdown` external binding is explicit: `SetModel(UiListModel&)`, `UseInternalModel()`, `GetInternalModel()`.
+- Numeric edits keep one vocabulary only: `Min`, `Max`, `MinMax`, `Step`, `Precision`, `NotNull`.
+- `UiAccordion` section accessors are `GetSectionContent()`, `GetSectionHeader()`, and `GetSectionBody()`.
 
 Minimal button usage (current naming):
 
@@ -63,10 +75,12 @@ UiButton b;
 b.SetText("Run")
  .SetIcon(CtrlImg::go_forward())
  .SetIconLayout(UiAlign::LEFT)
- .SetAccentStyle();
+ .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
 ```
 
 ## License
 
 Intended to live alongside Ultimate++.
+
+
 

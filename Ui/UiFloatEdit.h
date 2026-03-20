@@ -1,6 +1,28 @@
 #ifndef _Ui_UiFloatEdit_h_
 #define _Ui_UiFloatEdit_h_
 
+/*
+    UiFloatEdit
+    -----------
+
+    Purpose
+    - Floating-point edit control built on UiBaseEdit with optional spin buttons.
+
+    Intent
+    - Public API follows one compact numeric vocabulary: Min, Max,
+      MinMax, Step, Precision, NotNull, SetValue, and GetValue.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetData/GetData for generic control binding.
+    - Use SetValue/GetValue for typed floating-point work.
+
+    Changelog
+    - 2026-03: removed redundant alias setters/getters during public API cleanup.
+*/
+
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiButton.h>
 
@@ -20,17 +42,7 @@ public:
     UiFloatEdit&  Precision(int n);
     UiFloatEdit&  NotNull(bool b = true);
 
-    // Canonical naming aliases
-    UiFloatEdit&  SetMinValue(double n) { return Min(n); }
-    UiFloatEdit&  SetMaxValue(double n) { return Max(n); }
-    UiFloatEdit&  SetMinMaxValue(double min, double max) { return MinMax(min, max); }
-    UiFloatEdit&  SetStepValue(double n) { return Step(n); }
-    UiFloatEdit&  SetPrecisionValue(int n) { return Precision(n); }
-    UiFloatEdit&  SetNotNull(bool b = true) { return NotNull(b); }
-    double        GetMinValue() const { return min_val_; }
-    double        GetMaxValue() const { return max_val_; }
-    double        GetStepValue() const { return step_val_; }
-    int           GetPrecisionValue() const { return precision_; }
+
     
     UiFloatEdit&  ShowSpin(bool b = true);
     
@@ -75,3 +87,4 @@ protected:
 } // namespace Upp
 
 #endif
+

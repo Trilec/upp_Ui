@@ -1,6 +1,28 @@
 #ifndef _Ui_UiPasswordEdit_h_
 #define _Ui_UiPasswordEdit_h_
 
+/*
+    UiPasswordEdit
+    ==============
+
+    Purpose
+    - Single-line password editor with optional visibility toggle.
+
+    Intent
+    - Reuse UiLineEdit behavior while changing only the display pipeline and
+      side-control composition needed for password entry.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetPasswordChar() and ShowRevealButton() style helpers as needed,
+      while relying on the inherited text/data contract from UiBaseEdit.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiButton.h>
 #include <Ui/UiIcons.h>
@@ -170,5 +192,7 @@ private:
 } // namespace Upp
 
 #endif
+
+
 
 

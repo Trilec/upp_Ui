@@ -136,8 +136,8 @@ public:
         accordion_probe.SetSectionBodyHeight(sec_b, DPI(58));
         acc_body_a.SetText("Body A content").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         acc_body_b.SetText("Body B content").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        accordion_probe.Body(sec_a).Add(acc_body_a.SizePos());
-        accordion_probe.Body(sec_b).Add(acc_body_b.SizePos());
+        accordion_probe.GetSectionBody(sec_a).Add(acc_body_a.SizePos());
+        accordion_probe.GetSectionBody(sec_b).Add(acc_body_b.SizePos());
         accordion_probe.SetSingleOpen(true);
 
         grid_probe.SetMode(UiGridLayout::Grid)

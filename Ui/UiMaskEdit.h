@@ -1,6 +1,28 @@
 #ifndef _Ui_UiMaskEdit_h_
 #define _Ui_UiMaskEdit_h_
 
+/*
+    UiMaskEdit
+    ==========
+
+    Purpose
+    - Single-line masked and formatted text editor built on UiLineEdit.
+
+    Intent
+    - Separate input-shape constraints from the shared edit rendering and caret
+      behavior inherited from UiBaseEdit.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetMask(...) for constrained input, SetFormatter(...) for reshape-on-
+      type behavior, or both when the formatter complements the mask.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiDraw.h>
 #include <Animation/Animation.h>
@@ -289,3 +311,5 @@ UiMaskEdit& UiMaskEdit::Animate(const T& from, const T& to, int ms, Event<const 
 } // namespace Upp
 
 #endif
+
+

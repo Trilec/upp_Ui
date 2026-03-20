@@ -1,7 +1,27 @@
-// UiScrollBar.h - Modern styled scrollbar for U++ Ui library
-// Follows Ui design guide v3.3, theme-driven default, CtrlStyled<T>
 #ifndef _Ui_UiScrollBar_h_
 #define _Ui_UiScrollBar_h_
+
+/*
+    UiScrollBar
+    ===========
+
+    Purpose
+    - Styled scrollbar control for scrollable Ui surfaces and popups.
+
+    Intent
+    - Provide one theme-driven scrollbar implementation shared by standalone
+      scroll surfaces and composite controls such as dropdown popups.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use directly for custom scroll surfaces or indirectly through controls
+      that own their own viewport/content model.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
 
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
@@ -368,3 +388,7 @@ UiScrollBar& UiScrollBar::Animate(const T& from, const T& to, int ms,
 } // namespace Upp
 
 #endif
+
+
+
+

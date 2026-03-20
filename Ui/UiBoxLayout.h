@@ -1,6 +1,28 @@
 #ifndef _Ui_UiBoxLayout_h_
 #define _Ui_UiBoxLayout_h_
 
+/*
+    UiBoxLayout
+    ===========
+
+    Purpose
+    - Lightweight flow/box layout control for arranging child controls.
+
+    Intent
+    - Provide a small, predictable layout primitive for Ui demos and composite
+      controls without turning layout helpers into theme surfaces.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use Add(...), gap/inset controls, and direction/wrap settings to build
+      row, column, or flowing child layouts.
+
+    Changelog
+    - 2026-03: added release-standard file documentation.
+*/
+
 // -----------------------------------------------------------------------------
 // UiBoxLayout
 //
@@ -494,3 +516,5 @@ private:
 } // namespace Upp
 
 #endif // _Ui_UiBoxLayout_h_
+
+

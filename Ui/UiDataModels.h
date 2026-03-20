@@ -1,6 +1,28 @@
 #ifndef _Ui_UiDataModels_h_
 #define _Ui_UiDataModels_h_
 
+/*
+    UiDataModels
+    ============
+
+    Purpose
+    - Shared lightweight list, tree, and graph data models for Ui controls.
+
+    Intent
+    - Keep model ownership and change notification explicit so controls can bind
+      to common item data without exposing control-specific helpers publicly.
+
+    Thread context
+    - Mutate on the GUI thread when models are bound to live controls.
+
+    Usage
+    - Use UiListModel and UiTreeModel as the canonical item sources for list,
+      tree, and dropdown-style controls.
+
+    Changelog
+    - 2026-03: documented as public shared model infrastructure.
+*/
+
 #include <Core/Core.h>
 #include <Draw/Draw.h>
 
@@ -193,4 +215,6 @@ private:
 }
 
 #endif
+
+
 

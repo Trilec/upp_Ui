@@ -324,7 +324,7 @@ int UiTab::FindEnabled(int start, int step) const
     return -1;
 }
 
-UiTab& UiTab::Set(int i)
+UiTab& UiTab::SetActiveTab(int i)
 {
     if(i < 0 || i >= tabs_.GetCount() || !tabs_[i].enabled)
         return *this;
@@ -342,7 +342,7 @@ void UiTab::SetData(const Value& v)
 {
     if(IsNull(v))
         return;
-    Set((int)v);
+    SetActiveTab((int)v);
 }
 
 Value UiTab::GetData() const
@@ -835,7 +835,7 @@ void UiTab::LeftDown(Point p, dword)
     int drag_hit = FindDragAt(p);
     int hit = FindTabAt(p);
     if(hit >= 0) {
-        Set(hit);
+        SetActiveTab(hit);
         drag_candidate_ = drag_reorder_enabled_ && (drag_hit == hit || (!show_drag_handles_ && tabs_[hit].draggable));
         dragging_ = false;
         drag_from_ = hit;
@@ -917,28 +917,28 @@ bool UiTab::Key(dword key, int count)
     if((horz && key == K_LEFT) || (!horz && key == K_UP)) {
         int ni = FindEnabled(active_, -1);
         if(ni >= 0) {
-            Set(ni);
+            SetActiveTab(ni);
             return true;
         }
     }
     if((horz && key == K_RIGHT) || (!horz && key == K_DOWN)) {
         int ni = FindEnabled(active_, +1);
         if(ni >= 0) {
-            Set(ni);
+            SetActiveTab(ni);
             return true;
         }
     }
     if(key == K_HOME) {
         for(int i = 0; i < tabs_.GetCount(); i++)
             if(tabs_[i].enabled) {
-                Set(i);
+                SetActiveTab(i);
                 return true;
             }
     }
     if(key == K_END) {
         for(int i = tabs_.GetCount() - 1; i >= 0; i--)
             if(tabs_[i].enabled) {
-                Set(i);
+                SetActiveTab(i);
                 return true;
             }
     }

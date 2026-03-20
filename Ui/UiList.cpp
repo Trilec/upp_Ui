@@ -260,6 +260,56 @@ Vector<int> UiList::GetSelection() const
     return out;
 }
 
+void UiList::SetData(const Value& v)
+{
+    SyncModel();
+
+    if(IsNull(v)) {
+        ClearSelection();
+        return;
+    }
+
+    if(selection_mode_ == UILISTSEL_MULTI || v.Is<ValueArray>()) {
+        selected_.Clear();
+        ValueArray values;
+        if(v.Is<ValueArray>())
+            values = v;
+        else
+            values.Add(v);
+
+        for(int i = 0; i < values.GetCount(); i++) {
+            int index = ResolveSelectionIndex(values[i]);
+            if(index >= 0)
+                selected_.FindAdd(index);
+        }
+
+        Vector<int> selection = GetSelection();
+        anchor_ = selection.IsEmpty() ? -1 : selection[0];
+        cursor_ = selection.IsEmpty() ? -1 : selection.Top();
+        NotifySelectionChange();
+        return;
+    }
+
+    int index = ResolveSelectionIndex(v);
+    if(index >= 0)
+        SelectSingle(index);
+    else
+        ClearSelection();
+}
+
+Value UiList::GetData() const
+{
+    if(selection_mode_ == UILISTSEL_MULTI) {
+        ValueArray values;
+        Vector<int> selection = GetSelection();
+        for(int i = 0; i < selection.GetCount(); i++)
+            values.Add(GetSelectionToken(selection[i]));
+        return values;
+    }
+
+    return cursor_ >= 0 ? GetSelectionToken(cursor_) : Value();
+}
+
 UiList& UiList::EnableRenameOnDblClick(bool on)
 {
     rename_on_dblclick_ = on;
@@ -774,11 +824,42 @@ void UiList::SelectRangeTo(int index, bool additive)
     NotifySelectionChange();
 }
 
+Value UiList::GetSelectionToken(int index) const
+{
+    if(!model_ || index < 0 || index >= model_->GetCount())
+        return Value();
+
+    const UiModelItem& item = model_->Get(index);
+    return IsNull(item.data) ? Value(index) : item.data;
+}
+
+int UiList::ResolveSelectionIndex(const Value& token) const
+{
+    if(!model_)
+        return -1;
+
+    for(int i = 0; i < model_->GetCount(); i++) {
+        const UiModelItem& item = model_->Get(i);
+        if(!IsNull(item.data) && item.data == token)
+            return i;
+    }
+
+    if(token.Is<int>()) {
+        int index = token;
+        return index >= 0 && index < model_->GetCount() ? index : -1;
+    }
+    if(token.Is<int64>()) {
+        int64 index = token;
+        return index >= 0 && index < model_->GetCount() ? (int)index : -1;
+    }
+    return -1;
+}
+
 void UiList::NotifySelectionChange()
 {
     Refresh();
-    if(WhenSel)
-        WhenSel();
+    if(WhenSelection)
+        WhenSelection();
 }
 
 bool UiList::CommitRenameIfNeeded(Point p)

@@ -358,19 +358,19 @@ void UiAccordion::Remove(int i)
     Refresh();
 }
 
-ParentCtrl& UiAccordion::Content(int i)
+ParentCtrl& UiAccordion::GetSectionContent(int i)
 {
     ASSERT(i >= 0 && i < sections_.GetCount());
     return sections_[i].content;
 }
 
-UiTitleCard& UiAccordion::Header(int i)
+UiTitleCard& UiAccordion::GetSectionHeader(int i)
 {
     ASSERT(i >= 0 && i < sections_.GetCount());
     return sections_[i].header;
 }
 
-UiPanel& UiAccordion::Body(int i)
+UiPanel& UiAccordion::GetSectionBody(int i)
 {
     ASSERT(i >= 0 && i < sections_.GetCount());
     return sections_[i].body;

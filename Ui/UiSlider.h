@@ -1,6 +1,28 @@
 #ifndef _Ui_UiSlider_h_
 #define _Ui_UiSlider_h_
 
+/*
+    UiSlider
+    ========
+
+    Purpose
+    - Styled scalar slider control with keyboard, wheel, and drag interaction.
+
+    Intent
+    - Keep value editing behavior separate from presentation while sharing the
+      theme-driven style contract used across interactive Ui controls.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Use SetRange(), SetStep(), and SetData/GetData for generic value binding.
+    - Observe committed user changes with WhenAction.
+
+    Changelog
+    - 2026-03: added release-standard header documentation.
+*/
+
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -138,3 +160,5 @@ private:
 }
 
 #endif
+
+
