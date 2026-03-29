@@ -61,6 +61,8 @@ file
 	UiSliderEdit.cpp,
 	UiScrollBar.h,
 	UiScrollBar.cpp,
+	UiTable.h,
+	UiTable.cpp,
 	UiDoc.h,
 	UiDoc.cpp,
 	UiTree.h,

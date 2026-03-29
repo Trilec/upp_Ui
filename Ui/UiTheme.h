@@ -1778,12 +1778,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiList::Style s = UiList::StyleDefault();
-        if(normalized.preset == UiThemePreset::Rounded)
-            s.metrics.radius = DPI(10);
         if(normalized.preset == UiThemePreset::Minimal) {
             s.metrics.face_enabled = false;
             s.metrics.frame_enabled = false;
             s.metrics.focus_enabled = false;
+            s.row_radius = 0;
             s.hot_face = Color(245, 247, 250);
             s.hot_frame = Color(226, 232, 240);
             s.selected_face = Color(241, 245, 249);
@@ -1816,6 +1815,86 @@ public:
                 s.palette.icon[ST_DISABLED] = Color(100, 116, 139);
             }
             return s;
+        }
+        switch(normalized.preset) {
+        case UiThemePreset::Rounded:
+            s.metrics.radius = DPI(18);
+            s.metrics.content_padding = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
+            s.row_radius = DPI(999);
+            s.row_height = DPI(30);
+            s.h_padding = DPI(12);
+            s.selected_face = Color(219, 234, 254);
+            s.selected_frame = Color(96, 165, 250);
+            s.hot_face = Color(239, 246, 255);
+            s.hot_frame = Color(191, 219, 254);
+            break;
+        case UiThemePreset::Linear:
+            s.metrics.face_enabled = false;
+            s.metrics.frame_enabled = false;
+            s.metrics.focus_enabled = false;
+            s.metrics.radius = 0;
+            s.row_radius = 0;
+            s.h_padding = DPI(4);
+            s.v_padding = DPI(4);
+            s.hot_as_underline = true;
+            s.selected_as_underline = true;
+            s.state_underline_thickness = DPI(3);
+            s.hot_face = Color(255, 255, 255);
+            s.selected_face = Color(255, 255, 255);
+            s.hot_frame = Color(148, 163, 184);
+            s.selected_frame = Color(37, 99, 235);
+            s.separator_color = Color(226, 232, 240);
+            break;
+        case UiThemePreset::Solid:
+            s.metrics.radius = 0;
+            s.metrics.frame_width = DPI(2);
+            s.row_radius = 0;
+            s.palette.face[ST_NORMAL] = UiFill::Solid(Color(255, 250, 232));
+            s.palette.face[ST_HOT] = UiFill::Solid(Color(255, 247, 204));
+            s.palette.face[ST_PRESSED] = UiFill::Solid(Color(255, 241, 163));
+            s.palette.face[ST_DISABLED] = UiFill::Solid(Color(247, 241, 222));
+            for(int i = 0; i < 4; i++) {
+                s.palette.frame[i] = Color(17, 24, 39);
+                s.palette.ink[i] = Color(17, 24, 39);
+                s.palette.icon[i] = Color(17, 24, 39);
+            }
+            s.selected_face = Color(17, 24, 39);
+            s.selected_frame = Color(17, 24, 39);
+            s.selected_ink = White();
+            s.hot_face = Color(254, 240, 138);
+            s.hot_frame = Color(17, 24, 39);
+            s.hot_ink = Color(17, 24, 39);
+            s.separator_color = Color(17, 24, 39);
+            s.check_frame = Color(17, 24, 39);
+            s.check_fill = Color(17, 24, 39);
+            break;
+        case UiThemePreset::Outline:
+            s.metrics.radius = 0;
+            s.metrics.frame_width = DPI(1);
+            s.row_radius = 0;
+            s.selected_face = Color(255, 255, 255);
+            s.selected_frame = Color(17, 24, 39);
+            s.hot_face = Color(248, 250, 252);
+            s.hot_frame = Color(100, 116, 139);
+            break;
+        case UiThemePreset::Compact:
+            s.row_height = DPI(22);
+            s.icon_size = DPI(14);
+            s.h_padding = DPI(6);
+            s.v_padding = DPI(4);
+            s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+            break;
+        case UiThemePreset::Layered:
+            s.metrics.radius = DPI(18);
+            s.metrics.shadow.enabled = true;
+            s.metrics.shadow.blur = DPI(5);
+            s.metrics.shadow.distance = DPI(3);
+            s.metrics.shadow.alpha = 40;
+            s.metrics.shadow.color = Color(148, 163, 184);
+            s.row_radius = DPI(12);
+            break;
+        case UiThemePreset::Minimal:
+            break;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         if(UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark) {

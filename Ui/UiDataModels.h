@@ -34,8 +34,11 @@ struct UiModelItem : Moveable<UiModelItem> {
     bool   enabled = true;
     String description;
     String right_text;
+    int    text_align = ALIGN_LEFT;
+    int    right_text_align = ALIGN_RIGHT;
     Image  icon;
     bool   mono_icon = false;
+    bool   has_check = false;
     bool   checked = false;
     bool   group_header = false;
     bool   separator_before = false;
@@ -210,6 +213,93 @@ private:
 
     Vector<GraphNode> nodes_;
     Vector<UiGraphEdge> edges_;
+};
+
+enum UiTableAxis : byte {
+    UITABLE_ROW_AXIS = 0,
+    UITABLE_COLUMN_AXIS,
+};
+
+enum UiTableSortDirection : byte {
+    UITABLE_SORT_NONE = 0,
+    UITABLE_SORT_ASC,
+    UITABLE_SORT_DESC,
+};
+
+struct UiTableHeader : Moveable<UiTableHeader> {
+    String text;
+    Value  data;
+    bool   enabled = true;
+    bool   sortable = false;
+    UiTableSortDirection sort = UITABLE_SORT_NONE;
+    int align = ALIGN_LEFT;
+    String tooltip;
+    Image  icon;
+    bool   mono_icon = false;
+    Color  custom_ink_color;
+    Color  custom_bg_color;
+
+    UiTableHeader() {}
+    UiTableHeader(const String& t, const Value& d = Value())
+        : text(t), data(d) {}
+};
+
+struct UiTableCell : Moveable<UiTableCell> {
+    Value  value;
+    Value  edit_value;
+    String display;
+    String tooltip;
+    bool   enabled = true;
+    bool   editable = true;
+    int align = ALIGN_LEFT;
+    Image  icon;
+    bool   mono_icon = false;
+    bool   use_custom_ink = false;
+    Color  ink = Null;
+    bool   use_custom_bg = false;
+    Color  bg = Null;
+    bool   use_custom_font = false;
+    Font   font = StdFont();
+    bool   has_warning = false;
+    bool   has_error = false;
+};
+
+class UiTableModel : public UiDataModelBase {
+public:
+    UiTableModel();
+    UiTableModel(int rows, int cols);
+
+    int GetRowCount() const { return cells_.GetCount(); }
+    int GetColumnCount() const { return column_headers_.GetCount(); }
+    bool IsValidCell(int row, int col) const;
+
+    void SetSize(int rows, int cols);
+    void SetRowCount(int rows);
+    void SetColumnCount(int cols);
+    void Clear();
+
+    bool InsertRow(int row);
+    bool RemoveRow(int row);
+    bool InsertColumn(int col);
+    bool RemoveColumn(int col);
+
+    const UiTableCell& GetCell(int row, int col) const;
+    UiTableCell& GetCell(int row, int col);
+    bool SetCell(int row, int col, const UiTableCell& cell);
+    Value GetCellValue(int row, int col) const;
+    bool SetCellValue(int row, int col, const Value& value);
+    bool IsCellEditable(int row, int col) const;
+
+    const UiTableHeader& GetHeader(UiTableAxis axis, int index) const;
+    UiTableHeader& GetHeader(UiTableAxis axis, int index);
+    bool SetHeader(UiTableAxis axis, int index, const UiTableHeader& header);
+    Value GetHeaderValue(UiTableAxis axis, int index) const;
+    bool SetHeaderValue(UiTableAxis axis, int index, const Value& value);
+
+private:
+    Vector< Vector<UiTableCell> > cells_;
+    Vector<UiTableHeader> row_headers_;
+    Vector<UiTableHeader> column_headers_;
 };
 
 }

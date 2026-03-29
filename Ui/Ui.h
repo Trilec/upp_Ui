@@ -55,6 +55,7 @@
 #include <Ui/UiSlider.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
+#include <Ui/UiTable.h>
 #include <Ui/UiDoc.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>

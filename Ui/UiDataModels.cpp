@@ -481,5 +481,201 @@ UiGraphModel UiGraphModel::FromTree(const UiTreeModel& tree, UiTreeNodeRef root)
     return g;
 }
 
+UiTableModel::UiTableModel()
+{
+}
+
+UiTableModel::UiTableModel(int rows, int cols)
+{
+    SetSize(rows, cols);
+}
+
+bool UiTableModel::IsValidCell(int row, int col) const
+{
+    return row >= 0 && row < cells_.GetCount()
+        && col >= 0 && !cells_.IsEmpty() && col < cells_[row].GetCount();
+}
+
+void UiTableModel::SetSize(int rows, int cols)
+{
+    rows = max(0, rows);
+    cols = max(0, cols);
+    cells_.SetCount(rows);
+    for(int r = 0; r < rows; r++)
+        cells_[r].SetCount(cols);
+    row_headers_.SetCount(rows);
+    column_headers_.SetCount(cols);
+    Notify(UI_MODEL_RESET, rows, cols);
+}
+
+void UiTableModel::SetRowCount(int rows)
+{
+    rows = max(0, rows);
+    int old_rows = cells_.GetCount();
+    if(rows == old_rows)
+        return;
+
+    int cols = GetColumnCount();
+    cells_.SetCount(rows);
+    for(int r = old_rows; r < rows; r++)
+        cells_[r].SetCount(cols);
+    row_headers_.SetCount(rows);
+    Notify(rows > old_rows ? UI_MODEL_INSERT : UI_MODEL_ERASE, min(rows, old_rows), abs(rows - old_rows), UITABLE_ROW_AXIS);
+}
+
+void UiTableModel::SetColumnCount(int cols)
+{
+    cols = max(0, cols);
+    int old_cols = GetColumnCount();
+    if(cols == old_cols)
+        return;
+
+    for(int r = 0; r < cells_.GetCount(); r++)
+        cells_[r].SetCount(cols);
+    column_headers_.SetCount(cols);
+    Notify(cols > old_cols ? UI_MODEL_INSERT : UI_MODEL_ERASE, min(cols, old_cols), abs(cols - old_cols), UITABLE_COLUMN_AXIS);
+}
+
+void UiTableModel::Clear()
+{
+    if(cells_.IsEmpty() && column_headers_.IsEmpty() && row_headers_.IsEmpty())
+        return;
+    cells_.Clear();
+    row_headers_.Clear();
+    column_headers_.Clear();
+    Notify(UI_MODEL_CLEAR);
+}
+
+bool UiTableModel::InsertRow(int row)
+{
+    if(row < 0 || row > GetRowCount())
+        return false;
+    Vector<UiTableCell> line;
+    line.SetCount(GetColumnCount());
+    cells_.Insert(row, pick(line));
+    row_headers_.Insert(row, UiTableHeader());
+    Notify(UI_MODEL_INSERT, row, 1, UITABLE_ROW_AXIS);
+    return true;
+}
+
+bool UiTableModel::RemoveRow(int row)
+{
+    if(row < 0 || row >= GetRowCount())
+        return false;
+    cells_.Remove(row);
+    row_headers_.Remove(row);
+    Notify(UI_MODEL_ERASE, row, 1, UITABLE_ROW_AXIS);
+    return true;
+}
+
+bool UiTableModel::InsertColumn(int col)
+{
+    if(col < 0 || col > GetColumnCount())
+        return false;
+    for(int r = 0; r < cells_.GetCount(); r++)
+        cells_[r].Insert(col, UiTableCell());
+    column_headers_.Insert(col, UiTableHeader());
+    Notify(UI_MODEL_INSERT, col, 1, UITABLE_COLUMN_AXIS);
+    return true;
+}
+
+bool UiTableModel::RemoveColumn(int col)
+{
+    if(col < 0 || col >= GetColumnCount())
+        return false;
+    for(int r = 0; r < cells_.GetCount(); r++)
+        cells_[r].Remove(col);
+    column_headers_.Remove(col);
+    Notify(UI_MODEL_ERASE, col, 1, UITABLE_COLUMN_AXIS);
+    return true;
+}
+
+const UiTableCell& UiTableModel::GetCell(int row, int col) const
+{
+    ASSERT(IsValidCell(row, col));
+    return cells_[row][col];
+}
+
+UiTableCell& UiTableModel::GetCell(int row, int col)
+{
+    ASSERT(IsValidCell(row, col));
+    return cells_[row][col];
+}
+
+bool UiTableModel::SetCell(int row, int col, const UiTableCell& cell)
+{
+    if(!IsValidCell(row, col))
+        return false;
+    cells_[row][col] = cell;
+    Notify(UI_MODEL_UPDATE, row, col, 1);
+    return true;
+}
+
+Value UiTableModel::GetCellValue(int row, int col) const
+{
+    return IsValidCell(row, col) ? cells_[row][col].value : Value();
+}
+
+bool UiTableModel::SetCellValue(int row, int col, const Value& value)
+{
+    if(!IsValidCell(row, col))
+        return false;
+    cells_[row][col].value = value;
+    if(IsNull(cells_[row][col].edit_value))
+        cells_[row][col].edit_value = value;
+    Notify(UI_MODEL_UPDATE, row, col, 1);
+    return true;
+}
+
+bool UiTableModel::IsCellEditable(int row, int col) const
+{
+    return IsValidCell(row, col) && cells_[row][col].editable && cells_[row][col].enabled;
+}
+
+const UiTableHeader& UiTableModel::GetHeader(UiTableAxis axis, int index) const
+{
+    ASSERT(index >= 0);
+    const Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    ASSERT(index < headers.GetCount());
+    return headers[index];
+}
+
+UiTableHeader& UiTableModel::GetHeader(UiTableAxis axis, int index)
+{
+    ASSERT(index >= 0);
+    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    ASSERT(index < headers.GetCount());
+    return headers[index];
+}
+
+bool UiTableModel::SetHeader(UiTableAxis axis, int index, const UiTableHeader& header)
+{
+    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    if(index < 0 || index >= headers.GetCount())
+        return false;
+    headers[index] = header;
+    Notify(UI_MODEL_UPDATE, axis, index, 0);
+    return true;
+}
+
+Value UiTableModel::GetHeaderValue(UiTableAxis axis, int index) const
+{
+    const Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    if(index < 0 || index >= headers.GetCount())
+        return Value();
+    return !IsNull(headers[index].data) ? headers[index].data : Value(headers[index].text);
+}
+
+bool UiTableModel::SetHeaderValue(UiTableAxis axis, int index, const Value& value)
+{
+    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    if(index < 0 || index >= headers.GetCount())
+        return false;
+    headers[index].data = value;
+    headers[index].text = AsString(value);
+    Notify(UI_MODEL_UPDATE, axis, index, 0);
+    return true;
+}
+
 }
 

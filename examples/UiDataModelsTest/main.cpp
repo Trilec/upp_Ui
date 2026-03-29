@@ -220,6 +220,74 @@ static void RunInteropTests(TestCtx& t)
     t.Expect(g.GetEdgeCount() == max(0, g.GetNodeCount() - 1), "Tree->Graph edge count is n-1");
 }
 
+static void RunTableTests(TestCtx& t)
+{
+    t.Section("UiTableModel");
+
+    UiTableModel table(8, 5);
+    t.Expect(table.GetRowCount() == 8, "Table row count after ctor");
+    t.Expect(table.GetColumnCount() == 5, "Table column count after ctor");
+
+    for(int c = 0; c < table.GetColumnCount(); c++)
+        t.Expect(table.SetHeader(UITABLE_COLUMN_AXIS, c, UiTableHeader(Format("Col %d", c))), "Set column header succeeds");
+    for(int r = 0; r < table.GetRowCount(); r++)
+        t.Expect(table.SetHeader(UITABLE_ROW_AXIS, r, UiTableHeader(Format("Row %d", r))), "Set row header succeeds");
+
+    for(int r = 0; r < table.GetRowCount(); r++) {
+        for(int c = 0; c < table.GetColumnCount(); c++) {
+            UiTableCell cell;
+            cell.value = Format("%d:%d", r, c);
+            cell.edit_value = cell.value;
+            cell.align = ((c % 2) ? ALIGN_RIGHT : ALIGN_LEFT);
+            cell.editable = ((r + c) % 3) != 0;
+            t.Expect(table.SetCell(r, c, cell), Format("Set cell %d,%d succeeds", r, c));
+        }
+    }
+
+    t.Expect(AsString(table.GetCellValue(3, 2)) == "3:2", "GetCellValue returns stored value");
+    t.Expect(table.GetHeaderValue(UITABLE_COLUMN_AXIS, 4) == Value("Col 4"), "GetHeaderValue returns column header");
+
+    UiTableCell frozen = table.GetCell(2, 2);
+    frozen.editable = false;
+    table.SetCell(2, 2, frozen);
+    t.Expect(!table.IsCellEditable(2, 2), "Non-editable cell reports read-only");
+
+    t.Expect(table.InsertRow(4), "InsertRow succeeds");
+    t.Expect(table.GetRowCount() == 9, "InsertRow increases count");
+    t.Expect(table.InsertColumn(1), "InsertColumn succeeds");
+    t.Expect(table.GetColumnCount() == 6, "InsertColumn increases count");
+    t.Expect(table.RemoveRow(0), "RemoveRow succeeds");
+    t.Expect(table.RemoveColumn(table.GetColumnCount() - 1), "RemoveColumn succeeds");
+
+    SeedRandom(4242);
+    for(int step = 0; step < 500; step++) {
+        int op = Random(6);
+        if(op == 0)
+            table.InsertRow(Random(table.GetRowCount() + 1));
+        else if(op == 1 && table.GetRowCount() > 1)
+            table.RemoveRow(Random(table.GetRowCount()));
+        else if(op == 2)
+            table.InsertColumn(Random(table.GetColumnCount() + 1));
+        else if(op == 3 && table.GetColumnCount() > 1)
+            table.RemoveColumn(Random(table.GetColumnCount()));
+        else if(op == 4 && table.GetRowCount() > 0 && table.GetColumnCount() > 0) {
+            int row = Random(table.GetRowCount());
+            int col = Random(table.GetColumnCount());
+            t.Expect(table.SetCellValue(row, col, Format("Mut %d", step)), "SetCellValue during random mutate");
+        }
+        else if(table.GetRowCount() > 0 && table.GetColumnCount() > 0) {
+            int row = Random(table.GetRowCount());
+            int col = Random(table.GetColumnCount());
+            t.Expect(table.IsValidCell(row, col), "Random valid cell remains in range");
+        }
+    }
+
+    for(int r = 0; r < table.GetRowCount(); r++)
+        t.Expect(table.GetHeader(UITABLE_ROW_AXIS, r).text.GetCount() >= 0, Format("Row header %d accessible", r));
+    for(int c = 0; c < table.GetColumnCount(); c++)
+        t.Expect(table.GetHeader(UITABLE_COLUMN_AXIS, c).text.GetCount() >= 0, Format("Column header %d accessible", c));
+}
+
 static void RunUnicodeControlTests(TestCtx& t)
 {
     t.Section("Unicode Controls");
@@ -292,6 +360,7 @@ CONSOLE_APP_MAIN
     RunTreeTests(t);
     RunGraphTests(t);
     RunInteropTests(t);
+    RunTableTests(t);
     RunUnicodeControlTests(t);
     RunLabelRichTests(t);
 

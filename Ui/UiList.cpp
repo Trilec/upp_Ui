@@ -36,6 +36,20 @@ static StyledState UiListState_(bool enabled, bool pressed, bool hot)
     return ST_NORMAL;
 }
 
+static void DrawAlignedListText(Draw& w, const Rect& r, const String& text, Font font, Color ink, int align)
+{
+    if(r.IsEmpty() || text.IsEmpty())
+        return;
+    Size sz = GetTextSize(text, font);
+    int x = r.left;
+    if(align == ALIGN_RIGHT)
+        x = max(r.left, r.right - sz.cx);
+    else if(align == ALIGN_CENTER)
+        x = max(r.left, r.left + (r.GetWidth() - sz.cx) / 2);
+    int y = r.top + max(0, (r.GetHeight() - sz.cy) / 2);
+    w.DrawText(x, y, text, font, ink);
+}
+
 const UiList::Style& UiList::StyleDefault()
 {
     static Style s;
@@ -86,6 +100,9 @@ const UiList::Style& UiList::StyleDefault()
         s.show_icons = true;
         s.show_checks = true;
         s.show_metadata_marker = true;
+        s.hot_as_underline = false;
+        s.selected_as_underline = false;
+        s.state_underline_thickness = DPI(2);
 
         s.ink = text_primary;
         s.disabled_ink = text_muted;
@@ -505,7 +522,15 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
     if(index > 0 && item.separator_before)
         w.DrawRect(row.left + style.h_padding, row.top, row.GetWidth() - style.h_padding * 2, 1, style.separator_color);
 
+    bool underline_state = (selected && style.selected_as_underline) || (!selected && hot && style.hot_as_underline);
+
     if(selected || hot) {
+        Color accent = selected ? style.selected_frame : style.hot_frame;
+        if(underline_state) {
+            int thickness = max(DPI(1), style.state_underline_thickness);
+            w.DrawRect(rr.left, rr.bottom - thickness, rr.GetWidth(), thickness, accent);
+        }
+        else {
         StyledPalette p;
         StyledMetrics m;
         m.face_enabled = true;
@@ -518,9 +543,10 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
             p.ink[i] = selected ? style.selected_ink : style.hot_ink;
         }
         UiPaintFaceFrameDash(w, rr, p, m, st);
+        }
     }
 
-    bool has_check = style.show_checks && item.checked;
+    bool has_check = style.show_checks && (item.has_check || item.checked);
     bool has_icon = style.show_icons && !IsNull(item.icon);
     bool has_metadata = style.show_metadata_marker && item.has_metadata;
 
@@ -548,22 +574,25 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
               ? item.custom_ink_color
               : (selected ? style.selected_ink : (item.enabled ? style.ink : style.disabled_ink));
 
-    int ty = tx.top + max(0, (tx.GetHeight() - GetTextSize(item.text, font).cy) / 2);
-    w.DrawText(tx.left, ty, item.text, font, ink);
+    DrawAlignedListText(w, tx, item.text, font, ink, item.text_align);
 
     if(item.underline) {
         Color uc = IsNull(item.underline_color) ? ink : item.underline_color;
-        int uy = min(tx.bottom - 2, ty + GetTextSize(item.text, font).cy + 1);
-        w.DrawRect(tx.left, uy, min(tx.GetWidth(), GetTextSize(item.text, font).cx), 1, uc);
+        Size tsz = GetTextSize(item.text, font);
+        int ux = tx.left;
+        if(item.text_align == ALIGN_RIGHT)
+            ux = max(tx.left, tx.right - tsz.cx);
+        else if(item.text_align == ALIGN_CENTER)
+            ux = max(tx.left, tx.left + (tx.GetWidth() - tsz.cx) / 2);
+        int uy = min(tx.bottom - 2, tx.top + max(0, (tx.GetHeight() - tsz.cy) / 2) + tsz.cy + 1);
+        w.DrawRect(ux, uy, min(tx.right - ux, tsz.cx), 1, uc);
     }
 
     if(!rx.IsEmpty()) {
         Font rf = style.font;
         if(item.group_header) rf.Bold();
         Color rink = selected ? style.selected_ink : (item.enabled ? style.muted_ink : style.disabled_ink);
-        Size rsz = GetTextSize(item.right_text, rf);
-        int rty = rx.top + max(0, (rx.GetHeight() - rsz.cy) / 2);
-        w.DrawText(rx.right - rsz.cx, rty, item.right_text, rf, rink);
+        DrawAlignedListText(w, rx, item.right_text, rf, rink, item.right_text_align);
     }
 }
 
@@ -594,7 +623,7 @@ void UiList::Layout()
     if(editing_ && editing_index_ >= 0 && model_ && editing_index_ < model_->GetCount()) {
         Rect row = GetRowRect(editing_index_);
         const UiModelItem& item = model_->Get(editing_index_);
-        bool has_check = GetEffectiveStyle().show_checks && item.checked;
+        bool has_check = GetEffectiveStyle().show_checks && (item.has_check || item.checked);
         bool has_icon = GetEffectiveStyle().show_icons && !IsNull(item.icon);
         bool has_metadata = GetEffectiveStyle().show_metadata_marker && item.has_metadata;
         Rect tx = GetTextRect(row.Deflated(DPI(2), DPI(1)), has_check, has_icon, has_metadata, item);
@@ -649,11 +678,7 @@ void UiList::LeftDouble(Point p, dword flags)
     if(row < 0 || !model_)
         return;
     const UiModelItem& item = model_->Get(row);
-    bool has_check = GetEffectiveStyle().show_checks && item.checked;
-    bool has_icon = GetEffectiveStyle().show_icons && !IsNull(item.icon);
-    bool has_metadata = GetEffectiveStyle().show_metadata_marker && item.has_metadata;
-    Rect tx = GetTextRect(GetRowRect(row).Deflated(DPI(2), DPI(1)), has_check, has_icon, has_metadata, item);
-    if(rename_on_dblclick_ && item.editable && tx.Contains(p))
+    if(rename_on_dblclick_ && item.editable && item.enabled && !item.group_header)
         BeginRename(row);
     else if(WhenAction)
         WhenAction();
@@ -737,7 +762,7 @@ void UiList::GotFocus()
 
 void UiList::LostFocus()
 {
-    if(editing_)
+    if(editing_ && !HasFocusDeep())
         CommitRename();
     Refresh();
 }

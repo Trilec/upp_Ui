@@ -35,7 +35,8 @@ public:
         info_button_.SetStyle(UiTheme::ResolveToolButton());
         info_button_.SetIcon(ICON_EDITOR_CLARIFY_48());
 
-        value_edit_.SetData("42");
+        value_edit_.MinMax(0, 99).Step(1).ShowSpin(false);
+        value_edit_.SetValue(42);
         value_edit_.SetMinSize(Size(DPI(72), DPI(28)));
 
         apply_button_.SetText("Apply");
@@ -99,7 +100,7 @@ public:
     void ApplyValue()
     {
         UiModelItem it = model_.Get(value_node_);
-        it.text = AsString(value_edit_.GetData());
+        it.text = AsString(value_edit_.GetValue());
         it.right_text = "applied";
         model_.Set(value_node_, it);
         SyncInspector();
@@ -294,7 +295,7 @@ private:
     UiButton toggle_root_;
     UiToggle notify_toggle_;
     UiToolButton info_button_;
-    UiLineEdit value_edit_;
+    UiIntEdit value_edit_;
     UiButton apply_button_;
     UiTreeNodeRef notifications_node_;
     UiTreeNodeRef value_node_;
@@ -306,4 +307,6 @@ GUI_APP_MAIN
 {
     UiTreeDemoWindow().Run();
 }
+
+
 

@@ -73,6 +73,9 @@ public:
         bool show_icons = true;
         bool show_checks = true;
         bool show_metadata_marker = true;
+        bool hot_as_underline = false;
+        bool selected_as_underline = false;
+        int state_underline_thickness = DPI(2);
 
         Color ink = SColorText();
         Color disabled_ink = SColorDisabled();
@@ -95,6 +98,7 @@ public:
               % label_gap % h_padding % v_padding % row_radius
               % metadata_size % metadata_gap % right_gap
               % show_icons % show_checks % show_metadata_marker
+              % hot_as_underline % selected_as_underline % state_underline_thickness
               % ink % disabled_ink % muted_ink
               % hot_face % hot_frame % hot_ink
               % selected_face % selected_frame % selected_ink
