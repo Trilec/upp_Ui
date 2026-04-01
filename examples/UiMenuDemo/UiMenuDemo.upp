@@ -1,9 +1,10 @@
 uses
-	Ui;
+	Ui,
+	plugin/png,
+	plugin/bmp;
 
 file
 	main.cpp;
 
 mainconfig
 	"" = "GUI";
-

@@ -288,6 +288,190 @@ static void RunTableTests(TestCtx& t)
         t.Expect(table.GetHeader(UITABLE_COLUMN_AXIS, c).text.GetCount() >= 0, Format("Column header %d accessible", c));
 }
 
+static bool ValidateMenuModel(const UiMenuModel& model, String& reason)
+{
+    reason.Clear();
+    UiMenuNodeRef root = model.Root();
+    if(!model.IsValid(root)) {
+        reason = "root invalid";
+        return false;
+    }
+
+    Index<int> seen;
+    Vector<int> stack;
+    stack.Add(root.id);
+
+    while(!stack.IsEmpty()) {
+        int id = stack.Top();
+        stack.Drop();
+        if(seen.Find(id) >= 0) {
+            reason = Format("cycle/revisit at %d", id);
+            return false;
+        }
+        seen.FindAdd(id);
+
+        UiMenuNodeRef node{id};
+        int count = model.GetChildCount(node);
+        for(int i = 0; i < count; i++) {
+            UiMenuNodeRef child = model.GetChild(node, i);
+            if(!model.IsValid(child)) {
+                reason = Format("invalid child under %d", id);
+                return false;
+            }
+            UiMenuNodeRef parent = model.GetParent(child);
+            if(parent.id != id) {
+                reason = Format("bad parent link child=%d parent=%d expected=%d", child.id, parent.id, id);
+                return false;
+            }
+            if(model.GetChildIndex(child) != i) {
+                reason = Format("bad child index child=%d got=%d expected=%d", child.id, model.GetChildIndex(child), i);
+                return false;
+            }
+            stack.Add(child.id);
+        }
+    }
+
+    if(seen.GetCount() != model.GetNodeCount()) {
+        reason = Format("reachable=%d total=%d mismatch", seen.GetCount(), model.GetNodeCount());
+        return false;
+    }
+    return true;
+}
+
+static Vector<int> CollectMenuNodeIds(const UiMenuModel& model, bool exclude_root)
+{
+    Vector<int> out;
+    if(!model.IsValid(model.Root()))
+        return out;
+    Vector<int> stack;
+    stack.Add(model.Root().id);
+    while(!stack.IsEmpty()) {
+        int id = stack.Top();
+        stack.Drop();
+        if(!exclude_root || id != model.Root().id)
+            out.Add(id);
+        UiMenuNodeRef node{id};
+        for(int i = model.GetChildCount(node) - 1; i >= 0; i--)
+            stack.Add(model.GetChild(node, i).id);
+    }
+    return out;
+}
+
+static void RunMenuTests(TestCtx& t)
+{
+    t.Section("UiMenuModel");
+
+    UiMenuModel menu;
+    UiMenuNodeRef root = menu.Root();
+    t.Expect(menu.IsValid(root), "Menu root is valid");
+
+    Vector<UiMenuNodeRef> top;
+    for(int i = 0; i < 20; i++) {
+        UiMenuItem item(Format("Top %02d", i), i);
+        item.shortcut_text = Format("Ctrl+%d", i % 10);
+        item.checkable = (i % 3) == 0;
+        item.checked = (i % 6) == 0;
+        top.Add(menu.AddChild(root, item));
+    }
+    t.Expect(menu.GetChildCount(root) == 20, "Menu root child count after seed");
+
+    for(int i = 0; i < top.GetCount(); i++) {
+        for(int j = 0; j < 10; j++) {
+            UiMenuItem child(Format("Item %02d.%02d", i, j), i * 100 + j);
+            child.separator_before = j == 4;
+            child.radio = (j % 5) == 0;
+            child.checked = child.radio && j == 0;
+            child.right_text = Format("F%d", j + 1);
+            menu.AddChild(top[i], child);
+        }
+    }
+
+    String reason;
+    t.Expect(ValidateMenuModel(menu, reason), "Seed menu validates");
+
+    UiMenuNodeRef moved = menu.GetChild(top[0], 0);
+    t.Expect(menu.Move(moved, top[5], 2), "Move submenu node succeeds");
+    t.Expect(ValidateMenuModel(menu, reason), "Menu validates after move");
+
+    UiMenuNodeRef cloned = menu.CloneSubtree(top[1], root, 3);
+    t.Expect(menu.IsValid(cloned), "Clone subtree returns valid node");
+    t.Expect(ValidateMenuModel(menu, reason), "Menu validates after clone");
+
+    t.Expect(menu.RemoveChildren(top[2]), "Prune/remove children succeeds");
+    t.Expect(menu.GetChildCount(top[2]) == 0, "Pruned node is empty");
+    t.Expect(ValidateMenuModel(menu, reason), "Menu validates after prune");
+
+    t.Expect(menu.Graft(top[3], top[4], menu.GetChildCount(top[4])), "Graft/move subtree succeeds");
+    t.Expect(menu.GetParent(top[3]).id == top[4].id, "Grafted node parent updated");
+    t.Expect(ValidateMenuModel(menu, reason), "Menu validates after graft");
+
+    SeedRandom(20260329);
+    for(int step = 0; step < 1600; step++) {
+        Vector<int> nodes = CollectMenuNodeIds(menu, false);
+        int op = Random(6);
+        if(op == 0 || nodes.IsEmpty()) {
+            UiMenuNodeRef parent{nodes.IsEmpty() ? root.id : nodes[Random(nodes.GetCount())]};
+            UiMenuItem item(Format("Ins %d", step), step);
+            item.checkable = (step % 4) == 0;
+            item.separator = (step % 29) == 0;
+            menu.InsertChild(parent, menu.GetChildCount(parent), item);
+        }
+        else if(op == 1 && menu.GetNodeCount() > 1) {
+            Vector<int> non_root = CollectMenuNodeIds(menu, true);
+            if(!non_root.IsEmpty())
+                menu.Remove(UiMenuNodeRef{non_root[Random(non_root.GetCount())]});
+        }
+        else if(op == 2) {
+            Vector<int> non_root = CollectMenuNodeIds(menu, true);
+            if(!non_root.IsEmpty()) {
+                UiMenuNodeRef node{non_root[Random(non_root.GetCount())]};
+                menu.RemoveChildren(node);
+            }
+        }
+        else if(op == 3) {
+            Vector<int> non_root = CollectMenuNodeIds(menu, true);
+            if(non_root.GetCount() > 2) {
+                UiMenuNodeRef node{non_root[Random(non_root.GetCount())]};
+                UiMenuNodeRef parent{nodes[Random(nodes.GetCount())]};
+                if(node.id != parent.id)
+                    menu.Move(node, parent, -1);
+            }
+        }
+        else if(op == 4) {
+            Vector<int> non_root = CollectMenuNodeIds(menu, true);
+            if(non_root.GetCount() > 1) {
+                UiMenuNodeRef node{non_root[Random(non_root.GetCount())]};
+                UiMenuNodeRef parent{nodes[Random(nodes.GetCount())]};
+                menu.CloneSubtree(node, parent, -1);
+            }
+        }
+        else {
+            Vector<int> non_root = CollectMenuNodeIds(menu, true);
+            if(!non_root.IsEmpty()) {
+                UiMenuNodeRef node{non_root[Random(non_root.GetCount())]};
+                UiMenuItem item = menu.Get(node);
+                item.text = Format("Set %d", step);
+                item.checked = !item.checked && item.checkable;
+                menu.Set(node, item);
+            }
+        }
+
+        if((step % 200) == 0)
+            t.Expect(ValidateMenuModel(menu, reason), Format("Menu validates at mutate step %d: %s", step, reason));
+    }
+
+    menu.Clear();
+    t.Expect(menu.GetChildCount(root) == 0, "Menu clear removes root children");
+
+    for(int i = 0; i < 1000; i++) {
+        UiMenuItem item(Format("Stress %04d", i), i);
+        item.shortcut_text = Format("Alt+%d", i % 10);
+        menu.AddChild(root, item);
+    }
+    t.Expect(menu.GetChildCount(root) == 1000, "Menu supports 1000 root items");
+    t.Expect(ValidateMenuModel(menu, reason), "Menu validates after 1000-item build");
+}
+
 static void RunUnicodeControlTests(TestCtx& t)
 {
     t.Section("Unicode Controls");
@@ -361,6 +545,7 @@ CONSOLE_APP_MAIN
     RunGraphTests(t);
     RunInteropTests(t);
     RunTableTests(t);
+    RunMenuTests(t);
     RunUnicodeControlTests(t);
     RunLabelRichTests(t);
 

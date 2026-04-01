@@ -28,9 +28,9 @@ As of today, `Ui/Ui.upp` compiles these controls:
 
 - Core: `UiStyle.h`, `UiDraw.h`, `UiIcons.h`
 - Layout: `UiBoxLayout`, `UiGridLayout`
-- Text/edit: `UiBaseEdit`, `UiLineEdit`, `UiPasswordEdit`, `UiMaskEdit`, `UiMultiEdit`, `UiIntEdit`, `UiFloatEdit`
+- Text/edit: `UiBaseEdit`, `UiLineEdit`, `UiPasswordEdit`, `UiMaskEdit`, `UiMultiEdit`, `UiIntEdit`, `UiFloatEdit`, `UiDoc`
 - Value/scroll: `UiSlider`, `UiSliderEdit`, `UiScrollBar`
-- Data/navigation: `UiDropdown`, `UiList`, `UiTree`, `UiTab`
+- Data/navigation: `UiDropdown`, `UiList`, `UiTree`, `UiTab`, `UiMenu`
 - Core controls: `UiLabel`, `UiButton`, `UiToolButton`, `UiCheckBox`, `UiToggle`, `UiRadioButton`, `UiPanel`, `UiAccordion`, `UiScrollPanel`, `UiTitleCard`
 
 ## Build and run (TheIDE)
