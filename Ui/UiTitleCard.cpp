@@ -423,12 +423,15 @@ void UiTitleCard::Paint(Draw& w)
     else
         UiPaintStyledBackground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
 
+    w.Clip(outer);
+
     Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
     if(content.IsEmpty()) {
         if(WhenPaintForeground)
             WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         else if(style.metrics.focus_enabled)
             UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
+        w.End();
         return;
     }
 
@@ -487,6 +490,9 @@ void UiTitleCard::Paint(Draw& w)
     Color ink = style.palette.ink[st];
     if(IsNull(ink))
         ink = SColorText();
+    Color title_ink = IsNull(style.title_color) ? ink : style.title_color;
+    Color subtitle_ink = IsNull(style.subtitle_color) ? Blend(ink, SColorPaper(), 40) : style.subtitle_color;
+    Color copy_ink = IsNull(style.copy_color) ? Blend(ink, SColorPaper(), 35) : style.copy_color;
 
     int y = text_r.top;
 
@@ -498,7 +504,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, title_, style.title_font, ink);
+        w.DrawText(tx, y, title_, style.title_font, title_ink);
         y += ts.cy;
 
         if(style.show_rule && style.rule_extent != NONE) {
@@ -510,7 +516,7 @@ void UiTitleCard::Paint(Draw& w)
                     rx = text_r.left + (text_r.GetWidth() - rcx) / 2;
                 else if(style.text_align_h == UiAlign::RIGHT)
                     rx = text_r.right - rcx;
-                DrawRule(w, rx, y, rcx, Blend(ink, SColorShadow(), 55), style.rule_thickness, style.rule_style);
+                DrawRule(w, rx, y, rcx, Blend(title_ink, SColorShadow(), 55), style.rule_thickness, style.rule_style);
             }
             y += max(1, style.rule_thickness) + style.rule_gap_below;
         }
@@ -527,7 +533,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, subtitle_, style.subtitle_font, Blend(ink, SColorPaper(), 40));
+        w.DrawText(tx, y, subtitle_, style.subtitle_font, subtitle_ink);
         y += ts.cy;
     }
 
@@ -542,7 +548,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, copy_, style.copy_font, Blend(ink, SColorPaper(), 35));
+        w.DrawText(tx, y, copy_, style.copy_font, copy_ink);
     }
 
     if(style.show_bottom_line && style.bottom_line_extent != NONE) {
@@ -567,6 +573,8 @@ void UiTitleCard::Paint(Draw& w)
         WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
     else if(style.metrics.focus_enabled)
         UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
+
+    w.End();
 }
 
 void UiTitleCard::MouseEnter(Point, dword)

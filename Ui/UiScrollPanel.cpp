@@ -33,18 +33,26 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
 UiScrollPanel::UiScrollPanel()
     : style_(StyleDefault())
 {
-    AddFrame(sb_);
+    Add(sbx_);
+    Add(sby_);
     Add(content_);
 
     content_.Transparent();
 
-    sb_.WhenScroll << [=] {
-        origin_ = sb_.Get();
+    sbx_.SetDirection(UiDirection::H);
+    sby_.SetDirection(UiDirection::V);
+
+    sbx_.WhenScroll << [=] {
+        origin_.x = sbx_.GetPos();
         ApplyScroll();
     };
-    sb_.WhenLeftClick << [=] { SetFocus(); };
+    sby_.WhenScroll << [=] {
+        origin_.y = sby_.GetPos();
+        ApplyScroll();
+    };
 
     SyncThemeStyle();
+    SyncScrollBarStyles();
     BackPaint();
 }
 
@@ -81,6 +89,7 @@ void UiScrollPanel::SyncThemeStyle()
     resolved.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     style_ = resolved;
     theme_revision_ = revision;
+    SyncScrollBarStyles();
 }
 
 const UiScrollPanel::Style& UiScrollPanel::GetEffectiveStyle() const
@@ -115,6 +124,7 @@ void UiScrollPanel::OnStyleChanged()
         Transparent();
     else
         BackPaint();
+    SyncScrollBarStyles();
     RefreshLayout();
     Refresh();
 }
@@ -154,6 +164,27 @@ Rect UiScrollPanel::MeasureContentBounds() const
     return first ? Rect(0, 0, 0, 0) : b;
 }
 
+Rect UiScrollPanel::GetViewportRect() const
+{
+    Rect face = GetFaceRect();
+    const Rect cp = UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding);
+    if(!UiIsZeroThicknessRect(cp))
+        face = UiApplyThicknessRect(face, cp);
+    return face;
+}
+
+Rect UiScrollPanel::GetFaceRect() const
+{
+    return UiStyledFaceRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+}
+
+void UiScrollPanel::SyncScrollBarStyles()
+{
+    UiScrollBar::Style sb = UiTheme::ResolveScrollBar();
+    sbx_.SetStyle(sb);
+    sby_.SetStyle(sb);
+}
+
 void UiScrollPanel::UpdateScrollbars()
 {
     if(updating_sb_)
@@ -182,35 +213,73 @@ void UiScrollPanel::UpdateScrollbars()
         }
     };
 
+    bool showx = false, showy = false;
+    int vbarw = max(DPI(12), sby_.GetMinSize().cx);
+    int hbarh = max(DPI(12), sbx_.GetMinSize().cy);
+
     for(int i = 0; i < 2; i++) {
-        Size page = GetView().GetSize();
+        Rect view = GetFaceRect();
+        if(showy)
+            view.right -= vbarw;
+        if(showx)
+            view.bottom -= hbarh;
+        Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
+        Size page = page_view.GetSize();
         bool sx = false, sy = false;
         Decide(page, sx, sy);
-        sb_.ShowX(sx);
-        sb_.ShowY(sy);
+        showx = sx;
+        showy = sy;
     }
 
-    Size page = GetView().GetSize();
+    Rect view = GetFaceRect();
+    if(showy)
+        view.right -= vbarw;
+    if(showx)
+        view.bottom -= hbarh;
+    Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
+    Size page = page_view.GetSize();
     Point p = origin_;
     p.x = minmax(p.x, 0, max(0, content_size_.cx - page.cx));
     p.y = minmax(p.y, 0, max(0, content_size_.cy - page.cy));
     origin_ = p;
 
     if(mode_ == UIPANELSCROLL_NONE) {
-        sb_.HideX();
-        sb_.HideY();
+        sbx_.Hide();
+        sby_.Hide();
         origin_ = Point(0, 0);
         updating_sb_ = false;
         return;
     }
 
-    sb_.Set(origin_, page, content_size_);
+    if(showx) {
+        sbx_.Show();
+        sbx_.SetRange(0, content_size_.cx, page.cx).SetPos(origin_.x);
+    }
+    else {
+        sbx_.Hide();
+        origin_.x = 0;
+    }
+
+    if(showy) {
+        sby_.Show();
+        sby_.SetRange(0, content_size_.cy, page.cy).SetPos(origin_.y);
+    }
+    else {
+        sby_.Hide();
+        origin_.y = 0;
+    }
+
     updating_sb_ = false;
 }
 
 void UiScrollPanel::ApplyScroll()
 {
-    Rect view = GetView();
+    Rect view = GetFaceRect();
+    if(sby_.IsShown())
+        view.right -= sby_.GetRect().GetWidth();
+    if(sbx_.IsShown())
+        view.bottom -= sbx_.GetRect().GetHeight();
+    view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
 
     int minx = content_bounds_.left;
     int miny = content_bounds_.top;
@@ -232,6 +301,36 @@ void UiScrollPanel::Layout()
     content_size_ = Size(max(0, logical_w), max(0, logical_h));
 
     UpdateScrollbars();
+
+    Rect view = GetFaceRect();
+    int vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
+    int hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
+    if(vbarw)
+        view.right -= vbarw;
+    if(hbarh)
+        view.bottom -= hbarh;
+    Rect content_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_padding));
+
+    // The content surface must size to the post-scrollbar viewport, otherwise
+    // child controls can end up laid out underneath the bars and lose input.
+    content_size_.cx = max(content_view.GetWidth(), content_bounds_.GetWidth());
+    content_size_.cy = max(content_view.GetHeight(), content_bounds_.GetHeight());
+    UpdateScrollbars();
+
+    view = GetFaceRect();
+    vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
+    hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
+    if(vbarw)
+        view.right -= vbarw;
+    if(hbarh)
+        view.bottom -= hbarh;
+
+    int vgap = sby_.IsShown() ? DPI(2) : 0;
+    int hgap = sbx_.IsShown() ? DPI(2) : 0;
+    if(sby_.IsShown())
+        sby_.SetRect(view.right + vgap, view.top + hgap, max(0, vbarw - vgap), max(0, view.GetHeight() - hgap));
+    if(sbx_.IsShown())
+        sbx_.SetRect(view.left, view.bottom + hgap, max(0, view.GetWidth() - vgap), max(0, hbarh - hgap));
     ApplyScroll();
 }
 

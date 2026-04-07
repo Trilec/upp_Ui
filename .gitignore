@@ -4,3 +4,7 @@ scripts/*
 UPP_GUIDES/*
 /designs
 /build
+/examples/UiDemoBase
+/examples/UiDemoBase
+/examples/UiDemoBase
+run_uidoc_regression.cmd

@@ -28,6 +28,7 @@
 
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
 #include <Ui/UiBoxLayout.h>
@@ -43,6 +44,7 @@
 #include <Ui/UiTab.h>
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiDropdown.h>
+#include <Ui/UiMenu.h>
 #include <Ui/UiButton.h>
 #include <Ui/UiToolButton.h>
 #include <Ui/UiBaseEdit.h>

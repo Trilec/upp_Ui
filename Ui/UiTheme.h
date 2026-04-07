@@ -40,6 +40,7 @@
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
+#include <Ui/UiMenu.h>
 
 namespace Upp {
 
@@ -265,7 +266,7 @@ inline Color ForceDarkFace(Color c)
 inline Color ForceDarkFrame(Color c)
 {
     if(IsNull(c))
-        return Blend(Color(203, 213, 225), Black(), 120);
+        return c;
     return Blend(c, Color(226, 232, 240), 52);
 }
 
@@ -742,13 +743,6 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         s.arrow_metrics.radius = DPI(999);
-        s.thick_px = DPI(16);
-        s.track_paint_px_idle = DPI(16);
-        s.track_paint_px_hot = DPI(16);
-        s.thumb_paint_px_idle = DPI(12);
-        s.thumb_paint_px_hot = DPI(16);
-        s.show_arrows = true;
-        s.arrows_layout = UIARROWS_GROUP_END;
         return s;
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
@@ -1579,6 +1573,7 @@ public:
     static UiTitleCard::Style ResolveTitleCard() { return ResolveTitleCard(GetContext()); }
     static UiTree::Style ResolveTree() { return ResolveTree(GetContext()); }
     static UiList::Style ResolveList() { return ResolveList(GetContext()); }
+    static UiMenu::Style ResolveMenu() { return ResolveMenu(GetContext()); }
     static UiLabel::Style ResolveLabel(UiLabelRole role = UiLabelRole::Body) { return ResolveLabel(GetContext(), role); }
 
     static UiButton::Style ResolveButton(const UiThemeContext& ctx, UiButtonRole role = UiButtonRole::Standard)
@@ -1913,7 +1908,86 @@ public:
             s.check_fill = UiThemeDetail::ForceDarkInk(s.check_fill);
         }
         return s;
-    }    static UiLabel::Style ResolveLabel(const UiThemeContext& ctx, UiLabelRole role = UiLabelRole::Body)
+    }
+
+    static UiMenu::Style ResolveMenu(const UiThemeContext& ctx)
+    {
+        UiThemeContext normalized = NormalizeContext(ctx);
+        UiMenu::Style s = UiMenu::StyleDefault();
+        if(normalized.preset == UiThemePreset::Minimal) {
+            s.metrics.frame_enabled = false;
+            s.metrics.face_enabled = false;
+            s.metrics.focus_enabled = false;
+            return s;
+        }
+        switch(normalized.preset) {
+        case UiThemePreset::Rounded:
+            s.metrics.radius = DPI(14);
+            s.hot_bg = Color(239, 246, 255);
+            s.pressed_bg = Color(219, 234, 254);
+            s.active_bar_bg = Color(219, 234, 254);
+            break;
+        case UiThemePreset::Linear:
+            s.metrics.radius = 0;
+            s.popup_padding = DPI(4);
+            break;
+        case UiThemePreset::Solid:
+            s.metrics.radius = 0;
+            s.metrics.frame_width = DPI(2);
+            s.popup_bg = Color(255, 250, 232);
+            s.bar_bg = Color(255, 250, 232);
+            s.item_ink = Color(17, 24, 39);
+            s.right_ink = Color(71, 85, 105);
+            s.hot_bg = Color(254, 240, 138);
+            s.hot_frame = Color(17, 24, 39);
+            s.pressed_bg = Color(17, 24, 39);
+            s.pressed_frame = Color(17, 24, 39);
+            s.active_bar_bg = Color(254, 240, 138);
+            s.check_color = Color(17, 24, 39);
+            s.arrow_color = Color(17, 24, 39);
+            break;
+        case UiThemePreset::Outline:
+            s.metrics.radius = 0;
+            s.metrics.frame_width = DPI(1);
+            break;
+        case UiThemePreset::Compact:
+            s.row_height = DPI(24);
+            s.bar_height = DPI(26);
+            s.icon_size = DPI(14);
+            s.left_padding = DPI(8);
+            s.right_padding = DPI(8);
+            break;
+        case UiThemePreset::Layered:
+            s.metrics.radius = DPI(16);
+            s.metrics.shadow.enabled = true;
+            s.metrics.shadow.blur = DPI(6);
+            s.metrics.shadow.distance = DPI(3);
+            s.metrics.shadow.alpha = 38;
+            s.metrics.shadow.color = Color(148, 163, 184);
+            break;
+        case UiThemePreset::Minimal:
+            break;
+        }
+        UiThemeDetail::ApplyMode(s.palette, normalized.mode);
+        if(UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark) {
+            s.popup_bg = UiThemeDetail::ForceDarkFace(s.popup_bg);
+            s.bar_bg = UiThemeDetail::ForceDarkFace(s.bar_bg);
+            s.separator_color = UiThemeDetail::ForceDarkFrame(s.separator_color);
+            s.item_ink = UiThemeDetail::ForceDarkInk(s.item_ink);
+            s.disabled_ink = UiThemeDetail::ForceDarkInk(s.disabled_ink);
+            s.right_ink = UiThemeDetail::ForceDarkInk(s.right_ink);
+            s.hot_bg = UiThemeDetail::ForceDarkFace(s.hot_bg);
+            s.hot_frame = UiThemeDetail::ForceDarkFrame(s.hot_frame);
+            s.pressed_bg = UiThemeDetail::ForceDarkFace(s.pressed_bg);
+            s.pressed_frame = UiThemeDetail::ForceDarkFrame(s.pressed_frame);
+            s.active_bar_bg = UiThemeDetail::ForceDarkFace(s.active_bar_bg);
+            s.check_color = UiThemeDetail::ForceDarkInk(s.check_color);
+            s.arrow_color = UiThemeDetail::ForceDarkInk(s.arrow_color);
+        }
+        return s;
+    }
+
+    static UiLabel::Style ResolveLabel(const UiThemeContext& ctx, UiLabelRole role = UiLabelRole::Body)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiLabelRole::Body;
@@ -1988,6 +2062,10 @@ public:
     {
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveTree(ctx);
     }
+    static UiMenu::Style ResolveMenu(UiThemePreset preset, UiThemeMode mode)
+    {
+        UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveMenu(ctx);
+    }
     static UiList::Style ResolveList(UiThemePreset preset, UiThemeMode mode)
     {
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveList(ctx);
@@ -2013,6 +2091,7 @@ inline UiDropdown::Style MakeDropdown(UiThemePreset preset, UiThemeMode mode) { 
 inline UiTab::Style MakeTab(UiThemePreset preset, UiThemeMode mode, UiTabVisual visual = UITAB_CLASSIC) { return UiTheme::ResolveTab(preset, mode, visual); }
 inline UiTitleCard::Style MakeTitleCard(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveTitleCard(preset, mode); }
 inline UiTree::Style MakeTree(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveTree(preset, mode); }
+inline UiMenu::Style MakeMenu(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveMenu(preset, mode); }
 inline UiList::Style MakeList(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveList(preset, mode); }
 inline UiLabel::Style MakeLabel(UiThemePreset preset, UiThemeMode mode, UiLabelRole role = UiLabelRole::Body) { return UiTheme::ResolveLabel(preset, mode, role); }
 }

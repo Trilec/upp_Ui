@@ -281,6 +281,8 @@ UiTreeNodeRef UiTreeModel::CloneSubtree(UiTreeNodeRef node, UiTreeNodeRef new_pa
 {
     if(!IsValid(node) || !IsValid(new_parent))
         return UiTreeNodeRef{-1};
+    if(node.id == new_parent.id || IsAncestor(node.id, new_parent.id))
+        return UiTreeNodeRef{-1};
     int id = CloneSubtreeRec(node.id, new_parent.id, pos);
     Notify(UI_MODEL_INSERT, new_parent.id, pos, 1);
     return UiTreeNodeRef{id};
@@ -675,6 +677,231 @@ bool UiTableModel::SetHeaderValue(UiTableAxis axis, int index, const Value& valu
     headers[index].text = AsString(value);
     Notify(UI_MODEL_UPDATE, axis, index, 0);
     return true;
+}
+
+UiMenuModel::UiMenuModel()
+{
+    root_id_ = AllocNode();
+    nodes_[root_id_].alive = true;
+    nodes_[root_id_].parent = -1;
+    nodes_[root_id_].item.text = "<root>";
+}
+
+int UiMenuModel::AllocNode()
+{
+    if(!free_ids_.IsEmpty()) {
+        int id = free_ids_.Pop();
+        nodes_[id] = Node();
+        nodes_[id].alive = true;
+        return id;
+    }
+    int id = nodes_.GetCount();
+    nodes_.Add();
+    nodes_.Top().alive = true;
+    return id;
+}
+
+bool UiMenuModel::IsValid(UiMenuNodeRef node) const
+{
+    return node.id >= 0 && node.id < nodes_.GetCount() && nodes_[node.id].alive;
+}
+
+UiMenuNodeRef UiMenuModel::AddChild(UiMenuNodeRef parent, const UiMenuItem& item)
+{
+    return InsertChild(parent, GetChildCount(parent), item);
+}
+
+UiMenuNodeRef UiMenuModel::InsertChild(UiMenuNodeRef parent, int pos, const UiMenuItem& item)
+{
+    if(!IsValid(parent))
+        return UiMenuNodeRef{-1};
+    int pcount = nodes_[parent.id].children.GetCount();
+    pos = min(max(pos, 0), pcount);
+
+    int id = AllocNode();
+    nodes_[id].parent = parent.id;
+    nodes_[id].item = item;
+    nodes_[parent.id].children.Insert(pos, id);
+    Notify(UI_MODEL_INSERT, parent.id, pos, 1);
+    return UiMenuNodeRef{id};
+}
+
+int UiMenuModel::GetChildCount(UiMenuNodeRef parent) const
+{
+    if(!IsValid(parent))
+        return 0;
+    return nodes_[parent.id].children.GetCount();
+}
+
+UiMenuNodeRef UiMenuModel::GetChild(UiMenuNodeRef parent, int index) const
+{
+    if(!IsValid(parent))
+        return UiMenuNodeRef{-1};
+    const Vector<int>& children = nodes_[parent.id].children;
+    if(index < 0 || index >= children.GetCount())
+        return UiMenuNodeRef{-1};
+    return UiMenuNodeRef{children[index]};
+}
+
+UiMenuNodeRef UiMenuModel::GetParent(UiMenuNodeRef node) const
+{
+    if(!IsValid(node))
+        return UiMenuNodeRef{-1};
+    return UiMenuNodeRef{nodes_[node.id].parent};
+}
+
+int UiMenuModel::GetChildIndex(UiMenuNodeRef node) const
+{
+    if(!IsValid(node) || node.id == root_id_)
+        return -1;
+    int parent = nodes_[node.id].parent;
+    return parent >= 0 ? FindIndex(nodes_[parent].children, node.id) : -1;
+}
+
+const UiMenuItem& UiMenuModel::Get(UiMenuNodeRef node) const
+{
+    ASSERT(IsValid(node));
+    return nodes_[node.id].item;
+}
+
+UiMenuItem& UiMenuModel::Get(UiMenuNodeRef node)
+{
+    ASSERT(IsValid(node));
+    return nodes_[node.id].item;
+}
+
+bool UiMenuModel::Set(UiMenuNodeRef node, const UiMenuItem& item)
+{
+    if(!IsValid(node))
+        return false;
+    nodes_[node.id].item = item;
+    Notify(UI_MODEL_UPDATE, node.id, 1);
+    return true;
+}
+
+void UiMenuModel::FreeSubtree(int id)
+{
+    Node& node = nodes_[id];
+    for(int child : node.children)
+        FreeSubtree(child);
+    node.children.Clear();
+    node.alive = false;
+    node.parent = -1;
+    node.item = UiMenuItem();
+    free_ids_.Add(id);
+}
+
+bool UiMenuModel::Remove(UiMenuNodeRef node)
+{
+    if(!IsValid(node) || node.id == root_id_)
+        return false;
+
+    int parent = nodes_[node.id].parent;
+    Vector<int>& children = nodes_[parent].children;
+    int pos = FindIndex(children, node.id);
+    if(pos >= 0)
+        children.Remove(pos);
+
+    FreeSubtree(node.id);
+    Notify(UI_MODEL_ERASE, parent, pos, 1);
+    return true;
+}
+
+bool UiMenuModel::RemoveChildren(UiMenuNodeRef parent)
+{
+    if(!IsValid(parent))
+        return false;
+    Vector<int> children = clone(nodes_[parent.id].children);
+    if(children.IsEmpty())
+        return true;
+    for(int id : children)
+        FreeSubtree(id);
+    nodes_[parent.id].children.Clear();
+    Notify(UI_MODEL_CLEAR, parent.id, 0, 0);
+    return true;
+}
+
+bool UiMenuModel::IsAncestor(int ancestor, int node) const
+{
+    int parent = node;
+    while(parent >= 0) {
+        if(parent == ancestor)
+            return true;
+        parent = nodes_[parent].parent;
+    }
+    return false;
+}
+
+bool UiMenuModel::Move(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos)
+{
+    if(!IsValid(node) || !IsValid(new_parent) || node.id == root_id_)
+        return false;
+    if(node.id == new_parent.id || IsAncestor(node.id, new_parent.id))
+        return false;
+
+    int old_parent = nodes_[node.id].parent;
+    Vector<int>& old_children = nodes_[old_parent].children;
+    int old_pos = FindIndex(old_children, node.id);
+    if(old_pos < 0)
+        return false;
+    if(new_parent.id == old_parent && pos < 0)
+        pos = old_children.GetCount() - 1;
+    if(new_parent.id == old_parent && pos > old_pos)
+        pos--;
+    old_children.Remove(old_pos);
+
+    Vector<int>& dst = nodes_[new_parent.id].children;
+    pos = (pos < 0) ? dst.GetCount() : min(max(pos, 0), dst.GetCount());
+    dst.Insert(pos, node.id);
+    nodes_[node.id].parent = new_parent.id;
+    Notify(UI_MODEL_MOVE, old_parent, new_parent.id, node.id);
+    return true;
+}
+
+int UiMenuModel::CloneSubtreeRec(int src_id, int dst_parent, int pos)
+{
+    int id = AllocNode();
+    nodes_[id].item = nodes_[src_id].item;
+    nodes_[id].parent = dst_parent;
+    Vector<int>& dst = nodes_[dst_parent].children;
+    if(pos < 0 || pos > dst.GetCount())
+        pos = dst.GetCount();
+    dst.Insert(pos, id);
+
+    for(int child : nodes_[src_id].children)
+        CloneSubtreeRec(child, id, -1);
+    return id;
+}
+
+UiMenuNodeRef UiMenuModel::CloneSubtree(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos)
+{
+    if(!IsValid(node) || !IsValid(new_parent))
+        return UiMenuNodeRef{-1};
+    if(node.id == new_parent.id || IsAncestor(node.id, new_parent.id))
+        return UiMenuNodeRef{-1};
+    int id = CloneSubtreeRec(node.id, new_parent.id, pos);
+    Notify(UI_MODEL_INSERT, new_parent.id, pos, 1);
+    return UiMenuNodeRef{id};
+}
+
+void UiMenuModel::Clear()
+{
+    if(root_id_ < 0)
+        return;
+    Vector<int> children = clone(nodes_[root_id_].children);
+    for(int id : children)
+        FreeSubtree(id);
+    nodes_[root_id_].children.Clear();
+    Notify(UI_MODEL_CLEAR);
+}
+
+int UiMenuModel::GetNodeCount() const
+{
+    int count = 0;
+    for(const Node& node : nodes_)
+        if(node.alive)
+            count++;
+    return count;
 }
 
 }

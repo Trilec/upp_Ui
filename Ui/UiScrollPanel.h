@@ -21,9 +21,12 @@
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-04: switched to UiScrollBar ownership and tightened scrollbar
+      placement so the reserved gutter reads more like a native inset rail.
 */
 
 #include <CtrlLib/CtrlLib.h>
+#include <Ui/UiScrollBar.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 
@@ -96,8 +99,11 @@ private:
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
     Rect MeasureContentBounds() const;
+    Rect GetFaceRect() const;
+    Rect GetViewportRect() const;
     void UpdateScrollbars();
     void ApplyScroll();
+    void SyncScrollBarStyles();
 
 private:
     Style style_;
@@ -105,7 +111,8 @@ private:
     bool has_style_override_ = false;
     UiScrollPanelMode mode_ = UIPANELSCROLL_AUTO;
 
-    ScrollBars sb_;
+    UiScrollBar sbx_;
+    UiScrollBar sby_;
     ParentCtrl content_;
 
     Point origin_ = Point(0, 0);

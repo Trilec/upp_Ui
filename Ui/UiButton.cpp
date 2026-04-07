@@ -6,6 +6,15 @@ namespace Upp {
 
 Image UiButton::ResolveIconForState(StyledState st) const
 {
+    const Image& assigned = assigned_icon_images_[st];
+    if(!IsNull(assigned))
+        return assigned;
+
+    for(int i = 0; i < 4; i++) {
+        if(!IsNull(assigned_icon_images_[i]))
+            return assigned_icon_images_[i];
+    }
+
     const Style& style = GetEffectiveStyle();
     const Image* icons = style.icon_images;
 
@@ -25,10 +34,10 @@ Image UiButton::ResolveIconForState(StyledState st) const
 
 Size UiButton::GetStableIconSize() const
 {
-    const Style& style = GetEffectiveStyle();
     Size best(0, 0);
     for(int i = 0; i < 4; i++) {
-        const Image& img = style.icon_images[i];
+        const Image& img = !IsNull(assigned_icon_images_[i]) ? assigned_icon_images_[i]
+                                                             : GetEffectiveStyle().icon_images[i];
         if(!IsNull(img)) {
             Size s = img.GetSize();
             best.cx = max(best.cx, s.cx);
@@ -413,9 +422,8 @@ UiButton& UiButton::SetText(const String& text)
 
 UiButton& UiButton::SetIcon(const Image& img)
 {
-    Style& style = StyleEdit();
     for(int i = 0; i < 4; i++)
-        style.icon_images[i] = img;
+        assigned_icon_images_[i] = img;
     OnStyleChanged();
     return *this;
 }
@@ -425,7 +433,7 @@ UiButton& UiButton::SetIconState(const Image& img, StyledState state)
     if(state < ST_NORMAL || state > ST_DISABLED)
         return *this;
 
-    StyleEdit().icon_images[state] = img;
+    assigned_icon_images_[state] = img;
     OnStyleChanged();
     return *this;
 }
@@ -435,20 +443,18 @@ UiButton& UiButton::SetIcons(const Image& normal,
                              const Image& pressed,
                              const Image& disabled)
 {
-    Style& style = StyleEdit();
-    style.icon_images[ST_NORMAL] = normal;
-    style.icon_images[ST_HOT] = IsNull(hot) ? normal : hot;
-    style.icon_images[ST_PRESSED] = IsNull(pressed) ? normal : pressed;
-    style.icon_images[ST_DISABLED] = IsNull(disabled) ? normal : disabled;
+    assigned_icon_images_[ST_NORMAL] = normal;
+    assigned_icon_images_[ST_HOT] = IsNull(hot) ? normal : hot;
+    assigned_icon_images_[ST_PRESSED] = IsNull(pressed) ? normal : pressed;
+    assigned_icon_images_[ST_DISABLED] = IsNull(disabled) ? normal : disabled;
     OnStyleChanged();
     return *this;
 }
 
 UiButton& UiButton::ClearIcon()
 {
-    Style& style = StyleEdit();
     for(int i = 0; i < 4; i++)
-        style.icon_images[i] = Image();
+        assigned_icon_images_[i] = Image();
     OnStyleChanged();
     return *this;
 }
@@ -661,7 +667,7 @@ void UiButton::Paint(Draw& w)
         font = StdFont();
 
     Color ink = AdjustInk(p.ink[st], st);
-    Color icon_ink = UiResolveIconColor(p, st);
+    Color icon_ink = has_assigned_icon_colors_ ? assigned_icon_colors_[st] : UiResolveIconColor(p, st);
     if(IsNull(icon_ink))
         icon_ink = ink;
 
@@ -678,7 +684,7 @@ void UiButton::Paint(Draw& w)
                           icon_r,
                           icon_img,
                           icon_scale_,
-                          style.icon_tint_mono,
+                          has_assigned_icon_tint_ ? assigned_icon_tint_mono_ : style.icon_tint_mono,
                           icon_ink,
                           IsEnabled());
     }

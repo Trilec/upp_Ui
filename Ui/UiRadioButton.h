@@ -21,12 +21,17 @@
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-03-31: switched indicator glyph painting to shared helpers in UiDraw.
+    - 2026-03-31: moved shared indicator layout/state helpers to UiIndicatorSupport.
+    - 2026-03-31: moved shared text/layout/input state into UiIndicatorBase.
+    - 2026-03-31: disabled controls now ignore keyboard activation paths.
 */
 
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
-#include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiIndicatorBase.h>
+#include <Ui/UiStyle.h>
 
 namespace Upp {
 
@@ -36,7 +41,7 @@ enum UiRadioVisual : byte {
     UIRADIOVIS_LIST,
 };
 
-class UiRadioButton : public Ctrl, public CtrlStyled<UiRadioButton> {
+class UiRadioButton : public UiIndicatorBase, public CtrlStyled<UiRadioButton> {
 public:
     typedef UiRadioButton CLASSNAME;
 
@@ -77,7 +82,7 @@ public:
     void OnStyleChanged();
 
     UiRadioButton& SetText(const String& s);
-    const String& GetText() const { return text_; }
+    const String& GetText() const { return GetIndicatorTextValue(); }
 
     UiRadioButton& SetChecked(bool on = true);
     bool IsChecked() const { return checked_; }
@@ -124,13 +129,9 @@ private:
     Style& StyleEdit();
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
-    Size GetTextSizeCached() const;
-    void RebuildLayoutCache(const Rect& content) const;
     UiRadioButton& SetCheckedInternal(bool on, bool fire_action);
 
     void UncheckSiblings_();
-    Rect GetIndicatorRect(const Rect& r) const;
-    Rect GetTextRect(const Rect& r, const Rect& ind) const;
 
 private:
     Style style_;
@@ -138,20 +139,8 @@ private:
     mutable uint64 theme_revision_ = 0;
     bool has_style_override_ = false;
     UiRadioVisual visual_ = UIRADIOVIS_CLASSIC;
-    String text_;
     bool checked_ = false;
     int  group_ = 0;
-
-    bool has_focus_ = false;
-    bool hover_ = false;
-    bool pressed_ = false;
-
-    Size user_min_size_ = Size(0, 0);
-    mutable bool text_size_dirty_ = true;
-    mutable Size text_size_cache_ = Size(0, 0);
-    mutable UiBlocksLayout layout_cache_;
-    mutable Rect           layout_content_cache_ = Rect(0, 0, 0, 0);
-    mutable bool           layout_dirty_ = true;
 };
 
 }

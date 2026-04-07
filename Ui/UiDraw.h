@@ -22,6 +22,7 @@
 
     Changelog
     - 2026-03: added release-standard file documentation.
+    - 2026-03-31: added shared indicator-glyph painters for checkbox/radio/menu reuse.
 */
 
 #include <Painter/Painter.h>
@@ -1289,6 +1290,100 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, const StyledMetrics& m,
                          Color color, int alpha)
 {
     UiPaintFlash(w, outer, max(m.radius, 0), color, alpha);
+}
+
+// -------------------------------------------------------------------------
+// Indicator glyph helpers
+// -------------------------------------------------------------------------
+
+inline bool UiPaintCenteredScaledImage(Draw& w, const Rect& outer, const Image& img,
+                                       int inset_x = DPI(3), int inset_y = DPI(3))
+{
+    if(outer.IsEmpty() || IsNull(img))
+        return false;
+
+    Rect rr = outer.Deflated(max(0, inset_x), max(0, inset_y));
+    if(rr.GetWidth() <= 0 || rr.GetHeight() <= 0)
+        return false;
+
+    Size isz = img.GetSize();
+    if(isz.cx <= 0 || isz.cy <= 0)
+        return false;
+
+    double sx = (double)rr.GetWidth() / isz.cx;
+    double sy = (double)rr.GetHeight() / isz.cy;
+    double s = min(sx, sy);
+    int dw = max(1, (int)floor(isz.cx * s + 0.5));
+    int dh = max(1, (int)floor(isz.cy * s + 0.5));
+    Image scaled = CachedRescale(img, Size(dw, dh));
+    int x = rr.left + (rr.GetWidth() - dw) / 2;
+    int y = rr.top + (rr.GetHeight() - dh) / 2;
+    w.DrawImage(x, y, scaled);
+    return true;
+}
+
+inline void UiPaintIndicatorBar(Draw& w, const Rect& outer, Color ink, int thickness,
+                                int horizontal_inset)
+{
+    if(outer.IsEmpty())
+        return;
+    int t = max(1, thickness);
+    int cx = max(1, outer.GetWidth() - horizontal_inset * 2);
+    int y = outer.top + outer.GetHeight() / 2;
+    w.DrawRect(outer.left + horizontal_inset, y, cx, t, ink);
+}
+
+inline void UiPaintIndicatorCheckStroke(Draw& w, const Rect& outer, Color ink, int thickness,
+                                        int left_inset, int mid_y_offset,
+                                        int bottom_inset, int right_inset, int top_inset)
+{
+    if(outer.IsEmpty())
+        return;
+    int t = max(1, thickness);
+    int cx = outer.left + outer.GetWidth() / 2 - DPI(1);
+    int cy = outer.top + outer.GetHeight() / 2 + mid_y_offset;
+    w.DrawLine(outer.left + left_inset, cy, cx, outer.bottom - bottom_inset, t, ink);
+    w.DrawLine(cx, outer.bottom - bottom_inset, outer.right - right_inset, outer.top + top_inset, t, ink);
+}
+
+inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
+                                     int inset, int radius_percent = 100, int min_side = DPI(8))
+{
+    Rect mark_area = outer.Deflated(max(0, inset), max(0, inset));
+    if(mark_area.IsEmpty())
+        return;
+
+    int mark_side = min(mark_area.GetWidth(), mark_area.GetHeight());
+    int dot = max(min_side, (mark_side * 76) / 100);
+    dot = min(dot, mark_side);
+
+    double cx = mark_area.left + mark_area.GetWidth() * 0.5;
+    double cy = mark_area.top + mark_area.GetHeight() * 0.5;
+    double x = cx - dot * 0.5;
+    double y = cy - dot * 0.5;
+
+    ImageBuffer ib(max(1, dot + 4), max(1, dot + 4));
+    ib.SetKind(IMAGE_ALPHA);
+    Fill(~ib, RGBAZero(), ib.GetLength());
+
+    BufferPainter p(ib, MODE_ANTIALIASED);
+    p.Clear(RGBAZero());
+    if(radius_percent >= 95) {
+        p.Circle(ib.GetWidth() * 0.5, ib.GetHeight() * 0.5, dot * 0.5);
+    }
+    else {
+        double rr = max(0.0, dot * clamp(radius_percent, 0, 100) / 200.0);
+        p.RoundedRectangle((ib.GetWidth() - dot) * 0.5,
+                           (ib.GetHeight() - dot) * 0.5,
+                           dot,
+                           dot,
+                           rr);
+    }
+    p.Fill(ink);
+
+    int dx = fround(x) - 2;
+    int dy = fround(y) - 2;
+    w.DrawImage(dx, dy, Image(ib));
 }
 
 // -------------------------------------------------------------------------

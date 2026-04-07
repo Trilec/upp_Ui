@@ -21,6 +21,8 @@
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-03-31: disabled controls now ignore keyboard and mouse activation paths.
+    - 2026-03-31: SetData now updates state without emitting WhenAction.
 */
 #include <Animation/Animation.h>
 #include <CtrlCore/CtrlCore.h>
@@ -109,6 +111,7 @@ private:
     Rect GetTextRect(const Rect& content, const Rect& track) const;
     Rect GetThumbRect(const Rect& track) const;
     void StartThumbAnimation(double target);
+    UiToggle& SetOnInternal(bool on, bool fire_action);
 private:
     Style style_;
     mutable Style themed_style_;
@@ -126,6 +129,10 @@ private:
 };
 }
 #endif
+
+
+
+
 
 
 

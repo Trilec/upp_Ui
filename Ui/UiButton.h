@@ -105,6 +105,11 @@ protected:
     Size           user_min_size_ = Size(0, 0);
     One<Animation> anim_;
     bool           icon_scale_ = true;
+    Image          assigned_icon_images_[4];
+    bool           assigned_icon_tint_mono_ = true;
+    bool           has_assigned_icon_tint_ = false;
+    Color          assigned_icon_colors_[4];
+    bool           has_assigned_icon_colors_ = false;
 
     Vector<String> lines_;
     Vector<Size>   line_sizes_;
@@ -154,12 +159,17 @@ public:
     UiButton& SetIconScale(bool on = true) { icon_scale_ = on; Refresh(); return *this; }
     bool      GetIconScale() const { return icon_scale_; }
 
-    UiButton& SetIconTintMono(bool on = true) { StyleEdit().icon_tint_mono = on; Refresh(); return *this; }
-    bool      GetIconTintMono() const { return GetEffectiveStyle().icon_tint_mono; }
+    UiButton& SetIconTintMono(bool on = true) { has_assigned_icon_tint_ = true; assigned_icon_tint_mono_ = on; Refresh(); return *this; }
+    bool      GetIconTintMono() const { return has_assigned_icon_tint_ ? assigned_icon_tint_mono_ : GetEffectiveStyle().icon_tint_mono; }
 
     UiButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
     {
-        CtrlStyled<UiButton>::SetIconColor(base, hot_pct, press_pct);
+        has_assigned_icon_colors_ = true;
+        assigned_icon_colors_[ST_NORMAL] = base;
+        assigned_icon_colors_[ST_HOT] = hot_pct ? LtColor(base, hot_pct) : base;
+        assigned_icon_colors_[ST_PRESSED] = press_pct ? DkColor(base, press_pct) : base;
+        assigned_icon_colors_[ST_DISABLED] = DisabledColor(base);
+        Refresh();
         return *this;
     }
 

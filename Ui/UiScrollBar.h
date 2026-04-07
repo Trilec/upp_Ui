@@ -21,6 +21,8 @@
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-04: tightened default thin-idle geometry and thumb contrast so
+      scrollbars reserve the full gutter but paint a more centered, inset thumb.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -112,6 +114,7 @@ public:
         UiScrollGrip grip = UIGRIP_NONE;
         Color grip_color = Null;
         Image grip_image;
+        Rect track_inset = Rect(0, 0, 0, 0);
         Rect thumb_inset = Rect(0, 0, 0, 0);
 
         void Serialize(Stream& s)
@@ -161,6 +164,7 @@ public:
               % _grip
               % grip_color
               % grip_image
+              % track_inset
               % thumb_inset;
 
             if(s.IsLoading()) {

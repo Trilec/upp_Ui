@@ -11,6 +11,9 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiIndicatorBase.h,
+	UiIndicatorBase.cpp,
+	UiIndicatorSupport.h,
 	UiTheme.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
@@ -70,7 +73,9 @@ file
 	UiList.h,
 	UiList.cpp,
 	UiDropdown.h,
-	UiDropdown.cpp;
+	UiDropdown.cpp,
+	UiMenu.h,
+	UiMenu.cpp;
 
 mainconfig
 	"" = "";

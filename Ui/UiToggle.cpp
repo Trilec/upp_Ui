@@ -156,12 +156,17 @@ UiToggle& UiToggle::SetText(const String& s)
 
 UiToggle& UiToggle::SetOn(bool on)
 {
+    return SetOnInternal(on, true);
+}
+
+UiToggle& UiToggle::SetOnInternal(bool on, bool fire_action)
+{
     if(on_ == on)
         return *this;
 
     on_ = on;
     StartThumbAnimation(on_ ? 1.0 : 0.0);
-    if(WhenAction)
+    if(fire_action && WhenAction)
         WhenAction();
     return *this;
 }
@@ -365,6 +370,8 @@ void UiToggle::SetMinSize(Size sz)
 
 void UiToggle::LeftDown(Point, dword)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return;
     SetFocus();
     pressed_ = true;
     Refresh();
@@ -415,6 +422,8 @@ void UiToggle::LostFocus()
 
 bool UiToggle::Key(dword key, int)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return false;
     if(key == K_SPACE || key == K_ENTER) {
         Toggle();
         return true;
@@ -430,7 +439,7 @@ void UiToggle::CancelMode()
 
 void UiToggle::SetData(const Value& v)
 {
-    SetOn(!IsNull(v) && (bool)v);
+    SetOnInternal(!IsNull(v) && (bool)v, false);
 }
 
 Value UiToggle::GetData() const
@@ -439,6 +448,13 @@ Value UiToggle::GetData() const
 }
 
 } // namespace Upp
+
+
+
+
+
+
+
 
 
 

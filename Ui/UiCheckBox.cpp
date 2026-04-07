@@ -1,16 +1,9 @@
 #include <Ui/UiCheckBox.h>
+#include <Ui/UiIndicatorSupport.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
-
-static StyledState UiCheckToStyledState_(bool enabled, bool pressed, bool hover)
-{
-    if(!enabled) return ST_DISABLED;
-    if(pressed)  return ST_PRESSED;
-    if(hover)    return ST_HOT;
-    return ST_NORMAL;
-}
 
 static Size UiCheckIndicatorExtent(const UiCheckBox::Style& style)
 {
@@ -84,17 +77,13 @@ UiCheckBox::UiCheckBox()
     : style_(StyleDefault())
     , themed_style_(StyleDefault())
 {
-    BackPaint();
-    WantFocus();
     SyncThemeStyle();
 }
 
 void UiCheckBox::InvalidateStyleCache()
 {
     theme_revision_ = 0;
-    text_size_dirty_ = true;
-    layout_dirty_ = true;
-    layout_content_cache_ = Rect(0, 0, 0, 0);
+    InvalidateIndicatorCaches();
 }
 
 UiCheckBox::Style& UiCheckBox::StyleEdit()
@@ -118,9 +107,7 @@ void UiCheckBox::SyncThemeStyle()
 
     themed_style_ = UiTheme::ResolveCheckBox(visual_);
     theme_revision_ = revision;
-    text_size_dirty_ = true;
-    layout_dirty_ = true;
-    layout_content_cache_ = Rect(0, 0, 0, 0);
+    InvalidateIndicatorCaches();
 }
 
 const UiCheckBox::Style& UiCheckBox::GetEffectiveStyle() const
@@ -154,36 +141,13 @@ UiCheckBox& UiCheckBox::ClearStyleOverride()
 
 void UiCheckBox::OnStyleChanged()
 {
-    const Style& style = GetEffectiveStyle();
-    text_size_cache_ = GetTextSize(text_, style.font);
-    text_size_dirty_ = false;
-    layout_dirty_ = true;
-    layout_content_cache_ = Rect(0, 0, 0, 0);
-    RefreshLayout();
-    Refresh();
+    OnIndicatorStyleChanged(GetEffectiveStyle().font);
 }
 
 UiCheckBox& UiCheckBox::SetText(const String& s)
 {
-    const Style& style = GetEffectiveStyle();
-    text_ = s;
-    text_size_cache_ = GetTextSize(text_, style.font);
-    text_size_dirty_ = false;
-    layout_dirty_ = true;
-    layout_content_cache_ = Rect(0, 0, 0, 0);
-    RefreshLayout();
-    Refresh();
+    SetIndicatorTextValue(s, GetEffectiveStyle().font);
     return *this;
-}
-
-Size UiCheckBox::GetTextSizeCached() const
-{
-    const Style& style = GetEffectiveStyle();
-    if(text_size_dirty_) {
-        text_size_cache_ = GetTextSize(text_, style.font);
-        text_size_dirty_ = false;
-    }
-    return text_size_cache_;
 }
 
 UiCheckBox& UiCheckBox::SetTriState(bool on)
@@ -250,28 +214,6 @@ UiCheckBox& UiCheckBox::SetIndicatorRoundness(int percent)
     return SetIndicatorRadius(r);
 }
 
-Rect UiCheckBox::GetIndicatorRect(const Rect& r) const
-{
-    const Style& style = GetEffectiveStyle();
-    Size extent = UiCheckIndicatorExtent(style);
-    int y = r.top + (r.GetHeight() - extent.cy) / 2;
-    int x = style.indicator_side == UiAlign::RIGHT ? (r.right - extent.cx) : r.left;
-    return RectC(x, y, extent.cx, extent.cy);
-}
-
-Rect UiCheckBox::GetTextRect(const Rect& r, const Rect& ind) const
-{
-    const Style& style = GetEffectiveStyle();
-    Rect t = r;
-    if(visual_ == UICHECKVIS_CHIP)
-        return t;
-    if(style.indicator_side == UiAlign::RIGHT)
-        t.right = max(t.left, ind.left - style.indicator_gap);
-    else
-        t.left = min(t.right, ind.right + style.indicator_gap);
-    return t;
-}
-
 void UiCheckBox::Paint(Draw& w)
 {
     const Style& style = GetEffectiveStyle();
@@ -279,7 +221,7 @@ void UiCheckBox::Paint(Draw& w)
     if(r.IsEmpty())
         return;
 
-    StyledState st = UiCheckToStyledState_(IsEnabled() && IsShowEnabled(), pressed_, hover_);
+    StyledState st = GetIndicatorStyledState();
     bool has_focus = HasFocus();
 
     if(WhenPaintBackground)
@@ -287,34 +229,9 @@ void UiCheckBox::Paint(Draw& w)
     else if(visual_ == UICHECKVIS_CHIP)
         UiPaintStyledBackground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
 
-    Rect ind = layout_cache_.support;
-    Rect text_r = layout_cache_.main;
-
-    auto DrawCheckSmall = [&](const Rect& rc) {
-        Image mk = ICON_DESIGN_CHECK_SMALL_48();
-        if(IsNull(mk))
-            return false;
-
-        Rect rr = rc;
-        rr.Deflate(DPI(3), DPI(3));
-        if(rr.GetWidth() <= 0 || rr.GetHeight() <= 0)
-            return false;
-
-        Size isz = mk.GetSize();
-        if(isz.cx <= 0 || isz.cy <= 0)
-            return false;
-
-        double sx = (double)rr.GetWidth() / isz.cx;
-        double sy = (double)rr.GetHeight() / isz.cy;
-        double s = min(sx, sy);
-        int dw = max(1, (int)floor(isz.cx * s + 0.5));
-        int dh = max(1, (int)floor(isz.cy * s + 0.5));
-        Image scaled = CachedRescale(mk, Size(dw, dh));
-        int x = rr.left + (rr.GetWidth() - dw) / 2;
-        int y = rr.top + (rr.GetHeight() - dh) / 2;
-        w.DrawImage(x, y, scaled);
-        return true;
-    };
+    const UiBlocksLayout& layout = GetIndicatorLayoutCache();
+    Rect ind = layout.support;
+    Rect text_r = layout.main;
 
     if(visual_ == UICHECKVIS_SWITCH) {
         if(style.indicator_skin.enabled) {
@@ -345,14 +262,10 @@ void UiCheckBox::Paint(Draw& w)
             Color mk = style.indicator_palette.ink[st];
             if(IsNull(mk)) mk = SColorHighlight();
             int t = max(1, style.mark_thickness);
-            int cx = ind.left + ind.GetWidth() / 2;
-            int cy = ind.top + ind.GetHeight() / 2;
             if(state_ == UICHECK_INDETERMINATE)
-                w.DrawRect(ind.left + DPI(2), cy, max(1, ind.GetWidth() - DPI(4)), t, mk);
-            else if(!DrawCheckSmall(ind)) {
-                w.DrawLine(ind.left + DPI(2), cy, cx - DPI(1), ind.bottom - DPI(3), t, mk);
-                w.DrawLine(cx - DPI(1), ind.bottom - DPI(3), ind.right - DPI(2), ind.top + DPI(3), t, mk);
-            }
+                UiPaintIndicatorBar(w, ind, mk, t, DPI(2));
+            else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
+                UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(2), 0, DPI(3), DPI(2), DPI(3));
         }
     }
     else {
@@ -361,14 +274,10 @@ void UiCheckBox::Paint(Draw& w)
             Color mk = style.indicator_palette.ink[st];
             if(IsNull(mk)) mk = SColorHighlight();
             int t = max(1, style.mark_thickness);
-            int cx = ind.left + ind.GetWidth() / 2;
-            int cy = ind.top + ind.GetHeight() / 2;
             if(state_ == UICHECK_INDETERMINATE)
-                w.DrawRect(ind.left + DPI(3), cy, max(1, ind.GetWidth() - DPI(6)), t, mk);
-            else if(!DrawCheckSmall(ind)) {
-                w.DrawLine(ind.left + DPI(3), cy, cx - DPI(1), ind.bottom - DPI(4), t, mk);
-                w.DrawLine(cx - DPI(1), ind.bottom - DPI(4), ind.right - DPI(3), ind.top + DPI(4), t, mk);
-            }
+                UiPaintIndicatorBar(w, ind, mk, t, DPI(3));
+            else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
+                UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(3), 0, DPI(4), DPI(3), DPI(4));
         }
     }
 
@@ -376,7 +285,7 @@ void UiCheckBox::Paint(Draw& w)
     if(IsNull(ink)) ink = SColorText();
     Font f = style.font;
     int ty = text_r.top + (text_r.GetHeight() - f.GetHeight()) / 2;
-    DrawSmartText(w, text_r.left, ty, max(0, text_r.GetWidth()), text_, f, ink, 0);
+    DrawSmartText(w, text_r.left, ty, max(0, text_r.GetWidth()), GetIndicatorTextValue(), f, ink, 0);
 
     if(WhenPaintForeground)
         WhenPaintForeground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
@@ -384,68 +293,39 @@ void UiCheckBox::Paint(Draw& w)
         UiPaintStyledForeground(w, r, style.palette, style.metrics, style.skin, st, has_focus);
 }
 
-void UiCheckBox::RebuildLayoutCache(const Rect& content) const
-{
-    const Style& style = GetEffectiveStyle();
-    if(!layout_dirty_ && layout_content_cache_ == content)
-        return;
-
-    Size support_natural = UiCheckIndicatorExtent(style);
-    Size main_natural = GetTextSizeCached();
-    Rect main_margin = style.indicator_side == UiAlign::RIGHT
-                       ? Rect(0, 0, style.indicator_gap, 0)
-                       : Rect(style.indicator_gap, 0, 0, 0);
-
-    layout_cache_ = UiComputeBlocksLayout(content,
-                                          support_natural,
-                                          main_natural,
-                                          style.align_h,
-                                          style.align_v,
-                                          style.indicator_side,
-                                          Rect(0, 0, 0, 0),
-                                          main_margin,
-                                          max(DPI(10), max(support_natural.cx, support_natural.cy)));
-    layout_content_cache_ = content;
-    layout_dirty_ = false;
-}
-
 void UiCheckBox::Layout()
 {
     const Style& style = GetEffectiveStyle();
-    Rect content = UiStyledInnerRect(GetSize(), style.metrics, style.skin);
-    RebuildLayoutCache(content);
+    Size support_natural = UiCheckIndicatorExtent(style);
+    LayoutIndicatorBlocks(style.metrics,
+                          style.skin,
+                          style.font,
+                          support_natural,
+                          style.align_h,
+                          style.align_v,
+                          style.indicator_side,
+                          style.indicator_gap,
+                          max(DPI(10), max(support_natural.cx, support_natural.cy)));
 }
 
 Size UiCheckBox::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    if(user_min_size_.cx > 0 && user_min_size_.cy > 0)
-        return user_min_size_;
-
     Size support_natural = UiCheckIndicatorExtent(style);
-    Size main_natural = GetTextSizeCached();
-    Rect main_margin = style.indicator_side == UiAlign::RIGHT
-                       ? Rect(0, 0, style.indicator_gap, 0)
-                       : Rect(style.indicator_gap, 0, 0, 0);
-
-    Size content = UiMeasureBlocksContent(support_natural,
-                                          main_natural,
-                                          Rect(0, 0, 0, 0),
-                                          main_margin,
-                                          style.indicator_side,
-                                          true,
-                                          !text_.IsEmpty(),
-                                          0,
-                                          max(GetTextSize("A", style.font).cy, support_natural.cy),
-                                          max(DPI(10), max(support_natural.cx, support_natural.cy)));
-    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
+    return GetIndicatorMinSize(style.metrics,
+                               style.skin,
+                               style.font,
+                               support_natural,
+                               style.indicator_side,
+                               style.indicator_gap,
+                               0,
+                               max(GetTextSize("A", style.font).cy, support_natural.cy),
+                               max(DPI(10), max(support_natural.cx, support_natural.cy)));
 }
 
 void UiCheckBox::SetMinSize(Size sz)
 {
-    user_min_size_ = Size(max(0, sz.cx), max(0, sz.cy));
-    layout_dirty_ = true;
-    RefreshLayout();
+    SetIndicatorUserMinSize(sz);
 }
 
 void UiCheckBox::Toggle_()
@@ -466,25 +346,27 @@ void UiCheckBox::LeftDown(Point, dword)
 {
     if(!IsEnabled() || !IsShowEnabled())
         return;
-    pressed_ = true;
+    BeginIndicatorPress();
     SetFocus();
     Toggle_();
-    pressed_ = false;
+    EndIndicatorPress();
 }
 
 bool UiCheckBox::Key(dword key, int)
 {
-    if(key == K_SPACE || key == K_ENTER) {
+    if(!IsEnabled() || !IsShowEnabled())
+        return false;
+    if(IsIndicatorActivationKey(key)) {
         Toggle_();
         return true;
     }
     return false;
 }
 
-void UiCheckBox::GotFocus() { has_focus_ = true; Refresh(); }
-void UiCheckBox::LostFocus() { has_focus_ = false; Refresh(); }
-void UiCheckBox::MouseEnter(Point, dword) { hover_ = true; Refresh(); }
-void UiCheckBox::MouseLeave() { hover_ = false; Refresh(); }
+void UiCheckBox::GotFocus() { IndicatorGotFocus(); }
+void UiCheckBox::LostFocus() { IndicatorLostFocus(); }
+void UiCheckBox::MouseEnter(Point, dword) { IndicatorMouseEnter(); }
+void UiCheckBox::MouseLeave() { IndicatorMouseLeave(); }
 
 void UiCheckBox::SetData(const Value& v)
 {
@@ -504,6 +386,15 @@ Value UiCheckBox::GetData() const
 }
 
 }
+
+
+
+
+
+
+
+
+
 
 
 

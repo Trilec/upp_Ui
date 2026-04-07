@@ -302,6 +302,82 @@ private:
     Vector<UiTableHeader> column_headers_;
 };
 
+struct UiMenuItem : Moveable<UiMenuItem> {
+    String text;
+    String description;
+    String right_text;
+    String shortcut_text;
+    String tooltip;
+    Value  data;
+    Value  command_id;
+    Image  icon;
+    bool   mono_icon = false;
+    bool   enabled = true;
+    bool   visible = true;
+    bool   separator_before = false;
+    bool   separator = false;
+    bool   checkable = false;
+    bool   checked = false;
+    bool   radio = false;
+    bool   default_item = false;
+
+    UiMenuItem() {}
+    UiMenuItem(const String& t, const Value& d = Value(), bool en = true)
+        : text(t), data(d), enabled(en) {}
+};
+
+struct UiMenuNodeRef {
+    int id = -1;
+    bool IsValid() const { return id >= 0; }
+};
+
+class UiMenuModel : public UiDataModelBase {
+public:
+    UiMenuModel();
+
+    UiMenuNodeRef Root() const { return UiMenuNodeRef{root_id_}; }
+    bool IsValid(UiMenuNodeRef node) const;
+
+    UiMenuNodeRef AddChild(UiMenuNodeRef parent, const UiMenuItem& item);
+    UiMenuNodeRef InsertChild(UiMenuNodeRef parent, int pos, const UiMenuItem& item);
+
+    int GetChildCount(UiMenuNodeRef parent) const;
+    UiMenuNodeRef GetChild(UiMenuNodeRef parent, int index) const;
+    UiMenuNodeRef GetParent(UiMenuNodeRef node) const;
+    int GetChildIndex(UiMenuNodeRef node) const;
+
+    const UiMenuItem& Get(UiMenuNodeRef node) const;
+    UiMenuItem& Get(UiMenuNodeRef node);
+    bool Set(UiMenuNodeRef node, const UiMenuItem& item);
+
+    bool Remove(UiMenuNodeRef node);
+    bool RemoveChildren(UiMenuNodeRef parent);
+    bool Move(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos = -1);
+    UiMenuNodeRef CloneSubtree(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos = -1);
+    bool Prune(UiMenuNodeRef node) { return RemoveChildren(node); }
+    bool Graft(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos = -1) { return Move(node, new_parent, pos); }
+
+    void Clear();
+    int GetNodeCount() const;
+
+private:
+    struct Node : Moveable<Node> {
+        UiMenuItem item;
+        int parent = -1;
+        Vector<int> children;
+        bool alive = false;
+    };
+
+    int AllocNode();
+    void FreeSubtree(int id);
+    bool IsAncestor(int ancestor, int node) const;
+    int CloneSubtreeRec(int src_id, int dst_parent, int pos);
+
+    Vector<Node> nodes_;
+    Vector<int> free_ids_;
+    int root_id_ = -1;
+};
+
 }
 
 #endif

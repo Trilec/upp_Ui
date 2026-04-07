@@ -41,6 +41,9 @@ public:
         Font title_font    = SansSerifZ(20).Bold();
         Font subtitle_font = SansSerifZ(13).Bold();
         Font copy_font     = SansSerifZ(11);
+        Color title_color;
+        Color subtitle_color;
+        Color copy_color;
 
         UiAlign text_align_h = UiAlign::LEFT;
         UiAlign media_side   = UiAlign::RIGHT; // LEFT/RIGHT/TOP/BOTTOM
@@ -80,6 +83,7 @@ public:
             int ble = (int)bottom_line_extent;
             s % palette % metrics % skin
               % title_font % subtitle_font % copy_font
+              % title_color % subtitle_color % copy_color
               % text_align_h % media_side % media_align_h % media_align_v
               % media_reserve % media_share_percent % media_gap % media_min % preserve_media_aspect
               % show_rule % rs % re % rule_thickness % rule_gap_above % rule_gap_below

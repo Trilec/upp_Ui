@@ -124,36 +124,37 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 {
 	static Style s;
 	ONCELOCK {
-		// Track: subtle background
-		s.track_palette.face[ST_NORMAL]   = SColorFace();
-		s.track_palette.face[ST_HOT]      = Blend(SColorFace(), SColorHighlight(), 10);
-		s.track_palette.face[ST_PRESSED]  = Blend(SColorFace(), SColorShadow(), 10);
-		s.track_palette.face[ST_DISABLED] = DisabledColor(SColorFace());
+		// Track: no idle fill; on hover it becomes a light outlined gutter.
+		s.track_palette.face[ST_NORMAL]   = UiFill::None();
+		s.track_palette.face[ST_HOT]      = UiFill::None();
+		s.track_palette.face[ST_PRESSED]  = UiFill::None();
+		s.track_palette.face[ST_DISABLED] = UiFill::None();
 
-		s.track_palette.frame[ST_NORMAL]  = SColorShadow();
-		s.track_palette.frame[ST_HOT]     = Blend(SColorShadow(), SColorHighlight(), 20);
-		s.track_palette.frame[ST_PRESSED] = SColorShadow();
+		s.track_palette.frame[ST_NORMAL]  = Null;
+		s.track_palette.frame[ST_HOT]     = Blend(SColorShadow(), White(), 210);
+		s.track_palette.frame[ST_PRESSED] = Blend(SColorShadow(), White(), 170);
 		s.track_palette.frame[ST_DISABLED] = DisabledColor(SColorShadow());
 
-		s.track_metrics.radius        = DPI(4);
+		s.track_metrics.radius        = DPI(8);
 		s.track_metrics.frame_width   = DPI(1);
 		s.track_metrics.frame_enabled = true;
-		s.track_metrics.face_enabled  = true;
+		s.track_metrics.face_enabled  = false;
 
-		// Thumb: slightly contrasted
-		s.thumb_palette.face[ST_NORMAL]   = SColorPaper();
-		s.thumb_palette.face[ST_HOT]      = LtColor(SColorPaper(), 10);
-		s.thumb_palette.face[ST_PRESSED]  = DkColor(SColorPaper(), 15);
+		// Thumb: darker than the gutter, centered with a small inset.
+		Color thumb = Blend(SColorShadow(), SColorPaper(), 78);
+		s.thumb_palette.face[ST_NORMAL]   = thumb;
+		s.thumb_palette.face[ST_HOT]      = Blend(thumb, SColorText(), 32);
+		s.thumb_palette.face[ST_PRESSED]  = Blend(thumb, Black(), 58);
 		s.thumb_palette.face[ST_DISABLED] = DisabledColor(SColorPaper());
 
-		s.thumb_palette.frame[ST_NORMAL]  = SColorShadow();
-		s.thumb_palette.frame[ST_HOT]     = SColorShadow();
-		s.thumb_palette.frame[ST_PRESSED] = SColorShadow();
+		s.thumb_palette.frame[ST_NORMAL]  = Null;
+		s.thumb_palette.frame[ST_HOT]     = Null;
+		s.thumb_palette.frame[ST_PRESSED] = Null;
 		s.thumb_palette.frame[ST_DISABLED] = DisabledColor(SColorShadow());
 
-		s.thumb_metrics.radius        = DPI(4);
-		s.thumb_metrics.frame_width   = DPI(1);
-		s.thumb_metrics.frame_enabled = true;
+		s.thumb_metrics.radius        = DPI(999);
+		s.thumb_metrics.frame_width   = 0;
+		s.thumb_metrics.frame_enabled = false;
 		s.thumb_metrics.face_enabled  = true;
 
 		// Arrows: same as thumb
@@ -180,13 +181,13 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 		s.auto_hide         = false;
 
 		// Thickness
-		s.thin_idle         = false;
-		s.thin_px           = DPI(5);
-		s.thick_px          = DPI(18);
-		s.track_paint_px_idle = DPI(5);
-		s.track_paint_px_hot  = DPI(18);
-		s.thumb_paint_px_idle = DPI(10);
-		s.thumb_paint_px_hot  = DPI(18);
+		s.thin_idle         = true;
+		s.thin_px           = DPI(2);
+		s.thick_px          = DPI(12);
+		s.track_paint_px_idle = 0;
+		s.track_paint_px_hot  = DPI(12);
+		s.thumb_paint_px_idle = DPI(2);
+		s.thumb_paint_px_hot  = DPI(6);
 
 		// Expand animation
 		s.animate_expand    = true;
@@ -197,12 +198,13 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 		// Fade
 		s.fade_idle         = true;
 		s.fade_ms           = 300;
-		s.idle_fade_pct     = 70;
+		s.idle_fade_pct     = 0;
 		s.fade_easing       = Easing::OutCubic();
 
 		s.grip              = UIGRIP_NONE;
 		s.grip_color        = Null;
 		s.grip_image        = Image();
+		s.track_inset       = Rect(0, 0, 0, 0);
 		s.thumb_inset       = Rect(0, 0, 0, 0);
 	}
 	return s;
@@ -459,12 +461,15 @@ Rect UiScrollBar::GetTrackRect() const
 	return r;
 }
 
+static Rect UiApplyCrossInset_(Rect r, const Rect& inset, UiDirection dir);
+
 Rect UiScrollBar::GetThumbLaneRect_() const
 {
     const Style& style_ = GetEffectiveStyle();
 	Rect tr = GetTrackRect();
 	if(tr.IsEmpty())
 		return tr;
+	tr = UiApplyCrossInset_(tr, style_.track_inset, dir_);
 	Rect lane = UiStyledInnerRect(tr, style_.track_metrics, style_.track_skin);
 	if(lane.IsEmpty())
 		lane = tr;
@@ -475,7 +480,8 @@ static Rect UiShrinkCrossAxis_(Rect r, UiDirection dir, int paint)
 {
 	if(r.IsEmpty())
 		return r;
-	paint = max(1, paint);
+	if(paint <= 0)
+		return Rect(0, 0, 0, 0);
 	if(dir == UiDirection::V) {
 		int cx = r.left + r.GetWidth() / 2;
 		int l = cx - paint / 2;
@@ -671,10 +677,10 @@ bool UiScrollBar::PtInArrow(Point p, int& idx) const
 void UiScrollBar::UpdateVisualState()
 {
 	bool enabled = IsEnabled() && IsShowEnabled();
-	bool hot     = hover_thumb_ || hover_track_ || hover_arrow_ >= 0;
+	bool track_hot = hover_track_ || hover_thumb_ || dragging_;
 	bool pressed = dragging_ || (hover_arrow_ >= 0 && HasCapture());
 
-	track_state_  = ResolveStyledState(enabled, hover_track_, false);
+	track_state_  = ResolveStyledState(enabled, track_hot, false);
 	thumb_state_  = ResolveStyledState(enabled, hover_thumb_, dragging_);
 	arrow0_state_ = ResolveStyledState(enabled, hover_arrow_ == 0, hover_arrow_ == 0 && HasCapture());
 	arrow1_state_ = ResolveStyledState(enabled, hover_arrow_ == 1, hover_arrow_ == 1 && HasCapture());
@@ -987,18 +993,18 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 	int paint = clamp(paint_thickness_ > 0 ? paint_thickness_ : thick, thin, thick);
 
 	bool hover_now = dragging_ || hover_thumb_ || hover_track_ || hover_arrow_ >= 0;
-	int  track_paint = hover_now ? clamp(style_.track_paint_px_hot, 1, thick)
-	                            : clamp(style_.track_paint_px_idle, 1, thick);
+	int  track_paint = hover_now ? clamp(style_.track_paint_px_hot, 0, thick)
+	                            : clamp(style_.track_paint_px_idle, 0, thick);
 	int  thumb_paint = hover_now ? clamp(style_.thumb_paint_px_hot, 1, thick)
 	                            : clamp(style_.thumb_paint_px_idle, 1, thick);
 
-	// When thin-idle is enabled, paint thickness drives both track and thumb.
+	// Thin-idle keeps the reserved gutter, but only expands the track on interaction.
 	if(style_.thin_idle) {
-		track_paint = paint;
-		thumb_paint = paint;
+		track_paint = hover_now ? paint : min(track_paint, thin);
 	}
 
 	Rect track_r = UiShrinkCrossAxis_(track_base, dir_, track_paint);
+	track_r = UiApplyCrossInset_(track_r, style_.track_inset, dir_);
 
 	const StyledPalette& tr_pal = style_.track_palette;
 	const StyledPalette& th_pal = style_.thumb_palette;
