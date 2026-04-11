@@ -48,8 +48,8 @@ struct DemoPalette {
     bool dark = false;
     Color blue, subtitle, ink, muted, paper, grid, divider;
     Color badge_face, badge_frame, badge_ink;
-    Color segment_face, segment_frame, segment_idle_ink;
-    Color card_face;
+    Color segment_face, segment_frame, segment_idle_ink, segment_active_face, segment_active_frame, segment_active_ink;
+    Color card_face, card_frame;
     Color exit_face, exit_hot, exit_pressed, exit_frame, exit_ink;
     Color slider_track, slider_track_frame, slider_thumb, slider_thumb_frame;
     Color preview_frame;
@@ -76,7 +76,11 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
         p.segment_face = Color(29, 36, 47);
         p.segment_frame = Color(59, 73, 96);
         p.segment_idle_ink = p.muted;
+        p.segment_active_face = Color(36, 53, 82);
+        p.segment_active_frame = Color(82, 113, 165);
+        p.segment_active_ink = Color(145, 194, 255);
         p.card_face = Color(31, 44, 65);
+        p.card_frame = Color(70, 95, 136);
         p.exit_face = Color(126, 37, 52);
         p.exit_hot = Color(149, 44, 61);
         p.exit_pressed = Color(108, 32, 45);
@@ -107,7 +111,11 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
         p.segment_face = Color(236, 241, 248);
         p.segment_frame = Color(211, 221, 237);
         p.segment_idle_ink = Color(94, 114, 149);
+        p.segment_active_face = White();
+        p.segment_active_frame = Color(214, 226, 246);
+        p.segment_active_ink = p.blue;
         p.card_face = Color(238, 245, 255);
+        p.card_frame = Color(201, 217, 245);
         p.exit_face = Color(250, 233, 236);
         p.exit_hot = Color(247, 219, 224);
         p.exit_pressed = Color(241, 204, 210);
@@ -183,10 +191,40 @@ UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
 UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
 {
     UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
-    for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.badge_face); s.palette.frame[i] = c.badge_frame; s.palette.ink[i] = c.blue; }
-    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
+    for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.badge_face); s.palette.frame[i] = c.badge_frame; s.palette.ink[i] = c.badge_ink; }
+    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(DEMO_RADIUS); s.metrics.focus_enabled = false;
+    s.metrics.content_padding = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
     s.font = DemoSans(10, true);
+    return s;
+}
+
+UiLabel::Style MakeSectionTagStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Caption);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = c.blue;
+    }
+    s.transparent = true;
+    Font f;
+    if(Font::FindFaceNameIndex("Arial Black") >= 0)
+        f = Font().FaceName("Arial Black").Height(12);
+    else
+        f = DemoSans(14, true);
+    s.font = f;
+    s.metrics.text_font = f;
+    s.metrics.use_text_font = true;
+    return s;
+}
+
+UiPanel::Style MakeCardStyle(const DemoPalette& c)
+{
+    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.card_face); s.palette.frame[i] = c.card_frame; }
+    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(DEMO_RADIUS); s.metrics.focus_enabled = false;
+    s.metrics.content_padding = Rect(DPI(14), DPI(14), DPI(14), DPI(14));
+    s.metrics.shadow.enabled = false;
     return s;
 }
 
@@ -222,103 +260,6 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     return s;
 }
 
-UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
-{
-    UiAccordion::Style s = UiAccordion::StyleDefault();
-    s.transparent = true;
-    s.section_gap = 0;
-    s.header_body_gap = DPI(8);
-    s.header_height = DPI(24);
-    s.body_min_height = 0;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
-    s.unified_section_frame = false;
-    s.body_line_extent = NONE;
-    s.show_chevron = true;
-    s.chevron_side = UiAlign::RIGHT;
-    s.chevron_scale = true;
-    s.chevron_size = DPI(10);
-    s.single_open = false;
-    s.enforce_one = false;
-    s.animation_enabled = true;
-    s.anim_open_ms = 90;
-    s.anim_close_ms = 90;
-
-    s.header_style = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.header_style.palette.face[i] = UiFill::None();
-        s.header_style.palette.frame[i] = Null;
-        s.header_style.palette.ink[i] = c.blue;
-        s.header_style.palette.icon[i] = c.blue;
-    }
-    s.header_style.transparent = true;
-    s.header_style.hover_enabled = true;
-    s.header_style.media_tint_mono = true;
-    s.header_style.metrics.face_enabled = false;
-    s.header_style.metrics.frame_enabled = false;
-    s.header_style.metrics.focus_enabled = false;
-    s.header_style.metrics.content_padding = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_extent = LARGE;
-    s.header_style.bottom_line_style = SOLID;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
-    Font hf;
-    if(Font::FindFaceNameIndex("Arial Black") >= 0)
-        hf = Font().FaceName("Arial Black").Height(12);
-    else
-        hf = DemoSans(14, true);
-    s.header_style.title_font = hf;
-    s.header_style.subtitle_font = DemoSans(1);
-    s.header_style.copy_font = DemoSans(1);
-    s.header_style.title_subtitle_gap = 0;
-    s.header_style.subtitle_copy_gap = 0;
-    s.header_style.media_gap = 0;
-    s.header_style.media_reserve = 0;
-
-    s.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    for(int i = 0; i < 4; i++) {
-        s.body_style.palette.face[i] = UiFill::None();
-        s.body_style.palette.frame[i] = Null;
-        s.body_style.palette.ink[i] = c.ink;
-    }
-    s.body_style.transparent = true;
-    s.body_style.metrics.face_enabled = false;
-    s.body_style.metrics.frame_enabled = false;
-    s.body_style.metrics.frame_width = 0;
-    s.body_style.metrics.radius = 0;
-    s.body_style.metrics.focus_enabled = false;
-    s.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
-    s.body_style.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
-{
-    UiAccordion::Style s = MakeInspectorAccordionStyle(c);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Blend(c.divider, c.paper, 8);
-        s.palette.ink[i] = c.ink;
-    }
-    s.header_height = DPI(22);
-    s.header_style.title_font = DemoSans(10, true);
-    s.header_style.metrics.content_padding = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
-    s.header_style.bottom_line_color = Blend(c.divider, c.paper, 20);
-    s.chevron_size = DPI(8);
-    s.section_gap = DPI(6);
-    s.header_body_gap = DPI(2);
-    s.unified_section_frame = true;
-    s.unified_section_radius = DPI(DEMO_RADIUS);
-    s.unified_section_frame_width = 1;
-    s.header_style.show_bottom_line = false;
-    s.body_style.metrics.content_padding = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
-    return s;
-}
-
 UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
 {
     UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
@@ -329,8 +270,6 @@ UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
     }
     s.transparent = true;
     s.font = DemoMono(10);
-    s.metrics.radius = DPI(DEMO_RADIUS);
-    s.metrics.focus_enabled = true;
     return s;
 }
 
@@ -415,8 +354,8 @@ UiList::Style MakeStateListStyle(const DemoPalette& c)
     s.separator_color = c.divider;
     s.muted_ink = c.blue;
     s.striped_rows = true;
-    s.row_even_face = Blend(c.card_face, c.paper, 34);
-    s.row_odd_face = Blend(c.card_face, c.paper, 12);
+    s.row_even_face = Blend(c.card_face, c.paper, 18);
+    s.row_odd_face = Blend(c.card_face, c.paper, 8);
     return s;
 }
 
@@ -424,7 +363,7 @@ UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
 {
     UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
     for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.segment_face); s.palette.frame[i] = c.segment_frame; }
-    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
+    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(DEMO_RADIUS); s.metrics.focus_enabled = false;
     s.metrics.content_padding = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
     s.metrics.shadow.enabled = false;
     return s;
@@ -452,17 +391,48 @@ UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
     return s;
 }
 
+UiButton::Style MakeSegmentButtonStyle(const DemoPalette& c, bool active)
+{
+    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(active ? c.segment_active_face : c.segment_face);
+        s.palette.frame[i] = active ? c.segment_active_frame : Null;
+        s.palette.ink[i] = active ? c.segment_active_ink : c.segment_idle_ink;
+        s.palette.icon[i] = s.palette.ink[i];
+    }
+    s.metrics.face_enabled = true; s.metrics.frame_enabled = active; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(DEMO_RADIUS); s.metrics.focus_enabled = false;
+    s.metrics.content_padding = Rect(DPI(12), DPI(6), DPI(8), DPI(6));
+    s.metrics.shadow.enabled = false;
+    s.font = DemoSans(10, true);
+    return s;
+}
+
 UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
 {
     UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
     for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.exit_face); s.palette.frame[i] = c.exit_frame; s.palette.ink[i] = c.exit_ink; s.palette.icon[i] = c.exit_ink; }
     s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
     s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
-    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
+    s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(DEMO_RADIUS); s.metrics.focus_enabled = false;
     s.metrics.content_padding = Rect(DPI(12), DPI(6), DPI(8), DPI(6));
     s.icon_margin = Rect(DPI(0), 0, DPI(2), 0);
     s.text_margin = Rect(DPI(1), 0, 0, 0);
     s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiSlider::Style MakeSliderStyle(const DemoPalette& c)
+{
+    UiSlider::Style s = UiTheme::ResolveSlider();
+    for(int i = 0; i < 4; i++) {
+        s.track_palette.face[i] = UiFill::Solid(c.slider_track);
+        s.track_palette.frame[i] = c.slider_track_frame;
+        s.thumb_palette.face[i] = UiFill::Solid(c.slider_thumb);
+        s.thumb_palette.frame[i] = c.slider_thumb_frame;
+    }
+    s.track_metrics.radius = DPI(999); s.track_metrics.frame_width = DPI(1); s.track_metrics.focus_enabled = false;
+    s.thumb_metrics.radius = DPI(999); s.thumb_metrics.frame_width = DPI(1); s.thumb_metrics.focus_enabled = false;
+    s.track_px = DPI(4); s.thumb_len_px = DPI(14); s.thick_px = DPI(18);
     return s;
 }
 
@@ -703,8 +673,6 @@ void ApplyPanelStyle(UiPanel& panel, const DemoPalette& palette, const PanelConf
     panel.Enable(cfg.enabled);
 }
 
-// PanelPreview renders the centered test surface and keeps preview-specific
-// drawing logic out of the demo window controller.
 class PanelPreview : public Ctrl {
 public:
     typedef PanelPreview CLASSNAME;
@@ -775,8 +743,6 @@ public:
         UiPaintStyledSurface(w, outer, style.palette, style.metrics, style.skin, st, false, false, false);
     }
 
-    // Layout keeps the preview and accordion inspector in sync with the
-    // current window size and the live accordion body heights.
     virtual void Layout() override
     {
         Rect canvas = Rect(GetSize()).Deflated(DPI(18), DPI(18));
@@ -839,8 +805,6 @@ private:
     UiLabel title_, note_;
 };
 
-// DemoColorSwatch exposes the standard U++ color popup behind a compact
-// rounded tile so property rows can stay dense without custom picker chrome.
 class DemoColorSwatch : public Ctrl {
 public:
     typedef DemoColorSwatch CLASSNAME;
@@ -916,15 +880,38 @@ private:
     ColorPopUp popup_;
 };
 
-// UiPanelDemoWindow is the reference single-control builder demo.
-// It binds one UiPanel configuration to preview, usage, and inspector state.
+class DemoDivider : public Ctrl {
+public:
+    typedef DemoDivider CLASSNAME;
+
+    void SetPalette(const DemoPalette& p)
+    {
+        palette_ = p;
+        Refresh();
+    }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(20), DPI(8));
+    }
+
+    virtual void Paint(Draw& w) override
+    {
+        Rect r(Point(0, 0), GetSize());
+        int y = r.top + r.GetHeight() / 2;
+        w.DrawRect(r.left, y, r.GetWidth(), 1, Blend(palette_.divider, palette_.paper, 18));
+    }
+
+private:
+    DemoPalette palette_;
+};
+
 class UiPanelDemoWindow : public TopWindow {
 public:
     typedef UiPanelDemoWindow CLASSNAME;
 
     UiPanelDemoWindow()
     {
-        // Window shell and top-level preview/inspector controls.
         Title("UiPanel Demo");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(940), DPI(640));
@@ -940,50 +927,15 @@ public:
         Add(inspector_scroll_);
 
         inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-        inspector_scroll_.Content().Add(inspector_acc_);
-
-        // Top-level accordion structure and nested property groups.
-        int usage_sec = inspector_acc_.AddSection("USAGE", true);
-        int state_sec = inspector_acc_.AddSection("STATE", true);
-        int props_sec = inspector_acc_.AddSection("PROPERTIES", true);
-        // The top-level inspector accordion stays responsible for section order.
-        inspector_acc_.GetSectionContent(usage_sec).Add(usage_toolbar_);
-        inspector_acc_.GetSectionContent(usage_sec).Add(usage_code_panel_);
-        inspector_acc_.GetSectionContent(state_sec).Add(state_list_);
-        inspector_acc_.GetSectionContent(props_sec).Add(props_toolbar_);
-        inspector_acc_.GetSectionContent(props_sec).Add(property_box_);
-        // Property groups are nested accordions so demos can collapse detail without
-        // inventing a different property model per control.
-        property_box_.Add(size_acc_).Fit();
-        property_box_.Add(frame_acc_).Fit();
-        property_box_.Add(face_acc_).Fit();
-        property_box_.Add(shadow_acc_).Fit();
-        size_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        frame_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        face_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        shadow_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        int size_sec = size_acc_.AddSection("SIZE", true);
-        int frame_sec = frame_acc_.AddSection("FRAME", false);
-        int face_sec = face_acc_.AddSection("FACE", true);
-        int shadow_sec = shadow_acc_.AddSection("SHADOW", true);
-        size_acc_.GetSectionContent(size_sec).Add(size_box_.SizePos());
-        frame_acc_.GetSectionContent(frame_sec).Add(frame_box_.SizePos());
-        face_acc_.GetSectionContent(face_sec).Add(face_box_.SizePos());
-        shadow_acc_.GetSectionContent(shadow_sec).Add(shadow_box_.SizePos());
-        inspector_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
-        auto nested_relayout = [=](int, bool) { Layout(); };
-        size_acc_.WhenSectionToggled = nested_relayout;
-        frame_acc_.WhenSectionToggled = nested_relayout;
-        face_acc_.WhenSectionToggled = nested_relayout;
-        shadow_acc_.WhenSectionToggled = nested_relayout;
-        // Usage toolbar and action affordances.
-        usage_copy_label_.SetText("Copy Code").NoWantFocus();
-        usage_toolbar_.Add(usage_toolbar_fill_).Expand(1);
-        usage_toolbar_.Add(usage_copy_label_).Fixed(DPI(64));
-        usage_toolbar_.Add(usage_copy_).Fixed(DPI(22));
-        props_toolbar_.Add(props_toolbar_fill_).Expand(1);
-        props_toolbar_.Add(props_reset_).Fixed(DPI(62));
+        inspector_scroll_.Content().Add(usage_tag_);
+        inspector_scroll_.Content().Add(usage_copy_);
+        inspector_scroll_.Content().Add(usage_code_panel_);
         usage_code_panel_.Add(usage_code_);
+        inspector_scroll_.Content().Add(state_tag_);
+        inspector_scroll_.Content().Add(state_list_);
+        inspector_scroll_.Content().Add(props_tag_);
+        inspector_scroll_.Content().Add(props_reset_);
+        inspector_scroll_.Content().Add(property_box_);
 
         header_.SetTitle("U++ UiPanel Builder")
             .SetSubTitle("Generate a styled panel surface and copy the exact code for the current result.")
@@ -991,51 +943,52 @@ public:
             .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
 
         version_badge_.SetText("v0.4.0").NoWantFocus();
-        theme_icon_.SetIconScale(true).SetIconMargin(0).NoWantFocus();
+        theme_icon_.SetText("").SetIconScale(true).SetIconMargin(0).NoWantFocus();
+        theme_toggle_.SetText("");
         exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconTintMono(true).SetIconScale(true);
 
-        usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconScale(true).NoWantFocus();
+        usage_tag_.SetText("USAGE").NoWantFocus();
+        usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetText("").SetIconScale(true).NoWantFocus();
         usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_.GetText().ToString()); };
         usage_code_.SetSelectable(true);
 
+        state_tag_.SetText("STATE").NoWantFocus();
         state_list_.NoWantFocus();
 
+        props_tag_.SetText("PROPERTIES").NoWantFocus();
         props_reset_.SetText("Reset").NoWantFocus();
-        // Dense property rows keep the inspector usable even with many controls.
-        property_box_.SetGap(DPI(2)).SetInset(0);
-        usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        props_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        size_box_.SetGap(DPI(2)).SetInset(0);
-        frame_box_.SetGap(DPI(2)).SetInset(0);
-        face_box_.SetGap(DPI(2)).SetInset(0);
-        shadow_box_.SetGap(DPI(2)).SetInset(0);
+        property_box_.SetGap(DPI(4)).SetInset(0);
 
-        AddSliderRow(size_box_, width_row_, width_label_, width_slider_, width_value_, "Width", "220px");
-        AddSliderRow(size_box_, height_row_, height_label_, height_slider_, height_value_, "Height", "140px");
-        AddSliderRow(size_box_, radius_row_, radius_label_, radius_slider_, radius_value_, "Radius", "14px");
+        AddSliderRow(width_row_, width_label_, width_slider_, width_value_, "Width", "220px");
+        AddSliderRow(height_row_, height_label_, height_slider_, height_value_, "Height", "140px");
+        AddSliderRow(radius_row_, radius_label_, radius_slider_, radius_value_, "Radius", "14px");
+        AddSliderRow(border_row_, border_label_, border_slider_, border_value_, "Frame Width", "1px");
 
         width_slider_.SetRange(20.0, 520.0).SetStep(1.0).SetValue(220.0);
         height_slider_.SetRange(20.0, 320.0).SetStep(1.0).SetValue(140.0);
         radius_slider_.SetRange(0.0, 36.0).SetStep(1.0).SetValue(14.0);
         border_slider_.SetRange(0.0, 8.0).SetStep(1.0).SetValue(1.0);
 
-        AddToggleRow(size_box_, enabled_row_, enabled_label_, enabled_toggle_, "Enabled");
-        AddToggleRow(frame_box_, frame_row_, frame_label_, frame_toggle_, "Frame");
-        AddSliderRow(frame_box_, border_row_, border_label_, border_slider_, border_value_, "Frame Width", "1px");
-        AddColorRow(frame_box_, frame_color_row_, frame_color_label_, frame_color_btn_, "Frame Color");
+        AddToggleRow(enabled_row_, enabled_label_, enabled_toggle_, "Enabled");
+        AddToggleRow(frame_row_, frame_label_, frame_toggle_, "Frame");
+        AddToggleRow(face_row_, face_label_, face_toggle_, "Background");
+        AddToggleRow(shadow_row_, shadow_label_, shadow_toggle_, "Shadow");
 
-        AddToggleRow(face_box_, face_row_, face_label_, face_toggle_, "Background");
-        AddColorRow(face_box_, face_color_row_, face_color_label_, face_color_btn_, "Face Color");
-        AddDropdownRow(face_box_, gradient_row_, gradient_label_, gradient_drop_, "Gradient");
-        AddColorQuadRow(face_box_, gradient_colors_row_, gradient_colors_label_, grad_from_btn_, grad_top_right_btn_, grad_bottom_left_btn_, grad_to_btn_, "Gradient Colors");
-        AddToggleRow(shadow_box_, shadow_row_, shadow_label_, shadow_toggle_, "Shadow");
-        AddColorRow(shadow_box_, shadow_color_row_, shadow_color_label_, shadow_color_btn_, "Shadow Color");
-        AddSliderRow(shadow_box_, shadow_distance_row_, shadow_distance_label_, shadow_distance_slider_, shadow_distance_value_, "Shadow Dist", "6px");
-        AddSliderRow(shadow_box_, shadow_offset_x_row_, shadow_offset_x_label_, shadow_offset_x_slider_, shadow_offset_x_value_, "Shadow X", "0px");
-        AddSliderRow(shadow_box_, shadow_offset_y_row_, shadow_offset_y_label_, shadow_offset_y_slider_, shadow_offset_y_value_, "Shadow Y", "3px");
-        AddDropdownRow(shadow_box_, shadow_curve_preset_row_, shadow_curve_preset_label_, shadow_curve_preset_drop_, "Curve Preset");
-        shadow_box_.Add(shadow_curve_field_).Fixed(DPI(98));
-        AddSliderRow(shadow_box_, shadow_alpha_row_, shadow_alpha_label_, shadow_alpha_slider_, shadow_alpha_value_, "Shadow Alpha", "86");
+        AddDropdownRow(gradient_row_, gradient_label_, gradient_drop_, "Gradient");
+        AddColorRow(frame_color_row_, frame_color_label_, frame_color_btn_, "Frame Color");
+        AddColorQuadRow(gradient_colors_row_, gradient_colors_label_, grad_from_btn_, grad_top_right_btn_, grad_bottom_left_btn_, grad_to_btn_, "Gradient Colors");
+        property_box_.Add(shadow_divider_).Fixed(DPI(8));
+        shadow_group_tag_.SetText("SHADOW").NoWantFocus();
+        property_box_.Add(shadow_group_tag_).Fixed(DPI(18));
+        AddColorRow(shadow_color_row_, shadow_color_label_, shadow_color_btn_, "Shadow Color");
+        AddSliderRow(shadow_distance_row_, shadow_distance_label_, shadow_distance_slider_, shadow_distance_value_, "Shadow Dist", "6px");
+        AddSliderRow(shadow_offset_x_row_, shadow_offset_x_label_, shadow_offset_x_slider_, shadow_offset_x_value_, "Shadow X", "0px");
+        AddSliderRow(shadow_offset_y_row_, shadow_offset_y_label_, shadow_offset_y_slider_, shadow_offset_y_value_, "Shadow Y", "3px");
+        AddDropdownRow(shadow_curve_preset_row_, shadow_curve_preset_label_, shadow_curve_preset_drop_, "Curve Preset");
+        shadow_curve_tag_.SetText("Shadow Curve").NoWantFocus();
+        property_box_.Add(shadow_curve_tag_).Fixed(DPI(18));
+        property_box_.Add(shadow_curve_field_).Fixed(DPI(98));
+        AddSliderRow(shadow_alpha_row_, shadow_alpha_label_, shadow_alpha_slider_, shadow_alpha_value_, "Shadow Alpha", "86");
 
         PopulateGradientDropdown();
         PopulateShadowPresetDropdown();
@@ -1098,7 +1051,6 @@ public:
         grad_to_btn_.WhenAction = sync;
         shadow_color_btn_.WhenAction = sync;
 
-        // Theme application also seeds the per-theme default panel config.
         ApplyTheme(UiThemeMode::Light);
     }
 
@@ -1112,8 +1064,6 @@ public:
         w.DrawRect(0, header_bottom, r.GetWidth(), 1, palette_.divider);
     }
 
-    // Layout keeps the preview and accordion inspector in sync with the
-    // current window size and the live accordion body heights.
     virtual void Layout() override
     {
         Rect r(Point(0, 0), GetSize());
@@ -1128,7 +1078,7 @@ public:
         int theme_x = exit_x - gap - shell_w;
         int version_x = theme_x - gap - shell_w;
 
-        version_badge_.SetRect(version_x, top_y + DPI(3), shell_w, DPI(30));
+        version_badge_.SetRect(version_x, top_y, shell_w, DPI(36));
         theme_shell_.SetRect(theme_x, top_y, shell_w, DPI(36));
         theme_icon_.SetRect(theme_x + DPI(10), top_y + DPI(7), DPI(20), DPI(20));
 
@@ -1147,84 +1097,54 @@ public:
 
         ParentCtrl& body = inspector_scroll_.Content();
         int inner_w = max(0, body.GetSize().cx - DPI(10));
-
-        int usage_y = 0;
-        int usage_toolbar_h = DPI(40);
-        usage_toolbar_.SetRect(0, usage_y, max(0, inner_w - DPI(8)), usage_toolbar_h);
-        usage_y += usage_toolbar_h + DPI(8);
-        usage_code_panel_.SetRect(0, usage_y, inner_w, DPI(126));
-        usage_code_.SetRect(DPI(10), DPI(10), max(0, inner_w - DPI(20)), DPI(106));
-
+        int iy = 0;
+        usage_tag_.SetRect(0, iy, DPI(150), DPI(18));
+        usage_copy_.SetRect(inner_w - DPI(22), iy - DPI(1), DPI(22), DPI(22));
+        iy += DPI(24);
+        usage_code_panel_.SetRect(0, iy, inner_w, DPI(118));
+        usage_code_.SetRect(DPI(10), DPI(10), max(0, inner_w - DPI(20)), DPI(98));
+        iy = usage_code_panel_.GetRect().bottom + DPI(10);
+        state_tag_.SetRect(0, iy, inner_w, DPI(18));
+        iy += DPI(18);
         int state_h = max(DPI(72), state_model_.GetCount() * DPI(22) + DPI(4));
-        state_list_.SetRect(0, 0, inner_w, state_h);
-
-        int props_y = 0;
-        int props_toolbar_h = DPI(22);
-        props_toolbar_.SetRect(0, props_y, inner_w, props_toolbar_h);
-        props_y += props_toolbar_h + DPI(2);
-        int props_w = inner_w;
-        int group_w = props_w;
-        int size_body_h = size_box_.GetMinSize().cy;
-        int frame_body_h = frame_box_.GetMinSize().cy;
-        int face_body_h = face_box_.GetMinSize().cy;
-        int shadow_body_h = shadow_box_.GetMinSize().cy;
-        size_acc_.SetSectionBodyHeight(0, size_body_h);
-        frame_acc_.SetSectionBodyHeight(0, frame_body_h);
-        face_acc_.SetSectionBodyHeight(0, face_body_h);
-        shadow_acc_.SetSectionBodyHeight(0, shadow_body_h);
-        property_box_.SetRect(0, props_y, props_w, property_box_.GetMinSize().cy);
-        inspector_acc_.SetSectionBodyHeight(0, usage_code_panel_.GetRect().bottom + DPI(12));
-        inspector_acc_.SetSectionBodyHeight(1, state_h);
-        inspector_acc_.SetSectionBodyHeight(2, property_box_.GetRect().bottom);
-        inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
+        state_list_.SetRect(0, iy, inner_w, state_h);
+        iy = state_list_.GetRect().bottom + DPI(10);
+        props_tag_.SetRect(0, iy, inner_w - DPI(54), DPI(18));
+        props_reset_.SetRect(inner_w - DPI(52), iy - DPI(2), DPI(52), DPI(22));
+        iy += DPI(18);
+        property_box_.SetRect(0, iy, inner_w, property_box_.GetMinSize().cy);
         inspector_scroll_.Layout();
     }
 
 private:
-    // Slider rows are the base property-row pattern used throughout the demo.
-    void AddSliderRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
+    void AddSliderRow(UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
     {
         row.SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         label.SetText(name).NoWantFocus();
         value.SetText(initial).NoWantFocus();
-        target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(82)).MinHeight(DPI(18));
-        row.Add(slider).Expand(1).MinHeight(DPI(18));
+        property_box_.Add(row).Fit();
+        row.Add(label).Fixed(DPI(82)).MinHeight(DPI(20));
+        row.Add(slider).Expand(1).MinHeight(DPI(20));
         row.Add(value).Fixed(DPI(56)).MinHeight(DPI(18));
-    }
-
-    void AddSliderRow(UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
-    {
-        AddSliderRow(property_box_, row, label, slider, value, name, initial);
-    }
-
-    void AddToggleRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiToggle& toggle, const char* name)
-    {
-        row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
-        toggle.SetText("On");
-        target.Add(row).Fit();
-        row.Add(label).Expand(1).MinHeight(DPI(20));
-        row.Add(toggle).Fit().MinHeight(DPI(20));
     }
 
     void AddToggleRow(UiBoxLayout& row, UiLabel& label, UiToggle& toggle, const char* name)
     {
-        AddToggleRow(property_box_, row, label, toggle, name);
-    }
-
-    void AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiDropdown& drop, const char* name)
-    {
         row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         label.SetText(name).NoWantFocus();
-        target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(20));
-        row.Add(drop).Expand(1).MinHeight(DPI(24));
+        toggle.SetText("On");
+        property_box_.Add(row).Fit();
+        row.Add(label).Expand(1).MinHeight(DPI(22));
+        row.Add(toggle).Fit().MinHeight(DPI(22));
     }
 
     void AddDropdownRow(UiBoxLayout& row, UiLabel& label, UiDropdown& drop, const char* name)
     {
-        AddDropdownRow(property_box_, row, label, drop, name);
+        row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        label.SetText(name).NoWantFocus();
+        property_box_.Add(row).Fit();
+        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(22));
+        row.Add(drop).Expand(1).MinHeight(DPI(28));
     }
 
     void InitColorButton(DemoColorSwatch& btn)
@@ -1232,35 +1152,25 @@ private:
         btn.NoWantFocus();
     }
 
-    void AddColorRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, DemoColorSwatch& btn, const char* name)
+    void AddColorRow(UiBoxLayout& row, UiLabel& label, DemoColorSwatch& btn, const char* name)
     {
         row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         label.SetText(name).NoWantFocus();
-        target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(20));
-        row.Add(btn).Fixed(DPI(28)).MinHeight(DPI(20));
-    }
-
-    void AddColorRow(UiBoxLayout& row, UiLabel& label, DemoColorSwatch& btn, const char* name)
-    {
-        AddColorRow(property_box_, row, label, btn, name);
-    }
-
-    void AddColorQuadRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, DemoColorSwatch& a, DemoColorSwatch& b, DemoColorSwatch& c, DemoColorSwatch& d, const char* name)
-    {
-        row.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
-        target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(20));
-        row.Add(a).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(b).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(c).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(d).Fixed(DPI(28)).MinHeight(DPI(20));
+        property_box_.Add(row).Fit();
+        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(22));
+        row.Add(btn).Fixed(DPI(28)).MinHeight(DPI(22));
     }
 
     void AddColorQuadRow(UiBoxLayout& row, UiLabel& label, DemoColorSwatch& a, DemoColorSwatch& b, DemoColorSwatch& c, DemoColorSwatch& d, const char* name)
     {
-        AddColorQuadRow(property_box_, row, label, a, b, c, d, name);
+        row.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        label.SetText(name).NoWantFocus();
+        property_box_.Add(row).Fit();
+        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(22));
+        row.Add(a).Fixed(DPI(28)).MinHeight(DPI(22));
+        row.Add(b).Fixed(DPI(28)).MinHeight(DPI(22));
+        row.Add(c).Fixed(DPI(28)).MinHeight(DPI(22));
+        row.Add(d).Fixed(DPI(28)).MinHeight(DPI(22));
     }
 
     void PopulateGradientDropdown()
@@ -1280,8 +1190,6 @@ private:
         shadow_curve_preset_drop_.Add("Custom", SHADOWPRESET_CUSTOM);
     }
 
-    // Push the active panel config back into the inspector controls without
-    // re-triggering the control->config sync path.
     void SyncControlsFromConfig()
     {
         syncing_controls_ = true;
@@ -1315,7 +1223,6 @@ private:
         return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
     }
 
-    // BuildUsageCode emits the exact cut-and-paste recipe for the current panel.
     String BuildUsageCode() const
     {
         String code;
@@ -1352,8 +1259,6 @@ private:
         return code;
     }
 
-    // RefreshState only reports values that are not already obvious from the
-    // property editor rows.
     void RefreshState()
     {
         state_model_.Clear();
@@ -1370,7 +1275,6 @@ private:
         state_list_.SetModel(state_model_);
     }
 
-    // RefreshFromConfig fans the resolved config back out to preview, usage, and state.
     void RefreshFromConfig()
     {
         width_value_.SetText(AsString(config_.width) + "px");
@@ -1388,7 +1292,6 @@ private:
         Refresh();
     }
 
-    // SyncFromControls is the single inspector->config write path.
     void SyncFromControls()
     {
         if(syncing_controls_)
@@ -1417,8 +1320,6 @@ private:
         RefreshFromConfig();
     }
 
-    // ApplyTheme swaps the shared shell palette, resets theme defaults, and
-    // reapplies the compact inspector styling used by the reference demo.
     void ApplyTheme(UiThemeMode mode)
     {
         UiThemeContext ctx = UiTheme::GetContext();
@@ -1435,22 +1336,21 @@ private:
         theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
         theme_icon_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        theme_icon_.SetText("");
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
         theme_icon_.SetIconColor(mode == UiThemeMode::Dark ? Color(214, 222, 236) : palette_.blue);
         exit_button_.SetStyle(MakeExitButtonStyle(palette_));
         exit_button_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         exit_button_.SetIconMargin(DPI(3));
 
-        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
-        size_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        frame_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        face_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        shadow_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+        usage_tag_.SetStyle(MakeSectionTagStyle(palette_));
+        state_tag_.SetStyle(MakeSectionTagStyle(palette_));
+        props_tag_.SetStyle(MakeSectionTagStyle(palette_));
         usage_copy_.SetStyle(MakeCopyButtonStyle(palette_));
-        usage_copy_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body, true, true));
         props_reset_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
         usage_code_.SetStyle(MakeCodeLabelStyle(palette_));
+        shadow_divider_.SetPalette(palette_);
         shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
         shadow_curve_field_.SetFormulaStyle(MakeFormulaLabelStyle(palette_));
         shadow_curve_field_.SetCopyStyle(MakeCopyButtonStyle(palette_));
@@ -1478,11 +1378,13 @@ private:
         gradient_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         frame_color_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         gradient_colors_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        shadow_group_tag_.SetStyle(MakeSectionTagStyle(palette_));
         shadow_color_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         shadow_distance_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         shadow_offset_x_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         shadow_offset_y_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         shadow_curve_preset_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        shadow_curve_tag_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         shadow_alpha_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         width_value_.SetStyle(MakeValueLabelStyle(palette_));
         height_value_.SetStyle(MakeValueLabelStyle(palette_));
@@ -1492,6 +1394,16 @@ private:
         shadow_offset_x_value_.SetStyle(MakeValueLabelStyle(palette_));
         shadow_offset_y_value_.SetStyle(MakeValueLabelStyle(palette_));
         shadow_alpha_value_.SetStyle(MakeValueLabelStyle(palette_));
+
+        UiSlider::Style slider_style = MakeSliderStyle(palette_);
+        width_slider_.SetStyle(slider_style);
+        height_slider_.SetStyle(slider_style);
+        radius_slider_.SetStyle(slider_style);
+        border_slider_.SetStyle(slider_style);
+        shadow_distance_slider_.SetStyle(slider_style);
+        shadow_offset_x_slider_.SetStyle(slider_style);
+        shadow_offset_y_slider_.SetStyle(slider_style);
+        shadow_alpha_slider_.SetStyle(slider_style);
 
         preview_.SetPalette(palette_);
         SyncControlsFromConfig();
@@ -1512,38 +1424,30 @@ private:
 
     PanelPreview preview_;
     UiScrollPanel inspector_scroll_;
-    UiAccordion inspector_acc_;
-    UiBoxLayout usage_toolbar_ { UiDirection::H };
-    ParentCtrl usage_toolbar_fill_;
-    UiLabel usage_copy_label_;
+    UiLabel usage_tag_;
     UiButton usage_copy_;
     UiPanel usage_code_panel_;
     UiLabel usage_code_;
+    UiLabel state_tag_;
     UiList state_list_;
     UiListModel state_model_;
-    UiBoxLayout props_toolbar_ { UiDirection::H };
-    ParentCtrl props_toolbar_fill_;
+    UiLabel props_tag_;
     UiButton props_reset_;
     UiBoxLayout property_box_ { UiDirection::V };
-    UiAccordion size_acc_;
-    UiAccordion frame_acc_;
-    UiAccordion face_acc_;
-    UiAccordion shadow_acc_;
-    UiBoxLayout size_box_ { UiDirection::V };
-    UiBoxLayout frame_box_ { UiDirection::V };
-    UiBoxLayout face_box_ { UiDirection::V };
-    UiBoxLayout shadow_box_ { UiDirection::V };
+    DemoDivider shadow_divider_;
+    UiLabel shadow_group_tag_;
+    UiLabel shadow_curve_tag_;
     UiBezierCurveField shadow_curve_field_;
 
     UiBoxLayout width_row_ { UiDirection::H }, height_row_ { UiDirection::H }, radius_row_ { UiDirection::H }, border_row_ { UiDirection::H };
     UiBoxLayout enabled_row_ { UiDirection::H }, frame_row_ { UiDirection::H }, face_row_ { UiDirection::H }, shadow_row_ { UiDirection::H };
-    UiBoxLayout gradient_row_ { UiDirection::H }, gradient_colors_row_ { UiDirection::H }, face_color_row_ { UiDirection::H }, frame_color_row_ { UiDirection::H }, shadow_color_row_ { UiDirection::H };
+    UiBoxLayout gradient_row_ { UiDirection::H }, gradient_colors_row_ { UiDirection::H }, frame_color_row_ { UiDirection::H }, shadow_color_row_ { UiDirection::H };
     UiBoxLayout shadow_curve_preset_row_ { UiDirection::H };
     UiBoxLayout shadow_distance_row_ { UiDirection::H }, shadow_offset_x_row_ { UiDirection::H }, shadow_offset_y_row_ { UiDirection::H }, shadow_alpha_row_ { UiDirection::H };
 
     UiLabel width_label_, width_value_, height_label_, height_value_, radius_label_, radius_value_, border_label_, border_value_;
     UiLabel enabled_label_, frame_label_, face_label_, shadow_label_;
-    UiLabel gradient_label_, gradient_colors_label_, face_color_label_, frame_color_label_, shadow_color_label_;
+    UiLabel gradient_label_, gradient_colors_label_, frame_color_label_, shadow_color_label_;
     UiLabel shadow_curve_preset_label_;
     UiLabel shadow_distance_label_, shadow_distance_value_, shadow_offset_x_label_, shadow_offset_x_value_, shadow_offset_y_label_, shadow_offset_y_value_, shadow_alpha_label_, shadow_alpha_value_;
 

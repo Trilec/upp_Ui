@@ -55,6 +55,7 @@ public:
         int media_gap     = DPI(10);
         int media_min     = DPI(24);
         bool preserve_media_aspect = true;
+        bool media_tint_mono = false;
 
         bool show_rule = true;
         UiLineStyle rule_style = SOLID;
@@ -85,7 +86,7 @@ public:
               % title_font % subtitle_font % copy_font
               % title_color % subtitle_color % copy_color
               % text_align_h % media_side % media_align_h % media_align_v
-              % media_reserve % media_share_percent % media_gap % media_min % preserve_media_aspect
+              % media_reserve % media_share_percent % media_gap % media_min % preserve_media_aspect % media_tint_mono
               % show_rule % rs % re % rule_thickness % rule_gap_above % rule_gap_below
               % show_bottom_line % bls % ble % bottom_line_thickness % bottom_line_color
               % title_subtitle_gap % subtitle_copy_gap

@@ -36,7 +36,7 @@ If you have `umk.exe`, you can build demos without opening TheIDE.
 Example (Windows):
 
 ```bat
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiLabelDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiLabelDemo"
+"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" examples/UiLabelDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiLabelDemo"
 ```
 
 Notes:
@@ -59,5 +59,6 @@ Note: `Animation/` in this repo is a vendored copy of the animation/easing packa
 See `CHECKLIST.md` for the per-control plan and current blockers.
 
 See `UPP_GUIDES/README.md` for deeper architecture, theme, review, UiDoc, tree, and data-model guidance.
+
 
 

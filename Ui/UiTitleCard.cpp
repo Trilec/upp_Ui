@@ -484,7 +484,14 @@ void UiTitleCard::Paint(Draw& w)
                 draw_r = RectC(dx, dy, dw, dh);
             }
         }
-        w.DrawImage(draw_r.left, draw_r.top, draw_r.GetWidth(), draw_r.GetHeight(), media_);
+
+        if(style.media_tint_mono) {
+            Color media_ink = UiResolveIconColor(style.palette, st);
+            UiPaintStyledIcon(w, draw_r, media_, true, true, media_ink, IsEnabled());
+        }
+        else {
+            w.DrawImage(draw_r.left, draw_r.top, draw_r.GetWidth(), draw_r.GetHeight(), media_);
+        }
     }
 
     Color ink = style.palette.ink[st];

@@ -31,8 +31,11 @@
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiLayoutCursor.h>
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>
+#include <Ui/UiBezierCurveEditor.h>
+#include <Ui/UiBezierCurveField.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiLabel.h>
 #include <Ui/UiCheckBox.h>

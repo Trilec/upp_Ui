@@ -76,6 +76,7 @@ public:
         bool hot_as_underline = false;
         bool selected_as_underline = false;
         int state_underline_thickness = DPI(2);
+        bool striped_rows = false;
 
         Color ink = SColorText();
         Color disabled_ink = SColorDisabled();
@@ -87,6 +88,8 @@ public:
         Color selected_frame = Color(65, 167, 248);
         Color selected_ink = SColorText();
         Color separator_color = Color(226, 232, 240);
+        Color row_even_face = Null;
+        Color row_odd_face = Null;
         Color metadata_default = Color(65, 167, 248);
         Color check_frame = Color(148, 163, 184);
         Color check_fill = Color(17, 24, 39);
@@ -223,3 +226,5 @@ private:
 }
 
 #endif
+
+

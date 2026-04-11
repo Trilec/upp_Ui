@@ -1,6 +1,18 @@
-// UiFontSelectorDemo
-// Enumerates fonts available to U++, previews them in the shared demo shell,
-// and exposes a small set of font properties with live usage/state feedback.
+/*
+    UiFontSelectorDemo
+    ==================
+
+    Purpose
+    - Enumerate fonts available to U++, preview them, and emit the matching usage code.
+
+    Intent
+    - Serve as both a practical font helper and a reference demo for shared shell,
+      accordion inspector, list/model, and property-row patterns.
+
+    Changelog
+    - v0.1.0: Initial font selector utility and demo shell integration.
+    - v0.1.1: Trimmed redundant default setters and expanded inline documentation.
+*/
 
 #include <Ui/Ui.h>
 
@@ -8,7 +20,7 @@ using namespace Upp;
 
 namespace {
 
-static const char* DEMO_VERSION = "v0.1.0";
+static const char* DEMO_VERSION = "v0.1.1";
 static const char* DEFAULT_SAMPLE = "The quick brown fox jumps over the lazy moon.\nPack my box with five dozen liquor jugs.";
 
 Font DemoSans(int px, bool bold = false)
@@ -177,13 +189,13 @@ UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::Solid(c.badge_face);
         s.palette.frame[i] = c.badge_frame;
-        s.palette.ink[i] = c.badge_ink;
+        s.palette.ink[i] = c.blue;
     }
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(999);
-    s.metrics.content_padding = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
+    s.metrics.content_padding = Rect(DPI(10), DPI(2), DPI(10), DPI(2));
     s.font = DemoSans(10, true);
     return s;
 }
@@ -293,6 +305,65 @@ UiScrollPanel::Style MakeScrollBodyStyle()
     return s;
 }
 
+UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
+{
+    UiAccordion::Style s = UiAccordion::StyleDefault();
+    s.transparent = true;
+    s.section_gap = 0;
+    s.header_body_gap = DPI(8);
+    s.header_height = DPI(24);
+    s.body_min_height = 0;
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.focus_enabled = false;
+    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.unified_section_frame = false;
+    s.body_line_extent = NONE;
+    s.show_chevron = true;
+    s.chevron_side = UiAlign::RIGHT;
+    s.chevron_scale = true;
+    s.chevron_size = DPI(10);
+    s.single_open = false;
+    s.enforce_one = false;
+    s.animation_enabled = true;
+    s.anim_open_ms = 90;
+    s.anim_close_ms = 90;
+
+    s.header_style = UiTheme::ResolveTitleCard();
+    for(int i = 0; i < 4; i++) {
+        s.header_style.palette.face[i] = UiFill::None();
+        s.header_style.palette.frame[i] = Null;
+        s.header_style.palette.ink[i] = c.blue;
+        s.header_style.palette.icon[i] = c.blue;
+    }
+    s.header_style.transparent = true;
+    s.header_style.hover_enabled = true;
+    s.header_style.media_tint_mono = true;
+    s.header_style.metrics.face_enabled = false;
+    s.header_style.metrics.frame_enabled = false;
+    s.header_style.metrics.focus_enabled = false;
+    s.header_style.metrics.content_padding = Rect(0, DPI(1), DPI(28), DPI(1));
+    s.header_style.show_rule = false;
+    s.header_style.show_bottom_line = true;
+    s.header_style.bottom_line_extent = LARGE;
+    s.header_style.bottom_line_style = SOLID;
+    s.header_style.bottom_line_thickness = 1;
+    s.header_style.bottom_line_color = c.divider;
+    Font hf;
+    if(Font::FindFaceNameIndex("Arial Black") >= 0)
+        hf = Font().FaceName("Arial Black").Height(12);
+    else
+        hf = DemoSans(14, true);
+    s.header_style.title_font = hf;
+    s.header_style.subtitle_font = DemoSans(1);
+    s.header_style.copy_font = DemoSans(1);
+    s.header_style.title_subtitle_gap = 0;
+    s.header_style.subtitle_copy_gap = 0;
+    s.header_style.media_gap = 0;
+    s.header_style.media_reserve = 0;
+    return s;
+}
+
 UiButton::Style MakeCopyButtonStyle(const DemoPalette& c)
 {
     UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
@@ -302,11 +373,20 @@ UiButton::Style MakeCopyButtonStyle(const DemoPalette& c)
         s.palette.ink[i] = c.muted;
         s.palette.icon[i] = c.muted;
     }
+
     s.palette.ink[ST_HOT] = c.blue;
     s.palette.icon[ST_HOT] = c.blue;
+
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
-    s.metrics.content_padding = Rect(DPI(2), DPI(2), DPI(6), DPI(2));
+    s.metrics.focus_enabled = false;
+
+    // Important: keep the button's internal content box very small,
+    // otherwise the icon gets squeezed/clipped inside the fixed slot.
+    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.icon_margin = Rect(0, 0, 0, 0);
+    s.text_margin = Rect(0, 0, 0, 0);
+
     s.font = DemoSans(9, true);
     return s;
 }
@@ -369,25 +449,9 @@ UiList::Style MakeStateListStyle(const DemoPalette& c)
     return s;
 }
 
-UiSlider::Style MakeSliderStyle(const DemoPalette& c)
-{
-    UiSlider::Style s = UiTheme::ResolveSlider();
-    for(int i = 0; i < 4; i++) {
-        s.track_palette.face[i] = UiFill::Solid(c.dark ? Color(49, 59, 77) : Color(225, 231, 241));
-        s.track_palette.frame[i] = c.dark ? Color(68, 81, 106) : Color(210, 220, 236);
-        s.thumb_palette.face[i] = UiFill::Solid(c.dark ? Color(210, 220, 236) : Color(126, 151, 193));
-        s.thumb_palette.frame[i] = c.dark ? Color(120, 146, 190) : Color(88, 116, 166);
-    }
-    s.track_metrics.radius = DPI(999);
-    s.track_metrics.frame_width = DPI(1);
-    s.thumb_metrics.radius = DPI(999);
-    s.thumb_metrics.frame_width = 0;
-    s.track_px = DPI(4);
-    s.thumb_len_px = DPI(14);
-    s.thick_px = DPI(18);
-    return s;
-}
-
+// FontPreview is a very small paint-only surface used by the demo.
+// It intentionally owns no layout logic; the window positions it and feeds it
+// the resolved font/sample pair so the paint path stays simple.
 class FontPreview : public Ctrl {
 public:
     typedef FontPreview CLASSNAME;
@@ -422,88 +486,113 @@ private:
     String sample_ = DEFAULT_SAMPLE;
 };
 
+// UiFontSelectorWindow is both a usable font utility and a reference demo for:
+// - font face enumeration
+// - list/model binding
+// - live code generation
+// - the shared demo shell + accordion inspector pattern
 class UiFontSelectorWindow : public TopWindow {
 public:
     typedef UiFontSelectorWindow CLASSNAME;
 
     UiFontSelectorWindow()
     {
-        Title("UiFontSelectorDemo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(980), DPI(680));
-        SetMinSize(Size(DPI(900), DPI(560)));
-
-        Add(header_);
-        Add(version_badge_);
-        Add(theme_shell_);
-        Add(theme_label_);
-        Add(theme_toggle_);
-        Add(exit_button_);
-        Add(font_panel_);
-        Add(preview_panel_);
-        Add(inspector_scroll_);
-
-        font_panel_.Add(fonts_title_);
-        font_panel_.Add(font_search_);
-        font_panel_.Add(fonts_list_);
-        preview_panel_.Add(preview_);
-
-        inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-        inspector_scroll_.Content().Add(usage_tag_);
-        inspector_scroll_.Content().Add(usage_copy_);
-        inspector_scroll_.Content().Add(usage_panel_);
-        usage_panel_.Add(usage_code_);
-        inspector_scroll_.Content().Add(state_tag_);
-        inspector_scroll_.Content().Add(state_list_);
-        inspector_scroll_.Content().Add(props_tag_);
-        inspector_scroll_.Content().Add(property_box_);
-
+        // Window shell and the three main regions: font list, preview, inspector.
+	    Title("UiFontSelectorDemo");
+	    Sizeable().Zoomable();
+	    SetRect(0, 0, DPI(980), DPI(680));
+	    SetMinSize(Size(DPI(900), DPI(560)));
+	
+	    Add(header_);
+	    Add(version_badge_);
+	    Add(theme_shell_);
+	    Add(theme_label_);
+	    Add(theme_toggle_);
+	    Add(exit_button_);
+	    Add(font_panel_);
+	    Add(preview_panel_);
+	    Add(inspector_scroll_);
+	
+	    font_panel_.Add(fonts_title_);
+	    font_panel_.Add(font_search_);
+	    font_panel_.Add(fonts_list_);
+	    preview_panel_.Add(preview_);
+	
+	    inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+	    inspector_scroll_.Content().Add(inspector_acc_);
+	    inspector_acc_.SetSingleOpen(false).SetEnforceOne(false);
+	
+	    int usage_sec = inspector_acc_.AddSection("USAGE", true);
+	    int state_sec = inspector_acc_.AddSection("STATE", true);
+	    int props_sec = inspector_acc_.AddSection("PROPERTIES", true);
+	
+	    inspector_acc_.GetSectionContent(usage_sec).Add(usage_panel_.SizePos());
+	    usage_panel_.Add(usage_toolbar_);
+	    usage_panel_.Add(usage_code_);
+	
+	    inspector_acc_.GetSectionContent(state_sec).Add(state_list_);
+	    inspector_acc_.GetSectionContent(props_sec).Add(property_box_);
+	
+	        // Usage toolbar and code panel stay as the shared copyable code pattern.
+        usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	    usage_toolbar_.Add(usage_toolbar_fill_).Expand(1);
+	    usage_toolbar_.Add(usage_copy_label_).Fixed(DPI(64));
+	    usage_toolbar_.Add(usage_copy_).Fixed(DPI(22));
+	
+	        // Shared demo-shell header content.
         header_.SetTitle("U++ Font Helper")
-            .SetSubTitle("Display and select fonts available to U++ across light and dark theme preview states.")
-            .SetMedia(ICON_BRAND_UPPLOGO2_48(), Size(DPI(48), DPI(48)))
-            .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
-
-        version_badge_.SetText(DEMO_VERSION).NoWantFocus();
-        theme_label_.SetText("Theme").NoWantFocus();
-        theme_toggle_.SetText("");
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconTintMono(true).SetIconScale(true);
-        exit_button_.WhenAction = [=] { Close(); };
-
+	        .SetSubTitle("Display and select fonts available to U++ across light and dark theme preview states.")
+	        .SetMedia(ICON_BRAND_UPPLOGO2_48(), Size(DPI(48), DPI(48)))
+	        .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false);
+	
+	    version_badge_.SetText(DEMO_VERSION).NoWantFocus();
+	    theme_label_.SetText("Theme").NoWantFocus();
+	    exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconTintMono(true).SetIconScale(true);
+	    exit_button_.WhenAction = [=] { Close(); };
+	
+	        // Font catalog controls.
         fonts_title_.SetText("Available Fonts").NoWantFocus();
-        font_search_.SetPlaceholder("Search fonts");
-        font_search_.WhenChange = [=] { RebuildVisibleFonts(); };
-        fonts_list_.NoWantFocus();
-        fonts_list_.WhenSelection = [=] { OnFontSelected(); };
-
-        usage_tag_.SetText("USAGE").NoWantFocus();
-        usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetText("").SetIconTintMono(true).SetIconScale(true).NoWantFocus();
-        usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_.GetText().ToString()); };
-        usage_code_.NoWantFocus();
-
-        state_tag_.SetText("STATE").NoWantFocus();
-        state_list_.NoWantFocus();
-
-        props_tag_.SetText("PROPERTIES").NoWantFocus();
+	    font_search_.SetPlaceholder("Search fonts");
+	    font_search_.WhenChange = [=] { RebuildVisibleFonts(); };
+	    fonts_list_.NoWantFocus();
+	    fonts_list_.WhenSelection = [=] { OnFontSelected(); };
+	
+	    usage_copy_label_.SetText("Copy Code").NoWantFocus();
+	    usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48())
+	               .SetIconTintMono(true)
+	               .SetIconScale(true)
+	               .NoWantFocus();
+	    usage_copy_.SetIconMargin(Rect(DPI(1), DPI(1), DPI(1), DPI(1)));
+	    usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_.GetText().ToString()); };
+	
+	    usage_code_.NoWantFocus();
+	    usage_code_.SetSelectable(true);
+	    state_list_.NoWantFocus();
+	
+	        // Property rows stay intentionally small: one slider, two toggles, one text sample.
         AddSliderRow(size_row_, size_label_, size_slider_, size_value_, "Font Size", "18");
-        AddToggleRow(bold_row_, bold_label_, bold_toggle_, "Bold");
-        AddToggleRow(underline_row_, underline_label_, underline_toggle_, "Underline");
-        AddTextRow(text_row_, text_label_, text_edit_, "Sample Text");
-
-        size_slider_.SetRange(10.0, 36.0).SetStep(1.0).SetValue(18.0);
-        bold_toggle_.SetData(false);
-        underline_toggle_.SetData(false);
-        text_edit_.SetTextUtf8(DEFAULT_SAMPLE);
-
-        theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
-        size_slider_.WhenAction = size_slider_.WhenChanging = [=] { SyncFontPreview(); };
-        bold_toggle_.WhenAction = underline_toggle_.WhenAction = [=] { SyncFontPreview(); };
-        text_edit_.WhenChange = [=] { SyncFontPreview(); };
-
+	    AddToggleRow(bold_row_, bold_label_, bold_toggle_, "Bold");
+	    AddToggleRow(underline_row_, underline_label_, underline_toggle_, "Underline");
+	    AddTextRow(text_row_, text_label_, text_edit_, "Sample Text");
+	
+	    size_slider_.SetRange(10.0, 36.0).SetStep(1.0).SetValue(18.0);
+	    bold_toggle_.SetData(false);
+	    underline_toggle_.SetData(false);
+	    text_edit_.SetTextUtf8(DEFAULT_SAMPLE);
+	
+	    theme_toggle_.WhenAction = [=] {
+	        ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
+	    };
+	    size_slider_.WhenAction = size_slider_.WhenChanging = [=] { SyncFontPreview(); };
+	    bold_toggle_.WhenAction = underline_toggle_.WhenAction = [=] { SyncFontPreview(); };
+	    text_edit_.WhenChange = [=] { SyncFontPreview(); };
+	
+	        // Initial data load and first themed render.
         BuildFontCatalog();
-        RebuildVisibleFonts();
-        ApplyTheme(UiThemeMode::Light);
-        SyncFontPreview();
-    }
+	    RebuildVisibleFonts();
+	    ApplyTheme(UiThemeMode::Light);
+	    SyncFontPreview();
+	}
 
     virtual void Paint(Draw& w) override
     {
@@ -514,59 +603,107 @@ public:
         w.DrawRect(0, DPI(90), r.GetWidth(), 1, palette_.divider);
     }
 
+	// Layout keeps the three-column demo shell aligned while the inspector
+    // accordion changes height.
     virtual void Layout() override
-    {
-        Rect r = GetSize();
-        int split_x = max(DPI(600), r.right - DPI(340));
-        int header_h = max(DPI(54), header_.GetMinSize().cy);
-        header_.SetRect(DPI(20), DPI(14), split_x - DPI(94), header_h);
-        int sx = split_x + DPI(16);
-        int sy = DPI(16);
-        version_badge_.SetRect(split_x - DPI(92), sy + DPI(1), DPI(72), DPI(22));
-        int controls_y = DPI(36);
-        int exit_w = DPI(88);
-        int shell_w = max(DPI(146), r.right - sx - DPI(16) - exit_w - DPI(20));
-        theme_shell_.SetRect(sx, controls_y, shell_w, DPI(38));
-        theme_label_.SetRect(sx + DPI(12), controls_y + DPI(9), DPI(54), DPI(18));
-        Size toggle_sz = theme_toggle_.GetMinSize();
-        int toggle_h = max(DPI(24), toggle_sz.cy);
-        int toggle_w = max(DPI(46), toggle_sz.cx);
-        theme_toggle_.SetRect(theme_shell_.GetRect().right - toggle_w - DPI(10), controls_y + (DPI(38) - toggle_h) / 2, toggle_w, toggle_h);
-        exit_button_.SetRect(theme_shell_.GetRect().right + DPI(12), controls_y, exit_w, DPI(38));
-
-        Rect body(0, DPI(91), split_x, r.bottom - DPI(91));
-        Rect work = body.Deflated(DPI(16), DPI(16));
-        int left_w = max(DPI(220), work.GetWidth() / 3);
-        font_panel_.SetRect(work.left, work.top, left_w, work.GetHeight());
-        preview_panel_.SetRect(font_panel_.GetRect().right + DPI(14), work.top, work.right - (font_panel_.GetRect().right + DPI(14)), work.GetHeight());
-
-        Size fp = font_panel_.GetSize();
-        fonts_title_.SetRect(DPI(14), DPI(12), fp.cx - DPI(28), DPI(20));
-        font_search_.SetRect(DPI(10), DPI(38), fp.cx - DPI(20), DPI(28));
-        fonts_list_.SetRect(DPI(10), DPI(74), fp.cx - DPI(20), fp.cy - DPI(84));
-        preview_.SetRect(DPI(10), DPI(10), preview_panel_.GetSize().cx - DPI(20), preview_panel_.GetSize().cy - DPI(20));
-
-        int y = DPI(100);
-        inspector_scroll_.SetRect(sx, y, r.right - sx - DPI(20), r.bottom - y - DPI(18));
-
-        ParentCtrl& bodyc = inspector_scroll_.Content();
-        int iy = 0;
-        int inner_w = max(0, bodyc.GetSize().cx - DPI(10));
-        usage_tag_.SetRect(0, iy, DPI(150), DPI(18));
-        usage_copy_.SetRect(inner_w - DPI(30), iy - DPI(1), DPI(24), DPI(24));
-        iy += DPI(24);
-        usage_panel_.SetRect(0, iy, inner_w, DPI(110));
-        usage_code_.SetRect(DPI(10), DPI(10), max(0, inner_w - DPI(20)), DPI(90));
-        iy = usage_panel_.GetRect().bottom + DPI(18);
-        state_tag_.SetRect(0, iy, inner_w, DPI(18));
-        iy += DPI(18);
-        state_list_.SetRect(0, iy, inner_w, DPI(182));
-        iy = state_list_.GetRect().bottom + DPI(18);
-        props_tag_.SetRect(0, iy, inner_w, DPI(18));
-        iy += DPI(18);
-        property_box_.SetRect(0, iy, inner_w, property_box_.GetMinSize().cy);
-        inspector_scroll_.Layout();
-    }
+	{
+	    Rect r = GetSize();
+	    int split_x = max(DPI(600), r.right - DPI(340));
+	    int header_h = max(DPI(54), header_.GetMinSize().cy);
+	    header_.SetRect(DPI(20), DPI(14), split_x - DPI(94), header_h);
+	
+	    int sx = split_x + DPI(16);
+	    int controls_y = DPI(36);
+	    int gap = DPI(8);
+	    int shell_h = DPI(38);
+	    int version_w = DPI(74);
+	    int theme_w = DPI(132);
+	    int exit_w = DPI(88);
+	
+	    UiLayoutCursor curH(RectC(sx, controls_y, r.right - sx - DPI(20), shell_h));
+	    curH.SetGapX(gap);
+	    exit_button_.SetRect(curH.TakeDecrX(exit_w), controls_y, exit_w, shell_h);
+	    theme_shell_.SetRect(curH.TakeDecrX(theme_w), controls_y, theme_w, shell_h);
+	    version_badge_.SetRect(curH.TakeDecrX(version_w), controls_y + DPI(4), version_w, DPI(30));
+	
+	    theme_label_.SetRect(theme_shell_.GetRect().left + DPI(12), controls_y + DPI(9), DPI(54), DPI(18));
+	    Size toggle_sz = theme_toggle_.GetMinSize();
+	    int toggle_h = max(DPI(24), toggle_sz.cy);
+	    int toggle_w = max(DPI(46), toggle_sz.cx);
+	    theme_toggle_.SetRect(theme_shell_.GetRect().right - toggle_w - DPI(10),
+	                          controls_y + (shell_h - toggle_h) / 2,
+	                          toggle_w, toggle_h);
+	
+	    Rect body(0, DPI(91), split_x, r.bottom - DPI(91));
+	    Rect work = body.Deflated(DPI(16), DPI(16));
+	    int left_w = max(DPI(220), work.GetWidth() / 3);
+	
+	    font_panel_.SetRect(work.left, work.top, left_w, work.GetHeight());
+	    preview_panel_.SetRect(font_panel_.GetRect().right + DPI(14),
+	                           work.top,
+	                           work.right - (font_panel_.GetRect().right + DPI(14)),
+	                           work.GetHeight());
+	
+	    Size fp = font_panel_.GetSize();
+	    fonts_title_.SetRect(DPI(14), DPI(12), fp.cx - DPI(28), DPI(20));
+	    font_search_.SetRect(DPI(10), DPI(38), fp.cx - DPI(20), DPI(28));
+	    fonts_list_.SetRect(DPI(10), DPI(74), fp.cx - DPI(20), fp.cy - DPI(84));
+	
+	    preview_.SetRect(DPI(10), DPI(10),
+	                     preview_panel_.GetSize().cx - DPI(20),
+	                     preview_panel_.GetSize().cy - DPI(20));
+	
+	    Rect inspector_area(sx, DPI(100), r.right - DPI(20), r.bottom - DPI(18));
+	    inspector_scroll_.SetRect(inspector_area);
+	
+	    ParentCtrl& body_ctrl = inspector_scroll_.Content();
+	    int inner_w = max(0, body_ctrl.GetSize().cx - DPI(10));
+	
+	    // Usage section
+	    int usage_toolbar_h = DPI(40);
+	    int usage_gap = DPI(10);
+	    int usage_panel_inset = DPI(8);
+	    int usage_panel_h = DPI(90);
+	
+	    usage_panel_.SetRect(0, 0, inner_w, usage_toolbar_h + usage_gap + usage_panel_h);
+	
+	    // Inset the toolbar so the copy icon is not pushed into the top-right edge.
+	    usage_toolbar_.SetRect(DPI(8), DPI(2),
+	                           max(0, inner_w - DPI(16)),
+	                           usage_toolbar_h);
+	
+	    // Keep the dark panel slightly inset from accordion width.
+	    Rect code_panel_rect(usage_panel_inset,
+	                         usage_toolbar_h + usage_gap,
+	                         max(0, inner_w - usage_panel_inset * 2),
+	                         usage_panel_h);
+	
+	    Rect usage_inner = UiStyledInnerRect(RectC(0, 0,
+	                                               code_panel_rect.GetWidth(),
+	                                               code_panel_rect.GetHeight()),
+	                                         usage_panel_.GetStyle().metrics,
+	                                         usage_panel_.GetStyle().skin);
+	
+	    // Pull text block left a bit versus the styled inner rect.
+	    int code_left = max(0, usage_inner.left - DPI(8));
+	    int code_top = usage_inner.top;
+	    int code_w = max(0, usage_inner.GetWidth() + DPI(4));
+	    int code_h = usage_inner.GetHeight();
+	
+	    usage_code_.SetRect(code_panel_rect.left + code_left,
+	                        code_panel_rect.top + code_top,
+	                        code_w,
+	                        code_h);
+	
+	    int state_h = max(DPI(72), state_model_.GetCount() * DPI(26) + DPI(4));
+	    state_list_.SetRect(0, 0, inner_w, state_h);
+	
+	    property_box_.SetRect(0, 0, inner_w, property_box_.GetMinSize().cy);
+	
+	    inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
+	
+	    inspector_scroll_.Layout();
+	}
 
 private:
     void AddSliderRow(UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
@@ -599,6 +736,7 @@ private:
         row.Add(edit).Expand(1).MinHeight(DPI(84));
     }
 
+    // BuildFontCatalog captures the available face list once from U++.
     void BuildFontCatalog()
     {
         all_faces_.Clear();
@@ -610,6 +748,7 @@ private:
         }
     }
 
+    // RebuildVisibleFonts reapplies the search filter while preserving selection when possible.
     void RebuildVisibleFonts()
     {
         String keep = GetSelectedFace();
@@ -670,6 +809,7 @@ private:
         SyncFontPreview();
     }
 
+    // SyncFontPreview is the single source of truth for preview, state, and usage output.
     void SyncFontPreview()
     {
         Font f = GetSelectedFont();
@@ -706,6 +846,8 @@ private:
         usage_panel_.Refresh();
     }
 
+    // ApplyTheme updates the shared shell and then restyles the list/editor surfaces
+    // that intentionally differ from the base theme defaults.
     void ApplyTheme(UiThemeMode mode)
     {
         UiThemeContext ctx = UiTheme::GetContext();
@@ -713,6 +855,7 @@ private:
         ctx.mode = mode;
         UiTheme::SetContext(ctx);
 
+        // Shared shell styling
         palette_ = ResolveDemoPalette(mode);
         header_.SetStyle(MakeHeaderStyle(palette_));
         version_badge_.SetStyle(MakeBadgeStyle(palette_));
@@ -723,11 +866,11 @@ private:
         exit_button_.SetStyle(MakeExitButtonStyle(palette_));
         exit_button_.SetIconMargin(DPI(3));
 
+        // Inspector and preview styling
         fonts_title_.SetStyle(MakeSectionStyle(palette_));
         fonts_list_.SetStyle(MakeFontListStyle(palette_));
-        usage_tag_.SetStyle(MakeSectionStyle(palette_));
-        state_tag_.SetStyle(MakeSectionStyle(palette_));
-        props_tag_.SetStyle(MakeSectionStyle(palette_));
+        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
+        usage_copy_label_.SetStyle(MakeBodyStyle(palette_, true, true, false, true));
         usage_copy_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_copy_.SetIconColor(palette_.muted);
         usage_panel_.SetStyle(MakeCodePanelStyle(palette_));
@@ -736,15 +879,16 @@ private:
         state_list_.SetModel(state_model_);
         inspector_scroll_.SetStyle(MakeScrollBodyStyle());
 
+        // Property row styling
         size_label_.SetStyle(MakeBodyStyle(palette_, false, false, false, false));
         size_value_.SetStyle(MakeBodyStyle(palette_, true, true, true, true));
         size_value_.SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
         bold_label_.SetStyle(MakeBodyStyle(palette_, false, false, false, false));
         underline_label_.SetStyle(MakeBodyStyle(palette_, false, false, false, false));
         text_label_.SetStyle(MakeBodyStyle(palette_, false, false, false, false));
-        size_slider_.SetStyle(MakeSliderStyle(palette_));
         preview_.SetPalette(palette_);
 
+        // Main card surfaces
         UiPanel::Style card = UiTheme::ResolvePanel(UiPanelRole::Surface);
         for(int i = 0; i < 4; i++) {
             card.palette.face[i] = UiFill::Solid(Blend(palette_.paper, palette_.card_face, palette_.dark ? 100 : 35));
@@ -758,6 +902,7 @@ private:
         font_panel_.SetStyle(card);
         preview_panel_.SetStyle(card);
 
+        // Editable controls keep the same rounded card language.
         UiBaseEdit::Style es = UiTheme::ResolveEdit();
         for(int i = 0; i < 4; i++) {
             es.palette.face[i] = UiFill::Solid(Blend(palette_.paper, palette_.card_face, palette_.dark ? 140 : 40));
@@ -773,7 +918,6 @@ private:
         RefreshLayout();
         SyncFontPreview();
     }
-
     DemoPalette palette_;
 
     UiTitleCard header_;
@@ -791,14 +935,15 @@ private:
     FontPreview preview_;
 
     UiScrollPanel inspector_scroll_;
-    UiLabel usage_tag_;
+    UiAccordion inspector_acc_;
+    UiBoxLayout usage_toolbar_ { UiDirection::H };
+    ParentCtrl usage_toolbar_fill_;
+    UiLabel usage_copy_label_;
     UiButton usage_copy_;
     UiPanel usage_panel_;
     UiLabel usage_code_;
-    UiLabel state_tag_;
     UiList state_list_;
     UiListModel state_model_;
-    UiLabel props_tag_;
     UiBoxLayout property_box_ { UiDirection::V };
 
     UiBoxLayout size_row_ { UiDirection::H }, bold_row_ { UiDirection::H }, underline_row_ { UiDirection::H }, text_row_ { UiDirection::H };
@@ -815,6 +960,14 @@ GUI_APP_MAIN
     UiFontSelectorWindow demo;
     demo.Run();
 }
+
+
+
+
+
+
+
+
 
 
 

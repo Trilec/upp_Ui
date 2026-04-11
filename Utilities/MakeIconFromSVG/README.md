@@ -15,7 +15,7 @@ Small CLI utility that converts SVG and raster image files into U++ icon headers
 From repo root:
 
 ```bat
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" Utilities/MakeIconFromSVG CLANGx64 -br "E:\apps\github\upp_Ui\build\MakeIconFromSVG_tools"
+"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" Utilities/MakeIconFromSVG CLANGx64 -br "E:\apps\github\upp_Ui\build\MakeIconFromSVG_tools"
 ```
 
 Output tool:
@@ -63,3 +63,4 @@ build\MakeIconFromSVG_tools.exe --help
 - Copy/merge finalized content into the single main icon header (`Ui/UiIcons.h`).
 
 This keeps the main icon surface centralized while still using the converter for fast generation.
+

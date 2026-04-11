@@ -239,8 +239,9 @@ private:
 
     void ApplyBrutalistShadow(UiDropdown& d)
     {
-        d.SetShadowBlur(DPI(5));
-        d.SetShadowAngle(45);
+        d.SetShadowDistance(DPI(5));
+        d.SetShadowOffset(DPI(4), DPI(4));
+        d.SetShadowHard(true);
         d.SetShadowDetail(DPI(5), 255, Black(), false);
     }
 
@@ -505,7 +506,8 @@ private:
         d.SetRadius(DPI(8));
         d.SetFrameWidth(0);
         d.SetPadding(DPI(14), DPI(10), DPI(14), DPI(10));
-        d.SetShadowBlur(DPI(20));
+        d.SetShadowDistance(DPI(20));
+        d.SetShadowGamma(0.35);
         d.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
         d.SelectByData("contact");
         d.WhenPaintForeground = [&](Draw& w, const Rect& rr,
@@ -631,8 +633,9 @@ private:
         drop9.SetFaceColor(Color(30, 41, 59));
         drop9.SetInkColor(White());
         drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadowBlur(DPI(20));
-        drop9.SetShadowAngle(90);
+        drop9.SetShadowDistance(DPI(20));
+        drop9.SetShadowOffset(0, DPI(6));
+        drop9.SetShadowGamma(0.35);
         drop9.SetShadowDetail(DPI(6), 170, Color(2, 10, 30), false);
 
         drop10.SetFaceColor(Color(30, 41, 59));
@@ -712,8 +715,9 @@ private:
         drop9.SetFaceColor(White());
         drop9.SetInkColor(Color(30, 41, 59));
         drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadowBlur(DPI(20));
-        drop9.SetShadowAngle(90);
+        drop9.SetShadowDistance(DPI(20));
+        drop9.SetShadowOffset(0, DPI(6));
+        drop9.SetShadowGamma(0.35);
         drop9.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
 
         drop10.SetFaceColor(Color(241, 245, 249));
@@ -752,5 +756,6 @@ GUI_APP_MAIN
 {
     UiDropdownDemo().Run();
 }
+
 
 

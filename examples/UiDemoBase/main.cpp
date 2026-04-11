@@ -1,91 +1,180 @@
 #include <Ui/Ui.h>
+#include <cmath>
 
 using namespace Upp;
 
 namespace {
 
-static const char* DEMO_TEMPLATE_VERSION = "v0.2.0";
+/*
+    UiDemoBase
+    ==========
 
-Color DemoBlue()      { return Color(44, 99, 212); }
-Color DemoBlueDark()  { return Color(26, 78, 187); }
-Color DemoBlueSoft()  { return Color(232, 240, 255); }
-Color DemoBlueLine()  { return Color(201, 216, 241); }
-Color DemoInk()       { return Color(28, 47, 78); }
-Color DemoMuted()     { return Color(106, 128, 164); }
-Color DemoGrid()      { return Color(236, 240, 247); }
-Color DemoPaper()     { return Color(250, 252, 255); }
-Color DemoDarkPaper() { return Color(22, 28, 39); }
-Color DemoDarkInk()   { return Color(218, 228, 241); }
-Color DemoDarkMuted() { return Color(151, 167, 194); }
-Color DemoDarkGrid()  { return Color(42, 52, 68); }
+    Purpose
+    - Shared baseline shell for Ui demo executables.
 
-UiTitleCard::Style MakeHeaderStyle(UiThemeMode mode)
+    Intent
+    - Keep the preview/inspector split, header chrome, code block, and accordion
+      inspector pattern consistent across demos.
+
+    Notes
+    - This file is the styling reference for lightweight demo composition.
+    - Prefer theme defaults first; only override pieces that materially change
+      the shared demo language.
+
+    Changelog
+    - v0.2.0: Added accordion-based inspector shell and shared header layout.
+    - v0.2.1: Trimmed redundant default setters, tightened comments, and renamed
+      local layout cursors to shorter readable identifiers.
+*/
+
+static const char* DEMO_TEMPLATE_VERSION = "v0.2.1";
+static const int DEMO_CORNER_RADIUS = 8;
+
+struct DemoPalette {
+    UiThemeMode mode = UiThemeMode::Light;
+    bool dark = false;
+
+    Color blue;
+    Color subtitle;
+    Color ink;
+    Color muted;
+    Color paper;
+    Color grid;
+    Color divider;
+    Color badge_face;
+    Color badge_frame;
+    Color badge_ink;
+    Color segment_shell_face;
+    Color segment_shell_frame;
+    Color segment_idle_face;
+    Color segment_idle_ink;
+    Color segment_active_face;
+    Color segment_active_frame;
+    Color segment_active_ink;
+    Color exit_face;
+    Color exit_face_hot;
+    Color exit_face_pressed;
+    Color exit_frame;
+    Color exit_ink;
+    Color slider_track;
+    Color slider_track_frame;
+    Color slider_thumb;
+    Color slider_thumb_frame;
+    Color preview_frame;
+    Color preview_hint;
+    Color code_face;
+    Color code_frame;
+    Color code_ink;
+};
+
+DemoPalette ResolveDemoPalette(UiThemeMode mode)
+{
+    DemoPalette p;
+    p.mode = mode;
+    p.dark = mode == UiThemeMode::Dark;
+    p.blue = Color(44, 99, 212);
+    p.subtitle = Color(47, 132, 192);
+
+    if(p.dark) {
+        p.ink = Color(218, 228, 241);
+        p.muted = Color(151, 167, 194);
+        p.paper = Color(22, 28, 39);
+        p.grid = Color(42, 52, 68);
+        p.divider = Color(49, 60, 78);
+        p.badge_face = Color(34, 46, 66);
+        p.badge_frame = Color(70, 91, 124);
+        p.badge_ink = p.muted;
+        p.segment_shell_face = Color(29, 36, 47);
+        p.segment_shell_frame = Color(59, 73, 96);
+        p.segment_idle_face = p.segment_shell_face;
+        p.segment_idle_ink = p.muted;
+        p.segment_active_face = Color(36, 53, 82);
+        p.segment_active_frame = Color(82, 113, 165);
+        p.segment_active_ink = Color(145, 194, 255);
+        p.exit_face = Color(126, 37, 52);
+        p.exit_face_hot = Color(149, 44, 61);
+        p.exit_face_pressed = Color(108, 32, 45);
+        p.exit_frame = Color(191, 104, 119);
+        p.exit_ink = Color(255, 240, 242);
+        p.slider_track = Color(49, 59, 77);
+        p.slider_track_frame = Color(68, 81, 106);
+        p.slider_thumb = Color(82, 148, 255);
+        p.slider_thumb_frame = Color(44, 99, 212);
+        p.preview_frame = Color(77, 92, 116);
+        p.preview_hint = p.muted;
+        p.code_face = Color(5, 12, 24);
+        p.code_frame = Color(30, 41, 59);
+        p.code_ink = Color(110, 255, 160);
+    }
+    else {
+        p.ink = Color(28, 47, 78);
+        p.muted = Color(106, 128, 164);
+        p.paper = Color(250, 252, 255);
+        p.grid = Color(236, 240, 247);
+        p.divider = Color(228, 235, 246);
+        p.badge_face = Color(240, 244, 251);
+        p.badge_frame = Color(219, 229, 243);
+        p.badge_ink = p.muted;
+        p.segment_shell_face = Color(236, 241, 248);
+        p.segment_shell_frame = Color(211, 221, 237);
+        p.segment_idle_face = p.segment_shell_face;
+        p.segment_idle_ink = Color(94, 114, 149);
+        p.segment_active_face = White();
+        p.segment_active_frame = Color(214, 226, 246);
+        p.segment_active_ink = p.blue;
+        p.exit_face = Color(250, 233, 236);
+        p.exit_face_hot = Color(247, 219, 224);
+        p.exit_face_pressed = Color(241, 204, 210);
+        p.exit_frame = Color(228, 170, 181);
+        p.exit_ink = Color(156, 41, 58);
+        p.slider_track = Color(225, 231, 241);
+        p.slider_track_frame = Color(210, 220, 236);
+        p.slider_thumb = p.blue;
+        p.slider_thumb_frame = Color(31, 78, 176);
+        p.preview_frame = Color(208, 219, 236);
+        p.preview_hint = p.muted;
+        p.code_face = Color(10, 15, 29);
+        p.code_frame = Color(30, 41, 59);
+        p.code_ink = Color(110, 255, 160);
+    }
+
+    return p;
+}
+
+UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
 {
     UiTitleCard::Style s = UiTheme::ResolveTitleCard();
-    Color ink = mode == UiThemeMode::Dark ? DemoDarkInk() : DemoInk();
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::None();
         s.palette.frame[i] = Null;
-        s.palette.ink[i] = ink;
+        s.palette.ink[i] = c.blue;
     }
     s.transparent = true;
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
     s.metrics.content_padding = Rect(0, 0, 0, 0);
-    s.title_font = SansSerifZ(20).Bold();
-    s.subtitle_font = SansSerifZ(10);
+    s.title_font = SansSerifZ(18).Bold();
+    s.subtitle_font = SansSerifZ(8);
     s.copy_font = SansSerifZ(10);
-    s.subtitle_color = Color(47, 132, 192);
+    s.subtitle_color = c.subtitle;
     s.media_side = UiAlign::LEFT;
-    s.media_gap = DPI(10);
-    s.media_reserve = DPI(32);
+    s.media_gap = DPI(8);
+    s.media_reserve = DPI(52);
+    s.title_subtitle_gap = 0;
+    s.subtitle_copy_gap = DPI(2);
     s.show_rule = false;
     s.show_bottom_line = false;
     return s;
 }
 
-UiLabel::Style MakeInspectorTitleStyle(UiThemeMode mode)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Title);
-    Color ink = mode == UiThemeMode::Dark ? DemoDarkInk() : DemoInk();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = ink;
-    }
-    s.transparent = true;
-    s.font = SansSerifZ(20).Bold();
-    s.align_h = UiAlign::LEFT;
-    s.align_v = UiAlign::CENTER;
-    return s;
-}
-
-UiLabel::Style MakeSectionTagStyle(UiThemeMode mode)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Caption);
-    Color ink = mode == UiThemeMode::Dark ? DemoDarkInk() : DemoInk();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = ink;
-    }
-    s.transparent = true;
-    s.font = SansSerifZ(10).Bold();
-    s.align_h = UiAlign::LEFT;
-    s.align_v = UiAlign::CENTER;
-    return s;
-}
-
-UiLabel::Style MakeBodyLabelStyle(UiThemeMode mode, bool muted = false, bool small = false)
+UiLabel::Style MakeBodyLabelStyle(const DemoPalette& c, bool muted = false, bool small = false)
 {
     UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    Color ink = mode == UiThemeMode::Dark ? (muted ? DemoDarkMuted() : DemoDarkInk())
-                                          : (muted ? DemoMuted() : DemoInk());
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::None();
         s.palette.frame[i] = Null;
-        s.palette.ink[i] = ink;
+        s.palette.ink[i] = muted ? c.muted : c.ink;
     }
     s.transparent = true;
     s.font = small ? SansSerifZ(9) : SansSerifZ(10);
@@ -95,192 +184,318 @@ UiLabel::Style MakeBodyLabelStyle(UiThemeMode mode, bool muted = false, bool sma
     return s;
 }
 
-UiLabel::Style MakeBadgeStyle(UiThemeMode mode)
+UiLabel::Style MakeHeaderIconStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
+    Color ink = c.dark ? Color(218, 228, 241) : c.blue;
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = ink;
+    }
+    s.transparent = true;
+    s.align_h = UiAlign::CENTER;
+    s.align_v = UiAlign::CENTER;
+    return s;
+}
+
+UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
 {
     UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
-    Color face = mode == UiThemeMode::Dark ? Color(34, 46, 66) : Color(240, 244, 251);
-    Color frame = mode == UiThemeMode::Dark ? Color(70, 91, 124) : Color(219, 229, 243);
-    Color ink = mode == UiThemeMode::Dark ? DemoDarkMuted() : DemoMuted();
     for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(face);
-        s.palette.frame[i] = frame;
-        s.palette.ink[i] = ink;
+        s.palette.face[i] = UiFill::Solid(c.badge_face);
+        s.palette.frame[i] = c.badge_frame;
+        s.palette.ink[i] = c.blue;
     }
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(999);
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(14), DPI(6), DPI(14), DPI(6));
-    s.font = SansSerifZ(12).Bold();
+    s.metrics.content_padding = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
+    s.font = SansSerifZ(10).Bold();
     s.align_h = UiAlign::CENTER;
     s.align_v = UiAlign::CENTER;
     s.transparent = false;
     return s;
 }
 
-UiPanel::Style MakeSegmentShellStyle(UiThemeMode mode)
+UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
 {
     UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-    Color face = mode == UiThemeMode::Dark ? Color(29, 36, 47) : Color(243, 246, 251);
-    Color frame = mode == UiThemeMode::Dark ? Color(59, 73, 96) : Color(220, 229, 242);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(face);
-        s.palette.frame[i] = frame;
-    }
+    Image normal_tile = MakeQuadGradientTile(32,
+                                             Blend(c.segment_shell_face, c.dark ? White() : c.subtitle, c.dark ? 10 : 28),
+                                             Blend(c.segment_shell_face, c.dark ? c.blue : c.subtitle, c.dark ? 14 : 20),
+                                             Blend(c.segment_shell_face, c.paper, c.dark ? 16 : 36),
+                                             Blend(c.segment_shell_face, c.paper, c.dark ? 26 : 52),
+                                             3);
+    Image hot_tile = MakeQuadGradientTile(32,
+                                          Blend(c.segment_shell_face, c.dark ? White() : c.subtitle, c.dark ? 14 : 34),
+                                          Blend(c.segment_shell_face, c.blue, c.dark ? 18 : 28),
+                                          Blend(c.segment_shell_face, c.paper, c.dark ? 18 : 40),
+                                          Blend(c.segment_shell_face, c.paper, c.dark ? 28 : 56),
+                                          3);
+    for(int i = 0; i < 4; i++)
+        s.palette.frame[i] = c.segment_shell_frame;
+    s.palette.face[ST_NORMAL] = UiFill::ImageFill(normal_tile);
+    s.palette.face[ST_HOT] = UiFill::ImageFill(hot_tile);
+    s.palette.face[ST_PRESSED] = UiFill::ImageFill(hot_tile);
+    s.palette.face[ST_DISABLED] = UiFill::ImageFill(normal_tile);
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(12);
+    s.metrics.radius = DPI(999);
     s.metrics.focus_enabled = false;
     s.metrics.content_padding = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
     s.metrics.shadow.enabled = false;
     return s;
 }
 
-UiPanel::Style MakeInfoCardStyle(UiThemeMode mode)
+UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
 {
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    Color face = mode == UiThemeMode::Dark ? Color(31, 44, 65) : Color(238, 245, 255);
-    Color frame = mode == UiThemeMode::Dark ? Color(70, 95, 136) : Color(201, 217, 245);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(face);
-        s.palette.frame[i] = frame;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(12);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(14), DPI(14), DPI(14), DPI(14));
-    s.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiButton::Style MakeSegmentButtonStyle(UiThemeMode mode, bool active)
-{
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    Color face = active
-        ? (mode == UiThemeMode::Dark ? Color(36, 53, 82) : White())
-        : (mode == UiThemeMode::Dark ? Color(29, 36, 47) : Color(243, 246, 251));
-    Color frame = active
-        ? (mode == UiThemeMode::Dark ? Color(82, 113, 165) : Color(214, 226, 246))
-        : Null;
-    Color ink = active
-        ? (mode == UiThemeMode::Dark ? Color(145, 194, 255) : DemoBlue())
-        : (mode == UiThemeMode::Dark ? DemoDarkMuted() : DemoMuted());
-
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(face);
-        s.palette.frame[i] = frame;
-        s.palette.ink[i] = ink;
-        s.palette.icon[i] = ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = !IsNull(frame);
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(10);
-    s.metrics.focus_enabled = false;
-    s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-    s.font = SansSerifZ(10).Bold();
-    return s;
-}
-
-UiButton::Style MakeIconButtonStyle(UiThemeMode mode)
-{
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    Color face = mode == UiThemeMode::Dark ? Color(29, 36, 47) : White();
-    Color frame = mode == UiThemeMode::Dark ? Color(59, 73, 96) : Color(220, 229, 242);
-    Color ink = mode == UiThemeMode::Dark ? DemoDarkMuted() : DemoMuted();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(face);
-        s.palette.frame[i] = frame;
-        s.palette.ink[i] = ink;
-        s.palette.icon[i] = ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(10);
-    s.metrics.focus_enabled = false;
-    s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
-    s.font = SansSerifZ(10).Bold();
-    return s;
-}
-
-UiSlider::Style MakeSliderStyle(UiThemeMode mode)
-{
-    UiSlider::Style s = UiTheme::ResolveSlider();
-    Color track = mode == UiThemeMode::Dark ? Color(49, 59, 77) : Color(225, 231, 241);
-    Color track_frame = mode == UiThemeMode::Dark ? Color(68, 81, 106) : Color(210, 220, 236);
-    Color thumb = mode == UiThemeMode::Dark ? Color(233, 238, 246) : White();
-    Color thumb_frame = mode == UiThemeMode::Dark ? Color(101, 128, 171) : Color(176, 198, 232);
-
-    for(int i = 0; i < 4; i++) {
-        s.track_palette.face[i] = UiFill::Solid(track);
-        s.track_palette.frame[i] = track_frame;
-        s.thumb_palette.face[i] = UiFill::Solid(thumb);
-        s.thumb_palette.frame[i] = thumb_frame;
-    }
-    s.track_metrics.radius = DPI(999);
-    s.track_metrics.frame_width = DPI(1);
-    s.track_metrics.focus_enabled = false;
-    s.thumb_metrics.radius = DPI(999);
-    s.thumb_metrics.frame_width = DPI(1);
-    s.thumb_metrics.focus_enabled = false;
-    s.track_px = DPI(4);
-    s.thumb_len_px = DPI(18);
-    s.thick_px = DPI(26);
-    return s;
-}
-
-UiToggle::Style MakePropertyToggleStyle(UiThemeMode mode)
-{
-    UiToggle::Style s = UiTheme::ResolveToggle();
-    Color track_off = mode == UiThemeMode::Dark ? Color(57, 68, 88) : Color(226, 232, 241);
-    Color track_on = mode == UiThemeMode::Dark ? Color(54, 96, 163) : Color(211, 227, 255);
-    Color thumb = mode == UiThemeMode::Dark ? Color(236, 241, 247) : White();
-    Color shell_ink = mode == UiThemeMode::Dark ? DemoDarkMuted() : DemoMuted();
-
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = shell_ink;
-        s.track_palette.frame[i] = Null;
-        s.thumb_palette.frame[i] = Null;
-        s.thumb_palette.face[i] = UiFill::Solid(thumb);
-    }
-    s.track_palette.face[ST_NORMAL] = UiFill::Solid(track_off);
-    s.track_palette.face[ST_HOT] = UiFill::Solid(Blend(track_off, mode == UiThemeMode::Dark ? White() : DemoBlue(), 8));
-    s.track_palette.face[ST_PRESSED] = UiFill::Solid(Blend(track_on, mode == UiThemeMode::Dark ? Black() : DemoBlueDark(), 8));
-    s.track_palette.face[ST_DISABLED] = UiFill::Solid(Blend(track_off, mode == UiThemeMode::Dark ? Black() : White(), 20));
+    UiAccordion::Style s = UiAccordion::StyleDefault();
+    s.transparent = true;
+    s.section_gap = 0;
+    s.header_body_gap = DPI(8);
+    s.header_height = DPI(24);
+    s.body_min_height = 0;
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
-    s.track_metrics.face_enabled = true;
-    s.track_metrics.frame_enabled = false;
-    s.track_metrics.radius = DPI(999);
-    s.track_metrics.focus_enabled = false;
-    s.thumb_metrics.face_enabled = true;
-    s.thumb_metrics.frame_enabled = false;
-    s.thumb_metrics.radius = DPI(999);
-    s.thumb_metrics.focus_enabled = false;
-    s.track_extent = Size(DPI(34), DPI(18));
-    s.label_gap = 0;
-    s.thumb_inset = DPI(2);
-    s.animate = true;
+    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.unified_section_frame = false;
+    s.body_line_extent = NONE;
+    s.show_chevron = true;
+    s.chevron_side = UiAlign::RIGHT;
+    s.chevron_scale = true;
+    s.chevron_size = DPI(10);
+    s.single_open = false;
+    s.enforce_one = false;
+    s.animation_enabled = true;
+    s.anim_open_ms = 90;
+    s.anim_close_ms = 90;
+
+    s.header_style = UiTheme::ResolveTitleCard();
+    for(int i = 0; i < 4; i++) {
+        s.header_style.palette.face[i] = UiFill::None();
+        s.header_style.palette.frame[i] = Null;
+        s.header_style.palette.ink[i] = c.blue;
+        s.header_style.palette.icon[i] = c.blue;
+    }
+    s.header_style.transparent = true;
+    s.header_style.hover_enabled = true;
+    s.header_style.media_tint_mono = true;
+    s.header_style.metrics.face_enabled = false;
+    s.header_style.metrics.frame_enabled = false;
+    s.header_style.metrics.focus_enabled = false;
+    s.header_style.metrics.content_padding = Rect(0, DPI(1), DPI(28), DPI(1));
+    s.header_style.show_rule = false;
+    s.header_style.show_bottom_line = true;
+    s.header_style.bottom_line_extent = LARGE;
+    s.header_style.bottom_line_style = SOLID;
+    s.header_style.bottom_line_thickness = 1;
+    s.header_style.bottom_line_color = c.divider;
+    Font hf;
+    if(Font::FindFaceNameIndex("Arial Black") >= 0)
+        hf = Font().FaceName("Arial Black").Height(12);
+    else
+        hf = SansSerifZ(14).Bold();
+    s.header_style.title_font = hf;
+    s.header_style.subtitle_font = SansSerifZ(1);
+    s.header_style.copy_font = SansSerifZ(1);
+    s.header_style.title_subtitle_gap = 0;
+    s.header_style.subtitle_copy_gap = 0;
+    s.header_style.media_gap = 0;
+    s.header_style.media_reserve = 0;
+
+    s.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    for(int i = 0; i < 4; i++) {
+        s.body_style.palette.face[i] = UiFill::None();
+        s.body_style.palette.frame[i] = Null;
+        s.body_style.palette.ink[i] = c.ink;
+    }
+    s.body_style.transparent = true;
+    s.body_style.metrics.face_enabled = false;
+    s.body_style.metrics.frame_enabled = false;
+    s.body_style.metrics.frame_width = 0;
+    s.body_style.metrics.radius = 0;
+    s.body_style.metrics.focus_enabled = false;
+    s.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.body_style.metrics.shadow.enabled = false;
     return s;
 }
 
-void DrawGrid(Draw& w, const Rect& r, Color line, int step)
+UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
 {
-    for(int x = r.left; x < r.right; x += step)
-        w.DrawRect(x, r.top, 1, r.GetHeight(), line);
-    for(int y = r.top; y < r.bottom; y += step)
-        w.DrawRect(r.left, y, r.GetWidth(), 1, line);
+    UiAccordion::Style s = MakeInspectorAccordionStyle(c);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Blend(c.divider, c.paper, 8);
+        s.palette.ink[i] = c.ink;
+    }
+    s.header_height = DPI(22);
+    s.header_style.title_font = SansSerifZ(10).Bold();
+    s.header_style.metrics.content_padding = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
+    s.header_style.show_bottom_line = false;
+    s.header_style.bottom_line_color = Blend(c.divider, c.paper, 20);
+    s.chevron_size = DPI(8);
+    s.section_gap = DPI(6);
+    s.header_body_gap = DPI(2);
+    s.unified_section_frame = true;
+    s.unified_section_radius = DPI(DEMO_CORNER_RADIUS);
+    s.unified_section_frame_width = 1;
+    s.body_style.metrics.content_padding = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
+    return s;
 }
+
+UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
+{
+    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.code_face);
+        s.palette.frame[i] = c.code_frame;
+        s.palette.ink[i] = c.code_ink;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.focus_enabled = false;
+    s.metrics.content_padding = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
+    s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = c.code_ink;
+    }
+    s.transparent = true;
+    Font f = MonospaceZ(10);
+    if(Font::FindFaceNameIndex("Fira Code") >= 0)
+        f.FaceName("Fira Code");
+    s.font = f;
+    s.metrics.text_font = f;
+    s.metrics.use_text_font = true;
+    s.nowrap = false;
+    return s;
+}
+
+UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = c.muted;
+    }
+    Font f = SansSerifZ(10);
+    s.transparent = true;
+    s.font = f;
+    s.metrics.text_font = f;
+    s.metrics.use_text_font = true;
+    s.align_h = UiAlign::RIGHT;
+    s.align_v = UiAlign::CENTER;
+    s.text_margin = Rect(0, 0, DPI(2), 0);
+    return s;
+}
+
+UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
+{
+    UiToggle::Style s = UiTheme::ResolveToggle();
+    for(int i = 0; i < 4; i++) {
+        s.track_palette.face[i] = UiFill::Solid(Blend(c.segment_shell_face, c.dark ? Black() : c.subtitle, c.dark ? 18 : 24));
+        s.track_palette.frame[i] = Blend(c.segment_shell_frame, c.dark ? White() : c.subtitle, c.dark ? 14 : 22);
+        s.thumb_palette.face[i] = UiFill::Solid(c.segment_active_face);
+        s.thumb_palette.frame[i] = c.segment_active_frame;
+        s.palette.ink[i] = c.segment_idle_ink;
+    }
+    s.track_metrics.frame_enabled = true;
+    s.track_metrics.frame_width = DPI(1);
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.frame_enabled = true;
+    s.thumb_metrics.frame_width = 0;
+    s.thumb_metrics.radius = DPI(999);
+    s.track_extent = Size(DPI(42), DPI(24));
+    s.thumb_inset = DPI(4);
+    s.label_gap = 0;
+    return s;
+}
+
+UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
+{
+    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
+    Image normal_tile = MakeQuadGradientTile(32,
+                                             Blend(c.exit_face, White(), c.dark ? 8 : 18),
+                                             c.exit_face,
+                                             c.exit_face_pressed,
+                                             Blend(c.exit_face_pressed, Black(), c.dark ? 10 : 4),
+                                             2);
+    Image hot_tile = MakeQuadGradientTile(32,
+                                          Blend(c.exit_face_hot, White(), c.dark ? 10 : 20),
+                                          c.exit_face_hot,
+                                          Blend(c.exit_face, c.exit_face_hot, 120),
+                                          Blend(c.exit_face_hot, Black(), c.dark ? 12 : 6),
+                                          2);
+    Image pressed_tile = MakeQuadGradientTile(32,
+                                              Blend(c.exit_face_pressed, White(), c.dark ? 4 : 10),
+                                              c.exit_face_pressed,
+                                              Blend(c.exit_face_pressed, Black(), c.dark ? 10 : 4),
+                                              Blend(c.exit_face_pressed, Black(), c.dark ? 18 : 10),
+                                              2);
+    Image disabled_tile = MakeQuadGradientTile(32,
+                                               Blend(c.exit_face, c.paper, 180),
+                                               Blend(c.exit_face, c.paper, 190),
+                                               Blend(c.exit_face_pressed, c.paper, 190),
+                                               Blend(c.exit_face_pressed, c.paper, 200),
+                                               2);
+    s.palette.face[ST_NORMAL] = UiFill::ImageFill(normal_tile);
+    s.palette.face[ST_HOT] = UiFill::ImageFill(hot_tile);
+    s.palette.face[ST_PRESSED] = UiFill::ImageFill(pressed_tile);
+    s.palette.face[ST_DISABLED] = UiFill::ImageFill(disabled_tile);
+    for(int i = 0; i < 4; i++) {
+        s.palette.frame[i] = c.exit_frame;
+        s.palette.ink[i] = c.exit_ink;
+        s.palette.icon[i] = c.exit_ink;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.focus_enabled = false;
+    s.metrics.shadow.enabled = false;
+    s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(8), DPI(6));
+    s.font = SansSerifZ(10).Bold();
+    s.icon_margin = Rect(DPI(0), 0, DPI(1), 0);
+    s.text_margin = Rect(DPI(0), 0, 0, 0);
+    return s;
+}
+
+UiGridLayout::Style MakePreviewHostStyle()
+{
+    UiGridLayout::Style s = UiGridLayout::StyleMinimal();
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+    }
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.padding = 0;
+    s.spacing = DPI(10);
+    return s;
+}
+
+void DrawDotGrid(Draw& w, const Rect& r, Color color, int step, int dot = 2)
+{
+    for(int y = r.top + step / 2; y < r.bottom; y += step)
+        for(int x = r.left + step / 2; x < r.right; x += step)
+            w.DrawRect(x, y, dot, dot, color);
+}
+
 
 void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap = 4)
 {
@@ -296,6 +511,9 @@ void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap =
     }
 }
 
+// PreviewCanvas owns the neutral preview field used by the demo template.
+// It keeps the painting self-contained so demo controls can just drop content
+// into the exposed UiGridLayout without reimplementing shell chrome.
 class PreviewCanvas : public Ctrl {
 public:
     typedef PreviewCanvas CLASSNAME;
@@ -303,11 +521,19 @@ public:
     PreviewCanvas()
     {
         NoWantFocus();
+        Add(content_);
+        content_.SetMode(UiGridLayout::Flow)
+                .SetDirection(UiDirection::H)
+                .SetWrap(true)
+                .SetGap(DPI(10))
+                .SetInset(0)
+                .SetScrollMode(UiGridLayout::None)
+                .SetStyle(MakePreviewHostStyle());
     }
 
-    void SetDark(bool on)
+    void SetPalette(const DemoPalette& palette)
     {
-        dark_ = on;
+        palette_ = palette;
         Refresh();
     }
 
@@ -315,131 +541,166 @@ public:
     {
         scale_ = clamp(v, 0.8, 1.4);
         Refresh();
+        RefreshLayout();
     }
 
-    void SetDraft(bool on)
+    UiGridLayout& Content()
     {
-        draft_ = on;
-        Refresh();
+        return content_;
     }
 
     virtual void Paint(Draw& w) override
     {
         Rect r(Point(0, 0), GetSize());
-        Color paper = dark_ ? DemoDarkPaper() : DemoPaper();
-        Color grid = dark_ ? DemoDarkGrid() : DemoGrid();
-        Color frame = dark_ ? Color(77, 92, 116) : Color(208, 219, 236);
-        Color muted = dark_ ? DemoDarkMuted() : DemoMuted();
+        Color paper = palette_.paper;
+        Color grid = palette_.grid;
+        Color frame = palette_.preview_frame;
+        Color muted = palette_.preview_hint;
 
         w.DrawRect(r, paper);
-        DrawGrid(w, r, grid, DPI(36));
 
-        Rect canvas = r.Deflated(DPI(38), DPI(52));
+        Rect canvas = r.Deflated(DPI(15), DPI(21));
         int inset = int(DPI(22) * (1.4 - scale_));
         canvas = canvas.Deflated(inset, inset);
+        DrawDotGrid(w, canvas, grid, DPI(20), DPI(2));
         DrawDashedRect(w, canvas, frame);
 
-        Rect circle = RectC(canvas.CenterPoint().x - DPI(28), canvas.CenterPoint().y - DPI(38), DPI(56), DPI(56));
-        w.DrawEllipse(circle, dark_ ? Color(34, 44, 60) : Color(243, 247, 252), 1, frame);
-        Image icon = ICON_NAVIGATION_OUTLINED_ARROW_RIGHT_48();
-        w.DrawImage(circle.left + DPI(14), circle.top + DPI(14), DPI(28), DPI(28), icon);
-
-        String title = draft_ ? "Draft Preview" : "Preview Canvas";
-        Font title_font = SansSerifZ(13).Italic();
-        Size ts = GetTextSize(title, title_font);
-        int tx = canvas.left + (canvas.GetWidth() - ts.cx) / 2;
-        int ty = circle.bottom + DPI(18);
-        w.DrawText(tx, ty, title, title_font, muted);
-
         String hint = "PLACE CONTROLS HERE";
-        Font hint_font = SansSerifZ(9).Bold();
+        Font hint_font = SansSerifZ(11).Bold();
         Size hs = GetTextSize(hint, hint_font);
-        w.DrawText(canvas.left + (canvas.GetWidth() - hs.cx) / 2, ty + DPI(28), hint, hint_font, Blend(muted, paper, dark_ ? 10 : 20));
+        int hx = canvas.left + (canvas.GetWidth() - hs.cx) / 2;
+        int hy = canvas.top + (canvas.GetHeight() - hs.cy) / 2;
+        w.DrawText(hx, hy, hint, hint_font, Blend(muted, paper, palette_.dark ? 10 : 20));
+    }
+
+    virtual void Layout() override
+    {
+        Rect canvas = Rect(GetSize()).Deflated(DPI(15), DPI(21));
+        int inset = int(DPI(22) * (1.4 - scale_));
+        content_.SetRect(canvas.Deflated(inset, inset));
     }
 
 private:
-    bool dark_ = false;
-    bool draft_ = false;
+    DemoPalette palette_;
     double scale_ = 1.0;
+    UiGridLayout content_;
 };
 
+// UiDemoBaseWindow is the reusable split-shell template for new demos.
+// It intentionally keeps the property set small so new control demos can copy
+// the structure without inheriting unnecessary demo-specific behavior.
 class UiDemoBaseWindow : public TopWindow {
 public:
     typedef UiDemoBaseWindow CLASSNAME;
 
+    UiGridLayout& PreviewGrid()
+    {
+        return preview_.Content();
+    }
+
+    UiBoxLayout& PropertyBox()
+    {
+        return property_box_;
+    }
+
+    UiBoxLayout& StateBox()
+    {
+        return state_box_;
+    }
+
     UiDemoBaseWindow()
     {
+        // Window shell and root controls.
         Title("Ui Demo Base");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(920), DPI(620));
         SetMinSize(Size(DPI(820), DPI(520)));
 
         Add(header_);
-        Add(inspector_tag_);
         Add(version_badge_);
         Add(theme_shell_);
-        Add(light_button_);
-        Add(dark_button_);
+        Add(theme_icon_);
+        Add(theme_toggle_);
         Add(exit_button_);
         Add(preview_);
-        Add(doc_tag_);
-        Add(doc_card_);
-        Add(doc_icon_);
-        Add(doc_text_);
-        Add(props_tag_);
-        Add(scale_label_);
-        Add(scale_value_);
-        Add(scale_slider_);
-        Add(draft_label_);
-        Add(draft_toggle_);
+        Add(inspector_acc_);
+        // The template demonstrates the shared inspector pattern directly:
+        // top-level accordion sections plus one nested property subgroup.
+        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_code_panel_.SizePos());
+        usage_code_panel_.Add(usage_code_);
+        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
+        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("PROPERTIES", true)).Add(property_box_.SizePos());
+        property_box_.Add(scale_row_).Fit();
+        property_box_.Add(property_group_acc_).Fit();
+        property_group_acc_.SetSingleOpen(false).SetEnforceOne(false);
+        property_group_acc_.GetSectionContent(property_group_acc_.AddSection("GROUP", true)).Add(property_group_box_.SizePos());
 
+        // Shared title-card header content.
         header_.SetTitle("Architectural Header System")
                .SetSubTitle("A responsive navigation component with glassmorphism and scroll-aware state management.")
-               .SetMedia(ICON_BRAND_UPPLOGO2_48(), Size(DPI(28), DPI(28)))
+               .SetMedia(ICON_BRAND_UPPLOGO2_48(), Size(DPI(48), DPI(48)))
                .ShowRule(false)
                .ShowBottomLine(false)
                .SetSelectable(false)
                .SetShowFocus(false)
                .EnableHover(false);
 
-        inspector_tag_.SetText("Inspector").NoWantFocus();
+        // Header actions intentionally stay close to theme defaults.
         version_badge_.SetText(DEMO_TEMPLATE_VERSION).NoWantFocus();
-        light_button_.SetText("LIGHT");
-        dark_button_.SetText("DARK");
-        exit_button_.SetIcon(ICON_NAVIGATION_CLOSE_SMALL_48()).SetText("").SetIconTintMono(true);
+        theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).NoWantFocus();
+        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48())
+                    .SetText("Exit")
+                    .SetIconTintMono(true)
+                    .SetIconScale(true);
 
-        doc_tag_.SetText("DOCUMENTATION").NoWantFocus();
-        doc_icon_.SetIcon(ICON_CONTENT_OUTLINED_ADD_CIRCLE_OUTLINE_48()).NoWantFocus();
-        doc_text_.SetText("Properties below directly modify the live instance of the demo shell and preview canvas.").NoWantFocus();
+        usage_code_.SetText("UiDemoBase demo;\n"
+                            "demo.PreviewGrid();\n"
+                            "demo.StateBox();\n"
+                            "demo.PropertyBox();").NoWantFocus();
+        usage_code_.SetSelectable(true);
 
-        props_tag_.SetText("PROPERTIES").NoWantFocus();
+        state_label_.SetText("No control state is bound yet.").NoWantFocus();
+        state_box_.SetGap(DPI(8)).SetInset(0);
+        state_box_.Add(state_label_).Fit();
+
         scale_label_.SetText("Scaling").NoWantFocus();
         scale_value_.SetText("1.0x").NoWantFocus();
         scale_slider_.SetRange(0.8, 1.4).SetStep(0.1).SetValue(1.0);
-        draft_label_.SetText("Draft Mode").NoWantFocus();
-        draft_toggle_.SetText("").SetData(false);
+        property_box_.SetGap(DPI(8)).SetInset(0);
+        property_group_box_.SetGap(DPI(8)).SetInset(0);
+        scale_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        scale_row_.Add(scale_label_).Fixed(DPI(82)).MinHeight(DPI(20));
+        scale_row_.Add(scale_slider_).Expand(1).MinHeight(DPI(20));
+        scale_row_.Add(scale_value_).Fixed(DPI(56)).MinHeight(DPI(18));
+        group_note_.SetText("Nested group placeholder for control-specific sections.").NoWantFocus();
+        property_group_box_.Add(group_note_).Fit();
 
-        light_button_.WhenAction = [=] { ApplyTheme(UiThemeMode::Light); };
-        dark_button_.WhenAction = [=] { ApplyTheme(UiThemeMode::Dark); };
+        // Keep interaction hooks minimal so derived demos can replace them selectively.
+        theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
         exit_button_.WhenAction = [=] { Close(); };
         scale_slider_.WhenAction = [=] { SyncProperties(); };
         scale_slider_.WhenChanging = [=] { SyncProperties(); };
-        draft_toggle_.WhenAction = [=] { SyncProperties(); };
+        inspector_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
+        property_group_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
 
         ApplyTheme(UiThemeMode::Light);
         SyncProperties();
+        ScheduleExitPulse();
+    }
+
+    virtual ~UiDemoBaseWindow()
+    {
+        exit_pulse_timer_.Kill();
     }
 
     virtual void Paint(Draw& w) override
     {
         Rect r(Point(0, 0), GetSize());
-        Color paper = dark_mode_ ? DemoDarkPaper() : White();
-        Color line = dark_mode_ ? Color(49, 60, 78) : Color(228, 235, 246);
-        w.DrawRect(r, paper);
+        w.DrawRect(r, palette_.paper);
         int split_x = GetSplitX();
         int header_bottom = GetHeaderBottom();
-        w.DrawRect(split_x, 0, 1, r.GetHeight(), line);
-        w.DrawRect(0, header_bottom, r.GetWidth(), 1, line);
+        w.DrawRect(split_x, 0, 1, r.GetHeight(), palette_.divider);
+        w.DrawRect(0, header_bottom, r.GetWidth(), 1, palette_.divider);
     }
 
     virtual void Layout() override
@@ -448,43 +709,41 @@ public:
         int split_x = GetSplitX();
         int header_bottom = GetHeaderBottom();
 
-        header_.SetRect(DPI(20), DPI(18), split_x - DPI(94), DPI(44));
+        header_.SetRect(DPI(20), DPI(14), split_x - DPI(94), DPI(40));
 
         int sx = split_x + DPI(16);
-        int sy = DPI(16);
-        inspector_tag_.SetRect(sx, sy - DPI(1), DPI(130), DPI(24));
-        version_badge_.SetRect(split_x - DPI(106), sy - DPI(2), DPI(86), DPI(28));
-
-        int controls_y = DPI(44);
-        int exit_w = DPI(52);
-        int shell_w = r.right - sx - DPI(16) - exit_w - DPI(12);
-        theme_shell_.SetRect(sx, controls_y, shell_w, DPI(38));
-        light_button_.SetRect(sx + DPI(5), controls_y + DPI(5), (shell_w - DPI(14)) / 2, DPI(28));
-        dark_button_.SetRect(light_button_.GetRect().right + DPI(4), controls_y + DPI(5), (shell_w - DPI(14)) / 2, DPI(28));
-        exit_button_.SetRect(theme_shell_.GetRect().right + DPI(12), controls_y, exit_w, DPI(38));
-
+        int controls_y = DPI(22);
+        int version_w = DPI(83);
+        int exit_w = DPI(83);
+        int shell_w = DPI(88);
+        int gap = DPI(8);
+        int shell_h = DPI(38);
+        UiLayoutCursor curH(RectC(sx, controls_y, r.right - sx - DPI(11), shell_h));
+        curH.SetGapX(gap);
+        exit_button_.SetRect(curH.TakeDecrX(exit_w), controls_y, exit_w, shell_h);
+        theme_shell_.SetRect(curH.TakeDecrX(shell_w), controls_y, shell_w, shell_h);
+        version_badge_.SetRect(curH.TakeDecrX(version_w), controls_y + DPI(4), version_w, DPI(30));
+        Size toggle_sz = theme_toggle_.GetMinSize();
+        int toggle_h = max(DPI(24), toggle_sz.cy);
+        int toggle_w = max(DPI(42), toggle_sz.cx);
+        theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), controls_y + DPI(7), DPI(22), DPI(22));
+        theme_toggle_.SetRect(theme_shell_.GetRect().right - toggle_w - DPI(6), controls_y + (shell_h - toggle_h) / 2, toggle_w, toggle_h);
         preview_.SetRect(0, header_bottom + 1, split_x, r.bottom - header_bottom - 1);
 
-        int y = header_bottom + DPI(28);
-        doc_tag_.SetRect(sx, y, DPI(150), DPI(18));
-        y += DPI(22);
-        doc_card_.SetRect(sx, y, r.right - sx - DPI(16), DPI(92));
-        Rect dc = UiStyledInnerRect(doc_card_.GetRect(), doc_card_.GetStyle().metrics, doc_card_.GetStyle().skin);
-        doc_icon_.SetRect(dc.left, dc.top + DPI(2), DPI(22), DPI(22));
-        doc_text_.SetRect(dc.left + DPI(18), dc.top, dc.GetWidth() - DPI(18), dc.GetHeight());
-
-        y = doc_card_.GetRect().bottom + DPI(32);
-        props_tag_.SetRect(sx, y, DPI(140), DPI(18));
-        y += DPI(28);
-
-        scale_label_.SetRect(sx, y, DPI(120), DPI(20));
-        scale_value_.SetRect(r.right - DPI(58), y, DPI(32), DPI(18));
-        y += DPI(24);
-        scale_slider_.SetRect(sx, y, r.right - sx - DPI(16), DPI(26));
-
-        y += DPI(42);
-        draft_label_.SetRect(sx, y, DPI(120), DPI(20));
-        draft_toggle_.SetRect(r.right - DPI(50), y - DPI(1), DPI(34), DPI(18));
+        int inner_w = r.right - sx - DPI(16);
+        int usage_h = DPI(96);
+        UiLayoutCursor curI(RectC(sx, header_bottom + DPI(12), inner_w, max(0, r.bottom - header_bottom - DPI(12))));
+        curI.SetGapY(0);
+        usage_code_panel_.SetRect(0, 0, inner_w, usage_h);
+        Rect uc = UiStyledInnerRect(usage_code_panel_.GetRect(), usage_code_panel_.GetStyle().metrics, usage_code_panel_.GetStyle().skin);
+        usage_code_.SetRect(uc.left, uc.top, uc.GetWidth(), uc.GetHeight());
+        state_box_.SetRect(0, 0, inner_w, state_box_.GetMinSize().cy);
+        property_group_acc_.SetSectionBodyHeight(0, property_group_box_.GetMinSize().cy);
+        property_box_.SetRect(0, 0, inner_w, property_box_.GetMinSize().cy);
+        inspector_acc_.SetSectionBodyHeight(0, usage_h);
+        inspector_acc_.SetSectionBodyHeight(1, state_box_.GetMinSize().cy);
+        inspector_acc_.SetSectionBodyHeight(2, property_box_.GetMinSize().cy);
+        inspector_acc_.SetRect(curI.X(), curI.Y(), inner_w, inspector_acc_.GetMinSize().cy);
     }
 
 private:
@@ -495,77 +754,104 @@ private:
 
     int GetHeaderBottom() const
     {
-        return DPI(90);
+        return DPI(72);
     }
 
+    // SyncProperties keeps the placeholder property row and preview field aligned.
     void SyncProperties()
     {
         double scale = scale_slider_.GetValue();
-        scale_value_.SetText(Format("%.1fx", scale));
+        scale_value_.SetText(Format("%.1f", scale) + "x");
         preview_.SetScale(scale);
-        preview_.SetDraft(!IsNull(draft_toggle_.GetData()) && (bool)draft_toggle_.GetData());
     }
 
+    // ApplyTheme is the single theme entry point for the template shell.
     void ApplyTheme(UiThemeMode mode)
     {
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Rounded;
         ctx.mode = mode;
         UiTheme::SetContext(ctx);
-        dark_mode_ = (mode == UiThemeMode::Dark);
+        palette_ = ResolveDemoPalette(mode);
 
-        header_.SetStyle(MakeHeaderStyle(mode));
-        inspector_tag_.SetStyle(MakeInspectorTitleStyle(mode));
-        version_badge_.SetStyle(MakeBadgeStyle(mode));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(mode));
-        light_button_.SetStyle(MakeSegmentButtonStyle(mode, mode == UiThemeMode::Light));
-        dark_button_.SetStyle(MakeSegmentButtonStyle(mode, mode == UiThemeMode::Dark));
-        exit_button_.SetStyle(MakeIconButtonStyle(mode));
-        exit_button_.SetIconColor(mode == UiThemeMode::Dark ? Color(230, 236, 245) : Color(24, 34, 50));
-        exit_button_.SetIconMargin(0);
+        header_.SetStyle(MakeHeaderStyle(palette_));
+        version_badge_.SetStyle(MakeBadgeStyle(palette_));
+        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
+        theme_icon_.SetStyle(MakeHeaderIconStyle(palette_));
+        theme_icon_.SetIcon((mode == UiThemeMode::Dark) ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
+        theme_icon_.SetIconColor(palette_.dark ? Color(218, 228, 241) : palette_.blue);
+        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
+        theme_toggle_.SetData(mode == UiThemeMode::Dark);
+        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
+        exit_button_.SetIconMargin(DPI(3));
+        ApplyExitPulse();
 
-        doc_tag_.SetStyle(MakeSectionTagStyle(mode));
-        props_tag_.SetStyle(MakeSectionTagStyle(mode));
-        doc_card_.SetStyle(MakeInfoCardStyle(mode));
-        doc_icon_.SetStyle(MakeBodyLabelStyle(mode, false, false));
-        doc_text_.SetStyle(MakeBodyLabelStyle(mode, true, false));
+        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
+        property_group_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+        usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
+        usage_code_.SetStyle(MakeCodeLabelStyle(palette_));
+        state_label_.SetStyle(MakeBodyLabelStyle(palette_, true, false));
+        group_note_.SetStyle(MakeBodyLabelStyle(palette_, true, true));
 
-        scale_label_.SetStyle(MakeBodyLabelStyle(mode, false, false));
-        scale_value_.SetStyle(MakeBodyLabelStyle(mode, true, true));
-        draft_label_.SetStyle(MakeBodyLabelStyle(mode, false, false));
-        scale_slider_.SetStyle(MakeSliderStyle(mode));
-        draft_toggle_.SetStyle(MakePropertyToggleStyle(mode));
-        preview_.SetDark(dark_mode_);
+        scale_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
+        scale_value_.SetStyle(MakeValueLabelStyle(palette_));
+        preview_.SetPalette(palette_);
 
         Refresh();
         RefreshLayout();
     }
 
+    // ScheduleExitPulse keeps the header exit action visually alive without
+    // pushing animation logic into the button itself.
+    void ScheduleExitPulse()
+    {
+        exit_pulse_timer_.Set(80, [=] {
+            ApplyExitPulse();
+            ScheduleExitPulse();
+        });
+    }
+
+    void ApplyExitPulse()
+    {
+        double t = msecs() / 1000.0;
+        double pulse = 0.5 + 0.5 * std::sin(t * 2.0);
+        Color dark_phase = palette_.dark ? Blend(palette_.exit_ink, Black(), 58)
+                                         : Blend(palette_.exit_ink, Black(), 42);
+        Color light_phase = palette_.dark ? Blend(palette_.exit_ink, palette_.exit_face_hot, 150)
+                                          : Blend(palette_.exit_ink, palette_.exit_face, 90);
+        Color pulse_color = Blend(dark_phase, light_phase, int(pulse * 255));
+        exit_button_.SetIconColor(pulse_color, 0, 0);
+    }
+
 private:
-    bool dark_mode_ = false;
+    DemoPalette palette_;
 
     UiTitleCard header_;
 
-    UiLabel inspector_tag_;
     UiLabel version_badge_;
     UiPanel theme_shell_;
-    UiButton light_button_;
-    UiButton dark_button_;
+    UiLabel theme_icon_;
+    UiToggle theme_toggle_;
     UiButton exit_button_;
 
     PreviewCanvas preview_;
 
-    UiLabel doc_tag_;
-    UiPanel doc_card_;
-    UiLabel doc_icon_;
-    UiLabel doc_text_;
+    UiAccordion inspector_acc_;
+    UiPanel usage_code_panel_;
+    UiLabel usage_code_;
 
-    UiLabel props_tag_;
+    UiBoxLayout state_box_ { UiDirection::V };
+    UiLabel state_label_;
+
+    UiBoxLayout property_box_ { UiDirection::V };
+    UiAccordion property_group_acc_;
+    UiBoxLayout property_group_box_ { UiDirection::V };
+    UiLabel group_note_;
+    UiBoxLayout scale_row_ { UiDirection::H };
     UiLabel scale_label_;
     UiLabel scale_value_;
     UiSlider scale_slider_;
-    UiLabel draft_label_;
-    UiToggle draft_toggle_;
+    TimeCallback exit_pulse_timer_;
 };
 
 }
@@ -575,3 +861,34 @@ GUI_APP_MAIN
     UiDemoBaseWindow demo;
     demo.Run();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

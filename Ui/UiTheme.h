@@ -384,7 +384,7 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(203, 213, 225), Color(226, 232, 240));
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 54;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -470,7 +470,7 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -556,7 +556,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -638,7 +638,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -681,12 +681,15 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
     case UiThemePreset::Rounded:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
-        s.track_px = DPI(5);
-        s.thumb_len_px = DPI(18);
-        SetFace(s.track_palette, Color(226, 232, 240), Color(219, 234, 254), Color(191, 219, 254), Color(241, 245, 249));
-        SetFrame(s.track_palette, Color(203, 213, 225), Color(147, 197, 253), Color(96, 165, 250), Color(226, 232, 240));
+        s.thumb_metrics.frame_enabled = true;
+        s.thumb_metrics.frame_width = DPI(2);
+        s.track_px = DPI(4);
+        s.thumb_len_px = DPI(14);
+        SetFace(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(241, 245, 249));
+        SetFrame(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(226, 232, 240));
+        SetInk(s.track_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
         SetFace(s.thumb_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
-        SetFrame(s.thumb_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
+        SetFrame(s.thumb_palette, Color(214, 223, 235), Color(195, 205, 220), Color(176, 188, 208), Color(148, 163, 184));
         return s;
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
@@ -716,18 +719,22 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         s.tick_len_minor = DPI(2);
         return s;
     case UiThemePreset::Layered:
-        s.track_px = DPI(6);
-        s.thumb_len_px = DPI(18);
+        s.track_px = DPI(4);
+        s.thumb_len_px = DPI(14);
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
+        s.thumb_metrics.frame_enabled = true;
+        s.thumb_metrics.frame_width = DPI(2);
         s.thumb_metrics.shadow.enabled = true;
-        s.thumb_metrics.shadow.blur = DPI(5);
+        s.thumb_metrics.shadow.curve = ShadowSoft();
         s.thumb_metrics.shadow.distance = DPI(3);
         s.thumb_metrics.shadow.alpha = 42;
         s.thumb_metrics.shadow.color = Color(148, 163, 184);
-        SetFace(s.track_palette, Color(226, 232, 240), Color(219, 234, 254), Color(191, 219, 254), Color(241, 245, 249));
-        SetFace(s.thumb_palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(226, 232, 240));
-        SetFrame(s.thumb_palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
+        SetFace(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(241, 245, 249));
+        SetFrame(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(226, 232, 240));
+        SetInk(s.track_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
+        SetFace(s.thumb_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
+        SetFrame(s.thumb_palette, Color(214, 223, 235), Color(195, 205, 220), Color(176, 188, 208), Color(148, 163, 184));
         return s;
     }
     return s;
@@ -787,7 +794,7 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.show_arrows = true;
         s.arrows_layout = UIARROWS_GROUP_END;
         s.thumb_metrics.shadow.enabled = true;
-        s.thumb_metrics.shadow.blur = DPI(5);
+        s.thumb_metrics.shadow.curve = ShadowSoft();
         s.thumb_metrics.shadow.distance = DPI(2);
         s.thumb_metrics.shadow.alpha = 42;
         s.thumb_metrics.shadow.color = Color(148, 163, 184);
@@ -829,7 +836,7 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(18);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 48;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -898,7 +905,7 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
         s.metrics.radius = DPI(14);
         s.popup_radius = DPI(14);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -939,7 +946,7 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
         s.metrics.radius = DPI(14);
         s.tab_metrics.radius = DPI(12);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -1030,7 +1037,7 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
         s.metrics.radius = DPI(16);
         s.metrics.content_padding = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 52;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -1090,7 +1097,7 @@ inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.shadow.enabled = true;
-        s.metrics.shadow.blur = DPI(5);
+        s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 48;
         s.metrics.shadow.color = Color(148, 163, 184);
@@ -1882,7 +1889,7 @@ public:
         case UiThemePreset::Layered:
             s.metrics.radius = DPI(18);
             s.metrics.shadow.enabled = true;
-            s.metrics.shadow.blur = DPI(5);
+            s.metrics.shadow.curve = ShadowSoft();
             s.metrics.shadow.distance = DPI(3);
             s.metrics.shadow.alpha = 40;
             s.metrics.shadow.color = Color(148, 163, 184);
@@ -1960,7 +1967,7 @@ public:
         case UiThemePreset::Layered:
             s.metrics.radius = DPI(16);
             s.metrics.shadow.enabled = true;
-            s.metrics.shadow.blur = DPI(6);
+            s.metrics.shadow.curve = ShadowSoft();
             s.metrics.shadow.distance = DPI(3);
             s.metrics.shadow.alpha = 38;
             s.metrics.shadow.color = Color(148, 163, 184);

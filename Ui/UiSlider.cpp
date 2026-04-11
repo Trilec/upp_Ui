@@ -17,26 +17,29 @@ const UiSlider::Style& UiSlider::StyleDefault()
     static bool init = false;
     if(!init) {
         for(int st = 0; st < 4; st++) {
-            s.track_palette.face[st] = UiFill::Solid(Color(226, 232, 240));
-            s.track_palette.frame[st] = Color(203, 213, 225);
-            s.track_palette.ink[st] = Color(100, 116, 139);
-            s.thumb_palette.face[st] = UiFill::Solid(Color(15, 23, 42));
-            s.thumb_palette.frame[st] = Color(15, 23, 42);
+            s.track_palette.face[st] = UiFill::Solid(Color(134, 135, 134));
+            s.track_palette.frame[st] = Color(134, 135, 134);
+            s.track_palette.ink[st] = Color(37, 99, 235);
+            s.thumb_palette.face[st] = UiFill::Solid(Color(37, 99, 235));
+            s.thumb_palette.frame[st] = Color(214, 223, 235);
             s.thumb_palette.ink[st] = White();
         }
 
-        s.track_palette.face[ST_HOT] = UiFill::Solid(Color(219, 234, 254));
-        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(191, 219, 254));
+        s.track_palette.face[ST_HOT] = UiFill::Solid(Color(134, 135, 134));
+        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(134, 135, 134));
         s.track_palette.face[ST_DISABLED] = UiFill::Solid(Color(241, 245, 249));
-        s.track_palette.frame[ST_HOT] = Color(147, 197, 253);
-        s.track_palette.frame[ST_PRESSED] = Color(96, 165, 250);
+        s.track_palette.frame[ST_HOT] = Color(134, 135, 134);
+        s.track_palette.frame[ST_PRESSED] = Color(134, 135, 134);
         s.track_palette.frame[ST_DISABLED] = Color(226, 232, 240);
+        s.track_palette.ink[ST_HOT] = Color(29, 78, 216);
+        s.track_palette.ink[ST_PRESSED] = Color(30, 64, 175);
+        s.track_palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.thumb_palette.face[ST_HOT] = UiFill::Solid(Color(30, 41, 59));
-        s.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Color(37, 99, 235));
+        s.thumb_palette.face[ST_HOT] = UiFill::Solid(Color(29, 78, 216));
+        s.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Color(30, 64, 175));
         s.thumb_palette.face[ST_DISABLED] = UiFill::Solid(Color(148, 163, 184));
-        s.thumb_palette.frame[ST_HOT] = Color(30, 41, 59);
-        s.thumb_palette.frame[ST_PRESSED] = Color(37, 99, 235);
+        s.thumb_palette.frame[ST_HOT] = Color(195, 205, 220);
+        s.thumb_palette.frame[ST_PRESSED] = Color(176, 188, 208);
         s.thumb_palette.frame[ST_DISABLED] = Color(148, 163, 184);
 
         s.track_metrics.radius = DPI(999);
@@ -45,17 +48,18 @@ const UiSlider::Style& UiSlider::StyleDefault()
         s.track_metrics.content_padding = Rect(0, 0, 0, 0);
 
         s.thumb_metrics.radius = DPI(999);
-        s.thumb_metrics.frame_enabled = false;
+        s.thumb_metrics.frame_enabled = true;
         s.thumb_metrics.face_enabled = true;
+        s.thumb_metrics.frame_width = DPI(2);
         s.thumb_metrics.content_padding = Rect(0, 0, 0, 0);
 
         s.tick_color = Color(148, 163, 184);
         s.tick_len_major = DPI(5);
         s.tick_len_minor = DPI(3);
         s.tick_gap = DPI(4);
-        s.thick_px = DPI(20);
+        s.thick_px = DPI(18);
         s.track_px = DPI(4);
-        s.thumb_len_px = DPI(16);
+        s.thumb_len_px = DPI(14);
 
         init = true;
     }
@@ -279,11 +283,9 @@ Rect UiSlider::GetThumbRect() const
     int pos = ValueToPos(value_);
 
     if(dir_ == UiDirection::H)
-        return RectC(tr.left + pos, tr.CenterPoint().y - style.thick_px / 2,
-                     thumb, max(style.thick_px, tr.GetHeight()));
+        return RectC(tr.left + pos, tr.CenterPoint().y - thumb / 2, thumb, thumb);
 
-    return RectC(tr.CenterPoint().x - style.thick_px / 2, tr.top + pos,
-                 max(style.thick_px, tr.GetWidth()), thumb);
+    return RectC(tr.CenterPoint().x - thumb / 2, tr.top + pos, thumb, thumb);
 }
 
 void UiSlider::SetValueInternal(double v, bool fire_action, bool fire_changing)
@@ -324,6 +326,27 @@ void UiSlider::Paint(Draw& w)
     Rect th = GetThumbRect();
 
     UiPaintFaceFrameDash(w, tr, style.track_palette, style.track_metrics, st);
+
+    StyledPalette active_pal = style.track_palette;
+    for(int i = 0; i < 4; i++) {
+        Color active = style.track_palette.ink[i];
+        active_pal.face[i] = IsNull(active) ? UiFill::None() : UiFill::Solid(active);
+        active_pal.frame[i] = Null;
+    }
+    StyledMetrics active_metrics = style.track_metrics;
+    active_metrics.frame_enabled = false;
+
+    Rect active = tr;
+    if(dir_ == UiDirection::H) {
+        int center_x = th.CenterPoint().x;
+        active.right = min(tr.right, max(tr.left, center_x));
+    }
+    else {
+        int center_y = th.CenterPoint().y;
+        active.top = min(tr.bottom, max(tr.top, center_y));
+    }
+    if(!active.IsEmpty())
+        UiPaintFaceFrameDash(w, active, active_pal, active_metrics, st);
 
     if(style.show_ticks && style.major_ticks > 1) {
         int major = style.major_ticks;

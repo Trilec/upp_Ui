@@ -53,24 +53,34 @@ struct UiShadowCacheKey : Moveable<UiShadowCacheKey> {
     int  height = 0;
     int  radius = 0;
     bool inset = false;
-    int  blur = 0;
+    int  mode = 0;
     int  alpha = 0;
     Color color;
-    int  angle = 0;
     int  distance = 0;
+    int  offset_x = 0;
+    int  offset_y = 0;
+    int  curve_x1 = 0;
+    int  curve_y1 = 0;
+    int  curve_x2 = 0;
+    int  curve_y2 = 0;
 
     bool operator==(const UiShadowCacheKey& b) const
     {
         return width == b.width && height == b.height && radius == b.radius
-            && inset == b.inset && blur == b.blur && alpha == b.alpha
-            && color == b.color && angle == b.angle && distance == b.distance;
+            && inset == b.inset && mode == b.mode && alpha == b.alpha
+            && color == b.color && distance == b.distance
+            && offset_x == b.offset_x && offset_y == b.offset_y
+            && curve_x1 == b.curve_x1 && curve_y1 == b.curve_y1
+            && curve_x2 == b.curve_x2 && curve_y2 == b.curve_y2;
     }
 };
 
 inline hash_t GetHashValue(const UiShadowCacheKey& k)
 {
     CombineHash h;
-    h << k.width << k.height << k.radius << k.inset << k.blur << k.alpha << k.color.GetRaw() << k.angle << k.distance;
+    h << k.width << k.height << k.radius << k.inset << k.mode << k.alpha << k.color.GetRaw()
+      << k.distance << k.offset_x << k.offset_y
+      << k.curve_x1 << k.curve_y1 << k.curve_x2 << k.curve_y2;
     return h;
 }
 
@@ -687,11 +697,16 @@ inline void UiPaintStyledBackground(Draw& w,
         key.height = sz.cy;
         key.radius = radius;
         key.inset = ly.inset;
-        key.blur = ly.blur;
+        key.mode = (int)ly.mode;
         key.alpha = ly.alpha;
         key.color = ly.color;
-        key.angle = ly.angle;
         key.distance = ly.distance;
+        key.offset_x = ly.offset_x;
+        key.offset_y = ly.offset_y;
+        key.curve_x1 = (int)std::round(ly.curve.x1 * 1000.0);
+        key.curve_y1 = (int)std::round(ly.curve.y1 * 1000.0);
+        key.curve_x2 = (int)std::round(ly.curve.x2 * 1000.0);
+        key.curve_y2 = (int)std::round(ly.curve.y2 * 1000.0);
         return key;
     };
 
@@ -699,8 +714,8 @@ inline void UiPaintStyledBackground(Draw& w,
         if(!ly.enabled)
             return;
 
-        int blur = UiResolveShadowExtentPx(ly);
-        if(blur <= 0)
+        int extent = UiResolveShadowExtentPx(ly);
+        if(extent <= 0)
             return;
 
         Point off = UiResolveShadowOffset(ly);
@@ -708,7 +723,7 @@ inline void UiPaintStyledBackground(Draw& w,
         if(osz.cx <= 0 || osz.cy <= 0)
             return;
 
-        int pad = ly.inset ? 0 : (blur + max(abs(off.x), abs(off.y)) + 2);
+        int pad = ly.inset ? 0 : (extent + max(abs(off.x), abs(off.y)) + 2);
         Size cache_sz = ly.inset ? osz : Size(osz.cx + pad * 2, osz.cy + pad * 2);
         UiShadowCacheKey cache_key = MakeShadowCacheKey(ly, cache_sz, metrics.radius);
         {
@@ -732,8 +747,10 @@ inline void UiPaintStyledBackground(Draw& w,
             {
                 BufferPainter p(ib, MODE_ANTIALIASED);
                 Rect base(0, 0, osz.cx, osz.cy);
-                for(int i = 0; i < blur; i++) {
-                    int alpha = clamp((ly.alpha * (blur - i)) / max(1, blur), 0, 255);
+                for(int i = 0; i < extent; i++) {
+                    double t = (double)(i + 1) / (double)max(1, extent);
+                    double curve_alpha = ly.mode == SHADOW_HARD ? 1.0 : (1.0 - UiShadowCurveEval(ly.curve, t));
+                    int alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
                     if(alpha <= 0)
                         continue;
                     Rect rr = base;
@@ -749,7 +766,10 @@ inline void UiPaintStyledBackground(Draw& w,
                         p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
                     else
                         p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
-                    p.Stroke(1.0, c);
+                    if(ly.mode == SHADOW_HARD)
+                        p.Fill(c);
+                    else
+                        p.Stroke(1.0, c);
                     p.End();
                 }
             }
@@ -797,63 +817,61 @@ inline void UiPaintStyledBackground(Draw& w,
                     p.End();
                 }
             }
-            // Build a neutral ambient halo, then layer a lighter directional blur on top.
-            ImageBuffer ambient_ib(sz);
-            ambient_ib.SetKind(IMAGE_ALPHA);
-            Fill(~ambient_ib, RGBAZero(), ambient_ib.GetLength());
-            Copy(~ambient_ib, ~seed_ib, ambient_ib.GetLength());
-            FastBlurAlpha(ambient_ib, max(1, blur));
-
-            ImageBuffer dir_seed_ib(sz);
-            dir_seed_ib.SetKind(IMAGE_ALPHA);
-            Fill(~dir_seed_ib, RGBAZero(), dir_seed_ib.GetLength());
-            {
-                BufferPainter p(dir_seed_ib, MODE_ANTIALIASED);
-                Rect dir_seed = seed;
-                dir_seed.Offset(off.x / 2, off.y / 2);
-                p.Begin();
-                if(rad > 0)
-                    p.RoundedRectangle(dir_seed.left + 0.5, dir_seed.top + 0.5, dir_seed.GetWidth() - 1.0, dir_seed.GetHeight() - 1.0, min<double>(rad, min(dir_seed.GetWidth(), dir_seed.GetHeight()) / 2.0));
-                else
-                    p.Rectangle(dir_seed.left + 0.5, dir_seed.top + 0.5, dir_seed.GetWidth() - 1.0, dir_seed.GetHeight() - 1.0);
-                p.Fill(c);
-                p.End();
-            }
-            ImageBuffer dir_ib(sz);
-            dir_ib.SetKind(IMAGE_ALPHA);
-            Fill(~dir_ib, RGBAZero(), dir_ib.GetLength());
-            Copy(~dir_ib, ~dir_seed_ib, dir_ib.GetLength());
-            FastBlurAlpha(dir_ib, max(1, blur));
-
             ImageBuffer ib(sz);
             ib.SetKind(IMAGE_ALPHA);
             Fill(~ib, RGBAZero(), ib.GetLength());
-            int dst_inner = clamp(ly.alpha, 0, 255);
-            RGBA* px = ib;
-            const RGBA* cutoff_px = cutoff_ib;
-            const RGBA* ambient_px = ambient_ib;
-            const RGBA* dir_px = dir_ib;
-            int count = ib.GetLength();
-            for(int i = 0; i < count; i++) {
-                int seed_alpha = (int)cutoff_px[i].a;
-                if(seed_alpha >= 250) {
-                    px[i] = RGBAZero();
-                    continue;
+            {
+                BufferPainter p(ib, MODE_ANTIALIASED);
+                Rect cutoff = seed;
+                cutoff.Deflate(1, 1);
+                double cutoff_rad = max(0.0, rad - 1.0);
+                if(ly.mode == SHADOW_HARD) {
+                    Rect rr = seed;
+                    rr.Inflate(extent, extent);
+                    rr.Offset(off);
+                    double rr_rad = max(0.0, rad + extent);
+                    RGBA fill = ly.color;
+                    fill.a = (byte)clamp(ly.alpha, 0, 255);
+                    p.Begin();
+                    if(rr_rad > 0)
+                        p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
+                    else
+                        p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                    p.Fill(fill);
+                    p.End();
                 }
-                int ambient_mask = (int)ambient_px[i].a;
-                int dir_mask = (int)dir_px[i].a;
-                int mask = min(255, (ambient_mask * 3) / 5 + (dir_mask * 2) / 3);
-                if(mask <= 0) {
-                    px[i] = RGBAZero();
-                    continue;
+                else {
+                    for(int d = extent; d >= 1; --d) {
+                        double t = (double)d / (double)max(1, extent);
+                        double curve_alpha = 1.0 - UiShadowCurveEval(ly.curve, t);
+                        int a = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
+                        if(a <= 0)
+                            continue;
+                        Rect rr = seed;
+                        rr.Inflate(d, d);
+                        rr.Offset(off);
+                        double rr_rad = max(0.0, rad + d);
+                        RGBA fill = ly.color;
+                        fill.a = (byte)a;
+                        p.Begin();
+                        if(rr_rad > 0)
+                            p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
+                        else
+                            p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                        p.Fill(fill);
+                        p.End();
+                    }
                 }
-                int a = (dst_inner * mask) / 255;
-                px[i].r = ly.color.GetR();
-                px[i].g = ly.color.GetG();
-                px[i].b = ly.color.GetB();
-                px[i].a = (byte)clamp(a, 0, 255);
+                // Cut interior so the shadow meets the control edge cleanly.
+                RGBA erase = RGBAZero();
+                p.Begin();
+                if(rad > 0)
+                    p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
+                else
+                    p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
+                p.Fill(erase);
+                p.End();
             }
-            Premultiply(ib);
             img = Image(ib);
             w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
         }

@@ -84,6 +84,7 @@ public:
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
+    virtual void MouseWheel(Point p, int zdelta, dword keyflags) override;
 
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
@@ -126,5 +127,6 @@ private:
 }
 
 #endif
+
 
 

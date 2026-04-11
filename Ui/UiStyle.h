@@ -358,19 +358,99 @@ inline Color UiResolveIconColor(const StyledPalette& p, StyledState st)
     return c;
 }
 
-struct StyledShadow {
-    bool  enabled  = false;
-    int   distance = DPI(4);
-    int   angle    = 135;
-    int   blur     = DPI(5);
-    int   alpha    = 90;
-    Color color    = Black();
-    bool  inset    = false;
+enum ShadowMode {
+    SHADOW_HARD = 0,
+    SHADOW_CURVE,
+};
+
+struct ShadowCurve {
+    double x1 = 0.000;
+    double y1 = 0.000;
+    double x2 = 1.000;
+    double y2 = 1.000;
 
     void Serialize(Stream& s)
     {
-        s % enabled % distance % angle % blur % alpha % color % inset;
-        blur = max(blur, 0);
+        s % x1 % y1 % x2 % y2;
+    }
+};
+
+inline ShadowCurve ShadowLinear()
+{
+    return ShadowCurve { 0.000, 0.000, 1.000, 1.000 };
+}
+
+inline ShadowCurve ShadowSoft()
+{
+    return ShadowCurve { 0.250, 0.100, 0.250, 1.000 };
+}
+
+inline ShadowCurve ShadowTight()
+{
+    return ShadowCurve { 0.550, 0.055, 0.675, 0.190 };
+}
+
+inline ShadowCurve ShadowHardCurve()
+{
+    return ShadowCurve { 0.750, 0.000, 0.900, 1.000 };
+}
+
+inline ShadowCurve ShadowGamma(double gamma)
+{
+    gamma = minmax(gamma, -1.0, 1.0);
+    ShadowCurve linear = ShadowLinear();
+    ShadowCurve hard_hold { 0.950, 0.050, 0.795, 0.035 };
+    ShadowCurve fast_fall { 0.190, 1.000, 0.220, 1.000 };
+    auto lerp = [](double a, double b, double t) { return a + (b - a) * t; };
+    ShadowCurve target = gamma >= 0.0 ? hard_hold : fast_fall;
+    double t = fabs(gamma);
+    return ShadowCurve {
+        lerp(linear.x1, target.x1, t),
+        lerp(linear.y1, target.y1, t),
+        lerp(linear.x2, target.x2, t),
+        lerp(linear.y2, target.y2, t)
+    };
+}
+
+inline double UiShadowCurveEval(const ShadowCurve& c, double x) noexcept
+{
+    if(x <= 0.0) return 0.0;
+    if(x >= 1.0) return 1.0;
+    auto BX = [&](double t) noexcept {
+        double u = 1.0 - t;
+        return 3.0 * u * u * t * c.x1 + 3.0 * u * t * t * c.x2 + t * t * t;
+    };
+    auto BY = [&](double t) noexcept {
+        double u = 1.0 - t;
+        return 3.0 * u * u * t * c.y1 + 3.0 * u * t * t * c.y2 + t * t * t;
+    };
+    double lo = 0.0, hi = 1.0, t = x;
+    for(int i = 0; i < 8; ++i) {
+        double cx = BX(t);
+        if(cx < x) lo = t;
+        else hi = t;
+        t = 0.5 * (lo + hi);
+    }
+    return BY(t);
+}
+
+struct StyledShadow {
+    bool        enabled  = false;
+    int         distance = DPI(6);
+    int         offset_x = 0;
+    int         offset_y = 0;
+    int         alpha    = 90;
+    Color       color    = Black();
+    bool        inset    = false;
+    ShadowMode  mode     = SHADOW_CURVE;
+    ShadowCurve curve    = ShadowSoft();
+
+    void Serialize(Stream& s)
+    {
+        int mode_i = (int)mode;
+        s % enabled % distance % offset_x % offset_y % alpha % color % inset % mode_i % curve;
+        mode = (ShadowMode)mode_i;
+        distance = max(distance, 0);
         alpha = clamp(alpha, 0, 255);
     }
 };
@@ -526,19 +606,12 @@ inline int UiResolvedFrameWidth(const StyledMetrics& m, const StyledSkin& skin)
 
 inline int UiResolveShadowExtentPx(const StyledShadow& sh)
 {
-    return max(sh.blur, 0);
+    return max(sh.distance, 0);
 }
 
 inline Point UiResolveShadowOffset(const StyledShadow& sh)
 {
-    int distance = max(0, sh.distance);
-    if(distance <= 0)
-        return Point(0, 0);
-
-    double a = sh.angle * M_PI / 180.0;
-    int dx = (int)std::round(std::cos(a) * distance);
-    int dy = (int)std::round(std::sin(a) * distance);
-    return Point(dx, dy);
+    return Point(sh.offset_x, sh.offset_y);
 }
 
 inline Rect UiStyledShadowMargins(const StyledMetrics& m)
@@ -1066,8 +1139,6 @@ public:
         sh.inset = inset;
         if(!IsNull(color))
             sh.color = color;
-        if(sh.blur <= 0)
-            sh.blur = DPI(5);
         sh.enabled = sh.alpha > 0;
         OnStyleChanged();
         return Self();
@@ -1081,18 +1152,45 @@ public:
         return Self();
     }
 
-    T& SetShadowAngle(int deg)
+    T& SetShadowOffset(int dx, int dy)
     {
-        StyledMetricsRef().shadow.angle = deg;
+        StyledMetricsRef().shadow.offset_x = dx;
+        StyledMetricsRef().shadow.offset_y = dy;
         StyledMetricsRef().shadow.enabled = true;
         OnStyleChanged();
         return Self();
     }
 
-    T& SetShadowBlur(int px)
+    T& SetShadowMode(ShadowMode mode)
     {
-        StyledMetricsRef().shadow.blur = max(px, 0);
-        StyledMetricsRef().shadow.enabled = StyledMetricsRef().shadow.enabled || px > 0;
+        StyledMetricsRef().shadow.mode = mode;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowCurve(const ShadowCurve& curve)
+    {
+        StyledMetricsRef().shadow.curve = curve;
+        StyledMetricsRef().shadow.mode = SHADOW_CURVE;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowGamma(double gamma)
+    {
+        StyledMetricsRef().shadow.curve = ShadowGamma(gamma);
+        StyledMetricsRef().shadow.mode = SHADOW_CURVE;
+        StyledMetricsRef().shadow.enabled = true;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetShadowHard(bool on = true)
+    {
+        StyledMetricsRef().shadow.mode = on ? SHADOW_HARD : SHADOW_CURVE;
+        StyledMetricsRef().shadow.enabled = true;
         OnStyleChanged();
         return Self();
     }

@@ -290,6 +290,21 @@ void UiScrollPanel::ApplyScroll()
                      content_size_.cy);
 }
 
+void UiScrollPanel::MouseWheel(Point, int zdelta, dword)
+{
+    if(mode_ == UIPANELSCROLL_NONE)
+        return;
+    if(!sby_.IsShown() && mode_ != UIPANELSCROLL_HORIZONTAL)
+        return;
+
+    Rect view = GetViewportRect();
+    int rows = max(1, view.GetHeight() / max(DPI(18), sby_.GetMinSize().cy));
+    int step = max(DPI(24), rows * DPI(10));
+    origin_.y -= sgn(zdelta) * step;
+    UpdateScrollbars();
+    ApplyScroll();
+    Refresh();
+}
 void UiScrollPanel::Layout()
 {
     const Style& style = GetEffectiveStyle();
@@ -372,4 +387,5 @@ void UiScrollPanel::Paint(Draw& w)
 }
 
 }
+
 

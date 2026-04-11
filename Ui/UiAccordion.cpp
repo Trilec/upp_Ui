@@ -1,7 +1,24 @@
 #include <Ui/UiAccordion.h>
 #include <Ui/UiTheme.h>
+#include <Ui/UiScrollPanel.h>
 
 namespace Upp {
+
+static void RefreshAccordionExtent(UiAccordion& acc)
+{
+    acc.RefreshLayout();
+    acc.RefreshParentLayout();
+
+    for(Ctrl* p = acc.GetParent(); p; p = p->GetParent()) {
+        p->RefreshLayout();
+        if(UiScrollPanel* sp = dynamic_cast<UiScrollPanel*>(p)) {
+            sp->RefreshLayout();
+            sp->Refresh();
+        }
+    }
+
+    acc.Refresh();
+}
 
 void UiAccordion::SectionHeader::LeftDown(Point p, dword keyflags)
 {
@@ -94,6 +111,7 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.header_style.hover_enabled = true;
         s.header_style.metrics.focus_enabled = false;
         s.header_style.show_rule = true;
+        s.header_style.media_tint_mono = true;
 
         s.body_style = UiPanel::StyleDefault();
         s.body_style.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
@@ -171,6 +189,7 @@ void UiAccordion::SyncThemeStyle()
     resolved.header_style.hover_enabled = true;
     resolved.header_style.metrics.focus_enabled = false;
     resolved.header_style.show_rule = true;
+    resolved.header_style.media_tint_mono = true;
     resolved.body_style = panel;
     resolved.body_style.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     style_ = resolved;
@@ -215,12 +234,12 @@ void UiAccordion::OnStyleChanged()
 
     for(int i = 0; i < sections_.GetCount(); i++) {
         sections_[i].animating = false;
-        sections_[i].current_body_cy = sections_[i].open ? max(style.body_min_height, sections_[i].body_height) : 0;
+        int body_w = max(1, UiStyledInnerRect(GetSize(), style.metrics, style.skin).GetWidth());
+        sections_[i].current_body_cy = sections_[i].open ? MeasureSectionBodyHeight(sections_[i], body_w) : 0;
         sections_[i].target_body_cy = sections_[i].current_body_cy;
     }
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 int UiAccordion::AddSection(const String& title, const String& subtitle, const String& copy, bool open)
 {
@@ -335,8 +354,7 @@ void UiAccordion::Clear()
         sections_[i].body.Remove();
     }
     sections_.Clear();
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 
 void UiAccordion::Remove(int i)
@@ -354,8 +372,7 @@ void UiAccordion::Remove(int i)
         WhenRemoved(i);
 
     NormalizePolicyAfterBulkChange();
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 
 ParentCtrl& UiAccordion::GetSectionContent(int i)
@@ -394,9 +411,11 @@ UiAccordion& UiAccordion::SetSectionBodyHeight(int i, int h)
 {
     if(i < 0 || i >= sections_.GetCount())
         return *this;
+    h = max(0, h);
+    if(sections_[i].body_height == h)
+        return *this;
     sections_[i].body_height = h;
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -446,11 +465,10 @@ UiAccordion& UiAccordion::Open(int i, bool on)
     StartSectionAnimation(i, item.open);
 
     RefreshChevron(item);
+    RefreshAccordionExtent(*this);
+
     if(WhenSectionToggled)
         WhenSectionToggled(i, item.open);
-
-    RefreshLayout();
-    Refresh();
     return *this;
 }
 
@@ -483,14 +501,16 @@ UiAccordion& UiAccordion::OpenAll(bool on)
 
         StartSectionAnimation(i, s.open);
         RefreshChevron(sections_[i]);
-        if(WhenSectionToggled)
-            WhenSectionToggled(i, s.open);
     }
 
     NormalizePolicyAfterBulkChange();
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
+
+    for(int i = 0; i < sections_.GetCount(); i++) {
+        if(WhenSectionToggled)
+            WhenSectionToggled(i, sections_[i].open);
+    }
     return *this;
 }
 
@@ -498,8 +518,7 @@ UiAccordion& UiAccordion::SetSingleOpen(bool on)
 {
     StyleEdit().single_open = on;
     NormalizePolicyAfterBulkChange();
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -507,8 +526,7 @@ UiAccordion& UiAccordion::SetEnforceOne(bool on)
 {
     StyleEdit().enforce_one = on;
     NormalizePolicyAfterBulkChange();
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -547,8 +565,7 @@ UiAccordion& UiAccordion::SetHeaderRuleExtent(UiSpan ex)
     StyleEdit().header_style.rule_extent = ex;
     for(int i = 0; i < sections_.GetCount(); i++)
         sections_[i].header.SetRuleExtent(ex);
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -586,9 +603,7 @@ UiAccordion& UiAccordion::SetLockMode(int i, Lock mode)
     NormalizePolicyAfterBulkChange();
 
     StartSectionAnimation(i, it.open);
-
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -608,8 +623,7 @@ UiAccordion& UiAccordion::SetAnimation(bool enabled, int open_ms, int close_ms)
     if(!enabled)
         StopAllAnimations();
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
     return *this;
 }
 
@@ -677,8 +691,7 @@ void UiAccordion::ContinueHeaderDrag(Point p_screen)
         }
     }
     drag_insert_before_ = before;
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 
 void UiAccordion::EndHeaderDrag(bool cancel)
@@ -724,8 +737,7 @@ void UiAccordion::MoveSectionTo(int from, int before)
     if(WhenReordered)
         WhenReordered(from, original_before);
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 
 void UiAccordion::ReindexSections()
@@ -742,7 +754,8 @@ void UiAccordion::StopAllAnimations()
     for(int i = 0; i < sections_.GetCount(); i++) {
         Section& s = sections_[i];
         s.animating = false;
-        s.current_body_cy = s.open ? max(GetEffectiveStyle().body_min_height, s.body_height) : 0;
+        int body_w = max(1, UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin).GetWidth());
+        s.current_body_cy = s.open ? MeasureSectionBodyHeight(s, body_w) : 0;
         s.target_body_cy = s.current_body_cy;
         if(!s.open && s.current_body_cy == 0)
             s.body.Hide();
@@ -807,8 +820,7 @@ void UiAccordion::AnimationStep()
             s.current_body_cy = max(0, s.current_body_cy);
     }
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 
     if(any)
         SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
@@ -917,7 +929,7 @@ Size UiAccordion::GetMinSize() const
         w = max(w, s.header.GetMinSize().cx);
         h += max(DPI(24), style.header_height);
         if(s.open)
-            h += style.header_body_gap + max(style.body_min_height, s.body_height);
+            h += style.header_body_gap + MeasureSectionBodyHeight(s, max(1, w));
         if(i + 1 < sections_.GetCount())
             h += style.section_gap;
     }
@@ -1129,8 +1141,7 @@ void UiAccordion::SetData(const Value& v)
         RefreshChevron(s);
     }
 
-    RefreshLayout();
-    Refresh();
+    RefreshAccordionExtent(*this);
 }
 
 Value UiAccordion::GetData() const
