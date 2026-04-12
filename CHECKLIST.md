@@ -1,129 +1,244 @@
-# Checklist (U++ Ui)
+# Theme Migration Checklist (U++ Ui)
 
-This is the living checklist for making the new `Ui*` control set compile cleanly and behave consistently.
+This is the active execution checklist for migrating the `Ui*` control set to the
+new theme-driven styling model.
 
-Repo rules:
+This replaces the previous preset-heavy direction.
 
-- No backward-compat naming shims.
-- Demos are tests: any API change requires updating `examples/**` and `README.md`.
-- Prefer no allocations in `Paint()`; cache where possible.
+## 2026-03 Public API Cleanup
 
-## Gold delta checklist (copy 1:1)
+Current canonical public names and contracts after the release-hardening pass:
 
-Use this gate before merge for any new/changed `Ui*` control. `UiLabel` + `UiButton` are the gold references.
+- `UiList` and `UiTree` now expose selection through `SetData/GetData`.
+  - Single selection uses one scalar `Value` token.
+  - Multi selection uses `ValueArray`.
+  - Token resolution prefers model `data`; fallback is row index for `UiList` and node id for `UiTree`.
+- Selection events use `WhenSelection`.
+- `UiBaseEdit` naming is normalized to `SetOverwriteMode()`, `IsOverwriteMode()`, `AcceptsNewlines()`, `AcceptsTabs()`, and `AcceptsDrop()`.
+- `UiTab` uses `SetActiveTab()` / `GetActiveTab()`.
+- `UiDropdown` external binding is explicit with `SetModel(UiListModel&)`; `UseInternalModel()` switches back to the owned model and `GetInternalModel()` exposes it.
+- `UiIntEdit` / `UiFloatEdit` keep only the canonical numeric vocabulary (`Min`, `Max`, `MinMax`, `Step`, `Precision`, `NotNull`).
+- `UiAccordion` section accessors are `GetSectionContent()`, `GetSectionHeader()`, and `GetSectionBody()`.
+- `UiToolButton` remains a distinct public control with its own theme/default-style path, but now shares the button interaction/paint/layout implementation through `UiButton`.
 
-### Cache lifecycle
+Verification completed for this cleanup slice:
 
-- [ ] Keep explicit dirty flags for derived caches (`layout_dirty_`, `metrics_dirty_`, `minsize_dirty_`).
-- [ ] Recompute caches only in invalidation paths (`SetText`, `SetStyle`, `SetFont`, `Layout`, size/state changes), not in `Paint()`.
-- [ ] Setters that affect geometry/text/style set the correct dirty flags and call `RefreshLayout()` (and `Refresh()` when visuals change).
-- [ ] `Layout()` early-outs when caches are valid; otherwise rebuild once and clear dirty flags.
-- [ ] `GetMinSize()` uses cached natural size and invalidates only when inputs change.
+- `examples/UiButtonDemo`
+- `examples/UiLabelDemo`
+- `examples/UiListDemo`
+- `examples/UiTreeDemo`
+- `examples/UiTreeRunTests`
+- `examples/UiDropdownDemo`
+- `examples/UiIntFloatDemo`
+- `examples/UiTabDemo`
+- `examples/UiSliderDemo`
+- `examples/UiDocModelTest`
+## Core Policy
 
-### Paint contract
+- This is a new UI system. We are not preserving old preset families for compatibility.
+- Every visual control must have exactly one hand-authored `StyleDefault()`.
+- `StyleDefault()` must be rebuilt intentionally to match the `Minimal` design direction.
+- The HTML mockup is the visual source of truth for theme intent.
+- Controls should be theme-aware by default.
+- `SetStyle(const Style&)` remains the explicit local override path.
+- If a control cannot express the intended design cleanly, flag the API gap before forcing a weak approximation.
+- Demos are tests. After adjusting a control, compile its demo before moving to the next control.
+- Layout classes are not primary theme surfaces unless they visibly paint something.
 
-- [ ] Paint phase order stays `background -> content -> foreground`.
-- [ ] `Paint()` remains render-only: no hidden state mutation, no layout/text measurement recompute, no expensive allocation.
-- [ ] If a cache is dirty inside `Paint()`, call `RefreshLayout()` and return (gold pattern).
-- [ ] Content draw uses precomputed rects/splits (`layout_`, line sizes, icon rects), not ad-hoc recomputation.
-- [ ] State mapping (`normal/hot/pressed/disabled/focus`) is explicit and consistent before drawing.
+## Design References
 
-### Style contract
+Primary visual references:
 
-- [ ] Style structs are data-only (`StyledPalette`, `StyledMetrics`, `StyledSkin` first); behavior stays in control code.
-- [ ] Reuse shared primitives/helpers; do not create parallel style/alignment/padding systems.
-- [ ] Preserve `frame -> inset -> padding` semantics and shared `UiAlign` conventions.
-- [ ] New public style fields satisfy the two-consumer rule (2 controls or 2 real use-cases) or include explicit rationale.
-- [ ] Prefer variants/presets/theme tokens over one-off public setters.
+- `E:\web\github\web_ui_theams\DesignSystemsTheams.html`
+- `E:\web\github\web_ui_theams\theme-presets\minimal.js`
+- `E:\web\github\web_ui_theams\theme-presets\rounded.js`
+- `E:\web\github\web_ui_theams\theme-presets\linear.js`
+- `E:\web\github\web_ui_theams\theme-presets\solid.js`
+- `E:\web\github\web_ui_theams\theme-presets\outline.js`
+- `E:\web\github\web_ui_theams\theme-presets\compact.js`
+- `E:\web\github\web_ui_theams\theme-presets\layered.js`
 
-### Event/data contract
+Initial implementation target:
 
-- [ ] Interactive controls expose `SetData(const Value&)` and `GetData() const`.
-- [ ] Action semantics are explicit (`WhenAction`, `WhenPush`, `WhenChange`, etc.) and fire exactly once per user action.
-- [ ] Naming symmetry is kept (`SetX`/`GetX`).
-- [ ] Async/timer callbacks are lifetime-safe (`Ptr` guard or equivalent), with teardown cancel where needed.
-- [ ] GUI work stays on GUI thread; callback paths avoid long/blocking work.
+- First theme default source: `Minimal`
+- Light and dark must both be tuned explicitly
+- First implementation slice after control cleanup: `Minimal` and `Rounded`
 
-## Build smoke tests
+## Control Style Policy
 
-Recommended minimal set (CLI):
+Every visual control should converge on this model where applicable:
+
+- `StyleDefault()`
+- `SetStyle(const Style&)`
+- `GetStyle() const`
+- `OnStyleChanged()`
+- theme-driven effective style path
+- explicit local override
+- semantic role only when the control family actually benefits from roles
+- control-specific visual mode only when the control has real structural variants
+
+What should be removed over time:
+
+- extra built-in family presets such as `StyleMinimal()`, `StyleSoft()`, `StyleStrong()` when they are only acting as local theme systems
+- unusual or inconsistent style naming that breaks API familiarity across controls
+
+## Per-Control Workflow
+
+Do this in order for each control:
+
+1. Inspect the control style API, paint path, layout path, and demo.
+2. Rebuild `StyleDefault()` from scratch using the HTML mockup as the guide.
+3. Remove superfluous built-in style presets from the control.
+4. Normalize naming so the style API feels familiar across controls.
+5. Add theme-aware resolution so the control uses `UiTheme` by default.
+6. Preserve explicit local `SetStyle(...)` override behavior.
+7. Update the control demo so it still makes sense as a test and showcase.
+8. Compile the demo.
+9. If the demo compiles, move to the next control.
+10. If the control cannot match the design cleanly, log the API gap and stop that control slice before papering over it.
+
+## Compile Testing
+
+U++ root:
+
+- `E:\upp-18468`
+
+General example command:
 
 ```bat
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiLabelDemo  CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiLabelDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiButtonDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiButtonDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiCheckBoxDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiCheckBoxDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiToggleDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiToggleDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiRadioButtonDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiRadioButtonDemo"
-
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiPanelDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiPanelDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiAccordionDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiAccordionDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiScrollPanelDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiScrollPanelDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiTitleCardDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiTitleCardDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiGridLayoutDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiGridLayoutDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiLineEditDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiLineEditDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiIntFloatDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiIntFloatDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiBoxLayoutDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiBoxLayoutDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiSliderDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiSliderDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiAllControlsDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiAllControlsDemo"
-"E:\upp-18182\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18182\uppsrc" examples/UiScrollBarDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiScrollBarDemo"
-
+"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" examples/UiThemeDemo CLANGx64 -br "E:\apps\github\upp_Ui\build\UiThemeDemo"
 ```
 
-## Control status
+Control demo compile rule:
+
+- Once a control is adjusted, compile its demo immediately.
+- Do not move to the next control until the current control demo compiles.
+- Once the entire control list is complete, begin the dedicated `UiThemeDemo`.
+
+## Familiarity / Consistency Gate
+
+For every control update, verify:
+
+- The default look reads as part of the same minimalist system.
+- Light and dark behavior are both considered.
+- The style API uses familiar naming and concepts.
+- Similar concepts are named similarly across controls.
+- The control does not expose a strange one-off style vocabulary unless genuinely necessary.
+- Behavior and appearance remain properly separated.
+
+## API Gap Rule
+
+Flag the control if any of the following happens:
+
+- The mockup requires a visual treatment the control cannot express cleanly.
+- The control needs new one-off public knobs just to imitate the theme.
+- The control's paint/layout model fights the intended design direction.
+- A composite control hardcodes child styling in a way that prevents theme consistency.
+
+When flagged:
+
+- note the specific gap
+- do not hide it with ad hoc styling hacks
+- resolve the API/design issue before continuing that control
+
+## Execution Order
+
+Primary order:
+
+1. `UiButton`
+2. `UiLabel`
+3. `UiPanel`
+4. `UiBaseEdit`
+5. `UiLineEdit`
+6. `UiPasswordEdit`
+7. `UiMaskEdit`
+8. `UiMultiEdit`
+9. `UiIntEdit / UiFloatEdit`
+10. `UiCheckBox`
+11. `UiRadioButton`
+12. `UiToggle`
+13. `UiSlider`
+14. `UiScrollBar`
+15. `UiDropdown`
+16. `UiTab`
+17. `UiTitleCard`
+18. `UiAccordion`
+19. `UiScrollPanel`
+
+Secondary / mostly non-theme surface:
+
+- `UiBoxLayout`
+- `UiGridLayout`
+- `UiDataModels`
+- `UiDoc`
+
+These should only be touched for theme work if they visibly paint theme surfaces or block the migration.
+
+## Control Queue
 
 Legend:
 
-- In `Ui/Ui.upp`: included in the Ui package build
-- Demo: `examples/<Control>Demo`
+- `Default`: new `StyleDefault()` authored from scratch against the mockup
+- `Cleanup`: extra presets removed / API normalized
+- `Theme`: theme-aware default path added
+- `Demo`: demo updated to remain a useful control test
+- `Compile`: demo compile verified
+- `Gap`: API gap found that blocks clean design implementation
 
-| Control | In `Ui/Ui.upp` | Demo | Status | Notes / blockers | Next |
-|---|---:|---:|---|---|---|
-| UiStyle / CtrlStyled | yes | n/a | baseline | core styling surface | keep stable; add perf notes as needed |
-| UiDraw | yes | n/a | baseline | 9-slice + blur helpers used across controls | ensure `Ui/Ui.upp` dependencies stay aligned |
-| UiIcons | yes | n/a | baseline | icon sources for demos | keep stable |
-| UiLabel | yes | UiLabelDemo | builds (umk) | baseline for 2-block layout + margins | run visual checks + refine edge cases |
-| UiButton | yes | UiButtonDemo | builds (umk) | baseline for states + animation hooks | run visual checks + refine edge cases |
-| UiCheckBox | yes | UiCheckBoxDemo | builds (umk) | classic/tri-state/switch/chip/list styles | add more grouping + keyboard behavior checks |
-| UiToggle | yes | UiToggleDemo | builds (umk) | boolean switch wrapper over UiCheckBox switch style | add optional labels/icons preset variants |
-| UiRadioButton | yes | UiRadioButtonDemo | builds (umk) | classic/pills/list styles with grouping | add arrow-key group navigation |
-| UiPanel | yes | UiPanelDemo | builds (umk) | background-only styled container | add a couple of interaction/focus checks |
-| UiAccordion | yes | UiAccordionDemo | builds (umk) | styled collapsible sections (header card + body panel) with single-open option | add animated open/close + drag reorder if needed |
-| UiScrollPanel | yes | UiScrollPanelDemo | builds (umk) | styled scroll container with viewport/content separation | add keyboard scroll navigation checks |
-| UiTitleCard | yes | UiTitleCardDemo | builds (umk) | header-focused card (title/subtitle/copy + decorative rule + media side) | add image-top and image-bottom demo variants |
-| UiGridLayout | yes | UiGridLayoutDemo | builds (umk) | large surface; selection is currently stub-like | add behavioural checks + scroll coverage |
-| UiBaseEdit | yes | UiBaseEditDemo | builds (umk) | foundation for edit family; flank/side API stable | add side overlay/stack tests |
-| UiLineEdit | yes | UiLineEditDemo | builds (umk) | single-line behaviour; scrollbar hidden | add behavioural checks (enter/tab) |
-| UiPasswordEdit | yes | UiPasswordEditDemo | builds (umk) | flank API migrated to `AddToSide` | visual pass on eye/submit compositions |
-| UiMaskEdit | yes | UiMaskEditDemo | builds (umk) | animation dependency integrated | add more semantic validator scenarios |
-| UiMultiEdit | yes | UiMultiEditDemo | builds (umk) | side controls now via `AddToSide` | add long-text perf checks |
-| UiIntEdit / UiFloatEdit | yes | UiIntFloatDemo | builds (umk) | spin arrows + wheel + key support | align style API with other controls |
-| UiSlider | yes | UiSliderDemo | builds (umk) | ticks + keyboard/wheel + drag | add label/tick text variants |
-| UiSliderEdit | yes | UiSliderDemo | builds (umk) | field alignment LEFT/RIGHT/TOP/BOTTOM | add integer mode and format presets |
-| UiScrollBar | yes | UiScrollBarDemo | builds (umk) | styled track/thumb/arrows + hover-expand animation | add behavioural checks (drag, wheel, arrows) |
-| UiBoxLayout | yes | UiBoxLayoutDemo | builds (umk) | implementation stabilized and integrated | add wrap_rows_expand visual tuning |
-| UiAllControlsDemo | n/a | UiAllControlsDemo | builds (umk) | smoke gallery containing all current controls | keep in sync as controls grow |
+| Control | Demo | Default | Cleanup | Theme | Demo | Compile | Gap | Notes |
+|---|---|---|---|---|---|---|---|---|
+| UiButton | `examples/UiButtonDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default, demo verified |
+| UiLabel | `examples/UiLabelDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default, demo verified |
+| UiPanel | `examples/UiPanelDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; surface default rebuilt, accordion dependency updated |
+| UiBaseEdit | `examples/UiBaseEditDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven edit base verified |
+| UiLineEdit | `examples/UiLineEditDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | verified through inherited edit theme path + demo compile |
+| UiPasswordEdit | `examples/UiPasswordEditDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | verified; eye-button styling now follows theme button roles |
+| UiMaskEdit | `examples/UiMaskEditDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | verified through edit-base inheritance and demo compile |
+| UiMultiEdit | `examples/UiMultiEditDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | verified; demo side buttons switched to theme button roles |
+| UiIntEdit / UiFloatEdit | `examples/UiIntFloatDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | verified; numeric edits inherit themed base and updated demo action button |
+| UiCheckBox | `examples/UiCheckBoxDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default, visual mode kept separate from theme |
+| UiRadioButton | `examples/UiRadioButtonDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default, visual mode kept separate from theme |
+| UiToggle | `examples/UiToggleDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; thin switch-wrapper over themed checkbox |
+| UiSlider | `examples/UiSliderDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; themed default plus slider-edit demo verification |
+| UiScrollBar | `examples/UiScrollBarDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; themed chrome default, popup dependency updated, demo verified |
+| UiDropdown | `examples/UiDropdownDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; field default/theme path cleaned up and popup demo verified |
+| UiTab | `examples/UiTabDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default with visual mode kept as structural axis |
+| UiTitleCard | `examples/UiTitleCardDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven default, resolver added, demo verified |
+| UiAccordion | `examples/UiAccordionDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; theme-driven composite default, demo updated to resolver APIs |
+| UiScrollPanel | `examples/UiScrollPanelDemo` | [x] | [x] | [x] | [x] | [x] | [ ] | complete; themed container default, demo verified |
+| UiBoxLayout | `examples/UiBoxLayoutDemo` | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | touch only if visible theme surface is needed |
+| UiGridLayout | `examples/UiGridLayoutDemo` | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | touch only if visible theme surface is needed |
 
-## Release milestone: "v1 green baseline"
+## Theme Demo Phase
 
-Criteria:
+Do not start `UiThemeDemo` until the control queue above has been worked through.
 
-- `Ui/Ui.upp` builds cleanly.
-- `UiLabelDemo` and `UiButtonDemo` build + run cleanly.
-- README + docs match the actual API.
-- Checklist shows clear blockers for all not-yet-added controls.
+When the control queue is complete:
 
-## Recent hardening log
+- [x] create `examples/UiThemeDemo`
+- use the HTML design system mockup as the structure guide
+- add sections for each preset
+- include a day/night switch
+- show the controls in a coherent specimen layout
+- [x] begin with `Minimal` and `Rounded`
 
-- `UiBaseEdit` side visibility/spin fix:
-  - `LayoutSides()` no longer force-shows side controls.
-  - `UiIntEdit` / `UiFloatEdit` spin controls now use side visibility APIs so hide/show state and side-space reservation stay in sync.
-- `UiTitleCard` paint pipeline + text metric cache:
-  - Consolidated to one explicit paint pipeline (background -> content -> foreground/focus).
-  - Added cached title/subtitle/copy text metrics with dirty invalidation on text/style changes.
-- `UiGridLayout` header paint metric cleanup:
-  - Replaced paint-time `GetTextSize(...)` for cluster headers with font metric usage.
-- `UiAccordion` destructor/timer teardown + `SetData/GetData`:
-  - Added explicit destructor teardown to stop active animation callbacks and drag state.
-  - Added explicit `SetData/GetData` open-state contract (`ValueArray` mapping, lock-policy normalization).
-- Demo non-paint text-metric cleanup:
-  - `UiGridLayoutDemo`, `UiButtonDemo`, `UiLabelDemo`, `UiPanelDemo`, and `UiDemoBase` updated to avoid paint-time `GetTextSize(...)` where practical.
+## Operator Rule
+
+Once this workflow starts:
+
+- adjust one control
+- compile its demo
+- if clean, move to the next
+- continue through the queue without needing user interaction
+- stop only for a real blocker or when the control queue is complete and the `UiThemeDemo` phase begins
+
+
+
+
+
+
+
+
+
+
+

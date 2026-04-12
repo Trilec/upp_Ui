@@ -80,7 +80,6 @@ file
 	UiDropdown.h,
 	UiDropdown.cpp,
 	UiMenu.h,
-	UiMenu.cpp;
-
-mainconfig
-	"" = "";
+	UiMenu.cpp,
+    UiColorPicker.h,
+    UiColorPicker.cpp;

@@ -435,8 +435,10 @@ public:
         mode_shell_style.metrics.shadow.enabled = true;
         mode_shell_style.metrics.shadow.inset = false;
         mode_shell_style.metrics.shadow.distance = DPI(3);
-        mode_shell_style.metrics.shadow.angle = 45;
-        mode_shell_style.metrics.shadow.blur = DPI(15);
+        mode_shell_style.metrics.shadow.offset_x = DPI(2);
+        mode_shell_style.metrics.shadow.offset_y = DPI(2);
+        mode_shell_style.metrics.shadow.mode = SHADOW_CURVE;
+        mode_shell_style.metrics.shadow.curve = ShadowSoft();
         mode_shell_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 40 : 34;
         mode_shell_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
         mode_shell_.SetStyle(mode_shell_style);
@@ -450,8 +452,10 @@ public:
         mode_toggle_style.metrics.shadow.enabled = false;
         mode_toggle_style.metrics.shadow.inset = false;
         mode_toggle_style.metrics.shadow.distance = DPI(2);
-        mode_toggle_style.metrics.shadow.angle = 45;
-        mode_toggle_style.metrics.shadow.blur = DPI(15);
+        mode_toggle_style.metrics.shadow.offset_x = DPI(1);
+        mode_toggle_style.metrics.shadow.offset_y = DPI(1);
+        mode_toggle_style.metrics.shadow.mode = SHADOW_CURVE;
+        mode_toggle_style.metrics.shadow.curve = ShadowSoft();
         mode_toggle_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 32 : 24;
         mode_toggle_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
         mode_toggle_style.track_extent = Size(DPI(52), DPI(27));
@@ -535,6 +539,8 @@ GUI_APP_MAIN
 {
     UiThemeDemoWindow().Run();
 }
+
+
 
 
 

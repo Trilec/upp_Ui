@@ -486,6 +486,84 @@ private:
     String sample_ = DEFAULT_SAMPLE;
 };
 
+
+class DemoCodePanel : public UiPanel {
+public:
+    typedef DemoCodePanel CLASSNAME;
+
+    DemoCodePanel(int h = DPI(90))
+        : block_height_(h)
+    {
+        Add(code_);
+        code_.NoWantFocus();
+    }
+
+    UiLabel& Code()
+    {
+        return code_;
+    }
+
+    void SetTextAdjust(const Rect& r)
+    {
+        text_adjust_ = r;
+        RefreshLayout();
+    }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(180), block_height_);
+    }
+
+    virtual void Layout() override
+    {
+        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
+        rc.left += text_adjust_.left;
+        rc.top += text_adjust_.top;
+        rc.right += text_adjust_.right;
+        rc.bottom += text_adjust_.bottom;
+        rc = rc & GetSize();
+        code_.SetRect(rc);
+    }
+
+private:
+    UiLabel code_;
+    int block_height_ = 0;
+    Rect text_adjust_ = Rect(0, 0, 0, 0);
+};
+
+class DemoListHost : public Ctrl {
+public:
+    typedef DemoListHost CLASSNAME;
+
+    DemoListHost(int row_px = DPI(26), int min_h = DPI(72), int extra = DPI(4))
+        : row_px_(row_px), min_h_(min_h), extra_(extra)
+    {
+    }
+
+    void Attach(UiList& list)
+    {
+        if(list.GetParent() != this)
+            Add(list.SizePos());
+    }
+
+    void SetRowCount(int n)
+    {
+        row_count_ = max(0, n);
+        RefreshLayout();
+        RefreshParentLayout();
+    }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(180), max(min_h_, row_count_ * row_px_ + extra_));
+    }
+
+private:
+    int row_count_ = 0;
+    int row_px_ = 0;
+    int min_h_ = 0;
+    int extra_ = 0;
+};
 // UiFontSelectorWindow is both a usable font utility and a reference demo for:
 // - font face enumeration
 // - list/model binding
@@ -526,12 +604,15 @@ public:
 	    int state_sec = inspector_acc_.AddSection("STATE", true);
 	    int props_sec = inspector_acc_.AddSection("PROPERTIES", true);
 	
-	    inspector_acc_.GetSectionContent(usage_sec).Add(usage_panel_.SizePos());
-	    usage_panel_.Add(usage_toolbar_);
-	    usage_panel_.Add(usage_code_);
-	
-	    inspector_acc_.GetSectionContent(state_sec).Add(state_list_);
-	    inspector_acc_.GetSectionContent(props_sec).Add(property_box_);
+	    inspector_acc_.GetSectionContent(usage_sec).Add(usage_section_.SizePos());
+        usage_section_.SetGap(DPI(10)).SetInset(0);
+        usage_section_.Add(usage_toolbar_).Fixed(DPI(40));
+        usage_section_.Add(usage_panel_).Fit();
+        usage_panel_.SetTextAdjust(Rect(-DPI(8), 0, DPI(4), 0));
+
+        inspector_acc_.GetSectionContent(state_sec).Add(state_host_.SizePos());
+        state_host_.Attach(state_list_);
+        inspector_acc_.GetSectionContent(props_sec).Add(property_box_.SizePos());
 	
 	        // Usage toolbar and code panel stay as the shared copyable code pattern.
         usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
@@ -563,10 +644,8 @@ public:
 	               .SetIconScale(true)
 	               .NoWantFocus();
 	    usage_copy_.SetIconMargin(Rect(DPI(1), DPI(1), DPI(1), DPI(1)));
-	    usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_.GetText().ToString()); };
-	
-	    usage_code_.NoWantFocus();
-	    usage_code_.SetSelectable(true);
+	    usage_copy_.WhenAction = [=] { WriteClipboardText(usage_panel_.Code().GetText().ToString()); };
+        usage_panel_.Code().SetSelectable(true);
 	    state_list_.NoWantFocus();
 	
 	        // Property rows stay intentionally small: one slider, two toggles, one text sample.
@@ -658,51 +737,7 @@ public:
 	
 	    ParentCtrl& body_ctrl = inspector_scroll_.Content();
 	    int inner_w = max(0, body_ctrl.GetSize().cx - DPI(10));
-	
-	    // Usage section
-	    int usage_toolbar_h = DPI(40);
-	    int usage_gap = DPI(10);
-	    int usage_panel_inset = DPI(8);
-	    int usage_panel_h = DPI(90);
-	
-	    usage_panel_.SetRect(0, 0, inner_w, usage_toolbar_h + usage_gap + usage_panel_h);
-	
-	    // Inset the toolbar so the copy icon is not pushed into the top-right edge.
-	    usage_toolbar_.SetRect(DPI(8), DPI(2),
-	                           max(0, inner_w - DPI(16)),
-	                           usage_toolbar_h);
-	
-	    // Keep the dark panel slightly inset from accordion width.
-	    Rect code_panel_rect(usage_panel_inset,
-	                         usage_toolbar_h + usage_gap,
-	                         max(0, inner_w - usage_panel_inset * 2),
-	                         usage_panel_h);
-	
-	    Rect usage_inner = UiStyledInnerRect(RectC(0, 0,
-	                                               code_panel_rect.GetWidth(),
-	                                               code_panel_rect.GetHeight()),
-	                                         usage_panel_.GetStyle().metrics,
-	                                         usage_panel_.GetStyle().skin);
-	
-	    // Pull text block left a bit versus the styled inner rect.
-	    int code_left = max(0, usage_inner.left - DPI(8));
-	    int code_top = usage_inner.top;
-	    int code_w = max(0, usage_inner.GetWidth() + DPI(4));
-	    int code_h = usage_inner.GetHeight();
-	
-	    usage_code_.SetRect(code_panel_rect.left + code_left,
-	                        code_panel_rect.top + code_top,
-	                        code_w,
-	                        code_h);
-	
-	    int state_h = max(DPI(72), state_model_.GetCount() * DPI(26) + DPI(4));
-	    state_list_.SetRect(0, 0, inner_w, state_h);
-	
-	    property_box_.SetRect(0, 0, inner_w, property_box_.GetMinSize().cy);
-	
 	    inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
-	
-	    inspector_scroll_.Layout();
 	}
 
 private:
@@ -819,7 +854,7 @@ private:
             sample = DEFAULT_SAMPLE;
         preview_.SetFontSpec(f, sample);
 
-        usage_code_.SetText(Format("Font f = Font().FaceName(\"%s\").Height(%d)%s%s;",
+        usage_panel_.Code().SetText(Format("Font f = Font().FaceName(\"%s\").Height(%d)%s%s;",
                                    face,
                                    max(1, f.GetHeight()),
                                    f.IsBold() ? ".Bold()" : "",
@@ -842,7 +877,8 @@ private:
         size_value_.SetText(AsString((int)size_slider_.GetValue()) + "px");
         state_list_.SetModel(state_model_);
         state_list_.Refresh();
-        usage_code_.Refresh();
+        usage_panel_.Code().Refresh();
+        state_host_.SetRowCount(state_model_.GetCount());
         usage_panel_.Refresh();
     }
 
@@ -874,7 +910,7 @@ private:
         usage_copy_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_copy_.SetIconColor(palette_.muted);
         usage_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        usage_code_.SetStyle(MakeCodeLabelStyle(palette_));
+        usage_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
         state_list_.SetStyle(MakeStateListStyle(palette_));
         state_list_.SetModel(state_model_);
         inspector_scroll_.SetStyle(MakeScrollBodyStyle());
@@ -936,12 +972,13 @@ private:
 
     UiScrollPanel inspector_scroll_;
     UiAccordion inspector_acc_;
+    UiBoxLayout usage_section_ { UiDirection::V };
     UiBoxLayout usage_toolbar_ { UiDirection::H };
     ParentCtrl usage_toolbar_fill_;
     UiLabel usage_copy_label_;
     UiButton usage_copy_;
-    UiPanel usage_panel_;
-    UiLabel usage_code_;
+    DemoCodePanel usage_panel_;
+    DemoListHost state_host_;
     UiList state_list_;
     UiListModel state_model_;
     UiBoxLayout property_box_ { UiDirection::V };

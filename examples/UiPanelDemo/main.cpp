@@ -916,6 +916,69 @@ private:
     ColorPopUp popup_;
 };
 
+
+class DemoCodePanel : public UiPanel {
+public:
+    typedef DemoCodePanel CLASSNAME;
+
+    DemoCodePanel(int h = DPI(126))
+        : block_height_(h)
+    {
+        Add(code_);
+        code_.NoWantFocus();
+    }
+
+    UiLabel& Code() { return code_; }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(180), block_height_);
+    }
+
+    virtual void Layout() override
+    {
+        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
+        code_.SetRect(rc.left + DPI(10), rc.top + DPI(10), max(0, rc.GetWidth() - DPI(20)), max(0, rc.GetHeight() - DPI(20)));
+    }
+
+private:
+    UiLabel code_;
+    int block_height_ = 0;
+};
+
+class DemoListHost : public Ctrl {
+public:
+    typedef DemoListHost CLASSNAME;
+
+    DemoListHost(int row_px = DPI(22), int min_h = DPI(72), int extra = DPI(4))
+        : row_px_(row_px), min_h_(min_h), extra_(extra)
+    {
+    }
+
+    void Attach(UiList& list)
+    {
+        if(list.GetParent() != this)
+            Add(list.SizePos());
+    }
+
+    void SetRowCount(int n)
+    {
+        row_count_ = max(0, n);
+        RefreshLayout();
+        RefreshParentLayout();
+    }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(180), max(min_h_, row_count_ * row_px_ + extra_));
+    }
+
+private:
+    int row_count_ = 0;
+    int row_px_ = 0;
+    int min_h_ = 0;
+    int extra_ = 0;
+};
 // UiPanelDemoWindow is the reference single-control builder demo.
 // It binds one UiPanel configuration to preview, usage, and inspector state.
 class UiPanelDemoWindow : public TopWindow {
@@ -947,11 +1010,16 @@ public:
         int state_sec = inspector_acc_.AddSection("STATE", true);
         int props_sec = inspector_acc_.AddSection("PROPERTIES", true);
         // The top-level inspector accordion stays responsible for section order.
-        inspector_acc_.GetSectionContent(usage_sec).Add(usage_toolbar_);
-        inspector_acc_.GetSectionContent(usage_sec).Add(usage_code_panel_);
-        inspector_acc_.GetSectionContent(state_sec).Add(state_list_);
-        inspector_acc_.GetSectionContent(props_sec).Add(props_toolbar_);
-        inspector_acc_.GetSectionContent(props_sec).Add(property_box_);
+        inspector_acc_.GetSectionContent(usage_sec).Add(usage_section_.SizePos());
+        usage_section_.SetGap(DPI(8)).SetInset(0);
+        usage_section_.Add(usage_toolbar_).Fixed(DPI(40));
+        usage_section_.Add(usage_code_panel_).Fit();
+        inspector_acc_.GetSectionContent(state_sec).Add(state_host_.SizePos());
+        state_host_.Attach(state_list_);
+        inspector_acc_.GetSectionContent(props_sec).Add(props_section_.SizePos());
+        props_section_.SetGap(DPI(2)).SetInset(0);
+        props_section_.Add(props_toolbar_).Fixed(DPI(22));
+        props_section_.Add(property_box_).Fit();
         // Property groups are nested accordions so demos can collapse detail without
         // inventing a different property model per control.
         property_box_.Add(size_acc_).Fit();
@@ -970,12 +1038,7 @@ public:
         frame_acc_.GetSectionContent(frame_sec).Add(frame_box_.SizePos());
         face_acc_.GetSectionContent(face_sec).Add(face_box_.SizePos());
         shadow_acc_.GetSectionContent(shadow_sec).Add(shadow_box_.SizePos());
-        inspector_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
-        auto nested_relayout = [=](int, bool) { Layout(); };
-        size_acc_.WhenSectionToggled = nested_relayout;
-        frame_acc_.WhenSectionToggled = nested_relayout;
-        face_acc_.WhenSectionToggled = nested_relayout;
-        shadow_acc_.WhenSectionToggled = nested_relayout;
+
         // Usage toolbar and action affordances.
         usage_copy_label_.SetText("Copy Code").NoWantFocus();
         usage_toolbar_.Add(usage_toolbar_fill_).Expand(1);
@@ -983,7 +1046,6 @@ public:
         usage_toolbar_.Add(usage_copy_).Fixed(DPI(22));
         props_toolbar_.Add(props_toolbar_fill_).Expand(1);
         props_toolbar_.Add(props_reset_).Fixed(DPI(62));
-        usage_code_panel_.Add(usage_code_);
 
         header_.SetTitle("U++ UiPanel Builder")
             .SetSubTitle("Generate a styled panel surface and copy the exact code for the current result.")
@@ -995,8 +1057,8 @@ public:
         exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconTintMono(true).SetIconScale(true);
 
         usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconScale(true).NoWantFocus();
-        usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_.GetText().ToString()); };
-        usage_code_.SetSelectable(true);
+        usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_panel_.Code().GetText().ToString()); };
+        usage_code_panel_.Code().SetSelectable(true);
 
         state_list_.NoWantFocus();
 
@@ -1148,36 +1210,7 @@ public:
         ParentCtrl& body = inspector_scroll_.Content();
         int inner_w = max(0, body.GetSize().cx - DPI(10));
 
-        int usage_y = 0;
-        int usage_toolbar_h = DPI(40);
-        usage_toolbar_.SetRect(0, usage_y, max(0, inner_w - DPI(8)), usage_toolbar_h);
-        usage_y += usage_toolbar_h + DPI(8);
-        usage_code_panel_.SetRect(0, usage_y, inner_w, DPI(126));
-        usage_code_.SetRect(DPI(10), DPI(10), max(0, inner_w - DPI(20)), DPI(106));
-
-        int state_h = max(DPI(72), state_model_.GetCount() * DPI(22) + DPI(4));
-        state_list_.SetRect(0, 0, inner_w, state_h);
-
-        int props_y = 0;
-        int props_toolbar_h = DPI(22);
-        props_toolbar_.SetRect(0, props_y, inner_w, props_toolbar_h);
-        props_y += props_toolbar_h + DPI(2);
-        int props_w = inner_w;
-        int group_w = props_w;
-        int size_body_h = size_box_.GetMinSize().cy;
-        int frame_body_h = frame_box_.GetMinSize().cy;
-        int face_body_h = face_box_.GetMinSize().cy;
-        int shadow_body_h = shadow_box_.GetMinSize().cy;
-        size_acc_.SetSectionBodyHeight(0, size_body_h);
-        frame_acc_.SetSectionBodyHeight(0, frame_body_h);
-        face_acc_.SetSectionBodyHeight(0, face_body_h);
-        shadow_acc_.SetSectionBodyHeight(0, shadow_body_h);
-        property_box_.SetRect(0, props_y, props_w, property_box_.GetMinSize().cy);
-        inspector_acc_.SetSectionBodyHeight(0, usage_code_panel_.GetRect().bottom + DPI(12));
-        inspector_acc_.SetSectionBodyHeight(1, state_h);
-        inspector_acc_.SetSectionBodyHeight(2, property_box_.GetRect().bottom);
         inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
-        inspector_scroll_.Layout();
     }
 
 private:
@@ -1373,6 +1406,7 @@ private:
     // RefreshFromConfig fans the resolved config back out to preview, usage, and state.
     void RefreshFromConfig()
     {
+        state_host_.SetRowCount(state_model_.GetCount());
         width_value_.SetText(AsString(config_.width) + "px");
         height_value_.SetText(AsString(config_.height) + "px");
         radius_value_.SetText(AsString(config_.radius) + "px");
@@ -1383,7 +1417,7 @@ private:
         shadow_alpha_value_.SetText(AsString(config_.shadow_alpha));
         shadow_curve_field_.SetCurve(config_.shadow_curve);
         preview_.SetConfig(config_);
-        usage_code_.SetText(BuildUsageCode());
+        usage_code_panel_.Code().SetText(BuildUsageCode());
         RefreshState();
         Refresh();
     }
@@ -1450,7 +1484,7 @@ private:
         usage_copy_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body, true, true));
         props_reset_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        usage_code_.SetStyle(MakeCodeLabelStyle(palette_));
+        usage_code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
         shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
         shadow_curve_field_.SetFormulaStyle(MakeFormulaLabelStyle(palette_));
         shadow_curve_field_.SetCopyStyle(MakeCopyButtonStyle(palette_));
@@ -1513,14 +1547,16 @@ private:
     PanelPreview preview_;
     UiScrollPanel inspector_scroll_;
     UiAccordion inspector_acc_;
+    UiBoxLayout usage_section_ { UiDirection::V };
     UiBoxLayout usage_toolbar_ { UiDirection::H };
     ParentCtrl usage_toolbar_fill_;
     UiLabel usage_copy_label_;
     UiButton usage_copy_;
-    UiPanel usage_code_panel_;
-    UiLabel usage_code_;
+    DemoCodePanel usage_code_panel_;
+    DemoListHost state_host_;
     UiList state_list_;
     UiListModel state_model_;
+    UiBoxLayout props_section_ { UiDirection::V };
     UiBoxLayout props_toolbar_ { UiDirection::H };
     ParentCtrl props_toolbar_fill_;
     UiButton props_reset_;

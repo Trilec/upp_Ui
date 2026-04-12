@@ -357,8 +357,8 @@ Size UiBoxLayout::GetMinSize() const
             int h = it.fixed >= 0 ? it.fixed : ms.cy;
             if(fixed_row > 0)
                 h = min(h, fixed_row);
-            h = min(max(h, it.minw), it.maxw);
-            int w = min(max(ms.cx, it.minh), it.maxh);
+            h = min(max(h, it.minh), it.maxh);
+            int w = min(max(ms.cx, it.minw), it.maxw);
 
             main_total += max(0, h);
             cross_max = max(cross_max, max(0, w));

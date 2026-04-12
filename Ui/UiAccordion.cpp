@@ -114,7 +114,14 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.header_style.media_tint_mono = true;
 
         s.body_style = UiPanel::StyleDefault();
-        s.body_style.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.body_style.transparent = true;
+        s.body_style.metrics.face_enabled = false;
+        s.body_style.metrics.frame_enabled = false;
+        s.body_style.metrics.frame_width = 0;
+        s.body_style.metrics.radius = 0;
+        s.body_style.metrics.focus_enabled = false;
+        s.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.body_style.metrics.shadow.enabled = false;
 
         s.chevron_side = UiAlign::RIGHT;
         s.glyph_open = CtrlsImg::DA();
@@ -184,6 +191,15 @@ void UiAccordion::SyncThemeStyle()
     resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
     resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
     resolved.metrics.face_enabled = panel.metrics.face_enabled;
+    resolved.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    resolved.body_style.transparent = true;
+    resolved.body_style.metrics.face_enabled = false;
+    resolved.body_style.metrics.frame_enabled = false;
+    resolved.body_style.metrics.frame_width = 0;
+    resolved.body_style.metrics.radius = 0;
+    resolved.body_style.metrics.focus_enabled = false;
+    resolved.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+    resolved.body_style.metrics.shadow.enabled = false;
     resolved.header_style = UiTheme::ResolveTitleCard();
     resolved.header_style.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
     resolved.header_style.hover_enabled = true;
@@ -893,23 +909,34 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
 
     Rect b(0, 0, 0, 0);
     bool first = true;
+    int measured = 0;
     for(Ctrl* q = s.content.GetFirstChild(); q; q = q->GetNext()) {
         if(!q->IsShown())
             continue;
+
+        Size ms = q->GetMinSize();
+        measured = max(measured, ms.cy);
+
         Rect r = q->GetRect();
+        bool fill_host = q->GetFirstChild()
+                      && r.left == 0
+                      && r.top == 0
+                      && abs(r.GetWidth() - max(0, width)) <= 1;
+        if(r.GetWidth() <= 0 || r.GetHeight() <= 0 || fill_host)
+            r = RectC(0, 0, max(0, ms.cx), max(0, ms.cy));
+
         if(first) {
             b = r;
             first = false;
         }
-        else
+        else {
             b |= r;
+        }
     }
 
-    int measured = 0;
     if(!first)
-        measured = b.GetHeight();
+        measured = max(measured, b.GetHeight());
 
-    measured = max(measured, s.content.GetMinSize().cy);
     measured = max(measured, style.body_min_height);
 
     Size outer = UiStyledOuterSizeFromContent(Size(max(0, width), measured),

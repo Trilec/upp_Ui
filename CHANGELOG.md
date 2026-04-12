@@ -6,8 +6,9 @@ This project is experimental and iterating quickly. The goal of this file is to 
 
 - Documentation refresh (README + getting-started + architecture + checklist).
 - Examples updated to current naming (`SetText` / `SetIcon` / `SetIconLayout`).
-- `Ui/Ui.upp` dependencies aligned with code (`Painter`).
-- `Animation/` vendored from `upp_AnimationEasing` so CLI builds can find `Animation` without extra nests.
+- `Ui/Ui.upp` dependencies aligned with code (`Painter`) and cleaned up for UppHub packaging.
+- Removed local `Animation` package exposure from this repo and restored `Ui` to depend on the real external `Animation` nest (`E:\apps\github\upp_AnimationEasing`).
+- Removed library-package `mainconfig` from `Ui/Ui.upp` so `Ui` is not treated as a main package.
 - Hardening pass:
   - `UiBaseEdit`: fixed side visibility/spin conflict by removing layout-time force-show and wiring spin toggles to side visibility APIs.
   - `UiTitleCard`: normalized paint pipeline order and added cached text metrics to avoid repeated paint-time measuring.

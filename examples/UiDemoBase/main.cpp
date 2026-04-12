@@ -359,7 +359,7 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
+    s.metrics.radius = DPI(DEMO_CORNER_RADIUS);
     s.metrics.focus_enabled = false;
     s.metrics.content_padding = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
     s.metrics.shadow.enabled = false;
@@ -586,6 +586,35 @@ private:
     UiGridLayout content_;
 };
 
+
+class DemoCodePanel : public UiPanel {
+public:
+    typedef DemoCodePanel CLASSNAME;
+
+    DemoCodePanel(int h = DPI(96))
+        : block_height_(h)
+    {
+        Add(code_);
+        code_.NoWantFocus();
+    }
+
+    UiLabel& Code() { return code_; }
+
+    virtual Size GetMinSize() const override
+    {
+        return Size(DPI(180), block_height_);
+    }
+
+    virtual void Layout() override
+    {
+        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
+        code_.SetRect(rc);
+    }
+
+private:
+    UiLabel code_;
+    int block_height_ = 0;
+};
 // UiDemoBaseWindow is the reusable split-shell template for new demos.
 // It intentionally keeps the property set small so new control demos can copy
 // the structure without inheriting unnecessary demo-specific behavior.
@@ -626,11 +655,15 @@ public:
         Add(inspector_acc_);
         // The template demonstrates the shared inspector pattern directly:
         // top-level accordion sections plus one nested property subgroup.
-        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_code_panel_.SizePos());
-        usage_code_panel_.Add(usage_code_);
+        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_section_.SizePos());
+        usage_section_.SetGap(0).SetInset(0);
+        usage_section_.Add(usage_code_panel_).Fit();
         inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
         inspector_acc_.GetSectionContent(inspector_acc_.AddSection("PROPERTIES", true)).Add(property_box_.SizePos());
         property_box_.Add(scale_row_).Fit();
+        property_box_.Add(size_row_).Fit();
+        property_box_.Add(opacity_row_).Fit();
+        property_box_.Add(enabled_row_).Fit();
         property_box_.Add(property_group_acc_).Fit();
         property_group_acc_.SetSingleOpen(false).SetEnforceOne(false);
         property_group_acc_.GetSectionContent(property_group_acc_.AddSection("GROUP", true)).Add(property_group_box_.SizePos());
@@ -653,11 +686,11 @@ public:
                     .SetIconTintMono(true)
                     .SetIconScale(true);
 
-        usage_code_.SetText("UiDemoBase demo;\n"
+        usage_code_panel_.Code().SetText("UiDemoBase demo;\n"
                             "demo.PreviewGrid();\n"
                             "demo.StateBox();\n"
                             "demo.PropertyBox();").NoWantFocus();
-        usage_code_.SetSelectable(true);
+        usage_code_panel_.Code().SetSelectable(true);
 
         state_label_.SetText("No control state is bound yet.").NoWantFocus();
         state_box_.SetGap(DPI(8)).SetInset(0);
@@ -666,22 +699,53 @@ public:
         scale_label_.SetText("Scaling").NoWantFocus();
         scale_value_.SetText("1.0x").NoWantFocus();
         scale_slider_.SetRange(0.8, 1.4).SetStep(0.1).SetValue(1.0);
+        size_label_.SetText("Panel Width").NoWantFocus();
+        size_value_.SetText("320px").NoWantFocus();
+        size_slider_.SetRange(220.0, 520.0).SetStep(10.0).SetValue(320.0);
+        opacity_label_.SetText("Opacity").NoWantFocus();
+        opacity_value_.SetText("92%").NoWantFocus();
+        opacity_slider_.SetRange(40.0, 100.0).SetStep(1.0).SetValue(92.0);
+        enabled_label_.SetText("Enabled").NoWantFocus();
+        compact_label_.SetText("Compact Mode").NoWantFocus();
         property_box_.SetGap(DPI(8)).SetInset(0);
         property_group_box_.SetGap(DPI(8)).SetInset(0);
         scale_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         scale_row_.Add(scale_label_).Fixed(DPI(82)).MinHeight(DPI(20));
         scale_row_.Add(scale_slider_).Expand(1).MinHeight(DPI(20));
         scale_row_.Add(scale_value_).Fixed(DPI(56)).MinHeight(DPI(18));
+        size_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        size_row_.Add(size_label_).Fixed(DPI(82)).MinHeight(DPI(20));
+        size_row_.Add(size_slider_).Expand(1).MinHeight(DPI(20));
+        size_row_.Add(size_value_).Fixed(DPI(56)).MinHeight(DPI(18));
+        opacity_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        opacity_row_.Add(opacity_label_).Fixed(DPI(82)).MinHeight(DPI(20));
+        opacity_row_.Add(opacity_slider_).Expand(1).MinHeight(DPI(20));
+        opacity_row_.Add(opacity_value_).Fixed(DPI(56)).MinHeight(DPI(18));
+        enabled_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        enabled_toggle_.SetText("On");
+        enabled_row_.Add(enabled_label_).Expand(1).MinHeight(DPI(20));
+        enabled_row_.Add(enabled_toggle_).Fit().MinHeight(DPI(20));
+        compact_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        enabled_toggle_.SetData(true);
+        compact_toggle_.SetData(false);
+        compact_toggle_.SetText("On");
+        compact_row_.Add(compact_label_).Expand(1).MinHeight(DPI(20));
+        compact_row_.Add(compact_toggle_).Fit().MinHeight(DPI(20));
         group_note_.SetText("Nested group placeholder for control-specific sections.").NoWantFocus();
         property_group_box_.Add(group_note_).Fit();
+        property_group_box_.Add(compact_row_).Fit();
 
         // Keep interaction hooks minimal so derived demos can replace them selectively.
         theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
         exit_button_.WhenAction = [=] { Close(); };
         scale_slider_.WhenAction = [=] { SyncProperties(); };
         scale_slider_.WhenChanging = [=] { SyncProperties(); };
-        inspector_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
-        property_group_acc_.WhenSectionToggled = [=](int, bool) { Layout(); };
+        size_slider_.WhenAction = [=] { SyncProperties(); };
+        size_slider_.WhenChanging = [=] { SyncProperties(); };
+        opacity_slider_.WhenAction = [=] { SyncProperties(); };
+        opacity_slider_.WhenChanging = [=] { SyncProperties(); };
+        enabled_toggle_.WhenAction = [=] { SyncProperties(); };
+        compact_toggle_.WhenAction = [=] { SyncProperties(); };
 
         ApplyTheme(UiThemeMode::Light);
         SyncProperties();
@@ -731,18 +795,8 @@ public:
         preview_.SetRect(0, header_bottom + 1, split_x, r.bottom - header_bottom - 1);
 
         int inner_w = r.right - sx - DPI(16);
-        int usage_h = DPI(96);
         UiLayoutCursor curI(RectC(sx, header_bottom + DPI(12), inner_w, max(0, r.bottom - header_bottom - DPI(12))));
         curI.SetGapY(0);
-        usage_code_panel_.SetRect(0, 0, inner_w, usage_h);
-        Rect uc = UiStyledInnerRect(usage_code_panel_.GetRect(), usage_code_panel_.GetStyle().metrics, usage_code_panel_.GetStyle().skin);
-        usage_code_.SetRect(uc.left, uc.top, uc.GetWidth(), uc.GetHeight());
-        state_box_.SetRect(0, 0, inner_w, state_box_.GetMinSize().cy);
-        property_group_acc_.SetSectionBodyHeight(0, property_group_box_.GetMinSize().cy);
-        property_box_.SetRect(0, 0, inner_w, property_box_.GetMinSize().cy);
-        inspector_acc_.SetSectionBodyHeight(0, usage_h);
-        inspector_acc_.SetSectionBodyHeight(1, state_box_.GetMinSize().cy);
-        inspector_acc_.SetSectionBodyHeight(2, property_box_.GetMinSize().cy);
         inspector_acc_.SetRect(curI.X(), curI.Y(), inner_w, inspector_acc_.GetMinSize().cy);
     }
 
@@ -762,6 +816,8 @@ private:
     {
         double scale = scale_slider_.GetValue();
         scale_value_.SetText(Format("%.1f", scale) + "x");
+        size_value_.SetText(Format("%dpx", int(size_slider_.GetValue())));
+        opacity_value_.SetText(Format("%d%%", int(opacity_slider_.GetValue())));
         preview_.SetScale(scale);
     }
 
@@ -789,12 +845,18 @@ private:
         inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
         property_group_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
         usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        usage_code_.SetStyle(MakeCodeLabelStyle(palette_));
+        usage_code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
         state_label_.SetStyle(MakeBodyLabelStyle(palette_, true, false));
         group_note_.SetStyle(MakeBodyLabelStyle(palette_, true, true));
 
         scale_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
+        size_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
+        opacity_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
+        enabled_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
+        compact_label_.SetStyle(MakeBodyLabelStyle(palette_, false, false));
         scale_value_.SetStyle(MakeValueLabelStyle(palette_));
+        size_value_.SetStyle(MakeValueLabelStyle(palette_));
+        opacity_value_.SetStyle(MakeValueLabelStyle(palette_));
         preview_.SetPalette(palette_);
 
         Refresh();
@@ -837,8 +899,8 @@ private:
     PreviewCanvas preview_;
 
     UiAccordion inspector_acc_;
-    UiPanel usage_code_panel_;
-    UiLabel usage_code_;
+    UiBoxLayout usage_section_ { UiDirection::V };
+    DemoCodePanel usage_code_panel_;
 
     UiBoxLayout state_box_ { UiDirection::V };
     UiLabel state_label_;
@@ -848,9 +910,23 @@ private:
     UiBoxLayout property_group_box_ { UiDirection::V };
     UiLabel group_note_;
     UiBoxLayout scale_row_ { UiDirection::H };
+    UiBoxLayout size_row_ { UiDirection::H };
+    UiBoxLayout opacity_row_ { UiDirection::H };
+    UiBoxLayout enabled_row_ { UiDirection::H };
+    UiBoxLayout compact_row_ { UiDirection::H };
     UiLabel scale_label_;
+    UiLabel size_label_;
+    UiLabel opacity_label_;
+    UiLabel enabled_label_;
+    UiLabel compact_label_;
     UiLabel scale_value_;
+    UiLabel size_value_;
+    UiLabel opacity_value_;
     UiSlider scale_slider_;
+    UiSlider size_slider_;
+    UiSlider opacity_slider_;
+    UiToggle enabled_toggle_;
+    UiToggle compact_toggle_;
     TimeCallback exit_pulse_timer_;
 };
 
