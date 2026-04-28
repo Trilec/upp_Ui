@@ -9,7 +9,7 @@ UiBezierCurveField::UiBezierCurveField()
     Add(copy_);
 
     formula_.SetSelectable(true).NoWantFocus();
-    copy_.SetText("").SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconScale(true).NoWantFocus();
+    copy_.SetText("").SetIcon(ICON_CONTENT_CONTENT_COPY_48()).NoWantFocus();
 
     formula_.SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body));
     copy_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));

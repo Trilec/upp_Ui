@@ -18,14 +18,20 @@
     - GUI thread only.
 
     Usage
-    - Use SetText(), SetIcon(), SetCheckable(), and SetStyle() to configure
-      button behavior and appearance.
+    - Use SetText(), SetIcon(), SetIconRenderMode(), SetMargin(), SetContentGap(), SetCheckable(), and
+      SetStyle() to configure button behavior and appearance.
     - Paint() stays render-only; setters and style/theme changes drive cache
       invalidation and layout refresh.
 
     Changelog
     - 2026-03: hardened as the shared button behavior base for UiButton and
       UiToolButton while preserving per-control theme resolution.
+    - 2026-04: adopted shared UiIconRenderMode instead of button-local mono
+      tint state so icon rendering policy matches the wider Ui style system.
+    - 2026-04: added explicit icon size control and removed button-local icon
+      scale toggling so icon rendering uses the target icon size directly.
+    - 2026-04: simplified public content spacing to outer content_margin plus
+      one content_gap so buttons no longer expose separate icon/text margins.
 */
 
 #include <type_traits>
@@ -56,13 +62,11 @@ public:
 
         UiAlign align_h = UiAlign::CENTER;
         UiAlign align_v = UiAlign::CENTER;
-        UiAlign icon_layout = UiAlign::LEFT;
-
-        Rect icon_margin = Rect(0, 0, 0, 0);
-        Rect text_margin = Rect(DPI(4), 0, 0, 0);
+        UiAlign icon_side = UiAlign::LEFT;
+        int     content_gap = DPI(4);
 
         Image icon_images[4];
-        bool  icon_tint_mono = true;
+        UiIconRenderMode icon_render_mode = UiIconRenderMode::MonoTint;
 
         bool underline        = false;
         int  underline_width  = DPI(1);
@@ -73,13 +77,13 @@ public:
             s % palette % metrics % skin
               % press_offset % overpaint
               % font % transparent
-              % align_h % align_v % icon_layout
-              % icon_margin % text_margin;
+              % align_h % align_v % icon_side
+              % content_gap;
 
             for(int i = 0; i < 4; i++)
                 s % icon_images[i];
 
-            s % icon_tint_mono;
+            s % icon_render_mode;
             s % underline % underline_width % underline_offset;
         }
     };
@@ -104,10 +108,10 @@ protected:
 
     Size           user_min_size_ = Size(0, 0);
     One<Animation> anim_;
-    bool           icon_scale_ = true;
+    Size           icon_size_ = Size(0, 0);
     Image          assigned_icon_images_[4];
-    bool           assigned_icon_tint_mono_ = true;
-    bool           has_assigned_icon_tint_ = false;
+    UiIconRenderMode assigned_icon_render_mode_ = UiIconRenderMode::MonoTint;
+    bool           has_assigned_icon_render_mode_ = false;
     Color          assigned_icon_colors_[4];
     bool           has_assigned_icon_colors_ = false;
 
@@ -138,6 +142,7 @@ protected:
     void RebuildTextLinesFromStyle(const Style& st);
     Size GetTextBlockSize() const;
     Size GetStableIconSize() const;
+    bool HasResolvedIcon() const;
     Size ComputeNaturalSize() const;
     void UpdateLayout(const Rect& content) const;
     Image ResolveIconForState(StyledState st) const;
@@ -156,11 +161,12 @@ public:
                        const Image& disabled = Image());
     UiButton& ClearIcon();
 
-    UiButton& SetIconScale(bool on = true) { icon_scale_ = on; Refresh(); return *this; }
-    bool      GetIconScale() const { return icon_scale_; }
+    UiButton& SetIconSize(Size sz) { icon_size_ = sz; minsize_dirty_ = true; layout_dirty_ = true; RefreshLayout(); Refresh(); return *this; }
+    UiButton& SetIconSize(int cx, int cy) { return SetIconSize(Size(cx, cy)); }
+    Size      GetIconSize() const { return icon_size_; }
 
-    UiButton& SetIconTintMono(bool on = true) { has_assigned_icon_tint_ = true; assigned_icon_tint_mono_ = on; Refresh(); return *this; }
-    bool      GetIconTintMono() const { return has_assigned_icon_tint_ ? assigned_icon_tint_mono_ : GetEffectiveStyle().icon_tint_mono; }
+    UiButton& SetIconRenderMode(UiIconRenderMode mode) { has_assigned_icon_render_mode_ = true; assigned_icon_render_mode_ = mode; Refresh(); return *this; }
+    UiIconRenderMode GetIconRenderMode() const { return has_assigned_icon_render_mode_ ? assigned_icon_render_mode_ : GetEffectiveStyle().icon_render_mode; }
 
     UiButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
     {
@@ -173,21 +179,14 @@ public:
         return *this;
     }
 
-    UiButton& SetIconLayout(UiAlign layout);
+    UiButton& SetIconSide(UiAlign side);
 
     UiButton& SetAlign(UiAlign h, UiAlign v);
     UiButton& SetAlignH(UiAlign h);
     UiButton& SetAlignV(UiAlign v);
 
-    UiButton& SetIconMargin(const Rect& m);
-    UiButton& SetIconMargin(int l, int t, int r, int b) { return SetIconMargin(Rect(l, t, r, b)); }
-    UiButton& SetIconMargin(int all) { return SetIconMargin(all, all, all, all); }
-    Rect GetIconMargin() const { return GetEffectiveStyle().icon_margin; }
-
-    UiButton& SetTextMargin(const Rect& m);
-    UiButton& SetTextMargin(int l, int t, int r, int b) { return SetTextMargin(Rect(l, t, r, b)); }
-    UiButton& SetTextMargin(int all) { return SetTextMargin(all, all, all, all); }
-    Rect GetTextMargin() const { return GetEffectiveStyle().text_margin; }
+    UiButton& SetContentGap(int gap);
+    int       GetContentGap() const { return max(0, GetEffectiveStyle().content_gap); }
 
     UiButton& ClickFocus(bool on = true);
 

@@ -34,7 +34,7 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.radius = DPI(4);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = false;
@@ -54,10 +54,9 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
-        s.icon_layout = UiAlign::CENTER;
-        s.icon_margin = Rect(0, 0, 0, 0);
-        s.text_margin = Rect(0, 0, 0, 0);
-        s.icon_tint_mono = true;
+        s.icon_side = UiAlign::CENTER;
+        s.content_gap = 0;
+        s.icon_render_mode = UiIconRenderMode::MonoTint;
 
         for(int i = 0; i < 4; i++)
             s.icon_images[i] = Image();

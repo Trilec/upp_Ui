@@ -5,6 +5,8 @@
 
 namespace Upp {
 
+class ReadoutRow;
+
 class UiColorPicker : public Ctrl, public CtrlStyled<UiColorPicker> {
 public:
     typedef UiColorPicker CLASSNAME;
@@ -14,8 +16,8 @@ public:
         StyledMetrics metrics;
         StyledSkin    skin;
 
-        int header_height = DPI(44);
-        int slot_size = DPI(30);
+        int header_height = DPI(48);
+        int slot_size = DPI(42);
         int slot_gap = DPI(8);
         int page_gap = DPI(14);
         int right_panel_width = DPI(320);
@@ -104,6 +106,7 @@ public:
 private:
     struct SlotData : Moveable<SlotData> {
         Color  color = Black();
+        int    alpha = 255;
         String label;
     };
 
@@ -121,6 +124,9 @@ private:
     void           SyncSlotButtons();
     void           SyncSpectrumMode();
     void           PushRecentColor(Color c);
+    void           CommitColor(Color c, bool final_commit);
+    void           CommitAlpha(bool final_commit);
+    void           SyncControlsFromColor(Color c);
     void           ApplySliderColor(bool final_commit);
     void           HandleSlotButton(int index);
     void           HandleRecentPick(Color c);
@@ -135,6 +141,7 @@ private:
     mutable Style  themed_style_;
     mutable uint64 theme_revision_ = 0;
     bool           has_style_override_ = false;
+    dword          live_update_ms_ = 0;
 
     int            slot_count_ = 2;
     int            active_slot_ = 0;
@@ -142,6 +149,7 @@ private:
     SpectrumMode   spectrum_mode_ = SPECTRUM_HSV_RECT;
 
     Vector<SlotData> slots_;
+    Vector<SlotData> previous_slots_;
     Vector<Color>    recent_swatches_;
     Vector<Color>    user_swatches_;
     Color            pending_transfer_color_ = Null;
@@ -158,8 +166,10 @@ private:
 
     One<ColorField>  color_field_;
     UiDropdown       spectrum_mode_drop_;
+    UiDropdown       library_palette_drop_;
     UiSlider         slider_hue_axis_;
     UiSlider         slider_value_axis_;
+    UiSlider         slider_alpha_axis_;
     UiSlider         slider_r_;
     UiSlider         slider_g_;
     UiSlider         slider_b_;
@@ -173,32 +183,41 @@ private:
     UiSlider         slider_k_;
     UiButton         add_user_swatch_button_;
     UiButton         transfer_to_active_button_;
+    UiButton         push_user_swatch_button_;
 
     One<SwatchGrid>  recent_grid_;
     One<SwatchGrid>  user_grid_;
 
     Label            picker_section_title_;
+    ParentCtrl       current_slot_card_;
+    ParentCtrl       previous_slot_card_;
+    Label            current_slot_title_;
+    Label            previous_slot_title_;
+    UiButton         current_slot_preview_;
+    UiButton         previous_slot_preview_;
     Label            hue_axis_title_;
     Label            value_axis_title_;
-    Label            hue_axis_value_;
-    Label            value_axis_value_;
+    Label            alpha_axis_title_;
+    UiFloatEdit      hue_axis_value_;
+    UiFloatEdit      value_axis_value_;
+    UiFloatEdit      alpha_axis_value_;
     Label            rgb_section_title_;
     Label            hsv_section_title_;
     Label            cmyk_section_title_;
     Label            live_section_title_;
-    Label            readout_hex_;
-    Label            readout_rgb8_;
-    Label            readout_rgb_unit_;
-    Label            readout_hsv_;
-    Label            readout_alpha_;
+    One<ReadoutRow>  readout_hex_;
+    One<ReadoutRow>  readout_rgb8_;
+    One<ReadoutRow>  readout_rgb_unit_;
+    One<ReadoutRow>  readout_hsv_;
+    One<ReadoutRow>  readout_alpha_;
     Label            channel_r_;
     Label            channel_g_;
     Label            channel_b_;
     Label            channel_a_;
-    Label            channel_r_value_;
-    Label            channel_g_value_;
-    Label            channel_b_value_;
-    Label            channel_a_value_;
+    UiFloatEdit      channel_r_value_;
+    UiFloatEdit      channel_g_value_;
+    UiFloatEdit      channel_b_value_;
+    UiFloatEdit      channel_a_value_;
     Label            channel_h_;
     Label            channel_s_;
     Label            channel_v_;
@@ -210,17 +229,17 @@ private:
     Label            channel_m_;
     Label            channel_y_;
     Label            channel_k_;
-    Label            channel_h_value_;
-    Label            channel_s_value_;
-    Label            channel_v_value_;
-    Label            channel_ha_value_;
-    Label            channel_sa_value_;
-    Label            channel_va_value_;
-    Label            channel_aa_value_;
-    Label            channel_c_value_;
-    Label            channel_m_value_;
-    Label            channel_y_value_;
-    Label            channel_k_value_;
+    UiFloatEdit      channel_h_value_;
+    UiFloatEdit      channel_s_value_;
+    UiFloatEdit      channel_v_value_;
+    UiFloatEdit      channel_ha_value_;
+    UiFloatEdit      channel_sa_value_;
+    UiFloatEdit      channel_va_value_;
+    UiFloatEdit      channel_aa_value_;
+    UiFloatEdit      channel_c_value_;
+    UiFloatEdit      channel_m_value_;
+    UiFloatEdit      channel_y_value_;
+    UiFloatEdit      channel_k_value_;
     Label            swatches_palette_title_;
     Label            swatches_user_title_;
     Label            swatch_hint_;

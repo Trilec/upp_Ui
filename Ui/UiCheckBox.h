@@ -26,6 +26,7 @@
     - 2026-03-31: moved shared indicator layout/state helpers to UiIndicatorSupport.
     - 2026-03-31: moved shared text/layout/input state into UiIndicatorBase.
     - 2026-03-31: disabled controls now ignore keyboard activation paths.
+    - 2026-04-21: added icon-driven marker override support for checked and tri-state states.`r`n    renamed the public tri-state marker API to `tri_state_icon`.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -44,7 +45,6 @@ enum UiCheckState : byte {
 
 enum UiCheckVisual : byte {
     UICHECKVIS_CLASSIC = 0,
-    UICHECKVIS_SWITCH,
     UICHECKVIS_CHIP,
     UICHECKVIS_LIST,
 };
@@ -71,13 +71,17 @@ public:
         Size indicator_extent = Size(0, 0);
         int indicator_gap = DPI(8);
         int mark_thickness = DPI(2);
+        Image checked_icon;
+        Image tri_state_icon;
+        UiIconRenderMode marker_render_mode = UiIconRenderMode::MonoTint;
 
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
               % indicator_palette % indicator_metrics % indicator_skin
               % font % align_h % align_v % indicator_side
-              % indicator_size % indicator_extent % indicator_gap % mark_thickness;
+              % indicator_size % indicator_extent % indicator_gap % mark_thickness
+              % checked_icon % tri_state_icon % marker_render_mode;
         }
     };
 
@@ -113,6 +117,9 @@ public:
     UiCheckBox& SetIndicatorSide(UiAlign side);
     UiCheckBox& SetIndicatorRadius(int px);
     UiCheckBox& SetIndicatorRoundness(int percent);
+    UiCheckBox& SetCheckedIcon(const Image& img);
+    UiCheckBox& SetTriStateIcon(const Image& img);
+    UiCheckBox& SetMarkerRenderMode(UiIconRenderMode mode);
 
     UiCheckBox& SetSizeMin(Size sz)        { SetMinSize(sz); return *this; }
     UiCheckBox& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
@@ -164,8 +171,3 @@ private:
 }
 
 #endif
-
-
-
-
-

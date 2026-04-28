@@ -81,7 +81,7 @@ The `Ui` package currently covers:
 - Slider, picker, and curve utilities
   - `UiSlider` - themed scalar slider
   - `UiSliderEdit` - slider + edit composition surface
-  - `UiColorPicker` - reusable color selection utility
+  - `UiColorPicker` - reusable technical color picker with slot previews, editable numeric channels, and swatch-library workflow
   - `UiBezierCurveEditor` - interactive curve editor for four-point bezier curves
   - `UiBezierCurveField` - composite field around the curve editor for direct use in apps and demos
 
@@ -99,7 +99,9 @@ Examples:
 - `UiFontSelectorDemo` is a useful font helper that previews installed fonts and shows the exact font-construction call
 - `UiDemoBase` is the shell/template reference for how demo windows are structured and styled
 
-The current demo direction is to make each demo useful on its own while still exposing the implementation patterns behind the control.
+The current demo direction is to make each demo useful on its own while still exposing the implementation patterns behind the control. The active builder demos share one shell contract: header/title/subtitle/logo, version pill, theme toggle, red exit pill, dotted preview canvas, and Usage -> State -> Properties inspectors with live code output.
+
+Recent rewrites on that path include UiMultiEditDemo, UiRadioButtonDemo, UiMenuDemo, and UiTabDemo, each updated to surface the full control-specific behavior/layout/color seams rather than only a narrow showcase subset.
 
 ## Example/demo inventory
 
@@ -150,6 +152,12 @@ Example on Windows:
 
 This is a new codebase with no backward-compat naming shim layer. Public names are being kept explicit and direct, and docs/demos are updated with the code.
 
+Spacing conventions used across item-oriented controls:
+
+- `item_spacing` means spacing between repeated owned items
+- `content_gap` means primary spacing inside one control/item surface
+- semantic secondary gaps stay explicit, for example `right_gap`, `metadata_gap`, `drag_gap`, `chevron_gap`
+- `content_margin` is the outer inset around painted content
 Current conventions used across the controls and demos:
 
 - interactive selection controls expose `SetData()` / `GetData()`
@@ -158,6 +166,10 @@ Current conventions used across the controls and demos:
 - `UiDropdown` uses explicit model binding via `SetModel(UiListModel&)`, `UseInternalModel()`, and `GetInternalModel()`
 - numeric edits keep one vocabulary: `Min`, `Max`, `MinMax`, `Step`, `Precision`, `NotNull`
 - `UiAccordion` section accessors are `GetSectionContent()`, `GetSectionHeader()`, and `GetSectionBody()`
+- custom-painted primitive parts use dedicated hooks rather than outer overpaint:
+  - `UiSlider`: `WhenPaintTrack`, `WhenPaintActiveTrack`, `WhenPaintThumb`
+  - `UiScrollBar`: `WhenPaintTrack`, `WhenPaintThumb`, `WhenPaintArrow`
+  - `UiToggle`: `WhenPaintTrack`, `WhenPaintThumb`
 
 Minimal button usage:
 
@@ -165,7 +177,7 @@ Minimal button usage:
 UiButton b;
 b.SetText("Run")
  .SetIcon(CtrlImg::go_forward())
- .SetIconLayout(UiAlign::LEFT)
+ .SetIconSide(UiAlign::LEFT)
  .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
 ```
 
@@ -182,3 +194,4 @@ The overall direction is no longer just exploratory. The controls, helpers, and 
 ## License
 
 Intended to live alongside Ultimate++.
+

@@ -13,17 +13,21 @@ static bool IsHelpArg(const String& s)
 static void PrintHelp()
 {
     Cout() << "MakeIconFromSVG\n";
-    Cout() << "Convert SVG/PNG (and other StreamRaster formats) to UiMakeIcon header data.\n\n";
+    Cout() << "Convert SVG/PNG (and other StreamRaster formats) to either shared IML append files or UiMakeIcon headers.\n\n";
     Cout() << "Usage:\n";
-    Cout() << "  MakeIconFromSVG <input.(svg|png|...)> [output.h] [symbol_token] [size|WIDTHxHEIGHT]\n\n";
-    Cout() << "Arguments:\n";
-    Cout() << "  input         Source image path (.svg recommended, raster also supported).\n";
-    Cout() << "  output.h      Output header path. Default: <input_dir>/<input_name>_icon.h\n";
-    Cout() << "  symbol_token  Base token used for DATA_/ICON_ symbol names.\n";
-    Cout() << "  size          Target icon size, e.g. 24 or 48x48.\n\n";
+    Cout() << "  MakeIconFromSVG <input1> [input2 ...] [--format iml|uimakeicon] [--size N|WIDTHxHEIGHT]\n";
+    Cout() << "                  [--output-base path_without_extension] [--token-prefix PREFIX]\n\n";
+    Cout() << "Options:\n";
+    Cout() << "  --format       iml (default) or uimakeicon\n";
+    Cout() << "  --size         Target icon size, e.g. 24 or 48x48\n";
+    Cout() << "  --output-base  Base path without extension\n";
+    Cout() << "                 iml       -> <base>.iml.append + <base>.icons_h.append\n";
+    Cout() << "                 uimakeicon-> <base>.h\n";
+    Cout() << "  --token-prefix Prefix added ahead of the normalized icon token\n\n";
     Cout() << "Examples:\n";
-    Cout() << "  MakeIconFromSVG designs/search.svg Ui/newicons/search_icon.h ACTION_SEARCH_48 48x48\n";
-    Cout() << "  MakeIconFromSVG designs/NewLogo_v4.png Ui/newicons/upplogo2_icon.h BRAND_UPPLOGO2_48 48x48\n";
+    Cout() << "  MakeIconFromSVG designs/search.svg\n";
+    Cout() << "  MakeIconFromSVG designs/check.svg designs/radio.svg --size 48x48 --output-base Ui/icon_batch\n";
+    Cout() << "  MakeIconFromSVG designs/search.svg --format uimakeicon --output-base Ui/newicons/search_icon\n";
 }
 
 static String UpperToken(String s)
@@ -52,7 +56,7 @@ static String UpperToken(String s)
     return out;
 }
 
-static String DefaultTokenFromPath(const String& path, const Size& sz)
+static String DefaultTokenFromPath(const String& path, const Size& sz, const String& prefix = String())
 {
     String base = GetFileTitle(path);
     String tok = UpperToken(base);
@@ -60,6 +64,8 @@ static String DefaultTokenFromPath(const String& path, const Size& sz)
         int suffix = max(sz.cx, sz.cy);
         tok << "_" << AsString(suffix);
     }
+    if(!prefix.IsEmpty())
+        return UpperToken(prefix) + "_" + tok;
     return tok;
 }
 
@@ -89,11 +95,29 @@ static String ParseSizeText(const String& s, Size& out)
     return String();
 }
 
-static String ResolveOutputPath(const String& svg_path)
+static String ResolveOutputBase(const Vector<String>& input_paths, SvgIconOutputMode mode)
 {
-    String dir = GetFileDirectory(svg_path);
-    String base = GetFileTitle(svg_path);
-    return AppendFileName(dir, base + "_icon.h");
+    if(input_paths.GetCount() == 1) {
+        String dir = GetFileDirectory(input_paths[0]);
+        String base = GetFileTitle(input_paths[0]) + "_icon";
+        return AppendFileName(dir, base);
+    }
+    String dir = GetCurrentDirectory();
+    return AppendFileName(dir, mode == SvgIconOutputMode::IML ? "icons_batch" : "icons_batch_icon");
+}
+
+static bool ParseOutputMode(const String& text, SvgIconOutputMode& mode)
+{
+    String t = ToLower(TrimBoth(text));
+    if(t.IsEmpty() || t == "iml") {
+        mode = SvgIconOutputMode::IML;
+        return true;
+    }
+    if(t == "uimakeicon") {
+        mode = SvgIconOutputMode::UIMAKEICON;
+        return true;
+    }
+    return false;
 }
 
 static Image FitImageToTarget(const Image& src, Size target)
@@ -276,43 +300,89 @@ static String BuildHeaderText(const String& token, const Vector<byte>& data, con
     return out;
 }
 
-bool ParseSvgIconJob(const Vector<String>& args, SvgIconJob& job, String& error)
+static void AddLE16(StringBuffer& out, int value)
 {
-    if(args.GetCount() < 1) {
-        error = "usage: MakeIconFromSVG <input.(svg|png|...)> [output.h] [symbol_token] [size|WIDTHxHEIGHT]";
-        return false;
-    }
-
-    job = SvgIconJob();
-    job.input_path = args[0];
-
-    if(args.GetCount() >= 2)
-        job.output_header = args[1];
-    else
-        job.output_header = ResolveOutputPath(job.input_path);
-
-    if(args.GetCount() >= 4) {
-        String e = ParseSizeText(args[3], job.size);
-        if(!e.IsEmpty()) {
-            error = e;
-            return false;
-        }
-    }
-
-    if(args.GetCount() >= 3)
-        job.symbol_token = UpperToken(args[2]);
-
-    return true;
+    out.Cat((char)(value & 0xff));
+    out.Cat((char)((value >> 8) & 0xff));
 }
 
-bool BuildIconHeaderFromSvg(const SvgIconJob& job, String& error)
+static String BuildImlPayload(const Image& img)
 {
-    if(!FileExists(job.input_path)) {
-        error = "input file not found: " + job.input_path;
+    Size sz = img.GetSize();
+    StringBuffer raw;
+    raw.Reserve(13 + sz.cx * sz.cy * 4);
+    raw.Cat((char)0);
+    AddLE16(raw, sz.cx);
+    AddLE16(raw, sz.cy);
+    AddLE16(raw, 0);
+    AddLE16(raw, 0);
+    AddLE16(raw, 0);
+    AddLE16(raw, 0);
+
+    for(int y = 0; y < sz.cy; y++)
+        for(int x = 0; x < sz.cx; x++) {
+            RGBA px = img[y][x];
+            raw.Cat((char)px.r);
+            raw.Cat((char)px.g);
+            raw.Cat((char)px.b);
+            raw.Cat((char)px.a);
+        }
+
+    return ZCompress(String(raw));
+}
+
+static String BuildImlEntryText(const String& token, const String& compressed, const String& source_svg, Size sz)
+{
+    String out;
+    out << "// Auto-generated by MakeIconFromSVG\n";
+    out << "// Source: " << source_svg << "\n";
+    out << "// Size: " << sz.cx << "x" << sz.cy << "\n";
+    out << "// Format: U++ IML packed payload\n";
+    out << "IMAGE_ID(" << token << ")\n";
+    out << "IMAGE_BEGIN_DATA\n";
+    for(int i = 0; i < compressed.GetCount(); i += 32) {
+        out << "IMAGE_DATA(";
+        for(int j = 0; j < 32; j++) {
+            int index = i + j;
+            byte b = index < compressed.GetCount() ? (byte)compressed[index] : 0;
+            if(j)
+                out << ",";
+            out << Format("0x%02x", (int)b);
+        }
+        out << ")\n";
+    }
+    out << "IMAGE_END_DATA(" << compressed.GetCount() << ", 1)\n";
+    return out;
+}
+
+static String BuildIconsHAppendText(const String& token, const String& source_path, Size sz)
+{
+    String out;
+    out << "// Source: " << source_path << "\n";
+    out << "// Size: " << sz.cx << "x" << sz.cy << "\n";
+    out << "inline Image " << token << "()\n";
+    out << "{\n";
+    out << "    return UiIconsImg::" << token << "();\n";
+    out << "}\n";
+    out << "out.Add(UiIconCatalogEntry(\"" << token << "\", &" << token << "));\n";
+    return out;
+}
+
+struct ResolvedSvgIcon : Moveable<ResolvedSvgIcon> {
+    String input_path;
+    String token;
+    Size   size;
+    Image  image;
+};
+
+static bool ResolveIconImage(const SvgIconJob& job, const String& input_path, ResolvedSvgIcon& out, String& error)
+{
+    if(!FileExists(input_path)) {
+        error = "input file not found: " + input_path;
         return false;
     }
 
-    String ext = ToLower(GetFileExt(job.input_path));
+    String ext = ToLower(GetFileExt(input_path));
     bool svg_input = (ext == ".svg");
 
     String svg;
@@ -320,22 +390,22 @@ bool BuildIconHeaderFromSvg(const SvgIconJob& job, String& error)
     Image img;
 
     if(svg_input) {
-        svg = LoadFile(job.input_path);
+        svg = LoadFile(input_path);
         if(svg.IsEmpty()) {
-            error = "failed to load input svg or file is empty";
+            error = "failed to load input svg or file is empty: " + input_path;
             return false;
         }
         if(!IsSVG(svg)) {
-            error = "input .svg file is not valid";
+            error = "input .svg file is not valid: " + input_path;
             return false;
         }
         render_sz = ResolveSize(svg, job.size);
         img = RenderSvgExact(render_sz, svg);
     }
     else {
-        img = StreamRaster::LoadFileAny(job.input_path);
+        img = StreamRaster::LoadFileAny(input_path);
         if(IsNull(img)) {
-            error = "unsupported image file (supported: .svg, and raster via StreamRaster e.g. .png)";
+            error = "unsupported image file: " + input_path;
             return false;
         }
         if(render_sz.cx <= 0 || render_sz.cy <= 0)
@@ -344,31 +414,139 @@ bool BuildIconHeaderFromSvg(const SvgIconJob& job, String& error)
     }
 
     if(render_sz.cx <= 0 || render_sz.cy <= 0 || render_sz.cx > 4096 || render_sz.cy > 4096) {
-        error = "render size is invalid/out-of-range";
+        error = "render size is invalid/out-of-range for: " + input_path;
         return false;
     }
-
     if(IsNull(img)) {
-        error = "failed to render input image";
+        error = "failed to render input image: " + input_path;
         return false;
     }
 
-    Vector<byte> encoded = EncodeRle(img);
-    if(encoded.IsEmpty()) {
-        error = "failed to encode image";
+    out.input_path = input_path;
+    out.size = render_sz;
+    out.image = img;
+    out.token = DefaultTokenFromPath(input_path, render_sz, job.token_prefix);
+    return true;
+}
+
+bool ParseSvgIconJob(const Vector<String>& args, SvgIconJob& job, String& error)
+{
+    if(args.GetCount() < 1) {
+        error = "usage: MakeIconFromSVG <input1> [input2 ...] [--format iml|uimakeicon] [--size N|WIDTHxHEIGHT] [--output-base path] [--token-prefix PREFIX]";
         return false;
     }
 
-    String token = job.symbol_token;
-    if(token.IsEmpty())
-        token = DefaultTokenFromPath(job.input_path, render_sz);
+    job = SvgIconJob();
+    for(int i = 0; i < args.GetCount(); i++) {
+        const String& a = args[i];
+        if(a == "--format") {
+            if(i + 1 >= args.GetCount() || !ParseOutputMode(args[++i], job.output_mode)) {
+                error = "unknown or missing --format value";
+                return false;
+            }
+        }
+        else if(a == "--size") {
+            if(i + 1 >= args.GetCount()) {
+                error = "missing --size value";
+                return false;
+            }
+            String e = ParseSizeText(args[++i], job.size);
+            if(!e.IsEmpty()) {
+                error = e;
+                return false;
+            }
+        }
+        else if(a == "--output-base") {
+            if(i + 1 >= args.GetCount()) {
+                error = "missing --output-base value";
+                return false;
+            }
+            job.output_base = args[++i];
+        }
+        else if(a == "--token-prefix") {
+            if(i + 1 >= args.GetCount()) {
+                error = "missing --token-prefix value";
+                return false;
+            }
+            job.token_prefix = args[++i];
+        }
+        else if(a.StartsWith("--")) {
+            error = "unknown option: " + a;
+            return false;
+        }
+        else {
+            job.input_paths.Add(a);
+        }
+    }
 
-    String header = BuildHeaderText(token, encoded, job.input_path, render_sz);
-    if(!SaveFile(job.output_header, header)) {
-        error = "failed to write output header: " + job.output_header;
+    if(job.input_paths.IsEmpty()) {
+        error = "at least one input path is required";
         return false;
     }
 
+    if(job.output_base.IsEmpty())
+        job.output_base = ResolveOutputBase(job.input_paths, job.output_mode);
+
+    return true;
+}
+
+bool BuildIconHeaderFromSvg(const SvgIconJob& job, String& error)
+{
+    // The shared icon workflow has two explicit insertion points now:
+    // UiIcons.iml for data payloads and UiIcons.h for wrappers/catalog lines.
+    // Emit them as separate append files so future scripted or AI-assisted
+    // merges do not need to infer destinations from mixed output text.
+    Vector<ResolvedSvgIcon> icons;
+    Index<String> used;
+    for(int i = 0; i < job.input_paths.GetCount(); i++) {
+        ResolvedSvgIcon icon;
+        if(!ResolveIconImage(job, job.input_paths[i], icon, error))
+            return false;
+        if(used.Find(icon.token) >= 0) {
+            error = "duplicate generated token: " + icon.token;
+            return false;
+        }
+        used.Add(icon.token);
+        icons.Add(pick(icon));
+    }
+
+    if(job.output_mode == SvgIconOutputMode::IML) {
+        String iml_append;
+        String header_append;
+        header_append << "// Auto-generated by MakeIconFromSVG\n";
+        header_append << "// Append ICON_* wrappers near the wrapper block and add catalog lines\n";
+        header_append << "// inside UiIconCatalog() in Ui/UiIcons.h.\n\n";
+        for(int i = 0; i < icons.GetCount(); i++) {
+            iml_append << BuildImlEntryText(icons[i].token, BuildImlPayload(icons[i].image), icons[i].input_path, icons[i].size) << "\n";
+            header_append << BuildIconsHAppendText(icons[i].token, icons[i].input_path, icons[i].size) << "\n";
+        }
+        String iml_path = job.output_base + ".iml.append";
+        String header_path = job.output_base + ".icons_h.append";
+        if(!SaveFile(iml_path, iml_append)) {
+            error = "failed to write output file: " + iml_path;
+            return false;
+        }
+        if(!SaveFile(header_path, header_append)) {
+            error = "failed to write output file: " + header_path;
+            return false;
+        }
+    }
+    else {
+        String output_text;
+        for(int i = 0; i < icons.GetCount(); i++) {
+            Vector<byte> encoded = EncodeRle(icons[i].image);
+            if(encoded.IsEmpty()) {
+                error = "failed to encode image: " + icons[i].input_path;
+                return false;
+            }
+            output_text << BuildHeaderText(icons[i].token, encoded, icons[i].input_path, icons[i].size) << "\n";
+        }
+        String header_path = job.output_base + ".h";
+        if(!SaveFile(header_path, output_text)) {
+            error = "failed to write output file: " + header_path;
+            return false;
+        }
+    }
     return true;
 }
 
@@ -402,5 +580,11 @@ CONSOLE_APP_MAIN
         return;
     }
 
-    Cout() << "ok: wrote " << job.output_header << "\n";
+    if(job.output_mode == SvgIconOutputMode::IML) {
+        Cout() << "ok: wrote " << job.output_base << ".iml.append\n";
+        Cout() << "ok: wrote " << job.output_base << ".icons_h.append\n";
+    }
+    else {
+        Cout() << "ok: wrote " << job.output_base << ".h\n";
+    }
 }

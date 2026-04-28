@@ -1,623 +1,476 @@
-#include <CtrlCore/CtrlCore.h>
-#include <CtrlLib/CtrlLib.h>
-
-#include <Ui/Ui.h>
-#include <Ui/UiDraw.h>
-
-#include <Animation/Animation.h>
-#include <Painter/Painter.h>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
-
-// -----------------------------------------------------------------------------
-// Shared constants for the soft 9-slice skin
-// -----------------------------------------------------------------------------
-
-static const int SOFT_SKIN_FACE = DPI(22);
-
-
-// "Raised" 9-slice: light face + subtle drop shadow
-static Image MakeNineSliceSkinRaised(int size=30, int radius=4)
-{
-    ImageBuffer ib(size, size);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    double r       = DPI(4);
-    double sz_face = SOFT_SKIN_FACE;
-
-    double face_x = DPI(1);
-    double face_y = DPI(1);
-
-    double shadow_off_x = DPI(1.0);
-    double shadow_off_y = DPI(3.0);
-
-    // 1) shadow blob
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(face_x + shadow_off_x,
-                           face_y + shadow_off_y,
-                           sz_face, sz_face, radius);
-        p.Fill(Color(140, 140, 140));
-        p.End();
-    }
-
-    // 2) blur shadow
-    FastBlur(ib, 4);
-    FastBlur(ib, 4);
-
-    // 3) face + borders
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-
-        p.RoundedRectangle(face_x, face_y, sz_face, sz_face, radius);
-        p.Fill(Color(240, 240, 240));
-
-        p.RoundedRectangle(face_x, face_y, sz_face, sz_face, radius);
-        p.Stroke(1.0, Color(180, 180, 180));
-
-        p.RoundedRectangle(face_x + 1.0, face_y + 1.0,
-                           sz_face - 2.0, sz_face - 2.0,
-                           max(0.0, radius - 1.0));
-        p.Stroke(2.5, Color(255, 255, 255));
-
-        p.End();
-    }
-
-    return ib;
-}
-
-// "Inset" 9-slice: bevel that reads pressed-in
-static Image MakeNineSliceSkinInset(int size=30, int radius=4)
-{
-    ImageBuffer ib(size, size);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    double r       = DPI(4);
-    double sz_face = SOFT_SKIN_FACE;
-
-    double face_x = DPI(1);
-    double face_y = DPI(1);
-
-    double dark_off_x  = DPI(-1.0);
-    double dark_off_y  = DPI(-2.0);
-    double light_off_x = DPI(1.0);
-    double light_off_y = DPI(2.0);
-
-    // dark top-left
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(face_x + dark_off_x,
-                           face_y + dark_off_y,
-                           sz_face, sz_face, r);
-        p.Fill(Color(120, 120, 120));
-        p.End();
-    }
-
-    // light bottom-right
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(face_x + light_off_x,
-                           face_y + light_off_y,
-                           sz_face, sz_face, r);
-        p.Fill(Color(255, 255, 255));
-        p.End();
-    }
-
-    FastBlur(ib, 4);
-    FastBlur(ib, 4);
-
-    // face + borders
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-
-        p.RoundedRectangle(face_x, face_y, sz_face, sz_face, r);
-        p.Fill(Color(235, 235, 235));
-
-        p.RoundedRectangle(face_x, face_y, sz_face, sz_face, r);
-        p.Stroke(1.0, Color(175, 175, 175));
-
-        p.RoundedRectangle(face_x + 1.0, face_y + 1.0,
-                           sz_face - 2.0, sz_face - 2.0,
-                           max(0.0, r - 1.0));
-        p.Stroke(2.0, Color(210, 210, 210));
-
-        p.End();
-    }
-
-    return ib;
-}
-
-static Image MakeDotIcon(int side, Color fill, Color stroke)
-{
-    side = max(side, 8);
-    ImageBuffer ib(side, side);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    double s  = (double)side;
-    double cx = s * 0.5;
-    double cy = s * 0.5;
-    double rr = s * 0.36;
-
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    p.Begin();
-    p.Circle(cx, cy, rr);
-    p.Fill(fill);
-    p.Circle(cx, cy, rr);
-    p.Stroke(max(1.0, s * 0.06), stroke);
-    p.End();
-
-    return ib;
-}
-
-// ============================================================================
-//  UiLabel Demo Window
-// ============================================================================
-
-class UiLabelDemoWindow : public TopWindow {
-public:
-    typedef UiLabelDemoWindow CLASSNAME;
-
-    UiLabelDemoWindow()
-    {
-        Title("UiLabel Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1050), DPI(780));
-        BackPaint();
-
-        icon16 = MakeDotIcon(DPI(16), Color(80, 140, 220), Color(30, 60, 120));
-        icon20 = MakeDotIcon(DPI(20), Color(80, 140, 220), Color(30, 60, 120));
-        icon24 = MakeDotIcon(DPI(24), Color(80, 140, 220), Color(30, 60, 120));
-        icon32 = MakeDotIcon(DPI(32), Color(80, 140, 220), Color(30, 60, 120));
-        icon48 = MakeDotIcon(DPI(48), Color(80, 140, 220), Color(30, 60, 120));
-        icon64 = MakeDotIcon(DPI(64), Color(80, 140, 220), Color(30, 60, 120));
-
-        skinRaised = MakeNineSliceSkinRaised();
-        skinInset  = MakeNineSliceSkinInset();
-
-        SetupGrid();
-        StartPulse();
-        SetTimeCallback(180, [=] { UpdateConsoleProgress(); }, 3001);
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Rect r = GetSize();
-        w.DrawRect(r, SColorPaper());
-
-        int head_h = DPI(88);
-        w.DrawRect(0, 0, r.GetWidth(), head_h, SColorFace());
-
-        Font title = SansSerifZ(24).Bold();
-        Font desc  = SansSerifZ(12);
-
-        w.DrawText(DPI(28), DPI(10), "UiLabel Demo", title, SColorText());
-
-        String line1 = "Showcase for UiLabel: theme roles, icon layouts, icon-only, margins/inset, gradients, 9-slice, animation.";
-        w.DrawText(DPI(28), DPI(44), line1, desc, SColorText());
-
-        PaintGridChrome(w, r);
-    }
-
-    virtual void Layout() override
-    {
-        Rect r = GetSize();
-
-        int head_h   = DPI(88);
-        int margin_x = DPI(28);
-
-        int rowlabel_w = DPI(190);
-        int cols       = 6;
-
-        int title_h = DPI(18);
-        int row_h   = DPI(66);
-
-        int grid_top = head_h + DPI(20) + title_h + DPI(10);
-
-        int usable_w = r.GetWidth() - 2 * margin_x - rowlabel_w;
-        int col_w    = usable_w / cols;
-        int start_x  = margin_x + rowlabel_w;
-
-        for(int rr = 0; rr < 6; rr++) {
-            int row_y = grid_top + rr * row_h;
-            for(int cc = 0; cc < cols; cc++) {
-                UiLabel& c = cell[rr][cc];
-
-                int cw = col_w - DPI(16);
-                int ch = row_h - DPI(16);
-
-                c.SetRect(start_x + cc * col_w + (col_w - cw) / 2,
-                          row_y + (row_h - ch) / 2,
-                          cw, ch);
-            }
-        }
-    }
-
-private:
-    void PaintGridChrome(Draw& w, const Rect& r)
-    {
-        int head_h   = DPI(88);
-        int margin_x = DPI(28);
-
-        int rowlabel_w = DPI(190);
-        int cols       = 6;
-
-        int title_h = DPI(18);
-        int row_h   = DPI(66);
-
-        int grid_top = head_h + DPI(20);
-
-        Font sec = SansSerifZ(14).Bold();
-        Font row = SansSerifZ(11).Bold();
-
-        w.DrawText(margin_x, grid_top, "Feature grid (6×6)", sec, SColorText());
-
-        int y0 = grid_top + title_h + DPI(10);
-
-        static const char* row_names[6] = {
-            "Theme roles + state",
-            "Icon layouts (L/R/T/B)",
-            "Icon-only sizes",
-            "Margins / inset / dash",
-            "9-slice skins",
-            "Animation + misc"
-        };
-
-        for(int rr = 0; rr < 6; rr++) {
-            int y = y0 + rr * row_h;
-
-            w.DrawRect(margin_x, y - 1, r.GetWidth() - 2 * margin_x, 1, SColorShadow());
-
-            int row_cy = max(1, row.GetCy());
-            w.DrawText(margin_x, y + (row_h - row_cy) / 2, row_names[rr], row, SColorText());
-        }
-
-        w.DrawRect(margin_x, y0 + 6 * row_h - 1,
-                   r.GetWidth() - 2 * margin_x, 1, SColorShadow());
-    }
-
-    void SetupGrid()
-    {
-        Size min_sz(DPI(150), DPI(28));
-
-        for(int r = 0; r < 6; r++)
-            for(int c = 0; c < 6; c++) {
-                Add(cell[r][c]);
-                cell[r][c].SetSizeMin(min_sz);
-            }
-
-        // -----------------------------------------------------------------
-        // Row 0: Theme roles + disabled
-        // -----------------------------------------------------------------
-        cell[0][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body)).SetText("Default");
-        cell[0][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Caption)).SetText("Caption");
-        cell[0][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Subheadline)).SetText("Subheadline");
-        cell[0][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Footnote)).SetText("Footnote");
-
-        cell[0][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
-                  .SetText("Badge")
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-
-        cell[0][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Disabled")
-                  .Disable();
-
-        // -----------------------------------------------------------------
-        // Row 1: Icon layouts (text opposite side)
-        // -----------------------------------------------------------------
-        cell[1][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Left icon")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetIconScale(true);
-
-        cell[1][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Right icon")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::RIGHT)
-                  .SetAlign(UiAlign::RIGHT, UiAlign::CENTER)
-                  .SetIconScale(true);
-
-        cell[1][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Top icon")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::TOP)
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-                  .SetIconScale(true)
-                  .SetSizeMin(Size(DPI(150), DPI(48)));
-
-        cell[1][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Bottom")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::BOTTOM)
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-                  .SetIconScale(true)
-                  .SetSizeMin(Size(DPI(150), DPI(48)));
-
-        cell[1][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
-                  .SetText("Left\nmultiline")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetIconScale(true)
-                  .SetSizeMin(Size(DPI(150), DPI(56)));
-
-        cell[1][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
-                  .SetText("Top\nmultiline")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::TOP)
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-                  .SetIconScale(true)
-                  .SetSizeMin(Size(DPI(150), DPI(60)));
-
-        // -----------------------------------------------------------------
-        // Row 2: Icon-only sizes
-        // -----------------------------------------------------------------
-        auto IconOnly = [&](int col, const Image& img, const String& label, int hmin = 0) {
-            UiLabel& x = cell[2][col];
-            x.SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-             .SetText(label)
-             .SetIcon(img)
-             .SetIconLayout(UiAlign::TOP)
-             .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-             .SetIconScale(true);
-            if(hmin > 0)
-                x.SetSizeMin(Size(DPI(150), hmin));
-        };
-
-        IconOnly(0, icon16, "16", DPI(56));
-        IconOnly(1, icon20, "20", DPI(56));
-        IconOnly(2, icon24, "24", DPI(56));
-        IconOnly(3, icon32, "32", DPI(62));
-        IconOnly(4, icon48, "48", DPI(72));
-        IconOnly(5, icon64, "64", DPI(84));
-
-        // -----------------------------------------------------------------
-        // Row 3: Margins / inset / dash / gradients
-        // -----------------------------------------------------------------
-        cell[3][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Inset +10")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
-
-        cell[3][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Icon margin")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetIconMargin(Rect(DPI(8), DPI(2), DPI(2), DPI(2)));
-
-        cell[3][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Text margin")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetTextMargin(Rect(DPI(10), 0, 0, 0));
-
-        cell[3][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Overlap")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetIconMargin(Rect(DPI(-4), 0, 0, 0))
-                  .SetTextMargin(Rect(DPI(-2), 0, 0, 0));
-
-        cell[3][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Dashed")
-				  .EnableFace(false)
-				  .SetFrameWidth(DPI(2))
-				  .EnableDash(true);
-
-
-        cell[3][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Pill grad")
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-                  .SetFaceQuadGradient(Color(243, 247, 255),
-                                       Color(230, 240, 255),
-                                       Color(220, 230, 250),
-                                       Color(210, 220, 250),
-                                       32, 3)
-                  .SetRadius(DPI(999))
-                  .EnableFace(true)
-                  .EnableFrame(false);
-
-        // -----------------------------------------------------------------
-        // Row 4: 9-slice skins (raised + inset + variants)
-        // -----------------------------------------------------------------
-
-        Rect slice = Rect(10,10,10,10);
-
-        cell[4][0].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Raised skin")
-                  .SetFill9Slice(skinRaised, slice, false)
-                  .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
-
-        cell[4][1].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Inset skin")
-                  .SetFill9Slice(skinInset, slice, false)
-                  .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
-
-        cell[4][2].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Skin + frame")
-                  .SetFill9Slice(skinRaised, slice, true)
-                  .EnableFrame(true)
-                  .SetFrameWidth( DPI(5) )
-                  .SetFrameColor(Color(40,40,240))
-                  .SetRadius( DPI(4) );
-                  
-
-        cell[4][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Skin no frame")
-                  .SetFill9Slice(skinRaised, slice, false)
-                  .EnableFrame(false);
-
-        cell[4][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Skin + icon")
-                  .SetIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetFill9Slice(skinInset, slice, false)
-                  .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(8)));
-
-        cell[4][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Badge))
-                  .SetText("Badge skin")
-                  .SetFill9Slice(skinRaised, slice, false)
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-
-        // -----------------------------------------------------------------
-        // Row 5: Animation + misc
-        // -----------------------------------------------------------------
-        cell[5][0].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
-                  .EnableRich(true)
-                  .ClearSpans()
-                  .AddBulletSpan(Color(52, 211, 153), DPI(8))
-                  .AddTextSpan("  OK ", Color(52, 211, 153), true)
-                  .AddIconSpan(icon16, false)
-                  .AddTextSpan("  runtime healthy", SColorText());
-
-        String ansi;
-        ansi << (char)27 << "[32mINFO" << (char)27 << "[0m  "
-             << (char)27 << "[33mWARN" << (char)27 << "[0m  "
-             << (char)27 << "[31mERROR" << (char)27 << "[0m";
-
-        cell[5][1].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
-                  .SetAnsiText(ansi);
-
-        cell[5][2].SetStyle(UiTheme::ResolveLabel(UiThemePreset::Layered, UiThemeMode::Light, UiLabelRole::Body))
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER)
-                  .SetTextMargin(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
-                  .EnableRich(true)
-                  .ClearSpans()
-                  .AddTextSpan("Build ", SColorText(), true)
-                  .AddTextSpan("[..........]", Color(56, 189, 248), false, false, true)
-                  .AddTextSpan(" 0%", SColorText());
-
-        progress_bar_span_ = 1;
-        progress_pct_span_ = 2;
-
-        // SetMonoIcon takes Image (not bool) — demo uses the same icon as mono source
-        cell[5][3].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("Mono icon")
-                  .SetIcon(icon24)
-                  .SetMonoIcon(icon24)
-                  .SetIconLayout(UiAlign::LEFT)
-                  .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-
-        // Small overlay tint demo using foreground hook
-        cell[5][4].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("FG tint")
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-
-        cell[5][4].WhenPaintForeground = [=](Draw& w, const Rect& outer,
-                                             const StyledPalette& p, const StyledMetrics& m, const StyledSkin& s,
-                                             StyledState st, bool has_focus)
-        {
-            Rect top = outer;
-            top.bottom = top.top + top.GetHeight() / 2;
-            w.DrawRect(top, Color(255, 255, 255));
-
-            UiPaintStyledForeground(w, outer, p, m, s, st, has_focus);
-        };
-
-        cell[5][5].SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body))
-                  .SetText("PULSE")
-                  .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
-                  .SetRadius(DPI(10));
-    }
-
-    void StartPulse()
-    {
-        // Animation requires Animation(Ctrl& owner)
-        if(pulse) {
-            pulse->Cancel();
-            pulse.Clear();
-        }
-
-        pulse = new Animation(*this);
-        Animation& a = *pulse;
-
-        Ptr<UiLabel> target1 = &cell[5][0];
-        Ptr<UiLabel> target2 = &cell[5][5];
-
-        Color base  = SColorText();
-        Color paper = SColorPaper();
-
-        a([target1,target2, base, paper](double t) mutable -> bool {
-            if(!target1 || !target2)
-                return false;
-
-            // Simulate “alpha” by blending text toward paper.
-            // t in [0..1] => blend factor ~0..230 => visible ~100%..~10%
-            int k = int(t * 230.0 + 0.5);
-            Color c = Blend(base, paper, k);
-            Color c2 = Blend(base, Red(), k);
-
-            StyledPalette& pal1 = target1->StyledPaletteRef();
-            StyledPalette& pal2 = target2->StyledPaletteRef();
-            for(int i = 0; i < 4; i++) {
-                pal1.ink[i] = c;
-                pal2.ink[i] = c2;
-            
-            }
-            target1->Refresh();
-            target2->Refresh();
-            return true;
-        })
-        .Duration(1200)
-        .Ease(Easing::InOutCubic())
-        .Yoyo(true)
-        .Loop(-1);
-
-        a.Play();
-    }
-
-    void UpdateConsoleProgress()
-    {
-        progress_ = (progress_ + 1) % 11;
-        String bar = "[";
-        for(int i = 0; i < 10; i++)
-            bar.Cat(i < progress_ ? '#' : '.');
-        bar.Cat(']');
-
-        if(progress_bar_span_ >= 0 && progress_bar_span_ < cell[5][2].GetSpanCount()) {
-            UiLabel::Span s = cell[5][2].GetSpan(progress_bar_span_);
-            s.text = bar;
-            cell[5][2].SetSpan(progress_bar_span_, s);
-        }
-        if(progress_pct_span_ >= 0 && progress_pct_span_ < cell[5][2].GetSpanCount()) {
-            UiLabel::Span s = cell[5][2].GetSpan(progress_pct_span_);
-            s.text = Format(" %d%%", progress_ * 10);
-            cell[5][2].SetSpan(progress_pct_span_, s);
-        }
-
-        SetTimeCallback(180, [=] { UpdateConsoleProgress(); }, 3001);
-    }
-
-private:
-    Image icon16, icon20, icon24, icon32, icon48, icon64;
-    Image skinRaised, skinInset;
-
-    UiLabel cell[6][6];
-    int progress_ = 0;
-    int progress_bar_span_ = -1;
-    int progress_pct_span_ = -1;
-
-    One<Animation> pulse;
+using namespace BuilderDemoSupport;
+
+namespace {
+
+struct RichSpanConfig : Moveable<RichSpanConfig> {
+    String text;
+    Color ink = Null;
+    bool bold = false;
+    bool italic = false;
+    bool underline = false;
 };
+
+struct LabelConfig {
+    String text = "System status";
+    UiAlign align_h = UiAlign::LEFT;
+    UiAlign align_v = UiAlign::CENTER;
+    UiAlign icon_side = UiAlign::LEFT;
+    int content_gap = DPI(8);
+    int icon_size = DPI(18);
+    int margin_x = DPI(10);
+    int margin_y = DPI(6);
+    int radius = DPI(8);
+    int frame_width = 1;
+    bool body_face = true;
+    bool body_frame = true;
+    bool selectable = true;
+    bool underline = false;
+    bool show_icon = true;
+    bool rich_mode = false;
+};
+
+class UiLabelBuilder : public BuilderWindowBase {
+public:
+    typedef UiLabelBuilder CLASSNAME;
+
+    UiLabelBuilder()
+        : BuilderWindowBase("UiLabelDemo", "U++ UiLabel Builder", "Inspect plain and rich label content, icon layout, alignment, and partial text styling from one shell.")
+    {
+        Preview().Add(label_);
+
+        AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
+        AddStateRow(StateBox(), state_mode_row_, state_mode_label_, state_mode_value_, "Mode");
+        AddStateRow(StateBox(), state_text_row_, state_text_label_, state_text_value_, "Text");
+        AddStateRow(StateBox(), state_span_row_, state_span_label_, state_span_value_, "Spans");
+        AddStateRow(StateBox(), state_surface_row_, state_surface_label_, state_surface_value_, "Surface");
+
+        AddEditRow(PropsBox(), text_row_box_, text_label_, text_edit_, "Text");
+        AddDropdownRow(PropsBox(), align_h_row_box_, align_h_label_, align_h_drop_, "Align H");
+        AddDropdownRow(PropsBox(), align_v_row_box_, align_v_label_, align_v_drop_, "Align V");
+        AddDropdownRow(PropsBox(), icon_side_row_box_, icon_side_label_, icon_side_drop_, "Icon Side");
+        AddSliderRow(PropsBox(), gap_row_, "Content Gap", "8px");
+        AddSliderRow(PropsBox(), icon_size_row_, "Icon Sz", "18px");
+        AddSliderRow(PropsBox(), margin_x_row_, "Margin X", "10px");
+        AddSliderRow(PropsBox(), margin_y_row_, "Margin Y", "6px");
+        AddSliderRow(PropsBox(), radius_row_, "Radius", "8px");
+        AddSliderRow(PropsBox(), frame_width_row_, "Frame W", "1px");
+        AddToggleRow(PropsBox(), rich_mode_row_, "Rich Mode");
+        AddToggleRow(PropsBox(), face_row_, "Body Face");
+        AddToggleRow(PropsBox(), frame_row_, "Body Frame");
+        AddToggleRow(PropsBox(), selectable_row_, "Selectable");
+        AddToggleRow(PropsBox(), underline_row_, "Underline");
+        AddToggleRow(PropsBox(), icon_row_, "Show Icon");
+
+        AddEditRow(PropsBox(), span_text_row_box_, span_text_label_, span_text_edit_, "Span Text");
+        AddToggleRow(PropsBox(), span_bold_row_, "Span Bold");
+        AddToggleRow(PropsBox(), span_italic_row_, "Span Italic");
+        AddToggleRow(PropsBox(), span_underline_row_, "Span Underline");
+        AddToggleRow(PropsBox(), span_color_enabled_row_, "Span Ink");
+        AddColorRow(PropsBox(), span_color_row_, "Ink Color");
+
+        span_actions_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        span_actions_row_.Add(add_span_button_).Expand(1).MinHeight(DPI(28));
+        span_actions_row_.Add(update_span_button_).Expand(1).MinHeight(DPI(28));
+        span_actions_row_.Add(newline_button_).Expand(1).MinHeight(DPI(28));
+        span_actions_row_.Add(delete_span_button_).Expand(1).MinHeight(DPI(28));
+        span_actions_row_.Add(clear_spans_button_).Expand(1).MinHeight(DPI(28));
+        PropsBox().Add(span_actions_row_).Fit();
+
+        span_list_.NoHeader();
+        span_list_.AddColumn("Span");
+        span_list_.AddColumn("Style");
+        span_list_.SetLineCy(DPI(22));
+        span_list_.SetMinSize(Size(DPI(240), DPI(120)));
+        PropsBox().Add(span_list_).Fit();
+
+        const EnumOption aligns_h[] = {
+            { "Left", (int)UiAlign::LEFT }, { "Center", (int)UiAlign::CENTER }, { "Right", (int)UiAlign::RIGHT }
+        };
+        const EnumOption aligns_v[] = {
+            { "Top", (int)UiAlign::TOP }, { "Center", (int)UiAlign::CENTER }, { "Bottom", (int)UiAlign::BOTTOM }
+        };
+        const EnumOption sides[] = {
+            { "Left", (int)UiAlign::LEFT }, { "Right", (int)UiAlign::RIGHT }, { "Top", (int)UiAlign::TOP }, { "Bottom", (int)UiAlign::BOTTOM }
+        };
+
+        PopulateDropdown(align_h_drop_, aligns_h, 3);
+        PopulateDropdown(align_v_drop_, aligns_v, 3);
+        PopulateDropdown(icon_side_drop_, sides, 4);
+
+        text_edit_.SetData(cfg_.text);
+        span_text_edit_.SetData(String("LIVE"));
+        gap_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(cfg_.content_gap);
+        icon_size_row_.Slider().SetRange(DPI(8), DPI(48)).SetStep(1).SetValue(cfg_.icon_size);
+        margin_x_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(cfg_.margin_x);
+        margin_y_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.margin_y);
+        radius_row_.Slider().SetRange(0, DPI(20)).SetStep(1).SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetRange(0, 4).SetStep(1).SetValue(cfg_.frame_width);
+        span_color_row_.SetLabel("Ink Color").SetSwatchCount(1).ShowValue(false);
+        span_color_row_.SetSwatchColor(0, Color(196, 59, 59));
+
+        text_edit_.WhenAction = [=] { cfg_.text = text_edit_.GetText().ToString(); RefreshFromConfig(); };
+        text_edit_.WhenChange = [=] { cfg_.text = text_edit_.GetText().ToString(); RefreshFromConfig(); };
+        align_h_drop_.WhenSelect = [=](int) { cfg_.align_h = (UiAlign)(int)align_h_drop_.GetSelectedData(); RefreshFromConfig(); };
+        align_v_drop_.WhenSelect = [=](int) { cfg_.align_v = (UiAlign)(int)align_v_drop_.GetSelectedData(); RefreshFromConfig(); };
+        icon_side_drop_.WhenSelect = [=](int) { cfg_.icon_side = (UiAlign)(int)icon_side_drop_.GetSelectedData(); RefreshFromConfig(); };
+        gap_row_.WhenAction = [=] { cfg_.content_gap = (int)gap_row_.Slider().GetValue(); RefreshFromConfig(); };
+        icon_size_row_.WhenAction = [=] { cfg_.icon_size = (int)icon_size_row_.Slider().GetValue(); RefreshFromConfig(); };
+        margin_x_row_.WhenAction = [=] { cfg_.margin_x = (int)margin_x_row_.Slider().GetValue(); RefreshFromConfig(); };
+        margin_y_row_.WhenAction = [=] { cfg_.margin_y = (int)margin_y_row_.Slider().GetValue(); RefreshFromConfig(); };
+        radius_row_.WhenAction = [=] { cfg_.radius = (int)radius_row_.Slider().GetValue(); RefreshFromConfig(); };
+        frame_width_row_.WhenAction = [=] { cfg_.frame_width = (int)frame_width_row_.Slider().GetValue(); RefreshFromConfig(); };
+        rich_mode_row_.Toggle().WhenAction = [=] { cfg_.rich_mode = rich_mode_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        face_row_.Toggle().WhenAction = [=] { cfg_.body_face = face_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        frame_row_.Toggle().WhenAction = [=] { cfg_.body_frame = frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        selectable_row_.Toggle().WhenAction = [=] { cfg_.selectable = selectable_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        underline_row_.Toggle().WhenAction = [=] { cfg_.underline = underline_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        icon_row_.Toggle().WhenAction = [=] { cfg_.show_icon = icon_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        span_bold_row_.Toggle().WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_italic_row_.Toggle().WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_underline_row_.Toggle().WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_color_enabled_row_.Toggle().WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_color_row_.WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_text_edit_.WhenAction = [=] { SyncSelectedSpanFromEditor(false); };
+        span_text_edit_.WhenChange = [=] { SyncSelectedSpanFromEditor(false); };
+        add_span_button_.WhenAction = [=] { AddSpanFromEditor(); };
+        update_span_button_.WhenAction = [=] { SyncSelectedSpanFromEditor(true); };
+        newline_button_.WhenAction = [=] { AddNewlineSpan(); };
+        delete_span_button_.WhenAction = [=] { DeleteSelectedSpan(); };
+        clear_spans_button_.WhenAction = [=] { spans_.Clear(); selected_span_ = -1; RefreshFromConfig(); };
+        span_list_.WhenSel = [=] { selected_span_ = span_list_.GetCursor(); LoadSelectedSpanToEditor(); };
+
+        add_span_button_.SetText("Add Span");
+        update_span_button_.SetText("Update");
+        newline_button_.SetText("New Line");
+        delete_span_button_.SetText("Delete");
+        clear_spans_button_.SetText("Clear");
+
+        BuildDefaultRichSpans();
+        label_.NoWantFocus();
+        FinishInit();
+        RefreshFromConfig();
+    }
+
+protected:
+    virtual void ApplyDemoTheme() override
+    {
+        UiLabel::Style body = MakeBodyLabelStyle(Palette());
+        UiLabel::Style value = MakeValueLabelStyle(Palette());
+        UiBaseEdit::Style edit = MakeEditStyle(Palette());
+        UiDropdown::Style dd = MakeDropdownStyle(Palette());
+        UiButton::Style btn = MakeSmallButtonStyle(Palette());
+
+        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
+        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
+        state_text_label_.SetStyle(body); state_text_value_.SetStyle(value);
+        state_span_label_.SetStyle(body); state_span_value_.SetStyle(value);
+        state_surface_label_.SetStyle(body); state_surface_value_.SetStyle(value);
+        text_label_.SetStyle(body); align_h_label_.SetStyle(body); align_v_label_.SetStyle(body); icon_side_label_.SetStyle(body);
+        span_text_label_.SetStyle(body);
+        text_edit_.SetStyle(edit);
+        span_text_edit_.SetStyle(edit);
+        align_h_drop_.SetStyle(dd); align_v_drop_.SetStyle(dd); icon_side_drop_.SetStyle(dd);
+        gap_row_.SetLabelStyle(body).SetValueStyle(value);
+        icon_size_row_.SetLabelStyle(body).SetValueStyle(value);
+        margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
+        margin_y_row_.SetLabelStyle(body).SetValueStyle(value);
+        radius_row_.SetLabelStyle(body).SetValueStyle(value);
+        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
+        rich_mode_row_.SetLabelStyle(body);
+        face_row_.SetLabelStyle(body);
+        frame_row_.SetLabelStyle(body);
+        selectable_row_.SetLabelStyle(body);
+        underline_row_.SetLabelStyle(body);
+        icon_row_.SetLabelStyle(body);
+        span_bold_row_.SetLabelStyle(body);
+        span_italic_row_.SetLabelStyle(body);
+        span_underline_row_.SetLabelStyle(body);
+        span_color_enabled_row_.SetLabelStyle(body);
+        span_color_row_.SetLabelStyle(body);
+        add_span_button_.SetStyle(btn);
+        update_span_button_.SetStyle(btn);
+        newline_button_.SetStyle(btn);
+        delete_span_button_.SetStyle(btn);
+        clear_spans_button_.SetStyle(btn);
+    }
+
+    virtual void LayoutPreviewContent() override
+    {
+        Rect canvas = Preview().GetCanvasRect();
+        Size sz = label_.GetMinSize();
+        sz.cx = min(sz.cx + DPI(32), canvas.GetWidth());
+        sz.cy = min(sz.cy + DPI(18), canvas.GetHeight());
+        int x = canvas.left + (canvas.GetWidth() - sz.cx) / 2;
+        int y = canvas.top + (canvas.GetHeight() - sz.cy) / 2;
+        label_.SetRect(x, y, sz.cx, sz.cy);
+    }
+
+private:
+    struct EnumOption { const char* label; int value; };
+
+    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    {
+        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        target.Add(row).Fit();
+    }
+
+    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
+    {
+        drop.UseInternalModel();
+        drop.Clear();
+        for(int i = 0; i < count; i++)
+            drop.Add(opts[i].label, opts[i].value);
+    }
+
+    void BuildDefaultRichSpans()
+    {
+        spans_.Clear();
+        RichSpanConfig a; a.text = "System"; a.ink = Color(44, 99, 212); a.bold = true; spans_.Add(a);
+        RichSpanConfig b; b.text = " status "; spans_.Add(b);
+        RichSpanConfig c; c.text = "LIVE"; c.ink = Color(201, 55, 72); c.bold = true; spans_.Add(c);
+    }
+
+    RichSpanConfig SpanFromEditor() const
+    {
+        RichSpanConfig s;
+        s.text = span_text_edit_.GetText().ToString();
+        s.bold = span_bold_row_.Toggle().IsOn();
+        s.italic = span_italic_row_.Toggle().IsOn();
+        s.underline = span_underline_row_.Toggle().IsOn();
+        s.ink = span_color_enabled_row_.Toggle().IsOn() ? span_color_row_.GetSwatchColor(0) : Null;
+        return s;
+    }
+
+    void LoadSelectedSpanToEditor()
+    {
+        if(selected_span_ < 0 || selected_span_ >= spans_.GetCount())
+            return;
+        const RichSpanConfig& s = spans_[selected_span_];
+        span_text_edit_.SetData(s.text == "\n" ? String() : s.text);
+        span_bold_row_.Toggle().SetOn(s.bold);
+        span_italic_row_.Toggle().SetOn(s.italic);
+        span_underline_row_.Toggle().SetOn(s.underline);
+        span_color_enabled_row_.Toggle().SetOn(!IsNull(s.ink));
+        span_color_row_.SetSwatchColor(0, IsNull(s.ink) ? Palette().blue : s.ink);
+    }
+
+    void AddSpanFromEditor()
+    {
+        RichSpanConfig s = SpanFromEditor();
+        if(s.text.IsEmpty())
+            return;
+        spans_.Add(s);
+        selected_span_ = spans_.GetCount() - 1;
+        RefreshFromConfig();
+    }
+
+    void AddNewlineSpan()
+    {
+        RichSpanConfig s;
+        s.text = "\n";
+        spans_.Add(s);
+        selected_span_ = spans_.GetCount() - 1;
+        RefreshFromConfig();
+    }
+
+    void DeleteSelectedSpan()
+    {
+        if(selected_span_ < 0 || selected_span_ >= spans_.GetCount())
+            return;
+        spans_.Remove(selected_span_);
+        if(selected_span_ >= spans_.GetCount())
+            selected_span_ = spans_.GetCount() - 1;
+        RefreshFromConfig();
+    }
+
+    void SyncSelectedSpanFromEditor(bool commit)
+    {
+        if(selected_span_ < 0 || selected_span_ >= spans_.GetCount())
+            return;
+        spans_[selected_span_] = SpanFromEditor();
+        if(commit)
+            RefreshFromConfig();
+    }
+
+    String BuildRichPlainText() const
+    {
+        String out;
+        for(const RichSpanConfig& s : spans_)
+            out << s.text;
+        return out;
+    }
+
+    String SpanStyleCode(const RichSpanConfig& s) const
+    {
+        String out;
+        if(!IsNull(s.ink)) out << "ink ";
+        if(s.bold) out << "bold ";
+        if(s.italic) out << "italic ";
+        if(s.underline) out << "underline ";
+        return out.IsEmpty() ? String("plain") : TrimBoth(out);
+    }
+
+    void RefreshSpanList()
+    {
+        span_list_.Clear();
+        for(int i = 0; i < spans_.GetCount(); i++) {
+            const RichSpanConfig& s = spans_[i];
+            String label = s.text == "\n" ? String("<newline>") : s.text;
+            span_list_.Add(label, SpanStyleCode(s));
+        }
+        if(selected_span_ >= 0 && selected_span_ < span_list_.GetCount())
+            span_list_.SetCursor(selected_span_);
+    }
+
+    void ApplyRichContent()
+    {
+        label_.ClearSpans().EnableRich(true);
+        for(const RichSpanConfig& s : spans_) {
+            if(s.text == "\n")
+                label_.AddNewlineSpan();
+            else
+                label_.AddTextSpan(s.text, s.ink, s.bold, s.italic, s.underline);
+        }
+    }
+
+    void RefreshFromConfig()
+    {
+        UiLabel::Style style = UiTheme::ResolveLabel(UiLabelRole::Body);
+        style.align_h = cfg_.align_h;
+        style.align_v = cfg_.align_v;
+        style.metrics.radius = cfg_.radius;
+        style.metrics.frame_width = cfg_.frame_width;
+        style.metrics.face_enabled = cfg_.body_face;
+        style.metrics.frame_enabled = cfg_.body_frame;
+        style.metrics.content_margin = Rect(cfg_.margin_x, cfg_.margin_y, cfg_.margin_x, cfg_.margin_y);
+        style.content_gap = cfg_.content_gap;
+        for(int i = 0; i < 4; ++i) {
+            style.palette.face[i] = UiFill::Solid(Palette().segment_face);
+            style.palette.frame[i] = Palette().segment_frame;
+        }
+
+        label_.SetStyle(style)
+              .SetIcon(cfg_.show_icon ? ICON_ACTION_SEARCH_48() : Image())
+              .SetIconRenderMode(UiIconRenderMode::PreserveColor)
+              .SetIconSide(cfg_.icon_side)
+              .SetIconSize(cfg_.icon_size, cfg_.icon_size)
+              .SetSelectable(cfg_.selectable)
+              .SetUnderline(cfg_.underline);
+
+        if(cfg_.rich_mode)
+            ApplyRichContent();
+        else
+            label_.EnableRich(false).SetText(cfg_.text);
+
+        align_h_drop_.SelectByData((int)cfg_.align_h);
+        align_v_drop_.SelectByData((int)cfg_.align_v);
+        icon_side_drop_.SelectByData((int)cfg_.icon_side);
+        text_edit_.SetData(cfg_.text);
+        gap_row_.Slider().SetValue(cfg_.content_gap);
+        icon_size_row_.Slider().SetValue(cfg_.icon_size);
+        margin_x_row_.Slider().SetValue(cfg_.margin_x);
+        margin_y_row_.Slider().SetValue(cfg_.margin_y);
+        radius_row_.Slider().SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetValue(cfg_.frame_width);
+        rich_mode_row_.Toggle().SetOn(cfg_.rich_mode);
+        face_row_.Toggle().SetOn(cfg_.body_face);
+        frame_row_.Toggle().SetOn(cfg_.body_frame);
+        selectable_row_.Toggle().SetOn(cfg_.selectable);
+        underline_row_.Toggle().SetOn(cfg_.underline);
+        icon_row_.Toggle().SetOn(cfg_.show_icon);
+
+        gap_row_.SetValueText(AsString(cfg_.content_gap) + "px");
+        icon_size_row_.SetValueText(AsString(cfg_.icon_size) + "px");
+        margin_x_row_.SetValueText(AsString(cfg_.margin_x) + "px");
+        margin_y_row_.SetValueText(AsString(cfg_.margin_y) + "px");
+        radius_row_.SetValueText(AsString(cfg_.radius) + "px");
+        frame_width_row_.SetValueText(AsString(cfg_.frame_width) + "px");
+
+        RefreshSpanList();
+        if(selected_span_ >= 0 && selected_span_ < spans_.GetCount())
+            LoadSelectedSpanToEditor();
+
+        state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
+        state_mode_value_.SetText(cfg_.rich_mode ? "Rich" : "Plain");
+        state_text_value_.SetText(cfg_.rich_mode ? BuildRichPlainText() : cfg_.text);
+        state_span_value_.SetText(AsString(spans_.GetCount()));
+        state_surface_value_.SetText(AsString(cfg_.body_face ? "Face" : "No Face") + " / " + AsString(cfg_.body_frame ? "Frame" : "No Frame"));
+
+        SetUsageCode(BuildUsageCode());
+        Refresh();
+        Preview().Refresh();
+    }
+
+    String BuildUsageCode() const
+    {
+        String code;
+        code << "UiLabel label;\n";
+        code << "UiLabel::Style style = UiTheme::ResolveLabel(UiLabelRole::Body);\n";
+        code << "style.align_h = UiAlign::" << (cfg_.align_h == UiAlign::CENTER ? "CENTER" : cfg_.align_h == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ";\n";
+        code << "style.align_v = UiAlign::" << (cfg_.align_v == UiAlign::TOP ? "TOP" : cfg_.align_v == UiAlign::BOTTOM ? "BOTTOM" : "CENTER") << ";\n";
+        code << "style.metrics.content_margin = Rect(" << cfg_.margin_x << ", " << cfg_.margin_y << ", " << cfg_.margin_x << ", " << cfg_.margin_y << ");\n";
+        code << "style.metrics.radius = " << cfg_.radius << ";\n";
+        code << "style.metrics.frame_width = " << cfg_.frame_width << ";\n";
+        code << "style.metrics.face_enabled = " << (cfg_.body_face ? "true" : "false") << ";\n";
+        code << "style.metrics.frame_enabled = " << (cfg_.body_frame ? "true" : "false") << ";\n";
+        code << "style.content_gap = " << cfg_.content_gap << ";\n";
+        code << "label.SetStyle(style)\n";
+        if(cfg_.show_icon)
+            code << "     .SetIcon(ICON_ACTION_SEARCH_48())\n";
+        code << "     .SetIconSide(UiAlign::" << (cfg_.icon_side == UiAlign::RIGHT ? "RIGHT" : cfg_.icon_side == UiAlign::TOP ? "TOP" : cfg_.icon_side == UiAlign::BOTTOM ? "BOTTOM" : "LEFT") << ")\n";
+        code << "     .SetIconSize(" << cfg_.icon_size << ", " << cfg_.icon_size << ")\n";
+        code << "     .SetSelectable(" << (cfg_.selectable ? "true" : "false") << ")";
+        if(cfg_.rich_mode) {
+            code << "\n     .EnableRich(true);\n";
+            for(const RichSpanConfig& s : spans_) {
+                if(s.text == "\n")
+                    code << "label.AddNewlineSpan();\n";
+                else {
+                    code << "label.AddTextSpan(" << QuoteCpp(s.text) << ", ";
+                    if(IsNull(s.ink))
+                        code << "Null";
+                    else
+                        code << "Color(" << s.ink.GetR() << ", " << s.ink.GetG() << ", " << s.ink.GetB() << ")";
+                    code << ", " << (s.bold ? "true" : "false") << ", " << (s.italic ? "true" : "false") << ", " << (s.underline ? "true" : "false") << ");\n";
+                }
+            }
+        }
+        else {
+            code << "\n     .SetText(" << QuoteCpp(cfg_.text) << ")";
+            if(cfg_.underline)
+                code << "\n     .SetUnderline(true);\n";
+            else
+                code << ";\n";
+        }
+        return code;
+    }
+
+    LabelConfig cfg_;
+    Vector<RichSpanConfig> spans_;
+    int selected_span_ = -1;
+    UiLabel label_;
+
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_mode_row_ { UiBoxLayout::Direction::H }, state_text_row_ { UiBoxLayout::Direction::H }, state_span_row_ { UiBoxLayout::Direction::H }, state_surface_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_theme_value_, state_mode_label_, state_mode_value_, state_text_label_, state_text_value_, state_span_label_, state_span_value_, state_surface_label_, state_surface_value_;
+
+    UiBoxLayout text_row_box_ { UiBoxLayout::Direction::H }, align_h_row_box_ { UiBoxLayout::Direction::H }, align_v_row_box_ { UiBoxLayout::Direction::H }, icon_side_row_box_ { UiBoxLayout::Direction::H }, span_text_row_box_ { UiBoxLayout::Direction::H }, span_actions_row_ { UiBoxLayout::Direction::H };
+    UiLabel text_label_, align_h_label_, align_v_label_, icon_side_label_, span_text_label_;
+    UiLineEdit text_edit_, span_text_edit_;
+    UiDropdown align_h_drop_, align_v_drop_, icon_side_drop_;
+    UiCompositeSlider gap_row_, icon_size_row_, margin_x_row_, margin_y_row_, radius_row_, frame_width_row_;
+    UiCompositeToggle rich_mode_row_, face_row_, frame_row_, selectable_row_, underline_row_, icon_row_, span_bold_row_, span_italic_row_, span_underline_row_, span_color_enabled_row_;
+    UiCompositeColor span_color_row_;
+    UiButton add_span_button_, update_span_button_, newline_button_, delete_span_button_, clear_spans_button_;
+    ArrayCtrl span_list_;
+};
+
+}
 
 GUI_APP_MAIN
 {
-    UiLabelDemoWindow().Run();
+    UiLabelBuilder demo;
+    demo.Run();
 }
-

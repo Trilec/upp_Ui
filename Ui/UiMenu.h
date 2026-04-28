@@ -54,7 +54,8 @@ public:
         int arrow_size = DPI(12);
         int left_padding = DPI(10);
         int right_padding = DPI(10);
-        int text_gap = DPI(8);
+        int content_gap = DPI(8);
+        int item_spacing = 0;
         int right_gap = DPI(16);
         int popup_padding = DPI(6);
         int popup_min_width = DPI(180);
@@ -87,7 +88,7 @@ public:
             s % palette % metrics % skin
               % font % bar_font
               % row_height % bar_height % icon_size % check_size % arrow_size
-              % left_padding % right_padding % text_gap % right_gap
+              % left_padding % right_padding % content_gap % right_gap % item_spacing
               % popup_padding % popup_min_width % popup_max_height
               % popup_shadow_margin % submenu_overlap
               % show_icons % show_checks % show_descriptions % show_shortcuts % show_separators

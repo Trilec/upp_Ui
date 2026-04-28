@@ -1,249 +1,212 @@
-#include <Ui/Ui.h>
-#include <Painter/Painter.h>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
+using namespace BuilderDemoSupport;
 
-static Image MakeNeoSkin30()
-{
-    const int sz = DPI(30);
-    ImageBuffer ib(sz, sz);
-    Fill(~ib, RGBAZero(), ib.GetLength());
+namespace {
 
-    const double m = DPI(2);
-    const double w = sz - DPI(4);
-    const double h = sz - DPI(4);
-    const double r = DPI(6);
-
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(m + 1, m + 1, w, h, r);
-        p.Fill(Color(145, 154, 168));
-        p.End();
-    }
-    FastBlur(ib, 2);
-
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(m, m, w, h, r);
-        p.Fill(Color(244, 247, 251));
-        p.RoundedRectangle(m, m, w, h, r);
-        p.Stroke(1.2, Color(182, 192, 208));
-        p.End();
-    }
-    return ib;
-}
-
-class UiTitleCardDemoWindow : public TopWindow {
-public:
-    typedef UiTitleCardDemoWindow CLASSNAME;
-
-    UiTitleCardDemoWindow()
-    {
-        Title("UiTitleCard Showcase");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1220), DPI(860));
-
-        Add(headline);
-        for(int i = 0; i < 9; i++)
-            Add(cards[i]);
-
-        SetupCards();
-    }
-
-    virtual void Layout() override
-    {
-        Rect r = GetSize();
-        int m = DPI(12);
-        int g = DPI(10);
-
-        headline.SetRect(m, m, r.GetWidth() - m * 2, DPI(92));
-
-        int top = headline.GetRect().bottom + g;
-        int avail_h = r.GetHeight() - top - m;
-        int row_h = (avail_h - g * 2) / 3;
-        int col_w = (r.GetWidth() - m * 2 - g * 2) / 3;
-
-        for(int row = 0; row < 3; row++)
-            for(int col = 0; col < 3; col++)
-                cards[row * 3 + col].SetRect(m + col * (col_w + g),
-                                             top + row * (row_h + g),
-                                             col_w, row_h);
-    }
-
-private:
-    static void FillGradientRect(Draw& w, const Rect& r, Color top, Color bottom)
-    {
-        if(r.IsEmpty())
-            return;
-        int h = max(1, r.GetHeight());
-        for(int i = 0; i < h; i++) {
-            int t = (255 * i) / max(1, h - 1);
-            w.DrawRect(r.left, r.top + i, r.GetWidth(), 1, Blend(bottom, top, t));
-        }
-    }
-
-    void SetupCards()
-    {
-        UiTitleCard::Style hs = UiTitleCard::StyleDefault();
-        hs.metrics.frame_width = DPI(1);
-        hs.metrics.radius = 0;
-        hs.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
-        hs.palette.face[ST_NORMAL] = UiFill::Solid(Color(242, 239, 222));
-        hs.palette.frame[ST_NORMAL] = Color(122, 128, 136);
-
-        headline.SetStyle(hs)
-                .SetTitle("Title Card Showcase")
-                .SetSubTitle("showcases modern and classic variants")
-                .SetCopyText("Cards below: some are selectable (focus ring + hover), some are static headers/tiles.")
-                .ShowRule(false)
-                .EnableHover(false)
-                .SetShowFocus(false)
-                .SetSelectable(false);
-
-        Image neo_skin = MakeNeoSkin30();
-
-        UiTitleCard::Style s0 = UiTitleCard::StyleDefault();
-        s0.skin.enabled = true;
-        s0.skin.base = neo_skin;
-        s0.skin.slice = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
-        s0.skin.content_inset = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        s0.metrics.face_enabled = false;
-        s0.metrics.frame_enabled = false;
-        cards[0].SetStyle(s0)
-                .SetTitle("Modern Top")
-                .SetSubTitle("tech style")
-                .SetCopyText("Top image region uses 50% share")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(36), DPI(36)))
-                .SetMediaSide(UiAlign::TOP)
-                .SetMediaSharePercent(50)
-                .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
-                .SetRuleStyle(SOLID)
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-
-        UiTitleCard::Style s1 = UiTitleCard::StyleDefault();
-        s1.skin.enabled = true;
-        s1.skin.base = neo_skin;
-        s1.skin.slice = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
-        s1.skin.content_inset = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        s1.metrics.face_enabled = false;
-        s1.metrics.frame_enabled = false;
-        cards[1].SetStyle(s1)
-                .SetTitle("Soft UI")
-                .SetSubTitle("standard")
-                .SetCopyText("tactile shadows on neutral base")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(30), DPI(30)))
-                .SetMediaSide(UiAlign::TOP)
-                .SetMediaSharePercent(38)
-                .SetRuleStyle(DOTTED)
-                .EnableHover(true).SetShowFocus(true).SetSelectable(true);
-
-        UiTitleCard::Style s2 = UiTitleCard::StyleDefault();
-        s2.metrics.frame_width = DPI(2);
-        s2.palette.face[ST_NORMAL] = UiFill::Solid(Color(247, 244, 232));
-        s2.palette.frame[ST_NORMAL] = Color(44, 44, 44);
-        cards[2].SetStyle(s2)
-                .SetTitle("Classic Right")
-                .SetSubTitle("block")
-                .SetCopyText("right media share 35%")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(34), DPI(34)))
-                .SetMediaSide(UiAlign::RIGHT)
-                .SetMediaSharePercent(35)
-                .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
-                .SetRuleStyle(DASHED)
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-
-        UiTitleCard::Style s3 = UiTitleCard::StyleDefault();
-        s3.metrics.content_padding = Rect(DPI(10), DPI(9), DPI(10), DPI(9));
-        cards[3].SetStyle(s3)
-                .SetTitle("Classic L")
-                .SetSubTitle("row")
-                .SetCopyText("left side media 30%")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(34), DPI(34)))
-                .SetMediaSide(UiAlign::LEFT)
-                .SetMediaSharePercent(30)
-                .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
-                .SetRuleStyle(SOLID)
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-
-        UiTitleCard::Style s4 = UiTitleCard::StyleDefault();
-        s4.metrics.face_enabled = false;
-        s4.metrics.frame_enabled = true;
-        s4.metrics.frame_width = DPI(1);
-        cards[4].SetStyle(s4)
-                .SetTitle("Gradient Hero")
-                .SetSubTitle("contrast")
-                .SetCopyText("smooth gradient background")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(28), DPI(28)))
-                .SetMediaSide(UiAlign::RIGHT)
-                .SetMediaSharePercent(28)
-                .SetRuleStyle(SOLID)
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-        cards[4].WhenPaintBackground = [=](Draw& w, const Rect& rr,
-                                           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-                                           StyledState st, bool) {
-            Color t = st == ST_HOT ? Color(49, 74, 112) : Color(38, 58, 90);
-            Color b = st == ST_HOT ? Color(28, 44, 70)  : Color(24, 37, 58);
-            FillGradientRect(w, rr, t, b);
-            w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, Color(62, 86, 126));
-            w.DrawRect(rr.left, rr.bottom - 1, rr.GetWidth(), 1, Color(62, 86, 126));
-            w.DrawRect(rr.left, rr.top, 1, rr.GetHeight(), Color(62, 86, 126));
-            w.DrawRect(rr.right - 1, rr.top, 1, rr.GetHeight(), Color(62, 86, 126));
-        };
-
-        UiTitleCard::Style s5 = UiTitleCard::StyleDefault();
-        s5.metrics.face_enabled = true;
-        s5.metrics.frame_enabled = true;
-        s5.palette.face[ST_NORMAL] = UiFill::Solid(Color(246, 248, 251));
-        cards[5].SetStyle(s5)
-                .SetTitle("Content")
-                .SetSubTitle("flipped")
-                .SetCopyText("bottom image region uses 45% share")
-                .SetMedia(CtrlImg::Dir(), Size(DPI(36), DPI(36)))
-                .SetMediaSide(UiAlign::BOTTOM)
-                .SetMediaSharePercent(45)
-                .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
-                .SetRuleStyle(SOLID)
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-
-        UiTitleCard::Style s6 = UiTitleCard::StyleDefault();
-        s6.metrics.frame_enabled = false;
-        s6.metrics.face_enabled = false;
-        cards[6].SetStyle(s6)
-                .SetTitle("Minimal")
-                .SetSubTitle("no graphics")
-                .SetCopyText("clean typography focus")
-                .ShowRule(false)
-                .ClearMedia()
-                .EnableHover(false).SetShowFocus(false).SetSelectable(false);
-
-        for(int i = 7; i < 9; i++) {
-            UiTitleCard::Style ss = UiTitleCard::StyleDefault();
-            ss.metrics.radius = DPI(7);
-            ss.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-            ss.palette.face[ST_NORMAL] = UiFill::Solid(Color(243, 246, 250));
-            ss.palette.face[ST_HOT] = UiFill::Solid(Color(229, 237, 248));
-            ss.palette.face[ST_PRESSED] = UiFill::Solid(Color(215, 227, 243));
-            cards[i].SetStyle(ss)
-                    .SetTitle(i == 7 ? "Selectable A" : "Selectable B")
-                    .SetSubTitle("hover + focus")
-                    .SetCopyText("click to move focus ring")
-                    .ShowRule(false)
-                    .SetMedia(CtrlImg::Dir(), Size(DPI(20), DPI(20)))
-                    .SetMediaSide(i == 7 ? UiAlign::LEFT : UiAlign::RIGHT)
-                    .SetMediaSharePercent(24)
-                    .EnableHover(true).SetShowFocus(true).SetSelectable(true);
-        }
-    }
-
-private:
-    UiTitleCard headline;
-    UiTitleCard cards[9];
+struct TitleCardConfig {
+    String title = "Release Notes";
+    String subtitle = "Sprint 12";
+    String copy = "A compact summary card that can carry media, title, and copy in a single styled surface.";
+    UiAlign media_side = UiAlign::LEFT;
+    int media_share = 28;
+    int media_size = DPI(28);
+    int radius = DPI(8);
+    bool show_rule = true;
+    bool show_bottom = false;
+    bool hover = false;
+    bool selectable = false;
 };
+
+class UiTitleCardBuilder : public BuilderWindowBase {
+public:
+    typedef UiTitleCardBuilder CLASSNAME;
+
+    UiTitleCardBuilder()
+        : BuilderWindowBase("UiTitleCardDemo", "U++ UiTitleCard Builder", "Inspect header card media placement, rule display, and title/copy layout from one shell.")
+    {
+        Preview().Add(card_);
+
+        AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
+        AddStateRow(StateBox(), state_title_row_, state_title_label_, state_title_value_, "Title");
+        AddStateRow(StateBox(), state_side_row_, state_side_label_, state_side_value_, "Media Side");
+        AddStateRow(StateBox(), state_rule_row_, state_rule_label_, state_rule_value_, "Rule");
+
+        AddEditRow(PropsBox(), title_row_box_, title_label_, title_edit_, "Title");
+        AddEditRow(PropsBox(), subtitle_row_box_, subtitle_label_, subtitle_edit_, "Subtitle");
+        AddEditRow(PropsBox(), copy_row_box_, copy_label2_, copy_edit_, "Copy");
+        AddDropdownRow(PropsBox(), side_row_box_, side_label_, side_drop_, "Media Side");
+        AddSliderRow(PropsBox(), share_row_, "Media %", "28%");
+        AddSliderRow(PropsBox(), size_row_, "Media Sz", "28px");
+        AddSliderRow(PropsBox(), radius_row_, "Radius", "8px");
+        AddToggleRow(PropsBox(), rule_row_, "Show Rule");
+        AddToggleRow(PropsBox(), bottom_row_, "Bottom Line");
+        AddToggleRow(PropsBox(), hover_row_, "Hover");
+        AddToggleRow(PropsBox(), selectable_row_, "Selectable");
+
+        const EnumOption sides[] = { { "Left", (int)UiAlign::LEFT }, { "Right", (int)UiAlign::RIGHT }, { "Top", (int)UiAlign::TOP }, { "Bottom", (int)UiAlign::BOTTOM } };
+        PopulateDropdown(side_drop_, sides, 4);
+
+        title_edit_.SetData(cfg_.title);
+        subtitle_edit_.SetData(cfg_.subtitle);
+        copy_edit_.SetData(cfg_.copy);
+        share_row_.Slider().SetRange(20, 60).SetStep(1).SetValue(cfg_.media_share);
+        size_row_.Slider().SetRange(DPI(18), DPI(48)).SetStep(1).SetValue(cfg_.media_size);
+        radius_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.radius);
+
+        title_edit_.WhenChange = [=] { cfg_.title = title_edit_.GetData().ToString(); RefreshFromConfig(); };
+        subtitle_edit_.WhenChange = [=] { cfg_.subtitle = subtitle_edit_.GetData().ToString(); RefreshFromConfig(); };
+        copy_edit_.WhenChange = [=] { cfg_.copy = copy_edit_.GetData().ToString(); RefreshFromConfig(); };
+        side_drop_.WhenSelect = [=](int) { cfg_.media_side = (UiAlign)(int)side_drop_.GetSelectedData(); RefreshFromConfig(); };
+        share_row_.WhenAction = [=] { cfg_.media_share = (int)share_row_.Slider().GetValue(); RefreshFromConfig(); };
+        size_row_.WhenAction = [=] { cfg_.media_size = (int)size_row_.Slider().GetValue(); RefreshFromConfig(); };
+        radius_row_.WhenAction = [=] { cfg_.radius = (int)radius_row_.Slider().GetValue(); RefreshFromConfig(); };
+        rule_row_.Toggle().WhenAction = [=] { cfg_.show_rule = rule_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        bottom_row_.Toggle().WhenAction = [=] { cfg_.show_bottom = bottom_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        hover_row_.Toggle().WhenAction = [=] { cfg_.hover = hover_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        selectable_row_.Toggle().WhenAction = [=] { cfg_.selectable = selectable_row_.Toggle().IsOn(); RefreshFromConfig(); };
+
+        FinishInit();
+        RefreshFromConfig();
+    }
+
+protected:
+    virtual void ApplyDemoTheme() override
+    {
+        UiLabel::Style body = MakeBodyLabelStyle(Palette());
+        UiLabel::Style value = MakeValueLabelStyle(Palette());
+        UiBaseEdit::Style edit = MakeEditStyle(Palette());
+        UiDropdown::Style dd = MakeDropdownStyle(Palette());
+
+        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
+        state_title_label_.SetStyle(body); state_title_value_.SetStyle(value);
+        state_side_label_.SetStyle(body); state_side_value_.SetStyle(value);
+        state_rule_label_.SetStyle(body); state_rule_value_.SetStyle(value);
+        title_label_.SetStyle(body); subtitle_label_.SetStyle(body); copy_label2_.SetStyle(body); side_label_.SetStyle(body);
+        title_edit_.SetStyle(edit); subtitle_edit_.SetStyle(edit); copy_edit_.SetStyle(edit); side_drop_.SetStyle(dd);
+        share_row_.SetLabelStyle(body).SetValueStyle(value);
+        size_row_.SetLabelStyle(body).SetValueStyle(value);
+        radius_row_.SetLabelStyle(body).SetValueStyle(value);
+        rule_row_.SetLabelStyle(body);
+        bottom_row_.SetLabelStyle(body);
+        hover_row_.SetLabelStyle(body);
+        selectable_row_.SetLabelStyle(body);
+    }
+
+    virtual void LayoutPreviewContent() override
+    {
+        Rect canvas = Preview().GetCanvasRect();
+        int w = min(DPI(420), canvas.GetWidth() - DPI(30));
+        int h = min(DPI(180), canvas.GetHeight() - DPI(30));
+        int x = canvas.left + (canvas.GetWidth() - w) / 2;
+        int y = canvas.top + (canvas.GetHeight() - h) / 2;
+        card_.SetRect(x, y, w, h);
+    }
+
+private:
+    struct EnumOption { const char* label; int value; };
+
+    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
+    {
+        drop.UseInternalModel();
+        drop.Clear();
+        for(int i = 0; i < count; i++)
+            drop.Add(opts[i].label, opts[i].value);
+    }
+
+    String SideLabel() const
+    {
+        if(cfg_.media_side == UiAlign::RIGHT) return "Right";
+        if(cfg_.media_side == UiAlign::TOP) return "Top";
+        if(cfg_.media_side == UiAlign::BOTTOM) return "Bottom";
+        return "Left";
+    }
+
+    void RefreshFromConfig()
+    {
+        UiTitleCard::Style style = UiTheme::ResolveTitleCard();
+        style.metrics.radius = cfg_.radius;
+        style.metrics.frame_enabled = true;
+        style.metrics.face_enabled = true;
+        style.metrics.frame_width = DPI(1);
+        for(int i = 0; i < 4; i++) {
+            style.palette.face[i] = UiFill::Solid(Palette().segment_face);
+            style.palette.frame[i] = Palette().segment_frame;
+            style.palette.ink[i] = Palette().ink;
+        }
+        style.show_rule = cfg_.show_rule;
+        style.show_bottom_line = cfg_.show_bottom;
+        style.hover_enabled = cfg_.hover;
+
+        card_.SetStyle(style)
+             .SetTitle(cfg_.title)
+             .SetSubTitle(cfg_.subtitle)
+             .SetCopyText(cfg_.copy)
+             .SetMedia(ICON_EDITOR_NOTES_48(), Size(cfg_.media_size, cfg_.media_size))
+             .SetMediaSide(cfg_.media_side)
+             .SetMediaSharePercent(cfg_.media_share)
+             .EnableHover(cfg_.hover)
+             .SetSelectable(cfg_.selectable);
+
+        side_drop_.SelectByData((int)cfg_.media_side);
+        share_row_.Slider().SetValue(cfg_.media_share);
+        size_row_.Slider().SetValue(cfg_.media_size);
+        radius_row_.Slider().SetValue(cfg_.radius);
+        rule_row_.Toggle().SetOn(cfg_.show_rule);
+        bottom_row_.Toggle().SetOn(cfg_.show_bottom);
+        hover_row_.Toggle().SetOn(cfg_.hover);
+        selectable_row_.Toggle().SetOn(cfg_.selectable);
+        share_row_.SetValueText(AsString(cfg_.media_share) + "%");
+        size_row_.SetValueText(AsString(cfg_.media_size) + "px");
+        radius_row_.SetValueText(AsString(cfg_.radius) + "px");
+
+        state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
+        state_title_value_.SetText(cfg_.title);
+        state_side_value_.SetText(SideLabel());
+        state_rule_value_.SetText(cfg_.show_rule ? "Shown" : "Hidden");
+
+        SetUsageCode(BuildUsageCode());
+        Preview().Refresh();
+    }
+
+    String BuildUsageCode() const
+    {
+        String code;
+        code << "UiTitleCard card;\n";
+        code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n";
+        code << "style.metrics.radius = " << cfg_.radius << ";\n";
+        code << "style.show_rule = " << (cfg_.show_rule ? "true" : "false") << ";\n";
+        code << "style.show_bottom_line = " << (cfg_.show_bottom ? "true" : "false") << ";\n";
+        code << "card.SetStyle(style)\n";
+        code << "    .SetTitle(" << QuoteCpp(cfg_.title) << ")\n";
+        code << "    .SetSubTitle(" << QuoteCpp(cfg_.subtitle) << ")\n";
+        code << "    .SetCopyText(" << QuoteCpp(cfg_.copy) << ")\n";
+        code << "    .SetMedia(ICON_EDITOR_NOTES_48(), Size(" << cfg_.media_size << ", " << cfg_.media_size << "))\n";
+        code << "    .SetMediaSide(UiAlign::" << (cfg_.media_side == UiAlign::RIGHT ? "RIGHT" : cfg_.media_side == UiAlign::TOP ? "TOP" : cfg_.media_side == UiAlign::BOTTOM ? "BOTTOM" : "LEFT") << ")\n";
+        code << "    .SetMediaSharePercent(" << cfg_.media_share << ");\n";
+        return code;
+    }
+
+    TitleCardConfig cfg_;
+    UiTitleCard card_;
+
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_title_row_ { UiBoxLayout::Direction::H }, state_side_row_ { UiBoxLayout::Direction::H }, state_rule_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_theme_value_, state_title_label_, state_title_value_, state_side_label_, state_side_value_, state_rule_label_, state_rule_value_;
+
+    UiBoxLayout title_row_box_ { UiBoxLayout::Direction::H }, subtitle_row_box_ { UiBoxLayout::Direction::H }, copy_row_box_ { UiBoxLayout::Direction::H }, side_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel title_label_, subtitle_label_, copy_label2_, side_label_;
+    UiLineEdit title_edit_, subtitle_edit_, copy_edit_;
+    UiDropdown side_drop_;
+    UiCompositeSlider share_row_, size_row_, radius_row_;
+    UiCompositeToggle rule_row_, bottom_row_, hover_row_, selectable_row_;
+};
+
+}
 
 GUI_APP_MAIN
 {
-    UiTitleCardDemoWindow().Run();
+    UiTitleCardBuilder demo;
+    demo.Run();
 }
 

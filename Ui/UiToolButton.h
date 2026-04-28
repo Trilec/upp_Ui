@@ -27,6 +27,10 @@
       instead of carrying a second full button copy.
     - 2026-03: kept fluent wrapper forwards intentionally so inherited
       mutators continue to chain as UiToolButton& while behavior stays shared.
+    - 2026-04: aligned icon rendering configuration with UiButton via the
+      shared UiIconRenderMode contract.
+    - 2026-04: aligned inherited spacing vocabulary with UiButton around
+      content_margin, content_gap, and icon_side.
 */
 
 #include <Ui/UiButton.h>
@@ -54,19 +58,13 @@ public:
         return *this;
     }
     UiToolButton& ClearIcon() { UiButton::ClearIcon(); return *this; }
-    UiToolButton& SetIconScale(bool on = true) { UiButton::SetIconScale(on); return *this; }
-    UiToolButton& SetIconTintMono(bool on = true) { UiButton::SetIconTintMono(on); return *this; }
+    UiToolButton& SetIconRenderMode(UiIconRenderMode mode) { UiButton::SetIconRenderMode(mode); return *this; }
     UiToolButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0) { UiButton::SetIconColor(base, hot_pct, press_pct); return *this; }
-    UiToolButton& SetIconLayout(UiAlign layout) { UiButton::SetIconLayout(layout); return *this; }
+    UiToolButton& SetIconSide(UiAlign side) { UiButton::SetIconSide(side); return *this; }
     UiToolButton& SetAlign(UiAlign h, UiAlign v) { UiButton::SetAlign(h, v); return *this; }
     UiToolButton& SetAlignH(UiAlign h) { UiButton::SetAlignH(h); return *this; }
     UiToolButton& SetAlignV(UiAlign v) { UiButton::SetAlignV(v); return *this; }
-    UiToolButton& SetIconMargin(const Rect& m) { UiButton::SetIconMargin(m); return *this; }
-    UiToolButton& SetIconMargin(int l, int t, int r, int b) { UiButton::SetIconMargin(l, t, r, b); return *this; }
-    UiToolButton& SetIconMargin(int all) { UiButton::SetIconMargin(all); return *this; }
-    UiToolButton& SetTextMargin(const Rect& m) { UiButton::SetTextMargin(m); return *this; }
-    UiToolButton& SetTextMargin(int l, int t, int r, int b) { UiButton::SetTextMargin(l, t, r, b); return *this; }
-    UiToolButton& SetTextMargin(int all) { UiButton::SetTextMargin(all); return *this; }
+    UiToolButton& SetContentGap(int gap) { UiButton::SetContentGap(gap); return *this; }
     UiToolButton& ClickFocus(bool on = true) { UiButton::ClickFocus(on); return *this; }
     UiToolButton& SetCheckable(bool on = true) { UiButton::SetCheckable(on); return *this; }
     UiToolButton& SetChecked(bool on = true) { UiButton::SetChecked(on); return *this; }
@@ -87,5 +85,3 @@ public:
 } // namespace Upp
 
 #endif
-
-

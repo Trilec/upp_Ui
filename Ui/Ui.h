@@ -58,6 +58,9 @@
 #include <Ui/UiMultiEdit.h>
 #include <Ui/UiMaskEdit.h>
 #include <Ui/UiSlider.h>
+#include <Ui/UiCompositeSlider.h>
+#include <Ui/UiCompositeToggle.h>
+#include <Ui/UiCompositeColor.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
 #include <Ui/UiTable.h>
@@ -66,5 +69,3 @@
 #include <Ui/UiList.h>
 
 #endif
-
-

@@ -21,6 +21,8 @@
 
     Changelog
     - 2026-03: added release-standard file documentation.
+    - 2026-04: added explicit content sizing helpers so parent containers can
+      query layout extent without overloading GetMinSize().
 */
 
 // -----------------------------------------------------------------------------
@@ -483,6 +485,8 @@ public:
 
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
+    Size GetContentSize() const;
+    int  MeasureHeightForWidth(int total_width) const;
     virtual Size GetMinSize() const override;
 
 private:
@@ -516,5 +520,3 @@ private:
 } // namespace Upp
 
 #endif // _Ui_UiBoxLayout_h_
-
-

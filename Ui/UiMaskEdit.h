@@ -311,5 +311,3 @@ UiMaskEdit& UiMaskEdit::Animate(const T& from, const T& to, int ms, Event<const 
 } // namespace Upp
 
 #endif
-
-

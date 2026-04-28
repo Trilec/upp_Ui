@@ -88,7 +88,7 @@ public:
                .Add("Custom Setup", 1)
                .Add("Audit Mode", 2)
                .SetData(0);
-        toggle_.SetText("").SetOn(true);
+        toggle_.SetOn(true);
         toggle_label_.SetText("Notifications");
         option_a_.SetText("Option A").SetGroup(1).SetChecked(true);
         option_b_.SetText("Option B").SetGroup(1);
@@ -136,11 +136,11 @@ public:
         form_panel_.SetStyle(strong_panel);
         tabs_.SetStyle(tab_style);
 
-        tool_list_.SetStyle(icon_button).SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48()).SetIconScale(true).SetIconTintMono(true);
-        tool_clarify_.SetStyle(icon_button).SetIcon(ICON_EDITOR_CLARIFY_48()).SetIconScale(true).SetIconTintMono(true);
-        tool_table_.SetStyle(icon_button).SetIcon(ICON_EDITOR_TABLE_48()).SetIconScale(true).SetIconTintMono(true);
-        tool_settings_.SetStyle(icon_button).SetIcon(ICON_DESIGN_SETTINGS_48()).SetIconScale(true).SetIconTintMono(true);
-        search_icon_.SetStyle(icon_button).SetIcon(ICON_ACTION_SEARCH_48()).SetIconScale(true).SetIconTintMono(true);
+        tool_list_.SetStyle(icon_button).SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_clarify_.SetStyle(icon_button).SetIcon(ICON_EDITOR_CLARIFY_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_table_.SetStyle(icon_button).SetIcon(ICON_EDITOR_TABLE_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_settings_.SetStyle(icon_button).SetIcon(ICON_DESIGN_SETTINGS_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        search_icon_.SetStyle(icon_button).SetIcon(ICON_ACTION_SEARCH_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
         primary_action_.SetStyle(primary_button);
         secondary_action_.SetStyle(subtle_button);
 
@@ -257,7 +257,7 @@ private:
         minimal.checked = true;
         minimal.right_text = "active";
         minimal.icon = ICON_EDITOR_FORMAT_LIST_BULLETED_48();
-        minimal.mono_icon = true;
+        minimal.icon_render_mode = UiIconRenderMode::MonoTint;
         minimal.has_metadata = true;
         minimal.metadata_color = Color(65, 167, 248);
         model_list_.Add(minimal);
@@ -265,7 +265,7 @@ private:
         UiModelItem rounded("Rounded");
         rounded.right_text = "preview";
         rounded.icon = ICON_DESIGN_FOLDER_48();
-        rounded.mono_icon = true;
+        rounded.icon_render_mode = UiIconRenderMode::MonoTint;
         model_list_.Add(rounded);
 
         UiModelItem runtime("Runtime");
@@ -411,7 +411,7 @@ public:
         copy_.SetText("Minimal is being tuned against the HTML preset contract first. Rounded remains live for side-by-side comparison while the fidelity pass continues.")
              .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         mode_label_.SetText("Light").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        mode_toggle_.SetText("").SetOn(false).SetShowFocus(false);
+        mode_toggle_.SetOn(false).SetShowFocus(false);
         mode_toggle_.WhenAction = [=] { ApplyMode(mode_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
 
         ApplyMode(UiThemeMode::Light);
@@ -447,7 +447,7 @@ public:
         mode_toggle_style.metrics.frame_enabled = false;
         mode_toggle_style.metrics.frame_width = 0;
         mode_toggle_style.metrics.radius = DPI(999);
-        mode_toggle_style.metrics.content_padding = Rect(0, 0, 0, 0);
+        mode_toggle_style.metrics.content_margin = Rect(0, 0, 0, 0);
         mode_toggle_style.metrics.focus_enabled = false;
         mode_toggle_style.metrics.shadow.enabled = false;
         mode_toggle_style.metrics.shadow.inset = false;
@@ -458,11 +458,9 @@ public:
         mode_toggle_style.metrics.shadow.curve = ShadowSoft();
         mode_toggle_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 32 : 24;
         mode_toggle_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
-        mode_toggle_style.track_extent = Size(DPI(52), DPI(27));
-        mode_toggle_style.label_gap = 0;
+        mode_toggle_style.track_size = Size(DPI(52), DPI(27));
         mode_toggle_style.thumb_inset = DPI(2);
         mode_toggle_style.track_side = UiAlign::RIGHT;
-        mode_toggle_style.font = SansSerifZ(13).Bold();
         mode_toggle_style.track_metrics.face_enabled = true;
         mode_toggle_style.track_metrics.frame_enabled = true;
         mode_toggle_style.track_metrics.frame_width = DPI(1);
@@ -489,7 +487,7 @@ public:
             UiThemeDetail::SetFace(mode_toggle_style.thumb_palette, White(), White(), White(), Color(245, 247, 250));
             UiThemeDetail::SetFrame(mode_toggle_style.thumb_palette, Color(198, 208, 220), Color(198, 208, 220), Color(17, 24, 39), Color(214, 222, 231));
         }
-        mode_toggle_.SetStyle(mode_toggle_style).SetText("").SetShowFocus(false);
+        mode_toggle_.SetStyle(mode_toggle_style).SetShowFocus(false);
 
         minimal_.ApplyTheme(mode_);
         rounded_.ApplyTheme(mode_);
@@ -539,31 +537,3 @@ GUI_APP_MAIN
 {
     UiThemeDemoWindow().Run();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

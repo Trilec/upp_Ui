@@ -278,4 +278,3 @@ GUI_APP_MAIN
 {
     UiTabCapDemoWindow().Run();
 }
-

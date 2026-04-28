@@ -9,7 +9,7 @@ struct RichPiece : Moveable<RichPiece> {
     UiLabel::Span::Kind kind = UiLabel::Span::TEXT;
     String text;
     Image icon;
-    bool mono_icon = false;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     Color ink;
     Color bg;
     Font font;
@@ -51,7 +51,7 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
             RichPiece p;
             p.kind = s.kind;
             p.icon = s.icon;
-            p.mono_icon = s.mono_icon;
+            p.icon_render_mode = s.icon_render_mode;
             p.ink = IsNull(s.ink) ? base_ink : s.ink;
             p.sz = s.icon.GetSize();
             lines.Top().Add(p);
@@ -109,6 +109,15 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
     }
 }
 
+static Vector<int> BuildCaretAdvances(const String& text, Font font)
+{
+    Vector<int> x;
+    x.SetCount(text.GetCount() + 1);
+    for(int i = 0; i <= text.GetCount(); i++)
+        x[i] = GetTextSize(text.Left(i), font).cx;
+    return x;
+}
+
 static Color AnsiColor(int code)
 {
     switch(code) {
@@ -156,7 +165,7 @@ const UiLabel::Style& UiLabel::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
         s.metrics.radius = 0;
         s.metrics.frame_width = 0;
         s.metrics.frame_enabled = false;
@@ -169,9 +178,8 @@ const UiLabel::Style& UiLabel::StyleDefault()
         s.skin = StyledSkin();
         s.align_h = UiAlign::LEFT;
         s.align_v = UiAlign::CENTER;
-        s.icon_layout = UiAlign::LEFT;
-        s.icon_margin = Rect(0, 0, DPI(6), 0);
-        s.text_margin = Rect(0, 0, 0, 0);
+        s.icon_side = UiAlign::LEFT;
+        s.content_gap = DPI(6);
         s.font = StdFont();
         s.transparent = true;
         s.underline = false;
@@ -326,6 +334,16 @@ String UiLabel::BuildPlainTextFromSpans() const
     return out;
 }
 
+Size UiLabel::GetStableIconSize() const
+{
+    // Explicit icon sizing is the label contract now; a zero size simply
+    // falls back to the source image size so layout and paint stay aligned.
+    if(icon_size_.cx > 0 && icon_size_.cy > 0)
+        return icon_size_;
+
+    return IsNull(icon_) ? Size(0, 0) : icon_.GetSize();
+}
+
 bool UiLabel::HasSelection() const
 {
     return selectable_text_ && sel_anchor_ >= 0 && sel_caret_ >= 0 && sel_anchor_ != sel_caret_;
@@ -360,6 +378,111 @@ int UiLabel::HitTestTextPos(Point p) const
         fnt = StdFont();
 
     const int gap = UiStyledTextLineGap();
+
+    if(rich_enabled_ && !spans_.IsEmpty()) {
+        Vector<Vector<RichPiece>> rich_lines;
+        Vector<Size> rich_line_sizes;
+        BuildRichLines(spans_, fnt, style.palette.ink[ST_NORMAL], rich_lines, rich_line_sizes);
+
+        const int count = rich_lines.GetCount();
+        if(count <= 0)
+            return 0;
+
+        int total_h = 0;
+        for(int i = 0; i < count; i++)
+            total_h += rich_line_sizes[i].cy;
+        if(count > 1)
+            total_h += gap * (count - 1);
+
+        int start_y;
+        switch(style.align_v) {
+        case UiAlign::BOTTOM:
+            start_y = text_r.bottom - total_h;
+            break;
+        case UiAlign::CENTER:
+            start_y = text_r.top + (text_r.GetHeight() - total_h) / 2;
+            break;
+        case UiAlign::TOP:
+        default:
+            start_y = text_r.top;
+            break;
+        }
+
+        int y = start_y;
+        int text_ofs = 0;
+        int best_pos = text_.GetCount();
+
+        for(int i = 0; i < count; i++) {
+            const Vector<RichPiece>& line = rich_lines[i];
+            const Size& sz = rich_line_sizes[i];
+
+            int line_x;
+            switch(style.align_h) {
+            case UiAlign::CENTER:
+                line_x = text_r.left + (text_r.GetWidth() - sz.cx) / 2;
+                break;
+            case UiAlign::RIGHT:
+                line_x = text_r.right - sz.cx;
+                break;
+            case UiAlign::LEFT:
+            default:
+                line_x = text_r.left;
+                break;
+            }
+
+            int line_top = y;
+            int line_bottom = y + sz.cy;
+            int line_text_len = 0;
+            for(const RichPiece& rp : line)
+                if(rp.kind == Span::TEXT)
+                    line_text_len += rp.text.GetCount();
+
+            if(p.y < line_top)
+                return text_ofs;
+
+            if(p.y <= line_bottom || i + 1 == count) {
+                if(p.x <= line_x)
+                    return text_ofs;
+                if(p.x >= line_x + sz.cx)
+                    return text_ofs + line_text_len;
+
+                int x = line_x;
+                for(const RichPiece& rp : line) {
+                    int next_x = x + rp.sz.cx;
+                    if(p.x <= next_x) {
+                        if(rp.kind != Span::TEXT || rp.text.IsEmpty())
+                            return text_ofs;
+
+                        int relx = max(0, p.x - x);
+                        Vector<int> caret_x = BuildCaretAdvances(rp.text, rp.font);
+                        for(int k = 1; k <= rp.text.GetCount(); k++) {
+                            int w = caret_x[k];
+                            if(w >= relx) {
+                                int prev = caret_x[k - 1];
+                                int pos = (relx - prev <= w - relx) ? (k - 1) : k;
+                                return text_ofs + pos;
+                            }
+                        }
+                        return text_ofs + rp.text.GetCount();
+                    }
+
+                    if(rp.kind == Span::TEXT)
+                        text_ofs += rp.text.GetCount();
+                    x = next_x;
+                }
+                return text_ofs;
+            }
+
+            best_pos = text_ofs + line_text_len;
+            text_ofs += line_text_len;
+            if(i + 1 < count)
+                text_ofs += 1;
+            y = line_bottom + gap;
+        }
+
+        return best_pos;
+    }
+
     const int count = lines_.GetCount();
     if(count <= 0)
         return 0;
@@ -409,6 +532,8 @@ int UiLabel::HitTestTextPos(Point p) const
         int line_top = y;
         int line_bottom = y + sz.cy;
         int line_len = line.GetCount();
+        Vector<int> caret_x = BuildCaretAdvances(line, fnt);
+        int line_w = caret_x.IsEmpty() ? 0 : caret_x.Top();
 
         if(p.y < line_top)
             return text_ofs;
@@ -416,14 +541,13 @@ int UiLabel::HitTestTextPos(Point p) const
         if(p.y <= line_bottom || i + 1 == count) {
             if(p.x <= line_x)
                 return text_ofs;
-            if(p.x >= line_x + sz.cx)
+            if(p.x >= line_x + line_w)
                 return text_ofs + line_len;
-
             int relx = p.x - line_x;
             for(int k = 1; k <= line_len; k++) {
-                int w = GetTextSize(line.Left(k), fnt).cx;
+                int w = caret_x[k];
                 if(w >= relx) {
-                    int prev = (k > 1) ? GetTextSize(line.Left(k - 1), fnt).cx : 0;
+                    int prev = caret_x[k - 1];
                     int pos = (relx - prev <= w - relx) ? (k - 1) : k;
                     return text_ofs + pos;
                 }
@@ -440,7 +564,6 @@ int UiLabel::HitTestTextPos(Point p) const
 
     return best_pos;
 }
-
 Size UiLabel::GetTextBlockSize() const
 {
     const Style& style = GetEffectiveStyle();
@@ -465,18 +588,18 @@ Size UiLabel::ComputeNaturalSize() const
     Size text_block = have_text ? GetTextBlockSize() : Size(0, 0);
 
     bool have_icon = !IsNull(icon_);
-    Size icon_sz = have_icon ? icon_.GetSize() : Size(0, 0);
+    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
 
     Size content = UiMeasureBlocksContent(icon_sz,
                                           text_block,
-                                          style.icon_margin,
-                                          style.text_margin,
-                                          style.icon_layout,
+                                          style.icon_side,
                                           have_icon,
                                           have_text,
                                           DPI(16),
                                           DPI(8),
-                                          DPI(16));
+                                          explicit_icon_size ? 0 : DPI(16),
+                                          have_icon && have_text ? style.content_gap : 0);
 
     return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
 }
@@ -494,17 +617,17 @@ void UiLabel::UpdateLayout(const Rect& content) const
     bool have_text = !lines_.IsEmpty();
     Size text_block = have_text ? GetTextBlockSize() : Size(0, 0);
     bool have_icon = !IsNull(icon_);
-    Size icon_sz = have_icon ? icon_.GetSize() : Size(0, 0);
+    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
 
     layout_ = UiComputeBlocksLayout(content,
                                     have_icon ? icon_sz : Size(0, 0),
                                     have_text ? text_block : Size(0, 0),
                                     style.align_h,
                                     style.align_v,
-                                    style.icon_layout,
-                                    style.icon_margin,
-                                    style.text_margin,
-                                    DPI(16));
+                                    style.icon_side,
+                                    explicit_icon_size ? 0 : DPI(16),
+                                    have_icon && have_text ? style.content_gap : 0);
 
     layout_dirty_ = false;
 }
@@ -580,6 +703,17 @@ UiLabel& UiLabel::SetSelectable(bool on)
         sel_caret_ = -1;
         selecting_drag_ = false;
     }
+    Refresh();
+    return *this;
+}
+
+UiLabel& UiLabel::SetIconSize(Size sz)
+{
+    icon_size_ = Size(max(0, sz.cx), max(0, sz.cy));
+    minsize_dirty_ = true;
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -667,12 +801,12 @@ UiLabel& UiLabel::AddTextSpan(const String& text, Color ink, bool bold, bool ita
     return AddSpan(s);
 }
 
-UiLabel& UiLabel::AddIconSpan(const Image& icon, bool mono)
+UiLabel& UiLabel::AddIconSpan(const Image& icon, UiIconRenderMode render_mode)
 {
     Span s;
     s.kind = Span::ICON;
     s.icon = icon;
-    s.mono_icon = mono;
+    s.icon_render_mode = render_mode;
     return AddSpan(s);
 }
 
@@ -818,7 +952,7 @@ void UiLabel::CopySelectionToClipboard() const
 UiLabel& UiLabel::SetIcon(const Image& img)
 {
     icon_ = img;
-    mono_icon_ = false;
+    icon_render_mode_ = UiIconRenderMode::PreserveColor;
     minsize_dirty_ = true;
     layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
@@ -827,14 +961,21 @@ UiLabel& UiLabel::SetIcon(const Image& img)
     return *this;
 }
 
-UiLabel& UiLabel::SetMonoIcon(const Image& img)
+UiLabel& UiLabel::SetIcon(const Image& img, UiIconRenderMode render_mode)
 {
     icon_ = img;
-    mono_icon_ = true;
+    icon_render_mode_ = render_mode;
     minsize_dirty_ = true;
     layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiLabel& UiLabel::SetIconRenderMode(UiIconRenderMode render_mode)
+{
+    icon_render_mode_ = render_mode;
     Refresh();
     return *this;
 }
@@ -842,7 +983,7 @@ UiLabel& UiLabel::SetMonoIcon(const Image& img)
 UiLabel& UiLabel::ClearIcon()
 {
     icon_ = Image();
-    mono_icon_ = false;
+    icon_render_mode_ = UiIconRenderMode::PreserveColor;
     minsize_dirty_ = true;
     layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
@@ -851,9 +992,12 @@ UiLabel& UiLabel::ClearIcon()
     return *this;
 }
 
-UiLabel& UiLabel::SetIconLayout(UiAlign where)
+UiLabel& UiLabel::SetIconSide(UiAlign where)
 {
-    StyleEdit().icon_layout = where;
+    if(where != UiAlign::LEFT && where != UiAlign::RIGHT &&
+       where != UiAlign::TOP  && where != UiAlign::BOTTOM)
+        where = UiAlign::LEFT;
+    StyleEdit().icon_side = where;
     OnStyleChanged();
     return *this;
 }
@@ -881,16 +1025,9 @@ UiLabel& UiLabel::SetAlignV(UiAlign v)
     return *this;
 }
 
-UiLabel& UiLabel::SetIconMargin(const Rect& m)
+UiLabel& UiLabel::SetContentGap(int gap)
 {
-    StyleEdit().icon_margin = m;
-    OnStyleChanged();
-    return *this;
-}
-
-UiLabel& UiLabel::SetTextMargin(const Rect& m)
-{
-    StyleEdit().text_margin = m;
+    StyleEdit().content_gap = max(0, gap);
     OnStyleChanged();
     return *this;
 }
@@ -922,6 +1059,11 @@ Size UiLabel::GetMinSize() const
     cached_minsize_ = Size(w, h);
     minsize_dirty_ = false;
     return cached_minsize_;
+}
+
+Size UiLabel::GetContentSize() const
+{
+    return ComputeNaturalSize();
 }
 
 void UiLabel::Layout()
@@ -980,6 +1122,9 @@ void UiLabel::Paint(Draw& w)
         Vector<Vector<RichPiece>> rich_lines;
         Vector<Size> rich_line_sizes;
         BuildRichLines(spans_, fnt, ink, rich_lines, rich_line_sizes);
+        bool draw_sel = HasSelection() && !text_.IsEmpty();
+        int sf = draw_sel ? SelFrom() : -1;
+        int st = draw_sel ? SelTo() : -1;
 
         int gap = UiStyledTextLineGap();
         int total_h = 0;
@@ -1003,6 +1148,7 @@ void UiLabel::Paint(Draw& w)
         }
 
         int y = start_y;
+        int text_ofs = 0;
         for(int i = 0; i < rich_lines.GetCount(); i++) {
             const Vector<RichPiece>& ln = rich_lines[i];
             Size lsz = rich_line_sizes[i];
@@ -1023,15 +1169,51 @@ void UiLabel::Paint(Draw& w)
 
                 if(rp.kind == Span::TEXT) {
                     Color rk = IsNull(rp.ink) ? ink : rp.ink;
-                    w.DrawText(pr.left, pr.top, rp.text, rp.font, rk);
+                    int piece_len = rp.text.GetCount();
+                    if(draw_sel && piece_len > 0) {
+                        int hs0 = max(sf, text_ofs);
+                        int hs1 = min(st, text_ofs + piece_len);
+                        if(hs0 < hs1) {
+                            int a = hs0 - text_ofs;
+                            int b = hs1 - text_ofs;
+                            String pre = rp.text.Left(a);
+                            String mid = rp.text.Mid(a, b - a);
+                            String post = rp.text.Mid(b);
+                            int x0 = pr.left;
+                            int x1 = pr.right;
+                            if(a > 0)
+                                x0 = pr.left + GetTextSize(pre, rp.font).cx;
+                            if(b < piece_len)
+                                x1 = pr.left + GetTextSize(rp.text.Left(b), rp.font).cx;
+                            if(x1 > x0)
+                                w.DrawRect(x0, pr.top, x1 - x0, rp.sz.cy, SColorHighlight());
+
+                            int tx = pr.left;
+                            if(!pre.IsEmpty()) {
+                                w.DrawText(tx, pr.top, pre, rp.font, rk);
+                                tx += GetTextSize(pre, rp.font).cx;
+                            }
+                            if(!mid.IsEmpty()) {
+                                w.DrawText(tx, pr.top, mid, rp.font, SColorHighlightText());
+                                tx += GetTextSize(mid, rp.font).cx;
+                            }
+                            if(!post.IsEmpty())
+                                w.DrawText(tx, pr.top, post, rp.font, rk);
+                        }
+                        else
+                            w.DrawText(pr.left, pr.top, rp.text, rp.font, rk);
+                    }
+                    else
+                        w.DrawText(pr.left, pr.top, rp.text, rp.font, rk);
                     if(rp.underline) {
                         int uy = pr.bottom - 1;
                         w.DrawRect(pr.left, uy, rp.sz.cx, 1, rk);
                     }
+                    text_ofs += piece_len;
                 }
                 else if(rp.kind == Span::ICON) {
                     Color rk = IsNull(rp.ink) ? icon_ink : rp.ink;
-                    UiPaintStyledIcon(w, pr, rp.icon, true, rp.mono_icon, rk, enabled);
+                    UiPaintStyledIcon(w, pr, rp.icon, true, false, rp.icon_render_mode, rk, enabled);
                 }
                 else if(rp.kind == Span::BULLET) {
                     int d = max(2, min(pr.GetWidth(), pr.GetHeight()));
@@ -1042,6 +1224,8 @@ void UiLabel::Paint(Draw& w)
                 x += rp.sz.cx;
             }
 
+            if(i + 1 < rich_lines.GetCount())
+                text_ofs += 1;
             y += lsz.cy;
             if(i + 1 < rich_lines.GetCount())
                 y += gap;
@@ -1049,11 +1233,13 @@ void UiLabel::Paint(Draw& w)
     }
     else {
         if(!IsNull(icon_) && !layout_.support.IsEmpty()) {
+            const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
             UiPaintStyledIcon(w,
                               layout_.support,
                               icon_,
-                              icon_scale_,
-                              mono_icon_,
+                              true,
+                              !explicit_icon_size,
+                              icon_render_mode_,
                               icon_ink,
                               enabled);
         }
@@ -1124,19 +1310,14 @@ void UiLabel::Paint(Draw& w)
                 int lt = text_ofs + line_len;
                 int hs0 = max(sf, lf);
                 int hs1 = min(st, lt);
-
+                Vector<int> caret_x = BuildCaretAdvances(line, fnt);
                 if(hs0 < hs1) {
-                    int x0 = line_x;
-                    int x1 = line_x + sz.cx;
                     int a = hs0 - lf;
                     int b = hs1 - lf;
-                    if(a > 0)
-                        x0 = line_x + GetTextSize(line.Left(a), fnt).cx;
-                    if(b < line_len)
-                        x1 = line_x + GetTextSize(line.Left(b), fnt).cx;
+                    int x0 = line_x + caret_x[a];
+                    int x1 = line_x + caret_x[b];
                     if(x1 > x0)
                         w.DrawRect(x0, y, x1 - x0, sz.cy, SColorHighlight());
-
                     String pre = line.Left(a);
                     String mid = line.Mid(a, b - a);
                     String post = line.Mid(b);
@@ -1285,3 +1466,7 @@ void UiLabel::AssignAccessKeys(dword used)
 }
 
 } // namespace Upp
+
+
+
+

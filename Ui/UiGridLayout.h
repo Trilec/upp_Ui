@@ -507,5 +507,3 @@ private:
 } // namespace Upp
 
 #endif
-
-

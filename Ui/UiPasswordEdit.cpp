@@ -30,9 +30,9 @@ UiPasswordEdit::UiPasswordEdit()
     bs.metrics.frame_enabled = false;
     bs.metrics.face_enabled  = false;
 
-    // Use margins instead of padding: keep a small inset around the icon.
-    bs.icon_margin = Rect(DPI(2), DPI(2), DPI(4), DPI(2));
-    bs.text_margin = Rect(0, 0, 0, 0);
+    // Keep a small inset around the glyph inside the edit chrome.
+    bs.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(4), DPI(2));
+    bs.content_gap = 0;
 
     // Transparent background so the edit's face shows through.
     bs.transparent = true;
@@ -40,7 +40,6 @@ UiPasswordEdit::UiPasswordEdit()
     eye_button_.SetStyle(bs);
     eye_button_.SetText(String());   // icon-only
     eye_button_.SetIcon(Image());     // start with null icon
-    eye_button_.SetIconScale(true);
     eye_button_.ClickFocus(false);    // don't steal focus from the edit
     eye_button_.SetMinSize(Size(DPI(18), DPI(18)));
 
@@ -196,5 +195,3 @@ WString UiPasswordEdit::GetDisplayLine(int i) const
 }
 
 } // namespace Upp
-
-

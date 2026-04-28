@@ -44,7 +44,7 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
         s.metrics.high_contrast = false;
         s.metrics.use_text_font = false;
         s.metrics.text_font = StdFont();
-        s.metrics.content_padding = Rect(DPI(10), DPI(7), DPI(10), DPI(7));
+        s.metrics.content_margin = Rect(DPI(10), DPI(7), DPI(10), DPI(7));
         s.metrics.shadow = StyledShadow();
         s.metrics.highlight = StyledHighlight();
 
@@ -867,7 +867,7 @@ Point UiBaseEdit::GetContentArea() const
 {
     const Style& style = GetEffectiveStyle();
     Rect ci = UiNonNegativeThickness(style.skin.content_inset);
-    Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
+    Rect cp = UiNonNegativeThickness(style.metrics.content_margin);
     int fw  = UiResolvedFrameWidth(style.metrics, style.skin);
     return Point(fw + ci.left + cp.left,
                  fw + ci.top + cp.top);
@@ -914,7 +914,7 @@ void UiBaseEdit::LayoutSides()
     }
 
     if(sides_.IsEmpty()) {
-        Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
+        Rect cp = UiNonNegativeThickness(style.metrics.content_margin);
         text_rect_ = UiApplyThicknessRect(chrome, cp);
         return;
     }
@@ -1231,7 +1231,7 @@ void UiBaseEdit::LayoutSides()
     layout_side_lr(right_idx, false);
 
     // Finally: compute text rect from remaining chrome area, then apply styled content padding.
-    Rect cp = UiNonNegativeThickness(style.metrics.content_padding);
+    Rect cp = UiNonNegativeThickness(style.metrics.content_margin);
     Rect tr = UiApplyThicknessRect(remaining, cp);
 
     // Clamp degenerate
@@ -2289,12 +2289,3 @@ SideHandle SideHandle::AddToSide(Ctrl& c,
 
 
 } // namespace Upp
-
-
-
-
-
-
-
-
-

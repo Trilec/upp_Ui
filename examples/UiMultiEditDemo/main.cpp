@@ -1,206 +1,376 @@
-#include <CtrlLib/CtrlLib.h>
-#include <Ui/UiMultiEdit.h>
-#include <Ui/UiButton.h>
-#include <Ui/UiTheme.h>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
+using namespace BuilderDemoSupport;
 
-class UiMultiEditDemo : public TopWindow {
+namespace {
+
+enum TextPreset {
+    MULTI_NOTES = 0,
+    MULTI_CODE,
+    MULTI_LOG,
+};
+
+struct MultiEditConfig {
+    int preset = MULTI_NOTES;
+    String placeholder = "Enter content...";
+    UiAlign text_align = UiAlign::LEFT;
+    int radius = DPI(8);
+    int frame_width = 1;
+    int margin_x = DPI(10);
+    int margin_y = DPI(8);
+    int caret_width = DPI(1);
+    int font_px = 10;
+    int tab_size = 4;
+    bool read_only = false;
+    bool accepts_tabs = true;
+    bool accepts_drop = true;
+    bool overwrite = false;
+    bool show_tabs = false;
+    bool show_spaces = false;
+    bool show_line_endings = false;
+    bool show_readonly_bg = true;
+    bool left_icon = false;
+    bool right_action = false;
+    Color face = Color(250, 252, 255);
+    Color frame = Color(211, 221, 237);
+    Color text = Color(28, 47, 78);
+    Color placeholder_ink = Color(106, 128, 164);
+    Color selection = Color(44, 99, 212);
+    Color selection_ink = White();
+    Color caret = Color(28, 47, 78);
+};
+
+String MultiPresetText(int preset)
+{
+    switch(preset) {
+    case MULTI_CODE:
+        return String()
+            << "void BuildTheme(UiThemeContext& ctx) {\n"
+            << "    ctx.mode = UiThemeMode::Dark;\n"
+            << "    ctx.preset = UiThemePreset::Minimal;\n"
+            << "}\n\n"
+            << "int main() {\n"
+            << "    return RunDemo();\n"
+            << "}";
+    case MULTI_LOG:
+        return String()
+            << "[INFO] Session started\n"
+            << "[INFO] Loading workspace cache\n"
+            << "[WARN] Theme asset missing, using fallback\n"
+            << "[INFO] Ready";
+    case MULTI_NOTES:
+    default:
+        return String()
+            << "Sprint Notes\n\n"
+            << "- tighten item spacing contract\n"
+            << "- verify dark theme paint path\n"
+            << "- finish builder demos";
+    }
+}
+
+String AlignName(UiAlign a)
+{
+    if(a == UiAlign::CENTER) return "Center";
+    if(a == UiAlign::RIGHT) return "Right";
+    return "Left";
+}
+
+class UiMultiEditBuilder : public BuilderWindowBase {
 public:
-    typedef UiMultiEditDemo CLASSNAME;
+    typedef UiMultiEditBuilder CLASSNAME;
 
-    UiMultiEditDemo()
+    UiMultiEditBuilder()
+        : BuilderWindowBase("UiMultiEditDemo", "U++ UiMultiEdit Builder", "Inspect multiline editing, scrolling, side-items, and the shared edit style contract from one shell.")
     {
-        Title("UiMultiEdit Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(900), DPI(850));
+        Preview().Add(editor_);
+        Preview().Add(left_icon_btn_);
+        Preview().Add(clear_btn_);
 
-        // Add controls
-        Add(lbl_standard);    Add(edit_standard);
-        Add(lbl_readonly);    Add(edit_readonly);
-        Add(lbl_icon_left);   Add(edit_icon_left);
-        Add(lbl_centered);    Add(edit_centered);
-        Add(lbl_code);        Add(edit_code);
-        Add(lbl_log);         Add(edit_log);
+        AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
+        AddStateRow(StateBox(), state_preset_row_, state_preset_label_, state_preset_value_, "Preset");
+        AddStateRow(StateBox(), state_mode_row_, state_mode_label_, state_mode_value_, "Mode");
+        AddStateRow(StateBox(), state_length_row_, state_length_label_, state_length_value_, "Length");
 
-        // 1. Standard Multi-line
-        lbl_standard.SetText("Standard Notes:");
-        edit_standard.SetText(
-            "This is a standard multi-line editor.\n"
-            "Press Enter to create new lines.\n"
-            "Use the scrollbars if text exceeds the view.\n\n"
-            "It supports standard clipboard operations (Ctrl+C, Ctrl+V)."
-        );
-        edit_standard.SetPlaceholder("Enter your notes here...");
-        edit_standard.SetTip("Basic UiMultiEdit usage.");
+        AddDropdownRow(PropsBox(), preset_row_box_, preset_label_, preset_drop_, "Preset");
+        AddEditRow(PropsBox(), placeholder_row_box_, placeholder_label_, placeholder_edit_, "Placeholder");
+        AddDropdownRow(PropsBox(), align_row_box_, align_label_, align_drop_, "Text Align");
+        AddSliderRow(PropsBox(), radius_row_, "Radius", "8px");
+        AddSliderRow(PropsBox(), frame_width_row_, "Frame W", "1px");
+        AddSliderRow(PropsBox(), margin_x_row_, "Margin X", "10px");
+        AddSliderRow(PropsBox(), margin_y_row_, "Margin Y", "8px");
+        AddSliderRow(PropsBox(), caret_width_row_, "Caret W", "1px");
+        AddSliderRow(PropsBox(), font_px_row_, "Font Size", "10px");
+        AddSliderRow(PropsBox(), tab_size_row_, "Tab Size", "4");
+        AddToggleRow(PropsBox(), read_only_row_, "Read Only");
+        AddToggleRow(PropsBox(), accepts_tabs_row_, "Accept Tabs");
+        AddToggleRow(PropsBox(), accepts_drop_row_, "Accept Drop");
+        AddToggleRow(PropsBox(), overwrite_row_, "Overwrite");
+        AddToggleRow(PropsBox(), show_tabs_row_, "Show Tabs");
+        AddToggleRow(PropsBox(), show_spaces_row_, "Show Spaces");
+        AddToggleRow(PropsBox(), show_line_endings_row_, "Show Endings");
+        AddToggleRow(PropsBox(), show_readonly_bg_row_, "Readonly Bg");
+        AddToggleRow(PropsBox(), left_icon_row_, "Left Icon");
+        AddToggleRow(PropsBox(), right_action_row_, "Right Action");
+        AddColorRow(PropsBox(), face_row_, "Face");
+        AddColorRow(PropsBox(), frame_row_, "Frame");
+        AddColorRow(PropsBox(), text_row_, "Text");
+        AddColorRow(PropsBox(), placeholder_ink_row_, "Placeholder");
+        AddColorRow(PropsBox(), selection_row_, "Selection");
+        AddColorRow(PropsBox(), selection_ink_row_, "Sel Text");
+        AddColorRow(PropsBox(), caret_row_, "Caret");
 
-        // 2. Read-only (License/Terms example)
-        lbl_readonly.SetText("Read-only (Terms):");
-        edit_readonly.SetText(
-            "MIT License\n\n"
-            "Copyright (c) 2024 U++ User\n\n"
-            "Permission is hereby granted, free of charge, to any person obtaining a copy "
-            "of this software and associated documentation files (the \"Software\"), to deal "
-            "in the Software without restriction..."
-        );
-        edit_readonly.SetReadOnly();
-        edit_readonly.SetTip("Read-only mode. Text can be selected and copied, but not modified.");
-
-        // 3. Icon Left (e.g., "Description" field)
-        lbl_icon_left.SetText("Icon Left:");
-        edit_icon_left.SetPlaceholder("Enter description...");
-        edit_icon_left.SetText("Item description goes here.\nIt has an icon on the left.");
-        icon_left_btn.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
-        icon_left_btn.SetIcon(CtrlImg::write());
-        icon_left_btn.ClickFocus(false);
-        edit_icon_left.AddToSide(icon_left_btn, UiAlign::LEFT, Size(DPI(24), DPI(24)));
-        edit_icon_left.SetTip("Demonstrates icon alignment in a multi-line control.");
-
-        // 4. Centered Text Alignment
-        lbl_centered.SetText("Centered Text:");
-        edit_centered.SetText(
-            "Title Page\n"
-            "Subtitle\n"
-            "Author Name"
-        );
-        edit_centered.SetTextAlign(UiAlign::CENTER);
-        edit_centered.SetTip("Demonstrates UiAlign::CENTER for text.");
-
-        // 5. Custom Style (Code Editor Look)
-        lbl_code.SetText("Custom Style (Code):");
-        {
-            UiBaseEdit::Style s = UiBaseEdit::StyleDefault();
-            s.font = Monospace(DPI(13)); // Monospace font
-            
-            // Rounded corners
-            s.metrics.radius = DPI(6);
-
-            // Use 'face' for background
-            s.palette.face[ST_NORMAL] = Color(30, 30, 30);  // Dark background
-            
-            // Lighter green text
-            s.palette.ink[ST_NORMAL]  = Color(144, 238, 144); // Light Green
-            
-            s.palette.frame[ST_NORMAL] = Color(50, 50, 50);
-            
-            s.selection_color = Color(60, 80, 110);
-            s.caret_color = White();
-            edit_code.SetStyle(s);
-        }
-        edit_code.SetText(
-            "#include <iostream>\n\n"
-            "int main() {\n"
-            "    std::cout << \"Hello World!\" << std::endl;\n"
-            "    return 0;\n"
-            "}"
-        );
-        edit_code.SetTip("Custom dark theme with monospace font.");
-
-        // 6. Log / Output View (Bottom)
-        lbl_log.SetText("Log Output:");
-        edit_log.SetReadOnly();
-        edit_log.SetText(
-            "[INFO] System started.\n"
-            "[INFO] Loading resources...\n"
-            "[WARN] Config file not found, using defaults.\n"
-            "[INFO] Ready."
-        );
-        clear_log_btn.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
-        clear_log_btn.SetIcon(CtrlImg::remove());
-        clear_log_btn.ClickFocus(false);
-        edit_log.AddToSide(clear_log_btn, UiAlign::RIGHT, Size(DPI(24), DPI(24)));
-        clear_log_btn.WhenAction = [=] {
-            if(PromptYesNo("Clear the log?")) {
-                edit_log.Clear();
-            }
+        const EnumOption presets[] = {
+            { "Notes", MULTI_NOTES }, { "Code", MULTI_CODE }, { "Log", MULTI_LOG }
         };
-        edit_log.SetTip("Read-only log view. Click the 'X' icon to clear.");
+        const EnumOption aligns[] = {
+            { "Left", (int)UiAlign::LEFT }, { "Center", (int)UiAlign::CENTER }, { "Right", (int)UiAlign::RIGHT }
+        };
+        PopulateDropdown(preset_drop_, presets, 3);
+        PopulateDropdown(align_drop_, aligns, 3);
+
+        radius_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetRange(0, 4).SetStep(1).SetValue(cfg_.frame_width);
+        margin_x_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(cfg_.margin_x);
+        margin_y_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.margin_y);
+        caret_width_row_.Slider().SetRange(1, DPI(4)).SetStep(1).SetValue(cfg_.caret_width);
+        font_px_row_.Slider().SetRange(8, 16).SetStep(1).SetValue(cfg_.font_px);
+        tab_size_row_.Slider().SetRange(2, 8).SetStep(1).SetValue(cfg_.tab_size);
+
+        placeholder_edit_.SetData(cfg_.placeholder);
+        InitColorRow(face_row_, cfg_.face);
+        InitColorRow(frame_row_, cfg_.frame);
+        InitColorRow(text_row_, cfg_.text);
+        InitColorRow(placeholder_ink_row_, cfg_.placeholder_ink);
+        InitColorRow(selection_row_, cfg_.selection);
+        InitColorRow(selection_ink_row_, cfg_.selection_ink);
+        InitColorRow(caret_row_, cfg_.caret);
+
+        left_icon_btn_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
+        left_icon_btn_.SetIcon(ICON_CONTENT_CONTENT_COPY_48());
+        clear_btn_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
+        clear_btn_.SetIcon(ICON_DESIGN_DELETE_48());
+        clear_btn_.WhenAction = [=] { editor_.Clear(); SyncState(); };
+
+        preset_drop_.WhenSelect = [=](int) { cfg_.preset = (int)preset_drop_.GetSelectedData(); RefreshFromConfig(); };
+        placeholder_edit_.WhenAction = [=] { cfg_.placeholder = placeholder_edit_.GetText().ToString(); RefreshFromConfig(); };
+        placeholder_edit_.WhenChange = [=] { cfg_.placeholder = placeholder_edit_.GetText().ToString(); RefreshFromConfig(); };
+        align_drop_.WhenSelect = [=](int) { cfg_.text_align = (UiAlign)(int)align_drop_.GetSelectedData(); RefreshFromConfig(); };
+        radius_row_.WhenAction = [=] { cfg_.radius = (int)radius_row_.Slider().GetValue(); RefreshFromConfig(); };
+        frame_width_row_.WhenAction = [=] { cfg_.frame_width = (int)frame_width_row_.Slider().GetValue(); RefreshFromConfig(); };
+        margin_x_row_.WhenAction = [=] { cfg_.margin_x = (int)margin_x_row_.Slider().GetValue(); RefreshFromConfig(); };
+        margin_y_row_.WhenAction = [=] { cfg_.margin_y = (int)margin_y_row_.Slider().GetValue(); RefreshFromConfig(); };
+        caret_width_row_.WhenAction = [=] { cfg_.caret_width = (int)caret_width_row_.Slider().GetValue(); RefreshFromConfig(); };
+        font_px_row_.WhenAction = [=] { cfg_.font_px = (int)font_px_row_.Slider().GetValue(); RefreshFromConfig(); };
+        tab_size_row_.WhenAction = [=] { cfg_.tab_size = (int)tab_size_row_.Slider().GetValue(); RefreshFromConfig(); };
+        read_only_row_.Toggle().WhenAction = [=] { cfg_.read_only = read_only_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        accepts_tabs_row_.Toggle().WhenAction = [=] { cfg_.accepts_tabs = accepts_tabs_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        accepts_drop_row_.Toggle().WhenAction = [=] { cfg_.accepts_drop = accepts_drop_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        overwrite_row_.Toggle().WhenAction = [=] { cfg_.overwrite = overwrite_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        show_tabs_row_.Toggle().WhenAction = [=] { cfg_.show_tabs = show_tabs_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        show_spaces_row_.Toggle().WhenAction = [=] { cfg_.show_spaces = show_spaces_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        show_line_endings_row_.Toggle().WhenAction = [=] { cfg_.show_line_endings = show_line_endings_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        show_readonly_bg_row_.Toggle().WhenAction = [=] { cfg_.show_readonly_bg = show_readonly_bg_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        left_icon_row_.Toggle().WhenAction = [=] { cfg_.left_icon = left_icon_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        right_action_row_.Toggle().WhenAction = [=] { cfg_.right_action = right_action_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        face_row_.WhenAction = [=] { cfg_.face = face_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        frame_row_.WhenAction = [=] { cfg_.frame = frame_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        text_row_.WhenAction = [=] { cfg_.text = text_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        placeholder_ink_row_.WhenAction = [=] { cfg_.placeholder_ink = placeholder_ink_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        selection_row_.WhenAction = [=] { cfg_.selection = selection_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        selection_ink_row_.WhenAction = [=] { cfg_.selection_ink = selection_ink_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        caret_row_.WhenAction = [=] { cfg_.caret = caret_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        editor_.WhenAction = [=] { SyncState(); };
+
+        FinishInit();
+        RefreshFromConfig();
     }
 
-    virtual void Paint(Draw& w) override
+protected:
+    virtual void ApplyDemoTheme() override
     {
-        Rect r = GetSize();
-        w.DrawRect(r, SColorPaper());
+        UiLabel::Style body = MakeBodyLabelStyle(Palette());
+        UiLabel::Style value = MakeValueLabelStyle(Palette());
+        UiBaseEdit::Style edit = MakeEditStyle(Palette());
+        UiDropdown::Style dd = MakeDropdownStyle(Palette());
 
-        // Header
-        int head_h = DPI(100);
-        Rect header = r;
-        header.bottom = header.top + head_h;
-        w.DrawRect(header, SColorFace());
-
-        Font title = SansSerifZ(24).Bold();
-        Font subtitle = SansSerifZ(12);
-
-        int x = DPI(32);
-        int y = DPI(20);
-
-        w.DrawText(x, y, "UiMultiEdit Demo", title, SColorText());
-        y += title.GetHeight() + DPI(6);
-
-        w.DrawText(x, y,
-            "A multi-line text editor with scrolling support.",
-            subtitle, SColorText());
-
-        // Left label column background
-        int margin = DPI(20);
-        int label_panel_w = DPI(160);
-        Rect panel = r;
-        panel.top = header.bottom + DPI(12);
-        panel.bottom = r.bottom - DPI(16);
-        panel.left = margin;
-        panel.right = margin + label_panel_w;
-
-        w.DrawRect(panel, Blend(SColorFace(), SColorPaper(), 220));
+        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
+        state_preset_label_.SetStyle(body); state_preset_value_.SetStyle(value);
+        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
+        state_length_label_.SetStyle(body); state_length_value_.SetStyle(value);
+        preset_label_.SetStyle(body); placeholder_label_.SetStyle(body); align_label_.SetStyle(body);
+        preset_drop_.SetStyle(dd); align_drop_.SetStyle(dd); placeholder_edit_.SetStyle(edit);
+        radius_row_.SetLabelStyle(body).SetValueStyle(value);
+        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
+        margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
+        margin_y_row_.SetLabelStyle(body).SetValueStyle(value);
+        caret_width_row_.SetLabelStyle(body).SetValueStyle(value);
+        font_px_row_.SetLabelStyle(body).SetValueStyle(value);
+        tab_size_row_.SetLabelStyle(body).SetValueStyle(value);
+        read_only_row_.SetLabelStyle(body);
+        accepts_tabs_row_.SetLabelStyle(body);
+        accepts_drop_row_.SetLabelStyle(body);
+        overwrite_row_.SetLabelStyle(body);
+        show_tabs_row_.SetLabelStyle(body);
+        show_spaces_row_.SetLabelStyle(body);
+        show_line_endings_row_.SetLabelStyle(body);
+        show_readonly_bg_row_.SetLabelStyle(body);
+        left_icon_row_.SetLabelStyle(body);
+        right_action_row_.SetLabelStyle(body);
+        face_row_.SetLabelStyle(body);
+        frame_row_.SetLabelStyle(body);
+        text_row_.SetLabelStyle(body);
+        placeholder_ink_row_.SetLabelStyle(body);
+        selection_row_.SetLabelStyle(body);
+        selection_ink_row_.SetLabelStyle(body);
+        caret_row_.SetLabelStyle(body);
     }
 
-    virtual void Layout() override
+    virtual void LayoutPreviewContent() override
     {
-        Rect r = GetSize();
-        int header_h = DPI(100);
-        int margin = DPI(20);
-        int label_panel_w = DPI(160);
-        int label_w = label_panel_w - DPI(16);
-        int vgap = DPI(16); // Larger gap for multi-line controls
-
-        int x_label = margin + DPI(8);
-        int x_edit = x_label + label_w + DPI(12);
-        int edit_w = r.right - x_edit - margin;
-
-        int y = header_h + DPI(30);
-
-        // Helper to place rows with variable height
-        auto PlaceRow = [&](Label& lbl, UiMultiEdit& edit, int height_dp) {
-            int h = DPI(height_dp);
-            lbl.SetRect(x_label, y, label_w, DPI(24)); // Label stays at top
-            edit.SetRect(x_edit, y, edit_w, h);
-            y += h + vgap;
-        };
-
-        PlaceRow(lbl_standard,   edit_standard,  100);
-        PlaceRow(lbl_readonly,   edit_readonly,  80);
-        PlaceRow(lbl_icon_left,  edit_icon_left, 80);
-        PlaceRow(lbl_centered,   edit_centered,  80);
-        PlaceRow(lbl_code,       edit_code,      120);
-        PlaceRow(lbl_log,        edit_log,       100);
+        Rect canvas = Preview().GetCanvasRect();
+        editor_.SetRect(canvas.left + DPI(36), canvas.top + DPI(40), max(DPI(280), canvas.GetWidth() - DPI(72)), max(DPI(220), canvas.GetHeight() - DPI(80)));
     }
 
 private:
-    Label lbl_standard, lbl_readonly, lbl_icon_left, lbl_centered, lbl_code, lbl_log;
-    UiMultiEdit edit_standard;
-    UiMultiEdit edit_readonly;
-    UiMultiEdit edit_icon_left;
-    UiMultiEdit edit_centered;
-    UiMultiEdit edit_code;
-    UiMultiEdit edit_log;
+    struct EnumOption { const char* label; int value; };
 
-    UiButton icon_left_btn;
-    UiButton clear_log_btn;
+    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    {
+        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        target.Add(row).Fit();
+    }
+
+    void InitColorRow(UiCompositeColor& row, Color c)
+    {
+        row.SetSwatchColor(0, c);
+    }
+
+    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
+    {
+        drop.UseInternalModel();
+        drop.Clear();
+        for(int i = 0; i < count; i++)
+            drop.Add(opts[i].label, opts[i].value);
+    }
+
+    void RefreshFromConfig()
+    {
+        preset_drop_.SelectByData(cfg_.preset);
+        placeholder_edit_.SetData(cfg_.placeholder);
+        align_drop_.SelectByData((int)cfg_.text_align);
+        radius_row_.Slider().SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetValue(cfg_.frame_width);
+        margin_x_row_.Slider().SetValue(cfg_.margin_x);
+        margin_y_row_.Slider().SetValue(cfg_.margin_y);
+        caret_width_row_.Slider().SetValue(cfg_.caret_width);
+        font_px_row_.Slider().SetValue(cfg_.font_px);
+        tab_size_row_.Slider().SetValue(cfg_.tab_size);
+        read_only_row_.Toggle().SetOn(cfg_.read_only);
+        accepts_tabs_row_.Toggle().SetOn(cfg_.accepts_tabs);
+        accepts_drop_row_.Toggle().SetOn(cfg_.accepts_drop);
+        overwrite_row_.Toggle().SetOn(cfg_.overwrite);
+        show_tabs_row_.Toggle().SetOn(cfg_.show_tabs);
+        show_spaces_row_.Toggle().SetOn(cfg_.show_spaces);
+        show_line_endings_row_.Toggle().SetOn(cfg_.show_line_endings);
+        show_readonly_bg_row_.Toggle().SetOn(cfg_.show_readonly_bg);
+        left_icon_row_.Toggle().SetOn(cfg_.left_icon);
+        right_action_row_.Toggle().SetOn(cfg_.right_action);
+        face_row_.SetSwatchColor(0, cfg_.face);
+        frame_row_.SetSwatchColor(0, cfg_.frame);
+        text_row_.SetSwatchColor(0, cfg_.text);
+        placeholder_ink_row_.SetSwatchColor(0, cfg_.placeholder_ink);
+        selection_row_.SetSwatchColor(0, cfg_.selection);
+        selection_ink_row_.SetSwatchColor(0, cfg_.selection_ink);
+        caret_row_.SetSwatchColor(0, cfg_.caret);
+
+        UiBaseEdit::Style s = MakeEditStyle(Palette());
+        for(int i = 0; i < 4; i++) {
+            s.palette.face[i] = UiFill::Solid(cfg_.face);
+            s.palette.frame[i] = cfg_.frame;
+            s.palette.ink[i] = cfg_.text;
+        }
+        s.placeholder_ink = cfg_.placeholder_ink;
+        s.selection_color = cfg_.selection;
+        s.selection_ink = cfg_.selection_ink;
+        s.caret_color = cfg_.caret;
+        s.caret_width = cfg_.caret_width;
+        s.font = DemoMono(cfg_.preset == MULTI_CODE ? cfg_.font_px : cfg_.font_px, false);
+        if(cfg_.preset != MULTI_CODE)
+            s.font = DemoSans(cfg_.font_px);
+        s.text_align = cfg_.text_align;
+        s.metrics.radius = cfg_.radius;
+        s.metrics.frame_width = cfg_.frame_width;
+        s.metrics.content_margin = Rect(cfg_.margin_x, cfg_.margin_y, cfg_.margin_x, cfg_.margin_y);
+        s.tab_size = cfg_.tab_size;
+        s.show_tabs = cfg_.show_tabs;
+        s.show_spaces = cfg_.show_spaces;
+        s.show_line_endings = cfg_.show_line_endings;
+        s.show_readonly_bg = cfg_.show_readonly_bg;
+        editor_.SetStyle(s);
+        editor_.SetPlaceholder(cfg_.placeholder);
+        editor_.SetAcceptsTabs(cfg_.accepts_tabs);
+        editor_.SetAcceptsDrop(cfg_.accepts_drop);
+        editor_.SetOverwriteMode(cfg_.overwrite);
+        editor_.SetTextAlign(cfg_.text_align);
+        editor_.SetText(MultiPresetText(cfg_.preset).ToWString());
+        if(cfg_.read_only) editor_.SetReadOnly(); else editor_.SetEditable(true);
+        editor_.ClearSides();
+        if(cfg_.left_icon)
+            editor_.AddToSide(left_icon_btn_, UiAlign::LEFT, Size(DPI(24), DPI(24))).Overlay(false);
+        if(cfg_.right_action)
+            editor_.AddToSide(clear_btn_, UiAlign::RIGHT, Size(DPI(24), DPI(24))).Overlay(false);
+
+        SyncState();
+        SyncCode();
+        LayoutPreviewContent();
+        Preview().Refresh();
+    }
+
+    void SyncState()
+    {
+        state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
+        state_preset_value_.SetText(cfg_.preset == MULTI_CODE ? "Code" : cfg_.preset == MULTI_LOG ? "Log" : "Notes");
+        state_mode_value_.SetText(cfg_.read_only ? "Read Only" : "Editable");
+        state_length_value_.SetText(AsString(editor_.GetText().GetCount()) + " chars");
+    }
+
+    void SyncCode()
+    {
+        String code;
+        code << "UiMultiEdit edit;\n";
+        code << "edit.SetStyle(UiTheme::ResolveEdit());\n";
+        code << "edit.SetPlaceholder(" << QuoteCpp(cfg_.placeholder) << ");\n";
+        code << "edit.SetTextAlign(UiAlign::" << (cfg_.text_align == UiAlign::CENTER ? "CENTER" : cfg_.text_align == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";
+        code << "edit.SetText(" << QuoteCpp(MultiPresetText(cfg_.preset)) << ");\n";
+        if(cfg_.read_only) code << "edit.SetReadOnly();\n";
+        if(cfg_.left_icon) code << "edit.AddToSide(icon_button, UiAlign::LEFT, Size(24, 24));\n";
+        if(cfg_.right_action) code << "edit.AddToSide(action_button, UiAlign::RIGHT, Size(24, 24));\n";
+        code << "// style: radius=" << cfg_.radius << ", frame_width=" << cfg_.frame_width << ", content_margin=Rect(" << cfg_.margin_x << ", " << cfg_.margin_y << ", " << cfg_.margin_x << ", " << cfg_.margin_y << ")\n";
+        SetUsageCode(code);
+    }
+
+    MultiEditConfig cfg_;
+    UiMultiEdit editor_;
+    UiButton left_icon_btn_, clear_btn_;
+
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_preset_row_ { UiBoxLayout::Direction::H }, state_mode_row_ { UiBoxLayout::Direction::H }, state_length_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_theme_value_, state_preset_label_, state_preset_value_, state_mode_label_, state_mode_value_, state_length_label_, state_length_value_;
+
+    UiBoxLayout preset_row_box_ { UiBoxLayout::Direction::H }, placeholder_row_box_ { UiBoxLayout::Direction::H }, align_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel preset_label_, placeholder_label_, align_label_;
+    UiDropdown preset_drop_, align_drop_;
+    UiLineEdit placeholder_edit_;
+    UiCompositeSlider radius_row_, frame_width_row_, margin_x_row_, margin_y_row_, caret_width_row_, font_px_row_, tab_size_row_;
+    UiCompositeToggle read_only_row_, accepts_tabs_row_, accepts_drop_row_, overwrite_row_, show_tabs_row_, show_spaces_row_, show_line_endings_row_, show_readonly_bg_row_, left_icon_row_, right_action_row_;
+    UiCompositeColor face_row_, frame_row_, text_row_, placeholder_ink_row_, selection_row_, selection_ink_row_, caret_row_;
 };
+
+}
 
 GUI_APP_MAIN
 {
-
-    UiMultiEditDemo().Run();
+    UiMultiEditBuilder().Run();
 }
 
 

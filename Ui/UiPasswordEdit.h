@@ -192,7 +192,3 @@ private:
 } // namespace Upp
 
 #endif
-
-
-
-

@@ -169,4 +169,3 @@ void UiIntEdit::MouseWheel(Point p, int zdelta, dword keyflags)
 }
 
 } // namespace Upp
-

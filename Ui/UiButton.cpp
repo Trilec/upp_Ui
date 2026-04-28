@@ -34,6 +34,9 @@ Image UiButton::ResolveIconForState(StyledState st) const
 
 Size UiButton::GetStableIconSize() const
 {
+    if(icon_size_.cx > 0 && icon_size_.cy > 0)
+        return icon_size_;
+
     Size best(0, 0);
     for(int i = 0; i < 4; i++) {
         const Image& img = !IsNull(assigned_icon_images_[i]) ? assigned_icon_images_[i]
@@ -45,6 +48,22 @@ Size UiButton::GetStableIconSize() const
         }
     }
     return best;
+}
+
+bool UiButton::HasResolvedIcon() const
+{
+    for(int i = 0; i < 4; i++) {
+        if(!IsNull(assigned_icon_images_[i]))
+            return true;
+    }
+
+    const Style& style = GetEffectiveStyle();
+    for(int i = 0; i < 4; i++) {
+        if(!IsNull(style.icon_images[i]))
+            return true;
+    }
+
+    return false;
 }
 
 const UiButton::Style& UiButton::StyleDefault()
@@ -79,7 +98,7 @@ const UiButton::Style& UiButton::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
+        s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         s.metrics.radius = 0;
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
@@ -99,10 +118,9 @@ const UiButton::Style& UiButton::StyleDefault()
 
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
-        s.icon_layout = UiAlign::LEFT;
-        s.icon_margin = Rect(0, 0, 0, 0);
-        s.text_margin = Rect(DPI(6), 0, 0, 0);
-        s.icon_tint_mono = true;
+        s.icon_side = UiAlign::LEFT;
+        s.content_gap = DPI(6);
+        s.icon_render_mode = UiIconRenderMode::MonoTint;
 
         for(int i = 0; i < 4; i++)
             s.icon_images[i] = Image();
@@ -252,24 +270,24 @@ Size UiButton::ComputeNaturalSize() const
     Size text_block = GetTextBlockSize();
     bool have_text = !lines_.IsEmpty();
 
-    Size icon_sz = GetStableIconSize();
-    bool have_icon = icon_sz.cx > 0 && icon_sz.cy > 0;
+    bool have_icon = HasResolvedIcon();
+    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
 
-    UiAlign stack_dir = style.icon_layout;
+    UiAlign stack_dir = style.icon_side;
     if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
        stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
         stack_dir = UiAlign::LEFT;
 
     Size content = UiMeasureBlocksContent(icon_sz,
                                           text_block,
-                                          style.icon_margin,
-                                          style.text_margin,
                                           stack_dir,
                                           have_icon,
                                           have_text,
                                           DPI(40),
                                           DPI(20),
-                                          DPI(16));
+                                          explicit_icon_size ? 0 : DPI(16),
+                                          have_icon && have_text ? style.content_gap : 0);
 
     return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
 }
@@ -287,10 +305,11 @@ void UiButton::UpdateLayout(const Rect& content) const
     Size text_block = GetTextBlockSize();
     bool have_text = !lines_.IsEmpty();
 
-    Size icon_sz = GetStableIconSize();
-    bool have_icon = icon_sz.cx > 0 && icon_sz.cy > 0;
+    bool have_icon = HasResolvedIcon();
+    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
 
-    UiAlign stack_dir = style.icon_layout;
+    UiAlign stack_dir = style.icon_side;
     if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
        stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
         stack_dir = UiAlign::LEFT;
@@ -301,9 +320,8 @@ void UiButton::UpdateLayout(const Rect& content) const
                                     style.align_h,
                                     style.align_v,
                                     stack_dir,
-                                    style.icon_margin,
-                                    style.text_margin,
-                                    DPI(16));
+                                    explicit_icon_size ? 0 : DPI(16),
+                                    have_icon && have_text ? style.content_gap : 0);
 
     layout_dirty_ = false;
 }
@@ -318,13 +336,13 @@ UiButton& UiButton::SetUnderline(bool on, int thickness, int offset)
     return *this;
 }
 
-UiButton& UiButton::SetIconLayout(UiAlign layout)
+UiButton& UiButton::SetIconSide(UiAlign side)
 {
-    if(layout != UiAlign::LEFT && layout != UiAlign::RIGHT &&
-       layout != UiAlign::TOP  && layout != UiAlign::BOTTOM)
-        layout = UiAlign::LEFT;
+    if(side != UiAlign::LEFT && side != UiAlign::RIGHT &&
+       side != UiAlign::TOP  && side != UiAlign::BOTTOM)
+        side = UiAlign::LEFT;
 
-    StyleEdit().icon_layout = layout;
+    StyleEdit().icon_side = side;
     OnStyleChanged();
     return *this;
 }
@@ -352,16 +370,9 @@ UiButton& UiButton::SetAlignV(UiAlign v)
     return *this;
 }
 
-UiButton& UiButton::SetIconMargin(const Rect& m)
+UiButton& UiButton::SetContentGap(int gap)
 {
-    StyleEdit().icon_margin = m;
-    OnStyleChanged();
-    return *this;
-}
-
-UiButton& UiButton::SetTextMargin(const Rect& m)
-{
-    StyleEdit().text_margin = m;
+    StyleEdit().content_gap = max(0, gap);
     OnStyleChanged();
     return *this;
 }
@@ -668,6 +679,8 @@ void UiButton::Paint(Draw& w)
 
     Color ink = AdjustInk(p.ink[st], st);
     Color icon_ink = has_assigned_icon_colors_ ? assigned_icon_colors_[st] : UiResolveIconColor(p, st);
+    UiIconRenderMode icon_render_mode = has_assigned_icon_render_mode_ ? assigned_icon_render_mode_ : style.icon_render_mode;
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
     if(IsNull(icon_ink))
         icon_ink = ink;
 
@@ -683,8 +696,9 @@ void UiButton::Paint(Draw& w)
         UiPaintStyledIcon(w,
                           icon_r,
                           icon_img,
-                          icon_scale_,
-                          has_assigned_icon_tint_ ? assigned_icon_tint_mono_ : style.icon_tint_mono,
+                          true,
+                          !explicit_icon_size,
+                          icon_render_mode,
                           icon_ink,
                           IsEnabled());
     }

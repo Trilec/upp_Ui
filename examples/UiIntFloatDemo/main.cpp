@@ -74,4 +74,3 @@ GUI_APP_MAIN
 {
     UiIntFloatDemoWindow().Run();
 }
-

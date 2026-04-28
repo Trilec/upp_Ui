@@ -1,275 +1,204 @@
-#include <CtrlLib/CtrlLib.h>
-#include <Ui/UiPasswordEdit.h>
-#include <Ui/UiButton.h>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
+using namespace BuilderDemoSupport;
 
-class UiPasswordEditDemoWindow : public TopWindow {
+namespace {
+
+struct PasswordConfig {
+    String text = "hunter2";
+    String placeholder = "Password";
+    int radius = DPI(8);
+    int frame_width = 1;
+    bool enabled = true;
+    bool readonly = false;
+    bool show_visibility = true;
+    bool plain_visible = false;
+    int mask_mode = 0;
+};
+
+class UiPasswordEditBuilder : public BuilderWindowBase {
 public:
-    typedef UiPasswordEditDemoWindow CLASSNAME;
+    typedef UiPasswordEditBuilder CLASSNAME;
 
-    UiPasswordEditDemoWindow()
+    UiPasswordEditBuilder()
+        : BuilderWindowBase("UiPasswordEditDemo", "U++ UiPasswordEdit Builder", "Inspect masking, reveal, placeholder, and password field styling from one shell.")
     {
-        Title("UiPasswordEdit Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(900), DPI(600));
+        Preview().Add(edit_);
 
-        // Register controls
-        Add(lbl_standard);      Add(pass_standard);
-        Add(lbl_custom_char);   Add(pass_custom_char);
-        Add(lbl_toggle_right);  Add(pass_toggle_right);
-        Add(lbl_plain_visible); Add(pass_plain_visible);
-        Add(lbl_login_style);   Add(pass_login);
+        AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
+        AddStateRow(StateBox(), state_mode_row_, state_mode_label_, state_mode_value_, "Visibility");
+        AddStateRow(StateBox(), state_mask_row_, state_mask_label_, state_mask_value_, "Mask");
+        AddStateRow(StateBox(), state_text_row_, state_text_label_, state_text_value_, "Value");
 
-        // -----------------------------------------------------------------
-        // 1. Standard masked password
-        // -----------------------------------------------------------------
-        lbl_standard.SetText("Standard:");
-        pass_standard.SetPlaceholder("Enter password");
-        pass_standard.SetTip("Default masked password field using UiPasswordEdit.");
+        AddEditRow(PropsBox(), text_row_box_, text_label_, text_edit_, "Text");
+        AddEditRow(PropsBox(), placeholder_row_box_, placeholder_label_, placeholder_edit_, "Placeholder");
+        AddDropdownRow(PropsBox(), mask_row_box_, mask_label_, mask_drop_, "Mask Char");
+        AddSliderRow(PropsBox(), radius_row_, "Radius", "8px");
+        AddSliderRow(PropsBox(), frame_width_row_, "Frame W", "1px");
+        AddToggleRow(PropsBox(), enabled_row_, "Enabled");
+        AddToggleRow(PropsBox(), readonly_row_, "Read Only");
+        AddToggleRow(PropsBox(), visibility_row_, "Reveal Icon");
+        AddToggleRow(PropsBox(), plain_row_, "Plain Visible");
 
-        // -----------------------------------------------------------------
-        // 2. Custom mask character
-        // -----------------------------------------------------------------
-        lbl_custom_char.SetText("Custom mask char:");
-        pass_custom_char.SetPlaceholder("Password with '*'");
-        pass_custom_char.SetPasswordChar('*');
-        pass_custom_char.SetTip("Mask character changed via SetPasswordChar('*').");
+        const EnumOption masks[] = { { "Bullet", 0 }, { "Asterisk", 1 }, { "Hash", 2 } };
+        PopulateDropdown(mask_drop_, masks, 3);
 
-        // -----------------------------------------------------------------
-        // 3. Toggle visibility (right-side visibility icons)
-        // -----------------------------------------------------------------
-        lbl_toggle_right.SetText("Toggle visibility:");
-        pass_toggle_right.SetPlaceholder("Click eye icon to show / hide");
-        pass_toggle_right.EnableVisibilityIcon(true);
+        text_edit_.SetData(cfg_.text);
+        placeholder_edit_.SetData(cfg_.placeholder);
+        radius_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetRange(0, 4).SetStep(1).SetValue(cfg_.frame_width);
 
-        pass_toggle_right.SetTip(
-            "Visibility toggle using built-in design visibility icons."
-        );
+        text_edit_.WhenChange = [=] { cfg_.text = text_edit_.GetData().ToString(); RefreshFromConfig(); };
+        placeholder_edit_.WhenChange = [=] { cfg_.placeholder = placeholder_edit_.GetData().ToString(); RefreshFromConfig(); };
+        mask_drop_.WhenSelect = [=](int) { cfg_.mask_mode = (int)mask_drop_.GetSelectedData(); RefreshFromConfig(); };
+        radius_row_.WhenAction = [=] { cfg_.radius = (int)radius_row_.Slider().GetValue(); RefreshFromConfig(); };
+        frame_width_row_.WhenAction = [=] { cfg_.frame_width = (int)frame_width_row_.Slider().GetValue(); RefreshFromConfig(); };
+        enabled_row_.Toggle().WhenAction = [=] { cfg_.enabled = enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        readonly_row_.Toggle().WhenAction = [=] { cfg_.readonly = readonly_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        visibility_row_.Toggle().WhenAction = [=] { cfg_.show_visibility = visibility_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        plain_row_.Toggle().WhenAction = [=] { cfg_.plain_visible = plain_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        edit_.WhenAction = [=] { cfg_.text = edit_.GetText().ToString(); RefreshFromConfig(); };
+        edit_.WhenToggleVisible = [=](bool on) { cfg_.plain_visible = on; RefreshState(); };
 
-        // -----------------------------------------------------------------
-        // 4. Always-visible password (no masking)
-        // -----------------------------------------------------------------
-        lbl_plain_visible.SetText("Plain visible:");
-        pass_plain_visible.SetPlaceholder("Visible text (no masking)");
-        pass_plain_visible.SetPlainTextVisible(true);
-        pass_plain_visible.SetTip(
-            "Masking disabled via SetPlainTextVisible(true) â€“ handy for debugging."
-        );
-
-        // -----------------------------------------------------------------
-        // 5. Login-style composite (styled + visibility + submit arrow)
-        // -----------------------------------------------------------------
-        lbl_login_style.SetText("Login-style field:");
-
-        pass_login.SetPlaceholder("Password");
-
-        // a) Use built-in visibility icons
-        pass_login
-             .EnableVisibilityIcon(true);
-
-        pass_login.SetTip(
-            "Styled login field: rounded, dark background, inline visibility toggle "
-            "and a submit arrow attached on the right."
-        );
-
-        // b) Style the password edit to look like a dark, slightly rounded login box
-        {
-            UiBaseEdit::Style s = pass_login.GetStyle();
-
-            // Dark-ish blue/grey base
-            Color face  = Color(30, 50, 80);
-            Color frame = Color(90, 130, 170);
-            Color ink   = Color(235, 240, 245);
-
-            s.palette.face[ST_NORMAL]   = face;
-            s.palette.face[ST_HOT]      = DkColor(face, 10);
-            s.palette.face[ST_PRESSED]  = DkColor(face, 20);
-            s.palette.face[ST_DISABLED] = DisabledColor(face);
-
-            s.palette.frame[ST_NORMAL]   = frame;
-            s.palette.frame[ST_HOT]      = LtColor(frame, 15);
-            s.palette.frame[ST_PRESSED]  = DkColor(frame, 10);
-            s.palette.frame[ST_DISABLED] = DisabledColor(frame);
-
-            s.palette.ink[ST_NORMAL]   = ink;
-            s.palette.ink[ST_HOT]      = ink;
-            s.palette.ink[ST_PRESSED]  = ink;
-            s.palette.ink[ST_DISABLED] = SColorDisabled();
-
-            s.metrics.radius      = DPI(4);  // pill-ish corners
-            s.metrics.frame_width = DPI(1);
-
-            s.metrics.content_padding = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
-
-            s.caret_color     = ink;
-            s.placeholder_ink = Blend(ink, face, 160);
-
-            pass_login.SetStyle(s);
-        }
-
-        // c) Configure the submit arrow button as a right flank
-        {
-            // Style the arrow button so it visually merges with the edit
-            UiButton::Style bs = UiButton::StyleDefault();
-
-            // Match background + frame as closely as possible
-            Color face  = Color(38, 58, 88);
-            Color frame = Color(90, 130, 170);
-            Color ink   = Color(235, 240, 245);
-
-            bs.palette.face[ST_NORMAL]   = face;
-            bs.palette.face[ST_HOT]      = DkColor(face, 10);
-            bs.palette.face[ST_PRESSED]  = DkColor(face, 20);
-            bs.palette.face[ST_DISABLED] = DisabledColor(face);
-
-            bs.palette.frame[ST_NORMAL]   = frame;
-            bs.palette.frame[ST_HOT]      = LtColor(frame, 15);
-            bs.palette.frame[ST_PRESSED]  = DkColor(frame, 10);
-            bs.palette.frame[ST_DISABLED] = DisabledColor(frame);
-
-            bs.palette.ink[ST_NORMAL]   = ink;
-            bs.palette.ink[ST_HOT]      = ink;
-            bs.palette.ink[ST_PRESSED]  = ink;
-            bs.palette.ink[ST_DISABLED] = SColorDisabled();
-
-            bs.metrics.radius      = DPI(4);
-            bs.metrics.frame_width = DPI(0);
-
-            bs.metrics.content_padding = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
-
-            login_submit_btn.SetStyle(bs);
-            login_submit_btn.SetText(String());             // icon-only
-            login_submit_btn.SetIcon(CtrlImg::go_forward());
-            login_submit_btn.SetIconTintMono(false);
-            login_submit_btn.ClickFocus(false);             // keep focus on edit
-            login_submit_btn.SetMinSize(Size(DPI(32), 0));  // width ~= height
-
-            // Attach as right-hand flank; size auto-tracks edit height
-            pass_login.AddToSide(login_submit_btn, UiAlign::RIGHT, Size(0, 0), UiDirection::H);
-
-            // Simple behaviour: when clicked, "submit" the password
-            login_submit_btn.WhenAction = [=] {
-                String pwd = pass_login.GetText().ToString();
-                PromptOK(Format("Submitting password: \"%s\"", pwd));
-            };
-        }
+        FinishInit();
+        RefreshFromConfig();
     }
 
-    // ---------------------------------------------------------------------
-    // Nice painted header + label column (same general vibe as other demos)
-    // ---------------------------------------------------------------------
-    virtual void Paint(Draw& w) override
+protected:
+    virtual void ApplyDemoTheme() override
     {
-        Rect r = GetSize();
-        w.DrawRect(r, SColorPaper()); // background
+        UiLabel::Style body = MakeBodyLabelStyle(Palette());
+        UiLabel::Style value = MakeValueLabelStyle(Palette());
+        UiBaseEdit::Style edit = MakeEditStyle(Palette());
+        UiDropdown::Style dd = MakeDropdownStyle(Palette());
 
-        // Header band
-        int head_h = DPI(110);
-        Rect header = r;
-        header.bottom = header.top + head_h;
-        w.DrawRect(header, SColorFace());
-
-        Font title    = SansSerifZ(24).Bold();
-        Font subtitle = SansSerifZ(12);
-        Font body     = SansSerifZ(11);
-
-        int x = DPI(32);
-        int y = DPI(16);
-
-        w.DrawText(x, y, "UiPasswordEdit Demo", title, SColorText());
-        y += title.GetHeight() + DPI(4);
-
-        w.DrawText(
-            x, y,
-            "Password entry built on UiLineEdit / UiBaseEdit.",
-            subtitle, SColorText()
-        );
-        y += subtitle.GetHeight() + DPI(2);
-
-        w.DrawText(
-            x, y,
-            "Shows masking, custom mask chars, visibility toggles, plain-visible "
-            "mode, and a styled login-style composite with flanking controls.",
-            body, SColorText()
-        );
-
-        // Left label column background
-        int margin        = DPI(20);
-        int label_panel_w = DPI(180);
-        Rect panel = r;
-        panel.top    = header.bottom + DPI(12);
-        panel.bottom = r.bottom - DPI(16);
-        panel.left   = margin;
-        panel.right  = margin + label_panel_w;
-
-        w.DrawRect(panel, Blend(SColorFace(), SColorPaper(), 220));
-
-        // Column headers
-        Font colhdr = SansSerifZ(10).Bold();
-        Color hdrc  = SColorDisabled();
-
-        int y_hdr = header.bottom + DPI(16);
-        w.DrawText(margin + DPI(8), y_hdr, "Variant", colhdr, hdrc);
-
-        int right_hdr_x = r.right - DPI(260);
-        w.DrawText(right_hdr_x, y_hdr, "Notes / Behaviour", colhdr, hdrc);
+        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
+        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
+        state_mask_label_.SetStyle(body); state_mask_value_.SetStyle(value);
+        state_text_label_.SetStyle(body); state_text_value_.SetStyle(value);
+        text_label_.SetStyle(body); placeholder_label_.SetStyle(body); mask_label_.SetStyle(body);
+        text_edit_.SetStyle(edit); placeholder_edit_.SetStyle(edit); mask_drop_.SetStyle(dd);
+        radius_row_.SetLabelStyle(body).SetValueStyle(value);
+        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
+        enabled_row_.SetLabelStyle(body);
+        readonly_row_.SetLabelStyle(body);
+        visibility_row_.SetLabelStyle(body);
+        plain_row_.SetLabelStyle(body);
     }
 
-    virtual void Layout() override
+    virtual void LayoutPreviewContent() override
     {
-        Rect r = GetSize();
-
-        int header_h      = DPI(110);
-        int margin        = DPI(20);
-        int label_panel_w = DPI(180);
-        int label_w       = label_panel_w - DPI(16); // inside shaded panel
-        int vgap          = DPI(10);
-        int row_hmin      = DPI(32);
-
-        int x_label  = margin + DPI(8);
-        int x_edit   = x_label + label_w + DPI(20);
-        int edit_w   = r.right - margin - x_edit;
-
-        int y = header_h + DPI(40);
-
-        auto PlaceRow = [&](Label& lbl, Ctrl& ctrl) {
-            Size ms = ctrl.GetMinSize();
-            int  h  = max(row_hmin, ms.cy);
-
-            lbl.SetRect(x_label, y, label_w, h);
-            ctrl.SetRect(x_edit,  y, edit_w,  h);
-            y += h + vgap;
-        };
-
-        PlaceRow(lbl_standard,      pass_standard);
-        PlaceRow(lbl_custom_char,   pass_custom_char);
-        PlaceRow(lbl_toggle_right,  pass_toggle_right);
-        PlaceRow(lbl_plain_visible, pass_plain_visible);
-        PlaceRow(lbl_login_style,   pass_login);
+        Rect canvas = Preview().GetCanvasRect();
+        int w = min(DPI(340), canvas.GetWidth() - DPI(40));
+        int h = DPI(36);
+        int x = canvas.left + (canvas.GetWidth() - w) / 2;
+        int y = canvas.top + (canvas.GetHeight() - h) / 2;
+        edit_.SetRect(x, y, w, h);
     }
 
 private:
-    // Labels
-    Label lbl_standard;
-    Label lbl_custom_char;
-    Label lbl_toggle_right;
-    Label lbl_plain_visible;
-    Label lbl_login_style;
+    struct EnumOption { const char* label; int value; };
 
-    // Password edits
-    UiPasswordEdit pass_standard;
-    UiPasswordEdit pass_custom_char;
-    UiPasswordEdit pass_toggle_right;
-    UiPasswordEdit pass_plain_visible;
+    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
+    {
+        drop.UseInternalModel();
+        drop.Clear();
+        for(int i = 0; i < count; i++)
+            drop.Add(opts[i].label, opts[i].value);
+    }
 
-    // Login-style composite
-    UiPasswordEdit pass_login;
-    UiButton       login_submit_btn;
+    wchar MaskChar() const
+    {
+        if(cfg_.mask_mode == 1) return '*';
+        if(cfg_.mask_mode == 2) return '#';
+        return 0x25CF;
+    }
+
+    String MaskLabel() const
+    {
+        if(cfg_.mask_mode == 1) return "*";
+        if(cfg_.mask_mode == 2) return "#";
+        return "Bullet";
+    }
+
+    void RefreshState()
+    {
+        state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
+        state_mode_value_.SetText(cfg_.plain_visible ? "Visible" : "Masked");
+        state_mask_value_.SetText(MaskLabel());
+        state_text_value_.SetText(cfg_.plain_visible ? cfg_.text : String("••••••"));
+    }
+
+    void RefreshFromConfig()
+    {
+        UiBaseEdit::Style style = MakeEditStyle(Palette());
+        style.metrics.radius = cfg_.radius;
+        style.metrics.frame_width = cfg_.frame_width;
+        edit_.SetStyle(style);
+        edit_.SetText(WString(cfg_.text));
+        edit_.SetPlaceholder(cfg_.placeholder);
+        edit_.SetPasswordChar(MaskChar());
+        edit_.EnableVisibilityIcon(cfg_.show_visibility);
+        edit_.SetPlainTextVisible(cfg_.plain_visible);
+        edit_.SetEditable(!cfg_.readonly);
+        edit_.Enable(cfg_.enabled);
+
+        mask_drop_.SelectByData(cfg_.mask_mode);
+        radius_row_.Slider().SetValue(cfg_.radius);
+        frame_width_row_.Slider().SetValue(cfg_.frame_width);
+        enabled_row_.Toggle().SetOn(cfg_.enabled);
+        readonly_row_.Toggle().SetOn(cfg_.readonly);
+        visibility_row_.Toggle().SetOn(cfg_.show_visibility);
+        plain_row_.Toggle().SetOn(cfg_.plain_visible);
+        radius_row_.SetValueText(AsString(cfg_.radius) + "px");
+        frame_width_row_.SetValueText(AsString(cfg_.frame_width) + "px");
+
+        SetUsageCode(BuildUsageCode());
+        RefreshState();
+        Preview().Refresh();
+    }
+
+    String BuildUsageCode() const
+    {
+        String code;
+        code << "UiPasswordEdit pass;\n";
+        code << "UiBaseEdit::Style style = UiTheme::ResolveEdit();\n";
+        code << "style.metrics.radius = " << cfg_.radius << ";\n";
+        code << "style.metrics.frame_width = " << cfg_.frame_width << ";\n";
+        code << "pass.SetStyle(style)\n";
+        code << "    .SetPlaceholder(" << QuoteCpp(cfg_.placeholder) << ")\n";
+        code << "    .SetPasswordChar(" << (int)MaskChar() << ")\n";
+        if(cfg_.show_visibility)
+            code << "    .EnableVisibilityIcon(true)\n";
+        if(cfg_.plain_visible)
+            code << "    .SetPlainTextVisible(true)";
+        code << ";\n";
+        if(cfg_.readonly)
+            code << "pass.SetEditable(false);\n";
+        if(!cfg_.enabled)
+            code << "pass.Enable(false);\n";
+        return code;
+    }
+
+    PasswordConfig cfg_;
+    UiPasswordEdit edit_;
+
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_mode_row_ { UiBoxLayout::Direction::H }, state_mask_row_ { UiBoxLayout::Direction::H }, state_text_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_theme_value_, state_mode_label_, state_mode_value_, state_mask_label_, state_mask_value_, state_text_label_, state_text_value_;
+
+    UiBoxLayout text_row_box_ { UiBoxLayout::Direction::H }, placeholder_row_box_ { UiBoxLayout::Direction::H }, mask_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel text_label_, placeholder_label_, mask_label_;
+    UiLineEdit text_edit_, placeholder_edit_;
+    UiDropdown mask_drop_;
+    UiCompositeSlider radius_row_, frame_width_row_;
+    UiCompositeToggle enabled_row_, readonly_row_, visibility_row_, plain_row_;
 };
+
+}
 
 GUI_APP_MAIN
 {
-    Ctrl::GlobalBackPaint();
-    UiPasswordEditDemoWindow().Run();
+    UiPasswordEditBuilder demo;
+    demo.Run();
 }

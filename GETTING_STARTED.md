@@ -59,6 +59,3 @@ Note: `Animation/` in this repo is a vendored copy of the animation/easing packa
 See `CHECKLIST.md` for the per-control plan and current blockers.
 
 See `UPP_GUIDES/README.md` for deeper architecture, theme, review, UiDoc, tree, and data-model guidance.
-
-
-

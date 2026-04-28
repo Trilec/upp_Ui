@@ -1,6 +1,10 @@
 #include <Ui/UiAccordion.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiScrollPanel.h>
+#include <Ui/UiBoxLayout.h>
+#include <Ui/UiGridLayout.h>
+#include <Ui/UiTree.h>
+#include <Ui/UiLabel.h>
 
 namespace Upp {
 
@@ -20,12 +24,40 @@ static void RefreshAccordionExtent(UiAccordion& acc)
     acc.Refresh();
 }
 
+static int MeasureAccordionChildHeight(Ctrl* q, int width)
+{
+    if(!q)
+        return 0;
+
+    width = max(0, width);
+
+    if(UiBoxLayout* box = dynamic_cast<UiBoxLayout*>(q)) {
+        if(width > 0)
+            return box->MeasureHeightForWidth(width);
+        return box->GetContentSize().cy;
+    }
+    if(UiGridLayout* grid = dynamic_cast<UiGridLayout*>(q)) {
+        if(width > 0)
+            return grid->MeasureHeightForWidth(width);
+        return grid->GetContentSize().cy;
+    }
+    if(UiTree* tree = dynamic_cast<UiTree*>(q))
+        return max(tree->GetMinSize().cy, tree->GetContentSize().cy);
+    if(UiLabel* label = dynamic_cast<UiLabel*>(q))
+        return max(label->GetMinSize().cy, label->GetContentSize().cy);
+    if(UiScrollPanel* sp = dynamic_cast<UiScrollPanel*>(q))
+        return max(sp->GetMinSize().cy, sp->GetContentSize().cy);
+
+    return q->GetMinSize().cy;
+}
+
 void UiAccordion::SectionHeader::LeftDown(Point p, dword keyflags)
 {
     UiTitleCard::LeftDown(p, keyflags);
     down = true;
+    down_on_drag = owner && index >= 0 && owner->CanBeginHeaderDrag(index, p);
     SetCapture();
-    if(owner && index >= 0)
+    if(down_on_drag)
         owner->BeginHeaderDrag(index, GetMousePos());
 }
 
@@ -47,9 +79,10 @@ void UiAccordion::SectionHeader::LeftUp(Point p, dword keyflags)
         owner->EndHeaderDrag(false);
 
     Rect bounds = GetSize();
-    if(owner && index >= 0 && down && !moved && bounds.Contains(p))
+    if(owner && index >= 0 && down && !moved && bounds.Contains(p) && !down_on_drag)
         owner->Toggle(index);
     down = false;
+    down_on_drag = false;
 }
 
 bool UiAccordion::SectionHeader::Key(dword key, int count)
@@ -82,6 +115,34 @@ bool UiAccordion::SectionHeader::Key(dword key, int count)
     return UiTitleCard::Key(key, count);
 }
 
+void UiAccordion::SectionHeader::Paint(Draw& w)
+{
+    UiTitleCard::Paint(w);
+    if(!owner || index < 0)
+        return;
+
+    const UiAccordion::Style& style = owner->GetStyle();
+    if(!owner->drag_reorder_enabled_ || !style.show_drag_handle || owner->GetCount() < 2)
+        return;
+
+    Rect dr = owner->GetHeaderDragRect(index);
+    if(dr.IsEmpty())
+        return;
+
+    StyledState st = !IsEnabled() ? ST_DISABLED : (down ? ST_PRESSED : (HasMouse() ? ST_HOT : ST_NORMAL));
+    Color ink = style.header_style.palette.icon[st];
+    if(IsNull(ink))
+        ink = style.header_style.palette.ink[st];
+    if(IsNull(ink))
+        ink = style.palette.ink[st];
+    if(owner->dragging_ && owner->drag_from_ == index)
+        ink = Color(56, 146, 255);
+
+    UiPaintStyledIcon(w, dr,
+                      IsNull(style.drag_glyph) ? ICON_DESIGN_DRAG_INDICATOR_48() : style.drag_glyph,
+                      true, true, UiIconRenderMode::MonoTint, ink, IsEnabled());
+}
+
 const UiAccordion::Style& UiAccordion::StyleDefault()
 {
     static Style s;
@@ -104,10 +165,10 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
-        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
 
         s.header_style = UiTitleCard::StyleDefault();
-        s.header_style.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
+        s.header_style.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
         s.header_style.hover_enabled = true;
         s.header_style.metrics.focus_enabled = false;
         s.header_style.show_rule = true;
@@ -120,7 +181,7 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.body_style.metrics.frame_width = 0;
         s.body_style.metrics.radius = 0;
         s.body_style.metrics.focus_enabled = false;
-        s.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
         s.body_style.metrics.shadow.enabled = false;
 
         s.chevron_side = UiAlign::RIGHT;
@@ -129,6 +190,11 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.glyph_lock = Image();
         s.chevron_scale = false;
         s.chevron_size = 0;
+        s.show_drag_handle = true;
+        s.drag_side = UiAlign::RIGHT;
+        s.drag_glyph = ICON_DESIGN_DRAG_INDICATOR_48();
+        s.drag_size = DPI(14);
+        s.drag_gap = DPI(8);
 
         s.unified_section_frame = false;
         s.unified_section_radius = DPI(10);
@@ -198,16 +264,16 @@ void UiAccordion::SyncThemeStyle()
     resolved.body_style.metrics.frame_width = 0;
     resolved.body_style.metrics.radius = 0;
     resolved.body_style.metrics.focus_enabled = false;
-    resolved.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+    resolved.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
     resolved.body_style.metrics.shadow.enabled = false;
     resolved.header_style = UiTheme::ResolveTitleCard();
-    resolved.header_style.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
+    resolved.header_style.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
     resolved.header_style.hover_enabled = true;
     resolved.header_style.metrics.focus_enabled = false;
     resolved.header_style.show_rule = true;
     resolved.header_style.media_tint_mono = true;
     resolved.body_style = panel;
-    resolved.body_style.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    resolved.body_style.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     style_ = resolved;
     theme_revision_ = revision;
 }
@@ -299,7 +365,16 @@ int UiAccordion::AddSection(const String& title, bool open)
 void UiAccordion::ApplySectionStyle(Section& s, int)
 {
     const Style& style = GetEffectiveStyle();
-    s.header.SetStyle(style.header_style)
+    UiTitleCard::Style hs = style.header_style;
+    hs.media_gap = style.chevron_gap;
+    if(drag_reorder_enabled_ && style.show_drag_handle && sections_.GetCount() > 1) {
+        int reserve = GetDragReserve();
+        if(style.drag_side == UiAlign::LEFT)
+            hs.metrics.content_margin.left += reserve;
+        else
+            hs.metrics.content_margin.right += reserve;
+    }
+    s.header.SetStyle(hs)
             .SetTitle(s.title)
             .SetSubTitle(s.subtitle)
             .SetCopyText(s.copy)
@@ -353,7 +428,9 @@ void UiAccordion::RefreshChevron(Section& s)
         }
     }
 
-    int reserve = max(DPI(20), pref.cx + DPI(10));
+    int reserve = max(DPI(20), pref.cx + max(DPI(6), style.chevron_gap));
+    if(drag_reorder_enabled_ && style.show_drag_handle && sections_.GetCount() > 1 && style.drag_side == style.chevron_side)
+        reserve += GetDragReserve();
 
     s.header.SetMedia(arrow, pref)
             .SetMediaSide(style.chevron_side)
@@ -576,6 +653,25 @@ UiAccordion& UiAccordion::SetChevronGlyphs(const Image& open, const Image& close
     return *this;
 }
 
+
+UiAccordion& UiAccordion::SetChevronSize(int px)
+{
+    StyleEdit().chevron_scale = true;
+    StyleEdit().chevron_size = max(0, px);
+    for(int i = 0; i < sections_.GetCount(); i++)
+        RefreshChevron(sections_[i]);
+    Refresh();
+    return *this;
+}
+
+UiAccordion& UiAccordion::SetChevronGap(int px)
+{
+    StyleEdit().chevron_gap = max(0, px);
+    for(int i = 0; i < sections_.GetCount(); i++)
+        RefreshChevron(sections_[i]);
+    Refresh();
+    return *this;
+}
 UiAccordion& UiAccordion::SetHeaderRuleExtent(UiSpan ex)
 {
     StyleEdit().header_style.rule_extent = ex;
@@ -648,6 +744,30 @@ UiAccordion& UiAccordion::EnableDragReorder(bool on)
     drag_reorder_enabled_ = on;
     if(!on)
         EndHeaderDrag(true);
+    OnStyleChanged();
+    return *this;
+}
+
+UiAccordion& UiAccordion::ShowDragHandle(bool on)
+{
+    StyleEdit().show_drag_handle = on;
+    OnStyleChanged();
+    return *this;
+}
+
+UiAccordion& UiAccordion::SetDragSide(UiAlign side)
+{
+    if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
+        side = UiAlign::RIGHT;
+    StyleEdit().drag_side = side;
+    OnStyleChanged();
+    return *this;
+}
+
+UiAccordion& UiAccordion::SetDragGlyph(const Image& glyph)
+{
+    StyleEdit().drag_glyph = glyph;
+    Refresh();
     return *this;
 }
 
@@ -728,6 +848,77 @@ void UiAccordion::EndHeaderDrag(bool cancel)
     drag_insert_before_ = -1;
     drag_marker_.Hide();
     Refresh();
+}
+
+
+int UiAccordion::GetChevronReserve(const Section& s) const
+{
+    const Style& style = GetEffectiveStyle();
+    if(!style.show_chevron)
+        return 0;
+
+    Size pref = Size(DPI(14), DPI(14));
+    if(style.chevron_scale) {
+        int px = style.chevron_size > 0 ? style.chevron_size : DPI(14);
+        pref = Size(px, px);
+    }
+    else {
+        Image arrow;
+        if(s.lock != Lock::None && !IsNull(style.glyph_lock))
+            arrow = style.glyph_lock;
+        else
+            arrow = s.open ? style.glyph_open : style.glyph_closed;
+        if(!IsNull(arrow) && arrow.GetSize().cx > 0 && arrow.GetSize().cy > 0)
+            pref = arrow.GetSize();
+    }
+    return max(DPI(20), pref.cx + max(DPI(6), style.chevron_gap));
+}
+
+int UiAccordion::GetDragReserve() const
+{
+    const Style& style = GetEffectiveStyle();
+    int size = max(DPI(10), style.drag_size);
+    return size + max(0, style.drag_gap);
+}
+
+Rect UiAccordion::GetHeaderDragRect(int i) const
+{
+    if(i < 0 || i >= sections_.GetCount())
+        return Rect(0, 0, 0, 0);
+
+    const Style& style = GetEffectiveStyle();
+    if(!drag_reorder_enabled_ || !style.show_drag_handle || sections_.GetCount() < 2)
+        return Rect(0, 0, 0, 0);
+
+    const Section& s = sections_[i];
+    Size sz = s.header.GetSize();
+    if(sz.cx <= 0 || sz.cy <= 0)
+        return Rect(0, 0, 0, 0);
+
+    Rect hr(Point(0, 0), sz);
+    int side = min(style.drag_size, max(0, hr.GetHeight() - DPI(8)));
+    side = max(DPI(10), side);
+    int y = hr.top + (hr.GetHeight() - side) / 2;
+
+    Rect cm = style.header_style.metrics.content_margin;
+    if(style.drag_side == UiAlign::LEFT) {
+        int x = hr.left + cm.left;
+        return RectC(x, y, side, side);
+    }
+    else {
+        int x = hr.right - cm.right - side;
+        return RectC(x, y, side, side);
+    }
+}
+
+bool UiAccordion::CanBeginHeaderDrag(int i, Point p_local) const
+{
+    if(!drag_reorder_enabled_ || i < 0 || i >= sections_.GetCount() || sections_.GetCount() < 2)
+        return false;
+    const Style& style = GetEffectiveStyle();
+    if(!style.show_drag_handle)
+        return true;
+    return GetHeaderDragRect(i).Contains(p_local);
 }
 
 void UiAccordion::MoveSectionTo(int from, int before)
@@ -915,7 +1106,8 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
             continue;
 
         Size ms = q->GetMinSize();
-        measured = max(measured, ms.cy);
+        int body_h = MeasureAccordionChildHeight(q, width);
+        measured = max(measured, max(ms.cy, body_h));
 
         Rect r = q->GetRect();
         bool fill_host = q->GetFirstChild()
@@ -923,7 +1115,9 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
                       && r.top == 0
                       && abs(r.GetWidth() - max(0, width)) <= 1;
         if(r.GetWidth() <= 0 || r.GetHeight() <= 0 || fill_host)
-            r = RectC(0, 0, max(0, ms.cx), max(0, ms.cy));
+            r = RectC(0, 0, max(0, width), max(0, max(ms.cy, body_h)));
+        else
+            r.bottom = max(r.bottom, r.top + max(ms.cy, body_h));
 
         if(first) {
             b = r;
@@ -958,7 +1152,7 @@ Size UiAccordion::GetMinSize() const
         if(s.open)
             h += style.header_body_gap + MeasureSectionBodyHeight(s, max(1, w));
         if(i + 1 < sections_.GetCount())
-            h += style.section_gap;
+            h += style.item_spacing;
     }
 
     Size out = UiStyledOuterSizeFromContent(Size(w, h), style.metrics, style.skin);
@@ -1001,7 +1195,7 @@ void UiAccordion::Layout()
         }
 
         if(i + 1 < sections_.GetCount())
-            y += style.section_gap;
+            y += style.item_spacing;
     }
 
     if(dragging_ && drag_from_ >= 0 && drag_from_ < sections_.GetCount()) {
@@ -1220,12 +1414,6 @@ void UiAccordion::PaintRuleLine(Draw& w, int x, int y, int cx, int thickness, Ui
 }
 
 }
-
-
-
-
-
-
 
 
 

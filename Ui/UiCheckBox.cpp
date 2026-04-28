@@ -52,7 +52,7 @@ const UiCheckBox::Style& UiCheckBox::StyleDefault()
         s.metrics = StyledMetrics();
         s.metrics.face_enabled = false;
         s.metrics.frame_enabled = false;
-        s.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.indicator_metrics = StyledMetrics();
         s.indicator_metrics.face_enabled = true;
@@ -214,6 +214,27 @@ UiCheckBox& UiCheckBox::SetIndicatorRoundness(int percent)
     return SetIndicatorRadius(r);
 }
 
+UiCheckBox& UiCheckBox::SetCheckedIcon(const Image& img)
+{
+    StyleEdit().checked_icon = img;
+    OnStyleChanged();
+    return *this;
+}
+
+UiCheckBox& UiCheckBox::SetTriStateIcon(const Image& img)
+{
+    StyleEdit().tri_state_icon = img;
+    OnStyleChanged();
+    return *this;
+}
+
+UiCheckBox& UiCheckBox::SetMarkerRenderMode(UiIconRenderMode mode)
+{
+    StyleEdit().marker_render_mode = mode;
+    OnStyleChanged();
+    return *this;
+}
+
 void UiCheckBox::Paint(Draw& w)
 {
     const Style& style = GetEffectiveStyle();
@@ -233,49 +254,45 @@ void UiCheckBox::Paint(Draw& w)
     Rect ind = layout.support;
     Rect text_r = layout.main;
 
-    if(visual_ == UICHECKVIS_SWITCH) {
-        if(style.indicator_skin.enabled) {
-            UiDraw9Slice(w, ind, style.indicator_skin.base, style.indicator_skin.slice);
-            StyledMetrics mm = style.indicator_metrics;
-            mm.face_enabled = false;
-            UiPaintFaceFrameDash(w, ind, style.indicator_palette, mm, st);
-        }
-        else {
-            UiPaintFaceFrameDash(w, ind, style.indicator_palette, style.indicator_metrics, st);
-        }
-        int thumb = max(DPI(8), ind.GetHeight() - DPI(4));
-        int x = ind.left + DPI(2);
-        if(state_ == UICHECK_CHECKED)
-            x = ind.right - DPI(2) - thumb;
-        else if(state_ == UICHECK_INDETERMINATE)
-            x = ind.left + (ind.GetWidth() - thumb) / 2;
-        Rect tr = RectC(x, ind.top + (ind.GetHeight() - thumb) / 2, thumb, thumb);
-        StyledPalette tp = style.indicator_palette;
-        for(int i = 0; i < 4; i++)
-            tp.face[i] = UiFill::Solid(i == ST_DISABLED ? SColorDisabled() : SColorPaper());
-        StyledMetrics tm = style.indicator_metrics;
-        tm.frame_enabled = false;
-        UiPaintFaceFrameDash(w, tr, tp, tm, st);
-    }
-    else if(visual_ == UICHECKVIS_LIST) {
+    if(visual_ == UICHECKVIS_LIST) {
         if(state_ != UICHECK_UNCHECKED) {
-            Color mk = style.indicator_palette.ink[st];
+            Color mk = style.indicator_palette.ink[ST_PRESSED];
+            if(IsNull(mk)) mk = style.indicator_palette.ink[st];
             if(IsNull(mk)) mk = SColorHighlight();
             int t = max(1, style.mark_thickness);
-            if(state_ == UICHECK_INDETERMINATE)
-                UiPaintIndicatorBar(w, ind, mk, t, DPI(2));
+            if(state_ == UICHECK_INDETERMINATE) {
+                if(!IsNull(style.tri_state_icon))
+                    UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.tri_state_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
+                else
+                    UiPaintIndicatorBar(w, ind, mk, t, DPI(2));
+            }
+            else if(!IsNull(style.checked_icon))
+                UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.checked_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
             else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
                 UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(2), 0, DPI(3), DPI(2), DPI(3));
         }
     }
     else {
-        UiPaintFaceFrameDash(w, ind, style.indicator_palette, style.indicator_metrics, st);
+        StyledPalette indicator_palette = style.indicator_palette;
         if(state_ != UICHECK_UNCHECKED) {
-            Color mk = style.indicator_palette.ink[st];
+            indicator_palette.face[st] = style.indicator_palette.face[ST_PRESSED];
+            indicator_palette.frame[st] = style.indicator_palette.frame[ST_PRESSED];
+            if(!IsNull(style.indicator_palette.ink[ST_PRESSED]))
+                indicator_palette.ink[st] = style.indicator_palette.ink[ST_PRESSED];
+        }
+        UiPaintFaceFrameDash(w, ind, indicator_palette, style.indicator_metrics, st);
+        if(state_ != UICHECK_UNCHECKED) {
+            Color mk = indicator_palette.ink[st];
             if(IsNull(mk)) mk = SColorHighlight();
             int t = max(1, style.mark_thickness);
-            if(state_ == UICHECK_INDETERMINATE)
-                UiPaintIndicatorBar(w, ind, mk, t, DPI(3));
+            if(state_ == UICHECK_INDETERMINATE) {
+                if(!IsNull(style.tri_state_icon))
+                    UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.tri_state_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
+                else
+                    UiPaintIndicatorBar(w, ind, mk, t, DPI(3));
+            }
+            else if(!IsNull(style.checked_icon))
+                UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.checked_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
             else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
                 UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(3), 0, DPI(4), DPI(3), DPI(4));
         }
@@ -386,15 +403,3 @@ Value UiCheckBox::GetData() const
 }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-

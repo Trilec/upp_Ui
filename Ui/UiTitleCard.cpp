@@ -23,7 +23,7 @@ const UiTitleCard::Style& UiTitleCard::StyleDefault()
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
-        s.metrics.content_padding = Rect(DPI(12), DPI(10), DPI(12), DPI(10));
+        s.metrics.content_margin = Rect(DPI(12), DPI(10), DPI(12), DPI(10));
         s.rule_style = SOLID;
         s.rule_extent = LARGE;
         s.rule_thickness = DPI(1);
@@ -487,7 +487,7 @@ void UiTitleCard::Paint(Draw& w)
 
         if(style.media_tint_mono) {
             Color media_ink = UiResolveIconColor(style.palette, st);
-            UiPaintStyledIcon(w, draw_r, media_, true, true, media_ink, IsEnabled());
+        UiPaintStyledIcon(w, draw_r, media_, true, true, UiIconRenderMode::MonoTint, media_ink, IsEnabled());
         }
         else {
             w.DrawImage(draw_r.left, draw_r.top, draw_r.GetWidth(), draw_r.GetHeight(), media_);
@@ -625,4 +625,3 @@ void UiTitleCard::LeftUp(Point, dword)
 }
 
 }
-

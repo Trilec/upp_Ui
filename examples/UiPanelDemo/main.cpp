@@ -12,6 +12,8 @@
     Notes
     - Theme changes reset to that theme's baseline panel defaults.
     - Property edits update preview, state, and usage together.
+    - Usage output emits concrete shadow setters so the copied example matches
+      the live shadow configuration instead of hiding it behind a summary comment.
 */
 
 #include <Ui/Ui.h>
@@ -77,10 +79,10 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
         p.segment_frame = Color(59, 73, 96);
         p.segment_idle_ink = p.muted;
         p.card_face = Color(31, 44, 65);
-        p.exit_face = Color(126, 37, 52);
-        p.exit_hot = Color(149, 44, 61);
-        p.exit_pressed = Color(108, 32, 45);
-        p.exit_frame = Color(191, 104, 119);
+        p.exit_face = Color(176, 28, 52);
+        p.exit_hot = Color(196, 35, 61);
+        p.exit_pressed = Color(152, 22, 44);
+        p.exit_frame = Color(128, 18, 37);
         p.exit_ink = Color(255, 240, 242);
         p.slider_track = Color(49, 59, 77);
         p.slider_track_frame = Color(68, 81, 106);
@@ -108,11 +110,11 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
         p.segment_frame = Color(211, 221, 237);
         p.segment_idle_ink = Color(94, 114, 149);
         p.card_face = Color(238, 245, 255);
-        p.exit_face = Color(250, 233, 236);
-        p.exit_hot = Color(247, 219, 224);
-        p.exit_pressed = Color(241, 204, 210);
-        p.exit_frame = Color(228, 170, 181);
-        p.exit_ink = Color(156, 41, 58);
+        p.exit_face = Color(191, 34, 59);
+        p.exit_hot = Color(210, 40, 67);
+        p.exit_pressed = Color(168, 29, 51);
+        p.exit_frame = Color(145, 25, 44);
+        p.exit_ink = Color(255, 246, 248);
         p.slider_track = Color(225, 231, 241);
         p.slider_track_frame = Color(210, 220, 236);
         p.slider_thumb = p.blue;
@@ -137,7 +139,7 @@ UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.title_font = DemoSans(18, true);
     s.subtitle_font = DemoSans(8);
     s.subtitle_color = c.subtitle;
@@ -176,7 +178,7 @@ UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
     s.metrics.use_text_font = true;
     s.align_h = UiAlign::RIGHT;
     s.align_v = UiAlign::CENTER;
-    s.text_margin = Rect(0, 0, DPI(2), 0);
+    s.metrics.content_margin = Rect(0, 0, DPI(2), 0);
     return s;
 }
 
@@ -185,7 +187,7 @@ UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
     UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
     for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.badge_face); s.palette.frame[i] = c.badge_frame; s.palette.ink[i] = c.blue; }
     s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
+    s.metrics.content_margin = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
     s.font = DemoSans(10, true);
     return s;
 }
@@ -200,7 +202,7 @@ UiScrollPanel::Style MakeScrollBodyStyle(const DemoPalette& c)
     s.metrics.frame_width = 0;
     s.metrics.radius = 0;
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
     return s;
 }
 
@@ -217,7 +219,7 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(DEMO_RADIUS);
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
+    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -226,14 +228,14 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
 {
     UiAccordion::Style s = UiAccordion::StyleDefault();
     s.transparent = true;
-    s.section_gap = 0;
+    s.item_spacing = 0;
     s.header_body_gap = DPI(8);
     s.header_height = DPI(24);
     s.body_min_height = 0;
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.unified_section_frame = false;
     s.body_line_extent = NONE;
     s.show_chevron = true;
@@ -259,7 +261,7 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.header_style.metrics.face_enabled = false;
     s.header_style.metrics.frame_enabled = false;
     s.header_style.metrics.focus_enabled = false;
-    s.header_style.metrics.content_padding = Rect(0, DPI(1), DPI(28), DPI(1));
+    s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
     s.header_style.show_rule = false;
     s.header_style.show_bottom_line = true;
     s.header_style.bottom_line_extent = LARGE;
@@ -291,7 +293,7 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.body_style.metrics.frame_width = 0;
     s.body_style.metrics.radius = 0;
     s.body_style.metrics.focus_enabled = false;
-    s.body_style.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
     s.body_style.metrics.shadow.enabled = false;
     return s;
 }
@@ -306,16 +308,16 @@ UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
     }
     s.header_height = DPI(22);
     s.header_style.title_font = DemoSans(10, true);
-    s.header_style.metrics.content_padding = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
+    s.header_style.metrics.content_margin = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
     s.header_style.bottom_line_color = Blend(c.divider, c.paper, 20);
     s.chevron_size = DPI(8);
-    s.section_gap = DPI(6);
+    s.item_spacing = DPI(6);
     s.header_body_gap = DPI(2);
     s.unified_section_frame = true;
     s.unified_section_radius = DPI(DEMO_RADIUS);
     s.unified_section_frame_width = 1;
     s.header_style.show_bottom_line = false;
-    s.body_style.metrics.content_padding = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
+    s.body_style.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
     return s;
 }
 
@@ -381,7 +383,7 @@ UiButton::Style MakeCopyButtonStyle(const DemoPalette& c)
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+    s.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
     s.font = DemoSans(9, true);
     return s;
 }
@@ -398,7 +400,7 @@ UiList::Style MakeStateListStyle(const DemoPalette& c)
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.font = DemoSans(10);
     s.row_height = DPI(20);
     s.h_padding = DPI(6);
@@ -425,7 +427,7 @@ UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
     UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
     for(int i = 0; i < 4; i++) { s.palette.face[i] = UiFill::Solid(c.segment_face); s.palette.frame[i] = c.segment_frame; }
     s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
+    s.metrics.content_margin = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -446,9 +448,8 @@ UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
     s.thumb_metrics.frame_enabled = true;
     s.thumb_metrics.frame_width = 0;
     s.thumb_metrics.radius = DPI(999);
-    s.track_extent = Size(DPI(42), DPI(24));
+    s.track_size = Size(DPI(42), DPI(24));
     s.thumb_inset = DPI(4);
-    s.label_gap = 0;
     return s;
 }
 
@@ -459,9 +460,10 @@ UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
     s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
     s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
     s.metrics.face_enabled = true; s.metrics.frame_enabled = true; s.metrics.frame_width = DPI(1); s.metrics.radius = DPI(999); s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(12), DPI(6), DPI(8), DPI(6));
-    s.icon_margin = Rect(DPI(0), 0, DPI(2), 0);
-    s.text_margin = Rect(DPI(1), 0, 0, 0);
+    s.align_h = UiAlign::CENTER;
+    s.align_v = UiAlign::CENTER;
+    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(10), DPI(6));
+    s.content_gap = DPI(12);
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -481,7 +483,7 @@ UiDropdown::Style MakeDropdownStyle(const DemoPalette& c)
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(DEMO_RADIUS);
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(10), DPI(4), DPI(8), DPI(4));
+    s.metrics.content_margin = Rect(DPI(10), DPI(4), DPI(8), DPI(4));
     s.popup_radius = DPI(DEMO_RADIUS);
     s.popup_frame_width = DPI(1);
     s.popup_frame_color = c.segment_frame;
@@ -588,6 +590,29 @@ ShadowCurve ShadowPresetCurve(ShadowCurvePreset preset)
     return ShadowSoft();
 }
 
+const char* ShadowPresetName(ShadowCurvePreset preset)
+{
+    switch(preset) {
+    case SHADOWPRESET_LINEAR: return "Linear";
+    case SHADOWPRESET_SOFT:   return "Soft";
+    case SHADOWPRESET_HARD:   return "Hard";
+    case SHADOWPRESET_CUSTOM: return "Custom";
+    }
+    return "Custom";
+}
+
+String ShadowCurveExpr(const ShadowCurve& c)
+{
+    switch(ResolveShadowPreset(c)) {
+    case SHADOWPRESET_LINEAR: return "ShadowLinear()";
+    case SHADOWPRESET_SOFT:   return "ShadowSoft()";
+    case SHADOWPRESET_HARD:   return "ShadowHardCurve()";
+    case SHADOWPRESET_CUSTOM:
+        return Format("Bezier(%.3f, %.3f, %.3f, %.3f)", c.x1, c.y1, c.x2, c.y2);
+    }
+    return Format("Bezier(%.3f, %.3f, %.3f, %.3f)", c.x1, c.y1, c.x2, c.y2);
+}
+
 PanelConfig MakeDefaultPanelConfig(UiThemeMode mode)
 {
     PanelConfig cfg;
@@ -637,7 +662,7 @@ UiPanel::Style MakePanelStyle(const DemoPalette& palette, const PanelConfig& cfg
     s.metrics.frame_width = max(0, cfg.frame_width);
     s.metrics.radius = max(0, cfg.radius);
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(DPI(18), DPI(16), DPI(18), DPI(16));
+    s.metrics.content_margin = Rect(DPI(18), DPI(16), DPI(18), DPI(16));
     s.metrics.shadow.enabled = cfg.shadow;
     s.metrics.shadow.inset = false;
     s.metrics.shadow.distance = max(0, cfg.shadow_distance);
@@ -839,96 +864,21 @@ private:
     UiLabel title_, note_;
 };
 
-// DemoColorSwatch exposes the standard U++ color popup behind a compact
-// rounded tile so property rows can stay dense without custom picker chrome.
-class DemoColorSwatch : public Ctrl {
-public:
-    typedef DemoColorSwatch CLASSNAME;
-
-    Event<> WhenAction;
-
-    DemoColorSwatch()
-    {
-        popup_.NotNull().NoRampWheel();
-        popup_.WhenSelect = [=] {
-            color_ = popup_.Get();
-            Refresh();
-            WhenAction();
-        };
-        popup_.WhenCancel = [=] { Refresh(); };
-        NoWantFocus();
-    }
-
-    void SetPalette(const DemoPalette& p)
-    {
-        palette_ = p;
-        popup_.DarkContent(p.dark).AllowDarkContent(true);
-        Refresh();
-    }
-
-    void SetColor(Color c)
-    {
-        color_ = c;
-        Refresh();
-    }
-
-    Color GetColor() const
-    {
-        return color_;
-    }
-
-    virtual Size GetMinSize() const override
-    {
-        return Size(DPI(24), DPI(22));
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Rect r(Point(0, 0), GetSize());
-        Color frame = hot_ ? palette_.blue : palette_.segment_frame;
-        Color back = hot_ ? Blend(palette_.segment_face, palette_.paper, 22) : palette_.segment_face;
-        DrawRoundedBox(w, r, DPI(DEMO_RADIUS), back, frame, DPI(1));
-        Rect sw = r.Deflated(DPI(4), DPI(4));
-        DrawRoundedBox(w, sw, DPI(DEMO_RADIUS - 2), IsNull(color_) ? palette_.paper : color_, Blend(frame, palette_.paper, 96), DPI(1));
-    }
-
-    virtual void LeftDown(Point, dword) override
-    {
-        popup_.PopUp(this, IsNull(color_) ? palette_.paper : color_);
-    }
-
-    virtual void MouseEnter(Point, dword) override
-    {
-        hot_ = true;
-        Refresh();
-    }
-
-    virtual void MouseLeave() override
-    {
-        hot_ = false;
-        Refresh();
-    }
-
-private:
-    DemoPalette palette_;
-    Color color_;
-    bool hot_ = false;
-    ColorPopUp popup_;
-};
-
-
 class DemoCodePanel : public UiPanel {
 public:
     typedef DemoCodePanel CLASSNAME;
 
-    DemoCodePanel(int h = DPI(126))
+    DemoCodePanel(int h = DPI(146))
         : block_height_(h)
     {
-        Add(code_);
+        Add(scroll_);
+        scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+        scroll_.Content().Add(code_);
         code_.NoWantFocus();
     }
 
     UiLabel& Code() { return code_; }
+    UiScrollPanel& Scroll() { return scroll_; }
 
     virtual Size GetMinSize() const override
     {
@@ -938,14 +888,19 @@ public:
     virtual void Layout() override
     {
         Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
-        code_.SetRect(rc.left + DPI(10), rc.top + DPI(10), max(0, rc.GetWidth() - DPI(20)), max(0, rc.GetHeight() - DPI(20)));
+        scroll_.SetRect(rc);
+        scroll_.Layout();
+        Rect viewport = scroll_.GetViewportRect();
+        int content_w = max(0, viewport.GetWidth());
+        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy);
+        code_.SetRect(0, 0, content_w, content_h);
     }
 
 private:
+    UiScrollPanel scroll_;
     UiLabel code_;
     int block_height_ = 0;
 };
-
 class DemoListHost : public Ctrl {
 public:
     typedef DemoListHost CLASSNAME;
@@ -988,6 +943,7 @@ public:
     UiPanelDemoWindow()
     {
         // Window shell and top-level preview/inspector controls.
+        BackPaint();
         Title("UiPanel Demo");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(940), DPI(640));
@@ -1011,8 +967,8 @@ public:
         int props_sec = inspector_acc_.AddSection("PROPERTIES", true);
         // The top-level inspector accordion stays responsible for section order.
         inspector_acc_.GetSectionContent(usage_sec).Add(usage_section_.SizePos());
-        usage_section_.SetGap(DPI(8)).SetInset(0);
-        usage_section_.Add(usage_toolbar_).Fixed(DPI(40));
+        usage_section_.SetGap(DPI(5)).SetInset(0);
+        usage_section_.Add(usage_toolbar_).Fixed(DPI(32));
         usage_section_.Add(usage_code_panel_).Fit();
         inspector_acc_.GetSectionContent(state_sec).Add(state_host_.SizePos());
         state_host_.Attach(state_list_);
@@ -1042,21 +998,21 @@ public:
         // Usage toolbar and action affordances.
         usage_copy_label_.SetText("Copy Code").NoWantFocus();
         usage_toolbar_.Add(usage_toolbar_fill_).Expand(1);
-        usage_toolbar_.Add(usage_copy_label_).Fixed(DPI(64));
-        usage_toolbar_.Add(usage_copy_).Fixed(DPI(22));
+        usage_toolbar_.Add(usage_copy_label_).Fixed(DPI(52));
+        usage_toolbar_.Add(usage_copy_).Fixed(DPI(18));
         props_toolbar_.Add(props_toolbar_fill_).Expand(1);
         props_toolbar_.Add(props_reset_).Fixed(DPI(62));
 
         header_.SetTitle("U++ UiPanel Builder")
             .SetSubTitle("Generate a styled panel surface and copy the exact code for the current result.")
-            .SetMedia(ICON_BRAND_UPPLOGO2_48(), Size(DPI(48), DPI(48)))
+            .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
             .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
 
         version_badge_.SetText("v0.4.0").NoWantFocus();
-        theme_icon_.SetIconScale(true).SetIconMargin(0).NoWantFocus();
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconTintMono(true).SetIconScale(true);
+        theme_icon_.SetIconSize(DPI(20), DPI(20)).NoWantFocus();
+        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconSize(DPI(15), DPI(15)).SetIconRenderMode(UiIconRenderMode::MonoTint);
 
-        usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconScale(true).NoWantFocus();
+        usage_copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(14), DPI(14)).NoWantFocus();
         usage_copy_.WhenAction = [=] { WriteClipboardText(usage_code_panel_.Code().GetText().ToString()); };
         usage_code_panel_.Code().SetSelectable(true);
 
@@ -1065,53 +1021,51 @@ public:
         props_reset_.SetText("Reset").NoWantFocus();
         // Dense property rows keep the inspector usable even with many controls.
         property_box_.SetGap(DPI(2)).SetInset(0);
-        usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        usage_toolbar_.SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         props_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         size_box_.SetGap(DPI(2)).SetInset(0);
         frame_box_.SetGap(DPI(2)).SetInset(0);
         face_box_.SetGap(DPI(2)).SetInset(0);
         shadow_box_.SetGap(DPI(2)).SetInset(0);
 
-        AddSliderRow(size_box_, width_row_, width_label_, width_slider_, width_value_, "Width", "220px");
-        AddSliderRow(size_box_, height_row_, height_label_, height_slider_, height_value_, "Height", "140px");
-        AddSliderRow(size_box_, radius_row_, radius_label_, radius_slider_, radius_value_, "Radius", "14px");
+        AddSliderRow(size_box_, width_row_, "Width", "220px");
+        AddSliderRow(size_box_, height_row_, "Height", "140px");
+        AddSliderRow(size_box_, radius_row_, "Radius", "14px");
 
-        width_slider_.SetRange(20.0, 520.0).SetStep(1.0).SetValue(220.0);
-        height_slider_.SetRange(20.0, 320.0).SetStep(1.0).SetValue(140.0);
-        radius_slider_.SetRange(0.0, 36.0).SetStep(1.0).SetValue(14.0);
-        border_slider_.SetRange(0.0, 8.0).SetStep(1.0).SetValue(1.0);
+        width_row_.Slider().SetRange(20.0, 520.0).SetStep(1.0).SetValue(220.0);
+        height_row_.Slider().SetRange(20.0, 320.0).SetStep(1.0).SetValue(140.0);
+        radius_row_.Slider().SetRange(0.0, 36.0).SetStep(1.0).SetValue(14.0);
+        border_row_.Slider().SetRange(0.0, 8.0).SetStep(1.0).SetValue(1.0);
 
-        AddToggleRow(size_box_, enabled_row_, enabled_label_, enabled_toggle_, "Enabled");
-        AddToggleRow(frame_box_, frame_row_, frame_label_, frame_toggle_, "Frame");
-        AddSliderRow(frame_box_, border_row_, border_label_, border_slider_, border_value_, "Frame Width", "1px");
-        AddColorRow(frame_box_, frame_color_row_, frame_color_label_, frame_color_btn_, "Frame Color");
+        AddToggleRow(size_box_, enabled_row_, "Enabled");
+        AddToggleRow(frame_box_, frame_row_, "Frame");
+        AddSliderRow(frame_box_, border_row_, "Frame Width", "1px");
+        AddColorRow(frame_box_, frame_color_row_, "Frame Color");
 
-        AddToggleRow(face_box_, face_row_, face_label_, face_toggle_, "Background");
-        AddColorRow(face_box_, face_color_row_, face_color_label_, face_color_btn_, "Face Color");
+        AddToggleRow(face_box_, face_row_, "Background");
+        AddColorRow(face_box_, face_color_row_, "Face Color");
         AddDropdownRow(face_box_, gradient_row_, gradient_label_, gradient_drop_, "Gradient");
-        AddColorQuadRow(face_box_, gradient_colors_row_, gradient_colors_label_, grad_from_btn_, grad_top_right_btn_, grad_bottom_left_btn_, grad_to_btn_, "Gradient Colors");
-        AddToggleRow(shadow_box_, shadow_row_, shadow_label_, shadow_toggle_, "Shadow");
-        AddColorRow(shadow_box_, shadow_color_row_, shadow_color_label_, shadow_color_btn_, "Shadow Color");
-        AddSliderRow(shadow_box_, shadow_distance_row_, shadow_distance_label_, shadow_distance_slider_, shadow_distance_value_, "Shadow Dist", "6px");
-        AddSliderRow(shadow_box_, shadow_offset_x_row_, shadow_offset_x_label_, shadow_offset_x_slider_, shadow_offset_x_value_, "Shadow X", "0px");
-        AddSliderRow(shadow_box_, shadow_offset_y_row_, shadow_offset_y_label_, shadow_offset_y_slider_, shadow_offset_y_value_, "Shadow Y", "3px");
+        gradient_colors_row_.SetSwatchCount(4);
+        AddColorRow(face_box_, gradient_colors_row_, "Gradient Colors");
+        AddToggleRow(shadow_box_, shadow_row_, "Shadow");
+        AddColorRow(shadow_box_, shadow_color_row_, "Shadow Color");
+        AddSliderRow(shadow_box_, shadow_distance_row_, "Shadow Dist", "6px");
+        AddSliderRow(shadow_box_, shadow_offset_x_row_, "Shadow X", "0px");
+        AddSliderRow(shadow_box_, shadow_offset_y_row_, "Shadow Y", "3px");
         AddDropdownRow(shadow_box_, shadow_curve_preset_row_, shadow_curve_preset_label_, shadow_curve_preset_drop_, "Curve Preset");
         shadow_box_.Add(shadow_curve_field_).Fixed(DPI(98));
-        AddSliderRow(shadow_box_, shadow_alpha_row_, shadow_alpha_label_, shadow_alpha_slider_, shadow_alpha_value_, "Shadow Alpha", "86");
+        AddSliderRow(shadow_box_, shadow_alpha_row_, "Shadow Alpha", "86");
 
         PopulateGradientDropdown();
         PopulateShadowPresetDropdown();
-        shadow_distance_slider_.SetRange(0.0, 24.0).SetStep(1.0).SetValue(6.0);
-        shadow_offset_x_slider_.SetRange(-24.0, 24.0).SetStep(1.0).SetValue(0.0);
-        shadow_offset_y_slider_.SetRange(-24.0, 24.0).SetStep(1.0).SetValue(3.0);
-        shadow_alpha_slider_.SetRange(0.0, 255.0).SetStep(1.0).SetValue(86.0);
-        InitColorButton(face_color_btn_);
-        InitColorButton(frame_color_btn_);
-        InitColorButton(grad_from_btn_);
-        InitColorButton(grad_top_right_btn_);
-        InitColorButton(grad_bottom_left_btn_);
-        InitColorButton(grad_to_btn_);
-        InitColorButton(shadow_color_btn_);
+        shadow_distance_row_.Slider().SetRange(0.0, 24.0).SetStep(1.0).SetValue(6.0);
+        shadow_offset_x_row_.Slider().SetRange(-24.0, 24.0).SetStep(1.0).SetValue(0.0);
+        shadow_offset_y_row_.Slider().SetRange(-24.0, 24.0).SetStep(1.0).SetValue(3.0);
+        shadow_alpha_row_.Slider().SetRange(0.0, 255.0).SetStep(1.0).SetValue(86.0);
+        InitColorButton(face_color_row_);
+        InitColorButton(frame_color_row_);
+        InitColorButton(gradient_colors_row_);
+        InitColorButton(shadow_color_row_);
 
         theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
         exit_button_.WhenAction = [=] { Close(); };
@@ -1119,14 +1073,14 @@ public:
 
         auto sync = [=] { SyncFromControls(); };
         auto sync_select = [=](int) { SyncFromControls(); };
-        width_slider_.WhenAction = width_slider_.WhenChanging = sync;
-        height_slider_.WhenAction = height_slider_.WhenChanging = sync;
-        radius_slider_.WhenAction = radius_slider_.WhenChanging = sync;
-        border_slider_.WhenAction = border_slider_.WhenChanging = sync;
-        shadow_distance_slider_.WhenAction = shadow_distance_slider_.WhenChanging = sync;
-        shadow_offset_x_slider_.WhenAction = shadow_offset_x_slider_.WhenChanging = sync;
-        shadow_offset_y_slider_.WhenAction = shadow_offset_y_slider_.WhenChanging = sync;
-        shadow_alpha_slider_.WhenAction = shadow_alpha_slider_.WhenChanging = sync;
+        width_row_.WhenAction = sync;
+        height_row_.WhenAction = sync;
+        radius_row_.WhenAction = sync;
+        border_row_.WhenAction = sync;
+        shadow_distance_row_.WhenAction = sync;
+        shadow_offset_x_row_.WhenAction = sync;
+        shadow_offset_y_row_.WhenAction = sync;
+        shadow_alpha_row_.WhenAction = sync;
         shadow_curve_field_.WhenChanging = [=] {
             if(syncing_controls_)
                 return;
@@ -1139,10 +1093,10 @@ public:
             shadow_curve_preset_drop_.SelectByData(SHADOWPRESET_CUSTOM);
             SyncFromControls();
         };
-        enabled_toggle_.WhenAction = sync;
-        frame_toggle_.WhenAction = sync;
-        face_toggle_.WhenAction = sync;
-        shadow_toggle_.WhenAction = sync;
+        enabled_row_.WhenAction = sync;
+        frame_row_.WhenAction = sync;
+        face_row_.WhenAction = sync;
+        shadow_row_.WhenAction = sync;
         gradient_drop_.WhenSelect = sync_select;
         shadow_curve_preset_drop_.WhenSelect = [=](int) {
             if(syncing_controls_)
@@ -1152,13 +1106,10 @@ public:
                 shadow_curve_field_.SetCurve(ShadowPresetCurve(preset));
             SyncFromControls();
         };
-        face_color_btn_.WhenAction = sync;
-        frame_color_btn_.WhenAction = sync;
-        grad_from_btn_.WhenAction = sync;
-        grad_top_right_btn_.WhenAction = sync;
-        grad_bottom_left_btn_.WhenAction = sync;
-        grad_to_btn_.WhenAction = sync;
-        shadow_color_btn_.WhenAction = sync;
+        face_color_row_.WhenAction = sync;
+        frame_color_row_.WhenAction = sync;
+        gradient_colors_row_.WhenAction = sync;
+        shadow_color_row_.WhenAction = sync;
 
         // Theme application also seeds the per-theme default panel config.
         ApplyTheme(UiThemeMode::Light);
@@ -1215,35 +1166,26 @@ public:
 
 private:
     // Slider rows are the base property-row pattern used throughout the demo.
-    void AddSliderRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
+    void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
     {
-        row.SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
-        value.SetText(initial).NoWantFocus();
+        row.SetLabel(name)
+           .SetValueText(initial)
+           .SetLabelWidth(DPI(82))
+           .SetValueWidth(DPI(56))
+           .SetFieldGap(DPI(4));
+        row.LabelCtrl().NoWantFocus();
+        row.ValueCtrl().NoWantFocus();
         target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(82)).MinHeight(DPI(18));
-        row.Add(slider).Expand(1).MinHeight(DPI(18));
-        row.Add(value).Fixed(DPI(56)).MinHeight(DPI(18));
     }
 
-    void AddSliderRow(UiBoxLayout& row, UiLabel& label, UiSlider& slider, UiLabel& value, const char* name, const char* initial)
+    void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
     {
-        AddSliderRow(property_box_, row, label, slider, value, name, initial);
-    }
-
-    void AddToggleRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiToggle& toggle, const char* name)
-    {
-        row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
-        toggle.SetText("On");
+        row.SetLabel(name)
+           .SetLabelWidth(DPI(82))
+           .ShowValue(false)
+           .SetFieldGap(DPI(6));
+        row.LabelCtrl().NoWantFocus();
         target.Add(row).Fit();
-        row.Add(label).Expand(1).MinHeight(DPI(20));
-        row.Add(toggle).Fit().MinHeight(DPI(20));
-    }
-
-    void AddToggleRow(UiBoxLayout& row, UiLabel& label, UiToggle& toggle, const char* name)
-    {
-        AddToggleRow(property_box_, row, label, toggle, name);
     }
 
     void AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiDropdown& drop, const char* name)
@@ -1255,45 +1197,22 @@ private:
         row.Add(drop).Expand(1).MinHeight(DPI(24));
     }
 
-    void AddDropdownRow(UiBoxLayout& row, UiLabel& label, UiDropdown& drop, const char* name)
+    void InitColorButton(UiCompositeColor& row)
     {
-        AddDropdownRow(property_box_, row, label, drop, name);
+        row.LabelCtrl().NoWantFocus();
+        row.ValueCtrl().NoWantFocus();
+        for(int i = 0; i < row.GetSwatchCount(); i++)
+            row.Swatch(i).NoWantFocus();
     }
 
-    void InitColorButton(DemoColorSwatch& btn)
+    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
     {
-        btn.NoWantFocus();
-    }
-
-    void AddColorRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, DemoColorSwatch& btn, const char* name)
-    {
-        row.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
+        row.SetLabel(name)
+           .SetLabelWidth(DPI(102))
+           .ShowValue(false)
+           .SetSwatchCount(1)
+           .SetFieldGap(DPI(6));
         target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(20));
-        row.Add(btn).Fixed(DPI(28)).MinHeight(DPI(20));
-    }
-
-    void AddColorRow(UiBoxLayout& row, UiLabel& label, DemoColorSwatch& btn, const char* name)
-    {
-        AddColorRow(property_box_, row, label, btn, name);
-    }
-
-    void AddColorQuadRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, DemoColorSwatch& a, DemoColorSwatch& b, DemoColorSwatch& c, DemoColorSwatch& d, const char* name)
-    {
-        row.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        label.SetText(name).NoWantFocus();
-        target.Add(row).Fit();
-        row.Add(label).Fixed(DPI(102)).MinHeight(DPI(20));
-        row.Add(a).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(b).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(c).Fixed(DPI(28)).MinHeight(DPI(20));
-        row.Add(d).Fixed(DPI(28)).MinHeight(DPI(20));
-    }
-
-    void AddColorQuadRow(UiBoxLayout& row, UiLabel& label, DemoColorSwatch& a, DemoColorSwatch& b, DemoColorSwatch& c, DemoColorSwatch& d, const char* name)
-    {
-        AddColorQuadRow(property_box_, row, label, a, b, c, d, name);
     }
 
     void PopulateGradientDropdown()
@@ -1318,25 +1237,25 @@ private:
     void SyncControlsFromConfig()
     {
         syncing_controls_ = true;
-        width_slider_.SetValue(config_.width);
-        height_slider_.SetValue(config_.height);
-        radius_slider_.SetValue(config_.radius);
-        border_slider_.SetValue(config_.frame_width);
-        shadow_distance_slider_.SetValue(config_.shadow_distance);
-        shadow_offset_x_slider_.SetValue(config_.shadow_offset_x);
-        shadow_offset_y_slider_.SetValue(config_.shadow_offset_y);
-        shadow_alpha_slider_.SetValue(config_.shadow_alpha);
-        enabled_toggle_.SetData(config_.enabled);
-        frame_toggle_.SetData(config_.frame);
-        face_toggle_.SetData(config_.face);
-        shadow_toggle_.SetData(config_.shadow);
-        face_color_btn_.SetColor(config_.face_color);
-        frame_color_btn_.SetColor(config_.frame_color);
-        grad_from_btn_.SetColor(config_.grad_from);
-        grad_top_right_btn_.SetColor(config_.grad_top_right);
-        grad_bottom_left_btn_.SetColor(config_.grad_bottom_left);
-        grad_to_btn_.SetColor(config_.grad_to);
-        shadow_color_btn_.SetColor(config_.shadow_color);
+        width_row_.Slider().SetValue(config_.width);
+        height_row_.Slider().SetValue(config_.height);
+        radius_row_.Slider().SetValue(config_.radius);
+        border_row_.Slider().SetValue(config_.frame_width);
+        shadow_distance_row_.Slider().SetValue(config_.shadow_distance);
+        shadow_offset_x_row_.Slider().SetValue(config_.shadow_offset_x);
+        shadow_offset_y_row_.Slider().SetValue(config_.shadow_offset_y);
+        shadow_alpha_row_.Slider().SetValue(config_.shadow_alpha);
+        enabled_row_.Toggle().SetData(config_.enabled);
+        frame_row_.Toggle().SetData(config_.frame);
+        face_row_.Toggle().SetData(config_.face);
+        shadow_row_.Toggle().SetData(config_.shadow);
+        face_color_row_.SetSwatchColor(0, config_.face_color);
+        frame_color_row_.SetSwatchColor(0, config_.frame_color);
+        gradient_colors_row_.SetSwatchColor(0, config_.grad_from);
+        gradient_colors_row_.SetSwatchColor(1, config_.grad_top_right);
+        gradient_colors_row_.SetSwatchColor(2, config_.grad_bottom_left);
+        gradient_colors_row_.SetSwatchColor(3, config_.grad_to);
+        shadow_color_row_.SetSwatchColor(0, config_.shadow_color);
         shadow_curve_field_.SetCurve(config_.shadow_curve);
         shadow_curve_preset_drop_.SelectByData(ResolveShadowPreset(config_.shadow_curve));
         gradient_drop_.SelectByData(config_.gradient);
@@ -1352,6 +1271,17 @@ private:
     String BuildUsageCode() const
     {
         String code;
+        const PanelConfig defaults = MakeDefaultPanelConfig(palette_.mode);
+        const ShadowCurvePreset shadow_preset = ResolveShadowPreset(config_.shadow_curve);
+        const bool shadow_matches_default =
+            config_.shadow == defaults.shadow &&
+            config_.shadow_distance == defaults.shadow_distance &&
+            config_.shadow_offset_x == defaults.shadow_offset_x &&
+            config_.shadow_offset_y == defaults.shadow_offset_y &&
+            config_.shadow_alpha == defaults.shadow_alpha &&
+            config_.shadow_color == defaults.shadow_color &&
+            SameShadowCurve(config_.shadow_curve, defaults.shadow_curve);
+
         code << "UiPanel panel;\n";
         code << Format("panel.SetSizeFixed(%d, %d)\n", config_.width, config_.height);
         code << Format(" .SetRadius(%d)\n", config_.radius);
@@ -1370,14 +1300,29 @@ private:
             code << Format(" .SetFaceQuadGradient(%s, %s, %s, %s)\n", AsCString(a), AsCString(b), AsCString(c), AsCString(d));
         }
         code << Format(" .EnableShadow(%s)\n", config_.shadow ? "true" : "false");
-        code << Format(" // Shadow: distance=%d offset=(%d,%d) curve=Bezier(%.3f, %.3f, %.3f, %.3f) alpha=%d color=%s",
-                       config_.shadow_distance,
-                       config_.shadow_offset_x,
-                       config_.shadow_offset_y,
-                       config_.shadow_curve.x1, config_.shadow_curve.y1,
-                       config_.shadow_curve.x2, config_.shadow_curve.y2,
-                       config_.shadow_alpha,
-                       AsCString(config_.shadow_color));
+        if(config_.shadow) {
+            if(shadow_matches_default)
+                code << Format(" // Shadow matches the %s theme default.\n", palette_.dark ? "dark" : "light");
+            else
+                code << Format(" // Shadow preset: %s.\n", ShadowPresetName(shadow_preset));
+            code << Format(" .SetShadowDistance(%d)\n", config_.shadow_distance);
+            code << Format(" .SetShadowOffset(%d, %d)\n", config_.shadow_offset_x, config_.shadow_offset_y);
+            code << Format(" .SetShadowOpacity(%d)\n", config_.shadow_alpha);
+            code << Format(" .SetShadowColor(%s)\n", AsCString(config_.shadow_color));
+            code << Format(" .SetShadowCurve(%s)\n", ShadowCurveExpr(config_.shadow_curve));
+        }
+        else if(shadow_matches_default) {
+            code << Format(" // Shadow remains at the %s theme default (disabled).\n", palette_.dark ? "dark" : "light");
+        }
+        else {
+            code << Format(" // Shadow is disabled; stored values were distance=%d, offset=(%d,%d), alpha=%d, color=%s, curve=%s.\n",
+                           config_.shadow_distance,
+                           config_.shadow_offset_x,
+                           config_.shadow_offset_y,
+                           config_.shadow_alpha,
+                           AsCString(config_.shadow_color),
+                           ~ShadowCurveExpr(config_.shadow_curve));
+        }
         if(!config_.enabled)
             code << "\n .Disable();";
         else
@@ -1407,14 +1352,14 @@ private:
     void RefreshFromConfig()
     {
         state_host_.SetRowCount(state_model_.GetCount());
-        width_value_.SetText(AsString(config_.width) + "px");
-        height_value_.SetText(AsString(config_.height) + "px");
-        radius_value_.SetText(AsString(config_.radius) + "px");
-        border_value_.SetText(AsString(config_.frame_width) + "px");
-        shadow_distance_value_.SetText(AsString(config_.shadow_distance) + "px");
-        shadow_offset_x_value_.SetText(AsString(config_.shadow_offset_x) + "px");
-        shadow_offset_y_value_.SetText(AsString(config_.shadow_offset_y) + "px");
-        shadow_alpha_value_.SetText(AsString(config_.shadow_alpha));
+        width_row_.ValueCtrl().SetText(AsString(config_.width) + "px");
+        height_row_.ValueCtrl().SetText(AsString(config_.height) + "px");
+        radius_row_.ValueCtrl().SetText(AsString(config_.radius) + "px");
+        border_row_.ValueCtrl().SetText(AsString(config_.frame_width) + "px");
+        shadow_distance_row_.ValueCtrl().SetText(AsString(config_.shadow_distance) + "px");
+        shadow_offset_x_row_.ValueCtrl().SetText(AsString(config_.shadow_offset_x) + "px");
+        shadow_offset_y_row_.ValueCtrl().SetText(AsString(config_.shadow_offset_y) + "px");
+        shadow_alpha_row_.ValueCtrl().SetText(AsString(config_.shadow_alpha));
         shadow_curve_field_.SetCurve(config_.shadow_curve);
         preview_.SetConfig(config_);
         usage_code_panel_.Code().SetText(BuildUsageCode());
@@ -1427,27 +1372,27 @@ private:
     {
         if(syncing_controls_)
             return;
-        config_.width = max(20, int(width_slider_.GetValue()));
-        config_.height = max(20, int(height_slider_.GetValue()));
-        config_.radius = max(0, int(radius_slider_.GetValue()));
-        config_.frame_width = max(0, int(border_slider_.GetValue()));
-        config_.shadow_distance = max(0, int(shadow_distance_slider_.GetValue()));
-        config_.shadow_offset_x = int(shadow_offset_x_slider_.GetValue());
-        config_.shadow_offset_y = int(shadow_offset_y_slider_.GetValue());
+        config_.width = max(20, int(width_row_.Slider().GetValue()));
+        config_.height = max(20, int(height_row_.Slider().GetValue()));
+        config_.radius = max(0, int(radius_row_.Slider().GetValue()));
+        config_.frame_width = max(0, int(border_row_.Slider().GetValue()));
+        config_.shadow_distance = max(0, int(shadow_distance_row_.Slider().GetValue()));
+        config_.shadow_offset_x = int(shadow_offset_x_row_.Slider().GetValue());
+        config_.shadow_offset_y = int(shadow_offset_y_row_.Slider().GetValue());
         config_.shadow_curve = shadow_curve_field_.GetCurve();
-        config_.shadow_alpha = max(0, min(255, int(shadow_alpha_slider_.GetValue())));
-        config_.enabled = !IsNull(enabled_toggle_.GetData()) && (bool)enabled_toggle_.GetData();
-        config_.frame = !IsNull(frame_toggle_.GetData()) && (bool)frame_toggle_.GetData();
-        config_.face = !IsNull(face_toggle_.GetData()) && (bool)face_toggle_.GetData();
-        config_.shadow = !IsNull(shadow_toggle_.GetData()) && (bool)shadow_toggle_.GetData();
+        config_.shadow_alpha = max(0, min(255, int(shadow_alpha_row_.Slider().GetValue())));
+        config_.enabled = !IsNull(enabled_row_.Toggle().GetData()) && (bool)enabled_row_.Toggle().GetData();
+        config_.frame = !IsNull(frame_row_.Toggle().GetData()) && (bool)frame_row_.Toggle().GetData();
+        config_.face = !IsNull(face_row_.Toggle().GetData()) && (bool)face_row_.Toggle().GetData();
+        config_.shadow = !IsNull(shadow_row_.Toggle().GetData()) && (bool)shadow_row_.Toggle().GetData();
         config_.gradient = (PanelGradientMode)(int)gradient_drop_.GetSelectedData();
-        config_.face_color = face_color_btn_.GetColor();
-        config_.frame_color = frame_color_btn_.GetColor();
-        config_.grad_from = grad_from_btn_.GetColor();
-        config_.grad_top_right = grad_top_right_btn_.GetColor();
-        config_.grad_bottom_left = grad_bottom_left_btn_.GetColor();
-        config_.grad_to = grad_to_btn_.GetColor();
-        config_.shadow_color = shadow_color_btn_.GetColor();
+        config_.face_color = face_color_row_.GetSwatchColor(0);
+        config_.frame_color = frame_color_row_.GetSwatchColor(0);
+        config_.grad_from = gradient_colors_row_.GetSwatchColor(0);
+        config_.grad_top_right = gradient_colors_row_.GetSwatchColor(1);
+        config_.grad_bottom_left = gradient_colors_row_.GetSwatchColor(2);
+        config_.grad_to = gradient_colors_row_.GetSwatchColor(3);
+        config_.shadow_color = shadow_color_row_.GetSwatchColor(0);
         RefreshFromConfig();
     }
 
@@ -1456,7 +1401,7 @@ private:
     void ApplyTheme(UiThemeMode mode)
     {
         UiThemeContext ctx = UiTheme::GetContext();
-        ctx.preset = UiThemePreset::Rounded;
+        ctx.preset = UiThemePreset::Minimal;
         ctx.mode = mode;
         UiTheme::SetContext(ctx);
 
@@ -1472,8 +1417,6 @@ private:
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
         theme_icon_.SetIconColor(mode == UiThemeMode::Dark ? Color(214, 222, 236) : palette_.blue);
         exit_button_.SetStyle(MakeExitButtonStyle(palette_));
-        exit_button_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        exit_button_.SetIconMargin(DPI(3));
 
         inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
         size_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
@@ -1484,6 +1427,7 @@ private:
         usage_copy_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body, true, true));
         props_reset_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
+        usage_code_panel_.Scroll().SetStyle(MakeScrollBodyStyle(palette_));
         usage_code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
         shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
         shadow_curve_field_.SetFormulaStyle(MakeFormulaLabelStyle(palette_));
@@ -1493,39 +1437,31 @@ private:
         state_list_.SetStyle(MakeStateListStyle(palette_));
         gradient_drop_.SetStyle(MakeDropdownStyle(palette_));
         shadow_curve_preset_drop_.SetStyle(MakeDropdownStyle(palette_));
-        face_color_btn_.SetPalette(palette_);
-        frame_color_btn_.SetPalette(palette_);
-        grad_from_btn_.SetPalette(palette_);
-        grad_top_right_btn_.SetPalette(palette_);
-        grad_bottom_left_btn_.SetPalette(palette_);
-        grad_to_btn_.SetPalette(palette_);
-        shadow_color_btn_.SetPalette(palette_);
-
-        width_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        height_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        radius_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        border_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        enabled_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        frame_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        face_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        width_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                  .SetValueStyle(MakeValueLabelStyle(palette_));
+        height_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                   .SetValueStyle(MakeValueLabelStyle(palette_));
+        radius_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                   .SetValueStyle(MakeValueLabelStyle(palette_));
+        border_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                   .SetValueStyle(MakeValueLabelStyle(palette_));
+        enabled_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        frame_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        face_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        shadow_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
         gradient_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        frame_color_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        gradient_colors_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_color_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_distance_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_offset_x_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_offset_y_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        frame_color_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        gradient_colors_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        shadow_color_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        shadow_distance_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                           .SetValueStyle(MakeValueLabelStyle(palette_));
+        shadow_offset_x_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                           .SetValueStyle(MakeValueLabelStyle(palette_));
+        shadow_offset_y_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                           .SetValueStyle(MakeValueLabelStyle(palette_));
         shadow_curve_preset_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_alpha_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        width_value_.SetStyle(MakeValueLabelStyle(palette_));
-        height_value_.SetStyle(MakeValueLabelStyle(palette_));
-        radius_value_.SetStyle(MakeValueLabelStyle(palette_));
-        border_value_.SetStyle(MakeValueLabelStyle(palette_));
-        shadow_distance_value_.SetStyle(MakeValueLabelStyle(palette_));
-        shadow_offset_x_value_.SetStyle(MakeValueLabelStyle(palette_));
-        shadow_offset_y_value_.SetStyle(MakeValueLabelStyle(palette_));
-        shadow_alpha_value_.SetStyle(MakeValueLabelStyle(palette_));
+        shadow_alpha_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
+                         .SetValueStyle(MakeValueLabelStyle(palette_));
 
         preview_.SetPalette(palette_);
         SyncControlsFromConfig();
@@ -1571,23 +1507,16 @@ private:
     UiBoxLayout shadow_box_ { UiDirection::V };
     UiBezierCurveField shadow_curve_field_;
 
-    UiBoxLayout width_row_ { UiDirection::H }, height_row_ { UiDirection::H }, radius_row_ { UiDirection::H }, border_row_ { UiDirection::H };
-    UiBoxLayout enabled_row_ { UiDirection::H }, frame_row_ { UiDirection::H }, face_row_ { UiDirection::H }, shadow_row_ { UiDirection::H };
-    UiBoxLayout gradient_row_ { UiDirection::H }, gradient_colors_row_ { UiDirection::H }, face_color_row_ { UiDirection::H }, frame_color_row_ { UiDirection::H }, shadow_color_row_ { UiDirection::H };
+    UiCompositeSlider width_row_, height_row_, radius_row_, border_row_;
+    UiCompositeToggle enabled_row_, frame_row_, face_row_, shadow_row_;
+    UiBoxLayout gradient_row_ { UiDirection::H };
+    UiCompositeColor gradient_colors_row_, face_color_row_, frame_color_row_, shadow_color_row_;
     UiBoxLayout shadow_curve_preset_row_ { UiDirection::H };
-    UiBoxLayout shadow_distance_row_ { UiDirection::H }, shadow_offset_x_row_ { UiDirection::H }, shadow_offset_y_row_ { UiDirection::H }, shadow_alpha_row_ { UiDirection::H };
+    UiCompositeSlider shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
 
-    UiLabel width_label_, width_value_, height_label_, height_value_, radius_label_, radius_value_, border_label_, border_value_;
-    UiLabel enabled_label_, frame_label_, face_label_, shadow_label_;
-    UiLabel gradient_label_, gradient_colors_label_, face_color_label_, frame_color_label_, shadow_color_label_;
+    UiLabel gradient_label_;
     UiLabel shadow_curve_preset_label_;
-    UiLabel shadow_distance_label_, shadow_distance_value_, shadow_offset_x_label_, shadow_offset_x_value_, shadow_offset_y_label_, shadow_offset_y_value_, shadow_alpha_label_, shadow_alpha_value_;
-
-    UiSlider width_slider_, height_slider_, radius_slider_, border_slider_;
-    UiSlider shadow_distance_slider_, shadow_offset_x_slider_, shadow_offset_y_slider_, shadow_alpha_slider_;
-    UiToggle enabled_toggle_, frame_toggle_, face_toggle_, shadow_toggle_;
     UiDropdown gradient_drop_, shadow_curve_preset_drop_;
-    DemoColorSwatch face_color_btn_, frame_color_btn_, grad_from_btn_, grad_top_right_btn_, grad_bottom_left_btn_, grad_to_btn_, shadow_color_btn_;
 };
 
 }
@@ -1597,10 +1526,6 @@ GUI_APP_MAIN
     UiPanelDemoWindow demo;
     demo.Run();
 }
-
-
-
-
 
 
 

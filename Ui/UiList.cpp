@@ -79,7 +79,7 @@ const UiList::Style& UiList::StyleDefault()
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = 0;
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.focus_enabled = true;
         s.metrics.focus_margin = DPI(2);
         s.metrics.focus_alpha = 180;
@@ -88,18 +88,24 @@ const UiList::Style& UiList::StyleDefault()
 
         s.font = StdFont();
         s.row_height = DPI(26);
+        s.item_spacing = 0;
         s.icon_size = DPI(16);
         s.check_size = DPI(14);
-        s.label_gap = DPI(6);
+        s.content_gap = DPI(6);
         s.h_padding = DPI(8);
         s.v_padding = DPI(6);
         s.row_radius = DPI(4);
         s.metadata_size = DPI(8);
         s.metadata_gap = DPI(6);
         s.right_gap = DPI(8);
+        s.drag_size = DPI(14);
+        s.drag_gap = DPI(6);
         s.show_icons = true;
         s.show_checks = true;
         s.show_metadata_marker = true;
+        s.show_drag_handle = true;
+        s.drag_side = UiAlign::RIGHT;
+        s.drag_glyph = ICON_DESIGN_DRAG_INDICATOR_48();
         s.hot_as_underline = false;
         s.selected_as_underline = false;
         s.state_underline_thickness = DPI(2);
@@ -117,6 +123,7 @@ const UiList::Style& UiList::StyleDefault()
         s.metadata_default = Color(65, 167, 248);
         s.check_frame = Color(148, 163, 184);
         s.check_fill = Color(17, 24, 39);
+        s.drag_marker = Color(56, 146, 255);
     }
     return s;
 }
@@ -128,6 +135,8 @@ UiList::UiList()
 {
     BackPaint();
     WantFocus();
+    Add(drag_marker_);
+    drag_marker_.Color(Color(56, 146, 255)).IgnoreMouse().Hide();
 
     inline_editor_.Hide();
     inline_editor_.WhenAccept = [=] { CommitRename(); };
@@ -199,7 +208,10 @@ void UiList::OnStyleChanged()
 UiList& UiList::SetModel(UiListModel& model)
 {
     CancelRename();
+    if(model_ == &model)
+        return *this;
     model_ = &model;
+    BindModel(model);
     model_revision_ = -1;
     selected_.Clear();
     cursor_ = -1;
@@ -333,6 +345,59 @@ UiList& UiList::EnableRenameOnDblClick(bool on)
     return *this;
 }
 
+UiList& UiList::EnableDragReorder(bool on)
+{
+    drag_reorder_enabled_ = on;
+    if(!on)
+        EndRowDrag(true);
+    Refresh();
+    return *this;
+}
+
+void UiList::BindModel(UiListModel& model)
+{
+    for(int i = 0; i < bound_models_.GetCount(); i++) {
+        if(bound_models_[i] == &model)
+            return;
+    }
+
+    bound_models_.Add(&model);
+    Ptr<UiList> self = this;
+    UiListModel* observed = &model;
+    model.WhenChange << [self, observed](const UiModelChange&) {
+        if(self && self->model_ == observed) {
+            self->SyncModel();
+            self->RefreshLayout();
+            self->Refresh();
+        }
+    };
+}
+
+UiList& UiList::ShowDragHandle(bool on)
+{
+    StyleEdit().show_drag_handle = on;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiList& UiList::SetDragSide(UiAlign side)
+{
+    if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
+        side = UiAlign::RIGHT;
+    StyleEdit().drag_side = side;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiList& UiList::SetDragGlyph(const Image& glyph)
+{
+    StyleEdit().drag_glyph = glyph;
+    Refresh();
+    return *this;
+}
+
 UiList& UiList::SetCursor(int index)
 {
     SyncModel();
@@ -385,14 +450,23 @@ Rect UiList::GetViewportRect() const
 
 int UiList::GetTotalHeight() const
 {
-    return model_ ? model_->GetCount() * max(DPI(18), GetEffectiveStyle().row_height) : 0;
+    if(!model_)
+        return 0;
+    int count = model_->GetCount();
+    if(count <= 0)
+        return 0;
+    int rh = max(DPI(18), GetEffectiveStyle().row_height);
+    int sp = max(0, GetEffectiveStyle().item_spacing);
+    return count * rh + max(0, count - 1) * sp;
 }
 
 Rect UiList::GetRowRect(int row) const
 {
     Rect vp = GetViewportRect();
     int rh = max(DPI(18), GetEffectiveStyle().row_height);
-    int y = vp.top - scroll_y_ + row * rh;
+    int sp = max(0, GetEffectiveStyle().item_spacing);
+    int extent = rh + sp;
+    int y = vp.top - scroll_y_ + row * extent;
     return Rect(vp.left, y, vp.right, y + rh);
 }
 
@@ -402,8 +476,15 @@ int UiList::HitTestRow(Point p) const
     if(!vp.Contains(p) || !model_)
         return -1;
     int rh = max(DPI(18), GetEffectiveStyle().row_height);
-    int row = (p.y - vp.top + scroll_y_) / rh;
-    return row >= 0 && row < model_->GetCount() ? row : -1;
+    int sp = max(0, GetEffectiveStyle().item_spacing);
+    int extent = rh + sp;
+    int local = p.y - vp.top + scroll_y_;
+    int row = local / max(1, extent);
+    if(row < 0 || row >= model_->GetCount())
+        return -1;
+    if(local % max(1, extent) >= rh)
+        return -1;
+    return row;
 }
 
 Rect UiList::GetCheckRect(const Rect& row) const
@@ -422,7 +503,7 @@ Rect UiList::GetIconRect(const Rect& row, bool has_check) const
     int y = row.top + (row.GetHeight() - size) / 2;
     int x = row.left + style.h_padding;
     if(has_check)
-        x = GetCheckRect(row).right + style.label_gap;
+        x = GetCheckRect(row).right + style.content_gap;
     return RectC(x, y, size, size);
 }
 
@@ -432,10 +513,25 @@ Rect UiList::GetMetadataRect(const Rect& row, bool has_check, bool has_icon) con
     int size = min(style.metadata_size, row.GetHeight() - DPI(8));
     int y = row.top + (row.GetHeight() - size) / 2;
     int x = row.left + style.h_padding;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::LEFT)
+        x = GetDragRect(row).right + style.drag_gap;
     if(has_check)
-        x = GetCheckRect(row).right + style.label_gap;
+        x = GetCheckRect(row).right + style.content_gap;
     if(has_icon)
-        x = GetIconRect(row, has_check).right + style.label_gap;
+        x = GetIconRect(row, has_check).right + style.content_gap;
+    return RectC(x, y, size, size);
+}
+
+Rect UiList::GetDragRect(const Rect& row) const
+{
+    const Style& style = GetEffectiveStyle();
+    if(!drag_reorder_enabled_ || !style.show_drag_handle)
+        return Rect(0, 0, 0, 0);
+    int size = min(style.drag_size, row.GetHeight() - DPI(6));
+    int y = row.top + (row.GetHeight() - size) / 2;
+    int x = style.drag_side == UiAlign::LEFT
+          ? row.left + style.h_padding
+          : row.right - style.h_padding - size;
     return RectC(x, y, size, size);
 }
 
@@ -447,21 +543,28 @@ Rect UiList::GetRightTextRect(const Rect& row, const UiModelItem& item) const
     Font font = item.use_custom_font ? item.custom_font : style.font;
     Size sz = GetTextSize(item.right_text, font);
     int w = min(sz.cx + DPI(4), max(0, row.GetWidth() / 2));
-    return Rect(row.right - style.h_padding - w, row.top, row.right - style.h_padding, row.bottom);
+    int right = row.right - style.h_padding;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::RIGHT)
+        right = GetDragRect(row).left - style.drag_gap;
+    return Rect(max(row.left, right - w), row.top, right, row.bottom);
 }
 
 Rect UiList::GetTextRect(const Rect& row, bool has_check, bool has_icon, bool has_metadata, const UiModelItem& item) const
 {
     const Style& style = GetEffectiveStyle();
     int left = row.left + style.h_padding;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::LEFT)
+        left = GetDragRect(row).right + style.drag_gap;
     if(has_check)
-        left = GetCheckRect(row).right + style.label_gap;
+        left = GetCheckRect(row).right + style.content_gap;
     if(has_icon)
-        left = GetIconRect(row, has_check).right + style.label_gap;
+        left = GetIconRect(row, has_check).right + style.content_gap;
     if(has_metadata)
         left = GetMetadataRect(row, has_check, has_icon).right + style.metadata_gap;
     Rect right = GetRightTextRect(row, item);
     int right_edge = right.IsEmpty() ? row.right - style.h_padding : right.left - style.right_gap;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::RIGHT)
+        right_edge = min(right_edge, GetDragRect(row).left - style.drag_gap);
     return Rect(left, row.top, max(left, right_edge), row.bottom);
 }
 
@@ -549,6 +652,18 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
     bool has_check = style.show_checks && (item.has_check || item.checked);
     bool has_icon = style.show_icons && !IsNull(item.icon);
     bool has_metadata = style.show_metadata_marker && item.has_metadata;
+    bool has_drag = drag_reorder_enabled_ && style.show_drag_handle;
+
+    if(has_drag) {
+        Rect dr = GetDragRect(rr);
+        Color drag_ink = style.muted_ink;
+        if(index == drag_from_ && dragging_)
+            drag_ink = style.selected_frame;
+        else if(index == hot_drag_ || index == pressed_drag_)
+            drag_ink = style.hot_ink;
+        UiPaintStyledIcon(w, dr, IsNull(style.drag_glyph) ? ICON_DESIGN_DRAG_INDICATOR_48() : style.drag_glyph,
+                          true, true, UiIconRenderMode::MonoTint, drag_ink, item.enabled);
+    }
 
     if(has_check)
         PaintCheck(w, GetCheckRect(rr), item, selected);
@@ -557,7 +672,7 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
         Color icon_ink = !IsNull(item.custom_ink_color)
                        ? item.custom_ink_color
                        : (selected ? style.selected_ink : (item.enabled ? style.muted_ink : style.disabled_ink));
-        UiPaintStyledIcon(w, GetIconRect(rr, has_check), item.icon, true, item.mono_icon, icon_ink, item.enabled);
+                UiPaintStyledIcon(w, GetIconRect(rr, has_check), item.icon, true, true, item.icon_render_mode, icon_ink, item.enabled);
     }
 
     if(has_metadata) {
@@ -631,12 +746,15 @@ void UiList::Layout()
     }
     else
         inline_editor_.Hide();
+
+    UpdateDragMarker();
 }
 
 Size UiList::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    return UiStyledOuterSizeFromContent(Size(DPI(180), max(DPI(80), style.row_height * 4)), style.metrics, style.skin);
+    int rows_h = style.row_height * 4 + max(0, style.item_spacing) * 3;
+    return UiStyledOuterSizeFromContent(Size(DPI(180), max(DPI(80), rows_h)), style.metrics, style.skin);
 }
 
 void UiList::LeftDown(Point p, dword flags)
@@ -646,7 +764,20 @@ void UiList::LeftDown(Point p, dword flags)
     SyncModel();
     int row = HitTestRow(p);
     pressed_ = row;
+    pressed_drag_ = -1;
     if(row < 0) {
+        Refresh();
+        return;
+    }
+
+    int drag_row = HitTestDrag(p);
+    if(drag_row >= 0) {
+        pressed_drag_ = drag_row;
+        if(!IsSelected(drag_row))
+            SelectSingle(drag_row);
+        cursor_ = drag_row;
+        anchor_ = drag_row;
+        BeginRowDrag(drag_row, GetMousePos());
         Refresh();
         return;
     }
@@ -671,6 +802,26 @@ void UiList::LeftDown(Point p, dword flags)
     Refresh();
 }
 
+void UiList::LeftDrag(Point, dword)
+{
+    if(drag_candidate_)
+        ContinueRowDrag(GetMousePos());
+}
+
+void UiList::LeftUp(Point, dword)
+{
+    if(drag_candidate_) {
+        EndRowDrag(false);
+        return;
+    }
+
+    if(pressed_ >= 0 || pressed_drag_ >= 0) {
+        pressed_ = -1;
+        pressed_drag_ = -1;
+        Refresh();
+    }
+}
+
 void UiList::LeftDouble(Point p, dword flags)
 {
     CommitRenameIfNeeded(p);
@@ -686,18 +837,29 @@ void UiList::LeftDouble(Point p, dword flags)
 
 void UiList::MouseMove(Point p, dword)
 {
+    if(drag_candidate_) {
+        ContinueRowDrag(GetMousePos());
+        return;
+    }
+
     int row = HitTestRow(p);
-    if(hot_ != row) {
+    int drag_row = HitTestDrag(p);
+    if(hot_ != row || hot_drag_ != drag_row) {
         hot_ = row;
+        hot_drag_ = drag_row;
         Refresh();
     }
 }
 
 void UiList::MouseLeave()
 {
-    if(hot_ >= 0 || pressed_ >= 0) {
+    if(drag_candidate_)
+        return;
+    if(hot_ >= 0 || hot_drag_ >= 0 || pressed_ >= 0 || pressed_drag_ >= 0) {
         hot_ = -1;
+        hot_drag_ = -1;
         pressed_ = -1;
+        pressed_drag_ = -1;
         Refresh();
     }
 }
@@ -705,8 +867,9 @@ void UiList::MouseLeave()
 void UiList::MouseWheel(Point, int zdelta, dword)
 {
     Rect vp = GetViewportRect();
-    int rows = max(1, vp.GetHeight() / max(DPI(18), GetEffectiveStyle().row_height));
-    int step = max(1, rows / 2) * max(DPI(18), GetEffectiveStyle().row_height);
+    int extent = max(DPI(18), GetEffectiveStyle().row_height) + max(0, GetEffectiveStyle().item_spacing);
+    int rows = max(1, vp.GetHeight() / max(1, extent));
+    int step = max(1, rows / 2) * extent;
     scroll_y_ -= sgn(zdelta) * step;
     ClampScroll();
     Layout();
@@ -725,12 +888,14 @@ bool UiList::Key(dword key, int)
     case K_HOME: MoveCursorToEdge(false); return true;
     case K_END: MoveCursorToEdge(true); return true;
     case K_PAGEUP: {
-        int rows = max(1, GetViewportRect().GetHeight() / max(DPI(18), GetEffectiveStyle().row_height));
+        int extent = max(DPI(18), GetEffectiveStyle().row_height) + max(0, GetEffectiveStyle().item_spacing);
+        int rows = max(1, GetViewportRect().GetHeight() / max(1, extent));
         MoveCursorBy(-rows);
         return true;
     }
     case K_PAGEDOWN: {
-        int rows = max(1, GetViewportRect().GetHeight() / max(DPI(18), GetEffectiveStyle().row_height));
+        int extent = max(DPI(18), GetEffectiveStyle().row_height) + max(0, GetEffectiveStyle().item_spacing);
+        int rows = max(1, GetViewportRect().GetHeight() / max(1, extent));
         MoveCursorBy(rows);
         return true;
     }
@@ -939,7 +1104,163 @@ void UiList::CancelRename()
     Refresh();
 }
 
+int UiList::HitTestDrag(Point p) const
+{
+    int row = HitTestRow(p);
+    if(row < 0 || !model_)
+        return -1;
+    Rect rr = GetRowRect(row).Deflated(DPI(2), DPI(1));
+    return GetDragRect(rr).Contains(p) ? row : -1;
 }
 
+void UiList::BeginRowDrag(int row, Point start_screen)
+{
+    if(!drag_reorder_enabled_ || !model_ || row < 0 || row >= model_->GetCount() || model_->GetCount() < 2) {
+        drag_candidate_ = false;
+        return;
+    }
 
+    drag_candidate_ = true;
+    dragging_ = false;
+    drag_moved_ = false;
+    drag_from_ = row;
+    drag_insert_before_ = row;
+    drag_start_screen_ = start_screen;
+    drag_marker_.Hide();
+}
+
+void UiList::ContinueRowDrag(Point p_screen)
+{
+    if(!drag_candidate_)
+        return;
+
+    if(!dragging_) {
+        int dx = p_screen.x - drag_start_screen_.x;
+        int dy = p_screen.y - drag_start_screen_.y;
+        if(abs(dy) < drag_threshold_px_ || abs(dy) < abs(dx))
+            return;
+        dragging_ = true;
+        drag_moved_ = true;
+        drag_marker_.Show();
+        drag_marker_.Remove();
+        Add(drag_marker_);
+    }
+
+    Rect self = GetScreenRect();
+    int y = p_screen.y - self.top;
+    Rect vp = GetViewportRect();
+    int before = model_ ? model_->GetCount() : 0;
+    if(model_) {
+        for(int i = 0; i < model_->GetCount(); i++) {
+            Rect rr = GetRowRect(i);
+            int mid = rr.top + rr.GetHeight() / 2;
+            if(y < mid) {
+                before = i;
+                break;
+            }
+        }
+    }
+    drag_insert_before_ = before;
+    UpdateDragMarker();
+    Refresh();
+}
+
+void UiList::EndRowDrag(bool cancel)
+{
+    if(!drag_candidate_) {
+        dragging_ = false;
+        drag_moved_ = false;
+        return;
+    }
+
+    if(!cancel && dragging_ && drag_from_ >= 0)
+        MoveRowTo(drag_from_, drag_insert_before_);
+
+    drag_candidate_ = false;
+    dragging_ = false;
+    drag_moved_ = false;
+    drag_from_ = -1;
+    drag_insert_before_ = -1;
+    pressed_drag_ = -1;
+    drag_marker_.Hide();
+    Refresh();
+}
+
+void UiList::MoveRowTo(int from, int before)
+{
+    if(!model_ || from < 0 || from >= model_->GetCount())
+        return;
+    if(before < 0 || before > model_->GetCount())
+        return;
+    if(before == from || before == from + 1)
+        return;
+
+    const int original_before = before;
+    if(!model_->Move(from, before))
+        return;
+
+    Index<int> remapped;
+    for(int i = 0; i < selected_.GetCount(); i++)
+        remapped.FindAdd(RemapIndexAfterMove(selected_[i], from, before));
+    selected_ = pick(remapped);
+    cursor_ = RemapIndexAfterMove(cursor_, from, before);
+    anchor_ = RemapIndexAfterMove(anchor_, from, before);
+    hot_ = RemapIndexAfterMove(hot_, from, before);
+    pressed_ = RemapIndexAfterMove(pressed_, from, before);
+    hot_drag_ = RemapIndexAfterMove(hot_drag_, from, before);
+    pressed_drag_ = RemapIndexAfterMove(pressed_drag_, from, before);
+    editing_index_ = RemapIndexAfterMove(editing_index_, from, before);
+    model_revision_ = model_->GetRevision();
+
+    if(WhenReordered)
+        WhenReordered(from, original_before);
+
+    Layout();
+    Refresh();
+}
+
+void UiList::UpdateDragMarker()
+{
+    if(!dragging_ || !model_ || drag_from_ < 0 || drag_from_ >= model_->GetCount()) {
+        drag_marker_.Hide();
+        return;
+    }
+
+    Rect vp = GetViewportRect();
+    int line_y = vp.top;
+    if(drag_insert_before_ >= 0 && drag_insert_before_ < model_->GetCount())
+        line_y = GetRowRect(drag_insert_before_).top;
+    else if(model_->GetCount() > 0)
+        line_y = GetRowRect(model_->GetCount() - 1).bottom;
+
+    int cy = DPI(2);
+    int x = vp.left + GetEffectiveStyle().h_padding;
+    int cx = max(DPI(24), vp.GetWidth() - GetEffectiveStyle().h_padding * 2);
+    drag_marker_.Color(GetEffectiveStyle().drag_marker);
+    drag_marker_.SetRect(x, line_y - cy / 2, cx, cy);
+    drag_marker_.Show();
+}
+
+int UiList::RemapIndexAfterMove(int index, int from, int before) const
+{
+    if(index < 0)
+        return index;
+    if(before < from) {
+        if(index == from)
+            return before;
+        if(index >= before && index < from)
+            return index + 1;
+        return index;
+    }
+    if(before > from + 1) {
+        if(index == from)
+            return before - 1;
+        if(index > from && index < before)
+            return index - 1;
+        return index;
+    }
+    return index;
+}
+
+}
 

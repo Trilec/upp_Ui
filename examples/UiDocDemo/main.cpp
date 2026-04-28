@@ -174,12 +174,12 @@ public:
         inspector_checks_.SetText("Checks: idle");
 
         auto setup_icon_button = [&](UiButton& b) {
-            b.SetIconLayout(UiAlign::CENTER);
-            b.SetIconScale(true);
-            b.SetIconTintMono(true);
+            b.SetIconSide(UiAlign::CENTER);
+            b.SetIconSize(DPI(18), DPI(18));
+            b.SetIconRenderMode(UiIconRenderMode::MonoTint);
             b.SetIconColor(Color(28, 31, 38), 10, -8);
-            b.SetIconMargin(DPI(3));
-            b.SetTextMargin(DPI(3));
+            b.SetMargin(DPI(3));
+            b.SetContentGap(DPI(3));
         };
 
         setup_icon_button(bold_);

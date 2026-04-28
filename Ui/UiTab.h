@@ -21,6 +21,8 @@
 
     Changelog
     - 2026-03: renamed active-tab accessors for release API cleanup.
+    - 2026-04: standardized repeated-tab spacing as item_spacing and primary
+      tab content spacing as content_gap.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -54,11 +56,11 @@ public:
         Font tab_font = StdFont();
 
         int  tab_extent = DPI(32);
-        int  tab_gap = DPI(4);
+        int  item_spacing = DPI(4);
         int  body_gap = DPI(4);
         Rect tab_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         Rect strip_inset = Rect(0, 0, 0, 0);
-        int  icon_text_gap = DPI(6);
+        int  content_gap = DPI(6);
         int  affordance_gap = DPI(4);
         int  affordance_size = DPI(12);
         int  min_tab_main = DPI(72);
@@ -72,7 +74,7 @@ public:
             s % palette % metrics % skin
               % tab_palette % tab_metrics % tab_skin
               % tab_font
-              % tab_extent % tab_gap % body_gap % tab_padding % strip_inset % icon_text_gap
+              % tab_extent % item_spacing % body_gap % tab_padding % strip_inset % content_gap
               % affordance_gap % affordance_size
               % min_tab_main % indicator_thickness;
             int sp = (int)indicator_span;

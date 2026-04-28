@@ -176,7 +176,7 @@ public:
         r4_tool.SetMinSize(Size(DPI(70), DPI(70)));
         r4_tool.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         r4_tool.SetIcon(CtrlImg::go_forward());
-        r4_tool.SetIconLayout(UiAlign::TOP);
+        r4_tool.SetIconSide(UiAlign::TOP);
         r4_tool.SetRadius(0);
         r4_tool.SetFrameWidth(DPI(2));
         r4_tool.SetFrameColor(Color(40, 40, 40));
@@ -382,4 +382,3 @@ GUI_APP_MAIN
 {
     UiBaseEditDemoWindow().Run();
 }
-

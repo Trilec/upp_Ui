@@ -37,13 +37,6 @@ inline StyledState UiIndicatorStyledState(bool enabled, bool pressed, bool hover
     return ST_NORMAL;
 }
 
-inline Rect UiIndicatorMainMargin(UiAlign side, int gap)
-{
-    gap = max(0, gap);
-    return side == UiAlign::RIGHT ? Rect(0, 0, gap, 0)
-                                  : Rect(gap, 0, 0, 0);
-}
-
 inline UiBlocksLayout UiComputeIndicatorBlocksLayout(const Rect& content,
                                                      Size support_natural,
                                                      Size main_natural,
@@ -59,9 +52,8 @@ inline UiBlocksLayout UiComputeIndicatorBlocksLayout(const Rect& content,
                                  align_h,
                                  align_v,
                                  indicator_side,
-                                 Rect(0, 0, 0, 0),
-                                 UiIndicatorMainMargin(indicator_side, gap),
-                                 min_support_side);
+                                 min_support_side,
+                                 gap);
 }
 
 inline Size UiMeasureIndicatorBlocksContent(Size support_natural,
@@ -75,14 +67,13 @@ inline Size UiMeasureIndicatorBlocksContent(Size support_natural,
 {
     return UiMeasureBlocksContent(support_natural,
                                   main_natural,
-                                  Rect(0, 0, 0, 0),
-                                  UiIndicatorMainMargin(indicator_side, gap),
                                   indicator_side,
                                   true,
                                   have_main,
                                   empty_w,
                                   empty_h,
-                                  min_support_side);
+                                  min_support_side,
+                                  gap);
 }
 
 }

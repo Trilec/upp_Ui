@@ -26,7 +26,7 @@ const UiPanel::Style& UiPanel::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_padding = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
+        s.metrics.content_margin = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
         s.metrics.radius = 0;
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
@@ -178,4 +178,3 @@ void UiPanel::Paint(Draw& w)
 }
 
 } // namespace Upp
-

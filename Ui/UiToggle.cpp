@@ -38,7 +38,7 @@ const UiToggle::Style& UiToggle::StyleDefault()
 
         s.metrics.face_enabled = false;
         s.metrics.frame_enabled = false;
-        s.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.track_metrics.face_enabled = true;
         s.track_metrics.frame_enabled = false;
@@ -53,12 +53,12 @@ const UiToggle::Style& UiToggle::StyleDefault()
         s.skin = StyledSkin();
         s.track_skin = StyledSkin();
         s.thumb_skin = StyledSkin();
-        s.font = StdFont();
+        s.direction = UiDirection::H;
         s.align_h = UiAlign::LEFT;
         s.align_v = UiAlign::CENTER;
         s.track_side = UiAlign::LEFT;
-        s.track_extent = Size(DPI(36), DPI(20));
-        s.label_gap = DPI(10);
+        s.track_size = Size(DPI(36), DPI(20));
+        s.thumb_size = Size(0, 0);
         s.thumb_inset = DPI(3);
         s.metrics.focus_enabled = false;
         s.metrics.focus_margin = DPI(2);
@@ -83,7 +83,6 @@ UiToggle::UiToggle()
 void UiToggle::InvalidateStyleCache()
 {
     theme_revision_ = 0;
-    text_size_dirty_ = true;
 }
 
 UiToggle::Style& UiToggle::StyleEdit()
@@ -107,7 +106,6 @@ void UiToggle::SyncThemeStyle()
 
     themed_style_ = UiTheme::ResolveToggle();
     theme_revision_ = revision;
-    text_size_dirty_ = true;
 }
 
 const UiToggle::Style& UiToggle::GetEffectiveStyle() const
@@ -140,18 +138,8 @@ UiToggle& UiToggle::ClearStyleOverride()
 
 void UiToggle::OnStyleChanged()
 {
-    text_size_dirty_ = true;
     RefreshLayout();
     Refresh();
-}
-
-UiToggle& UiToggle::SetText(const String& s)
-{
-    text_ = s;
-    text_size_dirty_ = true;
-    RefreshLayout();
-    Refresh();
-    return *this;
 }
 
 UiToggle& UiToggle::SetOn(bool on)
@@ -176,30 +164,63 @@ UiToggle& UiToggle::Toggle()
     return SetOn(!on_);
 }
 
+UiToggle& UiToggle::SetDirection(UiDirection dir)
+{
+    StyleEdit().direction = dir;
+    OnStyleChanged();
+    return *this;
+}
+
 UiToggle& UiToggle::SetTrackSide(UiAlign side)
 {
-    if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
+    if(side != UiAlign::LEFT && side != UiAlign::RIGHT &&
+       side != UiAlign::TOP && side != UiAlign::BOTTOM)
         side = UiAlign::LEFT;
     StyleEdit().track_side = side;
     OnStyleChanged();
     return *this;
 }
 
-UiToggle& UiToggle::SetPadding(const Rect& pad)
+UiToggle& UiToggle::SetTrackSize(Size sz)
 {
-    StyleEdit().metrics.content_padding = pad;
+    StyleEdit().track_size = Size(max(DPI(20), sz.cx), max(DPI(12), sz.cy));
     OnStyleChanged();
     return *this;
 }
 
-Size UiToggle::GetTextSizeCached() const
+UiToggle& UiToggle::SetThumbSize(Size sz)
 {
-    if(text_size_dirty_) {
-        const Style& style = GetEffectiveStyle();
-        text_size_cache_ = text_.IsEmpty() ? Size(0, 0) : GetTextSize(text_, style.font);
-        text_size_dirty_ = false;
-    }
-    return text_size_cache_;
+    StyleEdit().thumb_size = Size(max(0, sz.cx), max(0, sz.cy));
+    OnStyleChanged();
+    return *this;
+}
+
+UiToggle& UiToggle::SetTrackRadius(int radius)
+{
+    StyleEdit().track_metrics.radius = max(0, radius);
+    OnStyleChanged();
+    return *this;
+}
+
+UiToggle& UiToggle::SetThumbRadius(int radius)
+{
+    StyleEdit().thumb_metrics.radius = max(0, radius);
+    OnStyleChanged();
+    return *this;
+}
+
+UiToggle& UiToggle::SetThumbInset(int inset)
+{
+    StyleEdit().thumb_inset = max(0, inset);
+    OnStyleChanged();
+    return *this;
+}
+
+UiToggle& UiToggle::SetMargin(const Rect& pad)
+{
+    StyleEdit().metrics.content_margin = pad;
+    OnStyleChanged();
+    return *this;
 }
 
 Rect UiToggle::GetShellRect() const
@@ -212,44 +233,125 @@ Rect UiToggle::GetContentRect() const
     return UiStyledInnerRect(GetShellRect(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
 }
 
-Rect UiToggle::GetTrackRect(const Rect& content) const
+Size UiToggle::GetTrackExtent() const
 {
-    const Style& style = GetEffectiveStyle();
-    Size extent = style.track_extent;
+    Size extent = GetEffectiveStyle().track_size;
     extent.cx = max(DPI(20), extent.cx);
     extent.cy = max(DPI(12), extent.cy);
-    int y = content.top + (content.GetHeight() - extent.cy) / 2;
-    int x = style.track_side == UiAlign::RIGHT ? (content.right - extent.cx) : content.left;
-    return RectC(x, y, extent.cx, extent.cy);
+    return extent;
 }
 
-Rect UiToggle::GetTextRect(const Rect& content, const Rect& track) const
+Rect UiToggle::GetTrackShadowMargins() const
+{
+    return UiStyledShadowMargins(GetEffectiveStyle().track_metrics);
+}
+
+Size UiToggle::GetTrackSlotSize() const
+{
+    Size extent = GetTrackExtent();
+    Rect sh = GetTrackShadowMargins();
+    return Size(extent.cx + sh.left + sh.right, extent.cy + sh.top + sh.bottom);
+}
+
+Rect UiToggle::GetTrackSlotRect(const Rect& content) const
 {
     const Style& style = GetEffectiveStyle();
-    Rect r = content;
-    if(style.track_side == UiAlign::RIGHT)
-        r.right = max(r.left, track.left - style.label_gap);
-    else
-        r.left = min(r.right, track.right + style.label_gap);
-    return r;
+    Size need = GetTrackSlotSize();
+    int aligned_x = content.left;
+    int aligned_y = content.top;
+
+    if(content.GetWidth() > need.cx) {
+        switch(style.align_h) {
+        case UiAlign::CENTER: aligned_x = content.left + (content.GetWidth() - need.cx) / 2; break;
+        case UiAlign::RIGHT:  aligned_x = content.right - need.cx; break;
+        default: break;
+        }
+    }
+    if(content.GetHeight() > need.cy) {
+        switch(style.align_v) {
+        case UiAlign::TOP:    aligned_y = content.top; break;
+        case UiAlign::BOTTOM: aligned_y = content.bottom - need.cy; break;
+        default:              aligned_y = content.top + (content.GetHeight() - need.cy) / 2; break;
+        }
+    }
+
+    Rect aligned = RectC(aligned_x, aligned_y, min(content.GetWidth(), need.cx), min(content.GetHeight(), need.cy));
+    Size slot = GetTrackSlotSize();
+    int x = aligned.left;
+    int y = aligned.top;
+
+    switch(style.track_side) {
+    case UiAlign::RIGHT:
+        x = aligned.right - slot.cx;
+        y = aligned.top + (aligned.GetHeight() - slot.cy) / 2;
+        break;
+    case UiAlign::TOP:
+        x = aligned.left + (aligned.GetWidth() - slot.cx) / 2;
+        y = aligned.bottom - slot.cy;
+        break;
+    case UiAlign::BOTTOM:
+        x = aligned.left + (aligned.GetWidth() - slot.cx) / 2;
+        y = aligned.top;
+        break;
+    case UiAlign::LEFT:
+    default:
+        x = aligned.left;
+        y = aligned.top + (aligned.GetHeight() - slot.cy) / 2;
+        break;
+    }
+    return RectC(x, y, slot.cx, slot.cy);
+}
+
+int UiToggle::ClampRadiusPx(int radius, Size bounds) const
+{
+    return min(max(0, radius), min(bounds.cx, bounds.cy) / 2);
+}
+
+Rect UiToggle::GetTrackRect(const Rect& content) const
+{
+    Rect slot = GetTrackSlotRect(content);
+    Size extent = GetTrackExtent();
+    Rect sh = GetTrackShadowMargins();
+    int x = slot.left + sh.left;
+    int y = slot.top + sh.top;
+    return RectC(x, y, extent.cx, extent.cy);
 }
 
 Rect UiToggle::GetThumbRect(const Rect& track) const
 {
     const Style& style = GetEffectiveStyle();
     int inset = max(0, style.thumb_inset);
-    Rect bounds = track.Deflated(inset, inset);
+    Rect face = UiStyledFaceRect(track, style.track_metrics, style.track_skin);
+    if(face.IsEmpty())
+        face = track;
+
+    Rect bounds = face.Deflated(inset, inset);
     if(bounds.IsEmpty())
-        bounds = track;
+        bounds = face;
 
-    int thumb = min(bounds.GetWidth(), bounds.GetHeight());
-    thumb = max(DPI(8), thumb);
-    thumb = min(thumb, bounds.GetHeight());
+    Size thumb = style.thumb_size;
+    if(thumb.cx <= 0 || thumb.cy <= 0) {
+        int side = min(bounds.GetWidth(), bounds.GetHeight());
+        side = max(DPI(8), side);
+        thumb = Size(side, side);
+    }
 
-    int x = bounds.left + int((bounds.GetWidth() - thumb) * thumb_pos_ + 0.5);
-    x = min(max(x, bounds.left), bounds.right - thumb);
-    int y = bounds.top + (bounds.GetHeight() - thumb) / 2;
-    return RectC(x, y, thumb, thumb);
+    thumb.cx = min(thumb.cx, bounds.GetWidth());
+    thumb.cy = min(thumb.cy, bounds.GetHeight());
+    thumb.cx = max(DPI(6), thumb.cx);
+    thumb.cy = max(DPI(6), thumb.cy);
+
+    if(style.direction == UiDirection::H) {
+        int x = bounds.left + int((bounds.GetWidth() - thumb.cx) * thumb_pos_ + 0.5);
+        x = min(max(x, bounds.left), bounds.right - thumb.cx);
+        int y = bounds.top + (bounds.GetHeight() - thumb.cy) / 2;
+        return RectC(x, y, thumb.cx, thumb.cy);
+    }
+
+    int x = bounds.left + (bounds.GetWidth() - thumb.cx) / 2;
+    int y = bounds.top + int((bounds.GetHeight() - thumb.cy) * thumb_pos_ + 0.5);
+    y = min(max(y, bounds.top), bounds.bottom - thumb.cy);
+    return RectC(x, y, thumb.cx, thumb.cy);
 }
 
 void UiToggle::StartThumbAnimation(double target)
@@ -306,19 +408,36 @@ void UiToggle::Paint(Draw& w)
 
     Rect content = GetContentRect();
     Rect track = GetTrackRect(content);
-    Rect text_r = GetTextRect(content, track);
     Rect thumb = GetThumbRect(track);
 
-    UiPaintFaceFrameDash(w, track, style.track_palette, style.track_metrics, on_ ? ST_PRESSED : st);
-    UiPaintFaceFrameDash(w, thumb, style.thumb_palette, style.thumb_metrics, st);
+    PaintContext ctx;
+    ctx.outer = outer;
+    ctx.shell = shell;
+    ctx.content = content;
+    ctx.track = track;
+    ctx.thumb = thumb;
+    ctx.style = &style;
+    ctx.state = st;
+    ctx.has_focus = focus;
+    ctx.on = on_;
+    ctx.thumb_pos = thumb_pos_;
 
-    if(!text_.IsEmpty() && !text_r.IsEmpty()) {
-        Color ink = style.palette.ink[st];
-        if(IsNull(ink))
-            ink = SColorText();
-        int y = text_r.top + (text_r.GetHeight() - GetTextSizeCached().cy) / 2;
-        DrawSmartText(w, text_r.left, y, max(1, text_r.GetWidth()), text_, style.font, ink);
-    }
+    StyledMetrics track_metrics = style.track_metrics;
+    track_metrics.radius = ClampRadiusPx(track_metrics.radius, track.GetSize());
+    StyledMetrics thumb_metrics = style.thumb_metrics;
+    thumb_metrics.radius = ClampRadiusPx(thumb_metrics.radius, thumb.GetSize());
+
+    bool handled = false;
+    if(WhenPaintTrack)
+        WhenPaintTrack(w, ctx, handled);
+    if(!handled)
+        UiPaintStyledBackground(w, track, style.track_palette, track_metrics, style.track_skin, on_ ? ST_PRESSED : st, false);
+
+    handled = false;
+    if(WhenPaintThumb)
+        WhenPaintThumb(w, ctx, handled);
+    if(!handled)
+        UiPaintStyledBackground(w, thumb, style.thumb_palette, thumb_metrics, style.thumb_skin, st, false);
 
     if(WhenPaintForeground)
         WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, focus);
@@ -348,11 +467,7 @@ void UiToggle::Layout()
 Size UiToggle::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    Size text = GetTextSizeCached();
-    Size content = style.track_extent;
-    if(text.cx > 0)
-        content.cx += style.label_gap + text.cx;
-    content.cy = max(content.cy, text.cy);
+    Size content = GetTrackSlotSize();
     Size outer = UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
     if(user_min_size_.cx > 0)
         outer.cx = max(outer.cx, user_min_size_.cx);
@@ -448,19 +563,3 @@ Value UiToggle::GetData() const
 }
 
 } // namespace Upp
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

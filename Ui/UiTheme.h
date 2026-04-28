@@ -20,6 +20,10 @@
     Changelog
     - 2026-03: expanded to release-standard documentation during the API and
       release-hardening pass.
+    - 2026-04: made plain UiLabel roles geometry-neutral and stopped feeding
+      them through the secondary metrics.text_font path by default.
+    - 2026-04: updated button, label, and dropdown theme defaults to the
+      content_margin/content_gap/icon_side spacing contract.
 */
 #ifndef _Ui_UiTheme_h_
 #define _Ui_UiTheme_h_
@@ -347,7 +351,7 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Rounded:
         s.metrics.radius = DPI(999);
-        s.metrics.content_padding = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
+        s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
         SetFace(s.palette, Color(255, 255, 255), Color(239, 246, 255), Color(219, 234, 254), Color(248, 250, 252));
         SetFrame(s.palette, Color(219, 227, 238), Color(191, 219, 254), Color(147, 197, 253), Color(226, 232, 240));
         SetInk(s.palette, Color(100, 116, 139), Color(37, 99, 235), Color(29, 78, 216), Color(148, 163, 184));
@@ -355,12 +359,12 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         SetFace(s.palette, Null, Color(243, 244, 246), Color(229, 231, 235), Null);
         return s;
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(8);
-        s.metrics.content_padding = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
+        s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
         SetFace(s.palette, Color(17, 24, 39), Color(31, 41, 55), Color(15, 23, 42), Color(203, 213, 225));
         SetFrame(s.palette, Color(17, 24, 39), Color(31, 41, 55), Color(15, 23, 42), Color(203, 213, 225));
         SetInk(s.palette, White(), White(), White(), Color(100, 116, 139));
@@ -368,19 +372,19 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
-        s.metrics.content_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
+        s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         s.metrics.face_enabled = true;
         SetFace(s.palette, Null, Null, Color(243, 244, 246), Null);
         SetFrame(s.palette, Color(156, 163, 175), Color(107, 114, 128), Color(75, 85, 99), Color(209, 213, 219));
         return s;
     case UiThemePreset::Compact:
         s.metrics.radius = 0;
-        s.metrics.content_padding = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
-        s.text_margin = Rect(DPI(4), 0, 0, 0);
+        s.metrics.content_margin = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
+        s.content_gap = DPI(4);
         return s;
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
-        s.metrics.content_padding = Rect(DPI(14), DPI(9), DPI(14), DPI(9));
+        s.metrics.content_margin = Rect(DPI(14), DPI(9), DPI(14), DPI(9));
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(203, 213, 225), Color(226, 232, 240));
         s.metrics.shadow.enabled = true;
@@ -417,13 +421,12 @@ inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
         return s;
     case UiButtonRole::Icon:
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.radius = max(s.metrics.radius, DPI(10));
-        s.text_margin = Rect(0, 0, 0, 0);
-        s.icon_margin = Rect(0, 0, 0, 0);
+        s.content_gap = 0;
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
-        s.icon_layout = UiAlign::LEFT;
+        s.icon_side = UiAlign::LEFT;
         return s;
     case UiButtonRole::Danger: {
         Color danger = Color(220, 38, 38);
@@ -447,7 +450,7 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Rounded:
         s.metrics.radius = DPI(999);
-        s.metrics.content_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
+        s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         SetFace(s.palette, Color(248, 250, 252), Color(255, 255, 255), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(219, 227, 238), Color(191, 219, 254), Color(147, 197, 253), Color(226, 232, 240));
         return s;
@@ -464,7 +467,7 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
         s.metrics.face_enabled = false;
         return s;
     case UiThemePreset::Compact:
-        s.metrics.content_padding = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
+        s.metrics.content_margin = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
         s.metrics.radius = DPI(4);
         return s;
     case UiThemePreset::Layered:
@@ -529,7 +532,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
         s.metrics.frame_width = DPI(1);
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
@@ -540,7 +543,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
         s.metrics.frame_width = DPI(1);
         SetFace(s.palette, Color(241, 245, 249), Color(226, 232, 240), Color(226, 232, 240), Color(248, 250, 252));
         SetFrame(s.palette, Color(203, 213, 225), Color(148, 163, 184), Color(100, 116, 139), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
@@ -562,7 +565,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
         s.metrics.shadow.color = Color(148, 163, 184);
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     }
     return s;
@@ -574,17 +577,11 @@ inline UiCheckBox::Style ApplyCheckBoxVisual(UiCheckBox::Style s, UiCheckVisual 
     case UICHECKVIS_CLASSIC:
         s.indicator_metrics.radius = DPI(4);
         return s;
-    case UICHECKVIS_SWITCH:
-        s.indicator_size = DPI(18);
-        s.indicator_metrics.radius = DPI(999);
-        SetFace(s.indicator_palette, Color(226, 232, 240), Color(219, 234, 254), Color(191, 219, 254), Color(226, 232, 240));
-        SetFrame(s.indicator_palette, Color(203, 213, 225), Color(147, 197, 253), Color(96, 165, 250), Color(226, 232, 240));
-        return s;
     case UICHECKVIS_CHIP:
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = max(s.metrics.radius, DPI(999));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.indicator_size = DPI(14);
@@ -593,7 +590,7 @@ inline UiCheckBox::Style ApplyCheckBoxVisual(UiCheckBox::Style s, UiCheckVisual 
         s.indicator_size = DPI(14);
         s.indicator_metrics.frame_enabled = false;
         s.indicator_metrics.face_enabled = false;
-        s.metrics.content_padding = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
+        s.metrics.content_margin = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
         return s;
     }
     return s;
@@ -611,7 +608,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         s.metrics.frame_width = DPI(1);
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
@@ -622,7 +619,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         s.metrics.frame_width = DPI(1);
         SetFace(s.palette, Color(241, 245, 249), Color(226, 232, 240), Color(226, 232, 240), Color(248, 250, 252));
         SetFrame(s.palette, Color(203, 213, 225), Color(148, 163, 184), Color(100, 116, 139), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
@@ -644,7 +641,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         s.metrics.shadow.color = Color(148, 163, 184);
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         return s;
     }
     return s;
@@ -660,14 +657,14 @@ inline UiRadioButton::Style ApplyRadioButtonVisual(UiRadioButton::Style s, UiRad
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = max(s.metrics.radius, DPI(999));
-        s.metrics.content_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         return s;
     case UIRADIOVIS_LIST:
         s.indicator_metrics.frame_enabled = false;
         s.indicator_metrics.face_enabled = false;
-        s.metrics.content_padding = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
+        s.metrics.content_margin = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
         return s;
     }
     return s;
@@ -683,8 +680,8 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         s.thumb_metrics.radius = DPI(999);
         s.thumb_metrics.frame_enabled = true;
         s.thumb_metrics.frame_width = DPI(2);
-        s.track_px = DPI(4);
-        s.thumb_len_px = DPI(14);
+        s.track_size = Size(DPI(120), DPI(4));
+        s.thumb_size = Size(DPI(14), DPI(18));
         SetFace(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(241, 245, 249));
         SetFrame(s.track_palette, Color(134, 135, 134), Color(134, 135, 134), Color(134, 135, 134), Color(226, 232, 240));
         SetInk(s.track_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
@@ -694,11 +691,11 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = DPI(4);
-        s.track_px = DPI(3);
+        s.track_size.cy = DPI(3);
         return s;
     case UiThemePreset::Solid:
-        s.track_px = DPI(6);
-        s.thumb_len_px = DPI(18);
+        s.track_size.cy = DPI(6);
+        s.thumb_size = Size(DPI(18), DPI(18));
         SetFace(s.track_palette, Color(203, 213, 225), Color(191, 219, 254), Color(147, 197, 253), Color(226, 232, 240));
         SetFrame(s.track_palette, Color(148, 163, 184), Color(96, 165, 250), Color(59, 130, 246), Color(203, 213, 225));
         SetFace(s.thumb_palette, Color(15, 23, 42), Color(30, 41, 59), Color(37, 99, 235), Color(148, 163, 184));
@@ -712,15 +709,14 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         s.thumb_metrics.radius = DPI(4);
         return s;
     case UiThemePreset::Compact:
-        s.thick_px = DPI(16);
-        s.track_px = DPI(3);
-        s.thumb_len_px = DPI(12);
+        s.track_size = Size(DPI(100), DPI(3));
+        s.thumb_size = Size(DPI(12), DPI(16));
         s.tick_len_major = DPI(4);
         s.tick_len_minor = DPI(2);
         return s;
     case UiThemePreset::Layered:
-        s.track_px = DPI(4);
-        s.thumb_len_px = DPI(14);
+        s.track_size.cy = DPI(4);
+        s.thumb_size = Size(DPI(14), DPI(18));
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         s.thumb_metrics.frame_enabled = true;
@@ -830,7 +826,7 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
         s.metrics.face_enabled = false;
         return s;
     case UiThemePreset::Compact:
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.radius = DPI(6);
         return s;
     case UiThemePreset::Layered:
@@ -898,7 +894,7 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
         s.popup_radius = 0;
         return s;
     case UiThemePreset::Compact:
-        s.metrics.content_padding = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
+        s.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
         s.popup_item_height = DPI(28);
         return s;
     case UiThemePreset::Layered:
@@ -939,7 +935,7 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Compact:
         s.tab_extent = DPI(30);
-        s.tab_gap = DPI(4);
+        s.item_spacing = DPI(4);
         s.tab_padding = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
         return s;
     case UiThemePreset::Layered:
@@ -960,7 +956,7 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
     s.visual = visual;
     switch(visual) {
     case UITAB_CLASSIC:
-        s.tab_gap = DPI(6);
+        s.item_spacing = DPI(6);
         s.body_gap = DPI(6);
         s.tab_metrics.face_enabled = true;
         s.tab_metrics.frame_enabled = true;
@@ -968,7 +964,7 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
     case UITAB_UNDERLINE:
         s.tab_metrics.face_enabled = false;
         s.tab_metrics.frame_enabled = false;
-        s.tab_gap = DPI(14);
+        s.item_spacing = DPI(14);
         s.body_gap = DPI(6);
         s.tab_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
         for(int i = 0; i < 4; i++) {
@@ -980,7 +976,7 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
         s.tab_palette.ink[ST_PRESSED] = Color(15, 23, 42);
         return s;
     case UITAB_SEGMENTED:
-        s.tab_gap = DPI(2);
+        s.item_spacing = DPI(2);
         s.body_gap = DPI(6);
         s.strip_inset = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
         s.tab_metrics.radius = DPI(999);
@@ -988,12 +984,12 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
     case UITAB_RAIL:
         s.tab_metrics.face_enabled = false;
         s.tab_metrics.frame_enabled = false;
-        s.tab_gap = DPI(10);
+        s.item_spacing = DPI(10);
         s.body_gap = DPI(6);
         s.tab_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         return s;
     case UITAB_DOCUMENT:
-        s.tab_gap = DPI(8);
+        s.item_spacing = DPI(8);
         s.body_gap = DPI(4);
         s.tab_metrics.radius = DPI(8);
         return s;
@@ -1008,7 +1004,7 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Rounded:
         s.metrics.radius = DPI(18);
-        s.metrics.content_padding = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
+        s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.media_reserve = DPI(84);
         return s;
     case UiThemePreset::Linear:
@@ -1018,7 +1014,7 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(14);
-        s.metrics.content_padding = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
+        s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.media_reserve = DPI(84);
         return s;
     case UiThemePreset::Outline:
@@ -1028,14 +1024,14 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
         return s;
     case UiThemePreset::Compact:
         s.metrics.radius = DPI(8);
-        s.metrics.content_padding = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
+        s.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
         s.media_reserve = DPI(64);
         s.title_subtitle_gap = DPI(2);
         s.subtitle_copy_gap = DPI(3);
         return s;
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(16);
-        s.metrics.content_padding = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
+        s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.metrics.shadow.enabled = true;
         s.metrics.shadow.curve = ShadowSoft();
         s.metrics.shadow.distance = DPI(4);
@@ -1049,63 +1045,30 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
 inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
 {
     UiLabel::Style s = UiLabel::StyleDefault();
+    // Plain label roles must start geometry-neutral. Semantic roles can change
+    // typography and ink, but layout spacing belongs to the parent layout and
+    // decorative container roles such as Badge.
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.frame_width = 0;
+    s.metrics.radius = 0;
+    s.metrics.shadow.enabled = false;
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
+    s.content_gap = 0;
     switch(preset) {
     case UiThemePreset::Minimal:
         break;
     case UiThemePreset::Rounded:
-        s.metrics.radius = DPI(999);
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
-            s.palette.frame[i] = Color(226, 232, 240);
-        }
-            s.text_margin = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
         break;
     case UiThemePreset::Linear:
-        s.metrics.radius = 0;
         break;
     case UiThemePreset::Solid:
-        s.metrics.radius = DPI(10);
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(Color(17, 24, 39));
-            s.palette.frame[i] = Color(17, 24, 39);
-            s.palette.ink[i] = White();
-            s.palette.icon[i] = White();
-        }
-        s.palette.ink[ST_DISABLED] = Color(203, 213, 225);
-        s.palette.icon[ST_DISABLED] = Color(203, 213, 225);
-            s.text_margin = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
         break;
     case UiThemePreset::Outline:
-        s.metrics.radius = 0;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.transparent = true;
         break;
     case UiThemePreset::Compact:
-        s.text_margin = Rect(0, 0, 0, 0);
-        s.icon_margin = Rect(0, 0, DPI(4), 0);
         break;
     case UiThemePreset::Layered:
-        s.metrics.radius = DPI(14);
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.shadow.enabled = true;
-        s.metrics.shadow.curve = ShadowSoft();
-        s.metrics.shadow.distance = DPI(4);
-        s.metrics.shadow.alpha = 48;
-        s.metrics.shadow.color = Color(148, 163, 184);
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
-            s.palette.frame[i] = Color(226, 232, 240);
-        }
-            s.text_margin = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
         break;
     }
     return s;
@@ -1118,34 +1081,23 @@ inline UiLabel::Style ApplyLabelRole(UiLabel::Style s, UiLabelRole role)
         return s;
     case UiLabelRole::Headline:
         s.font = SansSerifZ(24).Bold();
-        s.metrics.text_font = s.font;
-        s.metrics.use_text_font = true;
         s.align_h = UiAlign::LEFT;
         s.align_v = UiAlign::TOP;
-        s.text_margin = Rect(0, 0, 0, DPI(4));
         return s;
     case UiLabelRole::Subheadline:
         s.font = SansSerifZ(18).Bold();
-        s.metrics.text_font = s.font;
-        s.metrics.use_text_font = true;
         s.align_h = UiAlign::LEFT;
-        s.text_margin = Rect(0, 0, 0, DPI(2));
         return s;
     case UiLabelRole::Title:
         s.font = SansSerifZ(16).Bold();
-        s.metrics.text_font = s.font;
-        s.metrics.use_text_font = true;
         s.align_h = UiAlign::LEFT;
         return s;
     case UiLabelRole::Caption:
         s.font = SansSerifZ(11);
-        s.metrics.text_font = s.font;
-        s.metrics.use_text_font = true;
         for(int i = 0; i < 4; i++)
             s.palette.ink[i] = Color(100, 116, 139);
         s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
         s.align_h = UiAlign::LEFT;
-        s.text_margin = Rect(0, DPI(1), 0, DPI(1));
         return s;
     case UiLabelRole::Badge:
         s.metrics.face_enabled = true;
@@ -1162,17 +1114,16 @@ inline UiLabel::Style ApplyLabelRole(UiLabel::Style s, UiLabelRole role)
         s.palette.icon[ST_DISABLED] = Color(226, 232, 240);
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
-        s.icon_margin = Rect(DPI(6), DPI(2), DPI(4), DPI(2));
-        s.text_margin = Rect(DPI(8), DPI(2), DPI(8), DPI(2));
-            return s;
+        // Badge keeps its extra chrome in the outer content margin; the
+        // icon/text relationship itself is still one shared content gap.
+        s.metrics.content_margin = Rect(DPI(6), DPI(2), DPI(8), DPI(2));
+        s.content_gap = DPI(8);
+        return s;
     case UiLabelRole::Footnote:
         s.font = SansSerifZ(DPI(9));
-        s.metrics.text_font = s.font;
-        s.metrics.use_text_font = true;
         for(int i = 0; i < 4; i++)
             s.palette.ink[i] = Color(148, 163, 184);
         s.palette.ink[ST_DISABLED] = Color(203, 213, 225);
-        s.text_margin = Rect(0, DPI(2), 0, DPI(4));
         s.align_v = UiAlign::TOP;
         return s;
     }
@@ -1189,11 +1140,10 @@ inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiTo
     Color pressed = dark ? Color(46, 59, 79) : Color(232, 236, 241);
     s.metrics.radius = DPI(4);
     s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+    s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
     s.metrics.frame_enabled = false;
     s.metrics.face_enabled = true;
-    s.text_margin = Rect(0, 0, 0, 0);
-    s.icon_margin = Rect(0, 0, 0, 0);
+    s.content_gap = 0;
     s.align_h = UiAlign::CENTER;
     s.align_v = UiAlign::CENTER;
     s.transparent = false;
@@ -1210,10 +1160,10 @@ inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiTo
     Color pressed = dark ? Color(37, 49, 67) : Color(239, 243, 247);
     s.metrics.radius = DPI(4);
     s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
+    s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
     s.font = SansSerifZ(13);
     s.metrics.use_text_font = false;
-    s.text_margin = Rect(DPI(4), 0, 0, 0);
+    s.content_gap = DPI(4);
     s.transparent = false;
     switch(role) {
     case UiButtonRole::Accent:
@@ -1236,9 +1186,8 @@ inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiTo
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
         return;
     case UiButtonRole::Icon:
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        s.text_margin = Rect(0, 0, 0, 0);
-        s.icon_margin = Rect(0, 0, 0, 0);
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.content_gap = 0;
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
         SetFace(s.palette, Null, hover, pressed, Null);
@@ -1276,7 +1225,7 @@ inline void TuneMinimalEdit(UiBaseEdit::Style& s, UiThemeMode mode)
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
     s.metrics.radius = DPI(4);
     s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(12), DPI(8), DPI(12), DPI(8));
+    s.metrics.content_margin = Rect(DPI(12), DPI(8), DPI(12), DPI(8));
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.font = SansSerifZ(13);
@@ -1296,10 +1245,10 @@ inline void TuneMinimalToggle(UiToggle::Style& s, UiThemeMode mode)
     s.palette.ink[ST_DISABLED] = dark ? Color(128, 145, 168) : Color(154, 163, 175);
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
-    s.track_extent = Size(DPI(40), DPI(24));
-    s.label_gap = DPI(10);
+    s.direction = UiDirection::H;
+    s.track_size = Size(DPI(40), DPI(24));
+    s.thumb_size = Size(0, 0);
     s.thumb_inset = DPI(3);
-    s.font = SansSerifZ(13);
     s.track_metrics.face_enabled = true;
     s.track_metrics.frame_enabled = false;
     s.track_metrics.frame_width = 0;
@@ -1329,29 +1278,6 @@ inline void TuneMinimalToggle(UiToggle::Style& s, UiThemeMode mode)
     for(int i = 0; i < 4; i++)
         s.palette.ink[i] = ink;
     s.palette.ink[ST_DISABLED] = muted;
-    if(visual == UICHECKVIS_SWITCH) {
-        s.indicator_extent = Size(DPI(36), DPI(20));
-        s.indicator_size = DPI(20);
-        s.indicator_metrics.radius = DPI(999);
-        s.indicator_metrics.frame_enabled = true;
-        s.indicator_metrics.frame_width = DPI(1);
-        SetFace(s.indicator_palette,
-                dark ? Color(42, 54, 71) : Color(229, 231, 235),
-                dark ? Color(52, 66, 86) : Color(209, 213, 219),
-                dark ? Color(243, 247, 255) : Color(17, 24, 39),
-                dark ? Color(42, 54, 71) : Color(229, 231, 235));
-        SetFrame(s.indicator_palette,
-                 dark ? Color(58, 74, 96) : Color(209, 213, 219),
-                 dark ? Color(73, 92, 118) : Color(156, 163, 175),
-                 dark ? Color(243, 247, 255) : Color(17, 24, 39),
-                 dark ? Color(58, 74, 96) : Color(209, 213, 219));
-        SetInk(s.indicator_palette,
-               White(),
-               White(),
-               dark ? Color(15, 23, 34) : White(),
-               dark ? Color(148, 163, 184) : Color(226, 232, 240));
-        return;
-    }
     s.indicator_extent = Size(0, 0);
     s.indicator_metrics.radius = DPI(4);
     SetFace(s.indicator_palette,
@@ -1402,11 +1328,11 @@ inline void TuneMinimalDropdown(UiDropdown::Style& s, UiThemeMode mode)
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
     s.metrics.radius = DPI(4);
     s.metrics.shadow.enabled = false;
-    s.metrics.content_padding = Rect(DPI(12), DPI(8), DPI(12), DPI(8));
+    s.metrics.content_margin = Rect(DPI(12), DPI(8), DPI(12), DPI(8));
     s.glyph_closed = ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48();
     s.glyph_opened = ICON_NAVIGATION_OUTLINED_ARROW_DROP_UP_48();
     s.indicator_size = DPI(12);
-    s.indicator_margin = Rect(DPI(4), 0, DPI(6), 0);
+    s.content_gap = DPI(6);
     s.popup_radius = DPI(8);
     s.popup_frame_width = DPI(1);
     s.popup_frame_color = dark ? Color(29, 40, 56) : Color(236, 239, 243);
@@ -1434,11 +1360,11 @@ inline void TuneMinimalTab(UiTab::Style& s, UiThemeMode mode)
     s.tab_metrics.frame_enabled = true;
     s.tab_metrics.frame_width = DPI(1);
     s.tab_metrics.radius = DPI(4);
-    s.tab_gap = DPI(8);
+    s.item_spacing = DPI(8);
     s.body_gap = DPI(10);
     s.tab_padding = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
     s.strip_inset = Rect(0, 0, 0, 0);
-    s.icon_text_gap = 0;
+    s.content_gap = 0;
     s.min_tab_main = DPI(84);
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::None();
@@ -1463,9 +1389,16 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
     Color body = dark ? Color(237, 244, 255) : Color(22, 32, 51);
     Color muted = dark ? Color(153, 168, 192) : Color(96, 112, 134);
+    // Keep semantic label roles geometry-neutral in the minimal theme as well.
+    // This avoids hidden spacing contracts leaking into compact composite rows.
     s.transparent = true;
     s.metrics.face_enabled = false;
     s.metrics.frame_enabled = false;
+    s.metrics.frame_width = 0;
+    s.metrics.radius = 0;
+    s.metrics.shadow.enabled = false;
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
+    s.content_gap = 0;
     s.font = SansSerifZ(13);
     for(int i = 0; i < 4; i++) {
         s.palette.ink[i] = body;
@@ -1476,7 +1409,6 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
     switch(role) {
     case UiLabelRole::Headline:
         s.font = SansSerifZ(28).Bold();
-        s.text_margin = Rect(0, 0, 0, DPI(4));
         break;
     case UiLabelRole::Subheadline:
         s.font = SansSerifZ(15).Bold();
@@ -1505,15 +1437,13 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
             s.palette.face[i] = UiFill::Solid(dark ? Color(29, 40, 56) : Color(247, 248, 250));
             s.palette.ink[i] = dark ? Color(243, 247, 255) : Color(17, 24, 39);
         }
-        s.text_margin = Rect(DPI(10), DPI(3), DPI(10), DPI(3));
+        s.metrics.content_margin = Rect(DPI(10), DPI(3), DPI(10), DPI(3));
         s.transparent = false;
         break;
     case UiLabelRole::Body:
     default:
         break;
     }
-    s.metrics.text_font = s.font;
-    s.metrics.use_text_font = true;
 }
 } // namespace UiThemeDetail
 
@@ -1821,7 +1751,7 @@ public:
         switch(normalized.preset) {
         case UiThemePreset::Rounded:
             s.metrics.radius = DPI(18);
-            s.metrics.content_padding = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
+            s.metrics.content_margin = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
             s.row_radius = DPI(999);
             s.row_height = DPI(30);
             s.h_padding = DPI(12);
@@ -1884,7 +1814,7 @@ public:
             s.icon_size = DPI(14);
             s.h_padding = DPI(6);
             s.v_padding = DPI(4);
-            s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+            s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
             break;
         case UiThemePreset::Layered:
             s.metrics.radius = DPI(18);
@@ -2106,29 +2036,3 @@ inline UiLabel::Style MakeLabel(UiThemePreset preset, UiThemeMode mode, UiLabelR
 } // namespace Upp
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -39,7 +39,7 @@ const UiRadioButton::Style& UiRadioButton::StyleDefault()
         s.metrics = StyledMetrics();
         s.metrics.face_enabled = false;
         s.metrics.frame_enabled = false;
-        s.metrics.content_padding = Rect(0, 0, 0, 0);
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.indicator_metrics = StyledMetrics();
         s.indicator_metrics.face_enabled = true;
@@ -340,12 +340,3 @@ void UiRadioButton::MouseEnter(Point, dword) { IndicatorMouseEnter(); }
 void UiRadioButton::MouseLeave() { IndicatorMouseLeave(); }
 
 }
-
-
-
-
-
-
-
-
-

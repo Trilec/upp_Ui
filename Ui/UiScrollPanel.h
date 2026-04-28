@@ -23,6 +23,8 @@
     - 2026-03: added release-standard header documentation.
     - 2026-04: switched to UiScrollBar ownership and tightened scrollbar
       placement so the reserved gutter reads more like a native inset rail.
+    - 2026-04: added explicit GetContentSize() so parent containers can query
+      logical content extent without abusing GetMinSize().
 */
 
 #include <CtrlLib/CtrlLib.h>
@@ -72,11 +74,17 @@ public:
     UiScrollPanel& SetScrollMode(UiScrollPanelMode m);
     UiScrollPanelMode GetScrollMode() const { return mode_; }
 
+    UiScrollPanel& SetScrollBarStyle(const UiScrollBar::Style& s);
+    UiScrollPanel& ClearScrollBarStyleOverride();
+    bool HasScrollBarStyleOverride() const { return has_scrollbar_style_override_; }
+
     UiScrollPanel& SetSizeMin(Size sz) { user_min_size_ = sz; RefreshLayout(); Refresh(); return *this; }
     UiScrollPanel& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
     ParentCtrl& Content() { return content_; }
     const ParentCtrl& Content() const { return content_; }
+    Size GetContentSize() const { return content_size_; }
+    Rect GetViewportRect() const;
 
     Point GetScrollPos() const { return origin_; }
     UiScrollPanel& SetScrollPos(Point p);
@@ -101,7 +109,6 @@ private:
     const Style& GetEffectiveStyle() const;
     Rect MeasureContentBounds() const;
     Rect GetFaceRect() const;
-    Rect GetViewportRect() const;
     void UpdateScrollbars();
     void ApplyScroll();
     void SyncScrollBarStyles();
@@ -110,6 +117,8 @@ private:
     Style style_;
     uint64 theme_revision_ = 0;
     bool has_style_override_ = false;
+    UiScrollBar::Style scrollbar_style_;
+    bool has_scrollbar_style_override_ = false;
     UiScrollPanelMode mode_ = UIPANELSCROLL_AUTO;
 
     UiScrollBar sbx_;
@@ -127,6 +136,3 @@ private:
 }
 
 #endif
-
-
-

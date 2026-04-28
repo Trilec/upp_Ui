@@ -25,7 +25,7 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
-        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     }
     return s;
 }
@@ -33,9 +33,9 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
 UiScrollPanel::UiScrollPanel()
     : style_(StyleDefault())
 {
+    Add(content_);
     Add(sbx_);
     Add(sby_);
-    Add(content_);
 
     content_.Transparent();
 
@@ -86,7 +86,7 @@ void UiScrollPanel::SyncThemeStyle()
     resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
     resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
     resolved.metrics.face_enabled = panel.metrics.face_enabled;
-    resolved.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    resolved.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
     style_ = resolved;
     theme_revision_ = revision;
     SyncScrollBarStyles();
@@ -137,6 +137,27 @@ UiScrollPanel& UiScrollPanel::SetScrollMode(UiScrollPanelMode m)
     return *this;
 }
 
+UiScrollPanel& UiScrollPanel::SetScrollBarStyle(const UiScrollBar::Style& s)
+{
+    scrollbar_style_ = s;
+    has_scrollbar_style_override_ = true;
+    SyncScrollBarStyles();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiScrollPanel& UiScrollPanel::ClearScrollBarStyleOverride()
+{
+    if(!has_scrollbar_style_override_)
+        return *this;
+    has_scrollbar_style_override_ = false;
+    SyncScrollBarStyles();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
 UiScrollPanel& UiScrollPanel::SetScrollPos(Point p)
 {
     origin_ = p;
@@ -167,7 +188,11 @@ Rect UiScrollPanel::MeasureContentBounds() const
 Rect UiScrollPanel::GetViewportRect() const
 {
     Rect face = GetFaceRect();
-    const Rect cp = UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding);
+    if(sby_.IsShown())
+        face.right -= sby_.GetRect().GetWidth();
+    if(sbx_.IsShown())
+        face.bottom -= sbx_.GetRect().GetHeight();
+    const Rect cp = UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin);
     if(!UiIsZeroThicknessRect(cp))
         face = UiApplyThicknessRect(face, cp);
     return face;
@@ -180,7 +205,7 @@ Rect UiScrollPanel::GetFaceRect() const
 
 void UiScrollPanel::SyncScrollBarStyles()
 {
-    UiScrollBar::Style sb = UiTheme::ResolveScrollBar();
+    UiScrollBar::Style sb = has_scrollbar_style_override_ ? scrollbar_style_ : UiTheme::ResolveScrollBar();
     sbx_.SetStyle(sb);
     sby_.SetStyle(sb);
 }
@@ -223,7 +248,7 @@ void UiScrollPanel::UpdateScrollbars()
             view.right -= vbarw;
         if(showx)
             view.bottom -= hbarh;
-        Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
+        Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin));
         Size page = page_view.GetSize();
         bool sx = false, sy = false;
         Decide(page, sx, sy);
@@ -236,7 +261,7 @@ void UiScrollPanel::UpdateScrollbars()
         view.right -= vbarw;
     if(showx)
         view.bottom -= hbarh;
-    Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
+    Rect page_view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin));
     Size page = page_view.GetSize();
     Point p = origin_;
     p.x = minmax(p.x, 0, max(0, content_size_.cx - page.cx));
@@ -279,7 +304,7 @@ void UiScrollPanel::ApplyScroll()
         view.right -= sby_.GetRect().GetWidth();
     if(sbx_.IsShown())
         view.bottom -= sbx_.GetRect().GetHeight();
-    view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_padding));
+    view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin));
 
     int minx = content_bounds_.left;
     int miny = content_bounds_.top;
@@ -308,7 +333,7 @@ void UiScrollPanel::MouseWheel(Point, int zdelta, dword)
 void UiScrollPanel::Layout()
 {
     const Style& style = GetEffectiveStyle();
-    Rect content_area = UiStyledInnerRect(GetSize(), style.metrics, style.skin);
+    Rect content_area = GetViewportRect();
     content_bounds_ = MeasureContentBounds();
 
     int logical_w = max(content_area.GetWidth(), content_bounds_.GetWidth());
@@ -324,7 +349,7 @@ void UiScrollPanel::Layout()
         view.right -= vbarw;
     if(hbarh)
         view.bottom -= hbarh;
-    Rect content_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_padding));
+    Rect content_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_margin));
 
     // The content surface must size to the post-scrollbar viewport, otherwise
     // child controls can end up laid out underneath the bars and lose input.
@@ -347,6 +372,12 @@ void UiScrollPanel::Layout()
     if(sbx_.IsShown())
         sbx_.SetRect(view.left, view.bottom + hgap, max(0, view.GetWidth() - vgap), max(0, hbarh - hgap));
     ApplyScroll();
+
+    // A restore/fullscreen transition can move the bars under a stationary
+    // mouse cursor without generating a fresh enter event. Resync hover state
+    // explicitly so the painted hot gutter/thumb reflects reality.
+    sby_.SyncHoverFromMouse();
+    sbx_.SyncHoverFromMouse();
 }
 
 Size UiScrollPanel::GetMinSize() const
@@ -387,5 +418,3 @@ void UiScrollPanel::Paint(Draw& w)
 }
 
 }
-
-

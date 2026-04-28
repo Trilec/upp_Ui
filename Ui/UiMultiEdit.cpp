@@ -23,7 +23,7 @@ Size UiMultiEdit::GetMinSize() const
 
 	// Calculate height for ~3 lines
 	int line_h = GetVisualLineHeight();
-	Rect cp = UiNonNegativeThickness(style_.metrics.content_padding);
+	Rect cp = UiNonNegativeThickness(style_.metrics.content_margin);
 	int fw  = UiResolvedFrameWidth(style_.metrics, style_.skin);
 	sz.cy = (line_h * 3) + cp.top + cp.bottom + fw * 2;
 

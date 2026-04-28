@@ -1,761 +1,2175 @@
-#include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
+#include <cmath>
 
 using namespace Upp;
 
-class UiDropdownDemo : public TopWindow {
+namespace {
+
+static const char* DEMO_VERSION = "v0.1.0";
+static const int DEMO_RADIUS = 8;
+
+enum DatasetMode {
+    DATASET_SIMPLE = 0,
+    DATASET_BASIC,
+    DATASET_RICH,
+    DATASET_MULTI,
+};
+
+enum ShadowCurvePreset {
+    SHADOWPRESET_LINEAR = 0,
+    SHADOWPRESET_SOFT,
+    SHADOWPRESET_HARD,
+    SHADOWPRESET_CUSTOM,
+};
+
+Font DemoSans(int px, bool bold = false)
+{
+    Font f = SansSerifZ(px);
+    if(Font::FindFaceNameIndex("Inter") >= 0)
+        f.FaceName("Inter");
+    if(bold)
+        f.Bold();
+    return f;
+}
+
+Font DemoMono(int px, bool bold = false)
+{
+    Font f = MonospaceZ(px);
+    if(Font::FindFaceNameIndex("Fira Code") >= 0)
+        f.FaceName("Fira Code");
+    if(bold)
+        f.Bold();
+    return f;
+}
+
+String QuoteCpp(const String& s)
+{
+    String out = "\"";
+    for(int i = 0; i < s.GetCount(); i++) {
+        int c = s[i];
+        switch(c) {
+        case '\\': out << "\\\\"; break;
+        case '\"': out << "\\\""; break;
+        case '\n': out << "\\n"; break;
+        case '\r': out << "\\r"; break;
+        case '\t': out << "\\t"; break;
+        default: out.Cat(c); break;
+        }
+    }
+    out << "\"";
+    return out;
+}
+
+
+
+struct DemoPalette {
+    bool dark = false;
+    Color blue;
+    Color ink;
+    Color muted;
+    Color paper;
+    Color grid;
+    Color divider;
+    Color segment_face;
+    Color segment_frame;
+    Color exit_face;
+    Color exit_hot;
+    Color exit_pressed;
+    Color exit_frame;
+    Color exit_ink;
+    Color code_face;
+    Color code_frame;
+    Color code_ink;
+    Color preview_frame;
+    Color preview_hint;
+    Color theme_toggle_track;
+    Color theme_toggle_track_frame;
+    Color theme_toggle_thumb;
+    Color theme_toggle_thumb_frame;
+};
+
+DemoPalette ResolveDemoPalette(UiThemeMode mode)
+{
+    DemoPalette p;
+    p.dark = mode == UiThemeMode::Dark;
+    p.blue = Color(44, 99, 212);
+
+    if(p.dark) {
+        p.ink = Color(218, 228, 241);
+        p.muted = Color(151, 167, 194);
+        p.paper = Color(22, 28, 39);
+        p.grid = Color(42, 52, 68);
+        p.divider = Color(49, 60, 78);
+        p.segment_face = Color(29, 36, 47);
+        p.segment_frame = Color(59, 73, 96);
+        p.exit_face = Color(176, 28, 52);
+        p.exit_hot = Color(196, 35, 61);
+        p.exit_pressed = Color(152, 22, 44);
+        p.exit_frame = Color(128, 18, 37);
+        p.exit_ink = Color(255, 240, 242);
+        p.code_face = Color(5, 12, 24);
+        p.code_frame = Color(30, 41, 59);
+        p.code_ink = Color(110, 255, 160);
+        p.preview_frame = Color(77, 92, 116);
+        p.preview_hint = p.muted;
+        p.theme_toggle_track = Color(31, 44, 65);
+        p.theme_toggle_track_frame = Color(70, 95, 136);
+        p.theme_toggle_thumb = Color(145, 194, 255);
+        p.theme_toggle_thumb_frame = Color(110, 166, 236);
+    }
+    else {
+        p.ink = Color(28, 47, 78);
+        p.muted = Color(106, 128, 164);
+        p.paper = Color(250, 252, 255);
+        p.grid = Color(236, 240, 247);
+        p.divider = Color(228, 235, 246);
+        p.segment_face = Color(236, 241, 248);
+        p.segment_frame = Color(211, 221, 237);
+        p.exit_face = Color(191, 34, 59);
+        p.exit_hot = Color(210, 40, 67);
+        p.exit_pressed = Color(168, 29, 51);
+        p.exit_frame = Color(145, 25, 44);
+        p.exit_ink = Color(255, 246, 248);
+        p.code_face = Color(10, 15, 29);
+        p.code_frame = Color(30, 41, 59);
+        p.code_ink = Color(110, 255, 160);
+        p.preview_frame = Color(208, 219, 236);
+        p.preview_hint = p.muted;
+        p.theme_toggle_track = Color(236, 241, 248);
+        p.theme_toggle_track_frame = Color(211, 221, 237);
+        p.theme_toggle_thumb = White();
+        p.theme_toggle_thumb_frame = Color(164, 190, 232);
+    }
+    return p;
+}
+
+void DrawDotGrid(Draw& w, const Rect& r, Color dot, int step, int size)
+{
+    for(int y = r.top; y < r.bottom; y += step)
+        for(int x = r.left; x < r.right; x += step)
+            w.DrawRect(x, y, size, size, dot);
+}
+
+void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap = 4)
+{
+    for(int x = r.left; x < r.right; x += dash + gap) {
+        int len = min(dash, r.right - x);
+        w.DrawRect(x, r.top, len, 1, color);
+        w.DrawRect(x, r.bottom - 1, len, 1, color);
+    }
+    for(int y = r.top; y < r.bottom; y += dash + gap) {
+        int len = min(dash, r.bottom - y);
+        w.DrawRect(r.left, y, 1, len, color);
+        w.DrawRect(r.right - 1, y, 1, len, color);
+    }
+}
+
+UiLabel::Style MakeBodyLabelStyle(const DemoPalette& c, bool muted = false, bool small = false)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = muted ? c.muted : c.ink;
+    }
+    s.transparent = true;
+    s.font = small ? DemoSans(9) : DemoSans(10);
+    s.align_h = UiAlign::LEFT;
+    s.align_v = UiAlign::CENTER;
+    return s;
+}
+
+UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = MakeBodyLabelStyle(c, true);
+    s.align_h = UiAlign::RIGHT;
+    return s;
+}
+
+UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
+{
+    UiTitleCard::Style s = UiTheme::ResolveTitleCard();
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = c.ink;
+    }
+    s.transparent = true;
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
+    s.title_font = DemoSans(18, true);
+    s.subtitle_font = DemoSans(8);
+    s.subtitle_color = c.blue;
+    s.media_side = UiAlign::LEFT;
+    s.media_gap = DPI(8);
+    s.media_reserve = DPI(48);
+    s.show_rule = false;
+    s.show_bottom_line = false;
+    return s;
+}
+
+UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.segment_face);
+        s.palette.frame[i] = c.segment_frame;
+        s.palette.ink[i] = c.blue;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.content_margin = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
+    s.font = DemoSans(10, true);
+    s.align_h = UiAlign::CENTER;
+    s.align_v = UiAlign::CENTER;
+    return s;
+}
+
+UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
+{
+    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.segment_face);
+        s.palette.frame[i] = c.segment_frame;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
+    s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
+{
+    UiToggle::Style s = UiTheme::ResolveToggle();
+    for(int i = 0; i < 4; i++) {
+        s.track_palette.face[i] = UiFill::Solid(c.theme_toggle_track);
+        s.track_palette.frame[i] = c.theme_toggle_track_frame;
+        s.thumb_palette.face[i] = UiFill::Solid(c.theme_toggle_thumb);
+        s.thumb_palette.frame[i] = c.theme_toggle_thumb_frame;
+    }
+    s.track_metrics.frame_enabled = true;
+    s.track_metrics.frame_width = DPI(1);
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.frame_enabled = false;
+    s.thumb_metrics.radius = DPI(999);
+    s.track_size = Size(DPI(42), DPI(24));
+    s.thumb_inset = DPI(4);
+    return s;
+}
+
+UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
+{
+    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.exit_face);
+        s.palette.frame[i] = c.exit_frame;
+        s.palette.ink[i] = c.exit_ink;
+        s.palette.icon[i] = c.exit_ink;
+    }
+    s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
+    s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.focus_enabled = false;
+    s.align_h = UiAlign::CENTER;
+    s.align_v = UiAlign::CENTER;
+    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(10), DPI(6));
+    s.content_gap = DPI(12);
+    s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiButton::Style MakeSmallButtonStyle(const DemoPalette& c)
+{
+    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.segment_face);
+        s.palette.frame[i] = c.segment_frame;
+        s.palette.ink[i] = c.ink;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(6);
+    s.metrics.content_margin = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
+    s.metrics.focus_enabled = false;
+    s.font = DemoSans(9, true);
+    s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiButton::Style MakeCopyButtonStyle(const DemoPalette& c)
+{
+    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+        s.palette.ink[i] = c.muted;
+        s.palette.icon[i] = c.muted;
+    }
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+    s.font = DemoSans(9, true);
+    return s;
+}
+
+UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
+{
+    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.code_face);
+        s.palette.frame[i] = c.code_frame;
+        s.palette.ink[i] = c.code_ink;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(DEMO_RADIUS);
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
+    s.metrics.shadow.enabled = false;
+    return s;
+}
+
+UiScrollPanel::Style MakeScrollBodyStyle()
+{
+    UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Null;
+    }
+    s.transparent = true;
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.frame_width = 0;
+    s.metrics.radius = 0;
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
+    return s;
+}
+
+UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
+{
+    UiLabel::Style s = MakeBodyLabelStyle(c);
+    for(int i = 0; i < 4; i++)
+        s.palette.ink[i] = c.code_ink;
+    s.font = DemoMono(10);
+    return s;
+}
+
+UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
+{
+    UiAccordion::Style s = UiAccordion::StyleDefault();
+    s.transparent = true;
+    s.item_spacing = 0;
+    s.header_body_gap = DPI(8);
+    s.header_height = DPI(24);
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
+    s.unified_section_frame = false;
+    s.body_line_extent = NONE;
+    s.show_chevron = true;
+    s.chevron_side = UiAlign::RIGHT;
+    s.chevron_scale = true;
+    s.chevron_size = DPI(10);
+    s.single_open = false;
+    s.enforce_one = false;
+
+    s.header_style = UiTheme::ResolveTitleCard();
+    for(int i = 0; i < 4; i++) {
+        s.header_style.palette.face[i] = UiFill::None();
+        s.header_style.palette.frame[i] = Null;
+        s.header_style.palette.ink[i] = c.blue;
+        s.header_style.palette.icon[i] = c.blue;
+    }
+    s.header_style.transparent = true;
+    s.header_style.metrics.face_enabled = false;
+    s.header_style.metrics.frame_enabled = false;
+    s.header_style.metrics.focus_enabled = false;
+    s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
+    s.header_style.show_rule = false;
+    s.header_style.show_bottom_line = true;
+    s.header_style.bottom_line_extent = LARGE;
+    s.header_style.bottom_line_style = SOLID;
+    s.header_style.bottom_line_thickness = 1;
+    s.header_style.bottom_line_color = c.divider;
+    s.header_style.title_font = DemoSans(12, true);
+    s.header_style.media_gap = 0;
+    s.header_style.media_reserve = 0;
+    s.header_style.title_subtitle_gap = 0;
+    s.header_style.subtitle_copy_gap = 0;
+    return s;
+}
+
+UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
+{
+    UiAccordion::Style s = MakeInspectorAccordionStyle(c);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::None();
+        s.palette.frame[i] = Blend(c.divider, c.paper, 8);
+        s.palette.ink[i] = c.ink;
+    }
+    s.header_height = DPI(22);
+    s.header_style.title_font = DemoSans(10, true);
+    s.header_style.metrics.content_margin = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
+    s.chevron_size = DPI(8);
+    s.item_spacing = DPI(6);
+    s.header_body_gap = DPI(2);
+    s.unified_section_frame = true;
+    s.unified_section_radius = DPI(DEMO_RADIUS);
+    s.unified_section_frame_width = 1;
+    s.header_style.show_bottom_line = false;
+    return s;
+}
+
+UiDropdown::Style MakeDropdownStyle(const DemoPalette& c)
+{
+    UiDropdown::Style s = UiTheme::ResolveDropdown();
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.segment_face);
+        s.palette.frame[i] = c.segment_frame;
+        s.palette.ink[i] = c.ink;
+        s.palette.icon[i] = c.muted;
+    }
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(999);
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
+    s.popup_radius = DPI(DEMO_RADIUS);
+    s.popup_frame_width = DPI(1);
+    s.popup_frame_color = c.segment_frame;
+    s.popup_background_color = c.paper;
+    s.transparent = false;
+    s.font = DemoSans(10);
+    return s;
+}
+
+UiBaseEdit::Style MakeEditStyle(const DemoPalette& c)
+{
+    UiBaseEdit::Style s = UiTheme::ResolveEdit();
+    s.font = DemoSans(10);
+    for(int i = 0; i < 4; i++) {
+        s.palette.ink[i] = c.ink;
+        s.palette.frame[i] = c.segment_frame;
+        s.palette.face[i] = UiFill::Solid(c.paper);
+    }
+    return s;
+}
+
+UiBezierCurveEditor::Style MakeCurveEditorStyle(const DemoPalette& c)
+{
+    UiBezierCurveEditor::Style s = UiBezierCurveEditor::StyleDefault();
+    s.fill_background = false;
+    s.invert_y = true;
+    s.axis = Blend(c.divider, c.paper, c.dark ? 12 : 22);
+    s.curve = Color(212, 62, 62);
+    s.handle_fill = c.blue;
+    s.handle_ring = c.dark ? Color(233, 238, 247) : White();
+    s.handle_selected = Color(212, 62, 62);
+    return s;
+}
+
+class DemoCodePanel : public UiPanel {
 public:
-    typedef UiDropdownDemo CLASSNAME;
+    typedef DemoCodePanel CLASSNAME;
 
-    UiDropdownDemo()
+    DemoCodePanel(int h = DPI(146))
+        : block_height_(h)
     {
-        Title("Dropdown Design Language Matrix");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1339), DPI(860));
-
-        Add(toggle_theme);
-        toggle_theme.SetText("Toggle Theme");
-        toggle_theme.WhenAction = [=] {
-            dark_mode = !dark_mode;
-            ApplyTheme();
-            Refresh();
-        };
-
-        SetupCaption(cap1, "Modern Pill (Soft UI)");
-        SetupCaption(cap2, "Neumorphic (Extruded)");
-        SetupCaption(cap3, "Neo-Brutalist (Bold)");
-        SetupCaption(cap4, "Glassmorphism");
-        SetupCaption(cap5, "Minimalist (Border-Bottom)");
-        SetupCaption(cap6, "Skeuomorphic (Glossy Gradient)");
-        SetupCaption(cap7, "Multi-Select (Modern)");
-        SetupCaption(cap8, "Terminal / Code Style");
-        SetupCaption(cap9, "Material Design (Shadowed)");
-        cap7.SetAlign(ALIGN_RIGHT);
-        cap8.SetAlign(ALIGN_RIGHT);
-        cap9.SetAlign(ALIGN_RIGHT);
-
-        SetupModernPill(drop1);
-        SetupNeumorphic(drop2);
-        SetupBrutalist(drop3);
-        SetupGlass(drop4);
-        SetupMinimal(drop5);
-        SetupSkeuo(drop6);
-        SetupMulti(drop7);
-        SetupTerminal(drop8);
-        SetupMaterial(drop9);
-
-        SetupCaption(cap10, "Icon Catalog (UiIcons)");
-        cap10.SetAlign(ALIGN_LEFT);
-        SetupModelBound(drop10);
-
-        Add(model_info);
-        model_info.SetAlign(ALIGN_LEFT);
-        model_info.SetLabel("Bound from UiIconListModel(): each row uses icon name + image from UiIcons.h");
-
-        Add(footer);
-        footer.SetAlign(ALIGN_CENTER);
-        footer.SetLabel("Design Lab: Interactive Component Styles Matrix");
-
-        ApplyTheme();
-
-        SetTimeCallback(80, [=] { AnimateTerminalPulse(); }, 1001);
+        Add(scroll_);
+        scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+        scroll_.Content().Add(code_);
+        code_.NoWantFocus();
     }
 
-    virtual void Paint(Draw& w) override
+    UiLabel& Code() { return code_; }
+    UiScrollPanel& Scroll() { return scroll_; }
+
+    virtual Size GetMinSize() const override
     {
-        const Rect r = GetSize();
-        w.DrawRect(r, bg0);
-
-        if(dark_mode) {
-            for(int y = 0; y < r.bottom; y++) {
-                int t = min(255, (y * 255) / max(1, r.bottom));
-                w.DrawRect(0, y, r.right, 1, Blend(bg0, bg1, t));
-            }
-        }
-
-        const Font title_font = SansSerifZ(58).Bold();
-        const Font sub_font = SansSerifZ(18);
-
-        w.DrawText(DPI(20), DPI(14), "The Dropdown Matrix", title_font, title_ink);
-        w.DrawText(DPI(20), DPI(76), "Exploring UI design languages through a single component.", sub_font, subtitle_ink);
-
-        if(!glass_card.IsEmpty()) {
-            Color top = Color(99, 102, 241);
-            Color bottom = Color(124, 58, 237);
-            for(int y = 0; y < glass_card.GetHeight(); y++) {
-                int t = min(255, (y * 255) / max(1, glass_card.GetHeight() - 1));
-                w.DrawRect(glass_card.left, glass_card.top + y, glass_card.GetWidth(), 1, Blend(top, bottom, t));
-            }
-        }
-
-        w.DrawRect(DPI(20), r.bottom - DPI(108), r.GetWidth() - DPI(40), 1, divider_ink);
+        return Size(DPI(180), block_height_);
     }
 
     virtual void Layout() override
     {
-        const Rect r = GetSize();
-
-        toggle_theme.SetRect(r.right - DPI(208), DPI(24), DPI(190), DPI(46));
-
-        Rect grid = r;
-        grid.left += DPI(24);
-        grid.right -= DPI(24);
-        grid.top += DPI(152);
-        grid.bottom -= DPI(238);
-
-        const int gap = DPI(64);
-        const int colw = (grid.GetWidth() - 2 * gap) / 3;
-        const int rowh = DPI(176);
-        const int caph = DPI(22);
-        const int ddh = DPI(52);
-
-        const Rect c1(grid.left, grid.top, grid.left + colw, grid.bottom);
-        const Rect c2(c1.right + gap, grid.top, c1.right + gap + colw, grid.bottom);
-        const Rect c3(c2.right + gap, grid.top, grid.right, grid.bottom);
-
-        int y = c1.top;
-        cap1.SetRect(c1.left, y, c1.GetWidth(), caph);
-        drop1.SetRect(c1.left, y + DPI(36), c1.GetWidth(), ddh);
-        y += rowh;
-        cap4.SetRect(c1.left, y, c1.GetWidth(), caph);
-        drop4.SetRect(c1.left + DPI(12), y + DPI(36), c1.GetWidth() - DPI(24), ddh);
-        y += rowh;
-        cap7.SetRect(c1.left, y, c1.GetWidth(), caph);
-        drop7.SetRect(c1.left, y + DPI(36), c1.GetWidth(), ddh);
-
-        y = c2.top;
-        cap2.SetRect(c2.left, y, c2.GetWidth(), caph);
-        drop2.SetRect(c2.left, y + DPI(36), c2.GetWidth(), ddh);
-        y += rowh;
-        cap5.SetRect(c2.left, y, c2.GetWidth(), caph);
-        drop5.SetRect(c2.left, y + DPI(36), c2.GetWidth(), ddh);
-        y += rowh;
-        cap8.SetRect(c2.left, y, c2.GetWidth(), caph);
-        drop8.SetRect(c2.left, y + DPI(36), c2.GetWidth(), ddh);
-
-        y = c3.top;
-        cap3.SetRect(c3.left, y, c3.GetWidth(), caph);
-        drop3.SetRect(c3.left, y + DPI(36), c3.GetWidth(), ddh);
-        y += rowh;
-        cap6.SetRect(c3.left, y, c3.GetWidth(), caph);
-        drop6.SetRect(c3.left, y + DPI(36), c3.GetWidth(), ddh);
-        y += rowh;
-        cap9.SetRect(c3.left, y, c3.GetWidth(), caph);
-        drop9.SetRect(c3.left, y + DPI(36), c3.GetWidth(), ddh);
-
-        glass_card = Rect(c1.left, c1.top + rowh, c1.right, c1.top + 2 * rowh - DPI(12));
-
-        int model_y = r.bottom - DPI(196);
-        cap10.SetRect(grid.left, model_y, DPI(420), DPI(22));
-        drop10.SetRect(grid.left, model_y + DPI(30), DPI(420), DPI(48));
-        model_info.SetRect(grid.left + DPI(432), model_y + DPI(8), r.GetWidth() - DPI(456), DPI(22));
-        footer.SetRect(r.left, r.bottom - DPI(58), r.GetWidth(), DPI(22));
+        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
+        scroll_.SetRect(rc);
+        scroll_.Layout();
+        Rect viewport = scroll_.GetViewportRect();
+        code_.SetRect(0, 0, max(0, viewport.GetWidth()), max(viewport.GetHeight(), code_.GetMinSize().cy));
     }
 
 private:
-    static Image MakeGlossTile()
+    UiScrollPanel scroll_;
+    UiLabel code_;
+    int block_height_ = 0;
+};
+
+class DemoModelTree : public UiTree {
+public:
+    typedef DemoModelTree CLASSNAME;
+
+    Event<> WhenStructureChanged;
+
+    virtual void LeftDown(Point p, dword flags) override
     {
-        const int sz = DPI(28);
-        ImageDraw iw(sz, sz);
-        Color top = Color(255, 255, 255);
-        Color bottom = Color(226, 232, 240);
-        for(int y = 0; y < sz; y++) {
-            int t = min(255, (y * 255) / max(1, sz - 1));
-            iw.DrawRect(0, y, sz, 1, Blend(top, bottom, t));
-        }
-        for(int y = 0; y < sz / 3; y++) {
-            int t = min(255, (y * 255) / max(1, sz / 3 - 1));
-            iw.DrawRect(0, y, sz, 1, Blend(White(), Blend(top, bottom, t), 90));
-        }
-        iw.DrawRect(0, sz - DPI(2), sz, DPI(2), Color(168, 181, 204));
-        iw.DrawRect(0, 0, DPI(1), sz, Color(193, 202, 220));
-        iw.DrawRect(sz - DPI(1), 0, DPI(1), sz, Color(168, 181, 204));
-        return iw;
+        Size before = GetContentSize();
+        UiTree::LeftDown(p, flags);
+        if(before != GetContentSize() && WhenStructureChanged)
+            WhenStructureChanged();
     }
 
-    static Image MakeDotIcon(Color c, int size = 12)
+    virtual void LeftDouble(Point p, dword flags) override
     {
-        int sz = DPI(size);
-        ImageBuffer ib(sz, sz);
-        Upp::Fill(~ib, RGBAZero(), ib.GetLength());
-
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.Circle(sz * 0.5, sz * 0.5, max(1.0, sz * 0.42));
-        p.Fill(c);
-        p.End();
-
-        return ib;
+        Size before = GetContentSize();
+        UiTree::LeftDouble(p, flags);
+        if(before != GetContentSize() && WhenStructureChanged)
+            WhenStructureChanged();
     }
 
-    // Neumorphic raised tile copied from UiButtonDemo/UiLabelDemo geometry.
-    // The only variation is palette (dark/light), not geometry math.
-    static Image MakeNeumorphicRaisedTile(bool dark)
+    virtual bool Key(dword key, int count) override
     {
-        const int size = DPI(30);
-        const int radius = DPI(4);
+        Size before = GetContentSize();
+        bool out = UiTree::Key(key, count);
+        if(before != GetContentSize() && WhenStructureChanged)
+            WhenStructureChanged();
+        return out;
+    }
+};
+class DropdownPreview : public Ctrl {
+public:
+    typedef DropdownPreview CLASSNAME;
 
-        ImageBuffer ib(size, size);
-        Upp::Fill(~ib, RGBAZero(), ib.GetLength());
-
-        const double face = (double)DPI(22);
-        const double x = DPI(1);
-        const double y = DPI(1);
-        const double shadow_off_x = DPI(1.0);
-        const double shadow_off_y = DPI(3.0);
-
-        Color shadow_col = dark ? Color(30, 38, 54) : Color(140, 140, 140);
-        Color face_col   = dark ? Color(57, 69, 89) : Color(240, 240, 240);
-        Color edge_col   = dark ? Color(75, 88, 109) : Color(180, 180, 180);
-        Color hi_col     = dark ? Color(96, 110, 135) : Color(255, 255, 255);
-
-        {
-            BufferPainter p(ib, MODE_ANTIALIASED);
-            p.Begin();
-            p.RoundedRectangle(x + shadow_off_x, y + shadow_off_y, face, face, radius);
-            p.Fill(shadow_col);
-            p.End();
-        }
-
-        FastBlur(ib, 4);
-        FastBlur(ib, 4);
-
-        {
-            BufferPainter p(ib, MODE_ANTIALIASED);
-            p.Begin();
-            p.RoundedRectangle(x, y, face, face, radius);
-            p.Fill(face_col);
-            p.RoundedRectangle(x, y, face, face, radius);
-            p.Stroke(1.0, edge_col);
-            p.RoundedRectangle(x + 1.0, y + 1.0,
-                               face - 2.0, face - 2.0,
-                               max(0.0, (double)radius - 1.0));
-            p.Stroke(2.5, hi_col);
-            p.End();
-        }
-
-        return ib;
+    DropdownPreview()
+    {
+        NoWantFocus();
+        Add(dropdown_);
+        dropdown_.NoWantFocus();
     }
 
-    void ApplyBrutalistShadow(UiDropdown& d)
+    UiDropdown& Showcase() { return dropdown_; }
+    const UiDropdown& Showcase() const { return dropdown_; }
+
+    void SetShowcaseSize(Size sz)
     {
-        d.SetShadowDistance(DPI(5));
-        d.SetShadowOffset(DPI(4), DPI(4));
-        d.SetShadowHard(true);
-        d.SetShadowDetail(DPI(5), 255, Black(), false);
+        fixed_size_ = sz;
+        RefreshLayout();
     }
 
-    void SetupCaption(Label& l, const String& text)
+    void SetPalette(const DemoPalette& p)
     {
-        Add(l);
-        l.SetLabel(text);
-        l.SetAlign(ALIGN_LEFT);
-        l.SetFont(SansSerifZ(13).Bold());
-    }
-
-    void MakeOpaque(UiDropdown& d)
-    {
-        UiDropdown::Style s = d.GetStyle();
-        s.transparent = false;
-        d.SetStyle(s);
-    }
-
-    void Fill(UiDropdown& d, const char* a, const char* b, const char* c)
-    {
-        d.Add(a, a);
-        d.Add(b, b);
-        d.Add(c, c);
-    }
-
-    UiDropdown::Style RightTextStyle() const
-    {
-        UiDropdown::Style s = UiDropdown::StyleDefault();
-        s.align_h = UiAlign::RIGHT;
-        s.align_v = UiAlign::CENTER;
-        return s;
-    }
-
-    void SetupModernPill(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        d.Add("Select Profile", "profile");
-        d.Add("View Account", "account");
-        d.Add("Settings", "settings");
-        d.Add("Sign Out", "signout");
-        d.SetItemSeparatorBefore(3, true);
-        d.SetRadius(DPI(26));
-        d.SetFrameWidth(DPI(1));
-        d.SetPadding(DPI(22), DPI(10), DPI(20), DPI(10));
-        d.SetPopupItemHeight(DPI(42));
-        d.SetPopupUseMainSkin(true);
-        d.SetPopupFrame(DPI(1), DPI(26));
-        d.Select(0);
-    }
-
-    void SetupNeumorphic(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        Fill(d, "Music Quality", "High Fidelity", "Data Saver");
-        d.SetRadius(DPI(16));
-        d.SetPadding(DPI(10), DPI(10), DPI(14), DPI(10));
-        d.SetFrameWidth(0);
-        d.SetFill9Slice(MakeNeumorphicRaisedTile(true), Rect(DPI(10), DPI(10), DPI(10), DPI(10)), false);
-        d.SetInset(Rect(DPI(6), DPI(6), DPI(14), DPI(14)));
-        d.SetPopupUseMainSkin(false);
-        d.SetPopupBackground(Color(224, 229, 236));
-        d.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        d.ClearShadow();
-        d.Select(0);
-    }
-
-    void SetupBrutalist(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        Fill(d, "FILTER BY", "NEWEST FIRST", "OLDEST FIRST");
-        d.SetItem(0, "MOST POPULAR", "MOST POPULAR", true);
-        d.SetRadius(0);
-        d.SetFrameWidth(DPI(3));
-        d.SetPadding(DPI(10), DPI(10), DPI(10), DPI(10));
-        d.SetPopupUseMainSkin(false);
-        d.SetPopupBackground(White());
-        d.SetPopupFrame(DPI(3), 0, Black());
-        d.SetPopupItemHeight(DPI(44));
-        d.SetItemSeparatorBefore(1, true);
-        d.SetItemSeparatorBefore(2, true);
-        d.WhenPaintItem = [&](Draw& w, const Rect& rr, const UiDropdown::Item& it, int i,
-                              bool highlighted, bool selected, bool enabled, const UiDropdown::Style&) {
-            Color face = White();
-            if(selected)
-                face = Color(254, 240, 138);
-            else if(highlighted)
-                face = Color(253, 230, 138);
-            w.DrawRect(rr, face);
-            if(i > 0)
-                w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, Black());
-
-            Font f = SansSerifZ(14).Bold();
-            int ty = rr.top + (rr.GetHeight() - f.GetCy()) / 2;
-            w.DrawText(rr.left + DPI(18), ty, it.text, f, Color(15, 23, 42));
-
-            if(selected)
-                w.DrawText(rr.right - DPI(22), ty, "v", f, Color(15, 23, 42));
-        };
-        d.WhenPaintBackground = [&](Draw& w, const Rect& rr,
-                                    const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-                                    StyledState, bool) {
-            int off = DPI(5);
-            Rect face = rr;
-            face.right -= off;
-            face.bottom -= off;
-            w.DrawRect(face.left + off, face.top + off, face.GetWidth(), face.GetHeight(), Black());
-            w.DrawRect(face, White());
-            int fw = DPI(3);
-            w.DrawRect(face.left, face.top, face.GetWidth(), fw, Black());
-            w.DrawRect(face.left, face.bottom - fw, face.GetWidth(), fw, Black());
-            w.DrawRect(face.left, face.top, fw, face.GetHeight(), Black());
-            w.DrawRect(face.right - fw, face.top, fw, face.GetHeight(), Black());
-        };
-        d.Select(0);
-    }
-
-    void SetupGlass(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        d.Add("System State", "state");
-        d.AddGroupHeader("Status Presets");
-        d.Add("Online", "online");
-        d.Add("Away", "away");
-        d.Add("Busy", "busy");
-        d.SetItemIcon(2, MakeDotIcon(Color(34, 197, 94), 11), false);
-        d.SetItemIcon(3, MakeDotIcon(Color(234, 179, 8), 11), false);
-        d.SetItemIcon(4, MakeDotIcon(Color(239, 68, 68), 11), false);
-        d.SetItemDescription(2, "Realtime updates");
-        d.SetItemDescription(3, "Quiet mode");
-        d.SetItemDescription(4, "Do not disturb");
-        d.SetItemRightText(2, "Green");
-        d.SetItemRightText(3, "Amber");
-        d.SetItemRightText(4, "Red");
-        d.SetRadius(DPI(16));
-        d.SetFrameWidth(DPI(1));
-        d.SetPadding(DPI(20), DPI(10), DPI(20), DPI(10));
-        d.SetPopupUseMainSkin(true);
-        d.SetPopupFrame(DPI(1), DPI(16));
-        d.Select(0);
-    }
-
-    void SetupMinimal(UiDropdown& d)
-    {
-        Add(d);
-        Fill(d, "Choose Category...", "Engineering", "Design");
-        d.EnableFace(false);
-        d.EnableFrame(false);
-        d.SetPadding(DPI(2), DPI(8), DPI(2), DPI(8));
-        d.Select(0);
-        d.WhenPaintForeground = [&](Draw& w, const Rect& rr,
-                                    const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-                                    StyledState st, bool) {
-            Color line = st == ST_HOT ? Color(96, 165, 250) : minimal_line;
-            w.DrawRect(rr.left, rr.bottom - DPI(2), rr.GetWidth(), DPI(2), line);
-        };
-    }
-
-    void SetupSkeuo(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        Fill(d, "Select Action", "Save Changes", "Delete");
-        d.SetFill9Slice(MakeGlossTile(), Rect(DPI(6), DPI(6), DPI(6), DPI(6)), true);
-        d.SetPopupUseMainSkin(true);
-        d.SetInset(DPI(1));
-        d.SetFrameWidth(DPI(1));
-        d.SetRadius(DPI(6));
-        d.SetPadding(DPI(14), DPI(9), DPI(14), DPI(9));
-        d.Select(0);
-    }
-
-    void SetupMulti(UiDropdown& d)
-    {
-        Add(d);
-        d.SetStyle(RightTextStyle());
-        MakeOpaque(d);
-        d.SetIndicatorSide(UiAlign::LEFT);
-        d.SetPopupCheckSide(UiAlign::LEFT);
-        d.SetRadius(DPI(8));
-        d.SetFrameWidth(0);
-        d.SetPadding(DPI(12), DPI(10), DPI(14), DPI(10));
-        d.SetPopupItemHeight(DPI(42));
-        d.SetMultiSelect(true);
-
-        d.Add("JavaScript", "js");
-        d.Add("React", "react");
-        d.Add("TypeScript", "ts");
-
-        d.SetCheckedByData("js", true);
-        d.SetCheckedByData("react", true);
-
-        d.WhenPaintSelectionBadge = [&](Draw& w, const Rect& r, int count, const UiDropdown::Style&) {
-            int dia = min(r.GetHeight(), r.GetWidth());
-            Rect c(r.left + (r.GetWidth() - dia) / 2,
-                   r.top + (r.GetHeight() - dia) / 2,
-                   r.left + (r.GetWidth() - dia) / 2 + dia,
-                   r.top + (r.GetHeight() - dia) / 2 + dia);
-            w.DrawEllipse(c, badge_face);
-            const String txt = AsString(count);
-            const Font f = SansSerifZ(13).Bold();
-            const Size ts = GetTextSize(txt, f);
-            w.DrawText(c.left + (c.GetWidth() - ts.cx) / 2,
-                       c.top + (c.GetHeight() - ts.cy) / 2,
-                       txt, f, White());
-        };
-    }
-
-    void SetupTerminal(UiDropdown& d)
-    {
-        Add(d);
-        d.SetStyle(RightTextStyle());
-        MakeOpaque(d);
-        d.SetIndicatorSide(UiAlign::LEFT);
-        d.SetRadius(0);
-        d.SetFrameWidth(DPI(1));
-        d.SetPadding(DPI(12), DPI(10), DPI(12), DPI(10));
-        d.Add("> origin/main", "main");
-        d.Add("> origin/develop", "develop");
-        d.Add("> origin/feature", "feature");
-        d.Select(2);
-        d.WhenPaintItem = [&](Draw& w, const Rect& rr, const UiDropdown::Item& it, int, bool highlighted, bool, bool, const UiDropdown::Style&) {
-            if(highlighted)
-                w.DrawRect(rr, Color(3, 20, 10));
-
-            String txt = it.text;
-            if(txt.StartsWith("> "))
-                txt = txt.Mid(2);
-
-            Font f = SansSerifZ(14);
-            int ty = rr.top + (rr.GetHeight() - f.GetCy()) / 2;
-            w.DrawText(rr.left + DPI(12), ty, txt, f, terminal_pulse_ink);
-        };
-    }
-
-    void SetupMaterial(UiDropdown& d)
-    {
-        Add(d);
-        d.Add("Primary Contact", "contact");
-        d.AddGroupHeader("Contact Channels");
-        d.Add("Email", "email");
-        d.Add("Phone", "phone");
-        d.Add("Slack", "slack");
-
-        d.SetItemIcon(0, MakeDotIcon(Color(59, 130, 246), 10), false);
-        d.SetItemIcon(2, MakeDotIcon(Color(59, 130, 246), 10), false);
-        d.SetItemIcon(3, MakeDotIcon(Color(59, 130, 246), 10), false);
-        d.SetItemIcon(4, MakeDotIcon(Color(59, 130, 246), 10), false);
-        d.SetItemDescription(2, "Fastest response");
-        d.SetItemDescription(3, "Business hours");
-        d.SetItemDescription(4, "Engineering team");
-        d.SetItemRightText(2, "Primary");
-        d.SetItemRightText(3, "Backup");
-        d.SetItemRightText(4, "Team");
-        d.SetStyle(RightTextStyle());
-        MakeOpaque(d);
-        d.SetIndicatorSide(UiAlign::RIGHT);
-        d.SetLabelMargin(Rect(DPI(18), 0, 0, 0));
-        d.SetRadius(DPI(8));
-        d.SetFrameWidth(0);
-        d.SetPadding(DPI(14), DPI(10), DPI(14), DPI(10));
-        d.SetShadowDistance(DPI(20));
-        d.SetShadowGamma(0.35);
-        d.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
-        d.SelectByData("contact");
-        d.WhenPaintForeground = [&](Draw& w, const Rect& rr,
-                                    const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-                                    StyledState, bool) {
-            w.DrawRect(rr.left, rr.bottom - DPI(2), rr.GetWidth(), DPI(2), material_line);
-        };
-    }
-
-    void SetupModelBound(UiDropdown& d)
-    {
-        Add(d);
-        MakeOpaque(d);
-        d.SetRadius(DPI(10));
-        d.SetFrameWidth(DPI(1));
-        d.SetPadding(DPI(8), DPI(4), DPI(8), DPI(4));
-        d.SetPopupItemHeight(DPI(36));
-        d.SetPopupMaxItems(10);
-        icon_model_ = UiIconListModel();
-        d.SetModel(icon_model_);
-        d.Select(0);
-    }
-
-    void ApplyTheme()
-    {
-        if(dark_mode)
-            ApplyDarkTheme();
-        else
-            ApplyLightTheme();
-        ApplyTerminalPulse();
+        palette_ = p;
         Refresh();
     }
 
-    void ApplyTerminalPulse()
+    virtual void Paint(Draw& w) override
     {
-        Color face = Black();
-        int alpha = 204 + (terminal_pulse_ * 51) / 20; // ~80%..100%
-        terminal_pulse_ink = Blend(face, terminal_base_ink, alpha);
-        drop8.SetInkColor(terminal_pulse_ink);
-        drop8.SetIconColor(terminal_pulse_ink);
-        drop8.Refresh();
+        Rect r(Point(0, 0), GetSize());
+        w.DrawRect(r, palette_.paper);
+        Rect inset = r.Deflated(DPI(24), DPI(36));
+        DrawDotGrid(w, inset, palette_.grid, DPI(18), DPI(2));
+        DrawDashedRect(w, inset, palette_.preview_frame);
+        w.DrawText(inset.left, inset.top - DemoSans(9).GetCy() - DPI(8),
+                   "Open the popup and mutate the dataset from the inspector.",
+                   DemoSans(9), palette_.preview_hint);
     }
 
-    void AnimateTerminalPulse()
+    virtual void Layout() override
     {
-        terminal_pulse_ += terminal_pulse_dir_ ? 1 : -1;
-        if(terminal_pulse_ >= 20) {
-            terminal_pulse_ = 20;
-            terminal_pulse_dir_ = false;
-        }
-        else if(terminal_pulse_ <= 0) {
-            terminal_pulse_ = 0;
-            terminal_pulse_dir_ = true;
-        }
-
-        ApplyTerminalPulse();
-        SetTimeCallback(80, [=] { AnimateTerminalPulse(); }, 1001);
+        Rect r = GetSize();
+        Size sz = fixed_size_;
+        if(sz.cx <= 0 || sz.cy <= 0)
+            sz = dropdown_.GetMinSize();
+        int x = max(0, (r.GetWidth() - sz.cx) / 2);
+        int y = max(0, (r.GetHeight() - sz.cy) / 2);
+        dropdown_.SetRect(x, y, min(sz.cx, r.GetWidth()), min(sz.cy, r.GetHeight()));
     }
 
-    void ApplyDarkTheme()
-    {
-        bg0 = Color(8, 18, 52);
-        bg1 = Color(12, 28, 74);
-        title_ink = Color(241, 245, 249);
-        subtitle_ink = Color(203, 213, 225);
-        divider_ink = Color(30, 41, 59);
-        footer_ink = Color(148, 163, 184);
-        caption_ink = Color(148, 163, 184);
-        minimal_line = Color(226, 232, 240);
-        material_line = Color(37, 99, 235);
-        badge_face = Color(59, 130, 246);
-
-        toggle_theme.SetRadius(DPI(22));
-        toggle_theme.SetFrameWidth(DPI(2));
-        toggle_theme.SetFaceColor(bg0);
-        toggle_theme.SetFrameColor(Color(148, 163, 184));
-        toggle_theme.SetInkColor(White());
-        toggle_theme.SetPadding(DPI(18), DPI(8), DPI(18), DPI(8));
-
-        drop1.SetFaceColor(Color(30, 41, 59));
-        drop1.SetFrameColor(Color(71, 85, 105));
-        drop1.SetInkColor(White());
-        drop1.SetIconColor(Color(241, 245, 249));
-
-        drop2.SetFaceColor(Color(45, 55, 72));
-        drop2.SetFrameColor(Color(62, 76, 98));
-        drop2.SetInkColor(White());
-        drop2.SetIconColor(Color(241, 245, 249));
-        drop2.SetFill9Slice(MakeNeumorphicRaisedTile(true), Rect(DPI(10), DPI(10), DPI(10), DPI(10)), false);
-        drop2.SetPopupBackground(Color(224, 229, 236));
-        drop2.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        drop2.ClearShadow();
-
-        drop3.SetFaceColor(White());
-        drop3.SetFrameColor(Black());
-        drop3.SetInkColor(Black());
-        drop3.SetIconColor(Black());
-        ApplyBrutalistShadow(drop3);
-
-        drop4.SetFaceColor(Color(165, 131, 246));
-        drop4.SetFrameColor(Color(216, 190, 255));
-        drop4.SetInkColor(White());
-        drop4.SetIconColor(Color(240, 236, 255));
-        drop4.SetFaceQuadGradient(Color(157, 106, 246), Color(171, 126, 248), Color(145, 92, 236), Color(159, 109, 240));
-
-        drop5.SetInkColor(Color(100, 116, 139));
-        drop5.SetIconColor(Color(226, 232, 240));
-
-        drop6.SetInkColor(Color(51, 65, 85));
-        drop6.SetIconColor(Color(51, 65, 85));
-        drop6.SetFrameColor(Color(148, 163, 184));
-
-        drop7.SetFaceColor(Color(51, 65, 85));
-        drop7.SetInkColor(Color(241, 245, 249));
-        drop7.SetIconColor(Color(96, 165, 250));
-
-        drop8.SetFaceColor(Black());
-        drop8.SetFrameColor(Color(20, 83, 45));
-        terminal_base_ink = Color(74, 222, 128);
-        drop8.SetInkColor(terminal_base_ink);
-        drop8.SetIconColor(terminal_base_ink);
-
-        drop9.SetFaceColor(Color(30, 41, 59));
-        drop9.SetInkColor(White());
-        drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadowDistance(DPI(20));
-        drop9.SetShadowOffset(0, DPI(6));
-        drop9.SetShadowGamma(0.35);
-        drop9.SetShadowDetail(DPI(6), 170, Color(2, 10, 30), false);
-
-        drop10.SetFaceColor(Color(30, 41, 59));
-        drop10.SetFrameColor(Color(71, 85, 105));
-        drop10.SetInkColor(Color(241, 245, 249));
-        drop10.SetIconColor(Color(241, 245, 249));
-
-        footer.SetInk(footer_ink);
-        model_info.SetInk(caption_ink);
-        for(Label* l : Vector<Label*>{&cap1, &cap2, &cap3, &cap4, &cap5, &cap6, &cap7, &cap8, &cap9, &cap10})
-            l->SetInk(caption_ink);
-    }
-
-    void ApplyLightTheme()
-    {
-        bg0 = Color(248, 250, 252);
-        bg1 = bg0;
-        title_ink = Color(30, 41, 59);
-        subtitle_ink = Color(30, 41, 59);
-        divider_ink = Color(226, 232, 240);
-        footer_ink = Color(100, 116, 139);
-        caption_ink = Color(100, 116, 139);
-        minimal_line = Color(203, 213, 225);
-        material_line = Color(37, 99, 235);
-        badge_face = Color(59, 130, 246);
-
-        toggle_theme.SetRadius(DPI(22));
-        toggle_theme.SetFrameWidth(DPI(1));
-        toggle_theme.SetFaceColor(bg0);
-        toggle_theme.SetFrameColor(Color(148, 163, 184));
-        toggle_theme.SetInkColor(Color(15, 23, 42));
-        toggle_theme.SetPadding(DPI(18), DPI(8), DPI(18), DPI(8));
-
-        drop1.SetFaceColor(Color(241, 245, 249));
-        drop1.SetFrameColor(Color(203, 213, 225));
-        drop1.SetInkColor(Color(30, 41, 59));
-        drop1.SetIconColor(Color(30, 41, 59));
-
-        drop2.SetFaceColor(Color(224, 229, 236));
-        drop2.SetFrameColor(Color(194, 206, 224));
-        drop2.SetInkColor(Color(30, 41, 59));
-        drop2.SetIconColor(Color(30, 41, 59));
-        drop2.SetFill9Slice(MakeNeumorphicRaisedTile(false), Rect(DPI(10), DPI(10), DPI(10), DPI(10)), false);
-        drop2.SetPopupBackground(Color(224, 229, 236));
-        drop2.SetPopupFrame(DPI(1), DPI(5), Color(194, 206, 224));
-        drop2.ClearShadow();
-
-        drop3.SetFaceColor(White());
-        drop3.SetFrameColor(Black());
-        drop3.SetInkColor(Black());
-        drop3.SetIconColor(Black());
-        ApplyBrutalistShadow(drop3);
-
-        drop4.SetFaceColor(Color(155, 116, 236));
-        drop4.SetFrameColor(Color(225, 212, 255));
-        drop4.SetInkColor(White());
-        drop4.SetIconColor(White());
-        drop4.SetFaceQuadGradient(Color(99, 102, 241), Color(124, 58, 237), Color(79, 70, 229), Color(147, 51, 234));
-
-        drop5.SetInkColor(Color(100, 116, 139));
-        drop5.SetIconColor(Color(30, 41, 59));
-
-        drop6.SetInkColor(Color(51, 65, 85));
-        drop6.SetIconColor(Color(51, 65, 85));
-        drop6.SetFrameColor(Color(148, 163, 184));
-
-        drop7.SetFaceColor(Color(51, 65, 85));
-        drop7.SetInkColor(Color(241, 245, 249));
-        drop7.SetIconColor(Color(96, 165, 250));
-
-        drop8.SetFaceColor(Black());
-        drop8.SetFrameColor(Color(20, 83, 45));
-        terminal_base_ink = Color(74, 222, 128);
-        drop8.SetInkColor(terminal_base_ink);
-        drop8.SetIconColor(terminal_base_ink);
-
-        drop9.SetFaceColor(White());
-        drop9.SetInkColor(Color(30, 41, 59));
-        drop9.SetIconColor(Color(59, 130, 246));
-        drop9.SetShadowDistance(DPI(20));
-        drop9.SetShadowOffset(0, DPI(6));
-        drop9.SetShadowGamma(0.35);
-        drop9.SetShadowDetail(DPI(6), 170, Color(148, 163, 184), false);
-
-        drop10.SetFaceColor(Color(241, 245, 249));
-        drop10.SetFrameColor(Color(203, 213, 225));
-        drop10.SetInkColor(Color(30, 41, 59));
-        drop10.SetIconColor(Color(30, 41, 59));
-
-        footer.SetInk(footer_ink);
-        model_info.SetInk(caption_ink);
-        for(Label* l : Vector<Label*>{&cap1, &cap2, &cap3, &cap4, &cap5, &cap6, &cap7, &cap8, &cap9, &cap10})
-            l->SetInk(caption_ink);
-    }
-
-    bool dark_mode = true;
-    Rect glass_card;
-
-    Color bg0, bg1;
-    Color title_ink, subtitle_ink, divider_ink;
-    Color footer_ink, caption_ink, minimal_line, material_line;
-    Color badge_face;
-    Color terminal_base_ink = Color(74, 222, 128);
-    Color terminal_pulse_ink = Color(74, 222, 128);
-
-    int terminal_pulse_ = 10;
-    bool terminal_pulse_dir_ = true;
-    UiListModel icon_model_;
-
-    Label cap1, cap2, cap3, cap4, cap5, cap6, cap7, cap8, cap9, cap10;
-    UiDropdown drop1, drop2, drop3, drop4, drop5, drop6, drop7, drop8, drop9, drop10;
-    Label model_info;
-    Label footer;
-    UiButton toggle_theme;
+private:
+    UiDropdown dropdown_;
+    DemoPalette palette_;
+    Size fixed_size_;
 };
+
+bool SameShadowCurve(const ShadowCurve& a, const ShadowCurve& b)
+{
+    return fabs(a.x1 - b.x1) < 0.0005 &&
+           fabs(a.y1 - b.y1) < 0.0005 &&
+           fabs(a.x2 - b.x2) < 0.0005 &&
+           fabs(a.y2 - b.y2) < 0.0005;
+}
+
+ShadowCurvePreset ResolveShadowPreset(const ShadowCurve& c)
+{
+    if(SameShadowCurve(c, ShadowLinear()))
+        return SHADOWPRESET_LINEAR;
+    if(SameShadowCurve(c, ShadowSoft()))
+        return SHADOWPRESET_SOFT;
+    if(SameShadowCurve(c, ShadowHardCurve()))
+        return SHADOWPRESET_HARD;
+    return SHADOWPRESET_CUSTOM;
+}
+
+ShadowCurve ShadowPresetCurve(ShadowCurvePreset preset)
+{
+    switch(preset) {
+    case SHADOWPRESET_LINEAR: return ShadowLinear();
+    case SHADOWPRESET_SOFT: return ShadowSoft();
+    case SHADOWPRESET_HARD: return ShadowHardCurve();
+    default: return ShadowSoft();
+    }
+}
+
+struct EnumOption {
+    const char* label;
+    int value;
+};
+
+struct DropdownConfig {
+    DatasetMode dataset = DATASET_RICH;
+    bool enabled = true;
+    bool multi_select = false;
+    bool show_indicator = true;
+    bool popup_scrollbar = true;
+    bool popup_auto_close = true;
+    bool popup_pinned = false;
+    bool popup_use_main_skin = false;
+    bool show_selection_badge = true;
+    bool use_drag = true;
+    bool show_drag_handle = true;
+    bool shadow = false;
+    int min_width = DPI(220);
+    int min_height = DPI(38);
+    int radius = DPI(8);
+    int frame_width = 1;
+    int margin_x = DPI(10);
+    int margin_y = DPI(6);
+    int content_gap = DPI(6);
+    int item_spacing = 0;
+    int indicator_size = DPI(12);
+    bool popup_selection_marker = false;
+    int popup_item_height = DPI(36);
+    int popup_max_items = 8;
+    int popup_max_height = DPI(300);
+    int popup_space = DPI(5);
+    int popup_frame_width = 1;
+    int popup_radius = DPI(8);
+    int shadow_distance = 0;
+    int shadow_offset_x = 0;
+    int shadow_offset_y = 2;
+    int shadow_alpha = 82;
+    UiAlign indicator_side = UiAlign::RIGHT;
+    UiAlign popup_marker_side = UiAlign::RIGHT;
+    UiAlign drag_side = UiAlign::RIGHT;
+    UiAlign align_h = UiAlign::LEFT;
+    UiAlign align_v = UiAlign::CENTER;
+    String popup_selection_icon_name = "ICON_DESIGN_ADJUST_48";
+    String popup_check_checked_icon_name = "ICON_TOGGLE_CHECK_BOX_48";
+    String popup_check_unchecked_icon_name = "ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48";
+    Color face_color = Null;
+    Color frame_color = Null;
+    Color text_color = Null;
+    Color icon_color = Null;
+    Color popup_background = Null;
+    Color popup_frame_color = Null;
+    Color shadow_color = Black();
+    ShadowCurve shadow_curve = ShadowSoft();
+};
+
+class UiDropdownDemoWindow : public TopWindow {
+public:
+    typedef UiDropdownDemoWindow CLASSNAME;
+
+    UiDropdownDemoWindow();
+
+    virtual void Paint(Draw& w) override;
+    virtual void Layout() override;
+
+private:
+    void BuildShell();
+    void BuildRows();
+    void InitControls();
+    void SyncControlsFromConfig();
+    void ApplyTheme(UiThemeMode mode);
+    void ApplyDataset(DatasetMode mode);
+    void RefreshFromConfig();
+    void RefreshState();
+    void RefreshModelTree();
+    void UpdateModelViewport();
+    void InsertNewItem();
+    void SaveSelectedItem();
+    void DeleteSelectedItem();
+    String BuildUsageCode() const;
+    String AlignCode(UiAlign a) const;
+    String DatasetLabel(DatasetMode m) const;
+    UiListModel& ActiveModel();
+    const UiListModel& ActiveModel() const;
+
+    void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial);
+    void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name);
+    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name);
+    void AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiDropdown& drop, const char* name);
+    void AddEditRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiLineEdit& edit, const char* name);
+    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count);
+    void PopulateShadowPresetDropdown();
+
+    DemoPalette palette_;
+    DropdownConfig config_;
+    UiListModel icon_list_model_;
+    UiTreeModel tree_model_;
+
+    UiTitleCard header_;
+    UiLabel version_badge_;
+    UiPanel theme_shell_;
+    UiLabel theme_icon_;
+    UiToggle theme_toggle_;
+    UiButton exit_button_;
+    DropdownPreview preview_;
+    UiScrollPanel inspector_scroll_;
+    UiAccordion inspector_acc_;
+    UiBoxLayout usage_section_ { UiBoxLayout::Direction::V };
+    UiBoxLayout usage_toolbar_ { UiBoxLayout::Direction::H };
+    Ctrl usage_fill_;
+    UiLabel copy_label_;
+    UiButton copy_button_;
+    DemoCodePanel code_panel_;
+    UiBoxLayout state_box_ { UiBoxLayout::Direction::V };
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H };
+    UiBoxLayout state_mode_row_ { UiBoxLayout::Direction::H };
+    UiBoxLayout state_items_row_ { UiBoxLayout::Direction::H };
+    UiBoxLayout state_selection_row_ { UiBoxLayout::Direction::H };
+    UiBoxLayout state_data_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_mode_label_, state_items_label_, state_selection_label_, state_data_label_;
+    UiLabel state_theme_value_, state_mode_value_, state_items_value_, state_selection_value_, state_data_value_;
+    UiAccordion model_acc_;
+    int model_section_ = -1;
+    UiScrollPanel model_scroll_;
+    DemoModelTree model_tree_;
+    UiBoxLayout props_section_ { UiBoxLayout::Direction::V };
+    UiAccordion data_acc_, layout_acc_, behavior_acc_, appearance_acc_, popup_acc_, shadow_acc_;
+    UiBoxLayout data_box_ { UiBoxLayout::Direction::V }, layout_box_ { UiBoxLayout::Direction::V }, behavior_box_ { UiBoxLayout::Direction::V },
+                appearance_box_ { UiBoxLayout::Direction::V }, popup_box_ { UiBoxLayout::Direction::V }, shadow_box_ { UiBoxLayout::Direction::V };
+
+    UiBoxLayout dataset_row_box_ { UiBoxLayout::Direction::H }, item_text_row_box_ { UiBoxLayout::Direction::H }, item_desc_row_box_ { UiBoxLayout::Direction::H },
+                item_right_row_box_ { UiBoxLayout::Direction::H }, item_icon_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel dataset_label_, item_text_label_, item_desc_label_, item_right_label_, item_icon_label_;
+    UiDropdown dataset_drop_, item_icon_drop_;
+    UiLineEdit item_text_edit_, item_desc_edit_, item_right_edit_;
+    UiBoxLayout data_actions_row_ { UiBoxLayout::Direction::H };
+    UiButton new_item_button_, save_item_button_, delete_item_button_;
+
+    UiCompositeSlider min_width_row_, min_height_row_, radius_row_, frame_width_row_, margin_x_row_, margin_y_row_,
+                      content_gap_row_, indicator_size_row_, popup_item_height_row_, item_spacing_row_, popup_max_items_row_,
+                      popup_max_height_row_, popup_space_row_, popup_frame_width_row_, popup_radius_row_,
+                      shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
+    UiBoxLayout indicator_side_row_box_ { UiBoxLayout::Direction::H }, popup_marker_side_row_box_ { UiBoxLayout::Direction::H },
+                drag_side_row_box_ { UiBoxLayout::Direction::H },
+                popup_selection_icon_row_box_ { UiBoxLayout::Direction::H }, popup_check_checked_icon_row_box_ { UiBoxLayout::Direction::H },
+                popup_check_unchecked_icon_row_box_ { UiBoxLayout::Direction::H }, shadow_curve_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel indicator_side_label_, popup_marker_side_label_, drag_side_label_, popup_selection_icon_label_, popup_check_checked_icon_label_,
+            popup_check_unchecked_icon_label_, shadow_curve_label_;
+    UiDropdown indicator_side_drop_, popup_marker_side_drop_, drag_side_drop_, popup_selection_icon_drop_, popup_check_checked_icon_drop_,
+               popup_check_unchecked_icon_drop_, shadow_curve_preset_drop_, align_h_drop_, align_v_drop_;
+    UiBoxLayout align_h_row_box_ { UiBoxLayout::Direction::H }, align_v_row_box_ { UiBoxLayout::Direction::H };
+    UiLabel align_h_label_, align_v_label_;
+    UiCompositeToggle enabled_row_, multi_select_row_, show_indicator_row_, popup_scrollbar_row_,
+                      selection_badge_row_, use_drag_row_, drag_handle_row_,
+                      popup_marker_row_, popup_auto_close_row_, popup_pinned_row_, popup_use_main_skin_row_, shadow_row_;
+    UiCompositeColor face_color_row_, frame_color_row_, text_color_row_, icon_color_row_,
+                     popup_background_row_, popup_frame_color_row_, shadow_color_row_;
+    UiBezierCurveField shadow_curve_field_;
+};
+
+UiDropdownDemoWindow::UiDropdownDemoWindow()
+{
+    BackPaint();
+    Title("UiDropdownDemo");
+    Sizeable().Zoomable().MinimizeBox().MaximizeBox();
+    SetRect(0, 0, DPI(1220), DPI(780));
+
+    UiThemeContext ctx = UiTheme::GetContext();
+    ctx.preset = UiThemePreset::Minimal;
+    ctx.mode = UiThemeMode::Light;
+    UiTheme::SetContext(ctx);
+
+    BuildShell();
+    BuildRows();
+    InitControls();
+
+    theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
+    exit_button_.WhenAction = [=] { Close(); };
+    copy_button_.WhenAction = [=] { WriteClipboardText(code_panel_.Code().GetText().ToString()); };
+
+    preview_.Showcase().WhenSelect = [=](int) { RefreshState(); };
+    preview_.Showcase().WhenCheckedCount = [=](int) { RefreshState(); };
+    preview_.Showcase().WhenOpen = [=] { RefreshState(); };
+    preview_.Showcase().WhenClose = [=] { RefreshState(); };
+    model_tree_.WhenSelection = [=] {
+        UiTreeNodeRef cursor = model_tree_.GetCursor();
+        while(tree_model_.IsValid(cursor)) {
+            const UiModelItem& row = tree_model_.Get(cursor);
+            if(row.data.Is<int>()) {
+                int index = (int)row.data;
+                const UiListModel& model = ActiveModel();
+                if(index >= 0 && index < model.GetCount()) {
+                    const UiModelItem& item = model.Get(index);
+                    if(item.enabled && !item.group_header)
+                        preview_.Showcase().Select(index);
+                }
+                break;
+            }
+            cursor = tree_model_.GetParent(cursor);
+        }
+        RefreshState();
+    };
+
+    ActiveModel().WhenChange = [=](const UiModelChange&) {
+        RefreshModelTree();
+        RefreshState();
+        code_panel_.Code().SetText(BuildUsageCode());
+        preview_.RefreshLayout();
+        preview_.Refresh();
+    };
+
+    ApplyTheme(UiThemeMode::Light);
+    SyncControlsFromConfig();
+    ApplyDataset(config_.dataset);
+    RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+
+void UiDropdownDemoWindow::BuildShell()
+{
+    Add(header_);
+    Add(version_badge_);
+    Add(theme_shell_);
+    Add(theme_icon_);
+    Add(theme_toggle_);
+    Add(exit_button_);
+    Add(preview_);
+    Add(inspector_scroll_);
+    inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+    inspector_scroll_.Content().Add(inspector_acc_);
+
+    usage_section_.SetGap(DPI(8)).SetInset(0);
+    usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    usage_section_.Add(usage_toolbar_).Fixed(DPI(36));
+    usage_section_.Add(code_panel_).Fit();
+    usage_toolbar_.Add(usage_fill_).Expand(1);
+    usage_toolbar_.Add(copy_label_).Fixed(DPI(58));
+    usage_toolbar_.Add(copy_button_).Fixed(DPI(22));
+    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_section_.SizePos());
+
+    state_box_.SetGap(DPI(4)).SetInset(0);
+    state_theme_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_mode_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_items_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_selection_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_data_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_theme_row_.Add(state_theme_label_).Expand(1);
+    state_theme_row_.Add(state_theme_value_).Fixed(DPI(120)).MinHeight(DPI(20));
+    state_mode_row_.Add(state_mode_label_).Expand(1);
+    state_mode_row_.Add(state_mode_value_).Fixed(DPI(120)).MinHeight(DPI(20));
+    state_items_row_.Add(state_items_label_).Expand(1);
+    state_items_row_.Add(state_items_value_).Fixed(DPI(120)).MinHeight(DPI(20));
+    state_selection_row_.Add(state_selection_label_).Expand(1);
+    state_selection_row_.Add(state_selection_value_).Fixed(DPI(120)).MinHeight(DPI(20));
+    state_data_row_.Add(state_data_label_).Expand(1);
+    state_data_row_.Add(state_data_value_).Fixed(DPI(120)).MinHeight(DPI(20));
+    state_box_.Add(state_theme_row_).Fixed(DPI(20));
+    state_box_.Add(state_mode_row_).Fixed(DPI(20));
+    state_box_.Add(state_items_row_).Fixed(DPI(20));
+    state_box_.Add(state_selection_row_).Fixed(DPI(20));
+    state_box_.Add(state_data_row_).Fixed(DPI(20));
+    state_box_.Add(model_acc_).Fit();
+    model_section_ = model_acc_.AddSection("MODEL DATA", true);
+    model_acc_.GetSectionContent(model_section_).Add(model_scroll_.SizePos());
+    model_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+    model_scroll_.Content().Add(model_tree_);
+    model_tree_.SetRootVisible(false);
+    model_tree_.SetSelectionMode(UITREESEL_SINGLE);
+    model_tree_.SetModel(tree_model_);
+    model_tree_.WhenStructureChanged = [=] { UpdateModelViewport(); };
+    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
+
+    props_section_.SetGap(DPI(2)).SetInset(0);
+    props_section_.Add(data_acc_).Fit();
+    props_section_.Add(layout_acc_).Fit();
+    props_section_.Add(behavior_acc_).Fit();
+    props_section_.Add(appearance_acc_).Fit();
+    props_section_.Add(popup_acc_).Fit();
+    props_section_.Add(shadow_acc_).Fit();
+    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("PROPERTIES", true)).Add(props_section_.SizePos());
+
+    data_acc_.GetSectionContent(data_acc_.AddSection("DATA", true)).Add(data_box_.SizePos());
+    layout_acc_.GetSectionContent(layout_acc_.AddSection("LAYOUT", true)).Add(layout_box_.SizePos());
+    behavior_acc_.GetSectionContent(behavior_acc_.AddSection("BEHAVIOR", true)).Add(behavior_box_.SizePos());
+    appearance_acc_.GetSectionContent(appearance_acc_.AddSection("APPEARANCE", true)).Add(appearance_box_.SizePos());
+    popup_acc_.GetSectionContent(popup_acc_.AddSection("POPUP", true)).Add(popup_box_.SizePos());
+    shadow_acc_.GetSectionContent(shadow_acc_.AddSection("SHADOW", true)).Add(shadow_box_.SizePos());
+
+    data_box_.SetGap(DPI(2)).SetInset(0);
+    layout_box_.SetGap(DPI(2)).SetInset(0);
+    behavior_box_.SetGap(DPI(2)).SetInset(0);
+    appearance_box_.SetGap(DPI(2)).SetInset(0);
+    popup_box_.SetGap(DPI(2)).SetInset(0);
+    shadow_box_.SetGap(DPI(2)).SetInset(0);
+
+    header_.SetTitle("U++ UiDropdown Builder")
+           .SetSubTitle("Inspect collapsed styling, popup rows, and model binding from one demo shell.")
+           .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
+           .ShowRule(false)
+           .ShowBottomLine(false)
+           .SetSelectable(false)
+           .SetShowFocus(false)
+           .EnableHover(false);
+
+    version_badge_.SetText(DEMO_VERSION).NoWantFocus();
+    theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
+    exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconSize(DPI(15), DPI(15)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+    copy_label_.SetText("Copy Code").NoWantFocus();
+    copy_button_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(14), DPI(14)).NoWantFocus();
+    code_panel_.Code().SetSelectable(true);
+}
+
+void UiDropdownDemoWindow::AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
+{
+    row.SetLabel(name).SetValueText(initial).SetValueSelectable(false);
+    row.SetValueWidth(DPI(80));
+    target.Add(row).Fit();
+}
+
+void UiDropdownDemoWindow::AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
+{
+    row.SetLabel(name).ShowValue(false);
+    target.Add(row).Fit();
+}
+
+void UiDropdownDemoWindow::AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+{
+    row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+    target.Add(row).Fit();
+}
+
+void UiDropdownDemoWindow::AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiDropdown& drop, const char* name)
+{
+    row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row_box.Add(label).Fixed(DPI(96)).MinHeight(DPI(20));
+    row_box.Add(drop).Expand(1).MinHeight(DPI(24));
+    label.SetText(name).NoWantFocus();
+    target.Add(row_box).Fit();
+}
+
+void UiDropdownDemoWindow::AddEditRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiLineEdit& edit, const char* name)
+{
+    row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row_box.Add(label).Fixed(DPI(96)).MinHeight(DPI(20));
+    row_box.Add(edit).Expand(1).MinHeight(DPI(26));
+    label.SetText(name).NoWantFocus();
+    target.Add(row_box).Fit();
+}
+
+void UiDropdownDemoWindow::BuildRows()
+{
+    AddDropdownRow(data_box_, dataset_row_box_, dataset_label_, dataset_drop_, "Dataset");
+    AddEditRow(data_box_, item_text_row_box_, item_text_label_, item_text_edit_, "Item Text");
+    AddEditRow(data_box_, item_desc_row_box_, item_desc_label_, item_desc_edit_, "Description");
+    AddEditRow(data_box_, item_right_row_box_, item_right_label_, item_right_edit_, "Right Text");
+    AddDropdownRow(data_box_, item_icon_row_box_, item_icon_label_, item_icon_drop_, "Item Icon");
+    data_actions_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    data_actions_row_.Add(new_item_button_).Expand(1).MinHeight(DPI(28));
+    data_actions_row_.Add(save_item_button_).Expand(1).MinHeight(DPI(28));
+    data_actions_row_.Add(delete_item_button_).Expand(1).MinHeight(DPI(28));
+    data_box_.Add(data_actions_row_).Fit();
+
+    AddSliderRow(layout_box_, min_width_row_, "Min W", "220px");
+    AddSliderRow(layout_box_, min_height_row_, "Min H", "38px");
+    AddSliderRow(layout_box_, radius_row_, "Radius", "8px");
+    AddSliderRow(layout_box_, frame_width_row_, "Frame W", "1px");
+    AddSliderRow(layout_box_, margin_x_row_, "Margin X", "10px");
+    AddSliderRow(layout_box_, margin_y_row_, "Margin Y", "6px");
+    AddSliderRow(layout_box_, content_gap_row_, "Content Gap", "6px");
+    AddSliderRow(layout_box_, indicator_size_row_, "Indicator Sz", "12px");
+    AddDropdownRow(layout_box_, indicator_side_row_box_, indicator_side_label_, indicator_side_drop_, "Indicator Side");
+    AddDropdownRow(layout_box_, align_h_row_box_, align_h_label_, align_h_drop_, "Align H");
+    AddDropdownRow(layout_box_, align_v_row_box_, align_v_label_, align_v_drop_, "Align V");
+
+    AddToggleRow(behavior_box_, enabled_row_, "Enabled");
+    AddToggleRow(behavior_box_, multi_select_row_, "Multi Select");
+    AddToggleRow(behavior_box_, show_indicator_row_, "Show Indicator");
+    AddToggleRow(behavior_box_, popup_scrollbar_row_, "Popup Scroll");
+    AddToggleRow(behavior_box_, selection_badge_row_, "Summary Badge");
+    AddToggleRow(behavior_box_, use_drag_row_, "Use Drag");
+    AddToggleRow(behavior_box_, drag_handle_row_, "Drag Handle");
+    AddToggleRow(behavior_box_, popup_marker_row_, "Popup Marker");
+    AddToggleRow(behavior_box_, popup_auto_close_row_, "Auto Close");
+    AddToggleRow(behavior_box_, popup_pinned_row_, "Popup Pinned");
+    AddToggleRow(behavior_box_, popup_use_main_skin_row_, "Use Main Skin");
+    AddDropdownRow(behavior_box_, drag_side_row_box_, drag_side_label_, drag_side_drop_, "Drag Side");
+
+    AddColorRow(appearance_box_, face_color_row_, "Face");
+    AddColorRow(appearance_box_, frame_color_row_, "Frame");
+    AddColorRow(appearance_box_, text_color_row_, "Text");
+    AddColorRow(appearance_box_, icon_color_row_, "Icon");
+    AddColorRow(appearance_box_, popup_background_row_, "Popup Bg");
+    AddColorRow(appearance_box_, popup_frame_color_row_, "Popup Frame");
+
+    AddSliderRow(popup_box_, popup_item_height_row_, "Item H", "36px");
+    AddSliderRow(popup_box_, item_spacing_row_, "Item Spacing", "0px");
+    AddSliderRow(popup_box_, popup_max_items_row_, "Max Items", "8");
+    AddSliderRow(popup_box_, popup_max_height_row_, "Max H", "300px");
+    AddSliderRow(popup_box_, popup_space_row_, "Popup Gap", "5px");
+    AddSliderRow(popup_box_, popup_frame_width_row_, "Popup Frm", "1px");
+    AddSliderRow(popup_box_, popup_radius_row_, "Popup Rad", "8px");
+    AddDropdownRow(popup_box_, popup_marker_side_row_box_, popup_marker_side_label_, popup_marker_side_drop_, "Marker Side");
+    AddDropdownRow(popup_box_, popup_selection_icon_row_box_, popup_selection_icon_label_, popup_selection_icon_drop_, "Select Icon");
+    AddDropdownRow(popup_box_, popup_check_checked_icon_row_box_, popup_check_checked_icon_label_, popup_check_checked_icon_drop_, "Checked Icon");
+    AddDropdownRow(popup_box_, popup_check_unchecked_icon_row_box_, popup_check_unchecked_icon_label_, popup_check_unchecked_icon_drop_, "Unchecked Icon");
+
+    AddToggleRow(shadow_box_, shadow_row_, "Shadow");
+    AddColorRow(shadow_box_, shadow_color_row_, "Shadow Color");
+    AddSliderRow(shadow_box_, shadow_distance_row_, "Shadow Dist", "0px");
+    AddSliderRow(shadow_box_, shadow_offset_x_row_, "Shadow X", "0px");
+    AddSliderRow(shadow_box_, shadow_offset_y_row_, "Shadow Y", "2px");
+    AddDropdownRow(shadow_box_, shadow_curve_row_box_, shadow_curve_label_, shadow_curve_preset_drop_, "Curve Preset");
+    shadow_box_.Add(shadow_curve_field_).Fixed(DPI(98));
+    AddSliderRow(shadow_box_, shadow_alpha_row_, "Shadow Alpha", "82");
+}
+
+void UiDropdownDemoWindow::PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
+{
+    drop.UseInternalModel();
+    drop.Clear();
+    for(int i = 0; i < count; i++)
+        drop.Add(opts[i].label, opts[i].value);
+}
+
+void UiDropdownDemoWindow::PopulateShadowPresetDropdown()
+{
+    const EnumOption presets[] = {
+        { "Linear", SHADOWPRESET_LINEAR },
+        { "Soft", SHADOWPRESET_SOFT },
+        { "Hard", SHADOWPRESET_HARD },
+        { "Custom", SHADOWPRESET_CUSTOM },
+    };
+    PopulateDropdown(shadow_curve_preset_drop_, presets, __countof(presets));
+}
+
+void UiDropdownDemoWindow::InitControls()
+{
+    const EnumOption datasets[] = {
+        { "Simple Items", DATASET_SIMPLE },
+        { "Basic Internal", DATASET_BASIC },
+        { "Rich Internal", DATASET_RICH },
+        { "Multi Internal", DATASET_MULTI },
+    };
+    const EnumOption sides[] = {
+        { "Left", (int)UiAlign::LEFT },
+        { "Right", (int)UiAlign::RIGHT },
+    };
+    const EnumOption aligns_h[] = {
+        { "Left", (int)UiAlign::LEFT },
+        { "Center", (int)UiAlign::CENTER },
+        { "Right", (int)UiAlign::RIGHT },
+    };
+    const EnumOption aligns_v[] = {
+        { "Top", (int)UiAlign::TOP },
+        { "Center", (int)UiAlign::CENTER },
+        { "Bottom", (int)UiAlign::BOTTOM },
+    };
+
+    PopulateDropdown(dataset_drop_, datasets, __countof(datasets));
+    PopulateDropdown(indicator_side_drop_, sides, __countof(sides));
+    PopulateDropdown(popup_marker_side_drop_, sides, __countof(sides));
+    PopulateDropdown(drag_side_drop_, sides, __countof(sides));
+    PopulateDropdown(align_h_drop_, aligns_h, __countof(aligns_h));
+    PopulateDropdown(align_v_drop_, aligns_v, __countof(aligns_v));
+    PopulateShadowPresetDropdown();
+
+    icon_list_model_ = UiIconListModel();
+    auto init_icon_drop = [&](UiDropdown& drop) {
+        drop.UseInternalModel();
+        drop.Clear();
+        drop.Add("None", String());
+        drop.GetInternalModel().AddRange(icon_list_model_.GetAll());
+        drop.Select(0);
+    };
+    init_icon_drop(item_icon_drop_);
+    init_icon_drop(popup_selection_icon_drop_);
+    init_icon_drop(popup_check_checked_icon_drop_);
+    init_icon_drop(popup_check_unchecked_icon_drop_);
+
+    item_text_edit_.SetText("Staging");
+    item_desc_edit_.SetText("Live mutable row");
+    item_right_edit_.SetText("NEW");
+
+    new_item_button_.SetText("New");
+    save_item_button_.SetText("Save");
+    delete_item_button_.SetText("Delete");
+
+    min_width_row_.Slider().SetRange(DPI(100), DPI(340)).SetStep(1).SetValue(config_.min_width);
+    min_height_row_.Slider().SetRange(DPI(28), DPI(80)).SetStep(1).SetValue(config_.min_height);
+    radius_row_.Slider().SetRange(0, DPI(32)).SetStep(1).SetValue(config_.radius);
+    frame_width_row_.Slider().SetRange(0, 8).SetStep(1).SetValue(config_.frame_width);
+    margin_x_row_.Slider().SetRange(0, DPI(28)).SetStep(1).SetValue(config_.margin_x);
+    margin_y_row_.Slider().SetRange(0, DPI(20)).SetStep(1).SetValue(config_.margin_y);
+    content_gap_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(config_.content_gap);
+    item_spacing_row_.Slider().SetRange(0, DPI(16)).SetStep(1).SetValue(config_.item_spacing);
+    indicator_size_row_.Slider().SetRange(DPI(6), DPI(24)).SetStep(1).SetValue(config_.indicator_size);
+    popup_item_height_row_.Slider().SetRange(DPI(24), DPI(64)).SetStep(1).SetValue(config_.popup_item_height);
+    popup_max_items_row_.Slider().SetRange(1, 16).SetStep(1).SetValue(config_.popup_max_items);
+    popup_max_height_row_.Slider().SetRange(DPI(80), DPI(420)).SetStep(1).SetValue(config_.popup_max_height);
+    popup_space_row_.Slider().SetRange(0, DPI(20)).SetStep(1).SetValue(config_.popup_space);
+    popup_frame_width_row_.Slider().SetRange(0, 8).SetStep(1).SetValue(config_.popup_frame_width);
+    popup_radius_row_.Slider().SetRange(0, DPI(24)).SetStep(1).SetValue(config_.popup_radius);
+    shadow_distance_row_.Slider().SetRange(0, 24).SetStep(1).SetValue(config_.shadow_distance);
+    shadow_offset_x_row_.Slider().SetRange(-24, 24).SetStep(1).SetValue(config_.shadow_offset_x);
+    shadow_offset_y_row_.Slider().SetRange(-24, 24).SetStep(1).SetValue(config_.shadow_offset_y);
+    shadow_alpha_row_.Slider().SetRange(0, 255).SetStep(1).SetValue(config_.shadow_alpha);
+
+    min_width_row_.WhenAction = [=] { config_.min_width = int(min_width_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    min_height_row_.WhenAction = [=] { config_.min_height = int(min_height_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    radius_row_.WhenAction = [=] { config_.radius = int(radius_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    frame_width_row_.WhenAction = [=] { config_.frame_width = int(frame_width_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    margin_x_row_.WhenAction = [=] { config_.margin_x = int(margin_x_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    margin_y_row_.WhenAction = [=] { config_.margin_y = int(margin_y_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    content_gap_row_.WhenAction = [=] { config_.content_gap = int(content_gap_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    indicator_size_row_.WhenAction = [=] { config_.indicator_size = int(indicator_size_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_item_height_row_.WhenAction = [=] { config_.popup_item_height = int(popup_item_height_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_max_items_row_.WhenAction = [=] { config_.popup_max_items = int(popup_max_items_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_max_height_row_.WhenAction = [=] { config_.popup_max_height = int(popup_max_height_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_space_row_.WhenAction = [=] { config_.popup_space = int(popup_space_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_frame_width_row_.WhenAction = [=] { config_.popup_frame_width = int(popup_frame_width_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_radius_row_.WhenAction = [=] { config_.popup_radius = int(popup_radius_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_distance_row_.WhenAction = [=] { config_.shadow_distance = int(shadow_distance_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_offset_x_row_.WhenAction = [=] { config_.shadow_offset_x = int(shadow_offset_x_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_offset_y_row_.WhenAction = [=] { config_.shadow_offset_y = int(shadow_offset_y_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_alpha_row_.WhenAction = [=] { config_.shadow_alpha = int(shadow_alpha_row_.Slider().GetValue()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+
+    dataset_drop_.WhenSelect = [=](int) { config_.dataset = (DatasetMode)(int)dataset_drop_.GetSelectedData(); ApplyDataset(config_.dataset); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    indicator_side_drop_.WhenSelect = [=](int) { config_.indicator_side = (UiAlign)(int)indicator_side_drop_.GetSelectedData(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_marker_side_drop_.WhenSelect = [=](int) { config_.popup_marker_side = (UiAlign)(int)popup_marker_side_drop_.GetSelectedData(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    align_h_drop_.WhenSelect = [=](int) { config_.align_h = (UiAlign)(int)align_h_drop_.GetSelectedData(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    align_v_drop_.WhenSelect = [=](int) { config_.align_v = (UiAlign)(int)align_v_drop_.GetSelectedData(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_selection_icon_drop_.WhenSelect = [=](int) { config_.popup_selection_icon_name = AsString(popup_selection_icon_drop_.GetSelectedData()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_check_checked_icon_drop_.WhenSelect = [=](int) { config_.popup_check_checked_icon_name = AsString(popup_check_checked_icon_drop_.GetSelectedData()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_check_unchecked_icon_drop_.WhenSelect = [=](int) { config_.popup_check_unchecked_icon_name = AsString(popup_check_unchecked_icon_drop_.GetSelectedData()); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_curve_preset_drop_.WhenSelect = [=](int) {
+        ShadowCurvePreset p = (ShadowCurvePreset)(int)shadow_curve_preset_drop_.GetSelectedData();
+        if(p != SHADOWPRESET_CUSTOM) {
+            config_.shadow_curve = ShadowPresetCurve(p);
+            shadow_curve_field_.SetCurve(config_.shadow_curve);
+            RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+    };
+    shadow_curve_field_.WhenChanging = [=] { shadow_curve_preset_drop_.SelectByData(SHADOWPRESET_CUSTOM); config_.shadow_curve = shadow_curve_field_.GetCurve(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_curve_field_.WhenAction = [=] { shadow_curve_preset_drop_.SelectByData(SHADOWPRESET_CUSTOM); config_.shadow_curve = shadow_curve_field_.GetCurve(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+
+    enabled_row_.Toggle().WhenAction = [=] { config_.enabled = enabled_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    multi_select_row_.Toggle().WhenAction = [=] { config_.multi_select = multi_select_row_.Toggle().IsOn(); preview_.Showcase().SetMultiSelect(config_.multi_select); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    show_indicator_row_.Toggle().WhenAction = [=] { config_.show_indicator = show_indicator_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_scrollbar_row_.Toggle().WhenAction = [=] { config_.popup_scrollbar = popup_scrollbar_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    selection_badge_row_.Toggle().WhenAction = [=] { config_.show_selection_badge = selection_badge_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_marker_row_.Toggle().WhenAction = [=] { config_.popup_selection_marker = popup_marker_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    use_drag_row_.Toggle().WhenAction = [=] { config_.use_drag = use_drag_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    drag_handle_row_.Toggle().WhenAction = [=] { config_.show_drag_handle = drag_handle_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_auto_close_row_.Toggle().WhenAction = [=] { config_.popup_auto_close = popup_auto_close_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_pinned_row_.Toggle().WhenAction = [=] { config_.popup_pinned = popup_pinned_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_use_main_skin_row_.Toggle().WhenAction = [=] { config_.popup_use_main_skin = popup_use_main_skin_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_row_.Toggle().WhenAction = [=] { config_.shadow = shadow_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    drag_side_drop_.WhenSelect = [=](int) { config_.drag_side = (UiAlign)(int)drag_side_drop_.GetSelectedData(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+
+    face_color_row_.WhenAction = [=] { config_.face_color = face_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    frame_color_row_.WhenAction = [=] { config_.frame_color = frame_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    text_color_row_.WhenAction = [=] { config_.text_color = text_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    icon_color_row_.WhenAction = [=] { config_.icon_color = icon_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_background_row_.WhenAction = [=] { config_.popup_background = popup_background_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    popup_frame_color_row_.WhenAction = [=] { config_.popup_frame_color = popup_frame_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+    shadow_color_row_.WhenAction = [=] { config_.shadow_color = shadow_color_row_.GetSwatchColor(0); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
+
+    new_item_button_.WhenAction = [=] { InsertNewItem(); };
+    save_item_button_.WhenAction = [=] { SaveSelectedItem(); };
+    delete_item_button_.WhenAction = [=] { DeleteSelectedItem(); };
+}
+
+String UiDropdownDemoWindow::AlignCode(UiAlign a) const
+{
+    switch(a) {
+    case UiAlign::LEFT: return "UiAlign::LEFT";
+    case UiAlign::RIGHT: return "UiAlign::RIGHT";
+    case UiAlign::TOP: return "UiAlign::TOP";
+    case UiAlign::BOTTOM: return "UiAlign::BOTTOM";
+    default: return "UiAlign::CENTER";
+    }
+}
+
+String UiDropdownDemoWindow::DatasetLabel(DatasetMode m) const
+{
+    switch(m) {
+    case DATASET_SIMPLE: return "Simple Items";
+    case DATASET_BASIC: return "Basic Internal";
+    case DATASET_RICH: return "Rich Internal";
+    case DATASET_MULTI: return "Multi Internal";
+    default: return "Unknown";
+    }
+}
+
+UiListModel& UiDropdownDemoWindow::ActiveModel()
+{
+    return preview_.Showcase().GetInternalModel();
+}
+
+const UiListModel& UiDropdownDemoWindow::ActiveModel() const
+{
+    return preview_.Showcase().GetModel();
+}
+
+void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
+{
+    UiDropdown& dd = preview_.Showcase();
+    dd.ClosePopup();
+    dd.Clear();
+
+    auto add_simple = [&] {
+        dd.Add("Broccoli", "shopping.broccoli");
+        dd.Add("Carrots", "shopping.carrots");
+        dd.Add("Potatoes", "shopping.potatoes");
+        dd.Add("Parsley", "shopping.parsley");
+    };
+    auto add_basic = [&] {
+        UiDropdown::Item workspace("Choose Workspace", "workspace.choose");
+        workspace.icon = ICON_ACTION_CHECK_CIRCLE_48();
+        workspace.icon_render_mode = UiIconRenderMode::MonoTint;
+        workspace.checked = true;
+        dd.Add(workspace);
+
+        UiDropdown::Item design("Design System", "workspace.design");
+        design.icon = ICON_CONTENT_CONTENT_COPY_48();
+        design.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(design);
+
+        UiDropdown::Item icons("Icon Pass", "workspace.icons");
+        icons.icon = ICON_ACTION_SEARCH_48();
+        icons.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(icons);
+
+        UiDropdown::Item shipping("Shipping", "workspace.shipping");
+        shipping.icon = ICON_NAVIGATION_OUTLINED_APPS_48();
+        shipping.icon_render_mode = UiIconRenderMode::MonoTint;
+        shipping.checked = true;
+        dd.Add(shipping);
+    };
+    auto add_rich = [&] {
+        UiDropdown::Item head("Environment");
+        head.group_header = true;
+        head.enabled = false;
+        dd.Add(head);
+
+        UiDropdown::Item staging("Staging", "staging");
+        staging.description = "Live mutable row";
+        staging.right_text = "NEW";
+        staging.icon = ICON_ACTION_CHECK_CIRCLE_48();
+        staging.icon_render_mode = UiIconRenderMode::MonoTint;
+        staging.separator_before = true;
+        dd.Add(staging);
+
+        UiDropdown::Item prod("Production", "production");
+        prod.description = "Customer traffic";
+        prod.right_text = "LIVE";
+        prod.icon = ICON_ACTION_SEARCH_48();
+        prod.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(prod);
+
+        UiDropdown::Item arch("Archive", "archive");
+        arch.description = "Historical snapshots";
+        arch.right_text = "RO";
+        arch.icon = ICON_CONTENT_CONTENT_COPY_48();
+        arch.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(arch);
+    };
+    auto add_multi = [&] {
+        UiDropdown::Item head("Notifications");
+        head.group_header = true;
+        head.enabled = false;
+        dd.Add(head);
+
+        UiDropdown::Item email("Email", "email");
+        email.description = "Daily summaries";
+        email.right_text = "Daily";
+        email.checked = true;
+        email.icon = ICON_COMMUNICATION_COMMENT_48();
+        email.icon_render_mode = UiIconRenderMode::MonoTint;
+        email.separator_before = true;
+        dd.Add(email);
+
+        UiDropdown::Item push("Push", "push");
+        push.description = "Mobile alerts";
+        push.right_text = "Live";
+        push.checked = true;
+        push.icon = ICON_NAVIGATION_OUTLINED_APPS_48();
+        push.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(push);
+
+        UiDropdown::Item slack("Slack", "slack");
+        slack.description = "Channel digests";
+        slack.right_text = "Team";
+        slack.icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();
+        slack.icon_render_mode = UiIconRenderMode::MonoTint;
+        dd.Add(slack);
+    };
+
+    dd.UseInternalModel();
+
+    switch(mode) {
+    case DATASET_SIMPLE:
+        add_simple();
+        config_.multi_select = false;
+        config_.popup_selection_marker = false;
+        config_.show_selection_badge = false;
+        config_.popup_selection_icon_name = "ICON_DESIGN_ADJUST_48";
+        break;
+    case DATASET_BASIC:
+        add_basic();
+        config_.multi_select = false;
+        config_.popup_selection_marker = true;
+        config_.show_selection_badge = false;
+        config_.popup_selection_icon_name = "ICON_TOGGLE_RADIO_BUTTON_CHECKED_48";
+        break;
+    case DATASET_RICH:
+        add_rich();
+        config_.multi_select = false;
+        config_.popup_selection_marker = false;
+        config_.show_selection_badge = false;
+        config_.popup_selection_icon_name = "ICON_DESIGN_ADJUST_48";
+        break;
+    case DATASET_MULTI:
+        add_multi();
+        config_.multi_select = true;
+        config_.popup_selection_marker = false;
+        config_.show_selection_badge = true;
+        config_.popup_check_checked_icon_name = "ICON_TOGGLE_CHECK_BOX_48";
+        config_.popup_check_unchecked_icon_name = "ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48";
+        break;
+    default:
+        add_rich();
+        config_.multi_select = false;
+        config_.popup_selection_marker = false;
+        config_.show_selection_badge = false;
+        break;
+    }
+
+    dd.UseInternalModel();
+    dd.RefreshFromModel();
+    dd.SetMultiSelect(config_.multi_select);
+    UiListModel& model = dd.GetInternalModel();
+    int first_selectable = -1;
+    for(int i = 0; i < model.GetCount(); i++) {
+        const UiModelItem& item = model.Get(i);
+        if(item.enabled && !item.group_header) {
+            first_selectable = i;
+            break;
+        }
+    }
+    if(first_selectable >= 0)
+        dd.Select(first_selectable);
+    else
+        dd.ClearSelection();
+
+    RefreshModelTree();
+    RefreshState();
+    SyncControlsFromConfig();
+}
+
+void UiDropdownDemoWindow::InsertNewItem()
+{
+    UiDropdown& dd = preview_.Showcase();
+    UiListModel& model = ActiveModel();
+    UiModelItem item;
+    item.text = item_text_edit_.GetText().ToString();
+    if(item.text.IsEmpty())
+        item.text = "New Item";
+    item.data = item.text;
+    item.description = item_desc_edit_.GetText().ToString();
+    item.right_text = item_right_edit_.GetText().ToString();
+    item.group_header = false;
+    item.enabled = true;
+    item.separator_before = false;
+    item.checked = false;
+    Value icon = item_icon_drop_.GetSelectedData();
+    if(!icon.IsNull()) {
+        String name = AsString(icon);
+        if(!name.IsEmpty()) {
+            item.icon = UiIconFromName(name);
+            item.icon_render_mode = UiIconRenderMode::MonoTint;
+        }
+    }
+    int insert_at = dd.HasSelection() ? min(dd.GetSelection() + 1, model.GetCount()) : model.GetCount();
+    model.Insert(insert_at, item);
+    dd.Select(insert_at);
+    RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+
+void UiDropdownDemoWindow::SaveSelectedItem()
+{
+    UiDropdown& dd = preview_.Showcase();
+    int index = dd.GetSelection();
+    if(index < 0 || index >= ActiveModel().GetCount())
+        return;
+
+    UiListModel& model = ActiveModel();
+    UiModelItem item = model.Get(index);
+    String text = item_text_edit_.GetText().ToString();
+    if(text.IsEmpty())
+        text = item.group_header ? "Section" : "Item";
+    item.text = text;
+    item.data = text;
+    item.description = item_desc_edit_.GetText().ToString();
+    item.right_text = item_right_edit_.GetText().ToString();
+    Value icon = item_icon_drop_.GetSelectedData();
+    if(!icon.IsNull()) {
+        String name = AsString(icon);
+        item.icon = name.IsEmpty() ? Null : UiIconFromName(name);
+        item.icon_render_mode = UiIconRenderMode::MonoTint;
+    }
+    else {
+        item.icon = Null;
+    }
+    model.Set(index, item);
+    RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+
+void UiDropdownDemoWindow::DeleteSelectedItem()
+{
+    UiDropdown& dd = preview_.Showcase();
+    int index = dd.GetSelection();
+    if(index < 0 || index >= ActiveModel().GetCount())
+        return;
+    UiListModel& model = ActiveModel();
+    model.Remove(index);
+    if(model.GetCount() > 0)
+        dd.Select(min(index, model.GetCount() - 1));
+    RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+
+void UiDropdownDemoWindow::SyncControlsFromConfig()
+{
+    dataset_drop_.SelectByData((int)config_.dataset);
+    indicator_side_drop_.SelectByData((int)config_.indicator_side);
+    popup_marker_side_drop_.SelectByData((int)config_.popup_marker_side);
+    drag_side_drop_.SelectByData((int)config_.drag_side);
+    popup_selection_icon_drop_.SelectByData(config_.popup_selection_icon_name);
+    popup_check_checked_icon_drop_.SelectByData(config_.popup_check_checked_icon_name);
+    popup_check_unchecked_icon_drop_.SelectByData(config_.popup_check_unchecked_icon_name);
+    align_h_drop_.SelectByData((int)config_.align_h);
+    align_v_drop_.SelectByData((int)config_.align_v);
+    shadow_curve_preset_drop_.SelectByData((int)ResolveShadowPreset(config_.shadow_curve));
+    shadow_curve_field_.SetCurve(config_.shadow_curve);
+
+    min_width_row_.Slider().SetValue(config_.min_width);
+    min_height_row_.Slider().SetValue(config_.min_height);
+    radius_row_.Slider().SetValue(config_.radius);
+    frame_width_row_.Slider().SetValue(config_.frame_width);
+    margin_x_row_.Slider().SetValue(config_.margin_x);
+    margin_y_row_.Slider().SetValue(config_.margin_y);
+    content_gap_row_.Slider().SetValue(config_.content_gap);
+    item_spacing_row_.Slider().SetValue(config_.item_spacing);
+    indicator_size_row_.Slider().SetValue(config_.indicator_size);
+    popup_item_height_row_.Slider().SetValue(config_.popup_item_height);
+    popup_max_items_row_.Slider().SetValue(config_.popup_max_items);
+    popup_max_height_row_.Slider().SetValue(config_.popup_max_height);
+    popup_space_row_.Slider().SetValue(config_.popup_space);
+    popup_frame_width_row_.Slider().SetValue(config_.popup_frame_width);
+    popup_radius_row_.Slider().SetValue(config_.popup_radius);
+    shadow_distance_row_.Slider().SetValue(config_.shadow_distance);
+    shadow_offset_x_row_.Slider().SetValue(config_.shadow_offset_x);
+    shadow_offset_y_row_.Slider().SetValue(config_.shadow_offset_y);
+    shadow_alpha_row_.Slider().SetValue(config_.shadow_alpha);
+
+    enabled_row_.Toggle().SetOn(config_.enabled);
+    multi_select_row_.Toggle().SetOn(config_.multi_select);
+    show_indicator_row_.Toggle().SetOn(config_.show_indicator);
+    popup_scrollbar_row_.Toggle().SetOn(config_.popup_scrollbar);
+    selection_badge_row_.Toggle().SetOn(config_.show_selection_badge);
+    use_drag_row_.Toggle().SetOn(config_.use_drag);
+    drag_handle_row_.Toggle().SetOn(config_.show_drag_handle);
+    popup_marker_row_.Toggle().SetOn(config_.popup_selection_marker);
+    popup_auto_close_row_.Toggle().SetOn(config_.popup_auto_close);
+    popup_pinned_row_.Toggle().SetOn(config_.popup_pinned);
+    popup_use_main_skin_row_.Toggle().SetOn(config_.popup_use_main_skin);
+    shadow_row_.Toggle().SetOn(config_.shadow);
+
+    face_color_row_.SetSwatchColor(0, config_.face_color);
+    frame_color_row_.SetSwatchColor(0, config_.frame_color);
+    text_color_row_.SetSwatchColor(0, config_.text_color);
+    icon_color_row_.SetSwatchColor(0, config_.icon_color);
+    popup_background_row_.SetSwatchColor(0, config_.popup_background);
+    popup_frame_color_row_.SetSwatchColor(0, config_.popup_frame_color);
+    shadow_color_row_.SetSwatchColor(0, config_.shadow_color);
+}
+
+String UiDropdownDemoWindow::BuildUsageCode() const
+{
+    const UiListModel& model = ActiveModel();
+    String code;
+    code << "UiDropdown::Style style = UiTheme::ResolveDropdown();\n";
+    code << "style.metrics.content_margin = Rect(" << config_.margin_x << ", " << config_.margin_y << ", " << config_.margin_x << ", " << config_.margin_y << ");\n";
+    code << "style.metrics.radius = " << config_.radius << ";\n";
+    code << "style.metrics.frame_width = " << config_.frame_width << ";\n";
+    code << "style.align_h = " << AlignCode(config_.align_h) << ";\n";
+    code << "style.align_v = " << AlignCode(config_.align_v) << ";\n";
+    code << "style.indicator_side = " << AlignCode(config_.indicator_side) << ";\n";
+    code << "style.content_gap = " << config_.content_gap << ";\n";
+    code << "style.item_spacing = " << config_.item_spacing << ";\n";
+    code << "style.show_indicator = " << (config_.show_indicator ? "true" : "false") << ";\n";
+    code << "style.indicator_size = " << config_.indicator_size << ";\n";
+    code << "style.popup_item_height = " << config_.popup_item_height << ";\n";
+    code << "style.popup_max_items = " << config_.popup_max_items << ";\n";
+    code << "style.popup_max_height = " << config_.popup_max_height << ";\n";
+    code << "style.popup_space = " << config_.popup_space << ";\n";
+    code << "style.popup_frame_width = " << config_.popup_frame_width << ";\n";
+    code << "style.popup_radius = " << config_.popup_radius << ";\n";
+    code << "style.popup_marker_side = " << AlignCode(config_.popup_marker_side) << ";\n";
+    code << "style.popup_show_scrollbar = " << (config_.popup_scrollbar ? "true" : "false") << ";\n";
+    code << "style.show_drag_handle = " << (config_.show_drag_handle ? "true" : "false") << ";\n";
+    code << "style.drag_side = " << AlignCode(config_.drag_side) << ";\n";
+    code << "style.show_popup_selection_marker = " << (config_.popup_selection_marker ? "true" : "false") << ";\n";
+    code << "style.show_selection_badge = " << (config_.show_selection_badge ? "true" : "false") << ";\n";
+    if(!config_.popup_selection_icon_name.IsEmpty())
+        code << "style.popup_selection_icon = " << config_.popup_selection_icon_name << "();\n";
+    if(!config_.popup_check_checked_icon_name.IsEmpty())
+        code << "style.popup_check_checked_icon = " << config_.popup_check_checked_icon_name << "();\n";
+    if(!config_.popup_check_unchecked_icon_name.IsEmpty())
+        code << "style.popup_check_unchecked_icon = " << config_.popup_check_unchecked_icon_name << "();\n";
+    code << "style.popup_use_main_skin = " << (config_.popup_use_main_skin ? "true" : "false") << ";\n";
+    code << "style.metrics.shadow.enabled = " << (config_.shadow ? "true" : "false") << ";\n";
+    code << "style.metrics.shadow.distance = " << config_.shadow_distance << ";\n";
+    code << "style.metrics.shadow.offset_x = " << config_.shadow_offset_x << ";\n";
+    code << "style.metrics.shadow.offset_y = " << config_.shadow_offset_y << ";\n";
+    code << "style.metrics.shadow.alpha = " << config_.shadow_alpha << ";\n";
+    code << "style.metrics.shadow.mode = SHADOW_CURVE;\n";
+    code << Format("style.metrics.shadow.curve = Bezier(%.3f, %.3f, %.3f, %.3f);\n",
+                   config_.shadow_curve.x1, config_.shadow_curve.y1,
+                   config_.shadow_curve.x2, config_.shadow_curve.y2);
+    code << "style.metrics.shadow.color = Color(" << config_.shadow_color.GetR() << ", " << config_.shadow_color.GetG() << ", " << config_.shadow_color.GetB() << ");\n";
+    code << "style.popup_background_color = Color(" << config_.popup_background.GetR() << ", " << config_.popup_background.GetG() << ", " << config_.popup_background.GetB() << ");\n";
+    code << "style.popup_frame_color = Color(" << config_.popup_frame_color.GetR() << ", " << config_.popup_frame_color.GetG() << ", " << config_.popup_frame_color.GetB() << ");\n";
+    code << "dropdown.EnableDragReorder(" << (config_.use_drag ? "true" : "false") << ");\n\n";
+
+    for(int i = 0; i < model.GetCount(); i++) {
+        const UiModelItem& it = model.Get(i);
+        if(it.group_header) {
+            code << "UiModelItem head(" << QuoteCpp(it.text) << "); head.group_header = true; head.enabled = false; ";
+            if(it.separator_before)
+                code << "head.separator_before = true; ";
+            code << "dropdown.GetInternalModel().Add(head);\n";
+            continue;
+        }
+        code << "UiModelItem item(" << QuoteCpp(it.text) << ", " << QuoteCpp(AsString(it.data)) << ");\n";
+        if(!it.description.IsEmpty()) code << "item.description = " << QuoteCpp(it.description) << ";\n";
+        if(!it.right_text.IsEmpty()) code << "item.right_text = " << QuoteCpp(it.right_text) << ";\n";
+        if(!it.enabled) code << "item.enabled = false;\n";
+        if(it.checked) code << "item.checked = true;\n";
+        if(it.separator_before) code << "item.separator_before = true;\n";
+        if(!IsNull(it.icon)) code << "item.icon = /* chosen icon */ " << QuoteCpp(AsString(it.data)) << ";\n";
+        code << "dropdown.GetInternalModel().Add(item);\n";
+    }
+    code << "\nUiDropdown dropdown;\n";
+    code << "dropdown.SetStyle(style)\n";
+    code << "        .SetSizeMin(Size(" << config_.min_width << ", " << config_.min_height << "))\n";
+    code << "        .SetMultiSelect(" << (config_.multi_select ? "true" : "false") << ")\n";
+    code << "        .SetPopupAutoClose(" << (config_.popup_auto_close ? "true" : "false") << ")\n";
+    code << "        .SetPopupPinned(" << (config_.popup_pinned ? "true" : "false") << ");\n";
+    if(!config_.enabled)
+        code << "dropdown.Disable();\n";
+    code << "// Dataset: " << DatasetLabel(config_.dataset) << "\n";
+    code << "// Binding: Internal UiListModel\n";
+    return code;
+}
+
+
+
+void UiDropdownDemoWindow::RefreshModelTree()
+{
+    tree_model_.Clear();
+    UiTreeNodeRef root = tree_model_.Root();
+    const UiListModel& model = ActiveModel();
+    for(int i = 0; i < model.GetCount(); i++) {
+        const UiModelItem& it = model.Get(i);
+        UiModelItem row(Format("%d. %s", i + 1, it.text), i);
+        UiTreeNodeRef node = tree_model_.AddChild(root, row);
+        tree_model_.AddChild(node, UiModelItem("data = " + (it.data.IsVoid() ? String("<void>") : StdFormat(it.data))));
+        tree_model_.AddChild(node, UiModelItem("description = " + (it.description.IsEmpty() ? String("<empty>") : it.description)));
+        tree_model_.AddChild(node, UiModelItem("right_text = " + (it.right_text.IsEmpty() ? String("<empty>") : it.right_text)));
+        tree_model_.AddChild(node, UiModelItem(String("checked = ") + (it.checked ? "true" : "false")));
+        tree_model_.AddChild(node, UiModelItem(String("group_header = ") + (it.group_header ? "true" : "false")));
+        tree_model_.AddChild(node, UiModelItem(String("enabled = ") + (it.enabled ? "true" : "false")));
+    }
+    model_tree_.Expand(root, true, true);
+    UpdateModelViewport();
+}
+
+void UiDropdownDemoWindow::UpdateModelViewport()
+{
+    int viewport_h = min(max(model_tree_.GetContentSize().cy, DPI(120)), DPI(240));
+    model_acc_.SetSectionBodyHeight(model_section_, viewport_h);
+    int width = max(0, model_scroll_.GetViewportRect().GetWidth());
+    model_tree_.SetRect(0, 0, width, max(viewport_h, model_tree_.GetContentSize().cy));
+    model_scroll_.Layout();
+}
+void UiDropdownDemoWindow::RefreshState()
+{
+    UiDropdown& dd = preview_.Showcase();
+    const UiListModel& model = ActiveModel();
+    state_theme_label_.SetText("Theme");
+    state_mode_label_.SetText("Dataset");
+    state_items_label_.SetText("Items");
+    state_selection_label_.SetText(config_.multi_select ? "Checked" : "Selection");
+    state_data_label_.SetText("Data");
+    state_theme_value_.SetText(palette_.dark ? "Dark" : "Light");
+    state_mode_value_.SetText(DatasetLabel(config_.dataset));
+    state_items_value_.SetText(AsString(dd.GetCount()));
+    if(config_.multi_select) {
+        state_selection_value_.SetText(AsString(dd.GetCheckedCount()) + " checked");
+        Vector<Value> data = dd.GetCheckedData();
+        String joined;
+        for(int i = 0; i < data.GetCount() && i < 3; i++) {
+            if(i)
+                joined << ", ";
+            joined << AsString(data[i]);
+        }
+        if(data.GetCount() > 3)
+            joined << " +" << AsString(data.GetCount() - 3);
+        state_data_value_.SetText(joined.IsEmpty() ? "None" : joined);
+    }
+    else {
+        state_selection_value_.SetText(dd.HasSelection() ? dd.GetSelectedText() : "None");
+        state_data_value_.SetText(dd.HasSelection() ? AsString(dd.GetSelectedData()) : "None");
+    }
+
+    int active_index = -1;
+    if(dd.HasSelection())
+        active_index = dd.GetSelection();
+    else if(config_.multi_select) {
+        Vector<int> checked = dd.GetCheckedIndices();
+        if(!checked.IsEmpty())
+            active_index = checked[0];
+    }
+
+    UiTreeNodeRef cursor = model_tree_.GetCursor();
+    while(active_index < 0 && tree_model_.IsValid(cursor)) {
+        const UiModelItem& row = tree_model_.Get(cursor);
+        if(row.data.Is<int>()) {
+            active_index = (int)row.data;
+            break;
+        }
+        cursor = tree_model_.GetParent(cursor);
+    }
+
+    if(active_index < 0) {
+        for(int i = 0; i < model.GetCount(); i++) {
+            const UiModelItem& row = model.Get(i);
+            if(row.enabled && !row.group_header) {
+                active_index = i;
+                break;
+            }
+        }
+    }
+
+    if(active_index >= 0 && active_index < dd.GetCount()) {
+        const UiDropdown::Item& it = dd.GetItem(active_index);
+        item_text_edit_.SetText(WString(it.text));
+        item_desc_edit_.SetText(WString(it.description));
+        item_right_edit_.SetText(WString(it.right_text));
+        bool matched_icon = false;
+        if(!IsNull(it.icon)) {
+            for(int i = 0; i < icon_list_model_.GetCount(); i++) {
+                const UiModelItem& icon_item = icon_list_model_.Get(i);
+                if(icon_item.icon == it.icon) {
+                    item_icon_drop_.SelectByData(icon_item.data);
+                    matched_icon = true;
+                    break;
+                }
+            }
+        }
+        if(!matched_icon)
+            item_icon_drop_.SelectByData(String());
+    }
+    else {
+        item_text_edit_.SetText(WString());
+        item_desc_edit_.SetText(WString());
+        item_right_edit_.SetText(WString());
+        item_icon_drop_.SelectByData(String());
+    }
+}
+
+void UiDropdownDemoWindow::RefreshFromConfig()
+{
+    UiDropdown& dd = preview_.Showcase();
+    UiDropdown::Style style = MakeDropdownStyle(palette_);
+    if(IsNull(config_.face_color) && style.palette.face[ST_NORMAL].IsSolid())
+        config_.face_color = style.palette.face[ST_NORMAL].color;
+    if(IsNull(config_.frame_color))
+        config_.frame_color = style.palette.frame[ST_NORMAL];
+    if(IsNull(config_.text_color))
+        config_.text_color = style.palette.ink[ST_NORMAL];
+    if(IsNull(config_.icon_color))
+        config_.icon_color = style.palette.icon[ST_NORMAL];
+    if(IsNull(config_.popup_background))
+        config_.popup_background = style.popup_background_color;
+    if(IsNull(config_.popup_frame_color))
+        config_.popup_frame_color = style.popup_frame_color;
+    style.metrics.content_margin = Rect(config_.margin_x, config_.margin_y, config_.margin_x, config_.margin_y);
+    style.metrics.radius = config_.radius;
+    style.metrics.frame_width = config_.frame_width;
+    style.align_h = config_.align_h;
+    style.align_v = config_.align_v;
+    style.indicator_side = config_.indicator_side;
+    style.show_indicator = config_.show_indicator;
+    style.indicator_size = config_.indicator_size;
+    style.content_gap = config_.content_gap;
+    style.item_spacing = config_.item_spacing;
+    style.popup_item_height = config_.popup_item_height;
+    style.popup_max_items = config_.popup_max_items;
+    style.popup_max_height = config_.popup_max_height;
+    style.popup_space = config_.popup_space;
+    style.popup_frame_width = config_.popup_frame_width;
+    style.popup_radius = config_.popup_radius;
+    style.popup_marker_side = config_.popup_marker_side;
+    style.popup_show_scrollbar = config_.popup_scrollbar;
+    style.show_drag_handle = config_.show_drag_handle;
+    style.drag_side = config_.drag_side;
+    style.show_popup_selection_marker = config_.popup_selection_marker;
+    style.show_selection_badge = config_.show_selection_badge;
+    style.popup_use_main_skin = config_.popup_use_main_skin;
+    style.popup_selection_icon = config_.popup_selection_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_selection_icon_name);
+    style.popup_check_checked_icon = config_.popup_check_checked_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_check_checked_icon_name);
+    style.popup_check_unchecked_icon = config_.popup_check_unchecked_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_check_unchecked_icon_name);
+    style.popup_background_color = config_.popup_background;
+    style.popup_frame_color = config_.popup_frame_color;
+    style.metrics.shadow.enabled = config_.shadow;
+    style.metrics.shadow.distance = config_.shadow_distance;
+    style.metrics.shadow.offset_x = config_.shadow_offset_x;
+    style.metrics.shadow.offset_y = config_.shadow_offset_y;
+    style.metrics.shadow.alpha = config_.shadow_alpha;
+    style.metrics.shadow.color = config_.shadow_color;
+    style.metrics.shadow.mode = SHADOW_CURVE;
+    style.metrics.shadow.curve = config_.shadow_curve;
+    for(int i = 0; i < 4; i++) {
+        style.palette.face[i] = UiFill::Solid(config_.face_color);
+        style.palette.frame[i] = config_.frame_color;
+        style.palette.ink[i] = config_.text_color;
+        style.palette.icon[i] = config_.icon_color;
+    }
+    dd.SetStyle(style);
+    dd.EnableDragReorder(config_.use_drag);
+    dd.SetSizeMin(config_.min_width, config_.min_height);
+    dd.SetPopupAutoClose(config_.popup_auto_close);
+    dd.SetPopupPinned(config_.popup_pinned);
+    dd.SetPopupUseMainSkin(config_.popup_use_main_skin);
+    dd.SetPopupShowScrollbar(config_.popup_scrollbar);
+    dd.SetMultiSelect(config_.multi_select);
+    if(config_.enabled) dd.Enable(); else dd.Disable();
+    preview_.SetShowcaseSize(Size(config_.min_width, config_.min_height));
+
+    min_width_row_.SetValueText(AsString(config_.min_width) + "px");
+    min_height_row_.SetValueText(AsString(config_.min_height) + "px");
+    radius_row_.SetValueText(AsString(config_.radius) + "px");
+    frame_width_row_.SetValueText(AsString(config_.frame_width) + "px");
+    margin_x_row_.SetValueText(AsString(config_.margin_x) + "px");
+    margin_y_row_.SetValueText(AsString(config_.margin_y) + "px");
+    content_gap_row_.SetValueText(AsString(config_.content_gap) + "px");
+    item_spacing_row_.SetValueText(AsString(config_.item_spacing) + "px");
+    indicator_size_row_.SetValueText(AsString(config_.indicator_size) + "px");
+    popup_item_height_row_.SetValueText(AsString(config_.popup_item_height) + "px");
+    popup_max_items_row_.SetValueText(AsString(config_.popup_max_items));
+    popup_max_height_row_.SetValueText(AsString(config_.popup_max_height) + "px");
+    popup_space_row_.SetValueText(AsString(config_.popup_space) + "px");
+    popup_frame_width_row_.SetValueText(AsString(config_.popup_frame_width) + "px");
+    popup_radius_row_.SetValueText(AsString(config_.popup_radius) + "px");
+    shadow_distance_row_.SetValueText(AsString(config_.shadow_distance) + "px");
+    shadow_offset_x_row_.SetValueText(AsString(config_.shadow_offset_x) + "px");
+    shadow_offset_y_row_.SetValueText(AsString(config_.shadow_offset_y) + "px");
+    shadow_alpha_row_.SetValueText(AsString(config_.shadow_alpha));
+
+    code_panel_.Code().SetText(BuildUsageCode());
+    RefreshModelTree();
+    RefreshState();
+    inspector_acc_.RefreshLayoutDeep();
+    inspector_scroll_.RefreshLayout();
+    preview_.RefreshLayout();
+    preview_.Refresh();
+}
+
+void UiDropdownDemoWindow::ApplyTheme(UiThemeMode mode)
+{
+    UiThemeContext ctx = UiTheme::GetContext();
+    ctx.mode = mode;
+    ctx.preset = UiThemePreset::Minimal;
+    UiTheme::SetContext(ctx);
+    palette_ = ResolveDemoPalette(mode);
+
+    header_.SetStyle(MakeHeaderStyle(palette_));
+    version_badge_.SetStyle(MakeBadgeStyle(palette_));
+    theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
+    theme_icon_.SetStyle(MakeBodyLabelStyle(palette_));
+    theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
+    theme_toggle_.SetData(mode == UiThemeMode::Dark);
+    exit_button_.SetStyle(MakeExitButtonStyle(palette_));
+    copy_label_.SetStyle(MakeBodyLabelStyle(palette_, true, true));
+    copy_button_.SetStyle(MakeCopyButtonStyle(palette_));
+    code_panel_.SetStyle(MakeCodePanelStyle(palette_));
+    code_panel_.Scroll().SetStyle(MakeScrollBodyStyle());
+    code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
+    inspector_scroll_.SetStyle(MakeScrollBodyStyle());
+    inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
+    data_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    layout_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    behavior_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    appearance_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    popup_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    shadow_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
+    shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
+    shadow_curve_field_.SetCurve(config_.shadow_curve);
+    preview_.SetPalette(palette_);
+    model_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
+    model_scroll_.SetStyle(MakeScrollBodyStyle());
+    model_tree_.SetStyle(UiTheme::ResolveTree());
+
+    UiLabel::Style body = MakeBodyLabelStyle(palette_);
+    UiLabel::Style value = MakeValueLabelStyle(palette_);
+    UiBaseEdit::Style edit = MakeEditStyle(palette_);
+    dataset_label_.SetStyle(body); item_text_label_.SetStyle(body); item_desc_label_.SetStyle(body); item_right_label_.SetStyle(body);
+    item_icon_label_.SetStyle(body); indicator_side_label_.SetStyle(body); popup_marker_side_label_.SetStyle(body); drag_side_label_.SetStyle(body);
+    popup_selection_icon_label_.SetStyle(body); popup_check_checked_icon_label_.SetStyle(body); popup_check_unchecked_icon_label_.SetStyle(body);
+    align_h_label_.SetStyle(body); align_v_label_.SetStyle(body); shadow_curve_label_.SetStyle(body);
+    state_theme_label_.SetStyle(body); state_mode_label_.SetStyle(body); state_items_label_.SetStyle(body); state_selection_label_.SetStyle(body); state_data_label_.SetStyle(body);
+    state_theme_value_.SetStyle(value); state_mode_value_.SetStyle(value); state_items_value_.SetStyle(value); state_selection_value_.SetStyle(value); state_data_value_.SetStyle(value);
+
+    min_width_row_.SetLabelStyle(body).SetValueStyle(value);
+    min_height_row_.SetLabelStyle(body).SetValueStyle(value);
+    radius_row_.SetLabelStyle(body).SetValueStyle(value);
+    frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
+    margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
+    margin_y_row_.SetLabelStyle(body).SetValueStyle(value);
+    content_gap_row_.SetLabelStyle(body).SetValueStyle(value);
+    item_spacing_row_.SetLabelStyle(body).SetValueStyle(value);
+    indicator_size_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_item_height_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_max_items_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_max_height_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_space_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
+    popup_radius_row_.SetLabelStyle(body).SetValueStyle(value);
+    shadow_distance_row_.SetLabelStyle(body).SetValueStyle(value);
+    shadow_offset_x_row_.SetLabelStyle(body).SetValueStyle(value);
+    shadow_offset_y_row_.SetLabelStyle(body).SetValueStyle(value);
+    shadow_alpha_row_.SetLabelStyle(body).SetValueStyle(value);
+    enabled_row_.SetLabelStyle(body);
+    multi_select_row_.SetLabelStyle(body);
+    show_indicator_row_.SetLabelStyle(body);
+    popup_scrollbar_row_.SetLabelStyle(body);
+    selection_badge_row_.SetLabelStyle(body);
+    use_drag_row_.SetLabelStyle(body);
+    drag_handle_row_.SetLabelStyle(body);
+    popup_marker_row_.SetLabelStyle(body);
+    popup_auto_close_row_.SetLabelStyle(body);
+    popup_pinned_row_.SetLabelStyle(body);
+    popup_use_main_skin_row_.SetLabelStyle(body);
+    shadow_row_.SetLabelStyle(body);
+    face_color_row_.SetLabelStyle(body);
+    frame_color_row_.SetLabelStyle(body);
+    text_color_row_.SetLabelStyle(body);
+    icon_color_row_.SetLabelStyle(body);
+    popup_background_row_.SetLabelStyle(body);
+    popup_frame_color_row_.SetLabelStyle(body);
+    shadow_color_row_.SetLabelStyle(body);
+
+    UiDropdown::Style dd_style = MakeDropdownStyle(palette_);
+    dataset_drop_.SetStyle(dd_style); item_icon_drop_.SetStyle(dd_style); indicator_side_drop_.SetStyle(dd_style);
+    popup_marker_side_drop_.SetStyle(dd_style); drag_side_drop_.SetStyle(dd_style); popup_selection_icon_drop_.SetStyle(dd_style);
+    popup_check_checked_icon_drop_.SetStyle(dd_style); popup_check_unchecked_icon_drop_.SetStyle(dd_style);
+    align_h_drop_.SetStyle(dd_style); align_v_drop_.SetStyle(dd_style);
+    shadow_curve_preset_drop_.SetStyle(dd_style);
+
+    UiButton::Style btn = MakeSmallButtonStyle(palette_);
+    new_item_button_.SetStyle(btn);
+    save_item_button_.SetStyle(btn);
+    delete_item_button_.SetStyle(btn);
+    item_text_edit_.SetStyle(edit);
+    item_desc_edit_.SetStyle(edit);
+    item_right_edit_.SetStyle(edit);
+
+    RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+}
+
+void UiDropdownDemoWindow::Paint(Draw& w)
+{
+    Rect r(Point(0, 0), GetSize());
+    w.DrawRect(r, palette_.paper);
+    int split_x = int(r.GetWidth() * 0.64);
+    int header_h = DPI(78);
+    w.DrawRect(split_x, 0, 1, r.GetHeight(), palette_.divider);
+    w.DrawRect(0, header_h, r.GetWidth(), 1, palette_.divider);
+}
+
+void UiDropdownDemoWindow::Layout()
+{
+    Rect r(Point(0, 0), GetSize());
+    int split_x = int(r.GetWidth() * 0.64);
+    int header_h = DPI(78);
+    int body_y = header_h + 1;
+
+    header_.SetRect(DPI(18), DPI(12), max(0, split_x - DPI(36)), header_h - DPI(18));
+    version_badge_.SetRect(split_x + DPI(16), DPI(16), DPI(86), DPI(34));
+    theme_shell_.SetRect(split_x + DPI(110), DPI(16), DPI(96), DPI(34));
+    theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
+    theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
+    exit_button_.SetRect(r.right - DPI(112), DPI(16), DPI(94), DPI(34));
+
+    preview_.SetRect(0, body_y, split_x, max(0, r.bottom - body_y));
+    inspector_scroll_.SetRect(split_x + DPI(16), body_y + DPI(8), max(0, r.right - split_x - DPI(28)), max(0, r.bottom - body_y - DPI(16)));
+    inspector_scroll_.Layout();
+    Rect viewport = inspector_scroll_.GetViewportRect();
+    inspector_acc_.SetRect(0, 0, max(0, viewport.GetWidth()), inspector_acc_.GetMinSize().cy);
+}
+
+} // namespace
 
 GUI_APP_MAIN
 {
-    UiDropdownDemo().Run();
+    UiDropdownDemoWindow demo;
+    demo.Run();
 }
+
+
+
+
+
 
 
 

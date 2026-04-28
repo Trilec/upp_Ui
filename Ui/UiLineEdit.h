@@ -62,5 +62,3 @@ public:
 } // namespace Upp
 
 #endif
-
-

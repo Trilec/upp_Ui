@@ -66,7 +66,7 @@ bool UiListModel::Remove(int pos)
 
 bool UiListModel::Move(int from, int to)
 {
-    if(from < 0 || from >= items_.GetCount() || to < 0 || to >= items_.GetCount())
+    if(from < 0 || from >= items_.GetCount() || to < 0 || to > items_.GetCount())
         return false;
     if(from == to)
         return true;
@@ -905,4 +905,3 @@ int UiMenuModel::GetNodeCount() const
 }
 
 }
-

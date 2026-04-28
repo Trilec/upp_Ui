@@ -602,7 +602,7 @@ const UiDoc::Style& UiDoc::StyleDefault()
 
         s.metrics.frame_width      = DPI(1);
         s.metrics.radius           = DPI(2);
-        s.metrics.content_padding  = Rect(DPI(6), DPI(5), DPI(6), DPI(5));
+        s.metrics.content_margin  = Rect(DPI(6), DPI(5), DPI(6), DPI(5));
         s.metrics.use_text_font    = false;
         s.metrics.text_font        = StdFont();
 
@@ -1100,7 +1100,7 @@ void UiDoc::RebuildLayoutCache() const
                 int cell_h = max(DPI(22), base.GetHeight() + DPI(8));
                 int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
                 int gutter_right = (gutter_side_ == GUTTER_RIGHT ? GetGutterLaneWidth() : 0);
-                int avail_w = text_rect_.GetWidth() - style_.metrics.content_padding.left - style_.metrics.content_padding.right - gutter_left - gutter_right - DPI(8);
+                int avail_w = text_rect_.GetWidth() - style_.metrics.content_margin.left - style_.metrics.content_margin.right - gutter_left - gutter_right - DPI(8);
                 avail_w = max(DPI(120), avail_w);
                 int cell_w = max(DPI(56), avail_w / tm.cols);
                 Vector<int> row_heights;
@@ -1139,7 +1139,7 @@ void UiDoc::RebuildLayoutCache() const
     }
     line_height_ = max_line_h;
 
-    int py = style_.metrics.content_padding.top + style_.metrics.content_padding.bottom;
+    int py = style_.metrics.content_margin.top + style_.metrics.content_margin.bottom;
     doc_height_ = y_acc + py;
     ASSERT(paragraph_margin_steps_.GetCount() == line_starts_.GetCount());
     ASSERT(block_meta_.GetCount() == line_starts_.GetCount());
@@ -1294,7 +1294,7 @@ int UiDoc::PosToX(int line, int col) const
     line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     col  = ClampValue(col, 0, line_lengths_[line]);
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
-    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
+    int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
     int start = line_starts_[line];
@@ -1312,7 +1312,7 @@ int UiDoc::XToColumn(int line, int x) const
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
-    int rel = x - (text_rect_.left + style_.metrics.content_padding.left + gutter_left + indent * max(1, style_.margin_step) + prefix);
+    int rel = x - (text_rect_.left + style_.metrics.content_margin.left + gutter_left + indent * max(1, style_.margin_step) + prefix);
     int start = line_starts_[line];
     int len = line_lengths_[line];
     ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
@@ -1327,7 +1327,7 @@ int UiDoc::PosAtPointInternal(Point p) const
     if(text_rect_.IsEmpty())
         return 0;
 
-    int top = text_rect_.top + style_.metrics.content_padding.top;
+    int top = text_rect_.top + style_.metrics.content_margin.top;
     int y = p.y - top + scroll_y_;
     int line = HitTestLineByY(y);
 
@@ -2647,17 +2647,17 @@ bool UiDoc::GetTableLineVisual(int line,
     rows = model.rows.GetCount();
 
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
-    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
+    int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int indent = (line < paragraph_margin_steps_.GetCount() ? paragraph_margin_steps_[line] : 0) * max(1, style_.margin_step);
     int prefixw = GetLineVisualPrefixWidth(line);
     int x = left + indent + prefixw;
 
-    int line_top = text_rect_.top + style_.metrics.content_padding.top + GetLineTopY(line) - scroll_y_;
+    int line_top = text_rect_.top + style_.metrics.content_margin.top + GetLineTopY(line) - scroll_y_;
     int text_h = (line < line_text_heights_.GetCount() ? line_text_heights_[line] : max(DPI(16), GetBaseFont().GetHeight()));
     int y = line_top + (line_lengths_[line] > 0 ? text_h + DPI(3) : DPI(1));
 
     int gutter_right = (gutter_side_ == GUTTER_RIGHT ? GetGutterLaneWidth() : 0);
-    int avail_w = text_rect_.right - style_.metrics.content_padding.right - gutter_right - x - DPI(8);
+    int avail_w = text_rect_.right - style_.metrics.content_margin.right - gutter_right - x - DPI(8);
     avail_w = max(DPI(120), avail_w);
     cell_w = max(DPI(56), avail_w / cols);
     cell_h = max(DPI(22), GetBaseFont().GetHeight() + DPI(8));
@@ -2698,7 +2698,7 @@ bool UiDoc::HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& ca
     if(text_rect_.IsEmpty())
         return false;
 
-    int top = text_rect_.top + style_.metrics.content_padding.top;
+    int top = text_rect_.top + style_.metrics.content_margin.top;
     int y_doc = p.y - top + scroll_y_;
     int line = HitTestLineByY(y_doc);
     if(line < 0 || line >= line_table_embed_ix_.GetCount())
@@ -2824,9 +2824,9 @@ bool UiDoc::HitTestBlockImage(Point p, String& embed_id) const
     int gutter_w = GetGutterLaneWidth();
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
     int gutter_right = (gutter_side_ == GUTTER_RIGHT ? gutter_w : 0);
-    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
-    int right_content_edge = text_rect_.right - style_.metrics.content_padding.right - gutter_right;
-    int top_base = text_rect_.top + style_.metrics.content_padding.top - scroll_y_;
+    int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
+    int right_content_edge = text_rect_.right - style_.metrics.content_margin.right - gutter_right;
+    int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
 
     for(int line = 0; line < line_starts_.GetCount(); line++) {
         int y = top_base + GetLineTopY(line);
@@ -2880,8 +2880,8 @@ bool UiDoc::HitTestInlineImage(Point p, String& embed_id) const
 
     int gutter_w = GetGutterLaneWidth();
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
-    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
-    int top_base = text_rect_.top + style_.metrics.content_padding.top - scroll_y_;
+    int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
+    int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
 
     for(int line = 0; line < line_starts_.GetCount(); line++) {
         int y = top_base + GetLineTopY(line);
@@ -4959,8 +4959,8 @@ void UiDoc::ScrollSelectionIntoView()
     if(cr.IsEmpty())
         return;
 
-    int top = text_rect_.top + style_.metrics.content_padding.top;
-    int bottom = text_rect_.bottom - style_.metrics.content_padding.bottom;
+    int top = text_rect_.top + style_.metrics.content_margin.top;
+    int bottom = text_rect_.bottom - style_.metrics.content_margin.bottom;
     int view_h = max(1, bottom - top);
 
     int caret_top_doc = cr.top + scroll_y_ - top;
@@ -5659,7 +5659,7 @@ Rect UiDoc::GetCaretRect() const
     int col = GetColumnFromPos(line, caret_pos_);
     int x = PosToX(line, col);
     int lh = GetLineHeight(line);
-    int y = text_rect_.top + style_.metrics.content_padding.top + GetLineTopY(line) - scroll_y_;
+    int y = text_rect_.top + style_.metrics.content_margin.top + GetLineTopY(line) - scroll_y_;
     return RectC(x, y, max(1, style_.caret_width), lh);
 }
 
@@ -5675,7 +5675,7 @@ Point UiDoc::PointAtPos(int pos) const
     int line = GetLineIndexFromPos(pos);
     int col  = GetColumnFromPos(line, pos);
     int x = PosToX(line, col);
-    int y = text_rect_.top + style_.metrics.content_padding.top + GetLineTopY(line) - scroll_y_;
+    int y = text_rect_.top + style_.metrics.content_margin.top + GetLineTopY(line) - scroll_y_;
     return Point(x, y);
 }
 
@@ -5749,11 +5749,11 @@ void UiDoc::Paint(Draw& w)
     int gutter_w = GetGutterLaneWidth();
     int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
     int gutter_right = (gutter_side_ == GUTTER_RIGHT ? gutter_w : 0);
-    int left = text_rect_.left + style_.metrics.content_padding.left + gutter_left;
-    int lane_left = text_rect_.left + style_.metrics.content_padding.left;
-    int lane_right = text_rect_.right - style_.metrics.content_padding.right - gutter_w;
-    int right_content_edge = text_rect_.right - style_.metrics.content_padding.right - gutter_right;
-    int top_base = text_rect_.top + style_.metrics.content_padding.top - scroll_y_;
+    int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
+    int lane_left = text_rect_.left + style_.metrics.content_margin.left;
+    int lane_right = text_rect_.right - style_.metrics.content_margin.right - gutter_w;
+    int right_content_edge = text_rect_.right - style_.metrics.content_margin.right - gutter_right;
+    int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
 
     w.Clip(text_rect_);
 
@@ -6775,6 +6775,3 @@ Size UiDoc::GetMinSize() const
 }
 
 }
-
-
-

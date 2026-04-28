@@ -23,6 +23,9 @@
     - 2026-03: added release-standard header documentation.
     - 2026-04: tightened default thin-idle geometry and thumb contrast so
       scrollbars reserve the full gutter but paint a more centered, inset thumb.
+    - 2026-04: aligned arrow icon rendering with shared UiIconRenderMode while
+      keeping arrow-specific naming scoped to the scrollbar style.
+    - 2026-04: normalized part-aware paint hooks for track, thumb, and arrows.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -77,7 +80,7 @@ public:
 
         bool  arrow_icons      = false;
         bool  arrow_icon_scale = true;
-        bool  arrow_icon_mono  = true;
+        UiIconRenderMode arrow_icon_render_mode = UiIconRenderMode::MonoTint;
         Image arrow_icon_prev_h;
         Image arrow_icon_next_h;
         Image arrow_icon_prev_v;
@@ -134,7 +137,7 @@ public:
               % arrow_skin
               % arrow_icons
               % arrow_icon_scale
-              % arrow_icon_mono
+              % arrow_icon_render_mode
               % arrow_icon_prev_h
               % arrow_icon_next_h
               % arrow_icon_prev_v
@@ -174,6 +177,26 @@ public:
                 grip = (UiScrollGrip)clamp(_grip, (int)UIGRIP_NONE, (int)UIGRIP_IMAGE);
             }
         }
+    };
+
+    struct PaintContext {
+        Rect outer;
+        Rect track_hit;
+        Rect track;
+        Rect thumb_hit;
+        Rect thumb;
+        Rect arrow0;
+        Rect arrow1;
+        const Style* style = nullptr;
+        StyledState track_state = ST_NORMAL;
+        StyledState thumb_state = ST_NORMAL;
+        StyledState arrow0_state = ST_NORMAL;
+        StyledState arrow1_state = ST_NORMAL;
+        UiDirection direction = UiDirection::V;
+        int min = 0;
+        int max = 0;
+        int page = 0;
+        int pos = 0;
     };
 
 private:
@@ -217,15 +240,11 @@ private:
     void AnimateFade_(double target);
     void PaintCore_(Draw& w, const Rect& outer);
 
-    Event<Draw&, const Rect&,
-          const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-          StyledState> WhenPaintTrack;
-    Event<Draw&, const Rect&,
-          const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-          StyledState> WhenPaintThumb;
-    Event<Draw&, const Rect&,
-          const StyledPalette&, const StyledMetrics&, const StyledSkin&,
-          StyledState, int> WhenPaintArrow;
+    // Part-aware paint hooks. Set handled = true to replace the default paint
+    // for that surface while keeping geometry ownership inside the control.
+    Event<Draw&, const PaintContext&, bool&> WhenPaintTrack;
+    Event<Draw&, const PaintContext&, bool&> WhenPaintThumb;
+    Event<Draw&, const PaintContext&, int, bool&> WhenPaintArrow;
 
 public:
     UiScrollBar();
@@ -305,6 +324,7 @@ public:
     virtual void MouseLeave() override;
     virtual void CancelMode() override;
     virtual void MouseWheel(Point p, int zdelta, dword keyflags) override;
+    void SyncHoverFromMouse();
 
     virtual String GetDesc() const override;
     virtual dword  GetAccessKeys() const override { return 0; }
@@ -392,7 +412,3 @@ UiScrollBar& UiScrollBar::Animate(const T& from, const T& to, int ms,
 } // namespace Upp
 
 #endif
-
-
-
-

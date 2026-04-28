@@ -1,4 +1,4 @@
-description "U++ Ui Control library system\377";
+﻿description "U++ Ui Control library system\377";
 
 uses
 	Core,
@@ -19,6 +19,7 @@ file
 	UiDataModels.cpp,
 	UiLayoutCursor.h,
 	UiIcons.h,
+	UiIcons.iml,	UiIcons.cpp,
 	UiLabel.h,
 	UiLabel.cpp,
 	UiCheckBox.h,
@@ -61,6 +62,12 @@ file
 	UiMaskEdit.cpp,
 	UiSlider.h,
 	UiSlider.cpp,
+	UiCompositeSlider.h,
+	UiCompositeSlider.cpp,
+	UiCompositeToggle.h,
+	UiCompositeToggle.cpp,
+	UiCompositeColor.h,
+	UiCompositeColor.cpp,
 	UiSliderEdit.h,
 	UiSliderEdit.cpp,
 	UiScrollBar.h,

@@ -311,9 +311,9 @@ Rect UiTable::GetColumnHeaderRect() const
 {
     Rect vp = GetViewportRect();
     const Style& style = GetEffectiveStyle();
-    int top = vp.top + style.metrics.content_padding.top;
-    int left = vp.left + style.metrics.content_padding.left + (style.show_row_headers ? style.row_header_width : 0);
-    int right = vp.right - style.metrics.content_padding.right;
+    int top = vp.top + style.metrics.content_margin.top;
+    int left = vp.left + style.metrics.content_margin.left + (style.show_row_headers ? style.row_header_width : 0);
+    int right = vp.right - style.metrics.content_margin.right;
     return style.show_column_headers ? Rect(left, top, right, top + style.header_height) : Rect(0, 0, 0, 0);
 }
 
@@ -321,9 +321,9 @@ Rect UiTable::GetRowHeaderRect() const
 {
     Rect vp = GetViewportRect();
     const Style& style = GetEffectiveStyle();
-    int left = vp.left + style.metrics.content_padding.left;
-    int top = vp.top + style.metrics.content_padding.top + (style.show_column_headers ? style.header_height : 0);
-    int bottom = vp.bottom - style.metrics.content_padding.bottom;
+    int left = vp.left + style.metrics.content_margin.left;
+    int top = vp.top + style.metrics.content_margin.top + (style.show_column_headers ? style.header_height : 0);
+    int bottom = vp.bottom - style.metrics.content_margin.bottom;
     return style.show_row_headers ? Rect(left, top, left + style.row_header_width, bottom) : Rect(0, 0, 0, 0);
 }
 
@@ -341,10 +341,10 @@ Rect UiTable::GetDataRect() const
     Rect vp = GetViewportRect();
     const Style& style = GetEffectiveStyle();
     Rect r = vp;
-    r.left += style.metrics.content_padding.left + (style.show_row_headers ? style.row_header_width : 0);
-    r.top += style.metrics.content_padding.top + (style.show_column_headers ? style.header_height : 0);
-    r.right -= style.metrics.content_padding.right;
-    r.bottom -= style.metrics.content_padding.bottom;
+    r.left += style.metrics.content_margin.left + (style.show_row_headers ? style.row_header_width : 0);
+    r.top += style.metrics.content_margin.top + (style.show_column_headers ? style.header_height : 0);
+    r.right -= style.metrics.content_margin.right;
+    r.bottom -= style.metrics.content_margin.bottom;
     return r;
 }
 
@@ -971,9 +971,9 @@ void UiTable::Layout()
 Size UiTable::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    int width = style.metrics.content_padding.left + style.metrics.content_padding.right
+    int width = style.metrics.content_margin.left + style.metrics.content_margin.right
               + (style.show_row_headers ? style.row_header_width : 0) + style.default_column_width * 3;
-    int height = style.metrics.content_padding.top + style.metrics.content_padding.bottom
+    int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom
                + (style.show_column_headers ? style.header_height : 0) + style.row_height * 6;
     return UiStyledOuterSizeFromContent(Size(width, height), style.metrics, style.skin);
 }

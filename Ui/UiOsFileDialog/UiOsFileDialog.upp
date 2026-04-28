@@ -1,0 +1,14 @@
+description "UiOsFileDialog";
+charset "UTF-8";
+tabsize 4;
+file
+    UiOsFileDialog.h,
+    UiOsFileDialog.cpp,
+    UiOsFileDialogWin.cpp,
+    UiOsFileDialogMac.mm,
+    UiOsFileDialogLinux.cpp;
+mainconfig
+    "" = "";
+uses
+    Core,
+    CtrlCore;

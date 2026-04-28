@@ -22,9 +22,13 @@
     - Add sections with AddSection(...), populate GetSectionContent(i), and
       drive open state with Open()/Toggle().
 
-    Changelog
-    - 2026-03: normalized section accessor naming for release cleanup.
-*/
+      Changelog
+      - 2026-03: normalized section accessor naming for release cleanup.
+      - 2026-04: aligned drag reorder with list/dropdown by adding visible drag
+        handle support, side placement, and custom drag glyphs.
+      - 2026-04: stabilized section body measurement by preferring explicit
+        content sizing over naive child GetMinSize() fallback where possible.
+  */
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -53,7 +57,7 @@ public:
         UiPanel::Style     body_style;
 
         int  header_height   = DPI(72);
-        int  section_gap     = DPI(8);
+        int  item_spacing    = DPI(8);
         int  header_body_gap = DPI(4);
         int  body_min_height = DPI(88);
 
@@ -66,6 +70,13 @@ public:
         Image glyph_lock;
         bool chevron_scale = false;
         int  chevron_size  = 0;
+        int  chevron_gap   = DPI(8);
+
+        bool show_drag_handle = true;
+        UiAlign drag_side = UiAlign::RIGHT;
+        Image drag_glyph;
+        int  drag_size = DPI(14);
+        int  drag_gap  = DPI(8);
 
         bool unified_section_frame = false;
         int  unified_section_radius = DPI(7);
@@ -89,10 +100,11 @@ public:
 
             s % palette % metrics % skin
               % header_style % body_style
-              % header_height % section_gap % header_body_gap % body_min_height
+              % header_height % item_spacing % header_body_gap % body_min_height
               % single_open % enforce_one % show_chevron % chevron_side
               % glyph_open % glyph_closed % glyph_lock
-              % chevron_scale % chevron_size
+              % chevron_scale % chevron_size % chevron_gap
+              % show_drag_handle % drag_side % drag_glyph % drag_size % drag_gap
               % unified_section_frame % unified_section_radius % unified_section_frame_width
               % blex % blst % body_line_thickness % body_line_color
               % animation_enabled % anim_open_ms % anim_close_ms
@@ -109,11 +121,13 @@ private:
         UiAccordion* owner = nullptr;
         int          index = -1;
         bool         down  = false;
+        bool         down_on_drag = false;
 
         void LeftDown(Point p, dword keyflags) override;
         void MouseMove(Point p, dword keyflags) override;
         void LeftUp(Point p, dword keyflags) override;
         bool Key(dword key, int count) override;
+        void Paint(Draw& w) override;
     };
 
     struct Section {
@@ -181,6 +195,8 @@ public:
     UiAccordion& SetEnforceOne(bool on = true);
     UiAccordion& ShowChevron(bool on = true);
     UiAccordion& SetChevronSide(UiAlign side);
+    UiAccordion& SetChevronSize(int px);
+    UiAccordion& SetChevronGap(int px);
     UiAccordion& SetChevronGlyphs(const Image& open, const Image& closed, const Image& lock = Image());
     UiAccordion& SetHeaderRuleExtent(UiSpan ex);
     UiAccordion& SetBodyLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
@@ -191,6 +207,9 @@ public:
     UiAccordion& SetAnimation(bool enabled, int open_ms = 120, int close_ms = 0);
     UiAccordion& EnableDragReorder(bool on = true);
     bool         IsDragReorderEnabled() const { return drag_reorder_enabled_; }
+    UiAccordion& ShowDragHandle(bool on = true);
+    UiAccordion& SetDragSide(UiAlign side);
+    UiAccordion& SetDragGlyph(const Image& glyph);
 
     void BeginHeaderDrag(int i, Point start_screen);
     void ContinueHeaderDrag(Point p_screen);
@@ -228,6 +247,10 @@ private:
     void StopAllAnimations();
     void AnimationStep();
     void NormalizePolicyAfterBulkChange();
+    int  GetChevronReserve(const Section& s) const;
+    int  GetDragReserve() const;
+    Rect GetHeaderDragRect(int i) const;
+    bool CanBeginHeaderDrag(int i, Point p_local) const;
     void MoveSectionTo(int from, int before);
     void ReindexSections();
     int  ResolveLineWidth(UiSpan ex, int avail) const;
@@ -255,3 +278,4 @@ private:
 }
 
 #endif
+

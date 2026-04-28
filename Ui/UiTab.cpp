@@ -34,20 +34,20 @@ const UiTab::Style& UiTab::StyleDefault()
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = DPI(10);
-        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
 
         s.tab_metrics.face_enabled = true;
         s.tab_metrics.frame_enabled = true;
         s.tab_metrics.frame_width = DPI(1);
         s.tab_metrics.radius = DPI(8);
-        s.tab_metrics.content_padding = Rect(0, 0, 0, 0);
+        s.tab_metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.tab_extent = DPI(34);
-        s.tab_gap = DPI(6);
+        s.item_spacing = DPI(6);
         s.body_gap = DPI(6);
         s.tab_padding = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         s.strip_inset = Rect(0, 0, 0, 0);
-        s.icon_text_gap = DPI(6);
+        s.content_gap = DPI(6);
         s.affordance_gap = DPI(4);
         s.affordance_size = DPI(12);
         s.min_tab_main = DPI(72);
@@ -375,7 +375,7 @@ Size UiTab::GetMinSize() const
         }
     }
     const Style& style = GetEffectiveStyle();
-    int ex = max(DPI(24), style.tab_extent) + style.tab_gap;
+    int ex = max(DPI(24), style.tab_extent) + style.item_spacing;
     if(IsHorizontal())
         h += ex;
     else
@@ -425,7 +425,7 @@ void UiTab::Layout()
     if(n <= 0)
         return;
 
-    int gap = max(0, style.tab_gap);
+    int gap = max(0, style.item_spacing);
     bool horz = IsHorizontal();
     int avail = horz ? tabs_rect_.GetWidth() : tabs_rect_.GetHeight();
     Vector<int> pref;
@@ -443,7 +443,7 @@ void UiTab::Layout()
         int aff_w = aff_count > 0 ? (aff_count * style.affordance_size + max(0, aff_count - 1) * style.affordance_gap + style.affordance_gap) : 0;
         int main = (horz ? t.text_size.cx : t.text_size.cy) + style.tab_padding.left + style.tab_padding.right;
         if(icon_w > 0)
-            main += icon_w + style.icon_text_gap;
+            main += icon_w + style.content_gap;
         main += aff_w;
         main = max(main, style.min_tab_main);
         pref[i] = main;
@@ -636,12 +636,12 @@ void UiTab::Paint(Draw& w)
             int ico = max(DPI(12), min(ir.GetWidth(), ir.GetHeight()));
             int iw = min(ico, max(DPI(12), style.tab_extent - DPI(14)));
             Rect icon_r = RectC(ir.left, ir.top + (ir.GetHeight() - iw) / 2, iw, iw);
-            UiPaintStyledIcon(w, icon_r, t.icon, true, true, icon_ink, ts != ST_DISABLED);
-            ir.left = icon_r.right + style.icon_text_gap;
+        UiPaintStyledIcon(w, icon_r, t.icon, true, true, UiIconRenderMode::MonoTint, icon_ink, ts != ST_DISABLED);
+            ir.left = icon_r.right + style.content_gap;
         }
 
         if(!t.drag_rect.IsEmpty()) {
-            UiPaintStyledIcon(w, t.drag_rect, ICON_DESIGN_DRAG_INDICATOR_48(), true, true, icon_ink, ts != ST_DISABLED);
+        UiPaintStyledIcon(w, t.drag_rect, ICON_DESIGN_DRAG_INDICATOR_48(), true, true, UiIconRenderMode::MonoTint, icon_ink, ts != ST_DISABLED);
         }
 
         if(!t.close_rect.IsEmpty()) {
@@ -795,7 +795,7 @@ void UiTab::Paint(Draw& w)
 
             if(style.visual == UITAB_UNDERLINE && i == active_) {
                 int icon_w = IsNull(t.icon) ? 0 : max(DPI(12), style.tab_extent - DPI(14));
-                int content_w = t.text_size.cx + (icon_w > 0 ? (icon_w + style.icon_text_gap) : 0) + style.tab_padding.left + style.tab_padding.right;
+                int content_w = t.text_size.cx + (icon_w > 0 ? (icon_w + style.content_gap) : 0) + style.tab_padding.left + style.tab_padding.right;
                 int maxw = max(DPI(14), t.tab_rect.GetWidth() - DPI(8));
                 int wline = maxw;
                 if(style.indicator_span == SMALL)
@@ -956,15 +956,3 @@ void UiTab::LostFocus()
 }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -26,6 +26,10 @@
     Changelog
     - 2026-03: standardized selection event naming and added SetData/GetData
       selection contract for release cleanup.
+    - 2026-04: normalized custom tree icon naming and render policy onto
+      icon/icon_render_mode to match the wider Ui API vocabulary.
+    - 2026-04: added GetContentSize() to expose stable content extent for
+      parent containers and inspector shells.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -72,7 +76,8 @@ public:
         int indent_px = DPI(16);
         int glyph_size = DPI(10);
         int icon_size = DPI(16);
-        int label_gap = DPI(6);
+        int content_gap = DPI(6);
+        int item_spacing = 0;
         int h_padding = DPI(8);
         int v_padding = DPI(6);
         int row_radius = DPI(4);
@@ -84,9 +89,9 @@ public:
         bool show_connector_lines = false;
         bool show_metadata_marker = true;
         UiTreeGlyphStyle glyph_style = UITREEGLYPH_CHEVRON;
-        bool glyph_mono = true;
-        Image glyph_collapsed;
-        Image glyph_expanded;
+        UiIconRenderMode icon_render_mode = UiIconRenderMode::MonoTint;
+        Image collapsed_icon;
+        Image expanded_icon;
 
         Color ink = SColorText();
         Color disabled_ink = SColorDisabled();
@@ -106,10 +111,10 @@ public:
             byte glyph_style_byte = (byte)glyph_style;
             s % palette % metrics % skin
               % font % row_height % indent_px % glyph_size % icon_size
-              % label_gap % h_padding % v_padding % row_radius
+              % content_gap % item_spacing % h_padding % v_padding % row_radius
               % branch_hit_extra % metadata_size % metadata_gap % accessory_gap
               % show_icons % show_connector_lines % show_metadata_marker
-              % glyph_style_byte % glyph_mono % glyph_collapsed % glyph_expanded
+              % glyph_style_byte % icon_render_mode % collapsed_icon % expanded_icon
               % ink % disabled_ink
               % hot_face % hot_frame % hot_ink
               % selected_face % selected_frame % selected_ink
@@ -152,7 +157,8 @@ public:
     int GetSelectionCount() const { return selected_ids_.GetCount(); }
 
     UiTree& SetGlyphStyle(UiTreeGlyphStyle style);
-    UiTree& SetGlyphImages(const Image& collapsed, const Image& expanded, bool mono = true);
+    UiTree& SetGlyphImages(const Image& collapsed, const Image& expanded,
+                           UiIconRenderMode render_mode = UiIconRenderMode::MonoTint);
     UiTree& EnableDragDrop(bool on = true);
     bool IsDragDropEnabled() const { return dnd_enabled_; }
     UiTree& ShowConnectorLines(bool on = true);
@@ -184,6 +190,7 @@ public:
 
     virtual void Paint(Draw& w) override;
     virtual void Layout() override;
+    Size GetContentSize() const;
     virtual Size GetMinSize() const override;
     virtual void LeftDown(Point p, dword flags) override;
     virtual void LeftDouble(Point p, dword flags) override;
@@ -313,10 +320,3 @@ private:
 }
 
 #endif
-
-
-
-
-
-
-

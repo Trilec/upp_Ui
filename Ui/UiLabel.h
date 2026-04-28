@@ -16,11 +16,17 @@
     - GUI thread only.
 
     Usage
-    - Use SetText(), SetIcon(), and SetStyle() to configure static content.
+    - Use SetText(), SetIcon(), SetMargin(), SetContentGap(), and SetStyle() to configure static content.
     - Use GetData()/SetData() only for generic control binding scenarios.
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-04: aligned icon and rich-span icon rendering with shared
+      UiIconRenderMode.
+    - 2026-04: replaced label icon scaling with explicit icon sizing so
+      layout and paint use the requested icon size directly.
+    - 2026-04: simplified public content spacing to outer content_margin plus
+      one content_gap so labels no longer expose separate icon/text margins.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -44,7 +50,7 @@ public:
 
         String text;
         Image  icon;
-        bool   mono_icon = false;
+        UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
 
         Color  ink;
         Color  bg;
@@ -64,10 +70,8 @@ public:
 
         UiAlign align_h = UiAlign::LEFT;
         UiAlign align_v = UiAlign::CENTER;
-        UiAlign icon_layout = UiAlign::LEFT;
-
-        Rect icon_margin = Rect(DPI(2), 0, DPI(4), 0);
-        Rect text_margin = Rect(0, 0, 0, 0);
+        UiAlign icon_side = UiAlign::LEFT;
+        int     content_gap = DPI(6);
 
         Font font = StdFont();
         bool transparent = true;
@@ -81,8 +85,8 @@ public:
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
-              % align_h % align_v % icon_layout
-              % icon_margin % text_margin
+              % align_h % align_v % icon_side
+              % content_gap
               % font % transparent
               % underline % underline_width % underline_offset
               % nowrap;
@@ -100,8 +104,8 @@ private:
     bool   has_access_mnemonic_ = false;
 
     Image  icon_;
-    bool   mono_icon_ = false;
-    bool   icon_scale_ = true;
+    UiIconRenderMode icon_render_mode_ = UiIconRenderMode::PreserveColor;
+    Size   icon_size_ = Size(0, 0);
 
     Vector<String> lines_;
     Vector<Size>   line_sizes_;
@@ -129,6 +133,7 @@ private:
     void RebuildTextLines();
     void RebuildTextLinesFromStyle(const Style& st);
     String BuildPlainTextFromSpans() const;
+    Size GetStableIconSize() const;
     Size ComputeNaturalSize() const;
     Size GetTextBlockSize() const;
     void UpdateLayout(const Rect& content) const;
@@ -155,7 +160,7 @@ public:
     const Span& GetSpan(int i) const { return spans_[i]; }
 
     UiLabel& AddTextSpan(const String& text, Color ink = Null, bool bold = false, bool italic = false, bool underline = false);
-    UiLabel& AddIconSpan(const Image& icon, bool mono = false);
+    UiLabel& AddIconSpan(const Image& icon, UiIconRenderMode render_mode = UiIconRenderMode::PreserveColor);
     UiLabel& AddBulletSpan(Color color = Null, int size = DPI(6));
     UiLabel& AddNewlineSpan();
 
@@ -163,32 +168,21 @@ public:
     UiLabel& AppendAnsiText(const String& ansi);
 
     UiLabel& SetIcon(const Image& img);
-    UiLabel& SetMonoIcon(const Image& img);
+    UiLabel& SetIcon(const Image& img, UiIconRenderMode render_mode);
+    UiLabel& SetIconRenderMode(UiIconRenderMode render_mode);
     UiLabel& ClearIcon();
     Image    GetIcon() const { return icon_; }
+    UiLabel& SetIconSize(Size sz);
+    UiLabel& SetIconSize(int cx, int cy) { return SetIconSize(Size(cx, cy)); }
+    Size     GetIconSize() const { return icon_size_; }
 
-    UiLabel& SetIconLayout(UiAlign where);
+    UiLabel& SetIconSide(UiAlign where);
     UiLabel& SetAlign(UiAlign h, UiAlign v);
     UiLabel& SetAlignH(UiAlign h);
     UiLabel& SetAlignV(UiAlign v);
 
-    UiLabel& SetIconMargin(const Rect& m);
-    UiLabel& SetIconMargin(int l, int t, int r, int b) { return SetIconMargin(Rect(l, t, r, b)); }
-    UiLabel& SetIconMargin(int all) { return SetIconMargin(all, all, all, all); }
-    Rect     GetIconMargin() const { return GetEffectiveStyle().icon_margin; }
-
-    UiLabel& SetTextMargin(const Rect& m);
-    UiLabel& SetTextMargin(int l, int t, int r, int b) { return SetTextMargin(Rect(l, t, r, b)); }
-    UiLabel& SetTextMargin(int all) { return SetTextMargin(all, all, all, all); }
-    Rect     GetTextMargin() const { return GetEffectiveStyle().text_margin; }
-
-    UiLabel& SetIconScale(bool on = true)
-    {
-        icon_scale_ = on;
-        Refresh();
-        return *this;
-    }
-    bool IsIconScaled() const { return icon_scale_; }
+    UiLabel& SetContentGap(int gap);
+    int      GetContentGap() const { return max(0, GetEffectiveStyle().content_gap); }
 
     UiLabel& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)
     {
@@ -212,6 +206,8 @@ public:
     StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
 
     void OnStyleChanged();
+
+    Size GetContentSize() const;
 
     Size GetMinSize() const override;
     void Layout() override;
@@ -244,5 +240,3 @@ public:
 } // namespace Upp
 
 #endif
-
-

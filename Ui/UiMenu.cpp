@@ -84,7 +84,8 @@ Rect UiMenu::PopupLevel::GetRowRect(int index) const
     Rect r = GetSize();
     int sb = vscroll_.IsShown() ? ScrollBarSize() : 0;
     int scroll = vscroll_.IsShown() ? vscroll_.Get() : 0;
-    int row_top = style.popup_padding - scroll + index * style.row_height;
+    int extent = style.row_height + max(0, style.item_spacing);
+    int row_top = style.popup_padding - scroll + index * extent;
     return Rect(style.popup_padding, row_top, r.right - style.popup_padding - sb, row_top + style.row_height);
 }
 
@@ -109,14 +110,15 @@ int UiMenu::PopupLevel::GetVisibleStart() const
 {
     const Style& style = owner_->GetEffectiveStyle();
     int scroll = vscroll_.IsShown() ? vscroll_.Get() : 0;
-    return max(0, scroll / max(DPI(18), style.row_height));
+    int extent = max(DPI(18), style.row_height + max(0, style.item_spacing));
+    return max(0, scroll / max(1, extent));
 }
 
 int UiMenu::PopupLevel::GetVisibleCount() const
 {
     const Style& style = owner_->GetEffectiveStyle();
     int h = max(0, GetSize().cy - style.popup_padding * 2);
-    return max(1, h / max(DPI(18), style.row_height));
+    return max(1, h / max(DPI(18), style.row_height + max(0, style.item_spacing)));
 }
 
 Size UiMenu::PopupLevel::ComputeNaturalSize() const
@@ -248,7 +250,8 @@ void UiMenu::PopupLevel::MouseWheel(Point, int zdelta, dword)
 {
     if(!vscroll_.IsShown())
         return;
-    int step = owner_->GetEffectiveStyle().row_height * max(1, GetVisibleCount() / 2);
+    int extent = owner_->GetEffectiveStyle().row_height;
+    int step = extent * max(1, GetVisibleCount() / 2);
     vscroll_.Set(vscroll_.Get() - sgn(zdelta) * step);
     Refresh();
 }
@@ -284,7 +287,7 @@ const UiMenu::Style& UiMenu::StyleDefault()
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = DPI(8);
-        s.metrics.content_padding = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
         s.skin = StyledSkin();
     }
     return s;
@@ -859,9 +862,9 @@ Size UiMenu::ComputePopupSize(UiMenuNodeRef parent) const
         const UiMenuItem& item = model_->Get(node);
         int row_w = style.left_padding + style.right_padding;
         if(style.show_checks)
-            row_w += style.check_size + style.text_gap;
+            row_w += style.check_size + style.content_gap;
         if(style.show_icons && !IsNull(item.icon))
-            row_w += style.icon_size + style.text_gap;
+            row_w += style.icon_size + style.content_gap;
         row_w += GetTextSize(item.text, style.font).cx;
         if(!item.description.IsEmpty() && style.show_descriptions)
             row_w = max(row_w, style.left_padding + style.right_padding + GetTextSize(item.description, style.font).cx);
@@ -872,7 +875,8 @@ Size UiMenu::ComputePopupSize(UiMenuNodeRef parent) const
             row_w += style.right_gap + style.arrow_size;
         width = max(width, row_w + style.popup_padding * 2 + DPI(14));
     }
-    int height = min(style.popup_max_height, max(style.row_height, count * style.row_height + style.popup_padding * 2));
+    int content_h = count * style.row_height;
+    int height = min(style.popup_max_height, max(style.row_height, content_h + style.popup_padding * 2));
     return Size(width, height);
 }
 
@@ -956,20 +960,20 @@ void UiMenu::PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node, const Ui
             DrawMenuRadioGlyph(w, check_rect, style.check_color);
         else if(item.checkable && item.checked)
             DrawMenuCheckGlyph(w, check_rect, style.check_color);
-        x = check_rect.right + style.text_gap;
+        x = check_rect.right + style.content_gap;
     }
 
     if(style.show_icons && !IsNull(item.icon)) {
         Rect ir = RectC(x, rr.top + max(0, (rr.GetHeight() - style.icon_size) / 2), style.icon_size, style.icon_size);
         Color icon_ink = item.enabled ? style.item_ink : BlendDisabledMenu(style.disabled_ink);
-        UiPaintStyledIcon(w, ir, item.icon, true, item.mono_icon, icon_ink, item.enabled);
-        x = ir.right + style.text_gap;
+                UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, item.enabled);
+        x = ir.right + style.content_gap;
     }
 
     String right = GetRightText(item);
     int right_edge = rr.right - style.right_padding;
     if(HasSubMenu(node))
-        right_edge -= style.arrow_size + style.text_gap;
+        right_edge -= style.arrow_size + style.content_gap;
     if(!right.IsEmpty()) {
         Size rsz = GetTextSize(right, font);
         w.DrawText(max(x, right_edge - rsz.cx), rr.top + max(0, (rr.GetHeight() - rsz.cy) / 2), right, font, right_ink);
@@ -1109,4 +1113,3 @@ void UiMenu::LostFocus()
 }
 
 }
-

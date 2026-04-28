@@ -11,6 +11,23 @@ static double UiSliderClamp_(double v, double lo, double hi)
     return v;
 }
 
+static UiAlign UiSliderNormalizeTickSide_(UiDirection dir, UiAlign side)
+{
+    if(dir == UiDirection::H) {
+        if(side == UiAlign::LEFT)
+            return UiAlign::TOP;
+        if(side == UiAlign::RIGHT)
+            return UiAlign::BOTTOM;
+        return side == UiAlign::TOP ? UiAlign::TOP : UiAlign::BOTTOM;
+    }
+
+    if(side == UiAlign::TOP)
+        return UiAlign::LEFT;
+    if(side == UiAlign::BOTTOM)
+        return UiAlign::RIGHT;
+    return side == UiAlign::LEFT ? UiAlign::LEFT : UiAlign::RIGHT;
+}
+
 const UiSlider::Style& UiSlider::StyleDefault()
 {
     static Style s;
@@ -45,21 +62,20 @@ const UiSlider::Style& UiSlider::StyleDefault()
         s.track_metrics.radius = DPI(999);
         s.track_metrics.frame_enabled = false;
         s.track_metrics.face_enabled = true;
-        s.track_metrics.content_padding = Rect(0, 0, 0, 0);
+        s.track_metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.thumb_metrics.radius = DPI(999);
         s.thumb_metrics.frame_enabled = true;
         s.thumb_metrics.face_enabled = true;
         s.thumb_metrics.frame_width = DPI(2);
-        s.thumb_metrics.content_padding = Rect(0, 0, 0, 0);
+        s.thumb_metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.tick_color = Color(148, 163, 184);
         s.tick_len_major = DPI(5);
         s.tick_len_minor = DPI(3);
         s.tick_gap = DPI(4);
-        s.thick_px = DPI(18);
-        s.track_px = DPI(4);
-        s.thumb_len_px = DPI(14);
+        s.track_size = Size(DPI(120), DPI(4));
+        s.thumb_size = Size(DPI(14), DPI(18));
 
         init = true;
     }
@@ -144,6 +160,8 @@ UiSlider& UiSlider::SetDirection(UiDirection dir)
 {
     if(dir_ != dir) {
         dir_ = dir;
+        if(has_style_override_)
+            style_.tick_side = UiSliderNormalizeTickSide_(dir_, style_.tick_side);
         RefreshLayout();
         Refresh();
     }
@@ -185,7 +203,23 @@ UiSlider& UiSlider::SetTicks(bool on, int major_ticks, int minor_per_major)
 
 UiSlider& UiSlider::SetTickSide(UiAlign side)
 {
-    StyleEdit().tick_side = side;
+    StyleEdit().tick_side = UiSliderNormalizeTickSide_(dir_, side);
+    Refresh();
+    return *this;
+}
+
+UiSlider& UiSlider::SetTrackSize(Size sz)
+{
+    StyleEdit().track_size = Size(max(DPI(20), sz.cx), max(1, sz.cy));
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiSlider& UiSlider::SetThumbSize(Size sz)
+{
+    StyleEdit().thumb_size = Size(max(DPI(6), sz.cx), max(DPI(6), sz.cy));
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -211,11 +245,12 @@ Size UiSlider::GetMinSize() const
         return user_min_size_;
 
     const Style& style = GetEffectiveStyle();
-    int thick = max(DPI(18), style.thick_px);
+    int cross = dir_ == UiDirection::H ? max(DPI(18), style.thumb_size.cy) : max(DPI(18), style.thumb_size.cx);
     int tick_span = style.show_ticks ? (style.tick_gap + max(style.tick_len_major, style.tick_len_minor)) : 0;
+    int major = dir_ == UiDirection::H ? max(DPI(40), style.track_size.cx) : max(DPI(40), style.track_size.cy);
     return dir_ == UiDirection::H
-           ? Size(DPI(120), thick + tick_span + DPI(10))
-           : Size(thick + tick_span + DPI(10), DPI(120));
+           ? Size(major + DPI(16), cross + tick_span + DPI(10))
+           : Size(cross + tick_span + DPI(10), major + DPI(16));
 }
 
 void UiSlider::SetMinSize(Size sz)
@@ -231,14 +266,20 @@ Rect UiSlider::GetTrackRect() const
     if(outer.IsEmpty())
         return outer;
 
-    int thick = max(1, style.track_px);
-    int pad = max(DPI(8), style.thumb_len_px / 2 + DPI(2));
+    Size track = Size(max(DPI(20), style.track_size.cx), max(1, style.track_size.cy));
+    Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
     if(dir_ == UiDirection::H) {
-        int y = outer.CenterPoint().y - thick / 2;
-        return RectC(outer.left + pad, y, max(0, outer.GetWidth() - 2 * pad), thick);
+        int pad = max(DPI(8), thumb.cx / 2 + DPI(2));
+        int width = min(max(0, outer.GetWidth() - 2 * pad), track.cx);
+        int x = outer.left + (outer.GetWidth() - width) / 2;
+        int y = outer.CenterPoint().y - track.cy / 2;
+        return RectC(x, y, width, track.cy);
     }
-    int x = outer.CenterPoint().x - thick / 2;
-    return RectC(x, outer.top + pad, thick, max(0, outer.GetHeight() - 2 * pad));
+    int pad = max(DPI(8), thumb.cy / 2 + DPI(2));
+    int height = min(max(0, outer.GetHeight() - 2 * pad), track.cy);
+    int x = outer.CenterPoint().x - track.cx / 2;
+    int y = outer.top + (outer.GetHeight() - height) / 2;
+    return RectC(x, y, track.cx, height);
 }
 
 int UiSlider::ValueToPos(double v) const
@@ -246,7 +287,7 @@ int UiSlider::ValueToPos(double v) const
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
     int len = dir_ == UiDirection::H ? tr.GetWidth() : tr.GetHeight();
-    int thumb = max(1, style.thumb_len_px);
+    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
     int usable = max(0, len - thumb);
     if(usable <= 0 || max_ <= min_)
         return 0;
@@ -260,7 +301,7 @@ double UiSlider::PosToValue(int pos) const
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
     int len = dir_ == UiDirection::H ? tr.GetWidth() : tr.GetHeight();
-    int thumb = max(1, style.thumb_len_px);
+    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
     int usable = max(0, len - thumb);
     if(usable <= 0 || max_ <= min_)
         return min_;
@@ -279,13 +320,13 @@ Rect UiSlider::GetThumbRect() const
 {
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
-    int thumb = max(1, style.thumb_len_px);
+    Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
     int pos = ValueToPos(value_);
 
     if(dir_ == UiDirection::H)
-        return RectC(tr.left + pos, tr.CenterPoint().y - thumb / 2, thumb, thumb);
+        return RectC(tr.left + pos, tr.CenterPoint().y - thumb.cy / 2, thumb.cx, thumb.cy);
 
-    return RectC(tr.CenterPoint().x - thumb / 2, tr.top + pos, thumb, thumb);
+    return RectC(tr.CenterPoint().x - thumb.cx / 2, tr.top + pos, thumb.cx, thumb.cy);
 }
 
 void UiSlider::SetValueInternal(double v, bool fire_action, bool fire_changing)
@@ -325,8 +366,6 @@ void UiSlider::Paint(Draw& w)
     Rect tr = GetTrackRect();
     Rect th = GetThumbRect();
 
-    UiPaintFaceFrameDash(w, tr, style.track_palette, style.track_metrics, st);
-
     StyledPalette active_pal = style.track_palette;
     for(int i = 0; i < 4; i++) {
         Color active = style.track_palette.ink[i];
@@ -345,8 +384,33 @@ void UiSlider::Paint(Draw& w)
         int center_y = th.CenterPoint().y;
         active.top = min(tr.bottom, max(tr.top, center_y));
     }
-    if(!active.IsEmpty())
+
+    PaintContext ctx;
+    ctx.outer = outer;
+    ctx.track = tr;
+    ctx.active_track = active;
+    ctx.thumb = th;
+    ctx.style = &style;
+    ctx.state = st;
+    ctx.has_focus = has_focus;
+    ctx.direction = dir_;
+    ctx.min = min_;
+    ctx.max = max_;
+    ctx.value = value_;
+
+    bool handled = false;
+    if(WhenPaintTrack)
+        WhenPaintTrack(w, ctx, handled);
+    if(!handled)
+        UiPaintFaceFrameDash(w, tr, style.track_palette, style.track_metrics, st);
+
+    handled = false;
+    if(WhenPaintActiveTrack)
+        WhenPaintActiveTrack(w, ctx, handled);
+    if(!handled && !active.IsEmpty())
         UiPaintFaceFrameDash(w, active, active_pal, active_metrics, st);
+
+    UiAlign tick_side = UiSliderNormalizeTickSide_(dir_, style.tick_side);
 
     if(style.show_ticks && style.major_ticks > 1) {
         int major = style.major_ticks;
@@ -358,14 +422,14 @@ void UiSlider::Paint(Draw& w)
             int len = style.tick_len_major;
             if(dir_ == UiDirection::H) {
                 int x = tr.left + int(t * (tr.GetWidth() - 1) + 0.5);
-                int y0 = (style.tick_side == UiAlign::TOP)
+                int y0 = (tick_side == UiAlign::TOP)
                          ? tr.top - style.tick_gap - len
                          : tr.bottom + style.tick_gap;
                 w.DrawRect(x, y0, 1, len, tc);
             }
             else {
                 int y = tr.top + int(t * (tr.GetHeight() - 1) + 0.5);
-                int x0 = (style.tick_side == UiAlign::LEFT)
+                int x0 = (tick_side == UiAlign::LEFT)
                          ? tr.left - style.tick_gap - len
                          : tr.right + style.tick_gap;
                 w.DrawRect(x0, y, len, 1, tc);
@@ -377,14 +441,14 @@ void UiSlider::Paint(Draw& w)
                     int l2 = style.tick_len_minor;
                     if(dir_ == UiDirection::H) {
                         int x = tr.left + int(tm * (tr.GetWidth() - 1) + 0.5);
-                        int y0 = (style.tick_side == UiAlign::TOP)
+                        int y0 = (tick_side == UiAlign::TOP)
                                  ? tr.top - style.tick_gap - l2
                                  : tr.bottom + style.tick_gap;
                         w.DrawRect(x, y0, 1, l2, tc);
                     }
                     else {
                         int y = tr.top + int(tm * (tr.GetHeight() - 1) + 0.5);
-                        int x0 = (style.tick_side == UiAlign::LEFT)
+                        int x0 = (tick_side == UiAlign::LEFT)
                                  ? tr.left - style.tick_gap - l2
                                  : tr.right + style.tick_gap;
                         w.DrawRect(x0, y, l2, 1, tc);
@@ -394,7 +458,11 @@ void UiSlider::Paint(Draw& w)
         }
     }
 
-    UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);
+    handled = false;
+    if(WhenPaintThumb)
+        WhenPaintThumb(w, ctx, handled);
+    if(!handled)
+        UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);
 
     if(WhenPaintForeground)
         WhenPaintForeground(w, outer, style.thumb_palette, style.thumb_metrics, style.thumb_skin, st, has_focus);
@@ -415,7 +483,7 @@ void UiSlider::LeftDown(Point p, dword)
 
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
-    int thumb = max(1, style.thumb_len_px);
+    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
     int pos = dir_ == UiDirection::H ? (p.x - tr.left - thumb / 2) : (p.y - tr.top - thumb / 2);
     SetValueInternal(PosToValue(pos), true, true);
 }
@@ -470,4 +538,3 @@ bool UiSlider::Key(dword key, int)
 }
 
 }
-

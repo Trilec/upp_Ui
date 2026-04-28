@@ -227,7 +227,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_paint_px_hot  = DPI(16);
 
             // Slight inset to feel centered
-            s.track_metrics.content_padding = Rect(0, 0, 0, 0);
+            s.track_metrics.content_margin = Rect(0, 0, 0, 0);
 
             sl[i].SetStyle(s);
             sl[i].SetRange(0, 100, 0);
@@ -379,7 +379,7 @@ struct GalleryStrip : ParentCtrl {
             s.fade_idle = true;
             s.idle_fade_pct = 25;
             s.collapse_ms = 1000;
-            s.track_metrics.content_padding = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+            s.track_metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
             s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
             s.thumb_metrics.radius = DPI(20);
             s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 185));
@@ -659,7 +659,7 @@ struct UiScrollBarDemoWindow : TopWindow {
             s.thick_px = DPI(18);
             s.idle_fade_pct = 20;
             s.collapse_ms = 1000;
-            s.track_metrics.content_padding = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+            s.track_metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
             s.thumb_metrics.radius = DPI(20);
             s.track_metrics.radius = DPI(20);
             s.thumb_inset = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
@@ -734,4 +734,3 @@ GUI_APP_MAIN
 {
     UiScrollBarDemoWindow().Run();
 }
-

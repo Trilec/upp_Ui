@@ -21,10 +21,15 @@
 
     Changelog
     - 2026-03: documented as public shared model infrastructure.
+    - 2026-04: standardized per-item icon rendering metadata as
+      icon_render_mode so model-backed controls share one icon policy vocabulary.
+    - 2026-04: normalized list-model move semantics so reorder operations may
+      target the end position (`to == GetCount()`).
 */
 
 #include <Core/Core.h>
 #include <Draw/Draw.h>
+#include <Ui/UiStyle.h>
 
 namespace Upp {
 
@@ -37,7 +42,7 @@ struct UiModelItem : Moveable<UiModelItem> {
     int    text_align = ALIGN_LEFT;
     int    right_text_align = ALIGN_RIGHT;
     Image  icon;
-    bool   mono_icon = false;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     bool   has_check = false;
     bool   checked = false;
     bool   group_header = false;
@@ -112,6 +117,8 @@ public:
     bool Insert(int pos, const UiModelItem& it);
     bool Set(int pos, const UiModelItem& it);
     bool Remove(int pos);
+    // Move item `from` before logical position `to`. `to == GetCount()`
+    // appends the moved item at the end.
     bool Move(int from, int to);
     bool SwapItems(int a, int b);
     void Clear();
@@ -235,7 +242,7 @@ struct UiTableHeader : Moveable<UiTableHeader> {
     int align = ALIGN_LEFT;
     String tooltip;
     Image  icon;
-    bool   mono_icon = false;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     Color  custom_ink_color;
     Color  custom_bg_color;
 
@@ -253,7 +260,7 @@ struct UiTableCell : Moveable<UiTableCell> {
     bool   editable = true;
     int align = ALIGN_LEFT;
     Image  icon;
-    bool   mono_icon = false;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     bool   use_custom_ink = false;
     Color  ink = Null;
     bool   use_custom_bg = false;
@@ -311,7 +318,7 @@ struct UiMenuItem : Moveable<UiMenuItem> {
     Value  data;
     Value  command_id;
     Image  icon;
-    bool   mono_icon = false;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     bool   enabled = true;
     bool   visible = true;
     bool   separator_before = false;
@@ -381,6 +388,3 @@ private:
 }
 
 #endif
-
-
-

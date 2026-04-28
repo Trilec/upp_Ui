@@ -21,6 +21,7 @@
 
     Changelog
     - 2026-03: added release-standard header documentation.
+    - 2026-04: added part-aware paint hooks for track, active track, and thumb.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -51,10 +52,8 @@ public:
         int     tick_gap = DPI(3);
         Color   tick_color = SColorShadow();
         UiAlign tick_side = UiAlign::BOTTOM;
-
-        int thick_px = DPI(22);
-        int track_px = DPI(6);
-        int thumb_len_px = DPI(18);
+        Size    track_size = Size(DPI(120), DPI(4));
+        Size    thumb_size = Size(DPI(14), DPI(18));
 
         void Serialize(Stream& s)
         {
@@ -62,8 +61,22 @@ public:
               % thumb_palette % thumb_metrics % thumb_skin
               % show_ticks % major_ticks % minor_ticks_per_major
               % tick_len_major % tick_len_minor % tick_gap % tick_color % tick_side
-              % thick_px % track_px % thumb_len_px;
+              % track_size % thumb_size;
         }
+    };
+
+    struct PaintContext {
+        Rect outer;
+        Rect track;
+        Rect active_track;
+        Rect thumb;
+        const Style* style = nullptr;
+        StyledState state = ST_NORMAL;
+        bool has_focus = false;
+        UiDirection direction = UiDirection::H;
+        double min = 0.0;
+        double max = 0.0;
+        double value = 0.0;
     };
 
     static const Style& StyleDefault();
@@ -98,6 +111,8 @@ public:
 
     UiSlider& SetTicks(bool on = true, int major_ticks = 10, int minor_per_major = 0);
     UiSlider& SetTickSide(UiAlign side);
+    UiSlider& SetTrackSize(Size sz);
+    UiSlider& SetThumbSize(Size sz);
 
     virtual void  SetData(const Value& v) override;
     virtual Value GetData() const override;
@@ -116,6 +131,11 @@ public:
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
           StyledState, bool> WhenPaintForeground;
+    // Part-aware paint hooks. Set handled = true to replace the default paint
+    // for that surface while keeping geometry ownership inside the control.
+    Event<Draw&, const PaintContext&, bool&> WhenPaintTrack;
+    Event<Draw&, const PaintContext&, bool&> WhenPaintActiveTrack;
+    Event<Draw&, const PaintContext&, bool&> WhenPaintThumb;
 
     virtual void Paint(Draw& w) override;
     virtual Size GetMinSize() const override;
@@ -160,5 +180,3 @@ private:
 }
 
 #endif
-
-

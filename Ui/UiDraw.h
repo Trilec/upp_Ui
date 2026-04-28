@@ -23,6 +23,8 @@
     Changelog
     - 2026-03: added release-standard file documentation.
     - 2026-03-31: added shared indicator-glyph painters for checkbox/radio/menu reuse.
+    - 2026-04: moved icon tint/preserve behavior onto shared UiIconRenderMode
+      so controls no longer carry button-local icon rendering policy.
 */
 
 #include <Painter/Painter.h>
@@ -82,6 +84,28 @@ inline hash_t GetHashValue(const UiShadowCacheKey& k)
       << k.distance << k.offset_x << k.offset_y
       << k.curve_x1 << k.curve_y1 << k.curve_x2 << k.curve_y2;
     return h;
+}
+
+template <class Key, class Factory>
+inline Image UiGetCachedImage(const Key& key, Factory factory, int max_items = 128)
+{
+    static StaticMutex s_mutex;
+    static Index<Key>   s_keys;
+    static Vector<Image> s_images;
+
+    Mutex::Lock __(s_mutex);
+    int idx = s_keys.Find(key);
+    if(idx >= 0)
+        return s_images[idx];
+
+    Image img = factory();
+    if(s_keys.GetCount() >= max_items) {
+        s_keys.Remove(0);
+        s_images.Remove(0);
+    }
+    s_keys.Add(key);
+    s_images.Add(img);
+    return img;
 }
 
 inline UiAlign UiCapOpenSide(UiAlign tab_side)
@@ -484,7 +508,8 @@ inline void UiPaintStyledIcon(Draw& w,
                               const Rect& area,
                               const Image& src,
                               bool scale,
-                              bool mono,
+                              bool preserve_aspect,
+                              UiIconRenderMode render_mode,
                               Color ink,
                               bool enabled)
 {
@@ -493,8 +518,12 @@ inline void UiPaintStyledIcon(Draw& w,
 
     Image img = src;
 
-    // Disabled handling: only auto-gray if we are not in mono-tint mode.
-    if(!enabled && !mono)
+    const bool mono = render_mode == UiIconRenderMode::MonoTint;
+    const bool preserve_color = render_mode == UiIconRenderMode::PreserveColor;
+
+    // Disabled handling: only auto-gray when the icon is not explicitly
+    // being tinted or preserved by the caller's render policy.
+    if(!enabled && !mono && !preserve_color)
         img = DisabledImage(img);
 
     Size src_sz = img.GetSize();
@@ -505,13 +534,21 @@ inline void UiPaintStyledIcon(Draw& w,
     int dst_h = src_sz.cy;
 
     if(scale) {
-        double sx = (double)area.GetWidth()  / src_sz.cx;
-        double sy = (double)area.GetHeight() / src_sz.cy;
-        double s  = min(sx, sy);
+        // Exact-size callers such as UiButton/UiLabel pass preserve_aspect=false
+        // so explicit icon width/height mean the rendered icon size, not a fit box.
+        if(preserve_aspect) {
+            double sx = (double)area.GetWidth()  / src_sz.cx;
+            double sy = (double)area.GetHeight() / src_sz.cy;
+            double s  = min(sx, sy);
 
-        if(s > 0) {
-            dst_w = max(1, int(src_sz.cx * s + 0.5));
-            dst_h = max(1, int(src_sz.cy * s + 0.5));
+            if(s > 0) {
+                dst_w = max(1, int(src_sz.cx * s + 0.5));
+                dst_h = max(1, int(src_sz.cy * s + 0.5));
+            }
+        }
+        else {
+            dst_w = max(1, area.GetWidth());
+            dst_h = max(1, area.GetHeight());
         }
     }
 
@@ -742,13 +779,15 @@ inline void UiPaintStyledBackground(Draw& w,
         Image img;
                 if(ly.inset) {
             ImageBuffer ib(osz);
-            ib.SetKind(IMAGE_ALPHA);
             Fill(~ib, RGBAZero(), ib.GetLength());
             {
                 BufferPainter p(ib, MODE_ANTIALIASED);
                 Rect base(0, 0, osz.cx, osz.cy);
                 for(int i = 0; i < extent; i++) {
-                    double t = (double)(i + 1) / (double)max(1, extent);
+                    // Sample at the center of each shadow band. Sampling the
+                    // outer edge directly causes distance=1 to evaluate at 1.0,
+                    // which collapses the first visible step to zero alpha.
+                    double t = ((double)i + 0.5) / (double)max(1, extent);
                     double curve_alpha = ly.mode == SHADOW_HARD ? 1.0 : (1.0 - UiShadowCurveEval(ly.curve, t));
                     int alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
                     if(alpha <= 0)
@@ -759,8 +798,7 @@ inline void UiPaintStyledBackground(Draw& w,
                     if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
                         break;
                     double rad = (double)max(0, metrics.radius - i);
-                    RGBA c = ly.color;
-                    c.a = (byte)alpha;
+                    RGBA c = alpha * ly.color;
                     p.Begin();
                     if(rad > 0)
                         p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
@@ -773,6 +811,7 @@ inline void UiPaintStyledBackground(Draw& w,
                     p.End();
                 }
             }
+            Premultiply(ib);
             img = Image(ib);
             w.DrawImage(surface_outer.left, surface_outer.top, img);
         }
@@ -818,20 +857,19 @@ inline void UiPaintStyledBackground(Draw& w,
                 }
             }
             ImageBuffer ib(sz);
-            ib.SetKind(IMAGE_ALPHA);
             Fill(~ib, RGBAZero(), ib.GetLength());
+            Rect cutoff = seed;
+            cutoff.Deflate(1, 1);
+            double cutoff_rad = max(0.0, rad - 1.0);
+            bool smooth_shells = false;
             {
                 BufferPainter p(ib, MODE_ANTIALIASED);
-                Rect cutoff = seed;
-                cutoff.Deflate(1, 1);
-                double cutoff_rad = max(0.0, rad - 1.0);
                 if(ly.mode == SHADOW_HARD) {
                     Rect rr = seed;
                     rr.Inflate(extent, extent);
                     rr.Offset(off);
                     double rr_rad = max(0.0, rad + extent);
-                    RGBA fill = ly.color;
-                    fill.a = (byte)clamp(ly.alpha, 0, 255);
+                    RGBA fill = clamp(ly.alpha, 0, 255) * ly.color;
                     p.Begin();
                     if(rr_rad > 0)
                         p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
@@ -841,28 +879,45 @@ inline void UiPaintStyledBackground(Draw& w,
                     p.End();
                 }
                 else {
+                    smooth_shells = true;
+                    int next_alpha = 0;
                     for(int d = extent; d >= 1; --d) {
-                        double t = (double)d / (double)max(1, extent);
+                        // Build the shadow from differential filled shells.
+                        // Each band contributes only the opacity needed to
+                        // reach the target alpha at that distance, which keeps
+                        // the edge full-strength and avoids visible ring gaps.
+                        double t = ((double)d - 0.5) / (double)max(1, extent);
                         double curve_alpha = 1.0 - UiShadowCurveEval(ly.curve, t);
-                        int a = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
-                        if(a <= 0)
+                        int target_alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
+                        int shell_alpha = max(0, target_alpha - next_alpha);
+                        next_alpha = target_alpha;
+                        if(shell_alpha <= 0)
                             continue;
-                        Rect rr = seed;
-                        rr.Inflate(d, d);
-                        rr.Offset(off);
+
+                        double ox = (double)off.x * (double)d / (double)max(1, extent);
+                        double oy = (double)off.y * (double)d / (double)max(1, extent);
+                        double x = (double)seed.left - d + ox + 0.5;
+                        double y = (double)seed.top - d + oy + 0.5;
+                        double wdt = seed.GetWidth() + d * 2 - 1.0;
+                        double hgt = seed.GetHeight() + d * 2 - 1.0;
                         double rr_rad = max(0.0, rad + d);
-                        RGBA fill = ly.color;
-                        fill.a = (byte)a;
+                        RGBA fill = shell_alpha * ly.color;
                         p.Begin();
                         if(rr_rad > 0)
-                            p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
+                            p.RoundedRectangle(x, y, wdt, hgt, min<double>(rr_rad, min(wdt, hgt) / 2.0));
                         else
-                            p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                            p.Rectangle(x, y, wdt, hgt);
                         p.Fill(fill);
                         p.End();
                     }
                 }
-                // Cut interior so the shadow meets the control edge cleanly.
+            }
+            if(smooth_shells && extent > 1)
+                FastBlur(ib, 1);
+            {
+                // Cut interior after smoothing so the shadow meets the control
+                // edge cleanly without reintroducing visible shell steps.
+                BufferPainter p(ib, MODE_ANTIALIASED);
                 RGBA erase = RGBAZero();
                 p.Begin();
                 if(rad > 0)
@@ -872,6 +927,7 @@ inline void UiPaintStyledBackground(Draw& w,
                 p.Fill(erase);
                 p.End();
             }
+            Premultiply(ib);
             img = Image(ib);
             w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
         }
@@ -1223,14 +1279,19 @@ inline void UiPaintStyledText(Draw& w,
 
         int max_w = area.right - line_x;
         if(max_w > 0) {
-            DrawSmartText(w,
-                          line_x,
-                          y,
-                          max_w,
-                          line,
-                          f,
-                          ink,
-                          ak);
+            if(ak) {
+                DrawSmartText(w,
+                              line_x,
+                              y,
+                              max_w,
+                              line,
+                              f,
+                              ink,
+                              ak);
+            }
+            else {
+                w.DrawText(line_x, y, line, f, ink);
+            }
 
             underline_baseline = y + sz.cy;
         }
@@ -1561,21 +1622,11 @@ inline Image UiMakeIcon(const unsigned char* data)
 
     const unsigned char* payload = data + 4;
 
-    static StaticMutex                   s_mutex;
-    static VectorMap<const void*, Image> s_cache;
-
-    Mutex::Lock __(s_mutex);
-
-    int idx = s_cache.Find(data);
-    if(idx >= 0)
-        return s_cache[idx];
-
-    Image img = is_rle
-        ? UiDecodeInlineIconRle(payload, w, (int)h)
-        : UiDecodeInlineIconRaw(payload, w, (int)h);
-
-    s_cache.Add(data, img);
-    return img;
+    return UiGetCachedImage(data, [=] {
+        return is_rle
+            ? UiDecodeInlineIconRle(payload, w, (int)h)
+            : UiDecodeInlineIconRaw(payload, w, (int)h);
+    }, 256);
 }
 
 inline Image UiMakeIcon(const void* data)
@@ -1586,37 +1637,3 @@ inline Image UiMakeIcon(const void* data)
 } // namespace Upp
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

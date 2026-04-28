@@ -163,7 +163,7 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 
         s.arrow_icons      = true;
 		s.arrow_icon_scale = true;
-		s.arrow_icon_mono  = true;
+        s.arrow_icon_render_mode = UiIconRenderMode::MonoTint;
 		s.arrow_icon_prev_h = ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48();
 		s.arrow_icon_next_h = ICON_NAVIGATION_OUTLINED_ARROW_RIGHT_48();
 		s.arrow_icon_prev_v = ICON_NAVIGATION_OUTLINED_ARROW_DROP_UP_48();
@@ -942,6 +942,19 @@ void UiScrollBar::MouseLeave()
 	Refresh();
 }
 
+void UiScrollBar::SyncHoverFromMouse()
+{
+    if(HasCapture())
+        return;
+
+    Point mouse = GetMousePos();
+    Rect self = GetScreenRect();
+    if(self.Contains(mouse))
+        MouseMove(mouse - self.TopLeft(), 0);
+    else
+        MouseLeave();
+}
+
 void UiScrollBar::CancelMode()
 {
 	if(dragging_ || hover_thumb_ || hover_arrow_ >= 0) {
@@ -1009,39 +1022,64 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 	const StyledPalette& tr_pal = style_.track_palette;
 	const StyledPalette& th_pal = style_.thumb_palette;
 	const StyledPalette& ar_pal = style_.arrow_palette;
-
-	// 1. Track background: skin or face+frame
-	if(style_.track_skin.enabled) {
-		Image base = alpha < 255 ? UiImageMultiplyAlpha(style_.track_skin.base, alpha)
-		                         : style_.track_skin.base;
-		UiDraw9Slice(w, track_r, base, style_.track_skin.slice);
-		StyledMetrics mm = style_.track_metrics;
-		mm.face_enabled = false;
-		UiPaintFaceFrameDashAlpha(w, track_r, tr_pal, mm, track_state_, alpha);
-	}
-	else {
-		UiPaintFaceFrameDashAlpha(w, track_r, tr_pal, style_.track_metrics, track_state_, alpha);
-	}
-	if(WhenPaintTrack)
-		WhenPaintTrack(w, track_r, tr_pal, style_.track_metrics, style_.track_skin, track_state_);
-
-	// 2. Thumb
 	Rect thumb_hit = GetThumbRect();
 	Rect thumb_r   = UiShrinkCrossAxis_(thumb_hit, dir_, thumb_paint);
 	thumb_r = UiApplyCrossInset_(thumb_r, style_.thumb_inset, dir_);
-	if(style_.thumb_skin.enabled) {
-		Image base = alpha < 255 ? UiImageMultiplyAlpha(style_.thumb_skin.base, alpha)
-		                         : style_.thumb_skin.base;
-		UiDraw9Slice(w, thumb_r, base, style_.thumb_skin.slice);
-		StyledMetrics mm = style_.thumb_metrics;
-		mm.face_enabled = false;
-		UiPaintFaceFrameDashAlpha(w, thumb_r, th_pal, mm, thumb_state_, alpha);
+
+	PaintContext ctx;
+	ctx.outer = outer;
+	ctx.track_hit = track_hit;
+	ctx.track = track_r;
+	ctx.thumb_hit = thumb_hit;
+	ctx.thumb = thumb_r;
+	ctx.arrow0 = GetArrowRect(0);
+	ctx.arrow1 = GetArrowRect(1);
+	ctx.style = &style_;
+	ctx.track_state = track_state_;
+	ctx.thumb_state = thumb_state_;
+	ctx.arrow0_state = arrow0_state_;
+	ctx.arrow1_state = arrow1_state_;
+	ctx.direction = dir_;
+	ctx.min = min_;
+	ctx.max = max_;
+	ctx.page = page_;
+	ctx.pos = pos_;
+
+	// 1. Track background: skin or face+frame
+	bool handled = false;
+	if(WhenPaintTrack)
+		WhenPaintTrack(w, ctx, handled);
+	if(!handled) {
+		if(style_.track_skin.enabled) {
+			Image base = alpha < 255 ? UiImageMultiplyAlpha(style_.track_skin.base, alpha)
+			                         : style_.track_skin.base;
+			UiDraw9Slice(w, track_r, base, style_.track_skin.slice);
+			StyledMetrics mm = style_.track_metrics;
+			mm.face_enabled = false;
+			UiPaintFaceFrameDashAlpha(w, track_r, tr_pal, mm, track_state_, alpha);
+		}
+		else {
+			UiPaintFaceFrameDashAlpha(w, track_r, tr_pal, style_.track_metrics, track_state_, alpha);
+		}
 	}
-	else {
-		UiPaintFaceFrameDashAlpha(w, thumb_r, th_pal, style_.thumb_metrics, thumb_state_, alpha);
-	}
+
+	// 2. Thumb
+	handled = false;
 	if(WhenPaintThumb)
-		WhenPaintThumb(w, thumb_r, th_pal, style_.thumb_metrics, style_.thumb_skin, thumb_state_);
+		WhenPaintThumb(w, ctx, handled);
+	if(!handled) {
+		if(style_.thumb_skin.enabled) {
+			Image base = alpha < 255 ? UiImageMultiplyAlpha(style_.thumb_skin.base, alpha)
+			                         : style_.thumb_skin.base;
+			UiDraw9Slice(w, thumb_r, base, style_.thumb_skin.slice);
+			StyledMetrics mm = style_.thumb_metrics;
+			mm.face_enabled = false;
+			UiPaintFaceFrameDashAlpha(w, thumb_r, th_pal, mm, thumb_state_, alpha);
+		}
+		else {
+			UiPaintFaceFrameDashAlpha(w, thumb_r, th_pal, style_.thumb_metrics, thumb_state_, alpha);
+		}
+	}
 
 	// Thumb grip overlay
 	if(style_.grip != UIGRIP_NONE && !thumb_r.IsEmpty()) {
@@ -1143,6 +1181,12 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 			if(ar.IsEmpty())
 				continue;
 			StyledState st = (i == 0) ? arrow0_state_ : arrow1_state_;
+			bool arrow_handled = false;
+			if(WhenPaintArrow)
+				WhenPaintArrow(w, ctx, i, arrow_handled);
+			if(arrow_handled)
+				continue;
+
 			if(style_.arrow_skin.enabled) {
 				Image base = alpha < 255 ? UiImageMultiplyAlpha(style_.arrow_skin.base, alpha)
 				                         : style_.arrow_skin.base;
@@ -1173,11 +1217,8 @@ void UiScrollBar::PaintCore_(Draw& w, const Rect& outer)
 				if(alpha < 255)
 					ico = UiImageMultiplyAlpha(ico, alpha);
 				UiPaintStyledIcon(w, icon_r, ico, style_.arrow_icon_scale,
-				                  style_.arrow_icon_mono, icon_ink, enabled);
+				                  true, style_.arrow_icon_render_mode, icon_ink, enabled);
 			}
-
-			if(WhenPaintArrow)
-				WhenPaintArrow(w, ar, ar_pal, style_.arrow_metrics, style_.arrow_skin, st, i);
 		}
 	}
 
@@ -1195,7 +1236,3 @@ String UiScrollBar::GetDesc() const
 }
 
 } // namespace Upp
-
-
-
-

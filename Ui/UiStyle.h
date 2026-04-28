@@ -17,10 +17,14 @@
 
     Usage
     - Build control-local Style structs from these primitives and preserve the
-      shared frame -> inset -> padding geometry contract.
+      shared frame -> inset -> margin geometry contract.
 
     Changelog
     - 2026-03: promoted the primitive-style header to release-standard format.
+    - 2026-04: added UiIconRenderMode as the shared icon render policy used by
+      controls, item metadata, and shared drawing helpers.
+    - 2026-04: renamed styled content padding to content_margin and simplified
+      the shared two-block layout helpers around one public gap contract.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -41,12 +45,12 @@ namespace Upp {
       NOTE: thickness rects MUST NOT be tested using Rect::IsEmpty().
 
     - Canonical geometry:
-        UiStyledInnerRect(outer, metrics, skin, padding)
-        UiStyledOuterSizeFromContent(content, metrics, skin, padding)
+        UiStyledInnerRect(outer, metrics, skin, margin)
+        UiStyledOuterSizeFromContent(content, metrics, skin, margin)
 
       Policy:
-        * UiStyledInnerRect allows negative padding (layout-only tool).
-        * UiStyledOuterSizeFromContent forbids negative padding (minsize stability).
+        * UiStyledInnerRect allows negative margin (layout-only tool).
+        * UiStyledOuterSizeFromContent forbids negative margin (minsize stability).
 
     - Neutral two-block layout helpers:
         UiMeasureBlocksContent(...)
@@ -236,6 +240,24 @@ inline Stream& operator%(Stream& s, UiDirection& dir)
     return s;
 }
 
+enum class UiIconRenderMode : byte {
+    Auto = 0,
+    MonoTint,
+    PreserveColor,
+};
+
+inline Stream& operator%(Stream& s, UiIconRenderMode& mode)
+{
+    if(s.IsStoring())
+        s % (byte&)mode;
+    else {
+        byte b;
+        s % b;
+        mode = (UiIconRenderMode)b;
+    }
+    return s;
+}
+
 enum class UiCrossAlign : byte {
     Auto    = 0,
     Stretch = 1,
@@ -382,7 +404,7 @@ inline ShadowCurve ShadowLinear()
 
 inline ShadowCurve ShadowSoft()
 {
-    return ShadowCurve { 0.250, 0.100, 0.250, 1.000 };
+    return ShadowCurve { 0.011, 0.491, 0.925, 1.000 };
 }
 
 inline ShadowCurve ShadowTight()
@@ -392,7 +414,7 @@ inline ShadowCurve ShadowTight()
 
 inline ShadowCurve ShadowHardCurve()
 {
-    return ShadowCurve { 0.750, 0.000, 0.900, 1.000 };
+    return ShadowCurve { 1.000, 0.000, 1.000, 0.000 };
 }
 
 inline ShadowCurve ShadowGamma(double gamma)
@@ -476,11 +498,12 @@ struct StyledMetrics {
     Font text_font      = StdFont();
     bool use_text_font  = false;
 
-    // Geometry-only padding applied inside the skin "face" bounds.
-    // Public API: SetPadding(...)
+    // Geometry-only content margin applied inside the skin "face" bounds.
+    // This is the one public outer spacing contract for controls.
+    // Public API: SetMargin(...)
     // This is for density / breathing room (NOT for compensating skin shadows).
     // Thickness-rect semantics (l/t/r/b). Negative values are not allowed.
-    Rect content_padding = Rect(0, 0, 0, 0);
+    Rect content_margin = Rect(0, 0, 0, 0);
 
     int radius          = DPI(4);
     int frame_width     = DPI(1);
@@ -503,7 +526,7 @@ struct StyledMetrics {
     void Serialize(Stream& s)
     {
         s % text_font % use_text_font
-          % content_padding
+          % content_margin
           % radius % frame_width
           % frame_enabled % face_enabled
           % dashed % dash_pattern
@@ -663,18 +686,25 @@ inline Rect UiStyledInnerRect(const Rect& outer,
     if(r.IsEmpty())
         return r;
 
-    Rect cp = UiNonNegativeThickness(m.content_padding);
+    Rect cp = UiNonNegativeThickness(m.content_margin);
     if(!UiIsZeroThicknessRect(cp))
         r = UiApplyThicknessRect(r, cp);
 
     if(!UiIsZeroThicknessRect(padding))
         r = UiApplyThicknessRect(r, padding);
 
+    // Large margins should collapse to a clipped minimal content rect rather
+    // than silently eliminating content paint entirely.
+    if(r.right <= r.left)
+        r.right = r.left + 1;
+    if(r.bottom <= r.top)
+        r.bottom = r.top + 1;
+
     return r;
 }
 
 // "Face" rect for focus rings and skin-aligned overlays.
-// Applies shadow margins + frame + skin.content_inset, but NOT content_padding.
+// Applies shadow margins + frame + skin.content_inset, but NOT content_margin.
 inline Rect UiStyledFaceRect(const Rect& outer,
                              const StyledMetrics& m,
                              const StyledSkin& skin)
@@ -706,7 +736,7 @@ inline Size UiStyledOuterSizeFromContent(Size content,
 
     Rect pad = UiNonNegativeThickness(padding);
     Rect ci  = UiNonNegativeThickness(skin.content_inset);
-    Rect cp  = UiNonNegativeThickness(m.content_padding);
+    Rect cp  = UiNonNegativeThickness(m.content_margin);
     Rect sh  = UiStyledShadowMargins(m);
 
     int fw = UiResolvedFrameWidth(m, skin);
@@ -729,19 +759,19 @@ struct UiBlocksLayout {
     Rect main;
 };
 
-// Measurement: negative margins do NOT reduce minsize (pos()).
+// Measurement for two-block content using one public gap contract.
+// Public control APIs should feed one outer content_margin plus one gap.
 inline Size UiMeasureBlocksContent(Size support_natural,
                                    Size main_natural,
-                                   const Rect& support_margin,
-                                   const Rect& main_margin,
                                    UiAlign stack_dir,
                                    bool have_support,
                                    bool have_main,
                                    int empty_w,
                                    int empty_h,
-                                   int min_support_side)
+                                   int min_support_side,
+                                   int gap = 0)
 {
-    auto pos = [](int v) -> int { return v > 0 ? v : 0; };
+    gap = max(0, gap);
 
     // Enforce consistent support minimum whenever support is present
     // (so measure == layout rules).
@@ -757,32 +787,26 @@ inline Size UiMeasureBlocksContent(Size support_natural,
         h = empty_h;
     }
     else if(have_support && !have_main) {
-        w = support_natural.cx + pos(support_margin.left) + pos(support_margin.right);
-        h = support_natural.cy + pos(support_margin.top)  + pos(support_margin.bottom);
+        w = support_natural.cx;
+        h = support_natural.cy;
     }
     else if(!have_support && have_main) {
-        w = main_natural.cx + pos(main_margin.left) + pos(main_margin.right);
-        h = main_natural.cy + pos(main_margin.top)  + pos(main_margin.bottom);
+        w = main_natural.cx;
+        h = main_natural.cy;
     }
     else {
         switch(stack_dir) {
         case UiAlign::TOP:
         case UiAlign::BOTTOM:
-            w = max(main_natural.cx + pos(main_margin.left) + pos(main_margin.right),
-                    support_natural.cx + pos(support_margin.left) + pos(support_margin.right));
-            h = main_natural.cy + support_natural.cy
-              + pos(main_margin.top) + pos(main_margin.bottom)
-              + pos(support_margin.top) + pos(support_margin.bottom);
+            w = max(main_natural.cx, support_natural.cx);
+            h = main_natural.cy + support_natural.cy + gap;
             break;
 
         case UiAlign::RIGHT:
         case UiAlign::LEFT:
         default:
-            w = main_natural.cx + support_natural.cx
-              + pos(main_margin.left) + pos(main_margin.right)
-              + pos(support_margin.left) + pos(support_margin.right);
-            h = max(main_natural.cy + pos(main_margin.top) + pos(main_margin.bottom),
-                    support_natural.cy + pos(support_margin.top) + pos(support_margin.bottom));
+            w = main_natural.cx + support_natural.cx + gap;
+            h = max(main_natural.cy, support_natural.cy);
             break;
         }
     }
@@ -796,11 +820,11 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
                                             UiAlign align_h,
                                             UiAlign align_v,
                                             UiAlign stack_dir,
-                                            const Rect& support_margin,
-                                            const Rect& main_margin,
-                                            int min_support_side = DPI(16))
+                                            int min_support_side = DPI(16),
+                                            int gap = 0)
 {
     UiBlocksLayout lr;
+    gap = max(0, gap);
 
     if(content.IsEmpty())
         return lr;
@@ -845,13 +869,17 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
 
     if(have_support && have_main) {
         if(stack_dir == UiAlign::TOP || stack_dir == UiAlign::BOTTOM) {
-            main_sz.cx = min(main_sz.cx, cw);
+            int max_block_w = max(0, cw);
+            if(max(support_sz.cx, main_sz.cx) > max_block_w) {
+                support_sz.cx = min(support_sz.cx, max_block_w);
+                main_sz.cx = min(main_sz.cx, max_block_w);
+            }
 
-            int total_h = support_sz.cy + main_sz.cy;
+            int total_h = support_sz.cy + main_sz.cy + gap;
             if(total_h > ch) {
-                int max_support_h = max(0, ch - main_sz.cy);
+                int max_support_h = max(0, ch - main_sz.cy - gap);
                 support_sz.cy = min(support_sz.cy, max_support_h);
-                total_h = support_sz.cy + main_sz.cy;
+                total_h = support_sz.cy + main_sz.cy + gap;
             }
 
             int block_w = min(max(support_sz.cx, main_sz.cx), cw);
@@ -865,7 +893,7 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
                 lr.support = Rect(sx, sy, sx + support_sz.cx, sy + support_sz.cy);
 
                 int mx = x0 + (block_w - main_sz.cx) / 2;
-                int my = lr.support.bottom;
+                int my = lr.support.bottom + gap;
                 lr.main = Rect(mx, my, mx + main_sz.cx, my + main_sz.cy);
             }
             else {
@@ -874,18 +902,21 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
                 lr.main = Rect(mx, my, mx + main_sz.cx, my + main_sz.cy);
 
                 int sx = x0 + (block_w - support_sz.cx) / 2;
-                int sy = lr.main.bottom;
+                int sy = lr.main.bottom + gap;
                 lr.support = Rect(sx, sy, sx + support_sz.cx, sy + support_sz.cy);
             }
         }
         else {
-            main_sz.cx = min(main_sz.cx, cw);
-
-            int total_w = support_sz.cx + main_sz.cx;
+            int total_w = support_sz.cx + main_sz.cx + gap;
             if(total_w > cw) {
-                int max_support_w = max(0, cw - main_sz.cx);
-                support_sz.cx = min(support_sz.cx, max_support_w);
-                total_w = support_sz.cx + main_sz.cx;
+                int support_budget = max(0, cw - main_sz.cx - gap);
+                support_sz.cx = min(support_sz.cx, support_budget);
+                total_w = support_sz.cx + main_sz.cx + gap;
+                if(total_w > cw) {
+                    int main_budget = max(0, cw - support_sz.cx - gap);
+                    main_sz.cx = min(main_sz.cx, main_budget);
+                    total_w = support_sz.cx + main_sz.cx + gap;
+                }
             }
 
             int block_h = min(max(support_sz.cy, main_sz.cy), ch);
@@ -897,7 +928,7 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
                 int my = y0 + (block_h - main_sz.cy) / 2;
                 lr.main = Rect(x0, my, x0 + main_sz.cx, my + main_sz.cy);
 
-                int sx = lr.main.right;
+                int sx = lr.main.right + gap;
                 int sy = y0 + (block_h - support_sz.cy) / 2;
                 lr.support = Rect(sx, sy, sx + support_sz.cx, sy + support_sz.cy);
             }
@@ -905,7 +936,7 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
                 int sy = y0 + (block_h - support_sz.cy) / 2;
                 lr.support = Rect(x0, sy, x0 + support_sz.cx, sy + support_sz.cy);
 
-                int mx = lr.support.right;
+                int mx = lr.support.right + gap;
                 int my = y0 + (block_h - main_sz.cy) / 2;
                 lr.main = Rect(mx, my, mx + main_sz.cx, my + main_sz.cy);
             }
@@ -929,13 +960,6 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
         int y = content.top  + VOffset(ch, main_sz.cy);
         lr.main = Rect(x, y, x + main_sz.cx, y + main_sz.cy);
     }
-
-    // Apply margins last (negative expands).
-    if(have_support && !lr.support.IsEmpty())
-        lr.support = UiApplyMarginRect(lr.support, support_margin);
-
-    if(have_main && !lr.main.IsEmpty())
-        lr.main = UiApplyMarginRect(lr.main, main_margin);
 
     return lr;
 }
@@ -1238,28 +1262,28 @@ public:
         return SetFill9Slice(img, Rect(thickness, thickness, thickness, thickness), settheframe);
     }
 
-    // Geometry-only content padding (density/breathing room inside face bounds).
-    // Public API: SetPadding(...)
-    T& SetPadding(const Rect& pad)
+    // Geometry-only content margin (density/breathing room inside face bounds).
+    // Public API: SetMargin(...)
+    T& SetMargin(const Rect& margin)
     {
-        StyledMetricsRef().content_padding = UiNonNegativeThickness(pad);
+        StyledMetricsRef().content_margin = UiNonNegativeThickness(margin);
         OnStyleChanged();
         return Self();
     }
 
-    T& SetPadding(int l, int t, int r, int b)
+    T& SetMargin(int l, int t, int r, int b)
     {
-        return SetPadding(Rect(l, t, r, b));
+        return SetMargin(Rect(l, t, r, b));
     }
 
-    T& SetPadding(int all)
+    T& SetMargin(int all)
     {
-        return SetPadding(all, all, all, all);
+        return SetMargin(all, all, all, all);
     }
 
-    T& ClearPadding()
+    T& ClearMargin()
     {
-        StyledMetricsRef().content_padding = Rect(0, 0, 0, 0);
+        StyledMetricsRef().content_margin = Rect(0, 0, 0, 0);
         OnStyleChanged();
         return Self();
     }
@@ -1305,13 +1329,3 @@ public:
 } // namespace Upp
 
 #endif
-
-
-
-
-
-
-
-
-
-

@@ -23,6 +23,7 @@
     - 2026-03: added release-standard header documentation.
     - 2026-03-31: disabled controls now ignore keyboard and mouse activation paths.
     - 2026-03-31: SetData now updates state without emitting WhenAction.
+    - 2026-04: added part-aware paint hooks for track and thumb.
 */
 #include <Animation/Animation.h>
 #include <CtrlCore/CtrlCore.h>
@@ -33,6 +34,7 @@ namespace Upp {
 class UiToggle : public Ctrl, public CtrlStyled<UiToggle> {
 public:
     typedef UiToggle CLASSNAME;
+
     struct Style : ChStyle<Style> {
         StyledPalette palette;
         StyledMetrics metrics;
@@ -43,11 +45,12 @@ public:
         StyledPalette thumb_palette;
         StyledMetrics thumb_metrics;
         StyledSkin    thumb_skin;
-        Font    font = StdFont();
+        UiDirection direction = UiDirection::H;
         UiAlign align_h = UiAlign::LEFT;
         UiAlign align_v = UiAlign::CENTER;
-        UiAlign track_side = UiAlign::LEFT;        Size track_extent = Size(DPI(36), DPI(20));
-        int  label_gap = DPI(10);
+        UiAlign track_side = UiAlign::LEFT;
+        Size track_size = Size(DPI(36), DPI(20));
+        Size thumb_size = Size(0, 0);
         int  thumb_inset = DPI(3);
 
         bool animate = true;
@@ -57,11 +60,25 @@ public:
             s % palette % metrics % skin
               % track_palette % track_metrics % track_skin
               % thumb_palette % thumb_metrics % thumb_skin
-              % font % align_h % align_v % track_side
-              % track_extent % label_gap % thumb_inset
+              % direction % align_h % align_v % track_side
+              % track_size % thumb_size % thumb_inset
               % animate % animation_ms;
         }
     };
+
+    struct PaintContext {
+        Rect outer;
+        Rect shell;
+        Rect content;
+        Rect track;
+        Rect thumb;
+        const Style* style = nullptr;
+        StyledState state = ST_NORMAL;
+        bool has_focus = false;
+        bool on = false;
+        double thumb_pos = 0.0;
+    };
+
     static const Style& StyleDefault();
     UiToggle();
     UiToggle& SetStyle(const Style& s);
@@ -72,15 +89,20 @@ public:
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
     StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
     void OnStyleChanged();
-    UiToggle& SetText(const String& s);
-    const String& GetText() const { return text_; }
     UiToggle& SetOn(bool on = true);
     bool      IsOn() const { return on_; }
     UiToggle& Toggle();
+    UiToggle& SetDirection(UiDirection dir);
+    UiDirection GetDirection() const { return GetEffectiveStyle().direction; }
     UiToggle& SetTrackSide(UiAlign side);
-    UiToggle& SetPadding(const Rect& pad);
-    UiToggle& SetPadding(int l, int t, int r, int b) { return SetPadding(Rect(l, t, r, b)); }
-    UiToggle& SetPadding(int all) { return SetPadding(Rect(all, all, all, all)); }
+    UiToggle& SetTrackSize(Size sz);
+    UiToggle& SetThumbSize(Size sz);
+    UiToggle& SetTrackRadius(int radius);
+    UiToggle& SetThumbRadius(int radius);
+    UiToggle& SetThumbInset(int inset);
+    UiToggle& SetMargin(const Rect& pad);
+    UiToggle& SetMargin(int l, int t, int r, int b) { return SetMargin(Rect(l, t, r, b)); }
+    UiToggle& SetMargin(int all) { return SetMargin(Rect(all, all, all, all)); }
     virtual void Paint(Draw& w) override;
     virtual void Layout() override;
     virtual Size GetMinSize() const override;
@@ -99,16 +121,23 @@ public:
     Event<> WhenAction;
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintBackground;
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintForeground;
+    // Part-aware paint hooks. Set handled = true to replace the default paint
+    // for that surface while keeping geometry ownership inside the control.
+    Event<Draw&, const PaintContext&, bool&> WhenPaintTrack;
+    Event<Draw&, const PaintContext&, bool&> WhenPaintThumb;
 private:
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
-    Size GetTextSizeCached() const;
     Rect GetShellRect() const;
     Rect GetContentRect() const;
+    Size GetTrackExtent() const;
+    Rect GetTrackShadowMargins() const;
+    Size GetTrackSlotSize() const;
+    Rect GetTrackSlotRect(const Rect& content) const;
+    int ClampRadiusPx(int radius, Size bounds) const;
     Rect GetTrackRect(const Rect& content) const;
-    Rect GetTextRect(const Rect& content, const Rect& track) const;
     Rect GetThumbRect(const Rect& track) const;
     void StartThumbAnimation(double target);
     UiToggle& SetOnInternal(bool on, bool fire_action);
@@ -117,26 +146,12 @@ private:
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
     bool has_style_override_ = false;
-    String text_;
     bool on_ = false;
     bool hover_ = false;
     bool pressed_ = false;
-    mutable bool text_size_dirty_ = true;
-    mutable Size text_size_cache_ = Size(0, 0);
     Size user_min_size_ = Size(0, 0);
     double thumb_pos_ = 0.0;
     One<Animation> anim_;
 };
 }
 #endif
-
-
-
-
-
-
-
-
-
-
-

@@ -24,6 +24,14 @@
     Changelog
     - 2026-03: normalized external model binding semantics and documented the
       release-standard control contract.
+    - 2026-04: aligned item icon metadata with shared UiIconRenderMode for
+      popup rows and collapsed-face rendering.
+    - 2026-04: simplified collapsed-face spacing to content_margin plus one
+      content_gap instead of separate indicator/label margins.
+    - 2026-04: removed legacy indicator scaling and moved popup selection
+      markers to explicit icon assets instead of mixed draw/icon behavior.
+    - 2026-04: added popup-row drag reorder with explicit handle, side
+      placement, and model-backed move semantics.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -58,12 +66,10 @@ public:
         UiAlign indicator_side = UiAlign::RIGHT;  // LEFT or RIGHT
         Image glyph_closed;   // Default: arrow_drop_down
         Image glyph_opened;   // Default: arrow_drop_up
-        bool indicator_scale  = true;
-        int  indicator_size   = 0; // px, used when indicator_scale=true (0 -> default)
+        int  indicator_size   = 0; // px, 0 -> themed default, clamped to 6px minimum
 
-        // Per-block margins (thickness-rect semantics; negative expands)
-        Rect indicator_margin = Rect(DPI(2), 0, DPI(4), 0);
-        Rect label_margin     = Rect(0, 0, 0, 0);
+        // Single gap between indicator and main label content.
+        int content_gap = DPI(6);
 
         // Base font (used unless metrics.use_text_font == true)
         Font font = StdFont();
@@ -75,18 +81,30 @@ public:
         UiLabel::Style popup_item_style;
         int popup_max_height = DPI(300);
         int popup_item_height = DPI(32);
+        int item_spacing = 0;
         bool popup_show_scrollbar = true;
         int popup_space = DPI(5);
         int popup_max_items = 10;
+        int drag_size = DPI(14);
+        int drag_gap = DPI(6);
+        bool show_drag_handle = true;
+        UiAlign drag_side = UiAlign::RIGHT;
+        Image drag_glyph;
+        Color drag_marker = Color(56, 146, 255);
 
-        // Multi-select summary + marker visuals
+        // Popup selection / multi-select summary visuals.
+        // The control consumes explicit icon assets here so marker styling is
+        // predictable and shared by both single-select and multi-select rows.
+        bool show_popup_selection_marker = false;
+        Image popup_selection_icon;
+        Image popup_check_checked_icon;
+        Image popup_check_unchecked_icon;
+        UiIconRenderMode popup_marker_render_mode = UiIconRenderMode::MonoTint;
+        UiAlign popup_marker_side = UiAlign::RIGHT;
         bool show_selection_badge = true;
         int  selection_badge_radius = DPI(10);
         Color selection_badge_face = Color(65, 126, 232);
         Color selection_badge_ink = White();
-        bool use_rounded_check_marker = true;
-        int  check_marker_radius = DPI(5);
-        UiAlign popup_check_side = UiAlign::RIGHT;
 
         // Popup frame styling
         int  popup_frame_width = DPI(1);
@@ -101,14 +119,16 @@ public:
               % align_h % align_v
               % show_indicator % indicator_side
               % glyph_closed % glyph_opened
-              % indicator_scale % indicator_size
-              % indicator_margin % label_margin
+              % indicator_size
+              % content_gap
               % font % transparent
               % popup_item_style
-              % popup_max_height % popup_item_height % popup_show_scrollbar % popup_space % popup_max_items
+              % popup_max_height % popup_item_height % item_spacing % popup_show_scrollbar % popup_space % popup_max_items
+              % drag_size % drag_gap % show_drag_handle % drag_side % drag_glyph % drag_marker
+              % show_popup_selection_marker % popup_selection_icon % popup_check_checked_icon
+              % popup_check_unchecked_icon % popup_marker_render_mode % popup_marker_side
               % show_selection_badge % selection_badge_radius
               % selection_badge_face % selection_badge_ink
-              % use_rounded_check_marker % check_marker_radius % popup_check_side
               % popup_frame_width % popup_radius
               % popup_frame_color % popup_background_color
               % popup_use_main_skin;
@@ -125,7 +145,7 @@ public:
         String description;              // Secondary text line.
         String right_text;               // Right-aligned meta text.
         Image  icon;                     // Optional left icon.
-        bool   mono_icon = false;        // Tint icon using resolved ink/icon color.
+        UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
         bool   checked = false;          // Used by multi-select and checkmark visualization.
         Color  custom_ink_color;
 
@@ -183,6 +203,7 @@ private:
         
         void SetHighlight(int index);
         int  HitTest(Point p) const;
+        int  HitTestDrag(Point p) const;
         Rect GetItemRect(int index) const;
         void EnsureVisible(int index);
         void SyncWindowRegion();
@@ -201,6 +222,17 @@ private:
     UiListModel internal_model_;
     UiListModel* model_ = nullptr;
     Vector<UiListModel*> bound_models_;
+
+    int hot_drag_ = -1;
+    int pressed_drag_ = -1;
+    bool drag_reorder_enabled_ = false;
+    int  drag_threshold_px_ = DPI(10);
+    bool drag_candidate_ = false;
+    bool dragging_ = false;
+    bool drag_moved_ = false;
+    int  drag_from_ = -1;
+    int  drag_insert_before_ = -1;
+    Point drag_start_screen_ = Point(0, 0);
     
     // Internal helpers keep theme sync, popup lifetime, and model mirroring out of Paint().
     void InvalidateStyleCache();
@@ -230,6 +262,11 @@ private:
     void NotifyCheckedCountIfChanged(bool force = false);
     void SyncItemsFromModel();
     void BindModel(UiListModel& model);
+    void BeginPopupDrag(int row, Point start_screen);
+    void ContinuePopupDrag(Point screen);
+    void EndPopupDrag(bool cancel);
+    void MoveItemTo(int from, int before);
+    int  RemapIndexAfterMove(int index, int from, int before) const;
     UiModelItem ToModelItem(const Item& it) const;
     Item FromModelItem(const UiModelItem& it) const;
     
@@ -257,7 +294,7 @@ public:
     UiDropdown& SetItemText(int index, const String& text);
     UiDropdown& SetItemData(int index, const Value& data);
     UiDropdown& SetItemEnabled(int index, bool enabled);
-    UiDropdown& SetItemIcon(int index, const Image& icon, bool mono = false);
+    UiDropdown& SetItemIcon(int index, const Image& icon, UiIconRenderMode render_mode = UiIconRenderMode::PreserveColor);
     UiDropdown& SetItemDescription(int index, const String& desc);
     UiDropdown& SetItemRightText(int index, const String& text);
     UiDropdown& SetItemChecked(int index, bool checked = true);
@@ -305,9 +342,8 @@ public:
     UiDropdown& SetIndicatorSide(UiAlign side);
     UiDropdown& ShowIndicator(bool on = true);
     UiDropdown& SetIndicatorGlyphs(const Image& closed, const Image& opened);
-    UiDropdown& SetIndicatorScale(bool on = true, int size = 0);
-    UiDropdown& SetIndicatorMargin(const Rect& margin);
-    UiDropdown& SetLabelMargin(const Rect& margin);
+    UiDropdown& SetIndicatorSize(int size);
+    UiDropdown& SetContentGap(int gap);
     
     UiDropdown& SetPopupMaxHeight(int height);
     UiDropdown& SetPopupMaxItems(int count);
@@ -317,14 +353,27 @@ public:
     UiDropdown& SetPopupFrame(int width, int radius = DPI(4), Color frame_color = Null);
     UiDropdown& SetPopupBackground(Color color);
     UiDropdown& SetPopupUseMainSkin(bool on = true);
-    UiDropdown& SetPopupCheckSide(UiAlign side);
+    UiDropdown& SetPopupMarkerSide(UiAlign side);
+    UiDropdown& SetPopupSelectionMarker(bool on = true);
+    UiDropdown& SetPopupSelectionIcon(const Image& icon);
+    UiDropdown& SetPopupCheckIcons(const Image& checked, const Image& unchecked = Image());
+    UiDropdown& SetPopupMarkerRenderMode(UiIconRenderMode mode);
+    UiDropdown& ShowSelectionBadge(bool on = true);
     
     UiDropdown& SetPopupAutoClose(bool on = true);
     UiDropdown& SetPopupPinned(bool on = false); // Keep open after selection
 
+    // Drag reorder is popup-owned and updates the bound UiListModel directly.
+    UiDropdown& EnableDragReorder(bool on = true);
+    bool        IsDragReorderEnabled() const { return drag_reorder_enabled_; }
+    UiDropdown& ShowDragHandle(bool on = true);
+    UiDropdown& SetDragSide(UiAlign side);
+    UiDropdown& SetDragGlyph(const Image& glyph);
+
     // Explicit external model binding. Call UseInternalModel() to switch back.
     UiDropdown& SetModel(UiListModel& model);
     UiDropdown& UseInternalModel();
+    UiDropdown& RefreshFromModel(); // Resync visible rows after direct model mutation.
     UiListModel& GetInternalModel() { return internal_model_; }
     UiListModel& GetModel() { return *model_; }
     const UiListModel& GetModel() const { return *model_; }
@@ -397,6 +446,7 @@ public:
     Event<int, bool>      WhenItemState;   // index, enabled
     Event<int, bool>      WhenItemCheck;   // index, checked
     Event<int>            WhenCheckedCount;
+    Event<int, int>       WhenReordered;   // from, before
     
     // ------------------------------------------------------------------------
     // Popup control
@@ -415,6 +465,3 @@ private:
 } // namespace Upp
 
 #endif
-
-
-

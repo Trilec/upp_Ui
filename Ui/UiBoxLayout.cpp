@@ -210,9 +210,9 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
         int h = it.fixed >= 0 ? it.fixed : ms.cy;
         if(fixed_row > 0)
             h = min(h, fixed_row);
-        h = min(max(h, it.minw), it.maxw);
+        h = min(max(h, it.minh), it.maxh);
 
-        int w = min(max(ms.cx, it.minh), it.maxh);
+        int w = min(max(ms.cx, it.minw), it.maxw);
 
         base_h[i] = max(0, h);
         base_w[i] = max(0, w);
@@ -329,6 +329,29 @@ void UiBoxLayout::Paint(Draw& w)
         w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), Color(220, 0, 0));
         w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), Color(220, 0, 0));
     }
+}
+
+Size UiBoxLayout::GetContentSize() const
+{
+    if(layout_gen == cur_gen) {
+        return Size(max(0, used_w) + inset.left + inset.right,
+                    max(0, used_h) + inset.top + inset.bottom);
+    }
+    return GetMinSize();
+}
+
+int UiBoxLayout::MeasureHeightForWidth(int total_width) const
+{
+    if(total_width <= 0)
+        return inset.top + inset.bottom;
+
+    if(dir == Direction::V || !wrap)
+        return GetMinSize().cy;
+
+    Rect irc = RectC(0, 0, max(0, total_width - inset.left - inset.right), INT_MAX / 8);
+    UiBoxLayout *self = const_cast<UiBoxLayout*>(this);
+    self->RebuildLayoutCache(irc);
+    return max(0, self->used_h) + inset.top + inset.bottom;
 }
 
 Size UiBoxLayout::GetMinSize() const

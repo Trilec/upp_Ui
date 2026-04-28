@@ -75,7 +75,7 @@ const UiTree::Style& UiTree::StyleDefault()
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
         s.metrics.radius = 0;
-        s.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.focus_enabled = true;
         s.metrics.focus_margin = DPI(2);
         s.metrics.focus_alpha = 180;
@@ -87,7 +87,8 @@ const UiTree::Style& UiTree::StyleDefault()
         s.indent_px = DPI(18);
         s.glyph_size = DPI(10);
         s.icon_size = DPI(16);
-        s.label_gap = DPI(6);
+        s.content_gap = DPI(6);
+        s.item_spacing = 0;
         s.h_padding = DPI(6);
         s.v_padding = DPI(4);
         s.row_radius = DPI(4);
@@ -99,7 +100,7 @@ const UiTree::Style& UiTree::StyleDefault()
         s.show_connector_lines = false;
         s.show_metadata_marker = true;
         s.glyph_style = UITREEGLYPH_CHEVRON;
-        s.glyph_mono = true;
+        s.icon_render_mode = UiIconRenderMode::MonoTint;
 
         s.ink = text_primary;
         s.disabled_ink = text_muted;
@@ -376,12 +377,12 @@ UiTree& UiTree::SetGlyphStyle(UiTreeGlyphStyle style)
     return *this;
 }
 
-UiTree& UiTree::SetGlyphImages(const Image& collapsed, const Image& expanded, bool mono)
+UiTree& UiTree::SetGlyphImages(const Image& collapsed, const Image& expanded, UiIconRenderMode render_mode)
 {
     Style& st = StyleEdit();
-    st.glyph_collapsed = collapsed;
-    st.glyph_expanded = expanded;
-    st.glyph_mono = mono;
+    st.collapsed_icon = collapsed;
+    st.expanded_icon = expanded;
+    st.icon_render_mode = render_mode;
     st.glyph_style = UITREEGLYPH_CUSTOM;
     OnStyleChanged();
     return *this;
@@ -701,7 +702,11 @@ Rect UiTree::GetViewportRect() const
 
 int UiTree::GetTotalHeight() const
 {
-    return visible_rows_.GetCount() * max(DPI(18), GetEffectiveStyle().row_height);
+    int count = visible_rows_.GetCount();
+    if(count <= 0)
+        return 0;
+    int rh = max(DPI(18), GetEffectiveStyle().row_height);
+    return count * rh;
 }
 
 Rect UiTree::GetRowRect(int row) const
@@ -737,7 +742,7 @@ Rect UiTree::GetToggleHitRect(const Rect& row, int depth, bool has_children) con
         return Rect(0, 0, 0, 0);
     const Style& style = GetEffectiveStyle();
     Rect glyph = GetGlyphRect(row, depth);
-    return Rect(row.left, row.top, min(glyph.right + style.label_gap + style.branch_hit_extra, row.right), row.bottom);
+    return Rect(row.left, row.top, min(glyph.right + style.content_gap + style.branch_hit_extra, row.right), row.bottom);
 }
 
 Rect UiTree::GetIconRect(const Rect& row, int depth, bool has_glyph) const
@@ -745,7 +750,7 @@ Rect UiTree::GetIconRect(const Rect& row, int depth, bool has_glyph) const
     const Style& style = GetEffectiveStyle();
     Rect glyph = GetGlyphRect(row, depth);
     int side = max(DPI(12), style.icon_size);
-    int left = has_glyph ? glyph.right + style.label_gap : glyph.left;
+    int left = has_glyph ? glyph.right + style.content_gap : glyph.left;
     int top = row.top + (row.GetHeight() - side) / 2;
     return RectC(left, top, side, side);
 }
@@ -804,11 +809,11 @@ Rect UiTree::GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_ic
 
     int left = glyph.left;
     if(has_metadata)
-        left = metadata.right + style.label_gap;
+        left = metadata.right + style.content_gap;
     else if(has_icon)
-        left = icon.right + style.label_gap;
+        left = icon.right + style.content_gap;
     else if(has_glyph)
-        left = glyph.right + style.label_gap;
+        left = glyph.right + style.content_gap;
 
     int right = row.right - style.h_padding;
     if(!accessories.IsEmpty())
@@ -825,8 +830,8 @@ void UiTree::PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, 
     if(IsNull(color) || r.IsEmpty())
         return;
 
-    if(style.glyph_style == UITREEGLYPH_CUSTOM && !IsNull(expanded ? style.glyph_expanded : style.glyph_collapsed)) {
-        UiPaintStyledIcon(w, r, expanded ? style.glyph_expanded : style.glyph_collapsed, true, style.glyph_mono, color, true);
+    if(style.glyph_style == UITREEGLYPH_CUSTOM && !IsNull(expanded ? style.expanded_icon : style.collapsed_icon)) {
+        UiPaintStyledIcon(w, r, expanded ? style.expanded_icon : style.collapsed_icon, true, true, style.icon_render_mode, color, true);
         return;
     }
 
@@ -869,7 +874,7 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
     const Style& style = GetEffectiveStyle();
     const VisibleRow& vr = visible_rows_[index];
     if(vr.placeholder) {
-        int x = row.left + style.h_padding + vr.depth * style.indent_px + style.label_gap;
+        int x = row.left + style.h_padding + vr.depth * style.indent_px + style.content_gap;
         int y = row.top + (row.GetHeight() - style.font.GetHeight()) / 2;
         DrawSmartText(w, x, y, max(0, row.right - x - style.h_padding), "Loading...", style.font, style.disabled_ink, 0);
         return;
@@ -922,7 +927,7 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
     if(has_icon) {
         Rect ir = GetIconRect(row, vr.depth, vr.has_children);
         Color icon_ink = IsNull(style.palette.icon[st]) ? style.glyph_color : style.palette.icon[st];
-        UiPaintStyledIcon(w, ir, item.icon, true, item.mono_icon, icon_ink, enabled);
+            UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, enabled);
     }
 
     bool has_metadata = style.show_metadata_marker && item.has_metadata;
@@ -941,7 +946,7 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
         Color rink = enabled ? style.glyph_color : style.disabled_ink;
         int ry = rr.top + (rr.GetHeight() - right_font.GetHeight()) / 2;
         DrawSmartText(w, rr.left, ry, max(0, rr.GetWidth()), item.right_text, right_font, rink, 0);
-        left_text_r.right = max(left_text_r.left, rr.left - style.label_gap);
+        left_text_r.right = max(left_text_r.left, rr.left - style.content_gap);
     }
 
     Color ink = item.custom_ink_color;
@@ -1137,12 +1142,20 @@ void UiTree::Layout()
     UpdateAttachedCtrls();
 }
 
+Size UiTree::GetContentSize() const
+{
+    const Style& style = GetEffectiveStyle();
+    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
+    int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom + GetTotalHeight();
+    return Size(width, max(0, height));
+}
+
 Size UiTree::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
     int sample_rows = max(3, min(8, visible_rows_.GetCount()));
-    int width = style.metrics.content_padding.left + style.metrics.content_padding.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
-    int height = style.metrics.content_padding.top + style.metrics.content_padding.bottom + sample_rows * max(DPI(18), style.row_height);
+    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
+    int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom + sample_rows * max(DPI(18), style.row_height);
     return UiStyledOuterSizeFromContent(Size(width, height), style.metrics, style.skin);
 }
 
@@ -1371,13 +1384,15 @@ bool UiTree::Key(dword key, int)
         break;
     case K_PAGEUP: {
         Rect vp = GetViewportRect();
-        int rows = max(1, vp.GetHeight() / max(DPI(18), GetEffectiveStyle().row_height));
+        int extent = max(DPI(18), GetEffectiveStyle().row_height);
+        int rows = max(1, vp.GetHeight() / max(1, extent));
         MoveCursorBy(-rows);
         break;
     }
     case K_PAGEDOWN: {
         Rect vp = GetViewportRect();
-        int rows = max(1, vp.GetHeight() / max(DPI(18), GetEffectiveStyle().row_height));
+        int extent = max(DPI(18), GetEffectiveStyle().row_height);
+        int rows = max(1, vp.GetHeight() / max(1, extent));
         MoveCursorBy(rows);
         break;
     }
@@ -1719,13 +1734,3 @@ void UiTree::LostFocus()
         Refresh();
 }
 } // namespace Upp
-
-
-
-
-
-
-
-
-
-

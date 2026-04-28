@@ -18,7 +18,7 @@ UiPanel::Style MakePickerHostStyle()
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(8);
     s.metrics.focus_enabled = false;
-    s.metrics.content_padding = Rect(0, 0, 0, 0);
+    s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -48,6 +48,7 @@ public:
                .SetSlotLabel(1, "C2")
                .SetSlotLabel(2, "C3")
                .SetSlotLabel(3, "C4")
+               .SetAlphaEnabled(true)
                .SetActiveSlot(0);
     }
 

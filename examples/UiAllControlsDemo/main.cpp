@@ -121,10 +121,10 @@ public:
 
         UiAccordion::Style accs = UiAccordion::StyleDefault();
         accs.header_height = DPI(42);
-        accs.section_gap = DPI(10);
+        accs.item_spacing = DPI(10);
         accs.header_body_gap = DPI(6);
         accs.body_min_height = DPI(44);
-        accs.metrics.content_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(10));
+        accs.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(10));
         accs.header_style.title_font = SansSerifZ(13).Bold();
         accs.header_style.subtitle_font = SansSerifZ(11);
         accs.header_style.copy_font = SansSerifZ(1);
@@ -188,7 +188,7 @@ public:
         e_strong.SetPlaceholder("Strong").SetStyle(UiTheme::ResolveEdit(UiEditRole::Strong));
 
         c_std.SetText("Checked").SetChecked(true);
-        c_min.SetText("Switch").SetVisual(UICHECKVIS_SWITCH).SetChecked(true);
+        c_min.SetText("Classic").SetVisual(UICHECKVIS_CLASSIC).SetChecked(true);
         c_soft.SetText("Chip").SetVisual(UICHECKVIS_CHIP).SetChecked(true);
         c_strong.SetText("List").SetVisual(UICHECKVIS_LIST).SetChecked(true);
 
@@ -400,9 +400,3 @@ GUI_APP_MAIN
 {
     UiAllControlsDemoWindow().Run();
 }
-
-
-
-
-
-
