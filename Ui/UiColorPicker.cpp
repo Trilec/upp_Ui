@@ -151,26 +151,35 @@ static void DrawSolidTrack(Draw& w, const Rect& r, Color c)
         w.DrawRect(r, c);
 }
 
+static void DrawGrayRampTrack(Draw& w, const Rect& r, Color a, Color b)
+{
+    if(r.IsEmpty())
+        return;
+    for(int x = 0; x < r.GetWidth(); x++) {
+        int t = int((x / (double)max(1, r.GetWidth() - 1)) * 255.0 + 0.5);
+        Color c = Blend(a, b, t);
+        w.DrawRect(r.left + x, r.top, 1, r.GetHeight(), c);
+    }
+}
+
+static Image MakeSolidSwatchImage(Color c, Size sz)
+{
+    if(sz.cx <= 0 || sz.cy <= 0)
+        return Image();
+    ImageBuffer ib(sz);
+    for(int y = 0; y < sz.cy; y++) {
+        RGBA *q = ib[y];
+        for(int x = 0; x < sz.cx; x++)
+            q[x] = RGBA(c);
+    }
+    return Image(ib);
+}
+
 static void DrawAlphaTrack(Draw& w, const Rect& r, Color base)
 {
     if(r.IsEmpty())
         return;
-    const int cell = max(4, DPI(6));
-    for(int y = r.top; y < r.bottom; y += cell) {
-        for(int x = r.left; x < r.right; x += cell) {
-            bool dark = (((x - r.left) / cell) + ((y - r.top) / cell)) & 1;
-            w.DrawRect(x, y, min(cell, r.right - x), min(cell, r.bottom - y), dark ? Color(84, 42, 42) : Color(122, 62, 62));
-        }
-    }
-    for(int x = 0; x < r.GetWidth(); x++) {
-        int a = int((x / (double)max(1, r.GetWidth() - 1)) * 255.0 + 0.5);
-        RGBA rgba;
-        rgba.r = base.GetR();
-        rgba.g = base.GetG();
-        rgba.b = base.GetB();
-        rgba.a = a;
-        w.DrawRect(r.left + x, r.top, 1, r.GetHeight(), Color(rgba));
-    }
+    DrawGrayRampTrack(w, r, Color(0x32, 0x32, 0x32), Color(0x5C, 0x5C, 0x5C));
 }
 
 static void PrepValueEdit(UiFloatEdit& e, int precision, double mn, double mx)
@@ -238,14 +247,15 @@ private:
 
 }
 
-class ReadoutRow : public Ctrl {
+class ReadoutRow : public ParentCtrl {
 public:
     typedef ReadoutRow CLASSNAME;
 
     ReadoutRow()
     {
-        NoWantFocus();
+        Add(card_.SizePos());
         Add(copy_);
+        NoWantFocus();
         copy_.SetText("")
              .SetIcon(ICON_CONTENT_CONTENT_COPY_48())
              .SetIconSize(DPI(12), DPI(12))
@@ -261,21 +271,32 @@ public:
         title_ = title;
         value_ = value;
         compact_ = compact;
+        card_.SetTitle(title_).SetSubTitle(value_);
+        RefreshLayout();
         Refresh();
     }
 
     void SetInk(Color title_ink, Color value_ink)
     {
-        title_ink_ = title_ink;
-        value_ink_ = value_ink;
+        UiTitleCard::Style s = card_.GetStyle();
+        s.title_color = title_ink;
+        s.subtitle_color = value_ink;
+        card_.SetStyle(s);
         Refresh();
     }
 
     void SetFonts(Font title_font, Font value_font)
     {
-        title_font_ = title_font;
-        value_font_ = value_font;
+        UiTitleCard::Style s = card_.GetStyle();
+        s.title_font = title_font;
+        s.subtitle_font = value_font;
+        card_.SetStyle(s);
         Refresh();
+    }
+
+    void SetCardStyle(const UiTitleCard::Style& s)
+    {
+        card_.SetStyle(s);
     }
 
     void SetCopyText(const String& s)
@@ -293,37 +314,20 @@ public:
     virtual void Layout() override
     {
         int bw = DPI(14);
-        copy_.SetRect(GetSize().cx - bw, max(0, (GetSize().cy - bw) / 2) - DPI(1), bw, bw);
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Rect r(Point(0, 0), GetSize());
-        Font tf = title_font_.IsNullInstance() ? SansSerifZ(8) : title_font_;
-        Font vf = value_font_.IsNullInstance() ? (compact_ ? SansSerifZ(7) : SansSerifZ(8)) : value_font_;
-        int copy_w = copy_.IsShown() ? copy_.GetRect().GetWidth() + DPI(4) : 0;
-        int title_w = GetTextSize(title_, tf).cx;
-        int value_w = min(GetTextSize(value_, vf).cx, max(0, r.GetWidth() - copy_w - title_w - DPI(12)));
-        Color title = IsNull(title_ink_) ? Color(220, 226, 236) : title_ink_;
-        Color value = IsNull(value_ink_) ? Color(250, 252, 255) : value_ink_;
-        w.DrawText(r.left, r.top, title_, tf, title);
-        w.DrawText(r.right - copy_w - value_w, r.top, value_, vf, value);
+        copy_.SetRect(GetSize().cx - bw - DPI(6), DPI(4), bw, bw);
     }
 
     virtual Size GetMinSize() const override
     {
-        return Size(DPI(110), DPI(18));
+        return card_.GetMinSize();
     }
 
 private:
     String title_;
     String value_;
     bool   compact_ = false;
-    Color  title_ink_ = SColorText();
-    Color  value_ink_ = SColorText();
-    Font   title_font_;
-    Font   value_font_;
     String copy_text_;
+    UiTitleCard card_;
     UiToolButton copy_;
 };
 
@@ -356,7 +360,7 @@ public:
         w.DrawImage(r.left, r.top, img);
 
         Point marker = GetMarkerPos();
-        Color frame = SColorShadow();
+        Color frame = Color(0x22, 0x22, 0x22);
         w.DrawRect(r.left, r.top, r.GetWidth(), 1, frame);
         w.DrawRect(r.left, r.bottom - 1, r.GetWidth(), 1, frame);
         w.DrawRect(r.left, r.top, 1, r.GetHeight(), frame);
@@ -835,12 +839,21 @@ UiColorPicker::UiColorPicker()
         DrawHueTrack(w, ctx.track);
         handled = true;
     };
+    slider_hue_axis_.WhenPaintActiveTrack = [=](Draw&, const UiSlider::PaintContext&, bool& handled) {
+        handled = true;
+    };
     slider_value_axis_.WhenPaintTrack = [=](Draw& w, const UiSlider::PaintContext& ctx, bool& handled) {
-        DrawSolidTrack(w, ctx.track, Color(92, 98, 104));
+        DrawGrayRampTrack(w, ctx.track, Color(0x32, 0x32, 0x32), Color(0x5C, 0x5C, 0x5C));
+        handled = true;
+    };
+    slider_value_axis_.WhenPaintActiveTrack = [=](Draw&, const UiSlider::PaintContext&, bool& handled) {
         handled = true;
     };
     slider_alpha_axis_.WhenPaintTrack = [=](Draw& w, const UiSlider::PaintContext& ctx, bool& handled) {
-        DrawAlphaTrack(w, ctx.track, GetSlotColor(active_slot_));
+        DrawGrayRampTrack(w, ctx.track, Color(0x32, 0x32, 0x32), Color(0x5C, 0x5C, 0x5C));
+        handled = true;
+    };
+    slider_alpha_axis_.WhenPaintActiveTrack = [=](Draw&, const UiSlider::PaintContext&, bool& handled) {
         handled = true;
     };
 
@@ -867,7 +880,6 @@ void UiColorPicker::BuildChildTree()
     recent_grid_.Create();
     user_grid_.Create();
     readout_hex_.Create();
-    readout_rgb8_.Create();
     readout_rgb_unit_.Create();
     readout_hsv_.Create();
     readout_alpha_.Create();
@@ -894,7 +906,6 @@ void UiColorPicker::BuildChildTree()
     picker_left_.Add(slider_value_axis_);
     picker_left_.Add(slider_alpha_axis_);
     picker_page_.Add(*readout_hex_);
-    picker_page_.Add(*readout_rgb8_);
     picker_page_.Add(*readout_rgb_unit_);
     picker_page_.Add(*readout_hsv_);
     picker_page_.Add(*readout_alpha_);
@@ -962,24 +973,24 @@ UiColorPicker& UiColorPicker::SetStyle(const Style& s)
 {
     style_ = s;
     has_style_override_ = true;
-    InvalidateStyleCache();
-    RefreshLayout();
-    Refresh();
+    OnStyleChanged();
     return *this;
 }
 
 UiColorPicker& UiColorPicker::ClearStyleOverride()
 {
+    if(!has_style_override_)
+        return *this;
+
     has_style_override_ = false;
-    InvalidateStyleCache();
-    RefreshLayout();
-    Refresh();
+    OnStyleChanged();
     return *this;
 }
 
 void UiColorPicker::OnStyleChanged()
 {
     InvalidateStyleCache();
+    children_theme_revision_ = 0;
     SyncThemeToChildren();
     RefreshLayout();
     Refresh();
@@ -989,12 +1000,14 @@ UiColorPicker::Style& UiColorPicker::StyleEdit()
 {
     has_style_override_ = true;
     InvalidateStyleCache();
+    children_theme_revision_ = 0;
     return style_;
 }
 
 void UiColorPicker::InvalidateStyleCache()
 {
     theme_revision_ = 0;
+    children_style_dirty_ = true;
 }
 
 void UiColorPicker::SyncThemeStyle()
@@ -1194,12 +1207,10 @@ void UiColorPicker::SyncReadouts()
                                 cc, mm, yy, kk, a / 255.0);
 
     readout_hex_->SetText("RGBA (HEX8)", hex8);
-    readout_rgb8_->SetText("RGB 8-BIT", FormatRgb8(c));
     readout_rgb_unit_->SetText("NORMALIZED", normalized, true);
     readout_hsv_->SetText("HSV-A", hsva);
     readout_alpha_->SetText("CMYK-A", cmyka);
     readout_hex_->SetCopyText(hex8);
-    readout_rgb8_->SetCopyText(FormatRgb8(c));
     readout_rgb_unit_->SetCopyText(normalized);
     readout_hsv_->SetCopyText(hsva);
     readout_alpha_->SetCopyText(cmyka);
@@ -1315,22 +1326,35 @@ void UiColorPicker::CommitAlpha(bool final_commit)
 void UiColorPicker::SyncSlotButtons()
 {
     const bool dark = UiThemeDetail::ResolveEffectiveMode(UiTheme::GetContext().mode) == UiThemeMode::Dark;
+    const int inset = DPI(5);
+    const int icon_side = max(DPI(12), GetEffectiveStyle().slot_size - inset * 2);
+    Size icon_sz(icon_side, icon_side);
     for(int i = 0; i < 4; i++) {
         slot_button_[i].Show(i < slot_count_);
         slot_button_[i].SetText("");
         slot_button_[i].SetCheckable(true).SetChecked(i == active_slot_);
         UiButton::Style bs = UiTheme::ResolveButton(UiButtonRole::Subtle);
         for(int j = 0; j < 4; j++) {
-            bs.palette.face[j] = UiFill::Solid(slots_[i].color);
-            bs.palette.frame[j] = (i == active_slot_) ? Color(0, 120, 212)
-                                                      : (dark ? Color(52, 52, 52) : Color(120, 132, 152));
-            bs.palette.ink[j] = Grayscale(slots_[i].color) < 130 ? White() : Black();
+            bs.palette.face[j] = UiFill::Solid(dark ? Color(12, 12, 12) : SColorPaper());
+            bs.palette.frame[j] = dark ? Color(12, 12, 12) : SColorPaper();
+            bs.palette.ink[j] = Null;
+            bs.palette.icon[j] = Null;
         }
         bs.metrics.face_enabled = true;
-        bs.metrics.frame_enabled = true;
-        bs.metrics.frame_width = (i == active_slot_) ? DPI(2) : DPI(1);
+        bs.metrics.frame_enabled = (i == active_slot_);
+        bs.metrics.frame_width = DPI(1);
         bs.metrics.radius = DPI(3);
+        bs.metrics.content_margin = Rect(inset, inset, inset, inset);
         bs.metrics.shadow.enabled = false;
+        bs.metrics.focus_enabled = false;
+        slot_button_[i].SetIcon(MakeSolidSwatchImage(slots_[i].color, icon_sz));
+        slot_button_[i].SetIconSize(icon_sz);
+        slot_button_[i].SetIconRenderMode(UiIconRenderMode::PreserveColor);
+        slot_button_[i].SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        if(i == active_slot_) {
+            for(int j = 0; j < 4; j++)
+                bs.palette.frame[j] = Color(0x32, 0x32, 0x32);
+        }
         slot_button_[i].SetStyle(bs);
     }
 }
@@ -1416,7 +1440,6 @@ void UiColorPicker::UpdateTabVisibility()
     slider_y_.Show(picker);
     slider_k_.Show(picker);
     readout_hex_->Show(show_readouts);
-    readout_rgb8_->Show(false);
     readout_rgb_unit_->Show(show_readouts);
     readout_hsv_->Show(show_readouts);
     readout_alpha_->Show(show_readouts && alpha_enabled_);
@@ -1530,10 +1553,40 @@ void UiColorPicker::SyncThemeToChildren()
 
     Color readout_title = heading_ink;
     Color readout_value = value_ink;
+    UiTitleCard::Style info_style = UiTheme::ResolveTitleCard();
+    for(int i = 0; i < 4; i++) {
+        info_style.palette.face[i] = UiFill::Solid(face);
+        info_style.palette.frame[i] = Color(0x22, 0x22, 0x22);
+        info_style.palette.ink[i] = heading_ink;
+    }
+    info_style.metrics.face_enabled = false;
+    info_style.metrics.frame_enabled = true;
+    info_style.metrics.frame_width = DPI(1);
+    info_style.metrics.radius = DPI(4);
+    info_style.metrics.content_margin = Rect(DPI(6), DPI(4), DPI(22), DPI(4));
+    info_style.metrics.shadow.enabled = false;
+    info_style.show_rule = false;
+    info_style.show_bottom_line = false;
+    info_style.transparent = false;
+    info_style.hover_enabled = false;
+    info_style.title_subtitle_gap = 0;
+    info_style.subtitle_copy_gap = 0;
+    info_style.title_font = heading_font;
+    info_style.subtitle_font = readout_value_font;
+    info_style.title_color = readout_title;
+    info_style.subtitle_color = readout_value;
+
+    if(readout_hex_)
+        readout_hex_->SetCardStyle(info_style);
+    if(readout_rgb_unit_)
+        readout_rgb_unit_->SetCardStyle(info_style);
+    if(readout_hsv_)
+        readout_hsv_->SetCardStyle(info_style);
+    if(readout_alpha_)
+        readout_alpha_->SetCardStyle(info_style);
+
     if(readout_hex_)
         readout_hex_->SetInk(readout_title, readout_value);
-    if(readout_rgb8_)
-        readout_rgb8_->SetInk(readout_title, readout_value);
     if(readout_rgb_unit_)
         readout_rgb_unit_->SetInk(readout_title, readout_value);
     if(readout_hsv_)
@@ -1556,8 +1609,6 @@ void UiColorPicker::SyncThemeToChildren()
 
     if(readout_hex_)
         readout_hex_->SetCopyStyle(copy_style, readout_value);
-    if(readout_rgb8_)
-        readout_rgb8_->SetCopyStyle(copy_style, readout_value);
     if(readout_rgb_unit_)
         readout_rgb_unit_->SetCopyStyle(copy_style, readout_value);
     if(readout_hsv_)
@@ -1567,8 +1618,6 @@ void UiColorPicker::SyncThemeToChildren()
 
     if(readout_hex_)
         readout_hex_->SetFonts(heading_font, readout_value_font);
-    if(readout_rgb8_)
-        readout_rgb8_->SetFonts(heading_font, readout_value_font);
     if(readout_rgb_unit_)
         readout_rgb_unit_->SetFonts(heading_font, readout_compact_font);
     if(readout_hsv_)
@@ -1578,20 +1627,55 @@ void UiColorPicker::SyncThemeToChildren()
 
     UiDropdown::Style dd = UiTheme::ResolveDropdown();
     dd.font = SansSerifZ(8);
-    Color dd_face = dark_surface ? Color(28, 28, 28) : face;
+
+    Color dd_face     = dark_surface ? Color(12, 12, 12) : Color(252, 253, 255);
+    Color dd_hot      = dark_surface ? Color(20, 22, 26) : Color(242, 246, 252);
+    Color dd_pressed  = dark_surface ? Color(24, 28, 34) : Color(232, 240, 252);
+    Color dd_frame    = dark_surface ? Color(34, 34, 34) : Color(202, 210, 222);
+    Color dd_disabled = dark_surface ? Color(18, 18, 18) : Color(244, 246, 250);
+
+    dd.palette.face[ST_NORMAL]   = UiFill::Solid(dd_face);
+    dd.palette.face[ST_HOT]      = UiFill::Solid(dd_hot);
+    dd.palette.face[ST_PRESSED]  = UiFill::Solid(dd_pressed);
+    dd.palette.face[ST_DISABLED] = UiFill::Solid(dd_disabled);
+
     for(int i = 0; i < 4; i++) {
-        dd.palette.face[i] = UiFill::Solid(dd_face);
-        dd.palette.frame[i] = Blend(dd_face, heading_ink, dark_surface ? 55 : 30);
-        dd.palette.ink[i] = readout_value;
-        dd.palette.icon[i] = readout_value;
+        dd.palette.frame[i] = dd_frame;
+        dd.palette.ink[i]   = readout_value;
+        dd.palette.icon[i]  = readout_value;
     }
+
+    dd.popup_item_style.font = dd.font;
+    dd.popup_item_style.transparent = true;
+    dd.popup_item_style.palette.face[ST_NORMAL]   = UiFill::None();
+    dd.popup_item_style.palette.face[ST_HOT]      = UiFill::Solid(dd_hot);
+    dd.popup_item_style.palette.face[ST_PRESSED]  = UiFill::Solid(dd_pressed);
+    dd.popup_item_style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(dd_face, dd_frame, 35));
+    for(int i = 0; i < 4; i++) {
+        dd.popup_item_style.palette.frame[i] = Null;
+        dd.popup_item_style.palette.ink[i]   = readout_value;
+        dd.popup_item_style.palette.icon[i]  = readout_value;
+    }
+
     dd.popup_background_color = dd_face;
-    dd.metrics.frame_enabled = false;
+    dd.popup_frame_color = dd_frame;
+    dd.popup_use_main_skin = false;
+    dd.popup_frame_width = DPI(1);
+    dd.popup_radius = DPI(5);
+
+    dd.skin.enabled = false;
+    dd.metrics.frame_enabled = true;
+    dd.metrics.frame_width = DPI(1);
     dd.metrics.face_enabled = true;
+    dd.metrics.radius = DPI(5);
     dd.metrics.content_margin = Rect(DPI(8), DPI(6), DPI(8), DPI(6));
     dd.transparent = false;
+    dd.indicator_size = DPI(11);
+
     spectrum_mode_drop_.SetStyle(dd);
     library_palette_drop_.SetStyle(dd);
+    spectrum_mode_drop_.EnableDragReorder(true);
+    library_palette_drop_.EnableDragReorder(true);
 
     UiButton::Style action_style = UiTheme::ResolveButton(UiButtonRole::Accent);
     for(int i = 0; i < 4; i++) {
@@ -1633,20 +1717,28 @@ void UiColorPicker::SyncThemeToChildren()
     previous_slot_preview_.SetStyle(slot_preview_style);
 
     UiTab::Style ts = UiTheme::ResolveTab(UITAB_UNDERLINE);
+    ts.visual = UITAB_UNDERLINE;
     ts.fill_tabs = false;
     ts.item_spacing = DPI(18);
-    ts.indicator_thickness = DPI(2);
-    ts.tab_padding = Rect(DPI(0), DPI(6), DPI(0), DPI(10));
+    ts.indicator_thickness = DPI(3);
+    ts.indicator_span = LARGE;
+    ts.body_gap = 0;
+    ts.tab_padding = Rect(DPI(0), DPI(6), DPI(0), DPI(6));
     ts.tab_metrics.face_enabled = false;
     ts.tab_metrics.frame_enabled = false;
     for(int i = 0; i < 4; i++) {
         ts.tab_palette.face[i] = UiFill::None();
         ts.tab_palette.frame[i] = Null;
         ts.tab_palette.ink[i] = dark_surface
-                                ? ((i == ST_NORMAL || i == ST_DISABLED) ? Color(128, 137, 148) : Color(43, 155, 255))
-                                : ((i == ST_NORMAL || i == ST_DISABLED) ? Color(88, 98, 112) : Color(33, 98, 227));
+                                ? ((i == ST_NORMAL || i == ST_DISABLED) ? Color(128, 137, 148) : Color(186, 192, 200))
+                                : ((i == ST_NORMAL || i == ST_DISABLED) ? Color(88, 98, 112) : Color(120, 128, 136));
+        ts.tab_palette.frame[i] = Color(0x22, 0x22, 0x22);
     }
+    ts.tab_palette.frame[ST_PRESSED] = Color(0, 120, 212);
     tabs_.SetStyle(ts);
+
+    children_theme_revision_ = theme_revision_;
+    children_style_dirty_ = false;
 }
 
 void UiColorPicker::Paint(Draw& w)
@@ -1669,6 +1761,10 @@ void UiColorPicker::Paint(Draw& w)
 void UiColorPicker::Layout()
 {
     const Style& s = GetEffectiveStyle();
+    const uint64 rev = UiTheme::GetRevision();
+    if(children_style_dirty_ || children_theme_revision_ != rev)
+        SyncThemeToChildren();
+
     Rect body = UiStyledInnerRect(GetSize(), s.metrics, s.skin);
     Rect header = RectC(body.left, body.top, body.GetWidth(), s.header_height);
     header_bar_.SetRect(header);
@@ -1680,8 +1776,8 @@ void UiColorPicker::Layout()
     if(page.IsEmpty())
         return;
 
-    int slot_x = tabsr.right - DPI(8);
-    int slot_y = tabsr.top + DPI(6);
+    int slot_x = tabs_.GetSize().cx - DPI(8);
+    int slot_y = DPI(2);
     for(int i = slot_count_ - 1; i >= 0; i--) {
         slot_x -= s.slot_size;
         slot_button_[i].SetRect(slot_x, slot_y, s.slot_size, s.slot_size);
@@ -1695,7 +1791,6 @@ void UiColorPicker::Layout()
         int h = DPI(52);
         int w = max(DPI(120), (area.GetWidth() - gap * 3) / 4);
         readout_hex_->SetRect(area.left, area.top, w, h);
-        readout_rgb8_->SetRect(0, 0, 0, 0);
         readout_rgb_unit_->SetRect(area.left + w + gap, area.top, w, h);
         readout_hsv_->SetRect(area.left + (w + gap) * 2, area.top, w, h);
         readout_alpha_->SetRect(area.left + (w + gap) * 3, area.top, area.GetWidth() - (w + gap) * 3, h);
@@ -1723,7 +1818,7 @@ void UiColorPicker::Layout()
         color_field_->SetRect(left_local.left, top_y + DPI(34), left_local.GetWidth(), max(DPI(180), left_local.GetHeight() - readout_h - DPI(160)));
 
         int axis_y = color_field_->GetRect().bottom + DPI(14);
-        const int axis_label_w = DPI(34);
+        const int axis_label_w = DPI(24);
         const int axis_value_w = DPI(58);
         const int axis_gap = DPI(8);
         const int axis_row_h = DPI(24);
@@ -1833,7 +1928,6 @@ void UiColorPicker::Layout()
     else {
         mixer_placeholder_.SetRect(page.left, page.top, page.GetWidth(), DPI(80));
         readout_hex_->SetRect(0, 0, 0, 0);
-        readout_rgb8_->SetRect(0, 0, 0, 0);
         readout_rgb_unit_->SetRect(0, 0, 0, 0);
         readout_hsv_->SetRect(0, 0, 0, 0);
         readout_alpha_->SetRect(0, 0, 0, 0);

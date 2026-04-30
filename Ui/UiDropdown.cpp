@@ -777,42 +777,42 @@ Value UiDropdown::GetData() const
 
 UiDropdown& UiDropdown::SetIndicatorSide(UiAlign side)
 {
-    style_.indicator_side = side;
-    layout_dirty_ = true;
-    RefreshLayout();
+    Style& s = StyleEdit();
+    s.indicator_side = side;
+    OnStyleChanged();
     return *this;
 }
 
 UiDropdown& UiDropdown::ShowIndicator(bool on)
 {
-    style_.show_indicator = on;
-    layout_dirty_ = true;
-    RefreshLayout();
+    Style& s = StyleEdit();
+    s.show_indicator = on;
+    OnStyleChanged();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetIndicatorGlyphs(const Image& closed, const Image& opened)
 {
-    style_.glyph_closed = closed;
-    style_.glyph_opened = opened;
-    RebuildIndicator();
+    Style& s = StyleEdit();
+    s.glyph_closed = closed;
+    s.glyph_opened = opened;
     OnStyleChanged();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetIndicatorSize(int size)
 {
-    style_.indicator_size = size > 0 ? max(DPI(6), size) : 0;
-    RebuildIndicator();
+    Style& s = StyleEdit();
+    s.indicator_size = size > 0 ? max(DPI(6), size) : 0;
     OnStyleChanged();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetContentGap(int gap)
 {
-    style_.content_gap = max(0, gap);
-    layout_dirty_ = true;
-    RefreshLayout();
+    Style& s = StyleEdit();
+    s.content_gap = max(0, gap);
+    OnStyleChanged();
     return *this;
 }
 
@@ -822,13 +822,17 @@ UiDropdown& UiDropdown::SetContentGap(int gap)
 
 UiDropdown& UiDropdown::SetPopupMaxHeight(int height)
 {
-    style_.popup_max_height = max(height, DPI(40));
+    Style& s = StyleEdit();
+    s.popup_max_height = max(height, DPI(40));
+    if(popup_open_)
+        UpdatePopupPosition();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetPopupMaxItems(int count)
 {
-    style_.popup_max_items = max(1, count);
+    Style& s = StyleEdit();
+    s.popup_max_items = max(1, count);
     if(popup_open_)
         UpdatePopupPosition();
     return *this;
@@ -836,19 +840,26 @@ UiDropdown& UiDropdown::SetPopupMaxItems(int count)
 
 UiDropdown& UiDropdown::SetPopupItemHeight(int height)
 {
-    style_.popup_item_height = max(height, DPI(16));
+    Style& s = StyleEdit();
+    s.popup_item_height = max(height, DPI(16));
+    if(popup_open_)
+        UpdatePopupPosition();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetPopupShowScrollbar(bool on)
 {
-    style_.popup_show_scrollbar = on;
+    Style& s = StyleEdit();
+    s.popup_show_scrollbar = on;
+    if(popup_open_)
+        popup_.Refresh();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetPopupSpace(int space)
 {
-    style_.popup_space = max(0, space);
+    Style& s = StyleEdit();
+    s.popup_space = max(0, space);
     if(popup_open_)
         UpdatePopupPosition();
     return *this;
@@ -856,23 +867,31 @@ UiDropdown& UiDropdown::SetPopupSpace(int space)
 
 UiDropdown& UiDropdown::SetPopupFrame(int width, int radius, Color frame_color)
 {
-    style_.popup_frame_width = width;
-    style_.popup_radius = radius;
+    Style& s = StyleEdit();
+    s.popup_frame_width = max(0, width);
+    s.popup_radius = max(0, radius);
     if(!IsNull(frame_color))
-        style_.popup_frame_color = frame_color;
+        s.popup_frame_color = frame_color;
+    if(popup_open_)
+        popup_.Refresh();
     return *this;
 }
 
 UiDropdown& UiDropdown::SetPopupBackground(Color color)
 {
-    if(!IsNull(color))
-        style_.popup_background_color = color;
+    if(!IsNull(color)) {
+        Style& s = StyleEdit();
+        s.popup_background_color = color;
+        if(popup_open_)
+            popup_.Refresh();
+    }
     return *this;
 }
 
 UiDropdown& UiDropdown::SetPopupUseMainSkin(bool on)
 {
-    style_.popup_use_main_skin = on;
+    Style& s = StyleEdit();
+    s.popup_use_main_skin = on;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -880,7 +899,8 @@ UiDropdown& UiDropdown::SetPopupUseMainSkin(bool on)
 
 UiDropdown& UiDropdown::SetPopupMarkerSide(UiAlign side)
 {
-    style_.popup_marker_side = (side == UiAlign::LEFT) ? UiAlign::LEFT : UiAlign::RIGHT;
+    Style& s = StyleEdit();
+    s.popup_marker_side = (side == UiAlign::LEFT) ? UiAlign::LEFT : UiAlign::RIGHT;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -888,7 +908,8 @@ UiDropdown& UiDropdown::SetPopupMarkerSide(UiAlign side)
 
 UiDropdown& UiDropdown::SetPopupSelectionMarker(bool on)
 {
-    style_.show_popup_selection_marker = on;
+    Style& s = StyleEdit();
+    s.show_popup_selection_marker = on;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -896,7 +917,8 @@ UiDropdown& UiDropdown::SetPopupSelectionMarker(bool on)
 
 UiDropdown& UiDropdown::SetPopupSelectionIcon(const Image& icon)
 {
-    style_.popup_selection_icon = icon;
+    Style& s = StyleEdit();
+    s.popup_selection_icon = icon;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -904,8 +926,9 @@ UiDropdown& UiDropdown::SetPopupSelectionIcon(const Image& icon)
 
 UiDropdown& UiDropdown::SetPopupCheckIcons(const Image& checked, const Image& unchecked)
 {
-    style_.popup_check_checked_icon = checked;
-    style_.popup_check_unchecked_icon = unchecked;
+    Style& s = StyleEdit();
+    s.popup_check_checked_icon = checked;
+    s.popup_check_unchecked_icon = unchecked;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -913,7 +936,8 @@ UiDropdown& UiDropdown::SetPopupCheckIcons(const Image& checked, const Image& un
 
 UiDropdown& UiDropdown::SetPopupMarkerRenderMode(UiIconRenderMode mode)
 {
-    style_.popup_marker_render_mode = mode;
+    Style& s = StyleEdit();
+    s.popup_marker_render_mode = mode;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -921,7 +945,9 @@ UiDropdown& UiDropdown::SetPopupMarkerRenderMode(UiIconRenderMode mode)
 
 UiDropdown& UiDropdown::ShowSelectionBadge(bool on)
 {
-    style_.show_selection_badge = on;
+    Style& s = StyleEdit();
+    s.show_selection_badge = on;
+    OnStyleChanged();
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -951,7 +977,8 @@ UiDropdown& UiDropdown::EnableDragReorder(bool on)
 
 UiDropdown& UiDropdown::ShowDragHandle(bool on)
 {
-    style_.show_drag_handle = on;
+    Style& s = StyleEdit();
+    s.show_drag_handle = on;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -961,7 +988,8 @@ UiDropdown& UiDropdown::SetDragSide(UiAlign side)
 {
     if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
         side = UiAlign::RIGHT;
-    style_.drag_side = side;
+    Style& s = StyleEdit();
+    s.drag_side = side;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -969,7 +997,8 @@ UiDropdown& UiDropdown::SetDragSide(UiAlign side)
 
 UiDropdown& UiDropdown::SetDragGlyph(const Image& glyph)
 {
-    style_.drag_glyph = glyph;
+    Style& s = StyleEdit();
+    s.drag_glyph = glyph;
     if(popup_open_)
         popup_.Refresh();
     return *this;
@@ -1837,6 +1866,8 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
     SyncScrollBarState();
     
     Rect r = GetSize();
+    if(r.GetWidth() <= 0 || r.GetHeight() <= 0)
+        return;
 
     int popup_radius = owner->style_.popup_use_main_skin
                            ? max(0, owner->style_.metrics.radius)
@@ -1868,6 +1899,11 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
     Draw& __popup_draw = popup_buf;
 #define w __popup_draw
 
+    // Always clear the offscreen surface with the resolved popup base. Several
+    // styled painters intentionally draw only the rounded surface, and leaving
+    // untouched pixels lets the platform/default white backing leak through.
+    w.DrawRect(r, popup_base);
+
     // Popup can either inherit the full main skin/palette or use dedicated popup chrome.
     if(owner->style_.popup_use_main_skin) {
         StyledMetrics bg_met = owner->style_.metrics;
@@ -1887,7 +1923,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
             frame_color = owner->style_.palette.frame[ST_NORMAL];
 
         for(int i = 0; i < 4; i++) {
-            pop_pal.face[i] = UiFill::Solid(owner->style_.popup_background_color);
+            pop_pal.face[i] = UiFill::Solid(popup_base);
             pop_pal.frame[i] = frame_color;
             pop_pal.ink[i] = owner->style_.palette.ink[i];
             pop_pal.icon[i] = owner->style_.palette.icon[i];
@@ -1947,7 +1983,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
             const UiDropdown::Item& it = owner->items_[i];
             
             if(it.separator_before && i > 0) {
-                Color sep = Blend(SColorShadow(), SColorPaper(), 200);
+                Color sep = Blend(SColorShadow(), popup_base, 200);
                 w.DrawRect(item_rect.left + DPI(6), item_rect.top, item_rect.GetWidth() - DPI(12), 1, sep);
             }
 
@@ -1955,21 +1991,21 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
                 owner->WhenPaintItem(w, item_rect, it, i, highlighted, selected, enabled, owner->style_);
             }
             else if(it.group_header) {
-                Color hdr = Blend(SColorFace(), SColorPaper(), 20);
+                Color hdr = Blend(SColorFace(), popup_base, 20);
                 DrawRowFillClipped(item_rect, hdr);
                 String ht = ToUpper(it.text);
                 int hy = item_rect.top + (item_rect.GetHeight() - meta_font.GetCy()) / 2;
-                w.DrawText(item_rect.left + DPI(8), hy, ht, meta_font, Blend(SColorText(), SColorPaper(), 120));
+                w.DrawText(item_rect.left + DPI(8), hy, ht, meta_font, Blend(SColorText(), popup_base, 120));
             }
             else if(highlighted) {
                 Color c = owner->style_.popup_item_style.palette.face[ST_HOT].IsSolid()
                     ? owner->style_.popup_item_style.palette.face[ST_HOT].color
-                    : Blend(SColorHighlight(), SColorPaper(), 50);
+                    : Blend(SColorHighlight(), popup_base, 50);
                 DrawRowFillClipped(item_rect, c);
             } else if(selected) {
                 Color c = owner->style_.popup_item_style.palette.face[ST_PRESSED].IsSolid()
                     ? owner->style_.popup_item_style.palette.face[ST_PRESSED].color
-                    : Blend(SColorFace(), SColorPaper(), 30);
+                    : Blend(SColorFace(), popup_base, 30);
                 DrawRowFillClipped(item_rect, c);
             }
 
@@ -2086,7 +2122,7 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
                         int desc_y = text_r.bottom - meta_font.GetCy() - DPI(2);
                         w.DrawText(text_r.left, title_y, it.text, item_font, ink);
                         w.DrawText(text_r.left, desc_y, it.description, meta_font,
-                                   enabled ? Blend(ink, SColorPaper(), 95) : SColorDisabled());
+                                   enabled ? Blend(ink, popup_base, 95) : SColorDisabled());
                     }
                     else {
                         int ty = text_r.top + (text_r.GetHeight() - item_font.GetCy()) / 2;

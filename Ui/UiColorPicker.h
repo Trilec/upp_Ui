@@ -140,6 +140,8 @@ private:
     Style          style_;
     mutable Style  themed_style_;
     mutable uint64 theme_revision_ = 0;
+    uint64         children_theme_revision_ = 0;
+    bool           children_style_dirty_ = true;
     bool           has_style_override_ = false;
     dword          live_update_ms_ = 0;
 
@@ -206,7 +208,6 @@ private:
     Label            cmyk_section_title_;
     Label            live_section_title_;
     One<ReadoutRow>  readout_hex_;
-    One<ReadoutRow>  readout_rgb8_;
     One<ReadoutRow>  readout_rgb_unit_;
     One<ReadoutRow>  readout_hsv_;
     One<ReadoutRow>  readout_alpha_;
