@@ -60,6 +60,13 @@ String QuoteCpp(const String& s)
     return out;
 }
 
+String ColorCpp(Color c)
+{
+    if(IsNull(c))
+        return "Null";
+    return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
+}
+
 
 
 struct DemoPalette {
@@ -489,7 +496,7 @@ class DemoCodePanel : public UiPanel {
 public:
     typedef DemoCodePanel CLASSNAME;
 
-    DemoCodePanel(int h = DPI(146))
+    DemoCodePanel(int h = DPI(166))
         : block_height_(h)
     {
         Add(scroll_);
@@ -651,6 +658,7 @@ struct DropdownConfig {
     bool popup_pinned = false;
     bool popup_use_main_skin = false;
     bool show_selection_badge = true;
+    bool show_check_icons = true;
     bool use_drag = true;
     bool show_drag_handle = true;
     bool shadow = false;
@@ -717,6 +725,7 @@ private:
     void DeleteSelectedItem();
     String BuildUsageCode() const;
     String AlignCode(UiAlign a) const;
+    String IconNameFor(const Image& icon) const;
     String DatasetLabel(DatasetMode m) const;
     UiListModel& ActiveModel();
     const UiListModel& ActiveModel() const;
@@ -733,6 +742,7 @@ private:
     DropdownConfig config_;
     UiListModel icon_list_model_;
     UiTreeModel tree_model_;
+    int active_model_index_ = -1;
 
     UiTitleCard header_;
     UiLabel version_badge_;
@@ -773,6 +783,7 @@ private:
     UiLineEdit item_text_edit_, item_desc_edit_, item_right_edit_;
     UiBoxLayout data_actions_row_ { UiBoxLayout::Direction::H };
     UiButton new_item_button_, save_item_button_, delete_item_button_;
+    UiCompositeToggle item_checked_row_;
 
     UiCompositeSlider min_width_row_, min_height_row_, radius_row_, frame_width_row_, margin_x_row_, margin_y_row_,
                       content_gap_row_, indicator_size_row_, popup_item_height_row_, item_spacing_row_, popup_max_items_row_,
@@ -789,7 +800,7 @@ private:
     UiBoxLayout align_h_row_box_ { UiBoxLayout::Direction::H }, align_v_row_box_ { UiBoxLayout::Direction::H };
     UiLabel align_h_label_, align_v_label_;
     UiCompositeToggle enabled_row_, multi_select_row_, show_indicator_row_, popup_scrollbar_row_,
-                      selection_badge_row_, use_drag_row_, drag_handle_row_,
+                      selection_badge_row_, check_icons_row_, use_drag_row_, drag_handle_row_,
                       popup_marker_row_, popup_auto_close_row_, popup_pinned_row_, popup_use_main_skin_row_, shadow_row_;
     UiCompositeColor face_color_row_, frame_color_row_, text_color_row_, icon_color_row_,
                      popup_background_row_, popup_frame_color_row_, shadow_color_row_;
@@ -816,7 +827,7 @@ UiDropdownDemoWindow::UiDropdownDemoWindow()
     exit_button_.WhenAction = [=] { Close(); };
     copy_button_.WhenAction = [=] { WriteClipboardText(code_panel_.Code().GetText().ToString()); };
 
-    preview_.Showcase().WhenSelect = [=](int) { RefreshState(); };
+    preview_.Showcase().WhenSelect = [=](int index) { active_model_index_ = index; RefreshState(); };
     preview_.Showcase().WhenCheckedCount = [=](int) { RefreshState(); };
     preview_.Showcase().WhenOpen = [=] { RefreshState(); };
     preview_.Showcase().WhenClose = [=] { RefreshState(); };
@@ -828,9 +839,11 @@ UiDropdownDemoWindow::UiDropdownDemoWindow()
                 int index = (int)row.data;
                 const UiListModel& model = ActiveModel();
                 if(index >= 0 && index < model.GetCount()) {
+                    active_model_index_ = index;
                     const UiModelItem& item = model.Get(index);
                     if(item.enabled && !item.group_header)
                         preview_.Showcase().Select(index);
+                    RefreshState();
                 }
                 break;
             }
@@ -994,6 +1007,7 @@ void UiDropdownDemoWindow::BuildRows()
     AddEditRow(data_box_, item_desc_row_box_, item_desc_label_, item_desc_edit_, "Description");
     AddEditRow(data_box_, item_right_row_box_, item_right_label_, item_right_edit_, "Right Text");
     AddDropdownRow(data_box_, item_icon_row_box_, item_icon_label_, item_icon_drop_, "Item Icon");
+    AddToggleRow(data_box_, item_checked_row_, "Item Checked");
     data_actions_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     data_actions_row_.Add(new_item_button_).Expand(1).MinHeight(DPI(28));
     data_actions_row_.Add(save_item_button_).Expand(1).MinHeight(DPI(28));
@@ -1017,9 +1031,10 @@ void UiDropdownDemoWindow::BuildRows()
     AddToggleRow(behavior_box_, show_indicator_row_, "Show Indicator");
     AddToggleRow(behavior_box_, popup_scrollbar_row_, "Popup Scroll");
     AddToggleRow(behavior_box_, selection_badge_row_, "Summary Badge");
+    AddToggleRow(behavior_box_, check_icons_row_, "Check Icons");
     AddToggleRow(behavior_box_, use_drag_row_, "Use Drag");
     AddToggleRow(behavior_box_, drag_handle_row_, "Drag Handle");
-    AddToggleRow(behavior_box_, popup_marker_row_, "Popup Marker");
+    AddToggleRow(behavior_box_, popup_marker_row_, "Selection Tick");
     AddToggleRow(behavior_box_, popup_auto_close_row_, "Auto Close");
     AddToggleRow(behavior_box_, popup_pinned_row_, "Popup Pinned");
     AddToggleRow(behavior_box_, popup_use_main_skin_row_, "Use Main Skin");
@@ -1120,6 +1135,7 @@ void UiDropdownDemoWindow::InitControls()
     item_text_edit_.SetText("Staging");
     item_desc_edit_.SetText("Live mutable row");
     item_right_edit_.SetText("NEW");
+    item_checked_row_.Toggle().SetOn(false);
 
     new_item_button_.SetText("New");
     save_item_button_.SetText("Save");
@@ -1323,6 +1339,11 @@ void UiDropdownDemoWindow::InitControls()
     preview_.Refresh();
     inspector_scroll_.Refresh();
 };
+    check_icons_row_.Toggle().WhenAction = [=] { config_.show_check_icons = check_icons_row_.Toggle().IsOn(); RefreshFromConfig();
+    Refresh();
+    preview_.Refresh();
+    inspector_scroll_.Refresh();
+};
     popup_marker_row_.Toggle().WhenAction = [=] { config_.popup_selection_marker = popup_marker_row_.Toggle().IsOn(); RefreshFromConfig();
     Refresh();
     preview_.Refresh();
@@ -1399,6 +1420,15 @@ void UiDropdownDemoWindow::InitControls()
     preview_.Refresh();
     inspector_scroll_.Refresh();
 };
+    item_checked_row_.Toggle().WhenAction = [=] {
+        if(item_checked_row_.Toggle().IsOn()) {
+            if(config_.multi_select)
+                config_.show_check_icons = true;
+            else
+                config_.popup_selection_marker = true;
+        }
+        SaveSelectedItem();
+    };
 
     new_item_button_.WhenAction = [=] { InsertNewItem(); };
     save_item_button_.WhenAction = [=] { SaveSelectedItem(); };
@@ -1427,6 +1457,18 @@ String UiDropdownDemoWindow::DatasetLabel(DatasetMode m) const
     }
 }
 
+String UiDropdownDemoWindow::IconNameFor(const Image& icon) const
+{
+    if(IsNull(icon))
+        return String();
+    for(int i = 0; i < icon_list_model_.GetCount(); i++) {
+        const UiModelItem& it = icon_list_model_.Get(i);
+        if(it.icon == icon)
+            return AsString(it.data);
+    }
+    return String();
+}
+
 UiListModel& UiDropdownDemoWindow::ActiveModel()
 {
     return preview_.Showcase().GetInternalModel();
@@ -1442,6 +1484,7 @@ void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
     UiDropdown& dd = preview_.Showcase();
     dd.ClosePopup();
     dd.Clear();
+    active_model_index_ = -1;
 
     auto add_simple = [&] {
         dd.Add("Broccoli", "shopping.broccoli");
@@ -1587,6 +1630,7 @@ void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
         dd.Select(first_selectable);
     else
         dd.ClearSelection();
+    active_model_index_ = first_selectable;
 
     RefreshModelTree();
     RefreshState();
@@ -1607,7 +1651,7 @@ void UiDropdownDemoWindow::InsertNewItem()
     item.group_header = false;
     item.enabled = true;
     item.separator_before = false;
-    item.checked = false;
+    item.checked = item_checked_row_.Toggle().IsOn();
     Value icon = item_icon_drop_.GetSelectedData();
     if(!icon.IsNull()) {
         String name = AsString(icon);
@@ -1616,8 +1660,9 @@ void UiDropdownDemoWindow::InsertNewItem()
             item.icon_render_mode = UiIconRenderMode::MonoTint;
         }
     }
-    int insert_at = dd.HasSelection() ? min(dd.GetSelection() + 1, model.GetCount()) : model.GetCount();
+    int insert_at = active_model_index_ >= 0 ? min(active_model_index_ + 1, model.GetCount()) : model.GetCount();
     model.Insert(insert_at, item);
+    active_model_index_ = insert_at;
     dd.Select(insert_at);
     RefreshFromConfig();
     Refresh();
@@ -1628,7 +1673,7 @@ void UiDropdownDemoWindow::InsertNewItem()
 void UiDropdownDemoWindow::SaveSelectedItem()
 {
     UiDropdown& dd = preview_.Showcase();
-    int index = dd.GetSelection();
+    int index = active_model_index_ >= 0 ? active_model_index_ : dd.GetSelection();
     if(index < 0 || index >= ActiveModel().GetCount())
         return;
 
@@ -1641,6 +1686,7 @@ void UiDropdownDemoWindow::SaveSelectedItem()
     item.data = text;
     item.description = item_desc_edit_.GetText().ToString();
     item.right_text = item_right_edit_.GetText().ToString();
+    item.checked = item_checked_row_.Toggle().IsOn();
     Value icon = item_icon_drop_.GetSelectedData();
     if(!icon.IsNull()) {
         String name = AsString(icon);
@@ -1651,6 +1697,9 @@ void UiDropdownDemoWindow::SaveSelectedItem()
         item.icon = Null;
     }
     model.Set(index, item);
+    active_model_index_ = index;
+    if(item.enabled && !item.group_header)
+        dd.Select(index);
     RefreshFromConfig();
     Refresh();
     preview_.Refresh();
@@ -1660,13 +1709,23 @@ void UiDropdownDemoWindow::SaveSelectedItem()
 void UiDropdownDemoWindow::DeleteSelectedItem()
 {
     UiDropdown& dd = preview_.Showcase();
-    int index = dd.GetSelection();
+    int index = active_model_index_ >= 0 ? active_model_index_ : dd.GetSelection();
     if(index < 0 || index >= ActiveModel().GetCount())
         return;
     UiListModel& model = ActiveModel();
     model.Remove(index);
-    if(model.GetCount() > 0)
-        dd.Select(min(index, model.GetCount() - 1));
+    if(model.GetCount() > 0) {
+        active_model_index_ = min(index, model.GetCount() - 1);
+        const UiModelItem& item = model.Get(active_model_index_);
+        if(item.enabled && !item.group_header)
+            dd.Select(active_model_index_);
+        else
+            dd.ClearSelection();
+    }
+    else {
+        active_model_index_ = -1;
+        dd.ClearSelection();
+    }
     RefreshFromConfig();
     Refresh();
     preview_.Refresh();
@@ -1712,6 +1771,7 @@ void UiDropdownDemoWindow::SyncControlsFromConfig()
     show_indicator_row_.Toggle().SetOn(config_.show_indicator);
     popup_scrollbar_row_.Toggle().SetOn(config_.popup_scrollbar);
     selection_badge_row_.Toggle().SetOn(config_.show_selection_badge);
+    check_icons_row_.Toggle().SetOn(config_.show_check_icons);
     use_drag_row_.Toggle().SetOn(config_.use_drag);
     drag_handle_row_.Toggle().SetOn(config_.show_drag_handle);
     popup_marker_row_.Toggle().SetOn(config_.popup_selection_marker);
@@ -1719,6 +1779,7 @@ void UiDropdownDemoWindow::SyncControlsFromConfig()
     popup_pinned_row_.Toggle().SetOn(config_.popup_pinned);
     popup_use_main_skin_row_.Toggle().SetOn(config_.popup_use_main_skin);
     shadow_row_.Toggle().SetOn(config_.shadow);
+    item_checked_row_.Toggle().SetOn(false);
 
     face_color_row_.SetSwatchColor(0, config_.face_color);
     frame_color_row_.SetSwatchColor(0, config_.frame_color);
@@ -1733,7 +1794,15 @@ String UiDropdownDemoWindow::BuildUsageCode() const
 {
     const UiListModel& model = ActiveModel();
     String code;
+    code << "UiDropdown dropdown;\n";
+    code << "dropdown.UseInternalModel();\n\n";
     code << "UiDropdown::Style style = UiTheme::ResolveDropdown();\n";
+    code << "for(int i = 0; i < 4; i++) {\n";
+    code << "    style.palette.face[i] = UiFill::Solid(" << ColorCpp(config_.face_color) << ");\n";
+    code << "    style.palette.frame[i] = " << ColorCpp(config_.frame_color) << ";\n";
+    code << "    style.palette.ink[i] = " << ColorCpp(config_.text_color) << ";\n";
+    code << "    style.palette.icon[i] = " << ColorCpp(config_.icon_color) << ";\n";
+    code << "}\n";
     code << "style.metrics.content_margin = Rect(" << config_.margin_x << ", " << config_.margin_y << ", " << config_.margin_x << ", " << config_.margin_y << ");\n";
     code << "style.metrics.radius = " << config_.radius << ";\n";
     code << "style.metrics.frame_width = " << config_.frame_width << ";\n";
@@ -1758,10 +1827,14 @@ String UiDropdownDemoWindow::BuildUsageCode() const
     code << "style.show_selection_badge = " << (config_.show_selection_badge ? "true" : "false") << ";\n";
     if(!config_.popup_selection_icon_name.IsEmpty())
         code << "style.popup_selection_icon = " << config_.popup_selection_icon_name << "();\n";
-    if(!config_.popup_check_checked_icon_name.IsEmpty())
+    if(config_.show_check_icons && !config_.popup_check_checked_icon_name.IsEmpty())
         code << "style.popup_check_checked_icon = " << config_.popup_check_checked_icon_name << "();\n";
-    if(!config_.popup_check_unchecked_icon_name.IsEmpty())
+    else
+        code << "style.popup_check_checked_icon = Image();\n";
+    if(config_.show_check_icons && !config_.popup_check_unchecked_icon_name.IsEmpty())
         code << "style.popup_check_unchecked_icon = " << config_.popup_check_unchecked_icon_name << "();\n";
+    else
+        code << "style.popup_check_unchecked_icon = Image();\n";
     code << "style.popup_use_main_skin = " << (config_.popup_use_main_skin ? "true" : "false") << ";\n";
     code << "style.metrics.shadow.enabled = " << (config_.shadow ? "true" : "false") << ";\n";
     code << "style.metrics.shadow.distance = " << config_.shadow_distance << ";\n";
@@ -1772,10 +1845,18 @@ String UiDropdownDemoWindow::BuildUsageCode() const
     code << Format("style.metrics.shadow.curve = Bezier(%.3f, %.3f, %.3f, %.3f);\n",
                    config_.shadow_curve.x1, config_.shadow_curve.y1,
                    config_.shadow_curve.x2, config_.shadow_curve.y2);
-    code << "style.metrics.shadow.color = Color(" << config_.shadow_color.GetR() << ", " << config_.shadow_color.GetG() << ", " << config_.shadow_color.GetB() << ");\n";
-    code << "style.popup_background_color = Color(" << config_.popup_background.GetR() << ", " << config_.popup_background.GetG() << ", " << config_.popup_background.GetB() << ");\n";
-    code << "style.popup_frame_color = Color(" << config_.popup_frame_color.GetR() << ", " << config_.popup_frame_color.GetG() << ", " << config_.popup_frame_color.GetB() << ");\n";
-    code << "dropdown.EnableDragReorder(" << (config_.use_drag ? "true" : "false") << ");\n\n";
+    code << "style.metrics.shadow.color = " << ColorCpp(config_.shadow_color) << ";\n";
+    code << "style.popup_background_color = " << ColorCpp(config_.popup_background) << ";\n";
+    code << "style.popup_frame_color = " << ColorCpp(config_.popup_frame_color) << ";\n";
+    code << "\ndropdown.SetStyle(style)\n";
+    code << "        .SetSizeMin(Size(" << config_.min_width << ", " << config_.min_height << "))\n";
+    code << "        .SetMultiSelect(" << (config_.multi_select ? "true" : "false") << ")\n";
+    code << "        .SetPopupAutoClose(" << (config_.popup_auto_close ? "true" : "false") << ")\n";
+    code << "        .SetPopupPinned(" << (config_.popup_pinned ? "true" : "false") << ");\n";
+    code << "dropdown.EnableDragReorder(" << (config_.use_drag ? "true" : "false") << ");\n";
+    if(!config_.enabled)
+        code << "dropdown.Disable();\n";
+    code << "\n";
 
     for(int i = 0; i < model.GetCount(); i++) {
         const UiModelItem& it = model.Get(i);
@@ -1792,17 +1873,13 @@ String UiDropdownDemoWindow::BuildUsageCode() const
         if(!it.enabled) code << "item.enabled = false;\n";
         if(it.checked) code << "item.checked = true;\n";
         if(it.separator_before) code << "item.separator_before = true;\n";
-        if(!IsNull(it.icon)) code << "item.icon = /* chosen icon */ " << QuoteCpp(AsString(it.data)) << ";\n";
+        String icon_name = IconNameFor(it.icon);
+        if(!icon_name.IsEmpty()) {
+            code << "item.icon = " << icon_name << "();\n";
+            code << "item.icon_render_mode = UiIconRenderMode::MonoTint;\n";
+        }
         code << "dropdown.GetInternalModel().Add(item);\n";
     }
-    code << "\nUiDropdown dropdown;\n";
-    code << "dropdown.SetStyle(style)\n";
-    code << "        .SetSizeMin(Size(" << config_.min_width << ", " << config_.min_height << "))\n";
-    code << "        .SetMultiSelect(" << (config_.multi_select ? "true" : "false") << ")\n";
-    code << "        .SetPopupAutoClose(" << (config_.popup_auto_close ? "true" : "false") << ")\n";
-    code << "        .SetPopupPinned(" << (config_.popup_pinned ? "true" : "false") << ");\n";
-    if(!config_.enabled)
-        code << "dropdown.Disable();\n";
     code << "// Dataset: " << DatasetLabel(config_.dataset) << "\n";
     code << "// Binding: Internal UiListModel\n";
     return code;
@@ -1815,10 +1892,13 @@ void UiDropdownDemoWindow::RefreshModelTree()
     tree_model_.Clear();
     UiTreeNodeRef root = tree_model_.Root();
     const UiListModel& model = ActiveModel();
+    UiTreeNodeRef active_node;
     for(int i = 0; i < model.GetCount(); i++) {
         const UiModelItem& it = model.Get(i);
         UiModelItem row(Format("%d. %s", i + 1, it.text), i);
         UiTreeNodeRef node = tree_model_.AddChild(root, row);
+        if(i == active_model_index_)
+            active_node = node;
         tree_model_.AddChild(node, UiModelItem("data = " + (it.data.IsVoid() ? String("<void>") : StdFormat(it.data))));
         tree_model_.AddChild(node, UiModelItem("description = " + (it.description.IsEmpty() ? String("<empty>") : it.description)));
         tree_model_.AddChild(node, UiModelItem("right_text = " + (it.right_text.IsEmpty() ? String("<empty>") : it.right_text)));
@@ -1827,6 +1907,8 @@ void UiDropdownDemoWindow::RefreshModelTree()
         tree_model_.AddChild(node, UiModelItem(String("enabled = ") + (it.enabled ? "true" : "false")));
     }
     model_tree_.Expand(root, true, true);
+    if(tree_model_.IsValid(active_node))
+        model_tree_.SetCursor(active_node);
     UpdateModelViewport();
 }
 
@@ -1868,8 +1950,8 @@ void UiDropdownDemoWindow::RefreshState()
         state_data_value_.SetText(dd.HasSelection() ? AsString(dd.GetSelectedData()) : "None");
     }
 
-    int active_index = -1;
-    if(dd.HasSelection())
+    int active_index = active_model_index_;
+    if(active_index < 0 && dd.HasSelection())
         active_index = dd.GetSelection();
     else if(config_.multi_select) {
         Vector<int> checked = dd.GetCheckedIndices();
@@ -1902,6 +1984,7 @@ void UiDropdownDemoWindow::RefreshState()
         item_text_edit_.SetText(WString(it.text));
         item_desc_edit_.SetText(WString(it.description));
         item_right_edit_.SetText(WString(it.right_text));
+        item_checked_row_.Toggle().SetOn(it.checked);
         bool matched_icon = false;
         if(!IsNull(it.icon)) {
             for(int i = 0; i < icon_list_model_.GetCount(); i++) {
@@ -1921,6 +2004,7 @@ void UiDropdownDemoWindow::RefreshState()
         item_desc_edit_.SetText(WString());
         item_right_edit_.SetText(WString());
         item_icon_drop_.SelectByData(String());
+        item_checked_row_.Toggle().SetOn(false);
     }
 }
 
@@ -1964,8 +2048,8 @@ void UiDropdownDemoWindow::RefreshFromConfig()
     style.show_selection_badge = config_.show_selection_badge;
     style.popup_use_main_skin = config_.popup_use_main_skin;
     style.popup_selection_icon = config_.popup_selection_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_selection_icon_name);
-    style.popup_check_checked_icon = config_.popup_check_checked_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_check_checked_icon_name);
-    style.popup_check_unchecked_icon = config_.popup_check_unchecked_icon_name.IsEmpty() ? Image() : UiIconFromName(config_.popup_check_unchecked_icon_name);
+    style.popup_check_checked_icon = config_.show_check_icons && !config_.popup_check_checked_icon_name.IsEmpty() ? UiIconFromName(config_.popup_check_checked_icon_name) : Image();
+    style.popup_check_unchecked_icon = config_.show_check_icons && !config_.popup_check_unchecked_icon_name.IsEmpty() ? UiIconFromName(config_.popup_check_unchecked_icon_name) : Image();
     style.popup_background_color = config_.popup_background;
     style.popup_frame_color = config_.popup_frame_color;
     style.metrics.shadow.enabled = config_.shadow;
@@ -2091,6 +2175,7 @@ void UiDropdownDemoWindow::ApplyTheme(UiThemeMode mode)
     show_indicator_row_.SetLabelStyle(body);
     popup_scrollbar_row_.SetLabelStyle(body);
     selection_badge_row_.SetLabelStyle(body);
+    check_icons_row_.SetLabelStyle(body);
     use_drag_row_.SetLabelStyle(body);
     drag_handle_row_.SetLabelStyle(body);
     popup_marker_row_.SetLabelStyle(body);
@@ -2098,6 +2183,7 @@ void UiDropdownDemoWindow::ApplyTheme(UiThemeMode mode)
     popup_pinned_row_.SetLabelStyle(body);
     popup_use_main_skin_row_.SetLabelStyle(body);
     shadow_row_.SetLabelStyle(body);
+    item_checked_row_.SetLabelStyle(body);
     face_color_row_.SetLabelStyle(body);
     frame_color_row_.SetLabelStyle(body);
     text_color_row_.SetLabelStyle(body);
