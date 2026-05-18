@@ -157,7 +157,7 @@ public:
     // the currently displayed icon to match the current visibility.
     UiPasswordEdit& SetVisibilityIcons(const Image& visible, const Image& hidden);
 
-    UiPasswordEdit& SetStyle(const UiBaseEdit::Style& s);
+    UiPasswordEdit& SetCustomStyle(const UiBaseEdit::Style& s);
 
     // Built-in eye icons backed by UiIcons.h (48px).
     // These are convenience helpers; you can also pass your own icons.

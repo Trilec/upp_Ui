@@ -104,9 +104,9 @@ void UiDropdown::InvalidateStyleCache()
 
 UiDropdown::Style& UiDropdown::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -114,14 +114,14 @@ UiDropdown::Style& UiDropdown::StyleEdit()
 
 void UiDropdown::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
     if(theme_revision_ == revision)
         return;
 
-    style_ = UiTheme::ResolveDropdown();
+    style_ = UiTheme::ResolveDropdown((UiRole)role_);
     theme_revision_ = revision;
 }
 
@@ -165,6 +165,22 @@ void UiDropdown::RebuildIndicator()
         indicator_ = ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48();
 
     Refresh();
+}
+
+UiDropdown& UiDropdown::SetRole(UiRole role)
+{
+    if(!UiIsValid(role))
+        role = UiRole::Standard;
+    if((UiRole)role_ == role && !has_custom_style_)
+        return *this;
+    role_ = (byte)role;
+    if(has_custom_style_)
+        return *this;
+    InvalidateStyleCache();
+    SyncThemeStyle();
+    RefreshLayout();
+    Refresh();
+    return *this;
 }
 
 void UiDropdown::UpdateDisplayText()
@@ -1169,20 +1185,20 @@ int UiDropdown::RemapIndexAfterMove(int index, int from, int before) const
 // Styling
 // ----------------------------------------------------------------------------
 
-UiDropdown& UiDropdown::SetStyle(const Style& s)
+UiDropdown& UiDropdown::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiDropdown& UiDropdown::ClearStyleOverride()
+UiDropdown& UiDropdown::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     SyncThemeStyle();
@@ -1766,8 +1782,10 @@ bool UiDropdown::PopupWindow::Key(dword key, int count)
                 if(owner->popup_auto_close_)
                     owner->ClosePopupInternal(false);
             }
-            else
-                owner->ClosePopupInternal(true);
+            else {
+                owner->Select(owner->highlight_index_);
+                owner->ClosePopupInternal(false);
+            }
         }
         return true;
         
@@ -1851,6 +1869,9 @@ void UiDropdown::PopupWindow::Layout()
 
 void UiDropdown::PopupWindow::Deactivate()
 {
+    if(GetScreenRect().Contains(GetMousePos()))
+        return;
+
     if(owner) {
         owner->suppress_next_open_ = owner->GetScreenRect().Contains(GetMousePos());
     }
@@ -2215,8 +2236,10 @@ void UiDropdown::PopupWindow::LeftDown(Point p, dword flags)
             else
                 Refresh(GetItemRect(idx));
         }
-        else
-            owner->ClosePopupInternal(true);
+        else {
+            owner->Select(idx);
+            owner->ClosePopupInternal(false);
+        }
     }
 }
 

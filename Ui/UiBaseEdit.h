@@ -137,6 +137,10 @@ public:
         bool show_line_endings = false;
         bool show_readonly_bg  = true; // Use Paper_Readonly color
 
+        bool  underline_enabled = false;
+        int   underline_width   = 1;
+        Color underline[4];
+
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
@@ -146,7 +150,10 @@ public:
               % selection_color % selection_ink % placeholder_ink
               % whitespace_color % tab_char_color
               % tab_size % show_tabs % show_spaces
-              % show_line_endings % show_readonly_bg;
+              % show_line_endings % show_readonly_bg
+              % underline_enabled % underline_width;
+            for(int i = 0; i < 4; i++)
+                s % underline[i];
         }
     };
 
@@ -189,7 +196,7 @@ protected:
     Style       style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool        has_style_override_ = false;
+    bool        has_custom_style_ = false;
     ScrollBars  sb_;
     Scroller    scroller_;
     Size        font_size_ {0, 0};   // Cached font size
@@ -397,10 +404,11 @@ public:
     // Styling Interface (CtrlStyled)
     // ------------------------------------------------------------------------
     
-    UiBaseEdit&     SetStyle(const Style& s);
-    UiBaseEdit&     ClearStyleOverride();
-    bool            HasStyleOverride() const { return has_style_override_; }
+    UiBaseEdit&     SetCustomStyle(const Style& s);
+    UiBaseEdit&     ClearCustomStyle();
+    bool            HasCustomStyle() const { return has_custom_style_; }
     const Style&    GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     
     StyledPalette&  StyledPaletteRef()  { return StyleEdit().palette; }
     StyledMetrics&  StyledMetricsRef()  { return StyleEdit().metrics; }

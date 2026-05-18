@@ -61,10 +61,11 @@ public:
 
     static const Style& StyleDefault();
 
-    UiScrollPanel& SetStyle(const Style& s);
-    UiScrollPanel& ClearStyleOverride();
-    bool           HasStyleOverride() const { return has_style_override_; }
+    UiScrollPanel& SetCustomStyle(const Style& s);
+    UiScrollPanel& ClearCustomStyle();
+    bool           HasCustomStyle() const { return has_custom_style_; }
     const Style&   GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -74,9 +75,9 @@ public:
     UiScrollPanel& SetScrollMode(UiScrollPanelMode m);
     UiScrollPanelMode GetScrollMode() const { return mode_; }
 
-    UiScrollPanel& SetScrollBarStyle(const UiScrollBar::Style& s);
-    UiScrollPanel& ClearScrollBarStyleOverride();
-    bool HasScrollBarStyleOverride() const { return has_scrollbar_style_override_; }
+    UiScrollPanel& SetCustomScrollBarStyle(const UiScrollBar::Style& s);
+    UiScrollPanel& ClearCustomScrollBarStyle();
+    bool HasCustomScrollBarStyle() const { return has_custom_scrollbar_style_; }
 
     UiScrollPanel& SetSizeMin(Size sz) { user_min_size_ = sz; RefreshLayout(); Refresh(); return *this; }
     UiScrollPanel& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
@@ -116,9 +117,9 @@ private:
 private:
     Style style_;
     uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     UiScrollBar::Style scrollbar_style_;
-    bool has_scrollbar_style_override_ = false;
+    bool has_custom_scrollbar_style_ = false;
     UiScrollPanelMode mode_ = UIPANELSCROLL_AUTO;
 
     UiScrollBar sbx_;

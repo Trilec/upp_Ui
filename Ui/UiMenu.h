@@ -108,10 +108,11 @@ public:
     StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
     void OnStyleChanged();
 
-    UiMenu& SetStyle(const Style& s);
-    UiMenu& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiMenu& SetCustomStyle(const Style& s);
+    UiMenu& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     UiMenu& SetModel(UiMenuModel& model);
     UiMenu& UseInternalModel();
@@ -223,7 +224,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
 
     UiMenuModel internal_model_;
     UiMenuModel* model_ = nullptr;

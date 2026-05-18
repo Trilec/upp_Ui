@@ -21,11 +21,12 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
         s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
         s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.metrics.radius = DPI(12);
+        s.metrics.radius = 0;
         s.metrics.frame_width = DPI(1);
-        s.metrics.frame_enabled = true;
-        s.metrics.face_enabled = true;
-        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.metrics.frame_enabled = false;
+        s.metrics.face_enabled = false;
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
+        s.transparent = true;
     }
     return s;
 }
@@ -63,9 +64,9 @@ void UiScrollPanel::InvalidateStyleCache()
 
 UiScrollPanel::Style& UiScrollPanel::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -73,7 +74,7 @@ UiScrollPanel::Style& UiScrollPanel::StyleEdit()
 
 void UiScrollPanel::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
     const uint64 revision = UiTheme::GetRevision();
     if(theme_revision_ == revision)
@@ -82,11 +83,12 @@ void UiScrollPanel::SyncThemeStyle()
     Style resolved = StyleDefault();
     UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
     resolved.palette = panel.palette;
-    resolved.metrics.radius = max(DPI(10), panel.metrics.radius);
-    resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
-    resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
-    resolved.metrics.face_enabled = panel.metrics.face_enabled;
-    resolved.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    resolved.metrics.radius = 0;
+    resolved.metrics.frame_width = 0;
+    resolved.metrics.frame_enabled = false;
+    resolved.metrics.face_enabled = false;
+    resolved.metrics.content_margin = Rect(0, 0, 0, 0);
+    resolved.transparent = true;
     style_ = resolved;
     theme_revision_ = revision;
     SyncScrollBarStyles();
@@ -98,19 +100,19 @@ const UiScrollPanel::Style& UiScrollPanel::GetEffectiveStyle() const
     return style_;
 }
 
-UiScrollPanel& UiScrollPanel::SetStyle(const Style& s)
+UiScrollPanel& UiScrollPanel::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiScrollPanel& UiScrollPanel::ClearStyleOverride()
+UiScrollPanel& UiScrollPanel::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -137,21 +139,21 @@ UiScrollPanel& UiScrollPanel::SetScrollMode(UiScrollPanelMode m)
     return *this;
 }
 
-UiScrollPanel& UiScrollPanel::SetScrollBarStyle(const UiScrollBar::Style& s)
+UiScrollPanel& UiScrollPanel::SetCustomScrollBarStyle(const UiScrollBar::Style& s)
 {
     scrollbar_style_ = s;
-    has_scrollbar_style_override_ = true;
+    has_custom_scrollbar_style_ = true;
     SyncScrollBarStyles();
     RefreshLayout();
     Refresh();
     return *this;
 }
 
-UiScrollPanel& UiScrollPanel::ClearScrollBarStyleOverride()
+UiScrollPanel& UiScrollPanel::ClearCustomScrollBarStyle()
 {
-    if(!has_scrollbar_style_override_)
+    if(!has_custom_scrollbar_style_)
         return *this;
-    has_scrollbar_style_override_ = false;
+    has_custom_scrollbar_style_ = false;
     SyncScrollBarStyles();
     RefreshLayout();
     Refresh();
@@ -205,9 +207,9 @@ Rect UiScrollPanel::GetFaceRect() const
 
 void UiScrollPanel::SyncScrollBarStyles()
 {
-    UiScrollBar::Style sb = has_scrollbar_style_override_ ? scrollbar_style_ : UiTheme::ResolveScrollBar();
-    sbx_.SetStyle(sb);
-    sby_.SetStyle(sb);
+    UiScrollBar::Style sb = has_custom_scrollbar_style_ ? scrollbar_style_ : UiTheme::ResolveScrollBar();
+    sbx_.SetCustomStyle(sb);
+    sby_.SetCustomStyle(sb);
 }
 
 void UiScrollPanel::UpdateScrollbars()

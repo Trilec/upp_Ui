@@ -13,10 +13,10 @@ const UiRadioButton::Style& UiRadioButton::StyleDefault()
         const Color indicator_face = Color(255, 255, 255);
         const Color indicator_hot = Color(248, 250, 252);
         const Color indicator_down = Color(241, 245, 249);
-        const Color indicator_frame = Color(203, 213, 225);
-        const Color indicator_hot_frame = Color(148, 163, 184);
-        const Color indicator_press_frame = Color(100, 116, 139);
-        const Color accent = Color(37, 99, 235);
+        const Color indicator_frame = Color(215, 219, 226);
+        const Color indicator_hot_frame = Color(142, 151, 165);
+        const Color indicator_press_frame = Color(112, 122, 138);
+        const Color accent = Color(0, 120, 212);
 
         for(int st = 0; st < 4; st++) {
             s.palette.face[st] = UiFill::None();
@@ -49,7 +49,7 @@ const UiRadioButton::Style& UiRadioButton::StyleDefault()
 
         s.skin = StyledSkin();
         s.indicator_skin = StyledSkin();
-        s.font = StdFont();
+        s.font = SansSerifZ(13);
         s.indicator_side = UiAlign::LEFT;
         s.indicator_size = DPI(18);
         s.indicator_gap = DPI(10);
@@ -72,9 +72,9 @@ void UiRadioButton::InvalidateStyleCache()
 
 UiRadioButton::Style& UiRadioButton::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -82,7 +82,7 @@ UiRadioButton::Style& UiRadioButton::StyleEdit()
 
 void UiRadioButton::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -96,27 +96,27 @@ void UiRadioButton::SyncThemeStyle()
 
 const UiRadioButton::Style& UiRadioButton::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiRadioButton*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-UiRadioButton& UiRadioButton::SetStyle(const Style& s)
+UiRadioButton& UiRadioButton::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiRadioButton& UiRadioButton::ClearStyleOverride()
+UiRadioButton& UiRadioButton::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();

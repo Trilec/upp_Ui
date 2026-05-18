@@ -43,6 +43,10 @@ Notes:
 
 - The first argument is the assembly: a comma-separated list of nests.
 - `Ui` depends on `Painter` and `Animation` (see `Ui/Ui.upp`).
+- For local development, use this repo's `GitHubOut.var`; it includes the
+  external animation nest and writes build intermediates to
+  `E:/apps/github/upp_Ui/out`. Avoid using `E:/upp-18468/out` for this repo,
+  as shared or locked object files there can cause permission errors.
 
 Note: `Animation/` in this repo is a vendored copy of the animation/easing package from `E:\apps\github\upp_AnimationEasing`.
 

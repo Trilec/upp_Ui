@@ -11,7 +11,7 @@ UiFloatEdit::UiFloatEdit()
 {
     auto SetupSpin = [&](UiButton& b, bool up) {
         b.SetText("");
-        b.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        b.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         b.SetMinSize(Size(DPI(16), DPI(14)));
         
         UiButton* btn_ptr = &b;

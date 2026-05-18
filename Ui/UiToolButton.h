@@ -69,8 +69,8 @@ public:
     UiToolButton& SetCheckable(bool on = true) { UiButton::SetCheckable(on); return *this; }
     UiToolButton& SetChecked(bool on = true) { UiButton::SetChecked(on); return *this; }
     UiToolButton& Toggle() { UiButton::Toggle(); return *this; }
-    UiToolButton& SetStyle(const Style& s) { UiButton::SetStyle(s); return *this; }
-    UiToolButton& ClearStyleOverride() { UiButton::ClearStyleOverride(); return *this; }
+    UiToolButton& SetCustomStyle(const Style& s) { UiButton::SetCustomStyle(s); return *this; }
+    UiToolButton& ClearCustomStyle() { UiButton::ClearCustomStyle(); return *this; }
     UiToolButton& SetUnderline(bool on = true, int thickness = DPI(1), int offset = 0) { UiButton::SetUnderline(on, thickness, offset); return *this; }
 
     static const Style& StyleDefault();

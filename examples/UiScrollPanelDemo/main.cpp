@@ -1,195 +1,199 @@
-#include <Ui/Ui.h>
+/*
+    UiScrollPanelDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
+using namespace BuilderDemoSupport;
 
-class UiScrollPanelDemoWindow : public TopWindow {
+namespace {
+
+class UiScrollPanelBuilder : public BuilderWindowBase {
 public:
-    typedef UiScrollPanelDemoWindow CLASSNAME;
+    typedef UiScrollPanelBuilder CLASSNAME;
 
-    UiScrollPanelDemoWindow()
+    UiScrollPanelBuilder()
+        : BuilderWindowBase("UiScrollPanelDemo", "U++ UiScrollPanel Builder",
+                            "Compare automatic, vertical, horizontal, and disabled scrolling with live content sizing.")
     {
-        Title("UiScrollPanel Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1140), DPI(760));
+        for(int i = 0; i < 4; i++) {
+            Preview().Add(caption_[i]);
+            Preview().Add(panel_[i]);
+        }
 
-        Add(title);
-        Add(auto_label);
-        Add(vertical_label);
-        Add(horizontal_label);
-        Add(none_label);
+        AddStateRow(StateBox(), state_mode_row_, state_mode_label_, state_mode_value_, "Mode");
+        AddStateRow(StateBox(), state_rows_row_, state_rows_label_, state_rows_value_, "Rows");
+        AddStateRow(StateBox(), state_width_row_, state_width_label_, state_width_value_, "Content W");
 
-        Add(auto_panel);
-        Add(vertical_panel);
-        Add(horizontal_panel);
-        Add(none_panel);
+        AddSliderRow(PropsBox(), rows_row_, "Rows", "18");
+        AddSliderRow(PropsBox(), content_width_row_, "Content W", "620px");
+        AddToggleRow(PropsBox(), auto_panel_row_, "Show auto");
+        AddToggleRow(PropsBox(), vertical_panel_row_, "Show vertical");
+        AddToggleRow(PropsBox(), horizontal_panel_row_, "Show horizontal");
+        AddToggleRow(PropsBox(), none_panel_row_, "Show none");
 
-        title.SetText("UiScrollPanel modes: Auto / Vertical / Horizontal / None")
-             .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        rows_row_.Slider().SetRange(4, 40).SetStep(1).SetValue(row_count_);
+        content_width_row_.Slider().SetRange(240, 1200).SetStep(20).SetValue(content_width_);
+        rows_row_.WhenAction = [=] { row_count_ = (int)rows_row_.Slider().GetValue(); RefreshFromConfig(); };
+        content_width_row_.WhenAction = [=] { content_width_ = (int)content_width_row_.Slider().GetValue(); RefreshFromConfig(); };
+        auto_panel_row_.Toggle().WhenAction = [=] { show_[0] = auto_panel_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        vertical_panel_row_.Toggle().WhenAction = [=] { show_[1] = vertical_panel_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        horizontal_panel_row_.Toggle().WhenAction = [=] { show_[2] = horizontal_panel_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        none_panel_row_.Toggle().WhenAction = [=] { show_[3] = none_panel_row_.Toggle().IsOn(); RefreshFromConfig(); };
 
-        SetupHeaderLabel(auto_label, "AUTO");
-        SetupHeaderLabel(vertical_label, "VERTICAL");
-        SetupHeaderLabel(horizontal_label, "HORIZONTAL");
-        SetupHeaderLabel(none_label, "NONE");
-
-        auto_panel.SetScrollMode(UIPANELSCROLL_AUTO).SetStyle(UiScrollPanel::StyleDefault());
-        vertical_panel.SetScrollMode(UIPANELSCROLL_VERTICAL).SetStyle(UiScrollPanel::StyleDefault());
-        horizontal_panel.SetScrollMode(UIPANELSCROLL_HORIZONTAL).SetStyle(UiScrollPanel::StyleDefault());
-        none_panel.SetScrollMode(UIPANELSCROLL_NONE).SetStyle(UiScrollPanel::StyleDefault());
-
-        BuildAutoContent();
-        BuildVerticalContent();
-        BuildHorizontalContent();
-        BuildNoneContent();
+        FinishInit();
+        RefreshFromConfig();
     }
 
-    virtual void Layout() override
+protected:
+    virtual void ApplyDemoTheme() override
     {
-        Rect r = GetSize();
-        int m = DPI(12);
-        int g = DPI(10);
-        int title_h = DPI(30);
-        int label_h = DPI(22);
-
-        title.SetRect(m, m, r.GetWidth() - 2 * m, title_h);
-
-        int top = m + title_h + g;
-        int avail_h = r.GetHeight() - top - m;
-        int row_h = (avail_h - g - label_h * 2) / 2;
-        int col_w = (r.GetWidth() - 2 * m - g) / 2;
-
-        Rect a(m, top, m + col_w, top + label_h);
-        Rect b(a.right + g, top, a.right + g + col_w, top + label_h);
-        Rect c(m, a.bottom + g + row_h, m + col_w, a.bottom + g + row_h + label_h);
-        Rect d(c.right + g, c.top, c.right + g + col_w, c.top + label_h);
-
-        auto_label.SetRect(a);
-        vertical_label.SetRect(b);
-        horizontal_label.SetRect(c);
-        none_label.SetRect(d);
-
-        auto_panel.SetRect(a.left, a.bottom, col_w, row_h);
-        vertical_panel.SetRect(b.left, b.bottom, col_w, row_h);
-        horizontal_panel.SetRect(c.left, c.bottom, col_w, row_h);
-        none_panel.SetRect(d.left, d.bottom, col_w, row_h);
-
-        LayoutAutoContent();
-        LayoutVerticalContent();
-        LayoutHorizontalContent();
-        LayoutNoneContent();
-    }
-
-private:
-    static void SetupHeaderLabel(UiLabel& l, const String& text)
-    {
-        l.SetText(text).SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        l.SetInkColor(Color(96, 110, 136));
-    }
-
-    void BuildAutoContent()
-    {
-        ParentCtrl& c = auto_panel.Content();
-        for(int i = 0; i < 22; i++) {
-            UiButton& b = auto_rows.Add();
-            c.Add(b);
-            b.SetText(Format("Auto row %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        for(int i = 0; i < 4; i++) {
+            caption_[i].SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+            panel_[i].SetCustomStyle(UiScrollPanel::StyleDefault());
+            for(int j = 0; j < rows_[i].GetCount(); j++)
+                rows_[i][j].SetCustomStyle(UiTheme::ResolveButton(j % 4 == 0 ? UiRole::Accent : UiRole::Subtle));
         }
     }
 
-    void BuildVerticalContent()
+    virtual void LayoutPreviewContent() override
     {
-        ParentCtrl& c = vertical_panel.Content();
-        for(int i = 0; i < 24; i++) {
-            UiButton& b = vertical_rows.Add();
-            c.Add(b);
-            if(i % 3 == 0)
-                b.SetText(Format("Vertical critical event %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
-            else
-                b.SetText(Format("Vertical event %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        }
-    }
+        Rect canvas = Preview().GetCanvasRect().Deflated(DPI(8));
+        int gap = DPI(12);
+        int label_h = DPI(20);
+        int col_w = max(DPI(180), (canvas.GetWidth() - gap) / 2);
+        int row_h = max(DPI(150), (canvas.GetHeight() - gap - label_h * 2) / 2);
 
-    void BuildHorizontalContent()
-    {
-        ParentCtrl& c = horizontal_panel.Content();
-        for(int i = 0; i < 18; i++) {
-            UiButton& b = horizontal_cols.Add();
-            c.Add(b);
-            b.SetText(Format("Col %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        }
-    }
-
-    void BuildNoneContent()
-    {
-        ParentCtrl& c = none_panel.Content();
-        for(int i = 0; i < 16; i++) {
-            UiButton& b = none_rows.Add();
-            c.Add(b);
-            b.SetText(Format("No-scroll row %02d", i + 1)).SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        }
-    }
-
-    void LayoutAutoContent()
-    {
-        int y = DPI(8);
-        int x = DPI(8);
-        int w = max(DPI(180), auto_panel.GetSize().cx - DPI(44));
-        for(int i = 0; i < auto_rows.GetCount(); i++) {
-            auto_rows[i].SetRect(x, y, w, DPI(30));
-            y += DPI(36);
-        }
-    }
-
-    void LayoutVerticalContent()
-    {
-        int y = DPI(8);
-        int x = DPI(8);
-        int w = max(DPI(220), vertical_panel.GetSize().cx - DPI(44));
-        for(int i = 0; i < vertical_rows.GetCount(); i++) {
-            vertical_rows[i].SetRect(x, y, w, DPI(30));
-            y += DPI(36);
-        }
-    }
-
-    void LayoutHorizontalContent()
-    {
-        int x = DPI(8);
-        int y = DPI(10);
-        for(int i = 0; i < horizontal_cols.GetCount(); i++) {
-            horizontal_cols[i].SetRect(x, y, DPI(120), DPI(34));
-            x += DPI(128);
-        }
-    }
-
-    void LayoutNoneContent()
-    {
-        int y = DPI(8);
-        int x = DPI(8);
-        int w = max(DPI(220), none_panel.GetSize().cx - DPI(44));
-        for(int i = 0; i < none_rows.GetCount(); i++) {
-            none_rows[i].SetRect(x, y, w, DPI(30));
-            y += DPI(36);
+        for(int i = 0; i < 4; i++) {
+            int col = i % 2;
+            int row = i / 2;
+            int x = canvas.left + col * (col_w + gap);
+            int y = canvas.top + row * (row_h + label_h + gap);
+            caption_[i].SetRect(x, y, col_w, label_h);
+            panel_[i].SetRect(x, y + label_h, col_w, row_h);
+            LayoutPanelContent(i);
         }
     }
 
 private:
-    UiLabel title;
-    UiLabel auto_label;
-    UiLabel vertical_label;
-    UiLabel horizontal_label;
-    UiLabel none_label;
+    void RebuildRows()
+    {
+        const char *prefix[] = { "Auto", "Vertical", "Horizontal", "No-scroll" };
+        for(int p = 0; p < 4; p++) {
+            ParentCtrl& content = panel_[p].Content();
+            while(rows_[p].GetCount() < row_count_) {
+                UiButton& b = rows_[p].Add();
+                content.Add(b);
+            }
+            while(rows_[p].GetCount() > row_count_)
+                rows_[p].Remove(rows_[p].GetCount() - 1);
+            for(int i = 0; i < rows_[p].GetCount(); i++) {
+                rows_[p][i].SetText(Format("%s item %02d", prefix[p], i + 1));
+                rows_[p][i].Show(show_[p]);
+            }
+        }
+    }
 
-    UiScrollPanel auto_panel;
-    UiScrollPanel vertical_panel;
-    UiScrollPanel horizontal_panel;
-    UiScrollPanel none_panel;
+    void LayoutPanelContent(int p)
+    {
+        if(p < 0 || p >= 4)
+            return;
+        int x = DPI(8);
+        int y = DPI(8);
+        if(p == 2) {
+            for(int i = 0; i < rows_[p].GetCount(); i++) {
+                rows_[p][i].SetRect(x, y, DPI(128), DPI(32));
+                x += DPI(136);
+            }
+            return;
+        }
+        int w = max(DPI(180), min(content_width_, max(content_width_, panel_[p].GetSize().cx - DPI(36))));
+        for(int i = 0; i < rows_[p].GetCount(); i++) {
+            rows_[p][i].SetRect(x, y, w, DPI(30));
+            y += DPI(36);
+        }
+    }
 
-    Array<UiButton> auto_rows;
-    Array<UiButton> vertical_rows;
-    Array<UiButton> horizontal_cols;
-    Array<UiButton> none_rows;
+    void RefreshFromConfig()
+    {
+        caption_[0].SetText("AUTO");
+        caption_[1].SetText("VERTICAL");
+        caption_[2].SetText("HORIZONTAL");
+        caption_[3].SetText("NONE");
+
+        panel_[0].SetScrollMode(UIPANELSCROLL_AUTO);
+        panel_[1].SetScrollMode(UIPANELSCROLL_VERTICAL);
+        panel_[2].SetScrollMode(UIPANELSCROLL_HORIZONTAL);
+        panel_[3].SetScrollMode(UIPANELSCROLL_NONE);
+
+        for(int i = 0; i < 4; i++) {
+            caption_[i].Show(show_[i]);
+            panel_[i].Show(show_[i]);
+        }
+
+        RebuildRows();
+        ApplyDemoTheme();
+
+        rows_row_.Slider().SetValue(row_count_);
+        content_width_row_.Slider().SetValue(content_width_);
+        rows_row_.SetValueText(AsString(row_count_));
+        content_width_row_.SetValueText(AsString(content_width_) + "px");
+        auto_panel_row_.Toggle().SetOn(show_[0]);
+        vertical_panel_row_.Toggle().SetOn(show_[1]);
+        horizontal_panel_row_.Toggle().SetOn(show_[2]);
+        none_panel_row_.Toggle().SetOn(show_[3]);
+
+        state_mode_value_.SetText("Auto / Vertical / Horizontal / None");
+        state_rows_value_.SetText(AsString(row_count_));
+        state_width_value_.SetText(AsString(content_width_) + "px");
+
+        SetUsageCode(BuildUsageCode());
+        RefreshLayout();
+        Preview().Refresh();
+    }
+
+    String BuildUsageCode() const
+    {
+        String code;
+        code << "UiScrollPanel scroll;\n";
+        code << "scroll.SetScrollMode(UIPANELSCROLL_AUTO);\n";
+        code << "scroll.SetCustomStyle(UiScrollPanel::StyleDefault());\n";
+        code << "ParentCtrl& content = scroll.Content();\n";
+        code << "// Add child controls to content and size them to the real content bounds.\n";
+        return code;
+    }
+
+    int row_count_ = 18;
+    int content_width_ = DPI(620);
+    bool show_[4] = { true, true, true, true };
+
+    UiLabel caption_[4];
+    UiScrollPanel panel_[4];
+    Array<UiButton> rows_[4];
+
+    UiBoxLayout state_mode_row_ { UiBoxLayout::Direction::H }, state_rows_row_ { UiBoxLayout::Direction::H }, state_width_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_mode_label_, state_mode_value_, state_rows_label_, state_rows_value_, state_width_label_, state_width_value_;
+
+    UiCompositeSlider rows_row_, content_width_row_;
+    UiCompositeToggle auto_panel_row_, vertical_panel_row_, horizontal_panel_row_, none_panel_row_;
 };
+
+}
 
 GUI_APP_MAIN
 {
-    UiScrollPanelDemoWindow().Run();
+    UiScrollPanelBuilder demo;
+    demo.Run();
 }

@@ -16,7 +16,7 @@
     - GUI thread only.
 
     Usage
-    - Use SetTitle(), SetSubtitle(), SetCopy(), and media helpers to build
+    - Use SetTitle(), SetSubTitle(), SetCopy(), and media helpers to build
       display-only header compositions.
 
     Changelog
@@ -46,7 +46,7 @@ public:
         Color copy_color;
 
         UiAlign text_align_h = UiAlign::LEFT;
-        UiAlign media_side   = UiAlign::RIGHT; // LEFT/RIGHT/TOP/BOTTOM
+        UiAlign media_side   = UiAlign::LEFT; // LEFT/RIGHT/TOP/BOTTOM
         UiAlign media_align_h = UiAlign::CENTER;
         UiAlign media_align_v = UiAlign::CENTER;
 
@@ -54,21 +54,23 @@ public:
         int media_share_percent = 0; // 0 = disabled, otherwise 10..90 of content axis
         int media_gap     = DPI(10);
         int media_min     = DPI(24);
+        bool media_auto_fit = true;
         bool preserve_media_aspect = true;
         bool media_tint_mono = false;
 
-        bool show_rule = true;
-        UiLineStyle rule_style = SOLID;
-        UiSpan rule_extent = LARGE;
-        int  rule_thickness = DPI(1);
-        int  rule_gap_above = DPI(5);
-        int  rule_gap_below = DPI(5);
+        bool title_line = true;
+        UiLineStyle title_line_style = SOLID;
+        UiSpan title_line_length = LARGE;
+        int  title_line_thickness = DPI(1);
+        Color title_line_color;
+        int  title_line_gap_above = DPI(5);
+        int  title_line_gap_below = DPI(5);
 
-        bool show_bottom_line = false;
-        UiLineStyle bottom_line_style = SOLID;
-        UiSpan bottom_line_extent = LARGE;
-        int  bottom_line_thickness = DPI(1);
-        Color bottom_line_color;
+        bool card_line = false;
+        UiLineStyle card_line_style = SOLID;
+        UiSpan card_line_length = LARGE;
+        int  card_line_thickness = DPI(1);
+        Color card_line_color;
 
         int title_subtitle_gap = DPI(3);
         int subtitle_copy_gap  = DPI(4);
@@ -78,23 +80,23 @@ public:
 
         void Serialize(Stream& s)
         {
-            int rs = (int)rule_style;
-            int re = (int)rule_extent;
-            int bls = (int)bottom_line_style;
-            int ble = (int)bottom_line_extent;
+            int rs = (int)title_line_style;
+            int re = (int)title_line_length;
+            int bls = (int)card_line_style;
+            int ble = (int)card_line_length;
             s % palette % metrics % skin
               % title_font % subtitle_font % copy_font
               % title_color % subtitle_color % copy_color
               % text_align_h % media_side % media_align_h % media_align_v
-              % media_reserve % media_share_percent % media_gap % media_min % preserve_media_aspect % media_tint_mono
-              % show_rule % rs % re % rule_thickness % rule_gap_above % rule_gap_below
-              % show_bottom_line % bls % ble % bottom_line_thickness % bottom_line_color
+              % media_reserve % media_share_percent % media_gap % media_min % media_auto_fit % preserve_media_aspect % media_tint_mono
+              % title_line % rs % re % title_line_thickness % title_line_color % title_line_gap_above % title_line_gap_below
+              % card_line % bls % ble % card_line_thickness % card_line_color
               % title_subtitle_gap % subtitle_copy_gap
               % transparent % hover_enabled;
-            rule_style = (UiLineStyle)rs;
-            rule_extent = (UiSpan)re;
-            bottom_line_style = (UiLineStyle)bls;
-            bottom_line_extent = (UiSpan)ble;
+            title_line_style = (UiLineStyle)rs;
+            title_line_length = (UiSpan)re;
+            card_line_style = (UiLineStyle)bls;
+            card_line_length = (UiSpan)ble;
         }
     };
 
@@ -102,10 +104,11 @@ public:
 
     static const Style& StyleDefault();
 
-    UiTitleCard& SetStyle(const Style& s);
-    UiTitleCard& ClearStyleOverride();
-    bool         HasStyleOverride() const { return has_style_override_; }
+    UiTitleCard& SetCustomStyle(const Style& s);
+    UiTitleCard& ClearCustomStyle();
+    bool         HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -122,12 +125,12 @@ public:
     UiTitleCard& SetMediaAlign(UiAlign h, UiAlign v);
     UiTitleCard& SetMediaReserve(int px);
     UiTitleCard& SetMediaSharePercent(int pct);
+    UiTitleCard& SetMediaAutoFit(bool on = true);
 
-    UiTitleCard& SetRuleStyle(UiLineStyle st);
-    UiTitleCard& SetRuleExtent(UiSpan ex);
-    UiTitleCard& SetBottomLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
-    UiTitleCard& ShowRule(bool on = true);
-    UiTitleCard& ShowBottomLine(bool on = true);
+    UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
+    UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
+    UiTitleCard& ShowTitleLine(bool on = true);
+    UiTitleCard& ShowCardLine(bool on = true);
     UiTitleCard& EnableHover(bool on = true);
 
     UiTitleCard& SetSelectable(bool on = true);
@@ -158,8 +161,8 @@ private:
     void InvalidateTextCache();
     void RebuildTextCache();
 
-    void DrawRule(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style) const;
-    int  GetRuleWidth(int title_cx, int text_cx) const;
+    void DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style) const;
+    int  GetLineWidth(UiSpan length, int title_cx, int text_cx) const;
     Size GetTextBlockSize() const;
     Rect GetMediaRect(const Rect& content) const;
 
@@ -167,7 +170,7 @@ private:
     Style  style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     String title_;
     String subtitle_;
     String copy_;

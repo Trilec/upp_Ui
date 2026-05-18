@@ -3,7 +3,7 @@ uses
 	Ui;
 
 file
-	main.cpp;
+	DemoBaseMain.cpp;
 
 mainconfig
 	"" = "GUI";

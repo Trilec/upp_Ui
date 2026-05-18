@@ -98,6 +98,14 @@ public:
         Color separator_color = Color(226, 232, 240);
         Color row_even_face = Null;
         Color row_odd_face = Null;
+        bool show_row_separator = false;
+        bool row_state_frame_enabled = false;
+        bool right_text_as_badge = false;
+        Color badge_face = Color(241, 245, 249);
+        Color badge_frame = Null;
+        Color badge_ink = Color(51, 65, 85);
+        int badge_radius = DPI(999);
+        int badge_h_padding = DPI(6);
         Color metadata_default = Color(65, 167, 248);
         Color check_frame = Color(148, 163, 184);
         Color check_fill = Color(17, 24, 39);
@@ -116,7 +124,10 @@ public:
               % ink % disabled_ink % muted_ink
               % hot_face % hot_frame % hot_ink
               % selected_face % selected_frame % selected_ink
-              % separator_color % metadata_default % check_frame % check_fill
+              % separator_color % row_even_face % row_odd_face
+              % show_row_separator % row_state_frame_enabled % right_text_as_badge
+              % badge_face % badge_frame % badge_ink % badge_radius % badge_h_padding
+              % metadata_default % check_frame % check_fill
               % drag_marker;
         }
     };
@@ -130,10 +141,11 @@ public:
     StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
     void OnStyleChanged();
 
-    UiList& SetStyle(const Style& s);
-    UiList& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiList& SetCustomStyle(const Style& s);
+    UiList& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     UiList& SetModel(UiListModel& model);
     UiListModel& GetInternalModel() { return internal_model_; }
@@ -207,6 +219,7 @@ private:
     void PaintRow(Draw& w, int index, const Rect& row) const;
     void MoveCursorBy(int delta);
     void MoveCursorToEdge(bool end);
+    bool IsSelectableIndex(int index) const;
     void SelectSingle(int index);
     void ToggleSelection(int index);
     void SelectRangeTo(int index, bool additive);
@@ -234,7 +247,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
 
     UiListModel internal_model_;
     UiListModel* model_ = nullptr;

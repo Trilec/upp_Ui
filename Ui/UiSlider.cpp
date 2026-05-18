@@ -34,30 +34,30 @@ const UiSlider::Style& UiSlider::StyleDefault()
     static bool init = false;
     if(!init) {
         for(int st = 0; st < 4; st++) {
-            s.track_palette.face[st] = UiFill::Solid(Color(134, 135, 134));
-            s.track_palette.frame[st] = Color(134, 135, 134);
-            s.track_palette.ink[st] = Color(37, 99, 235);
-            s.thumb_palette.face[st] = UiFill::Solid(Color(37, 99, 235));
-            s.thumb_palette.frame[st] = Color(214, 223, 235);
+            s.track_palette.face[st] = UiFill::Solid(Color(218, 221, 228));
+            s.track_palette.frame[st] = Color(128, 138, 154);
+            s.track_palette.ink[st] = Color(0, 120, 212);
+            s.thumb_palette.face[st] = UiFill::Solid(Color(102, 105, 114));
+            s.thumb_palette.frame[st] = Color(142, 146, 154);
             s.thumb_palette.ink[st] = White();
         }
 
-        s.track_palette.face[ST_HOT] = UiFill::Solid(Color(134, 135, 134));
-        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(134, 135, 134));
+        s.track_palette.face[ST_HOT] = UiFill::Solid(Color(247, 248, 250));
+        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(239, 243, 247));
         s.track_palette.face[ST_DISABLED] = UiFill::Solid(Color(241, 245, 249));
-        s.track_palette.frame[ST_HOT] = Color(134, 135, 134);
-        s.track_palette.frame[ST_PRESSED] = Color(134, 135, 134);
+        s.track_palette.frame[ST_HOT] = Color(142, 151, 165);
+        s.track_palette.frame[ST_PRESSED] = Color(112, 122, 138);
         s.track_palette.frame[ST_DISABLED] = Color(226, 232, 240);
-        s.track_palette.ink[ST_HOT] = Color(29, 78, 216);
-        s.track_palette.ink[ST_PRESSED] = Color(30, 64, 175);
+        s.track_palette.ink[ST_HOT] = Color(18, 135, 232);
+        s.track_palette.ink[ST_PRESSED] = Color(0, 96, 176);
         s.track_palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.thumb_palette.face[ST_HOT] = UiFill::Solid(Color(29, 78, 216));
-        s.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Color(30, 64, 175));
-        s.thumb_palette.face[ST_DISABLED] = UiFill::Solid(Color(148, 163, 184));
-        s.thumb_palette.frame[ST_HOT] = Color(195, 205, 220);
-        s.thumb_palette.frame[ST_PRESSED] = Color(176, 188, 208);
-        s.thumb_palette.frame[ST_DISABLED] = Color(148, 163, 184);
+        s.thumb_palette.face[ST_HOT] = UiFill::Solid(Color(247, 248, 250));
+        s.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Color(239, 243, 247));
+        s.thumb_palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
+        s.thumb_palette.frame[ST_HOT] = Color(142, 151, 165);
+        s.thumb_palette.frame[ST_PRESSED] = Color(112, 122, 138);
+        s.thumb_palette.frame[ST_DISABLED] = Color(226, 232, 240);
 
         s.track_metrics.radius = DPI(999);
         s.track_metrics.frame_enabled = false;
@@ -67,15 +67,18 @@ const UiSlider::Style& UiSlider::StyleDefault()
         s.thumb_metrics.radius = DPI(999);
         s.thumb_metrics.frame_enabled = true;
         s.thumb_metrics.face_enabled = true;
-        s.thumb_metrics.frame_width = DPI(2);
+        s.thumb_metrics.frame_width = DPI(1);
         s.thumb_metrics.content_margin = Rect(0, 0, 0, 0);
 
         s.tick_color = Color(148, 163, 184);
         s.tick_len_major = DPI(5);
         s.tick_len_minor = DPI(3);
         s.tick_gap = DPI(4);
-        s.track_size = Size(DPI(120), DPI(4));
-        s.thumb_size = Size(DPI(14), DPI(18));
+        s.track_size = Size(DPI(120), DPI(3));
+        s.thumb_size = Size(DPI(16), DPI(16));
+        s.thumb_inner_ring = true;
+        s.thumb_inner_ring_width = DPI(2);
+        s.thumb_inner_ring_color = White();
 
         init = true;
     }
@@ -100,9 +103,9 @@ void UiSlider::InvalidateStyleCache()
 
 UiSlider::Style& UiSlider::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -110,7 +113,7 @@ UiSlider::Style& UiSlider::StyleEdit()
 
 void UiSlider::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -123,27 +126,27 @@ void UiSlider::SyncThemeStyle()
 
 const UiSlider::Style& UiSlider::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiSlider*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-UiSlider& UiSlider::SetStyle(const Style& s)
+UiSlider& UiSlider::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiSlider& UiSlider::ClearStyleOverride()
+UiSlider& UiSlider::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -160,7 +163,7 @@ UiSlider& UiSlider::SetDirection(UiDirection dir)
 {
     if(dir_ != dir) {
         dir_ = dir;
-        if(has_style_override_)
+        if(has_custom_style_)
             style_.tick_side = UiSliderNormalizeTickSide_(dir_, style_.tick_side);
         RefreshLayout();
         Refresh();
@@ -461,7 +464,42 @@ void UiSlider::Paint(Draw& w)
     handled = false;
     if(WhenPaintThumb)
         WhenPaintThumb(w, ctx, handled);
-    if(!handled)
+    if(!handled && style.thumb_inner_ring && style.thumb_inner_ring_width > 0) {
+        ImageBuffer ib(th.GetSize());
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Clear(RGBAZero());
+
+        Color face = style.thumb_palette.face[st].IsSolid() ? style.thumb_palette.face[st].color : style.thumb_palette.ink[st];
+        Color frame = style.thumb_palette.frame[st];
+        if(IsNull(face))
+            face = SColorFace();
+        if(IsNull(frame))
+            frame = face;
+
+        double cx = th.GetWidth() * 0.5;
+        double cy = th.GetHeight() * 0.5;
+        double r = max(0.0, min(th.GetWidth(), th.GetHeight()) * 0.5 - 0.5);
+        double frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
+        double ring_w = max(0, style.thumb_inner_ring_width);
+
+        p.Begin();
+        p.Circle(cx, cy, r);
+        p.Fill(frame);
+        p.End();
+
+        p.Begin();
+        p.Circle(cx, cy, max(0.0, r - frame_w));
+        p.Fill(style.thumb_inner_ring_color);
+        p.End();
+
+        p.Begin();
+        p.Circle(cx, cy, max(0.0, r - frame_w - ring_w));
+        p.Fill(face);
+        p.End();
+
+        w.DrawImage(th.left, th.top, ib);
+    }
+    else if(!handled)
         UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);
 
     if(WhenPaintForeground)
@@ -470,6 +508,9 @@ void UiSlider::Paint(Draw& w)
 
 void UiSlider::LeftDown(Point p, dword)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return;
+
     SetFocus();
     Rect th = GetThumbRect();
     if(th.Contains(p)) {
@@ -485,7 +526,12 @@ void UiSlider::LeftDown(Point p, dword)
     Rect tr = GetTrackRect();
     int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
     int pos = dir_ == UiDirection::H ? (p.x - tr.left - thumb / 2) : (p.y - tr.top - thumb / 2);
-    SetValueInternal(PosToValue(pos), true, true);
+    dragging_ = true;
+    drag_start_value_ = value_;
+    drag_offset_ = thumb / 2;
+    SetCapture();
+    SetValueInternal(PosToValue(pos), false, true);
+    Refresh();
 }
 
 void UiSlider::LeftUp(Point, dword)

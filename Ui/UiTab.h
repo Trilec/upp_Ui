@@ -61,12 +61,17 @@ public:
         Rect tab_padding = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         Rect strip_inset = Rect(0, 0, 0, 0);
         int  content_gap = DPI(6);
+        int  icon_size = 0;
         int  affordance_gap = DPI(4);
-        int  affordance_size = DPI(12);
         int  min_tab_main = DPI(72);
         int  indicator_thickness = DPI(3);
+        int  active_frame_width = DPI(2);
+        int  open_corner_radius = 0;
+        Color active_frame_color = Null;
         UiSpan indicator_span = LARGE;
-        bool fill_tabs = false;
+        bool expand_tabs = false;
+        bool fill_tabs = false; // Deprecated storage alias; prefer expand_tabs.
+        bool active_tab_uses_body_face = true;
         UiTabVisual visual = UITAB_CLASSIC;
 
         void Serialize(Stream& s)
@@ -75,12 +80,14 @@ public:
               % tab_palette % tab_metrics % tab_skin
               % tab_font
               % tab_extent % item_spacing % body_gap % tab_padding % strip_inset % content_gap
-              % affordance_gap % affordance_size
-              % min_tab_main % indicator_thickness;
+              % icon_size
+              % affordance_gap
+              % min_tab_main % indicator_thickness
+              % active_frame_width % open_corner_radius % active_frame_color;
             int sp = (int)indicator_span;
             s % sp;
             indicator_span = (UiSpan)sp;
-            s % fill_tabs;
+            s % expand_tabs % fill_tabs % active_tab_uses_body_face;
             int vv = (int)visual;
             s % vv;
             visual = (UiTabVisual)vv;
@@ -91,10 +98,11 @@ public:
 
     UiTab();
 
-    UiTab& SetStyle(const Style& s);
-    UiTab& ClearStyleOverride();
-    bool   HasStyleOverride() const { return has_style_override_; }
+    UiTab& SetCustomStyle(const Style& s);
+    UiTab& ClearCustomStyle();
+    bool   HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -106,7 +114,10 @@ public:
     UiTab& SetVisual(UiTabVisual visual);
     UiTabVisual GetVisual() const { return visual_; }
 
-    UiTab& SetFillTabs(bool on = true) { StyleEdit().fill_tabs = on; RefreshLayout(); Refresh(); return *this; }
+    UiTab& SetExpandTabs(bool on = true) { StyleEdit().expand_tabs = on; StyleEdit().fill_tabs = on; RefreshLayout(); Refresh(); return *this; }
+    bool   IsExpandTabs() const { const Style& s = GetEffectiveStyle(); return s.expand_tabs || s.fill_tabs; }
+    UiTab& SetFillTabs(bool on = true) { return SetExpandTabs(on); } // Compatibility alias; prefer SetExpandTabs.
+    UiTab& SetActiveTabUsesBodyFace(bool on = true) { StyleEdit().active_tab_uses_body_face = on; Refresh(); return *this; }
     UiTab& EnableCloseButtons(bool on = true) { show_close_buttons_ = on; RefreshLayout(); Refresh(); return *this; }
     UiTab& EnableDragHandles(bool on = true)  { show_drag_handles_ = on; RefreshLayout(); Refresh(); return *this; }
     bool   IsCloseButtonsEnabled() const { return show_close_buttons_; }
@@ -184,7 +195,7 @@ private:
     Style       style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     UiTabVisual visual_ = UITAB_CLASSIC;
     Vector<TabItem> tabs_;
     ParentCtrl  pane_;

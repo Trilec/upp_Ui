@@ -1,3 +1,18 @@
+/*
+    UiAccordionDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -103,32 +118,32 @@ protected:
         UiButton::Style btn = MakeSmallButtonStyle(Palette());
         UiDropdown::Style dd = MakeDropdownStyle(Palette());
 
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_open_label_.SetStyle(body); state_open_value_.SetStyle(value);
-        state_chevron_label_.SetStyle(body); state_chevron_value_.SetStyle(value);
-        state_drag_label_.SetStyle(body); state_drag_value_.SetStyle(value);
+        state_theme_label_.SetCustomStyle(body); state_theme_value_.SetCustomStyle(value);
+        state_open_label_.SetCustomStyle(body); state_open_value_.SetCustomStyle(value);
+        state_chevron_label_.SetCustomStyle(body); state_chevron_value_.SetCustomStyle(value);
+        state_drag_label_.SetCustomStyle(body); state_drag_value_.SetCustomStyle(value);
         header_row_.SetLabelStyle(body).SetValueStyle(value);
         gap_row_.SetLabelStyle(body).SetValueStyle(value);
         chevron_size_row_.SetLabelStyle(body).SetValueStyle(value);
         chevron_gap_row_.SetLabelStyle(body).SetValueStyle(value);
         radius_row_.SetLabelStyle(body).SetValueStyle(value);
-        side_label_.SetStyle(body);
-        drag_side_label_.SetStyle(body);
-        drag_glyph_label_.SetStyle(body);
-        side_drop_.SetStyle(dd);
-        drag_side_drop_.SetStyle(dd);
-        drag_glyph_drop_.SetStyle(dd);
+        side_label_.SetCustomStyle(body);
+        drag_side_label_.SetCustomStyle(body);
+        drag_glyph_label_.SetCustomStyle(body);
+        side_drop_.SetCustomStyle(dd);
+        drag_side_drop_.SetCustomStyle(dd);
+        drag_glyph_drop_.SetCustomStyle(dd);
         single_row_.SetLabelStyle(body);
         enforce_row_.SetLabelStyle(body);
         chevron_row_.SetLabelStyle(body);
         animation_row_.SetLabelStyle(body);
         drag_row_.SetLabelStyle(body);
         drag_handle_row_.SetLabelStyle(body);
-        open_all_btn_.SetStyle(btn);
-        close_all_btn_.SetStyle(btn);
-        section_a_.SetStyle(body);
-        section_b_.SetStyle(body);
-        section_c_.SetStyle(body);
+        open_all_btn_.SetCustomStyle(btn);
+        close_all_btn_.SetCustomStyle(btn);
+        section_a_.SetCustomStyle(body);
+        section_b_.SetCustomStyle(body);
+        section_c_.SetCustomStyle(body);
     }
 
     virtual void LayoutPreviewContent() override
@@ -211,7 +226,7 @@ private:
         style.drag_side = cfg_.drag_side;
         if(!cfg_.drag_glyph.IsEmpty())
             style.drag_glyph = ResolveGlyphImage(cfg_.drag_glyph);
-        acc_.SetStyle(style)
+        acc_.SetCustomStyle(style)
             .SetSingleOpen(cfg_.single_open)
             .SetEnforceOne(cfg_.enforce_one)
             .ShowChevron(cfg_.show_chevron)
@@ -268,7 +283,7 @@ private:
         code << "style.drag_side = UiAlign::" << (cfg_.drag_side == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ";\n";
         if(!cfg_.drag_glyph.IsEmpty())
             code << "style.drag_glyph = UiIconFromName(\"" << cfg_.drag_glyph << "\");\n";
-        code << "acc.SetStyle(style)\n";
+        code << "acc.SetCustomStyle(style)\n";
         code << "   .EnableDragReorder(" << (cfg_.drag_reorder ? "true" : "false") << ")\n";
         code << "   .ShowDragHandle(" << (cfg_.show_drag_handle ? "true" : "false") << ")\n";
         code << "   .SetDragSide(UiAlign::" << (cfg_.drag_side == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";

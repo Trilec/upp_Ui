@@ -16,7 +16,7 @@
     - GUI thread only.
 
     Usage
-    - Use SetText(), SetIcon(), SetMargin(), SetContentGap(), and SetStyle() to configure static content.
+    - Use SetText(), SetIcon(), SetMargin(), SetContentGap(), and SetCustomStyle() to configure static content.
     - Use GetData()/SetData() only for generic control binding scenarios.
 
     Changelog
@@ -97,7 +97,7 @@ private:
     Style  style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool   has_style_override_ = false;
+    bool   has_custom_style_ = false;
 
     String text_;
     wchar  accesskey_ = 0;
@@ -190,10 +190,11 @@ public:
         return *this;
     }
 
-    UiLabel& SetStyle(const Style& s);
-    UiLabel& ClearStyleOverride();
-    bool     HasStyleOverride() const { return has_style_override_; }
+    UiLabel& SetCustomStyle(const Style& s);
+    UiLabel& ClearCustomStyle();
+    bool     HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     const Style& GetEffectiveStyle() const;
     static const Style& StyleDefault();
 

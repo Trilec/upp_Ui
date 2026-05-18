@@ -133,10 +133,11 @@ public:
     StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
     void OnStyleChanged();
 
-    UiTree& SetStyle(const Style& s);
-    UiTree& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiTree& SetCustomStyle(const Style& s);
+    UiTree& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     UiTree& SetModel(UiTreeModel& model);
     UiTreeModel& GetInternalModel() { return internal_model_; }
@@ -259,6 +260,7 @@ private:
     void PaintRow(Draw& w, int index, const Rect& row) const;
     void MoveCursorBy(int delta);
     void MoveCursorToEdge(bool end);
+    bool IsSelectableNode(UiTreeNodeRef node) const;
     void SelectSingle(UiTreeNodeRef node);
     void ToggleSelection(UiTreeNodeRef node);
     void SelectRangeTo(UiTreeNodeRef node, bool additive);
@@ -282,7 +284,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
 
     UiTreeModel internal_model_;
     UiTreeModel* model_ = nullptr;

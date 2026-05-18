@@ -1,0 +1,35 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	DesignerModel.h,
+	DesignerModel.cpp,
+	DesignerRegistry.h,
+	DesignerRegistry.cpp,
+	DesignerBuiltins.h,
+	DesignerBuiltins.cpp,
+	DesignerAdapter.h,
+	DesignerAdapter.cpp,
+	DesignerCommands.h,
+	DesignerCommands.cpp,
+	DesignerDragController.h,
+	DesignerDragController.cpp,
+	DesignerPreview.h,
+	DesignerPreview.cpp,
+	DesignerTemplates.h,
+	DesignerTemplates.cpp,
+	DesignerCodeGen.h,
+	DesignerCodeGen.cpp,
+	DesignerInspector.h,
+	DesignerInspector.cpp,
+	DesignerHierarchy.h,
+	DesignerHierarchy.cpp,
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
+

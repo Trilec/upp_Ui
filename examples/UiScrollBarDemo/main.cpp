@@ -1,3 +1,18 @@
+/*
+    UiScrollBarDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 // UiScrollBarDemo.cpp
 // Top row: 4 behavior panels. Bottom: style gallery (sliders + scrollbars).
 
@@ -229,7 +244,7 @@ struct GalleryStrip : ParentCtrl {
             // Slight inset to feel centered
             s.track_metrics.content_margin = Rect(0, 0, 0, 0);
 
-            sl[i].SetStyle(s);
+            sl[i].SetCustomStyle(s);
             sl[i].SetRange(0, 100, 0);
             sl[i].SetPos(35 + i * 8);
         }
@@ -247,7 +262,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_metrics.radius = 0;
             s.thumb_metrics.frame_enabled = false;
             s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            sl[2].SetStyle(s);
+            sl[2].SetCustomStyle(s);
         }
 
         sl_cap[3].SetText("slot pill");
@@ -258,7 +273,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
             s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 130));
             s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 165));
-            sl[3].SetStyle(s);
+            sl[3].SetCustomStyle(s);
         }
 
         sl_cap[4].SetText("ring");
@@ -274,7 +289,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_metrics.face_enabled = false;
             s.thumb_metrics.frame_enabled = true;
             s.thumb_metrics.frame_width = DPI(2);
-            sl[4].SetStyle(s);
+            sl[4].SetCustomStyle(s);
         }
 
         sl_cap[5].SetText("image");
@@ -296,7 +311,7 @@ struct GalleryStrip : ParentCtrl {
                 s.thumb_palette.face[st]  = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 35));
                 s.thumb_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 55);
             }
-            sl[5].SetStyle(s);
+            sl[5].SetCustomStyle(s);
         }
 
         sl_cap[6].SetText("big");
@@ -317,7 +332,7 @@ struct GalleryStrip : ParentCtrl {
                 s.track_palette.face[st] = UiFill::Solid(Blend(SColorPaper(), b, 90));
             s.track_metrics.frame_enabled = false;
 
-            sl[6].SetStyle(s);
+            sl[6].SetCustomStyle(s);
             sl[6].SetPos(70);
         }
 
@@ -334,7 +349,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_paint_px_idle = DPI(18);
             s.thumb_paint_px_hot  = DPI(18);
             s.arrow_cross = UIARROWCROSS_SQUARE;
-            sb[i].SetStyle(s);
+            sb[i].SetCustomStyle(s);
             sb[i].SetRange(0, DPI(900), DPI(220));
             sb[i].SetPos(DPI(140));
         }
@@ -358,7 +373,7 @@ struct GalleryStrip : ParentCtrl {
 
             // Arrow buttons match the track thickness and are pill/circle-like.
             s.arrow_metrics.radius = DPI(50);
-            sb[0].SetStyle(s);
+            sb[0].SetCustomStyle(s);
         }
 
         sb_cap[1].SetText("group end");
@@ -366,7 +381,7 @@ struct GalleryStrip : ParentCtrl {
             UiScrollBar::Style s = sb[1].GetStyle();
             s.show_arrows = true;
             s.arrows_layout = UIARROWS_GROUP_END;
-            sb[1].SetStyle(s);
+            sb[1].SetCustomStyle(s);
         }
 
         sb_cap[2].SetText("thin&exp");
@@ -384,7 +399,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_metrics.radius = DPI(20);
             s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 185));
             s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 205));
-            sb[2].SetStyle(s);
+            sb[2].SetCustomStyle(s);
         }
 
         sb_cap[3].SetText("gradient");
@@ -415,7 +430,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_metrics.radius = DPI(10);
             s.thumb_metrics.frame_enabled = false;
 
-            sb[3].SetStyle(s);
+            sb[3].SetCustomStyle(s);
         }
 
         sb_cap[4].SetText("dark" );
@@ -428,7 +443,7 @@ struct GalleryStrip : ParentCtrl {
                 s.thumb_palette.ink[st] = White();
             }
             s.thumb_metrics.radius = DPI(10);
-            sb[4].SetStyle(s);
+            sb[4].SetCustomStyle(s);
             sb[4].SetGrip(UIGRIP_LINES);
         }
 
@@ -451,7 +466,7 @@ struct GalleryStrip : ParentCtrl {
             // Reduce thumb painted thickness by 4px
             s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
             s.thumb_paint_px_hot  = max(DPI(1), s.thick_px - DPI(4));
-            sb[5].SetStyle(s);
+            sb[5].SetCustomStyle(s);
         }
 
         sb_cap[6].SetText("no frame");
@@ -470,7 +485,7 @@ struct GalleryStrip : ParentCtrl {
             s.thumb_metrics.radius = DPI(10);
             s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
             s.thumb_paint_px_hot  = max(DPI(1), s.thick_px - DPI(4));
-            sb[6].SetStyle(s);
+            sb[6].SetCustomStyle(s);
         }
 
         sb_cap[7].SetText("slot" );
@@ -496,7 +511,7 @@ struct GalleryStrip : ParentCtrl {
                 s.thumb_palette.face[st]  = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 55));
                 s.thumb_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 90);
             }
-            sb[9].SetStyle(s);
+            sb[9].SetCustomStyle(s);
         }
     }
 
@@ -616,11 +631,11 @@ struct UiScrollBarDemoWindow : TopWindow {
                 s.arrow_palette.ink[st]   = Blend(SColorText(), SColorPaper(), 80);
             }
 
-            p1.V().SetStyle(s);
+            p1.V().SetCustomStyle(s);
 
             // Horizontal uses the same look.
             UiScrollBar::Style sh = s;
-            p1.H().SetStyle(sh);
+            p1.H().SetCustomStyle(sh);
         }
 
         // P2: Grouped arrows at end, hover expand.
@@ -635,7 +650,7 @@ struct UiScrollBarDemoWindow : TopWindow {
             sv.thick_px = DPI(18);
             sv.idle_fade_pct = 25;
             sv.collapse_ms = 1000;
-            p2.V().SetStyle(sv);
+            p2.V().SetCustomStyle(sv);
 
             UiScrollBar::Style sh = p2.H().GetStyle();
             sh.show_arrows = true;
@@ -645,7 +660,7 @@ struct UiScrollBarDemoWindow : TopWindow {
             sh.thick_px = DPI(18);
             sh.idle_fade_pct = 25;
             sh.collapse_ms = 1000;
-            p2.H().SetStyle(sh);
+            p2.H().SetCustomStyle(sh);
         }
 
         // P3: No arrows, thin idle + expand. Make thumb darker/pill-ish.
@@ -665,8 +680,8 @@ struct UiScrollBarDemoWindow : TopWindow {
             s.thumb_inset = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
             s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 175));
             s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 195));
-            p3.V().SetStyle(s);
-            p3.H().SetStyle(s);
+            p3.V().SetCustomStyle(s);
+            p3.H().SetCustomStyle(s);
         }
 
         // P4: Auto-hide.
@@ -681,8 +696,8 @@ struct UiScrollBarDemoWindow : TopWindow {
             s.thick_px = DPI(18);
             s.idle_fade_pct = 30;
             s.collapse_ms = 1000;
-            p4.V().SetStyle(s);
-            p4.H().SetStyle(s);
+            p4.V().SetCustomStyle(s);
+            p4.H().SetCustomStyle(s);
         }
 
         p1.SetVirtual(Size(DPI(1400), DPI(1000)));

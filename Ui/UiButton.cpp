@@ -72,10 +72,10 @@ const UiButton::Style& UiButton::StyleDefault()
     ONCELOCK {
         const Color text_primary   = Color(17, 24, 39);
         const Color text_muted     = Color(107, 114, 128);
-        const Color border_neutral = Color(209, 213, 219);
-        const Color face_hot       = Color(243, 244, 246);
-        const Color face_pressed   = Color(229, 231, 235);
-        const Color accent         = Color(37, 99, 235);
+        const Color border_neutral = Color(215, 219, 226);
+        const Color face_hot       = Color(247, 248, 250);
+        const Color face_pressed   = Color(239, 243, 247);
+        const Color accent         = Color(0, 120, 212);
 
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::None();
@@ -98,8 +98,8 @@ const UiButton::Style& UiButton::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
-        s.metrics.radius = 0;
+        s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
+        s.metrics.radius = DPI(8);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
@@ -113,13 +113,13 @@ const UiButton::Style& UiButton::StyleDefault()
         s.press_offset = Point(0, 0);
         s.metrics.focus_margin = DPI(2);
         s.overpaint = 0;
-        s.font = StdFont();
+        s.font = SansSerifZ(13);
         s.transparent = false;
 
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
         s.icon_side = UiAlign::LEFT;
-        s.content_gap = DPI(6);
+        s.content_gap = DPI(4);
         s.icon_render_mode = UiIconRenderMode::MonoTint;
 
         for(int i = 0; i < 4; i++)
@@ -169,9 +169,9 @@ void UiButton::InvalidateStyleCache()
 
 UiButton::Style& UiButton::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -179,7 +179,7 @@ UiButton::Style& UiButton::StyleEdit()
 
 void UiButton::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -214,20 +214,20 @@ void UiButton::RebuildTextLinesFromStyle(const Style& st)
     UiBuildStyledTextLines(text_, fnt, lines_, line_sizes_);
 }
 
-UiButton& UiButton::SetStyle(const Style& s)
+UiButton& UiButton::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiButton& UiButton::ClearStyleOverride()
+UiButton& UiButton::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -236,7 +236,7 @@ UiButton& UiButton::ClearStyleOverride()
 
 const UiButton::Style& UiButton::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiButton*>(this)->SyncThemeStyle();

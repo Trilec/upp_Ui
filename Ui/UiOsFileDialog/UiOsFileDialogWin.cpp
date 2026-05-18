@@ -2,287 +2,149 @@
 
 #ifdef PLATFORM_WIN32
 
-#include <objbase.h>
-#include <shobjidl.h>
+#include <windows.h>
+#include <commdlg.h>
+#include <shlobj.h>
+#include <string>
 
 namespace Upp {
 namespace {
 
-struct CoInitScope {
-    HRESULT hr = E_FAIL;
-    bool    owns_uninit = false;
-
-    CoInitScope()
-    {
-        hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        owns_uninit = SUCCEEDED(hr);
-    }
-
-    ~CoInitScope()
-    {
-        if(owns_uninit)
-            CoUninitialize();
-    }
-
-    bool Ok() const
-    {
-        // RPC_E_CHANGED_MODE still means COM is already initialized for the thread.
-        return SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE;
-    }
-};
-
-template <class T>
-struct ComPtr {
-    T* p = nullptr;
-
-    ~ComPtr()
-    {
-        if(p)
-            p->Release();
-    }
-
-    T** operator~()       { return &p; }
-    T* operator->() const { return p; }
-    operator bool() const { return p != nullptr; }
-};
-
-static WString ToWideString(const String& s)
+static std::wstring ToWinWide(const String& s)
 {
-    return s.ToWString();
+    return s.ToWString().ToStd();
 }
 
 static String ToUppString(const wchar_t* ws)
 {
-    return ws ? String(WString(ws)) : String();
+    return ws ? WString(std::wstring(ws)).ToString() : String();
 }
 
-static DWORD GetOpenOptions(const UiOsFileDialog& dlg, UiOsFileDialog::Mode mode)
+static std::wstring BuildFilterString(const Vector<UiOsFileDialog::Filter>& filters)
 {
-    DWORD opt = FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST;
-
-    if(mode == UiOsFileDialog::Mode::OpenFiles)
-        opt |= FOS_ALLOWMULTISELECT;
-    if(mode == UiOsFileDialog::Mode::PickFolder)
-        opt |= FOS_PICKFOLDERS;
-    if(dlg.IsShowHidden())
-        opt |= FOS_FORCESHOWHIDDEN;
-    if(dlg.IsCreatePrompt())
-        opt |= FOS_CREATEPROMPT;
-    if(!dlg.IsFollowAliases())
-        opt |= FOS_NODEREFERENCELINKS;
-
-    return opt;
-}
-
-static DWORD GetSaveOptions(const UiOsFileDialog& dlg)
-{
-    DWORD opt = FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST;
-
-    if(dlg.IsConfirmOverwrite())
-        opt |= FOS_OVERWRITEPROMPT;
-    if(dlg.IsShowHidden())
-        opt |= FOS_FORCESHOWHIDDEN;
-    if(dlg.IsCreatePrompt())
-        opt |= FOS_CREATEPROMPT;
-    if(!dlg.IsFollowAliases())
-        opt |= FOS_NODEREFERENCELINKS;
-
-    return opt;
-}
-
-struct FilterStorage {
-    Vector<WString> names;
-    Vector<WString> specs;
-    Vector<COMDLG_FILTERSPEC> items;
-
-    void Build(const Vector<UiOsFileDialog::Filter>& filters)
-    {
-        names.Clear();
-        specs.Clear();
-        items.Clear();
-
-        for(const auto& f : filters) {
-            names.Add(f.label);
-
-            String joined;
-            for(int i = 0; i < f.patterns.GetCount(); i++) {
-                if(i)
-                    joined << ';';
-                joined << f.patterns[i];
-            }
-            specs.Add(joined.ToWString());
-        }
-
-        items.SetCount(filters.GetCount());
-        for(int i = 0; i < filters.GetCount(); i++) {
-            items[i].pszName = ~names[i];
-            items[i].pszSpec = ~specs[i];
-        }
+    std::wstring out;
+    if(filters.IsEmpty()) {
+        out += L"All files";
+        out.push_back(L'\0');
+        out += L"*.*";
+        out.push_back(L'\0');
+        out.push_back(L'\0');
+        return out;
     }
-};
 
-static bool SetDefaultFolder(IFileDialog* dlg, const String& path)
-{
-    if(path.IsEmpty())
-        return true;
+    for(const auto& f : filters) {
+        out += ToWinWide(f.label);
+        out.push_back(L'\0');
 
-    ComPtr<IShellItem> folder;
-    HRESULT hr = SHCreateItemFromParsingName(ToWideString(path), nullptr, IID_IShellItem, (void**)~folder);
-    if(FAILED(hr) || !folder)
-        return false;
-
-    dlg->SetDefaultFolder(folder.p);
-    dlg->SetFolder(folder.p);
-    return true;
-}
-
-static void CaptureSingleResult(IFileDialog* dlg, UiOsFileDialog& out)
-{
-    ComPtr<IShellItem> item;
-    if(FAILED(dlg->GetResult(~item)) || !item)
-        return;
-
-    PWSTR path = nullptr;
-    if(SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
-        out.SetSingleResult(ToUppString(path));
-        CoTaskMemFree(path);
-    }
-}
-
-static void CaptureMultiResult(IFileOpenDialog* dlg, UiOsFileDialog& out)
-{
-    ComPtr<IShellItemArray> items;
-    if(FAILED(dlg->GetResults(~items)) || !items)
-        return;
-
-    DWORD count = 0;
-    if(FAILED(items->GetCount(&count)))
-        return;
-
-    for(DWORD i = 0; i < count; i++) {
-        ComPtr<IShellItem> item;
-        if(FAILED(items->GetItemAt(i, ~item)) || !item)
-            continue;
-
-        PWSTR path = nullptr;
-        if(SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
-            out.AddResult(ToUppString(path));
-            CoTaskMemFree(path);
+        String patterns;
+        for(int i = 0; i < f.patterns.GetCount(); i++) {
+            if(i)
+                patterns << ';';
+            patterns << f.patterns[i];
         }
+        out += ToWinWide(patterns);
+        out.push_back(L'\0');
     }
+    out.push_back(L'\0');
+    return out;
+}
+
+static Vector<String> ParseMultiSelectBuffer(const Vector<wchar_t>& buffer)
+{
+    Vector<String> out;
+    const wchar_t* first = buffer.Begin();
+    if(!first || !*first)
+        return out;
+
+    const wchar_t* p = first + wcslen(first) + 1;
+    if(!*p) {
+        out.Add(ToUppString(first));
+        return out;
+    }
+
+    String dir = ToUppString(first);
+    while(*p) {
+        String name = ToUppString(p);
+        out.Add(AppendFileName(dir, name));
+        p += wcslen(p) + 1;
+    }
+    return out;
 }
 
 }
 
 bool UiOsFileDialog::ExecuteWin(Ctrl*)
 {
-    CoInitScope com;
-    if(!com.Ok())
-        return false;
+    Vector<wchar_t> file_buffer;
+    file_buffer.SetCount(mode_ == Mode::OpenFiles ? 32768 : 4096, 0);
 
-    if(mode_ == Mode::SaveFile) {
-        ComPtr<IFileSaveDialog> save;
-        HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog,
-                                      nullptr,
-                                      CLSCTX_INPROC_SERVER,
-                                      IID_IFileSaveDialog,
-                                      (void**)~save);
-        if(FAILED(hr) || !save)
+    std::wstring title = ToWinWide(title_);
+    std::wstring initial_dir = ToWinWide(initial_directory_);
+    std::wstring suggested = ToWinWide(suggested_name_);
+    std::wstring defext = ToWinWide(default_extension_);
+    std::wstring filter = BuildFilterString(filters_);
+
+    if(mode_ == Mode::PickFolder) {
+        BROWSEINFOW bi;
+        Zero(bi);
+        bi.lpszTitle = title.empty() ? nullptr : title.c_str();
+        bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+
+        PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
+        if(!pidl)
             return false;
 
-        DWORD opt = 0;
-        if(FAILED(save->GetOptions(&opt)))
+        wchar_t path[MAX_PATH];
+        bool ok = SHGetPathFromIDListW(pidl, path);
+        CoTaskMemFree(pidl);
+        if(!ok)
             return false;
 
-        opt |= GetSaveOptions(*this);
-        if(FAILED(save->SetOptions(opt)))
-            return false;
-
-        if(!title_.IsEmpty())
-            save->SetTitle(ToWideString(title_));
-        if(!suggested_name_.IsEmpty())
-            save->SetFileName(ToWideString(suggested_name_));
-        if(!default_extension_.IsEmpty())
-            save->SetDefaultExtension(ToWideString(default_extension_));
-
-        SetDefaultFolder(save.p, initial_directory_);
-
-        FilterStorage fs;
-        fs.Build(filters_);
-        if(!fs.items.IsEmpty()) {
-            save->SetFileTypes((UINT)fs.items.GetCount(), fs.items.Begin());
-
-            UINT idx = (UINT)minmax(filter_index_ + 1, 1, fs.items.GetCount());
-            save->SetFileTypeIndex(idx);
-        }
-
-        hr = save->Show(nullptr);
-        if(hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
-            return false;
-        if(FAILED(hr))
-            return false;
-
-        CaptureSingleResult(save.p, *this);
-
-        if(!fs.items.IsEmpty()) {
-            UINT idx = 0;
-            if(SUCCEEDED(save->GetFileTypeIndex(&idx)) && idx > 0)
-                filter_index_ = (int)idx - 1;
-        }
-
+        SetSingleResult(ToUppString(path));
         return !result_paths_.IsEmpty();
     }
 
-    ComPtr<IFileOpenDialog> open;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog,
-                                  nullptr,
-                                  CLSCTX_INPROC_SERVER,
-                                  IID_IFileOpenDialog,
-                                  (void**)~open);
-    if(FAILED(hr) || !open)
-        return false;
+    if(!suggested.empty())
+        wcsncpy(file_buffer.Begin(), suggested.c_str(), file_buffer.GetCount() - 1);
 
-    DWORD opt = 0;
-    if(FAILED(open->GetOptions(&opt)))
-        return false;
+    OPENFILENAMEW ofn;
+    Zero(ofn);
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = file_buffer.Begin();
+    ofn.nMaxFile = file_buffer.GetCount();
+    ofn.lpstrTitle = title.empty() ? nullptr : title.c_str();
+    ofn.lpstrInitialDir = initial_dir.empty() ? nullptr : initial_dir.c_str();
+    ofn.lpstrFilter = filter.c_str();
+    ofn.nFilterIndex = (DWORD)max(1, filter_index_ + 1);
+    ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 
-    opt |= GetOpenOptions(*this, mode_);
-    if(FAILED(open->SetOptions(opt)))
-        return false;
+    if(mode_ == Mode::OpenFile || mode_ == Mode::OpenFiles) {
+        ofn.Flags |= OFN_FILEMUSTEXIST;
+        if(mode_ == Mode::OpenFiles)
+            ofn.Flags |= OFN_ALLOWMULTISELECT;
 
-    if(!title_.IsEmpty())
-        open->SetTitle(ToWideString(title_));
+        if(!GetOpenFileNameW(&ofn))
+            return false;
 
-    SetDefaultFolder(open.p, initial_directory_);
+        Vector<String> paths = ParseMultiSelectBuffer(file_buffer);
+        for(const String& path : paths)
+            AddResult(path);
+    }
+    else {
+        if(confirm_overwrite_)
+            ofn.Flags |= OFN_OVERWRITEPROMPT;
+        ofn.lpstrDefExt = defext.empty() ? nullptr : defext.c_str();
 
-    FilterStorage fs;
-    fs.Build(filters_);
-    if(!fs.items.IsEmpty() && mode_ != Mode::PickFolder) {
-        open->SetFileTypes((UINT)fs.items.GetCount(), fs.items.Begin());
+        if(!GetSaveFileNameW(&ofn))
+            return false;
 
-        UINT idx = (UINT)minmax(filter_index_ + 1, 1, fs.items.GetCount());
-        open->SetFileTypeIndex(idx);
+        SetSingleResult(ToUppString(file_buffer.Begin()));
     }
 
-    hr = open->Show(nullptr);
-    if(hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
-        return false;
-    if(FAILED(hr))
-        return false;
-
-    if(mode_ == Mode::OpenFiles)
-        CaptureMultiResult(open.p, *this);
-    else
-        CaptureSingleResult(open.p, *this);
-
-    if(!fs.items.IsEmpty() && mode_ != Mode::PickFolder) {
-        UINT idx = 0;
-        if(SUCCEEDED(open->GetFileTypeIndex(&idx)) && idx > 0)
-            filter_index_ = (int)idx - 1;
-    }
-
+    filter_index_ = max(0, (int)ofn.nFilterIndex - 1);
     return !result_paths_.IsEmpty();
 }
 
 }
+
 #endif

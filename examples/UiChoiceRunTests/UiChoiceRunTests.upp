@@ -1,8 +1,0 @@
-uses
-	Ui;
-
-file
-	main.cpp;
-
-mainconfig
-	"" = "";

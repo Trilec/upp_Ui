@@ -1,3 +1,18 @@
+/*
+    UiTableDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -76,23 +91,7 @@ public:
 protected:
     virtual void ApplyDemoTheme() override
     {
-        UiLabel::Style body = MakeBodyLabelStyle(Palette());
-        UiLabel::Style value = MakeValueLabelStyle(Palette());
-        UiButton::Style btn = MakeSmallButtonStyle(Palette());
-
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_rows_label_.SetStyle(body); state_rows_value_.SetStyle(value);
-        state_cols_label_.SetStyle(body); state_cols_value_.SetStyle(value);
-        state_cell_label_.SetStyle(body); state_cell_value_.SetStyle(value);
-        row_height_row_.SetLabelStyle(body).SetValueStyle(value);
-        header_height_row_.SetLabelStyle(body).SetValueStyle(value);
-        width_row_.SetLabelStyle(body).SetValueStyle(value);
-        row_headers_row_.SetLabelStyle(body);
-        col_headers_row_.SetLabelStyle(body);
-        grid_row_.SetLabelStyle(body);
-        sort_row_.SetLabelStyle(body);
-        copy_button2_.SetStyle(btn);
-        mutate_button_.SetStyle(btn);
+        RefreshFromConfig();
     }
 
     virtual void LayoutPreviewContent() override
@@ -153,7 +152,7 @@ private:
         style.show_column_headers = cfg_.show_column_headers;
         style.show_grid = cfg_.show_grid;
         style.show_sort_indicator = cfg_.show_sort_indicator;
-        table_.SetStyle(style)
+        table_.SetCustomStyle(style)
               .SetRowHeight(cfg_.row_height)
               .SetHeaderHeight(cfg_.header_height)
               .SetDefaultColumnWidth(cfg_.default_col_width)
@@ -187,7 +186,7 @@ private:
         code << "style.show_column_headers = " << (cfg_.show_column_headers ? "true" : "false") << ";\n";
         code << "style.show_grid = " << (cfg_.show_grid ? "true" : "false") << ";\n";
         code << "style.show_sort_indicator = " << (cfg_.show_sort_indicator ? "true" : "false") << ";\n";
-        code << "table.SetStyle(style)\n";
+        code << "table.SetCustomStyle(style)\n";
         code << "     .SetRowHeight(" << cfg_.row_height << ")\n";
         code << "     .SetHeaderHeight(" << cfg_.header_height << ")\n";
         code << "     .SetDefaultColumnWidth(" << cfg_.default_col_width << ");\n";

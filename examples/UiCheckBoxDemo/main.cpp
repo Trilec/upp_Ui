@@ -1,3 +1,18 @@
+/*
+    UiCheckBoxDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include <Ui/Ui.h>
 
 using namespace Upp;
@@ -131,8 +146,8 @@ UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
     s.media_side = UiAlign::LEFT;
     s.media_gap = DPI(8);
     s.media_reserve = DPI(48);
-    s.show_rule = false;
-    s.show_bottom_line = false;
+    s.title_line = false;
+    s.card_line = false;
     return s;
 }
 
@@ -310,12 +325,12 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.header_style.metrics.frame_enabled = false;
     s.header_style.metrics.focus_enabled = false;
     s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_extent = LARGE;
-    s.header_style.bottom_line_style = SOLID;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
+    s.header_style.title_line = false;
+    s.header_style.card_line = true;
+    s.header_style.card_line_length = LARGE;
+    s.header_style.card_line_style = SOLID;
+    s.header_style.card_line_thickness = 1;
+    s.header_style.card_line_color = c.divider;
     s.header_style.title_font = DemoSans(13, true);
     s.header_style.subtitle_font = DemoSans(1);
     s.header_style.copy_font = DemoSans(1);
@@ -476,9 +491,9 @@ public:
 
         header_.SetTitle("U++ UiCheckBox Builder")
                .SetSubTitle("Simple shell-aligned builder for checkbox visuals and state.")
-               .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
-               .ShowRule(false)
-               .ShowBottomLine(false)
+               .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+               .ShowTitleLine(false)
+               .ShowCardLine(false)
                .SetSelectable(false)
                .SetShowFocus(false)
                .EnableHover(false);
@@ -561,12 +576,12 @@ public:
         body_frame_enabled_row_.SetLabel("Body Frame");
         indicator_face_enabled_row_.SetLabel("Ind Face On");
         indicator_frame_enabled_row_.SetLabel("Ind Frame On");
-        text_color_row_.SetLabel("Text").SetSwatchCount(1).ShowValue(false);
-        face_color_row_.SetLabel("Body Face").SetSwatchCount(1).ShowValue(false);
-        frame_color_row_.SetLabel("Body Frame").SetSwatchCount(1).ShowValue(false);
-        indicator_face_color_row_.SetLabel("Ind Face").SetSwatchCount(1).ShowValue(false);
-        indicator_frame_color_row_.SetLabel("Ind Frame").SetSwatchCount(1).ShowValue(false);
-        mark_color_row_.SetLabel("Mark").SetSwatchCount(1).ShowValue(false);
+        text_color_row_.SetLabel("Text").SetColorCount(1).ShowValue(false);
+        face_color_row_.SetLabel("Body Face").SetColorCount(1).ShowValue(false);
+        frame_color_row_.SetLabel("Body Frame").SetColorCount(1).ShowValue(false);
+        indicator_face_color_row_.SetLabel("Ind Face").SetColorCount(1).ShowValue(false);
+        indicator_frame_color_row_.SetLabel("Ind Frame").SetColorCount(1).ShowValue(false);
+        mark_color_row_.SetLabel("Mark").SetColorCount(1).ShowValue(false);
 
         checked_icon_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         tri_state_icon_row_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
@@ -613,12 +628,12 @@ public:
         bind_live_slider(body_radius_row_, body_radius_, 0, DPI(24));
         bind_live_slider(body_frame_width_row_, body_frame_width_, 0, 4);
         bind_live_slider(indicator_frame_width_row_, indicator_frame_width_, 0, 4);
-        text_color_row_.WhenAction = [=] { text_color_ = text_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        face_color_row_.WhenAction = [=] { face_color_ = face_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        frame_color_row_.WhenAction = [=] { frame_color_ = frame_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        indicator_face_color_row_.WhenAction = [=] { indicator_face_color_ = indicator_face_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        indicator_frame_color_row_.WhenAction = [=] { indicator_frame_color_ = indicator_frame_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        mark_color_row_.WhenAction = [=] { mark_color_ = mark_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        text_color_row_.WhenAction = [=] { text_color_ = text_color_row_.GetColor(0); RefreshFromConfig(); };
+        face_color_row_.WhenAction = [=] { face_color_ = face_color_row_.GetColor(0); RefreshFromConfig(); };
+        frame_color_row_.WhenAction = [=] { frame_color_ = frame_color_row_.GetColor(0); RefreshFromConfig(); };
+        indicator_face_color_row_.WhenAction = [=] { indicator_face_color_ = indicator_face_color_row_.GetColor(0); RefreshFromConfig(); };
+        indicator_frame_color_row_.WhenAction = [=] { indicator_frame_color_ = indicator_frame_color_row_.GetColor(0); RefreshFromConfig(); };
+        mark_color_row_.WhenAction = [=] { mark_color_ = mark_color_row_.GetColor(0); RefreshFromConfig(); };
         checked_icon_drop_.WhenSelect = [=](int) { checked_icon_name_ = AsString(checked_icon_drop_.GetSelectedData()); RefreshFromConfig(); };
         tri_state_icon_drop_.WhenSelect = [=](int) { tri_state_icon_name_ = AsString(tri_state_icon_drop_.GetSelectedData()); RefreshFromConfig(); };
 
@@ -682,12 +697,12 @@ private:
         body_radius_row_.Slider().SetValue(body_radius_);
         body_frame_width_row_.Slider().SetValue(body_frame_width_);
         indicator_frame_width_row_.Slider().SetValue(indicator_frame_width_);
-        text_color_row_.SetSwatchColor(0, text_color_);
-        face_color_row_.SetSwatchColor(0, face_color_);
-        frame_color_row_.SetSwatchColor(0, frame_color_);
-        indicator_face_color_row_.SetSwatchColor(0, indicator_face_color_);
-        indicator_frame_color_row_.SetSwatchColor(0, indicator_frame_color_);
-        mark_color_row_.SetSwatchColor(0, mark_color_);
+        text_color_row_.SetColor(0, text_color_);
+        face_color_row_.SetColor(0, face_color_);
+        frame_color_row_.SetColor(0, frame_color_);
+        indicator_face_color_row_.SetColor(0, indicator_face_color_);
+        indicator_frame_color_row_.SetColor(0, indicator_frame_color_);
+        mark_color_row_.SetColor(0, mark_color_);
         checked_icon_drop_.SelectByData(checked_icon_name_);
         tri_state_icon_drop_.SelectByData(tri_state_icon_name_);
     }
@@ -728,7 +743,7 @@ private:
         style.checked_icon = checked_icon_name_.IsEmpty() ? Image() : UiIconFromName(checked_icon_name_);
         style.tri_state_icon = tri_state_icon_name_.IsEmpty() ? Image() : UiIconFromName(tri_state_icon_name_);
         check_.SetVisual(visual_)
-              .SetStyle(style)
+              .SetCustomStyle(style)
               .SetText(text_)
               .SetIndicatorSide(side_)
               .SetTriState(tri_state_)
@@ -766,7 +781,7 @@ private:
         code << "style.indicator_metrics.frame_width = " << indicator_frame_width_ << ";\n";
         code << "style.mark_thickness = " << mark_thickness_ << ";\n\n";
         code << "UiCheckBox check;\n";
-        code << "check.SetStyle(style)\n";
+        code << "check.SetCustomStyle(style)\n";
         code << "     .SetText(\"" << text_ << "\")\n";
         code << "     .SetTriState(" << (tri_state_ ? "true" : "false") << ")\n";
         code << "     .SetState(" << (state_ == UICHECK_CHECKED ? "UICHECK_CHECKED" : state_ == UICHECK_INDETERMINATE ? "UICHECK_INDETERMINATE" : "UICHECK_UNCHECKED") << ");\n";
@@ -778,62 +793,16 @@ private:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
         ctx.mode = mode;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
         palette_ = ResolveDemoPalette(mode);
-        header_.SetStyle(MakeHeaderStyle(palette_));
-        version_badge_.SetStyle(MakeBadgeStyle(palette_));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
-        theme_icon_.SetStyle(MakeLabelStyle(palette_));
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
         theme_icon_.SetIconColor(mode == UiThemeMode::Dark ? Color(214, 222, 236) : palette_.blue);
-        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
-        code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        code_panel_.Scroll().SetStyle(MakeScrollBodyStyle(palette_));
-        code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
+        code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+        code_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle(palette_));
+        code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
         code_panel_.Code().SetSelectable(true);
         preview_.SetPalette(palette_);
-        inspector_scroll_.SetStyle(MakeScrollBodyStyle(palette_));
-        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
-        visual_drop_.SetStyle(MakeDropdownStyle(palette_));
-        state_drop_.SetStyle(MakeDropdownStyle(palette_));
-        side_drop_.SetStyle(MakeDropdownStyle(palette_));
-        checked_icon_drop_.SetStyle(MakeDropdownStyle(palette_));
-        tri_state_icon_drop_.SetStyle(MakeDropdownStyle(palette_));
-        UiLabel::Style note_style = MakeLabelStyle(palette_);
-        note_style.font = DemoSans(8);
-        for(int i = 0; i < 4; i++)
-            note_style.palette.ink[i] = Color(214, 64, 74);
-        chip_note_.SetStyle(note_style);
-        text_edit_.SetStyle(UiTheme::ResolveEdit());
-        UiLabel::Style row_label = MakeLabelStyle(palette_);
-        UiLabel::Style row_value = MakeLabelStyle(palette_, true, true);
-        text_label_.SetStyle(row_label);
-        visual_label_.SetStyle(row_label);
-        state_label_.SetStyle(row_label);
-        side_label_.SetStyle(row_label);
-        checked_icon_label_.SetStyle(row_label);
-        tri_state_icon_label_.SetStyle(row_label);
-        state_theme_label_.SetStyle(row_label);
-        state_theme_value_.SetStyle(row_value);
-        state_value_label_.SetStyle(row_label);
-        state_value_value_.SetStyle(row_value);
-        size_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        gap_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        radius_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        mark_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        body_radius_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        body_frame_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        indicator_frame_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        tristate_row_.SetLabelStyle(row_label);
-        enabled_row_.SetLabelStyle(row_label);
-        text_color_row_.SetLabelStyle(row_label);
-        face_color_row_.SetLabelStyle(row_label);
-        frame_color_row_.SetLabelStyle(row_label);
-        indicator_face_color_row_.SetLabelStyle(row_label);
-        indicator_frame_color_row_.SetLabelStyle(row_label);
-        mark_color_row_.SetLabelStyle(row_label);
         Refresh();
         RefreshFromConfig();
     }

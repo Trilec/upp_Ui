@@ -120,6 +120,16 @@ const UiList::Style& UiList::StyleDefault()
         s.selected_frame = Color(65, 167, 248);
         s.selected_ink = text_primary;
         s.separator_color = Color(226, 232, 240);
+        s.row_even_face = Null;
+        s.row_odd_face = Null;
+        s.show_row_separator = false;
+        s.row_state_frame_enabled = false;
+        s.right_text_as_badge = false;
+        s.badge_face = Color(241, 245, 249);
+        s.badge_frame = Null;
+        s.badge_ink = Color(51, 65, 85);
+        s.badge_radius = DPI(999);
+        s.badge_h_padding = DPI(6);
         s.metadata_default = Color(65, 167, 248);
         s.check_frame = Color(148, 163, 184);
         s.check_fill = Color(17, 24, 39);
@@ -153,9 +163,9 @@ UiList::UiList()
 
 UiList::Style& UiList::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     theme_revision_ = 0;
     return style_;
@@ -163,7 +173,7 @@ UiList::Style& UiList::StyleEdit()
 
 const UiList::Style& UiList::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
     const_cast<UiList*>(this)->SyncThemeStyle();
     return themed_style_;
@@ -171,7 +181,7 @@ const UiList::Style& UiList::GetEffectiveStyle() const
 
 void UiList::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
     uint64 revision = UiTheme::GetRevision();
     if(theme_revision_ == revision)
@@ -180,19 +190,19 @@ void UiList::SyncThemeStyle()
     theme_revision_ = revision;
 }
 
-UiList& UiList::SetStyle(const Style& s)
+UiList& UiList::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiList& UiList::ClearStyleOverride()
+UiList& UiList::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     theme_revision_ = 0;
     OnStyleChanged();
@@ -241,6 +251,7 @@ UiList& UiList::ClearSelection()
     if(selected_.IsEmpty())
         return *this;
     selected_.Clear();
+    cursor_ = -1;
     anchor_ = -1;
     NotifySelectionChange();
     return *this;
@@ -249,7 +260,7 @@ UiList& UiList::ClearSelection()
 UiList& UiList::Select(int index, bool additive)
 {
     SyncModel();
-    if(!model_ || index < 0 || index >= model_->GetCount())
+    if(!IsSelectableIndex(index))
         return *this;
     if(selection_mode_ != UILISTSEL_MULTI || !additive)
         SelectSingle(index);
@@ -336,7 +347,7 @@ Value UiList::GetData() const
         return values;
     }
 
-    return cursor_ >= 0 ? GetSelectionToken(cursor_) : Value();
+    return selected_.GetCount() > 0 ? GetSelectionToken(selected_[0]) : Value();
 }
 
 UiList& UiList::EnableRenameOnDblClick(bool on)
@@ -401,7 +412,7 @@ UiList& UiList::SetDragGlyph(const Image& glyph)
 UiList& UiList::SetCursor(int index)
 {
     SyncModel();
-    if(!model_ || index < 0 || index >= model_->GetCount())
+    if(!IsSelectableIndex(index))
         return *this;
     SelectSingle(index);
     ScrollTo(index);
@@ -542,7 +553,8 @@ Rect UiList::GetRightTextRect(const Rect& row, const UiModelItem& item) const
     const Style& style = GetEffectiveStyle();
     Font font = item.use_custom_font ? item.custom_font : style.font;
     Size sz = GetTextSize(item.right_text, font);
-    int w = min(sz.cx + DPI(4), max(0, row.GetWidth() / 2));
+    int extra = style.right_text_as_badge ? style.badge_h_padding * 2 : DPI(4);
+    int w = min(sz.cx + extra, max(0, row.GetWidth() / 2));
     int right = row.right - style.h_padding;
     if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::RIGHT)
         right = GetDragRect(row).left - style.drag_gap;
@@ -620,10 +632,9 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
     StyledState st = UiListState_(item.enabled, pressed, hot);
 
     Rect rr = row;
-    rr.Deflate(DPI(2), DPI(1));
 
     if(index > 0 && item.separator_before)
-        w.DrawRect(row.left + style.h_padding, row.top, row.GetWidth() - style.h_padding * 2, 1, style.separator_color);
+        w.DrawRect(row.left, row.top, row.GetWidth(), 1, style.separator_color);
 
     bool underline_state = (selected && style.selected_as_underline) || (!selected && hot && style.hot_as_underline);
 
@@ -637,7 +648,7 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
         StyledPalette p;
         StyledMetrics m;
         m.face_enabled = true;
-        m.frame_enabled = true;
+        m.frame_enabled = style.row_state_frame_enabled;
         m.frame_width = DPI(1);
         m.radius = style.row_radius;
         for(int i = 0; i < 4; i++) {
@@ -707,8 +718,29 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
         Font rf = style.font;
         if(item.group_header) rf.Bold();
         Color rink = selected ? style.selected_ink : (item.enabled ? style.muted_ink : style.disabled_ink);
-        DrawAlignedListText(w, rx, item.right_text, rf, rink, item.right_text_align);
+        Rect text_rx = rx;
+        if(style.right_text_as_badge) {
+            StyledPalette p;
+            StyledMetrics m;
+            m.face_enabled = !IsNull(style.badge_face);
+            m.frame_enabled = !IsNull(style.badge_frame);
+            m.frame_width = DPI(1);
+            m.radius = style.badge_radius;
+            m.focus_enabled = false;
+            for(int i = 0; i < 4; i++) {
+                p.face[i] = UiFill::Solid(style.badge_face);
+                p.frame[i] = style.badge_frame;
+                p.ink[i] = style.badge_ink;
+            }
+            UiPaintFaceFrameDash(w, rx.Deflated(0, DPI(2)), p, m, st);
+            rink = item.enabled ? style.badge_ink : style.disabled_ink;
+            text_rx = rx.Deflated(style.badge_h_padding, 0);
+        }
+        DrawAlignedListText(w, text_rx, item.right_text, rf, rink, item.right_text_align);
     }
+
+    if(style.show_row_separator && model_ && index + 1 < model_->GetCount())
+        w.DrawRect(row.left, row.bottom - 1, row.GetWidth(), 1, style.separator_color);
 }
 
 void UiList::Paint(Draw& w)
@@ -766,6 +798,11 @@ void UiList::LeftDown(Point p, dword flags)
     pressed_ = row;
     pressed_drag_ = -1;
     if(row < 0) {
+        Refresh();
+        return;
+    }
+    if(!IsSelectableIndex(row)) {
+        pressed_ = -1;
         Refresh();
         return;
     }
@@ -947,6 +984,14 @@ void UiList::ScrollTo(int index)
     Refresh();
 }
 
+bool UiList::IsSelectableIndex(int index) const
+{
+    if(!model_ || index < 0 || index >= model_->GetCount())
+        return false;
+    const UiModelItem& item = model_->Get(index);
+    return item.enabled && !item.group_header;
+}
+
 void UiList::ScrollToSelection()
 {
     if(cursor_ >= 0)
@@ -960,8 +1005,12 @@ void UiList::MoveCursorBy(int delta)
         return;
     int next = cursor_ >= 0 ? cursor_ + delta : (delta >= 0 ? 0 : model_->GetCount() - 1);
     next = clamp(next, 0, model_->GetCount() - 1);
-    SelectSingle(next);
-    ScrollTo(next);
+    while(next >= 0 && next < model_->GetCount() && !IsSelectableIndex(next))
+        next += delta >= 0 ? 1 : -1;
+    if(IsSelectableIndex(next)) {
+        SelectSingle(next);
+        ScrollTo(next);
+    }
 }
 
 void UiList::MoveCursorToEdge(bool end)
@@ -970,13 +1019,17 @@ void UiList::MoveCursorToEdge(bool end)
     if(!model_ || model_->IsEmpty())
         return;
     int index = end ? model_->GetCount() - 1 : 0;
-    SelectSingle(index);
-    ScrollTo(index);
+    while(index >= 0 && index < model_->GetCount() && !IsSelectableIndex(index))
+        index += end ? -1 : 1;
+    if(IsSelectableIndex(index)) {
+        SelectSingle(index);
+        ScrollTo(index);
+    }
 }
 
 void UiList::SelectSingle(int index)
 {
-    if(index < 0 || !model_ || index >= model_->GetCount())
+    if(!IsSelectableIndex(index))
         return;
     selected_.Clear();
     selected_.FindAdd(index);
@@ -987,7 +1040,7 @@ void UiList::SelectSingle(int index)
 
 void UiList::ToggleSelection(int index)
 {
-    if(index < 0 || !model_ || index >= model_->GetCount())
+    if(!IsSelectableIndex(index))
         return;
     int fi = selected_.Find(index);
     if(fi >= 0)
@@ -1001,7 +1054,7 @@ void UiList::ToggleSelection(int index)
 
 void UiList::SelectRangeTo(int index, bool additive)
 {
-    if(index < 0 || !model_ || index >= model_->GetCount())
+    if(!IsSelectableIndex(index))
         return;
     int start = anchor_ >= 0 ? anchor_ : (cursor_ >= 0 ? cursor_ : index);
     if(!additive)
@@ -1009,8 +1062,10 @@ void UiList::SelectRangeTo(int index, bool additive)
     int a = min(start, index);
     int b = max(start, index);
     for(int i = a; i <= b; i++)
-        selected_.FindAdd(i);
+        if(IsSelectableIndex(i))
+            selected_.FindAdd(i);
     cursor_ = index;
+    anchor_ = start;
     NotifySelectionChange();
 }
 
@@ -1030,17 +1085,17 @@ int UiList::ResolveSelectionIndex(const Value& token) const
 
     for(int i = 0; i < model_->GetCount(); i++) {
         const UiModelItem& item = model_->Get(i);
-        if(!IsNull(item.data) && item.data == token)
+        if(!IsNull(item.data) && item.data == token && IsSelectableIndex(i))
             return i;
     }
 
     if(token.Is<int>()) {
         int index = token;
-        return index >= 0 && index < model_->GetCount() ? index : -1;
+        return IsSelectableIndex(index) ? index : -1;
     }
     if(token.Is<int64>()) {
         int64 index = token;
-        return index >= 0 && index < model_->GetCount() ? (int)index : -1;
+        return index >= 0 && index <= INT_MAX && IsSelectableIndex((int)index) ? (int)index : -1;
     }
     return -1;
 }

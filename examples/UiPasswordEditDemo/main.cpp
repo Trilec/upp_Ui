@@ -1,3 +1,18 @@
+/*
+    UiPasswordEditDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -68,23 +83,7 @@ public:
 protected:
     virtual void ApplyDemoTheme() override
     {
-        UiLabel::Style body = MakeBodyLabelStyle(Palette());
-        UiLabel::Style value = MakeValueLabelStyle(Palette());
-        UiBaseEdit::Style edit = MakeEditStyle(Palette());
-        UiDropdown::Style dd = MakeDropdownStyle(Palette());
-
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
-        state_mask_label_.SetStyle(body); state_mask_value_.SetStyle(value);
-        state_text_label_.SetStyle(body); state_text_value_.SetStyle(value);
-        text_label_.SetStyle(body); placeholder_label_.SetStyle(body); mask_label_.SetStyle(body);
-        text_edit_.SetStyle(edit); placeholder_edit_.SetStyle(edit); mask_drop_.SetStyle(dd);
-        radius_row_.SetLabelStyle(body).SetValueStyle(value);
-        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
-        enabled_row_.SetLabelStyle(body);
-        readonly_row_.SetLabelStyle(body);
-        visibility_row_.SetLabelStyle(body);
-        plain_row_.SetLabelStyle(body);
+        RefreshFromConfig();
     }
 
     virtual void LayoutPreviewContent() override
@@ -127,7 +126,7 @@ private:
         state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
         state_mode_value_.SetText(cfg_.plain_visible ? "Visible" : "Masked");
         state_mask_value_.SetText(MaskLabel());
-        state_text_value_.SetText(cfg_.plain_visible ? cfg_.text : String("••••••"));
+        state_text_value_.SetText(cfg_.plain_visible ? cfg_.text : String("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"));
     }
 
     void RefreshFromConfig()
@@ -135,7 +134,7 @@ private:
         UiBaseEdit::Style style = MakeEditStyle(Palette());
         style.metrics.radius = cfg_.radius;
         style.metrics.frame_width = cfg_.frame_width;
-        edit_.SetStyle(style);
+        edit_.SetCustomStyle(style);
         edit_.SetText(WString(cfg_.text));
         edit_.SetPlaceholder(cfg_.placeholder);
         edit_.SetPasswordChar(MaskChar());
@@ -166,7 +165,7 @@ private:
         code << "UiBaseEdit::Style style = UiTheme::ResolveEdit();\n";
         code << "style.metrics.radius = " << cfg_.radius << ";\n";
         code << "style.metrics.frame_width = " << cfg_.frame_width << ";\n";
-        code << "pass.SetStyle(style)\n";
+        code << "pass.SetCustomStyle(style)\n";
         code << "    .SetPlaceholder(" << QuoteCpp(cfg_.placeholder) << ")\n";
         code << "    .SetPasswordChar(" << (int)MaskChar() << ")\n";
         if(cfg_.show_visibility)

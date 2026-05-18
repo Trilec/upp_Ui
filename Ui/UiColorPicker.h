@@ -11,12 +11,17 @@ class UiColorPicker : public Ctrl, public CtrlStyled<UiColorPicker> {
 public:
     typedef UiColorPicker CLASSNAME;
 
+    struct SlotValue : Moveable<SlotValue> {
+        Color  color = Black();
+        int    alpha = 255;
+        String label;
+    };
+
     struct Style : ChStyle<Style> {
         StyledPalette palette;
         StyledMetrics metrics;
         StyledSkin    skin;
 
-        int header_height = DPI(48);
         int slot_size = DPI(42);
         int slot_gap = DPI(8);
         int page_gap = DPI(14);
@@ -29,7 +34,7 @@ public:
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
-              % header_height % slot_size % slot_gap
+              % slot_size % slot_gap
               % page_gap % right_panel_width % section_gap % readout_row_height
               % tab_height % section_title_height;
         }
@@ -52,10 +57,11 @@ public:
     UiColorPicker();
     virtual ~UiColorPicker();
 
-    UiColorPicker& SetStyle(const Style& s);
-    UiColorPicker& ClearStyleOverride();
-    bool           HasStyleOverride() const { return has_style_override_; }
+    UiColorPicker& SetCustomStyle(const Style& s);
+    UiColorPicker& ClearCustomStyle();
+    bool           HasCustomStyle() const { return has_custom_style_; }
     const Style&   GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -70,6 +76,18 @@ public:
 
     UiColorPicker& SetSlotColor(int i, Color c, bool fire = true);
     Color          GetSlotColor(int i) const;
+
+    UiColorPicker& SetSlotAlpha(int i, int alpha, bool fire = true);
+    int            GetSlotAlpha(int i) const;
+
+    UiColorPicker& SetSlot(int i, Color c, int alpha, bool fire = true);
+    SlotValue      GetSlot(int i) const;
+    Vector<SlotValue> GetSlots() const;
+
+    UiColorPicker& SetColor(Color c, bool fire = true);
+    Color          GetColor() const { return GetSlotColor(active_slot_); }
+    UiColorPicker& SetAlpha(int alpha, bool fire = true);
+    int            GetAlpha() const { return GetSlotAlpha(active_slot_); }
 
     UiColorPicker& SetSlotLabel(int i, const String& s);
     String         GetSlotLabel(int i) const;
@@ -88,6 +106,8 @@ public:
     int            GetRecentSwatchCount() const;
 
     String         FormatActiveHex() const;
+    String         FormatActiveHex8() const;
+    String         FormatSlotHex8(int i) const;
     String         FormatActiveRgb8() const;
     String         FormatActiveRgbUnit() const;
     String         FormatActiveHsv() const;
@@ -101,6 +121,8 @@ public:
 
     Event<>        WhenAction;
     Event<>        WhenChanging;
+    Event<>        WhenAccept;
+    Event<>        WhenCancel;
     Event<int>     WhenSlotChanged;
 
 private:
@@ -130,9 +152,11 @@ private:
     void           ApplySliderColor(bool final_commit);
     void           HandleSlotButton(int index);
     void           HandleRecentPick(Color c);
-    void           HandleUserPick(Color c);
-    void           HandleAddUserSwatch();
-    void           HandleTransferRecentToActive();
+    void           HandleUserPick(int i, Color c);
+    void           HandleSaveActiveSwatch();
+    void           HandleSavePaletteColor();
+    void           HandleUsePaletteColor();
+    void           HandleUseStashColor();
     void           UpdateTabVisibility();
     void           SyncThemeToChildren();
 
@@ -142,8 +166,9 @@ private:
     mutable uint64 theme_revision_ = 0;
     uint64         children_theme_revision_ = 0;
     bool           children_style_dirty_ = true;
-    bool           has_style_override_ = false;
+    bool           has_custom_style_ = false;
     dword          live_update_ms_ = 0;
+    int            action_separator_y_ = -1;
 
     int            slot_count_ = 2;
     int            active_slot_ = 0;
@@ -155,14 +180,19 @@ private:
     Vector<Color>    recent_swatches_;
     Vector<Color>    user_swatches_;
     Color            pending_transfer_color_ = Null;
+    Color            selected_palette_color_ = Null;
+    Color            selected_stash_color_ = Null;
+    int              selected_stash_index_ = -1;
 
-    ParentCtrl       header_bar_;
-    Label            header_title_;
     UiButton         slot_button_[4];
     UiTab            tabs_;
     ParentCtrl       picker_page_;
     ParentCtrl       swatches_page_;
     ParentCtrl       mixer_page_;
+    UiBoxLayout      picker_root_ { UiBoxLayout::Direction::V };
+    UiBoxLayout      picker_columns_ { UiBoxLayout::Direction::H };
+    UiBoxLayout      picker_actions_ { UiBoxLayout::Direction::H };
+    Ctrl             picker_action_spacer_;
     ParentCtrl       picker_left_;
     ParentCtrl       picker_right_;
 
@@ -186,6 +216,9 @@ private:
     UiButton         add_user_swatch_button_;
     UiButton         transfer_to_active_button_;
     UiButton         push_user_swatch_button_;
+    UiButton         use_stash_swatch_button_;
+    UiButton         accept_button_;
+    UiButton         cancel_button_;
 
     One<SwatchGrid>  recent_grid_;
     One<SwatchGrid>  user_grid_;

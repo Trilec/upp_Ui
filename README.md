@@ -148,6 +148,12 @@ Example on Windows:
 "E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" examples/UiButtonDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiButtonDemo"
 ```
 
+For this repository, prefer the checked-in `GitHubOut.var` assembly when doing
+local development. It includes the `E:\apps\github\upp_AnimationEasing` nest
+required by `Ui/Ui.upp` and writes intermediates to
+`E:\apps\github\upp_Ui\out`, avoiding locked/shared objects under
+`E:\upp-18468\out`.
+
 ## Public API direction
 
 This is a new codebase with no backward-compat naming shim layer. Public names are being kept explicit and direct, and docs/demos are updated with the code.

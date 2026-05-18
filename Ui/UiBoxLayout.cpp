@@ -74,6 +74,8 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 return;
 
             int n = row.GetCount();
+            if(!wrap)
+                row_h = max(row_h, inner_h);
             int base_sum = 0;
             int weight_sum = 0;
             for(int i = 0; i < n; i++) {

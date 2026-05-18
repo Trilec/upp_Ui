@@ -1,22 +1,24 @@
 #include <Ui/UiCompositeColor.h>
+#include <Ui/UiColorPicker.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
+static String CompositeColorTipText(const String& label, Color color)
+{
+    return label.IsEmpty() ? "Color" : label;
+}
+
 UiCompositeColorSwatch::UiCompositeColorSwatch()
 {
-    popup_.NotNull().NoRampWheel();
-    popup_.WhenSelect = [=] {
-        color_ = popup_.Get();
-        Refresh();
-        WhenAction();
-    };
-    popup_.WhenCancel = [=] { Refresh(); };
     NoWantFocus();
+    Tip(CompositeColorTipText(label_, color_));
 }
 
 void UiCompositeColorSwatch::SetColor(Color color)
 {
     color_ = color;
+    Tip(CompositeColorTipText(label_, color_));
     Refresh();
 }
 
@@ -26,9 +28,16 @@ void UiCompositeColorSwatch::SetRadius(int radius)
     Refresh();
 }
 
+void UiCompositeColorSwatch::SetSlotLabel(const String& label)
+{
+    label_ = label;
+    Tip(CompositeColorTipText(label_, color_));
+    Refresh();
+}
+
 Size UiCompositeColorSwatch::GetMinSize() const
 {
-    return Size(DPI(28), DPI(22));
+    return Size(DPI(28), DPI(24));
 }
 
 void UiCompositeColorSwatch::Paint(Draw& w)
@@ -59,7 +68,7 @@ void UiCompositeColorSwatch::Paint(Draw& w)
 
 void UiCompositeColorSwatch::LeftDown(Point, dword)
 {
-    popup_.PopUp(this, IsNull(color_) ? White() : color_);
+    WhenAction();
 }
 
 void UiCompositeColorSwatch::MouseEnter(Point, dword)
@@ -79,13 +88,21 @@ UiCompositeColor::UiCompositeColor()
     Add(label_);
     Add(value_);
     for(int i = 0; i < 4; i++) {
-        Add(swatch_[i]);
-        swatch_[i].WhenAction = [=] { WhenAction(); };
+        Add(color_[i]);
+        int ii = i;
+        color_[i].WhenAction = [=] { OpenColorPicker(ii); };
     }
     label_.NoWantFocus();
     value_.NoWantFocus();
+    UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    label_style.font = SansSerifZ(9);
+    UiLabel::Style value_style = UiTheme::ResolveLabel(UiRole::Standard);
+    value_style.font = SansSerifZ(9);
+    label_.SetCustomStyle(label_style);
+    value_.SetCustomStyle(value_style);
     SyncValueVisibility();
-    SyncSwatchVisibility();
+    SyncColorVisibility();
+    BackPaint();
 }
 
 UiCompositeColor& UiCompositeColor::SetLayoutMode(UiCompositeLayoutMode mode)
@@ -159,10 +176,10 @@ UiCompositeColor& UiCompositeColor::SetStackGap(int px)
     return *this;
 }
 
-UiCompositeColor& UiCompositeColor::SetSwatchCount(int count)
+UiCompositeColor& UiCompositeColor::SetColorCount(int count)
 {
-    swatch_count_ = clamp(count, 1, 4);
-    SyncSwatchVisibility();
+    color_count_ = clamp(count, 1, 4);
+    SyncColorVisibility();
     RefreshLayout();
     Refresh();
     return *this;
@@ -170,40 +187,90 @@ UiCompositeColor& UiCompositeColor::SetSwatchCount(int count)
 
 UiCompositeColor& UiCompositeColor::SetLabelStyle(const UiLabel::Style& style)
 {
-    label_.SetStyle(style);
+    label_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
 UiCompositeColor& UiCompositeColor::SetValueStyle(const UiLabel::Style& style)
 {
-    value_.SetStyle(style);
+    value_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
-UiCompositeColor& UiCompositeColor::SetSwatchColor(int index, Color color)
+UiCompositeColor& UiCompositeColor::SetColor(int index, Color color)
 {
     if(index < 0 || index >= 4)
         return *this;
-    swatch_[index].SetColor(color);
+    color_[index].SetColor(color);
     Refresh();
     return *this;
 }
 
-Color UiCompositeColor::GetSwatchColor(int index) const
+Color UiCompositeColor::GetColor(int index) const
 {
-    return (index >= 0 && index < 4) ? swatch_[index].GetColor() : Null;
+    return (index >= 0 && index < 4) ? color_[index].GetColor() : Null;
+}
+
+UiCompositeColor& UiCompositeColor::SetColors(const Vector<Color>& colors)
+{
+    int count = min(4, colors.GetCount());
+    SetColorCount(max(1, count));
+    for(int i = 0; i < count; i++)
+        color_[i].SetColor(colors[i]);
+    Refresh();
+    return *this;
+}
+
+Vector<Color> UiCompositeColor::GetColors() const
+{
+    Vector<Color> out;
+    out.SetCount(color_count_);
+    for(int i = 0; i < color_count_; i++)
+        out[i] = color_[i].GetColor();
+    return out;
+}
+
+UiCompositeColor& UiCompositeColor::SetColorLabel(int index, const String& label)
+{
+    if(index < 0 || index >= 4)
+        return *this;
+    color_[index].SetSlotLabel(label);
+    Refresh();
+    return *this;
+}
+
+String UiCompositeColor::GetColorLabel(int index) const
+{
+    return (index >= 0 && index < 4) ? color_[index].GetSlotLabel() : String();
+}
+
+UiCompositeColor& UiCompositeColor::SetSeparatorBefore(int index, bool on)
+{
+    if(index <= 0 || index >= 4)
+        return *this;
+    separator_before_[index] = on;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+bool UiCompositeColor::HasSeparatorBefore(int index) const
+{
+    return index > 0 && index < 4 && separator_before_[index];
 }
 
 Size UiCompositeColor::GetMinSize() const
 {
     int sw_w = 0;
     int sw_h = 0;
-    for(int i = 0; i < swatch_count_; i++) {
-        Size sz = swatch_[i].GetMinSize();
+    for(int i = 0; i < color_count_; i++) {
+        Size sz = color_[i].GetMinSize();
         if(i)
             sw_w += field_gap_;
+        if(i > 0 && separator_before_[i])
+            sw_w += DPI(7);
         sw_w += sz.cx;
         sw_h = max(sw_h, sz.cy);
     }
@@ -223,13 +290,27 @@ Size UiCompositeColor::GetMinSize() const
     return Size(w, h);
 }
 
+void UiCompositeColor::Paint(Draw& w)
+{
+    Color c = SColorShadow();
+    for(int i = 1; i < color_count_; i++) {
+        if(!separator_before_[i])
+            continue;
+        Rect sr = color_[i].GetRect();
+        int x = sr.left - field_gap_ / 2 - DPI(3);
+        w.DrawRect(x, sr.top + DPI(3), 1, max(1, sr.GetHeight() - DPI(6)), c);
+    }
+}
+
 void UiCompositeColor::Layout()
 {
     int sw_w = 0;
-    for(int i = 0; i < swatch_count_; i++) {
+    for(int i = 0; i < color_count_; i++) {
         if(i)
             sw_w += field_gap_;
-        sw_w += swatch_[i].GetMinSize().cx;
+        if(i > 0 && separator_before_[i])
+            sw_w += DPI(7);
+        sw_w += color_[i].GetMinSize().cx;
     }
 
     Rect r = GetSize();
@@ -240,9 +321,11 @@ void UiCompositeColor::Layout()
         label_.SetRect(0, 0, max(0, r.GetWidth() - (show_value_ ? value_width_ + field_gap_ : 0)), top_h);
         if(show_value_)
             value_.SetRect(max(0, r.right - value_width_), 0, value_width_, top_h);
-        for(int i = 0; i < swatch_count_; i++) {
-            Size sz = swatch_[i].GetMinSize();
-            swatch_[i].SetRect(x, sw_y, sz.cx, sz.cy);
+        for(int i = 0; i < color_count_; i++) {
+            if(i > 0 && separator_before_[i])
+                x += DPI(7);
+            Size sz = color_[i].GetMinSize();
+            color_[i].SetRect(x, sw_y, sz.cx, sz.cy);
             x += sz.cx + field_gap_;
         }
         return;
@@ -251,13 +334,23 @@ void UiCompositeColor::Layout()
     int lw = label_width_;
     int vw = show_value_ ? value_width_ : 0;
     int sw_x = lw + field_gap_;
-    int sw_y = (r.GetHeight() - swatch_[0].GetMinSize().cy) / 2;
+    int sw_y = (r.GetHeight() - color_[0].GetMinSize().cy) / 2;
     label_.SetRect(0, 0, lw, r.GetHeight());
     int x = sw_x;
-    for(int i = 0; i < swatch_count_; i++) {
-        Size sz = swatch_[i].GetMinSize();
-        swatch_[i].SetRect(x, sw_y, sz.cx, sz.cy);
-        x += sz.cx + field_gap_;
+    int max_right = show_value_ ? max(x, r.right - vw - field_gap_) : r.right;
+    int available = max(0, max_right - x);
+    int sep_extra = 0;
+    for(int i = 1; i < color_count_; i++)
+        if(separator_before_[i])
+            sep_extra += DPI(7);
+    int slot_gap_total = max(0, color_count_ - 1) * field_gap_ + sep_extra;
+    int slot_w = color_count_ > 0 ? max(DPI(20), min(DPI(44), (available - slot_gap_total) / color_count_)) : DPI(28);
+    for(int i = 0; i < color_count_; i++) {
+        if(i > 0 && separator_before_[i])
+            x += DPI(7);
+        Size sz = color_[i].GetMinSize();
+        color_[i].SetRect(x, sw_y, slot_w, sz.cy);
+        x += slot_w + field_gap_;
     }
     if(show_value_)
         value_.SetRect(max(0, r.right - vw), 0, vw, r.GetHeight());
@@ -269,10 +362,40 @@ void UiCompositeColor::SyncValueVisibility()
     value_.Show(show_value_);
 }
 
-void UiCompositeColor::SyncSwatchVisibility()
+void UiCompositeColor::SyncColorVisibility()
 {
     for(int i = 0; i < 4; i++)
-        swatch_[i].Show(i < swatch_count_);
+        color_[i].Show(i < color_count_);
+}
+
+void UiCompositeColor::OpenColorPicker(int active)
+{
+    if(active < 0 || active >= color_count_)
+        return;
+
+    TopWindow dlg;
+    dlg.Title("Color");
+    dlg.Sizeable().Zoomable();
+    UiColorPicker picker;
+    picker.SetSlotCount(color_count_);
+    picker.SetActiveSlot(active);
+    picker.SetAlphaEnabled(true);
+    for(int i = 0; i < color_count_; i++) {
+        Color c = color_[i].GetColor();
+        picker.SetSlotColor(i, IsNull(c) ? White() : c, false);
+        picker.SetSlotLabel(i, color_[i].GetSlotLabel());
+    }
+    picker.WhenAccept = [&] {
+        for(int i = 0; i < color_count_; i++)
+            color_[i].SetColor(picker.GetSlotColor(i));
+        Refresh();
+        WhenAction();
+        dlg.Break(IDOK);
+    };
+    picker.WhenCancel = [&] { dlg.Break(IDCANCEL); };
+    dlg.Add(picker.SizePos());
+    dlg.SetRect(GetWorkArea().CenterRect(Size(DPI(760), DPI(550))));
+    dlg.RunAppModal();
 }
 
 }

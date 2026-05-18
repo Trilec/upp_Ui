@@ -57,7 +57,10 @@ public:
 
         Filter() {}
         Filter(const String& label, const Vector<String>& patterns)
-            : label(label), patterns(patterns) {}
+            : label(label)
+        {
+            this->patterns <<= clone(patterns);
+        }
     };
 
     UiOsFileDialog();

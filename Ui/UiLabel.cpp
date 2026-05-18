@@ -214,9 +214,9 @@ void UiLabel::InvalidateStyleCache()
 
 UiLabel::Style& UiLabel::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -224,7 +224,7 @@ UiLabel::Style& UiLabel::StyleEdit()
 
 void UiLabel::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -239,20 +239,20 @@ void UiLabel::SyncThemeStyle()
     layout_content_ = Rect(0, 0, 0, 0);
 }
 
-UiLabel& UiLabel::SetStyle(const Style& s)
+UiLabel& UiLabel::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiLabel& UiLabel::ClearStyleOverride()
+UiLabel& UiLabel::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -261,7 +261,7 @@ UiLabel& UiLabel::ClearStyleOverride()
 
 const UiLabel::Style& UiLabel::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiLabel*>(this)->SyncThemeStyle();
@@ -1109,6 +1109,8 @@ void UiLabel::Paint(Draw& w)
     else
         UiPaintStyledBackground(w, outer, p, m, s, state, has_focus);
 
+    w.Clip(outer);
+
     Font fnt = m.use_text_font ? m.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
@@ -1346,6 +1348,8 @@ void UiLabel::Paint(Draw& w)
             }
         }
     }
+
+    w.End();
 
     if(WhenPaintForeground)
         WhenPaintForeground(w, outer, p, m, s, state, has_focus);

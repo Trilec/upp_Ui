@@ -85,7 +85,7 @@ const UiTree::Style& UiTree::StyleDefault()
         s.font = StdFont();
         s.row_height = DPI(26);
         s.indent_px = DPI(18);
-        s.glyph_size = DPI(10);
+        s.glyph_size = DPI(12);
         s.icon_size = DPI(16);
         s.content_gap = DPI(6);
         s.item_spacing = 0;
@@ -99,7 +99,7 @@ const UiTree::Style& UiTree::StyleDefault()
         s.show_icons = true;
         s.show_connector_lines = false;
         s.show_metadata_marker = true;
-        s.glyph_style = UITREEGLYPH_CHEVRON;
+        s.glyph_style = UITREEGLYPH_THICK_CHEVRON;
         s.icon_render_mode = UiIconRenderMode::MonoTint;
 
         s.ink = text_primary;
@@ -142,9 +142,9 @@ UiTree::UiTree()
 
 UiTree::Style& UiTree::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     theme_revision_ = 0;
     return style_;
@@ -152,7 +152,7 @@ UiTree::Style& UiTree::StyleEdit()
 
 const UiTree::Style& UiTree::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
     const_cast<UiTree*>(this)->SyncThemeStyle();
     return themed_style_;
@@ -160,7 +160,7 @@ const UiTree::Style& UiTree::GetEffectiveStyle() const
 
 void UiTree::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
     uint64 revision = UiTheme::GetRevision();
     if(theme_revision_ == revision)
@@ -169,19 +169,19 @@ void UiTree::SyncThemeStyle()
     theme_revision_ = revision;
 }
 
-UiTree& UiTree::SetStyle(const Style& s)
+UiTree& UiTree::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiTree& UiTree::ClearStyleOverride()
+UiTree& UiTree::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     theme_revision_ = 0;
     OnStyleChanged();
@@ -246,6 +246,7 @@ UiTree& UiTree::ClearSelection()
     if(selected_ids_.IsEmpty())
         return *this;
     selected_ids_.Clear();
+    cursor_id_ = -1;
     anchor_id_ = -1;
     NotifySelectionChange();
     return *this;
@@ -253,27 +254,33 @@ UiTree& UiTree::ClearSelection()
 
 UiTree& UiTree::SelectNode(UiTreeNodeRef node, bool additive)
 {
-    if(!model_ || !model_->IsValid(node))
+    if(!IsSelectableNode(node))
         return *this;
     if(selection_mode_ != UITREESEL_MULTI || !additive)
         SelectSingle(node);
     else
         ToggleSelection(node);
-    SetCursor(node);
     return *this;
 }
 UiTree& UiTree::SelectAllVisible()
 {
     if(selection_mode_ != UITREESEL_MULTI) {
-        if(visible_rows_.IsEmpty())
-            return ClearSelection();
-        SelectSingle(UiTreeNodeRef{visible_rows_[0].id});
+        for(int i = 0; i < visible_rows_.GetCount(); i++) {
+            UiTreeNodeRef node{visible_rows_[i].id};
+            if(IsSelectableNode(node)) {
+                SelectSingle(node);
+                return *this;
+            }
+        }
+        ClearSelection();
         return *this;
     }
     selected_ids_.Clear();
     for(int i = 0; i < visible_rows_.GetCount(); i++)
-        selected_ids_.FindAdd(visible_rows_[i].id);
-    anchor_id_ = cursor_id_ >= 0 ? cursor_id_ : (visible_rows_.IsEmpty() ? -1 : visible_rows_[0].id);
+        if(IsSelectableNode(UiTreeNodeRef{visible_rows_[i].id}))
+            selected_ids_.FindAdd(visible_rows_[i].id);
+    cursor_id_ = selected_ids_.IsEmpty() ? -1 : selected_ids_[0];
+    anchor_id_ = cursor_id_;
     NotifySelectionChange();
     return *this;
 }
@@ -331,7 +338,7 @@ void UiTree::SetData(const Value& v)
     }
 
     UiTreeNodeRef node = ResolveSelectionNode(v);
-    if(model_ && model_->IsValid(node))
+    if(IsSelectableNode(node))
         SelectSingle(node);
     else
         ClearSelection();
@@ -347,7 +354,7 @@ Value UiTree::GetData() const
         return values;
     }
 
-    return (model_ && model_->IsValid(UiTreeNodeRef{cursor_id_})) ? GetSelectionToken(UiTreeNodeRef{cursor_id_}) : Value();
+    return selected_ids_.GetCount() > 0 ? GetSelectionToken(UiTreeNodeRef{selected_ids_[0]}) : Value();
 }
 bool UiTree::CanMoveSelection(UiTreeNodeRef new_parent, int pos) const
 {
@@ -835,17 +842,15 @@ void UiTree::PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, 
         return;
     }
 
-    int x0 = r.left;
-    int y0 = r.top;
-    int x1 = r.right - 1;
-    int y1 = r.bottom - 1;
-    int cx = (x0 + x1) / 2;
-    int cy = (y0 + y1) / 2;
-    int t = style.glyph_style == UITREEGLYPH_THICK_CHEVRON ? 2 : 1;
+    int cx = (r.left + r.right - 1) / 2;
+    int cy = (r.top + r.bottom - 1) / 2;
 
     if(style.glyph_style == UITREEGLYPH_PLUSMINUS) {
-        Rect box = r.Deflated(DPI(1), DPI(1));
-        w.DrawRect(box, White());
+        Rect box = r.Deflated(0, 0);
+        Color box_face = selected ? style.selected_face : hot ? style.hot_face : SColorPaper();
+        if(style.palette.face[ST_NORMAL].IsSolid() && !selected && !hot)
+            box_face = style.palette.face[ST_NORMAL].color;
+        w.DrawRect(box, box_face);
         w.DrawRect(box.left, box.top, box.GetWidth(), 1, color);
         w.DrawRect(box.left, box.bottom - 1, box.GetWidth(), 1, color);
         w.DrawRect(box.left, box.top, 1, box.GetHeight(), color);
@@ -856,14 +861,27 @@ void UiTree::PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, 
         return;
     }
 
+    ImageBuffer ib(r.GetSize());
+    BufferPainter p(ib, MODE_ANTIALIASED);
+    p.Clear(RGBAZero());
+
+    double w0 = max(1, r.GetWidth());
+    double h0 = max(1, r.GetHeight());
+    double stroke = style.glyph_style == UITREEGLYPH_THICK_CHEVRON ? 2.25 : 1.65;
+    p.Begin();
     if(expanded) {
-        w.DrawLine(x0 + 1, cy - 1, cx, y1 - 1, t, color);
-        w.DrawLine(cx, y1 - 1, x1 - 1, cy - 1, t, color);
+        p.Move(w0 * 0.22, h0 * 0.36);
+        p.Line(w0 * 0.50, h0 * 0.66);
+        p.Line(w0 * 0.78, h0 * 0.36);
     }
     else {
-        w.DrawLine(x0 + 1, y0 + 1, x1 - 1, cy, t, color);
-        w.DrawLine(x1 - 1, cy, x0 + 1, y1 - 1, t, color);
+        p.Move(w0 * 0.36, h0 * 0.22);
+        p.Line(w0 * 0.66, h0 * 0.50);
+        p.Line(w0 * 0.36, h0 * 0.78);
     }
+    p.Stroke(stroke, color);
+    p.End();
+    w.DrawImage(r.left, r.top, ib);
 }
 
 void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
@@ -914,10 +932,26 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
     if(style.show_connector_lines && !IsNull(style.line_color)) {
         int gx = glyph.left + glyph.GetWidth() / 2;
         int gy = glyph.top + glyph.GetHeight() / 2;
-        if(vr.depth > 0)
-            w.DrawLine(row.left + style.h_padding + (vr.depth - 1) * style.indent_px + style.indent_px / 2, gy, gx, gy, 1, style.line_color);
+        auto branch_x = [&](int depth) {
+            Rect gr = GetGlyphRect(row, depth);
+            return gr.left + gr.GetWidth() / 2;
+        };
+        auto has_next_below_depth = [&](int depth) {
+            return index + 1 < visible_rows_.GetCount() && visible_rows_[index + 1].depth > depth;
+        };
+        for(int depth = 0; depth < vr.depth; depth++)
+            if(has_next_below_depth(depth)) {
+                int x = branch_x(depth);
+                w.DrawLine(x, row.top, x, row.bottom, 1, style.line_color);
+            }
+        if(vr.depth > 0) {
+            int x0 = branch_x(vr.depth - 1);
+            int x1 = vr.has_children ? glyph.left - DPI(1) : gx;
+            if(x1 > x0)
+                w.DrawLine(x0, gy, x1, gy, 1, style.line_color);
+        }
         if(vr.has_children && vr.expanded)
-            w.DrawLine(gx, gy, gx, row.bottom - style.v_padding, 1, style.line_color);
+            w.DrawLine(gx, glyph.bottom, gx, row.bottom, 1, style.line_color);
     }
 
     if(vr.has_children)
@@ -986,7 +1020,10 @@ void UiTree::MoveCursorBy(int delta)
         row = 0;
     else
         row = clamp(row + delta, 0, visible_rows_.GetCount() - 1);
-    SetCursor(UiTreeNodeRef{visible_rows_[row].id});
+    while(row >= 0 && row < visible_rows_.GetCount() && !IsSelectableNode(UiTreeNodeRef{visible_rows_[row].id}))
+        row += delta >= 0 ? 1 : -1;
+    if(row >= 0 && row < visible_rows_.GetCount())
+        SetCursor(UiTreeNodeRef{visible_rows_[row].id});
 }
 
 void UiTree::MoveCursorToEdge(bool end)
@@ -995,7 +1032,11 @@ void UiTree::MoveCursorToEdge(bool end)
         SetCursor(UiTreeNodeRef{-1});
         return;
     }
-    SetCursor(UiTreeNodeRef{visible_rows_[end ? visible_rows_.GetCount() - 1 : 0].id});
+    int row = end ? visible_rows_.GetCount() - 1 : 0;
+    while(row >= 0 && row < visible_rows_.GetCount() && !IsSelectableNode(UiTreeNodeRef{visible_rows_[row].id}))
+        row += end ? -1 : 1;
+    if(row >= 0 && row < visible_rows_.GetCount())
+        SetCursor(UiTreeNodeRef{visible_rows_[row].id});
 }
 
 bool UiTree::CommitRenameIfNeeded(Point p)
@@ -1177,6 +1218,11 @@ void UiTree::LeftDown(Point p, dword flags)
         bool toggle_hit = vr.has_children && GetToggleHitRect(rr, vr.depth, vr.has_children).Contains(p);
         if(toggle_hit)
             Toggle(node);
+
+        if(!IsSelectableNode(node)) {
+            Refresh();
+            return;
+        }
 
         bool shift = (flags & K_SHIFT) != 0;
         bool ctrl = (flags & K_CTRL) != 0;
@@ -1446,31 +1492,35 @@ bool UiTree::Key(dword key, int)
 void UiTree::SelectSingle(UiTreeNodeRef node)
 {
     selected_ids_.Clear();
-    if(model_ && model_->IsValid(node)) {
+    if(IsSelectableNode(node)) {
+        cursor_id_ = node.id;
         selected_ids_.FindAdd(node.id);
         anchor_id_ = node.id;
     }
-    else
+    else {
+        cursor_id_ = -1;
         anchor_id_ = -1;
+    }
     NotifySelectionChange();
 }
 
 void UiTree::ToggleSelection(UiTreeNodeRef node)
 {
-    if(!model_ || !model_->IsValid(node))
+    if(!IsSelectableNode(node))
         return;
     int q = selected_ids_.Find(node.id);
     if(q >= 0)
         selected_ids_.Remove(q);
     else
         selected_ids_.FindAdd(node.id);
+    cursor_id_ = node.id;
     anchor_id_ = node.id;
     NotifySelectionChange();
 }
 
 void UiTree::SelectRangeTo(UiTreeNodeRef node, bool additive)
 {
-    if(!model_ || !model_->IsValid(node))
+    if(!IsSelectableNode(node))
         return;
     if(anchor_id_ < 0)
         anchor_id_ = cursor_id_ >= 0 ? cursor_id_ : node.id;
@@ -1483,8 +1533,18 @@ void UiTree::SelectRangeTo(UiTreeNodeRef node, bool additive)
     if(!additive)
         selected_ids_.Clear();
     for(int i = min(a, b); i <= max(a, b); i++)
-        selected_ids_.FindAdd(visible_rows_[i].id);
+        if(IsSelectableNode(UiTreeNodeRef{visible_rows_[i].id}))
+            selected_ids_.FindAdd(visible_rows_[i].id);
+    cursor_id_ = node.id;
     NotifySelectionChange();
+}
+
+bool UiTree::IsSelectableNode(UiTreeNodeRef node) const
+{
+    if(!model_ || !model_->IsValid(node))
+        return false;
+    const UiModelItem& item = model_->Get(node);
+    return item.enabled && !item.group_header;
 }
 
 
@@ -1510,7 +1570,7 @@ UiTreeNodeRef UiTree::ResolveSelectionNode(const Value& token) const
 
         UiTreeNodeRef node{id};
         const UiModelItem& item = model_->Get(node);
-        if(!IsNull(item.data) && item.data == token)
+        if(!IsNull(item.data) && item.data == token && IsSelectableNode(node))
             return node;
 
         for(int i = model_->GetChildCount(node) - 1; i >= 0; i--)
@@ -1519,11 +1579,11 @@ UiTreeNodeRef UiTree::ResolveSelectionNode(const Value& token) const
 
     if(token.Is<int>()) {
         UiTreeNodeRef node{(int)token};
-        return model_->IsValid(node) ? node : UiTreeNodeRef{-1};
+        return IsSelectableNode(node) ? node : UiTreeNodeRef{-1};
     }
     if(token.Is<int64>()) {
         UiTreeNodeRef node{(int)(int64)token};
-        return model_->IsValid(node) ? node : UiTreeNodeRef{-1};
+        return IsSelectableNode(node) ? node : UiTreeNodeRef{-1};
     }
     return UiTreeNodeRef{-1};
 }

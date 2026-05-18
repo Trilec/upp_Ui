@@ -579,7 +579,7 @@ public:
 
     static const Style& StyleDefault();
 
-    UiDoc& SetStyle(const Style& s);
+    UiDoc& SetCustomStyle(const Style& s);
     const Style& GetStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return style_.palette; }

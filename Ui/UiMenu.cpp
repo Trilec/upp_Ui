@@ -303,9 +303,9 @@ UiMenu::UiMenu()
 
 UiMenu::Style& UiMenu::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     theme_revision_ = 0;
     return style_;
@@ -313,7 +313,7 @@ UiMenu::Style& UiMenu::StyleEdit()
 
 const UiMenu::Style& UiMenu::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
     const_cast<UiMenu*>(this)->SyncThemeStyle();
     return themed_style_;
@@ -321,7 +321,7 @@ const UiMenu::Style& UiMenu::GetEffectiveStyle() const
 
 void UiMenu::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
     uint64 rev = UiTheme::GetRevision();
     if(theme_revision_ == rev)
@@ -336,17 +336,17 @@ void UiMenu::OnStyleChanged()
     Refresh();
 }
 
-UiMenu& UiMenu::SetStyle(const Style& s)
+UiMenu& UiMenu::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiMenu& UiMenu::ClearStyleOverride()
+UiMenu& UiMenu::ClearCustomStyle()
 {
-    has_style_override_ = false;
+    has_custom_style_ = false;
     theme_revision_ = 0;
     OnStyleChanged();
     return *this;

@@ -14,9 +14,9 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
     ONCELOCK {
         const Color face_normal    = Color(255, 255, 255);
         const Color face_pressed   = Color(248, 250, 252);
-        const Color frame_normal   = Color(209, 213, 219);
-        const Color frame_hot      = Color(148, 163, 184);
-        const Color frame_pressed  = Color(100, 116, 139);
+        const Color frame_normal   = Color(215, 219, 226);
+        const Color frame_hot      = Color(142, 151, 165);
+        const Color frame_pressed  = Color(112, 122, 138);
         const Color frame_disabled = Color(226, 232, 240);
         const Color text_primary   = Color(17, 24, 39);
         const Color text_muted     = Color(148, 163, 184);
@@ -36,7 +36,7 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
         s.palette.ink[ST_PRESSED]  = text_primary;
         s.palette.ink[ST_DISABLED] = text_muted;
 
-        s.metrics.radius = 0;
+        s.metrics.radius = DPI(8);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
@@ -44,12 +44,12 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
         s.metrics.high_contrast = false;
         s.metrics.use_text_font = false;
         s.metrics.text_font = StdFont();
-        s.metrics.content_margin = Rect(DPI(10), DPI(7), DPI(10), DPI(7));
+        s.metrics.content_margin = Rect(DPI(12), DPI(8), DPI(12), DPI(8));
         s.metrics.shadow = StyledShadow();
         s.metrics.highlight = StyledHighlight();
 
         s.skin = StyledSkin();
-        s.font = StdFont();
+        s.font = SansSerifZ(13);
         s.text_align = UiAlign::LEFT;
 
         s.caret_color = text_primary;
@@ -65,6 +65,10 @@ const UiBaseEdit::Style& UiBaseEdit::StyleDefault()
         s.show_spaces = false;
         s.show_line_endings = false;
         s.show_readonly_bg = true;
+        s.underline_enabled = false;
+        s.underline_width = DPI(1);
+        for(int i = 0; i < 4; i++)
+            s.underline[i] = frame_normal;
     }
     return s;
 }
@@ -78,9 +82,9 @@ void UiBaseEdit::InvalidateStyleCache()
 
 UiBaseEdit::Style& UiBaseEdit::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -88,7 +92,7 @@ UiBaseEdit::Style& UiBaseEdit::StyleEdit()
 
 void UiBaseEdit::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -115,27 +119,34 @@ void UiBaseEdit::SyncThemeStyle()
 
 const UiBaseEdit::Style& UiBaseEdit::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiBaseEdit*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-UiBaseEdit& UiBaseEdit::SetStyle(const Style& s)
+static bool UiBaseEditNeedsTransparentBackpaint(const UiBaseEdit::Style& s)
+{
+    return !s.metrics.face_enabled
+        && !(s.skin.enabled && !IsNull(s.skin.base))
+        && !s.metrics.shadow.enabled;
+}
+
+UiBaseEdit& UiBaseEdit::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiBaseEdit& UiBaseEdit::ClearStyleOverride()
+UiBaseEdit& UiBaseEdit::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -144,7 +155,10 @@ UiBaseEdit& UiBaseEdit::ClearStyleOverride()
 
 void UiBaseEdit::OnStyleChanged()
 {
-    BackPaint();
+    if(UiBaseEditNeedsTransparentBackpaint(GetEffectiveStyle()))
+        Transparent();
+    else
+        BackPaint();
     InvalidateTextMetricsCache();
     text_rect_ = Rect(0, 0, 0, 0);
     SyncFont();
@@ -182,6 +196,8 @@ UiBaseEdit::UiBaseEdit()
     };
 
     SyncThemeStyle();
+    if(UiBaseEditNeedsTransparentBackpaint(GetEffectiveStyle()))
+        Transparent();
     SyncFont();
     Clear();
 }
@@ -234,6 +250,7 @@ void UiBaseEdit::SetText(const WString& s)
     undo_.Clear();
     redo_.Clear();
     SetCursor(0);
+    Refresh();
 }
 
 WString UiBaseEdit::GetText() const
@@ -1680,9 +1697,27 @@ void UiBaseEdit::Paint(Draw& w)
     else
         UiPaintStyledBackground(w, outer, paint_palette, m, skin, st, has_focus);
 
+    if(style.underline_enabled) {
+        Rect cp = UiNonNegativeThickness(style.metrics.content_margin);
+        int th = max(1, style.underline_width);
+        Color c = style.underline[st];
+        if(!IsNull(c) && outer.GetWidth() > cp.left + cp.right) {
+            int left = outer.left + cp.left;
+            int right = outer.right - cp.right;
+            w.DrawRect(left, outer.bottom - th, max(0, right - left), th, c);
+        }
+    }
+
     Rect text_r = GetTextRect();
     if(text_r.IsEmpty())
         return;
+
+    if(!m.face_enabled && !(skin.enabled && !IsNull(skin.base))) {
+        Color paper = SColorPaper();
+        if(IsReadOnly() && style.show_readonly_bg)
+            paper = SColorFace();
+        w.DrawRect(text_r, paper);
+    }
 
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();
@@ -2030,6 +2065,10 @@ bool UiBaseEdit::Key(dword key, int count)
     NextUndo();
     
     switch(key & ~K_SHIFT) {
+    case K_INSERT:
+        SetOverwriteMode(!IsOverwriteMode());
+        Refresh();
+        return true;
     case K_LEFT:
         PlaceCaret(cursor_ - 1, sel);
         return true;

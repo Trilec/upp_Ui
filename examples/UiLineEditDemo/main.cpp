@@ -1,3 +1,18 @@
+/*
+    UiLineEditDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -70,23 +85,7 @@ public:
 protected:
     virtual void ApplyDemoTheme() override
     {
-        UiLabel::Style body = MakeBodyLabelStyle(Palette());
-        UiLabel::Style value = MakeValueLabelStyle(Palette());
-        UiBaseEdit::Style edit = MakeEditStyle(Palette());
-        UiDropdown::Style dd = MakeDropdownStyle(Palette());
-
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_text_label_.SetStyle(body); state_text_value_.SetStyle(value);
-        state_align_label_.SetStyle(body); state_align_value_.SetStyle(value);
-        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
-        text_label_.SetStyle(body); placeholder_label_.SetStyle(body); align_label_.SetStyle(body);
-        text_edit_.SetStyle(edit); placeholder_edit_.SetStyle(edit); align_drop_.SetStyle(dd);
-        radius_row_.SetLabelStyle(body).SetValueStyle(value);
-        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
-        margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
-        margin_y_row_.SetLabelStyle(body).SetValueStyle(value);
-        enabled_row_.SetLabelStyle(body);
-        readonly_row_.SetLabelStyle(body);
+        RefreshFromConfig();
     }
 
     virtual void LayoutPreviewContent() override
@@ -125,7 +124,7 @@ private:
         style.metrics.frame_width = cfg_.frame_width;
         style.metrics.content_margin = Rect(cfg_.margin_x, cfg_.margin_y, cfg_.margin_x, cfg_.margin_y);
 
-        edit_.SetStyle(style);
+        edit_.SetCustomStyle(style);
         edit_.SetData(cfg_.text);
         edit_.SetPlaceholder(cfg_.placeholder);
         edit_.SetTextAlign(cfg_.align);
@@ -158,7 +157,7 @@ private:
         code << "style.metrics.radius = " << cfg_.radius << ";\n";
         code << "style.metrics.frame_width = " << cfg_.frame_width << ";\n";
         code << "style.metrics.content_margin = Rect(" << cfg_.margin_x << ", " << cfg_.margin_y << ", " << cfg_.margin_x << ", " << cfg_.margin_y << ");\n";
-        code << "edit.SetStyle(style)\n";
+        code << "edit.SetCustomStyle(style)\n";
         code << "    .SetData(" << QuoteCpp(cfg_.text) << ")\n";
         code << "    .SetPlaceholder(" << QuoteCpp(cfg_.placeholder) << ")\n";
         code << "    .SetTextAlign(UiAlign::" << (cfg_.align == UiAlign::CENTER ? "CENTER" : cfg_.align == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ")";

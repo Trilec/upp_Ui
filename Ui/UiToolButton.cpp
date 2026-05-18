@@ -7,11 +7,11 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 {
     static UiToolButton::Style s;
     ONCELOCK {
-        const Color text_primary   = Color(48, 57, 71);
-        const Color text_muted     = Color(107, 114, 128);
-        const Color face_hot       = Color(242, 244, 247);
-        const Color face_pressed   = Color(232, 236, 241);
-        const Color accent         = Color(112, 122, 138);
+        const Color text_primary   = Color(17, 24, 39);
+        const Color text_muted     = Color(156, 163, 175);
+        const Color face_hot       = Color(247, 248, 250);
+        const Color face_pressed   = Color(239, 243, 247);
+        const Color accent         = Color(102, 105, 114);
 
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::None();
@@ -34,11 +34,11 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
-        s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        s.metrics.radius = DPI(4);
+        s.metrics.content_margin = Rect(0, 0, 0, 0);
+        s.metrics.radius = DPI(8);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = false;
-        s.metrics.face_enabled = true;
+        s.metrics.face_enabled = false;
         s.metrics.dashed = false;
         s.metrics.high_contrast = false;
         s.metrics.shadow = StyledShadow();
@@ -50,7 +50,7 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
         s.metrics.focus_margin = DPI(2);
         s.overpaint = 0;
         s.font = StdFont();
-        s.transparent = false;
+        s.transparent = true;
 
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
@@ -76,7 +76,8 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 
 UiToolButton::UiToolButton()
 {
-    user_min_size_ = Size(DPI(28), DPI(28));
+    user_min_size_ = Size(DPI(12), DPI(12));
+    ClickFocus(false);
     SyncThemeStyle();
     RebuildTextLinesFromStyle(GetEffectiveStyle());
     minsize_dirty_ = true;

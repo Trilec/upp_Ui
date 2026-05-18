@@ -8,19 +8,10 @@
     Purpose
     - Public icon catalog and thin ICON_* wrappers over the shared IML-backed
       Ui icon image class.
-
-    Intent
-    - Keep a single source of truth for shared icon identity while preserving
-      the existing named lookup and demo catalog surfaces.
-
-    Changelog
-    - 2026-04: migrated the shared icon pack to UiIconsImg (.iml-backed) and
-      removed inline DATA_* payloads from the main path.
 */
 
 #include <CtrlCore/CtrlCore.h>
 #include <Ui/UiDataModels.h>
-
 namespace Upp {
 
 #define IMAGECLASS UiIconsImg
@@ -33,7 +24,7 @@ struct UiIconCatalogEntry : Moveable<UiIconCatalogEntry> {
     String          name;
     UiIconFactoryFn factory = nullptr;
 
-    UiIconCatalogEntry() = default;
+    UiIconCatalogEntry() {}
     UiIconCatalogEntry(const String& n, UiIconFactoryFn f) : name(n), factory(f) {}
 };
 
@@ -342,11 +333,6 @@ inline Image ICON_EDITOR_MODE_OFF_ON_48()
     return UiIconsImg::ICON_EDITOR_MODE_OFF_ON_48();
 }
 
-inline Image ICON_BRAND_UPPLOGO2_48()
-{
-    return UiIconsImg::ICON_BRAND_UPPLOGO2_48();
-}
-
 inline Image ICON_EDITOR_NOTES_48()
 {
     return UiIconsImg::ICON_EDITOR_NOTES_48();
@@ -432,11 +418,9 @@ inline Image ICON_DESIGN_TRIP_ORIGIN_48()
     return UiIconsImg::ICON_DESIGN_TRIP_ORIGIN_48();
 }
 
-// Source: E:\apps\github\upp_Ui\designs\newlog0_v5.png
-// Size: 48x48
-inline Image ICON_BRAND_NEWLOG0_V5_48()
+inline Image ICON_BRAND_NEWLOGO_V5_48()
 {
-    return UiIconsImg::ICON_BRAND_NEWLOG0_V5_48();
+    return UiIconsImg::ICON_BRAND_NEWLOGO_V5_48();
 }
 
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
@@ -505,8 +489,6 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_EDITOR_FORMAT_STRIKETHROUGH_48", &ICON_EDITOR_FORMAT_STRIKETHROUGH_48));
         out.Add(UiIconCatalogEntry("ICON_EDITOR_MARGIN_48", &ICON_EDITOR_MARGIN_48));
         out.Add(UiIconCatalogEntry("ICON_EDITOR_MODE_OFF_ON_48", &ICON_EDITOR_MODE_OFF_ON_48));
-        out.Add(UiIconCatalogEntry("ICON_BRAND_UPPLOGO2_48", &ICON_BRAND_UPPLOGO2_48));
-        out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOG0_V5_48", &ICON_BRAND_NEWLOG0_V5_48));
         out.Add(UiIconCatalogEntry("ICON_EDITOR_NOTES_48", &ICON_EDITOR_NOTES_48));
         out.Add(UiIconCatalogEntry("ICON_ACTION_SEARCH_48", &ICON_ACTION_SEARCH_48));
         out.Add(UiIconCatalogEntry("ICON_EDITOR_SERIF_48", &ICON_EDITOR_SERIF_48));
@@ -524,6 +506,7 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_CHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_CHECKED_48));
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TRIP_ORIGIN_48", &ICON_DESIGN_TRIP_ORIGIN_48));
+        out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
     }();
     return catalog;

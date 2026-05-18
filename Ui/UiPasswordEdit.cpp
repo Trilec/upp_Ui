@@ -37,7 +37,7 @@ UiPasswordEdit::UiPasswordEdit()
     // Transparent background so the edit's face shows through.
     bs.transparent = true;
 
-    eye_button_.SetStyle(bs);
+    eye_button_.SetCustomStyle(bs);
     eye_button_.SetText(String());   // icon-only
     eye_button_.SetIcon(Image());     // start with null icon
     eye_button_.ClickFocus(false);    // don't steal focus from the edit
@@ -144,9 +144,9 @@ UiPasswordEdit& UiPasswordEdit::SetVisibilityIcons(const Image& visible,
     return *this;
 }
 
-UiPasswordEdit& UiPasswordEdit::SetStyle(const UiBaseEdit::Style& s)
+UiPasswordEdit& UiPasswordEdit::SetCustomStyle(const UiBaseEdit::Style& s)
 {
-    UiLineEdit::SetStyle(s);
+    UiLineEdit::SetCustomStyle(s);
     SyncEyeButtonIconColor_();
     return *this;
 }
@@ -159,7 +159,7 @@ void UiPasswordEdit::SyncEyeButtonIconColor_()
         bs.palette.icon[i] = c;
         bs.palette.ink[i] = c;
     }
-    eye_button_.SetStyle(bs);
+    eye_button_.SetCustomStyle(bs);
 }
 
 // Built-in eye icons (48px) ??? wrappers over UiIcons helpers.

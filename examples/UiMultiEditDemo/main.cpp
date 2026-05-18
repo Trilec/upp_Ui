@@ -1,3 +1,18 @@
+/*
+    UiMultiEditDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -146,9 +161,7 @@ public:
         InitColorRow(selection_ink_row_, cfg_.selection_ink);
         InitColorRow(caret_row_, cfg_.caret);
 
-        left_icon_btn_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         left_icon_btn_.SetIcon(ICON_CONTENT_CONTENT_COPY_48());
-        clear_btn_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Icon));
         clear_btn_.SetIcon(ICON_DESIGN_DELETE_48());
         clear_btn_.WhenAction = [=] { editor_.Clear(); SyncState(); };
 
@@ -173,13 +186,13 @@ public:
         show_readonly_bg_row_.Toggle().WhenAction = [=] { cfg_.show_readonly_bg = show_readonly_bg_row_.Toggle().IsOn(); RefreshFromConfig(); };
         left_icon_row_.Toggle().WhenAction = [=] { cfg_.left_icon = left_icon_row_.Toggle().IsOn(); RefreshFromConfig(); };
         right_action_row_.Toggle().WhenAction = [=] { cfg_.right_action = right_action_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        face_row_.WhenAction = [=] { cfg_.face = face_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        frame_row_.WhenAction = [=] { cfg_.frame = frame_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        text_row_.WhenAction = [=] { cfg_.text = text_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        placeholder_ink_row_.WhenAction = [=] { cfg_.placeholder_ink = placeholder_ink_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        selection_row_.WhenAction = [=] { cfg_.selection = selection_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        selection_ink_row_.WhenAction = [=] { cfg_.selection_ink = selection_ink_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        caret_row_.WhenAction = [=] { cfg_.caret = caret_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        face_row_.WhenAction = [=] { cfg_.face = face_row_.GetColor(0); RefreshFromConfig(); };
+        frame_row_.WhenAction = [=] { cfg_.frame = frame_row_.GetColor(0); RefreshFromConfig(); };
+        text_row_.WhenAction = [=] { cfg_.text = text_row_.GetColor(0); RefreshFromConfig(); };
+        placeholder_ink_row_.WhenAction = [=] { cfg_.placeholder_ink = placeholder_ink_row_.GetColor(0); RefreshFromConfig(); };
+        selection_row_.WhenAction = [=] { cfg_.selection = selection_row_.GetColor(0); RefreshFromConfig(); };
+        selection_ink_row_.WhenAction = [=] { cfg_.selection_ink = selection_ink_row_.GetColor(0); RefreshFromConfig(); };
+        caret_row_.WhenAction = [=] { cfg_.caret = caret_row_.GetColor(0); RefreshFromConfig(); };
         editor_.WhenAction = [=] { SyncState(); };
 
         FinishInit();
@@ -189,41 +202,7 @@ public:
 protected:
     virtual void ApplyDemoTheme() override
     {
-        UiLabel::Style body = MakeBodyLabelStyle(Palette());
-        UiLabel::Style value = MakeValueLabelStyle(Palette());
-        UiBaseEdit::Style edit = MakeEditStyle(Palette());
-        UiDropdown::Style dd = MakeDropdownStyle(Palette());
-
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_preset_label_.SetStyle(body); state_preset_value_.SetStyle(value);
-        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
-        state_length_label_.SetStyle(body); state_length_value_.SetStyle(value);
-        preset_label_.SetStyle(body); placeholder_label_.SetStyle(body); align_label_.SetStyle(body);
-        preset_drop_.SetStyle(dd); align_drop_.SetStyle(dd); placeholder_edit_.SetStyle(edit);
-        radius_row_.SetLabelStyle(body).SetValueStyle(value);
-        frame_width_row_.SetLabelStyle(body).SetValueStyle(value);
-        margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
-        margin_y_row_.SetLabelStyle(body).SetValueStyle(value);
-        caret_width_row_.SetLabelStyle(body).SetValueStyle(value);
-        font_px_row_.SetLabelStyle(body).SetValueStyle(value);
-        tab_size_row_.SetLabelStyle(body).SetValueStyle(value);
-        read_only_row_.SetLabelStyle(body);
-        accepts_tabs_row_.SetLabelStyle(body);
-        accepts_drop_row_.SetLabelStyle(body);
-        overwrite_row_.SetLabelStyle(body);
-        show_tabs_row_.SetLabelStyle(body);
-        show_spaces_row_.SetLabelStyle(body);
-        show_line_endings_row_.SetLabelStyle(body);
-        show_readonly_bg_row_.SetLabelStyle(body);
-        left_icon_row_.SetLabelStyle(body);
-        right_action_row_.SetLabelStyle(body);
-        face_row_.SetLabelStyle(body);
-        frame_row_.SetLabelStyle(body);
-        text_row_.SetLabelStyle(body);
-        placeholder_ink_row_.SetLabelStyle(body);
-        selection_row_.SetLabelStyle(body);
-        selection_ink_row_.SetLabelStyle(body);
-        caret_row_.SetLabelStyle(body);
+        RefreshFromConfig();
     }
 
     virtual void LayoutPreviewContent() override
@@ -237,13 +216,13 @@ private:
 
     void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
     {
-        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
 
     void InitColorRow(UiCompositeColor& row, Color c)
     {
-        row.SetSwatchColor(0, c);
+        row.SetColor(0, c);
     }
 
     void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
@@ -276,13 +255,13 @@ private:
         show_readonly_bg_row_.Toggle().SetOn(cfg_.show_readonly_bg);
         left_icon_row_.Toggle().SetOn(cfg_.left_icon);
         right_action_row_.Toggle().SetOn(cfg_.right_action);
-        face_row_.SetSwatchColor(0, cfg_.face);
-        frame_row_.SetSwatchColor(0, cfg_.frame);
-        text_row_.SetSwatchColor(0, cfg_.text);
-        placeholder_ink_row_.SetSwatchColor(0, cfg_.placeholder_ink);
-        selection_row_.SetSwatchColor(0, cfg_.selection);
-        selection_ink_row_.SetSwatchColor(0, cfg_.selection_ink);
-        caret_row_.SetSwatchColor(0, cfg_.caret);
+        face_row_.SetColor(0, cfg_.face);
+        frame_row_.SetColor(0, cfg_.frame);
+        text_row_.SetColor(0, cfg_.text);
+        placeholder_ink_row_.SetColor(0, cfg_.placeholder_ink);
+        selection_row_.SetColor(0, cfg_.selection);
+        selection_ink_row_.SetColor(0, cfg_.selection_ink);
+        caret_row_.SetColor(0, cfg_.caret);
 
         UiBaseEdit::Style s = MakeEditStyle(Palette());
         for(int i = 0; i < 4; i++) {
@@ -307,7 +286,7 @@ private:
         s.show_spaces = cfg_.show_spaces;
         s.show_line_endings = cfg_.show_line_endings;
         s.show_readonly_bg = cfg_.show_readonly_bg;
-        editor_.SetStyle(s);
+        editor_.SetCustomStyle(s);
         editor_.SetPlaceholder(cfg_.placeholder);
         editor_.SetAcceptsTabs(cfg_.accepts_tabs);
         editor_.SetAcceptsDrop(cfg_.accepts_drop);
@@ -339,7 +318,7 @@ private:
     {
         String code;
         code << "UiMultiEdit edit;\n";
-        code << "edit.SetStyle(UiTheme::ResolveEdit());\n";
+        code << "edit.SetCustomStyle(UiTheme::ResolveEdit());\n";
         code << "edit.SetPlaceholder(" << QuoteCpp(cfg_.placeholder) << ");\n";
         code << "edit.SetTextAlign(UiAlign::" << (cfg_.text_align == UiAlign::CENTER ? "CENTER" : cfg_.text_align == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";
         code << "edit.SetText(" << QuoteCpp(MultiPresetText(cfg_.preset)) << ");\n";

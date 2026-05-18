@@ -5,6 +5,7 @@
 #include <Ui/UiGridLayout.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiLabel.h>
+#include <Ui/UiPanel.h>
 
 namespace Upp {
 
@@ -47,6 +48,8 @@ static int MeasureAccordionChildHeight(Ctrl* q, int width)
         return max(label->GetMinSize().cy, label->GetContentSize().cy);
     if(UiScrollPanel* sp = dynamic_cast<UiScrollPanel*>(q))
         return max(sp->GetMinSize().cy, sp->GetContentSize().cy);
+    if(UiPanel* panel = dynamic_cast<UiPanel*>(q))
+        return max(panel->GetMinSize().cy, panel->GetContentSize().cy);
 
     return q->GetMinSize().cy;
 }
@@ -161,18 +164,27 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
         s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
 
-        s.metrics.radius = DPI(12);
+        s.metrics.radius = DPI(8);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
         s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
 
         s.header_style = UiTitleCard::StyleDefault();
-        s.header_style.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
-        s.header_style.hover_enabled = true;
+        s.header_style.metrics.radius = DPI(8);
+        s.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.header_style.hover_enabled = false;
         s.header_style.metrics.focus_enabled = false;
-        s.header_style.show_rule = true;
+        s.header_style.title_line = false;
+        s.header_style.card_line = true;
+        s.header_style.card_line_color = Color(215, 219, 226);
         s.header_style.media_tint_mono = true;
+        s.header_style.title_font = SansSerifZ(11).Bold();
+        s.header_style.subtitle_font = SansSerifZ(8);
+        for(int i = 0; i < 4; i++) {
+            s.header_style.palette.ink[i] = Color(0, 120, 212);
+            s.header_style.palette.icon[i] = Color(0, 120, 212);
+        }
 
         s.body_style = UiPanel::StyleDefault();
         s.body_style.transparent = true;
@@ -197,7 +209,7 @@ const UiAccordion::Style& UiAccordion::StyleDefault()
         s.drag_gap = DPI(8);
 
         s.unified_section_frame = false;
-        s.unified_section_radius = DPI(10);
+        s.unified_section_radius = DPI(8);
         s.unified_section_frame_width = 1;
 
         s.body_line_extent = NONE;
@@ -234,9 +246,9 @@ void UiAccordion::InvalidateStyleCache()
 
 UiAccordion::Style& UiAccordion::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -244,7 +256,7 @@ UiAccordion::Style& UiAccordion::StyleEdit()
 
 void UiAccordion::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
     const uint64 revision = UiTheme::GetRevision();
     if(theme_revision_ == revision)
@@ -253,7 +265,7 @@ void UiAccordion::SyncThemeStyle()
     Style resolved = StyleDefault();
     UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
     resolved.palette = panel.palette;
-    resolved.metrics.radius = max(DPI(10), panel.metrics.radius);
+    resolved.metrics.radius = max(DPI(8), panel.metrics.radius);
     resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
     resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
     resolved.metrics.face_enabled = panel.metrics.face_enabled;
@@ -266,14 +278,15 @@ void UiAccordion::SyncThemeStyle()
     resolved.body_style.metrics.focus_enabled = false;
     resolved.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
     resolved.body_style.metrics.shadow.enabled = false;
-    resolved.header_style = UiTheme::ResolveTitleCard();
-    resolved.header_style.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
-    resolved.header_style.hover_enabled = true;
+    resolved.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+    resolved.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+    resolved.header_style.hover_enabled = false;
     resolved.header_style.metrics.focus_enabled = false;
-    resolved.header_style.show_rule = true;
+    resolved.header_style.title_line = false;
+    resolved.header_style.card_line = true;
     resolved.header_style.media_tint_mono = true;
-    resolved.body_style = panel;
-    resolved.body_style.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+    resolved.header_style.title_font = SansSerifZ(11).Bold();
+    resolved.header_style.subtitle_font = SansSerifZ(8);
     style_ = resolved;
     theme_revision_ = revision;
 }
@@ -284,19 +297,19 @@ const UiAccordion::Style& UiAccordion::GetEffectiveStyle() const
     return style_;
 }
 
-UiAccordion& UiAccordion::SetStyle(const Style& s)
+UiAccordion& UiAccordion::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiAccordion& UiAccordion::ClearStyleOverride()
+UiAccordion& UiAccordion::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -374,7 +387,7 @@ void UiAccordion::ApplySectionStyle(Section& s, int)
         else
             hs.metrics.content_margin.right += reserve;
     }
-    s.header.SetStyle(hs)
+    s.header.SetCustomStyle(hs)
             .SetTitle(s.title)
             .SetSubTitle(s.subtitle)
             .SetCopyText(s.copy)
@@ -382,7 +395,7 @@ void UiAccordion::ApplySectionStyle(Section& s, int)
             .SetShowFocus(style.header_style.metrics.focus_enabled)
             .SetSelectable(true);
 
-    s.body.SetStyle(style.body_style);
+    s.body.SetCustomStyle(style.body_style);
     RefreshChevron(s);
 }
 
@@ -505,9 +518,30 @@ UiAccordion& UiAccordion::SetSectionBodyHeight(int i, int h)
     if(i < 0 || i >= sections_.GetCount())
         return *this;
     h = max(0, h);
-    if(sections_[i].body_height == h)
+    Section& s = sections_[i];
+    if(s.body_height == h) {
+        if(s.open && s.current_body_cy != h) {
+            s.animating = false;
+            s.current_body_cy = h;
+            s.target_body_cy = h;
+            if(h > 0) {
+                s.body.Show();
+                s.content.Show();
+            }
+            RefreshAccordionExtent(*this);
+        }
         return *this;
-    sections_[i].body_height = h;
+    }
+    s.body_height = h;
+    if(s.open) {
+        s.animating = false;
+        s.current_body_cy = h;
+        s.target_body_cy = h;
+        if(h > 0) {
+            s.body.Show();
+            s.content.Show();
+        }
+    }
     RefreshAccordionExtent(*this);
     return *this;
 }
@@ -672,11 +706,14 @@ UiAccordion& UiAccordion::SetChevronGap(int px)
     Refresh();
     return *this;
 }
-UiAccordion& UiAccordion::SetHeaderRuleExtent(UiSpan ex)
+UiAccordion& UiAccordion::SetHeaderTitleLineLength(UiSpan ex)
 {
-    StyleEdit().header_style.rule_extent = ex;
+    StyleEdit().header_style.title_line_length = ex;
     for(int i = 0; i < sections_.GetCount(); i++)
-        sections_[i].header.SetRuleExtent(ex);
+        sections_[i].header.SetTitleLine(ex,
+                                         StyleEdit().header_style.title_line_thickness,
+                                         StyleEdit().header_style.title_line_style,
+                                         StyleEdit().header_style.title_line_color);
     RefreshAccordionExtent(*this);
     return *this;
 }
@@ -981,15 +1018,19 @@ void UiAccordion::StartSectionAnimation(int i, bool opening)
     int target = opening ? MeasureSectionBodyHeight(s, max(1, content.GetWidth())) : 0;
 
     s.target_body_cy = target;
-    if(opening)
+    if(opening) {
         s.body.Show();
+        s.content.Show();
+    }
 
     int dur = opening ? style.anim_open_ms : style.anim_close_ms;
     if(!style.animation_enabled || dur <= 0) {
         s.current_body_cy = target;
         s.animating = false;
-        if(!opening && target == 0)
+        if(!opening && target == 0) {
+            s.content.Hide();
             s.body.Hide();
+        }
         return;
     }
 
@@ -1016,9 +1057,11 @@ void UiAccordion::AnimationStep()
         if(elapsed >= dur) {
             s.current_body_cy = s.target_body_cy;
             s.animating = false;
-            if(!s.open && s.current_body_cy == 0)
-                s.body.Hide();
-            continue;
+              if(!s.open && s.current_body_cy == 0) {
+                  s.content.Hide();
+                  s.body.Hide();
+              }
+              continue;
         }
 
         int delta = s.target_body_cy - s.anim_from_cy;
@@ -1080,10 +1123,14 @@ void UiAccordion::NormalizePolicyAfterBulkChange()
         }
 
         s.target_body_cy = desired;
-        if(desired > 0)
+        if(desired > 0) {
             s.body.Show();
-        else
+            s.content.Show();
+        }
+        else {
+            s.content.Hide();
             s.body.Hide();
+        }
 
         any_anim = any_anim || s.animating;
     }
@@ -1102,9 +1149,6 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
     bool first = true;
     int measured = 0;
     for(Ctrl* q = s.content.GetFirstChild(); q; q = q->GetNext()) {
-        if(!q->IsShown())
-            continue;
-
         Size ms = q->GetMinSize();
         int body_h = MeasureAccordionChildHeight(q, width);
         measured = max(measured, max(ms.cy, body_h));
@@ -1183,13 +1227,20 @@ void UiAccordion::Layout()
             if(!s.animating)
                 s.current_body_cy = bh;
             s.body.SetRect(content.left, y, w, bh);
-            if(bh > 0)
+            if(bh > 0) {
                 s.body.Show();
-            else
+                s.content.Show();
+                s.content.SetRect(0, 0, s.body.GetSize().cx, s.body.GetSize().cy);
+                s.content.Layout();
+            }
+            else {
+                s.content.Hide();
                 s.body.Hide();
+            }
             y += bh;
         }
         else {
+            s.content.Hide();
             s.body.Hide();
             s.body.SetRect(content.left, y, w, 0);
         }

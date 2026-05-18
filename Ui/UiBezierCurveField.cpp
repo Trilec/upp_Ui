@@ -11,8 +11,8 @@ UiBezierCurveField::UiBezierCurveField()
     formula_.SetSelectable(true).NoWantFocus();
     copy_.SetText("").SetIcon(ICON_CONTENT_CONTENT_COPY_48()).NoWantFocus();
 
-    formula_.SetStyle(UiTheme::ResolveLabel(UiLabelRole::Body));
-    copy_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+    formula_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Body));
+    copy_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
 
     copy_.WhenAction = [=] { WriteClipboardText(BuildFormulaText()); };
     editor_.WhenChanging = [=] {
@@ -80,19 +80,19 @@ UiBezierCurveField& UiBezierCurveField::SetFormulaSelectable(bool on)
 
 UiBezierCurveField& UiBezierCurveField::SetCurveStyle(const UiBezierCurveEditor::Style& s)
 {
-    editor_.SetStyle(s);
+    editor_.SetCustomStyle(s);
     return *this;
 }
 
 UiBezierCurveField& UiBezierCurveField::SetFormulaStyle(const UiLabel::Style& s)
 {
-    formula_.SetStyle(s);
+    formula_.SetCustomStyle(s);
     return *this;
 }
 
 UiBezierCurveField& UiBezierCurveField::SetCopyStyle(const UiButton::Style& s)
 {
-    copy_.SetStyle(s);
+    copy_.SetCustomStyle(s);
     return *this;
 }
 

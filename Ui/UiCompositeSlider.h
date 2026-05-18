@@ -72,6 +72,7 @@ public:
     virtual void Layout() override;
 
     Event<> WhenAction;
+    Event<> WhenChanging;
 
 private:
     void SyncValueVisibility();
@@ -84,9 +85,9 @@ private:
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     bool show_value_ = true;
     bool value_selectable_ = false;
-    int label_width_ = DPI(82);
-    int value_width_ = DPI(56);
-    int field_gap_ = DPI(4);
+    int label_width_ = DPI(112);
+    int value_width_ = DPI(48);
+    int field_gap_ = DPI(8);
     int stack_gap_ = DPI(4);
 };
 

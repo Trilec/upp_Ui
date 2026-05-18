@@ -1,3 +1,18 @@
+/*
+    UiRadioButtonDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -104,11 +119,11 @@ public:
         body_face_row_.Toggle().WhenAction = [=] { cfg_.body_face = body_face_row_.Toggle().IsOn(); RefreshFromConfig(); };
         body_frame_row_.Toggle().WhenAction = [=] { cfg_.body_frame = body_frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
         enabled_row_.Toggle().WhenAction = [=] { cfg_.enabled = enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        text_row_.WhenAction = [=] { cfg_.text = text_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        body_face_color_row_.WhenAction = [=] { cfg_.body_face_color = body_face_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        body_frame_color_row_.WhenAction = [=] { cfg_.body_frame_color = body_frame_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        indicator_face_row_.WhenAction = [=] { cfg_.indicator_face = indicator_face_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        indicator_frame_row_.WhenAction = [=] { cfg_.indicator_frame = indicator_frame_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        text_row_.WhenAction = [=] { cfg_.text = text_row_.GetColor(0); RefreshFromConfig(); };
+        body_face_color_row_.WhenAction = [=] { cfg_.body_face_color = body_face_color_row_.GetColor(0); RefreshFromConfig(); };
+        body_frame_color_row_.WhenAction = [=] { cfg_.body_frame_color = body_frame_color_row_.GetColor(0); RefreshFromConfig(); };
+        indicator_face_row_.WhenAction = [=] { cfg_.indicator_face = indicator_face_row_.GetColor(0); RefreshFromConfig(); };
+        indicator_frame_row_.WhenAction = [=] { cfg_.indicator_frame = indicator_frame_row_.GetColor(0); RefreshFromConfig(); };
 
         FinishInit();
         RefreshFromConfig();
@@ -120,12 +135,12 @@ protected:
         UiLabel::Style body = MakeBodyLabelStyle(Palette());
         UiLabel::Style value = MakeValueLabelStyle(Palette());
         UiDropdown::Style dd = MakeDropdownStyle(Palette());
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_visual_label_.SetStyle(body); state_visual_value_.SetStyle(value);
-        state_checked_label_.SetStyle(body); state_checked_value_.SetStyle(value);
-        state_side_label_.SetStyle(body); state_side_value_.SetStyle(value);
-        visual_label_.SetStyle(body); side_label_.SetStyle(body);
-        visual_drop_.SetStyle(dd); side_drop_.SetStyle(dd);
+        state_theme_label_.SetCustomStyle(body); state_theme_value_.SetCustomStyle(value);
+        state_visual_label_.SetCustomStyle(body); state_visual_value_.SetCustomStyle(value);
+        state_checked_label_.SetCustomStyle(body); state_checked_value_.SetCustomStyle(value);
+        state_side_label_.SetCustomStyle(body); state_side_value_.SetCustomStyle(value);
+        visual_label_.SetCustomStyle(body); side_label_.SetCustomStyle(body);
+        visual_drop_.SetCustomStyle(dd); side_drop_.SetCustomStyle(dd);
         indicator_size_row_.SetLabelStyle(body).SetValueStyle(value);
         indicator_gap_row_.SetLabelStyle(body).SetValueStyle(value);
         indicator_radius_row_.SetLabelStyle(body).SetValueStyle(value);
@@ -156,10 +171,10 @@ private:
     struct EnumOption { const char* label; int value; };
     void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
     {
-        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
-    void InitColorRow(UiCompositeColor& row, Color c) { row.SetSwatchColor(0, c); }
+    void InitColorRow(UiCompositeColor& row, Color c) { row.SetColor(0, c); }
     void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
     {
         drop.UseInternalModel();
@@ -191,7 +206,7 @@ private:
     }
     void ApplyTo(UiRadioButton& r)
     {
-        r.SetStyle(BuildStyle())
+        r.SetCustomStyle(BuildStyle())
          .SetVisual((UiRadioVisual)cfg_.visual)
          .SetIndicatorSide(cfg_.indicator_side)
          .SetIndicatorRadius(cfg_.indicator_radius);
@@ -209,11 +224,11 @@ private:
         body_face_row_.Toggle().SetOn(cfg_.body_face);
         body_frame_row_.Toggle().SetOn(cfg_.body_frame);
         enabled_row_.Toggle().SetOn(cfg_.enabled);
-        text_row_.SetSwatchColor(0, cfg_.text);
-        body_face_color_row_.SetSwatchColor(0, cfg_.body_face_color);
-        body_frame_color_row_.SetSwatchColor(0, cfg_.body_frame_color);
-        indicator_face_row_.SetSwatchColor(0, cfg_.indicator_face);
-        indicator_frame_row_.SetSwatchColor(0, cfg_.indicator_frame);
+        text_row_.SetColor(0, cfg_.text);
+        body_face_color_row_.SetColor(0, cfg_.body_face_color);
+        body_frame_color_row_.SetColor(0, cfg_.body_frame_color);
+        indicator_face_row_.SetColor(0, cfg_.indicator_face);
+        indicator_frame_row_.SetColor(0, cfg_.indicator_frame);
         ApplyTo(r1_); ApplyTo(r2_); ApplyTo(r3_);
         SyncState();
         SyncCode();

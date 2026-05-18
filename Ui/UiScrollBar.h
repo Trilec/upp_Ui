@@ -202,7 +202,7 @@ public:
 private:
     Style style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
 
     int pos_ = 0;
     int min_ = 0;
@@ -263,10 +263,11 @@ public:
     virtual void  SetData(const Value& v) override { SetPos((int)v); }
     virtual Value GetData() const override         { return pos_; }
 
-    UiScrollBar& SetStyle(const Style& s);
-    UiScrollBar& ClearStyleOverride();
-    bool         HasStyleOverride() const { return has_style_override_; }
+    UiScrollBar& SetCustomStyle(const Style& s);
+    UiScrollBar& ClearCustomStyle();
+    bool         HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     static const Style& StyleDefault();
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().track_palette; }

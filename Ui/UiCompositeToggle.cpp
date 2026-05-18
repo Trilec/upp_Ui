@@ -1,4 +1,5 @@
 #include <Ui/UiCompositeToggle.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -7,9 +8,18 @@ UiCompositeToggle::UiCompositeToggle()
     Add(label_);
     Add(toggle_);
     Add(value_);
-    toggle_.WhenAction = [=] { WhenAction(); };
+    toggle_.WhenAction = [=] {
+        toggle_.SetData(toggle_.GetData());
+        WhenAction();
+    };
     label_.NoWantFocus();
     value_.NoWantFocus();
+    UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    label_style.font = SansSerifZ(9);
+    UiLabel::Style value_style = UiTheme::ResolveLabel(UiRole::Standard);
+    value_style.font = SansSerifZ(9);
+    label_.SetCustomStyle(label_style);
+    value_.SetCustomStyle(value_style);
     SyncValueVisibility();
 }
 
@@ -86,14 +96,14 @@ UiCompositeToggle& UiCompositeToggle::SetStackGap(int px)
 
 UiCompositeToggle& UiCompositeToggle::SetLabelStyle(const UiLabel::Style& style)
 {
-    label_.SetStyle(style);
+    label_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
 UiCompositeToggle& UiCompositeToggle::SetValueStyle(const UiLabel::Style& style)
 {
-    value_.SetStyle(style);
+    value_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
@@ -101,6 +111,8 @@ UiCompositeToggle& UiCompositeToggle::SetValueStyle(const UiLabel::Style& style)
 void UiCompositeToggle::SetData(const Value& v)
 {
     toggle_.SetData(v);
+    toggle_.Refresh();
+    Refresh();
 }
 
 Value UiCompositeToggle::GetData() const

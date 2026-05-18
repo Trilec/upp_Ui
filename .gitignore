@@ -9,3 +9,10 @@ UPP_GUIDES/*
 /examples/UiDemoBase
 run_uidoc_regression.cmd
 /GitHubOut
+/examples/OLD
+/out
+/Utilities/DesignerRunTests
+Utilities/GenerateUiIconsIml.ps1
+/Utilities/UiGeneratedCodeSmoke
+*.ps1
+/examples/UiChoiceRunTests

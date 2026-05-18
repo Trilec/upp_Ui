@@ -144,8 +144,8 @@ UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
     s.media_side = UiAlign::LEFT;
     s.media_gap = DPI(10);
     s.media_reserve = DPI(58);
-    s.show_rule = false;
-    s.show_bottom_line = false;
+    s.title_line = false;
+    s.card_line = false;
     return s;
 }
 
@@ -343,12 +343,12 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.header_style.metrics.frame_enabled = false;
     s.header_style.metrics.focus_enabled = false;
     s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_extent = LARGE;
-    s.header_style.bottom_line_style = SOLID;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
+    s.header_style.title_line = false;
+    s.header_style.card_line = true;
+    s.header_style.card_line_length = LARGE;
+    s.header_style.card_line_style = SOLID;
+    s.header_style.card_line_thickness = 1;
+    s.header_style.card_line_color = c.divider;
     Font hf;
     if(Font::FindFaceNameIndex("Arial Black") >= 0)
         hf = Font().FaceName("Arial Black").Height(12);
@@ -632,8 +632,8 @@ public:
 	        // Shared demo-shell header content.
         header_.SetTitle("U++ Font Helper")
 	        .SetSubTitle("Display and select fonts available to U++ across light and dark theme preview states.")
-	        .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
-	        .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false);
+	        .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+	        .ShowTitleLine(false).ShowCardLine(false).SetSelectable(false).SetShowFocus(false);
 	
 	    version_badge_.SetText(DEMO_VERSION).NoWantFocus();
 	    theme_label_.SetText("Theme").NoWantFocus();
@@ -878,38 +878,15 @@ private:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
         ctx.mode = mode;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
 
-        // Shared shell styling
         palette_ = ResolveDemoPalette(mode);
-        header_.SetStyle(MakeHeaderStyle(palette_));
-        version_badge_.SetStyle(MakeBadgeStyle(palette_));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
-        theme_label_.SetStyle(MakeBodyStyle(palette_, true, true, false, true));
-        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
 
-        // Inspector and preview styling
-        fonts_title_.SetStyle(MakeSectionStyle(palette_));
-        fonts_list_.SetStyle(MakeFontListStyle(palette_));
-        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
-        usage_copy_label_.SetStyle(MakeBodyStyle(palette_, true, true, false, true));
-        usage_copy_.SetStyle(MakeCopyButtonStyle(palette_));
         usage_copy_.SetIconColor(palette_.muted);
-        usage_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        usage_panel_.Scroll().SetStyle(MakeScrollBodyStyle());
-        usage_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
-        state_list_.SetStyle(MakeStateListStyle(palette_));
-        state_list_.SetModel(state_model_);
-        inspector_scroll_.SetStyle(MakeScrollBodyStyle());
-
-        // Property row styling
-        size_row_.SetLabelStyle(MakeBodyStyle(palette_, false, false, false, false));
-        size_row_.SetValueStyle(MakeBodyStyle(palette_, true, true, true, true));
-        bold_row_.SetLabelStyle(MakeBodyStyle(palette_, false, false, false, false));
-        underline_row_.SetLabelStyle(MakeBodyStyle(palette_, false, false, false, false));
-        text_label_.SetStyle(MakeBodyStyle(palette_, false, false, false, false));
+        usage_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+        usage_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle());
+        usage_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
         preview_.SetPalette(palette_);
 
         // Main card surfaces
@@ -923,20 +900,8 @@ private:
         card.metrics.frame_width = DPI(1);
         card.metrics.radius = DPI(6);
         card.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
-        font_panel_.SetStyle(card);
-        preview_panel_.SetStyle(card);
-
-        // Editable controls keep the same rounded card language.
-        UiBaseEdit::Style es = UiTheme::ResolveEdit();
-        for(int i = 0; i < 4; i++) {
-            es.palette.face[i] = UiFill::Solid(Blend(palette_.paper, palette_.card_face, palette_.dark ? 140 : 40));
-            es.palette.frame[i] = palette_.card_frame;
-            es.palette.ink[i] = palette_.ink;
-        }
-        es.metrics.radius = DPI(6);
-        es.metrics.frame_width = DPI(1);
-        font_search_.SetStyle(es);
-        text_edit_.SetStyle(es);
+        font_panel_.SetCustomStyle(card);
+        preview_panel_.SetCustomStyle(card);
 
         Refresh();
         RefreshLayout();

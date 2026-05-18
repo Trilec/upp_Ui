@@ -148,10 +148,11 @@ public:
     StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
     void OnStyleChanged();
 
-    UiTable& SetStyle(const Style& s);
-    UiTable& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiTable& SetCustomStyle(const Style& s);
+    UiTable& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     UiTable& SetModel(UiTableModel& model);
     UiTable& UseInternalModel();
@@ -265,7 +266,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
 
     UiTableModel internal_model_;
     UiTableModel* model_ = nullptr;

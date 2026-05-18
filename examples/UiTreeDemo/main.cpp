@@ -1,3 +1,18 @@
+/*
+    UiTreeDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include <Ui/Ui.h>
 
 using namespace Upp;
@@ -13,16 +28,6 @@ enum DatasetMode {
     DATASET_RICH,
     DATASET_MULTI,
 };
-
-Font DemoSans(int px, bool bold = false)
-{
-    Font f = SansSerifZ(px);
-    if(Font::FindFaceNameIndex("Inter") >= 0)
-        f.FaceName("Inter");
-    if(bold)
-        f.Bold();
-    return f;
-}
 
 Font DemoMono(int px, bool bold = false)
 {
@@ -65,19 +70,8 @@ String AlignCode(UiAlign a)
 
 struct DemoPalette {
     bool dark = false;
-    Color blue;
-    Color ink;
-    Color muted;
     Color paper;
     Color grid;
-    Color divider;
-    Color segment_face;
-    Color segment_frame;
-    Color exit_face;
-    Color exit_hot;
-    Color exit_pressed;
-    Color exit_frame;
-    Color exit_ink;
     Color code_face;
     Color code_frame;
     Color code_ink;
@@ -88,38 +82,17 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
 {
     DemoPalette p;
     p.dark = mode == UiThemeMode::Dark;
-    p.blue = Color(44, 99, 212);
     if(p.dark) {
-        p.ink = Color(218, 228, 241);
-        p.muted = Color(151, 167, 194);
-        p.paper = Color(22, 28, 39);
-        p.grid = Color(42, 52, 68);
-        p.divider = Color(49, 60, 78);
-        p.segment_face = Color(29, 36, 47);
-        p.segment_frame = Color(59, 73, 96);
-        p.exit_face = Color(176, 28, 52);
-        p.exit_hot = Color(196, 35, 61);
-        p.exit_pressed = Color(152, 22, 44);
-        p.exit_frame = Color(128, 18, 37);
-        p.exit_ink = Color(255, 240, 242);
+        p.paper = Color(18, 18, 18);
+        p.grid = Color(42, 42, 42);
         p.code_face = Color(5, 12, 24);
         p.code_frame = Color(30, 41, 59);
         p.code_ink = Color(110, 255, 160);
         p.preview_frame = Color(77, 92, 116);
     }
     else {
-        p.ink = Color(28, 47, 78);
-        p.muted = Color(106, 128, 164);
         p.paper = Color(250, 252, 255);
         p.grid = Color(236, 240, 247);
-        p.divider = Color(228, 235, 246);
-        p.segment_face = Color(236, 241, 248);
-        p.segment_frame = Color(211, 221, 237);
-        p.exit_face = Color(191, 34, 59);
-        p.exit_hot = Color(210, 40, 67);
-        p.exit_pressed = Color(168, 29, 51);
-        p.exit_frame = Color(145, 25, 44);
-        p.exit_ink = Color(255, 246, 248);
         p.code_face = Color(10, 15, 29);
         p.code_frame = Color(30, 41, 59);
         p.code_ink = Color(110, 255, 160);
@@ -149,107 +122,6 @@ void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap =
     }
 }
 
-UiLabel::Style MakeBodyStyle(const DemoPalette& c, bool muted = false, bool small = false)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = muted ? c.muted : c.ink;
-    }
-    s.transparent = true;
-    s.font = small ? DemoSans(9) : DemoSans(10);
-    return s;
-}
-
-UiLabel::Style MakeValueStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = MakeBodyStyle(c, true);
-    s.align_h = UiAlign::RIGHT;
-    return s;
-}
-
-UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
-{
-    UiTitleCard::Style s = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.ink;
-    }
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.title_font = DemoSans(18, true);
-    s.subtitle_font = DemoSans(8);
-    s.subtitle_color = c.blue;
-    s.media_side = UiAlign::LEFT;
-    s.media_gap = DPI(8);
-    s.media_reserve = DPI(48);
-    s.show_rule = false;
-    s.show_bottom_line = false;
-    return s;
-}
-
-UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.blue;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.content_margin = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
-    s.font = DemoSans(10, true);
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    return s;
-}
-
-UiPanel::Style MakeShellStyle(const DemoPalette& c)
-{
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    return s;
-}
-
-UiButton::Style MakeExitStyle(const DemoPalette& c)
-{
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.exit_face);
-        s.palette.frame[i] = c.exit_frame;
-        s.palette.ink[i] = c.exit_ink;
-        s.palette.icon[i] = c.exit_ink;
-    }
-    s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
-    s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(10), DPI(6));
-    s.content_gap = DPI(12);
-    return s;
-}
-
 UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
 {
     UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
@@ -267,102 +139,12 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     return s;
 }
 
-UiScrollPanel::Style MakeScrollStyle()
-{
-    UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-    }
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    return s;
-}
-
 UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
 {
-    UiLabel::Style s = MakeBodyStyle(c);
+    UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Standard);
     for(int i = 0; i < 4; i++)
         s.palette.ink[i] = c.code_ink;
     s.font = DemoMono(10);
-    return s;
-}
-
-UiAccordion::Style MakeAccordionStyle(const DemoPalette& c)
-{
-    UiAccordion::Style s = UiAccordion::StyleDefault();
-    s.transparent = true;
-    s.item_spacing = 0;
-    s.header_body_gap = DPI(8);
-    s.header_height = DPI(24);
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.show_chevron = true;
-    s.chevron_side = UiAlign::RIGHT;
-    s.chevron_scale = true;
-    s.chevron_size = DPI(10);
-    s.single_open = false;
-    s.enforce_one = false;
-    s.header_style = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.header_style.palette.face[i] = UiFill::None();
-        s.header_style.palette.frame[i] = Null;
-        s.header_style.palette.ink[i] = c.blue;
-        s.header_style.palette.icon[i] = c.blue;
-    }
-    s.header_style.transparent = true;
-    s.header_style.metrics.face_enabled = false;
-    s.header_style.metrics.frame_enabled = false;
-    s.header_style.metrics.focus_enabled = false;
-    s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
-    s.header_style.title_font = DemoSans(12, true);
-    return s;
-}
-
-UiDropdown::Style MakeDropdownStyle(const DemoPalette& c)
-{
-    UiDropdown::Style s = UiTheme::ResolveDropdown();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-        s.palette.icon[i] = c.muted;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.content_margin = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
-    s.popup_radius = DPI(DEMO_RADIUS);
-    s.popup_frame_width = DPI(1);
-    s.popup_frame_color = c.segment_frame;
-    s.popup_background_color = c.paper;
-    s.font = DemoSans(10);
-    return s;
-}
-
-UiBaseEdit::Style MakeEditStyle(const DemoPalette& c)
-{
-    UiBaseEdit::Style s = UiTheme::ResolveEdit();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.paper);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(DEMO_RADIUS);
-    s.metrics.content_margin = Rect(DPI(10), DPI(4), DPI(10), DPI(4));
-    s.font = DemoSans(10);
     return s;
 }
 
@@ -370,7 +152,7 @@ class DemoCodePanel : public UiPanel {
 public:
     typedef DemoCodePanel CLASSNAME;
 
-    DemoCodePanel(int h = DPI(146)) : block_height_(h)
+    DemoCodePanel(int h = DPI(166)) : block_height_(h)
     {
         Add(scroll_);
         scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
@@ -535,12 +317,12 @@ private:
     bool show_connector_lines_ = false;
     bool root_visible_ = false;
     UiTreeSelectionMode selection_mode_ = UITREESEL_SINGLE;
-    UiTreeGlyphStyle glyph_style_ = UITREEGLYPH_CHEVRON;
+    UiTreeGlyphStyle glyph_style_ = UITREEGLYPH_THICK_CHEVRON;
     int row_height_ = 28;
     int icon_size_ = 16;
-    int glyph_size_ = 10;
+    int glyph_size_ = 12;
     int indent_px_ = 18;
-    int radius_ = 4;
+    int radius_ = 8;
     int margin_x_ = 8;
     int margin_y_ = 8;
     int item_spacing_ = 0;
@@ -628,7 +410,7 @@ UiTreeDemoWindow::UiTreeDemoWindow()
     UiThemeContext ctx = UiTheme::GetContext();
     ctx.preset = UiThemePreset::Minimal;
     ctx.mode = UiThemeMode::Light;
-    UiTheme::SetContext(ctx);
+    UiTheme::Set(ctx);
 
     BuildShell();
     BuildRows();
@@ -721,8 +503,8 @@ void UiTreeDemoWindow::BuildShell()
     inspector_acc_.GetSectionContent(inspector_acc_.AddSection("LAYOUT", true)).Add(layout_box_.SizePos());
     inspector_acc_.GetSectionContent(inspector_acc_.AddSection("APPEARANCE", true)).Add(appearance_box_.SizePos());
 
-    header_.SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44))).SetTitle("U++ UiTree Builder").SetSubTitle("Inspect tree styling, model structure, and drag/drop from one shell.");
-    header_.ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
+    header_.SetMedia(ICON_BRAND_NEWLOGO_V5_48()).SetTitle("U++ UiTree Builder").SetSubTitle("Inspect tree styling, model structure, and drag/drop from one shell.");
+    header_.ShowTitleLine(false).ShowCardLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
     version_badge_.SetText(DEMO_VERSION).NoWantFocus();
     theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
     exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconSize(DPI(15), DPI(15)).SetIconRenderMode(UiIconRenderMode::MonoTint);
@@ -755,7 +537,7 @@ void UiTreeDemoWindow::BuildRows()
         target.Add(row).Fit();
     };
     auto add_color = [&](UiBoxLayout& target, UiCompositeColor& row, const char* name) {
-        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     };
 
@@ -845,11 +627,11 @@ void UiTreeDemoWindow::InitControls()
     glyph_style_drop_.WhenSelect = [=](int) { glyph_style_ = (UiTreeGlyphStyle)(int)glyph_style_drop_.GetSelectedData(); RefreshFromConfig(); };
     dataset_drop_.WhenSelect = [=](int) { dataset_ = (DatasetMode)(int)dataset_drop_.GetSelectedData(); ApplyDataset(dataset_); RefreshFromConfig(); };
 
-    text_color_row_.WhenAction = [=] { text_color_ = text_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-    glyph_color_row_.WhenAction = [=] { glyph_color_ = glyph_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-    line_color_row_.WhenAction = [=] { line_color_ = line_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-    selected_face_row_.WhenAction = [=] { selected_face_ = selected_face_row_.GetSwatchColor(0); RefreshFromConfig(); };
-    selected_frame_row_.WhenAction = [=] { selected_frame_ = selected_frame_row_.GetSwatchColor(0); RefreshFromConfig(); };
+    text_color_row_.WhenAction = [=] { text_color_ = text_color_row_.GetColor(0); RefreshFromConfig(); };
+    glyph_color_row_.WhenAction = [=] { glyph_color_ = glyph_color_row_.GetColor(0); RefreshFromConfig(); };
+    line_color_row_.WhenAction = [=] { line_color_ = line_color_row_.GetColor(0); RefreshFromConfig(); };
+    selected_face_row_.WhenAction = [=] { selected_face_ = selected_face_row_.GetColor(0); RefreshFromConfig(); };
+    selected_frame_row_.WhenAction = [=] { selected_frame_ = selected_frame_row_.GetColor(0); RefreshFromConfig(); };
 
     new_child_button_.SetText("New Child");
     new_sibling_button_.SetText("New Sibling");
@@ -950,7 +732,7 @@ void UiTreeDemoWindow::ApplyTheme(UiThemeMode mode)
     UiThemeContext ctx = UiTheme::GetContext();
     ctx.mode = mode;
     ctx.preset = UiThemePreset::Minimal;
-    UiTheme::SetContext(ctx);
+    UiTheme::Set(ctx);
     palette_ = ResolveDemoPalette(mode);
 
     UiTree::Style base_tree = UiTheme::ResolveTree();
@@ -960,39 +742,19 @@ void UiTreeDemoWindow::ApplyTheme(UiThemeMode mode)
     selected_face_ = base_tree.selected_face;
     selected_frame_ = base_tree.selected_frame;
 
-    header_.SetStyle(MakeHeaderStyle(palette_));
-    version_badge_.SetStyle(MakeBadgeStyle(palette_));
-    theme_shell_.SetStyle(MakeShellStyle(palette_));
-    theme_icon_.SetStyle(MakeBodyStyle(palette_));
-    theme_toggle_.SetStyle(UiTheme::ResolveToggle());
+    header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+    version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+    theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
+    theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
+    theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
+    theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
     theme_toggle_.SetData(mode == UiThemeMode::Dark);
-    exit_button_.SetStyle(MakeExitStyle(palette_));
-    copy_label_.SetStyle(MakeBodyStyle(palette_, true, true));
-    copy_button_.SetStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-    code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-    code_panel_.Scroll().SetStyle(MakeScrollStyle());
-    code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
-    inspector_scroll_.SetStyle(MakeScrollStyle());
-    inspector_acc_.SetStyle(MakeAccordionStyle(palette_));
-    model_acc_.SetStyle(MakeAccordionStyle(palette_));
-    model_scroll_.SetStyle(MakeScrollStyle());
-    dataset_drop_.SetStyle(MakeDropdownStyle(palette_));
-    glyph_style_drop_.SetStyle(MakeDropdownStyle(palette_));
-    item_icon_drop_.SetStyle(MakeDropdownStyle(palette_));
-    item_text_edit_.SetStyle(MakeEditStyle(palette_));
-    item_desc_edit_.SetStyle(MakeEditStyle(palette_));
-    item_right_edit_.SetStyle(MakeEditStyle(palette_));
-    model_tree_.SetStyle(UiTheme::ResolveTree());
+    exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+    copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+    copy_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+    code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+    code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
     preview_.SetPalette(palette_);
-
-    UiLabel::Style body = MakeBodyStyle(palette_);
-    UiLabel::Style value = MakeValueStyle(palette_);
-    dataset_label_.SetStyle(body); item_text_label_.SetStyle(body); item_desc_label_.SetStyle(body); item_right_label_.SetStyle(body); item_icon_label_.SetStyle(body); glyph_style_label_.SetStyle(body);
-    state_theme_label_.SetStyle(body); state_dataset_label_.SetStyle(body); state_nodes_label_.SetStyle(body); state_cursor_label_.SetStyle(body); state_drag_label_.SetStyle(body);
-    state_theme_value_.SetStyle(value); state_dataset_value_.SetStyle(value); state_nodes_value_.SetStyle(value); state_cursor_value_.SetStyle(value); state_drag_value_.SetStyle(value);
-    row_height_row_.SetLabelStyle(body).SetValueStyle(value); item_spacing_row_.SetLabelStyle(body).SetValueStyle(value); icon_size_row_.SetLabelStyle(body).SetValueStyle(value); glyph_size_row_.SetLabelStyle(body).SetValueStyle(value); indent_row_.SetLabelStyle(body).SetValueStyle(value); radius_row_.SetLabelStyle(body).SetValueStyle(value); margin_x_row_.SetLabelStyle(body).SetValueStyle(value); margin_y_row_.SetLabelStyle(body).SetValueStyle(value); content_gap_row_.SetLabelStyle(body).SetValueStyle(value); metadata_size_row_.SetLabelStyle(body).SetValueStyle(value); metadata_gap_row_.SetLabelStyle(body).SetValueStyle(value);
-    use_drag_row_.SetLabelStyle(body); rename_row_.SetLabelStyle(body); multi_select_row_.SetLabelStyle(body); show_icons_row_.SetLabelStyle(body); show_metadata_row_.SetLabelStyle(body); connector_lines_row_.SetLabelStyle(body); root_visible_row_.SetLabelStyle(body);
-    text_color_row_.SetLabelStyle(body); glyph_color_row_.SetLabelStyle(body); line_color_row_.SetLabelStyle(body); selected_face_row_.SetLabelStyle(body); selected_frame_row_.SetLabelStyle(body);
 
     RefreshFromConfig();
     Refresh();
@@ -1219,7 +981,7 @@ void UiTreeDemoWindow::RefreshFromConfig()
     s.line_color = line_color_;
     s.selected_face = selected_face_;
     s.selected_frame = selected_frame_;
-    preview_.Showcase().SetStyle(s);
+    preview_.Showcase().SetCustomStyle(s);
     preview_.Showcase().SetSelectionMode(selection_mode_);
     preview_.Showcase().EnableRenameOnDblClick(rename_on_dblclick_);
     preview_.Showcase().EnableDragDrop(use_drag_);
@@ -1235,11 +997,11 @@ void UiTreeDemoWindow::RefreshFromConfig()
     root_visible_row_.Toggle().SetOn(root_visible_);
     glyph_style_drop_.SelectByData((int)glyph_style_);
     dataset_drop_.SelectByData((int)dataset_);
-    text_color_row_.SetSwatchColor(0, text_color_);
-    glyph_color_row_.SetSwatchColor(0, glyph_color_);
-    line_color_row_.SetSwatchColor(0, line_color_);
-    selected_face_row_.SetSwatchColor(0, selected_face_);
-    selected_frame_row_.SetSwatchColor(0, selected_frame_);
+    text_color_row_.SetColor(0, text_color_);
+    glyph_color_row_.SetColor(0, glyph_color_);
+    line_color_row_.SetColor(0, line_color_);
+    selected_face_row_.SetColor(0, selected_face_);
+    selected_frame_row_.SetColor(0, selected_frame_);
 
     code_panel_.Code().SetText(BuildUsageCode());
     RefreshModelTree();
@@ -1290,8 +1052,13 @@ String UiTreeDemoWindow::BuildUsageCode() const
     code << "style.show_metadata_marker = " << (show_metadata_ ? "true" : "false") << ";\n";
     code << "style.show_connector_lines = " << (show_connector_lines_ ? "true" : "false") << ";\n";
     code << "style.glyph_style = " << (glyph_style_ == UITREEGLYPH_PLUSMINUS ? "UITREEGLYPH_PLUSMINUS" : glyph_style_ == UITREEGLYPH_THICK_CHEVRON ? "UITREEGLYPH_THICK_CHEVRON" : "UITREEGLYPH_CHEVRON") << ";\n";
+    code << "style.ink = Color(" << text_color_.GetR() << ", " << text_color_.GetG() << ", " << text_color_.GetB() << ");\n";
+    code << "style.glyph_color = Color(" << glyph_color_.GetR() << ", " << glyph_color_.GetG() << ", " << glyph_color_.GetB() << ");\n";
+    code << "style.line_color = Color(" << line_color_.GetR() << ", " << line_color_.GetG() << ", " << line_color_.GetB() << ");\n";
+    code << "style.selected_face = Color(" << selected_face_.GetR() << ", " << selected_face_.GetG() << ", " << selected_face_.GetB() << ");\n";
+    code << "style.selected_frame = Color(" << selected_frame_.GetR() << ", " << selected_frame_.GetG() << ", " << selected_frame_.GetB() << ");\n";
     code << "\nUiTree tree;\n";
-    code << "tree.SetStyle(style);\n";
+    code << "tree.SetCustomStyle(style);\n";
     code << "tree.SetRootVisible(" << (root_visible_ ? "true" : "false") << ");\n";
     code << "tree.SetSelectionMode(" << (selection_mode_ == UITREESEL_MULTI ? "UITREESEL_MULTI" : "UITREESEL_SINGLE") << ");\n";
     code << "tree.EnableDragDrop(" << (use_drag_ ? "true" : "false") << ");\n";
@@ -1308,7 +1075,6 @@ void UiTreeDemoWindow::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), palette_.paper);
     int header_h = DPI(78);
-    w.DrawRect(0, header_h, GetSize().cx, 1, palette_.divider);
 }
 
 void UiTreeDemoWindow::Layout()

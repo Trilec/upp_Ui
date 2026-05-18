@@ -622,7 +622,7 @@ UiDoc::UiDoc()
     };
     sb_.SetLine(DPI(16));
 
-    SetStyle(StyleDefault());
+    SetCustomStyle(StyleDefault());
     SetText(String());
 
     BackPaint();
@@ -631,7 +631,7 @@ UiDoc::UiDoc()
     RegisterBuiltinCommands();
 }
 
-UiDoc& UiDoc::SetStyle(const Style& s)
+UiDoc& UiDoc::SetCustomStyle(const Style& s)
 {
     style_ = s;
     OnStyleChanged();

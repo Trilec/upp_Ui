@@ -54,6 +54,9 @@ public:
         UiAlign tick_side = UiAlign::BOTTOM;
         Size    track_size = Size(DPI(120), DPI(4));
         Size    thumb_size = Size(DPI(14), DPI(18));
+        bool    thumb_inner_ring = false;
+        int     thumb_inner_ring_width = DPI(2);
+        Color   thumb_inner_ring_color = White();
 
         void Serialize(Stream& s)
         {
@@ -61,7 +64,8 @@ public:
               % thumb_palette % thumb_metrics % thumb_skin
               % show_ticks % major_ticks % minor_ticks_per_major
               % tick_len_major % tick_len_minor % tick_gap % tick_color % tick_side
-              % track_size % thumb_size;
+              % track_size % thumb_size
+              % thumb_inner_ring % thumb_inner_ring_width % thumb_inner_ring_color;
         }
     };
 
@@ -84,10 +88,11 @@ public:
     UiSlider();
     UiSlider(UiDirection dir);
 
-    UiSlider& SetStyle(const Style& s);
-    UiSlider& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiSlider& SetCustomStyle(const Style& s);
+    UiSlider& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().track_palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().track_metrics; }
@@ -162,7 +167,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     UiDirection dir_ = UiDirection::H;
 
     double min_ = 0.0;

@@ -51,7 +51,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     Size user_min_size_ = Size(0, 0);
 
     void InvalidateStyleCache();
@@ -61,10 +61,11 @@ private:
 public:
     UiPanel();
 
-    UiPanel& SetStyle(const Style& s);
-    UiPanel& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiPanel& SetCustomStyle(const Style& s);
+    UiPanel& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     const Style& GetEffectiveStyle() const;
     static const Style& StyleDefault();
 
@@ -75,6 +76,9 @@ public:
     void OnStyleChanged();
 
     virtual Size GetMinSize() const override;
+    // Logical extent of visible child controls. UiPanel remains a styled host;
+    // use UiBoxLayout/UiGridLayout when children need automatic flow.
+    Size GetContentSize() const;
 
     UiPanel& SetSizeMin(Size sz);
     UiPanel& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }

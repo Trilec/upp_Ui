@@ -42,6 +42,7 @@
 #include <Ui/UiRadioButton.h>
 #include <Ui/UiToggle.h>
 #include <Ui/UiPanel.h>
+#include <Ui/UiStack.h>
 #include <Ui/UiAccordion.h>
 #include <Ui/UiScrollPanel.h>
 #include <Ui/UiTab.h>
@@ -61,8 +62,13 @@
 #include <Ui/UiCompositeSlider.h>
 #include <Ui/UiCompositeToggle.h>
 #include <Ui/UiCompositeColor.h>
+#include <Ui/UiCompositeDropdown.h>
+#include <Ui/UiCompositeLabel.h>
+#include <Ui/UiCompositeEdit.h>
+#include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
+#include <Ui/UiSplitter.h>
 #include <Ui/UiTable.h>
 #include <Ui/UiDoc.h>
 #include <Ui/UiTree.h>

@@ -1,3 +1,18 @@
+/*
+    UiThemeDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include <Ui/Ui.h>
 
 using namespace Upp;
@@ -127,51 +142,51 @@ public:
         UiCheckBox::Style check_style = UiTheme::ResolveCheckBox(preset_, mode_, UICHECKVIS_CLASSIC);
         UiRadioButton::Style radio_style = UiTheme::ResolveRadioButton(preset_, mode_, preset_ == UiThemePreset::Rounded ? UIRADIOVIS_PILLS : UIRADIOVIS_CLASSIC);
 
-        card_title_.SetStyle(heading_style).SetInkColor(mode_ == UiThemeMode::Dark ? Color(255, 255, 255) : Color(22, 32, 51));
+        card_title_.SetCustomStyle(heading_style).SetInkColor(mode_ == UiThemeMode::Dark ? Color(255, 255, 255) : Color(22, 32, 51));
 
-        shell_.SetStyle(shell);
-        sidebar_.SetStyle(subtle_panel);
-        tree_box_.SetStyle(strong_panel);
-        list_box_.SetStyle(strong_panel);
-        form_panel_.SetStyle(strong_panel);
-        tabs_.SetStyle(tab_style);
+        shell_.SetCustomStyle(shell);
+        sidebar_.SetCustomStyle(subtle_panel);
+        tree_box_.SetCustomStyle(strong_panel);
+        list_box_.SetCustomStyle(strong_panel);
+        form_panel_.SetCustomStyle(strong_panel);
+        tabs_.SetCustomStyle(tab_style);
 
-        tool_list_.SetStyle(icon_button).SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-        tool_clarify_.SetStyle(icon_button).SetIcon(ICON_EDITOR_CLARIFY_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-        tool_table_.SetStyle(icon_button).SetIcon(ICON_EDITOR_TABLE_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-        tool_settings_.SetStyle(icon_button).SetIcon(ICON_DESIGN_SETTINGS_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-        search_icon_.SetStyle(icon_button).SetIcon(ICON_ACTION_SEARCH_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-        primary_action_.SetStyle(primary_button);
-        secondary_action_.SetStyle(subtle_button);
+        tool_list_.SetCustomStyle(icon_button).SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_clarify_.SetCustomStyle(icon_button).SetIcon(ICON_EDITOR_CLARIFY_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_table_.SetCustomStyle(icon_button).SetIcon(ICON_EDITOR_TABLE_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        tool_settings_.SetCustomStyle(icon_button).SetIcon(ICON_DESIGN_SETTINGS_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        search_icon_.SetCustomStyle(icon_button).SetIcon(ICON_ACTION_SEARCH_48()).SetIconSize(DPI(18), DPI(18)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+        primary_action_.SetCustomStyle(primary_button);
+        secondary_action_.SetCustomStyle(subtle_button);
 
-        search_.SetStyle(edit_style);
-        config_.SetStyle(dropdown_style);
-        toggle_.SetStyle(toggle_style);
-        enabled_.SetStyle(check_style);
-        option_a_.SetStyle(radio_style);
-        option_b_.SetStyle(radio_style);
+        search_.SetCustomStyle(edit_style);
+        config_.SetCustomStyle(dropdown_style);
+        toggle_.SetCustomStyle(toggle_style);
+        enabled_.SetCustomStyle(check_style);
+        option_a_.SetCustomStyle(radio_style);
+        option_b_.SetCustomStyle(radio_style);
 
-        menu_file_.SetStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
-        menu_edit_.SetStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
-        menu_view_.SetStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
-        menu_help_.SetStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
+        menu_file_.SetCustomStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
+        menu_edit_.SetCustomStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
+        menu_view_.SetCustomStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
+        menu_help_.SetCustomStyle(label_caption).SetInkColor(label_caption.palette.ink[ST_NORMAL]);
 
-        crumb_.SetStyle(label_caption);
+        crumb_.SetCustomStyle(label_caption);
         crumb_.ClearSpans();
         crumb_.AddTextSpan("PROJECT", label_caption.palette.ink[ST_NORMAL], true);
         crumb_.AddTextSpan("  >  ", label_caption.palette.ink[ST_NORMAL], true);
         crumb_.AddTextSpan("SETTINGS", mode_ == UiThemeMode::Dark ? Color(105, 165, 255) : Color(65, 167, 248), true);
 
-        tree_label_.SetStyle(label_caption);
-        tree_.SetStyle(UiTheme::ResolveTree(preset_, mode_));
-        list_label_.SetStyle(label_caption);
-        list_.SetStyle(UiTheme::ResolveList(preset_, mode_));
-        empty_a_.SetStyle(label_body);
-        empty_b_.SetStyle(label_body);
-        group_title_.SetStyle(label_caption);
-        toggle_label_.SetStyle(label_body);
-        status_left_.SetStyle(label_caption);
-        status_right_.SetStyle(label_caption).SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
+        tree_label_.SetCustomStyle(label_caption);
+        tree_.SetCustomStyle(UiTheme::ResolveTree(preset_, mode_));
+        list_label_.SetCustomStyle(label_caption);
+        list_.SetCustomStyle(UiTheme::ResolveList(preset_, mode_));
+        empty_a_.SetCustomStyle(label_body);
+        empty_b_.SetCustomStyle(label_body);
+        group_title_.SetCustomStyle(label_caption);
+        toggle_label_.SetCustomStyle(label_body);
+        status_left_.SetCustomStyle(label_caption);
+        status_right_.SetCustomStyle(label_caption).SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
 
         Refresh();
     }
@@ -423,11 +438,11 @@ public:
 
         UiLabel::Style heading = UiTheme::ResolveLabel(UiThemePreset::Minimal, mode_, UiLabelRole::Headline);
         heading.align_h = UiAlign::CENTER;
-        title_.SetStyle(heading);
+        title_.SetCustomStyle(heading);
 
         UiLabel::Style sub = UiTheme::ResolveLabel(UiThemePreset::Minimal, mode_, UiLabelRole::Subheadline);
         sub.align_h = UiAlign::CENTER;
-        copy_.SetStyle(sub);
+        copy_.SetCustomStyle(sub);
 
         UiPanel::Style mode_shell_style = UiTheme::ResolvePanel(UiThemePreset::Minimal, mode_, UiPanelRole::Surface);
         mode_shell_style.metrics.radius = DPI(999);
@@ -441,7 +456,7 @@ public:
         mode_shell_style.metrics.shadow.curve = ShadowSoft();
         mode_shell_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 40 : 34;
         mode_shell_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
-        mode_shell_.SetStyle(mode_shell_style);
+        mode_shell_.SetCustomStyle(mode_shell_style);
         UiToggle::Style mode_toggle_style = UiTheme::ResolveToggle(UiThemePreset::Minimal, mode_);
         mode_toggle_style.metrics.face_enabled = false;
         mode_toggle_style.metrics.frame_enabled = false;
@@ -487,7 +502,7 @@ public:
             UiThemeDetail::SetFace(mode_toggle_style.thumb_palette, White(), White(), White(), Color(245, 247, 250));
             UiThemeDetail::SetFrame(mode_toggle_style.thumb_palette, Color(198, 208, 220), Color(198, 208, 220), Color(17, 24, 39), Color(214, 222, 231));
         }
-        mode_toggle_.SetStyle(mode_toggle_style).SetShowFocus(false);
+        mode_toggle_.SetCustomStyle(mode_toggle_style).SetShowFocus(false);
 
         minimal_.ApplyTheme(mode_);
         rounded_.ApplyTheme(mode_);

@@ -68,9 +68,9 @@ private:
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     bool show_value_ = false;
     bool value_selectable_ = false;
-    int label_width_ = DPI(82);
+    int label_width_ = DPI(112);
     int value_width_ = DPI(42);
-    int field_gap_ = DPI(6);
+    int field_gap_ = DPI(8);
     int stack_gap_ = DPI(4);
 };
 

@@ -1,4 +1,4 @@
-﻿description "U++ Ui Control library system\377";
+description "U++ Ui Control library system\377";
 
 uses
 	Core,
@@ -19,7 +19,8 @@ file
 	UiDataModels.cpp,
 	UiLayoutCursor.h,
 	UiIcons.h,
-	UiIcons.iml,	UiIcons.cpp,
+	UiIcons.iml,
+	UiIcons.cpp,
 	UiLabel.h,
 	UiLabel.cpp,
 	UiCheckBox.h,
@@ -30,6 +31,8 @@ file
 	UiToggle.cpp,
 	UiPanel.h,
 	UiPanel.cpp,
+	UiStack.h,
+	UiStack.cpp,
 	UiAccordion.h,
 	UiAccordion.cpp,
 	UiScrollPanel.h,
@@ -68,10 +71,20 @@ file
 	UiCompositeToggle.cpp,
 	UiCompositeColor.h,
 	UiCompositeColor.cpp,
+	UiCompositeDropdown.h,
+	UiCompositeDropdown.cpp,
+	UiCompositeLabel.h,
+	UiCompositeLabel.cpp,
+	UiCompositeEdit.h,
+	UiCompositeEdit.cpp,
+	UiBreadcrumbs.h,
+	UiBreadcrumbs.cpp,
 	UiSliderEdit.h,
 	UiSliderEdit.cpp,
 	UiScrollBar.h,
 	UiScrollBar.cpp,
+	UiSplitter.h,
+	UiSplitter.cpp,
 	UiTable.h,
 	UiTable.cpp,
 	UiDoc.h,
@@ -88,5 +101,5 @@ file
 	UiDropdown.cpp,
 	UiMenu.h,
 	UiMenu.cpp,
-    UiColorPicker.h,
-    UiColorPicker.cpp;
+	UiColorPicker.h,
+	UiColorPicker.cpp;

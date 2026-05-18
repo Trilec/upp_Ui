@@ -16,7 +16,7 @@ UiBezierCurveEditor::UiBezierCurveEditor()
     BackPaint();
 }
 
-UiBezierCurveEditor& UiBezierCurveEditor::SetStyle(const Style& s)
+UiBezierCurveEditor& UiBezierCurveEditor::SetCustomStyle(const Style& s)
 {
     style_ = s;
     Refresh();

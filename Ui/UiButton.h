@@ -19,7 +19,7 @@
 
     Usage
     - Use SetText(), SetIcon(), SetIconRenderMode(), SetMargin(), SetContentGap(), SetCheckable(), and
-      SetStyle() to configure button behavior and appearance.
+      SetCustomStyle() to configure button behavior and appearance.
     - Paint() stays render-only; setters and style/theme changes drive cache
       invalidation and layout refresh.
 
@@ -92,7 +92,7 @@ protected:
     Style  style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool   has_style_override_ = false;
+    bool   has_custom_style_ = false;
 
     String text_;
     wchar  accesskey_ = 0;
@@ -198,10 +198,11 @@ public:
 
     UiButton& Toggle() { return SetChecked(!checked_); }
 
-    UiButton& SetStyle(const Style& s);
-    UiButton& ClearStyleOverride();
-    bool      HasStyleOverride() const { return has_style_override_; }
+    UiButton& SetCustomStyle(const Style& s);
+    UiButton& ClearCustomStyle();
+    bool      HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     const Style& GetEffectiveStyle() const;
     static const Style& StyleDefault();
 

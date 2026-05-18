@@ -72,9 +72,9 @@ void UiScrollBar::InvalidateStyleCache()
 
 UiScrollBar::Style& UiScrollBar::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -82,7 +82,7 @@ UiScrollBar::Style& UiScrollBar::StyleEdit()
 
 void UiScrollBar::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -99,20 +99,20 @@ const UiScrollBar::Style& UiScrollBar::GetEffectiveStyle() const
     return style_;
 }
 
-UiScrollBar& UiScrollBar::SetStyle(const Style& s)
+UiScrollBar& UiScrollBar::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiScrollBar& UiScrollBar::ClearStyleOverride()
+UiScrollBar& UiScrollBar::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     SyncThemeStyle();
@@ -818,7 +818,7 @@ void UiScrollBar::JumpToPosition(int new_pos)
 
 void UiScrollBar::LeftDown(Point p, dword keyflags)
 {
-	if(!IsEnabled()) return;
+	if(!IsEnabled() || !IsShowEnabled()) return;
 
 	int arrow_idx;
 	if(PtInArrow(p, arrow_idx)) {
@@ -848,11 +848,13 @@ void UiScrollBar::LeftDown(Point p, dword keyflags)
 		return;
 	}
 
-	// Click on track: jump to position
+	// Click on track: jump the thumb under the cursor and keep dragging until
+	// release, matching UiSlider's direct-manipulation behavior.
 	Rect tr = GetThumbLaneRect_();
 	Rect thumb = GetThumbRect();
 	int track_len = dir_ == UiDirection::V ? tr.GetHeight() : tr.GetWidth();
 	int thumb_len = dir_ == UiDirection::V ? thumb.GetHeight() : thumb.GetWidth();
+	int usable = max(0, track_len - thumb_len);
 
 	Point rel = dir_ == UiDirection::V
 		? Point(0, p.y - tr.top)
@@ -861,15 +863,24 @@ void UiScrollBar::LeftDown(Point p, dword keyflags)
 	int click_pos = dir_ == UiDirection::V ? rel.y : rel.x;
 	click_pos = clamp(click_pos, 0, track_len);
 
-	if(click_pos < ComputeThumbPosition()) {
-		// Above/left of thumb: jump to page up
-		JumpToPosition(pos_ - page_);
-	} else if(click_pos > ComputeThumbPosition() + thumb_len) {
-		// Below/right of thumb: jump to page down
-		JumpToPosition(pos_ + page_);
-	} else {
-		// Inside thumb area (unlikely — already handled)
-	}
+	int centered = clamp(click_pos - thumb_len / 2, 0, usable);
+	double ratio = usable > 0 ? double(centered) / usable : 0.0;
+	int old_pos = pos_;
+	int new_pos = int(min_ + ratio * (max_ - min_ - page_) + 0.5);
+
+	dragging_ = true;
+	drag_offset_ = dir_ == UiDirection::V
+		? Point(0, thumb_len / 2)
+		: Point(thumb_len / 2, 0);
+	hover_thumb_ = true;
+	hover_track_ = true;
+	SetCapture();
+	SetPos(new_pos);
+	if(pos_ != old_pos)
+		WhenBar();
+	UpdateVisualState();
+	UpdateAnimatedVisuals_(true);
+	Refresh();
 }
 
 void UiScrollBar::LeftUp(Point p, dword keyflags)

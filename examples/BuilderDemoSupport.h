@@ -44,6 +44,13 @@ inline String QuoteCpp(const String& s)
     return out;
 }
 
+inline String ColorCpp(Color c)
+{
+    if(IsNull(c))
+        return "Null";
+    return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
+}
+
 struct DemoPalette {
     bool dark = false;
     Color blue;
@@ -54,20 +61,11 @@ struct DemoPalette {
     Color divider;
     Color segment_face;
     Color segment_frame;
-    Color exit_face;
-    Color exit_hot;
-    Color exit_pressed;
-    Color exit_frame;
-    Color exit_ink;
     Color code_face;
     Color code_frame;
     Color code_ink;
     Color preview_frame;
     Color preview_hint;
-    Color theme_toggle_track;
-    Color theme_toggle_track_frame;
-    Color theme_toggle_thumb;
-    Color theme_toggle_thumb_frame;
 };
 
 inline DemoPalette ResolveDemoPalette(UiThemeMode mode)
@@ -78,25 +76,16 @@ inline DemoPalette ResolveDemoPalette(UiThemeMode mode)
     if(p.dark) {
         p.ink = Color(218, 228, 241);
         p.muted = Color(151, 167, 194);
-        p.paper = Color(22, 28, 39);
-        p.grid = Color(42, 52, 68);
+        p.paper = Color(25, 25, 25);
+        p.grid = Color(44, 44, 44);
         p.divider = Color(49, 60, 78);
         p.segment_face = Color(29, 36, 47);
         p.segment_frame = Color(59, 73, 96);
-        p.exit_face = Color(176, 28, 52);
-        p.exit_hot = Color(196, 35, 61);
-        p.exit_pressed = Color(152, 22, 44);
-        p.exit_frame = Color(128, 18, 37);
-        p.exit_ink = Color(255, 240, 242);
-        p.code_face = Color(5, 12, 24);
-        p.code_frame = Color(30, 41, 59);
+        p.code_face = Color(18, 18, 18);
+        p.code_frame = Color(44, 44, 44);
         p.code_ink = Color(110, 255, 160);
-        p.preview_frame = Color(77, 92, 116);
-        p.preview_hint = p.muted;
-        p.theme_toggle_track = Color(31, 44, 65);
-        p.theme_toggle_track_frame = Color(70, 95, 136);
-        p.theme_toggle_thumb = Color(145, 194, 255);
-        p.theme_toggle_thumb_frame = Color(110, 166, 236);
+        p.preview_frame = Color(76, 76, 76);
+        p.preview_hint = Color(166, 166, 166);
     }
     else {
         p.ink = Color(28, 47, 78);
@@ -106,20 +95,11 @@ inline DemoPalette ResolveDemoPalette(UiThemeMode mode)
         p.divider = Color(228, 235, 246);
         p.segment_face = Color(236, 241, 248);
         p.segment_frame = Color(211, 221, 237);
-        p.exit_face = Color(191, 34, 59);
-        p.exit_hot = Color(210, 40, 67);
-        p.exit_pressed = Color(168, 29, 51);
-        p.exit_frame = Color(145, 25, 44);
-        p.exit_ink = Color(255, 246, 248);
         p.code_face = Color(10, 15, 29);
         p.code_frame = Color(30, 41, 59);
         p.code_ink = Color(110, 255, 160);
         p.preview_frame = Color(208, 219, 236);
-        p.preview_hint = p.muted;
-        p.theme_toggle_track = Color(236, 241, 248);
-        p.theme_toggle_track_frame = Color(211, 221, 237);
-        p.theme_toggle_thumb = White();
-        p.theme_toggle_thumb_frame = Color(164, 190, 232);
+        p.preview_hint = Color(106, 128, 164);
     }
     return p;
 }
@@ -147,14 +127,7 @@ inline void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, in
 
 inline UiLabel::Style MakeBodyLabelStyle(const DemoPalette& c, bool muted = false, bool small = false)
 {
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = muted ? c.muted : c.ink;
-    }
-    s.transparent = true;
-    s.font = small ? DemoSans(9) : DemoSans(10);
+    UiLabel::Style s = UiTheme::ResolveLabel(muted ? UiRole::Subtle : UiRole::Standard);
     s.align_h = UiAlign::LEFT;
     s.align_v = UiAlign::CENTER;
     return s;
@@ -169,42 +142,12 @@ inline UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
 
 inline UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
 {
-    UiTitleCard::Style s = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.ink;
-    }
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.title_font = DemoSans(18, true);
-    s.subtitle_font = DemoSans(8);
-    s.subtitle_color = c.blue;
-    s.media_side = UiAlign::LEFT;
-    s.media_gap = DPI(8);
-    s.media_reserve = DPI(48);
-    s.show_rule = false;
-    s.show_bottom_line = false;
-    return s;
+    return UiTheme::ResolveTitleCard(UiRole::Accent);
 }
 
 inline UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
 {
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.blue;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.content_margin = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
-    s.font = DemoSans(10, true);
+    UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3);
     s.align_h = UiAlign::CENTER;
     s.align_v = UiAlign::CENTER;
     return s;
@@ -212,64 +155,17 @@ inline UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
 
 inline UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
 {
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
-    s.metrics.shadow.enabled = false;
-    return s;
+    return UiTheme::ResolvePanel(UiRole::Standard);
 }
 
 inline UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
 {
-    UiToggle::Style s = UiTheme::ResolveToggle();
-    for(int i = 0; i < 4; i++) {
-        s.track_palette.face[i] = UiFill::Solid(c.theme_toggle_track);
-        s.track_palette.frame[i] = c.theme_toggle_track_frame;
-        s.thumb_palette.face[i] = UiFill::Solid(c.theme_toggle_thumb);
-        s.thumb_palette.frame[i] = c.theme_toggle_thumb_frame;
-    }
-    s.track_metrics.face_enabled = true;
-    s.track_metrics.frame_enabled = true;
-    s.track_metrics.frame_width = DPI(1);
-    s.track_metrics.radius = DPI(999);
-    s.thumb_metrics.face_enabled = true;
-    s.thumb_metrics.frame_enabled = false;
-    s.thumb_metrics.radius = DPI(999);
-    s.track_size = Size(DPI(48), DPI(24));
-    s.thumb_inset = DPI(3);
-    return s;
+    return UiTheme::ResolveToggle();
 }
 
 inline UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
 {
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.exit_face);
-        s.palette.frame[i] = c.exit_frame;
-        s.palette.ink[i] = c.exit_ink;
-        s.palette.icon[i] = c.exit_ink;
-    }
-    s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
-    s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(10), DPI(6));
-    s.content_gap = DPI(12);
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    s.metrics.shadow.enabled = false;
-    return s;
+    return UiTheme::ResolveButton(UiRole::Alert);
 }
 
 inline UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
@@ -325,126 +221,26 @@ inline UiAccordion::Style MakeAccordionStyle(const DemoPalette& c)
     UiAccordion::Style s = UiAccordion::StyleDefault();
     s.single_open = false;
     s.enforce_one = false;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.item_spacing = DPI(6);
-    s.unified_section_radius = DPI(8);
-    s.unified_section_frame_width = 1;
-    for(int i = 0; i < 4; i++) {
-        s.header_style.palette.face[i] = UiFill::None();
-        s.header_style.palette.frame[i] = Null;
-        s.header_style.palette.ink[i] = c.blue;
-        s.body_style.palette.face[i] = UiFill::None();
-        s.body_style.palette.frame[i] = Null;
-        s.body_style.palette.ink[i] = c.ink;
-    }
-    s.header_style.transparent = true;
-    s.header_style.hover_enabled = false;
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = false;
-    s.header_style.metrics.face_enabled = false;
-    s.header_style.metrics.frame_enabled = false;
-    s.header_style.metrics.focus_enabled = false;
-    s.header_style.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.header_style.title_font = DemoSans(10, true);
-    s.header_style.subtitle_font = DemoSans(8);
-    s.header_style.subtitle_color = c.muted;
-    s.body_style.transparent = true;
-    s.body_style.metrics.face_enabled = false;
-    s.body_style.metrics.frame_enabled = false;
-    s.body_style.metrics.focus_enabled = false;
-    s.body_style.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
-    s.header_height = DPI(26);
-    s.show_chevron = true;
-    s.chevron_side = UiAlign::RIGHT;
-    s.chevron_scale = true;
     return s;
 }
 
 inline UiDropdown::Style MakeDropdownStyle(const DemoPalette& c)
 {
-    UiDropdown::Style s = UiTheme::ResolveDropdown();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-        s.palette.icon[i] = c.muted;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(4), DPI(8), DPI(4));
-    s.popup_radius = DPI(8);
-    s.popup_frame_width = DPI(1);
-    s.popup_frame_color = c.segment_frame;
-    s.popup_background_color = c.paper;
-    s.indicator_size = DPI(12);
-    return s;
+    return UiTheme::ResolveDropdown();
 }
 
 inline UiBaseEdit::Style MakeEditStyle(const DemoPalette& c)
 {
-    UiBaseEdit::Style s = UiTheme::ResolveEdit();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.paper);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(8);
-    s.metrics.focus_enabled = true;
-    s.metrics.content_margin = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
-    s.placeholder_ink = c.muted;
-    s.caret_color = c.ink;
-    s.font = DemoSans(10);
-    return s;
+    return UiTheme::ResolveEdit(UiRole::Standard);
 }
 
 inline UiButton::Style MakeSmallButtonStyle(const DemoPalette& c)
 {
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-        s.palette.icon[i] = c.ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(8);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
-    s.metrics.shadow.enabled = false;
-    return s;
+    return UiTheme::ResolveButton(UiRole::Subtle);
 }
 inline UiButton::Style MakeGhostIconButtonStyle(const DemoPalette& c)
 {
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.muted;
-        s.palette.icon[i] = c.muted;
-    }
-    s.palette.ink[ST_HOT] = c.ink;
-    s.palette.icon[ST_HOT] = c.ink;
-    s.palette.ink[ST_PRESSED] = c.blue;
-    s.palette.icon[ST_PRESSED] = c.blue;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.radius = 0;
-    s.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-    s.metrics.shadow.enabled = false;
-    s.content_gap = 0;
-    return s;
+    return UiTheme::ResolveToolButton(UiRole::Subtle);
 }
 
 class DemoCodePanel : public UiPanel {
@@ -459,7 +255,7 @@ public:
     virtual Size GetMinSize() const override
     {
         int line_h = max(DPI(16), DemoMono(10).GetCy() + DPI(3));
-        return Size(DPI(320), line_h * 10 + DPI(24));
+        return Size(DPI(320), line_h * 12 + DPI(24));
     }
 
     virtual void Layout() override
@@ -469,7 +265,7 @@ public:
         scroll_.Layout();
         Rect viewport = scroll_.GetViewportRect();
         int line_h = max(DPI(16), DemoMono(10).GetCy() + DPI(3));
-        int min_h = line_h * 10;
+        int min_h = line_h * 12;
         int content_w = max(0, viewport.GetWidth());
         int content_h = max(max(viewport.GetHeight(), code_.GetMinSize().cy), min_h);
         code_.SetRect(0, 0, content_w, content_h);
@@ -518,7 +314,7 @@ public:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
         ctx.mode = UiThemeMode::Light;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
 
         Add(header_);
         Add(version_badge_);
@@ -540,7 +336,7 @@ public:
         usage_toolbar_.Add(copy_button_).Fixed(DPI(19));
         int usage_sec = inspector_acc_.AddSection("USAGE", true);
         inspector_acc_.GetSectionContent(usage_sec).Add(usage_section_.SizePos());
-        inspector_acc_.SetSectionBodyHeight(usage_sec, DPI(220));
+        inspector_acc_.SetSectionBodyHeight(usage_sec, DPI(260));
         inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
         inspector_acc_.GetSectionContent(inspector_acc_.AddSection("PROPERTIES", true)).Add(props_box_.SizePos());
 
@@ -549,9 +345,9 @@ public:
 
         header_.SetTitle(title)
                .SetSubTitle(subtitle)
-               .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
-               .ShowRule(false)
-               .ShowBottomLine(false)
+               .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+               .ShowTitleLine(false)
+               .ShowCardLine(false)
                .SetSelectable(false)
                .SetShowFocus(false)
                .EnableHover(false);
@@ -621,24 +417,22 @@ protected:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.mode = mode;
         ctx.preset = UiThemePreset::Minimal;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
         palette_ = ResolveDemoPalette(mode);
 
-        header_.SetStyle(MakeHeaderStyle(palette_));
-        version_badge_.SetStyle(MakeBadgeStyle(palette_));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
-        theme_icon_.SetStyle(MakeBodyLabelStyle(palette_));
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+        theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
+        theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
-        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
+        theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
-        copy_label_.SetStyle(MakeBodyLabelStyle(palette_, true, true));
-        copy_button_.SetStyle(MakeGhostIconButtonStyle(palette_));
-        code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        code_panel_.Scroll().SetStyle(MakeScrollBodyStyle());
-        code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
-        inspector_scroll_.SetStyle(MakeScrollBodyStyle());
-        inspector_acc_.SetStyle(MakeAccordionStyle(palette_));
+        exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+        copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+        code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+        code_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle());
+        code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
         preview_.SetPalette(palette_);
         ApplyDemoTheme();
         SyncInspectorLayout(true);
@@ -693,7 +487,7 @@ protected:
 
 inline void AddStateRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, UiLabel& value, const char* title)
 {
-    row.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     label.SetText(title).NoWantFocus();
     row.Add(label).Fixed(DPI(96)).MinHeight(DPI(18));
     row.Add(value).Expand(1).MinHeight(DPI(18));
@@ -702,16 +496,17 @@ inline void AddStateRow(UiBoxLayout& target, UiBoxLayout& row, UiLabel& label, U
 
 inline void AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiDropdown& drop, const char* name)
 {
-    row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row_box.SetDirection(UiDirection::H).SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     row_box.Add(label).Fixed(DPI(96)).MinHeight(DPI(20));
-    row_box.Add(drop).Expand(1).MinHeight(DPI(24));
+    drop.SetRole(UiRole::Accent);
+    row_box.Add(drop).Expand(1).MinHeight(DPI(20));
     label.SetText(name).NoWantFocus();
     target.Add(row_box).Fit();
 }
 
 inline void AddEditRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiLineEdit& edit, const char* name)
 {
-    row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row_box.SetDirection(UiDirection::H).SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     row_box.Add(label).Fixed(DPI(96)).MinHeight(DPI(20));
     row_box.Add(edit).Expand(1).MinHeight(DPI(26));
     label.SetText(name).NoWantFocus();
@@ -733,7 +528,7 @@ inline void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char
 
 inline void AddButtonRow(UiBoxLayout& target, UiBoxLayout& row_box, UiButton& a, UiButton& b, UiButton* c = nullptr)
 {
-    row_box.SetGap(DPI(5)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    row_box.SetDirection(UiDirection::H).SetGap(DPI(5)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     row_box.Add(a).Expand(1).MinHeight(DPI(28));
     row_box.Add(b).Expand(1).MinHeight(DPI(28));
     if(c)
@@ -743,8 +538,6 @@ inline void AddButtonRow(UiBoxLayout& target, UiBoxLayout& row_box, UiButton& a,
 
 inline void ApplyRowStyles(const DemoPalette& palette, UiLabel& label, UiLabel& value)
 {
-    label.SetStyle(MakeBodyLabelStyle(palette));
-    value.SetStyle(MakeValueLabelStyle(palette));
 }
 
 }

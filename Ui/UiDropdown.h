@@ -45,6 +45,8 @@
 
 namespace Upp {
 
+enum class UiRole : byte;
+
 class UiDropdown : public Ctrl, public CtrlStyled<UiDropdown> {
 public:
     typedef UiDropdown CLASSNAME;
@@ -157,8 +159,9 @@ public:
 private:
     // Style/theme state stays local; item content can come from an external model.
     Style  style_;
+    byte role_ = 0;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     String text_;                 // Current displayed text
     Image  indicator_;           // Current indicator image (open/closed state)
     
@@ -381,10 +384,13 @@ public:
     // ------------------------------------------------------------------------
     // Styling
     // ------------------------------------------------------------------------
-    UiDropdown&       SetStyle(const Style& s);
-    UiDropdown&       ClearStyleOverride();
-    bool              HasStyleOverride() const { return has_style_override_; }
+    UiDropdown&       SetRole(UiRole role);
+    UiRole            GetRole() const { return (UiRole)role_; }
+    UiDropdown&       SetCustomStyle(const Style& s);
+    UiDropdown&       ClearCustomStyle();
+    bool              HasCustomStyle() const { return has_custom_style_; }
     const Style&      GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     static const Style& StyleDefault();
     
     // CtrlStyled (CRTP) interface

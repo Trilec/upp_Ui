@@ -118,9 +118,9 @@ UiTable::UiTable()
 
 UiTable::Style& UiTable::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     theme_revision_ = 0;
     return style_;
@@ -128,7 +128,7 @@ UiTable::Style& UiTable::StyleEdit()
 
 const UiTable::Style& UiTable::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     uint64 rev = UiTheme::GetRevision();
@@ -153,17 +153,17 @@ void UiTable::OnStyleChanged()
     Refresh();
 }
 
-UiTable& UiTable::SetStyle(const Style& s)
+UiTable& UiTable::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiTable& UiTable::ClearStyleOverride()
+UiTable& UiTable::ClearCustomStyle()
 {
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = Style();
     OnStyleChanged();
     return *this;

@@ -19,15 +19,13 @@ namespace {
 
     Notes
     - This demo intentionally prefers theme defaults over deep styling.
-    - The shell styling is limited to the shared demo chrome language.
+    - Shell controls rely on the default minimal theme.
 
     Changelog
     - v0.1.0: Replaced the legacy showcase grid with the shared single-control builder shell.
 */
 
 static const char* DEMO_VERSION = "v0.1.0";
-static const int DEMO_RADIUS = 8;
-
 enum ShadowCurvePreset {
     SHADOWPRESET_LINEAR = 0,
     SHADOWPRESET_SOFT,
@@ -59,29 +57,11 @@ struct DemoPalette {
     UiThemeMode mode = UiThemeMode::Light;
     bool dark = false;
 
-    Color blue;
-    Color subtitle;
-    Color ink;
-    Color muted;
     Color paper;
     Color grid;
     Color divider;
-    Color badge_face;
-    Color badge_frame;
-    Color segment_face;
-    Color segment_frame;
-    Color segment_idle_ink;
-    Color exit_face;
-    Color exit_hot;
-    Color exit_pressed;
-    Color exit_frame;
-    Color exit_ink;
     Color preview_frame;
     Color preview_hint;
-    Color theme_toggle_track;
-    Color theme_toggle_track_frame;
-    Color theme_toggle_thumb;
-    Color theme_toggle_thumb_frame;
     Color code_face;
     Color code_frame;
     Color code_ink;
@@ -92,57 +72,22 @@ DemoPalette ResolveDemoPalette(UiThemeMode mode)
     DemoPalette p;
     p.mode = mode;
     p.dark = mode == UiThemeMode::Dark;
-    p.blue = Color(44, 99, 212);
-    p.subtitle = Color(47, 132, 192);
-
     if(p.dark) {
-        p.ink = Color(218, 228, 241);
-        p.muted = Color(151, 167, 194);
-        p.paper = Color(22, 28, 39);
-        p.grid = Color(42, 52, 68);
-        p.divider = Color(49, 60, 78);
-        p.badge_face = Color(34, 46, 66);
-        p.badge_frame = Color(70, 91, 124);
-        p.segment_face = Color(29, 36, 47);
-        p.segment_frame = Color(59, 73, 96);
-        p.segment_idle_ink = p.muted;
-        p.exit_face = Color(176, 28, 52);
-        p.exit_hot = Color(196, 35, 61);
-        p.exit_pressed = Color(152, 22, 44);
-        p.exit_frame = Color(128, 18, 37);
-        p.exit_ink = Color(255, 240, 242);
-        p.preview_frame = Color(77, 92, 116);
-        p.preview_hint = p.muted;
-        p.theme_toggle_track = Color(31, 44, 65);
-        p.theme_toggle_track_frame = Color(70, 95, 136);
-        p.theme_toggle_thumb = Color(145, 194, 255);
-        p.theme_toggle_thumb_frame = Color(110, 166, 236);
-        p.code_face = Color(5, 12, 24);
-        p.code_frame = Color(30, 41, 59);
+        p.paper = Color(25, 25, 25);
+        p.grid = Color(44, 44, 44);
+        p.divider = Color(51, 51, 51);
+        p.preview_frame = Color(76, 76, 76);
+        p.preview_hint = Color(166, 166, 166);
+        p.code_face = Color(18, 18, 18);
+        p.code_frame = Color(44, 44, 44);
         p.code_ink = Color(110, 255, 160);
     }
     else {
-        p.ink = Color(28, 47, 78);
-        p.muted = Color(106, 128, 164);
         p.paper = Color(250, 252, 255);
         p.grid = Color(236, 240, 247);
         p.divider = Color(228, 235, 246);
-        p.badge_face = Color(240, 244, 251);
-        p.badge_frame = Color(219, 229, 243);
-        p.segment_face = Color(236, 241, 248);
-        p.segment_frame = Color(211, 221, 237);
-        p.segment_idle_ink = Color(94, 114, 149);
-        p.exit_face = Color(191, 34, 59);
-        p.exit_hot = Color(210, 40, 67);
-        p.exit_pressed = Color(168, 29, 51);
-        p.exit_frame = Color(145, 25, 44);
-        p.exit_ink = Color(156, 41, 58);
         p.preview_frame = Color(208, 219, 236);
-        p.preview_hint = p.muted;
-        p.theme_toggle_track = Color(236, 241, 248);
-        p.theme_toggle_track_frame = Color(211, 221, 237);
-        p.theme_toggle_thumb = White();
-        p.theme_toggle_thumb_frame = Color(164, 190, 232);
+        p.preview_hint = Color(106, 128, 164);
         p.code_face = Color(10, 15, 29);
         p.code_frame = Color(30, 41, 59);
         p.code_ink = Color(110, 255, 160);
@@ -172,166 +117,6 @@ void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap =
     }
 }
 
-UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
-{
-    UiTitleCard::Style s = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.ink;
-    }
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.title_font = DemoSans(18, true);
-    s.subtitle_font = DemoSans(8);
-    s.subtitle_color = c.subtitle;
-    s.media_side = UiAlign::LEFT;
-    s.media_gap = DPI(8);
-    s.media_reserve = DPI(48);
-    s.title_subtitle_gap = 0;
-    s.subtitle_copy_gap = DPI(2);
-    s.show_rule = false;
-    s.show_bottom_line = false;
-    return s;
-}
-
-UiLabel::Style MakeBodyLabelStyle(const DemoPalette& c, bool muted = false, bool small = false)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = muted ? c.muted : c.ink;
-    }
-    s.transparent = true;
-    s.font = small ? DemoSans(9) : DemoSans(10);
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    s.nowrap = false;
-    return s;
-}
-
-UiLabel::Style MakeHeaderIconStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = MakeBodyLabelStyle(c);
-    for(int i = 0; i < 4; i++)
-        s.palette.ink[i] = c.dark ? Color(218, 228, 241) : c.blue;
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    return s;
-}
-
-UiLabel::Style MakeValueLabelStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = MakeBodyLabelStyle(c, true);
-    s.align_h = UiAlign::CENTER;
-    return s;
-}
-
-UiLabel::Style MakeBadgeStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Badge);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.badge_face);
-        s.palette.frame[i] = c.badge_frame;
-        s.palette.ink[i] = c.blue;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(9), DPI(2), DPI(9), DPI(2));
-    s.font = DemoSans(10, true);
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    s.transparent = false;
-    return s;
-}
-
-UiPanel::Style MakeSegmentShellStyle(const DemoPalette& c)
-{
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
-    s.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiToggle::Style MakeThemeToggleStyle(const DemoPalette& c)
-{
-    UiToggle::Style s = UiTheme::ResolveToggle();
-    for(int i = 0; i < 4; i++) {
-        s.track_palette.face[i] = UiFill::Solid(c.theme_toggle_track);
-        s.track_palette.frame[i] = c.theme_toggle_track_frame;
-        s.thumb_palette.face[i] = UiFill::Solid(c.theme_toggle_thumb);
-        s.thumb_palette.frame[i] = c.theme_toggle_thumb_frame;
-        s.palette.ink[i] = c.segment_idle_ink;
-    }
-    s.track_metrics.frame_enabled = true;
-    s.track_metrics.frame_width = DPI(1);
-    s.track_metrics.radius = DPI(999);
-    s.thumb_metrics.frame_enabled = false;
-    s.thumb_metrics.radius = DPI(999);
-    s.track_size = Size(DPI(42), DPI(24));
-    s.thumb_inset = DPI(4);
-    return s;
-}
-
-UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
-{
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.exit_face);
-        s.palette.frame[i] = c.exit_frame;
-        s.palette.ink[i] = c.exit_ink;
-        s.palette.icon[i] = c.exit_ink;
-    }
-    s.palette.face[ST_HOT] = UiFill::Solid(c.exit_hot);
-    s.palette.face[ST_PRESSED] = UiFill::Solid(c.exit_pressed);
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.align_h = UiAlign::CENTER;
-    s.align_v = UiAlign::CENTER;
-    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(10), DPI(6));
-    s.content_gap = DPI(12);
-    s.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiButton::Style MakeCopyButtonStyle(const DemoPalette& c)
-{
-    UiButton::Style s = UiTheme::ResolveButton(UiButtonRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.muted;
-        s.palette.icon[i] = c.muted;
-    }
-    s.palette.ink[ST_HOT] = c.blue;
-    s.palette.icon[ST_HOT] = c.blue;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-    s.font = DemoSans(9, true);
-    return s;
-}
-
 UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
 {
     UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
@@ -343,14 +128,14 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     s.metrics.face_enabled = true;
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
+    s.metrics.radius = DPI(8);
     s.metrics.focus_enabled = false;
     s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
     s.metrics.shadow.enabled = false;
     return s;
 }
 
-UiScrollPanel::Style MakeScrollBodyStyle(const DemoPalette& c)
+UiScrollPanel::Style MakeScrollBodyStyle()
 {
     UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
     for(int i = 0; i < 4; i++) {
@@ -369,179 +154,13 @@ UiScrollPanel::Style MakeScrollBodyStyle(const DemoPalette& c)
 
 UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
 {
-    UiLabel::Style s = MakeBodyLabelStyle(c);
+    UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Standard);
     for(int i = 0; i < 4; i++)
         s.palette.ink[i] = c.code_ink;
     s.font = DemoMono(10);
-    s.metrics.radius = DPI(999);
+    s.metrics.radius = DPI(8);
     s.metrics.focus_enabled = true;
     return s;
-}
-
-UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
-{
-    UiAccordion::Style s = UiAccordion::StyleDefault();
-    s.transparent = true;
-    s.item_spacing = 0;
-    s.header_body_gap = DPI(8);
-    s.header_height = DPI(24);
-    s.body_min_height = 0;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.unified_section_frame = false;
-    s.body_line_extent = NONE;
-    s.show_chevron = true;
-    s.chevron_side = UiAlign::RIGHT;
-    s.chevron_scale = true;
-    s.chevron_size = DPI(10);
-    s.single_open = false;
-    s.enforce_one = false;
-    s.animation_enabled = true;
-    s.anim_open_ms = 90;
-    s.anim_close_ms = 90;
-
-    s.header_style = UiTheme::ResolveTitleCard();
-    for(int i = 0; i < 4; i++) {
-        s.header_style.palette.face[i] = UiFill::None();
-        s.header_style.palette.frame[i] = Null;
-        s.header_style.palette.ink[i] = c.blue;
-        s.header_style.palette.icon[i] = c.blue;
-    }
-    s.header_style.transparent = true;
-    s.header_style.hover_enabled = true;
-    s.header_style.media_tint_mono = true;
-    s.header_style.metrics.face_enabled = false;
-    s.header_style.metrics.frame_enabled = false;
-    s.header_style.metrics.focus_enabled = false;
-    s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_extent = LARGE;
-    s.header_style.bottom_line_style = SOLID;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
-    s.header_style.title_font = DemoSans(12, true);
-    s.header_style.subtitle_font = DemoSans(1);
-    s.header_style.copy_font = DemoSans(1);
-    s.header_style.title_subtitle_gap = 0;
-    s.header_style.subtitle_copy_gap = 0;
-    s.header_style.media_gap = 0;
-    s.header_style.media_reserve = 0;
-
-    s.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    for(int i = 0; i < 4; i++) {
-        s.body_style.palette.face[i] = UiFill::None();
-        s.body_style.palette.frame[i] = Null;
-        s.body_style.palette.ink[i] = c.ink;
-    }
-    s.body_style.transparent = true;
-    s.body_style.metrics.face_enabled = false;
-    s.body_style.metrics.frame_enabled = false;
-    s.body_style.metrics.frame_width = 0;
-    s.body_style.metrics.radius = 0;
-    s.body_style.metrics.focus_enabled = false;
-    s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
-    s.body_style.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
-{
-    UiAccordion::Style s = MakeInspectorAccordionStyle(c);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Blend(c.divider, c.paper, 8);
-        s.palette.ink[i] = c.ink;
-    }
-    s.header_height = DPI(22);
-    s.header_style.title_font = DemoSans(10, true);
-    s.header_style.metrics.content_margin = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
-    s.header_style.bottom_line_color = Blend(c.divider, c.paper, 20);
-    s.chevron_size = DPI(8);
-    s.item_spacing = DPI(6);
-    s.header_body_gap = DPI(2);
-    s.unified_section_frame = true;
-    s.unified_section_radius = DPI(DEMO_RADIUS);
-    s.unified_section_frame_width = 1;
-    s.header_style.show_bottom_line = false;
-    s.body_style.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
-    return s;
-}
-
-UiDropdown::Style MakeDropdownStyle(const DemoPalette& c)
-{
-    UiDropdown::Style s = UiTheme::ResolveDropdown();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.segment_face);
-        s.palette.frame[i] = c.segment_frame;
-        s.palette.ink[i] = c.ink;
-        s.palette.icon[i] = c.muted;
-    }
-    s.palette.face[ST_HOT] = UiFill::Solid(Blend(c.segment_face, c.paper, 32));
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(4), DPI(8), DPI(4));
-    s.popup_radius = DPI(DEMO_RADIUS);
-    s.popup_frame_width = DPI(1);
-    s.popup_frame_color = c.segment_frame;
-    s.popup_background_color = c.paper;
-    s.transparent = false;
-    s.font = DemoSans(10);
-    return s;
-}
-
-UiLabel::Style MakeFormulaLabelStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-        s.palette.ink[i] = c.muted;
-    }
-    s.transparent = true;
-    s.font = DemoMono(11, true);
-    s.metrics.text_font = s.font;
-    s.metrics.use_text_font = true;
-    return s;
-}
-
-UiBezierCurveEditor::Style MakeCurveEditorStyle(const DemoPalette& c)
-{
-    UiBezierCurveEditor::Style s = UiBezierCurveEditor::StyleDefault();
-    s.fill_background = false;
-    s.invert_y = true;
-    s.axis = Blend(c.divider, c.paper, c.dark ? 12 : 22);
-    s.curve = Color(212, 62, 62);
-    s.handle_fill = c.blue;
-    s.handle_ring = c.dark ? Color(233, 238, 247) : White();
-    s.handle_selected = Color(212, 62, 62);
-    s.radius = DPI(5);
-    s.ring = DPI(3);
-    s.inset = DPI(8);
-    s.hit_radius = DPI(12);
-    s.stroke = DPI(2);
-    return s;
-}
-
-void DrawRoundedBox(Draw& w, const Rect& r, int radius, Color face, Color frame, int frame_width = 1)
-{
-    if(r.IsEmpty())
-        return;
-    ImageBuffer ib(r.GetWidth(), r.GetHeight());
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    p.Begin();
-    double rad = min<double>(radius, min(r.GetWidth(), r.GetHeight()) / 2.0);
-    p.RoundedRectangle(0.5, 0.5, r.GetWidth() - 1.0, r.GetHeight() - 1.0, rad);
-    p.Fill(face);
-    if(!IsNull(frame) && frame_width > 0)
-        p.Stroke(frame_width, frame);
-    p.End();
-    w.DrawImage(r.left, r.top, ib);
 }
 
 class DemoCodePanel : public UiPanel {
@@ -613,9 +232,9 @@ public:
         Rect inset = r.Deflated(DPI(24), DPI(36));
         DrawDotGrid(w, inset, palette_.grid, DPI(18), DPI(2));
         DrawDashedRect(w, inset, palette_.preview_frame);
-        UiLabel::Style hint = MakeBodyLabelStyle(palette_, true, true);
-        Size tsz = GetTextSize("Centered preview generated from active properties.", hint.font);
-        w.DrawText(inset.left, inset.top - tsz.cy - DPI(8), "Centered preview generated from active properties.", hint.font, palette_.preview_hint);
+        Font hint = DemoSans(9);
+        Size tsz = GetTextSize("Centered preview generated from active properties.", hint);
+        w.DrawText(inset.left, inset.top - tsz.cy - DPI(8), "Centered preview generated from active properties.", hint, palette_.preview_hint);
     }
 
     virtual void Layout() override
@@ -821,9 +440,9 @@ public:
 
         header_.SetTitle("U++ UiButton Builder")
                .SetSubTitle("Configure one button surface and copy the exact control code for the current result.")
-               .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
-               .ShowRule(false)
-               .ShowBottomLine(false)
+               .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+               .ShowTitleLine(false)
+               .ShowCardLine(false)
                .SetSelectable(false)
                .SetShowFocus(false)
                .EnableHover(false);
@@ -901,7 +520,7 @@ private:
 
     void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
     {
-        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
 
@@ -1043,11 +662,11 @@ private:
         fill_row_.Toggle().WhenAction = [=] { config_.fill = fill_row_.Toggle().IsOn(); RefreshFromConfig(); };
         frame_row_.Toggle().WhenAction = [=] { config_.frame = frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
         shadow_row_.Toggle().WhenAction = [=] { config_.shadow = shadow_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        face_color_row_.WhenAction = [=] { config_.face_color = face_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        frame_color_row_.WhenAction = [=] { config_.frame_color = frame_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        text_color_row_.WhenAction = [=] { config_.text_color = text_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        icon_color_row_.WhenAction = [=] { config_.icon_color = icon_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
-        shadow_color_row_.WhenAction = [=] { config_.shadow_color = shadow_color_row_.GetSwatchColor(0); RefreshFromConfig(); };
+        face_color_row_.WhenAction = [=] { config_.face_color = face_color_row_.GetColor(0); RefreshFromConfig(); };
+        frame_color_row_.WhenAction = [=] { config_.frame_color = frame_color_row_.GetColor(0); RefreshFromConfig(); };
+        text_color_row_.WhenAction = [=] { config_.text_color = text_color_row_.GetColor(0); RefreshFromConfig(); };
+        icon_color_row_.WhenAction = [=] { config_.icon_color = icon_color_row_.GetColor(0); RefreshFromConfig(); };
+        shadow_color_row_.WhenAction = [=] { config_.shadow_color = shadow_color_row_.GetColor(0); RefreshFromConfig(); };
     }
 
     String BuildUsageCode() const
@@ -1082,7 +701,7 @@ private:
         code << "style.palette.ink[ST_NORMAL] = Color(" << config_.text_color.GetR() << ", " << config_.text_color.GetG() << ", " << config_.text_color.GetB() << ");\n";
         code << "style.palette.icon[ST_NORMAL] = Color(" << config_.icon_color.GetR() << ", " << config_.icon_color.GetG() << ", " << config_.icon_color.GetB() << ");\n\n";
         code << "UiButton button;\n";
-        code << "button.SetStyle(style)\n";
+        code << "button.SetCustomStyle(style)\n";
         code << "      .SetText(\"" << config_.text << "\")\n";
         if(!config_.icon_name.IsEmpty())
             code << "      .SetIcon(UiIconFromName(\"" << config_.icon_name << "\"))\n";
@@ -1128,11 +747,11 @@ private:
         fill_row_.Toggle().SetOn(config_.fill);
         frame_row_.Toggle().SetOn(config_.frame);
         shadow_row_.Toggle().SetOn(config_.shadow);
-        face_color_row_.SetSwatchColor(0, config_.face_color);
-        frame_color_row_.SetSwatchColor(0, config_.frame_color);
-        text_color_row_.SetSwatchColor(0, config_.text_color);
-        icon_color_row_.SetSwatchColor(0, config_.icon_color);
-        shadow_color_row_.SetSwatchColor(0, config_.shadow_color);
+        face_color_row_.SetColor(0, config_.face_color);
+        frame_color_row_.SetColor(0, config_.frame_color);
+        text_color_row_.SetColor(0, config_.text_color);
+        icon_color_row_.SetColor(0, config_.icon_color);
+        shadow_color_row_.SetColor(0, config_.shadow_color);
         icon_layout_drop_.SelectByData((int)config_.icon_side);
         align_h_drop_.SelectByData((int)config_.align_h);
         align_v_drop_.SelectByData((int)config_.align_v);
@@ -1184,7 +803,7 @@ private:
         }
 
         Image icon = ResolveButtonIcon(config_.icon_name);
-        button.SetStyle(style)
+        button.SetCustomStyle(style)
               .SetText(config_.text)
               .SetIconSide(config_.icon_side)
               .SetAlign(config_.align_h, config_.align_v)
@@ -1229,85 +848,25 @@ private:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
         ctx.mode = mode;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
 
         palette_ = ResolveDemoPalette(mode);
 
-        header_.SetStyle(MakeHeaderStyle(palette_));
-        version_badge_.SetStyle(MakeBadgeStyle(palette_));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
-        theme_icon_.SetStyle(MakeHeaderIconStyle(palette_));
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+        theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
+        theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
-        theme_icon_.SetIconColor(mode == UiThemeMode::Dark ? Color(214, 222, 236) : palette_.blue);
-        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
+        theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
-        copy_label_.SetStyle(MakeBodyLabelStyle(palette_, true, true));
-        copy_button_.SetStyle(MakeCopyButtonStyle(palette_));
-        code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        code_panel_.Scroll().SetStyle(MakeScrollBodyStyle(palette_));
-        code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
-        shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
-        shadow_curve_field_.SetFormulaStyle(MakeFormulaLabelStyle(palette_));
-        shadow_curve_field_.SetCopyStyle(MakeCopyButtonStyle(palette_));
+        exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+        copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        copy_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+        code_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle());
+        code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
         shadow_curve_field_.SetFormulaSelectable(true).SetShowFormula(true).SetShowCopy(true).SetFlipVertical(true);
-        inspector_scroll_.SetStyle(MakeScrollBodyStyle(palette_));
-        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
-        layout_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        content_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        appearance_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        shadow_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        icon_layout_drop_.SetStyle(MakeDropdownStyle(palette_));
-        align_h_drop_.SetStyle(MakeDropdownStyle(palette_));
-        align_v_drop_.SetStyle(MakeDropdownStyle(palette_));
-        icon_mode_drop_.SetStyle(MakeDropdownStyle(palette_));
-        icon_drop_.SetStyle(MakeDropdownStyle(palette_));
-        shadow_curve_preset_drop_.SetStyle(MakeDropdownStyle(palette_));
-        text_edit_.SetStyle(UiTheme::ResolveEdit());
         preview_.SetPalette(palette_);
-
-        UiLabel::Style row_label = MakeBodyLabelStyle(palette_);
-        UiLabel::Style row_value = MakeValueLabelStyle(palette_);
-        state_theme_label_.SetStyle(row_label);
-        state_theme_value_.SetStyle(row_value);
-        state_size_label_.SetStyle(row_label);
-        state_size_value_.SetStyle(row_value);
-        state_button_label_.SetStyle(row_label);
-        state_button_value_.SetStyle(row_value);
-        icon_layout_label_.SetStyle(row_label);
-        align_h_label_.SetStyle(row_label);
-        align_v_label_.SetStyle(row_label);
-        text_label_.SetStyle(row_label);
-        icon_label_.SetStyle(row_label);
-        icon_mode_label_.SetStyle(row_label);
-        shadow_curve_preset_label_.SetStyle(row_label);
-        min_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        min_height_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        radius_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        frame_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        padding_x_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        padding_y_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        icon_gap_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        icon_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        icon_height_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        enabled_row_.SetLabelStyle(row_label);
-        checkable_row_.SetLabelStyle(row_label);
-        checked_row_.SetLabelStyle(row_label);
-        underline_row_.SetLabelStyle(row_label);
-        underline_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        underline_offset_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        fill_row_.SetLabelStyle(row_label);
-        frame_row_.SetLabelStyle(row_label);
-        face_color_row_.SetLabelStyle(row_label);
-        frame_color_row_.SetLabelStyle(row_label);
-        text_color_row_.SetLabelStyle(row_label);
-        icon_color_row_.SetLabelStyle(row_label);
-        shadow_row_.SetLabelStyle(row_label);
-        shadow_color_row_.SetLabelStyle(row_label);
-        shadow_distance_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_offset_x_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_offset_y_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_alpha_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
 
         RefreshFromConfig();
         Refresh();

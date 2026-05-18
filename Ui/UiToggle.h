@@ -81,10 +81,11 @@ public:
 
     static const Style& StyleDefault();
     UiToggle();
-    UiToggle& SetStyle(const Style& s);
-    UiToggle& ClearStyleOverride();
-    bool HasStyleOverride() const { return has_style_override_; }
+    UiToggle& SetCustomStyle(const Style& s);
+    UiToggle& ClearCustomStyle();
+    bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
     StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
@@ -145,7 +146,7 @@ private:
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     bool on_ = false;
     bool hover_ = false;
     bool pressed_ = false;

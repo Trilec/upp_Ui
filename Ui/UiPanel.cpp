@@ -27,7 +27,7 @@ const UiPanel::Style& UiPanel::StyleDefault()
         s.metrics.text_font = StdFont();
         s.metrics.use_text_font = false;
         s.metrics.content_margin = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
-        s.metrics.radius = 0;
+        s.metrics.radius = DPI(8);
         s.metrics.frame_width = DPI(1);
         s.metrics.frame_enabled = true;
         s.metrics.face_enabled = true;
@@ -58,9 +58,9 @@ void UiPanel::InvalidateStyleCache()
 
 UiPanel::Style& UiPanel::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -68,7 +68,7 @@ UiPanel::Style& UiPanel::StyleEdit()
 
 void UiPanel::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     const uint64 revision = UiTheme::GetRevision();
@@ -79,20 +79,20 @@ void UiPanel::SyncThemeStyle()
     theme_revision_ = revision;
 }
 
-UiPanel& UiPanel::SetStyle(const Style& s)
+UiPanel& UiPanel::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiPanel& UiPanel::ClearStyleOverride()
+UiPanel& UiPanel::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -101,7 +101,7 @@ UiPanel& UiPanel::ClearStyleOverride()
 
 const UiPanel::Style& UiPanel::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
 
     const_cast<UiPanel*>(this)->SyncThemeStyle();
@@ -136,6 +136,33 @@ Size UiPanel::GetMinSize() const
         h = max(h, user_min_size_.cy);
 
     return Size(w, h);
+}
+
+Size UiPanel::GetContentSize() const
+{
+    Rect bounds(0, 0, 0, 0);
+    bool any = false;
+    for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
+        if(!q->IsShown())
+            continue;
+        Rect r = q->GetRect();
+        if(r.IsEmpty()) {
+            Size sz = q->GetMinSize();
+            r = RectC(0, 0, sz.cx, sz.cy);
+        }
+        if(any)
+            bounds |= r;
+        else {
+            bounds = r;
+            any = true;
+        }
+    }
+
+    Size content = any ? Size(max(0, bounds.right), max(0, bounds.bottom)) : Size(0, 0);
+    const Style& style = GetEffectiveStyle();
+    Size natural = UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
+    Size minsz = GetMinSize();
+    return Size(max(natural.cx, minsz.cx), max(natural.cy, minsz.cy));
 }
 
 UiPanel& UiPanel::SetSizeMin(Size sz)

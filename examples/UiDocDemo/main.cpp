@@ -1,3 +1,18 @@
+/*
+    UiDocDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include <Ui/Ui.h>
 #include <Ui/UiIcons.h>
 
@@ -61,7 +76,7 @@ public:
                 .SetGap(DPI(6))
                 .SetInset(DPI(8))
                 .SetAlignItems(UiCrossAlign::Start)
-                .SetStyle(tool_style)
+                .SetCustomStyle(tool_style)
                 .SetGroupHeaders(true);
 
         const int cl_format = toolbar_.NewCluster();
@@ -458,10 +473,10 @@ public:
             doc_.SetFocus();
         };
         image_flow_demo_.WhenAction = [=] {
-            Image logo = Unmultiply(ICON_BRAND_UPPLOGO2_48());
+            Image logo = Unmultiply(ICON_BRAND_NEWLOGO_V5_48());
             String png = PNGEncoder().SaveString(logo);
             Size sz = logo.GetSize();
-            String key = doc_.AddResource("image", png, "image/png", "DATA_BRAND_UPPLOGO2_48", sz.cx, sz.cy, true);
+            String key = doc_.AddResource("image", png, "image/png", "DATA_BRAND_NEWLOGO_V5_48", sz.cx, sz.cy, true);
             if(!key.IsEmpty()) {
                 bool in_table = false;
                 ValueMap add;

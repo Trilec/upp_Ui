@@ -1,3 +1,18 @@
+/*
+    UiLabelDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -108,8 +123,8 @@ public:
         margin_y_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.margin_y);
         radius_row_.Slider().SetRange(0, DPI(20)).SetStep(1).SetValue(cfg_.radius);
         frame_width_row_.Slider().SetRange(0, 4).SetStep(1).SetValue(cfg_.frame_width);
-        span_color_row_.SetLabel("Ink Color").SetSwatchCount(1).ShowValue(false);
-        span_color_row_.SetSwatchColor(0, Color(196, 59, 59));
+        span_color_row_.SetLabel("Ink Color").SetColorCount(1).ShowValue(false);
+        span_color_row_.SetColor(0, Color(196, 59, 59));
 
         text_edit_.WhenAction = [=] { cfg_.text = text_edit_.GetText().ToString(); RefreshFromConfig(); };
         text_edit_.WhenChange = [=] { cfg_.text = text_edit_.GetText().ToString(); RefreshFromConfig(); };
@@ -163,16 +178,16 @@ protected:
         UiDropdown::Style dd = MakeDropdownStyle(Palette());
         UiButton::Style btn = MakeSmallButtonStyle(Palette());
 
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_mode_label_.SetStyle(body); state_mode_value_.SetStyle(value);
-        state_text_label_.SetStyle(body); state_text_value_.SetStyle(value);
-        state_span_label_.SetStyle(body); state_span_value_.SetStyle(value);
-        state_surface_label_.SetStyle(body); state_surface_value_.SetStyle(value);
-        text_label_.SetStyle(body); align_h_label_.SetStyle(body); align_v_label_.SetStyle(body); icon_side_label_.SetStyle(body);
-        span_text_label_.SetStyle(body);
-        text_edit_.SetStyle(edit);
-        span_text_edit_.SetStyle(edit);
-        align_h_drop_.SetStyle(dd); align_v_drop_.SetStyle(dd); icon_side_drop_.SetStyle(dd);
+        state_theme_label_.SetCustomStyle(body); state_theme_value_.SetCustomStyle(value);
+        state_mode_label_.SetCustomStyle(body); state_mode_value_.SetCustomStyle(value);
+        state_text_label_.SetCustomStyle(body); state_text_value_.SetCustomStyle(value);
+        state_span_label_.SetCustomStyle(body); state_span_value_.SetCustomStyle(value);
+        state_surface_label_.SetCustomStyle(body); state_surface_value_.SetCustomStyle(value);
+        text_label_.SetCustomStyle(body); align_h_label_.SetCustomStyle(body); align_v_label_.SetCustomStyle(body); icon_side_label_.SetCustomStyle(body);
+        span_text_label_.SetCustomStyle(body);
+        text_edit_.SetCustomStyle(edit);
+        span_text_edit_.SetCustomStyle(edit);
+        align_h_drop_.SetCustomStyle(dd); align_v_drop_.SetCustomStyle(dd); icon_side_drop_.SetCustomStyle(dd);
         gap_row_.SetLabelStyle(body).SetValueStyle(value);
         icon_size_row_.SetLabelStyle(body).SetValueStyle(value);
         margin_x_row_.SetLabelStyle(body).SetValueStyle(value);
@@ -190,11 +205,11 @@ protected:
         span_underline_row_.SetLabelStyle(body);
         span_color_enabled_row_.SetLabelStyle(body);
         span_color_row_.SetLabelStyle(body);
-        add_span_button_.SetStyle(btn);
-        update_span_button_.SetStyle(btn);
-        newline_button_.SetStyle(btn);
-        delete_span_button_.SetStyle(btn);
-        clear_spans_button_.SetStyle(btn);
+        add_span_button_.SetCustomStyle(btn);
+        update_span_button_.SetCustomStyle(btn);
+        newline_button_.SetCustomStyle(btn);
+        delete_span_button_.SetCustomStyle(btn);
+        clear_spans_button_.SetCustomStyle(btn);
     }
 
     virtual void LayoutPreviewContent() override
@@ -213,7 +228,7 @@ private:
 
     void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
     {
-        row.SetLabel(name).SetSwatchCount(1).ShowValue(false);
+        row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
 
@@ -240,7 +255,7 @@ private:
         s.bold = span_bold_row_.Toggle().IsOn();
         s.italic = span_italic_row_.Toggle().IsOn();
         s.underline = span_underline_row_.Toggle().IsOn();
-        s.ink = span_color_enabled_row_.Toggle().IsOn() ? span_color_row_.GetSwatchColor(0) : Null;
+        s.ink = span_color_enabled_row_.Toggle().IsOn() ? span_color_row_.GetColor(0) : Null;
         return s;
     }
 
@@ -254,7 +269,7 @@ private:
         span_italic_row_.Toggle().SetOn(s.italic);
         span_underline_row_.Toggle().SetOn(s.underline);
         span_color_enabled_row_.Toggle().SetOn(!IsNull(s.ink));
-        span_color_row_.SetSwatchColor(0, IsNull(s.ink) ? Palette().blue : s.ink);
+        span_color_row_.SetColor(0, IsNull(s.ink) ? Palette().blue : s.ink);
     }
 
     void AddSpanFromEditor()
@@ -352,7 +367,7 @@ private:
             style.palette.frame[i] = Palette().segment_frame;
         }
 
-        label_.SetStyle(style)
+        label_.SetCustomStyle(style)
               .SetIcon(cfg_.show_icon ? ICON_ACTION_SEARCH_48() : Image())
               .SetIconRenderMode(UiIconRenderMode::PreserveColor)
               .SetIconSide(cfg_.icon_side)
@@ -417,7 +432,7 @@ private:
         code << "style.metrics.face_enabled = " << (cfg_.body_face ? "true" : "false") << ";\n";
         code << "style.metrics.frame_enabled = " << (cfg_.body_frame ? "true" : "false") << ";\n";
         code << "style.content_gap = " << cfg_.content_gap << ";\n";
-        code << "label.SetStyle(style)\n";
+        code << "label.SetCustomStyle(style)\n";
         if(cfg_.show_icon)
             code << "     .SetIcon(ICON_ACTION_SEARCH_48())\n";
         code << "     .SetIconSide(UiAlign::" << (cfg_.icon_side == UiAlign::RIGHT ? "RIGHT" : cfg_.icon_side == UiAlign::TOP ? "TOP" : cfg_.icon_side == UiAlign::BOTTOM ? "BOTTOM" : "LEFT") << ")\n";

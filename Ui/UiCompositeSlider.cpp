@@ -1,4 +1,5 @@
 #include <Ui/UiCompositeSlider.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -8,9 +9,16 @@ UiCompositeSlider::UiCompositeSlider()
     Add(slider_);
     Add(value_);
     slider_.WhenAction = [=] { WhenAction(); };
-    slider_.WhenChanging = [=] { WhenAction(); };
+    slider_.WhenChanging = [=] { WhenChanging(); };
     label_.NoWantFocus();
     value_.NoWantFocus();
+    UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    label_style.font = SansSerifZ(9);
+    UiLabel::Style value_style = UiTheme::ResolveLabel(UiRole::Standard);
+    value_style.font = SansSerifZ(9);
+    label_.SetCustomStyle(label_style);
+    value_.SetCustomStyle(value_style);
+    slider_.SetTrackSize(Size(DPI(1000), DPI(3)));
     value_.SetSizeMin(Size(value_width_, 0));
     SyncValueVisibility();
 }
@@ -92,14 +100,14 @@ UiCompositeSlider& UiCompositeSlider::SetStackGap(int px)
 
 UiCompositeSlider& UiCompositeSlider::SetLabelStyle(const UiLabel::Style& style)
 {
-    label_.SetStyle(style);
+    label_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
 UiCompositeSlider& UiCompositeSlider::SetValueStyle(const UiLabel::Style& style)
 {
-    value_.SetStyle(style);
+    value_.SetCustomStyle(style);
     Refresh();
     return *this;
 }

@@ -57,7 +57,7 @@ public:
 
     UiBezierCurveEditor();
 
-    UiBezierCurveEditor& SetStyle(const Style& s);
+    UiBezierCurveEditor& SetCustomStyle(const Style& s);
     const Style& GetStyle() const { return style_; }
 
     UiBezierCurveEditor& SetCurve(const ShadowCurve& c);

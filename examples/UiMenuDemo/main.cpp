@@ -1,3 +1,18 @@
+/*
+    UiMenuDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
 #include "../BuilderDemoSupport.h"
 
 using namespace Upp;
@@ -158,13 +173,13 @@ protected:
         UiLabel::Style body = MakeBodyLabelStyle(Palette());
         UiLabel::Style value = MakeValueLabelStyle(Palette());
         UiDropdown::Style dd = MakeDropdownStyle(Palette());
-        state_theme_label_.SetStyle(body); state_theme_value_.SetStyle(value);
-        state_dataset_label_.SetStyle(body); state_dataset_value_.SetStyle(value);
-        state_items_label_.SetStyle(body); state_items_value_.SetStyle(value);
-        state_action_label_.SetStyle(body); state_action_value_.SetStyle(value);
-        dataset_label_.SetStyle(body); dataset_drop_.SetStyle(dd);
+        state_theme_label_.SetCustomStyle(body); state_theme_value_.SetCustomStyle(value);
+        state_dataset_label_.SetCustomStyle(body); state_dataset_value_.SetCustomStyle(value);
+        state_items_label_.SetCustomStyle(body); state_items_value_.SetCustomStyle(value);
+        state_action_label_.SetCustomStyle(body); state_action_value_.SetCustomStyle(value);
+        dataset_label_.SetCustomStyle(body); dataset_drop_.SetCustomStyle(dd);
         ApplySliderStyle(body, value); ApplyToggleStyle(body); ApplyColorStyle(body);
-        open_popup_button_.SetStyle(MakeSmallButtonStyle(Palette()));
+        open_popup_button_.SetCustomStyle(MakeSmallButtonStyle(Palette()));
     }
 
     virtual void LayoutPreviewContent() override
@@ -176,16 +191,27 @@ protected:
 
 private:
     struct EnumOption { const char* label; int value; };
-    void AddColorRow(UiBoxLayout& t, UiCompositeColor& r, const char* n) { r.SetLabel(n).SetSwatchCount(1).ShowValue(false); t.Add(r).Fit(); }
+    void AddColorRow(UiBoxLayout& t, UiCompositeColor& r, const char* n) { r.SetLabel(n).SetColorCount(1).ShowValue(false); t.Add(r).Fit(); }
     void PopulateDropdown(UiDropdown& d, const EnumOption* o, int n){ d.UseInternalModel(); d.Clear(); for(int i=0;i<n;i++) d.Add(o[i].label,o[i].value);}    
-    void InitColorRow(UiCompositeColor& r, Color c){ r.SetSwatchColor(0,c); }
+    void InitColorRow(UiCompositeColor& r, Color c){ r.SetColor(0,c); }
     void InitSlider(UiCompositeSlider& r, int value, int lo, int hi){ r.Slider().SetRange(lo,hi).SetStep(1).SetValue(value); }
     void ApplySliderStyle(const UiLabel::Style& body, const UiLabel::Style& value){ Vector<UiCompositeSlider*> rows = { &row_height_row_, &bar_height_row_, &icon_size_row_, &check_size_row_, &arrow_size_row_, &left_padding_row_, &right_padding_row_, &content_gap_row_, &item_spacing_row_, &right_gap_row_, &popup_padding_row_, &popup_min_width_row_, &popup_max_height_row_, &submenu_overlap_row_ }; for(auto* r : rows) r->SetLabelStyle(body).SetValueStyle(value); }
     void ApplyToggleStyle(const UiLabel::Style& body){ Vector<UiCompositeToggle*> rows = { &show_icons_row_, &show_checks_row_, &show_descriptions_row_, &show_shortcuts_row_, &show_separators_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
     void ApplyColorStyle(const UiLabel::Style& body){ Vector<UiCompositeColor*> rows = { &popup_bg_row_, &bar_bg_row_, &separator_row_, &item_ink_row_, &disabled_ink_row_, &right_ink_row_, &hot_bg_row_, &hot_frame_row_, &pressed_bg_row_, &pressed_frame_row_, &active_bar_bg_row_, &check_color_row_, &arrow_color_row_, &shadow_color_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
     void WireSlider(UiCompositeSlider& r, int& field){ r.WhenAction = [this, &r, &field] { field = (int)r.Slider().GetValue(); RefreshFromConfig(); }; }
     void WireToggle(UiCompositeToggle& r, bool& field){ r.Toggle().WhenAction = [this, &r, &field] { field = r.Toggle().IsOn(); RefreshFromConfig(); }; }
-    void WireColor(UiCompositeColor& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetSwatchColor(0); RefreshFromConfig(); }; }
+    void WireColor(UiCompositeColor& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetColor(0); RefreshFromConfig(); }; }
+
+    String IconNameFor(const Image& icon) const
+    {
+        if(IsNull(icon))
+            return String();
+        Vector<String> names = UiIconNameList();
+        for(const String& name : names)
+            if(UiIconFromName(name) == icon)
+                return name;
+        return String();
+    }
 
     UiMenu::Style BuildStyle() const
     {
@@ -259,8 +285,8 @@ private:
         dataset_drop_.SelectByData(cfg_.dataset);
         SyncRows();
         BuildModels();
-        menu_bar_.SetStyle(BuildStyle()).SetMenuBarMode(true).SetModel(bar_model_);
-        popup_menu_.SetStyle(BuildStyle()).SetModel(popup_model_);
+        menu_bar_.SetCustomStyle(BuildStyle()).SetMenuBarMode(true).SetModel(bar_model_);
+        popup_menu_.SetCustomStyle(BuildStyle()).SetModel(popup_model_);
         SyncState(); SyncCode(); LayoutPreviewContent(); Preview().Refresh();
     }
 
@@ -270,8 +296,8 @@ private:
         left_padding_row_.Slider().SetValue(cfg_.left_padding); right_padding_row_.Slider().SetValue(cfg_.right_padding); content_gap_row_.Slider().SetValue(cfg_.content_gap); item_spacing_row_.Slider().SetValue(cfg_.item_spacing); right_gap_row_.Slider().SetValue(cfg_.right_gap);
         popup_padding_row_.Slider().SetValue(cfg_.popup_padding); popup_min_width_row_.Slider().SetValue(cfg_.popup_min_width); popup_max_height_row_.Slider().SetValue(cfg_.popup_max_height); submenu_overlap_row_.Slider().SetValue(cfg_.submenu_overlap);
         show_icons_row_.Toggle().SetOn(cfg_.show_icons); show_checks_row_.Toggle().SetOn(cfg_.show_checks); show_descriptions_row_.Toggle().SetOn(cfg_.show_descriptions); show_shortcuts_row_.Toggle().SetOn(cfg_.show_shortcuts); show_separators_row_.Toggle().SetOn(cfg_.show_separators);
-        popup_bg_row_.SetSwatchColor(0, cfg_.popup_bg); bar_bg_row_.SetSwatchColor(0, cfg_.bar_bg); separator_row_.SetSwatchColor(0, cfg_.separator_color); item_ink_row_.SetSwatchColor(0, cfg_.item_ink); disabled_ink_row_.SetSwatchColor(0, cfg_.disabled_ink); right_ink_row_.SetSwatchColor(0, cfg_.right_ink);
-        hot_bg_row_.SetSwatchColor(0, cfg_.hot_bg); hot_frame_row_.SetSwatchColor(0, cfg_.hot_frame); pressed_bg_row_.SetSwatchColor(0, cfg_.pressed_bg); pressed_frame_row_.SetSwatchColor(0, cfg_.pressed_frame); active_bar_bg_row_.SetSwatchColor(0, cfg_.active_bar_bg); check_color_row_.SetSwatchColor(0, cfg_.check_color); arrow_color_row_.SetSwatchColor(0, cfg_.arrow_color); shadow_color_row_.SetSwatchColor(0, cfg_.shadow_color);
+        popup_bg_row_.SetColor(0, cfg_.popup_bg); bar_bg_row_.SetColor(0, cfg_.bar_bg); separator_row_.SetColor(0, cfg_.separator_color); item_ink_row_.SetColor(0, cfg_.item_ink); disabled_ink_row_.SetColor(0, cfg_.disabled_ink); right_ink_row_.SetColor(0, cfg_.right_ink);
+        hot_bg_row_.SetColor(0, cfg_.hot_bg); hot_frame_row_.SetColor(0, cfg_.hot_frame); pressed_bg_row_.SetColor(0, cfg_.pressed_bg); pressed_frame_row_.SetColor(0, cfg_.pressed_frame); active_bar_bg_row_.SetColor(0, cfg_.active_bar_bg); check_color_row_.SetColor(0, cfg_.check_color); arrow_color_row_.SetColor(0, cfg_.arrow_color); shadow_color_row_.SetColor(0, cfg_.shadow_color);
     }
 
     void SyncState()
@@ -285,11 +311,86 @@ private:
     void SyncCode()
     {
         String code;
-        code << "UiMenu menu;\n";
-        code << "menu.SetStyle(UiMenu::StyleDefault());\n";
-        code << "menu.SetMenuBarMode(true).SetModel(model);\n";
-        code << "// row_height=" << cfg_.row_height << ", bar_height=" << cfg_.bar_height << ", content_gap=" << cfg_.content_gap << ", item_spacing=" << cfg_.item_spacing << "\n";
+        code << "UiMenu::Style style = UiMenu::StyleDefault();\n";
+        code << "style.row_height = " << cfg_.row_height << ";\n";
+        code << "style.bar_height = " << cfg_.bar_height << ";\n";
+        code << "style.icon_size = " << cfg_.icon_size << ";\n";
+        code << "style.check_size = " << cfg_.check_size << ";\n";
+        code << "style.arrow_size = " << cfg_.arrow_size << ";\n";
+        code << "style.left_padding = " << cfg_.left_padding << ";\n";
+        code << "style.right_padding = " << cfg_.right_padding << ";\n";
+        code << "style.content_gap = " << cfg_.content_gap << ";\n";
+        code << "style.item_spacing = " << cfg_.item_spacing << ";\n";
+        code << "style.right_gap = " << cfg_.right_gap << ";\n";
+        code << "style.popup_padding = " << cfg_.popup_padding << ";\n";
+        code << "style.popup_min_width = " << cfg_.popup_min_width << ";\n";
+        code << "style.popup_max_height = " << cfg_.popup_max_height << ";\n";
+        code << "style.submenu_overlap = " << cfg_.submenu_overlap << ";\n";
+        code << "style.show_icons = " << (cfg_.show_icons ? "true" : "false") << ";\n";
+        code << "style.show_checks = " << (cfg_.show_checks ? "true" : "false") << ";\n";
+        code << "style.show_descriptions = " << (cfg_.show_descriptions ? "true" : "false") << ";\n";
+        code << "style.show_shortcuts = " << (cfg_.show_shortcuts ? "true" : "false") << ";\n";
+        code << "style.show_separators = " << (cfg_.show_separators ? "true" : "false") << ";\n";
+        code << "style.popup_bg = " << ColorCpp(cfg_.popup_bg) << ";\n";
+        code << "style.bar_bg = " << ColorCpp(cfg_.bar_bg) << ";\n";
+        code << "style.separator_color = " << ColorCpp(cfg_.separator_color) << ";\n";
+        code << "style.item_ink = " << ColorCpp(cfg_.item_ink) << ";\n";
+        code << "style.disabled_ink = " << ColorCpp(cfg_.disabled_ink) << ";\n";
+        code << "style.right_ink = " << ColorCpp(cfg_.right_ink) << ";\n";
+        code << "style.hot_bg = " << ColorCpp(cfg_.hot_bg) << ";\n";
+        code << "style.hot_frame = " << ColorCpp(cfg_.hot_frame) << ";\n";
+        code << "style.pressed_bg = " << ColorCpp(cfg_.pressed_bg) << ";\n";
+        code << "style.pressed_frame = " << ColorCpp(cfg_.pressed_frame) << ";\n";
+        code << "style.active_bar_bg = " << ColorCpp(cfg_.active_bar_bg) << ";\n";
+        code << "style.check_color = " << ColorCpp(cfg_.check_color) << ";\n";
+        code << "style.arrow_color = " << ColorCpp(cfg_.arrow_color) << ";\n";
+        code << "style.shadow_color = " << ColorCpp(cfg_.shadow_color) << ";\n\n";
+        code << "UiMenuModel model;\n";
+        code << "UiMenuNodeRef root = model.Root();\n";
+        int next_id = 0;
+        for(int i = 0; i < bar_model_.GetChildCount(bar_model_.Root()); i++)
+            AppendCodeNode(code, bar_model_, bar_model_.GetChild(bar_model_.Root(), i), "root", next_id);
+        code << "\nUiMenu menu;\n";
+        code << "menu.SetCustomStyle(style).SetMenuBarMode(true).SetModel(model);\n";
+        code << "\nUiMenuModel popup_model;\n";
+        code << "UiMenuNodeRef popup_root = popup_model.Root();\n";
+        next_id = 0;
+        for(int i = 0; i < popup_model_.GetChildCount(popup_model_.Root()); i++)
+            AppendCodeNode(code, popup_model_, popup_model_.GetChild(popup_model_.Root(), i), "popup_root", next_id);
+        code << "UiMenu popup;\n";
+        code << "popup.SetCustomStyle(style).SetModel(popup_model);\n";
         SetUsageCode(code);
+    }
+
+    void AppendCodeNode(String& code, const UiMenuModel& model, UiMenuNodeRef node, const String& parent, int& next_id) const
+    {
+        const UiMenuItem& it = model.Get(node);
+        String item_var = Format("item%d", next_id);
+        String node_var = Format("n%d", next_id++);
+        if(it.separator) {
+            code << "UiMenuItem " << item_var << "; " << item_var << ".separator = true; " << item_var << ".enabled = false;\n";
+        }
+        else {
+            code << "UiMenuItem " << item_var << "(" << QuoteCpp(it.text) << ", " << QuoteCpp(AsString(it.data)) << ");\n";
+            if(!it.description.IsEmpty()) code << item_var << ".description = " << QuoteCpp(it.description) << ";\n";
+            if(!it.right_text.IsEmpty()) code << item_var << ".right_text = " << QuoteCpp(it.right_text) << ";\n";
+            if(!it.shortcut_text.IsEmpty()) code << item_var << ".shortcut_text = " << QuoteCpp(it.shortcut_text) << ";\n";
+            if(!it.command_id.IsVoid()) code << item_var << ".command_id = " << AsString(it.command_id) << ";\n";
+            if(!it.enabled) code << item_var << ".enabled = false;\n";
+            if(!it.visible) code << item_var << ".visible = false;\n";
+            if(it.separator_before) code << item_var << ".separator_before = true;\n";
+            if(it.checkable) code << item_var << ".checkable = true;\n";
+            if(it.checked) code << item_var << ".checked = true;\n";
+            if(it.radio) code << item_var << ".radio = true;\n";
+            String icon_name = IconNameFor(it.icon);
+            if(!icon_name.IsEmpty()) {
+                code << item_var << ".icon = " << icon_name << "();\n";
+                code << item_var << ".icon_render_mode = UiIconRenderMode::MonoTint;\n";
+            }
+        }
+        code << "UiMenuNodeRef " << node_var << " = model.AddChild(" << parent << ", " << item_var << ");\n";
+        for(int i = 0; i < model.GetChildCount(node); i++)
+            AppendCodeNode(code, model, model.GetChild(node, i), node_var, next_id);
     }
 
     MenuConfig cfg_;

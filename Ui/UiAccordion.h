@@ -56,7 +56,7 @@ public:
         UiTitleCard::Style header_style;
         UiPanel::Style     body_style;
 
-        int  header_height   = DPI(72);
+        int  header_height   = DPI(28);
         int  item_spacing    = DPI(8);
         int  header_body_gap = DPI(4);
         int  body_min_height = DPI(88);
@@ -157,10 +157,11 @@ public:
 
     static const Style& StyleDefault();
 
-    UiAccordion& SetStyle(const Style& s);
-    UiAccordion& ClearStyleOverride();
-    bool         HasStyleOverride() const { return has_style_override_; }
+    UiAccordion& SetCustomStyle(const Style& s);
+    UiAccordion& ClearCustomStyle();
+    bool         HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
+    const Style& GetCustomStyle() const { return style_; }
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -198,7 +199,7 @@ public:
     UiAccordion& SetChevronSize(int px);
     UiAccordion& SetChevronGap(int px);
     UiAccordion& SetChevronGlyphs(const Image& open, const Image& closed, const Image& lock = Image());
-    UiAccordion& SetHeaderRuleExtent(UiSpan ex);
+    UiAccordion& SetHeaderTitleLineLength(UiSpan ex);
     UiAccordion& SetBodyLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
 
     UiAccordion& SetLockMode(int i, Lock mode);
@@ -259,7 +260,7 @@ private:
 private:
     Style style_;
     uint64 theme_revision_ = 0;
-    bool has_style_override_ = false;
+    bool has_custom_style_ = false;
     Array<Section> sections_;
 
     bool drag_reorder_enabled_ = false;

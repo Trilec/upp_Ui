@@ -128,7 +128,7 @@ public:
     }
 
     /** Assign visual style (padding/spacing, headers, cluster boxes). */
-    UiGridLayout& SetStyle(const Style& s)          { style = s; Reflow(); Refresh(); return *this; }
+    UiGridLayout& SetCustomStyle(const Style& s)          { style = s; Reflow(); Refresh(); return *this; }
 
     /** Read current style. */
     const Style&  GetStyle() const                  { return style; }

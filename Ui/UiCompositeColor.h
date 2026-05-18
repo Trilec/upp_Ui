@@ -32,6 +32,8 @@ public:
     void SetColor(Color color);
     Color GetColor() const { return color_; }
     void SetRadius(int radius);
+    void SetSlotLabel(const String& label);
+    String GetSlotLabel() const { return label_; }
 
     Event<> WhenAction;
 
@@ -45,7 +47,7 @@ private:
     Color color_;
     int radius_ = DPI(6);
     bool hot_ = false;
-    ColorPopUp popup_;
+    String label_;
 };
 
 class UiCompositeColor : public Ctrl {
@@ -63,41 +65,50 @@ public:
     UiCompositeColor& SetValueWidth(int cx);
     UiCompositeColor& SetFieldGap(int px);
     UiCompositeColor& SetStackGap(int px);
-    UiCompositeColor& SetSwatchCount(int count);
-    int GetSwatchCount() const { return swatch_count_; }
+    UiCompositeColor& SetColorCount(int count);
+    int GetColorCount() const { return color_count_; }
     UiCompositeColor& SetLabelStyle(const UiLabel::Style& style);
     UiCompositeColor& SetValueStyle(const UiLabel::Style& style);
-    UiCompositeColor& SetSwatchColor(int index, Color color);
-    Color GetSwatchColor(int index) const;
+    UiCompositeColor& SetColor(int index, Color color);
+    Color GetColor(int index) const;
+    UiCompositeColor& SetColors(const Vector<Color>& colors);
+    Vector<Color> GetColors() const;
+    UiCompositeColor& SetColorLabel(int index, const String& label);
+    String GetColorLabel(int index) const;
+    UiCompositeColor& SetSeparatorBefore(int index, bool on = true);
+    bool HasSeparatorBefore(int index) const;
 
     UiLabel& LabelCtrl() { return label_; }
     const UiLabel& LabelCtrl() const { return label_; }
     UiLabel& ValueCtrl() { return value_; }
     const UiLabel& ValueCtrl() const { return value_; }
-    UiCompositeColorSwatch& Swatch(int index) { return swatch_[index]; }
-    const UiCompositeColorSwatch& Swatch(int index) const { return swatch_[index]; }
+    UiCompositeColorSwatch& ColorCtrl(int index) { return color_[index]; }
+    const UiCompositeColorSwatch& ColorCtrl(int index) const { return color_[index]; }
 
     virtual Size GetMinSize() const override;
+    virtual void Paint(Draw& w) override;
     virtual void Layout() override;
 
     Event<> WhenAction;
 
 private:
     void SyncValueVisibility();
-    void SyncSwatchVisibility();
+    void SyncColorVisibility();
+    void OpenColorPicker(int active);
 
 private:
     UiLabel label_;
     UiLabel value_;
-    UiCompositeColorSwatch swatch_[4];
+    UiCompositeColorSwatch color_[4];
+    bool separator_before_[4] = { false, false, false, false };
 
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     bool show_value_ = true;
     bool value_selectable_ = false;
-    int swatch_count_ = 1;
-    int label_width_ = DPI(102);
-    int value_width_ = DPI(92);
-    int field_gap_ = DPI(6);
+    int color_count_ = 1;
+    int label_width_ = DPI(112);
+    int value_width_ = DPI(76);
+    int field_gap_ = DPI(8);
     int stack_gap_ = DPI(4);
 };
 

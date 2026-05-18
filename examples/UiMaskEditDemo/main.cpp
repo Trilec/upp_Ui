@@ -1,171 +1,218 @@
-#include <CtrlLib/CtrlLib.h>
-#include <Ui/UiMaskEdit.h>
+/*
+    UiMaskEditDemo
+    ------------
+
+    Purpose
+    - Active Ui control demo used as a build smoke test and visual styling reference.
+
+    Demo hygiene header
+    - Keep this package compiling in the active demo sweep.
+    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
+
+    Changelog
+    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
+*/
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
+using namespace BuilderDemoSupport;
 
-class UiMaskEditDemo : public TopWindow {
+namespace {
+
+struct MaskCase {
+    const char *name;
+    const char *mask;
+    const char *sample;
+    const char *tip;
+};
+
+const MaskCase kMaskCases[] = {
+    { "Phone", "(###) ###-####", "(123) 456-7890", "Classic digit mask" },
+    { "Date", "##/##/####", "12/31/2026", "Mask plus semantic date validation" },
+    { "ZIP", "#####", "90210", "Five digit numeric mask" },
+    { "Plate", "UUU-####", "ABC-1234", "Auto-capitalized letters" },
+    { "Username", "", "Open_Ui_Designer", "Formatter only, no fixed mask" },
+};
+
+class UiMaskEditBuilder : public BuilderWindowBase {
 public:
-    typedef UiMaskEditDemo CLASSNAME;
+    typedef UiMaskEditBuilder CLASSNAME;
 
-    UiMaskEditDemo()
+    UiMaskEditBuilder()
+        : BuilderWindowBase("UiMaskEditDemo", "U++ UiMaskEdit Builder",
+                            "Test masks, semantic validators, formatters, placeholder text, and validation feedback.")
     {
-        Title("UiMaskEdit Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(600), DPI(600));
-
-        // Add controls
-        Add(lbl_phone);    Add(edit_phone);
-        Add(lbl_date);     Add(edit_date);
-        Add(lbl_zip);      Add(edit_zip);
-        Add(lbl_plate);    Add(edit_plate);
-        Add(lbl_username); Add(edit_username);
-
-        // 1. Phone Number (classic mask)
-        lbl_phone.SetText("Phone Number:");
-        edit_phone.SetMask("(###) ###-####");
-        edit_phone.SetTip("Format: (123) 456-7890");
-        SetupValidation(edit_phone);
-
-        // 2. Date (mask + semantic validator)
-        lbl_date.SetText("Date (MM/DD/YYYY):");
-        edit_date.SetMask("##/##/####");
-        edit_date.SetValidator(UiMaskEdit::DateValidator()); // Built-in check
-        edit_date.SetTip("Format: 12/31/2024 (validates month/day/year)");
-        SetupValidation(edit_date);
-
-        // 3. ZIP Code (simple numeric mask)
-        lbl_zip.SetText("ZIP Code:");
-        edit_zip.SetMask("#####");
-        edit_zip.SetTip("5-digit ZIP code");
-        // Mask already restricts to digits; validator just piggybacks on completeness.
-        SetupValidation(edit_zip);
-
-        // 4. License Plate (Auto-Caps via 'U')
-        lbl_plate.SetText("License Plate:");
-        edit_plate.SetMask("UUU-####");
-        edit_plate.SetTip("Format: ABC-1234 (auto-capitalizes letters)");
-        SetupValidation(edit_plate);
-        
-        // 5. Username (Styled, *formatter-only*, NO mask)
-        lbl_username.SetText("Username (Formatter only):");
-
-        // NOTE: No SetMask() here – we want unlimited-length, free typing,
-        // with on-the-fly formatting only.
-        edit_username.SetTip("Live formatting: spaces/punctuation → '_', "
-                             "each word's first letter becomes uppercase.");
-
-        // Formatter: username-style (spaces/punct → '_', title-cased words)
-        edit_username.SetFormatter(UiMaskEdit::UsernameFormatter());
-
-        // Validator: final value must be [A-Za-z0-9_]* (allow empty),
-        // so after formatting it should always be valid.
-        edit_username.SetValidator(UiMaskEdit::AlnumUnderscoreValidator(true));
-
-        // Custom pill style for username
-        {
-            UiBaseEdit::Style s = UiBaseEdit::StyleDefault();
-
-            s.metrics.radius        = DPI(999);   // effectively pill (clamped by height)
-            s.metrics.frame_width   = 0;
-            s.metrics.frame_enabled = false;
-            s.metrics.face_enabled  = true;
-
-            Color base = Color(45, 45, 48);
-
-            s.palette.face[ST_NORMAL]   = base;
-            s.palette.face[ST_HOT]      = Blend(base, White(), 15);
-            s.palette.face[ST_PRESSED]  = Blend(base, Black(), 15);
-            s.palette.face[ST_DISABLED] = Blend(base, SColorPaper(), 70);
-
-            s.palette.ink[ST_NORMAL]   = White();
-            s.palette.ink[ST_HOT]      = White();
-            s.palette.ink[ST_PRESSED]  = White();
-            s.palette.ink[ST_DISABLED] = GrayColor(170);
-
-            // Slightly bolder / larger to highlight the demo
-            s.font = StdFont().Bold().Height(StdFont().GetHeight() + DPI(1));
-
-            edit_username.SetStyle(s);
+        for(int i = 0; i < 5; i++) {
+            Preview().Add(labels_[i]);
+            Preview().Add(edits_[i]);
         }
 
-        // For username we still use SetupValidation, but since the
-        // validator always passes (or empty), it will not flash red –
-        // it just shows the green flash on "good" actions.
-        SetupValidation(edit_username);
-    }
+        AddStateRow(StateBox(), state_case_row_, state_case_label_, state_case_value_, "Case");
+        AddStateRow(StateBox(), state_value_row_, state_value_label_, state_value_value_, "Value");
+        AddStateRow(StateBox(), state_valid_row_, state_valid_label_, state_valid_value_, "Valid");
+        AddStateRow(StateBox(), state_mask_row_, state_mask_label_, state_mask_value_, "Mask");
 
-    void SetupValidation(UiMaskEdit& edit)
-    {
-        // Live error state while typing
-        edit.WhenChange = [=, &edit] {
-            edit.ShowError(!edit.IsValid());
+        AddDropdownRow(PropsBox(), case_row_, case_label_, case_drop_, "Case");
+        PropsBox().Add(sample_row_).Fit();
+        sample_row_.SetLabel("Sample").SetData(kMaskCases[0].sample);
+        sample_row_.Edit().WhenChange = [=] {
+            sample_override_ = sample_row_.GetData().ToString();
+            RefreshFromConfig();
         };
+        AddToggleRow(PropsBox(), live_validation_row_, "Live validation");
+        AddToggleRow(PropsBox(), success_flash_row_, "Flash on action");
 
-        // On "action" (Enter/lose focus), flash success or error
-        edit.WhenAction = [=, &edit] {
-            if(edit.IsValid()) {
-                edit.ShowError(false);
-                edit.FlashSuccess();
+        case_drop_.UseInternalModel();
+        for(int i = 0; i < __countof(kMaskCases); i++)
+            case_drop_.Add(kMaskCases[i].name, i);
+        case_drop_.WhenSelect = [=](int) {
+            int selected = (int)case_drop_.GetSelectedData();
+            if(selected >= 0 && selected < __countof(kMaskCases)) {
+                active_case_ = selected;
+                sample_override_.Clear();
+                RefreshFromConfig();
             }
-            else {
-                edit.ShowError(true);
-                edit.FlashError();
-            }
         };
+        live_validation_row_.Toggle().WhenAction = [=] { live_validation_ = live_validation_row_.Toggle().IsOn(); RefreshFromConfig(); };
+        success_flash_row_.Toggle().WhenAction = [=] { success_flash_ = success_flash_row_.Toggle().IsOn(); RefreshFromConfig(); };
+
+        FinishInit();
+        RefreshFromConfig();
     }
 
-    virtual void Paint(Draw& w) override
+protected:
+    virtual void ApplyDemoTheme() override
     {
-        Rect r = GetSize();
-        w.DrawRect(r, SColorPaper());
-
-        // Header
-        int head_h = DPI(80);
-        Rect header = r;
-        header.bottom = header.top + head_h;
-        w.DrawRect(header, SColorFace());
-
-        Font title = SansSerifZ(20).Bold();
-        w.DrawText(DPI(32), DPI(25), "UiMaskEdit Demo", title, SColorText());
+        for(int i = 0; i < 5; i++)
+            labels_[i].SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
     }
 
-    virtual void Layout() override
+    virtual void LayoutPreviewContent() override
     {
-        Rect r = GetSize();
-        int header_h = DPI(80);
-        int margin   = DPI(32);
-        int label_w  = DPI(200);
-        int edit_w   = DPI(260);
-        int h        = DPI(32);
-        int vgap     = DPI(20);
+        Rect canvas = Preview().GetCanvasRect();
+        int label_w = DPI(132);
+        int edit_w = min(DPI(330), max(DPI(220), canvas.GetWidth() - label_w - DPI(92)));
+        int h = DPI(32);
+        int row_gap = DPI(18);
+        int row_w = label_w + DPI(12) + edit_w;
+        int total_h = 5 * h + 4 * row_gap;
+        int x = canvas.left + (canvas.GetWidth() - row_w) / 2;
+        int y = canvas.top + (canvas.GetHeight() - total_h) / 2;
 
-        int x_label = margin;
-        int x_edit  = x_label + label_w + DPI(10);
-        int y       = header_h + DPI(30);
-
-        auto PlaceRow = [&](Label& lbl, UiMaskEdit& edit) {
-            lbl.SetRect(x_label, y, label_w, h);
-            edit.SetRect(x_edit,  y, edit_w,  h);
-            y += h + vgap;
-        };
-
-        PlaceRow(lbl_phone,    edit_phone);
-        PlaceRow(lbl_date,     edit_date);
-        PlaceRow(lbl_zip,      edit_zip);
-        PlaceRow(lbl_plate,    edit_plate);
-        PlaceRow(lbl_username, edit_username);
+        for(int i = 0; i < 5; i++) {
+            labels_[i].SetRect(x, y, label_w, h);
+            edits_[i].SetRect(x + label_w + DPI(12), y, edit_w, h);
+            y += h + row_gap;
+        }
     }
 
 private:
-    Label     lbl_phone, lbl_date, lbl_zip, lbl_plate, lbl_username;
-    UiMaskEdit edit_phone;
-    UiMaskEdit edit_date;
-    UiMaskEdit edit_zip;
-    UiMaskEdit edit_plate;
-    UiMaskEdit edit_username;
+    void SetupValidation(UiMaskEdit& edit)
+    {
+        edit.WhenChange = [=, &edit] {
+            if(live_validation_)
+                edit.ShowError(!edit.IsValid());
+            RefreshState();
+        };
+        edit.WhenAction = [=, &edit] {
+            bool valid = edit.IsValid();
+            edit.ShowError(!valid);
+            if(success_flash_) {
+                if(valid)
+                    edit.FlashSuccess();
+                else
+                    edit.FlashError();
+            }
+            RefreshState();
+        };
+    }
+
+    void ConfigureEdit(int i)
+    {
+        const MaskCase& c = kMaskCases[i];
+        labels_[i].SetText(c.name);
+        edits_[i].SetTip(c.tip);
+        edits_[i].SetPlaceholder(c.mask[0] ? c.mask : "formatter only");
+        edits_[i].SetMask(c.mask);
+        if(i == 1)
+            edits_[i].SetValidator(UiMaskEdit::DateValidator());
+        else if(i == 4) {
+            edits_[i].SetFormatter(UiMaskEdit::UsernameFormatter());
+            edits_[i].SetValidator(UiMaskEdit::AlnumUnderscoreValidator(true));
+        }
+        SetupValidation(edits_[i]);
+    }
+
+    void RefreshState()
+    {
+        const MaskCase& c = kMaskCases[active_case_];
+        state_case_value_.SetText(c.name);
+        state_value_value_.SetText(edits_[active_case_].GetData().ToString());
+        state_valid_value_.SetText(edits_[active_case_].IsValid() ? "Valid" : "Invalid");
+        state_mask_value_.SetText(c.mask[0] ? c.mask : "formatter only");
+    }
+
+    void RefreshFromConfig()
+    {
+        for(int i = 0; i < 5; i++)
+            ConfigureEdit(i);
+
+        String sample = sample_override_.IsEmpty() ? String(kMaskCases[active_case_].sample) : sample_override_;
+        edits_[active_case_].SetData(sample);
+
+        case_drop_.SelectByData(active_case_);
+        sample_row_.SetData(sample);
+        live_validation_row_.Toggle().SetOn(live_validation_);
+        success_flash_row_.Toggle().SetOn(success_flash_);
+
+        SetUsageCode(BuildUsageCode());
+        RefreshState();
+        Preview().Refresh();
+    }
+
+    String BuildUsageCode() const
+    {
+        const MaskCase& c = kMaskCases[active_case_];
+        String code;
+        code << "UiMaskEdit edit;\n";
+        if(c.mask[0])
+            code << "edit.SetMask(" << QuoteCpp(c.mask) << ");\n";
+        if(active_case_ == 1)
+            code << "edit.SetValidator(UiMaskEdit::DateValidator());\n";
+        if(active_case_ == 4) {
+            code << "edit.SetFormatter(UiMaskEdit::UsernameFormatter());\n";
+            code << "edit.SetValidator(UiMaskEdit::AlnumUnderscoreValidator(true));\n";
+        }
+        code << "edit.SetPlaceholder(" << QuoteCpp(c.mask[0] ? c.mask : "formatter only") << ");\n";
+        code << "edit.WhenAction = [=] {\n";
+        code << "    edit.ShowError(!edit.IsValid());\n";
+        code << "};\n";
+        return code;
+    }
+
+    int active_case_ = 0;
+    bool live_validation_ = true;
+    bool success_flash_ = true;
+    String sample_override_;
+
+    UiLabel labels_[5];
+    UiMaskEdit edits_[5];
+
+    UiBoxLayout state_case_row_ { UiBoxLayout::Direction::H }, state_value_row_ { UiBoxLayout::Direction::H }, state_valid_row_ { UiBoxLayout::Direction::H }, state_mask_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_case_label_, state_case_value_, state_value_label_, state_value_value_, state_valid_label_, state_valid_value_, state_mask_label_, state_mask_value_;
+
+    UiBoxLayout case_row_ { UiBoxLayout::Direction::H };
+    UiLabel case_label_;
+    UiDropdown case_drop_;
+    UiCompositeEdit sample_row_;
+    UiCompositeToggle live_validation_row_, success_flash_row_;
 };
+
+}
 
 GUI_APP_MAIN
 {
-    UiMaskEditDemo().Run();
+    UiMaskEditBuilder demo;
+    demo.Run();
 }

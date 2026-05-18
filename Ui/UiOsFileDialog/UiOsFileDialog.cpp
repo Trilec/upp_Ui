@@ -76,7 +76,7 @@ UiOsFileDialog& UiOsFileDialog::AddFilter(const String& label, const Vector<Stri
 {
     Filter& f = filters_.Add();
     f.label = label;
-    f.patterns = patterns;
+    f.patterns <<= clone(patterns);
     return *this;
 }
 
@@ -166,7 +166,11 @@ Vector<String> UiOsFileDialog::SelectOpenFiles(const String& title,
        .SetTitle(title)
        .SetInitialDirectory(initial_directory);
 
-    return dlg.Execute(owner) ? dlg.GetPaths() : Vector<String>();
+    if(!dlg.Execute(owner))
+        return Vector<String>();
+    Vector<String> out;
+    out <<= clone(dlg.GetPaths());
+    return out;
 }
 
 String UiOsFileDialog::SelectSaveFile(const String& title,

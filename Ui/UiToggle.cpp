@@ -16,7 +16,7 @@ const UiToggle::Style& UiToggle::StyleDefault()
     static Style s;
     ONCELOCK {
         Color ink = Color(17, 24, 39);
-        Color muted = Color(148, 163, 184);
+        Color muted = Color(156, 163, 175);
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::None();
             s.palette.frame[i] = Null;
@@ -32,7 +32,7 @@ const UiToggle::Style& UiToggle::StyleDefault()
         }
         s.palette.ink[ST_DISABLED] = muted;
         s.track_palette.face[ST_HOT] = UiFill::Solid(Color(209, 213, 219));
-        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(17, 24, 39));
+        s.track_palette.face[ST_PRESSED] = UiFill::Solid(Color(0, 120, 212));
         s.track_palette.face[ST_DISABLED] = UiFill::Solid(Color(241, 245, 249));
         s.thumb_palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
 
@@ -57,7 +57,7 @@ const UiToggle::Style& UiToggle::StyleDefault()
         s.align_h = UiAlign::LEFT;
         s.align_v = UiAlign::CENTER;
         s.track_side = UiAlign::LEFT;
-        s.track_size = Size(DPI(36), DPI(20));
+        s.track_size = Size(DPI(40), DPI(24));
         s.thumb_size = Size(0, 0);
         s.thumb_inset = DPI(3);
         s.metrics.focus_enabled = false;
@@ -87,9 +87,9 @@ void UiToggle::InvalidateStyleCache()
 
 UiToggle::Style& UiToggle::StyleEdit()
 {
-    if(!has_style_override_) {
+    if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
-        has_style_override_ = true;
+        has_custom_style_ = true;
     }
     InvalidateStyleCache();
     return style_;
@@ -97,7 +97,7 @@ UiToggle::Style& UiToggle::StyleEdit()
 
 void UiToggle::SyncThemeStyle()
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return;
 
     uint64 revision = UiTheme::GetRevision();
@@ -110,26 +110,26 @@ void UiToggle::SyncThemeStyle()
 
 const UiToggle::Style& UiToggle::GetEffectiveStyle() const
 {
-    if(has_style_override_)
+    if(has_custom_style_)
         return style_;
     const_cast<UiToggle*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-UiToggle& UiToggle::SetStyle(const Style& s)
+UiToggle& UiToggle::SetCustomStyle(const Style& s)
 {
     style_ = s;
-    has_style_override_ = true;
+    has_custom_style_ = true;
     OnStyleChanged();
     return *this;
 }
 
-UiToggle& UiToggle::ClearStyleOverride()
+UiToggle& UiToggle::ClearCustomStyle()
 {
-    if(!has_style_override_)
+    if(!has_custom_style_)
         return *this;
 
-    has_style_override_ = false;
+    has_custom_style_ = false;
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
@@ -149,11 +149,14 @@ UiToggle& UiToggle::SetOn(bool on)
 
 UiToggle& UiToggle::SetOnInternal(bool on, bool fire_action)
 {
-    if(on_ == on)
+    if(on_ == on) {
+        Refresh();
         return *this;
+    }
 
     on_ = on;
     StartThumbAnimation(on_ ? 1.0 : 0.0);
+    Refresh();
     if(fire_action && WhenAction)
         WhenAction();
     return *this;
@@ -427,11 +430,26 @@ void UiToggle::Paint(Draw& w)
     StyledMetrics thumb_metrics = style.thumb_metrics;
     thumb_metrics.radius = ClampRadiusPx(thumb_metrics.radius, thumb.GetSize());
 
+    StyledPalette track_palette = style.track_palette;
+    StyledState track_state = on_ ? ST_PRESSED : st;
+    if(on_ && IsEnabled() && IsShowEnabled()) {
+        if(hover_ || pressed_) {
+            UiFill on_face = style.track_palette.face[ST_PRESSED];
+            if(on_face.IsSolid()) {
+                int lighten = pressed_ ? 18 : 28;
+                track_palette.face[ST_PRESSED] = UiFill::Solid(Blend(on_face.color, White(), lighten));
+            }
+            Color on_frame = style.track_palette.frame[ST_PRESSED];
+            if(!IsNull(on_frame))
+                track_palette.frame[ST_PRESSED] = Blend(on_frame, White(), pressed_ ? 18 : 28);
+        }
+    }
+
     bool handled = false;
     if(WhenPaintTrack)
         WhenPaintTrack(w, ctx, handled);
     if(!handled)
-        UiPaintStyledBackground(w, track, style.track_palette, track_metrics, style.track_skin, on_ ? ST_PRESSED : st, false);
+        UiPaintStyledBackground(w, track, track_palette, track_metrics, style.track_skin, track_state, false);
 
     handled = false;
     if(WhenPaintThumb)
@@ -554,7 +572,13 @@ void UiToggle::CancelMode()
 
 void UiToggle::SetData(const Value& v)
 {
-    SetOnInternal(!IsNull(v) && (bool)v, false);
+    bool on = !IsNull(v) && (bool)v;
+    if(on_ == on) {
+        thumb_pos_ = on ? 1.0 : 0.0;
+        Refresh();
+        return;
+    }
+    SetOnInternal(on, false);
 }
 
 Value UiToggle::GetData() const

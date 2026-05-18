@@ -14,6 +14,9 @@
     - Property edits update preview, state, and usage together.
     - Usage output emits concrete shadow setters so the copied example matches
       the live shadow configuration instead of hiding it behind a summary comment.
+
+    Changelog
+    - 2026-05: active demo sweep verified during shared demo cleanup pass.
 */
 
 #include <Ui/Ui.h>
@@ -147,8 +150,8 @@ UiTitleCard::Style MakeHeaderStyle(const DemoPalette& c)
     s.media_gap = DPI(8);
     s.media_reserve = DPI(48);
     s.title_subtitle_gap = DPI(1);
-    s.show_rule = false;
-    s.show_bottom_line = false;
+    s.title_line = false;
+    s.card_line = false;
     return s;
 }
 
@@ -203,6 +206,25 @@ UiScrollPanel::Style MakeScrollBodyStyle(const DemoPalette& c)
     s.metrics.radius = 0;
     s.metrics.focus_enabled = false;
     s.metrics.content_margin = Rect(0, 0, 0, 0);
+    return s;
+}
+
+UiScrollPanel::Style MakeInspectorScrollStyle(const DemoPalette& c)
+{
+    UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(c.paper);
+        s.palette.frame[i] = c.divider;
+        s.palette.ink[i] = c.ink;
+    }
+    s.transparent = false;
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+    s.metrics.radius = DPI(DEMO_RADIUS);
+    s.metrics.focus_enabled = false;
+    s.metrics.content_margin = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
+    s.metrics.shadow.enabled = false;
     return s;
 }
 
@@ -262,12 +284,12 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.header_style.metrics.frame_enabled = false;
     s.header_style.metrics.focus_enabled = false;
     s.header_style.metrics.content_margin = Rect(0, DPI(1), DPI(28), DPI(1));
-    s.header_style.show_rule = false;
-    s.header_style.show_bottom_line = true;
-    s.header_style.bottom_line_extent = LARGE;
-    s.header_style.bottom_line_style = SOLID;
-    s.header_style.bottom_line_thickness = 1;
-    s.header_style.bottom_line_color = c.divider;
+    s.header_style.title_line = false;
+    s.header_style.card_line = true;
+    s.header_style.card_line_length = LARGE;
+    s.header_style.card_line_style = SOLID;
+    s.header_style.card_line_thickness = 1;
+    s.header_style.card_line_color = c.divider;
     Font hf;
     if(Font::FindFaceNameIndex("Arial Black") >= 0)
         hf = Font().FaceName("Arial Black").Height(12);
@@ -309,14 +331,14 @@ UiAccordion::Style MakePropertyGroupAccordionStyle(const DemoPalette& c)
     s.header_height = DPI(22);
     s.header_style.title_font = DemoSans(10, true);
     s.header_style.metrics.content_margin = Rect(DPI(8), DPI(3), DPI(20), DPI(3));
-    s.header_style.bottom_line_color = Blend(c.divider, c.paper, 20);
+    s.header_style.card_line_color = Blend(c.divider, c.paper, 20);
     s.chevron_size = DPI(8);
     s.item_spacing = DPI(6);
     s.header_body_gap = DPI(2);
     s.unified_section_frame = true;
     s.unified_section_radius = DPI(DEMO_RADIUS);
     s.unified_section_frame_width = 1;
-    s.header_style.show_bottom_line = false;
+    s.header_style.card_line = false;
     s.body_style.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(8));
     return s;
 }
@@ -503,6 +525,23 @@ void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap =
 {
     for(int x = r.left; x < r.right; x += dash + gap) { int len = min(dash, r.right - x); w.DrawRect(x, r.top, len, 1, color); w.DrawRect(x, r.bottom - 1, len, 1, color); }
     for(int y = r.top; y < r.bottom; y += dash + gap) { int len = min(dash, r.bottom - y); w.DrawRect(r.left, y, 1, len, color); w.DrawRect(r.right - 1, y, 1, len, color); }
+}
+
+void DrawDashedRoundedRect(Draw& w, const Rect& r, Color color, int radius)
+{
+    StyledPalette p;
+    StyledMetrics m;
+    m.face_enabled = false;
+    m.frame_enabled = true;
+    m.frame_width = 1;
+    m.radius = max(0, radius);
+    m.dashed = true;
+    m.dash_pattern = "4,4";
+    for(int i = 0; i < 4; i++) {
+        p.face[i] = UiFill::None();
+        p.frame[i] = color;
+    }
+    UiPaintFaceFrameDash(w, r, p, m, ST_NORMAL);
 }
 
 void DrawRoundedBox(Draw& w, const Rect& r, int radius, Color face, Color frame, int frame_width = 1)
@@ -724,7 +763,7 @@ UiPanel::Style MakePanelStyle(const DemoPalette& palette, const PanelConfig& cfg
 
 void ApplyPanelStyle(UiPanel& panel, const DemoPalette& palette, const PanelConfig& cfg)
 {
-    panel.SetStyle(MakePanelStyle(palette, cfg));
+    panel.SetCustomStyle(MakePanelStyle(palette, cfg));
     panel.Enable(cfg.enabled);
 }
 
@@ -746,8 +785,8 @@ public:
     void SetPalette(const DemoPalette& p)
     {
         palette_ = p;
-        title_.SetStyle(MakeLabelStyle(p, UiLabelRole::Body));
-        note_.SetStyle(MakeLabelStyle(p, UiLabelRole::Body, true, true));
+        title_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
+        note_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
         Refresh();
         Layout();
     }
@@ -777,7 +816,7 @@ public:
         Rect r(Point(0, 0), GetSize());
         w.DrawRect(r, palette_.paper);
         Rect zone = GetPreviewZone();
-        DrawDashedRect(w, zone, palette_.preview_frame, 4, 4);
+        DrawDashedRoundedRect(w, zone, palette_.preview_frame, DPI(DEMO_RADIUS));
         const int step = DPI(18);
         for(int y = zone.top + step / 2; y < zone.bottom; y += step)
             for(int x = zone.left + step / 2; x < zone.right; x += step)
@@ -804,12 +843,14 @@ public:
     // current window size and the live accordion body heights.
     virtual void Layout() override
     {
-        Rect canvas = Rect(GetSize()).Deflated(DPI(18), DPI(18));
-        int title_w = DPI(90);
-        title_.SetRect(canvas.left, canvas.top, title_w, DPI(18));
-        note_.SetRect(canvas.left + title_w + DPI(8), canvas.top, canvas.GetWidth() - title_w - DPI(8), DPI(18));
         Rect zone = GetPreviewZone();
-        (void)zone;
+        int title_w = DPI(90);
+        int note_w = min(DPI(300), max(0, zone.GetWidth() - title_w - DPI(8) - DPI(20)));
+        int total_w = title_w + DPI(8) + note_w;
+        int x = zone.left + max(0, (zone.GetWidth() - total_w) / 2);
+        int y = zone.top + DPI(8);
+        title_.SetRect(x, y, title_w, DPI(18));
+        note_.SetRect(x + title_w + DPI(8), y, note_w, DPI(18));
     }
 
 private:
@@ -855,8 +896,7 @@ private:
 
     Rect GetPreviewZone() const
     {
-        Rect canvas = Rect(GetSize()).Deflated(DPI(18), DPI(18));
-        return Rect(canvas.left + DPI(18), canvas.top + DPI(24), canvas.right - DPI(18), canvas.bottom - DPI(18));
+        return Rect(GetSize()).Deflated(DPI(5), DPI(5));
     }
 
     DemoPalette palette_;
@@ -1005,8 +1045,8 @@ public:
 
         header_.SetTitle("U++ UiPanel Builder")
             .SetSubTitle("Generate a styled panel surface and copy the exact code for the current result.")
-            .SetMedia(ICON_BRAND_NEWLOG0_V5_48(), Size(DPI(44), DPI(44)))
-            .ShowRule(false).ShowBottomLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
+            .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+            .ShowTitleLine(false).ShowCardLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
 
         version_badge_.SetText("v0.4.0").NoWantFocus();
         theme_icon_.SetIconSize(DPI(20), DPI(20)).NoWantFocus();
@@ -1045,7 +1085,7 @@ public:
         AddToggleRow(face_box_, face_row_, "Background");
         AddColorRow(face_box_, face_color_row_, "Face Color");
         AddDropdownRow(face_box_, gradient_row_, gradient_label_, gradient_drop_, "Gradient");
-        gradient_colors_row_.SetSwatchCount(4);
+        gradient_colors_row_.SetColorCount(4);
         AddColorRow(face_box_, gradient_colors_row_, "Gradient Colors");
         AddToggleRow(shadow_box_, shadow_row_, "Shadow");
         AddColorRow(shadow_box_, shadow_color_row_, "Shadow Color");
@@ -1119,10 +1159,6 @@ public:
     {
         Rect r(Point(0, 0), GetSize());
         w.DrawRect(r, palette_.paper);
-        int split_x = max(DPI(520), r.right - DPI(340));
-        w.DrawRect(split_x, 0, 1, r.GetHeight(), palette_.divider);
-        int header_bottom = max(DPI(72), DPI(10) + max(DPI(42), header_.GetMinSize().cy) + DPI(12));
-        w.DrawRect(0, header_bottom, r.GetWidth(), 1, palette_.divider);
     }
 
     // Layout keeps the preview and accordion inspector in sync with the
@@ -1130,16 +1166,18 @@ public:
     virtual void Layout() override
     {
         Rect r(Point(0, 0), GetSize());
-        int split_x = max(DPI(520), r.right - DPI(340));
+        int split_x = max(DPI(560), r.right - DPI(320));
+        int preview_right = split_x - DPI(10);
+        int inspector_x = preview_right + DPI(5);
         int header_h = max(DPI(42), header_.GetMinSize().cy);
-        header_.SetRect(DPI(20), DPI(10), split_x - DPI(108), header_h);
+        header_.SetRect(DPI(5), DPI(5), preview_right - DPI(10), header_h);
 
-        int top_y = DPI(18);
+        int top_y = DPI(5);
         int shell_w = DPI(86);
         int gap = DPI(8);
-        int exit_x = r.right - DPI(20) - shell_w;
-        int theme_x = exit_x - gap - shell_w;
-        int version_x = theme_x - gap - shell_w;
+        int version_x = inspector_x;
+        int theme_x = version_x + shell_w + gap;
+        int exit_x = theme_x + shell_w + gap;
 
         version_badge_.SetRect(version_x, top_y + DPI(3), shell_w, DPI(30));
         theme_shell_.SetRect(theme_x, top_y, shell_w, DPI(36));
@@ -1151,15 +1189,15 @@ public:
         theme_toggle_.SetRect(theme_shell_.GetRect().right - toggle_w - DPI(10), top_y + (DPI(36) - toggle_h) / 2, toggle_w, toggle_h);
         exit_button_.SetRect(exit_x, top_y, shell_w, DPI(36));
 
-        int preview_top = header_.GetRect().bottom + DPI(11);
-        preview_.SetRect(0, preview_top, split_x, r.bottom - preview_top);
+        int preview_top = header_.GetRect().bottom;
+        preview_.SetRect(0, preview_top, preview_right, r.bottom - preview_top);
 
-        int sx = split_x + DPI(16);
-        int y = header_.GetRect().bottom + DPI(16);
-        inspector_scroll_.SetRect(sx, y, r.right - sx - DPI(20), r.bottom - y - DPI(18));
+        int sx = inspector_x;
+        int y = preview_top + DPI(5);
+        inspector_scroll_.SetRect(sx, y, r.right - sx - DPI(5), r.bottom - y - DPI(18));
 
         ParentCtrl& body = inspector_scroll_.Content();
-        int inner_w = max(0, body.GetSize().cx - DPI(10));
+        int inner_w = max(0, body.GetSize().cx - DPI(5));
 
         inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
     }
@@ -1201,8 +1239,8 @@ private:
     {
         row.LabelCtrl().NoWantFocus();
         row.ValueCtrl().NoWantFocus();
-        for(int i = 0; i < row.GetSwatchCount(); i++)
-            row.Swatch(i).NoWantFocus();
+        for(int i = 0; i < row.GetColorCount(); i++)
+            row.ColorCtrl(i).NoWantFocus();
     }
 
     void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
@@ -1210,7 +1248,7 @@ private:
         row.SetLabel(name)
            .SetLabelWidth(DPI(102))
            .ShowValue(false)
-           .SetSwatchCount(1)
+           .SetColorCount(1)
            .SetFieldGap(DPI(6));
         target.Add(row).Fit();
     }
@@ -1249,13 +1287,13 @@ private:
         frame_row_.Toggle().SetData(config_.frame);
         face_row_.Toggle().SetData(config_.face);
         shadow_row_.Toggle().SetData(config_.shadow);
-        face_color_row_.SetSwatchColor(0, config_.face_color);
-        frame_color_row_.SetSwatchColor(0, config_.frame_color);
-        gradient_colors_row_.SetSwatchColor(0, config_.grad_from);
-        gradient_colors_row_.SetSwatchColor(1, config_.grad_top_right);
-        gradient_colors_row_.SetSwatchColor(2, config_.grad_bottom_left);
-        gradient_colors_row_.SetSwatchColor(3, config_.grad_to);
-        shadow_color_row_.SetSwatchColor(0, config_.shadow_color);
+        face_color_row_.SetColor(0, config_.face_color);
+        frame_color_row_.SetColor(0, config_.frame_color);
+        gradient_colors_row_.SetColor(0, config_.grad_from);
+        gradient_colors_row_.SetColor(1, config_.grad_top_right);
+        gradient_colors_row_.SetColor(2, config_.grad_bottom_left);
+        gradient_colors_row_.SetColor(3, config_.grad_to);
+        shadow_color_row_.SetColor(0, config_.shadow_color);
         shadow_curve_field_.SetCurve(config_.shadow_curve);
         shadow_curve_preset_drop_.SelectByData(ResolveShadowPreset(config_.shadow_curve));
         gradient_drop_.SelectByData(config_.gradient);
@@ -1386,13 +1424,13 @@ private:
         config_.face = !IsNull(face_row_.Toggle().GetData()) && (bool)face_row_.Toggle().GetData();
         config_.shadow = !IsNull(shadow_row_.Toggle().GetData()) && (bool)shadow_row_.Toggle().GetData();
         config_.gradient = (PanelGradientMode)(int)gradient_drop_.GetSelectedData();
-        config_.face_color = face_color_row_.GetSwatchColor(0);
-        config_.frame_color = frame_color_row_.GetSwatchColor(0);
-        config_.grad_from = gradient_colors_row_.GetSwatchColor(0);
-        config_.grad_top_right = gradient_colors_row_.GetSwatchColor(1);
-        config_.grad_bottom_left = gradient_colors_row_.GetSwatchColor(2);
-        config_.grad_to = gradient_colors_row_.GetSwatchColor(3);
-        config_.shadow_color = shadow_color_row_.GetSwatchColor(0);
+        config_.face_color = face_color_row_.GetColor(0);
+        config_.frame_color = frame_color_row_.GetColor(0);
+        config_.grad_from = gradient_colors_row_.GetColor(0);
+        config_.grad_top_right = gradient_colors_row_.GetColor(1);
+        config_.grad_bottom_left = gradient_colors_row_.GetColor(2);
+        config_.grad_to = gradient_colors_row_.GetColor(3);
+        config_.shadow_color = shadow_color_row_.GetColor(0);
         RefreshFromConfig();
     }
 
@@ -1403,65 +1441,32 @@ private:
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
         ctx.mode = mode;
-        UiTheme::SetContext(ctx);
+        UiTheme::Set(ctx);
 
         palette_ = ResolveDemoPalette(mode);
         config_ = MakeDefaultPanelConfig(mode);
 
-        header_.SetStyle(MakeHeaderStyle(palette_));
-        version_badge_.SetStyle(MakeBadgeStyle(palette_));
-        theme_shell_.SetStyle(MakeSegmentShellStyle(palette_));
-        theme_toggle_.SetStyle(MakeThemeToggleStyle(palette_));
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+        theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
+        theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
+        theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
         theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        theme_icon_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
+        exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+        usage_copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        usage_copy_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+        props_reset_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
         theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
-        theme_icon_.SetIconColor(mode == UiThemeMode::Dark ? Color(214, 222, 236) : palette_.blue);
-        exit_button_.SetStyle(MakeExitButtonStyle(palette_));
-
-        inspector_acc_.SetStyle(MakeInspectorAccordionStyle(palette_));
-        size_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        frame_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        face_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        shadow_acc_.SetStyle(MakePropertyGroupAccordionStyle(palette_));
-        usage_copy_.SetStyle(MakeCopyButtonStyle(palette_));
-        usage_copy_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body, true, true));
-        props_reset_.SetStyle(MakeCopyButtonStyle(palette_));
-        usage_code_panel_.SetStyle(MakeCodePanelStyle(palette_));
-        usage_code_panel_.Scroll().SetStyle(MakeScrollBodyStyle(palette_));
-        usage_code_panel_.Code().SetStyle(MakeCodeLabelStyle(palette_));
-        shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
-        shadow_curve_field_.SetFormulaStyle(MakeFormulaLabelStyle(palette_));
-        shadow_curve_field_.SetCopyStyle(MakeCopyButtonStyle(palette_));
+        usage_code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
+        usage_code_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle(palette_));
+        usage_code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
+        inspector_scroll_.SetCustomStyle(MakeInspectorScrollStyle(palette_));
+        inspector_acc_.SetCustomStyle(MakeInspectorAccordionStyle(palette_));
+        size_acc_.SetCustomStyle(MakePropertyGroupAccordionStyle(palette_));
+        frame_acc_.SetCustomStyle(MakePropertyGroupAccordionStyle(palette_));
+        face_acc_.SetCustomStyle(MakePropertyGroupAccordionStyle(palette_));
+        shadow_acc_.SetCustomStyle(MakePropertyGroupAccordionStyle(palette_));
         shadow_curve_field_.SetFormulaSelectable(true).SetShowFormula(true).SetShowCopy(true).SetFlipVertical(true);
-        inspector_scroll_.SetStyle(MakeScrollBodyStyle(palette_));
-        state_list_.SetStyle(MakeStateListStyle(palette_));
-        gradient_drop_.SetStyle(MakeDropdownStyle(palette_));
-        shadow_curve_preset_drop_.SetStyle(MakeDropdownStyle(palette_));
-        width_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                  .SetValueStyle(MakeValueLabelStyle(palette_));
-        height_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                   .SetValueStyle(MakeValueLabelStyle(palette_));
-        radius_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                   .SetValueStyle(MakeValueLabelStyle(palette_));
-        border_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                   .SetValueStyle(MakeValueLabelStyle(palette_));
-        enabled_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        frame_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        face_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        gradient_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        frame_color_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        gradient_colors_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_color_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_distance_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                           .SetValueStyle(MakeValueLabelStyle(palette_));
-        shadow_offset_x_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                           .SetValueStyle(MakeValueLabelStyle(palette_));
-        shadow_offset_y_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                           .SetValueStyle(MakeValueLabelStyle(palette_));
-        shadow_curve_preset_label_.SetStyle(MakeLabelStyle(palette_, UiLabelRole::Body));
-        shadow_alpha_row_.SetLabelStyle(MakeLabelStyle(palette_, UiLabelRole::Body))
-                         .SetValueStyle(MakeValueLabelStyle(palette_));
 
         preview_.SetPalette(palette_);
         SyncControlsFromConfig();
