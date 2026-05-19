@@ -192,6 +192,44 @@ private:
 	DesignerOverlayState overlay_;
 };
 
+class DesignerIntEditAdapter : public UiIntEdit, public DesignerAdapter {
+public:
+	typedef DesignerIntEditAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiIntEdit"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+class DesignerFloatEditAdapter : public UiFloatEdit, public DesignerAdapter {
+public:
+	typedef DesignerFloatEditAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiFloatEdit"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
 class DesignerToggleAdapter : public UiToggle, public DesignerAdapter {
 public:
 	typedef DesignerToggleAdapter CLASSNAME;
@@ -219,6 +257,25 @@ public:
 	const Ctrl& GetCtrl() const override { return *this; }
 	DesignerNodeId GetNodeId() const override { return node_id_; }
 	String GetTypeId() const override { return "UiDropdown"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+class DesignerScrollPanelAdapter : public UiScrollPanel, public DesignerAdapter {
+public:
+	typedef DesignerScrollPanelAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiScrollPanel"; }
 	void SyncFromNode(const DesignerNode& node) override;
 	void SetOverlayState(const DesignerOverlayState& state) override;
 	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
@@ -261,6 +318,44 @@ public:
 	const Ctrl& GetCtrl() const override { return *this; }
 	DesignerNodeId GetNodeId() const override { return node_id_; }
 	String GetTypeId() const override { return "GridLayout"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+class DesignerSplitterAdapter : public UiSplitter, public DesignerAdapter {
+public:
+	typedef DesignerSplitterAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiSplitter"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+class DesignerQuadSplitterAdapter : public UiQuadSplitter, public DesignerAdapter {
+public:
+	typedef DesignerQuadSplitterAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiQuadSplitter"; }
 	void SyncFromNode(const DesignerNode& node) override;
 	void SetOverlayState(const DesignerOverlayState& state) override;
 	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }

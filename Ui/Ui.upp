@@ -85,6 +85,8 @@ file
 	UiScrollBar.cpp,
 	UiSplitter.h,
 	UiSplitter.cpp,
+	UiQuadSplitter.h,
+	UiQuadSplitter.cpp,
 	UiTable.h,
 	UiTable.cpp,
 	UiDoc.h,

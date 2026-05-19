@@ -1,7 +1,12 @@
-#ifndef _Ui_UiCompositeSlider_h_
+﻿#ifndef _Ui_UiCompositeSlider_h_
 #define _Ui_UiCompositeSlider_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiCompositeSlider
     =================
 
@@ -94,3 +99,4 @@ private:
 }
 
 #endif
+

@@ -1,7 +1,12 @@
-#ifndef _Ui_UiRadioButton_h_
+﻿#ifndef _Ui_UiRadioButton_h_
 #define _Ui_UiRadioButton_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiRadioButton
     =============
 
@@ -147,3 +152,4 @@ private:
 }
 
 #endif
+

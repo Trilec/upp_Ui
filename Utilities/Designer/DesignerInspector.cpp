@@ -27,6 +27,10 @@ String DesignerInspector::RuntimeTypeName(const String& type_id) const
 		return "UiBoxLayout";
 	if(type_id == "GridLayout")
 		return "UiGridLayout";
+	if(type_id == "UiSplitter")
+		return "UiSplitter";
+	if(type_id == "UiQuadSplitter")
+		return "UiQuadSplitter";
 	if(type_id == "Item")
 		return "UiPanel";
 	return type_id;
@@ -55,6 +59,44 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return 120;
 	if(b.property_id == "cell_height")
 		return 32;
+	if(b.property_id == "split_percent")
+		return 50;
+	if(b.property_id == "column_percent" || b.property_id == "row_percent")
+		return 50;
+	if(b.property_id == "min_a" || b.property_id == "min_b")
+		return 80;
+	if(b.property_id == "min_c" || b.property_id == "min_d")
+		return 60;
+	if(b.property_id == "hit_width")
+		return 14;
+	if(b.property_id == "track_thickness")
+		return 2;
+	if(b.property_id == "track_inset")
+		return 0;
+	if(b.property_id == "thumb_width")
+		return 14;
+	if(b.property_id == "thumb_height")
+		return 64;
+	if(b.property_id == "thumb_radius")
+		return 8;
+	if(b.property_id == "scroll_mode")
+		return "Auto";
+	if(b.property_id == "min" || b.property_id == "max" || b.property_id == "step")
+		return b.property_id == "max" ? 100 : b.property_id == "step" ? 1 : 0;
+	if(b.property_id == "value")
+		return 42;
+	if(b.property_id == "minf")
+		return 0.0;
+	if(b.property_id == "maxf")
+		return 100.0;
+	if(b.property_id == "stepf")
+		return 0.1;
+	if(b.property_id == "valuef")
+		return 3.14;
+	if(b.property_id == "precision")
+		return 2;
+	if(b.property_id == "spin")
+		return true;
 	if(b.property_id == "width")
 		return t.default_size.cx;
 	if(b.property_id == "height")

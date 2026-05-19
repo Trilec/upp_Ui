@@ -602,6 +602,90 @@ void DesignerLineEditAdapter::Paint(Draw& w)
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
+void DesignerIntEditAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyEditAppearance(*this, node);
+	MinMax((int)AdapterNodeProperty(node, "min", 0), (int)AdapterNodeProperty(node, "max", 100));
+	Step((int)AdapterNodeProperty(node, "step", 1));
+	ShowSpin((bool)AdapterNodeProperty(node, "spin", true));
+	SetValue((int)AdapterNodeProperty(node, "value", 42));
+	NoWantFocus();
+}
+
+void DesignerIntEditAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerIntEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiIntEdit::SetValue", "Preview integer value.", -1000, 1000);
+	b.AddInt("min", "Min", DesignerEditorKind::Slider, "UiIntEdit::Min", "Minimum accepted integer.", -1000, 1000);
+	b.AddInt("max", "Max", DesignerEditorKind::Slider, "UiIntEdit::Max", "Maximum accepted integer.", -1000, 1000);
+	b.AddInt("step", "Step", DesignerEditorKind::Slider, "UiIntEdit::Step", "Step used by spin buttons and wheel.", 1, 100);
+	b.Add("spin", "Spin buttons", DesignerEditorKind::Bool, "UiIntEdit::ShowSpin", "Shows the numeric spin buttons.");
+	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
+	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
+	            "Preview edit font family.", {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
+	         "Preview edit font size.", 7, 32);
+}
+
+void DesignerIntEditAdapter::Paint(Draw& w)
+{
+	UiIntEdit::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerFloatEditAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyEditAppearance(*this, node);
+	MinMax((double)AdapterNodeProperty(node, "minf", 0.0), (double)AdapterNodeProperty(node, "maxf", 100.0));
+	Step((double)AdapterNodeProperty(node, "stepf", 0.1));
+	Precision((int)AdapterNodeProperty(node, "precision", 2));
+	ShowSpin((bool)AdapterNodeProperty(node, "spin", true));
+	SetValue((double)AdapterNodeProperty(node, "valuef", 3.14));
+	NoWantFocus();
+}
+
+void DesignerFloatEditAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("valuef", "Value", DesignerEditorKind::Text, "UiFloatEdit::SetValue", "Preview floating-point value.");
+	b.Add("minf", "Min", DesignerEditorKind::Text, "UiFloatEdit::Min", "Minimum accepted value.");
+	b.Add("maxf", "Max", DesignerEditorKind::Text, "UiFloatEdit::Max", "Maximum accepted value.");
+	b.Add("stepf", "Step", DesignerEditorKind::Text, "UiFloatEdit::Step", "Step used by spin buttons and wheel.");
+	b.AddInt("precision", "Precision", DesignerEditorKind::Slider, "UiFloatEdit::Precision", "Decimal precision.", 0, 8);
+	b.Add("spin", "Spin buttons", DesignerEditorKind::Bool, "UiFloatEdit::ShowSpin", "Shows the numeric spin buttons.");
+	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
+	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
+	            "Preview edit font family.", {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
+	         "Preview edit font size.", 7, 32);
+}
+
+void DesignerFloatEditAdapter::Paint(Draw& w)
+{
+	UiFloatEdit::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
 void DesignerToggleAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
@@ -675,6 +759,46 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 void DesignerDropdownAdapter::Paint(Draw& w)
 {
 	UiDropdown::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
+	bool face_enabled = (bool)AdapterNodeProperty(node, "face_enabled", true);
+	bool frame_enabled = (bool)AdapterNodeProperty(node, "frame_enabled", true);
+	for(int i = 0; i < 4; i++) {
+		s.palette.face[i] = UiFill::Solid(GetColorProperty(node, "face", Color(248, 250, 252)));
+		s.palette.frame[i] = GetColorProperty(node, "frame", Color(203, 213, 225));
+	}
+	s.metrics.face_enabled = face_enabled;
+	s.metrics.frame_enabled = frame_enabled;
+	s.metrics.radius = max(0, (int)AdapterNodeProperty(node, "radius", 8));
+	SetCustomStyle(s);
+	String mode = AdapterNodeProperty(node, "scroll_mode", "Auto");
+	SetScrollMode(mode == "Vertical" ? UIPANELSCROLL_VERTICAL :
+	              mode == "Horizontal" ? UIPANELSCROLL_HORIZONTAL :
+	              mode == "None" ? UIPANELSCROLL_NONE : UIPANELSCROLL_AUTO);
+}
+
+void DesignerScrollPanelAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerScrollPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder(out).AddChoice("scroll_mode", "Scroll mode", "UiScrollPanel::SetScrollMode",
+	                                  "Controls which scroll directions are available.",
+	                                  {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}, {"None", "None"}});
+}
+
+void DesignerScrollPanelAdapter::Paint(Draw& w)
+{
+	UiScrollPanel::Paint(w);
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -809,6 +933,133 @@ void DesignerGridLayoutAdapter::Paint(Draw& w)
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 
+void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	if(AdapterNodeProperty(node, "direction", "H") == "V")
+		Vert();
+	else
+		Horz();
+	SetSplitPercent((int)AdapterNodeProperty(node, "split_percent", 50));
+	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 80)));
+	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 80)));
+
+	UiSplitter::Style s = UiTheme::ResolveSplitter();
+	s.hit_width = DPI((int)AdapterNodeProperty(node, "hit_width", 14));
+	s.track_thickness = DPI((int)AdapterNodeProperty(node, "track_thickness", 2));
+	int inset = DPI((int)AdapterNodeProperty(node, "track_inset", 0));
+	s.track_inset = Rect(inset, inset, inset, inset);
+	int thumb_w = DPI((int)AdapterNodeProperty(node, "thumb_width", 14));
+	int thumb_h = DPI((int)AdapterNodeProperty(node, "thumb_height", 64));
+	if(AdapterNodeProperty(node, "direction", "H") == "V") {
+		s.thumb_main = thumb_w;
+		s.thumb_cross = thumb_h;
+		s.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_VERT_48();
+	}
+	else {
+		s.thumb_main = thumb_h;
+		s.thumb_cross = thumb_w;
+		s.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();
+	}
+	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", 8));
+	s.label.Clear();
+	SetCustomStyle(s);
+}
+
+void DesignerSplitterAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.AddChoice("direction", "Orientation", "UiSplitter::Horz / UiSplitter::Vert",
+	            "Controls whether panes split left/right or top/bottom.",
+	            {{"H", "Left / Right"}, {"V", "Top / Bottom"}});
+	b.AddInt("split_percent", "Split", DesignerEditorKind::Slider, "UiSplitter::SetSplitPercent",
+	         "Unitless split percentage between the first two panes.", 5, 95);
+	b.AddInt("min_a", "Pane A min", DesignerEditorKind::Slider, "UiSplitter::SetMinPixels(0, DPI(...))",
+	         "Minimum size for the first pane.", 10, 640);
+	b.AddInt("min_b", "Pane B min", DesignerEditorKind::Slider, "UiSplitter::SetMinPixels(1, DPI(...))",
+	         "Minimum size for the second pane.", 10, 640);
+	b.AddInt("hit_width", "Hit width", DesignerEditorKind::Slider, "UiSplitter::Style::hit_width",
+	         "Mouse hit area around the split track.", 4, 40);
+	b.AddInt("track_thickness", "Track thick", DesignerEditorKind::Slider, "UiSplitter::Style::track_thickness",
+	         "Visible splitter track thickness.", 1, 18);
+	b.AddInt("track_inset", "Track inset", DesignerEditorKind::Slider, "UiSplitter::Style::track_inset",
+	         "Inset applied to the visible track.", 0, 32);
+	b.AddInt("thumb_width", "Thumb width", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_cross/main",
+	         "Visual thumb width in screen orientation.", 4, 80);
+	b.AddInt("thumb_height", "Thumb height", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_main/cross",
+	         "Visual thumb height in screen orientation.", 12, 180);
+	b.AddInt("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_metrics.radius",
+	         "Corner radius for the splitter thumb.", 0, 32);
+	b.Add("debug", "Debug", DesignerEditorKind::Bool, "designer overlay",
+	      "Shows the splitter layout bounds in the designer.");
+}
+
+void DesignerSplitterAdapter::Paint(Draw& w)
+{
+	UiSplitter::Paint(w);
+	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerQuadSplitterAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	SetSplitPercent((int)AdapterNodeProperty(node, "column_percent", 50),
+	                (int)AdapterNodeProperty(node, "row_percent", 50));
+	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 60)));
+	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 60)));
+	SetMinPixels(2, DPI((int)AdapterNodeProperty(node, "min_c", 60)));
+	SetMinPixels(3, DPI((int)AdapterNodeProperty(node, "min_d", 60)));
+}
+
+void DesignerQuadSplitterAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerQuadSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.AddInt("column_percent", "Column split", DesignerEditorKind::Slider, "UiQuadSplitter::SetColumnSplitPercent",
+	         "Left/right split percentage shared by the top and bottom rows.", 5, 95);
+	b.AddInt("row_percent", "Row split", DesignerEditorKind::Slider, "UiQuadSplitter::SetRowSplitPercent",
+	         "Top/bottom split percentage.", 5, 95);
+	b.AddInt("min_a", "Top-left min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(0, DPI(...))",
+	         "Minimum size for the top-left pane.", 10, 640);
+	b.AddInt("min_b", "Top-right min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(1, DPI(...))",
+	         "Minimum size for the top-right pane.", 10, 640);
+	b.AddInt("min_c", "Bottom-left min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(2, DPI(...))",
+	         "Minimum size for the bottom-left pane.", 10, 640);
+	b.AddInt("min_d", "Bottom-right min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(3, DPI(...))",
+	         "Minimum size for the bottom-right pane.", 10, 640);
+	b.Add("debug", "Debug", DesignerEditorKind::Bool, "designer overlay",
+	      "Shows the quad splitter layout bounds in the designer.");
+}
+
+void DesignerQuadSplitterAdapter::Paint(Draw& w)
+{
+	UiQuadSplitter::Paint(w);
+	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
+}
+
 Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adapter)
 {
 	Ctrl *ctrl = nullptr;
@@ -820,6 +1071,16 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 	}
 	else if(node.type_id == "GridLayout") {
 		DesignerGridLayoutAdapter *p = new DesignerGridLayoutAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiSplitter") {
+		DesignerSplitterAdapter *p = new DesignerSplitterAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiQuadSplitter") {
+		DesignerQuadSplitterAdapter *p = new DesignerQuadSplitterAdapter;
 		ctrl = p;
 		a = p;
 	}
@@ -848,6 +1109,16 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		ctrl = p;
 		a = p;
 	}
+	else if(node.type_id == "UiIntEdit") {
+		DesignerIntEditAdapter *p = new DesignerIntEditAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiFloatEdit") {
+		DesignerFloatEditAdapter *p = new DesignerFloatEditAdapter;
+		ctrl = p;
+		a = p;
+	}
 	else if(node.type_id == "UiToggle") {
 		DesignerToggleAdapter *p = new DesignerToggleAdapter;
 		ctrl = p;
@@ -855,6 +1126,11 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 	}
 	else if(node.type_id == "UiDropdown") {
 		DesignerDropdownAdapter *p = new DesignerDropdownAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiScrollPanel") {
+		DesignerScrollPanelAdapter *p = new DesignerScrollPanelAdapter;
 		ctrl = p;
 		a = p;
 	}
@@ -877,10 +1153,15 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerSliderAdapter *p = dynamic_cast<DesignerSliderAdapter *>(&ctrl)) return p;
 	if(DesignerButtonAdapter *p = dynamic_cast<DesignerButtonAdapter *>(&ctrl)) return p;
 	if(DesignerLineEditAdapter *p = dynamic_cast<DesignerLineEditAdapter *>(&ctrl)) return p;
+	if(DesignerIntEditAdapter *p = dynamic_cast<DesignerIntEditAdapter *>(&ctrl)) return p;
+	if(DesignerFloatEditAdapter *p = dynamic_cast<DesignerFloatEditAdapter *>(&ctrl)) return p;
 	if(DesignerToggleAdapter *p = dynamic_cast<DesignerToggleAdapter *>(&ctrl)) return p;
 	if(DesignerDropdownAdapter *p = dynamic_cast<DesignerDropdownAdapter *>(&ctrl)) return p;
+	if(DesignerScrollPanelAdapter *p = dynamic_cast<DesignerScrollPanelAdapter *>(&ctrl)) return p;
 	if(DesignerBoxLayoutAdapter *p = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) return p;
 	if(DesignerGridLayoutAdapter *p = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) return p;
+	if(DesignerSplitterAdapter *p = dynamic_cast<DesignerSplitterAdapter *>(&ctrl)) return p;
+	if(DesignerQuadSplitterAdapter *p = dynamic_cast<DesignerQuadSplitterAdapter *>(&ctrl)) return p;
 	return nullptr;
 }
 

@@ -1,7 +1,12 @@
-#ifndef _Ui_UiTitleCard_h_
+﻿#ifndef _Ui_UiTitleCard_h_
 #define _Ui_UiTitleCard_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiTitleCard
     ===========
 
@@ -193,3 +198,4 @@ private:
 }
 
 #endif
+

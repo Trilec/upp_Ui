@@ -72,6 +72,10 @@ static void EmitDeclaration(String& out, const DesignerNode& n)
 		out << "\tUiBoxLayout " << var << ";\n";
 	else if(n.type_id == "GridLayout")
 		out << "\tUiGridLayout " << var << ";\n";
+	else if(n.type_id == "UiSplitter")
+		out << "\tUiSplitter " << var << ";\n";
+	else if(n.type_id == "UiQuadSplitter")
+		out << "\tUiQuadSplitter " << var << ";\n";
 	else if(n.type_id == "UiLabel")
 		out << "\tUiLabel " << var << ";\n";
 	else if(n.type_id == "UiTitleCard")
@@ -80,12 +84,18 @@ static void EmitDeclaration(String& out, const DesignerNode& n)
 		out << "\tUiButton " << var << ";\n";
 	else if(n.type_id == "UiLineEdit")
 		out << "\tUiLineEdit " << var << ";\n";
+	else if(n.type_id == "UiIntEdit")
+		out << "\tUiIntEdit " << var << ";\n";
+	else if(n.type_id == "UiFloatEdit")
+		out << "\tUiFloatEdit " << var << ";\n";
 	else if(n.type_id == "UiSlider")
 		out << "\tUiSlider " << var << ";\n";
 	else if(n.type_id == "UiToggle")
 		out << "\tUiToggle " << var << ";\n";
 	else if(n.type_id == "UiDropdown")
 		out << "\tUiDropdown " << var << ";\n";
+	else if(n.type_id == "UiScrollPanel")
+		out << "\tUiScrollPanel " << var << ";\n";
 	else
 		out << "\tUiPanel " << var << ";\n";
 }
@@ -127,6 +137,43 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 			out << ".SetDebug(true)";
 		out << ";\n";
 	}
+	else if(n.type_id == "UiSplitter") {
+		String dir = CodeGenNodeProperty(n, "direction", "H");
+		out << "\t\t" << var << "." << (dir == "V" ? "Vert" : "Horz") << "();\n";
+		out << "\t\t" << var << ".SetSplitPercent(" << (int)CodeGenNodeProperty(n, "split_percent", 50) << ")"
+		    << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(n, "min_a", 80) << "))"
+		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 80) << "));\n";
+		out << "\t\t{\n"
+		    << "\t\t\tUiSplitter::Style s = UiTheme::ResolveSplitter();\n"
+		    << "\t\t\ts.hit_width = DPI(" << (int)CodeGenNodeProperty(n, "hit_width", 14) << ");\n"
+		    << "\t\t\ts.track_thickness = DPI(" << (int)CodeGenNodeProperty(n, "track_thickness", 2) << ");\n"
+		    << "\t\t\tint track_inset = DPI(" << (int)CodeGenNodeProperty(n, "track_inset", 0) << ");\n"
+		    << "\t\t\ts.track_inset = Rect(track_inset, track_inset, track_inset, track_inset);\n";
+		int thumb_w = (int)CodeGenNodeProperty(n, "thumb_width", 14);
+		int thumb_h = (int)CodeGenNodeProperty(n, "thumb_height", 64);
+		if(dir == "V") {
+			out << "\t\t\ts.thumb_main = DPI(" << thumb_w << ");\n"
+			    << "\t\t\ts.thumb_cross = DPI(" << thumb_h << ");\n"
+			    << "\t\t\ts.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_VERT_48();\n";
+		}
+		else {
+			out << "\t\t\ts.thumb_main = DPI(" << thumb_h << ");\n"
+			    << "\t\t\ts.thumb_cross = DPI(" << thumb_w << ");\n"
+			    << "\t\t\ts.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();\n";
+		}
+		out << "\t\t\ts.thumb_metrics.radius = DPI(" << (int)CodeGenNodeProperty(n, "thumb_radius", 8) << ");\n"
+		    << "\t\t\t" << var << ".SetCustomStyle(s);\n"
+		    << "\t\t}\n";
+	}
+	else if(n.type_id == "UiQuadSplitter") {
+		out << "\t\t" << var << ".SetSplitPercent("
+		    << (int)CodeGenNodeProperty(n, "column_percent", 50) << ", "
+		    << (int)CodeGenNodeProperty(n, "row_percent", 50) << ")"
+		    << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(n, "min_a", 60) << "))"
+		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 60) << "))"
+		    << ".SetMinPixels(2, DPI(" << (int)CodeGenNodeProperty(n, "min_c", 60) << "))"
+		    << ".SetMinPixels(3, DPI(" << (int)CodeGenNodeProperty(n, "min_d", 60) << "));\n";
+	}
 	else if(n.type_id == "UiLabel")
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
 	else if(n.type_id == "UiTitleCard")
@@ -139,6 +186,21 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 		if(!placeholder.IsEmpty())
 			out << "\t\t" << var << ".SetPlaceholder(" << CppString(placeholder) << ");\n";
 	}
+	else if(n.type_id == "UiIntEdit") {
+		out << "\t\t" << var << ".MinMax(" << (int)CodeGenNodeProperty(n, "min", 0)
+		    << ", " << (int)CodeGenNodeProperty(n, "max", 100) << ")"
+		    << ".Step(" << (int)CodeGenNodeProperty(n, "step", 1) << ")"
+		    << ".ShowSpin(" << ((bool)CodeGenNodeProperty(n, "spin", true) ? "true" : "false") << ");\n";
+		out << "\t\t" << var << ".SetValue(" << (int)CodeGenNodeProperty(n, "value", 42) << ");\n";
+	}
+	else if(n.type_id == "UiFloatEdit") {
+		out << "\t\t" << var << ".MinMax(" << (double)CodeGenNodeProperty(n, "minf", 0.0)
+		    << ", " << (double)CodeGenNodeProperty(n, "maxf", 100.0) << ")"
+		    << ".Step(" << (double)CodeGenNodeProperty(n, "stepf", 0.1) << ")"
+		    << ".Precision(" << (int)CodeGenNodeProperty(n, "precision", 2) << ")"
+		    << ".ShowSpin(" << ((bool)CodeGenNodeProperty(n, "spin", true) ? "true" : "false") << ");\n";
+		out << "\t\t" << var << ".SetValue(" << (double)CodeGenNodeProperty(n, "valuef", 3.14) << ");\n";
+	}
 	else if(n.type_id == "UiSlider")
 		out << "\t\t" << var << ".SetRange(0, 100).SetValue(50);\n";
 	else if(n.type_id == "UiToggle")
@@ -146,6 +208,13 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 	else if(n.type_id == "UiDropdown") {
 		out << "\t\t" << var << ".UseInternalModel().Add(\"First\", \"First\").Add(\"Second\", \"Second\").Add(\"Third\", \"Third\");\n";
 		out << "\t\t" << var << ".SetData(" << CppString(CodeGenNodeProperty(n, "selected", "First")) << ");\n";
+	}
+	else if(n.type_id == "UiScrollPanel") {
+		String mode = CodeGenNodeProperty(n, "scroll_mode", "Auto");
+		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
+		              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
+		              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
+		out << "\t\t" << var << ".SetScrollMode(" << expr << ");\n";
 	}
 	else {
 		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));\n";
@@ -178,6 +247,18 @@ static void EmitAddChild(String& out, const DesignerNode& parent, const Designer
 				out << "\t\t" << p << ".Add(" << c << ");\n";
 		}
 	}
+	else if(parent.type_id == "UiSplitter") {
+		out << "\t\t" << p << ".Add(" << c << ");\n";
+		out << "\t\t" << p << ".SetSplitPercent(" << (int)CodeGenNodeProperty(parent, "split_percent", 50) << ");\n";
+	}
+	else if(parent.type_id == "UiQuadSplitter") {
+		out << "\t\t" << p << ".Add(" << c << ");\n";
+		out << "\t\t" << p << ".SetSplitPercent("
+		    << (int)CodeGenNodeProperty(parent, "column_percent", 50) << ", "
+		    << (int)CodeGenNodeProperty(parent, "row_percent", 50) << ");\n";
+	}
+	else if(parent.type_id == "UiScrollPanel")
+		out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
 }
 
 static void EmitAdds(String& out, const DesignerModel& model, const DesignerNode& parent)

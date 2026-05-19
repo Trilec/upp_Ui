@@ -1,7 +1,12 @@
-#ifndef _Ui_UiIndicatorSupport_h_
+﻿#ifndef _Ui_UiIndicatorSupport_h_
 #define _Ui_UiIndicatorSupport_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiIndicatorSupport
     ==================
 
@@ -79,3 +84,4 @@ inline Size UiMeasureIndicatorBlocksContent(Size support_natural,
 }
 
 #endif
+

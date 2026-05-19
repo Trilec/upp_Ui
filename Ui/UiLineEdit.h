@@ -1,7 +1,12 @@
-#ifndef _Ui_UiLineEdit_h_
+﻿#ifndef _Ui_UiLineEdit_h_
 #define _Ui_UiLineEdit_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiLineEdit
     ==========
 
@@ -62,3 +67,4 @@ public:
 } // namespace Upp
 
 #endif
+

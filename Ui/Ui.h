@@ -1,7 +1,12 @@
-#ifndef _Ui_Ui_h_
+﻿#ifndef _Ui_Ui_h_
 #define _Ui_Ui_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     Ui.h
     ====
 
@@ -69,9 +74,11 @@
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
 #include <Ui/UiSplitter.h>
+#include <Ui/UiQuadSplitter.h>
 #include <Ui/UiTable.h>
 #include <Ui/UiDoc.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
 
 #endif
+

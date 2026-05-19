@@ -788,6 +788,31 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				else
 					grid->Add(child, -1, sizing == "Expand", fixed);
 			}
+			else if(DesignerSplitterAdapter *splitter = dynamic_cast<DesignerSplitterAdapter *>(&parent)) {
+				splitter->Add(child);
+				int pane = max(0, index);
+				if(sizing == "Fixed") {
+					bool vertical = DesignerPreviewNodeProperty(parent_node, "direction", "H") == "V";
+					int fixed = vertical
+					          ? (int)DesignerPreviewNodeProperty(child_node, "height", 80)
+					          : (int)DesignerPreviewNodeProperty(child_node, "width", 120);
+					splitter->SetMinPixels(pane, DPI(max(10, fixed)));
+				}
+				splitter->SetSplitPercent((int)DesignerPreviewNodeProperty(parent_node, "split_percent", 50));
+			}
+			else if(DesignerQuadSplitterAdapter *quad = dynamic_cast<DesignerQuadSplitterAdapter *>(&parent)) {
+				quad->Add(child);
+				int pane = max(0, index);
+				if(sizing == "Fixed") {
+					int fixed = max((int)DesignerPreviewNodeProperty(child_node, "width", 120),
+					                (int)DesignerPreviewNodeProperty(child_node, "height", 80));
+					quad->SetMinPixels(pane, DPI(max(10, fixed)));
+				}
+				quad->SetSplitPercent((int)DesignerPreviewNodeProperty(parent_node, "column_percent", 50),
+				                      (int)DesignerPreviewNodeProperty(parent_node, "row_percent", 50));
+			}
+			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent))
+				scroll->Content().Add(child);
 			else
 				parent_ctrl.Add(child);
 		}

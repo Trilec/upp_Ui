@@ -1,7 +1,12 @@
-#ifndef _Ui_UiDoc_h_
+﻿#ifndef _Ui_UiDoc_h_
 #define _Ui_UiDoc_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiDoc
     =====
 
@@ -755,3 +760,4 @@ public:
 }
 
 #endif
+

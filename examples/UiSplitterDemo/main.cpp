@@ -26,12 +26,6 @@ enum SplitterOrientation {
     SPLIT_VERT = 1
 };
 
-enum SplitterIconMode {
-    SPLIT_ICON_NONE = 0,
-    SPLIT_ICON_DRAG = 1,
-    SPLIT_ICON_MORE = 2
-};
-
 struct SplitterConfig {
     int orientation = SPLIT_HORZ;
     int split_percent = 42;
@@ -52,8 +46,6 @@ struct SplitterConfig {
     int grip_count = 6;
     int grip_dot = DPI(2);
     int grip_gap = DPI(3);
-    bool label_on = true;
-    int icon_mode = SPLIT_ICON_DRAG;
 
     Color track = Color(148, 163, 184);
     Color thumb_face_color = Color(241, 245, 249);
@@ -68,16 +60,11 @@ struct Option {
     int value;
 };
 
-Image SplitterIcon(int mode)
+Image SplitterIcon(int orientation)
 {
-    switch(mode) {
-    case SPLIT_ICON_MORE:
+    if(orientation == SPLIT_VERT)
         return ICON_NAVIGATION_OUTLINED_MORE_VERT_48();
-    case SPLIT_ICON_DRAG:
-        return ICON_DESIGN_DRAG_INDICATOR_48();
-    default:
-        return Image();
-    }
+    return ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();
 }
 
 String OrientationCode(int mode)
@@ -85,16 +72,11 @@ String OrientationCode(int mode)
     return mode == SPLIT_VERT ? "Vert" : "Horz";
 }
 
-String IconCode(int mode)
+String IconCode(int orientation)
 {
-    switch(mode) {
-    case SPLIT_ICON_MORE:
+    if(orientation == SPLIT_VERT)
         return "ICON_NAVIGATION_OUTLINED_MORE_VERT_48()";
-    case SPLIT_ICON_DRAG:
-        return "ICON_DESIGN_DRAG_INDICATOR_48()";
-    default:
-        return "Image()";
-    }
+    return "ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48()";
 }
 
 class UiSplitterBuilder : public BuilderWindowBase {
@@ -137,8 +119,6 @@ public:
         AddSliderRow(PropsBox(), grip_count_row_, "Grip Count", "6");
         AddSliderRow(PropsBox(), grip_dot_row_, "Grip Dot", "2px");
         AddSliderRow(PropsBox(), grip_gap_row_, "Grip Gap", "3px");
-        AddToggleRow(PropsBox(), label_on_row_, "Label");
-        AddDropdownRow(PropsBox(), icon_row_, icon_label_, icon_drop_, "Icon");
         AddColorRow(PropsBox(), track_color_row_, "Track");
         AddColorRow(PropsBox(), thumb_face_color_row_, "Thumb Face");
         AddColorRow(PropsBox(), thumb_frame_color_row_, "Thumb Frame");
@@ -150,13 +130,7 @@ public:
             { "Left / Right", SPLIT_HORZ },
             { "Top / Bottom", SPLIT_VERT }
         };
-        const Option icons[] = {
-            { "None", SPLIT_ICON_NONE },
-            { "Drag", SPLIT_ICON_DRAG },
-            { "More", SPLIT_ICON_MORE }
-        };
         Populate(orientation_drop_, orientations, __countof(orientations));
-        Populate(icon_drop_, icons, __countof(icons));
 
         InitSlider(position_row_, cfg_.split_percent, 5, 95);
         InitSlider(min_a_row_, cfg_.min_a, DPI(40), DPI(340));
@@ -180,7 +154,6 @@ public:
         InitColor(pane_b_color_row_, cfg_.pane_b);
 
         orientation_drop_.WhenSelect = [=](int) { cfg_.orientation = (int)orientation_drop_.GetSelectedData(); RefreshFromConfig(); };
-        icon_drop_.WhenSelect = [=](int) { cfg_.icon_mode = (int)icon_drop_.GetSelectedData(); RefreshFromConfig(); };
         WirePositionSlider();
         WireSlider(min_a_row_, cfg_.min_a);
         WireSlider(min_b_row_, cfg_.min_b);
@@ -198,7 +171,6 @@ public:
         WireToggle(thumb_face_row_, cfg_.thumb_face);
         WireToggle(thumb_frame_row_, cfg_.thumb_frame);
         WireToggle(show_grip_row_, cfg_.show_grip);
-        WireToggle(label_on_row_, cfg_.label_on);
         WireColor(track_color_row_, cfg_.track);
         WireColor(thumb_face_color_row_, cfg_.thumb_face_color);
         WireColor(thumb_frame_color_row_, cfg_.thumb_frame_color);
@@ -339,8 +311,8 @@ private:
         s.grip_dot_count = cfg_.grip_count;
         s.grip_dot_size = cfg_.grip_dot;
         s.grip_dot_gap = cfg_.grip_gap;
-        s.label = cfg_.label_on ? "Drag" : String();
-        s.thumb_icon = SplitterIcon(cfg_.icon_mode);
+        s.label.Clear();
+        s.thumb_icon = SplitterIcon(cfg_.orientation);
         s.thumb_icon_size = DPI(14);
 
         for(int i = 0; i < 4; i++) {
@@ -370,7 +342,6 @@ private:
     void RefreshFromConfig()
     {
         orientation_drop_.SelectByData(cfg_.orientation);
-        icon_drop_.SelectByData(cfg_.icon_mode);
         SyncRows();
 
         left_.SetCustomStyle(PaneStyle(cfg_.pane_a));
@@ -425,7 +396,6 @@ private:
         thumb_face_row_.Toggle().SetOn(cfg_.thumb_face);
         thumb_frame_row_.Toggle().SetOn(cfg_.thumb_frame);
         show_grip_row_.Toggle().SetOn(cfg_.show_grip);
-        label_on_row_.Toggle().SetOn(cfg_.label_on);
         track_color_row_.SetColor(0, cfg_.track);
         thumb_face_color_row_.SetColor(0, cfg_.thumb_face_color);
         thumb_frame_color_row_.SetColor(0, cfg_.thumb_frame_color);
@@ -471,8 +441,8 @@ private:
         code << "style.grip_dot_count = " << cfg_.grip_count << ";\n";
         code << "style.grip_dot_size = DPI(" << cfg_.grip_dot << ");\n";
         code << "style.grip_dot_gap = DPI(" << cfg_.grip_gap << ");\n";
-        code << "style.label = " << QuoteCpp(cfg_.label_on ? "Drag" : "") << ";\n";
-        code << "style.thumb_icon = " << IconCode(cfg_.icon_mode) << ";\n";
+        code << "style.label.Clear();\n";
+        code << "style.thumb_icon = " << IconCode(cfg_.orientation) << ";\n";
         code << "for(int i = 0; i < 4; i++) {\n";
         code << "    style.track_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.track) << ");\n";
         code << "    style.thumb_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.thumb_face_color) << ");\n";
@@ -495,11 +465,11 @@ private:
     UiBoxLayout state_orientation_row_ { UiDirection::H }, state_position_row_ { UiDirection::H }, state_panes_row_ { UiDirection::H }, state_track_row_ { UiDirection::H }, state_thumb_row_ { UiDirection::H };
     UiLabel state_orientation_label_, state_orientation_value_, state_position_label_, state_position_value_, state_panes_label_, state_panes_value_, state_track_label_, state_track_value_, state_thumb_label_, state_thumb_value_;
 
-    UiBoxLayout orientation_row_ { UiDirection::H }, icon_row_ { UiDirection::H };
-    UiLabel orientation_label_, icon_label_;
-    UiDropdown orientation_drop_, icon_drop_;
+    UiBoxLayout orientation_row_ { UiDirection::H };
+    UiLabel orientation_label_;
+    UiDropdown orientation_drop_;
     UiCompositeSlider position_row_, min_a_row_, min_b_row_, hit_width_row_, track_thickness_row_, track_inset_row_, thumb_width_row_, thumb_height_row_, thumb_inset_row_, thumb_radius_row_, thumb_frame_width_row_, grip_count_row_, grip_dot_row_, grip_gap_row_;
-    UiCompositeToggle thumb_face_row_, thumb_frame_row_, show_grip_row_, label_on_row_;
+    UiCompositeToggle thumb_face_row_, thumb_frame_row_, show_grip_row_;
     UiCompositeColor track_color_row_, thumb_face_color_row_, thumb_frame_color_row_, thumb_ink_color_row_, pane_a_color_row_, pane_b_color_row_;
 };
 

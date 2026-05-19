@@ -1,7 +1,12 @@
-#ifndef _Ui_UiBoxLayout_h_
+﻿#ifndef _Ui_UiBoxLayout_h_
 #define _Ui_UiBoxLayout_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiBoxLayout
     ===========
 
@@ -29,50 +34,50 @@
 // UiBoxLayout
 //
 // A small, dependency-free layout control for U++ that arranges children in
-// a **flow**: either left→right (UiDirection::H) or top→bottom (UiDirection::V).
+// a **flow**: either leftâ†’right (UiDirection::H) or topâ†’bottom (UiDirection::V).
 // It is designed to be:
-//   • Simple to use (tiny API, value semantics for item settings)
-//   • Predictable (explicit sizing modes per item: Fixed / Fit / Expand)
-//   • Flexible (optional wrapping in Horizontal mode; min/max caps; per-item
+//   â€¢ Simple to use (tiny API, value semantics for item settings)
+//   â€¢ Predictable (explicit sizing modes per item: Fixed / Fit / Expand)
+//   â€¢ Flexible (optional wrapping in Horizontal mode; min/max caps; per-item
 //     cross-axis alignment; spacers and hard breaks)
-//   • Fast (keeps a tiny min-size cache; does not allocate per-layout pass)
+//   â€¢ Fast (keeps a tiny min-size cache; does not allocate per-layout pass)
 //
 // Key concepts
 // ============
 //
-// • Direction
-//     - UiDirection::H: lay out items left→right, optional wrapping to next row.
-//     - UiDirection::V: lay out items top→bottom, no wrapping (but supports
+// â€¢ Direction
+//     - UiDirection::H: lay out items leftâ†’right, optional wrapping to next row.
+//     - UiDirection::V: lay out items topâ†’bottom, no wrapping (but supports
 //       "break" items).
 //
-// • Item sizing (main axis):
-//     Add(ctrl)    – attach a child, default sizing (Fit)
-//     Fixed(px)   – use exactly px on the main axis (never grows/shrinks)
-//     Fit()       – use the child’s *minimum* size on the main axis
-//     Expand(w)   – share the remaining space in proportion to weight w
+// â€¢ Item sizing (main axis):
+//     Add(ctrl)    â€“ attach a child, default sizing (Fit)
+//     Fixed(px)   â€“ use exactly px on the main axis (never grows/shrinks)
+//     Fit()       â€“ use the childâ€™s *minimum* size on the main axis
+//     Expand(w)   â€“ share the remaining space in proportion to weight w
 //
-// • Cross-axis alignment (secondary axis):
+// â€¢ Cross-axis alignment (secondary axis):
 //     Container default via SetAlignItems(Align), overridable per item with
 //     ItemRef::AlignSelf(Align). Stretch means the item fills the cross-axis.
 //
-// • Global caps / grids
-//     SetFixedColumn(px) – in UiDirection::H mode, cap each item’s width to px
-//                          (wrapping respects this, yielding a “fixed column” look)
-//     SetFixedRow(px)    – in UiDirection::V mode, cap each item’s height to px
+// â€¢ Global caps / grids
+//     SetFixedColumn(px) â€“ in UiDirection::H mode, cap each itemâ€™s width to px
+//                          (wrapping respects this, yielding a â€œfixed columnâ€ look)
+//     SetFixedRow(px)    â€“ in UiDirection::V mode, cap each itemâ€™s height to px
 //
-// • Spacing
-//     SetInset(...) – inner padding of the container
-//     SetGap(px)    – space between neighboring items (applies both axes)
+// â€¢ Spacing
+//     SetInset(...) â€“ inner padding of the container
+//     SetGap(px)    â€“ space between neighboring items (applies both axes)
 //
-// • Wrapping helpers (Horizontal mode)
-//     SetWrap(true)           – enable row wrapping
-//     SetWrapAutoResize(true) – report natural height as a function of width
-//                               (parents can query via GetMinSize/Measure…)
-//     SetWrapRowsExpand(true) – when the container has extra height, *rows*
+// â€¢ Wrapping helpers (Horizontal mode)
+//     SetWrap(true)           â€“ enable row wrapping
+//     SetWrapAutoResize(true) â€“ report natural height as a function of width
+//                               (parents can query via GetMinSize/Measureâ€¦)
+//     SetWrapRowsExpand(true) â€“ when the container has extra height, *rows*
 //                               grow to consume it (useful in card grids)
 //
-// • Debug
-//     SetDebug(true) – draws an overlay for inset, rows/columns, and item rects
+// â€¢ Debug
+//     SetDebug(true) â€“ draws an overlay for inset, rows/columns, and item rects
 //
 // Typical usage
 // =============
@@ -88,11 +93,11 @@
 // Design notes
 // ============
 //
-// • This control deliberately does **not** participate in Ui Face/Frame/Ink
+// â€¢ This control deliberately does **not** participate in Ui Face/Frame/Ink
 //   styling. It is purely a layout engine. If you need a styled panel, wrap
 //   UiBoxLayout inside a UiCard or another styled container.
-// • Layout decisions are driven by children’s GetMinSize() and the explicit
-//   per-item flags. There is no implicit “stretch everything” magic.
+// â€¢ Layout decisions are driven by childrenâ€™s GetMinSize() and the explicit
+//   per-item flags. There is no implicit â€œstretch everythingâ€ magic.
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -115,8 +120,8 @@ public:
     // -------------------------------------------------------------------------
     // Item
     //
-    // Internal storage of one child’s layout state. Public facing API mutates
-    // these fields via ItemRef methods (Fixed / Fit / Expand / MinMax…).
+    // Internal storage of one childâ€™s layout state. Public facing API mutates
+    // these fields via ItemRef methods (Fixed / Fit / Expand / MinMaxâ€¦).
     // -------------------------------------------------------------------------
     struct Item : Moveable<Item> {
         // --- Persistent API-facing state (sticks across passes) ---------------
@@ -171,7 +176,7 @@ public:
             return *this;
         }
 
-        // Set this item to fit its child’s GetMinSize() on the main axis.
+        // Set this item to fit its childâ€™s GetMinSize() on the main axis.
         ItemRef& Fit() {
             if(ok()) {
                 Item& it     = owner->items[index];
@@ -312,7 +317,7 @@ public:
         return *this;
     }
 
-    // Set outer inset (padding) inside this layout’s rect.
+    // Set outer inset (padding) inside this layoutâ€™s rect.
     UiBoxLayout& SetInset(const Rect& r) {
         inset = r;
         ++cur_gen;
@@ -333,7 +338,7 @@ public:
         return *this;
     }
 
-    // If true in wrap+UiDirection::H mode, GetMinSize()’s height is responsive
+    // If true in wrap+UiDirection::H mode, GetMinSize()â€™s height is responsive
     // to width:
     // parents can resize horizontally and re-query min height.
     UiBoxLayout& SetWrapAutoResize(bool on = true) {
@@ -361,7 +366,7 @@ public:
         return *this;
     }
 
-    // In UiDirection::H mode, cap all non-break items’ widths to a fixed column width.
+    // In UiDirection::H mode, cap all non-break itemsâ€™ widths to a fixed column width.
     UiBoxLayout& SetFixedColumn(int px) {
         fixed_column = max(0, px);
         ++cur_gen;
@@ -369,7 +374,7 @@ public:
         return *this;
     }
 
-    // In UiDirection::V mode, cap all non-break items’ heights to a fixed row height.
+    // In UiDirection::V mode, cap all non-break itemsâ€™ heights to a fixed row height.
     UiBoxLayout& SetFixedRow(int px) {
         fixed_row = max(0, px);
         ++cur_gen;
@@ -415,10 +420,10 @@ public:
     }
 
     // Add a "break" marker:
-    //  • UiDirection::H mode + wrap=true: forces a new row at this point.
-    //  • UiDirection::H mode + wrap=false: acts as a semantic row boundary
+    //  â€¢ UiDirection::H mode + wrap=true: forces a new row at this point.
+    //  â€¢ UiDirection::H mode + wrap=false: acts as a semantic row boundary
     //    (debug only).
-    //  • UiDirection::V mode: treated as a vertical spacer in the stack.
+    //  â€¢ UiDirection::V mode: treated as a vertical spacer in the stack.
     ItemRef AddBreak(int spacer_expandingWeight = 1) {
         Item it;
         it.is_break        = true;
@@ -520,3 +525,4 @@ private:
 } // namespace Upp
 
 #endif // _Ui_UiBoxLayout_h_
+

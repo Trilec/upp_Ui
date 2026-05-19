@@ -1,7 +1,12 @@
-#ifndef _Ui_UiTree_h_
+﻿#ifndef _Ui_UiTree_h_
 #define _Ui_UiTree_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiTree
     ------
 
@@ -322,3 +327,4 @@ private:
 }
 
 #endif
+

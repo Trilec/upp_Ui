@@ -5,6 +5,12 @@
     UiSplitter
     ==========
 
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
+
     Purpose
     - Styled splitter container for resizable panes.
 
@@ -23,6 +29,8 @@
 
     Changelog
     - 2026-05: initial Ui style-system splitter.
+    - 2026-05: public split position API uses percentages; raw internal split
+      units stay private.
 */
 
 #include <CtrlCore/CtrlCore.h>

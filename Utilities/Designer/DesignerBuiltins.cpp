@@ -4,6 +4,28 @@ namespace Upp {
 
 static Image MakeDesignerTypeIcon(const String& id)
 {
+	if(id == "BoxLayout")
+		return ICON_DESIGN_BORDER_INNER_48();
+	if(id == "GridLayout")
+		return ICON_DESIGN_SPACE_DASHBOARD_48();
+	if(id == "UiSplitter")
+		return ICON_DESIGN_BORDER_HORIZONTAL_48();
+	if(id == "UiQuadSplitter")
+		return ICON_DESIGN_BORDER_INNER_48();
+	if(id == "UiPanel")
+		return ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
+	if(id == "UiScrollPanel")
+		return ICON_DESIGN_BOTTOM_SHEETS_48();
+	if(id == "UiLabel")
+		return ICON_DESIGN_LABEL_48();
+	if(id == "UiTitleCard")
+		return ICON_DESIGN_ID_CARD_48();
+	if(id == "UiSlider")
+		return ICON_DESIGN_TUNE_48();
+	if(id == "UiToggle")
+		return ICON_DESIGN_TOGGLE_ON_48();
+	if(id == "UiDropdown")
+		return ICON_DESIGN_LIST_ALT_48();
 	ImageBuffer ib(16, 16);
 	RGBA clear;
 	clear.r = clear.g = clear.b = clear.a = 0;
@@ -46,6 +68,11 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(7, 3, 9, 13, blue);
 		rect(3, 7, 13, 9, blue);
 	}
+	else if(id == "UiSplitter") {
+		frame(2, 3, 14, 13, blue);
+		rect(7, 3, 9, 13, blue);
+		rect(5, 7, 11, 9, blue);
+	}
 	else if(id == "UiButton") {
 		frame(2, 5, 14, 12, green);
 		rect(5, 8, 11, 9, green);
@@ -68,6 +95,11 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(2, 8, 14, 10, green);
 		circle(9, 9, 3, green);
 	}
+	else if(id == "UiPanel" || id == "UiScrollPanel") {
+		frame(2, 3, 14, 13, green);
+		if(id == "UiScrollPanel")
+			rect(11, 4, 13, 12, green);
+	}
 	else if(id == "UiTitleCard") {
 		frame(2, 3, 14, 13, green);
 		rect(4, 5, 12, 7, green);
@@ -76,6 +108,12 @@ static Image MakeDesignerTypeIcon(const String& id)
 	else if(id == "UiLabel") {
 		rect(3, 5, 13, 7, green);
 		rect(3, 9, 10, 11, green);
+	}
+	else if(id == "UiIntEdit" || id == "UiFloatEdit") {
+		frame(2, 4, 14, 12, green);
+		rect(4, 7, 12, 9, green);
+		if(id == "UiFloatEdit")
+			dot(8, 10, green);
 	}
 	else
 		circle(8, 8, 5, gray);
@@ -138,6 +176,58 @@ static DesignerType MakeGridLayoutType()
 	return t;
 }
 
+static DesignerType MakeSplitterType()
+{
+	DesignerType t;
+	t.id = "UiSplitter";
+	t.display_name = "Splitter";
+	t.toolbox_group = "Layouts";
+	t.icon = MakeDesignerTypeIcon(t.id);
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(320, 180);
+	t.min_size = Size(100, 60);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("direction", "H");
+		n.properties.Set("split_percent", 50);
+		n.properties.Set("min_a", 80);
+		n.properties.Set("min_b", 80);
+		n.properties.Set("hit_width", 14);
+		n.properties.Set("track_thickness", 2);
+		n.properties.Set("track_inset", 0);
+		n.properties.Set("thumb_width", 14);
+		n.properties.Set("thumb_height", 64);
+		n.properties.Set("thumb_radius", 8);
+		n.properties.Set("debug", false);
+		n.properties.Set("sizing", "Expand");
+	};
+	return t;
+}
+
+static DesignerType MakeQuadSplitterType()
+{
+	DesignerType t;
+	t.id = "UiQuadSplitter";
+	t.display_name = "Quad Splitter";
+	t.toolbox_group = "Layouts";
+	t.icon = MakeDesignerTypeIcon(t.id);
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(360, 220);
+	t.min_size = Size(160, 120);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("column_percent", 50);
+		n.properties.Set("row_percent", 50);
+		n.properties.Set("min_a", 60);
+		n.properties.Set("min_b", 60);
+		n.properties.Set("min_c", 60);
+		n.properties.Set("min_d", 60);
+		n.properties.Set("debug", false);
+		n.properties.Set("sizing", "Expand");
+	};
+	return t;
+}
+
 static DesignerType MakeControlType(const String& id, const String& name, Size size)
 {
 	DesignerType t;
@@ -172,6 +262,28 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	return t;
 }
 
+static DesignerType MakePanelControlType(const String& id, const String& name, Size size)
+{
+	DesignerType t = MakeControlType(id, name, size);
+	t.toolbox_group = "Containers";
+	t.is_container = true;
+	t.can_have_children = true;
+	t.init_defaults = [=](DesignerNode& n) {
+		n.properties.Set("text", name);
+		n.properties.Set("sizing", "Expand");
+		n.properties.Set("width", size.cx);
+		n.properties.Set("height", size.cy);
+		n.properties.Set("face", Color(248, 250, 252));
+		n.properties.Set("frame", Color(203, 213, 225));
+		n.properties.Set("radius", 8);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("frame_enabled", true);
+		if(id == "UiScrollPanel")
+			n.properties.Set("scroll_mode", "Auto");
+	};
+	return t;
+}
+
 static DesignerType MakeWindowType()
 {
 	DesignerType t;
@@ -189,10 +301,16 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeWindowType());
 	registry.Register(MakeBoxLayoutType());
 	registry.Register(MakeGridLayoutType());
+	registry.Register(MakeSplitterType());
+	registry.Register(MakeQuadSplitterType());
+	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
+	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
 	registry.Register(MakeControlType("UiTitleCard", "Title Card", Size(220, 72)));
 	registry.Register(MakeControlType("UiButton", "Button", Size(120, 32)));
 	registry.Register(MakeControlType("UiLineEdit", "Edit", Size(180, 32)));
+	registry.Register(MakeControlType("UiIntEdit", "Integer Edit", Size(140, 32)));
+	registry.Register(MakeControlType("UiFloatEdit", "Float Edit", Size(140, 32)));
 	registry.Register(MakeControlType("UiSlider", "Slider", Size(180, 32)));
 	registry.Register(MakeControlType("UiToggle", "Toggle", Size(54, 28)));
 	registry.Register(MakeControlType("UiDropdown", "Dropdown", Size(180, 32)));

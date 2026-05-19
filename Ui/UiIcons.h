@@ -2,6 +2,11 @@
 #define _Ui_UiIcons_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiIcons
     =======
 
@@ -423,6 +428,67 @@ inline Image ICON_BRAND_NEWLOGO_V5_48()
     return UiIconsImg::ICON_BRAND_NEWLOGO_V5_48();
 }
 
+inline Image ICON_DESIGN_ACCOUNT_TREE_48()
+{
+    return UiIconsImg::ICON_DESIGN_ACCOUNT_TREE_48();
+}
+
+inline Image ICON_DESIGN_BORDER_HORIZONTAL_48()
+{
+    return UiIconsImg::ICON_DESIGN_BORDER_HORIZONTAL_48();
+}
+
+inline Image ICON_DESIGN_BORDER_INNER_48()
+{
+    return UiIconsImg::ICON_DESIGN_BORDER_INNER_48();
+}
+
+inline Image ICON_DESIGN_BOTTOM_PANEL_CLOSE_48()
+{
+    return UiIconsImg::ICON_DESIGN_BOTTOM_PANEL_CLOSE_48();
+}
+
+inline Image ICON_DESIGN_BOTTOM_PANEL_OPEN_48()
+{
+    return UiIconsImg::ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
+}
+
+inline Image ICON_DESIGN_BOTTOM_SHEETS_48()
+{
+    return UiIconsImg::ICON_DESIGN_BOTTOM_SHEETS_48();
+}
+
+inline Image ICON_DESIGN_ID_CARD_48()
+{
+    return UiIconsImg::ICON_DESIGN_ID_CARD_48();
+}
+
+inline Image ICON_DESIGN_LABEL_48()
+{
+    return UiIconsImg::ICON_DESIGN_LABEL_48();
+}
+
+inline Image ICON_DESIGN_LIST_ALT_48()
+{
+    return UiIconsImg::ICON_DESIGN_LIST_ALT_48();
+}
+
+inline Image ICON_DESIGN_SPACE_DASHBOARD_48()
+{
+    return UiIconsImg::ICON_DESIGN_SPACE_DASHBOARD_48();
+}
+
+inline Image ICON_DESIGN_TOGGLE_ON_48()
+{
+    return UiIconsImg::ICON_DESIGN_TOGGLE_ON_48();
+}
+
+inline Image ICON_DESIGN_TUNE_48()
+{
+    return UiIconsImg::ICON_DESIGN_TUNE_48();
+}
+
+
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
@@ -506,6 +572,18 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_CHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_CHECKED_48));
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TRIP_ORIGIN_48", &ICON_DESIGN_TRIP_ORIGIN_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_ACCOUNT_TREE_48", &ICON_DESIGN_ACCOUNT_TREE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_HORIZONTAL_48", &ICON_DESIGN_BORDER_HORIZONTAL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_INNER_48", &ICON_DESIGN_BORDER_INNER_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BOTTOM_PANEL_CLOSE_48", &ICON_DESIGN_BOTTOM_PANEL_CLOSE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BOTTOM_PANEL_OPEN_48", &ICON_DESIGN_BOTTOM_PANEL_OPEN_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BOTTOM_SHEETS_48", &ICON_DESIGN_BOTTOM_SHEETS_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_ID_CARD_48", &ICON_DESIGN_ID_CARD_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_LABEL_48", &ICON_DESIGN_LABEL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_LIST_ALT_48", &ICON_DESIGN_LIST_ALT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SPACE_DASHBOARD_48", &ICON_DESIGN_SPACE_DASHBOARD_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TOGGLE_ON_48", &ICON_DESIGN_TOGGLE_ON_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TUNE_48", &ICON_DESIGN_TUNE_48));
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
     }();
@@ -550,3 +628,4 @@ inline Image UiIconFromName(const String& icon_name)
 }
 
 #endif
+

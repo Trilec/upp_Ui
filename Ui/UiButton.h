@@ -1,7 +1,12 @@
-#ifndef _Ui_UiButton_h_
+﻿#ifndef _Ui_UiButton_h_
 #define _Ui_UiButton_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiButton
     ========
 
@@ -316,3 +321,4 @@ UiButton& UiButton::Animate(const T& from, const T& to, int ms, Event<const T&> 
 } // namespace Upp
 
 #endif
+

@@ -1,7 +1,12 @@
-#ifndef _Ui_UiToolButton_h_
+﻿#ifndef _Ui_UiToolButton_h_
 #define _Ui_UiToolButton_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiToolButton
     ============
 
@@ -85,3 +90,4 @@ public:
 } // namespace Upp
 
 #endif
+

@@ -1,4 +1,9 @@
-/*
+﻿/*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiTheme
     =======
 
@@ -2928,3 +2933,4 @@ inline UiLabel::Style MakeLabel(UiThemePreset preset, UiThemeMode mode, UiLabelR
 } // namespace Upp
 
 #endif
+

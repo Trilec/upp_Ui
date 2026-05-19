@@ -373,6 +373,7 @@ void UiSplitter::Paint(Draw& w)
         }
         if(!style.label.IsEmpty()) {
             Size tsz = GetTextSize(style.label, style.label_font);
+            w.Clip(thumb);
             if(vertical_) {
                 int y = thumb.top + (thumb.GetHeight() - tsz.cy) / 2;
                 w.DrawText(cursor, y, style.label, style.label_font, ink);
@@ -381,6 +382,7 @@ void UiSplitter::Paint(Draw& w)
                 int x = thumb.left + (thumb.GetWidth() - tsz.cx) / 2;
                 w.DrawText(x, cursor, style.label, style.label_font, ink);
             }
+            w.End();
         }
         PaintGrip(w, thumb, st);
     }

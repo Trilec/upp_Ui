@@ -1,7 +1,12 @@
-#ifndef _Ui_UiScrollPanel_h_
+﻿#ifndef _Ui_UiScrollPanel_h_
 #define _Ui_UiScrollPanel_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiScrollPanel
     =============
 
@@ -137,3 +142,4 @@ private:
 }
 
 #endif
+

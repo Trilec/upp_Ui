@@ -1,7 +1,12 @@
-#ifndef _Ui_UiBaseEdit_h_
+﻿#ifndef _Ui_UiBaseEdit_h_
 #define _Ui_UiBaseEdit_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiBaseEdit
     ========== 
 
@@ -515,3 +520,4 @@ public:
 } // namespace Upp
 
 #endif
+

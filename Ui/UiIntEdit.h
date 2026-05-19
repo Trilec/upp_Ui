@@ -1,7 +1,12 @@
-#ifndef _Ui_UiIntEdit_h_
+﻿#ifndef _Ui_UiIntEdit_h_
 #define _Ui_UiIntEdit_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiIntEdit
     ---------
 
@@ -89,3 +94,4 @@ protected:
 } // namespace Upp
 
 #endif
+

@@ -1,7 +1,12 @@
-#ifndef _Ui_UiBezierCurveField_h_
+﻿#ifndef _Ui_UiBezierCurveField_h_
 #define _Ui_UiBezierCurveField_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiBezierCurveField.h
     ====================
 
@@ -76,3 +81,4 @@ private:
 }
 
 #endif
+

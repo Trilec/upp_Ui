@@ -1,7 +1,12 @@
-#ifndef _Ui_UiDataModels_h_
+﻿#ifndef _Ui_UiDataModels_h_
 #define _Ui_UiDataModels_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiDataModels
     ============
 
@@ -388,3 +393,4 @@ private:
 }
 
 #endif
+

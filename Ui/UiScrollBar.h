@@ -1,7 +1,12 @@
-#ifndef _Ui_UiScrollBar_h_
+﻿#ifndef _Ui_UiScrollBar_h_
 #define _Ui_UiScrollBar_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiScrollBar
     ===========
 
@@ -413,3 +418,4 @@ UiScrollBar& UiScrollBar::Animate(const T& from, const T& to, int ms,
 } // namespace Upp
 
 #endif
+

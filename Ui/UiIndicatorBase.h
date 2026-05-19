@@ -1,7 +1,12 @@
-#ifndef _Ui_UiIndicatorBase_h_
+﻿#ifndef _Ui_UiIndicatorBase_h_
 #define _Ui_UiIndicatorBase_h_
 
 /*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
     UiIndicatorBase
     ===============
 
@@ -111,3 +116,4 @@ private:
 }
 
 #endif
+
