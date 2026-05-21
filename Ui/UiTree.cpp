@@ -966,10 +966,13 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
     bool has_icon = style.show_icons && !IsNull(item.icon);
     if(has_icon) {
         Rect ir = GetIconRect(row, vr.depth, vr.has_children);
-        Color icon_ink = IsNull(style.palette.icon[st]) ? style.glyph_color : style.palette.icon[st];
-        if(is_selected)
-            icon_ink = style.glyph_selected_color;
-            UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, enabled);
+        Color icon_ink = item.custom_ink_color;
+        if(IsNull(icon_ink)) {
+            icon_ink = IsNull(style.palette.icon[st]) ? style.glyph_color : style.palette.icon[st];
+            if(is_selected)
+                icon_ink = style.glyph_selected_color;
+        }
+        UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, enabled);
     }
 
     bool has_metadata = style.show_metadata_marker && item.has_metadata;
@@ -1193,6 +1196,7 @@ void UiTree::Layout()
 
 Size UiTree::GetContentSize() const
 {
+    const_cast<UiTree *>(this)->SyncModel();
     const Style& style = GetEffectiveStyle();
     int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
     int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom + GetTotalHeight();
@@ -1201,6 +1205,7 @@ Size UiTree::GetContentSize() const
 
 Size UiTree::GetMinSize() const
 {
+    const_cast<UiTree *>(this)->SyncModel();
     const Style& style = GetEffectiveStyle();
     int sample_rows = max(3, min(8, visible_rows_.GetCount()));
     int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);

@@ -1712,12 +1712,9 @@ void UiBaseEdit::Paint(Draw& w)
     if(text_r.IsEmpty())
         return;
 
-    if(!m.face_enabled && !(skin.enabled && !IsNull(skin.base))) {
-        Color paper = SColorPaper();
-        if(IsReadOnly() && style.show_readonly_bg)
-            paper = SColorFace();
-        w.DrawRect(text_r, paper);
-    }
+    if(!m.face_enabled && !(skin.enabled && !IsNull(skin.base))
+       && IsReadOnly() && style.show_readonly_bg)
+        w.DrawRect(text_r, SColorFace());
 
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();

@@ -31,6 +31,7 @@ public:
     virtual Value GetData() const override;
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
+    virtual void Paint(Draw& w) override;
 
 private:
     void SyncThemeStyle();
@@ -41,6 +42,9 @@ private:
     UiRole value_role_ = UiRole::Accent;
     int label_width_ = DPI(112);
     int field_gap_ = DPI(8);
+    uint64 theme_revision_ = 0;
+    bool custom_label_style_ = false;
+    bool custom_value_style_ = false;
 };
 
 }

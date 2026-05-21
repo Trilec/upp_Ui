@@ -16,10 +16,19 @@ UiCompositeDropdown::UiCompositeDropdown()
 
 void UiCompositeDropdown::SyncThemeStyle()
 {
-    UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
-    label_style.font = SansSerifZ(9);
-    label_.SetCustomStyle(label_style);
+    uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+    theme_revision_ = revision;
+
+    if(!custom_label_style_) {
+        UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
+        label_style.font = SansSerifZ(9);
+        label_.SetCustomStyle(label_style);
+    }
     drop_.SetRole(dropdown_role_);
+    RefreshLayout();
+    Refresh();
 }
 
 UiCompositeDropdown& UiCompositeDropdown::SetLayoutMode(UiCompositeLayoutMode mode)
@@ -66,6 +75,8 @@ UiCompositeDropdown& UiCompositeDropdown::SetLabelRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Subtle;
     label_role_ = role;
+    custom_label_style_ = false;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
@@ -75,12 +86,14 @@ UiCompositeDropdown& UiCompositeDropdown::SetDropdownRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Accent;
     dropdown_role_ = role;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
 
 UiCompositeDropdown& UiCompositeDropdown::SetLabelStyle(const UiLabel::Style& style)
 {
+    custom_label_style_ = true;
     label_.SetCustomStyle(style);
     Refresh();
     return *this;
@@ -126,6 +139,7 @@ Value UiCompositeDropdown::GetData() const
 
 Size UiCompositeDropdown::GetMinSize() const
 {
+    const_cast<UiCompositeDropdown *>(this)->SyncThemeStyle();
     Size label_sz = label_.GetMinSize();
     Size drop_sz = drop_.GetMinSize();
     if(layout_mode_ == UICOMPOSITE_STACKED)
@@ -135,6 +149,7 @@ Size UiCompositeDropdown::GetMinSize() const
 
 void UiCompositeDropdown::Layout()
 {
+    SyncThemeStyle();
     Rect r = GetSize();
     if(layout_mode_ == UICOMPOSITE_STACKED) {
         int label_h = label_.GetMinSize().cy;
@@ -146,6 +161,11 @@ void UiCompositeDropdown::Layout()
     int lw = min(label_width_, r.GetWidth());
     label_.SetRect(0, 0, lw, r.GetHeight());
     drop_.SetRect(lw + field_gap_, 0, max(0, r.GetWidth() - lw - field_gap_), r.GetHeight());
+}
+
+void UiCompositeDropdown::Paint(Draw& w)
+{
+    SyncThemeStyle();
 }
 
 }

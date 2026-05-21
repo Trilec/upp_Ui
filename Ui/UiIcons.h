@@ -25,12 +25,40 @@ namespace Upp {
 
 using UiIconFactoryFn = Image (*)();
 
+inline String UiIconDisplayName(const String& raw_name)
+{
+    String s = raw_name;
+    if(s.StartsWith("ICON_"))
+        s = s.Mid(5);
+    if(s.EndsWith("_48"))
+        s = s.Left(s.GetCount() - 3);
+    s.Replace("_", " ");
+    s = ToLower(s);
+
+    String out;
+    bool word_start = true;
+    for(int i = 0; i < s.GetCount(); i++) {
+        int c = s[i];
+        if(IsSpace(c)) {
+            out.Cat(' ');
+            word_start = true;
+        }
+        else {
+            out.Cat(word_start ? ToUpper(c) : c);
+            word_start = false;
+        }
+    }
+    return out;
+}
+
 struct UiIconCatalogEntry : Moveable<UiIconCatalogEntry> {
     String          name;
+    String          display_name;
     UiIconFactoryFn factory = nullptr;
 
     UiIconCatalogEntry() {}
-    UiIconCatalogEntry(const String& n, UiIconFactoryFn f) : name(n), factory(f) {}
+    UiIconCatalogEntry(const String& n, UiIconFactoryFn f) : name(n), display_name(UiIconDisplayName(n)), factory(f) {}
+    UiIconCatalogEntry(const String& n, const String& d, UiIconFactoryFn f) : name(n), display_name(d), factory(f) {}
 };
 
 inline Image ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48()
@@ -488,12 +516,82 @@ inline Image ICON_DESIGN_TUNE_48()
     return UiIconsImg::ICON_DESIGN_TUNE_48();
 }
 
+inline Image ICON_DESIGN_BOX_LAYOUT_48()
+{
+    return UiIconsImg::ICON_DESIGN_BOX_LAYOUT_48();
+}
+
+inline Image ICON_DESIGN_GRID_LAYOUT_48()
+{
+    return UiIconsImg::ICON_DESIGN_GRID_LAYOUT_48();
+}
+
+inline Image ICON_DESIGN_PANEL_48()
+{
+    return UiIconsImg::ICON_DESIGN_PANEL_48();
+}
+
+inline Image ICON_DESIGN_SCROLL_PANEL_48()
+{
+    return UiIconsImg::ICON_DESIGN_SCROLL_PANEL_48();
+}
+
+inline Image ICON_DESIGN_TABLE_48()
+{
+    return UiIconsImg::ICON_DESIGN_TABLE_48();
+}
+
+inline Image ICON_DESIGN_TAB_48()
+{
+    return UiIconsImg::ICON_DESIGN_TAB_48();
+}
+
+inline Image ICON_DESIGN_TREE_48()
+{
+    return UiIconsImg::ICON_DESIGN_TREE_48();
+}
+
+inline Image ICON_DESIGN_TOGGLE_COMPOSITE_48()
+{
+    return UiIconsImg::ICON_DESIGN_TOGGLE_COMPOSITE_48();
+}
+
+inline Image ICON_DESIGN_EDIT_TEXT_48()
+{
+    return UiIconsImg::ICON_DESIGN_EDIT_TEXT_48();
+}
+
+inline Image ICON_DESIGN_EDIT_INT_48()
+{
+    return UiIconsImg::ICON_DESIGN_EDIT_INT_48();
+}
+
+inline Image ICON_DESIGN_EDIT_FLOAT_48()
+{
+    return UiIconsImg::ICON_DESIGN_EDIT_FLOAT_48();
+}
+
+inline Image ICON_DESIGN_STACK_48()
+{
+    return UiIconsImg::ICON_DESIGN_STACK_48();
+}
+
+inline Image ICON_DESIGN_BUTTON_48()
+{
+    return UiIconsImg::ICON_DESIGN_BUTTON_48();
+}
+
+inline Image ICON_DESIGN_BREADCRUMBS_48()
+{
+    return UiIconsImg::ICON_DESIGN_BREADCRUMBS_48();
+}
+
 
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
         Vector<UiIconCatalogEntry> out;
-        out.Reserve(79);
+        out.Reserve(93);
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48", &ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MENU_48", &ICON_NAVIGATION_OUTLINED_MENU_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_VERT_48", &ICON_NAVIGATION_OUTLINED_MORE_VERT_48));
@@ -584,6 +682,20 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_SPACE_DASHBOARD_48", &ICON_DESIGN_SPACE_DASHBOARD_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TOGGLE_ON_48", &ICON_DESIGN_TOGGLE_ON_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TUNE_48", &ICON_DESIGN_TUNE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BOX_LAYOUT_48", &ICON_DESIGN_BOX_LAYOUT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_GRID_LAYOUT_48", &ICON_DESIGN_GRID_LAYOUT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_PANEL_48", &ICON_DESIGN_PANEL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SCROLL_PANEL_48", &ICON_DESIGN_SCROLL_PANEL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TABLE_48", &ICON_DESIGN_TABLE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TAB_48", &ICON_DESIGN_TAB_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TREE_48", &ICON_DESIGN_TREE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TOGGLE_COMPOSITE_48", &ICON_DESIGN_TOGGLE_COMPOSITE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_EDIT_TEXT_48", &ICON_DESIGN_EDIT_TEXT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_EDIT_INT_48", &ICON_DESIGN_EDIT_INT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_EDIT_FLOAT_48", &ICON_DESIGN_EDIT_FLOAT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_STACK_48", &ICON_DESIGN_STACK_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BUTTON_48", &ICON_DESIGN_BUTTON_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_BREADCRUMBS_48", &ICON_DESIGN_BREADCRUMBS_48));
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
     }();
@@ -600,6 +712,16 @@ inline Vector<String> UiIconNameList()
     return names;
 }
 
+inline Vector<String> UiIconDisplayNameList()
+{
+    Vector<String> names;
+    const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
+    names.Reserve(catalog.GetCount());
+    for(int i = 0; i < catalog.GetCount(); i++)
+        names.Add(catalog[i].display_name);
+    return names;
+}
+
 inline UiListModel UiIconListModel(bool use_icon_name_as_data = true)
 {
     UiListModel model;
@@ -607,10 +729,11 @@ inline UiListModel UiIconListModel(bool use_icon_name_as_data = true)
     model.Reserve(catalog.GetCount());
     for(int i = 0; i < catalog.GetCount(); i++) {
         UiModelItem it;
-        it.text = catalog[i].name;
+        it.text = catalog[i].display_name;
         if(use_icon_name_as_data)
             it.data = catalog[i].name;
         it.icon = catalog[i].factory ? catalog[i].factory() : Image();
+        it.icon_render_mode = UiIconRenderMode::MonoTint;
         model.Add(it);
     }
     return model;

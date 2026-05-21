@@ -14,12 +14,23 @@ UiCompositeLabel::UiCompositeLabel()
 
 void UiCompositeLabel::SyncThemeStyle()
 {
-    UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
-    label_style.font = SansSerifZ(9);
-    UiLabel::Style value_style = UiTheme::ResolveLabel(value_role_);
-    value_style.font = SansSerifZ(9);
-    label_.SetCustomStyle(label_style);
-    value_.SetCustomStyle(value_style);
+    uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+    theme_revision_ = revision;
+
+    if(!custom_label_style_) {
+        UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
+        label_style.font = SansSerifZ(9);
+        label_.SetCustomStyle(label_style);
+    }
+    if(!custom_value_style_) {
+        UiLabel::Style value_style = UiTheme::ResolveLabel(value_role_);
+        value_style.font = SansSerifZ(9);
+        value_.SetCustomStyle(value_style);
+    }
+    RefreshLayout();
+    Refresh();
 }
 
 UiCompositeLabel& UiCompositeLabel::SetLabel(const String& text)
@@ -58,6 +69,8 @@ UiCompositeLabel& UiCompositeLabel::SetLabelRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Subtle;
     label_role_ = role;
+    custom_label_style_ = false;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
@@ -67,12 +80,15 @@ UiCompositeLabel& UiCompositeLabel::SetValueRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Accent;
     value_role_ = role;
+    custom_value_style_ = false;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
 
 UiCompositeLabel& UiCompositeLabel::SetLabelStyle(const UiLabel::Style& style)
 {
+    custom_label_style_ = true;
     label_.SetCustomStyle(style);
     Refresh();
     return *this;
@@ -80,6 +96,7 @@ UiCompositeLabel& UiCompositeLabel::SetLabelStyle(const UiLabel::Style& style)
 
 UiCompositeLabel& UiCompositeLabel::SetValueStyle(const UiLabel::Style& style)
 {
+    custom_value_style_ = true;
     value_.SetCustomStyle(style);
     Refresh();
     return *this;
@@ -97,6 +114,7 @@ Value UiCompositeLabel::GetData() const
 
 Size UiCompositeLabel::GetMinSize() const
 {
+    const_cast<UiCompositeLabel *>(this)->SyncThemeStyle();
     Size label_sz = label_.GetMinSize();
     Size value_sz = value_.GetMinSize();
     return Size(max(label_width_, label_sz.cx) + field_gap_ + value_sz.cx, max(label_sz.cy, value_sz.cy));
@@ -104,10 +122,16 @@ Size UiCompositeLabel::GetMinSize() const
 
 void UiCompositeLabel::Layout()
 {
+    SyncThemeStyle();
     Rect r = GetSize();
     int lw = min(label_width_, r.GetWidth());
     label_.SetRect(0, 0, lw, r.GetHeight());
     value_.SetRect(lw + field_gap_, 0, max(0, r.GetWidth() - lw - field_gap_), r.GetHeight());
+}
+
+void UiCompositeLabel::Paint(Draw& w)
+{
+    SyncThemeStyle();
 }
 
 }

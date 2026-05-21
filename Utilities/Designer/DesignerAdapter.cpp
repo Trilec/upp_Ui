@@ -163,6 +163,11 @@ static Font DesignerFontChoice(const DesignerNode& n, const String& key, int siz
 static Image DesignerIconChoice(const DesignerNode& n)
 {
 	String icon = AdapterNodeProperty(n, "icon", "None");
+	if(icon == "None")
+		return Image();
+	Image catalog_icon = UiIconFromName(icon);
+	if(!IsNull(catalog_icon))
+		return catalog_icon;
 	if(icon == "Home") return ICON_DESIGN_HOME_48();
 	if(icon == "Settings") return ICON_DESIGN_SETTINGS_48();
 	if(icon == "Menu") return ICON_DESIGN_MENU_48();
@@ -176,10 +181,12 @@ static Image DesignerIconChoice(const DesignerNode& n)
 
 static void AddIconBinding(DesignerApiBuilder& b)
 {
-	b.AddChoice("icon", "Icon", "Ui control icon/media API",
-	            "Optional preview icon from the Ui icon catalog.",
-	            {{"None", "None"}, {"Home", "Home"}, {"Settings", "Settings"}, {"Menu", "Menu"},
-	             {"Search", "Search"}, {"Add", "Add"}, {"Check", "Check"}, {"Folder", "Folder"}, {"Image", "Image"}});
+	DesignerApiBinding& icon = b.Add("icon", "Icon", DesignerEditorKind::Choice, "Ui control icon/media API",
+	                                 "Optional preview icon from the Ui icon catalog.");
+	icon.choices.Add("None", "None");
+	const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
+	for(int i = 0; i < catalog.GetCount(); i++)
+		icon.choices.Add(catalog[i].name, catalog[i].display_name);
 	b.AddInt("icon_size", "Icon size", DesignerEditorKind::Slider,
 	         "SetIconSize / SetMedia preferred size",
 	         "Preview icon size for icon-capable controls.", 8, 64);
@@ -191,12 +198,20 @@ static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 	bool pane_slot = n.type_id == "PaneSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
 	bool face_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "face_enabled", true);
 	bool frame_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	for(int i = 0; i < 4; i++) {
-		s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(214, 231, 255)));
-		s.palette.frame[i] = GetColorProperty(n, "frame", s.palette.frame[i]);
+	if(face_enabled || frame_enabled) {
+		for(int i = 0; i < 4; i++) {
+			if(face_enabled)
+				s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(214, 231, 255)));
+			if(frame_enabled)
+				s.palette.frame[i] = GetColorProperty(n, "frame", s.palette.frame[i]);
+		}
+		s.metrics.face_enabled = face_enabled;
+		s.metrics.frame_enabled = frame_enabled;
 	}
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
+	if(pane_slot) {
+		s.metrics.face_enabled = false;
+		s.metrics.frame_enabled = false;
+	}
 	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
 	panel.SetCustomStyle(s);
 }
@@ -206,19 +221,22 @@ static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 	UiButton::Style s = UiTheme::ResolveButton();
 	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
 	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	for(int i = 0; i < 4; i++) {
-		s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(214, 231, 255)));
-		s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+	if(face_enabled || frame_enabled) {
+		for(int i = 0; i < 4; i++) {
+			if(face_enabled)
+				s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(214, 231, 255)));
+			if(frame_enabled)
+				s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+		}
+		s.metrics.face_enabled = face_enabled;
+		s.metrics.frame_enabled = frame_enabled;
 	}
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
 	s.metrics.frame_width = DPI(1);
 	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
 	s.align_h = AdapterNodeProperty(n, "align", "Center") == "Right" ? UiAlign::RIGHT
 	          : AdapterNodeProperty(n, "align", "Center") == "Left" ? UiAlign::LEFT
 	          : UiAlign::CENTER;
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
-	s.transparent = !face_enabled && !frame_enabled;
 	button.SetCustomStyle(s);
 }
 
@@ -227,12 +245,16 @@ static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 	UiBaseEdit::Style s = UiTheme::ResolveEdit(UiEditRole::Strong);
 	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
 	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	for(int i = 0; i < 4; i++) {
-		s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(255, 255, 255)));
-		s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+	if(face_enabled || frame_enabled) {
+		for(int i = 0; i < 4; i++) {
+			if(face_enabled)
+				s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(255, 255, 255)));
+			if(frame_enabled)
+				s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+		}
+		s.metrics.face_enabled = face_enabled;
+		s.metrics.frame_enabled = frame_enabled;
 	}
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
 	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.text_align = AdapterNodeProperty(n, "align", "Left") == "Right" ? UiAlign::RIGHT
@@ -246,18 +268,21 @@ static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 	UiDropdown::Style s = UiTheme::ResolveDropdown();
 	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
 	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	for(int i = 0; i < 4; i++) {
-		s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(255, 255, 255)));
-		s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+	if(face_enabled || frame_enabled) {
+		for(int i = 0; i < 4; i++) {
+			if(face_enabled)
+				s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(255, 255, 255)));
+			if(frame_enabled)
+				s.palette.frame[i] = GetColorProperty(n, "frame", Color(54, 116, 210));
+		}
+		s.metrics.face_enabled = face_enabled;
+		s.metrics.frame_enabled = frame_enabled;
 	}
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
 	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.align_h = AdapterNodeProperty(n, "align", "Left") == "Right" ? UiAlign::RIGHT
 	          : AdapterNodeProperty(n, "align", "Left") == "Center" ? UiAlign::CENTER
 	          : UiAlign::LEFT;
-	s.transparent = !face_enabled && !frame_enabled;
 	drop.SetCustomStyle(s);
 }
 
@@ -607,14 +632,19 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 	face_enabled_ = (bool)AdapterNodeProperty(node, "face_enabled", true);
 	frame_enabled_ = (bool)AdapterNodeProperty(node, "frame_enabled", true);
 	UiSlider::Style s = UiTheme::ResolveSlider();
-	for(int i = 0; i < 4; i++) {
-		s.track_palette.face[i] = UiFill::Solid(Blend(face_, White(), 30));
-		s.track_palette.frame[i] = frame_;
-		s.thumb_palette.face[i] = UiFill::Solid(frame_);
+	if(face_enabled_ || frame_enabled_) {
+		for(int i = 0; i < 4; i++) {
+			if(face_enabled_)
+				s.track_palette.face[i] = UiFill::Solid(Blend(face_, White(), 30));
+			if(frame_enabled_) {
+				s.track_palette.frame[i] = frame_;
+				s.thumb_palette.face[i] = UiFill::Solid(frame_);
+			}
+		}
+		s.track_metrics.face_enabled = face_enabled_;
+		s.track_metrics.frame_enabled = frame_enabled_;
 	}
 	s.track_metrics.radius = max(DPI(2), min(radius_, DPI(8)));
-	s.track_metrics.face_enabled = face_enabled_;
-	s.track_metrics.frame_enabled = frame_enabled_;
 	s.track_metrics.frame_width = DPI(1);
 	SetCustomStyle(s);
 	if(radius_ > 0)

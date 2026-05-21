@@ -31,6 +31,36 @@ static Color DesignerPreviewBackground(UiThemeMode mode)
 	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
 }
 
+static bool DesignerPreviewIsLayoutType(const DesignerType *t)
+{
+	return t && (t->toolbox_group == "Layouts" || t->id == "Window");
+}
+
+static bool DesignerPreviewIsPanelType(const DesignerType *t)
+{
+	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot");
+}
+
+static Color DesignerPreviewCategoryFace(const DesignerType *t, UiThemeMode mode)
+{
+	bool dark = mode == UiThemeMode::Dark;
+	if(DesignerPreviewIsLayoutType(t))
+		return dark ? Color(88, 59, 31) : Color(255, 224, 178);
+	if(DesignerPreviewIsPanelType(t))
+		return dark ? Color(34, 78, 54) : Color(187, 232, 203);
+	return dark ? Color(42, 68, 104) : Color(203, 224, 255);
+}
+
+static Color DesignerPreviewCategoryFrame(const DesignerType *t, UiThemeMode mode)
+{
+	bool dark = mode == UiThemeMode::Dark;
+	if(DesignerPreviewIsLayoutType(t))
+		return dark ? Color(245, 158, 66) : Color(217, 119, 6);
+	if(DesignerPreviewIsPanelType(t))
+		return dark ? Color(74, 222, 128) : Color(34, 150, 91);
+	return dark ? Color(96, 165, 250) : Color(54, 116, 210);
+}
+
 void DesignerPreview::Set(DesignerModel* model, DesignerRegistry* registry)
 {
 			model_ = model;
@@ -390,10 +420,8 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 {
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
 			bool selected = DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0;
-			bool dark = theme_mode_ == UiThemeMode::Dark;
-			Color default_face = t && t->is_container ? (dark ? Color(38, 82, 64) : Color(207, 242, 226))
-			                                          : (dark ? Color(42, 68, 104) : Color(214, 231, 255));
-			Color default_frame = t && t->is_container ? Color(44, 156, 105) : Color(54, 116, 210);
+			Color default_face = DesignerPreviewCategoryFace(t, theme_mode_);
+			Color default_frame = DesignerPreviewCategoryFrame(t, theme_mode_);
 			Color face = DesignerPreviewNodeProperty(n, "face", default_face);
 			Color frame = DesignerPreviewNodeProperty(n, "frame", default_frame);
 			bool face_enabled = (bool)DesignerPreviewNodeProperty(n, "face_enabled", true);

@@ -179,9 +179,10 @@ public:
 		Rect toolbox_rect = toolbox_panel_.GetSize();
 		int help_h = DPI(76);
 		int help_gap = DPI(8);
+		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
 		if(toolbox_rect.GetHeight() < DPI(260)) {
 			toolbox_scroll_.SetRect(toolbox_rect);
-			toolbox_tree_.SetRect(0, 0, max(0, toolbox_rect.GetWidth()), max(toolbox_rect.GetHeight(), toolbox_tree_.GetContentSize().cy));
+			toolbox_tree_.SetRect(0, 0, max(0, toolbox_rect.GetWidth()), max(toolbox_rect.GetHeight(), tree_h));
 			toolbox_help_panel_.Hide();
 			toolbox_help_icon_.Hide();
 			toolbox_help_title_.Hide();
@@ -195,7 +196,7 @@ public:
 			Rect scroll_r = RectC(toolbox_rect.left, toolbox_rect.top,
 			                      toolbox_rect.GetWidth(), max(0, toolbox_rect.GetHeight() - help_h - help_gap));
 			toolbox_scroll_.SetRect(scroll_r);
-			toolbox_tree_.SetRect(0, 0, max(0, scroll_r.GetWidth()), max(scroll_r.GetHeight(), toolbox_tree_.GetContentSize().cy));
+			toolbox_tree_.SetRect(0, 0, max(0, scroll_r.GetWidth()), max(scroll_r.GetHeight(), tree_h));
 			Rect hp = RectC(toolbox_rect.left, toolbox_rect.bottom - help_h,
 			                max(0, toolbox_rect.GetWidth()), help_h);
 			toolbox_help_panel_.SetRect(hp);
@@ -508,12 +509,11 @@ private:
 		preview_.Refresh();
 	}
 
-	Image NodeIcon(const DesignerType* t, bool selected) const
+	Image NodeIcon(const DesignerType* t) const
 	{
-		if(t && !t->icon.IsEmpty())
-			return t->icon;
-		bool layout = t && t->is_container;
-		return layout ? layout_icon_ : control_icon_;
+		if(!t)
+			return control_icon_;
+		return !t->icon.IsEmpty() ? t->icon : CategoryFallbackIcon(t);
 	}
 
 	String PanePrefix(const DesignerNode& parent, int child_index) const
@@ -544,8 +544,9 @@ private:
 			for(const DesignerType* t : registry_.GetToolboxTypes(group)) {
 				UiModelItem item(t->display_name, t->id);
 				item.description = t->id;
-				item.icon = !t->icon.IsEmpty() ? t->icon : (t->is_container ? layout_icon_ : control_icon_);
-				item.icon_render_mode = UiIconRenderMode::PreserveColor;
+				item.icon = !t->icon.IsEmpty() ? t->icon : CategoryFallbackIcon(t);
+				item.icon_render_mode = UiIconRenderMode::MonoTint;
+				item.custom_ink_color = CategoryColor(t);
 				toolbox_model_.AddChild(group_ref, item);
 			}
 		}
@@ -589,8 +590,9 @@ private:
 			UiModelItem item(text, n->id);
 			item.right_text = t ? t->display_name : n->type_id;
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
-			item.icon = NodeIcon(t, selected);
-			item.icon_render_mode = selected ? UiIconRenderMode::MonoTint : UiIconRenderMode::PreserveColor;
+			item.icon = NodeIcon(t);
+			item.icon_render_mode = UiIconRenderMode::MonoTint;
+			item.custom_ink_color = CategoryColor(t);
 			UiTreeNodeRef ref;
 			if(id == Designer_ROOT) {
 				ref = hierarchy_model_.Root();
@@ -627,8 +629,9 @@ private:
 			const DesignerType* t = n ? registry_.Find(n->type_id) : nullptr;
 			UiModelItem item = hierarchy_model_.Get(ref);
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
-			item.icon = NodeIcon(t, selected);
-			item.icon_render_mode = selected ? UiIconRenderMode::MonoTint : UiIconRenderMode::PreserveColor;
+			item.icon = NodeIcon(t);
+			item.icon_render_mode = UiIconRenderMode::MonoTint;
+			item.custom_ink_color = CategoryColor(t);
 			hierarchy_model_.Set(ref, item);
 		}
 		if(!model_.GetSelection().IsEmpty()) {
@@ -1145,6 +1148,35 @@ private:
 		return ib;
 	}
 
+	bool IsLayoutType(const DesignerType* t) const
+	{
+		return t && (t->toolbox_group == "Layouts" || t->id == "Window");
+	}
+
+	bool IsPanelType(const DesignerType* t) const
+	{
+		return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot");
+	}
+
+	Color CategoryColor(const DesignerType* t) const
+	{
+		bool dark = theme_mode_ == UiThemeMode::Dark;
+		if(IsLayoutType(t))
+			return dark ? Color(245, 158, 66) : Color(217, 119, 6);
+		if(IsPanelType(t))
+			return dark ? Color(74, 222, 128) : Color(34, 150, 91);
+		return dark ? Color(96, 165, 250) : Color(54, 116, 210);
+	}
+
+	Image CategoryFallbackIcon(const DesignerType* t) const
+	{
+		if(IsLayoutType(t))
+			return layout_icon_;
+		if(IsPanelType(t))
+			return panel_icon_;
+		return control_icon_;
+	}
+
 	// Apply the selected light/dark theme to the shell and child Ui controls.
 	// Demos and utilities should stay theme-first; local styling here is limited
 	// to layout shell surfaces and status affordances.
@@ -1155,8 +1187,9 @@ private:
 		ctx.preset = UiThemePreset::Minimal;
 		ctx.mode = mode;
 		UiTheme::Set(ctx);
-		layout_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(80, 170, 255) : Color(0, 102, 204));
-		control_icon_ = MakeTypeIcon(false, mode == UiThemeMode::Dark ? Color(91, 214, 139) : Color(27, 145, 72));
+		layout_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(245, 158, 66) : Color(217, 119, 6));
+		panel_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(74, 222, 128) : Color(34, 150, 91));
+		control_icon_ = MakeTypeIcon(false, mode == UiThemeMode::Dark ? Color(96, 165, 250) : Color(54, 116, 210));
 		header_.SetCustomStyle(UiTheme::ResolveTitleCard());
 		version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
@@ -1189,6 +1222,32 @@ private:
 		warn_text_style.font = SansSerifZ(11);
 		warning_text_.SetCustomStyle(warn_text_style);
 		right_box_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		UiAccordion::Style accordion_style = UiAccordion::StyleDefault();
+		UiPanel::Style accordion_panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+		accordion_style.palette = accordion_panel.palette;
+		accordion_style.metrics = accordion_panel.metrics;
+		accordion_style.metrics.radius = max(DPI(8), accordion_style.metrics.radius);
+		accordion_style.metrics.frame_enabled = true;
+		accordion_style.metrics.face_enabled = true;
+		accordion_style.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+		accordion_style.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+		accordion_style.header_style.hover_enabled = false;
+		accordion_style.header_style.metrics.focus_enabled = false;
+		accordion_style.header_style.title_line = false;
+		accordion_style.header_style.card_line = true;
+		accordion_style.header_style.media_tint_mono = true;
+		accordion_style.header_style.title_font = SansSerifZ(11).Bold();
+		accordion_style.header_style.subtitle_font = SansSerifZ(8);
+		accordion_style.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
+		accordion_style.body_style.transparent = true;
+		accordion_style.body_style.metrics.face_enabled = false;
+		accordion_style.body_style.metrics.frame_enabled = false;
+		accordion_style.body_style.metrics.frame_width = 0;
+		accordion_style.body_style.metrics.radius = 0;
+		accordion_style.body_style.metrics.focus_enabled = false;
+		accordion_style.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
+		accordion_style.body_style.metrics.shadow.enabled = false;
+		right_accordion_.SetCustomStyle(accordion_style);
 		UiScrollPanel::Style code_scroll_style = UiScrollPanel::StyleDefault();
 		for(int i = 0; i < 4; i++) {
 			code_scroll_style.palette.face[i] = UiFill::Solid(Color(20, 20, 20));
@@ -1255,6 +1314,7 @@ private:
 	UiBoxLayout code_box_;
 	UiLabel code_;
 	Image layout_icon_;
+	Image panel_icon_;
 	Image control_icon_;
 	bool drag_status_visible_ = false;
 	String drag_status_text_;

@@ -6,40 +6,55 @@
 
 namespace Upp {
 
+static Color DesignerLayoutFace()  { return Color(255, 224, 178); }
+static Color DesignerLayoutFrame() { return Color(217, 119, 6); }
+static Color DesignerPanelFace()   { return Color(187, 232, 203); }
+static Color DesignerPanelFrame()  { return Color(34, 150, 91); }
+static Color DesignerControlFace() { return Color(203, 224, 255); }
+static Color DesignerControlFrame(){ return Color(54, 116, 210); }
+
 static Image MakeDesignerTypeIcon(const String& id)
 {
 	if(id == "BoxLayout")
-		return ICON_DESIGN_UNFOLD_MORE_48();
+		return ICON_DESIGN_BOX_LAYOUT_48();
 	if(id == "GridLayout")
-		return ICON_DESIGN_BORDER_INNER_48();
+		return ICON_DESIGN_GRID_LAYOUT_48();
 	if(id == "UiSplitter")
 		return ICON_DESIGN_BORDER_HORIZONTAL_48();
 	if(id == "UiQuadSplitter")
 		return ICON_DESIGN_BORDER_INNER_48();
 	if(id == "UiPanel")
-		return ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
+		return ICON_DESIGN_PANEL_48();
 	if(id == "UiScrollPanel")
-		return ICON_DESIGN_BOTTOM_SHEETS_48();
+		return ICON_DESIGN_SCROLL_PANEL_48();
 	if(id == "UiLabel")
 		return ICON_DESIGN_LABEL_48();
 	if(id == "UiTitleCard")
 		return ICON_DESIGN_ID_CARD_48();
+	if(id == "UiButton")
+		return ICON_DESIGN_BUTTON_48();
+	if(id == "UiLineEdit")
+		return ICON_DESIGN_EDIT_TEXT_48();
+	if(id == "UiIntEdit")
+		return ICON_DESIGN_EDIT_INT_48();
+	if(id == "UiFloatEdit")
+		return ICON_DESIGN_EDIT_FLOAT_48();
 	if(id == "UiSlider")
 		return ICON_DESIGN_TUNE_48();
 	if(id == "UiToggle")
-		return ICON_DESIGN_TOGGLE_ON_48();
+		return ICON_DESIGN_TOGGLE_COMPOSITE_48();
 	if(id == "UiDropdown")
 		return ICON_DESIGN_LIST_ALT_48();
 	if(id == "UiCheckBox")
 		return ICON_DESIGN_CHECK_SMALL_48();
 	if(id == "UiBreadcrumbs")
-		return ICON_DESIGN_FOLDER_48();
+		return ICON_DESIGN_BREADCRUMBS_48();
 	if(id == "UiTab")
-		return ICON_DESIGN_BOTTOM_SHEETS_48();
+		return ICON_DESIGN_TAB_48();
 	if(id == "UiTable")
-		return ICON_DESIGN_SPACE_DASHBOARD_48();
+		return ICON_DESIGN_TABLE_48();
 	if(id == "UiTree")
-		return ICON_DESIGN_ACCOUNT_TREE_48();
+		return ICON_DESIGN_TREE_48();
 	ImageBuffer ib(16, 16);
 	RGBA clear;
 	clear.r = clear.g = clear.b = clear.a = 0;
@@ -154,8 +169,8 @@ static DesignerType MakeBoxLayoutType()
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
-		n.properties.Set("face", Color(207, 242, 226));
-		n.properties.Set("frame", Color(44, 156, 105));
+		n.properties.Set("face", DesignerLayoutFace());
+		n.properties.Set("frame", DesignerLayoutFrame());
 		n.properties.Set("radius", 0);
 	};
 	return t;
@@ -183,8 +198,8 @@ static DesignerType MakeGridLayoutType()
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
-		n.properties.Set("face", Color(207, 242, 226));
-		n.properties.Set("frame", Color(44, 156, 105));
+		n.properties.Set("face", DesignerLayoutFace());
+		n.properties.Set("frame", DesignerLayoutFrame());
 		n.properties.Set("radius", 0);
 	};
 	return t;
@@ -216,6 +231,10 @@ static DesignerType MakeSplitterType()
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("face", DesignerLayoutFace());
+		n.properties.Set("frame", DesignerLayoutFrame());
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
 	};
 	return t;
 }
@@ -242,6 +261,10 @@ static DesignerType MakeQuadSplitterType()
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("face", DesignerLayoutFace());
+		n.properties.Set("frame", DesignerLayoutFrame());
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
 	};
 	return t;
 }
@@ -256,17 +279,18 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	t.default_size = size;
 	t.min_size = Size(24, 20);
 	t.init_defaults = [=](DesignerNode& n) {
+		bool placeholder = id == "Item";
 		n.properties.Set("text", name);
 		n.properties.Set("sizing", "Fit");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
-		n.properties.Set("face", Color(214, 231, 255));
-		n.properties.Set("frame", Color(54, 116, 210));
+		n.properties.Set("face", DesignerControlFace());
+		n.properties.Set("frame", DesignerControlFrame());
 		n.properties.Set("radius", 0);
-		n.properties.Set("face_enabled", true);
-		n.properties.Set("frame_enabled", true);
+		n.properties.Set("face_enabled", placeholder);
+		n.properties.Set("frame_enabled", placeholder);
 		n.properties.Set("font", "Sans");
 		n.properties.Set("font_size", 11);
 		n.properties.Set("align", "Left");
@@ -292,7 +316,7 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("current", 2);
 			n.properties.Set("trim", false);
 			n.properties.Set("divider", "/");
-			n.properties.Set("icon", "Home");
+			n.properties.Set("icon", "ICON_DESIGN_HOME_48");
 			n.properties.Set("icon_size", 16);
 		}
 		if(id == "UiTab") {
@@ -337,11 +361,11 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
-		n.properties.Set("face", Color(248, 250, 252));
-		n.properties.Set("frame", Color(203, 213, 225));
+		n.properties.Set("face", DesignerPanelFace());
+		n.properties.Set("frame", DesignerPanelFrame());
 		n.properties.Set("radius", 8);
-		n.properties.Set("face_enabled", true);
-		n.properties.Set("frame_enabled", true);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
 		if(id == "UiScrollPanel")
 			n.properties.Set("scroll_mode", "Auto");
 	};

@@ -53,6 +53,12 @@ static String ColorExpr(Color c)
 
 static String IconExpr(const String& icon)
 {
+	if(icon == "None")
+		return String();
+	const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
+	for(int i = 0; i < catalog.GetCount(); i++)
+		if(icon == catalog[i].name)
+			return icon + "()";
 	if(icon == "Home") return "ICON_DESIGN_HOME_48()";
 	if(icon == "Settings") return "ICON_DESIGN_SETTINGS_48()";
 	if(icon == "Menu") return "ICON_DESIGN_MENU_48()";

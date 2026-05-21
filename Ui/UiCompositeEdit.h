@@ -33,6 +33,7 @@ public:
     virtual Value GetData() const override;
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
+    virtual void Paint(Draw& w) override;
 
     Event<> WhenAction;
     Event<> WhenChange;
@@ -48,6 +49,9 @@ private:
     int label_width_ = DPI(112);
     int field_gap_ = DPI(8);
     int stack_gap_ = DPI(4);
+    uint64 theme_revision_ = 0;
+    bool custom_label_style_ = false;
+    bool custom_edit_style_ = false;
 };
 
 }

@@ -122,9 +122,17 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 	if(b.property_id == "subtitle")
 		return "";
 	if(b.property_id == "face")
-		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout") ? Color(207, 242, 226) : Color(214, 231, 255);
+		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout" || n.type_id == "UiSplitter" || n.type_id == "UiQuadSplitter")
+		       ? Color(255, 224, 178)
+		       : (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" || n.type_id == "PaneSlot")
+		         ? Color(187, 232, 203)
+		         : Color(203, 224, 255);
 	if(b.property_id == "frame")
-		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout") ? Color(44, 156, 105) : Color(54, 116, 210);
+		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout" || n.type_id == "UiSplitter" || n.type_id == "UiQuadSplitter")
+		       ? Color(217, 119, 6)
+		       : (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" || n.type_id == "PaneSlot")
+		         ? Color(34, 150, 91)
+		         : Color(54, 116, 210);
 	if(b.property_id == "text")
 		return n.name;
 	if(b.property_id == "value")
@@ -291,8 +299,14 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		ctrl.Attach(row);
 		Ptr<UiCompositeDropdown> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap);
-		for(int i = 0; i < b.choices.GetCount(); i++)
+		for(int i = 0; i < b.choices.GetCount(); i++) {
 			row->Add(AsString(b.choices[i]), b.choices.GetKey(i));
+			if(property_id == "icon") {
+				Image icon = UiIconFromName(b.choices.GetKey(i));
+				if(!IsNull(icon))
+					row->Dropdown().SetItemIcon(i, icon, UiIconRenderMode::MonoTint);
+			}
+		}
 		row->SetData(value);
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && node_id_ == row_node)

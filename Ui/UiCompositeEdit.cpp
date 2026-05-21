@@ -15,10 +15,20 @@ UiCompositeEdit::UiCompositeEdit()
 
 void UiCompositeEdit::SyncThemeStyle()
 {
-    UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
-    label_style.font = SansSerifZ(9);
-    label_.SetCustomStyle(label_style);
-    edit_.SetCustomStyle(UiTheme::ResolveEdit(edit_role_));
+    uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ == revision)
+        return;
+    theme_revision_ = revision;
+
+    if(!custom_label_style_) {
+        UiLabel::Style label_style = UiTheme::ResolveLabel(label_role_);
+        label_style.font = SansSerifZ(9);
+        label_.SetCustomStyle(label_style);
+    }
+    if(!custom_edit_style_)
+        edit_.SetCustomStyle(UiTheme::ResolveEdit(edit_role_));
+    RefreshLayout();
+    Refresh();
 }
 
 UiCompositeEdit& UiCompositeEdit::SetLayoutMode(UiCompositeLayoutMode mode)
@@ -65,6 +75,8 @@ UiCompositeEdit& UiCompositeEdit::SetLabelRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Subtle;
     label_role_ = role;
+    custom_label_style_ = false;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
@@ -74,12 +86,15 @@ UiCompositeEdit& UiCompositeEdit::SetEditRole(UiRole role)
     if(!UiIsValid(role))
         role = UiRole::Standard;
     edit_role_ = role;
+    custom_edit_style_ = false;
+    theme_revision_ = 0;
     SyncThemeStyle();
     return *this;
 }
 
 UiCompositeEdit& UiCompositeEdit::SetLabelStyle(const UiLabel::Style& style)
 {
+    custom_label_style_ = true;
     label_.SetCustomStyle(style);
     Refresh();
     return *this;
@@ -87,6 +102,7 @@ UiCompositeEdit& UiCompositeEdit::SetLabelStyle(const UiLabel::Style& style)
 
 UiCompositeEdit& UiCompositeEdit::SetEditStyle(const UiBaseEdit::Style& style)
 {
+    custom_edit_style_ = true;
     edit_.SetCustomStyle(style);
     RefreshLayout();
     Refresh();
@@ -105,6 +121,7 @@ Value UiCompositeEdit::GetData() const
 
 Size UiCompositeEdit::GetMinSize() const
 {
+    const_cast<UiCompositeEdit *>(this)->SyncThemeStyle();
     Size label_sz = label_.GetMinSize();
     Size edit_sz = edit_.GetMinSize();
     if(layout_mode_ == UICOMPOSITE_STACKED)
@@ -114,6 +131,7 @@ Size UiCompositeEdit::GetMinSize() const
 
 void UiCompositeEdit::Layout()
 {
+    SyncThemeStyle();
     Rect r = GetSize();
     if(layout_mode_ == UICOMPOSITE_STACKED) {
         Size label_sz = label_.GetMinSize();
@@ -126,6 +144,11 @@ void UiCompositeEdit::Layout()
     int lw = min(label_width_, r.GetWidth());
     label_.SetRect(0, 0, lw, r.GetHeight());
     edit_.SetRect(lw + field_gap_, 0, max(0, r.GetWidth() - lw - field_gap_), r.GetHeight());
+}
+
+void UiCompositeEdit::Paint(Draw& w)
+{
+    SyncThemeStyle();
 }
 
 }
