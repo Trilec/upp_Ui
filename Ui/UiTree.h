@@ -35,6 +35,8 @@
       icon/icon_render_mode to match the wider Ui API vocabulary.
     - 2026-04: added GetContentSize() to expose stable content extent for
       parent containers and inspector shells.
+    - 2026-05: exposed GetNodeAt() so toolbox hover/help can use the same row
+      hit testing as normal selection without duplicating tree internals.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -190,6 +192,7 @@ public:
     UiTree& SetCursor(UiTreeNodeRef node);
     UiTreeNodeRef GetCursor() const { return UiTreeNodeRef{cursor_id_}; }
     UiTreeNodeRef GetHotNode() const { return UiTreeNodeRef{hot_id_}; }
+    UiTreeNodeRef GetNodeAt(Point p) const;
 
     void ScrollTo(UiTreeNodeRef node);
     void ScrollToSelection();

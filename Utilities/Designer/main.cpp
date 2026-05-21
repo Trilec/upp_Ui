@@ -8,10 +8,74 @@
 #include "DesignerHierarchy.h"
 #include "DesignerDragController.h"
 
+// Designer utility app - Box/Grid/Splitter layout builder for U++ Ui controls.
+// This file wires the subsystems together: model, commands, adapters, preview,
+// hierarchy, inspector, starter templates, theme shell, and generated code.
+
 namespace Upp {
 
 static const char* DESIGNER_VERSION = "v0.1.4";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
+
+static Color DesignerShellBackground(UiThemeMode mode)
+{
+	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
+}
+
+static Font ToolboxHelpFont()
+{
+	return SansSerifZ(9);
+}
+
+static String WrapDesignerHelpText(const String& text, int width, Font font)
+{
+	if(width <= DPI(24) || text.IsEmpty())
+		return text;
+
+	String out;
+	String line;
+	String word;
+
+	auto FlushLine = [&] {
+		if(!out.IsEmpty())
+			out.Cat('\n');
+		out << line;
+		line.Clear();
+	};
+
+	auto AddWord = [&](const String& w) {
+		if(w.IsEmpty())
+			return;
+		String candidate = line.IsEmpty() ? w : line + " " + w;
+		if(line.IsEmpty() || GetTextSize(candidate, font).cx <= width)
+			line = candidate;
+		else {
+			FlushLine();
+			line = w;
+		}
+	};
+
+	for(int i = 0; i < text.GetCount(); i++) {
+		int c = text[i];
+		if(c == '\n') {
+			AddWord(word);
+			word.Clear();
+			FlushLine();
+			continue;
+		}
+		if(c == ' ' || c == '\t') {
+			AddWord(word);
+			word.Clear();
+			continue;
+		}
+		word.Cat(c);
+	}
+
+	AddWord(word);
+	if(!line.IsEmpty())
+		FlushLine();
+	return out;
+}
 
 static int FindNodeId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {
@@ -35,6 +99,9 @@ static const DesignerApiBinding* FindApiBinding(const Vector<DesignerApiBinding>
 	return nullptr;
 }
 
+// Main application shell for the designer utility.
+// It owns the document model and command stack, coordinates all child views, and
+// keeps every edit flowing model -> refresh -> generated code.
 class DesignerWindow : public TopWindow {
 public:
 	typedef DesignerWindow CLASSNAME;
@@ -109,7 +176,34 @@ public:
 			warning_text_.Hide();
 		}
 
-		toolbox_tree_.SetRect(toolbox_panel_.GetRect().Deflated(DPI(4)));
+		Rect toolbox_rect = toolbox_panel_.GetSize();
+		int help_h = DPI(76);
+		int help_gap = DPI(8);
+		if(toolbox_rect.GetHeight() < DPI(260)) {
+			toolbox_scroll_.SetRect(toolbox_rect);
+			toolbox_tree_.SetRect(0, 0, max(0, toolbox_rect.GetWidth()), max(toolbox_rect.GetHeight(), toolbox_tree_.GetContentSize().cy));
+			toolbox_help_panel_.Hide();
+			toolbox_help_icon_.Hide();
+			toolbox_help_title_.Hide();
+			toolbox_help_text_.Hide();
+		}
+		else {
+			toolbox_help_panel_.Show();
+			toolbox_help_icon_.Show();
+			toolbox_help_title_.Show();
+			toolbox_help_text_.Show();
+			Rect scroll_r = RectC(toolbox_rect.left, toolbox_rect.top,
+			                      toolbox_rect.GetWidth(), max(0, toolbox_rect.GetHeight() - help_h - help_gap));
+			toolbox_scroll_.SetRect(scroll_r);
+			toolbox_tree_.SetRect(0, 0, max(0, scroll_r.GetWidth()), max(scroll_r.GetHeight(), toolbox_tree_.GetContentSize().cy));
+			Rect hp = RectC(toolbox_rect.left, toolbox_rect.bottom - help_h,
+			                max(0, toolbox_rect.GetWidth()), help_h);
+			toolbox_help_panel_.SetRect(hp);
+			toolbox_help_icon_.SetRect(DPI(10), DPI(10), DPI(18), DPI(18));
+			toolbox_help_title_.SetRect(DPI(34), DPI(8), max(0, hp.GetWidth() - DPI(44)), DPI(18));
+			toolbox_help_text_.SetRect(DPI(14), DPI(30), max(0, hp.GetWidth() - DPI(28)), max(0, hp.GetHeight() - DPI(38)));
+			RefreshToolboxHelpText();
+		}
 		side_.Layout();
 		Rect vp = side_.GetViewportRect();
 		right_box_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), DPI(640)));
@@ -117,6 +211,11 @@ public:
 	}
 
 private:
+	void Paint(Draw& w) override
+	{
+		w.DrawRect(GetSize(), DesignerShellBackground(theme_mode_));
+	}
+
 	bool Key(dword key, int count) override
 	{
 		if(key == K_DELETE) {
@@ -136,6 +235,9 @@ private:
 		return TopWindow::Key(key, count);
 	}
 
+	// Seed the default document used when the app opens.
+	// This should stay small and representative: one layout column, one grid, and
+	// a couple of controls for immediate drag/drop and inspector testing.
 	void BuildInitialModel()
 	{
 		DesignerNodeId main = model_.AddNode("BoxLayout", Designer_ROOT);
@@ -164,6 +266,37 @@ private:
 			t->init_defaults(*n);
 	}
 
+	DesignerNodeId AddInitializedNode(const String& type_id, DesignerNodeId parent, int index = -1)
+	{
+		DesignerNodeId id = commands_.AddNode(model_, type_id, parent, index);
+		if(id != Designer_NULL)
+			InitNode(id);
+		return id;
+	}
+
+	void AddDefaultSplitterPanes(DesignerNodeId id)
+	{
+		DesignerNode* n = model_.Find(id);
+		if(!n)
+			return;
+		if(n->type_id == "UiSplitter") {
+			DesignerNodeId a = AddInitializedNode("PaneSlot", id, 0);
+			DesignerNodeId b = AddInitializedNode("PaneSlot", id, 1);
+			if(DesignerNode* p = model_.Find(a))
+				p->name = "leftPane";
+			if(DesignerNode* p = model_.Find(b))
+				p->name = "rightPane";
+		}
+		else if(n->type_id == "UiQuadSplitter") {
+			static const char *name[] = { "topLeftPane", "topRightPane", "bottomLeftPane", "bottomRightPane" };
+			for(int i = 0; i < 4; i++) {
+				DesignerNodeId pane = AddInitializedNode("PaneSlot", id, i);
+				if(DesignerNode* p = model_.Find(pane))
+					p->name = name[i];
+			}
+		}
+	}
+
 	void ApplyStarterTemplate(const String& id)
 	{
 		if(ApplyDesignerTemplate(model_, registry_, id)) {
@@ -174,6 +307,9 @@ private:
 		}
 	}
 
+	// Construct the application chrome and connect subsystem events.
+	// The shell intentionally mirrors the Ui demo apps: header actions, theme
+	// switching, toolbox left, preview center, hierarchy/inspector/code right.
 	void BuildUi()
 	{
 		Add(header_);
@@ -189,7 +325,12 @@ private:
 		Add(warning_icon_);
 		Add(warning_text_);
 		Add(side_);
-		toolbox_panel_.Add(toolbox_tree_);
+		toolbox_panel_.Add(toolbox_scroll_);
+		toolbox_scroll_.Content().Add(toolbox_tree_);
+		toolbox_panel_.Add(toolbox_help_panel_);
+		toolbox_help_panel_.Add(toolbox_help_icon_);
+		toolbox_help_panel_.Add(toolbox_help_title_);
+		toolbox_help_panel_.Add(toolbox_help_text_);
 		side_.SetScrollMode(UIPANELSCROLL_VERTICAL);
 		side_.Content().Add(right_box_);
 		header_.SetTitle("Designer - Box/Grid Layout Builder")
@@ -229,8 +370,21 @@ private:
 		};
 
 		toolbox_tree_.SetModel(toolbox_model_);
+		toolbox_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
 		toolbox_tree_.SetRootVisible(false);
 		toolbox_tree_.SetSelectionMode(UITREESEL_SINGLE);
+		toolbox_tree_.WhenSelection = [=] {
+			Value v = toolbox_tree_.GetData();
+			UpdateToolboxHelp(IsNull(v) ? String() : AsString(v));
+		};
+		toolbox_tree_.WhenToolHover = [=](String type_id) {
+			if(!type_id.IsEmpty())
+				UpdateToolboxHelp(type_id);
+			else {
+				Value v = toolbox_tree_.GetData();
+				UpdateToolboxHelp(IsNull(v) ? String() : AsString(v));
+			}
+		};
 		toolbox_tree_.WhenToolDrag = [=](String type_id, Point screen) { TrackToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolDrop = [=](String type_id, Point screen) { FinishToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolCancel = [=] { CancelToolDrag(); };
@@ -289,6 +443,10 @@ private:
 			});
 		};
 		hierarchy_heading_.SetText("HIERARCHY").NoWantFocus();
+		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
+		toolbox_help_title_.NoWantFocus().IgnoreMouse();
+		toolbox_help_text_.NoWantFocus().IgnoreMouse();
+		UpdateToolboxHelp(String());
 		template_row_.SetLabel("Starter");
 		template_row_.Add("Current", "Current");
 		template_row_.Add("Holy Grail", "HolyGrail");
@@ -317,6 +475,9 @@ private:
 		ApplyTheme(UiThemeMode::Light);
 	}
 
+	// Full rebuild after structural edits or template changes.
+	// Use this when hierarchy, inspector, generated code, and preview can all be
+	// affected; narrower refresh helpers are used for pure selection changes.
 	void RefreshAll()
 	{
 		refresh_posted_ = false;
@@ -328,6 +489,9 @@ private:
 		preview_.Refresh();
 	}
 
+	// Refresh only the views affected by selection.
+	// This keeps tree selection, inspector page, generated code, and preview
+	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
 		refresh_posted_ = false;
@@ -346,12 +510,25 @@ private:
 
 	Image NodeIcon(const DesignerType* t, bool selected) const
 	{
-		if(t && !t->icon.IsEmpty() && !selected)
+		if(t && !t->icon.IsEmpty())
 			return t->icon;
 		bool layout = t && t->is_container;
-		if(selected)
-			return MakeTypeIcon(layout, SColorHighlight());
 		return layout ? layout_icon_ : control_icon_;
+	}
+
+	String PanePrefix(const DesignerNode& parent, int child_index) const
+	{
+		if(parent.type_id == "UiSplitter") {
+			bool vertical = DesignerNodePropertyOr(parent, "direction", "H") == "V";
+			if(vertical)
+				return child_index <= 0 ? "Top pane" : "Bottom pane";
+			return child_index <= 0 ? "Left pane" : "Right pane";
+		}
+		if(parent.type_id == "UiQuadSplitter") {
+			static const char *name[] = { "Top left pane", "Top right pane", "Bottom left pane", "Bottom right pane" };
+			return name[clamp(child_index, 0, 3)];
+		}
+		return String();
 	}
 
 	void RefreshToolbox()
@@ -373,24 +550,47 @@ private:
 			}
 		}
 		toolbox_tree_.Refresh();
+		UpdateToolboxHelp(IsNull(toolbox_tree_.GetData()) ? String() : AsString(toolbox_tree_.GetData()));
 	}
 
+	void UpdateToolboxHelp(const String& type_id)
+	{
+		const DesignerType* t = registry_.Find(type_id);
+		String title = t ? t->display_name : "Designer Help";
+		String help = t ? DesignerAdapterHelp(t->id)
+		                : "Click a toolbox item to see what it creates. Drag layouts or controls into the preview or hierarchy to build the model.";
+		toolbox_help_raw_ = help;
+		toolbox_help_title_.SetText(title);
+		RefreshToolboxHelpText();
+		toolbox_help_panel_.Tip(help);
+	}
+
+	void RefreshToolboxHelpText()
+	{
+		int w = toolbox_help_text_.GetRect().GetWidth();
+		toolbox_help_text_.SetText(WrapDesignerHelpText(toolbox_help_raw_, w, ToolboxHelpFont()));
+	}
+
+	// Rebuild the visible hierarchy tree from DesignerModel.
+	// Pane labels and icons are view annotations only; the model remains a generic
+	// parent/children tree underneath.
 	void RefreshHierarchy()
 	{
 		syncing_hierarchy_ = true;
 		StoreHierarchyExpandedState();
 		hierarchy_refs_.Clear();
 		hierarchy_model_.Clear();
-		Function<void(UiTreeNodeRef, DesignerNodeId)> add = [&](UiTreeNodeRef parent, DesignerNodeId id) {
+		Function<void(UiTreeNodeRef, DesignerNodeId, String)> add = [&](UiTreeNodeRef parent, DesignerNodeId id, String prefix) {
 			const DesignerNode* n = model_.Find(id);
 			if(!n)
 				return;
 			const DesignerType* t = registry_.Find(n->type_id);
-			UiModelItem item(n->name, n->id);
+			String text = prefix.IsEmpty() ? n->name : prefix + ": " + n->name;
+			UiModelItem item(text, n->id);
 			item.right_text = t ? t->display_name : n->type_id;
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
 			item.icon = NodeIcon(t, selected);
-			item.icon_render_mode = UiIconRenderMode::PreserveColor;
+			item.icon_render_mode = selected ? UiIconRenderMode::MonoTint : UiIconRenderMode::PreserveColor;
 			UiTreeNodeRef ref;
 			if(id == Designer_ROOT) {
 				ref = hierarchy_model_.Root();
@@ -399,10 +599,10 @@ private:
 			else
 				ref = hierarchy_model_.AddChild(parent, item);
 			hierarchy_refs_.Add(id, ref);
-			for(DesignerNodeId child : n->children)
-				add(ref, child);
+			for(int i = 0; i < n->children.GetCount(); i++)
+				add(ref, n->children[i], PanePrefix(*n, i));
 		};
-		add(hierarchy_model_.Root(), Designer_ROOT);
+		add(hierarchy_model_.Root(), Designer_ROOT, String());
 		RestoreHierarchyExpandedState(hierarchy_model_.Root());
 		if(!model_.GetSelection().IsEmpty()) {
 			int q = hierarchy_refs_.Find(model_.GetSelection()[0]);
@@ -428,6 +628,7 @@ private:
 			UiModelItem item = hierarchy_model_.Get(ref);
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
 			item.icon = NodeIcon(t, selected);
+			item.icon_render_mode = selected ? UiIconRenderMode::MonoTint : UiIconRenderMode::PreserveColor;
 			hierarchy_model_.Set(ref, item);
 		}
 		if(!model_.GetSelection().IsEmpty()) {
@@ -441,6 +642,9 @@ private:
 		syncing_hierarchy_ = false;
 	}
 
+	// Select the correct inspector page for the current node.
+	// The inspector gets descriptors from adapters, so this method should not know
+	// individual control APIs beyond choosing the selected DesignerNode.
 	void RefreshInspector()
 	{
 		if(model_.GetSelection().IsEmpty()) {
@@ -457,6 +661,9 @@ private:
 		RefreshRightPanel();
 	}
 
+	// Coalesce refreshes posted by property callbacks.
+	// Dropdowns and composite controls can fire while handling input, so posted
+	// refresh avoids destroying/rebuilding controls inside their own callbacks.
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
@@ -565,6 +772,9 @@ private:
 			RestoreHierarchyExpandedState(hierarchy_model_.GetChild(ref, i));
 	}
 
+	// Update an active toolbox drag against preview or hierarchy targets.
+	// The result is only hover/validation state; the model changes when the mouse
+	// is released and FinishToolDrag calls PlaceType.
 	void TrackToolDrag(const String& type_id, Point screen)
 	{
 		const DesignerType* t = registry_.Find(type_id);
@@ -626,6 +836,9 @@ private:
 		HideDragStatus();
 	}
 
+	// Update an active existing-node drag.
+	// The same drag controller validates preview and hierarchy targets so moving a
+	// node from either surface has the same model behavior.
 	void TrackNodeDrag(DesignerNodeId id, Point screen)
 	{
 		if(id == Designer_NULL || id == Designer_ROOT)
@@ -716,6 +929,9 @@ private:
                SetTimeCallback(16, [=] { PollToolDrag(); }, TOOL_DRAG_TIMER_ID);
 	}
 
+	// Create a new node under a validated target.
+	// Compound defaults, such as splitter pane slots and grid cell metadata, are
+	// grouped as one undoable user action.
 	void PlaceType(const String& type_id, DesignerNodeId target, int index = -1)
 	{
 		const DesignerType* new_type = registry_.Find(type_id);
@@ -728,17 +944,43 @@ private:
 		if(!parent)
 			parent = model_.Find(Designer_ROOT);
 		commands_.BeginGroup("Add " + new_type->display_name);
-		DesignerNodeId id = commands_.AddNode(model_, type_id, parent->id, index);
+		DesignerNodeId id = AddInitializedNode(type_id, parent->id, index);
 		if(id == Designer_NULL) {
 			commands_.EndGroup();
 			return;
 		}
-		InitNode(id);
+		AddDefaultSplitterPanes(id);
+		ApplyGridCellForNode(id, index);
 		AdjustGridCellForNode(id);
 		commands_.EndGroup();
 		model_.SelectOne(id);
 		preview_.SetPlacementType(String());
 		RefreshAll();
+	}
+
+	// Persist stable grid coordinates on a child node after grid placement.
+	// The DesignerModel remains ordered for hierarchy/codegen, while grid_row and
+	// grid_col let preview/codegen address a specific cell.
+	void ApplyGridCellForNode(DesignerNodeId id, int index)
+	{
+		DesignerNode* n = model_.Find(id);
+		DesignerNode* parent = n ? model_.Find(n->parent) : nullptr;
+		if(!n || !parent || parent->type_id != "GridLayout")
+			return;
+		int columns = max(1, (int)DesignerNodePropertyOr(*parent, "columns", 2));
+		int rows = max(1, (int)DesignerNodePropertyOr(*parent, "rows", 2));
+		if(index < 0) {
+			int q = 0;
+			for(int i = 0; i < parent->children.GetCount(); i++)
+				if(parent->children[i] == id) {
+					q = i;
+					break;
+				}
+			index = q;
+		}
+		index = clamp(index, 0, columns * rows - 1);
+		commands_.Execute(MakeDesignerSetPropertyCommand(id, "grid_col", index % columns), model_);
+		commands_.Execute(MakeDesignerSetPropertyCommand(id, "grid_row", index / columns), model_);
 	}
 
 	void AdjustGridCellForNode(DesignerNodeId id)
@@ -750,19 +992,13 @@ private:
 		if(!parent)
 			return;
 		const DesignerType* t = registry_.Find(n->type_id);
-		if(parent->type_id == "GridLayout"
-		   && DesignerNodePropertyOr(*parent, "mode", "Flow") == "Flow"
-		   && (bool)DesignerNodePropertyOr(*parent, "align_cells", true)
-		   && t && t->is_container) {
+		if(parent->type_id == "GridLayout" && t && t->is_container) {
 			commands_.Execute(MakeDesignerSetPropertyCommand(parent->id, "cell_width", max((int)DesignerNodePropertyOr(*parent, "cell_width", 120), t->default_size.cx)), model_);
 			commands_.Execute(MakeDesignerSetPropertyCommand(parent->id, "cell_height", max((int)DesignerNodePropertyOr(*parent, "cell_height", 96), t->default_size.cy)), model_);
 		}
 		DesignerNode* grand = model_.Find(parent->parent);
 		const DesignerType* pt = registry_.Find(parent->type_id);
-		if(grand && grand->type_id == "GridLayout"
-		   && DesignerNodePropertyOr(*grand, "mode", "Flow") == "Flow"
-		   && (bool)DesignerNodePropertyOr(*grand, "align_cells", true)
-		   && pt && pt->is_container) {
+		if(grand && grand->type_id == "GridLayout" && pt && pt->is_container) {
 			int count = max(1, parent->children.GetCount());
 			int needed_h = max(pt->default_size.cy,
 			                   DPI(24) * count
@@ -773,6 +1009,9 @@ private:
 		}
 	}
 
+	// Move an existing node through the drag command path.
+	// Never rewires children directly here; the drag controller and command stack
+	// keep validation, undo, and refresh behavior consistent.
 	void MovePreviewNode(DesignerNodeId id, DesignerNodeId target, int index)
 	{
 		if(id == Designer_ROOT || id == Designer_NULL || id == target)
@@ -783,6 +1022,7 @@ private:
 		drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target, index));
 		bool moved = drag_.Drop(model_, commands_);
 		if(moved) {
+			ApplyGridCellForNode(id, index);
 			AdjustGridCellForNode(id);
 			if(model_.Find(id))
 				model_.SelectOne(id);
@@ -813,6 +1053,9 @@ private:
 		return IsNumber(v) ? (int)v : Designer_NULL;
 	}
 
+	// Commit an inspector property edit through a command.
+	// The adapter descriptor is checked first so hidden/disabled properties cannot
+	// be changed by stale inspector widgets.
 	void SaveInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
 	{
 		DesignerNode* n = model_.Find(node_id);
@@ -829,11 +1072,17 @@ private:
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, normalized, binding->api_call), model_)) {
-			bool needs_inspector = property_id == "mode" || property_id == "sizing";
+			bool needs_inspector = property_id == "sizing" || property_id == "h_sizing" || property_id == "v_sizing";
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+			if(needs_inspector) {
+				PostDesignerRefresh(true);
+				return;
+			}
 			PostDesignerRefresh(needs_inspector);
 		}
 		else {
-			RefreshInspector();
+			PostDesignerRefresh(true);
 		}
 	}
 
@@ -896,6 +1145,9 @@ private:
 		return ib;
 	}
 
+	// Apply the selected light/dark theme to the shell and child Ui controls.
+	// Demos and utilities should stay theme-first; local styling here is limited
+	// to layout shell surfaces and status affordances.
 	void ApplyTheme(UiThemeMode mode)
 	{
 		theme_mode_ = mode;
@@ -912,7 +1164,19 @@ private:
 		theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
 		theme_toggle_.SetOn(mode == UiThemeMode::Dark);
 		exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
-		toolbox_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		toolbox_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+		toolbox_help_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		UiLabel::Style help_icon_style = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
+		help_icon_style.font = SansSerifZ(11).Bold();
+		help_icon_style.align_h = UiAlign::CENTER;
+		toolbox_help_icon_.SetCustomStyle(help_icon_style);
+		UiLabel::Style help_title_style = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
+		help_title_style.font = SansSerifZ(10).Bold();
+		toolbox_help_title_.SetCustomStyle(help_title_style);
+		UiLabel::Style help_text_style = UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body);
+		help_text_style.font = ToolboxHelpFont();
+		help_text_style.align_v = UiAlign::TOP;
+		toolbox_help_text_.SetCustomStyle(help_text_style);
 		toolbox_tree_.SetCustomStyle(UiTheme::ResolveTree());
 		hierarchy_.SetCustomStyle(UiTheme::ResolveTree());
 		drag_status_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body));
@@ -959,8 +1223,14 @@ private:
 	UiToggle theme_toggle_;
 	UiButton exit_button_;
 	UiPanel toolbox_panel_;
+	UiScrollPanel toolbox_scroll_;
 	DesignerToolboxTree toolbox_tree_;
 	UiTreeModel toolbox_model_;
+	UiPanel toolbox_help_panel_;
+	UiLabel toolbox_help_icon_;
+	UiLabel toolbox_help_title_;
+	UiLabel toolbox_help_text_;
+	String toolbox_help_raw_;
 	DesignerPreview preview_;
 	UiLabel drag_status_;
 	UiPanel warning_panel_;

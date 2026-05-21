@@ -13,9 +13,19 @@ This package supersedes the experimental `examples/UiDesignerDemo` path for new 
 
 ## Current Scope
 
-The initial package is a direct utility-port of the latest working designer prototype so it can compile independently while the app is split into cleaner `Designer*` subsystems.
+The package is now the active utility app for layout-designer work. It is split into focused `Designer*` subsystems:
+
+- `DesignerModel` owns the document tree and validation.
+- `DesignerCommands` owns undoable edits.
+- `DesignerRegistry` and `DesignerBuiltins` own the type catalog.
+- `DesignerAdapter` wraps real `Ui` controls for design-time properties and overlays.
+- `DesignerPreview` builds the real preview and maps pointer gestures to model targets.
+- `DesignerInspector` builds property pages from adapter descriptors.
+- `DesignerCodeGen` emits theme-first U++ code from the model.
 
 Near-term cleanup should happen in this package, not in `examples/UiDesignerDemo`.
+
+See `CHANGELOG.md` for the current development trail and decisions that still need follow-up.
 
 ## Build
 
@@ -31,3 +41,4 @@ umk GitHubOut Utilities/Designer CLANGx64 -br +GUI E:/apps/github/upp_Ui/out/Des
 - Keep designer-only behavior in adapter, preview, hierarchy, drag, and command layers.
 - Do not add local theme hacks to make the app look right; use the shared `Ui` theme defaults.
 - If a control/layout API weakness appears while building the app, fix or document the control contract rather than hiding it in the utility.
+- Keep file/class comments current. Future developers should be able to tell why a subsystem exists without reconstructing the whole discussion.

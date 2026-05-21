@@ -1,5 +1,9 @@
 #include "DesignerInspector.h"
 
+// DesignerInspector.cpp - descriptor-driven property editor.
+// Adapter bindings become themed composite rows on UiStack pages; edits are
+// emitted as events so the app can apply them through commands.
+
 namespace Upp {
 
 DesignerInspector::DesignerInspector()
@@ -41,15 +45,13 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 {
 	if(!IsNull(b.default_value))
 		return b.default_value;
-	if(b.property_id == "mode")
-		return "Flow";
 	if(b.property_id == "direction")
 		return n.type_id == "GridLayout" ? "H" : "V";
-	if(b.property_id == "sizing")
+	if(b.property_id == "h_sizing" || b.property_id == "v_sizing")
 		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout" || n.type_id == "Window") ? "Expand" : "Fit";
 	if(b.property_id == "wrap")
 		return n.type_id == "GridLayout";
-	if(b.property_id == "debug" || b.property_id == "align_cells")
+	if(b.property_id == "debug")
 		return false;
 	if(b.property_id == "gap" || b.property_id == "inset")
 		return 8;
@@ -346,6 +348,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
+			WhenProperty(row_node, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self || node_id_ != row_node)

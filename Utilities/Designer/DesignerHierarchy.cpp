@@ -1,5 +1,9 @@
 #include "DesignerHierarchy.h"
 
+// DesignerHierarchy.cpp - thin UiTree gesture wrappers for toolbox/hierarchy.
+// These controls keep normal tree behavior but expose drag events to the shared
+// designer drag controller instead of mutating the model directly.
+
 namespace Upp {
 
 void DesignerToolboxTree::LeftDown(Point p, dword flags)
@@ -14,6 +18,8 @@ void DesignerToolboxTree::LeftDown(Point p, dword flags)
 
 void DesignerToolboxTree::MouseMove(Point p, dword flags)
 {
+	EmitHover(p);
+
 	if(drag_type_.IsEmpty()) {
 		UiTree::MouseMove(p, flags);
 		return;
@@ -47,6 +53,12 @@ Image DesignerToolboxTree::CursorImage(Point p, dword flags)
 	return dragging_ ? Image::SizeAll() : UiTree::CursorImage(p, flags);
 }
 
+void DesignerToolboxTree::MouseLeave()
+{
+	UiTree::MouseLeave();
+	WhenToolHover(String());
+}
+
 void DesignerToolboxTree::LeftUp(Point p, dword flags)
 {
 	String type = drag_type_;
@@ -63,6 +75,18 @@ void DesignerToolboxTree::LeftUp(Point p, dword flags)
 
 	if(HasCapture())
 		ReleaseCapture();
+}
+
+void DesignerToolboxTree::EmitHover(Point p)
+{
+	UiTreeNodeRef ref = GetNodeAt(p);
+	if(!GetModel().IsValid(ref)) {
+		WhenToolHover(String());
+		return;
+	}
+
+	Value v = GetModel().Get(ref).data;
+	WhenToolHover(IsString(v) ? (String)v : String());
 }
 
 void DesignerToolboxTree::CancelMode()

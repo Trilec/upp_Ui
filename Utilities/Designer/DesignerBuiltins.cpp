@@ -1,13 +1,17 @@
 #include "DesignerBuiltins.h"
 
+// DesignerBuiltins.cpp - stock toolbox/control catalog for the designer.
+// Add new built-in controls here by registering a DesignerType, default model
+// properties, and an adapter implementation in DesignerAdapter.
+
 namespace Upp {
 
 static Image MakeDesignerTypeIcon(const String& id)
 {
 	if(id == "BoxLayout")
-		return ICON_DESIGN_BORDER_INNER_48();
+		return ICON_DESIGN_UNFOLD_MORE_48();
 	if(id == "GridLayout")
-		return ICON_DESIGN_SPACE_DASHBOARD_48();
+		return ICON_DESIGN_BORDER_INNER_48();
 	if(id == "UiSplitter")
 		return ICON_DESIGN_BORDER_HORIZONTAL_48();
 	if(id == "UiQuadSplitter")
@@ -26,6 +30,16 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_TOGGLE_ON_48();
 	if(id == "UiDropdown")
 		return ICON_DESIGN_LIST_ALT_48();
+	if(id == "UiCheckBox")
+		return ICON_DESIGN_CHECK_SMALL_48();
+	if(id == "UiBreadcrumbs")
+		return ICON_DESIGN_FOLDER_48();
+	if(id == "UiTab")
+		return ICON_DESIGN_BOTTOM_SHEETS_48();
+	if(id == "UiTable")
+		return ICON_DESIGN_SPACE_DASHBOARD_48();
+	if(id == "UiTree")
+		return ICON_DESIGN_ACCOUNT_TREE_48();
 	ImageBuffer ib(16, 16);
 	RGBA clear;
 	clear.r = clear.g = clear.b = clear.a = 0;
@@ -138,6 +152,8 @@ static DesignerType MakeBoxLayoutType()
 		n.properties.Set("inset", 8);
 		n.properties.Set("debug", false);
 		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", Color(207, 242, 226));
 		n.properties.Set("frame", Color(44, 156, 105));
 		n.properties.Set("radius", 0);
@@ -157,10 +173,6 @@ static DesignerType MakeGridLayoutType()
 	t.default_size = Size(280, 180);
 	t.min_size = Size(100, 60);
 	t.init_defaults = [](DesignerNode& n) {
-		n.properties.Set("mode", "Flow");
-		n.properties.Set("direction", "H");
-		n.properties.Set("wrap", true);
-		n.properties.Set("align_cells", true);
 		n.properties.Set("cell_width", 120);
 		n.properties.Set("cell_height", 96);
 		n.properties.Set("rows", 2);
@@ -169,6 +181,8 @@ static DesignerType MakeGridLayoutType()
 		n.properties.Set("inset", 8);
 		n.properties.Set("debug", false);
 		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", Color(207, 242, 226));
 		n.properties.Set("frame", Color(44, 156, 105));
 		n.properties.Set("radius", 0);
@@ -200,6 +214,8 @@ static DesignerType MakeSplitterType()
 		n.properties.Set("thumb_radius", 8);
 		n.properties.Set("debug", false);
 		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
 	};
 	return t;
 }
@@ -224,6 +240,8 @@ static DesignerType MakeQuadSplitterType()
 		n.properties.Set("min_d", 60);
 		n.properties.Set("debug", false);
 		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
 	};
 	return t;
 }
@@ -240,6 +258,8 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("sizing", "Fit");
+		n.properties.Set("h_sizing", "Fit");
+		n.properties.Set("v_sizing", "Fit");
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
 		n.properties.Set("face", Color(214, 231, 255));
@@ -250,6 +270,8 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		n.properties.Set("font", "Sans");
 		n.properties.Set("font_size", 11);
 		n.properties.Set("align", "Left");
+		n.properties.Set("icon", "None");
+		n.properties.Set("icon_size", 18);
 		if(id == "UiButton")
 			n.properties.Set("align", "Center");
 		if(id == "UiLineEdit")
@@ -258,6 +280,46 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("on", true);
 		if(id == "UiDropdown")
 			n.properties.Set("selected", "First");
+		if(id == "UiCheckBox") {
+			n.properties.Set("state", "Checked");
+			n.properties.Set("tri_state", false);
+			n.properties.Set("visual", "Classic");
+		}
+		if(id == "UiBreadcrumbs") {
+			n.properties.Set("crumb_a", "Home");
+			n.properties.Set("crumb_b", "Library");
+			n.properties.Set("crumb_c", "Current");
+			n.properties.Set("current", 2);
+			n.properties.Set("trim", false);
+			n.properties.Set("divider", "/");
+			n.properties.Set("icon", "Home");
+			n.properties.Set("icon_size", 16);
+		}
+		if(id == "UiTab") {
+			n.properties.Set("visual", "Underline");
+			n.properties.Set("placement", "Top");
+			n.properties.Set("expand_tabs", false);
+			n.properties.Set("close_buttons", false);
+			n.properties.Set("drag_handles", false);
+			n.properties.Set("active", 0);
+			n.properties.Set("tab_a", "TabA");
+			n.properties.Set("tab_b", "TabB");
+			n.properties.Set("tab_c", "TabC");
+		}
+		if(id == "UiTable") {
+			n.properties.Set("rows_count", 4);
+			n.properties.Set("cols_count", 3);
+			n.properties.Set("row_headers", true);
+			n.properties.Set("column_headers", true);
+			n.properties.Set("row_height", 28);
+			n.properties.Set("header_height", 30);
+			n.properties.Set("column_width", 120);
+		}
+		if(id == "UiTree") {
+			n.properties.Set("root_visible", false);
+			n.properties.Set("connectors", true);
+			n.properties.Set("metadata", false);
+		}
 	};
 	return t;
 }
@@ -271,6 +333,8 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
 		n.properties.Set("face", Color(248, 250, 252));
@@ -280,6 +344,29 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 		n.properties.Set("frame_enabled", true);
 		if(id == "UiScrollPanel")
 			n.properties.Set("scroll_mode", "Auto");
+	};
+	return t;
+}
+
+static DesignerType MakePaneSlotType()
+{
+	DesignerType t;
+	t.id = "PaneSlot";
+	t.display_name = "Pane Slot";
+	t.icon = ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(180, 120);
+	t.min_size = Size(40, 30);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 180);
+		n.properties.Set("height", 120);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
 	};
 	return t;
 }
@@ -303,6 +390,7 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeGridLayoutType());
 	registry.Register(MakeSplitterType());
 	registry.Register(MakeQuadSplitterType());
+	registry.Register(MakePaneSlotType());
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
 	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
@@ -314,6 +402,11 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeControlType("UiSlider", "Slider", Size(180, 32)));
 	registry.Register(MakeControlType("UiToggle", "Toggle", Size(54, 28)));
 	registry.Register(MakeControlType("UiDropdown", "Dropdown", Size(180, 32)));
+	registry.Register(MakeControlType("UiCheckBox", "Checkbox", Size(150, 28)));
+	registry.Register(MakeControlType("UiBreadcrumbs", "Breadcrumbs", Size(260, 32)));
+	registry.Register(MakeControlType("UiTab", "Tab", Size(300, 180)));
+	registry.Register(MakeControlType("UiTable", "Table", Size(320, 180)));
+	registry.Register(MakeControlType("UiTree", "Tree", Size(260, 180)));
 	registry.Register(MakeControlType("Item", "Item", Size(100, 32)));
 }
 

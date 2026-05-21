@@ -28,8 +28,9 @@ file
 	DesignerInspector.cpp,
 	DesignerHierarchy.h,
 	DesignerHierarchy.cpp,
+	README.md,
+	CHANGELOG.md,
 	main.cpp;
 
 mainconfig
 	"" = "GUI";
-

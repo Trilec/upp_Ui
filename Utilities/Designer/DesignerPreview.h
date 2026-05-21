@@ -3,8 +3,18 @@
 #include "DesignerAdapter.h"
 #include "DesignerBuiltins.h"
 
+// Ui Designer preview surface.
+// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
+//
+// DesignerPreview is the central visual editing canvas. It renders a virtual
+// window, builds real Ui controls through adapters, tracks selection/drop hover,
+// and maps pointer gestures back into model-level node moves.
+
 namespace Upp {
 
+// Virtual-window preview and interaction layer.
+// The preview is not the model: it rebuilds from DesignerModel, records transient
+// rectangles for hit testing, and emits events for selection, resize, and moves.
 class DesignerPreview : public Ctrl {
 public:
 		Event<DesignerNodeId> WhenSelect;
@@ -17,6 +27,7 @@ public:
 		void SetPlacementType(const String& type_id);
 		DesignerNodeId TrackPlacement(Point p);
 		int GetDropIndex() const;
+		void Layout() override;
 		void Paint(Draw& w) override;
 		void LeftDown(Point p, dword) override;
 		void MouseMove(Point p, dword) override;
@@ -31,6 +42,9 @@ private:
 		void DrawResizeHandle(Draw& w, const Rect& root);
 		void DrawDropIndicator(Draw& w, const Rect& root);
 		Rect GetInsertMarkerRect(const DesignerNode& parent, const Rect& root) const;
+		int GetSplitterPaneIndex(const DesignerNode& parent, Point p) const;
+		Rect GetSplitterPaneRect(const DesignerNode& parent, int pane) const;
+		String GetSplitterPaneName(const DesignerNode& parent, int pane) const;
 		void DrawRoundedOutline(Draw& w, const Rect& r, Color c, int radius, int width);
 		void DrawDashed(Draw& w, const Rect& r, Color c);
 		void PaintNode(Draw& w, const DesignerNode& n, const Rect& r, int depth);
@@ -50,7 +64,11 @@ private:
 		Ctrl* BuildRealNode(DesignerNodeId id);
 		void AddRealChild(DesignerAdapter& parent, Ctrl& child, const DesignerNode& parent_node,
 		                  const DesignerNode& child_node, int index);
+		void FinalizeRealNode(DesignerAdapter& adapter, const DesignerNode& node);
+		void ApplyRealLayoutProperties(Ctrl& ctrl);
 		void RebuildRealPreview();
+		void LayoutRealPreview();
+		void RefreshRealPreviewTree(Ctrl& ctrl);
 		void UpdateRealRects(Ctrl& ctrl, Point offset);
 		void ApplyRealOverlay();
 		DesignerModel* model_ = nullptr;

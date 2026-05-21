@@ -1,5 +1,9 @@
 #include "DesignerModel.h"
 
+// DesignerModel.cpp - source-of-truth document tree for the designer.
+// The model owns hierarchy, properties, selection, and validation; preview and
+// inspector state is derived from it and should not become authoritative.
+
 namespace Upp {
 
 static int FindId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)

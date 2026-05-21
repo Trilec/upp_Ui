@@ -289,6 +289,11 @@ void UiAccordion::SyncThemeStyle()
     resolved.header_style.subtitle_font = SansSerifZ(8);
     style_ = resolved;
     theme_revision_ = revision;
+
+    for(int i = 0; i < sections_.GetCount(); i++)
+        ApplySectionStyle(sections_[i], i);
+    RefreshLayout();
+    Refresh();
 }
 
 const UiAccordion::Style& UiAccordion::GetEffectiveStyle() const

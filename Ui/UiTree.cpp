@@ -734,6 +734,12 @@ int UiTree::HitTestRow(Point p) const
     return row >= 0 && row < visible_rows_.GetCount() ? row : -1;
 }
 
+UiTreeNodeRef UiTree::GetNodeAt(Point p) const
+{
+    int row = HitTestRow(p);
+    return row >= 0 ? UiTreeNodeRef{visible_rows_[row].id} : UiTreeNodeRef{-1};
+}
+
 Rect UiTree::GetGlyphRect(const Rect& row, int depth) const
 {
     const Style& style = GetEffectiveStyle();
@@ -961,6 +967,8 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
     if(has_icon) {
         Rect ir = GetIconRect(row, vr.depth, vr.has_children);
         Color icon_ink = IsNull(style.palette.icon[st]) ? style.glyph_color : style.palette.icon[st];
+        if(is_selected)
+            icon_ink = style.glyph_selected_color;
             UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, enabled);
     }
 

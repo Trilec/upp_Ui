@@ -2,8 +2,18 @@
 
 #include "DesignerModel.h"
 
+// Ui Designer command layer.
+// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
+//
+// Every user-visible edit should flow through this command API. Keeping structural
+// and property edits command-driven gives us undo/redo now and a clean path to
+// persistence, validation, and future scripting.
+
 namespace Upp {
 
+// Base undoable edit.
+// Implementations should mutate only DesignerModel and must be safe to undo after
+// later commands have refreshed preview/inspector controls.
 class DesignerCommand {
 public:
 	virtual ~DesignerCommand() {}
@@ -13,6 +23,9 @@ public:
 	virtual String Label() const = 0;
 };
 
+// Undo/redo stack with optional grouping for compound actions.
+// Use BeginGroup/EndGroup when one user action creates several model edits, such
+// as dropping a splitter and automatically adding pane slots.
 class DesignerCommandStack {
 public:
 	void BeginGroup(const String& label);
@@ -35,6 +48,9 @@ private:
 	bool grouping_ = false;
 };
 
+// Factory helpers for the supported command primitives.
+// Higher-level UI code should compose these rather than editing DesignerModel
+// directly, so validation and undo behavior remain predictable.
 One<DesignerCommand> MakeDesignerSetPropertyCommand(DesignerNodeId id, const String& property,
                                                      const Value& value, const String& label = String());
 One<DesignerCommand> MakeDesignerRenameCommand(DesignerNodeId id, const String& name);

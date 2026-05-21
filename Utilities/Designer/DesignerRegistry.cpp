@@ -1,5 +1,9 @@
 #include "DesignerRegistry.h"
 
+// DesignerRegistry.cpp - runtime catalog of designer-visible node types.
+// The registry keeps toolbox metadata and default initializers centralized so
+// adding controls does not require special cases in preview or inspector code.
+
 namespace Upp {
 
 static int FindString(const Vector<String>& v, const String& s)

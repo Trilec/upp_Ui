@@ -244,8 +244,14 @@ void UiSplitter::Layout()
     if(count == 0)
         return;
 
-    mins_.SetCount(count, 0);
-    minpx_.SetCount(count, 0);
+    while(mins_.GetCount() < count)
+        mins_.Add(0);
+    while(minpx_.GetCount() < count)
+        minpx_.Add(0);
+    if(mins_.GetCount() > count)
+        mins_.SetCount(count);
+    if(minpx_.GetCount() > count)
+        minpx_.SetCount(count);
     count--;
 
     if(pos_.GetCount() < count) {

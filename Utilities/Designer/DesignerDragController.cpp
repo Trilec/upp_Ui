@@ -1,5 +1,9 @@
 #include "DesignerDragController.h"
 
+// DesignerDragController.cpp - validates and completes toolbox/node drags.
+// Preview and hierarchy report potential targets, while this controller decides
+// whether the target is legal and emits the final command.
+
 namespace Upp {
 
 DesignerDropTarget DesignerMakeIntoTarget(DesignerNodeId parent, int insert_index)

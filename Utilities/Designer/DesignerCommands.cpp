@@ -1,5 +1,9 @@
 #include "DesignerCommands.h"
 
+// DesignerCommands.cpp - undoable model edits for the designer.
+// Commands are intentionally model-only so UI controls can be rebuilt after each
+// edit without losing command history or retaining stale widget pointers.
+
 namespace Upp {
 
 static int FindCommandChildPos(const DesignerNode& parent, DesignerNodeId child)

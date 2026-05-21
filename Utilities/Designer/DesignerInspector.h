@@ -2,8 +2,18 @@
 
 #include "DesignerAdapter.h"
 
+// Ui Designer inspector.
+// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
+//
+// The inspector turns adapter property descriptors into themed composite rows.
+// Each selected type gets a stable page inside UiStack so hidden controls from
+// previous selections do not keep stale state or overlap the active editor.
+
 namespace Upp {
 
+// Descriptor-driven property editor for the selected DesignerNode.
+// It commits changes through events only; the owning window turns those events
+// into commands and refreshes preview/code/hierarchy from the model.
 class DesignerInspector : public ParentCtrl {
 public:
 	typedef DesignerInspector CLASSNAME;

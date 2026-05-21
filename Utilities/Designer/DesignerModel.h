@@ -2,6 +2,14 @@
 
 #include <Ui/Ui.h>
 
+// Ui Designer model layer.
+// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
+//
+// This header defines the persistent document graph for the visual designer:
+// node identity, parent/child order, property values, selection, and validation.
+// UI widgets should edit this model through commands rather than keeping state
+// in the preview or inspector controls.
+
 namespace Upp {
 
 using DesignerNodeId = int;
@@ -9,6 +17,10 @@ using DesignerNodeId = int;
 static constexpr DesignerNodeId Designer_NULL = 0;
 static constexpr DesignerNodeId Designer_ROOT = 1;
 
+// One editable object in the designer document.
+// Layout containers, controls, splitter panes, and the virtual window all use
+// the same node shape so drag/drop, undo, serialization, and codegen share one
+// source of truth.
 struct DesignerNode : Moveable<DesignerNode> {
 	DesignerNodeId id = Designer_NULL;
 	DesignerNodeId parent = Designer_NULL;
@@ -20,6 +32,9 @@ struct DesignerNode : Moveable<DesignerNode> {
 	bool expanded = true;
 };
 
+// Snapshot used by undo/redo when a whole subtree is deleted or restored.
+// It deliberately mirrors DesignerNode so command objects can preserve history
+// without retaining live pointers into the model array.
 struct DesignerNodeState : Moveable<DesignerNodeState> {
 	DesignerNodeId id = Designer_NULL;
 	DesignerNodeId parent = Designer_NULL;
@@ -31,6 +46,9 @@ struct DesignerNodeState : Moveable<DesignerNodeState> {
 	bool expanded = true;
 };
 
+// Owns the designer document and enforces tree invariants.
+// Use AddNode/MoveNode/RemoveNode for structural edits and Validate() after
+// complex command groups; preview rectangles are cached here only as view hints.
 class DesignerModel {
 public:
 	DesignerModel();

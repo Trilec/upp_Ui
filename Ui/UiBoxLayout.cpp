@@ -320,16 +320,45 @@ void UiBoxLayout::Paint(Draw& w)
 
     Rect r = GetSize();
     Rect irc = r.Deflated(inset.left, inset.top, inset.right, inset.bottom);
-    w.DrawRect(irc, Color(230, 255, 230));
+    Color line = Color(220, 0, 0);
+    Color fill = Blend(line, SColorPaper(), 205);
+
+    if(inset.top > 0)
+        w.DrawRect(Rect(r.left, r.top, r.right, irc.top), fill);
+    if(inset.bottom > 0)
+        w.DrawRect(Rect(r.left, irc.bottom, r.right, r.bottom), fill);
+    if(inset.left > 0)
+        w.DrawRect(Rect(r.left, irc.top, irc.left, irc.bottom), fill);
+    if(inset.right > 0)
+        w.DrawRect(Rect(irc.right, irc.top, r.right, irc.bottom), fill);
+
+    w.DrawRect(irc.left, irc.top, irc.GetWidth(), 1, line);
+    w.DrawRect(irc.left, irc.bottom - 1, irc.GetWidth(), 1, line);
+    w.DrawRect(irc.left, irc.top, 1, irc.GetHeight(), line);
+    w.DrawRect(irc.right - 1, irc.top, 1, irc.GetHeight(), line);
+
+    Rect prev;
+    bool have_prev = false;
 
     for(const Item& it : items) {
         if(!it.cl.visible || it.cl.rect.IsEmpty())
             continue;
         Rect cr = it.cl.rect;
-        w.DrawRect(cr.left, cr.top, cr.GetWidth(), 1, Color(220, 0, 0));
-        w.DrawRect(cr.left, cr.bottom - 1, cr.GetWidth(), 1, Color(220, 0, 0));
-        w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), Color(220, 0, 0));
-        w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), Color(220, 0, 0));
+        if(have_prev && gap > 0) {
+            Rect gr;
+            if(dir == UiDirection::H)
+                gr = Rect(prev.right, max(prev.top, cr.top), cr.left, min(prev.bottom, cr.bottom));
+            else
+                gr = Rect(max(prev.left, cr.left), prev.bottom, min(prev.right, cr.right), cr.top);
+            if(!gr.IsEmpty())
+                w.DrawRect(gr, fill);
+        }
+        w.DrawRect(cr.left, cr.top, cr.GetWidth(), 1, line);
+        w.DrawRect(cr.left, cr.bottom - 1, cr.GetWidth(), 1, line);
+        w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), line);
+        w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), line);
+        prev = cr;
+        have_prev = true;
     }
 }
 

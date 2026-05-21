@@ -1,5 +1,9 @@
 #include "DesignerTemplates.h"
 
+// DesignerTemplates.cpp - starter model seeds for common layout shapes.
+// Templates create ordinary DesignerNode trees, so they exercise the same
+// command/preview/codegen paths as hand-built layouts.
+
 namespace Upp {
 
 static void InitTemplateNode(DesignerModel& model, const DesignerRegistry& registry, DesignerNodeId id)

@@ -11,21 +11,25 @@
     ============
 
     Purpose
-    - Hybrid flow/grid layout control for arranging child controls in rows,
-      columns, and grouped clusters.
+    - Stable row/column layout control for arranging child controls in
+      addressable grid cells.
 
     Intent
-    - Provide a stronger layout helper than UiBoxLayout when grid-like
-      placement, wrapping, and cluster headers are required.
+    - Provide explicit grid structure for forms, dashboards, property panels,
+      and other surfaces where cell identity must remain stable as the parent
+      resizes. Use UiBoxLayout wrap for gallery/flow-style responsive rows.
 
     Thread context
     - GUI thread only.
 
     Usage
-    - Use Flow or Grid mode depending on whether wrapping or fixed cell
-      structure is the primary layout concern.
+    - Set a grid size, then add controls either to the next free cell or to an
+      explicit row/column. Grid cells remain stable; resizing changes track
+      sizes, not logical cell assignment.
 
     Changelog
+    - 2026-05: clarified stable grid contract and added next-free/explicit
+      cell API with row/column helper functions.
     - 2026-03: added release-standard file documentation.
 */
 
@@ -112,7 +116,40 @@ public:
     /** Create the layout; installs ScrollBars as a frame. */
     UiGridLayout();
 
-    /** Set Flow vs Grid mode. Triggers relayout. */
+    /** Set the stable grid dimensions. Columns/rows are clamped to at least 1. */
+    UiGridLayout& SetGridSize(int columns, int rows) {
+        grid_cols_ = max(1, columns);
+        grid_rows_ = max(1, rows);
+        mode = FGLMode::Grid;
+        Reflow();
+        return *this;
+    }
+
+    /** Set the minimum track size used for empty cells and layout targets. */
+    UiGridLayout& SetMinCellSize(Size sz) {
+        min_cell_size_ = Size(max(1, sz.cx), max(1, sz.cy));
+        Reflow();
+        return *this;
+    }
+
+    static int ComputeColumns(int available_width, int approx_cell_width, int gap = 0) {
+        int cell = max(1, approx_cell_width);
+        int step = cell + max(0, gap);
+        return max(1, (available_width + max(0, gap)) / max(1, step));
+    }
+
+    static int ComputeRows(int available_height, int approx_cell_height, int gap = 0) {
+        int cell = max(1, approx_cell_height);
+        int step = cell + max(0, gap);
+        return max(1, (available_height + max(0, gap)) / max(1, step));
+    }
+
+    static Size ComputeGrid(Size available, Size approx_cell, Size gap = Size(0, 0)) {
+        return Size(ComputeColumns(available.cx, approx_cell.cx, gap.cx),
+                    ComputeRows(available.cy, approx_cell.cy, gap.cy));
+    }
+
+    /** Legacy mode setter kept for old experiments; active code should use SetGridSize. */
     UiGridLayout& SetMode(FGLMode m)                 { mode = m; Reflow(); return *this; }
 
     /** Set primary direction. Triggers relayout. */
@@ -259,10 +296,9 @@ public:
      */
     int Add(Ctrl& c, int cluster_id = -1, bool scale_to_cell = false, Size fixed = Size(0, 0));
 
-    /** Compatibility overload (older signature). */
-    int Add(Ctrl& c, int cluster_id, int /*segment_id_unused*/, bool scale_to_cell, Size fixed) {
-        return Add(c, cluster_id, scale_to_cell, fixed);
-    }
+    /** Add a control to an explicit stable grid cell. */
+    int Add(Ctrl& c, int row, int col, bool scale_to_cell, Size fixed = Size(0, 0));
+    int Add(Ctrl& c, int row, int col, bool scale_x, bool scale_y, Size fixed = Size(0, 0));
 
     /** Add a spacer with min/max pixels on the main axis. */
     int AddSpacer(int min_px = 0, int max_px = INT_MAX, int cluster_id = -1);
@@ -286,6 +322,8 @@ public:
     /** Add a control to a grid cell (row, col). */
     int AddGrid(Ctrl& c, int row, int col,
                 bool scale_to_cell = false, Size fixed = Size(0, 0));
+    int AddGrid(Ctrl& c, int row, int col,
+                bool scale_x, bool scale_y, Size fixed = Size(0, 0));
 
     /** Reserve a blank grid cell (affects row/col measurement). */
     int AddBlankGrid(int row, int col);
@@ -377,6 +415,8 @@ private:
         int   cluster       = -1;        // cluster id (keep-together unit)
         Ctrl* ctrl          = nullptr;
         bool  scale_to_cell = false;
+        bool  scale_x       = false;
+        bool  scale_y       = false;
         Size  fixed         = Size(0, 0); // overrides min size unless unified is on
         int   min_px        = 0;          // spacer/gap min
         int   max_px        = INT_MAX;    // spacer max
@@ -426,12 +466,15 @@ private:
 
 
     // Config/state
-    FGLMode   mode   = FGLMode::Flow;
+    FGLMode   mode   = FGLMode::Grid;
     Direction dir    = Direction::H;
     FGLScroll scroll = FGLScroll::AutoScroll;
     bool      wrap   = true;
     bool      unified = false;
     Size      unified_sz = Size(0, 0);
+    int       grid_cols_ = 2;
+    int       grid_rows_ = 2;
+    Size      min_cell_size_ = Size(DPI(6), DPI(6));
 
     Align     align_items = Align::Stretch;
     bool      debug       = false;
@@ -441,6 +484,7 @@ private:
     int  EnsureCluster(int id);                   
     bool HasAnyHeader() const; 
     int SimulateFlowHeight(int inner_width) const;
+    Point FindNextFreeCell() const;
     bool IsSelectableItem(const Item& it) const;
     int  FindItemAt(Point p) const;
     int  FindFirstSelectable() const;

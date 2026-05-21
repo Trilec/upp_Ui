@@ -2,22 +2,35 @@
 
 #include "DesignerModel.h"
 
+// Ui Designer hierarchy/toolbox trees.
+// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
+//
+// These are thin UiTree specializations that translate mouse gestures into
+// designer drag events. They do not own model edits; the main window and drag
+// controller decide whether a drop is valid and which command to execute.
+
 namespace Upp {
 
+// Toolbox tree used to start creation drags.
+// Rows represent registered DesignerType entries, and drag events carry the type
+// id plus screen position so preview and hierarchy can share one drop pipeline.
 class DesignerToolboxTree : public UiTree {
 public:
 	Event<String, Point> WhenToolDrag;
 	Event<String, Point> WhenToolDrop;
 	Event<> WhenToolCancel;
+	Event<String> WhenToolHover;
 
 	void LeftDown(Point p, dword flags) override;
 	void MouseMove(Point p, dword flags) override;
 	void LeftDrag(Point p, dword flags) override;
 	Image CursorImage(Point p, dword flags) override;
 	void LeftUp(Point p, dword flags) override;
+	void MouseLeave() override;
 	void CancelMode() override;
 
 private:
+	void EmitHover(Point p);
 	bool BeginFromSelection();
 	void ResetDragState();
 	void CancelDragNoRelease();
@@ -27,6 +40,9 @@ private:
 	bool dragging_ = false;
 };
 
+// Model hierarchy tree used to select and move existing nodes.
+// It preserves normal tree selection/expand behavior while adding external drop
+// tracking for moves from preview or toolbox.
 class DesignerHierarchyTree : public UiTree {
 public:
 	Event<DesignerNodeId, Point> WhenNodeDrag;

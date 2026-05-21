@@ -138,39 +138,84 @@ UiGridLayout& UiGridLayout::SetClusterHeader(int id, bool on, bool with_box) {
     return *this;
 }
 
-/** Add a control to the flow, optionally bound to a cluster. */
+Point UiGridLayout::FindNextFreeCell() const
+{
+    Vector<bool> occupied;
+    occupied.SetCount(max(1, grid_cols_ * grid_rows_), false);
+    for(const Item& it : items) {
+        if(!IsGridLike(it) && !IsCtrl(it) && !IsSpacer(it) && !IsExpander(it) && !IsGap(it))
+            continue;
+        if(it.row < 0 || it.col < 0 || it.row >= grid_rows_ || it.col >= grid_cols_)
+            continue;
+        occupied[it.row * grid_cols_ + it.col] = true;
+    }
+    for(int r = 0; r < grid_rows_; r++)
+        for(int c = 0; c < grid_cols_; c++)
+            if(!occupied[r * grid_cols_ + c])
+                return Point(c, r);
+    return Point(-1, -1);
+}
+
+/** Add a control to the next free stable grid cell. */
 int UiGridLayout::Add(Ctrl& c, int cluster_id, bool scale_to_cell, Size fixed) {
+    Point p = FindNextFreeCell();
+    if(p.x < 0 || p.y < 0)
+        return -1;
     Item& it = items.Add();
-    it.kind          = Kind::CtrlItem;
+    it.kind          = Kind::GridCell;
     it.ctrl          = &c;
     it.cluster       = EnsureCluster(cluster_id);
+    it.row           = p.y;
+    it.col           = p.x;
     it.scale_to_cell = scale_to_cell;
+    it.scale_x       = scale_to_cell;
+    it.scale_y       = scale_to_cell;
     it.fixed         = fixed;
 
-    // Add as child control via base class to avoid our overload.
     Ctrl::Add(c);
 
     Reflow();
     return items.GetCount() - 1;
 }
 
+/** Add a control to an explicit stable grid cell. */
+int UiGridLayout::Add(Ctrl& c, int row, int col, bool scale_to_cell, Size fixed)
+{
+    return AddGrid(c, row, col, scale_to_cell, fixed);
+}
+
+int UiGridLayout::Add(Ctrl& c, int row, int col, bool scale_x, bool scale_y, Size fixed)
+{
+    return AddGrid(c, row, col, scale_x, scale_y, fixed);
+}
+
 /** Add a spacer with min/max pixels along the main axis. */
 int UiGridLayout::AddSpacer(int min_px, int max_px, int cluster_id) {
+    Point p = FindNextFreeCell();
+    if(p.x < 0 || p.y < 0)
+        return -1;
     Item& it = items.Add();
     it.kind    = Kind::Spacer;
     it.cluster = EnsureCluster(cluster_id);
     it.min_px  = min_px;
     it.max_px  = max_px;
+    it.row     = p.y;
+    it.col     = p.x;
     Reflow();
     return items.GetCount() - 1;
 }
 
 /** Add an expanding gap (weight shares leftover main-axis space). */
 int UiGridLayout::AddExpand(int weight, int cluster_id) {
+    Point p = FindNextFreeCell();
+    if(p.x < 0 || p.y < 0)
+        return -1;
     Item& it = items.Add();
     it.kind    = Kind::Expander;
     it.cluster = EnsureCluster(cluster_id);
     it.weight  = max(1, weight);
+    it.row     = p.y;
+    it.col     = p.x;
     Reflow();
     return items.GetCount() - 1;
 }
@@ -197,12 +242,19 @@ int UiGridLayout::AddBreak(int cluster_id) {
 /** Add a control to the grid at (row, col). */
 int UiGridLayout::AddGrid(Ctrl& c, int row, int col,
                           bool scale_to_cell, Size fixed) {
+    return AddGrid(c, row, col, scale_to_cell, scale_to_cell, fixed);
+}
+
+int UiGridLayout::AddGrid(Ctrl& c, int row, int col,
+                          bool scale_x, bool scale_y, Size fixed) {
     Item& it = items.Add();
     it.kind          = Kind::GridCell;
     it.ctrl          = &c;
     it.row           = row;
     it.col           = col;
-    it.scale_to_cell = scale_to_cell;
+    it.scale_to_cell = scale_x && scale_y;
+    it.scale_x       = scale_x;
+    it.scale_y       = scale_y;
     it.fixed         = fixed;
 
     Ctrl::Add(c);
@@ -467,26 +519,23 @@ Size UiGridLayout::GetMinSize() const {
 
     // ---------- Grid envelope ----------
     if(mode == FGLMode::Grid) {
-        int maxrow = -1, maxcol = -1;
+        int maxrow = grid_rows_ - 1, maxcol = grid_cols_ - 1;
         for(const Item& it : items)
             if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid) {
                 maxrow = max(maxrow, it.row);
                 maxcol = max(maxcol, it.col);
             }
 
-        const int rows = maxrow + 1;
-        const int cols = max(maxcol + 1, 0);
+        const int rows = max(1, maxrow + 1);
+        const int cols = max(1, maxcol + 1);
 
         Vector<int> colw, rowh;
-        colw.SetCount(cols, 0);
-        rowh.SetCount(max(0, rows), 0);
+        colw.SetCount(cols, min_cell_size_.cx);
+        rowh.SetCount(rows, min_cell_size_.cy);
 
         for(const Item& it : items)
             if(it.kind == Kind::GridCell) {
-                Size ns = (it.fixed != Size(0, 0)
-                              ? it.fixed
-                              : (it.ctrl ? it.ctrl->GetMinSize()
-                                         : Size(0, 0)));
+                Size ns = NaturalItemSize(it);
                 colw[it.col] = max(colw[it.col], ns.cx);
                 rowh[it.row] = max(rowh[it.row], ns.cy);
             }
@@ -917,9 +966,131 @@ void UiGridLayout::DebugPaint(Upp::Draw& w) {
     w.DrawRect(inner.left, inner.top, 1, inner.GetHeight(), SColorShadow());
     w.DrawRect(inner.right - 1, inner.top, 1, inner.GetHeight(), SColorShadow());
 
-    // Item cell rects (skip Grid-like cells and Break markers)
+    if(mode == FGLMode::Grid) {
+        int rows = max(1, grid_rows_);
+        int cols = max(1, grid_cols_);
+        for(const Item& it : items) {
+            if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid ||
+               it.kind == Kind::Spacer || it.kind == Kind::Expander || it.kind == Kind::Gap) {
+                rows = max(rows, it.row + 1);
+                cols = max(cols, it.col + 1);
+            }
+        }
+
+        Vector<int> colw, rowh;
+        Vector<bool> col_expand, row_expand;
+        colw.SetCount(cols, min_cell_size_.cx);
+        rowh.SetCount(rows, min_cell_size_.cy);
+        col_expand.SetCount(cols, false);
+        row_expand.SetCount(rows, false);
+
+        for(const Item& it : items) {
+            if(it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
+                continue;
+            if(it.kind == Kind::GridCell || it.kind == Kind::Spacer || it.kind == Kind::Gap) {
+                Size ns = NaturalItemSize(it);
+                colw[it.col] = max(colw[it.col], ns.cx);
+                rowh[it.row] = max(rowh[it.row], ns.cy);
+                if(it.kind == Kind::GridCell) {
+                    col_expand[it.col] = col_expand[it.col] || it.scale_x;
+                    row_expand[it.row] = row_expand[it.row] || it.scale_y;
+                }
+            }
+            else if(it.kind == Kind::Expander) {
+                col_expand[it.col] = true;
+                row_expand[it.row] = true;
+            }
+        }
+
+        auto StretchAxis = [&](Vector<int>& lens, const Vector<bool>& expand, int avail) {
+            int spacing_sum = style.spacing * max(0, lens.GetCount() - 1);
+            int content_avail = max(0, avail - spacing_sum);
+            int sum = 0;
+            for(int v : lens)
+                sum += v;
+            if(content_avail <= sum)
+                return;
+
+            Vector<int> targets;
+            for(int i = 0; i < lens.GetCount(); ++i)
+                if(expand.IsEmpty() || expand[i])
+                    targets.Add(i);
+            if(targets.IsEmpty()) {
+                targets.SetCount(lens.GetCount());
+                for(int i = 0; i < lens.GetCount(); ++i)
+                    targets[i] = i;
+            }
+
+            int fixed_sum = 0;
+            for(int i = 0; i < lens.GetCount(); ++i)
+                if(FindInt(targets, i) < 0)
+                    fixed_sum += lens[i];
+            int expandable_avail = max(0, content_avail - fixed_sum);
+            int per = expandable_avail / max(1, targets.GetCount());
+            int rem = expandable_avail % max(1, targets.GetCount());
+            for(int q = 0; q < targets.GetCount(); ++q) {
+                int i = targets[q];
+                int target = per + (rem-- > 0 ? 1 : 0);
+                if(target > lens[i])
+                    lens[i] = target;
+            }
+        };
+
+        StretchAxis(colw, col_expand, inner.GetWidth());
+        StretchAxis(rowh, row_expand, inner.GetHeight());
+
+        Vector<int> xoff, yoff;
+        xoff.SetCount(cols + 1, inner.left);
+        yoff.SetCount(rows + 1, inner.top);
+        for(int c = 0; c < cols; ++c)
+            xoff[c + 1] = xoff[c] + colw[c] + (c + 1 < cols ? style.spacing : 0);
+        for(int r = 0; r < rows; ++r)
+            yoff[r + 1] = yoff[r] + rowh[r] + (r + 1 < rows ? style.spacing : 0);
+
+        Color cell_c = Color(220, 38, 38);
+        Color fill_c = Blend(cell_c, SColorPaper(), 205);
+
+        Rect paint_view = view;
+        Rect paint_inner = inner;
+        paint_view.Offset(-origin);
+        paint_inner.Offset(-origin);
+        if(inset_.top > 0)
+            w.DrawRect(Rect(paint_view.left, paint_view.top, paint_view.right, paint_inner.top), fill_c);
+        if(inset_.bottom > 0)
+            w.DrawRect(Rect(paint_view.left, paint_inner.bottom, paint_view.right, paint_view.bottom), fill_c);
+        if(inset_.left > 0)
+            w.DrawRect(Rect(paint_view.left, paint_inner.top, paint_inner.left, paint_inner.bottom), fill_c);
+        if(inset_.right > 0)
+            w.DrawRect(Rect(paint_inner.right, paint_inner.top, paint_view.right, paint_inner.bottom), fill_c);
+
+        if(style.spacing > 0) {
+            for(int c = 0; c + 1 < cols; ++c) {
+                Rect gap_r(xoff[c] + colw[c], inner.top, xoff[c] + colw[c] + style.spacing, inner.bottom);
+                gap_r.Offset(-origin);
+                w.DrawRect(gap_r, fill_c);
+            }
+            for(int r = 0; r + 1 < rows; ++r) {
+                Rect gap_r(inner.left, yoff[r] + rowh[r], inner.right, yoff[r] + rowh[r] + style.spacing);
+                gap_r.Offset(-origin);
+                w.DrawRect(gap_r, fill_c);
+            }
+        }
+
+        for(int r = 0; r < rows; ++r) {
+            for(int c = 0; c < cols; ++c) {
+                Rect cell = RectC(xoff[c], yoff[r], colw[c], rowh[r]);
+                cell.Offset(-origin);
+                w.DrawRect(cell.left, cell.top, cell.GetWidth(), 1, cell_c);
+                w.DrawRect(cell.left, cell.bottom - 1, cell.GetWidth(), 1, cell_c);
+                w.DrawRect(cell.left, cell.top, 1, cell.GetHeight(), cell_c);
+                w.DrawRect(cell.right - 1, cell.top, 1, cell.GetHeight(), cell_c);
+            }
+        }
+    }
+
+    // Item rects (skip Break markers)
     for(const Item& it : items) {
-        if(IsGridLike(it) || IsBreak(it))
+        if(IsBreak(it))
             continue;
         Rect  r = it.rect;
         r.Offset(-origin);
@@ -1328,6 +1499,7 @@ void UiGridLayout::LayoutHorizontal()
 
         int count_sp = 0;
         int wsum     = 0;
+        int scale_count = 0;
 
         // Pass 1: count spacers + accumulate expander weights
         for(int i = from; i < to; i++) {
@@ -1336,6 +1508,8 @@ void UiGridLayout::LayoutHorizontal()
                 ++count_sp;
             else if(it.kind == Kind::Expander)
                 wsum += max(1, it.weight);
+            else if(it.kind == Kind::CtrlItem && it.scale_to_cell)
+                ++scale_count;
         }
 
         // Pass 2: distribute extra space to spacers
@@ -1364,6 +1538,23 @@ void UiGridLayout::LayoutHorizontal()
 
                 int got = remaining * max(1, it.weight) / wsum;
                 it.rect.SetSize(Size(got, line_h));
+            }
+        }
+
+        // Pass 4: scale-to-cell controls in Flow mode are real expanding
+        // layout items, not just controls stretched inside a fixed natural cell.
+        // Share leftover main-axis space between them so an Expand child can
+        // fill a row while still using its natural/fixed size as a minimum.
+        if(scale_count > 0 && count_sp == 0 && wsum == 0 && remaining > 0) {
+            int each = remaining / scale_count;
+            int rem = remaining % scale_count;
+            for(int i = from; i < to; i++) {
+                Item& it = items[i];
+                if(it.kind != Kind::CtrlItem || !it.scale_to_cell)
+                    continue;
+                Size sz = it.rect.GetSize();
+                int grow = each + (rem-- > 0 ? 1 : 0);
+                it.rect.SetSize(Size(sz.cx + grow, line_h));
             }
         }
 
@@ -1594,6 +1785,85 @@ void UiGridLayout::LayoutHorizontal()
                    max(0, (vr.right - vr.left) - line_width));
     }
 
+    // Flow Expand is two-dimensional: after rows are known, rows containing
+    // scale-to-cell controls share spare cross-axis height.
+    Vector<int> row_top;
+    Vector<int> row_bottom;
+    Vector<bool> row_stretch;
+    for(const Item& it : items) {
+        if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid || it.kind == Kind::Break || it.rect.IsEmpty())
+            continue;
+        int q = FindInt(row_top, it.rect.top);
+        if(q < 0) {
+            row_top.Add(it.rect.top);
+            row_bottom.Add(it.rect.bottom);
+            row_stretch.Add(false);
+            q = row_top.GetCount() - 1;
+        }
+        row_bottom[q] = max(row_bottom[q], it.rect.bottom);
+        row_stretch[q] = row_stretch[q] || (it.kind == Kind::CtrlItem && it.scale_to_cell);
+    }
+    int max_bottom = vr.top;
+    int stretch_rows = 0;
+    for(int i = 0; i < row_top.GetCount(); i++) {
+        max_bottom = max(max_bottom, row_bottom[i]);
+        if(row_stretch[i])
+            stretch_rows++;
+    }
+    int cross_extra = max(0, vr.bottom - max_bottom);
+    if(cross_extra > 0 && stretch_rows > 0) {
+        int shift = 0;
+        int rem = cross_extra % stretch_rows;
+        for(int r = 0; r < row_top.GetCount(); r++) {
+            int grow = 0;
+            if(row_stretch[r]) {
+                grow = cross_extra / stretch_rows + (rem-- > 0 ? 1 : 0);
+            }
+            for(Item& it : items) {
+                if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid || it.kind == Kind::Break || it.rect.top != row_top[r])
+                    continue;
+                it.rect.Offset(0, shift);
+                if(row_stretch[r])
+                    it.rect.bottom += grow;
+                if(it.ctrl) {
+                    Size want = it.scale_to_cell ? it.rect.GetSize() : NaturalItemSize(it);
+                    want.cx = min(want.cx, it.rect.GetWidth());
+                    want.cy = min(want.cy, it.rect.GetHeight());
+                    Rect cr = it.rect;
+                    if(!it.scale_to_cell) {
+                        switch(align_items) {
+                        case Align::Stretch:
+                            cr = it.rect;
+                            break;
+                        case Align::Center:
+                            cr.left = it.rect.left + (it.rect.GetWidth() - want.cx) / 2;
+                            cr.top = it.rect.top + (it.rect.GetHeight() - want.cy) / 2;
+                            cr.right = cr.left + want.cx;
+                            cr.bottom = cr.top + want.cy;
+                            break;
+                        case Align::End:
+                            cr.right = it.rect.right;
+                            cr.bottom = it.rect.bottom;
+                            cr.left = cr.right - want.cx;
+                            cr.top = cr.bottom - want.cy;
+                            break;
+                        case Align::Start:
+                        case Align::Auto:
+                        default:
+                            cr.left = it.rect.left;
+                            cr.top = it.rect.top;
+                            cr.right = cr.left + want.cx;
+                            cr.bottom = cr.top + want.cy;
+                            break;
+                        }
+                    }
+                    it.ctrl->SetRect(cr);
+                }
+            }
+            shift += grow;
+        }
+    }
+
     // Compute overall content bounds from non-grid items.
     Rect cb(vr.left, vr.top, vr.left, vr.top);
     bool first = true;
@@ -1642,6 +1912,32 @@ void UiGridLayout::LayoutVertical()
 
         // First let spacers & expanders absorb vertical free space.
         DistributeSpacersAndExpanders(from, to, free_px, col_w, /*horizontal=*/false);
+
+        int remaining = max(0, free_px);
+        int scale_count = 0;
+        int count_sp = 0;
+        int wsum = 0;
+        for(int i = from; i < to; i++) {
+            const Item& it = items[i];
+            if(it.kind == Kind::Spacer)
+                ++count_sp;
+            else if(it.kind == Kind::Expander)
+                wsum += max(1, it.weight);
+            else if(it.kind == Kind::CtrlItem && it.scale_to_cell)
+                ++scale_count;
+        }
+        if(scale_count > 0 && count_sp == 0 && wsum == 0 && remaining > 0) {
+            int each = remaining / scale_count;
+            int rem = remaining % scale_count;
+            for(int i = from; i < to; i++) {
+                Item& it = items[i];
+                if(it.kind != Kind::CtrlItem || !it.scale_to_cell)
+                    continue;
+                Size sz = it.rect.GetSize();
+                int grow = each + (rem-- > 0 ? 1 : 0);
+                it.rect.SetSize(Size(col_w, sz.cy + grow));
+            }
+        }
 
         // Then place items and controls.
         int        ly = vr.top;
@@ -1841,6 +2137,84 @@ void UiGridLayout::LayoutVertical()
         used_w = max(used_w, x - vr.left);
     }
 
+    // Flow Expand is two-dimensional: after columns are known, columns
+    // containing scale-to-cell controls share spare cross-axis width.
+    Vector<int> col_left;
+    Vector<int> col_right;
+    Vector<bool> col_stretch;
+    for(const Item& it : items) {
+        if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid || it.kind == Kind::Break || it.rect.IsEmpty())
+            continue;
+        int q = FindInt(col_left, it.rect.left);
+        if(q < 0) {
+            col_left.Add(it.rect.left);
+            col_right.Add(it.rect.right);
+            col_stretch.Add(false);
+            q = col_left.GetCount() - 1;
+        }
+        col_right[q] = max(col_right[q], it.rect.right);
+        col_stretch[q] = col_stretch[q] || (it.kind == Kind::CtrlItem && it.scale_to_cell);
+    }
+    int max_right = vr.left;
+    int stretch_cols = 0;
+    for(int i = 0; i < col_left.GetCount(); i++) {
+        max_right = max(max_right, col_right[i]);
+        if(col_stretch[i])
+            stretch_cols++;
+    }
+    int cross_extra = max(0, vr.right - max_right);
+    if(cross_extra > 0 && stretch_cols > 0) {
+        int shift = 0;
+        int rem = cross_extra % stretch_cols;
+        for(int c = 0; c < col_left.GetCount(); c++) {
+            int grow = 0;
+            if(col_stretch[c])
+                grow = cross_extra / stretch_cols + (rem-- > 0 ? 1 : 0);
+            for(Item& it : items) {
+                if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid || it.kind == Kind::Break || it.rect.left != col_left[c])
+                    continue;
+                it.rect.Offset(shift, 0);
+                if(col_stretch[c])
+                    it.rect.right += grow;
+                if(it.ctrl) {
+                    Size want = it.scale_to_cell ? it.rect.GetSize() : NaturalItemSize(it);
+                    want.cx = min(want.cx, it.rect.GetWidth());
+                    want.cy = min(want.cy, it.rect.GetHeight());
+                    Rect cr = it.rect;
+                    if(!it.scale_to_cell) {
+                        switch(align_items) {
+                        case Align::Stretch:
+                            cr = it.rect;
+                            break;
+                        case Align::Center:
+                            cr.left = it.rect.left + (it.rect.GetWidth() - want.cx) / 2;
+                            cr.top = it.rect.top + (it.rect.GetHeight() - want.cy) / 2;
+                            cr.right = cr.left + want.cx;
+                            cr.bottom = cr.top + want.cy;
+                            break;
+                        case Align::End:
+                            cr.right = it.rect.right;
+                            cr.bottom = it.rect.bottom;
+                            cr.left = cr.right - want.cx;
+                            cr.top = cr.bottom - want.cy;
+                            break;
+                        case Align::Start:
+                        case Align::Auto:
+                        default:
+                            cr.left = it.rect.left;
+                            cr.top = it.rect.top;
+                            cr.right = cr.left + want.cx;
+                            cr.bottom = cr.top + want.cy;
+                            break;
+                        }
+                    }
+                    it.ctrl->SetRect(cr);
+                }
+            }
+            shift += grow;
+        }
+    }
+
     Rect cb(vr.left, vr.top, vr.left, vr.top);
     bool first = true;
     for(const Item& it : items) {
@@ -1872,57 +2246,97 @@ void UiGridLayout::LayoutGrid()
 
     // --- Pass 1: collect row/col natural sizes -----------------------------
     Vector<int> colw, rowh;
+    int maxrow = grid_rows_ - 1;
+    int maxcol = grid_cols_ - 1;
 
     for(const Item& it : items) {
-        if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid) {
-            if(it.row >= rowh.GetCount())
-                rowh.SetCount(it.row + 1, 0);
-            if(it.col >= colw.GetCount())
-                colw.SetCount(it.col + 1, 0);
-
-            if(it.kind == Kind::GridCell) {
-                Size ns = NaturalItemSize(it);
-                colw[it.col] = max(colw[it.col], ns.cx);
-                rowh[it.row] = max(rowh[it.row], ns.cy);
-            }
+        if(it.kind == Kind::GridCell || it.kind == Kind::BlankGrid ||
+           it.kind == Kind::Spacer || it.kind == Kind::Expander || it.kind == Kind::Gap) {
+            maxrow = max(maxrow, it.row);
+            maxcol = max(maxcol, it.col);
         }
     }
 
-    int rows = rowh.GetCount();
-    int cols = colw.GetCount();
+    int rows = max(1, maxrow + 1);
+    int cols = max(1, maxcol + 1);
+    colw.SetCount(cols, min_cell_size_.cx);
+    rowh.SetCount(rows, min_cell_size_.cy);
 
-    if(rows == 0 || cols == 0) {
-        content = Size(inset_.left + inset_.right, inset_.top + inset_.bottom);
-        return;
+    Vector<bool> col_expand, row_expand;
+    col_expand.SetCount(cols, false);
+    row_expand.SetCount(rows, false);
+
+    for(const Item& it : items) {
+        if(it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
+            continue;
+        if(it.kind == Kind::GridCell || it.kind == Kind::Spacer || it.kind == Kind::Gap) {
+            Size ns = NaturalItemSize(it);
+            colw[it.col] = max(colw[it.col], ns.cx);
+            rowh[it.row] = max(rowh[it.row], ns.cy);
+            if(it.kind == Kind::GridCell) {
+                col_expand[it.col] = col_expand[it.col] || it.scale_x;
+                row_expand[it.row] = row_expand[it.row] || it.scale_y;
+            }
+        }
+        else if(it.kind == Kind::Expander) {
+            col_expand[it.col] = true;
+            row_expand[it.row] = true;
+        }
     }
 
     // --- Pass 2: stretch columns / rows to fill vr -------------------------
-    auto StretchAxis = [&](Vector<int>& lens, int avail, int spacing) {
+    auto StretchAxis = [&](Vector<int>& lens, const Vector<bool>& expand, int avail, int spacing) {
         if(lens.IsEmpty())
             return;
-        int base_sum = 0;
-        for(int i = 0; i < lens.GetCount(); ++i) {
-            if(i)
-                base_sum += spacing;
-            base_sum += lens[i];
-        }
-        int extra = avail - base_sum;
-        if(extra <= 0)
+        int spacing_sum = spacing * max(0, lens.GetCount() - 1);
+        int content_avail = max(0, avail - spacing_sum);
+        int current_sum = 0;
+        for(int v : lens)
+            current_sum += v;
+        if(content_avail <= current_sum)
             return;
 
-        int count = lens.GetCount();
-        int per   = extra / count;
-        int rem   = extra % count;
+        Vector<int> targets;
+        for(int i = 0; i < lens.GetCount(); ++i)
+            if(expand.IsEmpty() || expand[i])
+                targets.Add(i);
+        if(targets.IsEmpty()) {
+            targets.SetCount(lens.GetCount());
+            for(int i = 0; i < lens.GetCount(); ++i)
+                targets[i] = i;
+        }
 
-        for(int i = 0; i < count; ++i) {
-            lens[i] += per;
-            if(i < rem)
-                lens[i] += 1;
+        int fixed_sum = 0;
+        for(int i = 0; i < lens.GetCount(); ++i)
+            if(FindInt(targets, i) < 0)
+                fixed_sum += lens[i];
+
+        int expandable_avail = max(0, content_avail - fixed_sum);
+        int per = expandable_avail / max(1, targets.GetCount());
+        int rem = expandable_avail % max(1, targets.GetCount());
+        for(int q = 0; q < targets.GetCount(); ++q) {
+            int i = targets[q];
+            int target = per + (rem-- > 0 ? 1 : 0);
+            if(target > lens[i])
+                lens[i] = target;
+        }
+
+        int after_sum = 0;
+        for(int v : lens)
+            after_sum += v;
+        int leftover = content_avail - after_sum;
+        if(leftover > 0) {
+            int per_extra = leftover / max(1, targets.GetCount());
+            int rem_extra = leftover % max(1, targets.GetCount());
+            for(int q = 0; q < targets.GetCount(); ++q) {
+                int i = targets[q];
+                lens[i] += per_extra + (rem_extra-- > 0 ? 1 : 0);
+            }
         }
     };
 
-    StretchAxis(colw, vr.GetWidth(),  style.spacing);
-    StretchAxis(rowh, vr.GetHeight(), style.spacing);
+    StretchAxis(colw, col_expand, vr.GetWidth(),  style.spacing);
+    StretchAxis(rowh, row_expand, vr.GetHeight(), style.spacing);
 
     // --- Pass 3: compute offsets -------------------------------------------
     Vector<int> xoff, yoff;
@@ -1939,7 +2353,8 @@ void UiGridLayout::LayoutGrid()
     bool first = true;
 
     for(Item& it : items) {
-        if(it.kind != Kind::GridCell && it.kind != Kind::BlankGrid)
+        if(it.kind != Kind::GridCell && it.kind != Kind::BlankGrid &&
+           it.kind != Kind::Spacer && it.kind != Kind::Expander && it.kind != Kind::Gap)
             continue;
 
         int col = max(0, it.col);
@@ -1947,7 +2362,7 @@ void UiGridLayout::LayoutGrid()
         if(col >= cols || row >= rows)
             continue;
 
-        Rect cell(xoff[col], yoff[row], xoff[col + 1], yoff[row + 1]);
+        Rect cell = RectC(xoff[col], yoff[row], colw[col], rowh[row]);
         it.rect = cell;
 
         // Content bounds
@@ -1961,20 +2376,22 @@ void UiGridLayout::LayoutGrid()
         if(it.kind != Kind::GridCell || !it.ctrl)
             continue;
 
-        Size want = it.scale_to_cell ? cell.GetSize() : NaturalItemSize(it);
+        Size natural = NaturalItemSize(it);
+        Size want = Size(it.scale_x ? cell.GetWidth() : natural.cx,
+                         it.scale_y ? cell.GetHeight() : natural.cy);
         want.cx   = min(want.cx, cell.GetWidth());
         want.cy   = min(want.cy, cell.GetHeight());
 
         Rect cr = cell;
-        if(it.scale_to_cell) {
+        if(it.scale_x && it.scale_y) {
             cr = cell;
         } else {
             switch(align_items) {
             case Align::Stretch:
                 cr.left   = cell.left;
-                cr.right  = cell.right;
+                cr.right  = it.scale_x ? cell.right : cell.left + want.cx;
                 cr.top    = cell.top;
-                cr.bottom = cell.top + want.cy;
+                cr.bottom = it.scale_y ? cell.bottom : cell.top + want.cy;
                 break;
             case Align::Start:
                 cr.left   = cell.left;

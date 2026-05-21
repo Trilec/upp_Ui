@@ -1,5 +1,9 @@
 #include "DesignerAdapter.h"
 
+// DesignerAdapter.cpp - real Ui control wrappers for the visual designer.
+// Each adapter keeps the runtime control behavior intact, then adds only
+// design-time synchronization, descriptors, and overlay painting.
+
 namespace Upp {
 
 static Value AdapterNodeProperty(const DesignerNode& n, const String& key, const Value& def)
@@ -156,11 +160,37 @@ static Font DesignerFontChoice(const DesignerNode& n, const String& key, int siz
 	return bold ? f.Bold() : f;
 }
 
+static Image DesignerIconChoice(const DesignerNode& n)
+{
+	String icon = AdapterNodeProperty(n, "icon", "None");
+	if(icon == "Home") return ICON_DESIGN_HOME_48();
+	if(icon == "Settings") return ICON_DESIGN_SETTINGS_48();
+	if(icon == "Menu") return ICON_DESIGN_MENU_48();
+	if(icon == "Search") return ICON_ACTION_SEARCH_48();
+	if(icon == "Add") return ICON_CONTENT_OUTLINED_ADD_48();
+	if(icon == "Check") return ICON_ACTION_CHECK_CIRCLE_48();
+	if(icon == "Folder") return ICON_DESIGN_FOLDER_48();
+	if(icon == "Image") return ICON_DESIGN_IMAGE_48();
+	return Image();
+}
+
+static void AddIconBinding(DesignerApiBuilder& b)
+{
+	b.AddChoice("icon", "Icon", "Ui control icon/media API",
+	            "Optional preview icon from the Ui icon catalog.",
+	            {{"None", "None"}, {"Home", "Home"}, {"Settings", "Settings"}, {"Menu", "Menu"},
+	             {"Search", "Search"}, {"Add", "Add"}, {"Check", "Check"}, {"Folder", "Folder"}, {"Image", "Image"}});
+	b.AddInt("icon_size", "Icon size", DesignerEditorKind::Slider,
+	         "SetIconSize / SetMedia preferred size",
+	         "Preview icon size for icon-capable controls.", 8, 64);
+}
+
 static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 {
 	UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
+	bool pane_slot = n.type_id == "PaneSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
+	bool face_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "face_enabled", true);
+	bool frame_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "frame_enabled", true);
 	for(int i = 0; i < 4; i++) {
 		s.palette.face[i] = UiFill::Solid(GetColorProperty(n, "face", Color(214, 231, 255)));
 		s.palette.frame[i] = GetColorProperty(n, "frame", s.palette.frame[i]);
@@ -231,6 +261,57 @@ static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 	drop.SetCustomStyle(s);
 }
 
+String DesignerAdapterHelp(const String& type_id)
+{
+	if(type_id == "BoxLayout")
+		return "Stacks children in one direction. Use gap, inset, wrap, and per-child sizing to test responsive rows or columns.";
+	if(type_id == "GridLayout")
+		return "Places children into stable cells. Use rows, columns, cell size, gap, and per-axis expand settings to inspect grid behavior.";
+	if(type_id == "UiSplitter")
+		return "Divides an area into two pane slots. Drop layouts or controls into each pane, then adjust orientation, split, and minimum pane sizes.";
+	if(type_id == "UiQuadSplitter")
+		return "Divides an area into four pane slots. Useful for editor-style workspaces with independent top/bottom and left/right regions.";
+	if(type_id == "UiPanel")
+		return "A styled container surface. Drop controls inside it when you want a visible face, frame, radius, or theme panel boundary.";
+	if(type_id == "UiScrollPanel")
+		return "A scrollable container. Use it when child content can exceed the visible area and should report content size to parents.";
+	if(type_id == "UiLabel")
+		return "Display text with alignment, size, color, fill, and frame options. Good for simple captions and form labels.";
+	if(type_id == "UiTitleCard")
+		return "Compact header/card content with title, subtitle, optional line, radius, and themed face/frame controls.";
+	if(type_id == "UiButton")
+		return "Clickable command control. Use this to test text alignment, sizing, and button placement inside layouts.";
+	if(type_id == "UiLineEdit")
+		return "Single-line text field. Use it to test form rows, fixed heights, and edit theming.";
+	if(type_id == "UiIntEdit")
+		return "Integer field with numeric editing behavior. Useful for compact property or settings forms.";
+	if(type_id == "UiFloatEdit")
+		return "Floating-point field with precision and step settings. Useful for numeric inspector-style input.";
+	if(type_id == "UiSlider")
+		return "Continuous/ranged value control. Use fixed height plus expanding width to test common toolbar and settings layouts.";
+	if(type_id == "UiToggle")
+		return "Boolean on/off control. Use it to test compact state controls and horizontal form alignment.";
+	if(type_id == "UiDropdown")
+		return "Choice selector. Use it to test popup controls and row sizing inside panels or grids.";
+	if(type_id == "UiCheckBox")
+		return "Boolean or tri-state field. Use it to test compact form rows and indicator alignment.";
+	if(type_id == "UiBreadcrumbs")
+		return "Path/navigation control. Use it to check long horizontal content, dividers, and optional path icons.";
+	if(type_id == "UiTab")
+		return "Tab strip and page container. Use it to test tab visuals, placement, close buttons, drag handles, and icon spacing.";
+	if(type_id == "UiTable")
+		return "Model-backed table. Use it to test row, header, grid, and scrolling behavior inside layouts.";
+	if(type_id == "UiTree")
+		return "Model-backed hierarchy. Use it to test indentation, connector lines, metadata markers, and tree selection sizing.";
+	if(type_id == "Item")
+		return "Generic placeholder item for layout experiments before choosing a real Ui control.";
+	if(type_id == "PaneSlot")
+		return "Internal splitter pane slot. It is shown in the hierarchy so controls can be dropped into a specific pane.";
+	if(type_id == "Window")
+		return "The virtual top-level window. Resize it to see how child layouts respond to available space.";
+	return "Select a toolbox item to see how it should be used in the designer.";
+}
+
 DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& label,
                                                 DesignerEditorKind editor, const String& api_call,
                                                 const String& help)
@@ -292,8 +373,11 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	DesignerApiBuilder b(out);
 	b.Add("name", "Name", DesignerEditorKind::Text, "designer model name",
 	      "Designer-only identifier used by hierarchy and generated variable naming.");
-	b.AddChoice("sizing", "Sizing", "parent layout item sizing",
-	            "Controls whether the parent layout treats this node as fit, fixed, or expanding.",
+	b.AddChoice("h_sizing", "Width mode", "parent layout horizontal item sizing",
+	            "Controls whether the parent layout treats this node width as fit, fixed, or expanding.",
+	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
+	b.AddChoice("v_sizing", "Height mode", "parent layout vertical item sizing",
+	            "Controls whether the parent layout treats this node height as fit, fixed, or expanding.",
 	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
 	b.AddInt("width", "Width", DesignerEditorKind::Slider,
 	         "UiGridLayout::Add(... fixed) / generated fixed size",
@@ -311,11 +395,13 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Shows or hides the explicit designer fill.");
 	b.Add("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
 	      "Shows or hides the explicit designer frame.");
-	String sizing = AdapterNodeProperty(n, "sizing", "Fit");
-	if(sizing != "Fixed") {
+	String legacy = AdapterNodeProperty(n, "sizing", "Fit");
+	String h_sizing = AdapterNodeProperty(n, "h_sizing", legacy);
+	String v_sizing = AdapterNodeProperty(n, "v_sizing", legacy);
+	if(h_sizing != "Fixed")
 		b.Disable("width", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
+	if(v_sizing != "Fixed")
 		b.Disable("height", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
-	}
 }
 
 static String TextProperty(const DesignerNode& n)
@@ -345,8 +431,21 @@ void DesignerPanelAdapter::SetOverlayState(const DesignerOverlayState& state)
 void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
 {
 	AddCommonBindings(out, node);
-	DesignerApiBuilder(out).Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
-	                              "Designer placeholder text used until this node becomes a real control.");
+	DesignerApiBuilder b(out);
+	if(node.type_id == "PaneSlot") {
+		b.Hide("face");
+		b.Hide("frame");
+		b.Hide("radius");
+		b.Hide("face_enabled");
+		b.Hide("frame_enabled");
+		b.Disable("h_sizing", "Pane slots are owned by the splitter.");
+		b.Disable("v_sizing", "Pane slots are owned by the splitter.");
+		b.Disable("width", "Pane size is owned by the splitter position and pane minimums.");
+		b.Disable("height", "Pane size is owned by the splitter position and pane minimums.");
+		return;
+	}
+	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
+	      "Designer placeholder text used until this node becomes a real control.");
 }
 
 void DesignerPanelAdapter::Paint(Draw& w)
@@ -376,6 +475,15 @@ void DesignerLabelAdapter::SyncFromNode(const DesignerNode& node)
 	s.font = DesignerFontChoice(node, "font", max(7, (int)AdapterNodeProperty(node, "font_size", 11)));
 	s.transparent = !face_enabled && !frame_enabled;
 	SetCustomStyle(s);
+	if(s.metrics.radius > 0)
+		Transparent();
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearIcon();
+	else
+		SetIcon(icon, UiIconRenderMode::MonoTint)
+			.SetIconSize(DPI((int)AdapterNodeProperty(node, "icon_size", 18)),
+			             DPI((int)AdapterNodeProperty(node, "icon_size", 18)));
 	SetText(TextProperty(node));
 	SetSelectable(false);
 	NoWantFocus();
@@ -393,6 +501,7 @@ void DesignerLabelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	DesignerApiBuilder b(out);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiLabel::SetText",
 	      "Sets the label text shown by the real UiLabel control.");
+	AddIconBinding(b);
 	b.AddChoice("align", "Justify", "UiLabel::Style::align_h",
 	            "Horizontal text justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("font", "Font", "UiLabel::Style::font",
@@ -434,6 +543,12 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	s.card_line = (bool)AdapterNodeProperty(node, "card_line", false);
 	s.transparent = !face_enabled && !frame_enabled;
 	SetCustomStyle(s);
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearMedia();
+	else
+		SetMedia(icon, Size(DPI((int)AdapterNodeProperty(node, "icon_size", 24)),
+		                    DPI((int)AdapterNodeProperty(node, "icon_size", 24))));
 	SetTitle(TextProperty(node));
 	SetSubTitle(AdapterNodeProperty(node, "subtitle", ""));
 	SetSelectable(false);
@@ -454,6 +569,7 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	      "Sets the title shown by the real UiTitleCard control.");
 	b.Add("subtitle", "Subtitle", DesignerEditorKind::Text, "UiTitleCard::SetSubTitle",
 	      "Sets the subtitle shown by the title card.");
+	AddIconBinding(b);
 	b.AddChoice("align", "Justify", "UiTitleCard::Style::text_align_h",
 	            "Horizontal title/subtitle justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.Add("title_line", "Title line", DesignerEditorKind::Bool, "UiTitleCard::ShowTitleLine",
@@ -501,6 +617,8 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 	s.track_metrics.frame_enabled = frame_enabled_;
 	s.track_metrics.frame_width = DPI(1);
 	SetCustomStyle(s);
+	if(radius_ > 0)
+		Transparent();
 	SetRange(0, 100).SetValue(50);
 	NoWantFocus();
 }
@@ -529,6 +647,13 @@ void DesignerButtonAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	ApplyButtonAppearance(*this, node);
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearIcon();
+	else
+		SetIcon(icon).SetIconSize(DPI((int)AdapterNodeProperty(node, "icon_size", 16)),
+		                          DPI((int)AdapterNodeProperty(node, "icon_size", 16)))
+		             .SetIconRenderMode(UiIconRenderMode::MonoTint);
 	SetText(TextProperty(node));
 	NoWantFocus();
 }
@@ -545,6 +670,7 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	DesignerApiBuilder b(out);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiButton::SetText",
 	      "Sets the button caption.");
+	AddIconBinding(b);
 	b.AddChoice("align", "Justify", "UiButton::SetAlignH",
 	            "Horizontal caption alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("font", "Font", "UiButton::Style::font",
@@ -762,6 +888,272 @@ void DesignerDropdownAdapter::Paint(Draw& w)
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
+void DesignerCheckBoxAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	String visual = AdapterNodeProperty(node, "visual", "Classic");
+	UiCheckBox::Style s = UiTheme::ResolveCheckBox(visual == "Chip" ? UICHECKVIS_CHIP :
+	                                               visual == "List" ? UICHECKVIS_LIST : UICHECKVIS_CLASSIC);
+	s.font = SansSerifZ(11);
+	s.indicator_metrics.radius = DPI(4);
+	SetCustomStyle(s);
+	SetText(TextProperty(node));
+	SetTriState((bool)AdapterNodeProperty(node, "tri_state", false));
+	String state = AdapterNodeProperty(node, "state", "Checked");
+	SetState(state == "Indeterminate" ? UICHECK_INDETERMINATE :
+	         state == "Unchecked" ? UICHECK_UNCHECKED : UICHECK_CHECKED);
+	NoWantFocus();
+}
+
+void DesignerCheckBoxAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Add("text", "Text", DesignerEditorKind::Text, "UiCheckBox::SetText",
+	      "Sets the checkbox label.");
+	b.AddChoice("state", "State", "UiCheckBox::SetState",
+	            "Preview check state.", {{"Unchecked", "Unchecked"}, {"Checked", "Checked"}, {"Indeterminate", "Indeterminate"}});
+	b.Add("tri_state", "Tri-state", DesignerEditorKind::Bool, "UiCheckBox::SetTriState",
+	      "Allows the indeterminate state.");
+	b.AddChoice("visual", "Visual", "UiCheckBox::SetVisual",
+	            "Checkbox visual style.", {{"Classic", "Classic"}, {"Chip", "Chip"}, {"List", "List"}});
+}
+
+void DesignerCheckBoxAdapter::Paint(Draw& w)
+{
+	UiCheckBox::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerBreadcrumbsAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ClearItems();
+	AddCrumb(AdapterNodeProperty(node, "crumb_a", "Home"), "home");
+	AddCrumb(AdapterNodeProperty(node, "crumb_b", "Section"), "section");
+	AddCrumb(AdapterNodeProperty(node, "crumb_c", "Current"), "current");
+	SetCurrentIndex(clamp((int)AdapterNodeProperty(node, "current", 2), 0, 2));
+	SetTrimOnSelect((bool)AdapterNodeProperty(node, "trim", false));
+	SetDivider(AdapterNodeProperty(node, "divider", "/"));
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearPathIcon();
+	else
+		SetPathIcon(icon, UiAlign::LEFT, Size(DPI((int)AdapterNodeProperty(node, "icon_size", 16)),
+		                                      DPI((int)AdapterNodeProperty(node, "icon_size", 16))));
+	NoWantFocus();
+}
+
+void DesignerBreadcrumbsAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Add("crumb_a", "Crumb 1", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "First path segment.");
+	b.Add("crumb_b", "Crumb 2", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "Second path segment.");
+	b.Add("crumb_c", "Crumb 3", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "Current path segment.");
+	b.AddInt("current", "Current", DesignerEditorKind::Slider, "UiBreadcrumbs::SetCurrentIndex", "Current crumb index.", 0, 2);
+	b.Add("trim", "Trim on select", DesignerEditorKind::Bool, "UiBreadcrumbs::SetTrimOnSelect", "Trims path after clicked crumb.");
+	b.Add("divider", "Divider", DesignerEditorKind::Text, "UiBreadcrumbs::SetDivider", "Text divider between crumbs.");
+	AddIconBinding(b);
+}
+
+void DesignerBreadcrumbsAdapter::Paint(Draw& w)
+{
+	UiBreadcrumbs::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerTabAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	String visual = AdapterNodeProperty(node, "visual", "Document");
+	UiTabVisual v = visual == "Classic" ? UITAB_CLASSIC :
+	                visual == "Underline" ? UITAB_UNDERLINE :
+	                visual == "Segmented" ? UITAB_SEGMENTED :
+	                visual == "Rail" ? UITAB_RAIL : UITAB_DOCUMENT;
+	String placement = AdapterNodeProperty(node, "placement", "Top");
+	UiTab::Style s = UiTheme::ResolveTab(v);
+	s.tab_font = SansSerifZ(11);
+	SetCustomStyle(s);
+	SetPlacement(placement == "Bottom" ? UiAlign::BOTTOM :
+	             placement == "Left" ? UiAlign::LEFT :
+	             placement == "Right" ? UiAlign::RIGHT : UiAlign::TOP);
+	SetVisual(v);
+	SetExpandTabs((bool)AdapterNodeProperty(node, "expand_tabs", false));
+	EnableCloseButtons((bool)AdapterNodeProperty(node, "close_buttons", true));
+	EnableDragHandles((bool)AdapterNodeProperty(node, "drag_handles", true));
+	EnableDragReorder(false);
+	page_a_.SetText("TabA page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	page_b_.SetText("TabB page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	page_c_.SetText("TabC page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	Clear();
+	Add(page_a_, AdapterNodeProperty(node, "tab_a", "Overview"), ICON_DESIGN_HOME_48());
+	Add(page_b_, AdapterNodeProperty(node, "tab_b", "Settings"), ICON_DESIGN_SETTINGS_48());
+	Add(page_c_, AdapterNodeProperty(node, "tab_c", "Logs"), ICON_DESIGN_MENU_48());
+	SetActiveTab(clamp((int)AdapterNodeProperty(node, "active", 0), 0, 2));
+	NoWantFocus();
+}
+
+void DesignerTabAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.AddChoice("visual", "Visual", "UiTab::SetVisual",
+	            "Tab drawing style.", {{"Document", "Document"}, {"Classic", "Classic"}, {"Underline", "Underline"}, {"Segmented", "Segmented"}, {"Rail", "Rail"}});
+	b.AddChoice("placement", "Placement", "UiTab::SetPlacement",
+	            "Side where the tab strip is placed.", {{"Top", "Top"}, {"Bottom", "Bottom"}, {"Left", "Left"}, {"Right", "Right"}});
+	b.Add("expand_tabs", "Expand tabs", DesignerEditorKind::Bool, "UiTab::SetExpandTabs", "Tabs share available strip space.");
+	b.Add("close_buttons", "Close buttons", DesignerEditorKind::Bool, "UiTab::EnableCloseButtons", "Shows close affordances.");
+	b.Add("drag_handles", "Drag handles", DesignerEditorKind::Bool, "UiTab::EnableDragHandles", "Shows tab drag handles.");
+	b.AddInt("active", "Active", DesignerEditorKind::Slider, "UiTab::SetActiveTab", "Active tab index.", 0, 2);
+	b.Add("tab_a", "Tab 1", DesignerEditorKind::Text, "UiTab::SetTabText", "First tab text.");
+	b.Add("tab_b", "Tab 2", DesignerEditorKind::Text, "UiTab::SetTabText", "Second tab text.");
+	b.Add("tab_c", "Tab 3", DesignerEditorKind::Text, "UiTab::SetTabText", "Third tab text.");
+}
+
+void DesignerTabAdapter::Paint(Draw& w)
+{
+	UiTab::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerTableAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	UseInternalModel();
+	UiTableModel& m = GetInternalModel();
+	int rows = clamp((int)AdapterNodeProperty(node, "rows_count", 4), 1, 20);
+	int cols = clamp((int)AdapterNodeProperty(node, "cols_count", 3), 1, 8);
+	m.SetSize(rows, cols);
+	for(int c = 0; c < cols; c++)
+		m.SetHeader(UITABLE_COLUMN_AXIS, c, UiTableHeader(Format("Column %d", c + 1)));
+	for(int r = 0; r < rows; r++) {
+		m.SetHeader(UITABLE_ROW_AXIS, r, UiTableHeader(AsString(r + 1)));
+		for(int c = 0; c < cols; c++) {
+			UiTableCell cell;
+			cell.value = Format("R%d C%d", r + 1, c + 1);
+			cell.edit_value = cell.value;
+			m.SetCell(r, c, cell);
+		}
+	}
+	ShowRowHeaders((bool)AdapterNodeProperty(node, "row_headers", true));
+	ShowColumnHeaders((bool)AdapterNodeProperty(node, "column_headers", true));
+	SetRowHeight(DPI((int)AdapterNodeProperty(node, "row_height", 28)));
+	SetHeaderHeight(DPI((int)AdapterNodeProperty(node, "header_height", 30)));
+	SetDefaultColumnWidth(DPI((int)AdapterNodeProperty(node, "column_width", 120)));
+	SetCustomStyle(UiTable::StyleDefault());
+	NoWantFocus();
+}
+
+void DesignerTableAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerTableAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.AddInt("rows_count", "Rows", DesignerEditorKind::Slider, "UiTableModel::SetSize", "Preview row count.", 1, 20);
+	b.AddInt("cols_count", "Columns", DesignerEditorKind::Slider, "UiTableModel::SetSize", "Preview column count.", 1, 8);
+	b.Add("row_headers", "Row headers", DesignerEditorKind::Bool, "UiTable::ShowRowHeaders", "Shows row headers.");
+	b.Add("column_headers", "Column headers", DesignerEditorKind::Bool, "UiTable::ShowColumnHeaders", "Shows column headers.");
+	b.AddInt("row_height", "Row height", DesignerEditorKind::Slider, "UiTable::SetRowHeight", "Table row height.", 18, 64);
+	b.AddInt("header_height", "Header height", DesignerEditorKind::Slider, "UiTable::SetHeaderHeight", "Table header height.", 18, 72);
+	b.AddInt("column_width", "Column width", DesignerEditorKind::Slider, "UiTable::SetDefaultColumnWidth", "Default column width.", 60, 360);
+}
+
+void DesignerTableAdapter::Paint(Draw& w)
+{
+	UiTable::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerTreeAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	preview_model_.Clear();
+	UiTreeNodeRef root = preview_model_.Root();
+	UiTreeNodeRef workspace = preview_model_.AddChild(root, UiModelItem("Workspace", "workspace"));
+	preview_model_.AddChild(workspace, UiModelItem("Overview", "overview"));
+	preview_model_.AddChild(workspace, UiModelItem("Settings", "settings"));
+	UiTreeNodeRef data = preview_model_.AddChild(root, UiModelItem("Data", "data"));
+	preview_model_.AddChild(data, UiModelItem("Table", "table"));
+	SetModel(preview_model_);
+	SetRootVisible((bool)AdapterNodeProperty(node, "root_visible", false));
+	ShowConnectorLines((bool)AdapterNodeProperty(node, "connectors", true));
+	ShowMetadataMarker((bool)AdapterNodeProperty(node, "metadata", false));
+	SetCustomStyle(UiTheme::ResolveTree());
+	Expand(workspace, true);
+	Expand(data, true);
+	NoWantFocus();
+}
+
+void DesignerTreeAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerTreeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Add("root_visible", "Root visible", DesignerEditorKind::Bool, "UiTree::SetRootVisible", "Shows the model root row.");
+	b.Add("connectors", "Connectors", DesignerEditorKind::Bool, "UiTree::ShowConnectorLines", "Shows parent/child connector lines.");
+	b.Add("metadata", "Metadata", DesignerEditorKind::Bool, "UiTree::ShowMetadataMarker", "Shows metadata markers on sample rows.");
+}
+
+void DesignerTreeAdapter::Paint(Draw& w)
+{
+	UiTree::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
 void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
@@ -860,18 +1252,13 @@ DesignerGridLayoutAdapter::DesignerGridLayoutAdapter()
 void DesignerGridLayoutAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
-	String mode = AdapterNodeProperty(node, "mode", "Flow");
-	SetMode(mode == "Grid" ? UiGridLayout::Grid : UiGridLayout::Flow)
-		.SetDirection(AdapterNodeProperty(node, "direction", "H") == "V" ? UiDirection::V : UiDirection::H)
+	SetGridSize((int)AdapterNodeProperty(node, "columns", 2),
+	            (int)AdapterNodeProperty(node, "rows", 2))
+		.SetMinCellSize(Size(DPI((int)AdapterNodeProperty(node, "cell_width", 120)),
+		                     DPI((int)AdapterNodeProperty(node, "cell_height", 32))))
 		.SetGap(DPI((int)AdapterNodeProperty(node, "gap", 8)))
 		.SetInset(DPI((int)AdapterNodeProperty(node, "inset", 8)))
-		.SetWrap((bool)AdapterNodeProperty(node, "wrap", true))
 		.SetDebug((bool)AdapterNodeProperty(node, "debug", false));
-	if(mode == "Flow" && (bool)AdapterNodeProperty(node, "align_cells", true))
-		SetUnifiedItemSize(Size(DPI((int)AdapterNodeProperty(node, "cell_width", 120)),
-		                        DPI((int)AdapterNodeProperty(node, "cell_height", 32))));
-	else
-		SetUnifiedItemSize(Size(0, 0), false);
 }
 
 void DesignerGridLayoutAdapter::SetOverlayState(const DesignerOverlayState& state)
@@ -883,48 +1270,26 @@ void DesignerGridLayoutAdapter::SetOverlayState(const DesignerOverlayState& stat
 void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
 {
 	AddCommonBindings(out, node);
-	String mode = AdapterNodeProperty(node, "mode", "Flow");
 	DesignerApiBuilder b(out);
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
-	b.AddChoice("mode", "Mode", "UiGridLayout::SetMode",
-	            "Flow uses child sizes and optional wrap; Grid uses addressed row/column cells.",
-	            {{"Flow", "Flow"}, {"Grid", "Grid"}});
-	b.AddChoice("direction", "Direction", "UiGridLayout::SetDirection",
-	            "Controls flow direction or grid fill order.",
-	            {{"H", "Horizontal"}, {"V", "Vertical"}});
-	b.Add("wrap", "Wrap", DesignerEditorKind::Bool, "UiGridLayout::SetWrap",
-	      "Only applies when mode is Flow.");
-	b.Add("align_cells", "Align cells", DesignerEditorKind::Bool, "UiGridLayout::SetUnifiedItemSize",
-	      "In Flow mode, gives every item a shared cell size so wrapped rows keep aligned columns.");
-	b.AddInt("cell_width", "Cell width", DesignerEditorKind::Slider, "UiGridLayout::SetFixedColumn / SetUnifiedItemSize",
-	         "Flow-mode aligned column width.", 10, 640);
-	b.AddInt("cell_height", "Cell height", DesignerEditorKind::Slider, "UiGridLayout::SetFixedRow / SetUnifiedItemSize",
-	         "Flow-mode aligned row height.", 10, 360);
-	b.AddInt("rows", "Rows", DesignerEditorKind::Slider, "UiGridLayout::AddGrid(row, col)",
-	         "Only applies when mode is Grid.", 1, 12);
-	b.AddInt("columns", "Columns", DesignerEditorKind::Slider, "UiGridLayout::AddGrid(row, col)",
-	         "Only applies when mode is Grid.", 1, 12);
+	b.AddInt("columns", "Columns", DesignerEditorKind::Slider, "UiGridLayout::SetGridSize",
+	         "Stable column count for addressable grid cells.", 1, 12);
+	b.AddInt("rows", "Rows", DesignerEditorKind::Slider, "UiGridLayout::SetGridSize",
+	         "Stable row count for addressable grid cells.", 1, 12);
+	b.AddInt("cell_width", "Min cell width", DesignerEditorKind::Slider, "UiGridLayout::SetMinCellSize",
+	         "Minimum column width used for empty cells and drop targets.", 6, 640);
+	b.AddInt("cell_height", "Min cell height", DesignerEditorKind::Slider, "UiGridLayout::SetMinCellSize",
+	         "Minimum row height used for empty cells and drop targets.", 6, 360);
 	b.AddInt("gap", "Gap", DesignerEditorKind::Slider, "UiGridLayout::SetGap",
-	         "Spacing between flow items or grid cells.", 0, 64);
+	         "Spacing between grid cells.", 0, 64);
 	b.AddInt("inset", "Inset", DesignerEditorKind::Slider, "UiGridLayout::SetInset",
 	         "Padding between the layout bounds and child area.", 0, 64);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "UiGridLayout::SetDebug",
 	      "Uses the real grid debug overlay.");
-	if(mode != "Flow")
-		b.Disable("wrap", "Wrap is only meaningful in Flow mode.");
-	if(mode != "Flow") {
-		b.Disable("align_cells", "Aligned flow cells are only meaningful in Flow mode.");
-		b.Disable("cell_width", "Cell width is only meaningful in Flow mode.");
-		b.Disable("cell_height", "Cell height is only meaningful in Flow mode.");
-	}
-	if(mode != "Grid") {
-		b.Disable("rows", "Rows are only meaningful in Grid mode.");
-		b.Disable("columns", "Columns are only meaningful in Grid mode.");
-	}
 }
 
 void DesignerGridLayoutAdapter::Paint(Draw& w)
@@ -940,9 +1305,6 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 		Vert();
 	else
 		Horz();
-	SetSplitPercent((int)AdapterNodeProperty(node, "split_percent", 50));
-	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 80)));
-	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 80)));
 
 	UiSplitter::Style s = UiTheme::ResolveSplitter();
 	s.hit_width = DPI((int)AdapterNodeProperty(node, "hit_width", 14));
@@ -964,6 +1326,9 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", 8));
 	s.label.Clear();
 	SetCustomStyle(s);
+	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 80)));
+	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 80)));
+	SetSplitPercent((int)AdapterNodeProperty(node, "split_percent", 50));
 }
 
 void DesignerSplitterAdapter::SetOverlayState(const DesignerOverlayState& state)
@@ -987,9 +1352,9 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	b.AddInt("split_percent", "Split", DesignerEditorKind::Slider, "UiSplitter::SetSplitPercent",
 	         "Unitless split percentage between the first two panes.", 5, 95);
 	b.AddInt("min_a", "Pane A min", DesignerEditorKind::Slider, "UiSplitter::SetMinPixels(0, DPI(...))",
-	         "Minimum size for the first pane.", 10, 640);
+	         "Minimum size for the first pane.", 10, 1024);
 	b.AddInt("min_b", "Pane B min", DesignerEditorKind::Slider, "UiSplitter::SetMinPixels(1, DPI(...))",
-	         "Minimum size for the second pane.", 10, 640);
+	         "Minimum size for the second pane.", 10, 1024);
 	b.AddInt("hit_width", "Hit width", DesignerEditorKind::Slider, "UiSplitter::Style::hit_width",
 	         "Mouse hit area around the split track.", 4, 40);
 	b.AddInt("track_thickness", "Track thick", DesignerEditorKind::Slider, "UiSplitter::Style::track_thickness",
@@ -1043,13 +1408,13 @@ void DesignerQuadSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, c
 	b.AddInt("row_percent", "Row split", DesignerEditorKind::Slider, "UiQuadSplitter::SetRowSplitPercent",
 	         "Top/bottom split percentage.", 5, 95);
 	b.AddInt("min_a", "Top-left min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(0, DPI(...))",
-	         "Minimum size for the top-left pane.", 10, 640);
+	         "Minimum size for the top-left pane.", 10, 1024);
 	b.AddInt("min_b", "Top-right min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(1, DPI(...))",
-	         "Minimum size for the top-right pane.", 10, 640);
+	         "Minimum size for the top-right pane.", 10, 1024);
 	b.AddInt("min_c", "Bottom-left min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(2, DPI(...))",
-	         "Minimum size for the bottom-left pane.", 10, 640);
+	         "Minimum size for the bottom-left pane.", 10, 1024);
 	b.AddInt("min_d", "Bottom-right min", DesignerEditorKind::Slider, "UiQuadSplitter::SetMinPixels(3, DPI(...))",
-	         "Minimum size for the bottom-right pane.", 10, 640);
+	         "Minimum size for the bottom-right pane.", 10, 1024);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "designer overlay",
 	      "Shows the quad splitter layout bounds in the designer.");
 }
@@ -1129,6 +1494,31 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		ctrl = p;
 		a = p;
 	}
+	else if(node.type_id == "UiCheckBox") {
+		DesignerCheckBoxAdapter *p = new DesignerCheckBoxAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiBreadcrumbs") {
+		DesignerBreadcrumbsAdapter *p = new DesignerBreadcrumbsAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiTab") {
+		DesignerTabAdapter *p = new DesignerTabAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiTable") {
+		DesignerTableAdapter *p = new DesignerTableAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiTree") {
+		DesignerTreeAdapter *p = new DesignerTreeAdapter;
+		ctrl = p;
+		a = p;
+	}
 	else if(node.type_id == "UiScrollPanel") {
 		DesignerScrollPanelAdapter *p = new DesignerScrollPanelAdapter;
 		ctrl = p;
@@ -1157,6 +1547,11 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerFloatEditAdapter *p = dynamic_cast<DesignerFloatEditAdapter *>(&ctrl)) return p;
 	if(DesignerToggleAdapter *p = dynamic_cast<DesignerToggleAdapter *>(&ctrl)) return p;
 	if(DesignerDropdownAdapter *p = dynamic_cast<DesignerDropdownAdapter *>(&ctrl)) return p;
+	if(DesignerCheckBoxAdapter *p = dynamic_cast<DesignerCheckBoxAdapter *>(&ctrl)) return p;
+	if(DesignerBreadcrumbsAdapter *p = dynamic_cast<DesignerBreadcrumbsAdapter *>(&ctrl)) return p;
+	if(DesignerTabAdapter *p = dynamic_cast<DesignerTabAdapter *>(&ctrl)) return p;
+	if(DesignerTableAdapter *p = dynamic_cast<DesignerTableAdapter *>(&ctrl)) return p;
+	if(DesignerTreeAdapter *p = dynamic_cast<DesignerTreeAdapter *>(&ctrl)) return p;
 	if(DesignerScrollPanelAdapter *p = dynamic_cast<DesignerScrollPanelAdapter *>(&ctrl)) return p;
 	if(DesignerBoxLayoutAdapter *p = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) return p;
 	if(DesignerGridLayoutAdapter *p = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) return p;

@@ -43,8 +43,11 @@ Size UiCompositeColorSwatch::GetMinSize() const
 void UiCompositeColorSwatch::Paint(Draw& w)
 {
     Rect r = GetSize();
-    Color frame = hot_ ? Color(44, 99, 212) : Color(211, 221, 237);
-    Color back = hot_ ? Blend(Color(236, 241, 248), White(), 22) : Color(236, 241, 248);
+    bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+    Color frame = hot_ ? (dark ? Color(96, 165, 250) : Color(44, 99, 212))
+                       : (dark ? Color(76, 76, 76) : Color(211, 221, 237));
+    Color back = hot_ ? (dark ? Color(44, 44, 44) : Blend(Color(236, 241, 248), White(), 22))
+                      : (dark ? Color(32, 32, 32) : Color(236, 241, 248));
     StyledPalette pal;
     StyledMetrics m;
     pal.face[ST_NORMAL] = UiFill::Solid(back);
@@ -57,8 +60,8 @@ void UiCompositeColorSwatch::Paint(Draw& w)
     Rect sw = r.Deflated(DPI(4), DPI(4));
     StyledPalette sw_pal;
     StyledMetrics sw_m;
-    sw_pal.face[ST_NORMAL] = UiFill::Solid(IsNull(color_) ? White() : color_);
-    sw_pal.frame[ST_NORMAL] = Blend(frame, White(), 96);
+    sw_pal.face[ST_NORMAL] = UiFill::Solid(IsNull(color_) ? (dark ? Color(25, 25, 25) : White()) : color_);
+    sw_pal.frame[ST_NORMAL] = dark ? Blend(frame, Black(), 64) : Blend(frame, White(), 96);
     sw_m.face_enabled = true;
     sw_m.frame_enabled = true;
     sw_m.frame_width = 1;
