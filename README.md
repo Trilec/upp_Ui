@@ -16,18 +16,25 @@ The library is still evolving, but it is now far enough along that the main dire
 
 ![UiAccordion demo screenshot](Snapshot_Accordion.jpg)
 
+![UiColorPicker demo screenshot](Snapshot_Colorpicker.jpg)
+
+![UiFontSelector demo screenshot](Snapshot_FontSelector.jpg)
+
+![UiTheme demo screenshot](Snapshot_Theme.jpg)
+
+![Designer screenshot](Snapshot_Designer.jpg)
+
 ## Quick links
 
 - `GETTING_STARTED.md` - fast ramp-up
 - `UPP_GUIDES/README.md` - engineering guides, architecture notes, and active roadmaps
-- `CHECKLIST.md` - living status + next steps
 - `CHANGELOG.md`
 
 ## Repo layout
 
 - `Ui/` - the `Ui` package: controls, theme/style infrastructure, layout helpers, icons, and draw utilities
 - `examples/` - demos and small test apps; these also act as a manual regression suite
-- `Animation/` - legacy local copy retained only as reference material; the active dependency is the external `upp_AnimationEasing` nest
+- `Utilities/Designer/` - visual layout/control designer for building and saving UI designs, inspecting generated code, and testing layout behavior
 
 ## What the repository provides
 
@@ -40,11 +47,15 @@ The `Ui` package currently covers:
 - Layout and composition
   - `UiBoxLayout` - lightweight row/column layout with fit, fixed, and expand semantics
   - `UiGridLayout` - structured grid-style placement for denser UI surfaces
+  - `UiSplitter` - two-pane splitter layout with themed thumb and pane sizing
+  - `UiQuadSplitter` - four-pane splitter layout for editor-style workspaces
+  - `UiStack` - page stack/container for switching between hosted child pages
   - `UiLayoutCursor` - small incremental placement helper for readable manual layout code
 
 - Text and display controls
   - `UiLabel` - styled text display with selection, alignment, icon/media, and richer presentation options
   - `UiTitleCard` - structured title/subtitle/media header surface
+  - `UiBreadcrumbs` - path/navigation display with optional icons and dividers
   - `UiDoc` - rich document display/editor surface for larger formatted text content
 
 - Buttons and toggles
@@ -60,6 +71,7 @@ The `Ui` package currently covers:
   - `UiScrollPanel` - themed scrollable content host
   - `UiScrollBar` - standalone themed scrollbar
   - `UiTab` - tabbed navigation surface
+  - `UiStack` - stacked page container for multi-view surfaces
 
 - Edit and text-entry controls
   - `UiBaseEdit` - shared base for edit controls
@@ -85,9 +97,25 @@ The `Ui` package currently covers:
   - `UiBezierCurveEditor` - interactive curve editor for four-point bezier curves
   - `UiBezierCurveField` - composite field around the curve editor for direct use in apps and demos
 
+- Composite controls
+  - `Composites/UiCompositeColor` - color-oriented composite helpers
+  - `Composites/UiCompositeDropdown` - dropdown composition helpers
+  - `Composites/UiCompositeEdit` - edit composition helpers
+  - `Composites/UiCompositeLabel` - label composition helpers
+  - `Composites/UiCompositeSlider` - slider composition helpers
+  - `Composites/UiCompositeToggle` - toggle composition helpers
+
 - Supporting utility pieces
   - `UiIndicatorBase`, `UiIndicatorSupport` - shared indicator helpers used by several controls
   - `Ui.h` - package umbrella include
+
+## Designer
+
+`Utilities/Designer` is the visual designer for this library. It lets you build a model using layouts, containers, controls, composites, and presets; inspect the hierarchy and sizing modes; save/load designs as JSON; and view generated U++ code while testing layout behavior in the preview.
+
+The Designer currently supports the same core layout concepts used by the controls: fit, fixed, and expand sizing; box/grid placement; spacers; splitters; panel and scroll-panel hosting; tab/stack containers; and reusable layout presets.
+
+![Designer screenshot](Snapshot_Designer.jpg)
 
 ## Intended role of the demos
 
@@ -108,17 +136,14 @@ Recent rewrites on that path include UiMultiEditDemo, UiRadioButtonDemo, UiMenuD
 The `examples/` directory currently includes:
 
 - `UiDemoBase` - shared demo shell/template reference
-- `UiAllControlsDemo` - broad visual overview of the control set
 - `UiAccordionDemo`, `UiPanelDemo`, `UiFontSelectorDemo`, `UiThemeDemo`
 - `UiButtonDemo`, `UiToolButton` behavior is represented in the button-oriented demos
-- `UiLabelDemo`, `UiTitleCardDemo`
-- `UiBoxLayoutDemo`, `UiGridLayoutDemo`, `UiScrollPanelDemo`, `UiScrollBarDemo`
+- `UiLabelDemo`, `UiTitleCardDemo`, `UiBreadcrumbsDemo`
+- `UiBoxLayoutDemo`, `UiGridLayoutDemo`, `UiSplitterDemo`, `UiScrollPanelDemo`, `UiScrollBarDemo`
 - `UiBaseEditDemo`, `UiLineEditDemo`, `UiPasswordEditDemo`, `UiMaskEditDemo`, `UiMultiEditDemo`, `UiIntFloatDemo`
-- `UiDropdownDemo`, `UiListDemo`, `UiTreeDemo`, `UiTableDemo`, `UiMenuDemo`, `UiTabDemo`, `UiTabCapDemo`
+- `UiDropdownDemo`, `UiListDemo`, `UiTreeDemo`, `UiTableDemo`, `UiMenuDemo`, `UiTabDemo`
 - `UiCheckBoxDemo`, `UiRadioButtonDemo`, `UiToggleDemo`
-- `UiColorPickerDemo`, `UiDocDemo`
-- `UiIndicatorPaintTest`, `UiDataModelsTest`, `UiDocModelTest`
-- `UiChoiceRunTests`, `UiMenuRunTests`, `UiTableRunTests`, `UiTreeRunTests`
+- `UiColorPickerDemo`, `UiDocDemo`, `UiOsFileDialogDemo`
 
 ## Build and run
 
