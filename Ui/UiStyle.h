@@ -948,14 +948,13 @@ inline UiBlocksLayout UiComputeBlocksLayout(const Rect& content,
         }
     }
     else if(have_support) {
-        int side = min(cw, ch);
-        side = max(side, min_support_side);
-        side = min(side, cw);
-        side = min(side, ch);
+        Size support_only = support_sz;
+        support_only.cx = min(support_only.cx, cw);
+        support_only.cy = min(support_only.cy, ch);
 
-        int x = content.left + HOffset(cw, side);
-        int y = content.top  + VOffset(ch, side);
-        lr.support = Rect(x, y, x + side, y + side);
+        int x = content.left + HOffset(cw, support_only.cx);
+        int y = content.top  + VOffset(ch, support_only.cy);
+        lr.support = Rect(x, y, x + support_only.cx, y + support_only.cy);
     }
     else {
         main_sz.cx = min(main_sz.cx, cw);

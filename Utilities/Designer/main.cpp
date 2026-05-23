@@ -16,7 +16,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.4";
+static const char* DESIGNER_VERSION = "v0.1.10";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static const char *DesignerThemePresetId(UiThemePreset preset)
@@ -54,6 +54,17 @@ static Font ToolboxHelpFont()
 {
 	return SansSerifZ(9);
 }
+
+class DesignerToolboxCategoryButton : public UiButton {
+public:
+	Event<> WhenHover;
+
+	virtual void MouseEnter(Point p, dword keyflags) override
+	{
+		UiButton::MouseEnter(p, keyflags);
+		WhenHover();
+	}
+};
 
 static String DesignerNameFromTitle(String text)
 {
@@ -269,9 +280,9 @@ public:
 		Rect toolbox_rect = toolbox_panel_.GetSize();
 		int help_h = DPI(76);
 		int help_gap = DPI(8);
-		int tabs_h = DPI(34);
+		int tabs_h = DPI(33);
 		int tab_gap = DPI(4);
-		int tab_w = max(DPI(26), (toolbox_rect.GetWidth() - tab_gap * 4) / 5);
+		int tab_w = tabs_h;
 		int tab_x = toolbox_rect.left;
 		toolbox_layouts_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
 		tab_x += tab_w + tab_gap;
@@ -281,7 +292,7 @@ public:
 		tab_x += tab_w + tab_gap;
 		toolbox_composites_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
 		tab_x += tab_w + tab_gap;
-		toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, max(DPI(26), toolbox_rect.right - tab_x), tabs_h);
+		toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
 		Rect toolbox_body = toolbox_rect;
 		toolbox_body.top += tabs_h + DPI(4);
 		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
@@ -547,11 +558,11 @@ private:
 		toolbox_tree_.WhenToolDrag = [=](String type_id, Point screen) { TrackToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolDrop = [=](String type_id, Point screen) { FinishToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolCancel = [=] { CancelToolDrag(); };
-		SetupToolboxCategoryButton(toolbox_layouts_button_, ICON_DESIGN_LAYOUTS_CATEGORY_48(), "Layouts", 0);
-		SetupToolboxCategoryButton(toolbox_containers_button_, ICON_DESIGN_TAB_GROUP_48(), "Containers", 1);
-		SetupToolboxCategoryButton(toolbox_controls_button_, ICON_DESIGN_WIDGETS_48(), "Controls", 2);
-		SetupToolboxCategoryButton(toolbox_composites_button_, ICON_DESIGN_DYNAMIC_FORM_48(), "Composites", 3);
-		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), "Presets", 4);
+		SetupToolboxCategoryButton(toolbox_layouts_button_, ICON_DESIGN_LAYOUTS_CATEGORY_48(), 0);
+		SetupToolboxCategoryButton(toolbox_containers_button_, ICON_DESIGN_TAB_GROUP_48(), 1);
+		SetupToolboxCategoryButton(toolbox_controls_button_, ICON_DESIGN_WIDGETS_48(), 2);
+		SetupToolboxCategoryButton(toolbox_composites_button_, ICON_DESIGN_DYNAMIC_FORM_48(), 3);
+		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), 4);
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_SINGLE);
@@ -814,29 +825,76 @@ private:
 		RefreshToolbox();
 	}
 
-	void SetupToolboxCategoryButton(UiButton& button, const Image& icon, const String& tip, int category)
+	String ToolboxCategoryTitle(int category) const
 	{
+		switch(category) {
+		case 0: return "Layouts";
+		case 1: return "Containers";
+		case 2: return "Controls";
+		case 3: return "Composites";
+		case 4: return "Presets";
+		default: return "Toolbox";
+		}
+	}
+
+	String ToolboxCategoryHelp(int category) const
+	{
+		switch(category) {
+		case 0: return "Layouts arrange child items, including box layouts, grids, spacers, and splitters.";
+		case 1: return "Containers hold other controls, such as panels, tabs, stacks, and scroll panels.";
+		case 2: return "Controls are interactive widgets such as buttons, edits, sliders, dropdowns, tables, and trees.";
+		case 3: return "Composites are prebuilt control assemblies for common UI patterns.";
+		case 4: return "Presets are predefined layout assemblies that can be dragged into the current design.";
+		default: return "Choose a toolbox category.";
+		}
+	}
+
+	void UpdateToolboxCategoryHelp(int category)
+	{
+		toolbox_help_raw_ = ToolboxCategoryHelp(category);
+		toolbox_help_title_.SetText(ToolboxCategoryTitle(category));
+		RefreshToolboxHelpText();
+		toolbox_help_panel_.Tip(toolbox_help_raw_);
+	}
+
+	void SetupToolboxCategoryButton(DesignerToolboxCategoryButton& button, const Image& icon, int category)
+	{
+		String title = ToolboxCategoryTitle(category);
+		String help = ToolboxCategoryHelp(category);
 		button.SetIcon(icon)
 		      .SetText("")
-		      .SetIconSize(DPI(18), DPI(18))
+		      .SetIconSize(DPI(16), DPI(16))
 		      .SetIconRenderMode(UiIconRenderMode::MonoTint)
-		      .Tip(tip);
+		      .Tip(title + "\n" + help);
+		button.WhenHover = [=] { UpdateToolboxCategoryHelp(category); };
 		button.WhenAction = [=] { SetToolboxCategory(category); };
+	}
+
+	UiButton::Style ToolboxCategoryButtonStyle(bool active) const
+	{
+		UiButton::Style s = UiTheme::ResolveButton(active ? UiRole::Accent : UiRole::Standard);
+		s.metrics.content_margin = Rect(3, 3, 3, 3);
+		s.metrics.radius = DPI(8);
+		s.content_gap = 0;
+		s.align_h = UiAlign::CENTER;
+		s.align_v = UiAlign::CENTER;
+		s.icon_side = UiAlign::LEFT;
+		return s;
 	}
 
 	void RefreshToolboxCategoryButtons()
 	{
-		toolbox_layouts_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 0 ? UiRole::Accent : UiRole::Standard));
-		toolbox_containers_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 1 ? UiRole::Accent : UiRole::Standard));
-		toolbox_controls_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 2 ? UiRole::Accent : UiRole::Standard));
-		toolbox_composites_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 3 ? UiRole::Accent : UiRole::Standard));
-		toolbox_presets_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 4 ? UiRole::Accent : UiRole::Standard));
+		toolbox_layouts_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 0));
+		toolbox_containers_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 1));
+		toolbox_controls_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 2));
+		toolbox_composites_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 3));
+		toolbox_presets_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 4));
 	}
 
 	void UpdateToolboxHelp(const String& type_id)
 	{
 		if(type_id.StartsWith("preset:")) {
-			toolbox_help_raw_ = "Creates a predefined layout and clears the current design after confirmation.";
+			toolbox_help_raw_ = "Creates a predefined layout assembly that can be dragged into the current design.";
 			toolbox_help_title_.SetText(PresetDisplayName(type_id.Mid(7)));
 			RefreshToolboxHelpText();
 			toolbox_help_panel_.Tip(toolbox_help_raw_);
@@ -974,6 +1032,7 @@ private:
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
+			self->RefreshHierarchy();
 			self->RefreshCode();
 			self->preview_.InvalidateRealPreview();
 			self->preview_.Refresh();
@@ -991,7 +1050,7 @@ private:
 		int body_w = max(DPI(120), right_accordion_.GetSize().cx - DPI(18));
 		inspector_.Layout();
 		int inspector_h = max(DPI(44), inspector_.MeasureHeightForWidth(body_w));
-		int code_h = DPI(220);
+		int code_h = DPI(320);
 		right_accordion_.SetSectionBodyHeight(inspector_section_, inspector_h);
 		right_accordion_.SetSectionBodyHeight(code_section_, code_h);
 	}
@@ -1008,8 +1067,9 @@ private:
 		int cw = max(DPI(120), csz.cx);
 		int ih = max(DPI(44), inspector_.MeasureHeightForWidth(iw));
 		int ch = max(DPI(120), csz.cy);
-		int code_inner_w = max(cw, code_.GetContentSize().cx + DPI(18));
-		int code_inner_h = max(ch, code_box_.MeasureHeightForWidth(code_inner_w));
+		Size code_size = code_.GetContentSize();
+		int code_inner_w = max(cw, code_size.cx + DPI(18));
+		int code_inner_h = max(ch, code_size.cy + DPI(18));
 		inspector_.SetRect(0, 0, iw, ih);
 		code_scroll_.SetRect(0, 0, cw, ch);
 		code_box_.SetRect(0, 0, code_inner_w, code_inner_h);
@@ -1477,9 +1537,12 @@ private:
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
-			bool needs_inspector = property_id == "sizing" || property_id == "h_sizing" || property_id == "v_sizing";
+			bool needs_inspector = property_id == "h_sizing" || property_id == "v_sizing";
+			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
+			if(needs_hierarchy)
+				RefreshHierarchy();
 			if(needs_inspector) {
 				PostDesignerRefresh(true);
 				return;
@@ -1549,7 +1612,7 @@ private:
 
 	UiModelColumn HierarchySizingColumn(const DesignerNode& n, const char *key) const
 	{
-		String sizing = AsString(DesignerNodePropertyOr(n, key, DesignerNodePropertyOr(n, "sizing", "Fit")));
+		String sizing = AsString(DesignerNodePropertyOr(n, key, "Fit"));
 		if(sizing == "Fixed")
 			return HierarchyIconColumn(ICON_DESIGN_ASPECT_RATIO_48());
 		if(sizing == "Expand")
@@ -1804,11 +1867,11 @@ private:
 	UiToggle theme_toggle_;
 	UiButton exit_button_;
 	UiPanel toolbox_panel_;
-	UiButton toolbox_layouts_button_;
-	UiButton toolbox_containers_button_;
-	UiButton toolbox_controls_button_;
-	UiButton toolbox_composites_button_;
-	UiButton toolbox_presets_button_;
+	DesignerToolboxCategoryButton toolbox_layouts_button_;
+	DesignerToolboxCategoryButton toolbox_containers_button_;
+	DesignerToolboxCategoryButton toolbox_controls_button_;
+	DesignerToolboxCategoryButton toolbox_composites_button_;
+	DesignerToolboxCategoryButton toolbox_presets_button_;
 	UiScrollPanel toolbox_scroll_;
 	DesignerToolboxTree toolbox_tree_;
 	UiTreeModel toolbox_model_;

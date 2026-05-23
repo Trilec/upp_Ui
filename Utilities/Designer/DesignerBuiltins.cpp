@@ -173,7 +173,6 @@ static DesignerType MakeBoxLayoutType()
 		n.properties.Set("debug", false);
 		n.properties.Set("debug_color", DesignerDebugRed());
 		n.properties.Set("debug_auto_color", true);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", DesignerLayoutFace());
@@ -204,7 +203,6 @@ static DesignerType MakeGridLayoutType()
 		n.properties.Set("debug", false);
 		n.properties.Set("debug_color", DesignerDebugRed());
 		n.properties.Set("debug_auto_color", true);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", DesignerLayoutFace());
@@ -228,7 +226,6 @@ static DesignerType MakeSpacerType()
 		n.properties.Set("space", 24);
 		n.properties.Set("max_space", 1000000);
 		n.properties.Set("weight", 1);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", 24);
@@ -263,7 +260,6 @@ static DesignerType MakeSplitterType()
 		n.properties.Set("thumb_height", 64);
 		n.properties.Set("thumb_radius", 8);
 		n.properties.Set("debug", false);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", DesignerLayoutFace());
@@ -293,7 +289,6 @@ static DesignerType MakeQuadSplitterType()
 		n.properties.Set("min_c", 60);
 		n.properties.Set("min_d", 60);
 		n.properties.Set("debug", false);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", DesignerLayoutFace());
@@ -316,7 +311,6 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	t.init_defaults = [=](DesignerNode& n) {
 		bool placeholder = id == "Item";
 		n.properties.Set("text", name);
-		n.properties.Set("sizing", "Fit");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
 		n.properties.Set("width", size.cx);
@@ -397,7 +391,6 @@ static DesignerType MakeGenericType()
 	t.init_defaults = [](DesignerNode& n) {
 		n.properties.Set("text", "Generic");
 		n.properties.Set("original_type", "");
-		n.properties.Set("sizing", "Fit");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
 		n.properties.Set("width", 140);
@@ -419,7 +412,6 @@ static DesignerType MakePageContainerType(const String& id, const String& name, 
 	t.can_have_children = true;
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", size.cx);
@@ -451,7 +443,6 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 	t.can_have_children = true;
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", size.cx);
@@ -482,7 +473,6 @@ static DesignerType MakePageSlotType()
 		n.properties.Set("show_title", true);
 		n.properties.Set("icon", "None");
 		n.properties.Set("icon_size", 16);
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", 220);
@@ -505,7 +495,6 @@ static DesignerType MakePaneSlotType()
 	t.default_size = Size(180, 120);
 	t.min_size = Size(40, 30);
 	t.init_defaults = [](DesignerNode& n) {
-		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", 180);
@@ -525,7 +514,7 @@ static DesignerType MakeWindowType()
 	t.is_container = true;
 	t.can_have_children = true;
 	t.default_size = Size(760, 460);
-	t.min_size = Size(240, 180);
+	t.min_size = Size(40, 40);
 	t.can_drop = [](const DesignerNode&, const DesignerNode& child) {
 		return child.type_id != "Spacer";
 	};

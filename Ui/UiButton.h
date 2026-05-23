@@ -25,8 +25,8 @@
     Usage
     - Use SetText(), SetIcon(), SetIconRenderMode(), SetMargin(), SetContentGap(), SetCheckable(), and
       SetCustomStyle() to configure button behavior and appearance.
-    - Paint() stays render-only; setters and style/theme changes drive cache
-      invalidation and layout refresh.
+    - Setters and style/theme changes drive cache invalidation and layout
+      refresh; Paint() also repairs stale layout before drawing.
 
     Changelog
     - 2026-03: hardened as the shared button behavior base for UiButton and

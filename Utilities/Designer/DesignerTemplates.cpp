@@ -16,7 +16,7 @@ static void InitTemplateNode(DesignerModel& model, const DesignerRegistry& regis
 
 static DesignerNodeId AddTemplateNode(DesignerModel& model, const DesignerRegistry& registry,
                                         const String& type, DesignerNodeId parent, const String& name,
-                                        Color face = Null, Color frame = Null, const String& sizing = String(),
+                                        Color face = Null, Color frame = Null, const String& axis_sizing = String(),
                                         int width = 0, int height = 0)
 {
 	DesignerNodeId id = model.AddNode(type, parent);
@@ -29,8 +29,10 @@ static DesignerNodeId AddTemplateNode(DesignerModel& model, const DesignerRegist
 		n->properties.Set("face", face);
 	if(!IsNull(frame))
 		n->properties.Set("frame", frame);
-	if(!sizing.IsEmpty())
-		n->properties.Set("sizing", sizing);
+	if(!axis_sizing.IsEmpty()) {
+		n->properties.Set("h_sizing", axis_sizing);
+		n->properties.Set("v_sizing", axis_sizing);
+	}
 	if(width > 0)
 		n->properties.Set("width", width);
 	if(height > 0)
@@ -54,7 +56,8 @@ static void ClearDesignerModel(DesignerModel& model)
 static void BuildHolyGrailTemplate(DesignerModel& model, const DesignerRegistry& registry)
 {
 	DesignerNodeId root = AddTemplateNode(model, registry, "BoxLayout", Designer_ROOT, "holyColumn");
-	model.Find(root)->properties.Set("sizing", "Expand");
+	model.Find(root)->properties.Set("h_sizing", "Expand");
+	model.Find(root)->properties.Set("v_sizing", "Expand");
 	AddTemplateNode(model, registry, "UiTitleCard", root, "Header", Color(79, 70, 229), Color(79, 70, 229), "Fixed", 600, 48);
 	DesignerNodeId body = AddTemplateNode(model, registry, "BoxLayout", root, "bodyRow", Color(248, 250, 252), Color(226, 232, 240), "Expand");
 	model.Find(body)->properties.Set("direction", "H");

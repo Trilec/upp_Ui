@@ -22,8 +22,7 @@ static Value DesignerPreviewNodeProperty(const DesignerNode& n, const String& ke
 
 static String DesignerPreviewAxisSizing(const DesignerNode& n, const String& axis_key)
 {
-	return DesignerPreviewNodeProperty(n, axis_key,
-	                                  DesignerPreviewNodeProperty(n, "sizing", "Fit"));
+	return DesignerPreviewNodeProperty(n, axis_key, "Fit");
 }
 
 static Color DesignerPreviewBackground(UiThemeMode mode)
@@ -173,8 +172,8 @@ void DesignerPreview::MouseMove(Point p, dword)
 {
 			Rect root = GetVirtualWindowRect();
 			if(resizing_) {
-				model_->SetVirtualSize(Size(max(DPI(240), p.x - root.left),
-				                            max(DPI(180), p.y - root.top)));
+				model_->SetVirtualSize(Size(max(DPI(40), p.x - root.left),
+				                            max(DPI(40), p.y - root.top)));
 				WhenChanged();
 				Refresh();
 				return;
@@ -552,9 +551,10 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
 			Size def = t ? t->default_size : Size(DPI(120), DPI(32));
 			Size minsz = t ? t->min_size : Size(DPI(24), DPI(20));
-			String sizing = DesignerPreviewNodeProperty(n, "sizing", "Fit");
-			if(sizing == "Fixed")
-				def = Size((int)DesignerPreviewNodeProperty(n, "width", def.cx), (int)DesignerPreviewNodeProperty(n, "height", def.cy));
+			if(DesignerPreviewAxisSizing(n, "h_sizing") == "Fixed")
+				def.cx = (int)DesignerPreviewNodeProperty(n, "width", def.cx);
+			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
+				def.cy = (int)DesignerPreviewNodeProperty(n, "height", def.cy);
 			return Size(max(minsz.cx, def.cx), max(minsz.cy, def.cy));
 		}
 
@@ -653,9 +653,12 @@ void DesignerPreview::PaintFlowGridChildren(Draw& w, const DesignerNode& parent,
 					if(!child)
 						continue;
 					Size sz = GetNodePreviewSize(*child);
-					String sizing = DesignerPreviewNodeProperty(*child, "sizing", "Fit");
-					if(align_cells || sizing == "Expand")
-						sz = Size(max(DPI(10), cell_size.cx), max(DPI(10), cell_size.cy));
+					String hs = DesignerPreviewAxisSizing(*child, "h_sizing");
+					String vs = DesignerPreviewAxisSizing(*child, "v_sizing");
+					if(align_cells || hs == "Expand")
+						sz.cx = max(DPI(10), cell_size.cx);
+					if(align_cells || vs == "Expand")
+						sz.cy = max(DPI(10), cell_size.cy);
 					int cx = min(sz.cx, area.GetWidth());
 					int cy = sz.cy;
 					if(wrap && x > area.left && x + cx > area.right) {
@@ -681,9 +684,12 @@ void DesignerPreview::PaintFlowGridChildren(Draw& w, const DesignerNode& parent,
 					if(!child)
 						continue;
 					Size sz = GetNodePreviewSize(*child);
-					String sizing = DesignerPreviewNodeProperty(*child, "sizing", "Fit");
-					if(align_cells || sizing == "Expand")
-						sz = Size(max(DPI(10), cell_size.cx), max(DPI(10), cell_size.cy));
+					String hs = DesignerPreviewAxisSizing(*child, "h_sizing");
+					String vs = DesignerPreviewAxisSizing(*child, "v_sizing");
+					if(align_cells || hs == "Expand")
+						sz.cx = max(DPI(10), cell_size.cx);
+					if(align_cells || vs == "Expand")
+						sz.cy = max(DPI(10), cell_size.cy);
 					int cx = sz.cx;
 					int cy = min(sz.cy, area.GetHeight());
 					if(wrap && y > area.top && y + cy > area.bottom) {
@@ -886,7 +892,6 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
                                      const DesignerNode& child_node, int index)
 {
 			Ctrl& parent_ctrl = parent.GetCtrl();
-			String sizing = DesignerPreviewNodeProperty(child_node, "sizing", "Fit");
 			String hs = DesignerPreviewAxisSizing(child_node, "h_sizing");
 			String vs = DesignerPreviewAxisSizing(child_node, "v_sizing");
 			if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&parent)) {
@@ -919,8 +924,9 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				int pane = max(0, index);
 				splitter->SetMinPixels(0, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_a", 80)));
 				splitter->SetMinPixels(1, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_b", 80)));
-				if(sizing == "Fixed") {
-					bool vertical = DesignerPreviewNodeProperty(parent_node, "direction", "H") == "V";
+				bool vertical = DesignerPreviewNodeProperty(parent_node, "direction", "H") == "V";
+				String pane_sizing = DesignerPreviewAxisSizing(child_node, vertical ? "v_sizing" : "h_sizing");
+				if(pane_sizing == "Fixed") {
 					int fixed = vertical
 					          ? (int)DesignerPreviewNodeProperty(child_node, "height", 80)
 					          : (int)DesignerPreviewNodeProperty(child_node, "width", 120);
@@ -934,7 +940,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				quad->SetMinPixels(1, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_b", 60)));
 				quad->SetMinPixels(2, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_c", 60)));
 				quad->SetMinPixels(3, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_d", 60)));
-				if(sizing == "Fixed") {
+				if(DesignerPreviewAxisSizing(child_node, "h_sizing") == "Fixed" ||
+				   DesignerPreviewAxisSizing(child_node, "v_sizing") == "Fixed") {
 					int fixed = max((int)DesignerPreviewNodeProperty(child_node, "width", 120),
 					                (int)DesignerPreviewNodeProperty(child_node, "height", 80));
 					quad->SetMinPixels(pane, DPI(max(10, fixed)));

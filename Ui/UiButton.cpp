@@ -660,6 +660,12 @@ void UiButton::Paint(Draw& w)
     if(outer.IsEmpty())
         return;
 
+    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
+    if(layout_dirty_ || content != layout_content_) {
+        layout_content_ = content;
+        UpdateLayout(content);
+    }
+
     UpdateVisualState();
 
     const bool has_focus = HasFocus();

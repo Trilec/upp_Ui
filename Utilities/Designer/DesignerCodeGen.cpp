@@ -238,7 +238,7 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 
 static String AxisSizing(const DesignerNode& n, const String& axis_key)
 {
-	return CodeGenNodeProperty(n, axis_key, CodeGenNodeProperty(n, "sizing", "Fit"));
+	return CodeGenNodeProperty(n, axis_key, "Fit");
 }
 
 static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& child)

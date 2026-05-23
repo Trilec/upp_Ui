@@ -460,9 +460,8 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Shows or hides the explicit designer fill.");
 	b.Add("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
 	      "Shows or hides the explicit designer frame.");
-	String legacy = AdapterNodeProperty(n, "sizing", "Fit");
-	String h_sizing = AdapterNodeProperty(n, "h_sizing", legacy);
-	String v_sizing = AdapterNodeProperty(n, "v_sizing", legacy);
+	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
+	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
 	if(h_sizing != "Fixed")
 		b.Disable("width", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
 	if(v_sizing != "Fixed")

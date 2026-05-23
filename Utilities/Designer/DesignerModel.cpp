@@ -243,7 +243,7 @@ bool DesignerModel::ReplaceDocument(const Vector<DesignerNodeState>& states, Siz
 		n.expanded = s.expanded;
 		next_id_ = max(next_id_, n.id + 1);
 	}
-	virtual_size_ = Size(max(240, virtual_size.cx), max(180, virtual_size.cy));
+	virtual_size_ = Size(max(40, virtual_size.cx), max(40, virtual_size.cy));
 	selection_.Clear();
 	for(DesignerNodeId id : selection)
 		if(Find(id) && FindId(selection_, id) < 0)
@@ -344,7 +344,7 @@ bool DesignerModel::Validate(String& error) const
 		error = "Root node is missing";
 		return false;
 	}
-	if(virtual_size_.cx < 240 || virtual_size_.cy < 180) {
+	if(virtual_size_.cx < 40 || virtual_size_.cy < 40) {
 		error = "Virtual window size is below minimum";
 		return false;
 	}
@@ -390,7 +390,7 @@ bool DesignerModel::Validate(String& error) const
 
 void DesignerModel::SetVirtualSize(Size sz)
 {
-	virtual_size_ = Size(max(240, sz.cx), max(180, sz.cy));
+	virtual_size_ = Size(max(40, sz.cx), max(40, sz.cy));
 	WhenChanged();
 }
 
