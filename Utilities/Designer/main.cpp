@@ -269,8 +269,19 @@ public:
 		Rect toolbox_rect = toolbox_panel_.GetSize();
 		int help_h = DPI(76);
 		int help_gap = DPI(8);
-		int tabs_h = DPI(38);
-		toolbox_tabs_.SetRect(toolbox_rect.left, toolbox_rect.top, toolbox_rect.GetWidth(), tabs_h);
+		int tabs_h = DPI(34);
+		int tab_gap = DPI(4);
+		int tab_w = max(DPI(26), (toolbox_rect.GetWidth() - tab_gap * 4) / 5);
+		int tab_x = toolbox_rect.left;
+		toolbox_layouts_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+		tab_x += tab_w + tab_gap;
+		toolbox_containers_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+		tab_x += tab_w + tab_gap;
+		toolbox_controls_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+		tab_x += tab_w + tab_gap;
+		toolbox_composites_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+		tab_x += tab_w + tab_gap;
+		toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, max(DPI(26), toolbox_rect.right - tab_x), tabs_h);
 		Rect toolbox_body = toolbox_rect;
 		toolbox_body.top += tabs_h + DPI(4);
 		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
@@ -410,8 +421,6 @@ private:
 	{
 		if(id.IsEmpty() || id == "Current")
 			return;
-		if(!PromptOKCancel("Applying this preset will clear the current design. Continue?"))
-			return;
 		if(ApplyDesignerTemplate(model_, registry_, id)) {
 			syncing_template_ = true;
 			template_row_.SetData("Current");
@@ -441,7 +450,11 @@ private:
 		Add(warning_icon_);
 		Add(warning_text_);
 		Add(side_);
-		toolbox_panel_.Add(toolbox_tabs_);
+		toolbox_panel_.Add(toolbox_layouts_button_);
+		toolbox_panel_.Add(toolbox_containers_button_);
+		toolbox_panel_.Add(toolbox_controls_button_);
+		toolbox_panel_.Add(toolbox_composites_button_);
+		toolbox_panel_.Add(toolbox_presets_button_);
 		toolbox_panel_.Add(toolbox_scroll_);
 		toolbox_scroll_.Content().Add(toolbox_tree_);
 		toolbox_panel_.Add(toolbox_help_panel_);
@@ -521,10 +534,6 @@ private:
 		toolbox_tree_.WhenSelection = [=] {
 			Value v = toolbox_tree_.GetData();
 			String id = IsNull(v) ? String() : AsString(v);
-			if(id.StartsWith("preset:")) {
-				ApplyStarterTemplate(id.Mid(7));
-				return;
-			}
 			UpdateToolboxHelp(IsNull(v) ? String() : AsString(v));
 		};
 		toolbox_tree_.WhenToolHover = [=](String type_id) {
@@ -538,25 +547,11 @@ private:
 		toolbox_tree_.WhenToolDrag = [=](String type_id, Point screen) { TrackToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolDrop = [=](String type_id, Point screen) { FinishToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolCancel = [=] { CancelToolDrag(); };
-		toolbox_tabs_.SetVisual(UITAB_UNDERLINE)
-		             .SetExpandTabs(true)
-		             .SetTabIconSize(DPI(18))
-		             .SetTabIconSide(UiAlign::TOP);
-		toolbox_tabs_.Add(toolbox_tab_layouts_, "", ICON_DESIGN_LAYOUTS_CATEGORY_48());
-		toolbox_tabs_.Add(toolbox_tab_containers_, "", ICON_DESIGN_TAB_GROUP_48());
-		toolbox_tabs_.Add(toolbox_tab_controls_, "", ICON_DESIGN_WIDGETS_48());
-		toolbox_tabs_.Add(toolbox_tab_composites_, "", ICON_DESIGN_DYNAMIC_FORM_48());
-		toolbox_tabs_.Add(toolbox_tab_presets_, "", ICON_DESIGN_DASHBOARD_CUSTOMIZE_48());
-		toolbox_tabs_.SetTabTip(0, "Layouts")
-		             .SetTabTip(1, "Containers")
-		             .SetTabTip(2, "Controls")
-		             .SetTabTip(3, "Composites")
-		             .SetTabTip(4, "Presets");
-		toolbox_tabs_.SetActiveTab(0);
-		toolbox_tabs_.Tip("Layouts");
-		toolbox_tabs_.WhenAction = [=] {
-			RefreshToolbox();
-		};
+		SetupToolboxCategoryButton(toolbox_layouts_button_, ICON_DESIGN_LAYOUTS_CATEGORY_48(), "Layouts", 0);
+		SetupToolboxCategoryButton(toolbox_containers_button_, ICON_DESIGN_TAB_GROUP_48(), "Containers", 1);
+		SetupToolboxCategoryButton(toolbox_controls_button_, ICON_DESIGN_WIDGETS_48(), "Controls", 2);
+		SetupToolboxCategoryButton(toolbox_composites_button_, ICON_DESIGN_DYNAMIC_FORM_48(), "Composites", 3);
+		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), "Presets", 4);
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_SINGLE);
@@ -754,7 +749,7 @@ private:
 		toolbox_model_.Clear();
 		UiTreeNodeRef root = toolbox_model_.Root();
 		String active_group = ActiveToolboxGroup();
-		toolbox_tabs_.Tip(active_group);
+		RefreshToolboxCategoryButtons();
 		if(active_group == "Presets") {
 			UiModelItem group_item("Presets");
 			group_item.group_header = true;
@@ -804,13 +799,38 @@ private:
 
 	String ActiveToolboxGroup() const
 	{
-		switch(toolbox_tabs_.GetActiveTab()) {
+		switch(active_toolbox_category_) {
 		case 1: return "Containers";
 		case 2: return "Controls";
 		case 3: return "Composites";
 		case 4: return "Presets";
 		default: return "Layouts";
 		}
+	}
+
+	void SetToolboxCategory(int category)
+	{
+		active_toolbox_category_ = clamp(category, 0, 4);
+		RefreshToolbox();
+	}
+
+	void SetupToolboxCategoryButton(UiButton& button, const Image& icon, const String& tip, int category)
+	{
+		button.SetIcon(icon)
+		      .SetText("")
+		      .SetIconSize(DPI(18), DPI(18))
+		      .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		      .Tip(tip);
+		button.WhenAction = [=] { SetToolboxCategory(category); };
+	}
+
+	void RefreshToolboxCategoryButtons()
+	{
+		toolbox_layouts_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 0 ? UiRole::Accent : UiRole::Standard));
+		toolbox_containers_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 1 ? UiRole::Accent : UiRole::Standard));
+		toolbox_controls_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 2 ? UiRole::Accent : UiRole::Standard));
+		toolbox_composites_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 3 ? UiRole::Accent : UiRole::Standard));
+		toolbox_presets_button_.SetCustomStyle(UiTheme::ResolveButton(active_toolbox_category_ == 4 ? UiRole::Accent : UiRole::Standard));
 	}
 
 	void UpdateToolboxHelp(const String& type_id)
@@ -1062,6 +1082,27 @@ private:
 	// is released and FinishToolDrag calls PlaceType.
 	void TrackToolDrag(const String& type_id, Point screen)
 	{
+		if(type_id.StartsWith("preset:")) {
+			if(!drag_.IsActive() || drag_.GetKind() != DesignerDragKind::Tool || drag_.GetToolType() != type_id) {
+				drag_.BeginToolDrag(type_id);
+				KillTimeCallback(TOOL_DRAG_TIMER_ID);
+				SetTimeCallback(16, [=] { PollToolDrag(); }, TOOL_DRAG_TIMER_ID);
+			}
+			Rect pr = preview_.GetScreenRect();
+			Rect hr = hierarchy_.GetScreenRect();
+			if(pr.Contains(screen)) {
+				preview_.SetPlacementType(PresetDisplayName(type_id.Mid(7)));
+				preview_.TrackPlacement(screen - pr.TopLeft());
+			}
+			else if(hr.Contains(screen)) {
+				preview_.SetPlacementType(String());
+				hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
+			}
+			else
+				preview_.SetPlacementType(String());
+			ShowDragStatus("Dragging preset " + PresetDisplayName(type_id.Mid(7)), screen);
+			return;
+		}
 		const DesignerType* t = registry_.Find(type_id);
 		if(!t || t->toolbox_group.IsEmpty())
 			return;
@@ -1104,6 +1145,14 @@ private:
 			add_type = drag_.GetToolType();
 		if(!add_type.IsEmpty())
 			TrackToolDrag(add_type, screen);
+		if(add_type.StartsWith("preset:")) {
+			KillTimeCallback(TOOL_DRAG_TIMER_ID);
+			preview_.SetPlacementType(String());
+			HideDragStatus();
+			drag_.Cancel();
+			PlacePreset(add_type.Mid(7), screen);
+			return;
+		}
 		DesignerDropTarget target = drag_.GetTarget();
 		KillTimeCallback(TOOL_DRAG_TIMER_ID);
 		preview_.SetPlacementType(String());
@@ -1241,6 +1290,70 @@ private:
 		model_.SelectOne(id);
 		preview_.SetPlacementType(String());
 		RefreshAll();
+	}
+
+	void PlacePreset(const String& preset_id, Point screen)
+	{
+		DesignerNodeId parent_id = Designer_ROOT;
+		int insert_index = -1;
+		Rect pr = preview_.GetScreenRect();
+		Rect hr = hierarchy_.GetScreenRect();
+		if(pr.Contains(screen)) {
+			DesignerNodeId target = preview_.TrackPlacement(screen - pr.TopLeft());
+			if(target)
+				parent_id = target;
+			insert_index = preview_.GetDropIndex();
+		}
+		else if(hr.Contains(screen)) {
+			UiTreeNodeRef ref = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
+			DesignerNodeId target = GetHierarchyNodeId(ref);
+			if(target)
+				parent_id = target;
+		}
+		else if(!model_.GetSelection().IsEmpty())
+			parent_id = model_.GetSelection()[0];
+
+		DesignerNode* parent = model_.Find(parent_id);
+		const DesignerType* parent_type = parent ? registry_.Find(parent->type_id) : nullptr;
+		if(!parent || !parent_type || !parent_type->can_have_children)
+			parent = model_.Find(parent ? parent->parent : Designer_ROOT);
+		if(!parent)
+			parent = model_.Find(Designer_ROOT);
+
+		DesignerModel seed;
+		if(!ApplyDesignerTemplate(seed, registry_, preset_id))
+			return;
+		const DesignerNode* seed_root = seed.Find(Designer_ROOT);
+		if(!seed_root)
+			return;
+		DesignerNodeId first = Designer_NULL;
+		int at = insert_index;
+		for(DesignerNodeId child : seed_root->children) {
+			DesignerNodeId id = ClonePresetSubtree(seed, child, parent->id, at);
+			if(first == Designer_NULL)
+				first = id;
+			if(at >= 0)
+				at++;
+		}
+		if(first != Designer_NULL)
+			model_.SelectOne(first);
+		RefreshAll();
+	}
+
+	DesignerNodeId ClonePresetSubtree(const DesignerModel& seed, DesignerNodeId source_id, DesignerNodeId parent_id, int index)
+	{
+		const DesignerNode* source = seed.Find(source_id);
+		if(!source)
+			return Designer_NULL;
+		DesignerNodeId id = model_.AddNode(source->type_id, parent_id, index);
+		DesignerNode* target = model_.Find(id);
+		if(!target)
+			return id;
+		target->name = UniqueDesignerName(source->name, id);
+		target->properties = clone(source->properties);
+		for(DesignerNodeId child : source->children)
+			ClonePresetSubtree(seed, child, id, -1);
+		return id;
 	}
 
 	// Persist stable grid coordinates on a child node after grid placement.
@@ -1596,6 +1709,7 @@ private:
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
 		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Standard));
+		RefreshToolboxCategoryButtons();
 		theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
 		theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
 		theme_toggle_.SetOn(mode == UiThemeMode::Dark);
@@ -1690,12 +1804,11 @@ private:
 	UiToggle theme_toggle_;
 	UiButton exit_button_;
 	UiPanel toolbox_panel_;
-	UiTab toolbox_tabs_;
-	ParentCtrl toolbox_tab_layouts_;
-	ParentCtrl toolbox_tab_containers_;
-	ParentCtrl toolbox_tab_controls_;
-	ParentCtrl toolbox_tab_composites_;
-	ParentCtrl toolbox_tab_presets_;
+	UiButton toolbox_layouts_button_;
+	UiButton toolbox_containers_button_;
+	UiButton toolbox_controls_button_;
+	UiButton toolbox_composites_button_;
+	UiButton toolbox_presets_button_;
 	UiScrollPanel toolbox_scroll_;
 	DesignerToolboxTree toolbox_tree_;
 	UiTreeModel toolbox_model_;
@@ -1739,6 +1852,7 @@ private:
 	bool pending_inspector_refresh_ = false;
 	bool syncing_theme_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
+	int active_toolbox_category_ = 0;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;
 };
 
