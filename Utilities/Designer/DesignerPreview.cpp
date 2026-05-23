@@ -473,7 +473,9 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			String label = (t ? t->display_name : n.type_id) + ": " + n.name;
 			w.DrawText(r.left + DPI(6), r.top + DPI(4), label, SansSerifZ(9).Bold(), SColorText());
 			if(t && t->is_container) {
-				Rect content = r.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
+				Rect content = (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel")
+				             ? r.Deflated(DPI(4))
+				             : r.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
 				PaintChildren(w, n, content, depth + 1);
 				DrawLayoutDebug(w, n, content);
 			}

@@ -653,6 +653,7 @@ public:
     }
 
     Event<int, Color> WhenPick;
+    Event<int, Color> WhenDoublePick;
 
     virtual void Paint(Draw& w) override
     {
@@ -706,18 +707,12 @@ public:
 
     virtual void LeftDown(Point p, dword) override
     {
-        int gap = DPI(4);
-        int cell = max(DPI(26), (GetSize().cx - max(0, cols_ - 1) * gap) / max(1, cols_));
-        int stride = cell + gap;
-        int col = p.x / max(1, stride);
-        int row = p.y / max(1, stride);
-        if(p.x % stride >= cell || p.y % stride >= cell)
-            return;
-        if(col < 0 || col >= cols_ || row < 0 || row >= rows_)
-            return;
-        int i = row * cols_ + col;
-        if(i >= 0 && i < cols_ * rows_)
-            WhenPick(i, i < colors_.GetCount() ? colors_[i] : Null);
+        PickAt(p, false);
+    }
+
+    virtual void LeftDouble(Point p, dword) override
+    {
+        PickAt(p, true);
     }
 
     virtual Size GetMinSize() const override
@@ -729,6 +724,29 @@ public:
     }
 
 private:
+    void PickAt(Point p, bool double_pick)
+    {
+        int gap = DPI(4);
+        int cell = max(DPI(26), (GetSize().cx - max(0, cols_ - 1) * gap) / max(1, cols_));
+        int stride = cell + gap;
+        int col = p.x / max(1, stride);
+        int row = p.y / max(1, stride);
+        if(p.x % stride >= cell || p.y % stride >= cell)
+            return;
+        if(col < 0 || col >= cols_ || row < 0 || row >= rows_)
+            return;
+        int i = row * cols_ + col;
+        if(i < 0 || i >= cols_ * rows_)
+            return;
+        Color c = i < colors_.GetCount() ? colors_[i] : Null;
+        if(double_pick) {
+            if(WhenDoublePick)
+                WhenDoublePick(i, c);
+        }
+        else if(WhenPick)
+            WhenPick(i, c);
+    }
+
     int cols_ = 10;
     int rows_ = 2;
     Vector<Color> colors_;
@@ -958,7 +976,9 @@ UiColorPicker::UiColorPicker()
     cancel_button_.WhenAction = [=] { WhenCancel(); };
 
     recent_grid_->WhenPick = [=](int, Color c) { HandleRecentPick(c); };
+    recent_grid_->WhenDoublePick = [=](int, Color c) { HandleRecentPick(c); HandleUsePaletteColor(); };
     user_grid_->WhenPick = [=](int i, Color c) { HandleUserPick(i, c); };
+    user_grid_->WhenDoublePick = [=](int i, Color c) { HandleUserPick(i, c); HandleUseStashColor(); };
     color_field_->WhenPick = [=](Point p, bool final_commit) {
         Rect rr = color_field_->GetRect();
         int x = max(0, min(p.x, rr.GetWidth() - 1));

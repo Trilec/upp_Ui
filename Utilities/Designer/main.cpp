@@ -16,7 +16,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.11";
+static const char* DESIGNER_VERSION = "v0.1.12";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static const char *DesignerThemePresetId(UiThemePreset preset)
