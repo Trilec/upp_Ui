@@ -382,12 +382,18 @@ public:
         return *this;
     }
 
-    // Toggle debug overlay (in Paint). When enabled, draws:
-    //   - green: inset rect
-    //   - blue: rows/columns
-    //   - red:  item rects
+    // Toggle debug overlay (in Paint). When enabled, draws inset, gap, and
+    // item rectangles using the current debug color.
     UiBoxLayout& SetDebug(bool on = true) {
         debug = on;
+        Refresh();
+        return *this;
+    }
+
+    // Set the debug overlay color. Gap/inset fills use the same color blended
+    // toward the current paper color so one color controls the whole overlay.
+    UiBoxLayout& SetDebugColor(Color c) {
+        debug_color = IsNull(c) ? Color(220, 38, 38) : c;
         Refresh();
         return *this;
     }
@@ -511,6 +517,7 @@ private:
     int          fixed_column = -1;                // UiDirection::H: cap item width
     int          fixed_row    = -1;                // UiDirection::V: cap item height
     bool         debug        = false;             // draw debug overlay?
+    Color        debug_color  = Color(220, 38, 38);// debug overlay line/fill source
 
     // Internal state
     Vector<Item> items;

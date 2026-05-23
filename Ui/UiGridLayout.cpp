@@ -1047,7 +1047,7 @@ void UiGridLayout::DebugPaint(Upp::Draw& w) {
         for(int r = 0; r < rows; ++r)
             yoff[r + 1] = yoff[r] + rowh[r] + (r + 1 < rows ? style.spacing : 0);
 
-        Color cell_c = Color(220, 38, 38);
+        Color cell_c = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
         Color fill_c = Blend(cell_c, SColorPaper(), 205);
 
         Rect paint_view = view;
@@ -1094,7 +1094,7 @@ void UiGridLayout::DebugPaint(Upp::Draw& w) {
             continue;
         Rect  r = it.rect;
         r.Offset(-origin);
-        Color c = SColorHighlight();
+        Color c = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
         w.DrawRect(r.left, r.top, r.GetWidth(), 1, c);
         w.DrawRect(r.left, r.bottom - 1, r.GetWidth(), 1, c);
         w.DrawRect(r.left, r.top, 1, r.GetHeight(), c);

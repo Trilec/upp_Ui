@@ -58,6 +58,8 @@ public:
 	bool RemoveNode(DesignerNodeId id);
 	bool CaptureSubtree(DesignerNodeId id, Vector<DesignerNodeState>& out) const;
 	bool RestoreSubtree(const Vector<DesignerNodeState>& states, DesignerNodeId parent, int insert_index = -1);
+	bool ReplaceDocument(const Vector<DesignerNodeState>& states, Size virtual_size,
+	                     const Vector<DesignerNodeId>& selection, String& error);
 	bool SetProperty(DesignerNodeId id, const String& property_id, const Value& value);
 	bool RemoveProperty(DesignerNodeId id, const String& property_id);
 

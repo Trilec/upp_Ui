@@ -39,9 +39,110 @@ static String VarName(DesignerNodeId id)
 	return "node" + AsString(id);
 }
 
+static String CodeIdentifier(String text)
+{
+	text = TrimBoth(text);
+	String out;
+	bool last_us = false;
+	for(int i = 0; i < text.GetCount(); i++) {
+		int c = text[i];
+		bool ok = IsAlNum(c) || c == '_';
+		if(ok) {
+			if(out.IsEmpty() && IsDigit(c))
+				out << '_';
+			out.Cat(c);
+			last_us = false;
+		}
+		else if(!last_us && !out.IsEmpty()) {
+			out << '_';
+			last_us = true;
+		}
+	}
+	while(out.GetCount() && out[out.GetCount() - 1] == '_')
+		out.Trim(out.GetCount() - 1);
+	if(out.IsEmpty())
+		out = "node";
+	static const char *reserved[] = {
+		"class", "private", "public", "protected", "template", "typename", "operator",
+		"int", "double", "float", "bool", "char", "void", "auto", "return", "new", "delete"
+	};
+	for(const char *r : reserved)
+		if(out == r)
+			return "_" + out;
+	return out;
+}
+
+static bool NameUsed(const VectorMap<DesignerNodeId, String>& names, const String& name)
+{
+	for(int i = 0; i < names.GetCount(); i++)
+		if(names[i] == name)
+			return true;
+	return false;
+}
+
+static VectorMap<DesignerNodeId, String> BuildCodeNames(const DesignerModel& model)
+{
+	VectorMap<DesignerNodeId, String> names;
+	for(const DesignerNode& n : model.GetNodes()) {
+		if(n.id == Designer_ROOT)
+			continue;
+		String root = CodeIdentifier(n.name);
+		String name = root;
+		int suffix = 2;
+		while(NameUsed(names, name))
+			name = Format("%s_%02d", root, suffix++);
+		names.Add(n.id, name);
+	}
+	return names;
+}
+
+static String VarName(const VectorMap<DesignerNodeId, String>& names, DesignerNodeId id)
+{
+	int q = names.Find(id);
+	return q >= 0 ? names[q] : VarName(id);
+}
+
 static String DirectionExpr(const DesignerNode& n, const String& def)
 {
 	return CodeGenNodeProperty(n, "direction", def) == "H" ? "UiDirection::H" : "UiDirection::V";
+}
+
+static String AlignSideExpr(const String& side, const String& def = "Left")
+{
+	String s = side.IsEmpty() ? def : side;
+	if(s == "Right")
+		return "UiAlign::RIGHT";
+	if(s == "Top")
+		return "UiAlign::TOP";
+	if(s == "Bottom")
+		return "UiAlign::BOTTOM";
+	return "UiAlign::LEFT";
+}
+
+static String TabVisualExpr(const String& visual)
+{
+	if(visual == "Classic")
+		return "UITAB_CLASSIC";
+	if(visual == "Document")
+		return "UITAB_DOCUMENT";
+	if(visual == "Segmented")
+		return "UITAB_SEGMENTED";
+	if(visual == "Rail")
+		return "UITAB_RAIL";
+	return "UITAB_UNDERLINE";
+}
+
+static String FontExpr(const String& family, int size)
+{
+	int z = max(7, size);
+	if(family == "Mono")
+		return Format("MonospaceZ(%d)", z);
+	if(family == "Serif")
+		return Format("SerifZ(%d)", z);
+	if(family == "Segoe UI" || family == "Arial" || family == "Verdana" ||
+	   family == "Tahoma" || family == "Consolas")
+		return Format("Font().FaceName(%s).Height(%d)", CppString(family), z);
+	return Format("SansSerifZ(%d)", z);
 }
 
 static String ColorExpr(Color c)
@@ -49,6 +150,20 @@ static String ColorExpr(Color c)
 	if(IsNull(c))
 		return "Null";
 	return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
+}
+
+static Color CodeGenDebugColor(const DesignerNode& n)
+{
+	if(!(bool)CodeGenNodeProperty(n, "debug_auto_color", false)) {
+		Value v = CodeGenNodeProperty(n, "debug_color", Color(220, 38, 38));
+		return IsNull(v) ? Color(220, 38, 38) : (Color)v;
+	}
+	static const Color palette[] = {
+		Color(220, 38, 38), Color(217, 119, 6), Color(37, 99, 235),
+		Color(22, 163, 74), Color(147, 51, 234), Color(8, 145, 178),
+		Color(219, 39, 119)
+	};
+	return palette[abs((int)n.id) % (int)(sizeof(palette) / sizeof(palette[0]))];
 }
 
 static String IconExpr(const String& icon)
@@ -70,9 +185,9 @@ static String IconExpr(const String& icon)
 	return String();
 }
 
-static void EmitDeclaration(String& out, const DesignerNode& n)
+static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
 {
-	String var = VarName(n.id);
+	String var = VarName(names, n.id);
 	if(n.type_id == "BoxLayout")
 		out << "\tUiBoxLayout " << var << ";\n";
 	else if(n.type_id == "GridLayout")
@@ -105,14 +220,18 @@ static void EmitDeclaration(String& out, const DesignerNode& n)
 		out << "\tUiBreadcrumbs " << var << ";\n";
 	else if(n.type_id == "UiTab")
 		out << "\tUiTab " << var << ";\n";
+	else if(n.type_id == "UiStack")
+		out << "\tUiStack " << var << ";\n";
 	else if(n.type_id == "UiTable")
 		out << "\tUiTable " << var << ";\n";
 	else if(n.type_id == "UiTree")
 		out << "\tUiTree " << var << ";\n";
 	else if(n.type_id == "UiScrollPanel")
 		out << "\tUiScrollPanel " << var << ";\n";
-	else if(n.type_id == "PaneSlot")
+	else if(n.type_id == "PaneSlot" || n.type_id == "PageSlot")
 		out << "\tParentCtrl " << var << ";\n";
+	else if(n.type_id == "Spacer")
+		return;
 	else
 		out << "\tUiPanel " << var << ";\n";
 }
@@ -136,9 +255,12 @@ static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& chil
 	return ".Fit()";
 }
 
-static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_appearance)
+static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& names,
+                      const DesignerNode& n, bool emit_designer_appearance)
 {
-	String var = VarName(n.id);
+	String var = VarName(names, n.id);
+	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "Spacer")
+		return;
 	if(emit_designer_appearance && n.type_id != "Window" && n.type_id != "PaneSlot" && !(bool)CodeGenNodeProperty(n, "pane_slot", false)) {
 		Color face = CodeGenNodeProperty(n, "face", Null);
 		Color frame = CodeGenNodeProperty(n, "frame", Null);
@@ -153,7 +275,7 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 		if((bool)CodeGenNodeProperty(n, "wrap", false))
 			out << ".SetWrap(true)";
 		if((bool)CodeGenNodeProperty(n, "debug", false))
-			out << ".SetDebug(true)";
+			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
 		out << ";\n";
 	}
 	else if(n.type_id == "GridLayout") {
@@ -165,7 +287,7 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 		    << ".SetGap(DPI(" << (int)CodeGenNodeProperty(n, "gap", 8) << "))"
 		    << ".SetInset(DPI(" << (int)CodeGenNodeProperty(n, "inset", 8) << "))";
 		if((bool)CodeGenNodeProperty(n, "debug", false))
-			out << ".SetDebug(true)";
+			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
 		out << ";\n";
 	}
 	else if(n.type_id == "UiSplitter") {
@@ -279,15 +401,19 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << ")));\n";
 	}
 	else if(n.type_id == "UiTab") {
-		out << "\t\t{\n"
-		    << "\t\t\tUiLabel& page1 = *new UiLabel; page1.SetText(\"Overview page\").SetAlign(UiAlign::CENTER, UiAlign::CENTER);\n"
-		    << "\t\t\tUiLabel& page2 = *new UiLabel; page2.SetText(\"Settings page\").SetAlign(UiAlign::CENTER, UiAlign::CENTER);\n"
-		    << "\t\t\tUiLabel& page3 = *new UiLabel; page3.SetText(\"Logs page\").SetAlign(UiAlign::CENTER, UiAlign::CENTER);\n"
-		    << "\t\t\t" << var << ".Add(page1, " << CppString(CodeGenNodeProperty(n, "tab_a", "Overview")) << ", ICON_DESIGN_HOME_48());\n"
-		    << "\t\t\t" << var << ".Add(page2, " << CppString(CodeGenNodeProperty(n, "tab_b", "Settings")) << ", ICON_DESIGN_SETTINGS_48());\n"
-		    << "\t\t\t" << var << ".Add(page3, " << CppString(CodeGenNodeProperty(n, "tab_c", "Logs")) << ", ICON_DESIGN_MENU_48());\n"
-		    << "\t\t}\n";
-		out << "\t\t" << var << ".SetActiveTab(" << (int)CodeGenNodeProperty(n, "active", 0) << ");\n";
+		String visual = CodeGenNodeProperty(n, "visual", "Underline");
+		out << "\t\t" << var << ".SetVisual(" << TabVisualExpr(visual) << ")"
+		    << ".SetPlacement(" << AlignSideExpr(CodeGenNodeProperty(n, "placement", "Top"), "Top") << ")"
+		    << ".SetExpandTabs(" << ((bool)CodeGenNodeProperty(n, "expand_tabs", false) ? "true" : "false") << ")"
+		    << ".EnableCloseButtons(" << ((bool)CodeGenNodeProperty(n, "close_buttons", false) ? "true" : "false") << ")"
+		    << ".EnableDragHandles(" << ((bool)CodeGenNodeProperty(n, "drag_handles", false) ? "true" : "false") << ");\n";
+		out << "\t\t" << var << ".SetTabFont("
+		    << FontExpr(CodeGenNodeProperty(n, "tab_font", "Sans"), (int)CodeGenNodeProperty(n, "tab_font_size", 11))
+		    << ").SetTabIconSize(DPI(" << (int)CodeGenNodeProperty(n, "tab_icon_size", 16) << "))"
+		    << ".SetTabIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "tab_icon_side", "Left")) << ");\n";
+	}
+	else if(n.type_id == "UiStack") {
+		// Headless page container: pages and active index are emitted after children.
 	}
 	else if(n.type_id == "UiTable") {
 		out << "\t\t" << var << ".UseInternalModel();\n"
@@ -310,12 +436,44 @@ static void EmitSetup(String& out, const DesignerNode& n, bool emit_designer_app
 	}
 }
 
-static void EmitAddChild(String& out, const DesignerNode& parent, const DesignerNode& child, int index)
+static void EmitAddSpacer(String& out, const String& parent_var, const DesignerNode& parent,
+                          const DesignerNode& child)
 {
-	String p = VarName(parent.id);
-	String c = VarName(child.id);
+	String kind = CodeGenNodeProperty(child, "spacer_kind", "Expander");
+	int size = max(0, (int)CodeGenNodeProperty(child, "space", 24));
+	int max_size = max(size, (int)CodeGenNodeProperty(child, "max_space", 1000000));
+	int weight = max(1, (int)CodeGenNodeProperty(child, "weight", 1));
+	if(parent.type_id == "BoxLayout") {
+		if(kind == "Break")
+			out << "\t\t" << parent_var << ".AddBreak(" << weight << ");\n";
+		else if(kind == "Fixed")
+			out << "\t\t" << parent_var << ".AddSpacer(1).Fixed(DPI(" << size << "));\n";
+		else
+			out << "\t\t" << parent_var << ".AddSpacer(" << weight << ");\n";
+	}
+	else if(parent.type_id == "GridLayout") {
+		if(kind == "Break")
+			out << "\t\t" << parent_var << ".AddBreak();\n";
+		else if(kind == "Fixed")
+			out << "\t\t" << parent_var << ".AddGap(DPI(" << size << "));\n";
+		else if(kind == "Bounded")
+			out << "\t\t" << parent_var << ".AddSpacer(DPI(" << size << "), DPI(" << max_size << "));\n";
+		else
+			out << "\t\t" << parent_var << ".AddExpand(" << weight << ");\n";
+	}
+}
+
+static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& names,
+                         const DesignerNode& parent, const DesignerNode& child, int index)
+{
+	String p = VarName(names, parent.id);
+	String c = VarName(names, child.id);
+	if(child.type_id == "Spacer" && parent.id == Designer_ROOT)
+		return;
 	if(parent.id == Designer_ROOT)
 		out << "\t\tAdd(" << c << ".SizePos());\n";
+	else if(child.type_id == "Spacer" && (parent.type_id == "BoxLayout" || parent.type_id == "GridLayout"))
+		EmitAddSpacer(out, p, parent, child);
 	else if(parent.type_id == "BoxLayout")
 		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << ";\n";
 	else if(parent.type_id == "GridLayout") {
@@ -357,23 +515,47 @@ static void EmitAddChild(String& out, const DesignerNode& parent, const Designer
 		    << (int)CodeGenNodeProperty(parent, "column_percent", 50) << ", "
 		    << (int)CodeGenNodeProperty(parent, "row_percent", 50) << ");\n";
 	}
+	else if(parent.type_id == "UiTab") {
+		String title = (bool)CodeGenNodeProperty(child, "show_title", true)
+		             ? AsString(CodeGenNodeProperty(child, "page_title", child.name))
+		             : String();
+		String icon = IconExpr(CodeGenNodeProperty(child, "icon", "None"));
+		out << "\t\t" << p << ".Add(" << c << ", " << CppString(title);
+		if(!icon.IsEmpty())
+			out << ", " << icon;
+		out << ");\n";
+	}
+	else if(parent.type_id == "UiStack")
+		out << "\t\t" << p << ".AddPage(" << c << ", " << CppString(CodeGenNodeProperty(child, "page_title", child.name)) << ");\n";
 	else if(parent.type_id == "UiScrollPanel")
 		out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
 	else if(parent.type_id == "UiPanel")
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
-	else if(parent.type_id == "PaneSlot")
+	else if(parent.type_id == "PaneSlot" || parent.type_id == "PageSlot")
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
 }
 
-static void EmitAdds(String& out, const DesignerModel& model, const DesignerNode& parent)
+static void EmitAdds(String& out, const VectorMap<DesignerNodeId, String>& names,
+                     const DesignerModel& model, const DesignerNode& parent)
 {
 	for(int i = 0; i < parent.children.GetCount(); i++) {
 		DesignerNodeId child_id = parent.children[i];
 		const DesignerNode* child = model.Find(child_id);
 		if(!child)
 			continue;
-		EmitAddChild(out, parent, *child, i);
-		EmitAdds(out, model, *child);
+		EmitAddChild(out, names, parent, *child, i);
+		EmitAdds(out, names, model, *child);
+	}
+}
+
+static void EmitPostAddSetup(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerModel& model)
+{
+	for(const DesignerNode& n : model.GetNodes()) {
+		String var = VarName(names, n.id);
+		if(n.type_id == "UiTab")
+			out << "\t\t" << var << ".SetActiveTab(" << (int)CodeGenNodeProperty(n, "active", 0) << ");\n";
+		else if(n.type_id == "UiStack")
+			out << "\t\t" << var << ".SetActivePage(" << (int)CodeGenNodeProperty(n, "active", 0) << ");\n";
 	}
 }
 
@@ -381,6 +563,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
                               const String& class_name, bool emit_designer_appearance)
 {
 	(void)registry;
+	VectorMap<DesignerNodeId, String> names = BuildCodeNames(model);
 	String out;
 	out << "#include <CtrlLib/CtrlLib.h>\n"
 	    << "#include <Ui/Ui.h>\n\n"
@@ -402,16 +585,17 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitSetup(out, n, emit_designer_appearance);
+		EmitSetup(out, names, n, emit_designer_appearance);
 	}
 	const DesignerNode* root = model.Find(Designer_ROOT);
 	if(root)
-		EmitAdds(out, model, *root);
+		EmitAdds(out, names, model, *root);
+	EmitPostAddSetup(out, names, model);
 	out << "\t}\n\n";
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitDeclaration(out, n);
+		EmitDeclaration(out, names, n);
 	}
 	out << "};\n\n"
 	    << "GUI_APP_MAIN\n"

@@ -128,6 +128,9 @@ inline void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, in
 inline UiLabel::Style MakeBodyLabelStyle(const DemoPalette& c, bool muted = false, bool small = false)
 {
     UiLabel::Style s = UiTheme::ResolveLabel(muted ? UiRole::Subtle : UiRole::Standard);
+    s.font = DemoSans(11);
+    s.metrics.text_font = s.font;
+    s.metrics.use_text_font = true;
     s.align_h = UiAlign::LEFT;
     s.align_v = UiAlign::CENTER;
     return s;
@@ -181,7 +184,7 @@ inline UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(8);
     s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
+    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(15), DPI(15));
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -221,6 +224,12 @@ inline UiAccordion::Style MakeAccordionStyle(const DemoPalette& c)
     UiAccordion::Style s = UiAccordion::StyleDefault();
     s.single_open = false;
     s.enforce_one = false;
+    s.body_style.transparent = true;
+    s.body_style.metrics.face_enabled = false;
+    s.body_style.metrics.frame_enabled = false;
+    s.body_style.metrics.frame_width = 0;
+    s.body_style.metrics.shadow.enabled = false;
+    s.header_style.title_font = DemoSans(11, true);
     return s;
 }
 
@@ -266,8 +275,8 @@ public:
         Rect viewport = scroll_.GetViewportRect();
         int line_h = max(DPI(16), DemoMono(10).GetCy() + DPI(3));
         int min_h = line_h * 12;
-        int content_w = max(0, viewport.GetWidth());
-        int content_h = max(max(viewport.GetHeight(), code_.GetMinSize().cy), min_h);
+        int content_w = max(0, viewport.GetWidth() - DPI(5));
+        int content_h = max(max(viewport.GetHeight(), code_.GetMinSize().cy), min_h) + DPI(5);
         code_.SetRect(0, 0, content_w, content_h);
     }
 
@@ -352,7 +361,7 @@ public:
                .SetShowFocus(false)
                .EnableHover(false);
 
-        version_badge_.SetText("v0.1.0").NoWantFocus();
+        version_badge_.SetText("v0.4.0").NoWantFocus();
         theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
         exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconSize(DPI(15), DPI(15)).SetIconRenderMode(UiIconRenderMode::MonoTint);
         copy_label_.SetText("Copy Code").NoWantFocus();
@@ -430,6 +439,7 @@ protected:
         exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
         copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
         copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+        inspector_acc_.SetCustomStyle(MakeAccordionStyle(palette_));
         code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
         code_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle());
         code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));

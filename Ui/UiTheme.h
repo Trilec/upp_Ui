@@ -1,4 +1,4 @@
-﻿/*
+/*
     Author
     - C Edwards (dodobar)
 
@@ -29,6 +29,11 @@
       them through the secondary metrics.text_font path by default.
     - 2026-04: updated button, label, and dropdown theme defaults to the
       content_margin/content_gap/icon_side spacing contract.
+    - 2026-05: normalized Minimal role fonts for dense controls to the shared
+      11px control standard used by composites and builder demos.
+    - 2026-05: renamed the soft rounded preset to Pill and made it a
+      role-tuned theme family over the Minimal normal/subtle/accent/alert
+      palette contract.
 */
 #ifndef _Ui_UiTheme_h_
 #define _Ui_UiTheme_h_
@@ -56,7 +61,7 @@ namespace Upp {
 
 enum class UiThemePreset : byte {
     Minimal,
-    Rounded,
+    Pill,
     Linear,
     Solid,
     Outline,
@@ -610,26 +615,137 @@ inline void ApplyLabelTextSize(UiLabel::Style& s, UiTextSize size)
     }
 }
 
+inline bool IsRoleTunedPreset(UiThemePreset preset)
+{
+    return preset == UiThemePreset::Minimal || preset == UiThemePreset::Pill;
+}
+
+inline bool IsPillPreset(UiThemePreset preset)
+{
+    return preset == UiThemePreset::Pill;
+}
+
+inline void ApplyPillGeometry(UiButton::Style& s)
+{
+    s.metrics.radius = DPI(999);
+    s.metrics.content_margin = Rect(DPI(16), DPI(8), DPI(16), DPI(8));
+}
+
+inline void ApplyPillGeometry(UiBaseEdit::Style& s)
+{
+    s.metrics.radius = DPI(999);
+    s.metrics.content_margin = Rect(DPI(12), DPI(5), DPI(12), DPI(5));
+}
+
+inline void ApplyPillGeometry(UiToggle::Style& s)
+{
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiCheckBox::Style& s)
+{
+    s.metrics.radius = DPI(999);
+    s.indicator_metrics.radius = DPI(999);
+    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(12), DPI(6));
+}
+
+inline void ApplyPillGeometry(UiRadioButton::Style& s)
+{
+    s.metrics.radius = DPI(999);
+    s.indicator_metrics.radius = DPI(999);
+    s.metrics.content_margin = Rect(DPI(12), DPI(6), DPI(12), DPI(6));
+}
+
+inline void ApplyPillGeometry(UiSlider::Style& s)
+{
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.radius = DPI(999);
+    s.track_size.cy = max(s.track_size.cy, DPI(4));
+}
+
+inline void ApplyPillGeometry(UiScrollBar::Style& s)
+{
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.radius = DPI(999);
+    s.arrow_metrics.radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiSplitter::Style& s)
+{
+    s.track_metrics.radius = DPI(999);
+    s.thumb_metrics.radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiPanel::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+}
+
+inline void ApplyPillGeometry(UiDropdown::Style& s)
+{
+    s.metrics.radius = DPI(999);
+    s.popup_radius = DPI(14);
+    s.metrics.content_margin = Rect(DPI(12), DPI(5), DPI(12), DPI(5));
+}
+
+inline void ApplyPillGeometry(UiTab::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+    s.tab_metrics.radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiTitleCard::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+    s.metrics.content_margin = Rect(DPI(14), DPI(10), DPI(14), DPI(10));
+}
+
+inline void ApplyPillGeometry(UiTree::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+    s.row_radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiList::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+    s.row_radius = DPI(999);
+}
+
+inline void ApplyPillGeometry(UiMenu::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+}
+
+inline void ApplyPillGeometry(UiLabel::Style& s, UiLabelRole role)
+{
+    if(role == UiLabelRole::Badge)
+        s.metrics.radius = DPI(999);
+}
+
 inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
 {
     UiToolButton::Style s = UiToolButton::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         return s;
     default:
         return s;
     }
-}inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
+}
+
+inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
 {
     UiButton::Style s = UiButton::StyleDefault();
 
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
         SetFace(s.palette, Color(255, 255, 255), Color(239, 246, 255), Color(219, 234, 254), Color(248, 250, 252));
@@ -728,7 +844,7 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         SetFace(s.palette, Color(248, 250, 252), Color(255, 255, 255), Color(241, 245, 249), Color(248, 250, 252));
@@ -789,7 +905,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         return s;
@@ -800,13 +916,15 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
     default:
         return s;
     }
-}inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
+}
+
+inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
 {
     UiCheckBox::Style s = UiCheckBox::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
@@ -882,7 +1000,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
@@ -955,7 +1073,7 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         s.thumb_metrics.frame_enabled = true;
@@ -1022,7 +1140,7 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         s.arrow_metrics.radius = DPI(999);
@@ -1085,7 +1203,7 @@ inline UiSplitter::Style ResolveSplitterBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.thumb_metrics.radius = DPI(999);
         s.track_metrics.radius = DPI(999);
         return s;
@@ -1126,7 +1244,7 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(30);
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
@@ -1197,7 +1315,7 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.popup_radius = DPI(14);
         return s;
@@ -1238,7 +1356,7 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(14);
         s.tab_metrics.radius = DPI(999);
         return s;
@@ -1326,7 +1444,7 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         return s;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         s.metrics.radius = DPI(18);
         s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.media_reserve = DPI(84);
@@ -1382,7 +1500,7 @@ inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Minimal:
         break;
-    case UiThemePreset::Rounded:
+    case UiThemePreset::Pill:
         break;
     case UiThemePreset::Linear:
         break;
@@ -1485,7 +1603,9 @@ inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiTo
     SetFrame(s.palette, Null, Null, Null, Null);
     SetInk(s.palette, icon_normal, icon_hot, icon_pressed, c.ink_disabled);
     SetIcon(s.palette, icon_normal, icon_hot, icon_pressed, c.ink_disabled);
-}inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole role)
+}
+
+inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole role)
 {
     UiRole universal = role == UiButtonRole::Accent ? UiRole::Accent :
                        role == UiButtonRole::Subtle ? UiRole::Subtle :
@@ -1501,7 +1621,7 @@ inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiTo
     s.transparent = false;
     switch(role) {
     case UiButtonRole::Accent:
-    	s.font = SansSerifZ(13).Bold();
+        s.font = SansSerifZ(11).Bold();
         ApplyPalette(s.palette, c);
         return;
     case UiButtonRole::Icon:
@@ -1692,16 +1812,18 @@ inline void TuneMinimalToggle(UiToggle::Style& s, UiThemeMode mode, UiRole role 
     SetFrame(s.track_palette, track_frame, track_frame, track_frame, IsNull(track_frame) ? Null : c.ink_disabled);
     SetFace(s.thumb_palette, thumb_face, thumb_hot, thumb_face, thumb_disabled);
     SetFrame(s.thumb_palette, thumb_frame, thumb_frame, thumb_frame, IsNull(thumb_frame) ? Null : c.ink_disabled);
-}inline void TuneMinimalCheckBox(UiCheckBox::Style& s, UiThemeMode mode, UiCheckVisual visual, UiRole role = UiRole::Standard)
+}
+
+inline void TuneMinimalCheckBox(UiCheckBox::Style& s, UiThemeMode mode, UiCheckVisual visual, UiRole role = UiRole::Standard)
 {
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
-    Color slate100 = dark ? Color(30, 41, 59) : Color(241, 245, 249);
-    Color slate400 = Color(148, 163, 184);
+    Color slate100 = dark ? Color(25, 25, 25) : Color(241, 245, 249);
+    Color slate400 = dark ? Color(96, 96, 96) : Color(148, 163, 184);
     Color slate500 = dark ? Color(148, 163, 184) : Color(100, 116, 139);
     Color blue600 = Color(37, 99, 235);
     Color red600 = Color(220, 38, 38);
     MinimalRoleColors c = MinimalRole(mode, role);
-    s.font = SansSerifZ(13);
+    s.font = SansSerifZ(11);
     for(int i = 0; i < 4; i++)
         s.palette.ink[i] = c.ink;
     s.palette.ink[ST_DISABLED] = c.ink_disabled;
@@ -1768,7 +1890,7 @@ inline void TuneMinimalRadioButton(UiRadioButton::Style& s, UiThemeMode mode, Ui
     Color blue600 = Color(37, 99, 235);
     Color red600 = Color(220, 38, 38);
     MinimalRoleColors c = MinimalRole(mode, role);
-    s.font = SansSerifZ(13);
+    s.font = SansSerifZ(11);
     for(int i = 0; i < 4; i++)
         s.palette.ink[i] = c.ink;
     s.palette.ink[ST_DISABLED] = c.ink_disabled;
@@ -1889,7 +2011,7 @@ inline void TuneMinimalTab(UiTab::Style& s, UiThemeMode mode, UiRole role = UiRo
     s.strip_inset = Rect(0, 0, 0, 0);
     s.content_gap = 0;
     s.min_tab_main = DPI(84);
-    s.tab_font = SansSerifZ(13);
+    s.tab_font = SansSerifZ(11);
     Color indicator = dark ? slate500 : slate400;
     s.indicator_thickness = DPI(2);
     if(role == UiRole::Subtle) {
@@ -1911,6 +2033,8 @@ inline void TuneMinimalTab(UiTab::Style& s, UiThemeMode mode, UiRole role = UiRo
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::None();
         s.palette.frame[i] = Null;
+        s.palette.ink[i] = standard.ink;
+        s.palette.icon[i] = standard.ink;
         s.tab_palette.face[i] = UiFill::None();
         s.tab_palette.frame[i] = indicator;
     }
@@ -1937,7 +2061,7 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
     s.metrics.shadow.enabled = false;
     s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.content_gap = 0;
-    s.font = SansSerifZ(13);
+    s.font = SansSerifZ(11);
     for(int i = 0; i < 4; i++) {
         s.palette.ink[i] = standard.ink;
         s.palette.icon[i] = standard.ink;
@@ -1949,13 +2073,13 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
         s.font = SansSerifZ(28).Bold();
         break;
     case UiLabelRole::Subheadline:
-        s.font = SansSerifZ(13).Bold();
+        s.font = SansSerifZ(11).Bold();
         for(int i = 0; i < 4; i++)
             s.palette.ink[i] = subtle.ink;
         s.palette.ink[ST_DISABLED] = subtle.ink_disabled;
         break;
     case UiLabelRole::Title:
-        s.font = SansSerifZ(12).Bold();
+        s.font = SansSerifZ(11).Bold();
         break;
     case UiLabelRole::Caption:
     case UiLabelRole::Footnote:
@@ -2084,8 +2208,10 @@ public:
         if(!UiIsValid(role)) role = UiButtonRole::Standard;
         UiButton::Style s = UiThemeDetail::ResolveButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyButtonRole(s, role);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalButton(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2103,8 +2229,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiToolButtonRole::Standard;
         UiToolButton::Style s = UiThemeDetail::ResolveToolButtonBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalToolButton(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2117,8 +2245,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         UiBaseEdit::Style s = UiThemeDetail::ResolveEditBase(normalized.preset);
         s = UiThemeDetail::ApplyEditRole(s, UiThemeDetail::ToEditRole(role));
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalEdit(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2131,10 +2261,12 @@ public:
         if(!UiIsValid(role)) role = UiEditRole::Field;
         UiBaseEdit::Style s = UiThemeDetail::ResolveEditBase(normalized.preset);
         s = UiThemeDetail::ApplyEditRole(s, role);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiRole universal = role == UiEditRole::Subtle ? UiRole::Subtle :
                                role == UiEditRole::Strong ? UiRole::Accent : UiRole::Standard;
             UiThemeDetail::TuneMinimalEdit(s, normalized.mode, universal);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2147,8 +2279,10 @@ public:
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiCheckBox::Style s = UiThemeDetail::ResolveCheckBoxBase(normalized.preset);
         s = UiThemeDetail::ApplyCheckBoxVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalCheckBox(s, normalized.mode, visual, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2161,8 +2295,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         UiCheckBox::Style s = UiThemeDetail::ResolveCheckBoxBase(normalized.preset);
         s = UiThemeDetail::ApplyCheckBoxVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalCheckBox(s, normalized.mode, visual, UiRole::Standard);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2180,8 +2316,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Accent;
         UiToggle::Style s = UiThemeDetail::ResolveToggleBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalToggle(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2196,8 +2334,10 @@ public:
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiRadioButton::Style s = UiThemeDetail::ResolveRadioButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyRadioButtonVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalRadioButton(s, normalized.mode, visual, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2210,8 +2350,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         UiRadioButton::Style s = UiThemeDetail::ResolveRadioButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyRadioButtonVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalRadioButton(s, normalized.mode, visual, UiRole::Standard);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2223,8 +2365,10 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiSlider::Style s = UiThemeDetail::ResolveSliderBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalSlider(s, normalized.mode);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
@@ -2238,6 +2382,8 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiScrollBar::Style s = UiThemeDetail::ResolveScrollBarBase(normalized.preset);
+        if(UiThemeDetail::IsPillPreset(normalized.preset))
+            UiThemeDetail::ApplyPillGeometry(s);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.arrow_palette, normalized.mode);
@@ -2248,6 +2394,8 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiSplitter::Style s = UiThemeDetail::ResolveSplitterBase(normalized.preset);
+        if(UiThemeDetail::IsPillPreset(normalized.preset))
+            UiThemeDetail::ApplyPillGeometry(s);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.background_palette, normalized.mode);
@@ -2266,8 +2414,10 @@ public:
         if(!UiIsValid(role)) role = UiPanelRole::Surface;
         UiPanel::Style s = UiThemeDetail::ResolvePanelBase(normalized.preset);
         s = UiThemeDetail::ApplyPanelRole(s, role);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalPanel(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2280,8 +2430,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiDropdown::Style s = UiThemeDetail::ResolveDropdownBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2293,8 +2445,10 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiDropdown::Style s = UiThemeDetail::ResolveDropdownBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, UiRole::Standard);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2308,8 +2462,10 @@ public:
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiTab::Style s = UiThemeDetail::ResolveTabBase(normalized.preset);
         s = UiThemeDetail::ApplyTabVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalTab(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2322,8 +2478,10 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         UiTab::Style s = UiThemeDetail::ResolveTabBase(normalized.preset);
         s = UiThemeDetail::ApplyTabVisual(s, visual);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalTab(s, normalized.mode, UiRole::Standard);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2333,7 +2491,7 @@ public:
     static UiTitleCard::Style ResolveTitleCard(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
-        if(normalized.preset == UiThemePreset::Minimal)
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset))
             return ResolveTitleCard(normalized, UiRole::Standard);
         UiTitleCard::Style s = UiThemeDetail::ResolveTitleCardBase(normalized.preset);
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2345,7 +2503,7 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiTitleCard::Style s = UiThemeDetail::ResolveTitleCardBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
             Color mid = dark ? Color(166, 166, 166) : Color(100, 116, 139);
             Color mid_dark = dark ? Color(190, 190, 190) : Color(71, 85, 105);
@@ -2421,6 +2579,8 @@ public:
                 s.palette.ink[i] = s.title_color;
                 s.palette.icon[i] = s.title_color;
             }
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2431,9 +2591,7 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiTree::Style s = UiTree::StyleDefault();
-        if(normalized.preset == UiThemePreset::Rounded)
-            s.metrics.radius = DPI(10);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             s.metrics.radius = DPI(8);
             s.metrics.face_enabled = true;
             s.metrics.frame_enabled = true;
@@ -2463,6 +2621,8 @@ public:
                 s.line_color = Color(51, 51, 51);
                 s.glyph_color = Color(166, 166, 166);
             }
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2492,7 +2652,7 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiList::Style s = UiList::StyleDefault();
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
             Color slate50 = dark ? Color(30, 41, 59) : Color(248, 250, 252);
             Color slate100 = dark ? Color(30, 41, 59) : Color(241, 245, 249);
@@ -2596,10 +2756,12 @@ public:
             s.metadata_default = role == UiRole::Alert ? red500 : role == UiRole::Accent ? blue500 : slate500;
             s.palette.ink[ST_DISABLED] = s.disabled_ink;
             s.palette.icon[ST_DISABLED] = s.disabled_ink;
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         switch(normalized.preset) {
-        case UiThemePreset::Rounded:
+        case UiThemePreset::Pill:
             s.metrics.radius = DPI(18);
             s.metrics.content_margin = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
             s.row_radius = DPI(999);
@@ -2701,14 +2863,31 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiMenu::Style s = UiMenu::StyleDefault();
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
+            bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
             s.metrics.frame_enabled = false;
             s.metrics.face_enabled = false;
             s.metrics.focus_enabled = false;
+            s.popup_bg = dark ? Color(25, 25, 25) : White();
+            s.bar_bg = dark ? Color(25, 25, 25) : Color(248, 250, 252);
+            s.separator_color = dark ? Color(64, 64, 64) : Color(226, 232, 240);
+            s.item_ink = dark ? Color(229, 229, 229) : Color(31, 41, 55);
+            s.disabled_ink = dark ? Color(115, 115, 115) : Color(156, 163, 175);
+            s.right_ink = dark ? Color(163, 163, 163) : Color(100, 116, 139);
+            s.hot_bg = dark ? Color(38, 38, 38) : Color(239, 246, 255);
+            s.hot_frame = dark ? Color(82, 82, 82) : Color(191, 219, 254);
+            s.pressed_bg = dark ? Color(51, 51, 51) : Color(219, 234, 254);
+            s.pressed_frame = dark ? Color(96, 165, 250) : Color(96, 165, 250);
+            s.active_bar_bg = dark ? Color(38, 38, 38) : Color(232, 242, 255);
+            s.check_color = dark ? Color(229, 229, 229) : Color(17, 24, 39);
+            s.arrow_color = dark ? Color(163, 163, 163) : Color(100, 116, 139);
+            s.shadow_color = dark ? Color(0, 0, 0) : Color(148, 163, 184);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
             return s;
         }
         switch(normalized.preset) {
-        case UiThemePreset::Rounded:
+        case UiThemePreset::Pill:
             s.metrics.radius = DPI(14);
             s.hot_bg = Color(239, 246, 255);
             s.pressed_bg = Color(219, 234, 254);
@@ -2780,8 +2959,10 @@ public:
         if(!UiIsValid(role)) role = UiLabelRole::Body;
         UiLabel::Style s = UiThemeDetail::ResolveLabelBase(normalized.preset);
         s = UiThemeDetail::ApplyLabelRole(s, role);
-        if(normalized.preset == UiThemePreset::Minimal) {
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalLabel(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s, role);
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -2794,7 +2975,7 @@ public:
         if(!UiIsValid(role)) role = UiRole::Standard;
         if(!UiIsValid(size)) size = UiTextSize::Body;
         UiLabel::Style s = UiThemeDetail::ResolveLabelBase(normalized.preset);
-        if(normalized.preset == UiThemePreset::Minimal)
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset))
             UiThemeDetail::TuneMinimalLabel(s, normalized.mode, UiLabelRole::Body);
         else
             UiThemeDetail::ApplyMode(s.palette, normalized.mode);

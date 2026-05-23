@@ -24,7 +24,7 @@ namespace {
     - v0.1.0: Replaced the legacy multi-toggle sample with a panel-style builder shell.
 */
 
-static const char* DEMO_VERSION = "v0.1.0";
+static const char* DEMO_VERSION = "v0.4.0";
 static const int DEMO_RADIUS = 8;
 
 Font DemoSans(int px, bool bold = false)
@@ -130,7 +130,7 @@ UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
     s.metrics.frame_width = DPI(1);
     s.metrics.radius = DPI(DEMO_RADIUS);
     s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
+    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(15), DPI(15));
     s.metrics.shadow.enabled = false;
     return s;
 }
@@ -161,6 +161,23 @@ UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
     s.font = DemoMono(10);
     s.metrics.radius = DPI(999);
     s.metrics.focus_enabled = true;
+    return s;
+}
+
+UiAccordion::Style MakeDemoAccordionStyle()
+{
+    UiAccordion::Style s = UiAccordion::StyleDefault();
+    s.transparent = true;
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.frame_width = 0;
+    s.metrics.focus_enabled = false;
+    s.metrics.shadow.enabled = false;
+    s.body_style.transparent = true;
+    s.body_style.metrics.face_enabled = false;
+    s.body_style.metrics.frame_enabled = false;
+    s.body_style.metrics.frame_width = 0;
+    s.body_style.metrics.shadow.enabled = false;
     return s;
 }
 
@@ -225,8 +242,8 @@ public:
         scroll_.SetRect(rc);
         scroll_.Layout();
         Rect viewport = scroll_.GetViewportRect();
-        int content_w = max(0, viewport.GetWidth());
-        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy);
+        int content_w = max(0, viewport.GetWidth() - DPI(5));
+        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy) + DPI(5);
         code_.SetRect(0, 0, content_w, content_h);
     }
 
@@ -900,10 +917,11 @@ private:
         code_panel_.Scroll().SetCustomStyle(MakeCodeScrollStyle());
         code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
         inspector_scroll_.SetCustomStyle(UiScrollPanel::StyleDefault());
-        inspector_acc_.SetCustomStyle(UiAccordion::StyleDefault());
-        layout_acc_.SetCustomStyle(UiAccordion::StyleDefault());
-        appearance_acc_.SetCustomStyle(UiAccordion::StyleDefault());
-        shadow_acc_.SetCustomStyle(UiAccordion::StyleDefault());
+        UiAccordion::Style acc = MakeDemoAccordionStyle();
+        inspector_acc_.SetCustomStyle(acc);
+        layout_acc_.SetCustomStyle(acc);
+        appearance_acc_.SetCustomStyle(acc);
+        shadow_acc_.SetCustomStyle(acc);
         direction_drop_.SetCustomStyle(UiTheme::ResolveDropdown());
         tick_side_drop_.SetCustomStyle(UiTheme::ResolveDropdown());
         shadow_curve_preset_drop_.SetCustomStyle(UiTheme::ResolveDropdown());

@@ -18,6 +18,7 @@ struct DesignerOverlayState {
 	bool hovered = false;
 	bool drop_target = false;
 	bool debug = false;
+	Color debug_color = Color(220, 38, 38);
 	int radius = 0;
 };
 
@@ -91,9 +92,9 @@ public:
 	virtual void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const = 0;
 };
 
-// Generic placeholder/control surface backed by UiPanel.
-// Use this for temporary item boxes or panel-like nodes where the user can later
-// drop a more specific layout/control inside.
+// Panel-like designer surface backed by UiPanel.
+// Used for real panel containers plus internal pane/page slots where the model
+// needs a selectable drop target but not a custom runtime control.
 class DesignerPanelAdapter : public UiPanel, public DesignerAdapter {
 public:
 	typedef DesignerPanelAdapter CLASSNAME;
@@ -112,7 +113,7 @@ public:
 
 private:
 	DesignerNodeId node_id_ = Designer_NULL;
-	String type_id_ = "Item";
+	String type_id_ = "UiPanel";
 	DesignerOverlayState overlay_;
 };
 
@@ -375,9 +376,28 @@ public:
 
 private:
 	DesignerNodeId node_id_ = Designer_NULL;
-	UiLabel page_a_;
-	UiLabel page_b_;
-	UiLabel page_c_;
+	DesignerOverlayState overlay_;
+};
+
+// Designer wrapper for UiStack.
+// Page slots are explicit child nodes, so the hierarchy and drag/drop model can
+// target each stack page while the real stack shows only the selected page.
+class DesignerStackAdapter : public UiStack, public DesignerAdapter {
+public:
+	typedef DesignerStackAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiStack"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
 	DesignerOverlayState overlay_;
 };
 

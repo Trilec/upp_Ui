@@ -586,12 +586,87 @@ inline Image ICON_DESIGN_BREADCRUMBS_48()
     return UiIconsImg::ICON_DESIGN_BREADCRUMBS_48();
 }
 
+inline Image ICON_DESIGN_ARROWS_OUTPUT_48()
+{
+    return UiIconsImg::DESIGN_ARROWS_OUTPUT_42_48();
+}
+
+inline Image ICON_DESIGN_ASPECT_RATIO_48()
+{
+    return UiIconsImg::DESIGN_ASPECT_RATIO_42_48();
+}
+
+inline Image ICON_DESIGN_DASHBOARD_EDIT_48()
+{
+    return UiIconsImg::DESIGN_DASHBOARD_2_EDIT_42_48();
+}
+
+inline Image ICON_DESIGN_DASHBOARD_CUSTOMIZE_48()
+{
+    return UiIconsImg::DESIGN_DASHBOARD_CUSTOMIZE_42_48();
+}
+
+inline Image ICON_DESIGN_DYNAMIC_FORM_48()
+{
+    return UiIconsImg::DESIGN_DYNAMIC_FORM_42_48();
+}
+
+inline Image ICON_DESIGN_EXPANSION_PANELS_48()
+{
+    return UiIconsImg::DESIGN_EXPANSION_PANELS_42_48();
+}
+
+inline Image ICON_DESIGN_FIT_PAGE_48()
+{
+    return UiIconsImg::DESIGN_FIT_PAGE_42_48();
+}
+
+inline Image ICON_DESIGN_FIT_WIDTH_48()
+{
+    return UiIconsImg::DESIGN_FIT_WIDTH_42_48();
+}
+
+inline Image ICON_DESIGN_GRID_4X4_48()
+{
+    return UiIconsImg::DESIGN_GRID_4X4_42_48();
+}
+
+inline Image ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48()
+{
+    return UiIconsImg::DESIGN_HORIZONTAL_DISTRIBUTE_42_48();
+}
+
+inline Image ICON_DESIGN_LAYOUTS_CATEGORY_48()
+{
+    return UiIconsImg::DESIGN_LAYOUTS_CATEGORY_48();
+}
+
+inline Image ICON_DESIGN_SLIDERS_48()
+{
+    return UiIconsImg::DESIGN_SLIDERS_42_48();
+}
+
+inline Image ICON_DESIGN_TAB_GROUP_48()
+{
+    return UiIconsImg::DESIGN_TAB_GROUP_42_48();
+}
+
+inline Image ICON_DESIGN_VERTICAL_DISTRIBUTE_48()
+{
+    return UiIconsImg::DESIGN_VERTICAL_DISTRIBUTE_42_48();
+}
+
+inline Image ICON_DESIGN_WIDGETS_48()
+{
+    return UiIconsImg::DESIGN_WIDGETS_42_48();
+}
+
 
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
         Vector<UiIconCatalogEntry> out;
-        out.Reserve(93);
+        out.Reserve(108);
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48", &ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MENU_48", &ICON_NAVIGATION_OUTLINED_MENU_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_VERT_48", &ICON_NAVIGATION_OUTLINED_MORE_VERT_48));
@@ -696,6 +771,21 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_STACK_48", &ICON_DESIGN_STACK_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BUTTON_48", &ICON_DESIGN_BUTTON_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BREADCRUMBS_48", &ICON_DESIGN_BREADCRUMBS_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_ARROWS_OUTPUT_48", &ICON_DESIGN_ARROWS_OUTPUT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_ASPECT_RATIO_48", &ICON_DESIGN_ASPECT_RATIO_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DASHBOARD_EDIT_48", &ICON_DESIGN_DASHBOARD_EDIT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DASHBOARD_CUSTOMIZE_48", &ICON_DESIGN_DASHBOARD_CUSTOMIZE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DYNAMIC_FORM_48", &ICON_DESIGN_DYNAMIC_FORM_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_EXPANSION_PANELS_48", &ICON_DESIGN_EXPANSION_PANELS_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_FIT_PAGE_48", &ICON_DESIGN_FIT_PAGE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_FIT_WIDTH_48", &ICON_DESIGN_FIT_WIDTH_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_GRID_4X4_48", &ICON_DESIGN_GRID_4X4_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48", &ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_LAYOUTS_CATEGORY_48", &ICON_DESIGN_LAYOUTS_CATEGORY_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SLIDERS_48", &ICON_DESIGN_SLIDERS_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TAB_GROUP_48", &ICON_DESIGN_TAB_GROUP_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_VERTICAL_DISTRIBUTE_48", &ICON_DESIGN_VERTICAL_DISTRIBUTE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_WIDGETS_48", &ICON_DESIGN_WIDGETS_48));
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
     }();

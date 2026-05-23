@@ -8,6 +8,7 @@ namespace Upp {
 
 static Color DesignerLayoutFace()  { return Color(255, 224, 178); }
 static Color DesignerLayoutFrame() { return Color(217, 119, 6); }
+static Color DesignerDebugRed()    { return Color(220, 38, 38); }
 static Color DesignerPanelFace()   { return Color(187, 232, 203); }
 static Color DesignerPanelFrame()  { return Color(34, 150, 91); }
 static Color DesignerControlFace() { return Color(203, 224, 255); }
@@ -18,15 +19,17 @@ static Image MakeDesignerTypeIcon(const String& id)
 	if(id == "BoxLayout")
 		return ICON_DESIGN_BOX_LAYOUT_48();
 	if(id == "GridLayout")
-		return ICON_DESIGN_GRID_LAYOUT_48();
+		return ICON_DESIGN_GRID_4X4_48();
 	if(id == "UiSplitter")
 		return ICON_DESIGN_BORDER_HORIZONTAL_48();
 	if(id == "UiQuadSplitter")
 		return ICON_DESIGN_BORDER_INNER_48();
+	if(id == "Spacer")
+		return ICON_DESIGN_FIT_WIDTH_48();
 	if(id == "UiPanel")
 		return ICON_DESIGN_PANEL_48();
 	if(id == "UiScrollPanel")
-		return ICON_DESIGN_SCROLL_PANEL_48();
+		return ICON_DESIGN_EXPANSION_PANELS_48();
 	if(id == "UiLabel")
 		return ICON_DESIGN_LABEL_48();
 	if(id == "UiTitleCard")
@@ -40,7 +43,7 @@ static Image MakeDesignerTypeIcon(const String& id)
 	if(id == "UiFloatEdit")
 		return ICON_DESIGN_EDIT_FLOAT_48();
 	if(id == "UiSlider")
-		return ICON_DESIGN_TUNE_48();
+		return ICON_DESIGN_SLIDERS_48();
 	if(id == "UiToggle")
 		return ICON_DESIGN_TOGGLE_COMPOSITE_48();
 	if(id == "UiDropdown")
@@ -51,6 +54,8 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_BREADCRUMBS_48();
 	if(id == "UiTab")
 		return ICON_DESIGN_TAB_48();
+	if(id == "UiStack")
+		return ICON_DESIGN_STACK_48();
 	if(id == "UiTable")
 		return ICON_DESIGN_TABLE_48();
 	if(id == "UiTree")
@@ -166,6 +171,8 @@ static DesignerType MakeBoxLayoutType()
 		n.properties.Set("gap", 8);
 		n.properties.Set("inset", 8);
 		n.properties.Set("debug", false);
+		n.properties.Set("debug_color", DesignerDebugRed());
+		n.properties.Set("debug_auto_color", true);
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
@@ -195,11 +202,39 @@ static DesignerType MakeGridLayoutType()
 		n.properties.Set("gap", 8);
 		n.properties.Set("inset", 8);
 		n.properties.Set("debug", false);
+		n.properties.Set("debug_color", DesignerDebugRed());
+		n.properties.Set("debug_auto_color", true);
 		n.properties.Set("sizing", "Expand");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("face", DesignerLayoutFace());
 		n.properties.Set("frame", DesignerLayoutFrame());
+		n.properties.Set("radius", 0);
+	};
+	return t;
+}
+
+static DesignerType MakeSpacerType()
+{
+	DesignerType t;
+	t.id = "Spacer";
+	t.display_name = "Spacer";
+	t.toolbox_group = "Layouts";
+	t.icon = MakeDesignerTypeIcon(t.id);
+	t.default_size = Size(32, 32);
+	t.min_size = Size(1, 1);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("spacer_kind", "Expander");
+		n.properties.Set("space", 24);
+		n.properties.Set("max_space", 1000000);
+		n.properties.Set("weight", 1);
+		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 24);
+		n.properties.Set("height", 24);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
 		n.properties.Set("radius", 0);
 	};
 	return t;
@@ -325,11 +360,17 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("expand_tabs", false);
 			n.properties.Set("close_buttons", false);
 			n.properties.Set("drag_handles", false);
+			n.properties.Set("tab_font", "Sans");
+			n.properties.Set("tab_font_size", 11);
+			n.properties.Set("tab_icon_size", 16);
+			n.properties.Set("tab_icon_side", "Left");
 			n.properties.Set("active", 0);
 			n.properties.Set("tab_a", "TabA");
 			n.properties.Set("tab_b", "TabB");
 			n.properties.Set("tab_c", "TabC");
 		}
+		if(id == "UiStack")
+			n.properties.Set("active", 0);
 		if(id == "UiTable") {
 			n.properties.Set("rows_count", 4);
 			n.properties.Set("cols_count", 3);
@@ -343,6 +384,60 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("root_visible", false);
 			n.properties.Set("connectors", true);
 			n.properties.Set("metadata", false);
+		}
+	};
+	return t;
+}
+
+static DesignerType MakeGenericType()
+{
+	DesignerType t = MakeControlType("Generic", "Generic", Size(140, 48));
+	t.toolbox_group.Clear();
+	t.display_name = "Generic";
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("text", "Generic");
+		n.properties.Set("original_type", "");
+		n.properties.Set("sizing", "Fit");
+		n.properties.Set("h_sizing", "Fit");
+		n.properties.Set("v_sizing", "Fit");
+		n.properties.Set("width", 140);
+		n.properties.Set("height", 48);
+		n.properties.Set("face", DesignerControlFace());
+		n.properties.Set("frame", DesignerControlFrame());
+		n.properties.Set("radius", 4);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("frame_enabled", true);
+	};
+	return t;
+}
+
+static DesignerType MakePageContainerType(const String& id, const String& name, Size size)
+{
+	DesignerType t = MakeControlType(id, name, size);
+	t.toolbox_group = "Containers";
+	t.is_container = true;
+	t.can_have_children = true;
+	t.init_defaults = [=](DesignerNode& n) {
+		n.properties.Set("text", name);
+		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", size.cx);
+		n.properties.Set("height", size.cy);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
+		n.properties.Set("active", 0);
+		if(id == "UiTab") {
+			n.properties.Set("visual", "Underline");
+			n.properties.Set("placement", "Top");
+			n.properties.Set("expand_tabs", false);
+			n.properties.Set("close_buttons", false);
+			n.properties.Set("drag_handles", false);
+			n.properties.Set("tab_font", "Sans");
+			n.properties.Set("tab_font_size", 11);
+			n.properties.Set("tab_icon_size", 16);
+			n.properties.Set("tab_icon_side", "Left");
 		}
 	};
 	return t;
@@ -368,6 +463,33 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 		n.properties.Set("frame_enabled", false);
 		if(id == "UiScrollPanel")
 			n.properties.Set("scroll_mode", "Auto");
+	};
+	return t;
+}
+
+static DesignerType MakePageSlotType()
+{
+	DesignerType t;
+	t.id = "PageSlot";
+	t.display_name = "Page Slot";
+	t.icon = ICON_DESIGN_STACK_48();
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(220, 140);
+	t.min_size = Size(40, 30);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("page_title", "Page");
+		n.properties.Set("show_title", true);
+		n.properties.Set("icon", "None");
+		n.properties.Set("icon_size", 16);
+		n.properties.Set("sizing", "Expand");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 220);
+		n.properties.Set("height", 140);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
 	};
 	return t;
 }
@@ -404,6 +526,9 @@ static DesignerType MakeWindowType()
 	t.can_have_children = true;
 	t.default_size = Size(760, 460);
 	t.min_size = Size(240, 180);
+	t.can_drop = [](const DesignerNode&, const DesignerNode& child) {
+		return child.type_id != "Spacer";
+	};
 	return t;
 }
 
@@ -412,11 +537,16 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeWindowType());
 	registry.Register(MakeBoxLayoutType());
 	registry.Register(MakeGridLayoutType());
+	registry.Register(MakeSpacerType());
 	registry.Register(MakeSplitterType());
 	registry.Register(MakeQuadSplitterType());
 	registry.Register(MakePaneSlotType());
+	registry.Register(MakePageSlotType());
+	registry.Register(MakeGenericType());
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
 	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
+	registry.Register(MakePageContainerType("UiTab", "Tab", Size(300, 180)));
+	registry.Register(MakePageContainerType("UiStack", "Stack", Size(300, 180)));
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
 	registry.Register(MakeControlType("UiTitleCard", "Title Card", Size(220, 72)));
 	registry.Register(MakeControlType("UiButton", "Button", Size(120, 32)));
@@ -428,10 +558,8 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeControlType("UiDropdown", "Dropdown", Size(180, 32)));
 	registry.Register(MakeControlType("UiCheckBox", "Checkbox", Size(150, 28)));
 	registry.Register(MakeControlType("UiBreadcrumbs", "Breadcrumbs", Size(260, 32)));
-	registry.Register(MakeControlType("UiTab", "Tab", Size(300, 180)));
 	registry.Register(MakeControlType("UiTable", "Table", Size(320, 180)));
 	registry.Register(MakeControlType("UiTree", "Tree", Size(260, 180)));
-	registry.Register(MakeControlType("Item", "Item", Size(100, 32)));
 }
 
 }

@@ -320,7 +320,7 @@ void UiBoxLayout::Paint(Draw& w)
 
     Rect r = GetSize();
     Rect irc = r.Deflated(inset.left, inset.top, inset.right, inset.bottom);
-    Color line = Color(220, 0, 0);
+    Color line = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
     Color fill = Blend(line, SColorPaper(), 205);
 
     if(inset.top > 0)

@@ -19,6 +19,7 @@ static void PaintDesignerAppearanceValues(Draw& w, const Rect& r, Color face, Co
                                           bool face_enabled = true, bool frame_enabled = true);
 static void PaintDesignerAppearance(Draw& w, const Rect& r, const DesignerNode& n,
                                     Color default_face, Color default_frame);
+static Color DesignerDebugColor(const DesignerNode& n);
 
 static void DrawDesignerOverlay(Draw& w, const Rect& r, const DesignerOverlayState& state)
 {
@@ -124,7 +125,7 @@ static void DrawDottedDesignerOverlay(Draw& w, const Rect& r, const DesignerOver
 {
 	if(r.IsEmpty())
 		return;
-	Color c = state.debug       ? Color(220, 38, 38)
+	Color c = state.debug       ? state.debug_color
 	        : state.drop_target ? Color(255, 191, 0)
 	        : state.selected    ? SColorHighlight()
 	        : state.hovered     ? Color(80, 160, 255)
@@ -146,6 +147,23 @@ static Color GetColorProperty(const DesignerNode& n, const String& key, Color de
 {
 	Value v = AdapterNodeProperty(n, key, def);
 	return IsNull(v) ? def : (Color)v;
+}
+
+static Color DesignerDebugColor(const DesignerNode& n)
+{
+	if(!(bool)AdapterNodeProperty(n, "debug_auto_color", false))
+		return GetColorProperty(n, "debug_color", Color(220, 38, 38));
+	static const Color palette[] = {
+		Color(220, 38, 38),
+		Color(217, 119, 6),
+		Color(37, 99, 235),
+		Color(22, 163, 74),
+		Color(147, 51, 234),
+		Color(8, 145, 178),
+		Color(219, 39, 119)
+	};
+	int q = abs((int)n.id) % (int)(sizeof(palette) / sizeof(palette[0]));
+	return palette[q];
 }
 
 static Font DesignerFontChoice(const DesignerNode& n, const String& key, int size, bool bold = false)
@@ -179,7 +197,20 @@ static Image DesignerIconChoice(const DesignerNode& n)
 	return Image();
 }
 
-static void AddIconBinding(DesignerApiBuilder& b)
+static UiAlign DesignerSideChoice(const String& side, UiAlign def = UiAlign::LEFT)
+{
+	if(side == "Right")
+		return UiAlign::RIGHT;
+	if(side == "Top")
+		return UiAlign::TOP;
+	if(side == "Bottom")
+		return UiAlign::BOTTOM;
+	if(side == "Left")
+		return UiAlign::LEFT;
+	return def;
+}
+
+static void AddIconChoiceBinding(DesignerApiBuilder& b)
 {
 	DesignerApiBinding& icon = b.Add("icon", "Icon", DesignerEditorKind::Choice, "Ui control icon/media API",
 	                                 "Optional preview icon from the Ui icon catalog.");
@@ -187,6 +218,11 @@ static void AddIconBinding(DesignerApiBuilder& b)
 	const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
 	for(int i = 0; i < catalog.GetCount(); i++)
 		icon.choices.Add(catalog[i].name, catalog[i].display_name);
+}
+
+static void AddIconBinding(DesignerApiBuilder& b)
+{
+	AddIconChoiceBinding(b);
 	b.AddInt("icon_size", "Icon size", DesignerEditorKind::Slider,
 	         "SetIconSize / SetMedia preferred size",
 	         "Preview icon size for icon-capable controls.", 8, 64);
@@ -195,7 +231,7 @@ static void AddIconBinding(DesignerApiBuilder& b)
 static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 {
 	UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Subtle);
-	bool pane_slot = n.type_id == "PaneSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
+	bool pane_slot = n.type_id == "PaneSlot" || n.type_id == "PageSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
 	bool face_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "face_enabled", true);
 	bool frame_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "frame_enabled", true);
 	if(face_enabled || frame_enabled) {
@@ -292,6 +328,8 @@ String DesignerAdapterHelp(const String& type_id)
 		return "Stacks children in one direction. Use gap, inset, wrap, and per-child sizing to test responsive rows or columns.";
 	if(type_id == "GridLayout")
 		return "Places children into stable cells. Use rows, columns, cell size, gap, and per-axis expand settings to inspect grid behavior.";
+	if(type_id == "Spacer")
+		return "Design-time entry for layout space. In box layouts it emits AddSpacer/AddBreak; in grid layouts it emits AddExpand/AddGap/AddSpacer.";
 	if(type_id == "UiSplitter")
 		return "Divides an area into two pane slots. Drop layouts or controls into each pane, then adjust orientation, split, and minimum pane sizes.";
 	if(type_id == "UiQuadSplitter")
@@ -323,15 +361,17 @@ String DesignerAdapterHelp(const String& type_id)
 	if(type_id == "UiBreadcrumbs")
 		return "Path/navigation control. Use it to check long horizontal content, dividers, and optional path icons.";
 	if(type_id == "UiTab")
-		return "Tab strip and page container. Use it to test tab visuals, placement, close buttons, drag handles, and icon spacing.";
+		return "Tab strip and page container. Drop controls into page slots, then choose the active page in the inspector.";
+	if(type_id == "UiStack")
+		return "Headless page container. Drop controls into page slots and switch the active page without visible tab chrome.";
 	if(type_id == "UiTable")
 		return "Model-backed table. Use it to test row, header, grid, and scrolling behavior inside layouts.";
 	if(type_id == "UiTree")
 		return "Model-backed hierarchy. Use it to test indentation, connector lines, metadata markers, and tree selection sizing.";
-	if(type_id == "Item")
-		return "Generic placeholder item for layout experiments before choosing a real Ui control.";
 	if(type_id == "PaneSlot")
 		return "Internal splitter pane slot. It is shown in the hierarchy so controls can be dropped into a specific pane.";
+	if(type_id == "PageSlot")
+		return "Internal tab/stack page slot. Drop layouts or controls here to edit the content of a specific page.";
 	if(type_id == "Window")
 		return "The virtual top-level window. Resize it to see how child layouts respond to available space.";
 	return "Select a toolbox item to see how it should be used in the designer.";
@@ -457,16 +497,42 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	if(node.type_id == "PaneSlot") {
+	if(node.type_id == "Spacer") {
+		b.Hide("text");
 		b.Hide("face");
 		b.Hide("frame");
 		b.Hide("radius");
 		b.Hide("face_enabled");
 		b.Hide("frame_enabled");
-		b.Disable("h_sizing", "Pane slots are owned by the splitter.");
-		b.Disable("v_sizing", "Pane slots are owned by the splitter.");
-		b.Disable("width", "Pane size is owned by the splitter position and pane minimums.");
-		b.Disable("height", "Pane size is owned by the splitter position and pane minimums.");
+		b.AddChoice("spacer_kind", "Spacer", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
+		            "Semantic layout spacer kind.",
+		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
+		b.AddInt("space", "Space", DesignerEditorKind::Slider, "AddGap / AddSpacer min",
+		         "Fixed size or bounded minimum in pixels before DPI scaling.", 0, 400);
+		b.AddInt("max_space", "Max space", DesignerEditorKind::Slider, "UiGridLayout::AddSpacer max",
+		         "Bounded spacer maximum in pixels before DPI scaling.", 0, 1600);
+		b.AddInt("weight", "Weight", DesignerEditorKind::Slider, "AddSpacer / AddExpand weight",
+		         "Expander weight relative to other expanding items.", 1, 12);
+		return;
+	}
+	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot") {
+		b.Hide("face");
+		b.Hide("frame");
+		b.Hide("radius");
+		b.Hide("face_enabled");
+		b.Hide("frame_enabled");
+		String owner = node.type_id == "PaneSlot" ? "splitter" : "page container";
+		b.Disable("h_sizing", "Slot size is owned by the " + owner + ".");
+		b.Disable("v_sizing", "Slot size is owned by the " + owner + ".");
+		b.Disable("width", "Slot width is owned by the " + owner + ".");
+		b.Disable("height", "Slot height is owned by the " + owner + ".");
+		if(node.type_id == "PageSlot") {
+			b.Add("page_title", "Page title", DesignerEditorKind::Text, "UiTab::Add / UiStack::AddPage key",
+			      "Title/key used by the owning tab or stack page.");
+			b.Add("show_title", "Show title", DesignerEditorKind::Bool, "UiTab::SetTabText",
+			      "When off, the tab can be shown as icon-only while keeping the page title for the model.");
+			AddIconChoiceBinding(b);
+		}
 		return;
 	}
 	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
@@ -1025,7 +1091,9 @@ void DesignerTabAdapter::SyncFromNode(const DesignerNode& node)
 	                visual == "Rail" ? UITAB_RAIL : UITAB_DOCUMENT;
 	String placement = AdapterNodeProperty(node, "placement", "Top");
 	UiTab::Style s = UiTheme::ResolveTab(v);
-	s.tab_font = SansSerifZ(11);
+	s.tab_font = DesignerFontChoice(node, "tab_font", max(7, (int)AdapterNodeProperty(node, "tab_font_size", 11)));
+	s.icon_size = DPI(max(0, (int)AdapterNodeProperty(node, "tab_icon_size", 16)));
+	s.icon_side = DesignerSideChoice(AdapterNodeProperty(node, "tab_icon_side", "Left"), UiAlign::LEFT);
 	SetCustomStyle(s);
 	SetPlacement(placement == "Bottom" ? UiAlign::BOTTOM :
 	             placement == "Left" ? UiAlign::LEFT :
@@ -1035,14 +1103,7 @@ void DesignerTabAdapter::SyncFromNode(const DesignerNode& node)
 	EnableCloseButtons((bool)AdapterNodeProperty(node, "close_buttons", true));
 	EnableDragHandles((bool)AdapterNodeProperty(node, "drag_handles", true));
 	EnableDragReorder(false);
-	page_a_.SetText("TabA page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-	page_b_.SetText("TabB page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-	page_c_.SetText("TabC page").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 	Clear();
-	Add(page_a_, AdapterNodeProperty(node, "tab_a", "Overview"), ICON_DESIGN_HOME_48());
-	Add(page_b_, AdapterNodeProperty(node, "tab_b", "Settings"), ICON_DESIGN_SETTINGS_48());
-	Add(page_c_, AdapterNodeProperty(node, "tab_c", "Logs"), ICON_DESIGN_MENU_48());
-	SetActiveTab(clamp((int)AdapterNodeProperty(node, "active", 0), 0, 2));
 	NoWantFocus();
 }
 
@@ -1068,15 +1129,61 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	b.Add("expand_tabs", "Expand tabs", DesignerEditorKind::Bool, "UiTab::SetExpandTabs", "Tabs share available strip space.");
 	b.Add("close_buttons", "Close buttons", DesignerEditorKind::Bool, "UiTab::EnableCloseButtons", "Shows close affordances.");
 	b.Add("drag_handles", "Drag handles", DesignerEditorKind::Bool, "UiTab::EnableDragHandles", "Shows tab drag handles.");
-	b.AddInt("active", "Active", DesignerEditorKind::Slider, "UiTab::SetActiveTab", "Active tab index.", 0, 2);
-	b.Add("tab_a", "Tab 1", DesignerEditorKind::Text, "UiTab::SetTabText", "First tab text.");
-	b.Add("tab_b", "Tab 2", DesignerEditorKind::Text, "UiTab::SetTabText", "Second tab text.");
-	b.Add("tab_c", "Tab 3", DesignerEditorKind::Text, "UiTab::SetTabText", "Third tab text.");
+	b.AddChoice("tab_font", "Tab font", "UiTab::SetTabFont",
+	            "Font family used by tab labels.",
+	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("tab_font_size", "Tab font size", DesignerEditorKind::Slider, "UiTab::SetTabFont",
+	         "Font size used by tab labels.", 7, 32);
+	b.AddInt("tab_icon_size", "Tab icon size", DesignerEditorKind::Slider, "UiTab::SetTabIconSize",
+	         "Shared icon size used by tab page icons and tab affordances.", 8, 64);
+	b.AddChoice("tab_icon_side", "Icon side", "UiTab::SetTabIconSide",
+	            "Where page icons sit relative to tab text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiTab::SetActiveTab",
+	                                   "Visible tab page. Rename individual Page Slot children to change tab labels.");
+	int pages = max(1, node.children.GetCount());
+	for(int i = 0; i < pages; i++)
+		active.choices.Add(AsString(i), Format("Page %d", i + 1));
 }
 
 void DesignerTabAdapter::Paint(Draw& w)
 {
 	UiTab::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerStackAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ClearPages();
+	NoWantFocus();
+}
+
+void DesignerStackAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerStackAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiStack::SetActivePage",
+	                                   "Visible stack page. Rename individual Page Slot children to change page keys.");
+	int pages = max(1, node.children.GetCount());
+	for(int i = 0; i < pages; i++)
+		active.choices.Add(AsString(i), Format("Page %d", i + 1));
+}
+
+void DesignerStackAdapter::Paint(Draw& w)
+{
+	UiStack::Paint(w);
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -1237,6 +1344,7 @@ void DesignerBoxLayoutAdapter::SyncFromNode(const DesignerNode& node)
 		.SetGap(DPI((int)AdapterNodeProperty(node, "gap", 8)))
 		.SetInset(DPI((int)AdapterNodeProperty(node, "inset", 8)))
 		.SetWrap((bool)AdapterNodeProperty(node, "wrap", false))
+		.SetDebugColor(DesignerDebugColor(node))
 		.SetDebug((bool)AdapterNodeProperty(node, "debug", false));
 }
 
@@ -1266,6 +1374,12 @@ void DesignerBoxLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	         "Padding between the layout bounds and child area.", 0, 64);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "UiBoxLayout::SetDebug",
 	      "Uses the real layout debug overlay.");
+	b.Add("debug_color", "Debug color", DesignerEditorKind::Color, "UiBoxLayout::SetDebugColor",
+	      "Color used for debug lines; debug fill is the same color blended to 20% strength.");
+	b.Add("debug_auto_color", "Auto debug color", DesignerEditorKind::Bool, "designer debug palette",
+	      "Chooses a stable palette color for this layout so nested debug overlays are easier to tell apart.");
+	if((bool)AdapterNodeProperty(node, "debug_auto_color", false))
+		b.Disable("debug_color", "Auto debug color is choosing a stable color for this layout.");
 }
 
 void DesignerBoxLayoutAdapter::Paint(Draw& w)
@@ -1288,6 +1402,7 @@ void DesignerGridLayoutAdapter::SyncFromNode(const DesignerNode& node)
 		                     DPI((int)AdapterNodeProperty(node, "cell_height", 32))))
 		.SetGap(DPI((int)AdapterNodeProperty(node, "gap", 8)))
 		.SetInset(DPI((int)AdapterNodeProperty(node, "inset", 8)))
+		.SetDebugColor(DesignerDebugColor(node))
 		.SetDebug((bool)AdapterNodeProperty(node, "debug", false));
 }
 
@@ -1320,6 +1435,12 @@ void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 	         "Padding between the layout bounds and child area.", 0, 64);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "UiGridLayout::SetDebug",
 	      "Uses the real grid debug overlay.");
+	b.Add("debug_color", "Debug color", DesignerEditorKind::Color, "UiGridLayout::SetDebugColor",
+	      "Color used for debug lines; debug fill is the same color blended to 20% strength.");
+	b.Add("debug_auto_color", "Auto debug color", DesignerEditorKind::Bool, "designer debug palette",
+	      "Chooses a stable palette color for this layout so nested debug overlays are easier to tell apart.");
+	if((bool)AdapterNodeProperty(node, "debug_auto_color", false))
+		b.Disable("debug_color", "Auto debug color is choosing a stable color for this layout.");
 }
 
 void DesignerGridLayoutAdapter::Paint(Draw& w)
@@ -1539,6 +1660,11 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		ctrl = p;
 		a = p;
 	}
+	else if(node.type_id == "UiStack") {
+		DesignerStackAdapter *p = new DesignerStackAdapter;
+		ctrl = p;
+		a = p;
+	}
 	else if(node.type_id == "UiTable") {
 		DesignerTableAdapter *p = new DesignerTableAdapter;
 		ctrl = p;
@@ -1580,6 +1706,7 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerCheckBoxAdapter *p = dynamic_cast<DesignerCheckBoxAdapter *>(&ctrl)) return p;
 	if(DesignerBreadcrumbsAdapter *p = dynamic_cast<DesignerBreadcrumbsAdapter *>(&ctrl)) return p;
 	if(DesignerTabAdapter *p = dynamic_cast<DesignerTabAdapter *>(&ctrl)) return p;
+	if(DesignerStackAdapter *p = dynamic_cast<DesignerStackAdapter *>(&ctrl)) return p;
 	if(DesignerTableAdapter *p = dynamic_cast<DesignerTableAdapter *>(&ctrl)) return p;
 	if(DesignerTreeAdapter *p = dynamic_cast<DesignerTreeAdapter *>(&ctrl)) return p;
 	if(DesignerScrollPanelAdapter *p = dynamic_cast<DesignerScrollPanelAdapter *>(&ctrl)) return p;

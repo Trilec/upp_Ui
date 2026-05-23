@@ -2,7 +2,7 @@
 #define _Ui_UiCompositeLabel_h_
 
 #include <Ui/UiLabel.h>
-#include <Ui/UiCompositeSlider.h>
+#include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {

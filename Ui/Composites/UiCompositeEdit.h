@@ -3,7 +3,7 @@
 
 #include <Ui/UiLabel.h>
 #include <Ui/UiLineEdit.h>
-#include <Ui/UiCompositeSlider.h>
+#include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {

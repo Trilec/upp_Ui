@@ -197,6 +197,9 @@ protected:
         cfg_.thumb_face_color = s.thumb_palette.face[ST_NORMAL].IsSolid() ? s.thumb_palette.face[ST_NORMAL].color : cfg_.thumb_face_color;
         cfg_.thumb_frame_color = s.thumb_palette.frame[ST_NORMAL];
         cfg_.thumb_ink = s.thumb_palette.ink[ST_NORMAL];
+        UiPanel::Style pane = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        cfg_.pane_a = pane.palette.face[ST_NORMAL].IsSolid() ? pane.palette.face[ST_NORMAL].color : Palette().paper;
+        cfg_.pane_b = Palette().dark ? Color(31, 31, 31) : Color(241, 245, 249);
         ApplyStateTextStyle();
         RefreshFromConfig();
     }

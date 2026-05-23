@@ -4,9 +4,11 @@
 #include "DesignerPreview.h"
 #include "DesignerTemplates.h"
 #include "DesignerCodeGen.h"
+#include "DesignerSerialization.h"
 #include "DesignerInspector.h"
 #include "DesignerHierarchy.h"
 #include "DesignerDragController.h"
+#include "DesignerAssets.h"
 
 // Designer utility app - Box/Grid/Splitter layout builder for U++ Ui controls.
 // This file wires the subsystems together: model, commands, adapters, preview,
@@ -17,6 +19,32 @@ namespace Upp {
 static const char* DESIGNER_VERSION = "v0.1.4";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
+static const char *DesignerThemePresetId(UiThemePreset preset)
+{
+	switch(preset) {
+	case UiThemePreset::Minimal: return "Minimal";
+	case UiThemePreset::Pill: return "Pill";
+	case UiThemePreset::Linear: return "Linear";
+	case UiThemePreset::Solid: return "Solid";
+	case UiThemePreset::Outline: return "Outline";
+	case UiThemePreset::Compact: return "Compact";
+	case UiThemePreset::Layered: return "Layered";
+	default: return "Minimal";
+	}
+}
+
+static UiThemePreset DesignerThemePresetFromId(const Value& id)
+{
+	String s = IsNull(id) ? String("Minimal") : AsString(id);
+	if(s == "Pill") return UiThemePreset::Pill;
+	if(s == "Linear")  return UiThemePreset::Linear;
+	if(s == "Solid")   return UiThemePreset::Solid;
+	if(s == "Outline") return UiThemePreset::Outline;
+	if(s == "Compact") return UiThemePreset::Compact;
+	if(s == "Layered") return UiThemePreset::Layered;
+	return UiThemePreset::Minimal;
+}
+
 static Color DesignerShellBackground(UiThemeMode mode)
 {
 	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
@@ -25,6 +53,60 @@ static Color DesignerShellBackground(UiThemeMode mode)
 static Font ToolboxHelpFont()
 {
 	return SansSerifZ(9);
+}
+
+static String DesignerNameFromTitle(String text)
+{
+	text = TrimBoth(text);
+	String out;
+	bool last_us = false;
+	for(int i = 0; i < text.GetCount(); i++) {
+		int c = (byte)text[i];
+		if(IsAlNum(c)) {
+			out.Cat(ToLower(c));
+			last_us = false;
+		}
+		else if(!last_us && !out.IsEmpty()) {
+			out.Cat('_');
+			last_us = true;
+		}
+	}
+	while(out.EndsWith("_"))
+		out.Trim(out.GetCount() - 1);
+	if(out.IsEmpty())
+		out = "node";
+	if(IsDigit((byte)out[0]))
+		out = "node_" + out;
+	return out;
+}
+
+static String DesignerDefaultBaseName(const String& type_id)
+{
+	if(type_id == "BoxLayout") return "boxLayout";
+	if(type_id == "GridLayout") return "gridLayout";
+	if(type_id == "Spacer") return "spacer";
+	if(type_id == "UiSplitter") return "splitter";
+	if(type_id == "UiQuadSplitter") return "quadSplitter";
+	if(type_id == "UiPanel") return "panel";
+	if(type_id == "UiScrollPanel") return "scrollPanel";
+	if(type_id == "UiTab") return "tab";
+	if(type_id == "UiStack") return "stack";
+	if(type_id == "UiLabel") return "label";
+	if(type_id == "UiTitleCard") return "titleCard";
+	if(type_id == "UiButton") return "button";
+	if(type_id == "UiLineEdit") return "lineEdit";
+	if(type_id == "UiIntEdit") return "intEdit";
+	if(type_id == "UiFloatEdit") return "floatEdit";
+	if(type_id == "UiSlider") return "slider";
+	if(type_id == "UiToggle") return "toggle";
+	if(type_id == "UiDropdown") return "dropdown";
+	if(type_id == "UiCheckBox") return "checkBox";
+	if(type_id == "UiBreadcrumbs") return "breadcrumbs";
+	if(type_id == "UiTable") return "table";
+	if(type_id == "UiTree") return "tree";
+	if(type_id == "PaneSlot") return "pane";
+	if(type_id == "PageSlot") return "page";
+	return DesignerNameFromTitle(type_id);
 }
 
 static String WrapDesignerHelpText(const String& text, int width, Font font)
@@ -109,6 +191,8 @@ public:
 	DesignerWindow()
 	{
 		Title("Designer - Box/Grid Layout Builder");
+		Icon(DesignerAssetsImg::DESIGNER_LOGO_V5())
+		    .LargeIcon(DesignerAssetsImg::DESIGNER_LOGO_V5());
 		Sizeable().Zoomable();
 		SetRect(0, 0, DPI(1180), DPI(740));
 		SetMinSize(Size(DPI(920), DPI(580)));
@@ -132,15 +216,21 @@ public:
 		int top_y = gap;
 		int control_y = top_y + DPI(12);
 		int version_w = DPI(82);
+		int save_w = DPI(92);
+		int load_w = DPI(92);
+		int preset_w = DPI(170);
 		int theme_w = DPI(96);
 		int exit_w = DPI(94);
-		int controls_w = version_w + theme_w + exit_w + gap * 3;
+		int controls_w = save_w + load_w + preset_w + theme_w + exit_w + version_w + gap * 6;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
-		version_badge_.SetRect(r.right - controls_w, control_y, version_w, DPI(34));
-		theme_shell_.SetRect(version_badge_.GetRect().right + gap, control_y, theme_w, DPI(34));
+		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
+		load_button_.SetRect(save_button_.GetRect().right + gap, control_y, load_w, DPI(34));
+		theme_preset_row_.SetRect(load_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
+		theme_shell_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, theme_w, DPI(34));
 		theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
 		theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
 		exit_button_.SetRect(theme_shell_.GetRect().right + gap, control_y, exit_w, DPI(34));
+		version_badge_.SetRect(exit_button_.GetRect().right + gap, control_y, version_w, DPI(34));
 
 		int warning_h = warning_visible_ ? DPI(30) : 0;
 		int body_y = top_y + header_h + gap;
@@ -179,10 +269,14 @@ public:
 		Rect toolbox_rect = toolbox_panel_.GetSize();
 		int help_h = DPI(76);
 		int help_gap = DPI(8);
+		int tabs_h = DPI(38);
+		toolbox_tabs_.SetRect(toolbox_rect.left, toolbox_rect.top, toolbox_rect.GetWidth(), tabs_h);
+		Rect toolbox_body = toolbox_rect;
+		toolbox_body.top += tabs_h + DPI(4);
 		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
-		if(toolbox_rect.GetHeight() < DPI(260)) {
-			toolbox_scroll_.SetRect(toolbox_rect);
-			toolbox_tree_.SetRect(0, 0, max(0, toolbox_rect.GetWidth()), max(toolbox_rect.GetHeight(), tree_h));
+		if(toolbox_body.GetHeight() < DPI(220)) {
+			toolbox_scroll_.SetRect(toolbox_body);
+			toolbox_tree_.SetRect(0, 0, max(0, toolbox_body.GetWidth()), max(toolbox_body.GetHeight(), tree_h));
 			toolbox_help_panel_.Hide();
 			toolbox_help_icon_.Hide();
 			toolbox_help_title_.Hide();
@@ -193,12 +287,12 @@ public:
 			toolbox_help_icon_.Show();
 			toolbox_help_title_.Show();
 			toolbox_help_text_.Show();
-			Rect scroll_r = RectC(toolbox_rect.left, toolbox_rect.top,
-			                      toolbox_rect.GetWidth(), max(0, toolbox_rect.GetHeight() - help_h - help_gap));
+			Rect scroll_r = RectC(toolbox_body.left, toolbox_body.top,
+			                      toolbox_body.GetWidth(), max(0, toolbox_body.GetHeight() - help_h - help_gap));
 			toolbox_scroll_.SetRect(scroll_r);
 			toolbox_tree_.SetRect(0, 0, max(0, scroll_r.GetWidth()), max(scroll_r.GetHeight(), tree_h));
-			Rect hp = RectC(toolbox_rect.left, toolbox_rect.bottom - help_h,
-			                max(0, toolbox_rect.GetWidth()), help_h);
+			Rect hp = RectC(toolbox_body.left, toolbox_body.bottom - help_h,
+			                max(0, toolbox_body.GetWidth()), help_h);
 			toolbox_help_panel_.SetRect(hp);
 			toolbox_help_icon_.SetRect(DPI(10), DPI(10), DPI(18), DPI(18));
 			toolbox_help_title_.SetRect(DPI(34), DPI(8), max(0, hp.GetWidth() - DPI(44)), DPI(18));
@@ -270,8 +364,11 @@ private:
 	DesignerNodeId AddInitializedNode(const String& type_id, DesignerNodeId parent, int index = -1)
 	{
 		DesignerNodeId id = commands_.AddNode(model_, type_id, parent, index);
-		if(id != Designer_NULL)
+		if(id != Designer_NULL) {
 			InitNode(id);
+			if(DesignerNode* n = model_.Find(id))
+				n->name = UniqueDesignerName(DesignerDefaultBaseName(type_id), id);
+		}
 		return id;
 	}
 
@@ -296,10 +393,25 @@ private:
 					p->name = name[i];
 			}
 		}
+		else if(n->type_id == "UiTab" || n->type_id == "UiStack") {
+			static const char *name[] = { "pageA", "pageB", "pageC" };
+			static const char *title[] = { "Page A", "Page B", "Page C" };
+			for(int i = 0; i < 3; i++) {
+				DesignerNodeId page = AddInitializedNode("PageSlot", id, i);
+				if(DesignerNode* p = model_.Find(page)) {
+					p->name = name[i];
+					p->properties.Set("page_title", title[i]);
+				}
+			}
+		}
 	}
 
 	void ApplyStarterTemplate(const String& id)
 	{
+		if(id.IsEmpty() || id == "Current")
+			return;
+		if(!PromptOKCancel("Applying this preset will clear the current design. Continue?"))
+			return;
 		if(ApplyDesignerTemplate(model_, registry_, id)) {
 			syncing_template_ = true;
 			template_row_.SetData("Current");
@@ -315,6 +427,9 @@ private:
 	{
 		Add(header_);
 		Add(version_badge_);
+		Add(save_button_);
+		Add(load_button_);
+		Add(theme_preset_row_);
 		Add(theme_shell_);
 		Add(theme_icon_);
 		Add(theme_toggle_);
@@ -326,6 +441,7 @@ private:
 		Add(warning_icon_);
 		Add(warning_text_);
 		Add(side_);
+		toolbox_panel_.Add(toolbox_tabs_);
 		toolbox_panel_.Add(toolbox_scroll_);
 		toolbox_scroll_.Content().Add(toolbox_tree_);
 		toolbox_panel_.Add(toolbox_help_panel_);
@@ -336,6 +452,10 @@ private:
 		side_.Content().Add(right_box_);
 		header_.SetTitle("Designer - Box/Grid Layout Builder")
 		       .SetSubTitle("Model-first designer skeleton with registered Ui types.")
+		       .SetMedia(DesignerAssetsImg::DESIGNER_LOGO_V5())
+		       .SetMediaSide(UiAlign::LEFT)
+		       .SetMediaReserve(DPI(42))
+		       .SetMediaAutoFit(true)
 		       .SetSelectable(false)
 		       .EnableHover(false);
 		drag_status_.NoWantFocus().IgnoreMouse();
@@ -348,9 +468,33 @@ private:
 		warning_icon_.Hide();
 		warning_text_.Hide();
 		version_badge_.SetText(DESIGNER_VERSION).NoWantFocus();
+		save_button_.SetIcon(CtrlImg::save())
+		            .SetText("Save")
+		            .SetIconSize(DPI(15), DPI(15))
+		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
+		save_button_.WhenAction = [=] { SaveDesignAs(); };
+		load_button_.SetIcon(CtrlImg::open())
+		            .SetText("Load")
+		            .SetIconSize(DPI(15), DPI(15))
+		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
+		load_button_.WhenAction = [=] { LoadDesignFromFile(); };
+		theme_preset_row_.SetLabel("Theme").SetLabelWidth(DPI(48)).SetFieldGap(DPI(6));
+		theme_preset_row_.Add("Minimal", "Minimal");
+		theme_preset_row_.Add("Pill", "Pill");
+		theme_preset_row_.SetData(DesignerThemePresetId(theme_preset_));
+		theme_preset_row_.WhenSelectData = [=](const Value& id) {
+			if(syncing_theme_)
+				return;
+			ApplyTheme(DesignerThemePresetFromId(id), theme_mode_);
+		};
+		theme_preset_row_.WhenClose = [=] {
+			if(syncing_theme_)
+				return;
+			ApplyTheme(DesignerThemePresetFromId(theme_preset_row_.GetData()), theme_mode_);
+		};
 		theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
 		theme_toggle_.WhenAction = [=] {
-			ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
+			ApplyTheme(theme_preset_, (bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
 		};
 		exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48())
 		            .SetText("Exit")
@@ -376,6 +520,11 @@ private:
 		toolbox_tree_.SetSelectionMode(UITREESEL_SINGLE);
 		toolbox_tree_.WhenSelection = [=] {
 			Value v = toolbox_tree_.GetData();
+			String id = IsNull(v) ? String() : AsString(v);
+			if(id.StartsWith("preset:")) {
+				ApplyStarterTemplate(id.Mid(7));
+				return;
+			}
 			UpdateToolboxHelp(IsNull(v) ? String() : AsString(v));
 		};
 		toolbox_tree_.WhenToolHover = [=](String type_id) {
@@ -389,10 +538,32 @@ private:
 		toolbox_tree_.WhenToolDrag = [=](String type_id, Point screen) { TrackToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolDrop = [=](String type_id, Point screen) { FinishToolDrag(type_id, screen); };
 		toolbox_tree_.WhenToolCancel = [=] { CancelToolDrag(); };
+		toolbox_tabs_.SetVisual(UITAB_UNDERLINE)
+		             .SetExpandTabs(true)
+		             .SetTabIconSize(DPI(18))
+		             .SetTabIconSide(UiAlign::TOP);
+		toolbox_tabs_.Add(toolbox_tab_layouts_, "", ICON_DESIGN_LAYOUTS_CATEGORY_48());
+		toolbox_tabs_.Add(toolbox_tab_containers_, "", ICON_DESIGN_TAB_GROUP_48());
+		toolbox_tabs_.Add(toolbox_tab_controls_, "", ICON_DESIGN_WIDGETS_48());
+		toolbox_tabs_.Add(toolbox_tab_composites_, "", ICON_DESIGN_DYNAMIC_FORM_48());
+		toolbox_tabs_.Add(toolbox_tab_presets_, "", ICON_DESIGN_DASHBOARD_CUSTOMIZE_48());
+		toolbox_tabs_.SetTabTip(0, "Layouts")
+		             .SetTabTip(1, "Containers")
+		             .SetTabTip(2, "Controls")
+		             .SetTabTip(3, "Composites")
+		             .SetTabTip(4, "Presets");
+		toolbox_tabs_.SetActiveTab(0);
+		toolbox_tabs_.Tip("Layouts");
+		toolbox_tabs_.WhenAction = [=] {
+			RefreshToolbox();
+		};
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_SINGLE);
 		hierarchy_.ShowConnectorLines(true);
+		Vector<int> hierarchy_cols;
+		hierarchy_cols << DPI(14) << DPI(14) << DPI(14) << DPI(14);
+		hierarchy_.SetColumnWidths(hierarchy_cols);
 		hierarchy_.WhenSelection = [=] {
 			if(syncing_hierarchy_)
 				return;
@@ -473,7 +644,50 @@ private:
 					ApplyStarterTemplate((String)id);
 			});
 		};
-		ApplyTheme(UiThemeMode::Light);
+		ApplyTheme(theme_preset_, UiThemeMode::Light);
+	}
+
+	void SaveDesignAs()
+	{
+		FileSel fs;
+		fs.Type("Designer JSON", "*.json").DefaultExt("json").DefaultName("design.json");
+		if(!fs.ExecuteSaveAs("Save designer document"))
+			return;
+		String path = ~fs;
+		if(!SaveFile(path, StoreDesignerModelJson(model_))) {
+			Exclamation("Unable to save designer document.");
+			return;
+		}
+		SetWarningNotes("Saved " + GetFileName(path));
+	}
+
+	void LoadDesignFromFile()
+	{
+		FileSel fs;
+		fs.Type("Designer JSON", "*.json").AllFilesType();
+		if(!fs.ExecuteOpen("Load designer document"))
+			return;
+		String path = ~fs;
+		String json = LoadFile(path);
+		if(json.IsVoid()) {
+			Exclamation("Unable to read designer document.");
+			return;
+		}
+		String error;
+		Vector<String> notes;
+		if(!LoadDesignerModelJson(model_, registry_, json, error, &notes)) {
+			Exclamation("Unable to load designer document:\n" + error);
+			return;
+		}
+		commands_.Clear();
+		RefreshAll();
+		String note_text;
+		for(const String& note : notes) {
+			if(!note_text.IsEmpty())
+				note_text << "\n";
+			note_text << note;
+		}
+		SetWarningNotes(note_text.IsEmpty() ? "Loaded " + GetFileName(path) : note_text);
 	}
 
 	// Full rebuild after structural edits or template changes.
@@ -528,6 +742,10 @@ private:
 			static const char *name[] = { "Top left pane", "Top right pane", "Bottom left pane", "Bottom right pane" };
 			return name[clamp(child_index, 0, 3)];
 		}
+		if(parent.type_id == "UiTab")
+			return Format("Tab page %d", child_index + 1);
+		if(parent.type_id == "UiStack")
+			return Format("Stack page %d", child_index + 1);
 		return String();
 	}
 
@@ -535,7 +753,27 @@ private:
 	{
 		toolbox_model_.Clear();
 		UiTreeNodeRef root = toolbox_model_.Root();
+		String active_group = ActiveToolboxGroup();
+		toolbox_tabs_.Tip(active_group);
+		if(active_group == "Presets") {
+			UiModelItem group_item("Presets");
+			group_item.group_header = true;
+			group_item.enabled = false;
+			UiTreeNodeRef group_ref = toolbox_model_.AddChild(root, group_item);
+			toolbox_tree_.Expand(group_ref, true);
+			AddPresetToolboxItem(group_ref, "Holy Grail", "HolyGrail");
+			AddPresetToolboxItem(group_ref, "Magazine", "Magazine");
+			AddPresetToolboxItem(group_ref, "SPA", "SPA");
+			AddPresetToolboxItem(group_ref, "Card Grid", "CardGrid");
+			AddPresetToolboxItem(group_ref, "Split Screen", "SplitScreen");
+			AddPresetToolboxItem(group_ref, "F-Pattern", "FPattern");
+			toolbox_tree_.Refresh();
+			UpdateToolboxHelp(IsNull(toolbox_tree_.GetData()) ? String() : AsString(toolbox_tree_.GetData()));
+			return;
+		}
 		for(String group : registry_.GetToolboxGroups()) {
+			if(group != active_group)
+				continue;
 			UiModelItem group_item(group);
 			group_item.group_header = true;
 			group_item.enabled = false;
@@ -554,8 +792,36 @@ private:
 		UpdateToolboxHelp(IsNull(toolbox_tree_.GetData()) ? String() : AsString(toolbox_tree_.GetData()));
 	}
 
+	void AddPresetToolboxItem(UiTreeNodeRef parent, const String& text, const String& id)
+	{
+		UiModelItem item(text, "preset:" + id);
+		item.description = "Preset";
+		item.icon = ICON_DESIGN_DASHBOARD_EDIT_48();
+		item.icon_render_mode = UiIconRenderMode::MonoTint;
+		item.custom_ink_color = CategoryColor(nullptr);
+		toolbox_model_.AddChild(parent, item);
+	}
+
+	String ActiveToolboxGroup() const
+	{
+		switch(toolbox_tabs_.GetActiveTab()) {
+		case 1: return "Containers";
+		case 2: return "Controls";
+		case 3: return "Composites";
+		case 4: return "Presets";
+		default: return "Layouts";
+		}
+	}
+
 	void UpdateToolboxHelp(const String& type_id)
 	{
+		if(type_id.StartsWith("preset:")) {
+			toolbox_help_raw_ = "Creates a predefined layout and clears the current design after confirmation.";
+			toolbox_help_title_.SetText(PresetDisplayName(type_id.Mid(7)));
+			RefreshToolboxHelpText();
+			toolbox_help_panel_.Tip(toolbox_help_raw_);
+			return;
+		}
 		const DesignerType* t = registry_.Find(type_id);
 		String title = t ? t->display_name : "Designer Help";
 		String help = t ? DesignerAdapterHelp(t->id)
@@ -564,6 +830,15 @@ private:
 		toolbox_help_title_.SetText(title);
 		RefreshToolboxHelpText();
 		toolbox_help_panel_.Tip(help);
+	}
+
+	String PresetDisplayName(const String& id) const
+	{
+		if(id == "HolyGrail") return "Holy Grail";
+		if(id == "CardGrid") return "Card Grid";
+		if(id == "SplitScreen") return "Split Screen";
+		if(id == "FPattern") return "F-Pattern";
+		return id;
 	}
 
 	void RefreshToolboxHelpText()
@@ -588,7 +863,8 @@ private:
 			const DesignerType* t = registry_.Find(n->type_id);
 			String text = prefix.IsEmpty() ? n->name : prefix + ": " + n->name;
 			UiModelItem item(text, n->id);
-			item.right_text = t ? t->display_name : n->type_id;
+			item.right_text = HierarchyTypeText(*n, t);
+			item.columns = HierarchyModeColumns(*n);
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
 			item.icon = NodeIcon(t);
 			item.icon_render_mode = UiIconRenderMode::MonoTint;
@@ -729,7 +1005,9 @@ private:
 		right_accordion_.Layout();
 		LayoutAccordionBodies();
 		LayoutRightPanel();
+		right_box_.RefreshLayout();
 		side_.RefreshLayout();
+		side_.Layout();
 		side_.Refresh();
 	}
 
@@ -744,11 +1022,15 @@ private:
 		y += DPI(26) + gap;
 		hierarchy_.SetRect(gap, y, max(0, r.GetWidth() - gap * 2), DPI(235));
 		y += DPI(235) + gap;
-		right_accordion_.SetRect(gap, y, max(0, r.GetWidth() - gap * 2), max(DPI(320), r.GetHeight() - y - gap));
+		int accordion_w = max(0, r.GetWidth() - gap * 2);
+		right_accordion_.SetRect(gap, y, accordion_w, max(DPI(320), r.GetHeight() - y - gap));
 		SyncAccordionBodyHeights();
+		right_accordion_.RefreshLayout();
+		int accordion_h = max(DPI(320), right_accordion_.GetMinSize().cy);
+		right_accordion_.SetRect(gap, y, accordion_w, accordion_h);
 		right_accordion_.Layout();
 		LayoutAccordionBodies();
-		int content_h = y + right_accordion_.GetMinSize().cy + gap;
+		int content_h = y + accordion_h + gap;
 		Rect vp = side_.GetViewportRect();
 		right_box_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), content_h));
 	}
@@ -1074,7 +1356,14 @@ private:
 		if(!binding || !binding->visible || !binding->enabled)
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		String auto_name = AutoNameForPropertyEdit(*n, property_id, normalized);
+		if(!auto_name.IsEmpty())
+			commands_.BeginGroup("Set " + property_id);
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, normalized, binding->api_call), model_)) {
+			if(!auto_name.IsEmpty())
+				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
+			if(!auto_name.IsEmpty())
+				commands_.EndGroup();
 			bool needs_inspector = property_id == "sizing" || property_id == "h_sizing" || property_id == "v_sizing";
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
@@ -1085,8 +1374,106 @@ private:
 			PostDesignerRefresh(needs_inspector);
 		}
 		else {
+			if(!auto_name.IsEmpty())
+				commands_.EndGroup();
 			PostDesignerRefresh(true);
 		}
+	}
+
+	bool IsDefaultDesignerName(const DesignerNode& n) const
+	{
+		if(n.name == Format("%s%d", n.type_id, n.id))
+			return true;
+		if(n.type_id == "PageSlot")
+			return n.name == "pageA" || n.name == "pageB" || n.name == "pageC" ||
+			       n.name == "PageSlot" + AsString(n.id);
+		return false;
+	}
+
+	bool NameExists(const String& name, DesignerNodeId except) const
+	{
+		for(const DesignerNode& n : model_.GetNodes())
+			if(n.id != except && n.name == name)
+				return true;
+		return false;
+	}
+
+	String UniqueDesignerName(const String& base, DesignerNodeId except) const
+	{
+		String root = DesignerNameFromTitle(base);
+		String name = root;
+		int suffix = 2;
+		while(NameExists(name, except))
+			name = Format("%s_%02d", root, suffix++);
+		return name;
+	}
+
+	String HierarchyTypeText(const DesignerNode& n, const DesignerType* t) const
+	{
+		String type = t ? t->display_name : n.type_id;
+		if(n.type_id == "Spacer") {
+			type << " " << AsString(DesignerNodePropertyOr(n, "spacer_kind", "Expander"));
+		}
+		else if(n.type_id == "Generic") {
+			String original = AsString(DesignerNodePropertyOr(n, "original_type", ""));
+			if(!original.IsEmpty())
+				type << " (" << original << ")";
+		}
+		return type;
+	}
+
+	UiModelColumn HierarchyIconColumn(const Image& icon) const
+	{
+		UiModelColumn column(icon, UiIconRenderMode::MonoTint);
+		column.align = ALIGN_CENTER;
+		return column;
+	}
+
+	UiModelColumn EmptyHierarchyColumn() const
+	{
+		return UiModelColumn();
+	}
+
+	UiModelColumn HierarchySizingColumn(const DesignerNode& n, const char *key) const
+	{
+		String sizing = AsString(DesignerNodePropertyOr(n, key, DesignerNodePropertyOr(n, "sizing", "Fit")));
+		if(sizing == "Fixed")
+			return HierarchyIconColumn(ICON_DESIGN_ASPECT_RATIO_48());
+		if(sizing == "Expand")
+			return HierarchyIconColumn(ICON_DESIGN_ARROWS_OUTPUT_48());
+		return HierarchyIconColumn(ICON_DESIGN_FIT_PAGE_48());
+	}
+
+	Vector<UiModelColumn> HierarchyModeColumns(const DesignerNode& n) const
+	{
+		Vector<UiModelColumn> out;
+		UiModelColumn orient = EmptyHierarchyColumn();
+		if(n.type_id == "BoxLayout") {
+			String d = DesignerNodePropertyOr(n, "direction", "V");
+			orient = HierarchyIconColumn(d == "H" ? ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48()
+			                                       : ICON_DESIGN_VERTICAL_DISTRIBUTE_48());
+		}
+		else if(n.type_id == "UiSplitter" || n.type_id == "UiQuadSplitter") {
+			String d = DesignerNodePropertyOr(n, "direction", "H");
+			orient = HierarchyIconColumn(d == "V" ? ICON_DESIGN_VERTICAL_DISTRIBUTE_48()
+			                                       : ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48());
+		}
+
+		UiModelColumn wrap = EmptyHierarchyColumn();
+		if(n.type_id == "BoxLayout" && (bool)DesignerNodePropertyOr(n, "wrap", false))
+			wrap = HierarchyIconColumn(ICON_EDITOR_FORMAT_LINE_SPACING_48());
+
+		out << orient << HierarchySizingColumn(n, "h_sizing") << HierarchySizingColumn(n, "v_sizing") << wrap;
+		return out;
+	}
+
+	String AutoNameForPropertyEdit(const DesignerNode& n, const String& property_id, const Value& value) const
+	{
+		if(property_id != "page_title")
+			return String();
+		if(!IsDefaultDesignerName(n))
+			return String();
+		return UniqueDesignerName(AsString(value), n.id);
 	}
 
 	Value NormalizeInspectorValue(const DesignerNode& n, const String& property_id, const Value& value) const
@@ -1095,6 +1482,10 @@ private:
 			return max(1, IsNumber(value) ? (int)value : 1);
 		if(property_id == "gap" || property_id == "inset" || property_id == "radius")
 			return max(0, IsNumber(value) ? (int)value : 0);
+		if(property_id == "active")
+			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
+		if(property_id == "icon_size" || property_id == "tab_icon_size" || property_id == "tab_font_size")
+			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
 		if(property_id == "cell_width" || property_id == "cell_height" ||
 		   property_id == "width" || property_id == "height")
 			return max(10, IsNumber(value) ? (int)value : 10);
@@ -1106,8 +1497,13 @@ private:
 		DesignerNode* n = model_.Find(node_id);
 		if(!n)
 			return;
-		if(commands_.Execute(MakeDesignerRenameCommand(node_id, new_name), model_))
-			RefreshAll();
+		String normalized = UniqueDesignerName(new_name, node_id);
+		if(commands_.Execute(MakeDesignerRenameCommand(node_id, normalized), model_)) {
+			RefreshHierarchy();
+			RefreshCode();
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+		}
 	}
 
 	void DeleteSelection()
@@ -1177,22 +1573,29 @@ private:
 		return control_icon_;
 	}
 
-	// Apply the selected light/dark theme to the shell and child Ui controls.
+	// Apply the selected theme preset and light/dark mode to the shell and child Ui controls.
 	// Demos and utilities should stay theme-first; local styling here is limited
 	// to layout shell surfaces and status affordances.
-	void ApplyTheme(UiThemeMode mode)
+	void ApplyTheme(UiThemePreset preset, UiThemeMode mode)
 	{
+		theme_preset_ = preset;
 		theme_mode_ = mode;
 		UiThemeContext ctx = UiTheme::GetContext();
-		ctx.preset = UiThemePreset::Minimal;
+		ctx.preset = preset;
 		ctx.mode = mode;
 		UiTheme::Set(ctx);
+		syncing_theme_ = true;
+		theme_preset_row_.SetData(DesignerThemePresetId(theme_preset_));
+		syncing_theme_ = false;
 		layout_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(245, 158, 66) : Color(217, 119, 6));
 		panel_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(74, 222, 128) : Color(34, 150, 91));
 		control_icon_ = MakeTypeIcon(false, mode == UiThemeMode::Dark ? Color(96, 165, 250) : Color(54, 116, 210));
 		header_.SetCustomStyle(UiTheme::ResolveTitleCard());
 		version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+		theme_preset_row_.SetLabelRole(UiRole::Subtle);
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Standard));
 		theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
 		theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
 		theme_toggle_.SetOn(mode == UiThemeMode::Dark);
@@ -1211,7 +1614,9 @@ private:
 		help_text_style.align_v = UiAlign::TOP;
 		toolbox_help_text_.SetCustomStyle(help_text_style);
 		toolbox_tree_.SetCustomStyle(UiTheme::ResolveTree());
-		hierarchy_.SetCustomStyle(UiTheme::ResolveTree());
+		UiTree::Style hierarchy_style = UiTheme::ResolveTree();
+		hierarchy_style.accessory_gap = DPI(2);
+		hierarchy_.SetCustomStyle(hierarchy_style);
 		drag_status_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body));
 		warning_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
 		UiLabel::Style warn_icon_style = UiTheme::ResolveLabel(UiRole::Alert, UiTextSize::Body);
@@ -1277,11 +1682,20 @@ private:
 
 	UiTitleCard header_;
 	UiLabel version_badge_;
+	UiButton save_button_;
+	UiButton load_button_;
+	UiCompositeDropdown theme_preset_row_;
 	UiPanel theme_shell_;
 	UiLabel theme_icon_;
 	UiToggle theme_toggle_;
 	UiButton exit_button_;
 	UiPanel toolbox_panel_;
+	UiTab toolbox_tabs_;
+	ParentCtrl toolbox_tab_layouts_;
+	ParentCtrl toolbox_tab_containers_;
+	ParentCtrl toolbox_tab_controls_;
+	ParentCtrl toolbox_tab_composites_;
+	ParentCtrl toolbox_tab_presets_;
 	UiScrollPanel toolbox_scroll_;
 	DesignerToolboxTree toolbox_tree_;
 	UiTreeModel toolbox_model_;
@@ -1323,6 +1737,8 @@ private:
 	String warning_text_value_;
 	bool refresh_posted_ = false;
 	bool pending_inspector_refresh_ = false;
+	bool syncing_theme_ = false;
+	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;
 };
 

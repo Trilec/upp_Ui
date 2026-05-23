@@ -176,6 +176,9 @@ public:
     UiTree& SetNodeLoading(UiTreeNodeRef node, bool on = true);
     bool IsNodeLoading(UiTreeNodeRef node) const;
     UiTree& MarkNodeChildrenLoaded(UiTreeNodeRef node, bool loaded = true);
+    UiTree& SetColumnWidths(const Vector<int>& widths);
+    UiTree& ClearColumnWidths();
+    const Vector<int>& GetColumnWidths() const { return column_widths_; }
 
     UiTree& AddNodeCtrl(UiTreeNodeRef node, Ctrl& ctrl);
     UiTree& SetNodeCtrl(UiTreeNodeRef node, Ctrl& ctrl);
@@ -253,8 +256,10 @@ private:
     Rect GetIconRect(const Rect& row, int depth, bool has_glyph) const;
     Rect GetMetadataRect(const Rect& row, int depth, bool has_glyph, bool has_icon) const;
     Vector<Rect> GetAccessoryRects(const Rect& row, int node_id) const;
+    Vector<Rect> GetColumnRects(const Rect& row, const UiModelItem& item) const;
     Rect GetAccessoryRect(const Rect& row, int node_id, int index) const;
     Rect GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_icon, bool has_metadata, int node_id) const;
+    void PaintItemColumns(Draw& w, const Rect& row, const UiModelItem& item, bool enabled, bool selected) const;
     struct DropTarget {
         int parent_id = -1;
         int insert_pos = -1;
@@ -296,6 +301,7 @@ private:
 
     UiTreeModel internal_model_;
     UiTreeModel* model_ = nullptr;
+    Vector<int> column_widths_;
     mutable int model_revision_ = -1;
 
     Vector<VisibleRow> visible_rows_;

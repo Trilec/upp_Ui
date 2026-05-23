@@ -35,7 +35,11 @@ String DesignerInspector::RuntimeTypeName(const String& type_id) const
 		return "UiSplitter";
 	if(type_id == "UiQuadSplitter")
 		return "UiQuadSplitter";
-	if(type_id == "Item")
+	if(type_id == "UiStack")
+		return "UiStack";
+	if(type_id == "PageSlot")
+		return "ParentCtrl";
+	if(type_id == "Item" || type_id == "Generic")
 		return "UiPanel";
 	return type_id;
 }
@@ -53,6 +57,10 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return n.type_id == "GridLayout";
 	if(b.property_id == "debug")
 		return false;
+	if(b.property_id == "debug_color")
+		return Color(220, 38, 38);
+	if(b.property_id == "debug_auto_color")
+		return true;
 	if(b.property_id == "gap" || b.property_id == "inset")
 		return 8;
 	if(b.property_id == "rows" || b.property_id == "columns")

@@ -165,6 +165,11 @@ static void UiTabPaintIcon(Draw& w, const Rect& r, const Image& img, Color ink, 
     UiPaintStyledIcon(w, r, UiTabTrimIconAlpha(img), true, true, UiIconRenderMode::MonoTint, ink, enabled);
 }
 
+static bool UiTabIconStacks(UiAlign side)
+{
+    return side == UiAlign::TOP || side == UiAlign::BOTTOM;
+}
+
 const UiTab::Style& UiTab::StyleDefault()
 {
     static Style s;
@@ -424,6 +429,14 @@ UiTab& UiTab::SetTabIcon(int i, const Image& icon)
     return *this;
 }
 
+UiTab& UiTab::SetTabTip(int i, const String& tip)
+{
+    if(i < 0 || i >= tabs_.GetCount())
+        return *this;
+    tabs_[i].tip = tip;
+    return *this;
+}
+
 UiTab& UiTab::EnableTab(int i, bool on)
 {
     if(i < 0 || i >= tabs_.GetCount())
@@ -598,6 +611,11 @@ void UiTab::Layout()
     Vector<int> pref;
     pref.SetCount(n);
     int pref_sum = 0;
+    UiAlign icon_side = style.icon_side;
+    if(icon_side != UiAlign::LEFT && icon_side != UiAlign::RIGHT &&
+       icon_side != UiAlign::TOP && icon_side != UiAlign::BOTTOM)
+        icon_side = horz ? UiAlign::LEFT : UiAlign::TOP;
+    bool stacked_icon = UiTabIconStacks(icon_side);
 
     for(int i = 0; i < n; i++) {
         const TabItem& t = tabs_[i];
@@ -611,15 +629,25 @@ void UiTab::Layout()
         int aff_main = aff_count > 0 ? (aff_count * aff_size + max(0, aff_count - 1) * style.affordance_gap + style.affordance_gap) : 0;
         int main;
         if(horz) {
-            main = t.text_size.cx + style.tab_padding.left + style.tab_padding.right;
-            if(icon_w > 0)
-                main += icon_w + style.content_gap;
+            main = style.tab_padding.left + style.tab_padding.right;
+            if(icon_w > 0 && stacked_icon)
+                main += max(t.text_size.cx, icon_w);
+            else {
+                main += t.text_size.cx;
+                if(icon_w > 0)
+                    main += icon_w + (t.text_size.cx > 0 ? style.content_gap : 0);
+            }
             main += aff_main;
         }
         else {
-            main = t.text_size.cy + style.tab_padding.top + style.tab_padding.bottom;
-            if(icon_w > 0)
-                main += icon_w + style.content_gap;
+            main = style.tab_padding.top + style.tab_padding.bottom;
+            if(icon_w > 0 && stacked_icon) {
+                main += t.text_size.cy + icon_w;
+                if(t.text_size.cy > 0)
+                    main += style.content_gap;
+            }
+            else
+                main += max(t.text_size.cy, icon_w);
             main += aff_main;
         }
         main = max(main, style.min_tab_main);
@@ -829,6 +857,11 @@ void UiTab::Paint(Draw& w)
         if(ts == ST_HOT || ts == ST_PRESSED)
             tf = tf.Bold();
 
+        UiAlign icon_side = style.icon_side;
+        if(icon_side != UiAlign::LEFT && icon_side != UiAlign::RIGHT &&
+           icon_side != UiAlign::TOP && icon_side != UiAlign::BOTTOM)
+            icon_side = IsHorizontal() ? UiAlign::LEFT : UiAlign::TOP;
+
         if(IsHorizontal()) {
             int text_right = ir.right;
             if(!t.close_rect.IsEmpty())
@@ -836,12 +869,26 @@ void UiTab::Paint(Draw& w)
             if(!t.drag_rect.IsEmpty())
                 text_right = min(text_right, t.drag_rect.left - style.affordance_gap);
 
+            int iw = !IsNull(t.icon) ? min(max(DPI(10), style.icon_size), min(ir.GetWidth(), ir.GetHeight())) : 0;
             if(!IsNull(t.icon)) {
-                int ico = max(DPI(12), min(ir.GetWidth(), ir.GetHeight()));
-                int iw = min(ico, max(DPI(10), style.icon_size));
-                Rect icon_r = RectC(ir.left, ir.top + (ir.GetHeight() - iw) / 2, iw, iw);
+                Rect icon_r;
+                if(icon_side == UiAlign::RIGHT) {
+                    icon_r = RectC(text_right - iw, ir.top + (ir.GetHeight() - iw) / 2, iw, iw);
+                    text_right = icon_r.left - style.content_gap;
+                }
+                else if(icon_side == UiAlign::TOP) {
+                    icon_r = RectC(ir.left + (max(1, text_right - ir.left) - iw) / 2, ir.top, iw, iw);
+                    ir.top = icon_r.bottom + style.content_gap;
+                }
+                else if(icon_side == UiAlign::BOTTOM) {
+                    icon_r = RectC(ir.left + (max(1, text_right - ir.left) - iw) / 2, ir.bottom - iw, iw, iw);
+                    ir.bottom = icon_r.top - style.content_gap;
+                }
+                else {
+                    icon_r = RectC(ir.left, ir.top + (ir.GetHeight() - iw) / 2, iw, iw);
+                    ir.left = icon_r.right + style.content_gap;
+                }
                 UiTabPaintIcon(w, icon_r, t.icon, icon_ink, ts != ST_DISABLED);
-                ir.left = icon_r.right + style.content_gap;
             }
 
             if(!t.text.IsEmpty() && !ir.IsEmpty()) {
@@ -859,18 +906,36 @@ void UiTab::Paint(Draw& w)
                 bottom = min(bottom, t.drag_rect.top - style.affordance_gap);
 
             int y = ir.top;
+            int text_left = ir.left;
+            int text_right = ir.right;
+            int iw = !IsNull(t.icon) ? min(max(DPI(10), style.icon_size), min(ir.GetWidth(), max(1, bottom - y))) : 0;
             if(!IsNull(t.icon)) {
-                int iw = min(max(DPI(10), style.icon_size), min(ir.GetWidth(), max(1, bottom - y)));
-                Rect icon_r = RectC(ir.left + (ir.GetWidth() - iw) / 2, y, iw, iw);
+                Rect icon_r;
+                if(icon_side == UiAlign::LEFT) {
+                    icon_r = RectC(ir.left, y + (max(1, bottom - y) - iw) / 2, iw, iw);
+                    text_left = icon_r.right + style.content_gap;
+                }
+                else if(icon_side == UiAlign::RIGHT) {
+                    icon_r = RectC(ir.right - iw, y + (max(1, bottom - y) - iw) / 2, iw, iw);
+                    text_right = icon_r.left - style.content_gap;
+                }
+                else if(icon_side == UiAlign::BOTTOM) {
+                    icon_r = RectC(ir.left + (ir.GetWidth() - iw) / 2, bottom - iw, iw, iw);
+                    bottom = icon_r.top - style.content_gap;
+                }
+                else {
+                    icon_r = RectC(ir.left + (ir.GetWidth() - iw) / 2, y, iw, iw);
+                    y = icon_r.bottom + style.content_gap;
+                }
                 UiTabPaintIcon(w, icon_r, t.icon, icon_ink, ts != ST_DISABLED);
-                y = icon_r.bottom + style.content_gap;
             }
 
             if(!t.text.IsEmpty() && y < bottom) {
                 Size tsz = GetTextSize(t.text, tf);
-                int tx = ir.left + (ir.GetWidth() - tsz.cx) / 2;
+                int text_width = max(1, text_right - text_left);
+                int tx = text_left + (text_width - tsz.cx) / 2;
                 int ty = y + max(0, bottom - y - tsz.cy) / 2;
-                DrawSmartText(w, tx, ty, max(1, ir.GetWidth()), t.text, tf, ink);
+                DrawSmartText(w, tx, ty, text_width, t.text, tf, ink);
             }
         }
     };
@@ -1065,6 +1130,8 @@ void UiTab::MouseMove(Point p, dword)
     int hit = FindTabAt(p);
     if(hit != hot_) {
         hot_ = hit;
+        if(hit >= 0)
+            Tip(tabs_[hit].tip.IsEmpty() ? tabs_[hit].text : tabs_[hit].tip);
         Refresh();
     }
 }

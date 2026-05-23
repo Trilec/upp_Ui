@@ -31,6 +31,8 @@
     - 2026-04: aligned arrow icon rendering with shared UiIconRenderMode while
       keeping arrow-specific naming scoped to the scrollbar style.
     - 2026-04: normalized part-aware paint hooks for track, thumb, and arrows.
+    - 2026-05: widened the minimal default idle/hot scrollbar thumb and hot
+      gutter by a small amount so scroll panels are easier to acquire.
 */
 
 #include <CtrlCore/CtrlCore.h>

@@ -23,6 +23,16 @@ The package is now the active utility app for layout-designer work. It is split 
 - `DesignerInspector` builds property pages from adapter descriptors.
 - `DesignerCodeGen` emits theme-first U++ code from the model.
 
+Container controls that own named regions use explicit slot nodes in the model.
+Splitters use `PaneSlot`; tabs and stacks use `PageSlot`. This makes hierarchy
+selection, drag/drop, undo, codegen, and future save/load work against one clear
+tree instead of hidden arrays inside individual adapters.
+
+The shell owns the active `UiThemeContext`. The top bar exposes the theme preset
+slot, currently with `Minimal` only, plus the light/dark mode toggle. Preview
+adapters should resolve their defaults from the active theme and only apply local
+appearance when the model explicitly enables fill/frame/radius overrides.
+
 Near-term cleanup should happen in this package, not in `examples/UiDesignerDemo`.
 
 See `CHANGELOG.md` for the current development trail and decisions that still need follow-up.

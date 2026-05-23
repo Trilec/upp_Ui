@@ -931,8 +931,8 @@ public:
         scroll_.SetRect(rc);
         scroll_.Layout();
         Rect viewport = scroll_.GetViewportRect();
-        int content_w = max(0, viewport.GetWidth());
-        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy);
+        int content_w = max(0, viewport.GetWidth() - DPI(5));
+        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy) + DPI(5);
         code_.SetRect(0, 0, content_w, content_h);
     }
 
@@ -1197,7 +1197,7 @@ public:
         inspector_scroll_.SetRect(sx, y, r.right - sx - DPI(5), r.bottom - y - DPI(18));
 
         ParentCtrl& body = inspector_scroll_.Content();
-        int inner_w = max(0, body.GetSize().cx - DPI(5));
+        int inner_w = max(0, body.GetSize().cx - DPI(35));
 
         inspector_acc_.SetRect(0, 0, inner_w, inspector_acc_.GetMinSize().cy);
     }

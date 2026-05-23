@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_Ui_h_
+#ifndef _Ui_Ui_h_
 #define _Ui_Ui_h_
 
 /*
@@ -26,6 +26,8 @@
 
     Changelog
     - 2026-03: documented as the public umbrella surface for release cleanup.
+    - 2026-05: composite property-row controls moved under Ui/Composites while
+      remaining available through this umbrella include.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -64,12 +66,12 @@
 #include <Ui/UiMultiEdit.h>
 #include <Ui/UiMaskEdit.h>
 #include <Ui/UiSlider.h>
-#include <Ui/UiCompositeSlider.h>
-#include <Ui/UiCompositeToggle.h>
-#include <Ui/UiCompositeColor.h>
-#include <Ui/UiCompositeDropdown.h>
-#include <Ui/UiCompositeLabel.h>
-#include <Ui/UiCompositeEdit.h>
+#include <Ui/Composites/UiCompositeSlider.h>
+#include <Ui/Composites/UiCompositeToggle.h>
+#include <Ui/Composites/UiCompositeColor.h>
+#include <Ui/Composites/UiCompositeDropdown.h>
+#include <Ui/Composites/UiCompositeLabel.h>
+#include <Ui/Composites/UiCompositeEdit.h>
 #include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>

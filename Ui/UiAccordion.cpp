@@ -266,9 +266,11 @@ void UiAccordion::SyncThemeStyle()
     UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
     resolved.palette = panel.palette;
     resolved.metrics.radius = max(DPI(8), panel.metrics.radius);
-    resolved.metrics.frame_width = max(1, panel.metrics.frame_width);
-    resolved.metrics.frame_enabled = panel.metrics.frame_enabled;
-    resolved.metrics.face_enabled = panel.metrics.face_enabled;
+    resolved.transparent = true;
+    resolved.metrics.frame_width = 0;
+    resolved.metrics.frame_enabled = false;
+    resolved.metrics.face_enabled = false;
+    resolved.metrics.shadow.enabled = false;
     resolved.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
     resolved.body_style.transparent = true;
     resolved.body_style.metrics.face_enabled = false;

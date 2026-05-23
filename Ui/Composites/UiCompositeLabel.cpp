@@ -1,4 +1,4 @@
-#include <Ui/UiCompositeLabel.h>
+#include <Ui/Composites/UiCompositeLabel.h>
 
 namespace Upp {
 

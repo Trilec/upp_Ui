@@ -450,6 +450,20 @@ UiTree& UiTree::MarkNodeChildrenLoaded(UiTreeNodeRef node, bool loaded)
     return *this;
 }
 
+UiTree& UiTree::SetColumnWidths(const Vector<int>& widths)
+{
+    column_widths_ = clone(widths);
+    Refresh();
+    return *this;
+}
+
+UiTree& UiTree::ClearColumnWidths()
+{
+    column_widths_.Clear();
+    Refresh();
+    return *this;
+}
+
 int UiTree::GetNodeCtrlIndex(UiTreeNodeRef node) const
 {
     return node_ctrls_.Find(node.id);
@@ -812,6 +826,21 @@ Rect UiTree::GetAccessoryRect(const Rect& row, int node_id, int index) const
     return index >= 0 && index < ars.GetCount() ? ars[index] : Rect(0, 0, 0, 0);
 }
 
+Vector<Rect> UiTree::GetColumnRects(const Rect& row, const UiModelItem& item) const
+{
+    Vector<Rect> out;
+    const Style& style = GetEffectiveStyle();
+    int count = min(column_widths_.GetCount(), item.columns.GetCount());
+    int right = row.right - style.h_padding;
+    for(int i = count - 1; i >= 0; i--) {
+        int w = max(DPI(16), column_widths_[i]);
+        int x = right - w;
+        out.Insert(0, RectC(x, row.top, w, row.GetHeight()));
+        right = x - style.accessory_gap;
+    }
+    return out;
+}
+
 Rect UiTree::GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_icon, bool has_metadata, int node_id) const
 {
     const Style& style = GetEffectiveStyle();
@@ -819,6 +848,10 @@ Rect UiTree::GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_ic
     Rect icon = GetIconRect(row, depth, has_glyph);
     Rect metadata = GetMetadataRect(row, depth, has_glyph, has_icon);
     Vector<Rect> accessories = GetAccessoryRects(row, node_id);
+    Vector<Rect> columns;
+    UiTreeNodeRef node{node_id};
+    if(model_ && model_->IsValid(node))
+        columns = GetColumnRects(row, model_->Get(node));
 
     int left = glyph.left;
     if(has_metadata)
@@ -831,9 +864,42 @@ Rect UiTree::GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_ic
     int right = row.right - style.h_padding;
     if(!accessories.IsEmpty())
         right = min(right, accessories[0].left - style.accessory_gap);
+    if(!columns.IsEmpty())
+        right = min(right, columns[0].left - style.accessory_gap);
 
     left = max(left, row.left + style.h_padding + depth * style.indent_px);
     return Rect(left, row.top, max(left, right), row.bottom);
+}
+
+void UiTree::PaintItemColumns(Draw& w, const Rect& row, const UiModelItem& item, bool enabled, bool selected) const
+{
+    Vector<Rect> cols = GetColumnRects(row, item);
+    if(cols.IsEmpty())
+        return;
+
+    const Style& style = GetEffectiveStyle();
+    Font font = item.use_custom_font ? item.custom_font : style.font;
+    font.Height(max(DPI(8), font.GetHeight() - DPI(1)));
+    Color fallback = selected ? style.glyph_selected_color : (enabled ? style.glyph_color : style.disabled_ink);
+    int count = min(cols.GetCount(), item.columns.GetCount());
+    for(int i = 0; i < count; i++) {
+        const UiModelColumn& c = item.columns[i];
+        Rect r = cols[i];
+        Color ink = IsNull(c.ink) ? fallback : c.ink;
+        if(!IsNull(c.icon)) {
+            int side = min(max(DPI(10), style.icon_size - DPI(2)), max(0, min(r.GetWidth(), r.GetHeight()) - DPI(4)));
+            Rect ir = RectC(r.left + (r.GetWidth() - side) / 2, r.top + (r.GetHeight() - side) / 2, side, side);
+            UiPaintStyledIcon(w, ir, c.icon, true, true, c.icon_render_mode, ink, enabled);
+        }
+        else if(!c.text.IsEmpty()) {
+            Size ts = GetTextSize(c.text, font);
+            int x = c.align == ALIGN_RIGHT ? r.right - ts.cx - DPI(1) :
+                    c.align == ALIGN_CENTER ? r.left + (r.GetWidth() - ts.cx) / 2 :
+                    r.left + DPI(1);
+            int y = r.top + (r.GetHeight() - font.GetHeight()) / 2;
+            DrawSmartText(w, x, y, max(0, r.GetWidth()), c.text, font, ink, 0);
+        }
+    }
 }
 
 void UiTree::PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, bool hot) const
@@ -984,6 +1050,7 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
 
     Rect text_r = GetTextRect(row, vr.depth, vr.has_children, has_icon, has_metadata, vr.id);
     Rect left_text_r = text_r;
+    PaintItemColumns(w, row, item, enabled, is_selected);
     Font right_font = item.use_custom_font ? item.custom_font : style.font;
     if(!item.right_text.IsEmpty()) {
         Size rsz = GetTextSize(item.right_text, right_font);

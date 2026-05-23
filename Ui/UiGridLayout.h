@@ -232,6 +232,9 @@ public:
     /** Toggle debug overlay. */
     UiGridLayout& SetDebug(bool on = true)          { debug = on; Refresh(); return *this; }
 
+    /** Set debug overlay color; inset/gap fills are derived from this color. */
+    UiGridLayout& SetDebugColor(Color c)            { debug_color = IsNull(c) ? Color(220, 38, 38) : c; Refresh(); return *this; }
+
     //-------------------------------------------------------------------------
     // Throttling (batch inserts)
     //-------------------------------------------------------------------------
@@ -478,6 +481,7 @@ private:
 
     Align     align_items = Align::Stretch;
     bool      debug       = false;
+    Color     debug_color = Color(220, 38, 38);
 
     // Measurement and distribute helpers
     Size NaturalItemSize(const Item& it) const;   

@@ -148,6 +148,26 @@ private:
     void RefreshFromConfig()
     {
         UiTable::Style style = UiTable::StyleDefault();
+        if(Palette().dark) {
+            style.table_bg = Color(25, 25, 25);
+            style.header_bg = Color(38, 38, 38);
+            style.header_hot_bg = Color(45, 45, 45);
+            style.header_ink = Color(229, 229, 229);
+            style.row_header_bg = Color(32, 32, 32);
+            style.cell_ink = Color(218, 228, 241);
+            style.muted_ink = Color(151, 167, 194);
+            style.grid_color = Color(64, 64, 64);
+            style.alternate_row_bg = Color(31, 31, 31);
+            style.hover_bg = Color(38, 38, 38);
+            style.selection_bg = Color(30, 58, 96);
+            style.selection_border = Color(96, 165, 250);
+            style.active_bg = Color(22, 37, 66);
+            style.active_border = Color(96, 165, 250);
+            style.read_only_bg = Color(38, 38, 38);
+            style.warning_bg = Color(68, 52, 24);
+            style.error_bg = Color(64, 26, 26);
+            style.resize_guide = Color(96, 165, 250);
+        }
         style.show_row_headers = cfg_.show_row_headers;
         style.show_column_headers = cfg_.show_column_headers;
         style.show_grid = cfg_.show_grid;

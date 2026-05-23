@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiCompositeColor_h_
+#ifndef _Ui_UiCompositeColor_h_
 #define _Ui_UiCompositeColor_h_
 
 /*
@@ -24,7 +24,7 @@
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiLabel.h>
-#include <Ui/UiCompositeSlider.h>
+#include <Ui/Composites/UiCompositeSlider.h>
 
 namespace Upp {
 

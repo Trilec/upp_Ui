@@ -28,6 +28,8 @@
     - 2026-03: renamed active-tab accessors for release API cleanup.
     - 2026-04: standardized repeated-tab spacing as item_spacing and primary
       tab content spacing as content_gap.
+    - 2026-05: exposed tab font, icon size, and icon side setters so compact
+      icon-only tab strips can be authored without editing style internals.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -67,6 +69,7 @@ public:
         Rect strip_inset = Rect(0, 0, 0, 0);
         int  content_gap = DPI(6);
         int  icon_size = 0;
+        UiAlign icon_side = UiAlign::LEFT;
         int  affordance_gap = DPI(4);
         int  min_tab_main = DPI(72);
         int  indicator_thickness = DPI(3);
@@ -85,7 +88,11 @@ public:
               % tab_palette % tab_metrics % tab_skin
               % tab_font
               % tab_extent % item_spacing % body_gap % tab_padding % strip_inset % content_gap
-              % icon_size
+              % icon_size;
+            int is = (int)icon_side;
+            s % is;
+            icon_side = (UiAlign)is;
+            s
               % affordance_gap
               % min_tab_main % indicator_thickness
               % active_frame_width % open_corner_radius % active_frame_color;
@@ -122,6 +129,12 @@ public:
     UiTab& SetExpandTabs(bool on = true) { StyleEdit().expand_tabs = on; StyleEdit().fill_tabs = on; RefreshLayout(); Refresh(); return *this; }
     bool   IsExpandTabs() const { const Style& s = GetEffectiveStyle(); return s.expand_tabs || s.fill_tabs; }
     UiTab& SetFillTabs(bool on = true) { return SetExpandTabs(on); } // Compatibility alias; prefer SetExpandTabs.
+    UiTab& SetTabFont(Font font) { StyleEdit().tab_font = font; OnStyleChanged(); return *this; }
+    Font   GetTabFont() const { return GetEffectiveStyle().tab_font; }
+    UiTab& SetTabIconSize(int size) { StyleEdit().icon_size = max(0, size); OnStyleChanged(); return *this; }
+    int    GetTabIconSize() const { return GetEffectiveStyle().icon_size; }
+    UiTab& SetTabIconSide(UiAlign side) { StyleEdit().icon_side = side; OnStyleChanged(); return *this; }
+    UiAlign GetTabIconSide() const { return GetEffectiveStyle().icon_side; }
     UiTab& SetActiveTabUsesBodyFace(bool on = true) { StyleEdit().active_tab_uses_body_face = on; Refresh(); return *this; }
     UiTab& EnableCloseButtons(bool on = true) { show_close_buttons_ = on; RefreshLayout(); Refresh(); return *this; }
     UiTab& EnableDragHandles(bool on = true)  { show_drag_handles_ = on; RefreshLayout(); Refresh(); return *this; }
@@ -139,6 +152,7 @@ public:
 
     UiTab& SetTabText(int i, const String& text);
     UiTab& SetTabIcon(int i, const Image& icon);
+    UiTab& SetTabTip(int i, const String& tip);
     UiTab& EnableTab(int i, bool on = true);
     UiTab& SetTabClosable(int i, bool on = true);
     UiTab& SetTabDraggable(int i, bool on = true);
@@ -171,6 +185,7 @@ public:
 private:
     struct TabItem : Moveable<TabItem> {
         String text;
+        String tip;
         Image  icon;
         Ctrl*  page = nullptr;
         bool   enabled = true;

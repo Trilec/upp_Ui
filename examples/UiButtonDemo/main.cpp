@@ -25,7 +25,7 @@ namespace {
     - v0.1.0: Replaced the legacy showcase grid with the shared single-control builder shell.
 */
 
-static const char* DEMO_VERSION = "v0.1.0";
+static const char* DEMO_VERSION = "v0.4.0";
 enum ShadowCurvePreset {
     SHADOWPRESET_LINEAR = 0,
     SHADOWPRESET_SOFT,

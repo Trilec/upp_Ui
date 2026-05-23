@@ -20,7 +20,7 @@ using namespace Upp;
 
 namespace {
 
-static const char* DEMO_VERSION = "v0.1.1";
+static const char* DEMO_VERSION = "v0.4.0";
 static const char* DEFAULT_SAMPLE = "The quick brown fox jumps over the lazy moon.\nPack my box with five dozen liquor jugs.";
 
 Font DemoSans(int px, bool bold = false)
@@ -349,12 +349,7 @@ UiAccordion::Style MakeInspectorAccordionStyle(const DemoPalette& c)
     s.header_style.card_line_style = SOLID;
     s.header_style.card_line_thickness = 1;
     s.header_style.card_line_color = c.divider;
-    Font hf;
-    if(Font::FindFaceNameIndex("Arial Black") >= 0)
-        hf = Font().FaceName("Arial Black").Height(12);
-    else
-        hf = DemoSans(14, true);
-    s.header_style.title_font = hf;
+    s.header_style.title_font = DemoSans(11, true);
     s.header_style.subtitle_font = DemoSans(1);
     s.header_style.copy_font = DemoSans(1);
     s.header_style.title_subtitle_gap = 0;
@@ -887,12 +882,13 @@ private:
         usage_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
         usage_panel_.Scroll().SetCustomStyle(MakeScrollBodyStyle());
         usage_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
+        inspector_acc_.SetCustomStyle(MakeInspectorAccordionStyle(palette_));
         preview_.SetPalette(palette_);
 
         // Main card surfaces
         UiPanel::Style card = UiTheme::ResolvePanel(UiPanelRole::Surface);
         for(int i = 0; i < 4; i++) {
-            card.palette.face[i] = UiFill::Solid(Blend(palette_.paper, palette_.card_face, palette_.dark ? 100 : 35));
+            card.palette.face[i] = UiFill::Solid(palette_.dark ? palette_.card_face : Blend(palette_.paper, palette_.card_face, 35));
             card.palette.frame[i] = palette_.card_frame;
         }
         card.metrics.face_enabled = true;

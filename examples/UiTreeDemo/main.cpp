@@ -19,7 +19,7 @@ using namespace Upp;
 
 namespace {
 
-static const char* DEMO_VERSION = "v0.1.0";
+static const char* DEMO_VERSION = "v0.4.0";
 static const int DEMO_RADIUS = 8;
 
 enum DatasetMode {

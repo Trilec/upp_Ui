@@ -1,4 +1,4 @@
-#include <Ui/UiCompositeEdit.h>
+#include <Ui/Composites/UiCompositeEdit.h>
 
 namespace Upp {
 

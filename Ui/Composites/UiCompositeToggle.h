@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiCompositeToggle_h_
+#ifndef _Ui_UiCompositeToggle_h_
 #define _Ui_UiCompositeToggle_h_
 
 /*
@@ -24,7 +24,7 @@
 
 #include <Ui/UiLabel.h>
 #include <Ui/UiToggle.h>
-#include <Ui/UiCompositeSlider.h>
+#include <Ui/Composites/UiCompositeSlider.h>
 
 namespace Upp {
 

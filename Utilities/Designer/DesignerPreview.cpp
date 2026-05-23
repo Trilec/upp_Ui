@@ -38,7 +38,20 @@ static bool DesignerPreviewIsLayoutType(const DesignerType *t)
 
 static bool DesignerPreviewIsPanelType(const DesignerType *t)
 {
-	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot");
+	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "PageSlot");
+}
+
+static bool DesignerPreviewIsPageContainer(const DesignerNode& n)
+{
+	return n.type_id == "UiTab" || n.type_id == "UiStack";
+}
+
+static DesignerNodeId DesignerPreviewActivePageSlot(const DesignerNode& n)
+{
+	if(!DesignerPreviewIsPageContainer(n) || n.children.IsEmpty())
+		return Designer_NULL;
+	int active = clamp((int)DesignerPreviewNodeProperty(n, "active", 0), 0, n.children.GetCount() - 1);
+	return n.children[active];
 }
 
 static Color DesignerPreviewCategoryFace(const DesignerType *t, UiThemeMode mode)
@@ -59,6 +72,12 @@ static Color DesignerPreviewCategoryFrame(const DesignerType *t, UiThemeMode mod
 	if(DesignerPreviewIsPanelType(t))
 		return dark ? Color(74, 222, 128) : Color(34, 150, 91);
 	return dark ? Color(96, 165, 250) : Color(54, 116, 210);
+}
+
+static Color DesignerPreviewWindowOutline(Color base, UiThemeMode mode)
+{
+	Color paper = DesignerPreviewBackground(mode);
+	return Blend(base, paper, 190);
 }
 
 void DesignerPreview::Set(DesignerModel* model, DesignerRegistry* registry)
@@ -125,7 +144,7 @@ void DesignerPreview::Paint(Draw& w)
 			LayoutRealPreview();
 			Rect root = GetVirtualWindowRect();
 			Size vsz = model_->GetVirtualSize();
-			DrawRoundedOutline(w, root, SColorHighlight(), DPI(8), DPI(2));
+			DrawRoundedOutline(w, root, DesignerPreviewWindowOutline(SColorHighlight(), theme_mode_), DPI(8), DPI(4));
 			DrawDropIndicator(w, root);
 			DrawResizeHandle(w, root);
 			if(!placement_type_.IsEmpty())
@@ -286,7 +305,7 @@ Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect
 {
 			if(parent.type_id == "UiSplitter" || parent.type_id == "UiQuadSplitter")
 				return GetSplitterPaneRect(parent, drop_index_);
-			Rect pr = parent.id == Designer_ROOT ? root.Deflated(DPI(12)) : parent.last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
+			Rect pr = parent.id == Designer_ROOT ? root : parent.last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
 			if(pr.IsEmpty())
 				return Rect(0, 0, 0, 0);
 			if(parent.type_id == "GridLayout") {
@@ -465,7 +484,9 @@ void DesignerPreview::DrawLayoutDebug(Draw& w, const DesignerNode& n, Rect conte
 {
 			if(!(bool)DesignerPreviewNodeProperty(n, "debug", false))
 				return;
-			Color c = Color(255, 128, 0);
+			Color c = (bool)DesignerPreviewNodeProperty(n, "debug_auto_color", false)
+			          ? Color(217, 119, 6)
+			          : (Color)DesignerPreviewNodeProperty(n, "debug_color", Color(220, 38, 38));
 			int inset = (int)DesignerPreviewNodeProperty(n, "inset", 0);
 			Rect inner = content.Deflated(inset);
 			w.DrawRect(inner.left, inner.top, inner.GetWidth(), DPI(1), c);
@@ -750,6 +771,11 @@ DesignerNodeId DesignerPreview::ResolveDropTarget(DesignerNodeId hit) const
 			while(id) {
 				const DesignerNode* n = model_->Find(id);
 				const DesignerType* t = n ? registry_->Find(n->type_id) : nullptr;
+				if(n && DesignerPreviewIsPageContainer(*n)) {
+					DesignerNodeId page = DesignerPreviewActivePageSlot(*n);
+					if(page != Designer_NULL && page != drag_candidate_)
+						return page;
+				}
 				if(n && t && t->can_have_children && id != drag_candidate_)
 					return id;
 				id = n ? n->parent : Designer_NULL;
@@ -785,7 +811,7 @@ void DesignerPreview::UpdateDropSlot(Point p)
 				drop_index_ = clamp(GetSplitterPaneIndex(*parent, p), 0, panes - 1);
 			}
 			else if(parent && parent->type_id == "GridLayout") {
-				Rect pr = parent->id == Designer_ROOT ? GetVirtualWindowRect().Deflated(DPI(12))
+				Rect pr = parent->id == Designer_ROOT ? GetVirtualWindowRect()
 				                                      : parent->last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
 				int inset = (int)DesignerPreviewNodeProperty(*parent, "inset", 0);
 				Rect grid = pr.Deflated(inset);
@@ -914,6 +940,16 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					quad->SetMinPixels(pane, DPI(max(10, fixed)));
 				}
 			}
+			else if(DesignerTabAdapter *tab = dynamic_cast<DesignerTabAdapter *>(&parent)) {
+				String title = DesignerPreviewNodeProperty(child_node, "page_title", child_node.name);
+				if(!(bool)DesignerPreviewNodeProperty(child_node, "show_title", true))
+					title.Clear();
+				tab->Add(child, title, UiIconFromName(DesignerPreviewNodeProperty(child_node, "icon", "None")));
+			}
+			else if(DesignerStackAdapter *stack = dynamic_cast<DesignerStackAdapter *>(&parent)) {
+				String title = DesignerPreviewNodeProperty(child_node, "page_title", child_node.name);
+				stack->AddPage(child, title);
+			}
 			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent))
 				scroll->Content().Add(child.SizePos());
 			else
@@ -934,6 +970,14 @@ void DesignerPreview::FinalizeRealNode(DesignerAdapter& adapter, const DesignerN
 				quad->SetMinPixels(3, DPI((int)DesignerPreviewNodeProperty(node, "min_d", 60)));
 				quad->SetSplitPercent((int)DesignerPreviewNodeProperty(node, "column_percent", 50),
 				                      (int)DesignerPreviewNodeProperty(node, "row_percent", 50));
+			}
+			else if(DesignerTabAdapter *tab = dynamic_cast<DesignerTabAdapter *>(&adapter)) {
+				if(tab->GetCount() > 0)
+					tab->SetActiveTab(clamp((int)DesignerPreviewNodeProperty(node, "active", 0), 0, tab->GetCount() - 1));
+			}
+			else if(DesignerStackAdapter *stack = dynamic_cast<DesignerStackAdapter *>(&adapter)) {
+				if(stack->GetCount() > 0)
+					stack->SetActivePage(clamp((int)DesignerPreviewNodeProperty(node, "active", 0), 0, stack->GetCount() - 1));
 			}
 		}
 
@@ -983,7 +1027,7 @@ void DesignerPreview::LayoutRealPreview()
 				RebuildRealPreview();
 			Rect root = GetVirtualWindowRect();
 			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())
-				child->SetRect(root.Deflated(DPI(12)));
+				child->SetRect(root);
 			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())
 				ApplyRealLayoutProperties(*child);
 			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())
@@ -1022,6 +1066,18 @@ void DesignerPreview::ApplyRealOverlay()
 				state.drop_target = real_adapters_.GetKey(i) == drop_target_;
 				const DesignerNode* n = model_ ? model_->Find(real_adapters_.GetKey(i)) : nullptr;
 				state.debug = n && (bool)DesignerPreviewNodeProperty(*n, "debug", false);
+				if(n) {
+					if((bool)DesignerPreviewNodeProperty(*n, "debug_auto_color", false)) {
+						static const Color palette[] = {
+							Color(220, 38, 38), Color(217, 119, 6), Color(37, 99, 235),
+							Color(22, 163, 74), Color(147, 51, 234), Color(8, 145, 178),
+							Color(219, 39, 119)
+						};
+						state.debug_color = palette[abs((int)n->id) % (int)(sizeof(palette) / sizeof(palette[0]))];
+					}
+					else
+						state.debug_color = (Color)DesignerPreviewNodeProperty(*n, "debug_color", Color(220, 38, 38));
+				}
 				state.radius = n ? (int)DesignerPreviewNodeProperty(*n, "radius", 0) : 0;
 				adapter->SetOverlayState(state);
 			}

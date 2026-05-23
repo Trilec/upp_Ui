@@ -15,8 +15,8 @@
 */
 #include "../BuilderDemoSupport.h"
 #include <Ui/UiBreadcrumbs.h>
-#include <Ui/UiCompositeDropdown.h>
-#include <Ui/UiCompositeLabel.h>
+#include <Ui/Composites/UiCompositeDropdown.h>
+#include <Ui/Composites/UiCompositeLabel.h>
 
 using namespace Upp;
 using namespace BuilderDemoSupport;

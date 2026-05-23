@@ -1,17 +1,15 @@
-#include <Ui/UiCompositeToggle.h>
+#include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
 
-UiCompositeToggle::UiCompositeToggle()
+UiCompositeSlider::UiCompositeSlider()
 {
     Add(label_);
-    Add(toggle_);
+    Add(slider_);
     Add(value_);
-    toggle_.WhenAction = [=] {
-        toggle_.SetData(toggle_.GetData());
-        WhenAction();
-    };
+    slider_.WhenAction = [=] { WhenAction(); };
+    slider_.WhenChanging = [=] { WhenChanging(); };
     label_.NoWantFocus();
     value_.NoWantFocus();
     UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
@@ -20,10 +18,12 @@ UiCompositeToggle::UiCompositeToggle()
     value_style.font = SansSerifZ(9);
     label_.SetCustomStyle(label_style);
     value_.SetCustomStyle(value_style);
+    slider_.SetTrackSize(Size(DPI(1000), DPI(3)));
+    value_.SetSizeMin(Size(value_width_, 0));
     SyncValueVisibility();
 }
 
-UiCompositeToggle& UiCompositeToggle::SetLayoutMode(UiCompositeLayoutMode mode)
+UiCompositeSlider& UiCompositeSlider::SetLayoutMode(UiCompositeLayoutMode mode)
 {
     if(layout_mode_ == mode)
         return *this;
@@ -33,7 +33,7 @@ UiCompositeToggle& UiCompositeToggle::SetLayoutMode(UiCompositeLayoutMode mode)
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetLabel(const String& text)
+UiCompositeSlider& UiCompositeSlider::SetLabel(const String& text)
 {
     label_.SetText(text);
     RefreshLayout();
@@ -41,14 +41,16 @@ UiCompositeToggle& UiCompositeToggle::SetLabel(const String& text)
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetValueText(const String& text)
+UiCompositeSlider& UiCompositeSlider::SetValueText(const String& text)
 {
     value_.SetText(text);
+    value_.RefreshLayout();
+    RefreshLayout();
     Refresh();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::ShowValue(bool show)
+UiCompositeSlider& UiCompositeSlider::ShowValue(bool show)
 {
     if(show_value_ == show)
         return *this;
@@ -59,112 +61,113 @@ UiCompositeToggle& UiCompositeToggle::ShowValue(bool show)
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetValueSelectable(bool selectable)
+UiCompositeSlider& UiCompositeSlider::SetValueSelectable(bool selectable)
 {
     value_selectable_ = selectable;
     value_.SetSelectable(selectable);
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetLabelWidth(int cx)
+UiCompositeSlider& UiCompositeSlider::SetLabelWidth(int cx)
 {
     label_width_ = max(0, cx);
     RefreshLayout();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetValueWidth(int cx)
+UiCompositeSlider& UiCompositeSlider::SetValueWidth(int cx)
 {
     value_width_ = max(0, cx);
+    value_.SetSizeMin(Size(value_width_, 0));
     RefreshLayout();
+    Refresh();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetFieldGap(int px)
+UiCompositeSlider& UiCompositeSlider::SetFieldGap(int px)
 {
     field_gap_ = max(0, px);
     RefreshLayout();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetStackGap(int px)
+UiCompositeSlider& UiCompositeSlider::SetStackGap(int px)
 {
     stack_gap_ = max(0, px);
     RefreshLayout();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetLabelStyle(const UiLabel::Style& style)
+UiCompositeSlider& UiCompositeSlider::SetLabelStyle(const UiLabel::Style& style)
 {
     label_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
-UiCompositeToggle& UiCompositeToggle::SetValueStyle(const UiLabel::Style& style)
+UiCompositeSlider& UiCompositeSlider::SetValueStyle(const UiLabel::Style& style)
 {
     value_.SetCustomStyle(style);
     Refresh();
     return *this;
 }
 
-void UiCompositeToggle::SetData(const Value& v)
+void UiCompositeSlider::SetData(const Value& v)
 {
-    toggle_.SetData(v);
-    toggle_.Refresh();
-    Refresh();
+    slider_.SetData(v);
 }
 
-Value UiCompositeToggle::GetData() const
+Value UiCompositeSlider::GetData() const
 {
-    return toggle_.GetData();
+    return slider_.GetData();
 }
 
-Size UiCompositeToggle::GetMinSize() const
+Size UiCompositeSlider::GetMinSize() const
 {
     Size label_sz = label_.GetMinSize();
-    Size toggle_sz = toggle_.GetMinSize();
+    Size slider_sz = slider_.GetMinSize();
     Size value_sz = show_value_ ? value_.GetMinSize() : Size(0, 0);
 
     if(layout_mode_ == UICOMPOSITE_STACKED) {
         int top_h = max(label_sz.cy, value_sz.cy);
         int top_w = label_sz.cx + (show_value_ ? field_gap_ + max(value_width_, value_sz.cx) : 0);
-        return Size(max(top_w, toggle_sz.cx), top_h + stack_gap_ + toggle_sz.cy);
+        return Size(max(top_w, slider_sz.cx), top_h + stack_gap_ + slider_sz.cy);
     }
 
-    int h = max(label_sz.cy, max(toggle_sz.cy, value_sz.cy));
-    int w = max(label_width_, label_sz.cx) + field_gap_ + toggle_sz.cx;
+    int h = max(label_sz.cy, max(slider_sz.cy, value_sz.cy));
+    int w = max(label_width_, label_sz.cx) + field_gap_ + slider_sz.cx;
     if(show_value_)
         w += field_gap_ + max(value_width_, value_sz.cx);
     return Size(w, h);
 }
 
-void UiCompositeToggle::Layout()
+void UiCompositeSlider::Layout()
 {
     Rect r = GetSize();
     if(layout_mode_ == UICOMPOSITE_STACKED) {
         int top_h = max(label_.GetMinSize().cy, show_value_ ? value_.GetMinSize().cy : 0);
-        int toggle_y = top_h + stack_gap_;
+        int top_y = 0;
+        int slider_y = top_h + stack_gap_;
+        int slider_h = max(0, r.bottom - slider_y);
         int vw = show_value_ ? value_width_ : 0;
-        label_.SetRect(0, 0, max(0, r.GetWidth() - (show_value_ ? vw + field_gap_ : 0)), top_h);
+        label_.SetRect(0, top_y, max(0, r.GetWidth() - (show_value_ ? vw + field_gap_ : 0)), top_h);
         if(show_value_)
-            value_.SetRect(max(0, r.right - vw), 0, vw, top_h);
-        Size ts = toggle_.GetMinSize();
-        int tx = max(0, (r.GetWidth() - ts.cx) / 2);
-        toggle_.SetRect(tx, toggle_y, min(r.GetWidth(), ts.cx), ts.cy);
+            value_.SetRect(max(0, r.right - vw), top_y, vw, top_h);
+        slider_.SetRect(0, slider_y, r.GetWidth(), slider_h);
         return;
     }
 
     int lw = label_width_;
     int vw = show_value_ ? value_width_ : 0;
-    int tx = r.right - (show_value_ ? (vw + field_gap_ + toggle_.GetMinSize().cx) : toggle_.GetMinSize().cx);
+    int slider_x = lw + field_gap_;
+    int slider_w = max(0, r.GetWidth() - slider_x - (show_value_ ? (field_gap_ + vw) : 0));
     label_.SetRect(0, 0, lw, r.GetHeight());
-    toggle_.SetRect(max(lw + field_gap_, tx), (r.GetHeight() - toggle_.GetMinSize().cy) / 2, toggle_.GetMinSize().cx, toggle_.GetMinSize().cy);
+    slider_.SetRect(slider_x, 0, slider_w, r.GetHeight());
     if(show_value_)
         value_.SetRect(max(0, r.right - vw), 0, vw, r.GetHeight());
 }
 
-void UiCompositeToggle::SyncValueVisibility()
+void UiCompositeSlider::SyncValueVisibility()
 {
     value_.SetSelectable(value_selectable_);
     value_.Show(show_value_);

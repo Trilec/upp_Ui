@@ -183,11 +183,11 @@ const UiScrollBar::Style& UiScrollBar::StyleDefault()
 		// Thickness
 		s.thin_idle         = true;
 		s.thin_px           = DPI(2);
-		s.thick_px          = DPI(12);
+		s.thick_px          = DPI(13);
 		s.track_paint_px_idle = 0;
-		s.track_paint_px_hot  = DPI(12);
-		s.thumb_paint_px_idle = DPI(2);
-		s.thumb_paint_px_hot  = DPI(6);
+		s.track_paint_px_hot  = DPI(13);
+		s.thumb_paint_px_idle = DPI(4);
+		s.thumb_paint_px_hot  = DPI(8);
 
 		// Expand animation
 		s.animate_expand    = true;

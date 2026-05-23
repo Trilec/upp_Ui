@@ -148,6 +148,28 @@ static void CopyNodeState(DesignerNodeState& s, const DesignerNode& n)
 	s.expanded = n.expanded;
 }
 
+static void CopyNode(DesignerNode& n, const DesignerNode& s)
+{
+	n.id = s.id;
+	n.parent = s.parent;
+	n.type_id = s.type_id;
+	n.name = s.name;
+	n.children = clone(s.children);
+	n.properties = s.properties;
+	n.last_rect = s.last_rect;
+	n.expanded = s.expanded;
+}
+
+static Vector<DesignerNode> CloneNodes(const Vector<DesignerNode>& nodes)
+{
+	Vector<DesignerNode> out;
+	for(const DesignerNode& s : nodes) {
+		DesignerNode& n = out.Add();
+		CopyNode(n, s);
+	}
+	return out;
+}
+
 bool DesignerModel::CaptureSubtree(DesignerNodeId id, Vector<DesignerNodeState>& out) const
 {
 	const DesignerNode* n = Find(id);
@@ -196,6 +218,48 @@ bool DesignerModel::RestoreSubtree(const Vector<DesignerNodeState>& states, Desi
 		p->children.Insert(insert_index, restored->id);
 	SelectOne(restored->id);
 	WhenChanged();
+	return true;
+}
+
+bool DesignerModel::ReplaceDocument(const Vector<DesignerNodeState>& states, Size virtual_size,
+                                    const Vector<DesignerNodeId>& selection, String& error)
+{
+	Vector<DesignerNode> old_nodes = CloneNodes(nodes_);
+	Vector<DesignerNodeId> old_selection = clone(selection_);
+	Size old_virtual_size = virtual_size_;
+	DesignerNodeId old_next_id = next_id_;
+
+	nodes_.Clear();
+	next_id_ = Designer_ROOT + 1;
+	for(const DesignerNodeState& s : states) {
+		DesignerNode& n = nodes_.Add();
+		n.id = s.id;
+		n.parent = s.parent;
+		n.type_id = s.type_id;
+		n.name = s.name;
+		n.children = clone(s.children);
+		n.properties = s.properties;
+		n.last_rect = s.last_rect;
+		n.expanded = s.expanded;
+		next_id_ = max(next_id_, n.id + 1);
+	}
+	virtual_size_ = Size(max(240, virtual_size.cx), max(180, virtual_size.cy));
+	selection_.Clear();
+	for(DesignerNodeId id : selection)
+		if(Find(id) && FindId(selection_, id) < 0)
+			selection_.Add(id);
+	if(selection_.IsEmpty())
+		selection_.Add(Designer_ROOT);
+
+	if(!Validate(error)) {
+		nodes_ = pick(old_nodes);
+		selection_ = pick(old_selection);
+		virtual_size_ = old_virtual_size;
+		next_id_ = old_next_id;
+		return false;
+	}
+	WhenChanged();
+	WhenSelectionChanged();
 	return true;
 }
 

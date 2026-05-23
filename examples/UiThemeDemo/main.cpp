@@ -140,7 +140,7 @@ public:
         UiTab::Style tab_style = UiTheme::ResolveTab(preset_, mode_, preset_ == UiThemePreset::Minimal ? UITAB_SEGMENTED : UITAB_CLASSIC);
         UiToggle::Style toggle_style = UiTheme::ResolveToggle(preset_, mode_);
         UiCheckBox::Style check_style = UiTheme::ResolveCheckBox(preset_, mode_, UICHECKVIS_CLASSIC);
-        UiRadioButton::Style radio_style = UiTheme::ResolveRadioButton(preset_, mode_, preset_ == UiThemePreset::Rounded ? UIRADIOVIS_PILLS : UIRADIOVIS_CLASSIC);
+        UiRadioButton::Style radio_style = UiTheme::ResolveRadioButton(preset_, mode_, preset_ == UiThemePreset::Pill ? UIRADIOVIS_PILLS : UIRADIOVIS_CLASSIC);
 
         card_title_.SetCustomStyle(heading_style).SetInkColor(mode_ == UiThemeMode::Dark ? Color(255, 255, 255) : Color(22, 32, 51));
 
@@ -277,11 +277,11 @@ private:
         minimal.metadata_color = Color(65, 167, 248);
         model_list_.Add(minimal);
 
-        UiModelItem rounded("Rounded");
-        rounded.right_text = "preview";
-        rounded.icon = ICON_DESIGN_FOLDER_48();
-        rounded.icon_render_mode = UiIconRenderMode::MonoTint;
-        model_list_.Add(rounded);
+        UiModelItem pill("Pill");
+        pill.right_text = "preview";
+        pill.icon = ICON_DESIGN_FOLDER_48();
+        pill.icon_render_mode = UiIconRenderMode::MonoTint;
+        model_list_.Add(pill);
 
         UiModelItem runtime("Runtime");
         runtime.group_header = true;
@@ -407,7 +407,7 @@ public:
 
     UiThemeDemoWindow()
         : minimal_(UiThemePreset::Minimal, "MINIMAL"),
-          rounded_(UiThemePreset::Rounded, "ROUNDED")
+          pill_(UiThemePreset::Pill, "PILL")
     {
         Title("UiTheme Demo");
         Sizeable().Zoomable();
@@ -420,10 +420,10 @@ public:
         mode_shell_.Add(mode_label_);
         mode_shell_.Add(mode_toggle_);
         Add(minimal_);
-        Add(rounded_);
+        Add(pill_);
 
         title_.SetText("Preset Theme Directions").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-        copy_.SetText("Minimal is being tuned against the HTML preset contract first. Rounded remains live for side-by-side comparison while the fidelity pass continues.")
+        copy_.SetText("Minimal and Pill are role-driven presets. Use light/dark mode to verify normal, subtle, accent, and alert styling across the same controls.")
              .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
         mode_label_.SetText("Light").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         mode_toggle_.SetOn(false).SetShowFocus(false);
@@ -505,7 +505,7 @@ public:
         mode_toggle_.SetCustomStyle(mode_toggle_style).SetShowFocus(false);
 
         minimal_.ApplyTheme(mode_);
-        rounded_.ApplyTheme(mode_);
+        pill_.ApplyTheme(mode_);
         Refresh();
     }
 
@@ -525,7 +525,7 @@ public:
         int specimen_w = (r.GetWidth() - m * 2 - gap) / 2;
         int specimen_h = r.GetHeight() - top - DPI(26);
         minimal_.SetRect(m, top, specimen_w, specimen_h);
-        rounded_.SetRect(m + specimen_w + gap, top, specimen_w, specimen_h);
+        pill_.SetRect(m + specimen_w + gap, top, specimen_w, specimen_h);
     }
 
     virtual void Paint(Draw& w) override
@@ -545,7 +545,7 @@ private:
     UiLabel mode_label_;
     UiToggle mode_toggle_;
     ThemeSpecimen minimal_;
-    ThemeSpecimen rounded_;
+    ThemeSpecimen pill_;
 };
 
 GUI_APP_MAIN

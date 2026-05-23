@@ -1,4 +1,4 @@
-#include <Ui/UiCompositeColor.h>
+#include <Ui/Composites/UiCompositeColor.h>
 #include <Ui/UiColorPicker.h>
 #include <Ui/UiTheme.h>
 

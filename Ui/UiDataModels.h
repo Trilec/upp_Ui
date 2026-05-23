@@ -38,12 +38,26 @@
 
 namespace Upp {
 
+struct UiModelColumn : Moveable<UiModelColumn> {
+    String text;
+    Image  icon;
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
+    Color  ink = Null;
+    int    align = ALIGN_CENTER;
+
+    UiModelColumn() {}
+    UiModelColumn(const String& s) : text(s) {}
+    UiModelColumn(const Image& img, UiIconRenderMode mode = UiIconRenderMode::PreserveColor)
+        : icon(img), icon_render_mode(mode) {}
+};
+
 struct UiModelItem : Moveable<UiModelItem> {
     String text;
     Value  data;
     bool   enabled = true;
     String description;
     String right_text;
+    Vector<UiModelColumn> columns;
     int    text_align = ALIGN_LEFT;
     int    right_text_align = ALIGN_RIGHT;
     Image  icon;
@@ -68,6 +82,43 @@ struct UiModelItem : Moveable<UiModelItem> {
     UiModelItem() {}
     UiModelItem(const String& t, const Value& d = Value(), bool en = true)
         : text(t), data(d), enabled(en) {}
+    UiModelItem(const UiModelItem& o)
+        : text(o.text), data(o.data), enabled(o.enabled), description(o.description),
+          right_text(o.right_text), columns(clone(o.columns)), text_align(o.text_align),
+          right_text_align(o.right_text_align), icon(o.icon), icon_render_mode(o.icon_render_mode),
+          has_check(o.has_check), checked(o.checked), group_header(o.group_header),
+          separator_before(o.separator_before), custom_ink_color(o.custom_ink_color), use_custom_font(o.use_custom_font),
+          custom_font(o.custom_font), underline(o.underline), underline_color(o.underline_color),
+          editable(o.editable), lazy_children(o.lazy_children), lazy_loaded(o.lazy_loaded),
+          has_metadata(o.has_metadata), metadata_color(o.metadata_color) {}
+    UiModelItem& operator=(const UiModelItem& o)
+    {
+        text = o.text;
+        data = o.data;
+        enabled = o.enabled;
+        description = o.description;
+        right_text = o.right_text;
+        columns = clone(o.columns);
+        text_align = o.text_align;
+        right_text_align = o.right_text_align;
+        icon = o.icon;
+        icon_render_mode = o.icon_render_mode;
+        has_check = o.has_check;
+        checked = o.checked;
+        group_header = o.group_header;
+        separator_before = o.separator_before;
+        custom_ink_color = o.custom_ink_color;
+        use_custom_font = o.use_custom_font;
+        custom_font = o.custom_font;
+        underline = o.underline;
+        underline_color = o.underline_color;
+        editable = o.editable;
+        lazy_children = o.lazy_children;
+        lazy_loaded = o.lazy_loaded;
+        has_metadata = o.has_metadata;
+        metadata_color = o.metadata_color;
+        return *this;
+    }
 };
 
 enum UiModelChangeKind {

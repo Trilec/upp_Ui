@@ -261,7 +261,7 @@ private:
             bar_model_.AddChild(edit, MakeAction("Redo", "Ctrl+Shift+Z", 202));
             UiMenuNodeRef theme = bar_model_.AddChild(view, UiMenuItem("Theme"));
             bar_model_.AddChild(theme, MakeRadio("Minimal", true, 301));
-            bar_model_.AddChild(theme, MakeRadio("Rounded", false, 302));
+            bar_model_.AddChild(theme, MakeRadio("Pill", false, 302));
             popup_model_.AddChild(popup_model_.Root(), MakeAction("Inspect", "F1", 501, ICON_DESIGN_SETTINGS_48()));
             popup_model_.AddChild(popup_model_.Root(), MakeAction("Rename", "F2", 502));
             popup_model_.AddChild(popup_model_.Root(), MakeSeparator());
