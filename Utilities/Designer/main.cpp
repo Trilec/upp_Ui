@@ -16,7 +16,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.10";
+static const char* DESIGNER_VERSION = "v0.1.11";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static const char *DesignerThemePresetId(UiThemePreset preset)
@@ -325,6 +325,9 @@ public:
 		Rect vp = side_.GetViewportRect();
 		right_box_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), DPI(640)));
 		LayoutRightPanel();
+		right_box_.RefreshLayout();
+		side_.RefreshLayout();
+		side_.Layout();
 	}
 
 private:
@@ -1820,6 +1823,9 @@ private:
 		accordion_style.header_style.media_tint_mono = true;
 		accordion_style.header_style.title_font = SansSerifZ(11).Bold();
 		accordion_style.header_style.subtitle_font = SansSerifZ(8);
+		accordion_style.animation_enabled = false;
+		accordion_style.anim_open_ms = 0;
+		accordion_style.anim_close_ms = 0;
 		accordion_style.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
 		accordion_style.body_style.transparent = true;
 		accordion_style.body_style.metrics.face_enabled = false;
