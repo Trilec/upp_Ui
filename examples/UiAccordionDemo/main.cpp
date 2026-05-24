@@ -144,6 +144,7 @@ protected:
         section_a_.SetCustomStyle(body);
         section_b_.SetCustomStyle(body);
         section_c_.SetCustomStyle(body);
+        RefreshFromConfig();
     }
 
     virtual void LayoutPreviewContent() override

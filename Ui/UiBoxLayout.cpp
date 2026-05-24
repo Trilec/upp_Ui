@@ -48,10 +48,32 @@ Size UiBoxLayout::GetCtrlMinSize(Item& it)
     return it.c->GetMinSize();
 }
 
+int UiBoxLayout::GetMainGap() const
+{
+    return dir == Direction::H ? gap_x : gap_y;
+}
+
+int UiBoxLayout::GetCrossGap() const
+{
+    return dir == Direction::H ? gap_y : gap_x;
+}
+
+int UiBoxLayout::GetSnapMainSize(int index, int fallback) const
+{
+    if(wrap != UiBoxWrap::Snap)
+        return fallback;
+    if(wrap_snap_sizes.IsEmpty())
+        return max(1, fallback);
+    int ix = min(max(0, index), wrap_snap_sizes.GetCount() - 1);
+    return max(1, wrap_snap_sizes[ix]);
+}
+
 void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
 {
     const int inner_w = max(0, irc.GetWidth());
     const int inner_h = max(0, irc.GetHeight());
+    const int main_gap = GetMainGap();
+    const int cross_gap = GetCrossGap();
 
     for(Item& it : items) {
         it.cl = Item::TransientLayoutCache();
@@ -74,7 +96,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 return;
 
             int n = row.GetCount();
-            if(!wrap)
+            if(wrap == UiBoxWrap::None)
                 row_h = max(row_h, inner_h);
             int base_sum = 0;
             int weight_sum = 0;
@@ -83,7 +105,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 if(items[row[i]].expandingWeight > 0)
                     weight_sum += items[row[i]].expandingWeight;
             }
-            int used_main = base_sum + gap * max(0, n - 1);
+            int used_main = base_sum + main_gap * max(0, n - 1);
             int extra = max(0, inner_w - used_main);
 
             Vector<int> grow;
@@ -126,13 +148,13 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                     rr = RectC(cx, y, w, h);
 
                 it.cl.rect = rr;
-                cx += w + gap;
+                cx += w + main_gap;
             }
 
-            used_w = max(used_w, min(inner_w, max(0, cx - irc.left - gap)));
+            used_w = max(used_w, min(inner_w, max(0, cx - irc.left - main_gap)));
             used_h = max(used_h, y - irc.top + row_h);
 
-            y += row_h + gap;
+            y += row_h + cross_gap;
             row.Clear();
             main.Clear();
             cross.Clear();
@@ -155,11 +177,15 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             if(fixed_column > 0)
                 w = min(w, fixed_column);
             w = min(max(w, it.minw), it.maxw);
+            if(wrap == UiBoxWrap::Snap)
+                w = GetSnapMainSize(row.GetCount(), w);
 
             int h = min(max(ms.cy, it.minh), it.maxh);
 
-            int need = row.IsEmpty() ? w : x_cursor + gap + w;
-            if(wrap && !row.IsEmpty() && need > inner_w) {
+            int need = row.IsEmpty() ? w : x_cursor + main_gap + w;
+            bool wrap_on = wrap != UiBoxWrap::None;
+            bool snap_full = wrap == UiBoxWrap::Snap && wrap_snap_count > 0 && row.GetCount() >= wrap_snap_count;
+            if(wrap_on && !row.IsEmpty() && (need > inner_w || snap_full)) {
                 FlushRow();
                 x_cursor = 0;
             }
@@ -168,7 +194,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             main.Add(max(0, w));
             cross.Add(max(0, h));
             row_h = max(row_h, h);
-            x_cursor = row.IsEmpty() ? 0 : (x_cursor + (row.GetCount() > 1 ? gap : 0) + w);
+            x_cursor = row.IsEmpty() ? 0 : (x_cursor + (row.GetCount() > 1 ? main_gap : 0) + w);
         }
 
         FlushRow();
@@ -225,7 +251,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
         nonbreak_count++;
     }
 
-    int gap_total = max(0, visible_count - 1) * gap;
+    int gap_total = max(0, visible_count - 1) * main_gap;
     int extra = max(0, inner_h - (main_sum + gap_total));
 
     Vector<int> grow;
@@ -261,7 +287,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             continue;
 
         if(it.is_break) {
-            y += gap;
+            y += main_gap;
             continue;
         }
 
@@ -281,12 +307,12 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             rr = RectC(irc.left, y, w, h);
 
         it.cl.rect = rr;
-        y += h + gap;
+        y += h + main_gap;
         max_w = max(max_w, rr.GetWidth());
     }
 
     if(visible_count > 0)
-        y -= gap;
+        y -= main_gap;
 
     used_w = min(inner_w, max_w);
     used_h = min(inner_h, max(0, y - irc.top));
@@ -315,10 +341,11 @@ void UiBoxLayout::Layout()
 
 void UiBoxLayout::Paint(Draw& w)
 {
+    Rect r = GetSize();
+
     if(!debug)
         return;
 
-    Rect r = GetSize();
     Rect irc = r.Deflated(inset.left, inset.top, inset.right, inset.bottom);
     Color line = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
     Color fill = Blend(line, SColorPaper(), 205);
@@ -344,7 +371,8 @@ void UiBoxLayout::Paint(Draw& w)
         if(!it.cl.visible || it.cl.rect.IsEmpty())
             continue;
         Rect cr = it.cl.rect;
-        if(have_prev && gap > 0) {
+        int main_gap = GetMainGap();
+        if(have_prev && main_gap > 0) {
             Rect gr;
             if(dir == UiDirection::H)
                 gr = Rect(prev.right, max(prev.top, cr.top), cr.left, min(prev.bottom, cr.bottom));
@@ -376,7 +404,7 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     if(total_width <= 0)
         return inset.top + inset.bottom;
 
-    if(dir == Direction::V || !wrap)
+    if(dir == Direction::V || wrap == UiBoxWrap::None)
         return GetMinSize().cy;
 
     Rect irc = RectC(0, 0, max(0, total_width - inset.left - inset.right), INT_MAX / 8);
@@ -421,7 +449,7 @@ Size UiBoxLayout::GetMinSize() const
     }
 
     if(visible_items > 1)
-        main_total += gap * (visible_items - 1);
+        main_total += GetMainGap() * (visible_items - 1);
 
     if(dir == Direction::H)
         return Size(main_total + inset.left + inset.right,

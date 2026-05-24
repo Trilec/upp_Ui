@@ -44,6 +44,7 @@
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiLabel.h>
 #include <Ui/UiPanel.h>
+#include <Ui/UiGroupPanel.h>
 #include <Ui/UiCheckBox.h>
 #include <Ui/UiToggle.h>
 #include <Ui/UiRadioButton.h>
@@ -682,6 +683,13 @@ inline void ApplyPillGeometry(UiPanel::Style& s)
     s.metrics.radius = max(s.metrics.radius, DPI(18));
 }
 
+inline void ApplyPillGeometry(UiGroupPanel::Style& s)
+{
+    s.metrics.radius = max(s.metrics.radius, DPI(18));
+    s.header_inset = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
+    s.inset = Rect(DPI(12), DPI(12), DPI(12), DPI(12));
+}
+
 inline void ApplyPillGeometry(UiDropdown::Style& s)
 {
     s.metrics.radius = DPI(999);
@@ -1305,6 +1313,176 @@ inline UiPanel::Style ApplyPanelRole(UiPanel::Style s, UiPanelRole role)
         return s;
     }
     return s;
+}
+
+inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
+{
+    UiGroupPanel::Style s = UiGroupPanel::StyleDefault();
+    s.metrics.radius = DPI(8);
+    s.metrics.frame_width = DPI(1);
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.focus_enabled = false;
+    s.title_font = SansSerifZ(11).Bold();
+    s.subtitle_font = SansSerifZ(9);
+    s.side_title_font = SansSerifZ(9);
+    s.header_mode = UiGroupPanel::Inside;
+    s.header_inset = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+    s.inset = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+    switch(preset) {
+    case UiThemePreset::Pill:
+        ApplyPillGeometry(s);
+        return s;
+    case UiThemePreset::Linear:
+        s.metrics.radius = 0;
+        s.metrics.face_enabled = false;
+        return s;
+    case UiThemePreset::Solid:
+        s.metrics.radius = DPI(10);
+        return s;
+    case UiThemePreset::Outline:
+        s.metrics.radius = 0;
+        s.metrics.face_enabled = false;
+        return s;
+    case UiThemePreset::Compact:
+        s.metrics.radius = DPI(6);
+        s.inset = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
+        s.header_inset = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
+        return s;
+    case UiThemePreset::Layered:
+        s.metrics.radius = DPI(18);
+        s.metrics.shadow.enabled = true;
+        s.metrics.shadow.curve = ShadowSoft();
+        s.metrics.shadow.distance = DPI(4);
+        s.metrics.shadow.alpha = 48;
+        s.metrics.shadow.color = Color(148, 163, 184);
+        return s;
+    case UiThemePreset::Minimal:
+    default:
+        return s;
+    }
+}
+
+inline void TuneMinimalGroupPanel(UiGroupPanel::Style& s, UiThemeMode mode, UiRole role)
+{
+    bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
+    s.metrics.shadow.enabled = false;
+    s.metrics.radius = DPI(8);
+    s.metrics.frame_width = DPI(1);
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.transparent = false;
+    s.title_font = SansSerifZ(11).Bold();
+    s.subtitle_font = SansSerifZ(9);
+    s.side_title_font = SansSerifZ(9);
+    s.separator_thickness = DPI(1);
+
+    Color face;
+    Color hot_face;
+    Color frame;
+    Color title;
+    Color subtitle;
+    Color disabled;
+
+    if(dark) {
+        face = Color(25, 25, 25);
+        hot_face = Color(32, 32, 32);
+        frame = Color(64, 64, 64);
+        title = Color(218, 218, 218);
+        subtitle = Color(158, 158, 158);
+        disabled = Color(115, 115, 115);
+        switch(role) {
+        case UiRole::Subtle:
+            s.metrics.face_enabled = false;
+            s.metrics.frame_enabled = false;
+            s.line_enabled = true;
+            s.header_band_enabled = false;
+            frame = Color(78, 78, 78);
+            title = Color(190, 190, 190);
+            subtitle = Color(145, 145, 145);
+            break;
+        case UiRole::Accent:
+            face = Color(18, 35, 54);
+            hot_face = Color(22, 47, 75);
+            frame = Color(96, 165, 250);
+            title = Color(147, 197, 253);
+            subtitle = Color(190, 205, 224);
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        case UiRole::Alert:
+            face = Color(48, 18, 18);
+            hot_face = Color(64, 24, 24);
+            frame = Color(248, 113, 113);
+            title = Color(252, 165, 165);
+            subtitle = Color(224, 190, 190);
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        case UiRole::Standard:
+        default:
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        }
+    }
+    else {
+        face = Color(248, 250, 252);
+        hot_face = Color(241, 245, 249);
+        frame = Color(226, 232, 240);
+        title = Color(71, 85, 105);
+        subtitle = Color(100, 116, 139);
+        disabled = Color(156, 163, 175);
+        switch(role) {
+        case UiRole::Subtle:
+            s.metrics.face_enabled = false;
+            s.metrics.frame_enabled = false;
+            s.line_enabled = true;
+            s.header_band_enabled = false;
+            frame = Color(148, 163, 184);
+            title = Color(75, 85, 99);
+            subtitle = Color(107, 114, 128);
+            break;
+        case UiRole::Accent:
+            face = Color(239, 246, 255);
+            hot_face = Color(219, 234, 254);
+            frame = Color(147, 197, 253);
+            title = Color(37, 99, 235);
+            subtitle = Color(100, 116, 139);
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        case UiRole::Alert:
+            face = Color(254, 242, 242);
+            hot_face = Color(254, 226, 226);
+            frame = Color(252, 165, 165);
+            title = Color(220, 38, 38);
+            subtitle = Color(100, 116, 139);
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        case UiRole::Standard:
+        default:
+            s.line_enabled = false;
+            s.header_band_enabled = false;
+            break;
+        }
+    }
+
+    s.title_color = title;
+    s.subtitle_color = subtitle;
+    s.side_title_color = subtitle;
+
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = s.metrics.face_enabled ? UiFill::Solid(face) : UiFill::None();
+        s.palette.frame[i] = frame;
+        s.palette.ink[i] = title;
+        s.palette.icon[i] = title;
+    }
+    s.palette.face[ST_HOT] = UiFill::Solid(hot_face);
+    s.palette.ink[ST_DISABLED] = disabled;
+    s.palette.icon[ST_DISABLED] = disabled;
+    s.palette.frame[ST_DISABLED] = dark ? Color(52, 52, 52) : Color(226, 232, 240);
 }
 
 
@@ -2424,6 +2602,25 @@ public:
         return s;
     }
 
+    static UiGroupPanel::Style ResolveGroupPanel(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
+    {
+        UiThemeContext normalized = NormalizeContext(ctx);
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        UiGroupPanel::Style s = UiThemeDetail::ResolveGroupPanelBase(normalized.preset);
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
+            UiThemeDetail::TuneMinimalGroupPanel(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
+            return s;
+        }
+        UiThemeDetail::ApplyMode(s.palette, normalized.mode);
+        return s;
+    }
+
+    static UiGroupPanel::Style ResolveGroupPanel(UiRole role = UiRole::Standard)
+    {
+        return ResolveGroupPanel(GetContext(), role);
+    }
 
     static UiDropdown::Style ResolveDropdown(const UiThemeContext& ctx, UiRole role)
     {
@@ -3009,6 +3206,11 @@ public:
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolvePanel(ctx, role);
     }
 
+    static UiGroupPanel::Style ResolveGroupPanel(UiThemePreset preset, UiThemeMode mode, UiRole role = UiRole::Standard)
+    {
+        UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveGroupPanel(ctx, role);
+    }
+
     static UiCheckBox::Style ResolveCheckBox(UiThemePreset preset, UiThemeMode mode, UiCheckVisual visual = UICHECKVIS_CLASSIC)
     {
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveCheckBox(ctx, visual);
@@ -3102,6 +3304,7 @@ inline UiSlider::Style MakeSlider(UiThemePreset preset, UiThemeMode mode) { retu
 inline UiScrollBar::Style MakeScrollBar(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveScrollBar(preset, mode); }
 inline UiSplitter::Style MakeSplitter(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveSplitter(preset, mode); }
 inline UiPanel::Style MakePanel(UiThemePreset preset, UiThemeMode mode, UiPanelRole role = UiPanelRole::Surface) { return UiTheme::ResolvePanel(preset, mode, role); }
+inline UiGroupPanel::Style MakeGroupPanel(UiThemePreset preset, UiThemeMode mode, UiRole role = UiRole::Standard) { return UiTheme::ResolveGroupPanel(preset, mode, role); }
 inline UiDropdown::Style MakeDropdown(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveDropdown(preset, mode); }
 inline UiTab::Style MakeTab(UiThemePreset preset, UiThemeMode mode, UiTabVisual visual = UITAB_CLASSIC) { return UiTheme::ResolveTab(preset, mode, visual); }
 inline UiTitleCard::Style MakeTitleCard(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveTitleCard(preset, mode); }

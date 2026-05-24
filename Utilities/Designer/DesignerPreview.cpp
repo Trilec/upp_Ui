@@ -1,4 +1,5 @@
 #include "DesignerPreview.h"
+#include "DesignerDefaults.h"
 
 // DesignerPreview.cpp - virtual-window preview and pointer interaction surface.
 // It rebuilds real Ui controls through adapters, records hit rectangles for the
@@ -77,6 +78,30 @@ static Color DesignerPreviewWindowOutline(Color base, UiThemeMode mode)
 {
 	Color paper = DesignerPreviewBackground(mode);
 	return Blend(base, paper, 190);
+}
+
+static UiGridLayout::Align DesignerPreviewGridAlignH(const DesignerNode& n)
+{
+	String align = DesignerPreviewNodeProperty(n, "cell_align_h", "Auto");
+	if(align == "Auto")
+		align = DesignerPreviewNodeProperty(n, "align_h", DesignerPreviewNodeProperty(n, "align", "Left"));
+	if(align == "Right")
+		return UiGridLayout::Align::End;
+	if(align == "Center")
+		return UiGridLayout::Align::Center;
+	return UiGridLayout::Align::Start;
+}
+
+static UiGridLayout::Align DesignerPreviewGridAlignV(const DesignerNode& n)
+{
+	String align = DesignerPreviewNodeProperty(n, "cell_align_v", "Auto");
+	if(align == "Auto")
+		align = DesignerPreviewNodeProperty(n, "align_v", "Top");
+	if(align == "Bottom")
+		return UiGridLayout::Align::End;
+	if(align == "Center")
+		return UiGridLayout::Align::Center;
+	return UiGridLayout::Align::Start;
 }
 
 void DesignerPreview::Set(DesignerModel* model, DesignerRegistry* registry)
@@ -172,8 +197,8 @@ void DesignerPreview::MouseMove(Point p, dword)
 {
 			Rect root = GetVirtualWindowRect();
 			if(resizing_) {
-				model_->SetVirtualSize(Size(max(DPI(40), p.x - root.left),
-				                            max(DPI(40), p.y - root.top)));
+				model_->SetVirtualSize(Size(max(DPI(DESIGNER_WINDOW_MIN_WIDTH), p.x - root.left),
+				                            max(DPI(DESIGNER_WINDOW_MIN_HEIGHT), p.y - root.top)));
 				WhenChanged();
 				Refresh();
 				return;
@@ -304,7 +329,7 @@ Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect
 {
 			if(parent.type_id == "UiSplitter" || parent.type_id == "UiQuadSplitter")
 				return GetSplitterPaneRect(parent, drop_index_);
-			Rect pr = parent.id == Designer_ROOT ? root : parent.last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
+			Rect pr = GetContainerContentRect(parent, root);
 			if(pr.IsEmpty())
 				return Rect(0, 0, 0, 0);
 			if(parent.type_id == "GridLayout") {
@@ -315,8 +340,8 @@ Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect
 					return Rect(0, 0, 0, 0);
 				int columns = max(1, (int)DesignerPreviewNodeProperty(parent, "columns", 2));
 				int rows = max(1, (int)DesignerPreviewNodeProperty(parent, "rows", 2));
-				int cw = max(DPI(24), (grid.GetWidth() - gap * (columns - 1)) / columns);
-				int ch = max(DPI(24), (grid.GetHeight() - gap * (rows - 1)) / rows);
+				int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (grid.GetWidth() - gap * (columns - 1)) / columns);
+				int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (grid.GetHeight() - gap * (rows - 1)) / rows);
 				int idx = clamp(drop_index_, 0, columns * rows - 1);
 				int row = idx / columns;
 				int col = idx % columns;
@@ -361,6 +386,15 @@ Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect
 				y = prev && next ? (prev->last_rect.bottom + next->last_rect.top) / 2 : pr.top;
 			}
 			return RectC(pr.left, y - DPI(2), pr.GetWidth(), DPI(4));
+		}
+
+Rect DesignerPreview::GetContainerContentRect(const DesignerNode& parent, const Rect& root) const
+{
+			if(parent.id == Designer_ROOT)
+				return root;
+			if(parent.type_id == "UiPanel" || parent.type_id == "UiScrollPanel")
+				return parent.last_rect.Deflated(DPI(4));
+			return parent.last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
 		}
 
 int DesignerPreview::GetSplitterPaneIndex(const DesignerNode& parent, Point p) const
@@ -473,9 +507,7 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			String label = (t ? t->display_name : n.type_id) + ": " + n.name;
 			w.DrawText(r.left + DPI(6), r.top + DPI(4), label, SansSerifZ(9).Bold(), SColorText());
 			if(t && t->is_container) {
-				Rect content = (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel")
-				             ? r.Deflated(DPI(4))
-				             : r.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
+				Rect content = GetContainerContentRect(n, r);
 				PaintChildren(w, n, content, depth + 1);
 				DrawLayoutDebug(w, n, content);
 			}
@@ -501,8 +533,8 @@ void DesignerPreview::DrawLayoutDebug(Draw& w, const DesignerNode& n, Rect conte
 			int rows = max(1, (int)DesignerPreviewNodeProperty(n, "rows", 2));
 			int count = n.children.GetCount();
 			rows = max(rows, (count + columns - 1) / columns);
-			int cw = max(DPI(24), (inner.GetWidth() - gap * (columns - 1)) / columns);
-			int ch = max(DPI(24), (inner.GetHeight() - gap * (rows - 1)) / rows);
+			int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (inner.GetWidth() - gap * (columns - 1)) / columns);
+			int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (inner.GetHeight() - gap * (rows - 1)) / rows);
 			String label = Format("Grid: %d columns x %d rows, gap %d", columns, rows, gap);
 			w.DrawText(inner.left + DPI(4), inner.top + DPI(4), label, SansSerifZ(9).Bold(), c);
 			for(int row = 0; row < rows; row++) {
@@ -551,8 +583,8 @@ void DesignerPreview::PaintChildren(Draw& w, const DesignerNode& parent, Rect ar
 Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 {
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
-			Size def = t ? t->default_size : Size(DPI(120), DPI(32));
-			Size minsz = t ? t->min_size : Size(DPI(24), DPI(20));
+			Size def = t ? t->default_size : Size(DPI(DESIGNER_DEFAULT_WIDTH), DPI(DESIGNER_DEFAULT_HEIGHT));
+			Size minsz = t ? t->min_size : Size(DPI(DESIGNER_MIN_WIDTH), DPI(DESIGNER_MIN_HEIGHT));
 			if(DesignerPreviewAxisSizing(n, "h_sizing") == "Fixed")
 				def.cx = (int)DesignerPreviewNodeProperty(n, "width", def.cx);
 			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
@@ -635,81 +667,6 @@ void DesignerPreview::PaintBoxChildren(Draw& w, const DesignerNode& parent, Rect
 			}
 		}
 
-void DesignerPreview::PaintFlowGridChildren(Draw& w, const DesignerNode& parent, Rect area, int depth)
-{
-			int gap = (int)DesignerPreviewNodeProperty(parent, "gap", DPI(8));
-			int inset = (int)DesignerPreviewNodeProperty(parent, "inset", 0);
-			area = area.Deflated(inset);
-			bool horizontal = DesignerPreviewNodeProperty(parent, "direction", "H") == "H";
-			bool wrap = (bool)DesignerPreviewNodeProperty(parent, "wrap", true);
-			bool align_cells = (bool)DesignerPreviewNodeProperty(parent, "align_cells", true);
-			Size cell_size((int)DesignerPreviewNodeProperty(parent, "cell_width", 120),
-			               (int)DesignerPreviewNodeProperty(parent, "cell_height", 32));
-			int count = parent.children.GetCount();
-			if(horizontal) {
-				int x = area.left;
-				int y = area.top;
-				int row_h = 0;
-				for(int i = 0; i < count; i++) {
-					DesignerNode* child = model_->Find(parent.children[i]);
-					if(!child)
-						continue;
-					Size sz = GetNodePreviewSize(*child);
-					String hs = DesignerPreviewAxisSizing(*child, "h_sizing");
-					String vs = DesignerPreviewAxisSizing(*child, "v_sizing");
-					if(align_cells || hs == "Expand")
-						sz.cx = max(DPI(10), cell_size.cx);
-					if(align_cells || vs == "Expand")
-						sz.cy = max(DPI(10), cell_size.cy);
-					int cx = min(sz.cx, area.GetWidth());
-					int cy = sz.cy;
-					if(wrap && x > area.left && x + cx > area.right) {
-						x = area.left;
-						y += row_h + gap;
-						row_h = 0;
-					}
-					if(y >= area.bottom)
-						break;
-					Rect cr = RectC(x, y, min(cx, max(0, area.right - x)), min(cy, max(0, area.bottom - y)));
-					child->last_rect = cr;
-					PaintNode(w, *child, cr, depth);
-					x += cx + gap;
-					row_h = max(row_h, cy);
-				}
-			}
-			else {
-				int x = area.left;
-				int y = area.top;
-				int col_w = 0;
-				for(int i = 0; i < count; i++) {
-					DesignerNode* child = model_->Find(parent.children[i]);
-					if(!child)
-						continue;
-					Size sz = GetNodePreviewSize(*child);
-					String hs = DesignerPreviewAxisSizing(*child, "h_sizing");
-					String vs = DesignerPreviewAxisSizing(*child, "v_sizing");
-					if(align_cells || hs == "Expand")
-						sz.cx = max(DPI(10), cell_size.cx);
-					if(align_cells || vs == "Expand")
-						sz.cy = max(DPI(10), cell_size.cy);
-					int cx = sz.cx;
-					int cy = min(sz.cy, area.GetHeight());
-					if(wrap && y > area.top && y + cy > area.bottom) {
-						y = area.top;
-						x += col_w + gap;
-						col_w = 0;
-					}
-					if(x >= area.right)
-						break;
-					Rect cr = RectC(x, y, min(cx, max(0, area.right - x)), min(cy, max(0, area.bottom - y)));
-					child->last_rect = cr;
-					PaintNode(w, *child, cr, depth);
-					y += cy + gap;
-					col_w = max(col_w, cx);
-				}
-			}
-		}
-
 void DesignerPreview::PaintGridChildren(Draw& w, const DesignerNode& parent, Rect area, int depth)
 {
 			int gap = (int)DesignerPreviewNodeProperty(parent, "gap", DPI(8));
@@ -719,8 +676,8 @@ void DesignerPreview::PaintGridChildren(Draw& w, const DesignerNode& parent, Rec
 			int rows = max(1, (int)DesignerPreviewNodeProperty(parent, "rows", 2));
 			int count = parent.children.GetCount();
 			rows = max(rows, (count + columns - 1) / columns);
-			int cw = max(DPI(24), (area.GetWidth() - gap * (columns - 1)) / columns);
-			int ch = max(DPI(24), (area.GetHeight() - gap * (rows - 1)) / rows);
+			int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (area.GetWidth() - gap * (columns - 1)) / columns);
+			int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (area.GetHeight() - gap * (rows - 1)) / rows);
 			for(int i = 0; i < count; i++) {
 				DesignerNode* child = model_->Find(parent.children[i]);
 				if(!child)
@@ -731,9 +688,25 @@ void DesignerPreview::PaintGridChildren(Draw& w, const DesignerNode& parent, Rec
 				Size sz = GetNodePreviewSize(*child);
 				String hs = DesignerPreviewAxisSizing(*child, "h_sizing");
 				String vs = DesignerPreviewAxisSizing(*child, "v_sizing");
-				Rect cr = RectC(cell.left, cell.top,
-				                hs == "Expand" ? cell.GetWidth() : min(cell.GetWidth(), sz.cx),
-				                vs == "Expand" ? cell.GetHeight() : min(cell.GetHeight(), sz.cy));
+				Size want(hs == "Expand" ? cell.GetWidth() : min(cell.GetWidth(), sz.cx),
+				          vs == "Expand" ? cell.GetHeight() : min(cell.GetHeight(), sz.cy));
+				int x = cell.left;
+				int y = cell.top;
+				if(hs != "Expand") {
+					UiGridLayout::Align ax = DesignerPreviewGridAlignH(*child);
+					if(ax == UiGridLayout::Align::Center)
+						x = cell.left + (cell.GetWidth() - want.cx) / 2;
+					else if(ax == UiGridLayout::Align::End)
+						x = cell.right - want.cx;
+				}
+				if(vs != "Expand") {
+					UiGridLayout::Align ay = DesignerPreviewGridAlignV(*child);
+					if(ay == UiGridLayout::Align::Center)
+						y = cell.top + (cell.GetHeight() - want.cy) / 2;
+					else if(ay == UiGridLayout::Align::End)
+						y = cell.bottom - want.cy;
+				}
+				Rect cr = RectC(x, y, want.cx, want.cy);
 				child->last_rect = cr;
 				PaintNode(w, *child, cr, depth);
 			}
@@ -819,15 +792,14 @@ void DesignerPreview::UpdateDropSlot(Point p)
 				drop_index_ = clamp(GetSplitterPaneIndex(*parent, p), 0, panes - 1);
 			}
 			else if(parent && parent->type_id == "GridLayout") {
-				Rect pr = parent->id == Designer_ROOT ? GetVirtualWindowRect()
-				                                      : parent->last_rect.Deflated(DPI(10), DPI(24), DPI(10), DPI(10));
+				Rect pr = GetContainerContentRect(*parent, GetVirtualWindowRect());
 				int inset = (int)DesignerPreviewNodeProperty(*parent, "inset", 0);
 				Rect grid = pr.Deflated(inset);
 				int columns = max(1, (int)DesignerPreviewNodeProperty(*parent, "columns", 2));
 				int rows = max(1, (int)DesignerPreviewNodeProperty(*parent, "rows", 2));
 				int gap = (int)DesignerPreviewNodeProperty(*parent, "gap", DPI(8));
-				int cw = max(DPI(24), (grid.GetWidth() - gap * (columns - 1)) / columns);
-				int ch = max(DPI(24), (grid.GetHeight() - gap * (rows - 1)) / rows);
+				int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (grid.GetWidth() - gap * (columns - 1)) / columns);
+				int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (grid.GetHeight() - gap * (rows - 1)) / rows);
 				int col = clamp((p.x - grid.left) / max(1, cw + gap), 0, columns - 1);
 				int row = clamp((p.y - grid.top) / max(1, ch + gap), 0, rows - 1);
 				drop_index_ = row * columns + col;
@@ -902,9 +874,9 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				String main_sizing = horizontal ? hs : vs;
 				if(main_sizing == "Fixed") {
 					int fixed = horizontal
-					          ? (int)DesignerPreviewNodeProperty(child_node, "width", 120)
-					          : (int)DesignerPreviewNodeProperty(child_node, "height", 32);
-					ref.Fixed(DPI(max(10, fixed)));
+					          ? (int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH)
+					          : (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT);
+					ref.Fixed(DPI(DesignerClampMin(fixed)));
 				}
 				else if(main_sizing == "Expand")
 					ref.Expand(1);
@@ -914,12 +886,13 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
 				Size fixed(0, 0);
 				if(hs == "Fixed" || vs == "Fixed")
-					fixed = Size(DPI(max(10, (int)DesignerPreviewNodeProperty(child_node, "width", 120))),
-					             DPI(max(10, (int)DesignerPreviewNodeProperty(child_node, "height", 32))));
+					fixed = Size(DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH))),
+					             DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))));
 				int columns = max(1, (int)DesignerPreviewNodeProperty(parent_node, "columns", 2));
 				int row = (int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns);
 				int col = (int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns);
-				grid->Add(child, row, col, hs == "Expand", vs == "Expand", fixed);
+				int item = grid->Add(child, row, col, hs == "Expand", vs == "Expand", fixed);
+				grid->SetItemAlign(item, DesignerPreviewGridAlignH(child_node), DesignerPreviewGridAlignV(child_node));
 			}
 			else if(DesignerSplitterAdapter *splitter = dynamic_cast<DesignerSplitterAdapter *>(&parent)) {
 				splitter->Add(child);
@@ -930,9 +903,9 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				String pane_sizing = DesignerPreviewAxisSizing(child_node, vertical ? "v_sizing" : "h_sizing");
 				if(pane_sizing == "Fixed") {
 					int fixed = vertical
-					          ? (int)DesignerPreviewNodeProperty(child_node, "height", 80)
-					          : (int)DesignerPreviewNodeProperty(child_node, "width", 120);
-					splitter->SetMinPixels(pane, DPI(max(10, fixed)));
+					          ? (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT)
+					          : (int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH);
+					splitter->SetMinPixels(pane, DPI(DesignerClampMin(fixed)));
 				}
 			}
 			else if(DesignerQuadSplitterAdapter *quad = dynamic_cast<DesignerQuadSplitterAdapter *>(&parent)) {
@@ -944,9 +917,9 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				quad->SetMinPixels(3, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_d", 60)));
 				if(DesignerPreviewAxisSizing(child_node, "h_sizing") == "Fixed" ||
 				   DesignerPreviewAxisSizing(child_node, "v_sizing") == "Fixed") {
-					int fixed = max((int)DesignerPreviewNodeProperty(child_node, "width", 120),
-					                (int)DesignerPreviewNodeProperty(child_node, "height", 80));
-					quad->SetMinPixels(pane, DPI(max(10, fixed)));
+					int fixed = max((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH),
+					                (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT));
+					quad->SetMinPixels(pane, DPI(DesignerClampMin(fixed)));
 				}
 			}
 			else if(DesignerTabAdapter *tab = dynamic_cast<DesignerTabAdapter *>(&parent)) {
@@ -961,6 +934,11 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			}
 			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent))
 				scroll->Content().Add(child.SizePos());
+			else if(DesignerGroupPanelAdapter *group = dynamic_cast<DesignerGroupPanelAdapter *>(&parent)) {
+				if(!group->GetContent())
+					group->SetContent(child);
+				child.SizePos();
+			}
 			else
 				parent_ctrl.Add(child.SizePos());
 		}

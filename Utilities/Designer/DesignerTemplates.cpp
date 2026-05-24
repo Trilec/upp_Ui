@@ -1,4 +1,5 @@
 #include "DesignerTemplates.h"
+#include "DesignerDefaults.h"
 
 // DesignerTemplates.cpp - starter model seeds for common layout shapes.
 // Templates create ordinary DesignerNode trees, so they exercise the same
@@ -50,7 +51,7 @@ static void ClearDesignerModel(DesignerModel& model)
 	Vector<DesignerNodeId> children = clone(root->children);
 	for(DesignerNodeId id : children)
 		model.RemoveNode(id);
-	model.SetVirtualSize(Size(760, 460));
+	model.SetVirtualSize(DesignerWindowSize());
 }
 
 static void BuildHolyGrailTemplate(DesignerModel& model, const DesignerRegistry& registry)

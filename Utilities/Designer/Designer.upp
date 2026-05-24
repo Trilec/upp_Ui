@@ -8,6 +8,7 @@ uses
 file
 	DesignerModel.h,
 	DesignerModel.cpp,
+	DesignerDefaults.h,
 	DesignerRegistry.h,
 	DesignerRegistry.cpp,
 	DesignerBuiltins.h,

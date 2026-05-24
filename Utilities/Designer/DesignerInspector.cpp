@@ -1,4 +1,5 @@
 #include "DesignerInspector.h"
+#include "DesignerDefaults.h"
 
 // DesignerInspector.cpp - descriptor-driven property editor.
 // Adapter bindings become themed composite rows on UiStack pages; edits are
@@ -66,9 +67,9 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 	if(b.property_id == "rows" || b.property_id == "columns")
 		return 2;
 	if(b.property_id == "cell_width")
-		return 120;
+		return DESIGNER_GRID_CELL_WIDTH;
 	if(b.property_id == "cell_height")
-		return 32;
+		return DESIGNER_GRID_CELL_HEIGHT;
 	if(b.property_id == "split_percent")
 		return 50;
 	if(b.property_id == "column_percent" || b.property_id == "row_percent")
@@ -309,7 +310,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap);
 		for(int i = 0; i < b.choices.GetCount(); i++) {
 			row->Add(AsString(b.choices[i]), b.choices.GetKey(i));
-			if(property_id == "icon") {
+			if(property_id == "icon" || property_id.EndsWith("_icon")) {
 				Image icon = UiIconFromName(b.choices.GetKey(i));
 				if(!IsNull(icon))
 					row->Dropdown().SetItemIcon(i, icon, UiIconRenderMode::MonoTint);

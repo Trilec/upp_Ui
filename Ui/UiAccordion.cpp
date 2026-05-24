@@ -1199,7 +1199,7 @@ Size UiAccordion::GetMinSize() const
     for(int i = 0; i < sections_.GetCount(); i++) {
         const Section& s = sections_[i];
         w = max(w, s.header.GetMinSize().cx);
-        h += max(DPI(24), style.header_height);
+        h += max(max(DPI(24), style.header_height), s.header.GetMinSize().cy);
         if(s.open)
             h += style.header_body_gap + MeasureSectionBodyHeight(s, max(1, w));
         if(i + 1 < sections_.GetCount())
@@ -1224,7 +1224,7 @@ void UiAccordion::Layout()
     for(int i = 0; i < sections_.GetCount(); i++) {
         Section& s = sections_[i];
 
-        int hh = max(DPI(24), style.header_height);
+        int hh = max(max(DPI(24), style.header_height), s.header.GetMinSize().cy);
         s.header.SetRect(content.left, y, w, hh);
         y += hh;
 

@@ -222,14 +222,35 @@ inline UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
 inline UiAccordion::Style MakeAccordionStyle(const DemoPalette& c)
 {
     UiAccordion::Style s = UiAccordion::StyleDefault();
+    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    s.palette = panel.palette;
+    s.metrics.radius = max(DPI(8), panel.metrics.radius);
+    s.transparent = true;
+    s.metrics.face_enabled = false;
+    s.metrics.frame_enabled = false;
+    s.metrics.frame_width = 0;
+    s.metrics.focus_enabled = false;
+    s.metrics.shadow.enabled = false;
     s.single_open = false;
     s.enforce_one = false;
+    s.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+    s.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+    s.header_style.hover_enabled = false;
+    s.header_style.metrics.focus_enabled = false;
+    s.header_style.title_line = false;
+    s.header_style.card_line = true;
+    s.header_style.media_tint_mono = true;
+    s.header_style.title_font = DemoSans(11, true);
+    s.header_style.subtitle_font = DemoSans(8);
+    s.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
     s.body_style.transparent = true;
     s.body_style.metrics.face_enabled = false;
     s.body_style.metrics.frame_enabled = false;
     s.body_style.metrics.frame_width = 0;
+    s.body_style.metrics.radius = 0;
+    s.body_style.metrics.focus_enabled = false;
+    s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
     s.body_style.metrics.shadow.enabled = false;
-    s.header_style.title_font = DemoSans(11, true);
     return s;
 }
 

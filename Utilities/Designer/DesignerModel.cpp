@@ -243,7 +243,8 @@ bool DesignerModel::ReplaceDocument(const Vector<DesignerNodeState>& states, Siz
 		n.expanded = s.expanded;
 		next_id_ = max(next_id_, n.id + 1);
 	}
-	virtual_size_ = Size(max(40, virtual_size.cx), max(40, virtual_size.cy));
+	virtual_size_ = Size(DesignerClampMin(virtual_size.cx, DESIGNER_WINDOW_MIN_WIDTH),
+	                     DesignerClampMin(virtual_size.cy, DESIGNER_WINDOW_MIN_HEIGHT));
 	selection_.Clear();
 	for(DesignerNodeId id : selection)
 		if(Find(id) && FindId(selection_, id) < 0)
@@ -390,7 +391,8 @@ bool DesignerModel::Validate(String& error) const
 
 void DesignerModel::SetVirtualSize(Size sz)
 {
-	virtual_size_ = Size(max(40, sz.cx), max(40, sz.cy));
+	virtual_size_ = Size(DesignerClampMin(sz.cx, DESIGNER_WINDOW_MIN_WIDTH),
+	                     DesignerClampMin(sz.cy, DESIGNER_WINDOW_MIN_HEIGHT));
 	WhenChanged();
 }
 

@@ -28,6 +28,8 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_FIT_WIDTH_48();
 	if(id == "UiPanel")
 		return ICON_DESIGN_PANEL_48();
+	if(id == "UiGroupPanel")
+		return ICON_DESIGN_BORDER_OUTER_48();
 	if(id == "UiScrollPanel")
 		return ICON_DESIGN_EXPANSION_PANELS_48();
 	if(id == "UiLabel")
@@ -167,7 +169,12 @@ static DesignerType MakeBoxLayoutType()
 	t.min_size = Size(80, 50);
 	t.init_defaults = [](DesignerNode& n) {
 		n.properties.Set("direction", "V");
-		n.properties.Set("wrap", false);
+		n.properties.Set("wrap", "None");
+		n.properties.Set("gap_x", 8);
+		n.properties.Set("gap_y", 8);
+		n.properties.Set("snap_count", 0);
+		n.properties.Set("snap_size_a", 80);
+		n.properties.Set("snap_size_b", 0);
 		n.properties.Set("gap", 8);
 		n.properties.Set("inset", 8);
 		n.properties.Set("debug", false);
@@ -192,10 +199,10 @@ static DesignerType MakeGridLayoutType()
 	t.is_container = true;
 	t.can_have_children = true;
 	t.default_size = Size(280, 180);
-	t.min_size = Size(100, 60);
+	t.min_size = Size(DESIGNER_GRID_MIN_WIDTH, DESIGNER_GRID_MIN_HEIGHT);
 	t.init_defaults = [](DesignerNode& n) {
-		n.properties.Set("cell_width", 120);
-		n.properties.Set("cell_height", 96);
+		n.properties.Set("cell_width", DESIGNER_GRID_CELL_WIDTH);
+		n.properties.Set("cell_height", DESIGNER_GRID_CELL_HEIGHT);
 		n.properties.Set("rows", 2);
 		n.properties.Set("columns", 2);
 		n.properties.Set("gap", 8);
@@ -307,10 +314,11 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	t.toolbox_group = "Controls";
 	t.icon = MakeDesignerTypeIcon(id);
 	t.default_size = size;
-	t.min_size = Size(24, 20);
+	t.min_size = DesignerMinSize();
 	t.init_defaults = [=](DesignerNode& n) {
 		bool placeholder = id == "Item";
 		n.properties.Set("text", name);
+		n.properties.Set("role", "Standard");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
 		n.properties.Set("width", size.cx);
@@ -458,6 +466,39 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 	return t;
 }
 
+static DesignerType MakeGroupPanelType()
+{
+	DesignerType t = MakeControlType("UiGroupPanel", "Group Panel", Size(260, 160));
+	t.toolbox_group = "Containers";
+	t.is_container = true;
+	t.can_have_children = true;
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("text", "Group");
+		n.properties.Set("subtitle", "");
+		n.properties.Set("side_title", "");
+		n.properties.Set("header_mode", "Inside");
+		n.properties.Set("line", false);
+		n.properties.Set("header_band", false);
+		n.properties.Set("role", "Standard");
+		n.properties.Set("placement", "Top");
+		n.properties.Set("icon", "None");
+		n.properties.Set("icon_size", 16);
+		n.properties.Set("inset", 8);
+		n.properties.Set("header_inset", 6);
+		n.properties.Set("line_thickness", 1);
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 260);
+		n.properties.Set("height", 160);
+		n.properties.Set("face", DesignerPanelFace());
+		n.properties.Set("frame", DesignerPanelFrame());
+		n.properties.Set("radius", 8);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("frame_enabled", true);
+	};
+	return t;
+}
+
 static DesignerType MakePageSlotType()
 {
 	DesignerType t;
@@ -513,8 +554,8 @@ static DesignerType MakeWindowType()
 	t.display_name = "Window";
 	t.is_container = true;
 	t.can_have_children = true;
-	t.default_size = Size(760, 460);
-	t.min_size = Size(40, 40);
+	t.default_size = DesignerWindowSize();
+	t.min_size = DesignerWindowMinSize();
 	t.can_drop = [](const DesignerNode&, const DesignerNode& child) {
 		return child.type_id != "Spacer";
 	};
@@ -533,12 +574,13 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakePageSlotType());
 	registry.Register(MakeGenericType());
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
+	registry.Register(MakeGroupPanelType());
 	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
 	registry.Register(MakePageContainerType("UiTab", "Tab", Size(300, 180)));
 	registry.Register(MakePageContainerType("UiStack", "Stack", Size(300, 180)));
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
 	registry.Register(MakeControlType("UiTitleCard", "Title Card", Size(220, 72)));
-	registry.Register(MakeControlType("UiButton", "Button", Size(120, 32)));
+	registry.Register(MakeControlType("UiButton", "Button", DesignerDefaultSize()));
 	registry.Register(MakeControlType("UiLineEdit", "Edit", Size(180, 32)));
 	registry.Register(MakeControlType("UiIntEdit", "Integer Edit", Size(140, 32)));
 	registry.Register(MakeControlType("UiFloatEdit", "Float Edit", Size(140, 32)));

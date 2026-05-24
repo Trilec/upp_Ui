@@ -1,4 +1,5 @@
 #include "DesignerSerialization.h"
+#include "DesignerDefaults.h"
 
 namespace Upp {
 
@@ -251,7 +252,7 @@ bool LoadDesignerModelJson(DesignerModel& model, const DesignerRegistry& registr
 		s.expanded = (bool)JsonGet(item, "expanded", true);
 		s.last_rect = RectFromJson(JsonGet(item, "last_rect"));
 	}
-	Size virtual_size = SizeFromJson(JsonGet(doc, "virtual_size"), Size(760, 460));
+	Size virtual_size = SizeFromJson(JsonGet(doc, "virtual_size"), DesignerWindowSize());
 	Vector<DesignerNodeId> selection = IdsFromJson(JsonGet(doc, "selection"));
 	return model.ReplaceDocument(states, virtual_size, selection, error);
 }

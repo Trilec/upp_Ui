@@ -31,6 +31,8 @@ file
 	UiToggle.cpp,
 	UiPanel.h,
 	UiPanel.cpp,
+	UiGroupPanel.h,
+	UiGroupPanel.cpp,
 	UiStack.h,
 	UiStack.cpp,
 	UiAccordion.h,
@@ -105,4 +107,3 @@ file
 	UiMenu.cpp,
 	UiColorPicker.h,
 	UiColorPicker.cpp;
-

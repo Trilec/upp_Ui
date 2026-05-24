@@ -27,6 +27,15 @@ Optional reference:
    - Larger feature-specific designs and roadmaps for UiDoc, UiMenu, UiTable,
      dropdown, tree/list/model work, shadow API, and PatchTrack.
 
+Active layout/container notes:
+
+- `UiBoxLayout_Flow_Groups_Design.md`
+  - Box wrapping, flow, and snap behavior; confirms grouping chrome belongs in
+    `UiGroupPanel`, not in the layout engine.
+- `UiGroupPanel_Design.md`
+  - Titled group-panel container contract, header modes, designer support, and
+    theme-role styling expectations.
+
 ## Archive Policy
 
 `archive/` contains the original segmented notes used to build the consolidated

@@ -42,6 +42,7 @@ private:
 		void DrawResizeHandle(Draw& w, const Rect& root);
 		void DrawDropIndicator(Draw& w, const Rect& root);
 		Rect GetInsertMarkerRect(const DesignerNode& parent, const Rect& root) const;
+		Rect GetContainerContentRect(const DesignerNode& parent, const Rect& root) const;
 		int GetSplitterPaneIndex(const DesignerNode& parent, Point p) const;
 		Rect GetSplitterPaneRect(const DesignerNode& parent, int pane) const;
 		String GetSplitterPaneName(const DesignerNode& parent, int pane) const;
@@ -52,7 +53,6 @@ private:
 		void PaintChildren(Draw& w, const DesignerNode& parent, Rect area, int depth);
 		Size GetNodePreviewSize(const DesignerNode& n) const;
 		void PaintBoxChildren(Draw& w, const DesignerNode& parent, Rect area, int depth);
-		void PaintFlowGridChildren(Draw& w, const DesignerNode& parent, Rect area, int depth);
 		void PaintGridChildren(Draw& w, const DesignerNode& parent, Rect area, int depth);
 		DesignerNodeId Hit(Point p) const;
 		int GetNodeDepth(DesignerNodeId id) const;

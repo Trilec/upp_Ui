@@ -1077,6 +1077,7 @@ void UiDoc::RebuildLayoutCache() const
             w = pref[len];
         line_widths_[line] = w;
         int lh = max(DPI(16), line_font_h + max(style_.line_gap + line_leading, 0));
+        lh += DPI(3);
         if(max_inline_h > 0)
             lh = max(lh, max_inline_h + DPI(4));
         line_text_heights_[line] = lh;
@@ -1299,8 +1300,9 @@ int UiDoc::PosToX(int line, int col) const
     int prefix = GetLineVisualPrefixWidth(line);
     int start = line_starts_[line];
     int len = line_lengths_[line];
+    int block_type = (line < block_meta_.GetCount() ? block_meta_[line].block_type : (int)BLOCK_PARAGRAPH);
     ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
-    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, ApplyBlockFont(GetBaseFont(), block_type), max(DPI(12), text_rect_.GetWidth()), false, false);
     Point cp = UiDocInlineCaretPoint(lo, col);
     return left + indent * max(1, style_.margin_step) + prefix + cp.x;
 }
@@ -1315,8 +1317,9 @@ int UiDoc::XToColumn(int line, int x) const
     int rel = x - (text_rect_.left + style_.metrics.content_margin.left + gutter_left + indent * max(1, style_.margin_step) + prefix);
     int start = line_starts_[line];
     int len = line_lengths_[line];
+    int block_type = (line < block_meta_.GetCount() ? block_meta_[line].block_type : (int)BLOCK_PARAGRAPH);
     ValueArray runs = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
-    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+    UiDocInlineLayout lo = UiDocLayoutInlineRuns(runs, ApplyBlockFont(GetBaseFont(), block_type), max(DPI(12), text_rect_.GetWidth()), false, false);
     return ClampValue(UiDocInlineHitCaret(lo, rel, max(0, lo.height / 2)), 0, len);
 }
 
@@ -6069,7 +6072,7 @@ void UiDoc::Paint(Draw& w)
         int block_type = (line < block_meta_.GetCount() ? block_meta_[line].block_type : (int)BLOCK_PARAGRAPH);
         bool quote_ink = (line < block_meta_.GetCount() && block_meta_[line].block_type == (int)BLOCK_QUOTE);
         ValueArray pruns = UiDocBuildParagraphInlineRuns(text_, start, len, embeds_);
-        UiDocInlineLayout plo = UiDocLayoutInlineRuns(pruns, GetBaseFont(), max(DPI(12), text_rect_.GetWidth()), false, false);
+        UiDocInlineLayout plo = UiDocLayoutInlineRuns(pruns, ApplyBlockFont(GetBaseFont(), block_type), max(DPI(12), text_rect_.GetWidth()), false, false);
         for(int bi = 0; bi < plo.boxes.GetCount(); bi++) {
             const UiDocInlineBox& b = plo.boxes[bi];
             if(b.kind == 1) {

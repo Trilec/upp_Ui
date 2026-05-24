@@ -31,7 +31,7 @@ Core styled surfaces and infrastructure:
 Primary controls:
 
 - UiLabel, UiButton, UiCheckBox, UiToggle, UiRadioButton
-- UiPanel, UiAccordion, UiScrollPanel, UiStack, UiTitleCard
+- UiPanel, UiGroupPanel, UiAccordion, UiScrollPanel, UiStack, UiTitleCard
 - UiBaseEdit, UiLineEdit, UiPasswordEdit, UiMaskEdit, UiMultiEdit
 - UiIntEdit, UiFloatEdit, UiSlider, UiSliderEdit, UiScrollBar, UiSplitter
 - UiColorPicker, UiDropdown, UiMenu, UiTab, UiBreadcrumbs
@@ -61,6 +61,7 @@ Support controls:
 - For UiLabel, remember that metrics.text_font is the actual paint path when metrics.use_text_font is enabled. Setting only style.font can be a no-op.
 - `GetMinSize()` is the stable floor. `GetContentSize()` is the logical child/content extent. Container controls that host children should expose content extent so callers do not hand-measure panels.
 - `UiPanel` reports visible child bounds as content size, but it is still a host surface, not a flow layout. Use `UiBoxLayout` when rows/items need wrapping or responsive sequence layout. Use `UiGridLayout` when children belong to stable row/column cells.
+- `UiGroupPanel` is the titled grouping container. It paints group chrome and hosts one child through `SetContent()`. Put a box/grid layout inside that slot when the grouped body needs arrangement; do not add group chrome to layout engines.
 - For accordions inside scroll panels, section body heights must be explicit only when a section intentionally contains a bounded viewport. Otherwise, accordion bodies should be able to measure real content through `MeasureHeightForWidth()` / `GetContentSize()`.
 - Use UiLayoutCursor for lightweight shell/manual placement, but keep box/grid layouts for repeated stacked content.
 - Add comments around meaningful constructor groups, layout groups, and theme groups in demos and new controls. New code should be readable without tracing every line.
@@ -87,6 +88,7 @@ Use these meanings consistently:
 Container rules:
 
 - `UiPanel` is a styled host. It reports visible child bounds through `GetContentSize()`, but it does not arrange children.
+- `UiGroupPanel` is a styled titled host with one content slot. It reports the title/header and body content extent, but it does not arrange multiple body children by itself.
 - `UiBoxLayout` and `UiGridLayout` are measured layout engines, but they have different contracts. `UiBoxLayout` owns wrapping/free-form sequence layout. `UiGridLayout` owns stable row/column placement; resizing may change track sizes, but it must not silently move an item to a different logical cell.
 - `UiScrollPanel` is a bounded viewport. Its `GetContentSize()` is the scrollable document extent, not the viewport height.
 - `UiAccordion` should measure real section content through width-aware measurement or `GetContentSize()`. Use explicit section body height only when the section intentionally contains a bounded viewport.
@@ -205,7 +207,8 @@ Retired prototype demos live under `examples/OLD` and are intentionally excluded
 
 ## Icon conversion utility (SVG/PNG)
 
-- Tool: `Utilities/MakeIconFromSVG` (build target: `build/MakeIconFromSVG.exe`).
+- Tool: `Utilities/MakeIconFromSVG` (build target:
+  `E:\apps\github\upp_Ui\out\MakeIconFromSVG.exe`).
 - Default output mode: `iml`.
 - Input: vector (`.svg`) and raster (`.png`, other `StreamRaster` formats).
 - Shared icon workflow output:
@@ -215,9 +218,9 @@ Retired prototype demos live under `examples/OLD` and are intentionally excluded
 - Typical usage:
 
 ```bat
-build\MakeIconFromSVG.exe designs\search.svg
-build\MakeIconFromSVG.exe designs\check.svg designs\radio.svg --size 48x48 --output-base Ui\icon_batch
-build\MakeIconFromSVG.exe designs\search.svg --format uimakeicon --output-base Ui\newicons\search_icon
+E:\apps\github\upp_Ui\out\MakeIconFromSVG.exe designs\search.svg
+E:\apps\github\upp_Ui\out\MakeIconFromSVG.exe designs\check.svg designs\radio.svg --size 48x48 --output-base Ui\icon_batch
+E:\apps\github\upp_Ui\out\MakeIconFromSVG.exe designs\search.svg --format uimakeicon --output-base Ui\newicons\search_icon
 ```
 
 - Workflow note: the shared icon pack is IML-backed now. Append the generated `.iml.append` content into `Ui/UiIcons.iml` and the generated `.icons_h.append` content into `Ui/UiIcons.h`.
@@ -242,6 +245,7 @@ Legend:
 | UiToggle | yes | UiToggleDemo | builds (umk) | boolean switch wrapper over UiCheckBox switch style | migrate remaining duplicated shell helpers to shared demo shell |
 | UiRadioButton | yes | UiRadioButtonDemo | builds (umk) | builder-shell demo exposes grouping and indicator/body geometry | add arrow-key group navigation |
 | UiPanel | yes | UiPanelDemo | builds (umk) | background-only styled container; reports child content bounds | reduce old local style duplication over time |
+| UiGroupPanel | yes | UiDocDemo / Designer | builds (umk) | titled group container with icon/subtitle/side-title header and one body slot | add focused demo if group-panel styling grows further |
 | UiAccordion | yes | UiAccordionDemo | builds (umk) | styled collapsible sections with measured body content | add animated open/close + drag reorder if needed |
 | UiScrollPanel | yes | UiScrollPanelDemo | builds (umk) | styled scroll container with viewport/content separation | add keyboard scroll navigation checks |
 | UiStack | yes | n/a | builds as package dependency | headless page container; intended for designer/inspector page switching | add a focused UiStackDemo or utility test if it becomes public-facing |

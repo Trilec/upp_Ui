@@ -57,49 +57,40 @@ public:
         Add(toolbar_);
 
         Add(inspector_title_); Add(inspector_state_); Add(inspector_modes_); Add(inspector_block_); Add(inspector_find_); Add(inspector_margin_); Add(inspector_meta_);
-        Add(insp_margin_plus_); Add(insp_margin_minus_); Add(insp_margin_reset_);
-        Add(insp_lead_plus_); Add(insp_lead_minus_);
-        Add(insp_track_plus_); Add(insp_track_minus_);
-        Add(insp_tab_plus_); Add(insp_tab_minus_); Add(insp_tab_mode_);
-        Add(insp_tx_check_); Add(insp_map_check_); Add(insp_accept_check_); Add(inspector_checks_);
+        Add(inspector_checks_);
         Add(comment_title_); Add(comment_pick_); Add(comment_edit_); Add(comment_save_); Add(comment_delete_); Add(comment_close_);
         Add(inspector_keys_);
         Add(doc_);
 
-        UiGridLayout::Style tool_style = toolbar_.GetStyle();
-        tool_style.group_header = true;
-        tool_style.group_divider = true;
-        tool_style.cluster_box_pad = DPI(4);
-        toolbar_.SetMode(UiGridLayout::Flow)
-                .SetDirection(UiDirection::H)
-                .SetWrap(true)
-                .SetGap(DPI(6))
+        toolbar_.SetDirection(UiDirection::H)
+                .SetWrap(UiBoxWrap::Flow)
+                .SetGap(DPI(6), DPI(8))
                 .SetInset(DPI(8))
-                .SetAlignItems(UiCrossAlign::Start)
-                .SetCustomStyle(tool_style)
-                .SetGroupHeaders(true);
+                .SetAlignItems(UiCrossAlign::Start);
 
-        const int cl_format = toolbar_.NewCluster();
-        const int cl_structure = toolbar_.NewCluster();
-        const int cl_table = toolbar_.NewCluster();
-        const int cl_embed = toolbar_.NewCluster();
-        const int cl_find = toolbar_.NewCluster();
-        const int cl_view = toolbar_.NewCluster();
-        toolbar_.SetClusterDecor(cl_format, true, true)
-                .SetClusterDecor(cl_structure, true, true)
-                .SetClusterDecor(cl_table, true, true)
-                .SetClusterDecor(cl_embed, true, true)
-                .SetClusterDecor(cl_find, true, true)
-                .SetClusterDecor(cl_view, true, true);
-        toolbar_.WhenClusterText([=](int id) -> String {
-            if(id == cl_format) return "Formatting";
-            if(id == cl_structure) return "Structure";
-            if(id == cl_table) return "Table";
-            if(id == cl_embed) return "Embed";
-            if(id == cl_find) return "Find";
-            if(id == cl_view) return "View";
-            return String();
-        });
+        auto setup_group = [&](UiGroupPanel& panel, UiBoxLayout& body, const char *title) -> UiBoxLayout& {
+            panel.SetTitle(title)
+                 .SetHeaderMode(UiGroupPanel::Inside)
+                 .SetInset(Rect(DPI(6), DPI(4), DPI(6), DPI(6)))
+                 .SetHeaderInset(Rect(DPI(8), DPI(4), DPI(8), DPI(2)));
+            body.SetDirection(UiDirection::H)
+                .SetWrap(UiBoxWrap::Flow)
+                .SetGap(DPI(4), DPI(4))
+                .SetInset(0)
+                .SetAlignItems(UiCrossAlign::Start);
+            panel.SetContent(body);
+            toolbar_.Add(panel).Fit();
+            return body;
+        };
+
+        UiBoxLayout& format_group = setup_group(format_group_panel_, format_group_, "Formatting");
+        UiBoxLayout& structure_group = setup_group(structure_group_panel_, structure_group_, "Structure");
+        UiBoxLayout& table_group = setup_group(table_group_panel_, table_group_, "Table");
+        UiBoxLayout& adjust_group = setup_group(adjust_group_panel_, adjust_group_, "Adjust");
+        UiBoxLayout& embed_group = setup_group(embed_group_panel_, embed_group_, "Embed");
+        UiBoxLayout& find_group = setup_group(find_group_panel_, find_group_, "Find");
+        UiBoxLayout& view_group = setup_group(view_group_panel_, view_group_, "View");
+        UiBoxLayout& checks_group = setup_group(checks_group_panel_, checks_group_, "Checks");
 
         inspector_title_.SetText("Inspector");
         find_status_ = "Find: idle";
@@ -317,56 +308,24 @@ public:
         comment_delete_.Tip("Delete current selected comment metadata.");
         comment_close_.Tip("Collapse currently active comment.");
 
-        toolbar_.Add(bold_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(italic_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(underline_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(strike_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(upper_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(lower_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(titlecase_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(size_up_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(size_down_, cl_format, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(comment_, cl_format, false, Size(DPI(34), DPI(30)));
+        format_group.Add(bold_).Fixed(DPI(34)); format_group.Add(italic_).Fixed(DPI(34)); format_group.Add(underline_).Fixed(DPI(34)); format_group.Add(strike_).Fixed(DPI(34));
+        format_group.Add(upper_).Fixed(DPI(34)); format_group.Add(lower_).Fixed(DPI(34)); format_group.Add(titlecase_).Fixed(DPI(34)); format_group.Add(size_up_).Fixed(DPI(34)); format_group.Add(size_down_).Fixed(DPI(34)); format_group.Add(comment_).Fixed(DPI(34));
 
-        toolbar_.Add(bullet_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(numbered_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(bullet_circle_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(bullet_dash_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(h1_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(h2_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(h3_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(indent_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(outdent_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(quote_, cl_structure, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(code_, cl_structure, false, Size(DPI(42), DPI(30)));
+        structure_group.Add(bullet_).Fixed(DPI(34)); structure_group.Add(numbered_).Fixed(DPI(34)); structure_group.Add(bullet_circle_).Fixed(DPI(34)); structure_group.Add(bullet_dash_).Fixed(DPI(34));
+        structure_group.Add(h1_).Fixed(DPI(34)); structure_group.Add(h2_).Fixed(DPI(34)); structure_group.Add(h3_).Fixed(DPI(34)); structure_group.Add(indent_).Fixed(DPI(34)); structure_group.Add(outdent_).Fixed(DPI(34)); structure_group.Add(quote_).Fixed(DPI(34)); structure_group.Add(code_).Fixed(DPI(42));
 
-        toolbar_.Add(table_, cl_table, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(table_row_add_, cl_table, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(table_row_del_, cl_table, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(table_col_add_, cl_table, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(table_col_del_, cl_table, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(table_decor_, cl_table, false, Size(DPI(54), DPI(30)));
-        toolbar_.Add(table_del_, cl_table, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(note_, cl_table, false, Size(DPI(34), DPI(30)));
+        table_group.Add(table_).Fixed(DPI(34)); table_group.Add(table_row_add_).Fixed(DPI(40)); table_group.Add(table_row_del_).Fixed(DPI(40)); table_group.Add(table_col_add_).Fixed(DPI(40)); table_group.Add(table_col_del_).Fixed(DPI(40));
+        table_group.Add(table_decor_).Fixed(DPI(54)); table_group.Add(table_del_).Fixed(DPI(34)); table_group.Add(note_).Fixed(DPI(34));
 
-        toolbar_.Add(hr_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(image_flow_demo_, cl_embed, false, Size(DPI(52), DPI(30)));
-        toolbar_.Add(image_file_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(image_align_left_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(image_align_center_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(image_align_right_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(svg_ins_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(meta_del_, cl_embed, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(embed_del_, cl_embed, false, Size(DPI(34), DPI(30)));
+        adjust_group.Add(insp_margin_plus_).Fixed(DPI(34)); adjust_group.Add(insp_margin_minus_).Fixed(DPI(34)); adjust_group.Add(insp_margin_reset_).Fixed(DPI(34)); adjust_group.Add(insp_lead_plus_).Fixed(DPI(34)); adjust_group.Add(insp_lead_minus_).Fixed(DPI(34));
+        adjust_group.Add(insp_track_plus_).Fixed(DPI(34)); adjust_group.Add(insp_track_minus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_plus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_minus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_mode_).Fixed(DPI(92));
 
-        toolbar_.Add(search_, cl_find, false, Size(DPI(240), DPI(30)));
-        toolbar_.Add(find_prev_, cl_find, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(find_, cl_find, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(find_ignore_case_, cl_find, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(find_whole_word_, cl_find, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(view_gutter_side_, cl_view, false, Size(DPI(34), DPI(30)));
-        toolbar_.Add(view_line_numbers_, cl_view, false, Size(DPI(40), DPI(30)));
-        toolbar_.Add(view_meta_markers_, cl_view, false, Size(DPI(34), DPI(30)));
+        embed_group.Add(hr_).Fixed(DPI(34)); embed_group.Add(image_flow_demo_).Fixed(DPI(52)); embed_group.Add(image_file_ins_).Fixed(DPI(34)); embed_group.Add(image_align_left_).Fixed(DPI(34)); embed_group.Add(image_align_center_).Fixed(DPI(34));
+        embed_group.Add(image_align_right_).Fixed(DPI(34)); embed_group.Add(svg_ins_).Fixed(DPI(34)); embed_group.Add(meta_del_).Fixed(DPI(34)); embed_group.Add(embed_del_).Fixed(DPI(34));
+
+        find_group.Add(search_).Fixed(DPI(240)); find_group.Add(find_prev_).Fixed(DPI(34)); find_group.Add(find_).Fixed(DPI(34)); find_group.Add(find_ignore_case_).Fixed(DPI(40)); find_group.Add(find_whole_word_).Fixed(DPI(34));
+        view_group.Add(view_gutter_side_).Fixed(DPI(34)); view_group.Add(view_line_numbers_).Fixed(DPI(40)); view_group.Add(view_meta_markers_).Fixed(DPI(34));
+        checks_group.Add(insp_tx_check_).Fixed(DPI(34)); checks_group.Add(insp_map_check_).Fixed(DPI(34)); checks_group.Add(insp_accept_check_).Fixed(DPI(48));
 
         bullet_.SetCheckable();
         numbered_.SetCheckable();
@@ -909,16 +868,7 @@ public:
         doc_.ShowLineNumbers(false);
         doc_.ShowMetadataMarkers(true);
 
-        doc_.SetText(
-            "UiDoc demo controls:\n"
-            "- rich formatting (bold/italic/underline/strike, upper/lower/title, A+/A-)\n"
-            "- comments, headings H1/H2/H3, quote/code\n"
-            "- list modes (bullet/numbered) with Enter continuation and empty-item exit\n"
-            "- bullet style: circle or dash\n"
-            "- embedded table create + row/col edits + Tab/Shift+Tab cell navigation\n"
-            "- embed insert: HR, image, SVG + delete at caret\n"
-            "- search with glob support (*, ?)\n\n"
-            "Try selecting several lines and press Tab / Shift+Tab.\n");
+        SeedDemoDocument();
 
         RefreshListButtons();
         TickModifierState();
@@ -929,10 +879,8 @@ public:
     {
         Rect r = GetSize();
         int pad = DPI(8);
-        int row_h = DPI(30);
-
         const int toolbar_w = max(1, r.GetWidth() - 2 * pad);
-        int toolbar_h = max(toolbar_.MeasureHeightForWidth(toolbar_w) + DPI(6), row_h + DPI(20));
+        int toolbar_h = max(toolbar_.MeasureHeightForWidth(toolbar_w), DPI(76));
         toolbar_.SetRect(pad, pad, toolbar_w, toolbar_h);
 
         Rect doc_r = r;
@@ -954,28 +902,6 @@ public:
         inspector_find_.SetRect(insp.left, iy, insp.GetWidth(), ih); iy += ih;
         inspector_margin_.SetRect(insp.left, iy, insp.GetWidth(), ih); iy += ih + DPI(6);
         inspector_meta_.SetRect(insp.left, iy, insp.GetWidth(), ih); iy += ih + DPI(6);
-        int bw = (insp.GetWidth() - DPI(8)) / 3;
-        insp_margin_plus_.SetRect(insp.left, iy, bw, ih);
-        insp_margin_minus_.SetRect(insp.left + bw + DPI(4), iy, bw, ih);
-        insp_margin_reset_.SetRect(insp.left + 2 * (bw + DPI(4)), iy, bw, ih);
-        iy += ih + DPI(4);
-        int bw2 = (insp.GetWidth() - DPI(4)) / 2;
-        insp_lead_plus_.SetRect(insp.left, iy, bw2, ih);
-        insp_lead_minus_.SetRect(insp.left + bw2 + DPI(4), iy, bw2, ih);
-        iy += ih + DPI(4);
-        insp_track_plus_.SetRect(insp.left, iy, bw2, ih);
-        insp_track_minus_.SetRect(insp.left + bw2 + DPI(4), iy, bw2, ih);
-        iy += ih + DPI(4);
-        insp_tab_plus_.SetRect(insp.left, iy, bw2, ih);
-        insp_tab_minus_.SetRect(insp.left + bw2 + DPI(4), iy, bw2, ih);
-        iy += ih + DPI(4);
-        insp_tab_mode_.SetRect(insp.left, iy, insp.GetWidth(), ih);
-        iy += ih + DPI(4);
-        int bw3 = (insp.GetWidth() - DPI(8)) / 3;
-        insp_tx_check_.SetRect(insp.left, iy, bw3, ih);
-        insp_map_check_.SetRect(insp.left + bw3 + DPI(4), iy, bw3, ih);
-        insp_accept_check_.SetRect(insp.left + 2 * (bw3 + DPI(4)), iy, bw3, ih);
-        iy += ih + DPI(4);
         inspector_checks_.SetRect(insp.left, iy, insp.GetWidth(), ih);
         iy += ih + DPI(6);
         comment_title_.SetRect(insp.left, iy, insp.GetWidth(), ih);
@@ -990,6 +916,11 @@ public:
         comment_close_.SetRect(insp.left + 2 * (cbw + DPI(4)), iy, cbw, ih);
         iy += ih + DPI(4);
         inspector_keys_.SetRect(insp.left, iy, insp.GetWidth(), ih);
+    }
+
+    void Paint(Draw& w) override
+    {
+        w.DrawRect(GetSize(), Color(245, 247, 250));
     }
 
     void RefreshInspector()
@@ -1024,6 +955,96 @@ public:
         insp_tab_mode_.SetChecked(doc_.IsInsertTabAsSpaces());
         inspector_checks_.SetText(strict_checks_status_.ToWString());
         UpdateModifierState();
+    }
+
+    void SelectRange(int from, int to)
+    {
+        ValueMap sel;
+        sel.Add("anchor", from);
+        sel.Add("caret", to);
+        doc_.ExecuteCommand("doc.select", sel);
+    }
+
+    bool SelectText(const String& text, int start = 0)
+    {
+        String body = doc_.GetText().ToString();
+        int pos = body.Find(text, start);
+        if(pos < 0)
+            return false;
+        SelectRange(pos, pos + text.GetCount());
+        return true;
+    }
+
+    void ApplyToText(const String& text, const String& command, int start = 0)
+    {
+        if(SelectText(text, start))
+            doc_.ExecuteCommand(command);
+    }
+
+    void ApplyBlockAtText(const String& text, const String& command)
+    {
+        String body = doc_.GetText().ToString();
+        int pos = body.Find(text);
+        if(pos < 0)
+            return;
+        SelectRange(pos, pos);
+        doc_.ExecuteCommand(command);
+    }
+
+    void SeedDemoDocument()
+    {
+        const String sample =
+            "UiDoc rich editor sample\n"
+            "A compact note can mix bold emphasis, italic nuance, underlined references, struck revisions, and a red warning word in one paragraph.\n\n"
+            "Formatting toolbar checklist\n"
+            "Select any word or line and use the toolbar: B, I, underline, strike, size, line spacing, letter spacing, quotes, comments, and case conversion.\n"
+            "The list tools should continue new items when you press Enter:\n"
+            "First list item\n"
+            "Second list item with dash or circle markers\n\n"
+            "Code and quote samples\n"
+            "return UiDoc::RenderToolbarPreview();\n"
+            "A quote block should stand apart from ordinary body copy.\n\n"
+            "Metrics table\n"
+            "\n"
+            "Search for toolbar, warning, or table to test highlight and navigation.\n";
+
+        doc_.SetText(sample);
+
+        ApplyBlockAtText("UiDoc rich editor sample", "block.h1");
+        ApplyBlockAtText("Formatting toolbar checklist", "block.h2");
+        ApplyBlockAtText("Code and quote samples", "block.h2");
+        ApplyBlockAtText("return UiDoc::RenderToolbarPreview();", "block.code");
+        ApplyBlockAtText("A quote block should stand apart from ordinary body copy.", "block.quote");
+
+        ApplyToText("bold emphasis", "mark.bold");
+        ApplyToText("italic nuance", "mark.italic");
+        ApplyToText("underlined references", "mark.underline");
+        ApplyToText("struck revisions", "mark.strike");
+        if(SelectText("red warning word"))
+            doc_.SetSelectionInk(Color(204, 34, 34));
+        ApplyToText("toolbar", "mark.bold");
+        ApplyToText("B, I, underline, strike", "mark.bold");
+
+        String body = doc_.GetText().ToString();
+        int first_list = body.Find("First list item");
+        int second_list = body.Find("Second list item");
+        if(first_list >= 0 && second_list >= 0)
+            SelectRange(first_list, second_list + String("Second list item with dash or circle markers").GetCount());
+        doc_.ExecuteCommand("list.bullet");
+
+        body = doc_.GetText().ToString();
+        int table_pos = body.Find("Search for toolbar");
+        if(table_pos >= 0) {
+            SelectRange(table_pos, table_pos);
+            ValueArray size;
+            size.Add(3);
+            size.Add(3);
+            doc_.ExecuteCommand("insert.table", size);
+        }
+
+        body = doc_.GetText().ToString();
+        int end = body.GetCount();
+        SelectRange(end, end);
     }
 
     void RefreshListButtons()
@@ -1157,7 +1178,23 @@ public:
     }
 
 private:
-    UiGridLayout toolbar_;
+    UiBoxLayout  toolbar_;
+    UiGroupPanel format_group_panel_;
+    UiGroupPanel structure_group_panel_;
+    UiGroupPanel table_group_panel_;
+    UiGroupPanel adjust_group_panel_;
+    UiGroupPanel embed_group_panel_;
+    UiGroupPanel find_group_panel_;
+    UiGroupPanel view_group_panel_;
+    UiGroupPanel checks_group_panel_;
+    UiBoxLayout  format_group_;
+    UiBoxLayout  structure_group_;
+    UiBoxLayout  table_group_;
+    UiBoxLayout  adjust_group_;
+    UiBoxLayout  embed_group_;
+    UiBoxLayout  find_group_;
+    UiBoxLayout  view_group_;
+    UiBoxLayout  checks_group_;
 
     UiButton   bold_;
     UiButton   italic_;

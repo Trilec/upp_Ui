@@ -589,7 +589,28 @@ Size UiLabel::ComputeNaturalSize() const
 
     bool have_icon = !IsNull(icon_);
     Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
-    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
+    if(icon_scale_to_content_ && have_icon && !have_text) {
+        Size src = icon_.GetSize();
+        if(src.cx > 0 && src.cy > 0)
+            icon_sz = src;
+    }
+    else if(icon_scale_to_content_ && have_icon && have_text) {
+        Size src = icon_.GetSize();
+        if(src.cx > 0 && src.cy > 0) {
+            UiAlign side = style.icon_side;
+            if(side == UiAlign::TOP || side == UiAlign::BOTTOM) {
+                int target_w = max(1, text_block.cx);
+                double scale = (double)target_w / src.cx;
+                icon_sz = Size(target_w, max(1, int(src.cy * scale + 0.5)));
+            }
+            else {
+                int target_h = max(1, text_block.cy);
+                double scale = (double)target_h / src.cy;
+                icon_sz = Size(max(1, int(src.cx * scale + 0.5)), target_h);
+            }
+        }
+    }
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
 
     Size content = UiMeasureBlocksContent(icon_sz,
                                           text_block,
@@ -618,7 +639,37 @@ void UiLabel::UpdateLayout(const Rect& content) const
     Size text_block = have_text ? GetTextBlockSize() : Size(0, 0);
     bool have_icon = !IsNull(icon_);
     Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
-    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
+    if(icon_scale_to_content_ && have_icon) {
+        Size src = icon_.GetSize();
+        if(have_text && src.cx > 0 && src.cy > 0) {
+            UiAlign side = style.icon_side;
+            if(side == UiAlign::TOP || side == UiAlign::BOTTOM) {
+                int target_w = max(1, min(content.GetWidth(), text_block.cx));
+                double scale = (double)target_w / src.cx;
+                icon_sz = Size(target_w, max(1, int(src.cy * scale + 0.5)));
+            }
+            else {
+                int target_h = max(1, min(content.GetHeight(), text_block.cy));
+                double scale = (double)target_h / src.cy;
+                icon_sz = Size(max(1, int(src.cx * scale + 0.5)), target_h);
+            }
+        }
+        else if(src.cx > 0 && src.cy > 0) {
+            int cw = max(1, content.GetWidth());
+            int ch = max(1, content.GetHeight());
+            double sx = (double)cw / src.cx;
+            double sy = (double)ch / src.cy;
+            double s = min(sx, sy);
+            icon_sz = Size(max(1, int(src.cx * s + 0.5)),
+                           max(1, int(src.cy * s + 0.5)));
+        }
+        else {
+            int cw = max(1, content.GetWidth());
+            int ch = max(1, content.GetHeight());
+            icon_sz = Size(cw, ch);
+        }
+    }
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
 
     layout_ = UiComputeBlocksLayout(content,
                                     have_icon ? icon_sz : Size(0, 0),
@@ -710,6 +761,17 @@ UiLabel& UiLabel::SetSelectable(bool on)
 UiLabel& UiLabel::SetIconSize(Size sz)
 {
     icon_size_ = Size(max(0, sz.cx), max(0, sz.cy));
+    minsize_dirty_ = true;
+    layout_dirty_ = true;
+    layout_content_ = Rect(0, 0, 0, 0);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiLabel& UiLabel::SetIconScaleToContent(bool on)
+{
+    icon_scale_to_content_ = on;
     minsize_dirty_ = true;
     layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
@@ -1235,12 +1297,12 @@ void UiLabel::Paint(Draw& w)
     }
     else {
         if(!IsNull(icon_) && !layout_.support.IsEmpty()) {
-            const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
+            const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
             UiPaintStyledIcon(w,
                               layout_.support,
                               icon_,
                               true,
-                              !explicit_icon_size,
+                              icon_scale_to_content_ || !explicit_icon_size,
                               icon_render_mode_,
                               icon_ink,
                               enabled);

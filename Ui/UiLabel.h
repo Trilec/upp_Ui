@@ -111,6 +111,7 @@ private:
     Image  icon_;
     UiIconRenderMode icon_render_mode_ = UiIconRenderMode::PreserveColor;
     Size   icon_size_ = Size(0, 0);
+    bool   icon_scale_to_content_ = false;
 
     Vector<String> lines_;
     Vector<Size>   line_sizes_;
@@ -180,6 +181,8 @@ public:
     UiLabel& SetIconSize(Size sz);
     UiLabel& SetIconSize(int cx, int cy) { return SetIconSize(Size(cx, cy)); }
     Size     GetIconSize() const { return icon_size_; }
+    UiLabel& SetIconScaleToContent(bool on = true);
+    bool     IsIconScaleToContent() const { return icon_scale_to_content_; }
 
     UiLabel& SetIconSide(UiAlign where);
     UiLabel& SetAlign(UiAlign h, UiAlign v);

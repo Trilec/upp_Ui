@@ -49,6 +49,7 @@
 #include <Ui/UiRadioButton.h>
 #include <Ui/UiToggle.h>
 #include <Ui/UiPanel.h>
+#include <Ui/UiGroupPanel.h>
 #include <Ui/UiStack.h>
 #include <Ui/UiAccordion.h>
 #include <Ui/UiScrollPanel.h>

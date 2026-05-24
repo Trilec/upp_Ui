@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DesignerDefaults.h"
 #include "DesignerModel.h"
 
 // Ui Designer type registry.
@@ -21,8 +22,8 @@ struct DesignerType : Moveable<DesignerType> {
 	Image icon;
 	bool is_container = false;
 	bool can_have_children = false;
-	Size default_size = Size(120, 32);
-	Size min_size = Size(24, 20);
+	Size default_size = DesignerDefaultSize();
+	Size min_size = DesignerMinSize();
 
 	Function<void(DesignerNode&)> init_defaults;
 	Function<bool(const DesignerNode& parent, const DesignerNode& child)> can_drop;

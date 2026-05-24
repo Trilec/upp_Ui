@@ -67,6 +67,7 @@ The `Ui` package currently covers:
 
 - Panels, containers, and scrolling
   - `UiPanel` - general styled surface with frame, fill, radius, and shadow support
+  - `UiGroupPanel` - titled group container with icon/subtitle/side-title header chrome and a single hosted body slot
   - `UiAccordion` - collapsible section container with themed headers and bodies
   - `UiScrollPanel` - themed scrollable content host
   - `UiScrollBar` - standalone themed scrollbar
@@ -113,7 +114,7 @@ The `Ui` package currently covers:
 
 `Utilities/Designer` is the visual designer for this library. It lets you build a model using layouts, containers, controls, composites, and presets; inspect the hierarchy and sizing modes; save/load designs as JSON; and view generated U++ code while testing layout behavior in the preview.
 
-The Designer currently supports the same core layout concepts used by the controls: fit, fixed, and expand sizing; box/grid placement; spacers; splitters; panel and scroll-panel hosting; tab/stack containers; and reusable layout presets.
+The Designer currently supports the same core layout concepts used by the controls: fit, fixed, and expand sizing; box/grid placement; box wrapping and snap flow; spacers; splitters; panel, group-panel, and scroll-panel hosting; tab/stack containers; theme roles; and reusable layout presets.
 
 ![Designer screenshot](Snapshot_Designer.jpg)
 
@@ -170,7 +171,7 @@ Note: `Animation` should resolve from the external `E:\apps\github\upp_Animation
 Example on Windows:
 
 ```bat
-"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" examples/UiButtonDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiButtonDemo"
+"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui\examples,E:\apps\github\upp_Ui,E:\apps\github\upp_AnimationEasing,E:\upp-18468\uppsrc" UiButtonDemo CLANGx64 --out-dir "E:\apps\github\upp_Ui\out" -br "E:\apps\github\upp_Ui\out\UiButtonDemo.exe"
 ```
 
 For this repository, prefer the checked-in `GitHubOut.var` assembly when doing
@@ -178,6 +179,10 @@ local development. It includes the `E:\apps\github\upp_AnimationEasing` nest
 required by `Ui/Ui.upp` and writes intermediates to
 `E:\apps\github\upp_Ui\out`, avoiding locked/shared objects under
 `E:\upp-18468\out`.
+
+Keep ad-hoc CLI build artifacts in the repository `out` root
+(`E:\apps\github\upp_Ui\out`). Do not place current demo/designer outputs in
+`build` or `bin`.
 
 ## Public API direction
 

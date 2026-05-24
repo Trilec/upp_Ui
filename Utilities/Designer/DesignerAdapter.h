@@ -117,6 +117,25 @@ private:
 	DesignerOverlayState overlay_;
 };
 
+class DesignerGroupPanelAdapter : public UiGroupPanel, public DesignerAdapter {
+public:
+	typedef DesignerGroupPanelAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiGroupPanel"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
 // Designer wrapper for UiLabel.
 // Exposes label text, alignment, face/frame toggles, radius, and sizing while
 // keeping the rendered result close to the actual runtime label.

@@ -9,6 +9,7 @@
 #include "DesignerHierarchy.h"
 #include "DesignerDragController.h"
 #include "DesignerAssets.h"
+#include "DesignerDefaults.h"
 
 // Designer utility app - Box/Grid/Splitter layout builder for U++ Ui controls.
 // This file wires the subsystems together: model, commands, adapters, preview,
@@ -16,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.12";
+static const char* DESIGNER_VERSION = "v0.1.21";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static const char *DesignerThemePresetId(UiThemePreset preset)
@@ -342,7 +343,15 @@ private:
 			DeleteSelection();
 			return true;
 		}
-	if(key == K_CTRL_Z) {
+		if(key == K_CTRL_C) {
+			CopySelection();
+			return true;
+		}
+		if(key == K_CTRL_V) {
+			PasteClipboard();
+			return true;
+		}
+		if(key == K_CTRL_Z) {
 			if(commands_.Undo(model_))
 				RefreshAll();
 			return true;
@@ -1419,6 +1428,128 @@ private:
 		return id;
 	}
 
+	const DesignerNodeState* FindClipboardState(const Vector<DesignerNodeState>& states, DesignerNodeId id) const
+	{
+		for(const DesignerNodeState& s : states)
+			if(s.id == id)
+				return &s;
+		return nullptr;
+	}
+
+	bool ClipboardContainsAncestor(DesignerNodeId id, const Vector<DesignerNodeId>& copied) const
+	{
+		const DesignerNode* n = model_.Find(id);
+		while(n && n->parent) {
+			if(FindNodeId(copied, n->parent) >= 0)
+				return true;
+			n = model_.Find(n->parent);
+		}
+		return false;
+	}
+
+	bool ClipboardStateIsNested(const DesignerNodeState& state, const Vector<DesignerNodeState>& states) const
+	{
+		for(const DesignerNodeState& candidate_parent : states)
+			if(FindNodeId(candidate_parent.children, state.id) >= 0)
+				return true;
+		return false;
+	}
+
+	void CopySelection()
+	{
+		designer_clipboard_.Clear();
+		Vector<DesignerNodeId> selected = clone(model_.GetSelection());
+		for(DesignerNodeId id : selected) {
+			if(id == Designer_ROOT || id == Designer_NULL)
+				continue;
+			if(ClipboardContainsAncestor(id, selected))
+				continue;
+			model_.CaptureSubtree(id, designer_clipboard_);
+		}
+	}
+
+	DesignerNodeId PasteStateSubtree(const Vector<DesignerNodeState>& states, DesignerNodeId source_id,
+	                                 DesignerNodeId parent_id, int index)
+	{
+		const DesignerNodeState* source = FindClipboardState(states, source_id);
+		if(!source)
+			return Designer_NULL;
+		DesignerNodeId id = AddInitializedNode(source->type_id, parent_id, index);
+		DesignerNode* target = model_.Find(id);
+		if(!target)
+			return id;
+		target->name = UniqueDesignerName(source->name, id);
+		target->properties = clone(source->properties);
+		target->expanded = source->expanded;
+		for(DesignerNodeId child : source->children)
+			PasteStateSubtree(states, child, id, -1);
+		return id;
+	}
+
+	bool ResolvePasteTarget(DesignerNodeId& parent_id, int& insert_index) const
+	{
+		parent_id = Designer_ROOT;
+		insert_index = -1;
+		DesignerNodeId selected_id = model_.GetSelection().IsEmpty() ? Designer_ROOT : model_.GetSelection()[0];
+		const DesignerNode* selected = model_.Find(selected_id);
+		const DesignerType* selected_type = selected ? registry_.Find(selected->type_id) : nullptr;
+		if(selected && selected_type && selected_type->can_have_children) {
+			parent_id = selected->id;
+			insert_index = selected->children.GetCount();
+			return true;
+		}
+		if(selected && selected->parent) {
+			const DesignerNode* parent = model_.Find(selected->parent);
+			if(parent) {
+				parent_id = parent->id;
+				insert_index = 0;
+				for(int i = 0; i < parent->children.GetCount(); i++)
+					if(parent->children[i] == selected->id) {
+						insert_index = i + 1;
+						break;
+					}
+				return true;
+			}
+		}
+		return model_.Find(parent_id);
+	}
+
+	void PasteClipboard()
+	{
+		if(designer_clipboard_.IsEmpty())
+			return;
+		DesignerNodeId parent_id;
+		int insert_index;
+		if(!ResolvePasteTarget(parent_id, insert_index))
+			return;
+		DesignerNode* parent = model_.Find(parent_id);
+		if(!parent)
+			return;
+		Vector<DesignerNodeId> pasted;
+		commands_.BeginGroup("Paste");
+		for(const DesignerNodeState& state : designer_clipboard_) {
+			if(ClipboardStateIsNested(state, designer_clipboard_))
+				continue;
+			DesignerNode candidate;
+			candidate.type_id = state.type_id;
+			if(!registry_.CanDrop(*parent, candidate))
+				continue;
+			DesignerNodeId id = PasteStateSubtree(designer_clipboard_, state.id, parent_id, insert_index);
+			if(id == Designer_NULL)
+				continue;
+			pasted.Add(id);
+			if(parent->type_id == "GridLayout")
+				ApplyGridCellForNode(id, insert_index);
+			if(insert_index >= 0)
+				insert_index++;
+		}
+		bool changed = commands_.EndGroup();
+		if(changed && !pasted.IsEmpty()) {
+			model_.SetSelection(pasted);
+			RefreshAll();
+		}
+	}
+
 	// Persist stable grid coordinates on a child node after grid placement.
 	// The DesignerModel remains ordered for hierarchy/codegen, while grid_row and
 	// grid_col let preview/codegen address a specific cell.
@@ -1453,21 +1584,8 @@ private:
 		if(!parent)
 			return;
 		const DesignerType* t = registry_.Find(n->type_id);
-		if(parent->type_id == "GridLayout" && t && t->is_container) {
-			commands_.Execute(MakeDesignerSetPropertyCommand(parent->id, "cell_width", max((int)DesignerNodePropertyOr(*parent, "cell_width", 120), t->default_size.cx)), model_);
-			commands_.Execute(MakeDesignerSetPropertyCommand(parent->id, "cell_height", max((int)DesignerNodePropertyOr(*parent, "cell_height", 96), t->default_size.cy)), model_);
-		}
-		DesignerNode* grand = model_.Find(parent->parent);
-		const DesignerType* pt = registry_.Find(parent->type_id);
-		if(grand && grand->type_id == "GridLayout" && pt && pt->is_container) {
-			int count = max(1, parent->children.GetCount());
-			int needed_h = max(pt->default_size.cy,
-			                   DPI(24) * count
-			                   + (int)DesignerNodePropertyOr(*parent, "gap", 8) * max(0, count - 1)
-			                   + 2 * (int)DesignerNodePropertyOr(*parent, "inset", 8));
-			commands_.Execute(MakeDesignerSetPropertyCommand(grand->id, "cell_width", max((int)DesignerNodePropertyOr(*grand, "cell_width", 120), pt->default_size.cx)), model_);
-			commands_.Execute(MakeDesignerSetPropertyCommand(grand->id, "cell_height", max((int)DesignerNodePropertyOr(*grand, "cell_height", 96), needed_h)), model_);
-		}
+		if(parent->type_id == "GridLayout" && t && t->is_container)
+			return;
 	}
 
 	// Move an existing node through the drag command path.
@@ -1639,7 +1757,7 @@ private:
 		}
 
 		UiModelColumn wrap = EmptyHierarchyColumn();
-		if(n.type_id == "BoxLayout" && (bool)DesignerNodePropertyOr(n, "wrap", false))
+		if(n.type_id == "BoxLayout" && AsString(DesignerNodePropertyOr(n, "wrap", "None")) != "None")
 			wrap = HierarchyIconColumn(ICON_EDITOR_FORMAT_LINE_SPACING_48());
 
 		out << orient << HierarchySizingColumn(n, "h_sizing") << HierarchySizingColumn(n, "v_sizing") << wrap;
@@ -1663,11 +1781,13 @@ private:
 			return max(0, IsNumber(value) ? (int)value : 0);
 		if(property_id == "active")
 			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
-		if(property_id == "icon_size" || property_id == "tab_icon_size" || property_id == "tab_font_size")
+		if(property_id == "icon_size" || property_id == "tab_icon_size" || property_id == "tab_font_size" ||
+		   property_id == "font_size" || property_id == "current_font_size" || property_id == "min_width" ||
+		   property_id == "min_height")
 			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
 		if(property_id == "cell_width" || property_id == "cell_height" ||
 		   property_id == "width" || property_id == "height")
-			return max(10, IsNumber(value) ? (int)value : 10);
+			return DesignerClampMin(IsNumber(value) ? (int)value : DESIGNER_MIN_CLAMP);
 		return value;
 	}
 
@@ -1912,6 +2032,7 @@ private:
 	Image layout_icon_;
 	Image panel_icon_;
 	Image control_icon_;
+	Vector<DesignerNodeState> designer_clipboard_;
 	bool drag_status_visible_ = false;
 	String drag_status_text_;
 	Point drag_status_screen_;

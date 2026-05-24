@@ -268,16 +268,37 @@ Size UiButton::ComputeNaturalSize() const
     const Style& style = GetEffectiveStyle();
 
     Size text_block = GetTextBlockSize();
-    bool have_text = !lines_.IsEmpty();
-
-    bool have_icon = HasResolvedIcon();
-    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
-    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
+	bool have_text = !lines_.IsEmpty();
 
     UiAlign stack_dir = style.icon_side;
     if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
        stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
         stack_dir = UiAlign::LEFT;
+
+	bool have_icon = HasResolvedIcon();
+	Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+	if(icon_scale_to_content_ && have_icon && !have_text) {
+		Image src = ResolveIconForState(ST_NORMAL);
+		if(!IsNull(src) && src.GetSize().cx > 0 && src.GetSize().cy > 0)
+			icon_sz = src.GetSize();
+	}
+	else if(icon_scale_to_content_ && have_icon && have_text) {
+		Image src = ResolveIconForState(ST_NORMAL);
+		if(!IsNull(src) && src.GetSize().cx > 0 && src.GetSize().cy > 0) {
+			Size src_sz = src.GetSize();
+			if(stack_dir == UiAlign::TOP || stack_dir == UiAlign::BOTTOM) {
+				int target_w = max(1, text_block.cx);
+				double scale = (double)target_w / src_sz.cx;
+				icon_sz = Size(target_w, max(1, int(src_sz.cy * scale + 0.5)));
+			}
+			else {
+				int target_h = max(1, text_block.cy);
+				double scale = (double)target_h / src_sz.cy;
+				icon_sz = Size(max(1, int(src_sz.cx * scale + 0.5)), target_h);
+			}
+		}
+	}
+	const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
 
     Size content = UiMeasureBlocksContent(icon_sz,
                                           text_block,
@@ -305,14 +326,43 @@ void UiButton::UpdateLayout(const Rect& content) const
     Size text_block = GetTextBlockSize();
     bool have_text = !lines_.IsEmpty();
 
-    bool have_icon = HasResolvedIcon();
-    Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
-    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
-
     UiAlign stack_dir = style.icon_side;
     if(stack_dir != UiAlign::LEFT && stack_dir != UiAlign::RIGHT &&
        stack_dir != UiAlign::TOP  && stack_dir != UiAlign::BOTTOM)
         stack_dir = UiAlign::LEFT;
+
+	bool have_icon = HasResolvedIcon();
+	Size icon_sz = have_icon ? GetStableIconSize() : Size(0, 0);
+	if(icon_scale_to_content_ && have_icon) {
+		Image src = ResolveIconForState(visual_state_);
+		if(have_text && !IsNull(src) && src.GetSize().cx > 0 && src.GetSize().cy > 0) {
+			Size src_sz = src.GetSize();
+			if(stack_dir == UiAlign::TOP || stack_dir == UiAlign::BOTTOM) {
+				int target_w = max(1, min(content.GetWidth(), text_block.cx));
+				double scale = (double)target_w / src_sz.cx;
+				icon_sz = Size(target_w, max(1, int(src_sz.cy * scale + 0.5)));
+			}
+			else {
+				int target_h = max(1, min(content.GetHeight(), text_block.cy));
+				double scale = (double)target_h / src_sz.cy;
+				icon_sz = Size(max(1, int(src_sz.cx * scale + 0.5)), target_h);
+			}
+		}
+		else if(!IsNull(src) && src.GetSize().cx > 0 && src.GetSize().cy > 0) {
+			int cw = max(1, content.GetWidth());
+			int ch = max(1, content.GetHeight());
+			Size src_sz = src.GetSize();
+			double scale = min((double)cw / src_sz.cx, (double)ch / src_sz.cy);
+			icon_sz = Size(max(1, int(src_sz.cx * scale + 0.5)),
+			               max(1, int(src_sz.cy * scale + 0.5)));
+		}
+		else {
+			int cw = max(1, content.GetWidth());
+			int ch = max(1, content.GetHeight());
+			icon_sz = Size(cw, ch);
+		}
+	}
+	const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
 
     layout_ = UiComputeBlocksLayout(content,
                                     have_icon ? icon_sz : Size(0, 0),
@@ -686,7 +736,7 @@ void UiButton::Paint(Draw& w)
     Color ink = AdjustInk(p.ink[st], st);
     Color icon_ink = has_assigned_icon_colors_ ? assigned_icon_colors_[st] : UiResolveIconColor(p, st);
     UiIconRenderMode icon_render_mode = has_assigned_icon_render_mode_ ? assigned_icon_render_mode_ : style.icon_render_mode;
-    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0;
+	const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
     if(IsNull(icon_ink))
         icon_ink = ink;
 
@@ -699,14 +749,14 @@ void UiButton::Paint(Draw& w)
 
     Image icon_img = ResolveIconForState(st);
     if(!IsNull(icon_img) && !icon_r.IsEmpty()) {
-        UiPaintStyledIcon(w,
-                          icon_r,
-                          icon_img,
-                          true,
-                          !explicit_icon_size,
-                          icon_render_mode,
-                          icon_ink,
-                          IsEnabled());
+		UiPaintStyledIcon(w,
+		                  icon_r,
+		                  icon_img,
+		                  true,
+		                  icon_scale_to_content_ || !explicit_icon_size,
+		                  icon_render_mode,
+		                  icon_ink,
+		                  IsEnabled());
     }
 
     if(!lines_.IsEmpty() && !text_r.IsEmpty()) {

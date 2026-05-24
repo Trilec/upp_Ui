@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Ui/Ui.h>
+#include "DesignerDefaults.h"
 
 // Ui Designer model layer.
 // Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
@@ -89,7 +89,7 @@ private:
 
 	Vector<DesignerNode> nodes_;
 	Vector<DesignerNodeId> selection_;
-	Size virtual_size_ = Size(760, 460);
+	Size virtual_size_ = DesignerWindowSize();
 	DesignerNodeId next_id_ = Designer_ROOT + 1;
 };
 

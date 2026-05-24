@@ -111,12 +111,13 @@ protected:
     bool        pressed_      = false;
     StyledState visual_state_ = ST_NORMAL;
 
-    Size           user_min_size_ = Size(0, 0);
-    One<Animation> anim_;
-    Size           icon_size_ = Size(0, 0);
-    Image          assigned_icon_images_[4];
-    UiIconRenderMode assigned_icon_render_mode_ = UiIconRenderMode::MonoTint;
-    bool           has_assigned_icon_render_mode_ = false;
+	Size           user_min_size_ = Size(0, 0);
+	One<Animation> anim_;
+	Size           icon_size_ = Size(0, 0);
+	bool           icon_scale_to_content_ = false;
+	Image          assigned_icon_images_[4];
+	UiIconRenderMode assigned_icon_render_mode_ = UiIconRenderMode::MonoTint;
+	bool           has_assigned_icon_render_mode_ = false;
     Color          assigned_icon_colors_[4];
     bool           has_assigned_icon_colors_ = false;
 
@@ -166,11 +167,13 @@ public:
                        const Image& disabled = Image());
     UiButton& ClearIcon();
 
-    UiButton& SetIconSize(Size sz) { icon_size_ = sz; minsize_dirty_ = true; layout_dirty_ = true; RefreshLayout(); Refresh(); return *this; }
-    UiButton& SetIconSize(int cx, int cy) { return SetIconSize(Size(cx, cy)); }
-    Size      GetIconSize() const { return icon_size_; }
+	UiButton& SetIconSize(Size sz) { icon_size_ = sz; minsize_dirty_ = true; layout_dirty_ = true; RefreshLayout(); Refresh(); return *this; }
+	UiButton& SetIconSize(int cx, int cy) { return SetIconSize(Size(cx, cy)); }
+	Size      GetIconSize() const { return icon_size_; }
+	UiButton& SetIconScaleToContent(bool on = true) { icon_scale_to_content_ = on; minsize_dirty_ = true; layout_dirty_ = true; layout_content_ = Rect(0, 0, 0, 0); RefreshLayout(); Refresh(); return *this; }
+	bool      IsIconScaleToContent() const { return icon_scale_to_content_; }
 
-    UiButton& SetIconRenderMode(UiIconRenderMode mode) { has_assigned_icon_render_mode_ = true; assigned_icon_render_mode_ = mode; Refresh(); return *this; }
+	UiButton& SetIconRenderMode(UiIconRenderMode mode) { has_assigned_icon_render_mode_ = true; assigned_icon_render_mode_ = mode; Refresh(); return *this; }
     UiIconRenderMode GetIconRenderMode() const { return has_assigned_icon_render_mode_ ? assigned_icon_render_mode_ : GetEffectiveStyle().icon_render_mode; }
 
     UiButton& SetIconColor(Color base, int hot_pct = 0, int press_pct = 0)

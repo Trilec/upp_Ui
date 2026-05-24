@@ -474,20 +474,6 @@ UiButton::Style MakeExitButtonStyle(const DemoPalette& c)
     return s;
 }
 
-UiGridLayout::Style MakePreviewHostStyle()
-{
-    UiGridLayout::Style s = UiGridLayout::StyleMinimal();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-    }
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.padding = 0;
-    s.spacing = DPI(10);
-    return s;
-}
-
 void DrawDotGrid(Draw& w, const Rect& r, Color color, int step, int dot = 2)
 {
     for(int y = r.top + step / 2; y < r.bottom; y += step)
@@ -512,7 +498,7 @@ void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap =
 
 // PreviewCanvas owns the neutral preview field used by the demo template.
 // It keeps the painting self-contained so demo controls can just drop content
-// into the exposed UiGridLayout without reimplementing shell chrome.
+// into the exposed UiBoxLayout without reimplementing shell chrome.
 class PreviewCanvas : public Ctrl {
 public:
     typedef PreviewCanvas CLASSNAME;
@@ -521,13 +507,10 @@ public:
     {
         NoWantFocus();
         Add(content_);
-        content_.SetMode(UiGridLayout::Flow)
-                .SetDirection(UiDirection::H)
-                .SetWrap(true)
+        content_.SetDirection(UiDirection::H)
+                .SetWrap(UiBoxWrap::Flow)
                 .SetGap(DPI(10))
-                .SetInset(0)
-                .SetScrollMode(UiGridLayout::None)
-                .SetCustomStyle(MakePreviewHostStyle());
+                .SetInset(0);
     }
 
     void SetPalette(const DemoPalette& palette)
@@ -543,7 +526,7 @@ public:
         RefreshLayout();
     }
 
-    UiGridLayout& Content()
+    UiBoxLayout& Content()
     {
         return content_;
     }
@@ -582,7 +565,7 @@ public:
 private:
     DemoPalette palette_;
     double scale_ = 1.0;
-    UiGridLayout content_;
+    UiBoxLayout content_;
 };
 
 
@@ -621,7 +604,7 @@ class UiDemoBaseWindow : public TopWindow {
 public:
     typedef UiDemoBaseWindow CLASSNAME;
 
-    UiGridLayout& PreviewGrid()
+    UiBoxLayout& PreviewGrid()
     {
         return preview_.Content();
     }

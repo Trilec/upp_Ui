@@ -105,6 +105,12 @@
 
 namespace Upp {
 
+enum class UiBoxWrap : byte {
+    None,
+    Flow,
+    Snap
+};
+
 class UiBoxLayout : public Ctrl {
 public:
     typedef UiBoxLayout CLASSNAME;
@@ -311,7 +317,16 @@ public:
 
     // Set space between neighboring items (both axes). Great for card gutters.
     UiBoxLayout& SetGap(int px) {
-        gap = max(0, px);
+        gap_x = gap_y = max(0, px);
+        ++cur_gen;
+        if(layout_pause == 0) Layout();
+        return *this;
+    }
+
+    // Set horizontal and vertical spacing independently.
+    UiBoxLayout& SetGap(int x, int y) {
+        gap_x = max(0, x);
+        gap_y = max(0, y);
         ++cur_gen;
         if(layout_pause == 0) Layout();
         return *this;
@@ -330,9 +345,33 @@ public:
         return SetInset(Rect(all, all, all, all));
     }
 
-    // Enable/disable wrapping (meaningful only in UiDirection::H mode).
+    // Enable/disable wrapping. Kept for existing call sites.
     UiBoxLayout& SetWrap(bool on = true) {
-        wrap = on;
+        wrap = on ? UiBoxWrap::Flow : UiBoxWrap::None;
+        ++cur_gen;
+        if(layout_pause == 0) Layout();
+        return *this;
+    }
+
+    // Select wrapping behavior. Snap is ordered flow aligned to repeated slots.
+    UiBoxLayout& SetWrap(UiBoxWrap mode) {
+        wrap = mode;
+        ++cur_gen;
+        if(layout_pause == 0) Layout();
+        return *this;
+    }
+
+    UiBoxLayout& SetWrapSnapCount(int n) {
+        wrap_snap_count = max(0, n);
+        ++cur_gen;
+        if(layout_pause == 0) Layout();
+        return *this;
+    }
+
+    UiBoxLayout& SetWrapSnapSizes(const Vector<int>& sizes) {
+        wrap_snap_sizes.Clear();
+        for(int s : sizes)
+            wrap_snap_sizes.Add(max(1, s));
         ++cur_gen;
         if(layout_pause == 0) Layout();
         return *this;
@@ -504,13 +543,19 @@ private:
     // Helpers
     Size GetCtrlMinSize(Item& it);
     void RebuildLayoutCache(const Rect& irc);
+    int  GetMainGap() const;
+    int  GetCrossGap() const;
+    int  GetSnapMainSize(int index, int fallback) const;
 
 private:
     // Persistent config
     Direction    dir          = Direction::V;      // main direction
-    int          gap          = 0;                 // gap between items
+    int          gap_x        = 0;                 // horizontal gap
+    int          gap_y        = 0;                 // vertical gap
     Rect         inset        = Rect(0, 0, 0, 0);  // inner padding
-    bool         wrap         = false;             // wrapping (UiDirection::H only)
+    UiBoxWrap    wrap         = UiBoxWrap::None;   // wrapping behavior
+    int          wrap_snap_count = 0;              // 0 = fit as many as possible
+    Vector<int>  wrap_snap_sizes;                  // last entry repeats
     bool         wrap_auto_resize = false;         // UiDirection::H+wrap: min height responsive to width
     bool         wrap_rows_expand = false;         // UiDirection::H+wrap: rows expand with extra height
     Align        align_items  = Align::Stretch;    // default cross-axis alignment
@@ -518,7 +563,6 @@ private:
     int          fixed_row    = -1;                // UiDirection::V: cap item height
     bool         debug        = false;             // draw debug overlay?
     Color        debug_color  = Color(220, 38, 38);// debug overlay line/fill source
-
     // Internal state
     Vector<Item> items;
     int          layout_gen   = 0;                 // generated last time we rebuilt
