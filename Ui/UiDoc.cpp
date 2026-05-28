@@ -19,6 +19,25 @@ namespace Upp {
 // - image bytes remain in resource table (resource_key references)
 // - payload write paths remain transaction-driven via Dispatch(tx)
 
+static bool UiDocIsRuleBlockEmbed(const UiDocEmbedBlock& e)
+{
+    return e.embed_type == "hr" || e.embed_type == "page_break";
+}
+
+static int UiDocRuleBlockHeight(const UiDocEmbedBlock& e)
+{
+    if(e.embed_type == "page_break")
+        return DPI(24);
+    return DPI(14);
+}
+
+static String UiDocRuleBlockLabel(const UiDocEmbedBlock& e)
+{
+    if(e.embed_type == "page_break")
+        return "Page break";
+    return String();
+}
+
 static WString TrimWs(const WString& s)
 {
     int b = 0;
@@ -105,6 +124,45 @@ static int UiDocCellRunUnits(const ValueArray& runs)
             n += 1;
     }
     return n;
+}
+
+static bool UiDocIsCommentAnnotation(const UiDocAnnotation& a)
+{
+    return a.type == "note" || a.type == "comment" || a.type == "review.comment";
+}
+
+static bool UiDocRangeTouchesLine(const UiDocRange& r, int line_from, int line_to)
+{
+    return r.from < line_to && r.to > line_from;
+}
+
+static void UiDocPaintMarker(Draw& w, const Rect& r, Color c, const Image& icon, int shape, bool selected)
+{
+    Rect rr = r;
+    if(!IsNull(icon)) {
+        UiPaintStyledIcon(w, rr.Inflated(1, 1), icon, true, true, UiIconRenderMode::MonoTint, c, true);
+    }
+    else if(shape == UiDoc::MARKER_CIRCLE) {
+        w.DrawEllipse(rr, c);
+    }
+    else if(shape == UiDoc::MARKER_SQUARE) {
+        w.DrawRect(rr, c);
+    }
+    else {
+        for(int i = 0; i < rr.GetHeight(); i++) {
+            int left = rr.left + (rr.GetWidth() - i - 1) / 2;
+            int width = min(rr.GetWidth(), i + 1);
+            w.DrawRect(left, rr.top + i, width, 1, c);
+        }
+    }
+    if(selected) {
+        Rect br = rr.Inflated(2, 2);
+        Color bc = Blend(SColorHighlight(), SColorText(), 70);
+        w.DrawRect(br.left, br.top, br.GetWidth(), 1, bc);
+        w.DrawRect(br.left, br.bottom - 1, br.GetWidth(), 1, bc);
+        w.DrawRect(br.left, br.top, 1, br.GetHeight(), bc);
+        w.DrawRect(br.right - 1, br.top, 1, br.GetHeight(), bc);
+    }
 }
 
 static WString UiDocCellTextFromRunsArr(const ValueArray& runs)
@@ -623,6 +681,7 @@ UiDoc::UiDoc()
     sb_.SetLine(DPI(16));
 
     SetCustomStyle(StyleDefault());
+    ResetDefaultAnnotationLanes();
     SetText(String());
 
     BackPaint();
@@ -1099,8 +1158,8 @@ void UiDoc::RebuildLayoutCache() const
             TableModel tm;
             if(PayloadToTableModel(embeds_[table_embed_ix].payload, tm) && !tm.rows.IsEmpty() && tm.cols > 0) {
                 int cell_h = max(DPI(22), base.GetHeight() + DPI(8));
-                int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
-                int gutter_right = (gutter_side_ == GUTTER_RIGHT ? GetGutterLaneWidth() : 0);
+                int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
+                int gutter_right = GetGutterLaneWidth(GUTTER_RIGHT);
                 int avail_w = text_rect_.GetWidth() - style_.metrics.content_margin.left - style_.metrics.content_margin.right - gutter_left - gutter_right - DPI(8);
                 avail_w = max(DPI(120), avail_w);
                 int cell_w = max(DPI(56), avail_w / tm.cols);
@@ -1112,6 +1171,17 @@ void UiDoc::RebuildLayoutCache() const
                 lh += gap + table_h + DPI(2);
             }
         }
+
+        int rule_extra = 0;
+        for(int ei = 0; ei < embeds_.GetCount(); ei++) {
+            const UiDocEmbedBlock& e = embeds_[ei];
+            if(!UiDocIsRuleBlockEmbed(e))
+                continue;
+            if(!(line_from <= e.range.from && e.range.from <= line_to))
+                continue;
+            rule_extra += max(0, (len > 0 ? DPI(4) : DPI(2)) + UiDocRuleBlockHeight(e) + DPI(2));
+        }
+        lh += rule_extra;
 
         int image_extra = 0;
         for(int ei = 0; ei < embeds_.GetCount(); ei++) {
@@ -1189,9 +1259,14 @@ int UiDoc::GetLineHeight(int line) const
 
 int UiDoc::GetGutterLaneWidth() const
 {
+    return GetGutterLaneWidth(gutter_side_);
+}
+
+int UiDoc::GetGutterLaneWidth(GutterSide side) const
+{
     int w_numbers = 0;
     int w_markers = 0;
-    if(show_line_numbers_) {
+    if(show_line_numbers_ && side == gutter_side_) {
         int lines = max(1, line_starts_.GetCount());
         int digits = AsString(lines).GetCount();
         String probe;
@@ -1200,9 +1275,13 @@ int UiDoc::GetGutterLaneWidth() const
         w_numbers = GetTextSize(probe, GetBaseFont()).cx + DPI(8);
     }
     if(show_metadata_markers_) {
-        int sz = max(DPI(6), GetBaseFont().GetHeight() - DPI(2));
+        int sz = max(DPI(6), GetBaseFont().GetHeight() - DPI(3));
         sz = min(sz, DPI(10));
-        w_markers = sz * 3 + DPI(2) * 2 + DPI(4);
+        int visible = 0;
+        for(const AnnotationLane& lane : annotation_lanes_)
+            if(lane.visible && IsLaneOnSide(lane, side))
+                visible++;
+        w_markers = visible > 0 ? sz * visible + DPI(2) * max(0, visible - 1) + DPI(4) : 0;
     }
     int w = max(w_numbers, w_markers);
     if(show_line_numbers_ && show_metadata_markers_)
@@ -1210,6 +1289,72 @@ int UiDoc::GetGutterLaneWidth() const
     if(w <= 0)
         return 0;
     return w + DPI(4);
+}
+
+bool UiDoc::IsLaneOnSide(const AnnotationLane& lane, GutterSide side) const
+{
+    if(!lane.visible)
+        return false;
+    if(lane.side == LANE_BOTH)
+        return true;
+    if(lane.side == LANE_LEFT)
+        return side == GUTTER_LEFT;
+    if(lane.side == LANE_RIGHT)
+        return side == GUTTER_RIGHT;
+    return side == gutter_side_;
+}
+
+int UiDoc::FindAnnotationLane(const String& id) const
+{
+    for(int i = 0; i < annotation_lanes_.GetCount(); i++)
+        if(annotation_lanes_[i].id == id)
+            return i;
+    return -1;
+}
+
+bool UiDoc::LaneMatchesAnnotation(const AnnotationLane& lane, const UiDocAnnotation& a) const
+{
+    if(lane.table_lane)
+        return false;
+    if(lane.annotation_types.IsEmpty())
+        return true;
+    for(const String& t : lane.annotation_types)
+        if(t == a.type)
+            return true;
+    return false;
+}
+
+void UiDoc::ResetDefaultAnnotationLanes()
+{
+    annotation_lanes_.Clear();
+
+    AnnotationLane metadata;
+    metadata.id = "metadata";
+    metadata.label = "Metadata";
+    metadata.color = style_.marker_annotation;
+    metadata.icon = style_.marker_annotation_icon;
+    metadata.shape = MARKER_SQUARE;
+    annotation_lanes_.Add(pick(metadata));
+
+    AnnotationLane table;
+    table.id = "table";
+    table.label = "Table";
+    table.color = style_.marker_table;
+    table.icon = style_.marker_table_icon;
+    table.shape = MARKER_SQUARE;
+    table.table_lane = true;
+    annotation_lanes_.Add(pick(table));
+
+    AnnotationLane comments;
+    comments.id = "comments";
+    comments.label = "Comments";
+    comments.color = style_.marker_comment;
+    comments.icon = style_.marker_comment_icon;
+    comments.shape = MARKER_CIRCLE;
+    comments.annotation_types.Add("note");
+    comments.annotation_types.Add("comment");
+    comments.annotation_types.Add("review.comment");
+    annotation_lanes_.Add(pick(comments));
 }
 
 int UiDoc::HitTestLineByY(int y_doc) const
@@ -1294,7 +1439,7 @@ int UiDoc::PosToX(int line, int col) const
     EnsureLayoutCache();
     line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     col  = ClampValue(col, 0, line_lengths_[line]);
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
     int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
@@ -1313,7 +1458,7 @@ int UiDoc::XToColumn(int line, int x) const
     line = ClampValue(line, 0, line_starts_.GetCount() - 1);
     int indent = paragraph_margin_steps_.GetCount() > line ? paragraph_margin_steps_[line] : 0;
     int prefix = GetLineVisualPrefixWidth(line);
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
     int rel = x - (text_rect_.left + style_.metrics.content_margin.left + gutter_left + indent * max(1, style_.margin_step) + prefix);
     int start = line_starts_[line];
     int len = line_lengths_[line];
@@ -2649,7 +2794,7 @@ bool UiDoc::GetTableLineVisual(int line,
     cols = model.cols;
     rows = model.rows.GetCount();
 
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? GetGutterLaneWidth() : 0);
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
     int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int indent = (line < paragraph_margin_steps_.GetCount() ? paragraph_margin_steps_[line] : 0) * max(1, style_.margin_step);
     int prefixw = GetLineVisualPrefixWidth(line);
@@ -2659,7 +2804,7 @@ bool UiDoc::GetTableLineVisual(int line,
     int text_h = (line < line_text_heights_.GetCount() ? line_text_heights_[line] : max(DPI(16), GetBaseFont().GetHeight()));
     int y = line_top + (line_lengths_[line] > 0 ? text_h + DPI(3) : DPI(1));
 
-    int gutter_right = (gutter_side_ == GUTTER_RIGHT ? GetGutterLaneWidth() : 0);
+    int gutter_right = GetGutterLaneWidth(GUTTER_RIGHT);
     int avail_w = text_rect_.right - style_.metrics.content_margin.right - gutter_right - x - DPI(8);
     avail_w = max(DPI(120), avail_w);
     cell_w = max(DPI(56), avail_w / cols);
@@ -2725,7 +2870,7 @@ bool UiDoc::HitTestTableCell(Point p, int& embed_ix, int& row, int& col, int& ca
     int rel_x = ClampValue(p.x - tr.left, 0, max(0, tr.GetWidth() - 1));
     int rel_y = ClampValue(p.y - tr.top, 0, max(0, tr.GetHeight() - 1));
     col = ClampValue(rel_x / max(1, cell_w), 0, cols - 1);
-    row = 0;
+    row = max(0, rows - 1);
     for(int r = 0; r < row_tops.GetCount(); r++) {
         int y0 = row_tops[r];
         int y1 = y0 + row_heights[r];
@@ -2824,9 +2969,8 @@ bool UiDoc::HitTestBlockImage(Point p, String& embed_id) const
     EnsureLayoutCache();
     embed_id.Clear();
 
-    int gutter_w = GetGutterLaneWidth();
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
-    int gutter_right = (gutter_side_ == GUTTER_RIGHT ? gutter_w : 0);
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
+    int gutter_right = GetGutterLaneWidth(GUTTER_RIGHT);
     int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int right_content_edge = text_rect_.right - style_.metrics.content_margin.right - gutter_right;
     int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
@@ -2876,13 +3020,114 @@ bool UiDoc::HitTestBlockImage(Point p, String& embed_id) const
     return false;
 }
 
+bool UiDoc::HitTestMetadataMarker(Point p, String& annotation_id, String& marker_type, int& line) const
+{
+    EnsureLayoutCache();
+    annotation_id.Clear();
+    marker_type.Clear();
+    line = -1;
+
+    if(!show_metadata_markers_ || text_rect_.IsEmpty())
+        return false;
+
+    int lane_left = text_rect_.left + style_.metrics.content_margin.left;
+    int left_w = GetGutterLaneWidth(GUTTER_LEFT);
+    int right_w = GetGutterLaneWidth(GUTTER_RIGHT);
+    int lane_right = text_rect_.right - style_.metrics.content_margin.right - right_w;
+    GutterSide hit_side;
+    int gutter_w = 0;
+    int lane_x = 0;
+    if(left_w > 0 && Rect(lane_left, text_rect_.top, lane_left + left_w, text_rect_.bottom).Contains(p)) {
+        hit_side = GUTTER_LEFT;
+        gutter_w = left_w;
+        lane_x = lane_left;
+    }
+    else if(right_w > 0 && Rect(lane_right, text_rect_.top, lane_right + right_w, text_rect_.bottom).Contains(p)) {
+        hit_side = GUTTER_RIGHT;
+        gutter_w = right_w;
+        lane_x = lane_right;
+    }
+    else
+        return false;
+
+    line = HitTestLineByY(p.y - text_rect_.top - style_.metrics.content_margin.top + scroll_y_);
+    if(line < 0 || line >= line_starts_.GetCount())
+        return false;
+
+    int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
+    int y = top_base + GetLineTopY(line);
+    int text_lh = (line < line_text_heights_.GetCount() ? line_text_heights_[line] : GetLineHeight(line));
+    if(p.y < y || p.y >= y + text_lh)
+        return false;
+
+    int lane_l = lane_x;
+    int lane_r = lane_x + gutter_w;
+    int numbers_w = 0;
+    if(show_line_numbers_ && hit_side == gutter_side_) {
+        Font gf = GetBaseFont();
+        int lines = max(1, line_starts_.GetCount());
+        int digits = AsString(lines).GetCount();
+        String probe;
+        for(int i = 0; i < digits; i++)
+            probe.Cat('8');
+        numbers_w = GetTextSize(probe, gf).cx + DPI(8);
+    }
+
+    int sz = max(DPI(6), text_lh - DPI(3));
+    sz = min(sz, DPI(10));
+    int gap = DPI(2);
+    int visible = 0;
+    for(const AnnotationLane& lane : annotation_lanes_)
+        if(IsLaneOnSide(lane, hit_side))
+            visible++;
+    if(visible <= 0)
+        return false;
+    int cluster_w = sz * visible + gap * max(0, visible - 1);
+    int mx = lane_r - DPI(2) - cluster_w;
+    if(show_line_numbers_ && hit_side == gutter_side_)
+        mx = max(mx, lane_l + numbers_w + DPI(2));
+    int my = y + max(0, (text_lh - sz) / 2);
+
+    int line_from = line_starts_[line];
+    int line_to = line_from + max(1, line_lengths_[line]);
+
+    int lane_index = 0;
+    for(const AnnotationLane& lane : annotation_lanes_) {
+        if(!IsLaneOnSide(lane, hit_side))
+            continue;
+        Rect marker_rc = RectC(mx + lane_index * (sz + gap), my, sz, sz).Inflated(DPI(2), DPI(2));
+        lane_index++;
+        if(!marker_rc.Contains(p))
+            continue;
+
+        if(lane.table_lane) {
+            bool has_table = (line < block_meta_.GetCount() && block_meta_[line].table_id >= 0)
+                             || (line < line_table_embed_ix_.GetCount() && line_table_embed_ix_[line] >= 0);
+            if(has_table) {
+                marker_type = lane.id;
+                return true;
+            }
+            return false;
+        }
+
+        for(const UiDocAnnotation& a : annotations_) {
+            if(UiDocRangeTouchesLine(a.range, line_from, line_to) && LaneMatchesAnnotation(lane, a)) {
+                annotation_id = a.id;
+                marker_type = lane.id;
+                return true;
+            }
+        }
+        return false;
+    }
+    return false;
+}
+
 bool UiDoc::HitTestInlineImage(Point p, String& embed_id) const
 {
     EnsureLayoutCache();
     embed_id.Clear();
 
-    int gutter_w = GetGutterLaneWidth();
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
     int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
 
@@ -3718,6 +3963,100 @@ bool UiDoc::FindPrev()
     return true;
 }
 
+bool UiDoc::ReplaceCurrentSearch(const WString& replacement)
+{
+    if(search_query_.IsEmpty())
+        return false;
+
+    RecomputeSearchMatches();
+    if(search_matches_.IsEmpty())
+        return false;
+
+    UiDocRange selected = CurrentSelectionRange();
+    int match = -1;
+    for(int i = 0; i < search_matches_.GetCount(); i++) {
+        if(search_matches_[i].from == selected.from && search_matches_[i].to == selected.to) {
+            match = i;
+            break;
+        }
+    }
+    if(match < 0 && 0 <= search_match_index_ && search_match_index_ < search_matches_.GetCount())
+        match = search_match_index_;
+    if(match < 0) {
+        int caret = GetSelection().caret;
+        for(int i = 0; i < search_matches_.GetCount(); i++) {
+            if(search_matches_[i].from >= caret) {
+                match = i;
+                break;
+            }
+        }
+        if(match < 0)
+            match = 0;
+    }
+
+    UiDocRange r = search_matches_[match];
+    UiDocChange rep;
+    rep.type = UiDocChange::REPLACE_TEXT;
+    rep.range = r;
+    rep.text = replacement;
+
+    UiDocChange sel;
+    sel.type = UiDocChange::SET_SELECTION;
+    sel.selection.anchor = r.from + replacement.GetCount();
+    sel.selection.caret = sel.selection.anchor;
+
+    UiDocTransaction tx;
+    tx.add_to_history = true;
+    tx.changes.Add(pick(rep));
+    tx.changes.Add(pick(sel));
+    bool ok = Dispatch(tx);
+    if(ok) {
+        RecomputeSearchMatches();
+        ScrollSelectionIntoView();
+        Refresh();
+        WhenSearch(search_query_);
+    }
+    return ok;
+}
+
+int UiDoc::ReplaceAllSearch(const WString& replacement)
+{
+    if(search_query_.IsEmpty())
+        return 0;
+
+    RecomputeSearchMatches();
+    if(search_matches_.IsEmpty())
+        return 0;
+
+    Vector<UiDocRange> matches = clone(search_matches_);
+    UiDocSelection old_sel = GetSelection();
+
+    UiDocTransaction tx;
+    tx.add_to_history = true;
+    for(int i = matches.GetCount() - 1; i >= 0; i--) {
+        UiDocChange rep;
+        rep.type = UiDocChange::REPLACE_TEXT;
+        rep.range = matches[i];
+        rep.text = replacement;
+        tx.changes.Add(pick(rep));
+    }
+
+    int count = matches.GetCount();
+    if(!Dispatch(tx))
+        return 0;
+
+    const UiDocPositionMap& map = GetLastPositionMap();
+    UiDocSelection mapped;
+    mapped.anchor = ClampPos(map.Map(old_sel.anchor, UiDocPositionMap::Left));
+    mapped.caret = ClampPos(map.Map(old_sel.caret, UiDocPositionMap::Right));
+    SetSelection(mapped);
+    RecomputeSearchMatches();
+    ScrollSelectionIntoView();
+    Refresh();
+    WhenSearch(search_query_);
+    return count;
+}
+
 bool UiDoc::IsGlobPattern(const WString& q) const
 {
     for(int i = 0; i < q.GetCount(); i++)
@@ -3946,6 +4285,62 @@ bool UiDoc::ApplyAnnotationFlagsInternal(const String& id,
     if(batching_ && batch_record_history_ && !replaying_history_ && !undo_.IsEmpty())
         RecordAnnotationStep(before, after);
     return true;
+}
+
+UiDoc& UiDoc::ClearAnnotationLanes()
+{
+    annotation_lanes_.Clear();
+    InvalidateLayoutCache();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiDoc& UiDoc::AddAnnotationLane(const AnnotationLane& lane)
+{
+    if(lane.id.IsEmpty())
+        return *this;
+    int ii = FindAnnotationLane(lane.id);
+    if(ii >= 0)
+        annotation_lanes_[ii] = clone(lane);
+    else
+        annotation_lanes_.Add(clone(lane));
+    InvalidateLayoutCache();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiDoc& UiDoc::SetAnnotationLaneVisible(const String& id, bool visible)
+{
+    int ii = FindAnnotationLane(id);
+    if(ii < 0)
+        return *this;
+    annotation_lanes_[ii].visible = visible;
+    InvalidateLayoutCache();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiDoc& UiDoc::SetAnnotationLaneColor(const String& id, Color color)
+{
+    int ii = FindAnnotationLane(id);
+    if(ii < 0)
+        return *this;
+    annotation_lanes_[ii].color = color;
+    Refresh();
+    return *this;
+}
+
+UiDoc& UiDoc::SetAnnotationLaneIcon(const String& id, const Image& icon)
+{
+    int ii = FindAnnotationLane(id);
+    if(ii < 0)
+        return *this;
+    annotation_lanes_[ii].icon = icon;
+    Refresh();
+    return *this;
 }
 
 bool UiDoc::ApplyResourceAddInternal(const UiDocResource& r)
@@ -4343,6 +4738,22 @@ String UiDoc::InsertEmbed(int pos,
     if(!Dispatch(tx))
         return String();
     return e.embed_id;
+}
+
+String UiDoc::InsertPageBreak(int pos)
+{
+    if(pos < 0)
+        pos = GetSelection().caret;
+
+    EnsureLayoutCache();
+    int line = GetLineIndexFromPos(pos);
+    line = ClampValue(line, 0, max(0, line_starts_.GetCount() - 1));
+    pos = line_starts_[line] + line_lengths_[line];
+
+    ValueMap payload;
+    payload.Add("kind", "page_break");
+    payload.Add("label", "Page break");
+    return InsertEmbed(pos, "page_break", payload);
 }
 
 bool UiDoc::DeleteEmbed(const String& embed_id)
@@ -5160,6 +5571,32 @@ void UiDoc::RegisterBuiltinCommands()
         d.DecreaseSelectionTracking();
         return true;
     });
+    RegisterCommand("search.replace.current", [](UiDoc& d, const Value& v) {
+        String replacement;
+        if(v.Is<ValueMap>()) {
+            ValueMap m = v;
+            if(m.Find("replacement") >= 0)
+                replacement = AsString(m["replacement"]);
+            else if(m.Find("text") >= 0)
+                replacement = AsString(m["text"]);
+        }
+        else
+            replacement = AsString(v);
+        return d.ReplaceCurrentSearch(replacement.ToWString());
+    });
+    RegisterCommand("search.replace.all", [](UiDoc& d, const Value& v) {
+        String replacement;
+        if(v.Is<ValueMap>()) {
+            ValueMap m = v;
+            if(m.Find("replacement") >= 0)
+                replacement = AsString(m["replacement"]);
+            else if(m.Find("text") >= 0)
+                replacement = AsString(m["text"]);
+        }
+        else
+            replacement = AsString(v);
+        return d.ReplaceAllSearch(replacement.ToWString()) > 0;
+    });
     RegisterCommand("list.bullet", [](UiDoc& d, const Value&) {
         d.ToggleBulletList();
         return true;
@@ -5530,6 +5967,18 @@ void UiDoc::RegisterBuiltinCommands()
     RegisterCommand("embed.hr.insert", [](UiDoc& d, const Value&) {
         return !d.InsertEmbed(d.GetSelection().caret, "hr").IsEmpty();
     });
+    RegisterCommand("embed.page_break.insert", [](UiDoc& d, const Value& v) {
+        int pos = -1;
+        if(v.Is<ValueMap>()) {
+            ValueMap m = v;
+            if(m.Find("pos") >= 0)
+                pos = (int)m["pos"];
+        }
+        return !d.InsertPageBreak(pos).IsEmpty();
+    });
+    RegisterCommand("insert.page_break", [](UiDoc& d, const Value& v) {
+        return d.ExecuteCommand("embed.page_break.insert", v);
+    });
     RegisterCommand("embed.image.insert", [](UiDoc& d, const Value& v) {
         if(!v.Is<ValueMap>())
             return false;
@@ -5661,7 +6110,9 @@ Rect UiDoc::GetCaretRect() const
     int line = GetLineIndexFromPos(caret_pos_);
     int col = GetColumnFromPos(line, caret_pos_);
     int x = PosToX(line, col);
-    int lh = GetLineHeight(line);
+    int lh = (line >= 0 && line < line_text_heights_.GetCount()
+              ? line_text_heights_[line]
+              : max(DPI(16), GetBaseFont().GetHeight() + max(style_.line_gap, 0)));
     int y = text_rect_.top + style_.metrics.content_margin.top + GetLineTopY(line) - scroll_y_;
     return RectC(x, y, max(1, style_.caret_width), lh);
 }
@@ -5731,6 +6182,8 @@ void UiDoc::Paint(Draw& w)
     Vector<UiDocEmbedBlock> table_embeds = QueryEmbeds(nullptr, "table");
     Vector<UiDocEmbedBlock> image_embeds = QueryEmbeds(nullptr, "image");
     Vector<UiDocEmbedBlock> svg_embeds = QueryEmbeds(nullptr, "svg");
+    Vector<UiDocEmbedBlock> rule_embeds = QueryEmbeds(nullptr, "hr");
+    rule_embeds.Append(QueryEmbeds(nullptr, "page_break"));
     Sort(table_embeds, [](const UiDocEmbedBlock& a, const UiDocEmbedBlock& b) {
         if(a.range.from != b.range.from)
             return a.range.from < b.range.from;
@@ -5746,15 +6199,20 @@ void UiDoc::Paint(Draw& w)
             return a.range.from < b.range.from;
         return a.embed_id < b.embed_id;
     });
+    Sort(rule_embeds, [](const UiDocEmbedBlock& a, const UiDocEmbedBlock& b) {
+        if(a.range.from != b.range.from)
+            return a.range.from < b.range.from;
+        return a.embed_id < b.embed_id;
+    });
     int table_idx = 0;
     int image_idx = 0;
     int svg_idx = 0;
-    int gutter_w = GetGutterLaneWidth();
-    int gutter_left = (gutter_side_ == GUTTER_LEFT ? gutter_w : 0);
-    int gutter_right = (gutter_side_ == GUTTER_RIGHT ? gutter_w : 0);
+    int rule_idx = 0;
+    int gutter_left = GetGutterLaneWidth(GUTTER_LEFT);
+    int gutter_right = GetGutterLaneWidth(GUTTER_RIGHT);
     int left = text_rect_.left + style_.metrics.content_margin.left + gutter_left;
     int lane_left = text_rect_.left + style_.metrics.content_margin.left;
-    int lane_right = text_rect_.right - style_.metrics.content_margin.right - gutter_w;
+    int lane_right = text_rect_.right - style_.metrics.content_margin.right - gutter_right;
     int right_content_edge = text_rect_.right - style_.metrics.content_margin.right - gutter_right;
     int top_base = text_rect_.top + style_.metrics.content_margin.top - scroll_y_;
 
@@ -5779,17 +6237,6 @@ void UiDoc::Paint(Draw& w)
 
         while(line_ann_idx < ann_ranges.GetCount() && ann_ranges[line_ann_idx].to <= line_from)
             line_ann_idx++;
-        bool line_has_ann = (line_ann_idx < ann_ranges.GetCount()
-                            && ann_ranges[line_ann_idx].from < line_to
-                            && ann_ranges[line_ann_idx].to > line_from);
-        int line_ann_count = 0;
-        for(const UiDocRange& ar : ann_ranges) {
-            if(ar.from >= line_to)
-                break;
-            if(ar.to > line_from)
-                line_ann_count++;
-        }
-
         if(line < block_meta_.GetCount()) {
             const UiDocBlockMeta& bm = block_meta_[line];
             if(bm.commented) {
@@ -5815,12 +6262,13 @@ void UiDoc::Paint(Draw& w)
             }
         }
 
-        if(gutter_w > 0) {
-            int lane_x = (gutter_side_ == GUTTER_LEFT ? lane_left : lane_right);
+        auto PaintGutterSide = [&](GutterSide side, int lane_x, int side_w) {
+            if(side_w <= 0)
+                return;
             int lane_l = lane_x;
-            int lane_r = lane_x + gutter_w;
+            int lane_r = lane_x + side_w;
             int numbers_w = 0;
-            if(show_line_numbers_) {
+            if(show_line_numbers_ && side == gutter_side_) {
                 Font gf = GetBaseFont();
                 String ln = AsString(line + 1);
                 int lines = max(1, line_starts_.GetCount());
@@ -5835,38 +6283,60 @@ void UiDoc::Paint(Draw& w)
             }
 
             if(show_metadata_markers_) {
-                bool has_comment = (line < block_meta_.GetCount() && block_meta_[line].commented);
+                bool has_line_comment = (line < block_meta_.GetCount() && block_meta_[line].commented);
                 bool has_table = (line < block_meta_.GetCount() && block_meta_[line].table_id >= 0) || (line < line_table_embed_ix_.GetCount() && line_table_embed_ix_[line] >= 0);
-                int sz = max(DPI(6), text_lh - DPI(2));
+                int sz = max(DPI(6), text_lh - DPI(3));
                 sz = min(sz, DPI(10));
                 int gap = DPI(2);
-                int cluster_w = sz * 3 + gap * 2;
+                int visible = 0;
+                for(const AnnotationLane& lane : annotation_lanes_)
+                    if(IsLaneOnSide(lane, side))
+                        visible++;
+                if(visible <= 0)
+                    return;
+                int cluster_w = sz * visible + gap * max(0, visible - 1);
                 int mx = lane_r - DPI(2) - cluster_w;
-                if(show_line_numbers_)
+                if(show_line_numbers_ && side == gutter_side_)
                     mx = max(mx, lane_l + numbers_w + DPI(2));
                 int my = y + max(0, (text_lh - sz) / 2);
-                if(line_has_ann) {
-                    int blend = max(40, 120 - min(4, line_ann_count) * 18);
-                    w.DrawEllipse(RectC(mx, my, sz, sz), Blend(style_.marker_annotation, SColorPaper(), blend));
-                }
-                if(has_table)
-                    w.DrawRect(mx + sz + gap, my, sz, sz, style_.marker_table);
-                if(has_comment) {
-                    int tx = mx + (sz + gap) * 2;
-                    int ty = my;
-                    for(int i = 0; i < sz; i++) {
-                        int left = tx + (sz - i - 1) / 2;
-                        int width = i + 1;
-                        w.DrawRect(left, ty + i, width, 1, style_.marker_comment);
+                int lane_index = 0;
+                for(const AnnotationLane& lane : annotation_lanes_) {
+                    if(!IsLaneOnSide(lane, side))
+                        continue;
+                    bool has_marker = false;
+                    bool selected_marker = false;
+                    if(lane.table_lane)
+                        has_marker = has_table;
+                    else {
+                        for(const UiDocAnnotation& a : annotations_) {
+                            if(UiDocRangeTouchesLine(a.range, line_from, line_to) && LaneMatchesAnnotation(lane, a)) {
+                                has_marker = true;
+                                if(!sel.IsEmpty() && !(a.range.to <= sel.from || a.range.from >= sel.to))
+                                    selected_marker = true;
+                                break;
+                            }
+                        }
+                        if(lane.id == "comments") {
+                            has_marker = has_marker || has_line_comment;
+                            if(has_line_comment && sel.IsEmpty() && line_from <= caret_pos_ && caret_pos_ <= line_to)
+                                selected_marker = true;
+                        }
                     }
+                    if(has_marker)
+                        UiDocPaintMarker(w, RectC(mx + lane_index * (sz + gap), my, sz, sz), lane.color, lane.icon, lane.shape, selected_marker);
+                    lane_index++;
                 }
             }
-        }
+        };
+        PaintGutterSide(GUTTER_LEFT, lane_left, GetGutterLaneWidth(GUTTER_LEFT));
+        PaintGutterSide(GUTTER_RIGHT, lane_right, GetGutterLaneWidth(GUTTER_RIGHT));
 
         while(image_idx < image_embeds.GetCount() && image_embeds[image_idx].range.from < line_from)
             image_idx++;
         while(svg_idx < svg_embeds.GetCount() && svg_embeds[svg_idx].range.from < line_from)
             svg_idx++;
+        while(rule_idx < rule_embeds.GetCount() && rule_embeds[rule_idx].range.from < line_from)
+            rule_idx++;
         while(table_idx < table_embeds.GetCount() && table_embeds[table_idx].range.from < line_from)
             table_idx++;
 
@@ -5905,8 +6375,39 @@ void UiDoc::Paint(Draw& w)
 
         // Inline images are drawn after text (later in this line pass).
 
+        int block_embed_y = y + max(0, text_lh + DPI(2));
+        for(int ii = rule_idx; ii < rule_embeds.GetCount(); ii++) {
+            const UiDocEmbedBlock& e = rule_embeds[ii];
+            if(e.range.from > line_to)
+                break;
+
+            int avail_w = max(DPI(80), right_content_edge - (line_left + prefixw) - DPI(8));
+            int h = UiDocRuleBlockHeight(e);
+            int rx = line_left + prefixw;
+            int ry = block_embed_y + (line_lengths_[line] > 0 ? DPI(2) : 0);
+            Color ink = Blend(SColorText(), SColorPaper(), e.embed_type == "page_break" ? 110 : 160);
+            if(e.embed_type == "page_break") {
+                String label = UiDocRuleBlockLabel(e);
+                Font pf = StdFont(max(8, GetBaseFont().GetHeight() - DPI(2)));
+                Size tsz = GetTextSize(label, pf);
+                int cy = ry + h / 2;
+                int lx = rx + max(0, (avail_w - tsz.cx) / 2);
+                int gap = DPI(6);
+                if(lx - gap > rx)
+                    w.DrawLine(rx, cy, lx - gap, cy, 1, ink);
+                if(lx + tsz.cx + gap < rx + avail_w)
+                    w.DrawLine(lx + tsz.cx + gap, cy, rx + avail_w, cy, 1, ink);
+                w.DrawText(lx, ry + max(0, (h - pf.GetHeight()) / 2), label, pf, ink);
+            }
+            else {
+                int cy = ry + h / 2;
+                w.DrawLine(rx, cy, rx + avail_w, cy, 1, ink);
+            }
+            block_embed_y += h + DPI(4);
+        }
+
         int image_slot = 0;
-        int image_block_y = y + max(0, text_lh + DPI(2));
+        int image_block_y = block_embed_y;
         for(int ii = image_idx; ii < image_embeds.GetCount(); ii++) {
             const UiDocEmbedBlock& e = image_embeds[ii];
             if(e.range.from > line_to)
@@ -6141,6 +6642,42 @@ void UiDoc::Paint(Draw& w)
 void UiDoc::LeftDown(Point p, dword)
 {
     SetFocus();
+
+    String marker_annotation_id;
+    String marker_type;
+    int marker_line = -1;
+    if(HitTestMetadataMarker(p, marker_annotation_id, marker_type, marker_line)) {
+        active_table_cell_selected_ = false;
+        active_image_embed_id_.Clear();
+        drag_selecting_ = false;
+        if(HasCapture())
+            ReleaseCapture();
+
+        if(!marker_annotation_id.IsEmpty()) {
+            for(const UiDocAnnotation& a : annotations_) {
+                if(a.id != marker_annotation_id)
+                    continue;
+                anchor_pos_ = ClampPos(a.range.from);
+                caret_pos_ = ClampPos(a.range.to);
+                preferred_x_ = -1;
+                ScrollSelectionIntoView();
+                Refresh();
+                WhenMetadataMarker(marker_annotation_id, marker_type, marker_line);
+                WhenSelection();
+                return;
+            }
+        }
+
+        if(marker_line >= 0 && marker_line < line_starts_.GetCount()) {
+            anchor_pos_ = caret_pos_ = ClampPos(line_starts_[marker_line]);
+            preferred_x_ = -1;
+            ScrollSelectionIntoView();
+            Refresh();
+            WhenMetadataMarker(marker_annotation_id, marker_type, marker_line);
+            WhenSelection();
+            return;
+        }
+    }
 
     String image_id;
     if(HitTestInlineImage(p, image_id) || HitTestBlockImage(p, image_id)) {

@@ -76,6 +76,7 @@ public:
 
     void Layout() override;
     void Paint(Draw& w) override;
+    void PaintDebugOverlay(Draw& w) const;
     void LeftDown(Point p, dword keyflags) override;
     bool Key(dword key, int count) override;
     void GotFocus() override;
@@ -111,6 +112,7 @@ private:
     void  NormalizeSelectionState();
     void  RefreshGridLayout();
     Rect  GetClientGridRect() const;
+    void  ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const;
     void  PaintDebug(Draw& w) const;
 
     Style style;

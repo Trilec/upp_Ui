@@ -22,6 +22,8 @@ public:
 		Event<DesignerNodeId, DesignerNodeId, int> WhenMoveNode;
 		void Set(DesignerModel* model, DesignerRegistry* registry);
 		void SetThemeMode(UiThemeMode mode);
+		void ShowDesignOverlays(bool show = true);
+		bool AreDesignOverlaysShown() const { return show_overlays_; }
 		void SyncRealPreview();
 		void InvalidateRealPreview();
 		void SetPlacementType(const String& type_id);
@@ -77,6 +79,7 @@ private:
 		VectorMap<DesignerNodeId, DesignerAdapter*> real_adapters_;
 		bool real_dirty_ = true;
 		bool rebuilding_real_ = false;
+		bool show_overlays_ = true;
 		UiThemeMode theme_mode_ = UiThemeMode::Light;
 		String placement_type_;
 		bool resizing_ = false;

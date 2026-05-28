@@ -14,6 +14,7 @@ static Value AdapterNodeProperty(const DesignerNode& n, const String& key, const
 }
 
 static Color GetColorProperty(const DesignerNode& n, const String& key, Color def);
+static bool DesignerHasProperty(const DesignerNode& n, const String& key);
 static void DrawRoundedFrame(Draw& w, const Rect& r, Color c, int radius, int width);
 static void DrawDashedFrame(Draw& w, const Rect& r, Color c, int radius, int width);
 static void PaintDesignerAppearanceValues(Draw& w, const Rect& r, Color face, Color frame, int radius,
@@ -21,6 +22,30 @@ static void PaintDesignerAppearanceValues(Draw& w, const Rect& r, Color face, Co
 static void PaintDesignerAppearance(Draw& w, const Rect& r, const DesignerNode& n,
                                     Color default_face, Color default_frame);
 static Color DesignerDebugColor(const DesignerNode& n);
+
+static int DesignerBreadcrumbCount(const DesignerNode& n)
+{
+	return max(1, min(24, (int)AdapterNodeProperty(n, "crumb_count", 3)));
+}
+
+static String DesignerBreadcrumbCrumbKey(int i)
+{
+	return Format("crumb_%d", i + 1);
+}
+
+static String DesignerBreadcrumbCrumbText(const DesignerNode& n, int i)
+{
+	String key = DesignerBreadcrumbCrumbKey(i);
+	if(DesignerHasProperty(n, key))
+		return AdapterNodeProperty(n, key, Format("Crumb %d", i + 1));
+	if(i == 0)
+		return AdapterNodeProperty(n, "crumb_a", "Home");
+	if(i == 1)
+		return AdapterNodeProperty(n, "crumb_b", "Library");
+	if(i == 2)
+		return AdapterNodeProperty(n, "crumb_c", "Current");
+	return Format("Crumb %d", i + 1);
+}
 
 static void DrawDesignerOverlay(Draw& w, const Rect& r, const DesignerOverlayState& state)
 {
@@ -299,31 +324,100 @@ static Image DesignerIconChoice(const DesignerNode& n, const String& key)
 	return UiIconFromName(icon);
 }
 
+static bool DesignerHasProperty(const DesignerNode& n, const String& key)
+{
+	return n.properties.Find(key) >= 0;
+}
+
+static bool DesignerBoolProperty(const DesignerNode& n, const String& key, bool def = false)
+{
+	return (bool)AdapterNodeProperty(n, key, def);
+}
+
+static ShadowCurve DesignerShadowCurveChoice(const Value& value)
+{
+	String s = AsString(value);
+	if(s == "Linear")
+		return ShadowLinear();
+	if(s == "Tight")
+		return ShadowTight();
+	if(s == "Hard")
+		return ShadowHardCurve();
+	return ShadowSoft();
+}
+
+static UiFill DesignerFaceFillChoice(const DesignerNode& n, Color face)
+{
+	String mode = AsString(AdapterNodeProperty(n, "face_mode", "Solid"));
+	if(mode != "Quad")
+		return UiFill::Solid(face);
+	Color tl = GetColorProperty(n, "face_tl", face);
+	Color tr = GetColorProperty(n, "face_tr", face);
+	Color bl = GetColorProperty(n, "face_bl", face);
+	Color br = GetColorProperty(n, "face_br", face);
+	return UiFill::ImageFill(MakeQuadGradientTile(48, tl, tr, bl, br, 0));
+}
+
+static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics& metrics,
+                                          const DesignerNode& n, bool allow_face = true, bool allow_frame = true)
+{
+	if(!DesignerBoolProperty(n, "theme_override", false))
+		return;
+	if(allow_face && DesignerBoolProperty(n, "face_enabled", false)) {
+		Color face = GetColorProperty(n, "face", SColorFace());
+		if(AsString(AdapterNodeProperty(n, "face_mode", "Solid")) == "Quad") {
+			UiFill fill = DesignerFaceFillChoice(n, face);
+			for(int i = 0; i < 4; i++)
+				palette.face[i] = fill;
+		}
+		else {
+			palette.face[ST_NORMAL] = UiFill::Solid(face);
+			palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
+			palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
+			palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
+		}
+		metrics.face_enabled = true;
+	}
+	if(allow_frame && DesignerBoolProperty(n, "frame_enabled", false)) {
+		Color frame = GetColorProperty(n, "frame", SColorShadow());
+		for(int i = 0; i < 4; i++)
+			palette.frame[i] = frame;
+		metrics.frame_enabled = true;
+		metrics.frame_width = max(DPI(1), metrics.frame_width);
+	}
+	if(DesignerHasProperty(n, "radius"))
+		metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", metrics.radius));
+	if(DesignerHasProperty(n, "shadow_enabled")) {
+		metrics.shadow.enabled = DesignerBoolProperty(n, "shadow_enabled", false);
+		if(metrics.shadow.enabled) {
+			metrics.shadow.distance = DPI(max(0, (int)AdapterNodeProperty(n, "shadow_distance", metrics.shadow.distance)));
+			metrics.shadow.offset_x = DPI((int)AdapterNodeProperty(n, "shadow_offset_x", metrics.shadow.offset_x));
+			metrics.shadow.offset_y = DPI((int)AdapterNodeProperty(n, "shadow_offset_y", metrics.shadow.offset_y));
+			metrics.shadow.alpha = minmax((int)AdapterNodeProperty(n, "shadow_alpha", metrics.shadow.alpha), 0, 255);
+			metrics.shadow.color = GetColorProperty(n, "shadow_color", metrics.shadow.color);
+			metrics.shadow.mode = SHADOW_CURVE;
+			metrics.shadow.curve = DesignerShadowCurveChoice(AdapterNodeProperty(n, "shadow_curve", "Soft"));
+		}
+	}
+}
+
 static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 {
 	UiPanel::Style s = UiTheme::ResolvePanel(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	bool pane_slot = n.type_id == "PaneSlot" || n.type_id == "PageSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
-	bool face_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "face_enabled", true);
-	bool frame_enabled = pane_slot ? false : (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
 	if(pane_slot) {
 		s.metrics.face_enabled = false;
 		s.metrics.frame_enabled = false;
 	}
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
+	else
+		ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
 	panel.SetCustomStyle(s);
 }
 
 static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 {
 	UiButton::Style s = UiTheme::ResolveButton(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.frame_width = DPI(1);
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Center")), UiAlign::CENTER);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Left"), UiAlign::LEFT);
@@ -334,11 +428,7 @@ static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 {
 	UiBaseEdit::Style s = UiTheme::ResolveEdit(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.text_align = AdapterNodeProperty(n, "align", "Left") == "Right" ? UiAlign::RIGHT
 	             : AdapterNodeProperty(n, "align", "Left") == "Center" ? UiAlign::CENTER
@@ -349,11 +439,7 @@ static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 {
 	UiDropdown::Style s = UiTheme::ResolveDropdown(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(n, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(n, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", s.metrics.radius));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Left")), UiAlign::LEFT);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
@@ -473,8 +559,31 @@ void DesignerApiBuilder::Hide(const String& id)
 		b->visible = false;
 }
 
+static void HideThemeOverrideBindings(DesignerApiBuilder& b)
+{
+	b.Hide("theme_override");
+	b.Hide("face");
+	b.Hide("face_mode");
+	b.Hide("face_tl");
+	b.Hide("face_tr");
+	b.Hide("face_bl");
+	b.Hide("face_br");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Hide("shadow_enabled");
+	b.Hide("shadow_distance");
+	b.Hide("shadow_offset_x");
+	b.Hide("shadow_offset_y");
+	b.Hide("shadow_alpha");
+	b.Hide("shadow_color");
+	b.Hide("shadow_curve");
+}
+
 static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNode& n)
 {
+	static const char *theme_group = "Theme Overrides";
 	DesignerApiBuilder b(out);
 	b.Add("name", "Name", DesignerEditorKind::Text, "designer model name",
 	      "Designer-only identifier used by hierarchy and generated variable naming.");
@@ -497,16 +606,42 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	b.AddInt("height", "Height", DesignerEditorKind::Slider,
 	         "UiBoxLayout::ItemRef::Fixed / UiGridLayout::Add(... fixed)",
 	         "Fixed height is applied when sizing is Fixed; otherwise actual height is computed by the parent layout.", 10, 900);
+	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
+	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
 	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
-	      "Only emitted when explicit appearance output is requested.");
+	      "Explicit fill color used when theme overrides and Fill are enabled.").group = theme_group;
+	b.AddChoice("face_mode", "Face mode", "StyledPalette::face",
+	            "Solid fill or four-corner gradient fill.", {{"Solid", "Solid"}, {"Quad", "Quad"}}).group = theme_group;
+	b.Add("face_tl", "Face top left", DesignerEditorKind::Color, "SetFaceQuadGradient",
+	      "Top-left gradient color.").group = theme_group;
+	b.Add("face_tr", "Face top right", DesignerEditorKind::Color, "SetFaceQuadGradient",
+	      "Top-right gradient color.").group = theme_group;
+	b.Add("face_bl", "Face bottom left", DesignerEditorKind::Color, "SetFaceQuadGradient",
+	      "Bottom-left gradient color.").group = theme_group;
+	b.Add("face_br", "Face bottom right", DesignerEditorKind::Color, "SetFaceQuadGradient",
+	      "Bottom-right gradient color.").group = theme_group;
 	b.Add("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
-	      "Only emitted when explicit appearance output is requested.");
+	      "Explicit frame color used when theme overrides and Frame are enabled.").group = theme_group;
 	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
-	         "Only emitted when explicit appearance output is requested.", 0, 64);
+	         "Explicit corner radius used when theme overrides are enabled.", 0, 64).group = theme_group;
 	b.Add("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
-	      "Shows or hides the explicit designer fill.");
+	      "Uses Face color as an explicit fill override.").group = theme_group;
 	b.Add("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
-	      "Shows or hides the explicit designer frame.");
+	      "Uses Frame color as an explicit frame override.").group = theme_group;
+	b.Add("shadow_enabled", "Shadow", DesignerEditorKind::Bool, "StyledMetrics::shadow.enabled",
+	      "Uses explicit shadow settings when theme overrides are active.").group = theme_group;
+	b.AddInt("shadow_distance", "Shadow size", DesignerEditorKind::Slider, "StyledShadow::distance",
+	         "Explicit shadow distance in pixels before DPI scaling.", 0, 64).group = theme_group;
+	b.AddInt("shadow_offset_x", "Shadow X", DesignerEditorKind::Slider, "StyledShadow::offset_x",
+	         "Explicit horizontal shadow offset in pixels before DPI scaling.", -32, 32).group = theme_group;
+	b.AddInt("shadow_offset_y", "Shadow Y", DesignerEditorKind::Slider, "StyledShadow::offset_y",
+	         "Explicit vertical shadow offset in pixels before DPI scaling.", -32, 32).group = theme_group;
+	b.AddInt("shadow_alpha", "Shadow alpha", DesignerEditorKind::Slider, "StyledShadow::alpha",
+	         "Explicit shadow opacity.", 0, 255).group = theme_group;
+	b.Add("shadow_color", "Shadow color", DesignerEditorKind::Color, "StyledShadow::color",
+	      "Explicit shadow color.").group = theme_group;
+	b.AddChoice("shadow_curve", "Shadow curve", "StyledShadow::curve",
+	            "Explicit shadow falloff curve.", {{"Soft", "Soft"}, {"Linear", "Linear"}, {"Tight", "Tight"}, {"Hard", "Hard"}}).group = theme_group;
 	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
 	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
 	if(h_sizing != "Fixed")
@@ -530,6 +665,11 @@ void DesignerPanelAdapter::SyncFromNode(const DesignerNode& node)
 	node_id_ = node.id;
 	type_id_ = node.type_id;
 	ApplyPanelAppearance(*this, node);
+	if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic")
+		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_width", DESIGNER_MIN_CLAMP))),
+		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP))));
+	else
+		SetSizeMin(Size(0, 0));
 }
 
 void DesignerPanelAdapter::SetOverlayState(const DesignerOverlayState& state)
@@ -545,6 +685,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	if(node.type_id == "Spacer") {
 		b.Hide("text");
 		b.Hide("role");
+		HideThemeOverrideBindings(b);
+		b.Hide("theme_override");
 		b.Hide("face");
 		b.Hide("frame");
 		b.Hide("radius");
@@ -563,6 +705,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	}
 	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot") {
 		b.Hide("role");
+		HideThemeOverrideBindings(b);
+		b.Hide("theme_override");
 		b.Hide("face");
 		b.Hide("frame");
 		b.Hide("radius");
@@ -582,6 +726,10 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		}
 		return;
 	}
+	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "UiPanel::SetSizeMin",
+	         "Outer minimum width used when the panel is fit-sized.", DESIGNER_MIN_CLAMP, 800);
+	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "UiPanel::SetSizeMin",
+	         "Outer minimum height used when the panel is fit-sized.", DESIGNER_MIN_CLAMP, 800);
 	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
 	      "Designer placeholder text used until this node becomes a real control.");
 }
@@ -596,11 +744,7 @@ void DesignerGroupPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	UiGroupPanel::Style s = UiTheme::ResolveGroupPanel(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(node, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(node, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(node, "radius", 8));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	s.header_mode = DesignerGroupHeaderModeChoice(AdapterNodeProperty(node, "header_mode", "Inside"));
 	s.line_enabled = (bool)AdapterNodeProperty(node, "line", false);
 	s.header_band_enabled = (bool)AdapterNodeProperty(node, "header_band", false);
@@ -667,12 +811,7 @@ void DesignerLabelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	UiLabel::Style s = UiTheme::ResolveLabel(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(node, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(node, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.frame_width = DPI(1);
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(node, "radius", 0));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	int inset = max(0, (int)AdapterNodeProperty(node, "inset", 6));
 	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(node, "align_h", AdapterNodeProperty(node, "align", "Left")), UiAlign::LEFT);
@@ -680,7 +819,7 @@ void DesignerLabelAdapter::SyncFromNode(const DesignerNode& node)
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(node, "icon_side", "Left"), UiAlign::LEFT);
 	s.content_gap = DPI(max(0, (int)AdapterNodeProperty(node, "content_gap", 6)));
 	s.font = DesignerFontChoice(node, "font", max(7, (int)AdapterNodeProperty(node, "font_size", 11)));
-	s.transparent = !face_enabled && !frame_enabled;
+	s.transparent = !s.metrics.face_enabled && !s.metrics.frame_enabled;
 	SetCustomStyle(s);
 	if(s.metrics.radius > 0)
 		Transparent();
@@ -739,12 +878,7 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	UiTitleCard::Style s = UiTheme::ResolveTitleCard(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
-	bool face_enabled = (bool)AdapterNodeProperty(node, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(node, "frame_enabled", true);
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.frame_width = DPI(1);
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(node, "radius", 0));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	s.metrics.content_margin = Rect(DPI(8), DPI(6), DPI(8), DPI(6));
 	s.text_align_h = AdapterNodeProperty(node, "align", "Left") == "Right" ? UiAlign::RIGHT
 	               : AdapterNodeProperty(node, "align", "Left") == "Center" ? UiAlign::CENTER
@@ -753,7 +887,7 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	s.subtitle_font = DesignerFontChoice(node, "subtitle_font", max(7, (int)AdapterNodeProperty(node, "subtitle_size", 10)));
 	s.title_line = (bool)AdapterNodeProperty(node, "title_line", true);
 	s.card_line = (bool)AdapterNodeProperty(node, "card_line", false);
-	s.transparent = !face_enabled && !frame_enabled;
+	s.transparent = !s.metrics.face_enabled && !s.metrics.frame_enabled;
 	SetCustomStyle(s);
 	Image icon = DesignerIconChoice(node);
 	if(IsNull(icon))
@@ -1056,6 +1190,8 @@ void DesignerToggleAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
 	b.Hide("text");
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1145,6 +1281,8 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1179,15 +1317,17 @@ void DesignerBreadcrumbsAdapter::SyncFromNode(const DesignerNode& node)
 	int inset = max(0, (int)AdapterNodeProperty(node, "inset", 10));
 	int inset_y = max(0, (int)AdapterNodeProperty(node, "inset_y", 5));
 	s.metrics.content_margin = Rect(DPI(inset), DPI(inset_y), DPI(inset), DPI(inset_y));
+	s.min_height = DPI(max(0, (int)AdapterNodeProperty(node, "min_height", 0)));
 	s.item_gap = DPI(max(0, (int)AdapterNodeProperty(node, "item_gap", 6)));
 	s.divider_gap = DPI(max(0, (int)AdapterNodeProperty(node, "divider_gap", 8)));
 	s.content_gap = DPI(max(0, (int)AdapterNodeProperty(node, "content_gap", 5)));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	SetCustomStyle(s);
 	ClearItems();
-	AddCrumb(AdapterNodeProperty(node, "crumb_a", "Home"), "home");
-	AddCrumb(AdapterNodeProperty(node, "crumb_b", "Section"), "section");
-	AddCrumb(AdapterNodeProperty(node, "crumb_c", "Current"), "current");
-	SetCurrentIndex(clamp((int)AdapterNodeProperty(node, "current", 2), 0, 2));
+	int count = DesignerBreadcrumbCount(node);
+	for(int i = 0; i < count; i++)
+		AddCrumb(DesignerBreadcrumbCrumbText(node, i), AsString(i));
+	SetCurrentIndex(clamp((int)AdapterNodeProperty(node, "current", min(2, count - 1)), 0, count - 1));
 	SetTrimOnSelect((bool)AdapterNodeProperty(node, "trim", false));
 	SetDivider(AdapterNodeProperty(node, "divider", "/"));
 	Image divider_icon = DesignerIconChoice(node, "divider_icon");
@@ -1201,7 +1341,7 @@ void DesignerBreadcrumbsAdapter::SyncFromNode(const DesignerNode& node)
 		SetPathIcon(icon, UiAlign::LEFT, Size(DPI((int)AdapterNodeProperty(node, "icon_size", 16)),
 		                                      DPI((int)AdapterNodeProperty(node, "icon_size", 16))));
 	SetMinSize(Size(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_width", 180))),
-	                DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_DEFAULT_HEIGHT)))));
+	                DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP)))));
 	NoWantFocus();
 }
 
@@ -1215,16 +1355,14 @@ void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.Hide("face");
-	b.Hide("frame");
-	b.Hide("radius");
-	b.Hide("face_enabled");
-	b.Hide("frame_enabled");
 	b.Hide("role");
-	b.Add("crumb_a", "Crumb 1", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "First path segment.");
-	b.Add("crumb_b", "Crumb 2", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "Second path segment.");
-	b.Add("crumb_c", "Crumb 3", DesignerEditorKind::Text, "UiBreadcrumbs::AddCrumb", "Current path segment.");
-	b.AddInt("current", "Current", DesignerEditorKind::Slider, "UiBreadcrumbs::SetCurrentIndex", "Current crumb index.", 0, 2);
+	int count = DesignerBreadcrumbCount(node);
+	b.AddInt("crumb_count", "Crumbs", DesignerEditorKind::Slider, "UiBreadcrumbs::AddCrumb count",
+	         "Number of path segments.", 1, 24);
+	for(int i = 0; i < count; i++)
+		b.Add(DesignerBreadcrumbCrumbKey(i), Format("Crumb %d", i + 1), DesignerEditorKind::Text,
+		      "UiBreadcrumbs::AddCrumb", "Path segment text.");
+	b.AddInt("current", "Current", DesignerEditorKind::Slider, "UiBreadcrumbs::SetCurrentIndex", "Current crumb index.", 0, max(0, count - 1));
 	b.Add("trim", "Trim on select", DesignerEditorKind::Bool, "UiBreadcrumbs::SetTrimOnSelect", "Trims path after clicked crumb.");
 	b.Add("divider", "Divider", DesignerEditorKind::Text, "UiBreadcrumbs::SetDivider", "Text divider between crumbs.");
 	AddIconChoiceBinding(b, "divider_icon", "Divider icon", "UiBreadcrumbs::SetDividerIcon",
@@ -1299,6 +1437,8 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1351,6 +1491,8 @@ void DesignerStackAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1408,6 +1550,8 @@ void DesignerTableAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1459,6 +1603,8 @@ void DesignerTreeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Des
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1480,15 +1626,7 @@ void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
-	bool face_enabled = (bool)AdapterNodeProperty(node, "face_enabled", true);
-	bool frame_enabled = (bool)AdapterNodeProperty(node, "frame_enabled", true);
-	for(int i = 0; i < 4; i++) {
-		s.palette.face[i] = UiFill::Solid(GetColorProperty(node, "face", Color(248, 250, 252)));
-		s.palette.frame[i] = GetColorProperty(node, "frame", Color(203, 213, 225));
-	}
-	s.metrics.face_enabled = face_enabled;
-	s.metrics.frame_enabled = frame_enabled;
-	s.metrics.radius = max(0, (int)AdapterNodeProperty(node, "radius", 8));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	SetCustomStyle(s);
 	String mode = AdapterNodeProperty(node, "scroll_mode", "Auto");
 	SetScrollMode(mode == "Vertical" ? UIPANELSCROLL_VERTICAL :
@@ -1558,6 +1696,8 @@ void DesignerBoxLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1594,13 +1734,17 @@ void DesignerBoxLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 
 void DesignerBoxLayoutAdapter::Paint(Draw& w)
 {
-	UiBoxLayout::Paint(w);
+	if(overlay_.debug)
+		UiBoxLayout::Paint(w);
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 
 DesignerGridLayoutAdapter::DesignerGridLayoutAdapter()
 {
 	Transparent();
+	debug_overlay_.owner = this;
+	debug_overlay_.IgnoreMouse().NoWantFocus();
+	Ctrl::Add(debug_overlay_);
 }
 
 void DesignerGridLayoutAdapter::SyncFromNode(const DesignerNode& node)
@@ -1619,6 +1763,7 @@ void DesignerGridLayoutAdapter::SyncFromNode(const DesignerNode& node)
 void DesignerGridLayoutAdapter::SetOverlayState(const DesignerOverlayState& state)
 {
 	overlay_ = state;
+	debug_overlay_.Refresh();
 	Refresh();
 }
 
@@ -1626,6 +1771,8 @@ void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1656,7 +1803,29 @@ void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 
 void DesignerGridLayoutAdapter::Paint(Draw& w)
 {
-	UiGridLayout::Paint(w);
+	if(overlay_.debug)
+		UiGridLayout::Paint(w);
+}
+
+void DesignerGridLayoutAdapter::Layout()
+{
+	UiGridLayout::Layout();
+	debug_overlay_.Remove();
+	Ctrl::Add(debug_overlay_);
+	debug_overlay_.SetRect(GetSize());
+	debug_overlay_.Refresh();
+}
+
+void DesignerGridLayoutAdapter::DebugOverlay::Paint(Draw& w)
+{
+	if(owner)
+		owner->PaintTopOverlay(w);
+}
+
+void DesignerGridLayoutAdapter::PaintTopOverlay(Draw& w) const
+{
+	if(overlay_.debug)
+		PaintDebugOverlay(w);
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -1703,6 +1872,8 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");
@@ -1761,6 +1932,8 @@ void DesignerQuadSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, c
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("frame");
 	b.Hide("radius");

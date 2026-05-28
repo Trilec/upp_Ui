@@ -991,6 +991,12 @@ UiDropdown& UiDropdown::EnableDragReorder(bool on)
     return *this;
 }
 
+UiDropdown& UiDropdown::EnableInternalMutation(bool on)
+{
+    internal_mutation_enabled_ = on;
+    return *this;
+}
+
 UiDropdown& UiDropdown::ShowDragHandle(bool on)
 {
     Style& s = StyleEdit();
@@ -1144,6 +1150,20 @@ void UiDropdown::MoveItemTo(int from, int before)
         return;
 
     const int original_before = before;
+    UiReorderRequest request;
+    request.from = from;
+    request.before = before;
+    if(WhenReorderRequest)
+        WhenReorderRequest(request);
+    if(!request.accept)
+        return;
+    if(request.handled) {
+        SyncItemsFromModel();
+        return;
+    }
+    if(!internal_mutation_enabled_)
+        return;
+
     if(!model_->Move(from, before))
         return;
 

@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiIcons_h_
+#ifndef _Ui_UiIcons_h_
 #define _Ui_UiIcons_h_
 
 /*
@@ -446,11 +446,6 @@ inline Image ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48()
     return UiIconsImg::ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48();
 }
 
-inline Image ICON_DESIGN_TRIP_ORIGIN_48()
-{
-    return UiIconsImg::ICON_DESIGN_TRIP_ORIGIN_48();
-}
-
 inline Image ICON_BRAND_NEWLOGO_V5_48()
 {
     return UiIconsImg::ICON_BRAND_NEWLOGO_V5_48();
@@ -682,6 +677,76 @@ inline Image ICON_DESIGN_SQUARE_DOT_48()
 }
 
 
+// Source: out\icon_import_tmp\arrow_circle_left.svg
+// Size: 48x48
+inline Image ICON_DESIGN_ARROW_CIRCLE_LEFT_48()
+{
+    return UiIconsImg::ICON_DESIGN_ARROW_CIRCLE_LEFT_48();
+}
+
+// Source: out\icon_import_tmp\comment.svg
+// Size: 48x48
+inline Image ICON_DESIGN_COMMENT_48()
+{
+    return UiIconsImg::ICON_DESIGN_COMMENT_48();
+}
+
+// Source: out\icon_import_tmp\description.svg
+// Size: 48x48
+inline Image ICON_DESIGN_DESCRIPTION_48()
+{
+    return UiIconsImg::ICON_DESIGN_DESCRIPTION_48();
+}
+
+// Source: out\icon_import_tmp\find_replace.svg
+// Size: 48x48
+inline Image ICON_DESIGN_FIND_REPLACE_48()
+{
+    return UiIconsImg::ICON_DESIGN_FIND_REPLACE_48();
+}
+
+// Source: out\icon_import_tmp\full_stacked_bar_chart.svg
+// Size: 48x48
+inline Image ICON_DESIGN_FULL_STACKED_BAR_CHART_48()
+{
+    return UiIconsImg::ICON_DESIGN_FULL_STACKED_BAR_CHART_48();
+}
+
+// Source: out\icon_import_tmp\remove_selection.svg
+// Size: 48x48
+inline Image ICON_DESIGN_REMOVE_SELECTION_48()
+{
+    return UiIconsImg::ICON_DESIGN_REMOVE_SELECTION_48();
+}
+
+// Source: out\icon_import_tmp\text_decrease.svg
+// Size: 48x48
+inline Image ICON_DESIGN_TEXT_DECREASE_48()
+{
+    return UiIconsImg::ICON_DESIGN_TEXT_DECREASE_48();
+}
+
+// Source: out\icon_import_tmp\toolbar.svg
+// Size: 48x48
+inline Image ICON_DESIGN_TOOLBAR_48()
+{
+    return UiIconsImg::ICON_DESIGN_TOOLBAR_48();
+}
+
+// Source: out\icon_import_tmp\trip_origin.svg
+// Size: 48x48
+inline Image ICON_DESIGN_TRIP_ORIGIN_48()
+{
+    return UiIconsImg::ICON_DESIGN_TRIP_ORIGIN_48();
+}
+
+// Source: out\icon_import_tmp\youtube_searched_for.svg
+// Size: 48x48
+inline Image ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48()
+{
+    return UiIconsImg::ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48();
+}
+
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
@@ -764,7 +829,6 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_FIBER_MANUAL_RECORD_48", &ICON_DESIGN_FIBER_MANUAL_RECORD_48));
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_CHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_CHECKED_48));
         out.Add(UiIconCatalogEntry("ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48", &ICON_TOGGLE_RADIO_BUTTON_UNCHECKED_48));
-        out.Add(UiIconCatalogEntry("ICON_DESIGN_TRIP_ORIGIN_48", &ICON_DESIGN_TRIP_ORIGIN_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_ACCOUNT_TREE_48", &ICON_DESIGN_ACCOUNT_TREE_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_HORIZONTAL_48", &ICON_DESIGN_BORDER_HORIZONTAL_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_INNER_48", &ICON_DESIGN_BORDER_INNER_48));
@@ -810,6 +874,17 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_OUTER_48", &ICON_DESIGN_BORDER_OUTER_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_BORDER_CLEAR_48", &ICON_DESIGN_BORDER_CLEAR_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_SQUARE_DOT_48", &ICON_DESIGN_SQUARE_DOT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_ARROW_CIRCLE_LEFT_48", &ICON_DESIGN_ARROW_CIRCLE_LEFT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_COMMENT_48", &ICON_DESIGN_COMMENT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DESCRIPTION_48", &ICON_DESIGN_DESCRIPTION_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_FIND_REPLACE_48", &ICON_DESIGN_FIND_REPLACE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_FULL_STACKED_BAR_CHART_48", &ICON_DESIGN_FULL_STACKED_BAR_CHART_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_REMOVE_SELECTION_48", &ICON_DESIGN_REMOVE_SELECTION_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TEXT_DECREASE_48", &ICON_DESIGN_TEXT_DECREASE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TOOLBAR_48", &ICON_DESIGN_TOOLBAR_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_TRIP_ORIGIN_48", &ICON_DESIGN_TRIP_ORIGIN_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48", &ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48));
+
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
     }();
@@ -865,4 +940,5 @@ inline Image UiIconFromName(const String& icon_name)
 }
 
 #endif
+
 

@@ -377,6 +377,13 @@ UiTree& UiTree::EnableDragDrop(bool on)
     }
     return *this;
 }
+
+UiTree& UiTree::EnableInternalMutation(bool on)
+{
+    internal_mutation_enabled_ = on;
+    return *this;
+}
+
 UiTree& UiTree::SetGlyphStyle(UiTreeGlyphStyle style)
 {
     StyleEdit().glyph_style = style;
@@ -754,6 +761,32 @@ UiTreeNodeRef UiTree::GetNodeAt(Point p) const
     return row >= 0 ? UiTreeNodeRef{visible_rows_[row].id} : UiTreeNodeRef{-1};
 }
 
+UiTree::DropInfo UiTree::GetDropInfo() const
+{
+    DropInfo out;
+    out.parent = UiTreeNodeRef{drop_parent_id_};
+    out.hover = UiTreeNodeRef{drop_hover_id_};
+    out.insert_pos = drop_insert_pos_;
+    out.into = drop_into_;
+    out.valid = drop_parent_id_ >= 0;
+    return out;
+}
+
+UiTree::DropInfo UiTree::TrackDropTarget(Point p)
+{
+    DropTarget target = GetDropTarget(p);
+    if(target.valid)
+        SetDropTarget(target);
+    else
+        ClearDropTarget();
+    return GetDropInfo();
+}
+
+void UiTree::ClearTrackedDropTarget()
+{
+    ClearDropTarget();
+}
+
 Rect UiTree::GetGlyphRect(const Rect& row, int depth) const
 {
     const Style& style = GetEffectiveStyle();
@@ -841,6 +874,16 @@ Vector<Rect> UiTree::GetColumnRects(const Rect& row, const UiModelItem& item) co
     return out;
 }
 
+int UiTree::HitTestColumn(const Rect& row, const UiModelItem& item, Point p) const
+{
+    Vector<Rect> cols = GetColumnRects(row, item);
+    int count = min(cols.GetCount(), item.columns.GetCount());
+    for(int i = 0; i < count; i++)
+        if(cols[i].Contains(p))
+            return i;
+    return -1;
+}
+
 Rect UiTree::GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_icon, bool has_metadata, int node_id) const
 {
     const Style& style = GetEffectiveStyle();
@@ -900,6 +943,61 @@ void UiTree::PaintItemColumns(Draw& w, const Rect& row, const UiModelItem& item,
             DrawSmartText(w, x, y, max(0, r.GetWidth()), c.text, font, ink, 0);
         }
     }
+}
+
+void UiTree::PaintDropTarget(Draw& w, const Rect& viewport) const
+{
+    if(drop_parent_id_ < 0 || !model_)
+        return;
+
+    const Style& style = GetEffectiveStyle();
+    Color c = IsNull(style.metrics.focus_color) ? Color(56, 146, 255) : style.metrics.focus_color;
+    int h = max(DPI(2), DPI(3));
+    int x = viewport.left + style.h_padding;
+    int cx = max(DPI(24), viewport.GetWidth() - style.h_padding * 2);
+
+    auto draw_line = [&](int y) {
+        y = clamp(y, viewport.top + h / 2, viewport.bottom - h / 2);
+        w.DrawRect(x, y - h / 2, cx, h, c);
+    };
+
+    if(drop_hover_id_ >= 0) {
+        int row = UiFindVisibleRowIndex(visible_rows_, drop_hover_id_);
+        if(row < 0)
+            return;
+        Rect rr = GetRowRect(row);
+        if(!viewport.Intersects(rr))
+            return;
+
+        if(drop_into_) {
+            Rect box = rr.Deflated(0, max(0, style.v_padding / 2));
+            if(box.IsEmpty())
+                box = rr;
+            StyledPalette pal;
+            StyledMetrics met;
+            met.face_enabled = false;
+            met.frame_enabled = true;
+            met.frame_width = DPI(2);
+            met.radius = style.row_radius;
+            pal.frame[ST_NORMAL] = c;
+            UiPaintFaceFrameDash(w, box, pal, met, ST_NORMAL);
+        }
+        else {
+            UiTreeNodeRef hover{drop_hover_id_};
+            int y = rr.top;
+            if(model_->IsValid(hover) && drop_insert_pos_ > model_->GetChildIndex(hover))
+                y = rr.bottom;
+            draw_line(y);
+        }
+        return;
+    }
+
+    int y = viewport.top + style.metrics.content_margin.top;
+    if(visible_rows_.GetCount() > 0) {
+        Rect last = GetRowRect(visible_rows_.GetCount() - 1);
+        y = min(viewport.bottom - h, max(viewport.top + h, last.bottom));
+    }
+    draw_line(y);
 }
 
 void UiTree::PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, bool hot) const
@@ -1249,6 +1347,7 @@ void UiTree::Paint(Draw& w)
                 break;
             PaintRow(w, i, rr);
         }
+        PaintDropTarget(w, vp);
         w.End();
     }
     UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, false);
@@ -1265,7 +1364,27 @@ Size UiTree::GetContentSize() const
 {
     const_cast<UiTree *>(this)->SyncModel();
     const Style& style = GetEffectiveStyle();
-    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
+    Font font = style.font;
+    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + DPI(24);
+    int column_w = 0;
+    for(int i = 0; i < column_widths_.GetCount(); i++)
+        column_w += max(DPI(16), column_widths_[i]) + (i ? style.accessory_gap : 0);
+    for(const VisibleRow& vr : visible_rows_) {
+        UiTreeNodeRef ref{vr.id};
+        if(!model_ || !model_->IsValid(ref))
+            continue;
+        const UiModelItem& item = model_->Get(ref);
+        int row_w = vr.depth * style.indent_px + style.glyph_size + style.content_gap;
+        if(style.show_icons && !IsNull(item.icon))
+            row_w += style.icon_size + style.content_gap;
+        row_w += GetTextSize(item.text, item.use_custom_font ? item.custom_font : font).cx;
+        if(!item.right_text.IsEmpty())
+            row_w += style.content_gap + GetTextSize(item.right_text, item.use_custom_font ? item.custom_font : font).cx;
+        if(column_w > 0)
+            row_w += style.accessory_gap + column_w;
+        width = max(width, style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + row_w);
+    }
+    width = max(width, style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220));
     int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom + GetTotalHeight();
     return Size(width, max(0, height));
 }
@@ -1295,6 +1414,8 @@ void UiTree::LeftDown(Point p, dword flags)
         }
         UiTreeNodeRef node{vr.id};
         Rect rr = GetRowRect(row);
+        const UiModelItem& item = model_->Get(node);
+        int column_hit = HitTestColumn(rr, item, p);
         bool toggle_hit = vr.has_children && GetToggleHitRect(rr, vr.depth, vr.has_children).Contains(p);
         if(toggle_hit)
             Toggle(node);
@@ -1317,7 +1438,10 @@ void UiTree::LeftDown(Point p, dword flags)
         else
             SelectSingle(node);
 
-        if(dnd_enabled_ && !toggle_hit) {
+        if(column_hit >= 0 && WhenColumnAction)
+            WhenColumnAction(node, column_hit);
+
+        if(dnd_enabled_ && !toggle_hit && column_hit < 0) {
             drag_id_ = node.id;
             SetCapture();
         }
@@ -1736,6 +1860,23 @@ bool UiTree::CanMoveNodes(const Vector<UiTreeNodeRef>& nodes, UiTreeNodeRef new_
 bool UiTree::MoveNodes(const Vector<UiTreeNodeRef>& nodes, UiTreeNodeRef new_parent, int pos)
 {
     if(!CanMoveNodes(nodes, new_parent, pos))
+        return false;
+
+    UiTreeMoveRequest request;
+    request.nodes = clone(nodes);
+    request.new_parent = new_parent;
+    request.insert_pos = pos;
+    if(WhenMoveRequest)
+        WhenMoveRequest(request);
+    if(!request.accept)
+        return false;
+    if(request.handled) {
+        SyncModel();
+        RefreshLayout();
+        Refresh();
+        return true;
+    }
+    if(!internal_mutation_enabled_)
         return false;
 
     int insert_pos = pos < 0 ? model_->GetChildCount(new_parent) : min(max(pos, 0), model_->GetChildCount(new_parent));

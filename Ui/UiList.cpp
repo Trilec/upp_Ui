@@ -365,6 +365,12 @@ UiList& UiList::EnableDragReorder(bool on)
     return *this;
 }
 
+UiList& UiList::EnableInternalMutation(bool on)
+{
+    internal_mutation_enabled_ = on;
+    return *this;
+}
+
 void UiList::BindModel(UiListModel& model)
 {
     for(int i = 0; i < bound_models_.GetCount(); i++) {
@@ -1251,6 +1257,22 @@ void UiList::MoveRowTo(int from, int before)
         return;
 
     const int original_before = before;
+    UiReorderRequest request;
+    request.from = from;
+    request.before = before;
+    if(WhenReorderRequest)
+        WhenReorderRequest(request);
+    if(!request.accept)
+        return;
+    if(request.handled) {
+        SyncModel();
+        Layout();
+        Refresh();
+        return;
+    }
+    if(!internal_mutation_enabled_)
+        return;
+
     if(!model_->Move(from, before))
         return;
 

@@ -120,8 +120,8 @@ public:
         lower_.SetText("").SetIcon(ICON_DESIGN_LOWERCASE_48());
         titlecase_.SetText("").SetIcon(ICON_EDITOR_TITLECASE_48());
         size_up_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
-        size_down_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
-        comment_.SetText("").SetIcon(ICON_COMMUNICATION_COMMENT_48());
+        size_down_.SetText("").SetIcon(ICON_DESIGN_TEXT_DECREASE_48());
+        comment_.SetText("").SetIcon(ICON_DESIGN_COMMENT_48());
 
         bullet_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LIST_BULLETED_48());
         numbered_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LIST_NUMBERED_RTL_48());
@@ -142,19 +142,20 @@ public:
         table_col_add_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         table_col_del_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
         table_decor_.SetText("Frame");
-        table_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
+        table_del_.SetText("").SetIcon(ICON_DESIGN_REMOVE_SELECTION_48());
         hr_.SetText("").SetIcon(ICON_EDITOR_FORMAT_LINE_SPACING_48());
+        page_break_.SetText("").SetIcon(ICON_DESIGN_DESCRIPTION_48());
         image_file_ins_.SetText("").SetIcon(ICON_DESIGN_FOLDER_48());
         image_flow_demo_.SetText("T+L+T").SetIcon(ICON_DESIGN_IMAGE_48());
         image_align_left_.SetText("").SetIcon(ICON_EDITOR_BORDER_LEFT_48());
         image_align_center_.SetText("C").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
         image_align_right_.SetText("").SetIcon(ICON_EDITOR_BORDER_RIGHT_48());
-        svg_ins_.SetText("M+").SetIcon(ICON_NAVIGATION_OUTLINED_APPS_48());
-        meta_del_.SetText("M-").SetIcon(ICON_DESIGN_DELETE_48());
+        svg_ins_.SetText("").SetIcon(ICON_DESIGN_FULL_STACKED_BAR_CHART_48());
+        meta_del_.SetText("M-").SetIcon(ICON_DESIGN_REMOVE_SELECTION_48());
         embed_del_.SetText("").SetIcon(ICON_DESIGN_DELETE_48());
 
-        note_.SetText("").SetIcon(ICON_EDITOR_NOTES_48());
-        find_prev_.SetText("").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48());
+        note_.SetText("").SetIcon(ICON_DESIGN_COMMENT_48());
+        find_prev_.SetText("").SetIcon(ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48());
         find_.SetText("").SetIcon(ICON_ACTION_SEARCH_48());
         find_ignore_case_.SetText("Aa");
         find_whole_word_.SetText("W");
@@ -162,6 +163,9 @@ public:
         view_line_numbers_.SetText("Ln").SetIcon(ICON_NAVIGATION_OUTLINED_DRAG_INDICATOR_48());
         view_meta_markers_.SetText("").SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48());
         search_.SetPlaceholder("Search text...");
+        replace_.SetPlaceholder("Replacement...");
+        replace_current_.SetText("").SetIcon(ICON_DESIGN_FIND_REPLACE_48());
+        replace_all_.SetText("All");
         insp_margin_plus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_ADD_48());
         insp_margin_minus_.SetText("").SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48());
         insp_margin_reset_.SetText("").SetIcon(ICON_EDITOR_MARGIN_48());
@@ -216,6 +220,7 @@ public:
         setup_icon_button(table_col_del_);
         setup_icon_button(table_del_);
         setup_icon_button(hr_);
+        setup_icon_button(page_break_);
         setup_icon_button(image_file_ins_);
         setup_icon_button(image_flow_demo_);
         setup_icon_button(image_align_left_);
@@ -244,6 +249,8 @@ public:
         setup_icon_button(insp_tx_check_);
         setup_icon_button(insp_map_check_);
         setup_icon_button(insp_accept_check_);
+        setup_icon_button(replace_current_);
+        setup_icon_button(replace_all_);
 
         bold_.Tip("Toggle bold. With no selection, affects typing mode.");
         italic_.Tip("Toggle italic. With no selection, affects typing mode.");
@@ -274,18 +281,22 @@ public:
         table_decor_.Tip("Toggle frame/grid decorations for active table.");
         table_del_.Tip("Delete current table at caret.");
         hr_.Tip("Insert horizontal rule embed.");
+        page_break_.Tip("Insert page break block embed.");
         image_flow_demo_.Tip("Insert text + logo + text (table cell if active, otherwise paragraph). ");
         image_file_ins_.Tip("Insert PNG/JPEG from file (table cell if active, otherwise paragraph). ");
         image_align_left_.Tip("Align selected block image left.");
         image_align_center_.Tip("Align selected block image center.");
         image_align_right_.Tip("Align selected block image right.");
-        svg_ins_.Tip("Attach demo metadata at caret (blue square marker).");
+        svg_ins_.Tip("Attach demo metadata at caret (stacked-bar marker).");
         meta_del_.Tip("Delete demo metadata attached at caret.");
         embed_del_.Tip("Delete embed at caret (image/svg/hr/table embed ref).");
-        note_.Tip("Attach metadata comment to selected text.");
+        note_.Tip("Attach comment metadata to selected text (comment marker).");
         search_.Tip("Type search query (supports * and ? wildcards).");
         find_prev_.Tip("Find previous match.");
         find_.Tip("Find next match. Highlights all matches.");
+        replace_.Tip("Replacement text for Replace and All.");
+        replace_current_.Tip("Replace the selected/current search match.");
+        replace_all_.Tip("Replace every current search match.");
         find_ignore_case_.Tip("Toggle case-insensitive matching.");
         find_whole_word_.Tip("Toggle whole-word matching.");
         view_gutter_side_.Tip("Toggle gutter side (left/right).");
@@ -320,10 +331,10 @@ public:
         adjust_group.Add(insp_margin_plus_).Fixed(DPI(34)); adjust_group.Add(insp_margin_minus_).Fixed(DPI(34)); adjust_group.Add(insp_margin_reset_).Fixed(DPI(34)); adjust_group.Add(insp_lead_plus_).Fixed(DPI(34)); adjust_group.Add(insp_lead_minus_).Fixed(DPI(34));
         adjust_group.Add(insp_track_plus_).Fixed(DPI(34)); adjust_group.Add(insp_track_minus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_plus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_minus_).Fixed(DPI(34)); adjust_group.Add(insp_tab_mode_).Fixed(DPI(92));
 
-        embed_group.Add(hr_).Fixed(DPI(34)); embed_group.Add(image_flow_demo_).Fixed(DPI(52)); embed_group.Add(image_file_ins_).Fixed(DPI(34)); embed_group.Add(image_align_left_).Fixed(DPI(34)); embed_group.Add(image_align_center_).Fixed(DPI(34));
+        embed_group.Add(hr_).Fixed(DPI(34)); embed_group.Add(page_break_).Fixed(DPI(42)); embed_group.Add(image_flow_demo_).Fixed(DPI(52)); embed_group.Add(image_file_ins_).Fixed(DPI(34)); embed_group.Add(image_align_left_).Fixed(DPI(34)); embed_group.Add(image_align_center_).Fixed(DPI(34));
         embed_group.Add(image_align_right_).Fixed(DPI(34)); embed_group.Add(svg_ins_).Fixed(DPI(34)); embed_group.Add(meta_del_).Fixed(DPI(34)); embed_group.Add(embed_del_).Fixed(DPI(34));
 
-        find_group.Add(search_).Fixed(DPI(240)); find_group.Add(find_prev_).Fixed(DPI(34)); find_group.Add(find_).Fixed(DPI(34)); find_group.Add(find_ignore_case_).Fixed(DPI(40)); find_group.Add(find_whole_word_).Fixed(DPI(34));
+        find_group.Add(search_).Fixed(DPI(200)); find_group.Add(replace_).Fixed(DPI(150)); find_group.Add(find_prev_).Fixed(DPI(34)); find_group.Add(find_).Fixed(DPI(34)); find_group.Add(replace_current_).Fixed(DPI(70)); find_group.Add(replace_all_).Fixed(DPI(42)); find_group.Add(find_ignore_case_).Fixed(DPI(40)); find_group.Add(find_whole_word_).Fixed(DPI(34));
         view_group.Add(view_gutter_side_).Fixed(DPI(34)); view_group.Add(view_line_numbers_).Fixed(DPI(40)); view_group.Add(view_meta_markers_).Fixed(DPI(34));
         checks_group.Add(insp_tx_check_).Fixed(DPI(34)); checks_group.Add(insp_map_check_).Fixed(DPI(34)); checks_group.Add(insp_accept_check_).Fixed(DPI(48));
 
@@ -395,6 +406,7 @@ public:
         table_decor_.WhenAction = [=] { doc_.ExecuteCommand("table.decor.toggle"); doc_.SetFocus(); };
         table_del_.WhenAction = [=] { doc_.ExecuteCommand("table.delete"); doc_.SetFocus(); };
         hr_.WhenAction = [=] { doc_.ExecuteCommand("embed.hr.insert"); doc_.SetFocus(); };
+        page_break_.WhenAction = [=] { doc_.ExecuteCommand("embed.page_break.insert"); doc_.SetFocus(); };
         image_file_ins_.WhenAction = [=] {
             FileSel fs;
             fs.Type("Image files", "*.png *.jpg *.jpeg");
@@ -675,6 +687,7 @@ public:
 
             strict_checks_status_ = String().Cat() << "ACPT " << (fail == 0 ? "PASS" : "FAIL")
                                                     << " (pass=" << pass << " fail=" << fail << ")";
+            SeedDemoDocument();
             RefreshInspector();
             doc_.SetFocus();
         };
@@ -816,6 +829,32 @@ public:
             doc_.SetFocus();
         };
         search_.WhenAction = find_.WhenAction;
+        replace_current_.WhenAction = [=] {
+            String raw = TrimBoth(search_.GetText().ToString());
+            String q = NormalizeFindInput(raw);
+            if(q != doc_.GetSearchQuery())
+                doc_.SetSearchQuery(q);
+            ValueMap args;
+            args.Add("replacement", replace_.GetText().ToString());
+            bool ok = doc_.ExecuteCommand("search.replace.current", args);
+            find_status_ = ok ? "Replace: current match replaced" : "Replace: no current match";
+            RefreshInspector();
+            doc_.SetFocus();
+        };
+        replace_all_.WhenAction = [=] {
+            String raw = TrimBoth(search_.GetText().ToString());
+            String q = NormalizeFindInput(raw);
+            if(q != doc_.GetSearchQuery())
+                doc_.SetSearchQuery(q);
+            int before = doc_.GetSearchMatchCount();
+            ValueMap args;
+            args.Add("replacement", replace_.GetText().ToString());
+            bool ok = doc_.ExecuteCommand("search.replace.all", args);
+            find_status_ = ok ? Format("Replace: %d match(es) replaced", before) : "Replace: no matches";
+            RefreshInspector();
+            doc_.SetFocus();
+        };
+        replace_.WhenAction = replace_current_.WhenAction;
         find_ignore_case_.WhenAction = [=] {
             doc_.SetSearchIgnoreCase(find_ignore_case_.IsChecked());
             find_.WhenAction();
@@ -863,10 +902,23 @@ public:
             find_status_ = "Find '" + q + "': " + AsString(doc_.GetSearchMatchCount()) + " matches";
             RefreshInspector();
         };
+        doc_.WhenMetadataMarker = [=](const String& id, const String& type, int line) {
+            if(!id.IsEmpty())
+                find_status_ = Format("Marker %s: %s on line %d", type, id, line + 1);
+            else
+                find_status_ = Format("Marker %s on line %d", type, line + 1);
+            RefreshInspector();
+        };
 
         doc_.SetGutterSide(UiDoc::GUTTER_LEFT);
         doc_.ShowLineNumbers(false);
         doc_.ShowMetadataMarkers(true);
+        doc_.SetMarkerAnnotationColor(Color(32, 116, 226));
+        doc_.SetMarkerTableColor(Color(38, 150, 92));
+        doc_.SetMarkerCommentColor(Color(232, 132, 38));
+        doc_.SetMarkerAnnotationIcon(ICON_DESIGN_FULL_STACKED_BAR_CHART_48());
+        doc_.SetMarkerTableIcon(ICON_EDITOR_TABLE_48());
+        doc_.SetMarkerCommentIcon(ICON_DESIGN_COMMENT_48());
 
         SeedDemoDocument();
 
@@ -1033,14 +1085,34 @@ public:
         doc_.ExecuteCommand("list.bullet");
 
         body = doc_.GetText().ToString();
-        int table_pos = body.Find("Search for toolbar");
+        int table_pos = body.Find("Metrics table\n\n");
         if(table_pos >= 0) {
+            table_pos += String("Metrics table\n").GetCount();
             SelectRange(table_pos, table_pos);
             ValueArray size;
             size.Add(3);
-            size.Add(3);
+            size.Add(5);
             doc_.ExecuteCommand("insert.table", size);
         }
+
+        body = doc_.GetText().ToString();
+        auto AddDemoComment = [&](const String& target, const String& text) {
+            int p = body.Find(target);
+            if(p < 0)
+                return;
+            ValueMap payload;
+            payload.Add("title", "Demo comment");
+            payload.Add("created_by", "UiDocDemo");
+            payload.Add("text", text);
+            ValueMap add;
+            add.Add("from", p);
+            add.Add("to", p + target.GetCount());
+            add.Add("type", "note");
+            add.Add("payload", payload);
+            doc_.ExecuteCommand("annot.add", add);
+        };
+        AddDemoComment("UiDoc rich editor sample", "Small comment here.");
+        AddDemoComment("Search for toolbar", "Another comment here.");
 
         body = doc_.GetText().ToString();
         int end = body.GetCount();
@@ -1228,6 +1300,7 @@ private:
     UiButton   table_decor_;
     UiButton   table_del_;
     UiButton   hr_;
+    UiButton   page_break_;
     UiButton   image_file_ins_;
     UiButton   image_flow_demo_;
     UiButton   image_align_left_;
@@ -1239,8 +1312,11 @@ private:
 
     UiButton   note_;
     UiLineEdit search_;
+    UiLineEdit replace_;
     UiButton   find_prev_;
     UiButton   find_;
+    UiButton   replace_current_;
+    UiButton   replace_all_;
     UiButton   find_ignore_case_;
     UiButton   find_whole_word_;
     UiButton   view_gutter_side_;

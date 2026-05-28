@@ -131,6 +131,14 @@ public:
         }
     };
 
+    struct DropInfo : Moveable<DropInfo> {
+        UiTreeNodeRef parent;
+        UiTreeNodeRef hover;
+        int insert_pos = -1;
+        bool into = false;
+        bool valid = false;
+    };
+
     static const Style& StyleDefault();
 
     UiTree();
@@ -169,6 +177,8 @@ public:
                            UiIconRenderMode render_mode = UiIconRenderMode::MonoTint);
     UiTree& EnableDragDrop(bool on = true);
     bool IsDragDropEnabled() const { return dnd_enabled_; }
+    UiTree& EnableInternalMutation(bool on = true);
+    bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
     UiTree& ShowConnectorLines(bool on = true);
     UiTree& ShowMetadataMarker(bool on = true);
     UiTree& EnableRenameOnDblClick(bool on = true);
@@ -196,6 +206,9 @@ public:
     UiTreeNodeRef GetCursor() const { return UiTreeNodeRef{cursor_id_}; }
     UiTreeNodeRef GetHotNode() const { return UiTreeNodeRef{hot_id_}; }
     UiTreeNodeRef GetNodeAt(Point p) const;
+    DropInfo TrackDropTarget(Point p);
+    DropInfo GetDropInfo() const;
+    void ClearTrackedDropTarget();
 
     void ScrollTo(UiTreeNodeRef node);
     void ScrollToSelection();
@@ -225,6 +238,8 @@ public:
     Event<> WhenSelection;
     Event<> WhenAction;
     Event<UiTreeNodeRef, const String&> WhenRename;
+    Event<UiTreeMoveRequest&> WhenMoveRequest;
+    Event<UiTreeNodeRef, int> WhenColumnAction;
 
 private:
     struct VisibleRow : Moveable<VisibleRow> {
@@ -259,7 +274,9 @@ private:
     Vector<Rect> GetColumnRects(const Rect& row, const UiModelItem& item) const;
     Rect GetAccessoryRect(const Rect& row, int node_id, int index) const;
     Rect GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_icon, bool has_metadata, int node_id) const;
+    int HitTestColumn(const Rect& row, const UiModelItem& item, Point p) const;
     void PaintItemColumns(Draw& w, const Rect& row, const UiModelItem& item, bool enabled, bool selected) const;
+    void PaintDropTarget(Draw& w, const Rect& viewport) const;
     struct DropTarget {
         int parent_id = -1;
         int insert_pos = -1;
@@ -313,6 +330,7 @@ private:
     VectorMap<int, Vector<Ptr<Ctrl>>> node_ctrls_;
     bool root_visible_ = false;
     bool dnd_enabled_ = true;
+    bool internal_mutation_enabled_ = true;
     UiTreeSelectionMode selection_mode_ = UITREESEL_SINGLE;
     bool rename_on_dblclick_ = true;
 

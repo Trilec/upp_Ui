@@ -45,6 +45,7 @@ struct DesignerApiBinding : Moveable<DesignerApiBinding> {
 	String help;
 	String api_call;
 	String codegen_hint;
+	String group;
 	Value default_value;
 	Value min_value;
 	Value max_value;
@@ -528,11 +529,21 @@ public:
 	void SetOverlayState(const DesignerOverlayState& state) override;
 	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
 	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Layout() override;
 	void Paint(Draw& w) override;
 
 private:
+	class DebugOverlay : public Ctrl {
+	public:
+		DesignerGridLayoutAdapter *owner = nullptr;
+		void Paint(Draw& w) override;
+	};
+
+	void PaintTopOverlay(Draw& w) const;
+
 	DesignerNodeId node_id_ = Designer_NULL;
 	DesignerOverlayState overlay_;
+	DebugOverlay debug_overlay_;
 };
 
 // Designer wrapper for UiSplitter.

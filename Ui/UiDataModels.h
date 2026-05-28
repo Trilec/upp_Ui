@@ -137,6 +137,13 @@ struct UiModelChange {
     int c = -1;
 };
 
+struct UiReorderRequest {
+    int from = -1;
+    int before = -1;
+    bool accept = true;
+    bool handled = false;
+};
+
 class UiDataModelBase {
 public:
     Event<const UiModelChange&> WhenChange;
@@ -189,6 +196,14 @@ private:
 struct UiTreeNodeRef {
     int id = -1;
     bool IsValid() const { return id >= 0; }
+};
+
+struct UiTreeMoveRequest {
+    Vector<UiTreeNodeRef> nodes;
+    UiTreeNodeRef new_parent;
+    int insert_pos = -1;
+    bool accept = true;
+    bool handled = false;
 };
 
 class UiTreeModel : public UiDataModelBase {
@@ -327,6 +342,15 @@ struct UiTableCell : Moveable<UiTableCell> {
     bool   has_error = false;
 };
 
+struct UiTableEditRequest {
+    int row = -1;
+    int col = -1;
+    Value value;
+    UiTableCell cell;
+    bool accept = true;
+    bool handled = false;
+};
+
 class UiTableModel : public UiDataModelBase {
 public:
     UiTableModel();
@@ -392,6 +416,13 @@ struct UiMenuItem : Moveable<UiMenuItem> {
 struct UiMenuNodeRef {
     int id = -1;
     bool IsValid() const { return id >= 0; }
+};
+
+struct UiMenuActionRequest {
+    UiMenuNodeRef node;
+    UiMenuItem item;
+    bool accept = true;
+    bool handled = false;
 };
 
 class UiMenuModel : public UiDataModelBase {

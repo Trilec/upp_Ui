@@ -372,6 +372,12 @@ UiMenu& UiMenu::UseInternalModel()
     return SetModel(internal_model_);
 }
 
+UiMenu& UiMenu::EnableInternalMutation(bool on)
+{
+    internal_mutation_enabled_ = on;
+    return *this;
+}
+
 UiMenu& UiMenu::SetMenuBarMode(bool on)
 {
     if(menu_bar_mode_ == on)
@@ -655,11 +661,24 @@ void UiMenu::ActivateItem(UiMenuNodeRef node)
     UiMenuItem item = model_->Get(node);
     if(!IsSelectable(item, node) || HasSubMenu(node))
         return;
-    if(item.checkable && !item.radio) {
+
+    UiMenuActionRequest request;
+    request.node = node;
+    request.item = item;
+    if(WhenActionRequest)
+        WhenActionRequest(request);
+    if(!request.accept)
+        return;
+    if(request.handled) {
+        EndSession(true);
+        return;
+    }
+
+    if(internal_mutation_enabled_ && item.checkable && !item.radio) {
         item.checked = !item.checked;
         model_->Set(node, item);
     }
-    else if(item.radio && !item.checked) {
+    else if(internal_mutation_enabled_ && item.radio && !item.checked) {
         UiMenuNodeRef parent = model_->GetParent(node);
         for(int i = 0; i < model_->GetChildCount(parent); i++) {
             UiMenuNodeRef sibling = model_->GetChild(parent, i);

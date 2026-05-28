@@ -480,9 +480,9 @@ inline MinimalRoleColors MinimalRole(UiThemeMode mode, UiRole role)
         c.face = dark ? Color(32, 32, 32) : Color(247, 248, 250);
         c.face_hot = dark ? Color(44, 44, 44) : Color(239, 243, 247);
         c.face_pressed = dark ? Color(51, 51, 51) : Color(229, 235, 241);
-        c.frame = dark ? Color(48, 48, 48) : Color(226, 232, 240);
-        c.frame_hot = dark ? Color(64, 64, 64) : Color(215, 219, 226);
-        c.frame_pressed = dark ? Color(76, 76, 76) : Color(203, 213, 225);
+        c.frame = dark ? Color(64, 64, 64) : Color(203, 213, 225);
+        c.frame_hot = dark ? Color(82, 82, 82) : Color(180, 190, 204);
+        c.frame_pressed = dark ? Color(96, 96, 96) : Color(148, 163, 184);
         c.ink = dark ? Color(183, 197, 218) : Color(75, 85, 99);
         c.ink_hot = dark ? Color(224, 224, 224) : Color(17, 24, 39);
         c.accent = c.frame;
@@ -1827,6 +1827,39 @@ inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole
         return;
     }
 }
+
+inline void TunePillButtonRole(UiButton::Style& s, UiThemeMode mode, UiButtonRole role)
+{
+    bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
+    if(role == UiButtonRole::Subtle) {
+        Color frame = dark ? Color(118, 124, 134) : Color(150, 157, 170);
+        Color frame_hot = dark ? Color(146, 153, 164) : Color(116, 124, 138);
+        Color ink = dark ? Color(226, 232, 240) : Color(55, 65, 81);
+        s.metrics.face_enabled = false;
+        s.metrics.frame_enabled = true;
+        s.metrics.frame_width = DPI(1);
+        SetFace(s.palette, Null, Null, Null, Null);
+        SetFrame(s.palette, frame, frame_hot, frame_hot, Blend(frame, SColorFace(), 80));
+        SetInk(s.palette, ink, ink, ink, Blend(ink, SColorFace(), 70));
+        SetIcon(s.palette, ink, ink, ink, Blend(ink, SColorFace(), 70));
+        return;
+    }
+    if(role == UiButtonRole::Standard) {
+        Color face = dark ? Color(58, 63, 72) : Color(232, 235, 240);
+        Color face_hot = dark ? Color(70, 76, 86) : Color(221, 225, 232);
+        Color face_pressed = dark ? Color(48, 53, 61) : Color(210, 215, 223);
+        Color frame = dark ? Color(96, 103, 114) : Color(166, 174, 188);
+        Color ink = dark ? Color(240, 244, 248) : Color(37, 47, 63);
+        s.metrics.face_enabled = true;
+        s.metrics.frame_enabled = true;
+        s.metrics.frame_width = DPI(1);
+        SetFace(s.palette, face, face_hot, face_pressed, Blend(face, SColorFace(), 80));
+        SetFrame(s.palette, frame, Blend(frame, White(), dark ? 18 : 0), Blend(frame, Black(), dark ? 0 : 16), Blend(frame, SColorFace(), 80));
+        SetInk(s.palette, ink, ink, ink, Blend(ink, SColorFace(), 70));
+        SetIcon(s.palette, ink, ink, ink, Blend(ink, SColorFace(), 70));
+    }
+}
+
 inline void TuneMinimalEdit(UiBaseEdit::Style& s, UiThemeMode mode, UiRole role = UiRole::Standard)
 {
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
@@ -2388,8 +2421,10 @@ public:
         s = UiThemeDetail::ApplyButtonRole(s, role);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalButton(s, normalized.mode, role);
-            if(UiThemeDetail::IsPillPreset(normalized.preset))
+            if(UiThemeDetail::IsPillPreset(normalized.preset)) {
+                UiThemeDetail::TunePillButtonRole(s, normalized.mode, role);
                 UiThemeDetail::ApplyPillGeometry(s);
+            }
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);

@@ -234,6 +234,7 @@ private:
     int hot_drag_ = -1;
     int pressed_drag_ = -1;
     bool drag_reorder_enabled_ = false;
+    bool internal_mutation_enabled_ = true;
     int  drag_threshold_px_ = DPI(10);
     bool drag_candidate_ = false;
     bool dragging_ = false;
@@ -371,9 +372,11 @@ public:
     UiDropdown& SetPopupAutoClose(bool on = true);
     UiDropdown& SetPopupPinned(bool on = false); // Keep open after selection
 
-    // Drag reorder is popup-owned and updates the bound UiListModel directly.
+    // Drag reorder is popup-owned interaction with request-first mutation.
     UiDropdown& EnableDragReorder(bool on = true);
     bool        IsDragReorderEnabled() const { return drag_reorder_enabled_; }
+    UiDropdown& EnableInternalMutation(bool on = true);
+    bool        IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
     UiDropdown& ShowDragHandle(bool on = true);
     UiDropdown& SetDragSide(UiAlign side);
     UiDropdown& SetDragGlyph(const Image& glyph);
@@ -457,6 +460,7 @@ public:
     Event<int, bool>      WhenItemState;   // index, enabled
     Event<int, bool>      WhenItemCheck;   // index, checked
     Event<int>            WhenCheckedCount;
+    Event<UiReorderRequest&> WhenReorderRequest;
     Event<int, int>       WhenReordered;   // from, before
     
     // ------------------------------------------------------------------------

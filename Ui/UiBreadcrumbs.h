@@ -48,7 +48,7 @@ public:
         int item_gap = DPI(6);
         int divider_gap = DPI(8);
         int content_gap = DPI(5);
-        int min_height = DPI(32);
+        int min_height = 0;
         bool current_bold = true;
         bool current_underline_enabled = false;
         int current_underline_width = DPI(2);

@@ -284,6 +284,48 @@ public:
         GUTTER_RIGHT
     };
 
+    enum AnnotationMarkerShape : byte {
+        MARKER_CIRCLE,
+        MARKER_SQUARE,
+        MARKER_TRIANGLE
+    };
+
+    enum AnnotationLaneSide : byte {
+        LANE_AUTO,
+        LANE_LEFT,
+        LANE_RIGHT,
+        LANE_BOTH
+    };
+
+    struct AnnotationLane : Moveable<AnnotationLane> {
+        AnnotationLane() {}
+        AnnotationLane(const AnnotationLane& x) { CopyFrom(x); }
+        AnnotationLane& operator=(const AnnotationLane& x) { CopyFrom(x); return *this; }
+
+        String id;
+        String label;
+        Vector<String> annotation_types;
+        Color color = SColorHighlight();
+        Image icon;
+        AnnotationMarkerShape shape = MARKER_SQUARE;
+        AnnotationLaneSide side = LANE_AUTO;
+        bool visible = true;
+        bool table_lane = false;
+
+    private:
+        void CopyFrom(const AnnotationLane& x) {
+            id = x.id;
+            label = x.label;
+            annotation_types <<= x.annotation_types;
+            color = x.color;
+            icon = x.icon;
+            shape = x.shape;
+            side = x.side;
+            visible = x.visible;
+            table_lane = x.table_lane;
+        }
+    };
+
     struct Style : ChStyle<Style> {
         StyledPalette palette;
         StyledMetrics metrics;
@@ -303,7 +345,10 @@ public:
         Color annotation_fill = Color(255, 230, 180);
         Color marker_annotation = SColorHighlight();
         Color marker_table      = SColorHighlight();
-        Color marker_comment    = SColorDisabled();
+        Color marker_comment    = Color(232, 132, 38);
+        Image marker_annotation_icon;
+        Image marker_table_icon;
+        Image marker_comment_icon;
     };
 
 private:
@@ -386,6 +431,7 @@ private:
     int next_table_id_ = 1;
 
     Vector<UiDocAnnotation> annotations_;
+    Vector<AnnotationLane> annotation_lanes_;
     Vector<UiDocResource> resources_;
     Vector<UiDocEmbedBlock> embeds_;
     VectorMap<String, int>  anchors_;
@@ -556,7 +602,13 @@ private:
     bool GetImageDisplaySize(const UiDocEmbedBlock& e, int avail_w, int& out_w, int& out_h) const;
     bool HitTestBlockImage(Point p, String& embed_id) const;
     bool HitTestInlineImage(Point p, String& embed_id) const;
+    bool HitTestMetadataMarker(Point p, String& annotation_id, String& marker_type, int& line) const;
     int  GetGutterLaneWidth() const;
+    int  GetGutterLaneWidth(GutterSide side) const;
+    bool IsLaneOnSide(const AnnotationLane& lane, GutterSide side) const;
+    int  FindAnnotationLane(const String& id) const;
+    bool LaneMatchesAnnotation(const AnnotationLane& lane, const UiDocAnnotation& a) const;
+    void ResetDefaultAnnotationLanes();
     void CopyTableModel(const TableModel& src, TableModel& dst) const;
     bool MoveTableCell(bool reverse);
     bool ReplaceInActiveTableCell(UiDocRange range, const WString& txt);
@@ -661,12 +713,25 @@ public:
     bool IsLineNumbersShown() const { return show_line_numbers_; }
     void ShowMetadataMarkers(bool b) { show_metadata_markers_ = b; InvalidateLayoutCache(); RefreshLayout(); Refresh(); }
     bool IsMetadataMarkersShown() const { return show_metadata_markers_; }
-    void SetMarkerAnnotationColor(Color c) { style_.marker_annotation = c; Refresh(); }
+    UiDoc& ClearAnnotationLanes();
+    UiDoc& AddAnnotationLane(const AnnotationLane& lane);
+    UiDoc& SetAnnotationLaneVisible(const String& id, bool visible);
+    UiDoc& SetAnnotationLaneColor(const String& id, Color color);
+    UiDoc& SetAnnotationLaneIcon(const String& id, const Image& icon);
+    Vector<AnnotationLane> GetAnnotationLanes() const { return clone(annotation_lanes_); }
+
+    void SetMarkerAnnotationColor(Color c) { style_.marker_annotation = c; SetAnnotationLaneColor("metadata", c); }
     Color GetMarkerAnnotationColor() const { return style_.marker_annotation; }
-    void SetMarkerTableColor(Color c) { style_.marker_table = c; Refresh(); }
+    void SetMarkerTableColor(Color c) { style_.marker_table = c; SetAnnotationLaneColor("table", c); }
     Color GetMarkerTableColor() const { return style_.marker_table; }
-    void SetMarkerCommentColor(Color c) { style_.marker_comment = c; Refresh(); }
+    void SetMarkerCommentColor(Color c) { style_.marker_comment = c; SetAnnotationLaneColor("comments", c); }
     Color GetMarkerCommentColor() const { return style_.marker_comment; }
+    void SetMarkerAnnotationIcon(const Image& img) { style_.marker_annotation_icon = img; SetAnnotationLaneIcon("metadata", img); }
+    void SetMarkerTableIcon(const Image& img) { style_.marker_table_icon = img; SetAnnotationLaneIcon("table", img); }
+    void SetMarkerCommentIcon(const Image& img) { style_.marker_comment_icon = img; SetAnnotationLaneIcon("comments", img); }
+    Image GetMarkerAnnotationIcon() const { return style_.marker_annotation_icon; }
+    Image GetMarkerTableIcon() const { return style_.marker_table_icon; }
+    Image GetMarkerCommentIcon() const { return style_.marker_comment_icon; }
 
     void SetSearchQuery(const String& q);
     String GetSearchQuery() const { return search_query_; }
@@ -679,6 +744,8 @@ public:
     int GetSearchMatchIndex() const { return search_match_index_; }
     bool FindNext();
     bool FindPrev();
+    bool ReplaceCurrentSearch(const WString& replacement);
+    int  ReplaceAllSearch(const WString& replacement);
 
     String AddAnnotation(const UiDocRange& r, const String& type, const ValueMap& payload);
     bool RemoveAnnotation(const String& id);
@@ -703,6 +770,7 @@ public:
                        const String& embed_type,
                        const ValueMap& payload = ValueMap(),
                        const ValueMap& layout_hints = ValueMap());
+    String InsertPageBreak(int pos = -1);
     bool DeleteEmbed(const String& embed_id);
     bool UpdateEmbedPayload(const String& embed_id, const ValueMap& payload_delta);
     bool UpdateEmbedLayout(const String& embed_id, const ValueMap& layout_delta);
@@ -739,6 +807,7 @@ public:
     Event<> WhenSelection;
     Event<const String&> WhenSearch;
     Event<const UiDocPositionMap&> WhenMapped;
+    Event<const String&, const String&, int> WhenMetadataMarker;
 
     void Layout() override;
     void Paint(Draw& w) override;

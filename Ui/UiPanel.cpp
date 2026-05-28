@@ -3,6 +3,15 @@
 
 namespace Upp {
 
+static Size UiPanelOuterSizeFromChildExtent(Size content, const StyledMetrics& m, const StyledSkin& skin)
+{
+    Rect ci = UiNonNegativeThickness(skin.content_inset);
+    Rect sh = UiStyledShadowMargins(m);
+    int fw = UiResolvedFrameWidth(m, skin);
+    return Size(max(0, content.cx) + ci.left + ci.right + sh.left + sh.right + 2 * fw,
+                max(0, content.cy) + ci.top + ci.bottom + sh.top + sh.bottom + 2 * fw);
+}
+
 const UiPanel::Style& UiPanel::StyleDefault()
 {
     static Style s;
@@ -124,8 +133,21 @@ void UiPanel::OnStyleChanged()
 Size UiPanel::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    Size base_content(DPI(40), DPI(40));
-    Size natural_outer = UiStyledOuterSizeFromContent(base_content, style.metrics, style.skin);
+    bool any_child = false;
+    Size child_content(0, 0);
+    for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
+        if(!q->IsShown())
+            continue;
+        Size sz = q->GetMinSize();
+        Rect r = q->GetRect();
+        int right = r.IsEmpty() ? sz.cx : max(0, r.left) + sz.cx;
+        int bottom = r.IsEmpty() ? sz.cy : max(0, r.top) + sz.cy;
+        child_content.cx = max(child_content.cx, max(0, right));
+        child_content.cy = max(child_content.cy, max(0, bottom));
+        any_child = true;
+    }
+    Size natural_outer = any_child ? UiPanelOuterSizeFromChildExtent(child_content, style.metrics, style.skin)
+                                   : Size(0, 0);
 
     int w = natural_outer.cx;
     int h = natural_outer.cy;
@@ -160,9 +182,12 @@ Size UiPanel::GetContentSize() const
 
     Size content = any ? Size(max(0, bounds.right), max(0, bounds.bottom)) : Size(0, 0);
     const Style& style = GetEffectiveStyle();
-    Size natural = UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
-    Size minsz = GetMinSize();
-    return Size(max(natural.cx, minsz.cx), max(natural.cy, minsz.cy));
+    Size natural = any ? UiPanelOuterSizeFromChildExtent(content, style.metrics, style.skin) : Size(0, 0);
+    if(user_min_size_.cx > 0)
+        natural.cx = max(natural.cx, user_min_size_.cx);
+    if(user_min_size_.cy > 0)
+        natural.cy = max(natural.cy, user_min_size_.cy);
+    return natural;
 }
 
 UiPanel& UiPanel::SetSizeMin(Size sz)

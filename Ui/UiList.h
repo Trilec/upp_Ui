@@ -168,9 +168,11 @@ public:
     UiList& EnableRenameOnDblClick(bool on = true);
     bool IsRenameOnDblClick() const { return rename_on_dblclick_; }
 
-    // Drag reorder is control-owned and uses a visible drag handle lane.
+    // Drag reorder is interaction-owned by the control. Mutation is request-first.
     UiList& EnableDragReorder(bool on = true);
     bool IsDragReorderEnabled() const { return drag_reorder_enabled_; }
+    UiList& EnableInternalMutation(bool on = true);
+    bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
     UiList& ShowDragHandle(bool on = true);
     UiList& SetDragSide(UiAlign side);
     UiList& SetDragGlyph(const Image& glyph);
@@ -201,6 +203,7 @@ public:
     Event<> WhenSelection;
     Event<> WhenAction;
     Event<int, const String&> WhenRename;
+    Event<UiReorderRequest&> WhenReorderRequest;
     Event<int, int> WhenReordered;
 
 private:
@@ -272,6 +275,7 @@ private:
     int scroll_y_ = 0;
 
     bool drag_reorder_enabled_ = false;
+    bool internal_mutation_enabled_ = true;
     int  drag_threshold_px_ = DPI(10);
     bool drag_candidate_ = false;
     bool dragging_ = false;

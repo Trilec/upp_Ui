@@ -13,6 +13,11 @@ static Value CodeGenNodeProperty(const DesignerNode& n, const String& key, const
 	return q >= 0 ? n.properties.GetValue(q) : def;
 }
 
+static bool CodeGenHasProperty(const DesignerNode& n, const String& key)
+{
+	return n.properties.Find(key) >= 0;
+}
+
 static String CppString(const String& s)
 {
 	String out = "\"";
@@ -153,32 +158,156 @@ static String RoleExpr(const String& role)
 	return "UiRole::Standard";
 }
 
-static void EmitRoleStyle(String& out, const String& var, const DesignerNode& n)
+static String ColorExpr(Color c);
+
+static int CodeGenBreadcrumbCount(const DesignerNode& n)
+{
+	return max(1, min(24, (int)CodeGenNodeProperty(n, "crumb_count", 3)));
+}
+
+static String CodeGenBreadcrumbCrumbKey(int i)
+{
+	return Format("crumb_%d", i + 1);
+}
+
+static String CodeGenBreadcrumbCrumbText(const DesignerNode& n, int i)
+{
+	String key = CodeGenBreadcrumbCrumbKey(i);
+	if(CodeGenHasProperty(n, key))
+		return CodeGenNodeProperty(n, key, Format("Crumb %d", i + 1));
+	if(i == 0)
+		return CodeGenNodeProperty(n, "crumb_a", "Home");
+	if(i == 1)
+		return CodeGenNodeProperty(n, "crumb_b", "Library");
+	if(i == 2)
+		return CodeGenNodeProperty(n, "crumb_c", "Current");
+	return Format("Crumb %d", i + 1);
+}
+
+static String StyleTypeExpr(const DesignerNode& n)
+{
+	if(n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic")
+		return "UiPanel::Style";
+	if(n.type_id == "UiScrollPanel")
+		return "UiScrollPanel::Style";
+	if(n.type_id == "UiGroupPanel")
+		return "UiGroupPanel::Style";
+	if(n.type_id == "UiLabel")
+		return "UiLabel::Style";
+	if(n.type_id == "UiTitleCard")
+		return "UiTitleCard::Style";
+	if(n.type_id == "UiButton")
+		return "UiButton::Style";
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+		return "UiBaseEdit::Style";
+	if(n.type_id == "UiDropdown")
+		return "UiDropdown::Style";
+	if(n.type_id == "UiBreadcrumbs")
+		return "UiBreadcrumbs::Style";
+	return String();
+}
+
+static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
+{
+	if(n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic")
+		return "UiTheme::ResolvePanel(" + role_expr + ")";
+	if(n.type_id == "UiScrollPanel")
+		return "UiScrollPanel::StyleDefault()";
+	if(n.type_id == "UiGroupPanel")
+		return "UiTheme::ResolveGroupPanel(" + role_expr + ")";
+	if(n.type_id == "UiLabel")
+		return "UiTheme::ResolveLabel(" + role_expr + ")";
+	if(n.type_id == "UiTitleCard")
+		return "UiTheme::ResolveTitleCard(" + role_expr + ")";
+	if(n.type_id == "UiButton")
+		return "UiTheme::ResolveButton(" + role_expr + ")";
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+		return "UiTheme::ResolveEdit(" + role_expr + ")";
+	if(n.type_id == "UiDropdown")
+		return "UiTheme::ResolveDropdown(" + role_expr + ")";
+	if(n.type_id == "UiBreadcrumbs")
+		return "UiBreadcrumbs::StyleDefault()";
+	return String();
+}
+
+static String ShadowCurveExpr(const String& curve)
+{
+	if(curve == "Linear")
+		return "ShadowLinear()";
+	if(curve == "Tight")
+		return "ShadowTight()";
+	if(curve == "Hard")
+		return "ShadowHardCurve()";
+	return "ShadowSoft()";
+}
+
+static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n, bool emit_designer_appearance)
 {
 	String role = CodeGenNodeProperty(n, "role", "Standard");
-	if(role == "Standard")
+	String role_expr = RoleExpr(role);
+	String style_type = StyleTypeExpr(n);
+	String resolve_expr = ResolveStyleExpr(n, role_expr);
+	if(style_type.IsEmpty() || resolve_expr.IsEmpty())
 		return;
-	String expr = RoleExpr(role);
-	if(n.type_id == "UiPanel")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolvePanel(" << expr << "));\n";
-	else if(n.type_id == "UiGroupPanel")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveGroupPanel(" << expr << "));\n";
-	else if(n.type_id == "UiLabel")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveLabel(" << expr << "));\n";
-	else if(n.type_id == "UiTitleCard")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveTitleCard(" << expr << "));\n";
-	else if(n.type_id == "UiButton")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveButton(" << expr << "));\n";
-	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveEdit(" << expr << "));\n";
-	else if(n.type_id == "UiToggle")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveToggle(" << expr << "));\n";
-	else if(n.type_id == "UiDropdown")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveDropdown(" << expr << "));\n";
-	else if(n.type_id == "UiCheckBox")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveCheckBox(" << expr << "));\n";
-	else if(n.type_id == "UiTab")
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolveTab(" << expr << "));\n";
+	bool override = emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+	if(!override) {
+		if(role != "Standard" && n.type_id != "UiScrollPanel")
+			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
+		return;
+	}
+
+	out << "\t\t{\n"
+	    << "\t\t\t" << style_type << " s = " << resolve_expr << ";\n";
+	if(CodeGenHasProperty(n, "face_enabled")) {
+		bool face_enabled = (bool)CodeGenNodeProperty(n, "face_enabled", false);
+		out << "\t\t\ts.metrics.face_enabled = " << (face_enabled ? "true" : "false") << ";\n";
+		if(face_enabled) {
+			Color face = CodeGenNodeProperty(n, "face", SColorFace());
+			if(CodeGenNodeProperty(n, "face_mode", "Solid") == "Quad") {
+				out << "\t\t\tUiFill face_fill = UiFill::ImageFill(MakeQuadGradientTile(48, "
+				    << ColorExpr(CodeGenNodeProperty(n, "face_tl", face)) << ", "
+				    << ColorExpr(CodeGenNodeProperty(n, "face_tr", face)) << ", "
+				    << ColorExpr(CodeGenNodeProperty(n, "face_bl", face)) << ", "
+				    << ColorExpr(CodeGenNodeProperty(n, "face_br", face)) << ", 0));\n"
+				    << "\t\t\tfor(int i = 0; i < 4; i++)\n"
+				    << "\t\t\t\ts.palette.face[i] = face_fill;\n";
+			}
+			else {
+				out << "\t\t\tColor face = " << ColorExpr(face) << ";\n"
+				    << "\t\t\ts.palette.face[ST_NORMAL] = UiFill::Solid(face);\n"
+				    << "\t\t\ts.palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));\n"
+				    << "\t\t\ts.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));\n"
+				    << "\t\t\ts.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));\n";
+			}
+		}
+	}
+	if(CodeGenHasProperty(n, "frame_enabled")) {
+		bool frame_enabled = (bool)CodeGenNodeProperty(n, "frame_enabled", false);
+		out << "\t\t\ts.metrics.frame_enabled = " << (frame_enabled ? "true" : "false") << ";\n";
+		if(frame_enabled) {
+			Color frame = CodeGenNodeProperty(n, "frame", SColorShadow());
+			out << "\t\t\tfor(int i = 0; i < 4; i++)\n"
+			    << "\t\t\t\ts.palette.frame[i] = " << ColorExpr(frame) << ";\n"
+			    << "\t\t\ts.metrics.frame_width = max(DPI(1), s.metrics.frame_width);\n";
+		}
+	}
+	if(CodeGenHasProperty(n, "radius"))
+		out << "\t\t\ts.metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "radius", 0)) << ");\n";
+	if(CodeGenHasProperty(n, "shadow_enabled")) {
+		bool shadow = (bool)CodeGenNodeProperty(n, "shadow_enabled", false);
+		out << "\t\t\ts.metrics.shadow.enabled = " << (shadow ? "true" : "false") << ";\n";
+		if(shadow) {
+			out << "\t\t\ts.metrics.shadow.distance = DPI(" << max(0, (int)CodeGenNodeProperty(n, "shadow_distance", 6)) << ");\n"
+			    << "\t\t\ts.metrics.shadow.offset_x = DPI(" << (int)CodeGenNodeProperty(n, "shadow_offset_x", 0) << ");\n"
+			    << "\t\t\ts.metrics.shadow.offset_y = DPI(" << (int)CodeGenNodeProperty(n, "shadow_offset_y", 0) << ");\n"
+			    << "\t\t\ts.metrics.shadow.alpha = " << minmax((int)CodeGenNodeProperty(n, "shadow_alpha", 90), 0, 255) << ";\n"
+			    << "\t\t\ts.metrics.shadow.color = " << ColorExpr(CodeGenNodeProperty(n, "shadow_color", Black())) << ";\n"
+			    << "\t\t\ts.metrics.shadow.mode = SHADOW_CURVE;\n"
+			    << "\t\t\ts.metrics.shadow.curve = " << ShadowCurveExpr(CodeGenNodeProperty(n, "shadow_curve", "Soft")) << ";\n";
+		}
+	}
+	out << "\t\t\t" << var << ".SetCustomStyle(s);\n"
+	    << "\t\t}\n";
 }
 
 static String FontExpr(const String& family, int size)
@@ -336,14 +465,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	String var = VarName(names, n.id);
 	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "Spacer")
 		return;
-	EmitRoleStyle(out, var, n);
-	if(emit_designer_appearance && n.type_id != "Window" && n.type_id != "PaneSlot" && !(bool)CodeGenNodeProperty(n, "pane_slot", false)) {
-		Color face = CodeGenNodeProperty(n, "face", Null);
-		Color frame = CodeGenNodeProperty(n, "frame", Null);
-		int radius = max(0, (int)CodeGenNodeProperty(n, "radius", 0));
-		out << "\t\t// Designer appearance for " << n.name << ": face=" << ColorExpr(face)
-		    << ", frame=" << ColorExpr(frame) << ", radius=" << radius << "\n";
-	}
+	EmitThemeStyle(out, var, n, emit_designer_appearance);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
 		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"
@@ -503,10 +625,12 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		                                       state == "Unchecked" ? "UICHECK_UNCHECKED" : "UICHECK_CHECKED") << ");\n";
 	}
 	else if(n.type_id == "UiBreadcrumbs") {
-		out << "\t\t" << var << ".AddCrumb(" << CppString(CodeGenNodeProperty(n, "crumb_a", "Home")) << ", \"a\")"
-		    << ".AddCrumb(" << CppString(CodeGenNodeProperty(n, "crumb_b", "Library")) << ", \"b\")"
-		    << ".AddCrumb(" << CppString(CodeGenNodeProperty(n, "crumb_c", "Current")) << ", \"c\")"
-		    << ".SetCurrentIndex(" << (int)CodeGenNodeProperty(n, "current", 2) << ");\n";
+		int count = CodeGenBreadcrumbCount(n);
+		for(int i = 0; i < count; i++)
+			out << "\t\t" << var << ".AddCrumb(" << CppString(CodeGenBreadcrumbCrumbText(n, i)) << ", "
+			    << CppString(AsString(i)) << ");\n";
+		out << "\t\t" << var << ".SetCurrentIndex("
+		    << clamp((int)CodeGenNodeProperty(n, "current", min(2, count - 1)), 0, count - 1) << ");\n";
 		out << "\t\t" << var << ".SetTrimOnSelect(" << ((bool)CodeGenNodeProperty(n, "trim", false) ? "true" : "false")
 		    << ").SetDivider(" << CppString(CodeGenNodeProperty(n, "divider", "/")) << ");\n";
 		String divider_icon = IconExpr(CodeGenNodeProperty(n, "divider_icon", "None"));
@@ -552,7 +676,11 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << "\t\t" << var << ".SetScrollMode(" << expr << ");\n";
 	}
 	else if(n.type_id == "UiPanel") {
-		// Theme role is emitted before type-specific setup.
+		out << "\t\t" << var << ".SetSizeMin(DPI("
+		    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP))
+		    << "), DPI("
+		    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP))
+		    << "));\n";
 	}
 	else {
 		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));\n";

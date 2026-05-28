@@ -188,6 +188,12 @@ UiTable& UiTable::UseInternalModel()
     return SetModel(internal_model_);
 }
 
+UiTable& UiTable::EnableInternalMutation(bool on)
+{
+    internal_mutation_enabled_ = on;
+    return *this;
+}
+
 UiTable& UiTable::ShowRowHeaders(bool on)
 {
     Style& s = StyleEdit();
@@ -781,7 +787,22 @@ void UiTable::CommitEdit()
     cell.value = v;
     cell.edit_value = v;
     cell.display.Clear();
-    model_->SetCell(active_cell_.row, active_cell_.col, cell);
+
+    UiTableEditRequest request;
+    request.row = active_cell_.row;
+    request.col = active_cell_.col;
+    request.value = v;
+    request.cell = cell;
+    if(WhenEditRequest)
+        WhenEditRequest(request);
+    if(!request.accept)
+        return;
+    if(!request.handled) {
+        if(!internal_mutation_enabled_)
+            return;
+        model_->SetCell(active_cell_.row, active_cell_.col, cell);
+    }
+
     if(WhenAcceptEdit)
         WhenAcceptEdit(active_cell_.row, active_cell_.col, v);
     editing_ = false;

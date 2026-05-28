@@ -88,6 +88,7 @@ public:
         AddStateRow(StateBox(), state_dataset_row_, state_dataset_label_, state_dataset_value_, "Dataset");
         AddStateRow(StateBox(), state_items_row_, state_items_label_, state_items_value_, "Items");
         AddStateRow(StateBox(), state_action_row_, state_action_label_, state_action_value_, "Last Action");
+        AddStateRow(StateBox(), state_request_row_, state_request_label_, state_request_value_, "Action Request");
 
         AddDropdownRow(PropsBox(), dataset_row_box_, dataset_label_, dataset_drop_, "Dataset");
         AddSliderRow(PropsBox(), row_height_row_, "Row Height", "28px");
@@ -160,6 +161,8 @@ public:
         WireColor(hot_bg_row_, cfg_.hot_bg); WireColor(hot_frame_row_, cfg_.hot_frame); WireColor(pressed_bg_row_, cfg_.pressed_bg); WireColor(pressed_frame_row_, cfg_.pressed_frame);
         WireColor(active_bar_bg_row_, cfg_.active_bar_bg); WireColor(check_color_row_, cfg_.check_color); WireColor(arrow_color_row_, cfg_.arrow_color); WireColor(shadow_color_row_, cfg_.shadow_color);
 
+        menu_bar_.WhenActionRequest = [=](UiMenuActionRequest& request) { last_request_ = request.item.text; SyncState(); };
+        popup_menu_.WhenActionRequest = [=](UiMenuActionRequest& request) { last_request_ = request.item.text; SyncState(); };
         menu_bar_.WhenAction = [=](UiMenuNodeRef, const UiMenuItem& item) { last_action_ = item.text; SyncState(); };
         popup_menu_.WhenAction = [=](UiMenuNodeRef, const UiMenuItem& item) { last_action_ = item.text; SyncState(); };
 
@@ -177,6 +180,7 @@ protected:
         state_dataset_label_.SetCustomStyle(body); state_dataset_value_.SetCustomStyle(value);
         state_items_label_.SetCustomStyle(body); state_items_value_.SetCustomStyle(value);
         state_action_label_.SetCustomStyle(body); state_action_value_.SetCustomStyle(value);
+        state_request_label_.SetCustomStyle(body); state_request_value_.SetCustomStyle(value);
         dataset_label_.SetCustomStyle(body); dataset_drop_.SetCustomStyle(dd);
         ApplySliderStyle(body, value); ApplyToggleStyle(body); ApplyColorStyle(body);
         open_popup_button_.SetCustomStyle(MakeSmallButtonStyle(Palette()));
@@ -306,6 +310,7 @@ private:
         state_dataset_value_.SetText(MenuDatasetName(cfg_.dataset));
         state_items_value_.SetText(AsString(popup_model_.GetChildCount(popup_model_.Root())) + " popup / " + AsString(bar_model_.GetChildCount(bar_model_.Root())) + " top");
         state_action_value_.SetText(last_action_.IsEmpty() ? "None" : last_action_);
+        state_request_value_.SetText(last_request_.IsEmpty() ? "None" : last_request_);
     }
 
     void SyncCode()
@@ -351,6 +356,9 @@ private:
         for(int i = 0; i < bar_model_.GetChildCount(bar_model_.Root()); i++)
             AppendCodeNode(code, bar_model_, bar_model_.GetChild(bar_model_.Root(), i), "root", next_id);
         code << "\nUiMenu menu;\n";
+        code << "menu.WhenActionRequest = [&](UiMenuActionRequest& request) {\n";
+        code << "    // Validate, reject, handle through commands, or leave unhandled for local check/radio mutation.\n";
+        code << "};\n";
         code << "menu.SetCustomStyle(style).SetMenuBarMode(true).SetModel(model);\n";
         code << "\nUiMenuModel popup_model;\n";
         code << "UiMenuNodeRef popup_root = popup_model.Root();\n";
@@ -395,12 +403,13 @@ private:
 
     MenuConfig cfg_;
     String last_action_;
+    String last_request_;
     UiMenu menu_bar_, popup_menu_;
     UiMenuModel bar_model_, popup_model_;
     UiButton open_popup_button_;
 
-    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_dataset_row_ { UiBoxLayout::Direction::H }, state_items_row_ { UiBoxLayout::Direction::H }, state_action_row_ { UiBoxLayout::Direction::H };
-    UiLabel state_theme_label_, state_theme_value_, state_dataset_label_, state_dataset_value_, state_items_label_, state_items_value_, state_action_label_, state_action_value_;
+    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_dataset_row_ { UiBoxLayout::Direction::H }, state_items_row_ { UiBoxLayout::Direction::H }, state_action_row_ { UiBoxLayout::Direction::H }, state_request_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_theme_value_, state_dataset_label_, state_dataset_value_, state_items_label_, state_items_value_, state_action_label_, state_action_value_, state_request_label_, state_request_value_;
     UiBoxLayout dataset_row_box_ { UiBoxLayout::Direction::H };
     UiLabel dataset_label_; UiDropdown dataset_drop_;
     UiCompositeSlider row_height_row_, bar_height_row_, icon_size_row_, check_size_row_, arrow_size_row_, left_padding_row_, right_padding_row_, content_gap_row_, item_spacing_row_, right_gap_row_, popup_padding_row_, popup_min_width_row_, popup_max_height_row_, submenu_overlap_row_;

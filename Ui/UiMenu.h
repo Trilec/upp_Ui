@@ -121,6 +121,8 @@ public:
 
     UiMenu& SetModel(UiMenuModel& model);
     UiMenu& UseInternalModel();
+    UiMenu& EnableInternalMutation(bool on = true);
+    bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
     UiMenuModel& GetInternalModel() { return internal_model_; }
     UiMenuModel& GetModel() { return *model_; }
     const UiMenuModel& GetModel() const { return *model_; }
@@ -143,6 +145,7 @@ public:
     virtual void LostFocus() override;
 
     Event<UiMenuNodeRef, const UiMenuItem&> WhenAction;
+    Event<UiMenuActionRequest&> WhenActionRequest;
     Event<> WhenOpen;
     Event<> WhenClose;
     Event<UiMenuNodeRef> WhenSubMenuOpen;
@@ -242,6 +245,7 @@ private:
     bool session_open_ = false;
     bool session_verifying_ = false;
     bool session_switching_ = false;
+    bool internal_mutation_enabled_ = true;
     bool suppress_top_hover_until_mouse_moves_ = false;
     Point suppressed_hover_mouse_pos_ = Point(-99999, -99999);
     int hot_top_index_ = -1;

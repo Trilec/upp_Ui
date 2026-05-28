@@ -7,6 +7,74 @@
 
 namespace Upp {
 
+static UiRole DesignerInspectorRoleChoice(const Value& role)
+{
+	String s = AsString(role);
+	if(s == "Subtle")
+		return UiRole::Subtle;
+	if(s == "Accent")
+		return UiRole::Accent;
+	if(s == "Alert")
+		return UiRole::Alert;
+	return UiRole::Standard;
+}
+
+struct DesignerInspectorSurfaceDefault {
+	Color face = SColorFace();
+	Color frame = SColorShadow();
+	int radius = 0;
+	bool shadow_enabled = false;
+	int shadow_distance = 6;
+	int shadow_offset_x = 0;
+	int shadow_offset_y = 0;
+	int shadow_alpha = 90;
+	Color shadow_color = Black();
+	String shadow_curve = "Soft";
+	bool found = false;
+};
+
+template <class Style>
+static DesignerInspectorSurfaceDefault DesignerInspectorSurfaceFromStyle(const Style& s)
+{
+	DesignerInspectorSurfaceDefault out;
+	out.face = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorFace();
+	out.frame = s.palette.frame[ST_NORMAL];
+	out.radius = s.metrics.radius;
+	out.shadow_enabled = s.metrics.shadow.enabled;
+	out.shadow_distance = s.metrics.shadow.distance;
+	out.shadow_offset_x = s.metrics.shadow.offset_x;
+	out.shadow_offset_y = s.metrics.shadow.offset_y;
+	out.shadow_alpha = s.metrics.shadow.alpha;
+	out.shadow_color = s.metrics.shadow.color;
+	out.shadow_curve = s.metrics.shadow.mode == SHADOW_HARD ? "Hard" : "Soft";
+	out.found = true;
+	return out;
+}
+
+static DesignerInspectorSurfaceDefault DesignerInspectorThemeSurfaceDefault(const DesignerNode& n)
+{
+	int role_pos = n.properties.Find("role");
+	UiRole role = DesignerInspectorRoleChoice(role_pos >= 0 ? n.properties.GetValue(role_pos) : Value("Standard"));
+	if(n.type_id == "Window" || n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" ||
+	   n.type_id == "Item" || n.type_id == "Generic")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolvePanel(role));
+	if(n.type_id == "UiGroupPanel")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveGroupPanel(role));
+	if(n.type_id == "UiLabel")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveLabel(role));
+	if(n.type_id == "UiTitleCard")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveTitleCard(role));
+	if(n.type_id == "UiButton")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveButton(role));
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveEdit(role));
+	if(n.type_id == "UiDropdown")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveDropdown(role));
+	if(n.type_id == "UiBreadcrumbs")
+		return DesignerInspectorSurfaceFromStyle(UiBreadcrumbs::StyleDefault());
+	return DesignerInspectorSurfaceDefault();
+}
+
 DesignerInspector::DesignerInspector()
 {
 	Add(stack_.SizePos());
@@ -16,6 +84,11 @@ void DesignerInspector::Set(DesignerModel *model, const DesignerRegistry *regist
 {
 	model_ = model;
 	registry_ = registry;
+}
+
+void DesignerInspector::SetBindingGroup(const String& group)
+{
+	binding_group_ = group;
 }
 
 Value DesignerInspector::NodeProperty(const DesignerNode& n, const String& key, const Value& def) const
@@ -112,9 +185,45 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return t.default_size.cx;
 	if(b.property_id == "height")
 		return t.default_size.cy;
-	if(b.property_id == "radius")
-		return 0;
-	if(b.property_id == "face_enabled" || b.property_id == "frame_enabled" || b.property_id == "title_line")
+	if(b.property_id == "radius") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.radius : 0;
+	}
+	if(b.property_id == "theme_override")
+		return false;
+	if(b.property_id == "face_mode")
+		return "Solid";
+	if(b.property_id == "face_enabled" || b.property_id == "frame_enabled")
+		return false;
+	if(b.property_id == "shadow_enabled") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_enabled : false;
+	}
+	if(b.property_id == "shadow_distance") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_distance : 6;
+	}
+	if(b.property_id == "shadow_offset_x") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_offset_x : 0;
+	}
+	if(b.property_id == "shadow_offset_y") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_offset_y : 0;
+	}
+	if(b.property_id == "shadow_alpha") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_alpha : 90;
+	}
+	if(b.property_id == "shadow_color") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_color : Black();
+	}
+	if(b.property_id == "shadow_curve") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.shadow_curve : "Soft";
+	}
+	if(b.property_id == "title_line")
 		return true;
 	if(b.property_id == "card_line")
 		return false;
@@ -131,17 +240,28 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 	if(b.property_id == "subtitle")
 		return "";
 	if(b.property_id == "face")
-		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout" || n.type_id == "UiSplitter" || n.type_id == "UiQuadSplitter")
-		       ? Color(255, 224, 178)
-		       : (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" || n.type_id == "PaneSlot")
-		         ? Color(187, 232, 203)
-		         : Color(203, 224, 255);
+	{
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.face : Color(203, 224, 255);
+	}
+	if(b.property_id == "face_tl" || b.property_id == "face_tr" ||
+	   b.property_id == "face_bl" || b.property_id == "face_br")
+	{
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		Color face = surface.found ? surface.face : Color(203, 224, 255);
+		if(b.property_id == "face_tr")
+			return Blend(face, White(), 18);
+		if(b.property_id == "face_bl")
+			return Blend(face, Black(), 10);
+		if(b.property_id == "face_br")
+			return Blend(face, White(), 8);
+		return face;
+	}
 	if(b.property_id == "frame")
-		return (n.type_id == "BoxLayout" || n.type_id == "GridLayout" || n.type_id == "UiSplitter" || n.type_id == "UiQuadSplitter")
-		       ? Color(217, 119, 6)
-		       : (n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" || n.type_id == "PaneSlot")
-		         ? Color(34, 150, 91)
-		         : Color(54, 116, 210);
+	{
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.frame : Color(54, 116, 210);
+	}
 	if(b.property_id == "text")
 		return n.name;
 	if(b.property_id == "value")
@@ -162,8 +282,18 @@ void DesignerInspector::Describe(Vector<DesignerApiBinding>& bindings, const Des
 	DesignerAdapter *adapter = nullptr;
 	One<Ctrl> ctrl;
 	ctrl.Attach(CreateDesignerAdapterCtrl(n, &adapter));
-	if(adapter)
-		adapter->DescribeApi(bindings, n);
+	if(adapter) {
+		Vector<DesignerApiBinding> all;
+		adapter->DescribeApi(all, n);
+		for(int i = 0; i < all.GetCount(); i++)
+			if(ShouldShowBinding(all[i]))
+				bindings.Add(pick(all[i]));
+	}
+}
+
+bool DesignerInspector::ShouldShowBinding(const DesignerApiBinding& b) const
+{
+	return binding_group_.IsEmpty() ? b.group.IsEmpty() : b.group == binding_group_;
 }
 
 String DesignerInspector::PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const
@@ -198,8 +328,12 @@ void DesignerInspector::SetNode(DesignerNodeId id)
 	stack_.ClearPages();
 	pages_.Clear();
 	Page& page = AddPage(key);
-	AddTypeRow(page, type_text);
-	AddNameRow(page, *n);
+	if(binding_group_.IsEmpty()) {
+		AddTypeRow(page, type_text);
+		AddNameRow(page, *n);
+	}
+	else if(bindings.IsEmpty())
+		AddMessageRow(page, "No overrides available");
 	for(const DesignerApiBinding& b : bindings)
 		AddBindingRow(page, *n, *t, b);
 	WhenNotes(BuildNoteText(bindings));
@@ -239,8 +373,12 @@ DesignerInspector::Page& DesignerInspector::EnsurePage(const DesignerNode& n, co
 	if(q >= 0)
 		return pages_[q];
 	Page& page = AddPage(key);
-	AddTypeRow(page, type_text);
-	AddNameRow(page, n);
+	if(binding_group_.IsEmpty()) {
+		AddTypeRow(page, type_text);
+		AddNameRow(page, n);
+	}
+	else if(bindings.IsEmpty())
+		AddMessageRow(page, "No overrides available");
 	for(const DesignerApiBinding& b : bindings)
 		AddBindingRow(page, n, t, b);
 	return page;
@@ -287,6 +425,20 @@ void DesignerInspector::AddNameRow(Page& page, const DesignerNode& n)
 	Row& r = page.rows.Add();
 	r.property_id = "name";
 	r.editor = DesignerEditorKind::Text;
+	r.ctrl = row;
+	AddOwned(page, pick(ctrl));
+}
+
+void DesignerInspector::AddMessageRow(Page& page, const String& text)
+{
+	One<Ctrl> ctrl;
+	UiCompositeLabel *row = new UiCompositeLabel;
+	ctrl.Attach(row);
+	row->SetLabel("").SetLabelWidth(DPI(0)).SetFieldGap(0).SetValueRole(UiRole::Subtle);
+	row->SetValueText(text);
+	Row& r = page.rows.Add();
+	r.property_id = "$message";
+	r.editor = DesignerEditorKind::ReadOnly;
 	r.ctrl = row;
 	AddOwned(page, pick(ctrl));
 }

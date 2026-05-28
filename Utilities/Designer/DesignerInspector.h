@@ -21,6 +21,7 @@ public:
 	DesignerInspector();
 
 	void Set(DesignerModel *model, const DesignerRegistry *registry);
+	void SetBindingGroup(const String& group);
 	void SetNode(DesignerNodeId id);
 	DesignerNodeId GetNode() const { return node_id_; }
 
@@ -56,6 +57,7 @@ private:
 	String RuntimeTypeName(const String& type_id) const;
 	String PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const;
 	void Describe(Vector<DesignerApiBinding>& bindings, const DesignerNode& n) const;
+	bool ShouldShowBinding(const DesignerApiBinding& b) const;
 
 	Page& EnsurePage(const DesignerNode& n, const DesignerType& t, const Vector<DesignerApiBinding>& bindings,
 	                 const String& type_text, const String& key);
@@ -64,6 +66,7 @@ private:
 	void AddOwned(Page& page, One<Ctrl> ctrl);
 	void AddTypeRow(Page& page, const String& type_text);
 	void AddNameRow(Page& page, const DesignerNode& n);
+	void AddMessageRow(Page& page, const String& text);
 	void AddBindingRow(Page& page, const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b);
 	String BuildNoteText(const Vector<DesignerApiBinding>& bindings) const;
 	void RefreshPage(Page& page, const DesignerNode& n, const DesignerType& t,
@@ -77,6 +80,7 @@ private:
 	DesignerModel *model_ = nullptr;
 	const DesignerRegistry *registry_ = nullptr;
 	DesignerNodeId node_id_ = Designer_NULL;
+	String binding_group_;
 	bool syncing_ = false;
 };
 

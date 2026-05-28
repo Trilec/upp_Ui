@@ -15,3 +15,5 @@ run_uidoc_regression.cmd
 /UPP_GUIDES/archive
 UPP_GUIDES/Plan*
 UPP_GUIDES/Agent*
+UPP_GUIDES/UiBoxLayout_Flow_Groups_Design.md
+UPP_GUIDES/UiGroupPanel_Design.md

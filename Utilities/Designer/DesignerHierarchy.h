@@ -49,7 +49,7 @@ public:
 	Event<DesignerNodeId, UiTreeNodeRef, Point> WhenNodeDrop;
 	Event<> WhenNodeCancel;
 
-	UiTreeNodeRef TrackExternalDrop(Point p);
+	UiTree::DropInfo TrackExternalDrop(Point p);
 
 	void LeftDown(Point p, dword flags) override;
 	void MouseMove(Point p, dword flags) override;
@@ -60,6 +60,7 @@ public:
 
 private:
 	bool BeginFromSelection();
+	void PollDrag();
 	void ResetDragState();
 	void CancelDragNoRelease();
 

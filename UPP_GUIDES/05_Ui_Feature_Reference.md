@@ -415,6 +415,16 @@ embed_type = "table"
 embed_type = "hr"
 ```
 
+### Page Break
+
+```
+embed_type = "page_break"
+```
+
+Page breaks are document-level block embeds. They reserve layout height and
+paint as a visible break marker without inserting visible text into the
+document body.
+
 ### Image
 
 ```
@@ -449,6 +459,24 @@ Payload stores SVG data.
 Renderer may display placeholder.
 
 ---
+
+# Document Editing Commands
+
+Search replacement belongs to the document command layer so editors, demos, and
+domain subclasses share one transaction path:
+
+```
+search.replace.current
+search.replace.all
+```
+
+Both commands accept either a plain replacement string or a map containing
+`replacement` or `text`. Page breaks are inserted through:
+
+```
+embed.page_break.insert
+insert.page_break
+```
 
 # 10. Table Embed Definition
 

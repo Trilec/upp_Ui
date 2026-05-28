@@ -121,6 +121,15 @@ void DesignerPreview::SetThemeMode(UiThemeMode mode)
 			Refresh();
 		}
 
+void DesignerPreview::ShowDesignOverlays(bool show)
+{
+			if(show_overlays_ == show)
+				return;
+			show_overlays_ = show;
+			ApplyRealOverlay();
+			Refresh();
+		}
+
 void DesignerPreview::SyncRealPreview()
 {
 			real_dirty_ = true;
@@ -168,10 +177,12 @@ void DesignerPreview::Paint(Draw& w)
 			LayoutRealPreview();
 			Rect root = GetVirtualWindowRect();
 			Size vsz = model_->GetVirtualSize();
-			DrawRoundedOutline(w, root, DesignerPreviewWindowOutline(SColorHighlight(), theme_mode_), DPI(8), DPI(4));
-			DrawDropIndicator(w, root);
-			DrawResizeHandle(w, root);
-			if(!placement_type_.IsEmpty())
+			if(show_overlays_) {
+				DrawRoundedOutline(w, root, DesignerPreviewWindowOutline(SColorHighlight(), theme_mode_), DPI(8), DPI(4));
+				DrawDropIndicator(w, root);
+				DrawResizeHandle(w, root);
+			}
+			if(show_overlays_ && !placement_type_.IsEmpty())
 				w.DrawText(root.left + DPI(10), root.bottom + DPI(8),
 				           "Release over a highlighted layout or insert line to place " + placement_type_,
 				           SansSerifZ(9), SColorHighlight());
@@ -471,7 +482,7 @@ void DesignerPreview::DrawDashed(Draw& w, const Rect& r, Color c)
 void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, int depth)
 {
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
-			bool selected = DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0;
+			bool selected = show_overlays_ && DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0;
 			Color default_face = DesignerPreviewCategoryFace(t, theme_mode_);
 			Color default_frame = DesignerPreviewCategoryFrame(t, theme_mode_);
 			Color face = DesignerPreviewNodeProperty(n, "face", default_face);
@@ -509,7 +520,8 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			if(t && t->is_container) {
 				Rect content = GetContainerContentRect(n, r);
 				PaintChildren(w, n, content, depth + 1);
-				DrawLayoutDebug(w, n, content);
+				if(show_overlays_)
+					DrawLayoutDebug(w, n, content);
 			}
 		}
 
@@ -585,11 +597,69 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
 			Size def = t ? t->default_size : Size(DPI(DESIGNER_DEFAULT_WIDTH), DPI(DESIGNER_DEFAULT_HEIGHT));
 			Size minsz = t ? t->min_size : Size(DPI(DESIGNER_MIN_WIDTH), DPI(DESIGNER_MIN_HEIGHT));
+			Size natural = def;
+			if(model_ && !n.children.IsEmpty()) {
+				if(n.type_id == "BoxLayout") {
+					int gap = (int)DesignerPreviewNodeProperty(n, "gap", DPI(8));
+					int inset = (int)DesignerPreviewNodeProperty(n, "inset", 0);
+					bool horizontal = DesignerPreviewNodeProperty(n, "direction", "V") == "H";
+					int main = 0;
+					int cross = 0;
+					int visible = 0;
+					for(DesignerNodeId child_id : n.children) {
+						const DesignerNode* child = model_->Find(child_id);
+						if(!child)
+							continue;
+						Size sz = GetNodePreviewSize(*child);
+						main += horizontal ? sz.cx : sz.cy;
+						cross = max(cross, horizontal ? sz.cy : sz.cx);
+						visible++;
+					}
+					main += gap * max(0, visible - 1);
+					natural = horizontal ? Size(main + inset * 2, cross + inset * 2)
+					                     : Size(cross + inset * 2, main + inset * 2);
+				}
+				else if(n.type_id == "GridLayout") {
+					int gap = (int)DesignerPreviewNodeProperty(n, "gap", DPI(8));
+					int inset = (int)DesignerPreviewNodeProperty(n, "inset", 0);
+					int columns = max(1, (int)DesignerPreviewNodeProperty(n, "columns", 2));
+					int rows = max(1, (int)DesignerPreviewNodeProperty(n, "rows", 2));
+					rows = max(rows, (n.children.GetCount() + columns - 1) / columns);
+					Vector<int> col_w, row_h;
+					col_w.SetCount(columns, max(1, (int)DesignerPreviewNodeProperty(n, "cell_width", DESIGNER_GRID_CELL_WIDTH)));
+					row_h.SetCount(rows, max(1, (int)DesignerPreviewNodeProperty(n, "cell_height", DESIGNER_GRID_CELL_HEIGHT)));
+					for(int i = 0; i < n.children.GetCount(); i++) {
+						const DesignerNode* child = model_->Find(n.children[i]);
+						if(!child)
+							continue;
+						int col = clamp((int)DesignerPreviewNodeProperty(*child, "grid_col", i % columns), 0, columns - 1);
+						int row = clamp((int)DesignerPreviewNodeProperty(*child, "grid_row", i / columns), 0, rows - 1);
+						Size sz = GetNodePreviewSize(*child);
+						col_w[col] = max(col_w[col], sz.cx);
+						row_h[row] = max(row_h[row], sz.cy);
+					}
+					int w = inset * 2 + gap * max(0, columns - 1);
+					int h = inset * 2 + gap * max(0, rows - 1);
+					for(int v : col_w) w += v;
+					for(int v : row_h) h += v;
+					natural = Size(w, h);
+				}
+				else if(n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" ||
+				        n.type_id == "UiGroupPanel" || n.type_id == "PageSlot" || n.type_id == "PaneSlot") {
+					Size child_max(0, 0);
+					for(DesignerNodeId child_id : n.children) {
+						const DesignerNode* child = model_->Find(child_id);
+						if(child)
+							child_max = max(child_max, GetNodePreviewSize(*child));
+					}
+					natural = max(natural, child_max);
+				}
+			}
 			if(DesignerPreviewAxisSizing(n, "h_sizing") == "Fixed")
-				def.cx = (int)DesignerPreviewNodeProperty(n, "width", def.cx);
+				natural.cx = (int)DesignerPreviewNodeProperty(n, "width", natural.cx);
 			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
-				def.cy = (int)DesignerPreviewNodeProperty(n, "height", def.cy);
-			return Size(max(minsz.cx, def.cx), max(minsz.cy, def.cy));
+				natural.cy = (int)DesignerPreviewNodeProperty(n, "height", natural.cy);
+			return Size(max(minsz.cx, natural.cx), max(minsz.cy, natural.cy));
 		}
 
 void DesignerPreview::PaintBoxChildren(Draw& w, const DesignerNode& parent, Rect area, int depth)
@@ -1049,6 +1119,10 @@ void DesignerPreview::ApplyRealOverlay()
 				if(!adapter)
 					continue;
 				DesignerOverlayState state;
+				if(!show_overlays_) {
+					adapter->SetOverlayState(state);
+					continue;
+				}
 				state.selected = DesignerPreviewFindNodeId(model_->GetSelection(), real_adapters_.GetKey(i)) >= 0;
 				state.drop_target = real_adapters_.GetKey(i) == drop_target_;
 				const DesignerNode* n = model_ ? model_->Find(real_adapters_.GetKey(i)) : nullptr;

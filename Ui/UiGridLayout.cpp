@@ -204,6 +204,76 @@ Size UiGridLayout::NaturalItemSize(const Item& it) const
     return sz;
 }
 
+static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<bool>& expand, int available, int gap)
+{
+    int count = sizes.GetCount();
+    if(count <= 0)
+        return;
+
+    int inner = max(0, available - gap * max(0, count - 1));
+    int base = 0;
+    for(int v : sizes)
+        base += v;
+    int extra = inner - base;
+    if(extra <= 0)
+        return;
+
+    Vector<int> targets;
+    for(int i = 0; i < count; i++)
+        if(expand[i])
+            targets.Add(i);
+    if(targets.IsEmpty())
+        return;
+
+    int per = extra / targets.GetCount();
+    int rem = extra % targets.GetCount();
+    for(int i = 0; i < targets.GetCount(); i++)
+        sizes[targets[i]] += per + (i < rem ? 1 : 0);
+}
+
+void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const
+{
+    int cols = max(1, grid_cols);
+    int rows = max(1, grid_rows);
+    int gap = style.spacing;
+
+    col_widths.SetCount(cols);
+    row_heights.SetCount(rows);
+    Vector<bool> expand_cols, expand_rows;
+    expand_cols.SetCount(cols, false);
+    expand_rows.SetCount(rows, false);
+
+    for(int i = 0; i < cols; i++)
+        col_widths[i] = min_cell_size.cx;
+    for(int i = 0; i < rows; i++)
+        row_heights[i] = min_cell_size.cy;
+
+    if(unified) {
+        int cell_w = unified_size.cx > 0 ? unified_size.cx : min_cell_size.cx;
+        int cell_h = unified_size.cy > 0 ? unified_size.cy : min_cell_size.cy;
+        for(int i = 0; i < cols; i++)
+            col_widths[i] = cell_w;
+        for(int i = 0; i < rows; i++)
+            row_heights[i] = cell_h;
+        return;
+    }
+
+    for(const Item& it : items) {
+        if(it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
+            continue;
+        Size want = NaturalItemSize(it);
+        col_widths[it.col] = max(col_widths[it.col], want.cx);
+        row_heights[it.row] = max(row_heights[it.row], want.cy);
+        if(it.scale_x)
+            expand_cols[it.col] = true;
+        if(it.scale_y)
+            expand_rows[it.row] = true;
+    }
+
+    UiDistributeGridTrackSpace(col_widths, expand_cols, available.cx, gap);
+    UiDistributeGridTrackSpace(row_heights, expand_rows, available.cy, gap);
+}
+
 Rect UiGridLayout::GetClientGridRect() const
 {
     return Rect(GetSize()).Deflated(inset.left, inset.top, inset.right, inset.bottom);
@@ -213,16 +283,25 @@ void UiGridLayout::Layout()
 {
     Rect area = GetClientGridRect();
     int gap = style.spacing;
-    int cell_w = max(min_cell_size.cx, (area.GetWidth() - gap * max(0, grid_cols - 1)) / max(1, grid_cols));
-    int cell_h = max(min_cell_size.cy, (area.GetHeight() - gap * max(0, grid_rows - 1)) / max(1, grid_rows));
-    if(unified) {
-        if(unified_size.cx > 0) cell_w = unified_size.cx;
-        if(unified_size.cy > 0) cell_h = unified_size.cy;
+    Vector<int> col_widths, row_heights;
+    ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
+    Vector<int> col_pos, row_pos;
+    col_pos.SetCount(col_widths.GetCount());
+    row_pos.SetCount(row_heights.GetCount());
+    int x = area.left;
+    for(int i = 0; i < col_widths.GetCount(); i++) {
+        col_pos[i] = x;
+        x += col_widths[i] + gap;
+    }
+    int y = area.top;
+    for(int i = 0; i < row_heights.GetCount(); i++) {
+        row_pos[i] = y;
+        y += row_heights[i] + gap;
     }
     for(Item& it : items) {
-        if(it.row < 0 || it.col < 0)
+        if(it.row < 0 || it.col < 0 || it.row >= row_heights.GetCount() || it.col >= col_widths.GetCount())
             continue;
-        Rect cell = RectC(area.left + it.col * (cell_w + gap), area.top + it.row * (cell_h + gap), cell_w, cell_h);
+        Rect cell = RectC(col_pos[it.col], row_pos[it.row], col_widths[it.col], row_heights[it.row]);
         it.rect = cell;
         if(!it.ctrl)
             continue;
@@ -251,8 +330,13 @@ void UiGridLayout::Layout()
         it.ctrl->Show();
         it.ctrl->SetRect(cr);
     }
-    content = Size(grid_cols * cell_w + max(0, grid_cols - 1) * gap + inset.left + inset.right,
-                   grid_rows * cell_h + max(0, grid_rows - 1) * gap + inset.top + inset.bottom);
+    int content_w = inset.left + inset.right + gap * max(0, col_widths.GetCount() - 1);
+    for(int v : col_widths)
+        content_w += v;
+    int content_h = inset.top + inset.bottom + gap * max(0, row_heights.GetCount() - 1);
+    for(int v : row_heights)
+        content_h += v;
+    content = Size(content_w, content_h);
     NormalizeSelectionState();
     if(content != last_reported_content) {
         last_reported_content = content;
@@ -273,6 +357,11 @@ void UiGridLayout::RefreshGridLayout()
 
 void UiGridLayout::Paint(Draw& w)
 {
+    PaintDebugOverlay(w);
+}
+
+void UiGridLayout::PaintDebugOverlay(Draw& w) const
+{
     if(debug)
         PaintDebug(w);
 }
@@ -280,6 +369,57 @@ void UiGridLayout::Paint(Draw& w)
 void UiGridLayout::PaintDebug(Draw& w) const
 {
     Color c = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
+    Color fill = Blend(c, SColorPaper(), 205);
+    Rect outer = GetSize();
+    Rect area = GetClientGridRect();
+    int gap = style.spacing;
+    Vector<int> col_widths, row_heights;
+    ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
+    Vector<int> col_pos, row_pos;
+    col_pos.SetCount(col_widths.GetCount());
+    row_pos.SetCount(row_heights.GetCount());
+    int x = area.left;
+    for(int i = 0; i < col_widths.GetCount(); i++) {
+        col_pos[i] = x;
+        x += col_widths[i] + gap;
+    }
+    int y = area.top;
+    for(int i = 0; i < row_heights.GetCount(); i++) {
+        row_pos[i] = y;
+        y += row_heights[i] + gap;
+    }
+
+    if(inset.top > 0)
+        w.DrawRect(Rect(outer.left, outer.top, outer.right, area.top), fill);
+    if(inset.bottom > 0)
+        w.DrawRect(Rect(outer.left, area.bottom, outer.right, outer.bottom), fill);
+    if(inset.left > 0)
+        w.DrawRect(Rect(outer.left, area.top, area.left, area.bottom), fill);
+    if(inset.right > 0)
+        w.DrawRect(Rect(area.right, area.top, outer.right, area.bottom), fill);
+
+    for(int i = 0; i + 1 < col_widths.GetCount(); i++) {
+        Rect gr(col_pos[i] + col_widths[i], area.top,
+                col_pos[i + 1], area.top + max(0, y - area.top - gap));
+        if(!gr.IsEmpty())
+            w.DrawRect(gr, fill);
+    }
+    for(int i = 0; i + 1 < row_heights.GetCount(); i++) {
+        Rect gr(area.left, row_pos[i] + row_heights[i],
+                area.left + max(0, x - area.left - gap), row_pos[i + 1]);
+        if(!gr.IsEmpty())
+            w.DrawRect(gr, fill);
+    }
+
+    for(int row = 0; row < row_heights.GetCount(); row++) {
+        for(int col = 0; col < col_widths.GetCount(); col++) {
+            Rect cell = RectC(col_pos[col], row_pos[row], col_widths[col], row_heights[row]);
+            w.DrawRect(cell.left, cell.top, cell.GetWidth(), 1, c);
+            w.DrawRect(cell.left, cell.bottom - 1, cell.GetWidth(), 1, c);
+            w.DrawRect(cell.left, cell.top, 1, cell.GetHeight(), c);
+            w.DrawRect(cell.right - 1, cell.top, 1, cell.GetHeight(), c);
+        }
+    }
     for(const Item& it : items) {
         if(it.rect.IsEmpty())
             continue;
@@ -303,17 +443,27 @@ void UiGridLayout::LostFocus() { Refresh(); }
 Size UiGridLayout::GetMinSize() const
 {
     int gap = style.spacing;
-    return Size(grid_cols * min_cell_size.cx + max(0, grid_cols - 1) * gap + inset.left + inset.right,
-                grid_rows * min_cell_size.cy + max(0, grid_rows - 1) * gap + inset.top + inset.bottom);
+    Vector<int> col_widths, row_heights;
+    ComputeTrackSizes(Size(0, 0), col_widths, row_heights);
+    int w = inset.left + inset.right + gap * max(0, col_widths.GetCount() - 1);
+    for(int v : col_widths)
+        w += v;
+    int h = inset.top + inset.bottom + gap * max(0, row_heights.GetCount() - 1);
+    for(int v : row_heights)
+        h += v;
+    return Size(w, h);
 }
 
 int UiGridLayout::MeasureHeightForWidth(int total_width)
 {
     int gap = style.spacing;
     int inner_w = max(0, total_width - inset.left - inset.right);
-    int cell_w = max(min_cell_size.cx, (inner_w - gap * max(0, grid_cols - 1)) / max(1, grid_cols));
-    (void)cell_w;
-    return grid_rows * min_cell_size.cy + max(0, grid_rows - 1) * gap + inset.top + inset.bottom;
+    Vector<int> col_widths, row_heights;
+    ComputeTrackSizes(Size(inner_w, 0), col_widths, row_heights);
+    int h = inset.top + inset.bottom + gap * max(0, row_heights.GetCount() - 1);
+    for(int v : row_heights)
+        h += v;
+    return h;
 }
 
 String UiGridLayout::ToString() const

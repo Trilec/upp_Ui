@@ -361,8 +361,9 @@ private:
     UiBoxLayout state_nodes_row_ { UiBoxLayout::Direction::H };
     UiBoxLayout state_cursor_row_ { UiBoxLayout::Direction::H };
     UiBoxLayout state_drag_row_ { UiBoxLayout::Direction::H };
-    UiLabel state_theme_label_, state_dataset_label_, state_nodes_label_, state_cursor_label_, state_drag_label_;
-    UiLabel state_theme_value_, state_dataset_value_, state_nodes_value_, state_cursor_value_, state_drag_value_;
+    UiBoxLayout state_move_row_ { UiBoxLayout::Direction::H };
+    UiLabel state_theme_label_, state_dataset_label_, state_nodes_label_, state_cursor_label_, state_drag_label_, state_move_label_;
+    UiLabel state_theme_value_, state_dataset_value_, state_nodes_value_, state_cursor_value_, state_drag_value_, state_move_value_;
     UiAccordion model_acc_;
     int model_section_ = -1;
     UiScrollPanel model_scroll_;
@@ -398,6 +399,7 @@ private:
 
     UiBoxLayout appearance_box_ { UiBoxLayout::Direction::V };
     UiCompositeColor text_color_row_, glyph_color_row_, line_color_row_, selected_face_row_, selected_frame_row_;
+    String last_move_request_;
 };
 
 UiTreeDemoWindow::UiTreeDemoWindow()
@@ -418,6 +420,19 @@ UiTreeDemoWindow::UiTreeDemoWindow()
 
     preview_.Showcase().SetModel(model_);
     preview_.Showcase().WhenSelection = [=] { SyncEditor(); RefreshState(); };
+    preview_.Showcase().WhenMoveRequest = [=](UiTreeMoveRequest& request) {
+        String labels;
+        for(int i = 0; i < request.nodes.GetCount(); i++) {
+            if(i)
+                labels << ", ";
+            labels << NodeLabel(request.nodes[i]);
+        }
+        last_move_request_ = Format("%s -> %s @ %d",
+                                    labels,
+                                    NodeLabel(request.new_parent),
+                                    request.insert_pos);
+        RefreshState();
+    };
     model_tree_.WhenSelection = [=] {
         UiTreeNodeRef node = ResolveModelTreeNode();
         if(model_.IsValid(node))
@@ -477,16 +492,19 @@ void UiTreeDemoWindow::BuildShell()
     state_nodes_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     state_cursor_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     state_drag_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    state_move_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
     state_theme_row_.Add(state_theme_label_).Expand(1); state_theme_row_.Add(state_theme_value_).Fixed(DPI(140));
     state_dataset_row_.Add(state_dataset_label_).Expand(1); state_dataset_row_.Add(state_dataset_value_).Fixed(DPI(140));
     state_nodes_row_.Add(state_nodes_label_).Expand(1); state_nodes_row_.Add(state_nodes_value_).Fixed(DPI(140));
     state_cursor_row_.Add(state_cursor_label_).Expand(1); state_cursor_row_.Add(state_cursor_value_).Fixed(DPI(140));
     state_drag_row_.Add(state_drag_label_).Expand(1); state_drag_row_.Add(state_drag_value_).Fixed(DPI(140));
+    state_move_row_.Add(state_move_label_).Expand(1); state_move_row_.Add(state_move_value_).Fixed(DPI(140));
     state_box_.Add(state_theme_row_).Fit();
     state_box_.Add(state_dataset_row_).Fit();
     state_box_.Add(state_nodes_row_).Fit();
     state_box_.Add(state_cursor_row_).Fit();
     state_box_.Add(state_drag_row_).Fit();
+    state_box_.Add(state_move_row_).Fit();
     state_box_.Add(model_acc_).Fit();
     model_section_ = model_acc_.AddSection("MODEL DATA", true);
     model_acc_.GetSectionContent(model_section_).Add(model_scroll_.SizePos());
@@ -951,11 +969,13 @@ void UiTreeDemoWindow::RefreshState()
     state_nodes_label_.SetText("Nodes");
     state_cursor_label_.SetText("Cursor");
     state_drag_label_.SetText("Drag");
+    state_move_label_.SetText("Move request");
     state_theme_value_.SetText(ctx.mode == UiThemeMode::Dark ? "Dark" : "Light");
     state_dataset_value_.SetText(DatasetLabel(dataset_));
     state_nodes_value_.SetText(AsString(max(0, model_.GetNodeCount() - 1)));
     state_cursor_value_.SetText(NodeLabel(CurrentNode()));
     state_drag_value_.SetText(use_drag_ ? "On" : "Off");
+    state_move_value_.SetText(last_move_request_.IsEmpty() ? "None" : last_move_request_);
 }
 
 void UiTreeDemoWindow::RefreshFromConfig()
@@ -1063,6 +1083,9 @@ String UiTreeDemoWindow::BuildUsageCode() const
     code << "tree.SetSelectionMode(" << (selection_mode_ == UITREESEL_MULTI ? "UITREESEL_MULTI" : "UITREESEL_SINGLE") << ");\n";
     code << "tree.EnableDragDrop(" << (use_drag_ ? "true" : "false") << ");\n";
     code << "tree.EnableRenameOnDblClick(" << (rename_on_dblclick_ ? "true" : "false") << ");\n";
+    code << "tree.WhenMoveRequest = [&](UiTreeMoveRequest& request) {\n";
+    code << "    // Validate, reject, handle through a command stack, or leave unhandled for local model mutation.\n";
+    code << "};\n";
     code << "\nUiTreeModel model;\n";
     code << "UiTreeNodeRef root = model.Root();\n";
     int next_id = 0;

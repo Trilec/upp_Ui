@@ -35,6 +35,11 @@ Active layout/container notes:
 - `UiGroupPanel_Design.md`
   - Titled group-panel container contract, header modes, designer support, and
     theme-role styling expectations.
+- `UiDoc_Annotation_Lanes.md`
+  - Annotation marker lane registry for comments, metadata, script treatments,
+    budget notes, and other typed review data.
+- `UiModelDrivenControls_Design.md`
+  - Request-first mutation contract for list, tree, menu, dropdown, and table.
 
 ## Archive Policy
 

@@ -6,6 +6,8 @@
 
 namespace Upp {
 
+static constexpr int DESIGNER_HIERARCHY_DRAG_TIMER_ID = 7021;
+
 void DesignerToolboxTree::LeftDown(Point p, dword flags)
 {
 	UiTree::LeftDown(p, flags);
@@ -25,7 +27,7 @@ void DesignerToolboxTree::MouseMove(Point p, dword flags)
 		return;
 	}
 
-	if(!(flags & K_MOUSELEFT)) {
+	if(!(flags & K_MOUSELEFT) && !GetMouseLeft()) {
 		CancelDragNoRelease();
 		return;
 	}
@@ -118,48 +120,55 @@ void DesignerToolboxTree::CancelDragNoRelease()
 		WhenToolCancel();
 }
 
-UiTreeNodeRef DesignerHierarchyTree::TrackExternalDrop(Point p)
+UiTree::DropInfo DesignerHierarchyTree::TrackExternalDrop(Point p)
 {
-	UiTree::MouseMove(p, 0);
-	Refresh();
-	return GetHotNode();
+	return TrackDropTarget(p);
 }
 
 void DesignerHierarchyTree::LeftDown(Point p, dword flags)
 {
+	UiTreeNodeRef ref = GetNodeAt(p);
+	DesignerNodeId pressed_id = Designer_NULL;
+	if(GetModel().IsValid(ref)) {
+		Value v = GetModel().Get(ref).data;
+		pressed_id = IsNumber(v) ? (int)v : Designer_NULL;
+	}
+	bool was_dnd = IsDragDropEnabled();
+	EnableDragDrop(false);
 	UiTree::LeftDown(p, flags);
-	BeginFromSelection();
+	EnableDragDrop(was_dnd);
 	drag_start_ = p;
 	dragging_ = false;
+	drag_id_ = pressed_id == Designer_ROOT ? Designer_NULL : pressed_id;
+	if(drag_id_ != Designer_NULL && drag_id_ != Designer_ROOT) {
+		SetCapture();
+		SetTimeCallback(16, [=] { PollDrag(); }, DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+	}
 }
 
 void DesignerHierarchyTree::MouseMove(Point p, dword flags)
 {
-	UiTree::MouseMove(p, flags);
-
-	if(drag_id_ == Designer_NULL || drag_id_ == Designer_ROOT)
-		return;
-
-	if(!(flags & K_MOUSELEFT)) {
-		CancelDragNoRelease();
+	if(drag_id_ == Designer_NULL || drag_id_ == Designer_ROOT) {
+		UiTree::MouseMove(p, flags);
 		return;
 	}
 
-	if(!dragging_ && Length(p - drag_start_) > DPI(4)) {
+	if(!dragging_ && Length(p - drag_start_) > DPI(4))
 		dragging_ = true;
-		SetCapture();
+
+	if(dragging_) {
+		TrackDropTarget(p);
+		WhenNodeDrag(drag_id_, GetMousePos());
+		return;
 	}
 
-	if(dragging_)
-		WhenNodeDrag(drag_id_, GetMousePos());
+	UiTree::MouseMove(p, flags);
 }
 
 void DesignerHierarchyTree::LeftDrag(Point p, dword flags)
 {
-	if(drag_id_ == Designer_NULL) {
-		drag_start_ = p;
-		BeginFromSelection();
-	}
+	if(drag_id_ != Designer_NULL && drag_id_ != Designer_ROOT && !HasCapture())
+		SetCapture();
 	MouseMove(p, flags | K_MOUSELEFT);
 }
 
@@ -170,12 +179,11 @@ Image DesignerHierarchyTree::CursorImage(Point p, dword flags)
 
 void DesignerHierarchyTree::LeftUp(Point p, dword flags)
 {
+	KillTimeCallback(DESIGNER_HIERARCHY_DRAG_TIMER_ID);
 	DesignerNodeId id = drag_id_;
 	bool was_dragging = dragging_;
 	UiTreeNodeRef hot = GetHotNode();
 	Point screen = GetMousePos();
-
-	ResetDragState();
 
 	if(was_dragging && id != Designer_NULL && id != Designer_ROOT)
 		WhenNodeDrop(id, hot, screen);
@@ -184,12 +192,14 @@ void DesignerHierarchyTree::LeftUp(Point p, dword flags)
 		WhenNodeCancel();
 	}
 
+	ResetDragState();
 	if(HasCapture())
 		ReleaseCapture();
 }
 
 void DesignerHierarchyTree::CancelMode()
 {
+	KillTimeCallback(DESIGNER_HIERARCHY_DRAG_TIMER_ID);
 	CancelDragNoRelease();
 	UiTree::CancelMode();
 }
@@ -201,10 +211,24 @@ bool DesignerHierarchyTree::BeginFromSelection()
 	return drag_id_ != Designer_NULL && drag_id_ != Designer_ROOT;
 }
 
+void DesignerHierarchyTree::PollDrag()
+{
+	if(drag_id_ == Designer_NULL || drag_id_ == Designer_ROOT)
+		return;
+
+	Point screen = GetMousePos();
+	Point local = screen - GetScreenRect().TopLeft();
+
+	MouseMove(local, K_MOUSELEFT);
+	SetTimeCallback(16, [=] { PollDrag(); }, DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+}
+
 void DesignerHierarchyTree::ResetDragState()
 {
+	KillTimeCallback(DESIGNER_HIERARCHY_DRAG_TIMER_ID);
 	drag_id_ = Designer_NULL;
 	dragging_ = false;
+	ClearTrackedDropTarget();
 }
 
 void DesignerHierarchyTree::CancelDragNoRelease()

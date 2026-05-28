@@ -17,8 +17,13 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.21";
+static const char* DESIGNER_VERSION = "v0.1.45";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
+
+static String DesignerCrumbPropertyKey(int i)
+{
+	return Format("crumb_%d", i + 1);
+}
 
 static const char *DesignerThemePresetId(UiThemePreset preset)
 {
@@ -230,14 +235,16 @@ public:
 		int version_w = DPI(82);
 		int save_w = DPI(92);
 		int load_w = DPI(92);
+		int overlay_w = DPI(42);
 		int preset_w = DPI(170);
 		int theme_w = DPI(96);
 		int exit_w = DPI(94);
-		int controls_w = save_w + load_w + preset_w + theme_w + exit_w + version_w + gap * 6;
+		int controls_w = save_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 7;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
 		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
 		load_button_.SetRect(save_button_.GetRect().right + gap, control_y, load_w, DPI(34));
-		theme_preset_row_.SetRect(load_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
+		overlay_button_.SetRect(load_button_.GetRect().right + gap, control_y, overlay_w, DPI(34));
+		theme_preset_row_.SetRect(overlay_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
 		theme_shell_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, theme_w, DPI(34));
 		theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
 		theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
@@ -440,18 +447,6 @@ private:
 		}
 	}
 
-	void ApplyStarterTemplate(const String& id)
-	{
-		if(id.IsEmpty() || id == "Current")
-			return;
-		if(ApplyDesignerTemplate(model_, registry_, id)) {
-			syncing_template_ = true;
-			template_row_.SetData("Current");
-			syncing_template_ = false;
-			RefreshAll();
-		}
-	}
-
 	// Construct the application chrome and connect subsystem events.
 	// The shell intentionally mirrors the Ui demo apps: header actions, theme
 	// switching, toolbox left, preview center, hierarchy/inspector/code right.
@@ -461,6 +456,7 @@ private:
 		Add(version_badge_);
 		Add(save_button_);
 		Add(load_button_);
+		Add(overlay_button_);
 		Add(theme_preset_row_);
 		Add(theme_shell_);
 		Add(theme_icon_);
@@ -514,6 +510,12 @@ private:
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
 		load_button_.WhenAction = [=] { LoadDesignFromFile(); };
+		overlay_button_.SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48())
+		               .SetText("")
+		               .SetIconSize(DPI(18), DPI(18))
+		               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		               .Tip("Hide designer overlays");
+		overlay_button_.WhenAction = [=] { ToggleDesignOverlays(); };
 		theme_preset_row_.SetLabel("Theme").SetLabelWidth(DPI(48)).SetFieldGap(DPI(6));
 		theme_preset_row_.Add("Minimal", "Minimal");
 		theme_preset_row_.Add("Pill", "Pill");
@@ -579,8 +581,10 @@ private:
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_SINGLE);
 		hierarchy_.ShowConnectorLines(true);
+		hierarchy_.EnableInternalMutation(false);
+		hierarchy_.EnableRenameOnDblClick(true);
 		Vector<int> hierarchy_cols;
-		hierarchy_cols << DPI(14) << DPI(14) << DPI(14) << DPI(14);
+		hierarchy_cols << DPI(13) << DPI(13) << DPI(13) << DPI(13);
 		hierarchy_.SetColumnWidths(hierarchy_cols);
 		hierarchy_.WhenSelection = [=] {
 			if(syncing_hierarchy_)
@@ -591,6 +595,17 @@ private:
 				RefreshInspectorPreview();
 			}
 		};
+		hierarchy_.WhenRename = [=](UiTreeNodeRef ref, const String& name) {
+			DesignerNodeId id = GetHierarchyNodeId(ref);
+			if(id != Designer_NULL && id != Designer_ROOT)
+				SaveInspectorNameValue(id, name);
+		};
+		hierarchy_.WhenColumnAction = [=](UiTreeNodeRef ref, int column) {
+			HandleHierarchyColumnAction(ref, column);
+		};
+		hierarchy_.WhenMoveRequest = [=](UiTreeMoveRequest& request) {
+			HandleHierarchyMoveRequest(request);
+		};
 		hierarchy_.WhenNodeDrag = [=](DesignerNodeId id, Point screen) {
 			TrackNodeDrag(id, screen);
 		};
@@ -599,11 +614,10 @@ private:
 		};
 		hierarchy_.WhenNodeCancel = [=] { CancelToolDrag(); };
 
-		right_box_.Add(hierarchy_heading_);
-		right_box_.Add(template_row_);
-		right_box_.Add(hierarchy_);
 		right_box_.Add(right_accordion_);
 		inspector_.Set(&model_, &registry_);
+		theme_override_inspector_.Set(&model_, &registry_);
+		theme_override_inspector_.SetBindingGroup("Theme Overrides");
 		inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
@@ -613,18 +627,46 @@ private:
 		inspector_.WhenNotes = [=](String notes) {
 			SetWarningNotes(notes);
 		};
+		theme_override_inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
+			SaveInspectorPropertyValue(id, property, value);
+		};
+		container_actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(DPI(8), DPI(4), DPI(8), DPI(4)));
+		container_action_label_.SetText("Pages").NoWantFocus();
+		container_add_button_.SetIcon(ICON_CONTENT_OUTLINED_ADD_48())
+		                     .SetText("")
+		                     .SetIconSize(DPI(15), DPI(15))
+		                     .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                     .Tip("Add page");
+		container_remove_button_.SetIcon(ICON_CONTENT_OUTLINED_REMOVE_48())
+		                        .SetText("")
+		                        .SetIconSize(DPI(15), DPI(15))
+		                        .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                        .Tip("Remove selected page");
+		container_add_button_.WhenAction = [=] { AddPageSlotForSelection(); };
+		container_remove_button_.WhenAction = [=] { RemovePageSlotForSelection(); };
+		container_actions_.Add(container_action_label_).Expand(1);
+		container_actions_.Add(container_add_button_).Fixed(DPI(30));
+		container_actions_.Add(container_remove_button_).Fixed(DPI(30));
+		container_actions_.Hide();
 		code_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
 		code_scroll_.Content().Add(code_box_);
 		code_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
 		code_box_.Add(code_).Fit();
 		right_accordion_.SetSingleOpen(false).SetEnforceOne(false);
+		hierarchy_section_ = right_accordion_.AddSection("HIERARCHY", true);
 		inspector_section_ = right_accordion_.AddSection("INSPECTOR", true);
+		theme_override_section_ = right_accordion_.AddSection("THEME OVERRIDES", false);
 		code_section_ = right_accordion_.AddSection("CODE", false);
+		hierarchy_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
+		hierarchy_scroll_.Content().Add(hierarchy_);
+		right_accordion_.GetSectionContent(hierarchy_section_).Add(hierarchy_scroll_.SizePos());
+		right_accordion_.GetSectionContent(inspector_section_).Add(container_actions_);
 		right_accordion_.GetSectionContent(inspector_section_).Add(inspector_.SizePos());
+		right_accordion_.GetSectionContent(theme_override_section_).Add(theme_override_inspector_.SizePos());
 		right_accordion_.GetSectionContent(code_section_).Add(code_scroll_.SizePos());
 		right_accordion_.WhenSectionToggled = [=](int section, bool open) {
 			PostCallback([=] {
-				if(section == inspector_section_ && open)
+				if((section == inspector_section_ || section == theme_override_section_) && open)
 					RefreshInspector();
 				else if(section == code_section_ && open)
 					RefreshCode();
@@ -632,36 +674,10 @@ private:
 					RefreshRightPanel();
 			});
 		};
-		hierarchy_heading_.SetText("HIERARCHY").NoWantFocus();
 		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
 		toolbox_help_text_.NoWantFocus().IgnoreMouse();
 		UpdateToolboxHelp(String());
-		template_row_.SetLabel("Starter");
-		template_row_.Add("Current", "Current");
-		template_row_.Add("Holy Grail", "HolyGrail");
-		template_row_.Add("Magazine", "Magazine");
-		template_row_.Add("SPA", "SPA");
-		template_row_.Add("Card Grid", "CardGrid");
-		template_row_.Add("Split Screen", "SplitScreen");
-		template_row_.Add("F-Pattern", "FPattern");
-		template_row_.SetData("Current");
-		template_row_.WhenSelectData = [=](const Value& id) {
-			if(syncing_template_)
-				return;
-			if(!IsNull(id))
-				ApplyStarterTemplate((String)id);
-		};
-		template_row_.WhenClose = [=] {
-			Ptr<UiCompositeDropdown> self = &template_row_;
-			PostCallback([=] {
-				if(syncing_template_ || !self)
-					return;
-				Value id = self->GetData();
-				if(!IsNull(id))
-					ApplyStarterTemplate((String)id);
-			});
-		};
 		ApplyTheme(theme_preset_, UiThemeMode::Light);
 	}
 
@@ -903,6 +919,21 @@ private:
 		toolbox_presets_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 4));
 	}
 
+	void RefreshOverlayButton()
+	{
+		overlay_button_.SetCustomStyle(UiTheme::ResolveButton(show_design_overlays_ ? UiRole::Accent : UiRole::Standard));
+		overlay_button_.SetIcon(show_design_overlays_ ? ICON_ACTION_OUTLINED_VISIBILITY_48()
+		                                               : ICON_ACTION_OUTLINED_VISIBILITY_OFF_48());
+		overlay_button_.Tip(show_design_overlays_ ? "Hide designer overlays" : "Show designer overlays");
+	}
+
+	void ToggleDesignOverlays()
+	{
+		show_design_overlays_ = !show_design_overlays_;
+		preview_.ShowDesignOverlays(show_design_overlays_);
+		RefreshOverlayButton();
+	}
+
 	void UpdateToolboxHelp(const String& type_id)
 	{
 		if(type_id.StartsWith("preset:")) {
@@ -955,6 +986,7 @@ private:
 			UiModelItem item(text, n->id);
 			item.right_text = HierarchyTypeText(*n, t);
 			item.columns = HierarchyModeColumns(*n);
+			item.editable = id != Designer_ROOT && prefix.IsEmpty();
 			bool selected = FindNodeId(model_.GetSelection(), id) >= 0;
 			item.icon = NodeIcon(t);
 			item.icon_render_mode = UiIconRenderMode::MonoTint;
@@ -1021,6 +1053,8 @@ private:
 			return;
 		}
 		inspector_.SetNode(model_.GetSelection()[0]);
+		theme_override_inspector_.SetNode(model_.GetSelection()[0]);
+		RefreshContainerActions();
 		RefreshRightPanel();
 	}
 
@@ -1028,6 +1062,170 @@ private:
 	{
 		code_.SetText(GenerateDesignerCode(model_, registry_));
 		RefreshRightPanel();
+	}
+
+	int FindChildPosition(const DesignerNode& parent, DesignerNodeId child) const
+	{
+		for(int i = 0; i < parent.children.GetCount(); i++)
+			if(parent.children[i] == child)
+				return i;
+		return -1;
+	}
+
+	bool IsPageContainer(const DesignerNode& n) const
+	{
+		return n.type_id == "UiTab" || n.type_id == "UiStack";
+	}
+
+	DesignerNodeId SelectedBreadcrumbId() const
+	{
+		if(model_.GetSelection().IsEmpty())
+			return Designer_NULL;
+		const DesignerNode* n = model_.Find(model_.GetSelection()[0]);
+		return n && n->type_id == "UiBreadcrumbs" ? n->id : Designer_NULL;
+	}
+
+	DesignerNodeId SelectedPageContainerId() const
+	{
+		if(model_.GetSelection().IsEmpty())
+			return Designer_NULL;
+		const DesignerNode* n = model_.Find(model_.GetSelection()[0]);
+		if(!n)
+			return Designer_NULL;
+		if(IsPageContainer(*n))
+			return n->id;
+		if(n->type_id == "PageSlot") {
+			const DesignerNode* parent = model_.Find(n->parent);
+			if(parent && IsPageContainer(*parent))
+				return parent->id;
+		}
+		return Designer_NULL;
+	}
+
+	DesignerNodeId SelectedPageSlotId() const
+	{
+		if(model_.GetSelection().IsEmpty())
+			return Designer_NULL;
+		const DesignerNode* n = model_.Find(model_.GetSelection()[0]);
+		if(n && n->type_id == "PageSlot")
+			return n->id;
+		DesignerNodeId container_id = SelectedPageContainerId();
+		const DesignerNode* container = model_.Find(container_id);
+		if(!container || container->children.IsEmpty())
+			return Designer_NULL;
+		int active = clamp((int)DesignerNodePropertyOr(*container, "active", 0), 0, container->children.GetCount() - 1);
+		return container->children[active];
+	}
+
+	void RefreshContainerActions()
+	{
+		DesignerNodeId breadcrumb_id = SelectedBreadcrumbId();
+		if(const DesignerNode* breadcrumb = model_.Find(breadcrumb_id)) {
+			int crumbs = max(1, min(24, (int)DesignerNodePropertyOr(*breadcrumb, "crumb_count", 3)));
+			container_action_label_.SetText(Format("Crumbs (%d)", crumbs));
+			container_add_button_.Tip("Add crumb");
+			container_remove_button_.Tip("Remove current crumb");
+			container_remove_button_.Enable(crumbs > 1);
+			container_actions_.Show();
+			return;
+		}
+		DesignerNodeId container_id = SelectedPageContainerId();
+		const DesignerNode* container = model_.Find(container_id);
+		if(!container) {
+			container_actions_.Hide();
+			return;
+		}
+		int pages = container->children.GetCount();
+		String label = container->type_id == "UiTab" ? "Tab pages" : "Stack pages";
+		label << Format(" (%d)", pages);
+		container_action_label_.SetText(label);
+		container_add_button_.Tip("Add page");
+		container_remove_button_.Tip("Remove selected page");
+		container_remove_button_.Enable(pages > 1);
+		container_actions_.Show();
+	}
+
+	void AddPageSlotForSelection()
+	{
+		DesignerNodeId breadcrumb_id = SelectedBreadcrumbId();
+		DesignerNode* breadcrumb = model_.Find(breadcrumb_id);
+		if(breadcrumb) {
+			int crumbs = max(1, min(24, (int)DesignerNodePropertyOr(*breadcrumb, "crumb_count", 3)));
+			if(crumbs >= 24)
+				return;
+			int next = crumbs + 1;
+			commands_.BeginGroup("Add crumb");
+			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "crumb_count", next, "Set crumb count"), model_);
+			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, DesignerCrumbPropertyKey(crumbs),
+			                                                 Format("Crumb %d", next), "Set crumb text"), model_);
+			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", crumbs, "Select crumb"), model_);
+			commands_.EndGroup();
+			RefreshAll();
+			return;
+		}
+		DesignerNodeId container_id = SelectedPageContainerId();
+		DesignerNode* container = model_.Find(container_id);
+		if(!container)
+			return;
+		int insert = container->children.GetCount();
+		DesignerNodeId selected_page = SelectedPageSlotId();
+		if(selected_page != Designer_NULL) {
+			int q = FindChildPosition(*container, selected_page);
+			if(q >= 0)
+				insert = q + 1;
+		}
+		commands_.BeginGroup("Add page");
+		DesignerNodeId page = AddInitializedNode("PageSlot", container_id, insert);
+		if(page == Designer_NULL) {
+			commands_.EndGroup();
+			return;
+		}
+		if(DesignerNode* p = model_.Find(page)) {
+			int number = insert + 1;
+			p->name = UniqueDesignerName(Format("page%d", number), page);
+			p->properties.Set("page_title", Format("Page %d", number));
+		}
+		commands_.Execute(MakeDesignerSetPropertyCommand(container_id, "active", insert, "Select page"), model_);
+		commands_.EndGroup();
+		model_.SelectOne(page);
+		RefreshAll();
+	}
+
+	void RemovePageSlotForSelection()
+	{
+		DesignerNodeId breadcrumb_id = SelectedBreadcrumbId();
+		DesignerNode* breadcrumb = model_.Find(breadcrumb_id);
+		if(breadcrumb) {
+			int crumbs = max(1, min(24, (int)DesignerNodePropertyOr(*breadcrumb, "crumb_count", 3)));
+			if(crumbs <= 1)
+				return;
+			int current = clamp((int)DesignerNodePropertyOr(*breadcrumb, "current", crumbs - 1), 0, crumbs - 1);
+			int next = crumbs - 1;
+			commands_.BeginGroup("Remove crumb");
+			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "crumb_count", next, "Set crumb count"), model_);
+			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", min(current, next - 1), "Select crumb"), model_);
+			commands_.EndGroup();
+			RefreshAll();
+			return;
+		}
+		DesignerNodeId container_id = SelectedPageContainerId();
+		DesignerNode* container = model_.Find(container_id);
+		if(!container || container->children.GetCount() <= 1)
+			return;
+		DesignerNodeId page = SelectedPageSlotId();
+		int pos = page != Designer_NULL ? FindChildPosition(*container, page) : -1;
+		if(pos < 0) {
+			pos = clamp((int)DesignerNodePropertyOr(*container, "active", 0), 0, container->children.GetCount() - 1);
+			page = container->children[pos];
+		}
+		int next_active = min(pos, container->children.GetCount() - 2);
+		DesignerNodeId next_page = container->children[next_active >= pos ? next_active + 1 : next_active];
+		commands_.BeginGroup("Remove page");
+		commands_.Execute(MakeDesignerRemoveNodeCommand(page), model_);
+		commands_.Execute(MakeDesignerSetPropertyCommand(container_id, "active", next_active, "Select page"), model_);
+		commands_.EndGroup();
+		model_.SelectOne(next_page);
+		RefreshAll();
 	}
 
 	// Coalesce refreshes posted by property callbacks.
@@ -1057,35 +1255,61 @@ private:
 
 	void SyncAccordionBodyHeights()
 	{
-		if(inspector_section_ < 0 || code_section_ < 0)
+		if(hierarchy_section_ < 0 || inspector_section_ < 0 || theme_override_section_ < 0 || code_section_ < 0)
 			return;
 		int body_w = max(DPI(120), right_accordion_.GetSize().cx - DPI(18));
 		inspector_.Layout();
-		int inspector_h = max(DPI(44), inspector_.MeasureHeightForWidth(body_w));
+		theme_override_inspector_.Layout();
+		int hierarchy_h = DPI(255);
+		int actions_h = container_actions_.IsShown() ? DPI(34) : 0;
+		int inspector_h = max(DPI(44), inspector_.MeasureHeightForWidth(body_w)) + actions_h;
+		int overrides_h = max(DPI(44), theme_override_inspector_.MeasureHeightForWidth(body_w));
 		int code_h = DPI(320);
+		right_accordion_.SetSectionBodyHeight(hierarchy_section_, hierarchy_h);
 		right_accordion_.SetSectionBodyHeight(inspector_section_, inspector_h);
+		right_accordion_.SetSectionBodyHeight(theme_override_section_, overrides_h);
 		right_accordion_.SetSectionBodyHeight(code_section_, code_h);
 	}
 
 	void LayoutAccordionBodies()
 	{
-		if(inspector_section_ < 0 || code_section_ < 0)
+		if(hierarchy_section_ < 0 || inspector_section_ < 0 || theme_override_section_ < 0 || code_section_ < 0)
 			return;
+		ParentCtrl& hierarchy_content = right_accordion_.GetSectionContent(hierarchy_section_);
 		ParentCtrl& inspector_content = right_accordion_.GetSectionContent(inspector_section_);
+		ParentCtrl& overrides_content = right_accordion_.GetSectionContent(theme_override_section_);
 		ParentCtrl& code_content = right_accordion_.GetSectionContent(code_section_);
+		Size hsz = hierarchy_content.GetSize();
 		Size isz = inspector_content.GetSize();
+		Size osz = overrides_content.GetSize();
 		Size csz = code_content.GetSize();
+		int hw = max(DPI(120), hsz.cx);
+		int hh = max(DPI(120), hsz.cy);
 		int iw = max(DPI(120), isz.cx);
+		int ow = max(DPI(120), osz.cx);
 		int cw = max(DPI(120), csz.cx);
+		int actions_h = container_actions_.IsShown() ? DPI(34) : 0;
 		int ih = max(DPI(44), inspector_.MeasureHeightForWidth(iw));
+		int oh = max(DPI(44), theme_override_inspector_.MeasureHeightForWidth(ow));
 		int ch = max(DPI(120), csz.cy);
 		Size code_size = code_.GetContentSize();
 		int code_inner_w = max(cw, code_size.cx + DPI(18));
 		int code_inner_h = max(ch, code_size.cy + DPI(18));
-		inspector_.SetRect(0, 0, iw, ih);
+		Size hierarchy_size = hierarchy_.GetContentSize();
+		int hierarchy_inner_w = max(hw, hierarchy_size.cx + DPI(18));
+		int hierarchy_inner_h = max(hh + DPI(20), hierarchy_size.cy + DPI(38));
+		hierarchy_scroll_.SetRect(0, 0, hw, hh);
+		hierarchy_.SetRect(0, 0, hierarchy_inner_w, hierarchy_inner_h);
+		if(container_actions_.IsShown())
+			container_actions_.SetRect(0, 0, iw, actions_h);
+		inspector_.SetRect(0, actions_h, iw, ih);
+		theme_override_inspector_.SetRect(0, 0, ow, oh);
 		code_scroll_.SetRect(0, 0, cw, ch);
 		code_box_.SetRect(0, 0, code_inner_w, code_inner_h);
+		hierarchy_.Layout();
+		hierarchy_scroll_.Layout();
 		inspector_.Layout();
+		theme_override_inspector_.Layout();
 		code_box_.Layout();
 		code_scroll_.Layout();
 	}
@@ -1108,12 +1332,6 @@ private:
 		int gap = DPI(8);
 		Rect r = right_box_.GetSize();
 		int y = gap;
-		hierarchy_heading_.SetRect(gap, y, max(0, r.GetWidth() - gap * 2), DPI(22));
-		y += DPI(26);
-		template_row_.SetRect(gap, y, max(0, r.GetWidth() - gap * 2), DPI(26));
-		y += DPI(26) + gap;
-		hierarchy_.SetRect(gap, y, max(0, r.GetWidth() - gap * 2), DPI(235));
-		y += DPI(235) + gap;
 		int accordion_w = max(0, r.GetWidth() - gap * 2);
 		right_accordion_.SetRect(gap, y, accordion_w, max(DPI(320), r.GetHeight() - y - gap));
 		SyncAccordionBodyHeights();
@@ -1162,10 +1380,11 @@ private:
 			}
 			Rect pr = preview_.GetScreenRect();
 			Rect hr = hierarchy_.GetScreenRect();
-			if(pr.Contains(screen)) {
-				preview_.SetPlacementType(PresetDisplayName(type_id.Mid(7)));
-				preview_.TrackPlacement(screen - pr.TopLeft());
-			}
+		if(pr.Contains(screen)) {
+			hierarchy_.ClearTrackedDropTarget();
+			preview_.SetPlacementType(PresetDisplayName(type_id.Mid(7)));
+			preview_.TrackPlacement(screen - pr.TopLeft());
+		}
 			else if(hr.Contains(screen)) {
 				preview_.SetPlacementType(String());
 				hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
@@ -1187,19 +1406,18 @@ private:
 		Rect pr = preview_.GetScreenRect();
 		Rect hr = hierarchy_.GetScreenRect();
 		if(pr.Contains(screen)) {
+			hierarchy_.ClearTrackedDropTarget();
 			preview_.SetPlacementType(type_id);
 			DesignerNodeId target = preview_.TrackPlacement(screen - pr.TopLeft());
 			drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target, preview_.GetDropIndex()));
 		}
 		else if(hr.Contains(screen)) {
 			preview_.SetPlacementType(String());
-			UiTreeNodeRef ref = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
-			DesignerNodeId target = GetHierarchyNodeId(ref);
-			if(!target)
-				target = Designer_ROOT;
-			drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target));
+			UiTree::DropInfo info = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
+			drag_.UpdateTarget(model_, registry_, MakeHierarchyDropTarget(info));
 		}
 		else {
+			hierarchy_.ClearTrackedDropTarget();
 			preview_.SetPlacementType(String());
 			drag_.UpdateTarget(model_, registry_, DesignerDropTarget());
 		}
@@ -1255,38 +1473,37 @@ private:
 		Rect pr = preview_.GetScreenRect();
 		Rect hr = hierarchy_.GetScreenRect();
 		if(pr.Contains(screen)) {
+			hierarchy_.ClearTrackedDropTarget();
 			preview_.SetPlacementType("selected node");
 			DesignerNodeId target = preview_.TrackPlacement(screen - pr.TopLeft());
 			drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target, preview_.GetDropIndex()));
 		}
 		else if(hr.Contains(screen)) {
 			preview_.SetPlacementType(String());
-			UiTreeNodeRef ref = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
-			DesignerNodeId target = GetHierarchyNodeId(ref);
-			if(!target)
-				target = Designer_ROOT;
-			drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target));
+			UiTree::DropInfo info = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
+			drag_.UpdateTarget(model_, registry_, MakeHierarchyDropTarget(info));
 		}
 		else
 		{
+			hierarchy_.ClearTrackedDropTarget();
 			preview_.SetPlacementType(String());
 			drag_.UpdateTarget(model_, registry_, DesignerDropTarget());
 		}
-		String text = "Dragging selected node";
-		const DesignerDropTarget& target = drag_.GetTarget();
-		if(!target.message.IsEmpty())
-			text << " - " << target.message;
-		ShowDragStatus(text, screen);
 	}
 
 	void FinishNodeDrag(DesignerNodeId id, UiTreeNodeRef fallback_target)
 	{
 		if(drag_.GetKind() != DesignerDragKind::Node || drag_.GetNodeId() != id) {
 			drag_.BeginNodeDrag(id);
-			DesignerNodeId target = GetHierarchyNodeId(fallback_target);
-			if(!target)
-				target = Designer_ROOT;
-			drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target));
+			UiTree::DropInfo info = hierarchy_.GetDropInfo();
+			if(!info.valid && fallback_target.IsValid()) {
+				DesignerNodeId target = GetHierarchyNodeId(fallback_target);
+				if(!target)
+					target = Designer_ROOT;
+				drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target));
+			}
+			else
+				drag_.UpdateTarget(model_, registry_, MakeHierarchyDropTarget(info));
 		}
 		DesignerDropTarget target = drag_.GetTarget();
 		preview_.SetPlacementType(String());
@@ -1377,10 +1594,12 @@ private:
 			insert_index = preview_.GetDropIndex();
 		}
 		else if(hr.Contains(screen)) {
-			UiTreeNodeRef ref = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
-			DesignerNodeId target = GetHierarchyNodeId(ref);
-			if(target)
+			UiTree::DropInfo info = hierarchy_.TrackExternalDrop(screen - hr.TopLeft());
+			DesignerNodeId target = GetHierarchyNodeId(info.parent);
+			if(target) {
 				parent_id = target;
+				insert_index = info.insert_pos;
+			}
 		}
 		else if(!model_.GetSelection().IsEmpty())
 			parent_id = model_.GetSelection()[0];
@@ -1632,6 +1851,96 @@ private:
 		return IsNumber(v) ? (int)v : Designer_NULL;
 	}
 
+	DesignerDropTarget MakeHierarchyDropTarget(const UiTree::DropInfo& info) const
+	{
+		if(!info.valid)
+			return DesignerDropTarget();
+		DesignerNodeId parent = GetHierarchyNodeId(info.parent);
+		if(parent == Designer_NULL)
+			parent = Designer_ROOT;
+		return DesignerMakeIntoTarget(parent, info.insert_pos);
+	}
+
+	void HandleHierarchyColumnAction(UiTreeNodeRef ref, int column)
+	{
+		DesignerNodeId id = GetHierarchyNodeId(ref);
+		DesignerNode* n = model_.Find(id);
+		if(!n || id == Designer_ROOT)
+			return;
+
+		if(column == 0) {
+			if(n->type_id == "BoxLayout") {
+				String d = AsString(DesignerNodePropertyOr(*n, "direction", "V"));
+				SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+			}
+			else if(n->type_id == "UiSplitter" || n->type_id == "UiQuadSplitter") {
+				String d = AsString(DesignerNodePropertyOr(*n, "direction", "H"));
+				SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+			}
+			return;
+		}
+
+		if(column == 1 || column == 2) {
+			const char *key = column == 1 ? "h_sizing" : "v_sizing";
+			String sizing = AsString(DesignerNodePropertyOr(*n, key, "Fit"));
+			String next = sizing == "Fit" ? "Expand" : sizing == "Expand" ? "Fixed" : "Fit";
+			SaveInspectorPropertyValue(id, key, next);
+			return;
+		}
+
+		if(column == 3 && n->type_id == "BoxLayout") {
+			String wrap = AsString(DesignerNodePropertyOr(*n, "wrap", "None"));
+			String next = wrap == "None" ? "Flow" : wrap == "Flow" ? "Snap" : "None";
+			SaveInspectorPropertyValue(id, "wrap", next);
+		}
+	}
+
+	void HandleHierarchyMoveRequest(UiTreeMoveRequest& request)
+	{
+		request.handled = true;
+		DesignerNodeId parent = GetHierarchyNodeId(request.new_parent);
+		if(parent == Designer_NULL)
+			parent = Designer_ROOT;
+		if(!model_.Find(parent) || request.nodes.IsEmpty()) {
+			request.accept = false;
+			return;
+		}
+
+		Vector<DesignerNodeId> ids;
+		for(const UiTreeNodeRef& ref : request.nodes) {
+			DesignerNodeId id = GetHierarchyNodeId(ref);
+			if(id == Designer_NULL || id == Designer_ROOT || !model_.Find(id)) {
+				request.accept = false;
+				return;
+			}
+			ids.Add(id);
+		}
+
+		bool changed = false;
+		if(ids.GetCount() > 1)
+			commands_.BeginGroup("Move nodes");
+		int insert = request.insert_pos;
+		for(int i = 0; i < ids.GetCount(); i++) {
+			if(commands_.Execute(MakeDesignerMoveNodeCommand(ids[i], parent, insert), model_)) {
+				changed = true;
+				if(insert >= 0)
+					insert++;
+			}
+		}
+		if(ids.GetCount() > 1)
+			changed = commands_.EndGroup() || changed;
+
+		if(!changed) {
+			request.accept = false;
+			return;
+		}
+		model_.SetSelection(ids);
+		String error;
+		if(!model_.Validate(error))
+			SetWarningNotes("Model validation failed after hierarchy move: " + error);
+		RefreshAll();
+	}
+
 	// Commit an inspector property edit through a command.
 	// The adapter descriptor is checked first so hidden/disabled properties cannot
 	// be changed by stale inspector widgets.
@@ -1658,7 +1967,7 @@ private:
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
-			bool needs_inspector = property_id == "h_sizing" || property_id == "v_sizing";
+			bool needs_inspector = property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
 			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
@@ -1895,6 +2204,10 @@ private:
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
 		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Standard));
+		container_add_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+		container_remove_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+		container_action_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body));
+		RefreshOverlayButton();
 		RefreshToolboxCategoryButtons();
 		theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
 		theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
@@ -1915,7 +2228,16 @@ private:
 		toolbox_help_text_.SetCustomStyle(help_text_style);
 		toolbox_tree_.SetCustomStyle(UiTheme::ResolveTree());
 		UiTree::Style hierarchy_style = UiTheme::ResolveTree();
-		hierarchy_style.accessory_gap = DPI(2);
+		hierarchy_style.font = SansSerifZ(11);
+		hierarchy_style.row_height = DPI(24);
+		hierarchy_style.indent_px = DPI(14);
+		hierarchy_style.glyph_size = DPI(10);
+		hierarchy_style.icon_size = DPI(14);
+		hierarchy_style.content_gap = DPI(4);
+		hierarchy_style.h_padding = DPI(4);
+		hierarchy_style.v_padding = DPI(3);
+		hierarchy_style.metrics.content_margin = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
+		hierarchy_style.accessory_gap = DPI(3);
 		hierarchy_.SetCustomStyle(hierarchy_style);
 		drag_status_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body));
 		warning_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
@@ -1987,6 +2309,7 @@ private:
 	UiLabel version_badge_;
 	UiButton save_button_;
 	UiButton load_button_;
+	UiButton overlay_button_;
 	UiCompositeDropdown theme_preset_row_;
 	UiPanel theme_shell_;
 	UiLabel theme_icon_;
@@ -2007,25 +2330,31 @@ private:
 	UiLabel toolbox_help_text_;
 	String toolbox_help_raw_;
 	DesignerPreview preview_;
+	bool show_design_overlays_ = true;
 	UiLabel drag_status_;
 	UiPanel warning_panel_;
 	UiLabel warning_icon_;
 	UiLabel warning_text_;
 	UiScrollPanel side_;
 	UiPanel right_box_;
-	UiLabel hierarchy_heading_;
-	UiCompositeDropdown template_row_;
+	UiScrollPanel hierarchy_scroll_;
 	DesignerHierarchyTree hierarchy_;
 	UiTreeModel hierarchy_model_;
 	VectorMap<DesignerNodeId, UiTreeNodeRef> hierarchy_refs_;
 	bool syncing_hierarchy_ = false;
 	UiAccordion right_accordion_;
+	int hierarchy_section_ = -1;
 	int inspector_section_ = -1;
+	int theme_override_section_ = -1;
 	int code_section_ = -1;
+	UiBoxLayout container_actions_ { UiDirection::H };
+	UiLabel container_action_label_;
+	UiButton container_add_button_;
+	UiButton container_remove_button_;
 	DesignerInspector inspector_;
+	DesignerInspector theme_override_inspector_;
 	DesignerCommandStack commands_;
 	DesignerDragController drag_;
-	bool syncing_template_ = false;
 	UiScrollPanel code_scroll_;
 	UiBoxLayout code_box_;
 	UiLabel code_;

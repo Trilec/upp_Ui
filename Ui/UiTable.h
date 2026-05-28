@@ -161,6 +161,8 @@ public:
 
     UiTable& SetModel(UiTableModel& model);
     UiTable& UseInternalModel();
+    UiTable& EnableInternalMutation(bool on = true);
+    bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
     UiTableModel& GetInternalModel() { return internal_model_; }
     UiTableModel& GetModel() { return *model_; }
     const UiTableModel& GetModel() const { return *model_; }
@@ -207,6 +209,7 @@ public:
 
     Event<> WhenSelection;
     Event<> WhenAction;
+    Event<UiTableEditRequest&> WhenEditRequest;
     Event<int, int, const Value&> WhenAcceptEdit;
     Event<UiTableAxis, int> WhenHeaderAction;
     Event<EditString&, int, int, const UiTableCell&> WhenConfigureEditor;
@@ -276,6 +279,7 @@ private:
     UiTableModel internal_model_;
     UiTableModel* model_ = nullptr;
     mutable int model_revision_ = -1;
+    bool internal_mutation_enabled_ = true;
 
     Vector<int> column_widths_;
     HScrollBar hscroll_;
