@@ -177,6 +177,9 @@ Rect UiScrollPanel::MeasureContentBounds() const
         if(!q->IsShown())
             continue;
         Rect r = q->GetRect();
+        Size min_size = q->GetMinSize();
+        r.right = max(r.right, r.left + min_size.cx);
+        r.bottom = max(r.bottom, r.top + min_size.cy);
         if(first) {
             b = r;
             first = false;
