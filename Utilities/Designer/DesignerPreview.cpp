@@ -660,6 +660,10 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 				natural.cx = (int)DesignerPreviewNodeProperty(n, "width", natural.cx);
 			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
 				natural.cy = (int)DesignerPreviewNodeProperty(n, "height", natural.cy);
+			if(n.type_id != "Spacer" && n.type_id != "PaneSlot" && n.type_id != "PageSlot" && n.type_id != "AccordionSectionSlot") {
+				minsz.cx = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP));
+				minsz.cy = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP));
+			}
 			return Size(max(minsz.cx, natural.cx), max(minsz.cy, natural.cy));
 		}
 

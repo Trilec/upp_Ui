@@ -563,6 +563,26 @@ static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& chil
 	return ".Fit()";
 }
 
+static bool HasDesignerMinSizeOverride(const DesignerNode& n)
+{
+	return DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP ||
+	       DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP;
+}
+
+static void EmitDesignerMinSize(String& out, const String& var, const DesignerNode& n)
+{
+	if(n.type_id == "Spacer" || n.type_id == "PaneSlot" || n.type_id == "UiPanel" ||
+	   n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
+		return;
+	if(!HasDesignerMinSizeOverride(n))
+		return;
+	out << "\t\t" << var << ".SetMinSize(Size(DPI("
+	    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP))
+	    << "), DPI("
+	    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP))
+	    << ")));\n";
+}
+
 static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& names,
                       const DesignerNode& n, bool emit_designer_appearance)
 {
@@ -570,6 +590,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
 		return;
 	EmitThemeStyle(out, var, n, emit_designer_appearance);
+	EmitDesignerMinSize(out, var, n);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
 		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"

@@ -707,6 +707,15 @@ static void HideThemeOverrideBindings(DesignerApiBuilder& b)
 	b.Hide("shadow_curve");
 }
 
+static void HideQuadFaceBindings(DesignerApiBuilder& b)
+{
+	b.Hide("face_mode");
+	b.Hide("face_tl");
+	b.Hide("face_tr");
+	b.Hide("face_bl");
+	b.Hide("face_br");
+}
+
 static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNode& n)
 {
 	static const char *theme_group = "Theme Overrides";
@@ -732,6 +741,10 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	b.AddInt("height", "Height", DesignerEditorKind::Slider,
 	         "UiBoxLayout::ItemRef::Fixed / UiGridLayout::Add(... fixed)",
 	         "Fixed height is applied when sizing is Fixed; otherwise actual height is computed by the parent layout.", 10, 900);
+	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
+	         "Minimum width used by preview and generated code when the parent layout compresses this control.", 10, 1600);
+	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
+	         "Minimum height used by preview and generated code when the parent layout compresses this control.", 10, 900);
 	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
 	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
 	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
@@ -818,6 +831,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("radius");
 		b.Hide("face_enabled");
 		b.Hide("frame_enabled");
+		b.Hide("min_width");
+		b.Hide("min_height");
 		b.AddChoice("spacer_kind", "Spacer", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
 		            "Semantic layout spacer kind.",
 		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
@@ -843,6 +858,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Disable("v_sizing", "Slot size is owned by the " + owner + ".");
 		b.Disable("width", "Slot width is owned by the " + owner + ".");
 		b.Disable("height", "Slot height is owned by the " + owner + ".");
+		b.Disable("min_width", "Slot minimum width is owned by the " + owner + ".");
+		b.Disable("min_height", "Slot minimum height is owned by the " + owner + ".");
 		if(node.type_id == "AccordionSectionSlot") {
 			b.Add("section_title", "Section title", DesignerEditorKind::Text, "UiAccordion::AddSection",
 			      "Title shown in the accordion header.");
@@ -864,10 +881,6 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		}
 		return;
 	}
-	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "UiPanel::SetSizeMin",
-	         "Outer minimum width used when the panel is fit-sized.", DESIGNER_MIN_CLAMP, 800);
-	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "UiPanel::SetSizeMin",
-	         "Outer minimum height used when the panel is fit-sized.", DESIGNER_MIN_CLAMP, 800);
 	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
 	      "Designer placeholder text used until this node becomes a real control.");
 }
@@ -1570,10 +1583,6 @@ void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	         "UiBreadcrumbs::Style::divider_gap", "Space on each side of the divider.", 0, 48);
 	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider,
 	         "UiBreadcrumbs::Style::content_gap", "Gap between optional path icon and crumbs.", 0, 48);
-	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider,
-	         "Ctrl::SetMinSize", "Preview minimum width.", 10, 800);
-	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider,
-	         "Ctrl::SetMinSize", "Preview minimum height.", 10, 160);
 }
 
 void DesignerBreadcrumbsAdapter::Paint(Draw& w)
@@ -1830,6 +1839,7 @@ void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideQuadFaceBindings(b);
 	b.Add("single_open", "Single open", DesignerEditorKind::Bool, "UiAccordion::SetSingleOpen",
 	      "Only one section can be open at a time.");
 	b.Add("enforce_one", "Keep one open", DesignerEditorKind::Bool, "UiAccordion::SetEnforceOne",
@@ -2227,6 +2237,16 @@ void DesignerQuadSplitterAdapter::Paint(Draw& w)
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 
+static void ApplyDesignerControlMinSize(Ctrl& ctrl, const DesignerNode& node)
+{
+	if(node.type_id == "Spacer" || node.type_id == "PaneSlot" ||
+	   node.type_id == "PageSlot" || node.type_id == "AccordionSectionSlot")
+		return;
+	int min_w = DesignerClampMin((int)AdapterNodeProperty(node, "min_width", DESIGNER_MIN_CLAMP));
+	int min_h = DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP));
+	ctrl.SetMinSize(Size(DPI(min_w), DPI(min_h)));
+}
+
 Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adapter)
 {
 	Ctrl *ctrl = nullptr;
@@ -2352,6 +2372,7 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		a = p;
 	}
 	a->SyncFromNode(node);
+	ApplyDesignerControlMinSize(*ctrl, node);
 	if(adapter)
 		*adapter = a;
 	return ctrl;

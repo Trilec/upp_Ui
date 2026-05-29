@@ -221,6 +221,8 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return t.default_size.cx;
 	if(b.property_id == "height")
 		return t.default_size.cy;
+	if(b.property_id == "min_width" || b.property_id == "min_height")
+		return DESIGNER_MIN_CLAMP;
 	if(b.property_id == "radius") {
 		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
 		return surface.found ? surface.radius : 0;
