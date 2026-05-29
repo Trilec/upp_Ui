@@ -26,6 +26,32 @@ static String DesignerPreviewAxisSizing(const DesignerNode& n, const String& axi
 	return DesignerPreviewNodeProperty(n, axis_key, "Fit");
 }
 
+
+static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
+{
+	String sizing = DesignerPreviewAxisSizing(n, axis);
+	if(sizing == "Fixed")
+		return DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(n, value_key, fallback)));
+	Size minsz = child.GetMinSize();
+	int natural = value_key == "width" ? minsz.cx : minsz.cy;
+	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 10)));
+	return max(natural, user_min);
+}
+
+static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n)
+{
+	String hs = DesignerPreviewAxisSizing(n, "h_sizing");
+	String vs = DesignerPreviewAxisSizing(n, "v_sizing");
+	if(hs == "Expand")
+		child.HSizePosZ(0, 0);
+	else
+		child.LeftPosZ(0, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+	if(vs == "Expand")
+		child.VSizePosZ(0, 0);
+	else
+		child.TopPosZ(0, DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+}
+
 static Color DesignerPreviewBackground(UiThemeMode mode)
 {
 	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
@@ -827,6 +853,12 @@ DesignerNodeId DesignerPreview::ResolveDropTarget(DesignerNodeId hit) const
 			while(id) {
 				const DesignerNode* n = model_->Find(id);
 				const DesignerType* t = n ? registry_->Find(n->type_id) : nullptr;
+				const DesignerNode* parent = n ? model_->Find(n->parent) : nullptr;
+				if(parent && DesignerPreviewIsPageContainer(*parent)) {
+					DesignerNodeId page = DesignerPreviewActivePageSlot(*parent);
+					if(page != Designer_NULL && page != drag_candidate_)
+						return page;
+				}
 				if(n && DesignerPreviewIsPageContainer(*n)) {
 					DesignerNodeId page = DesignerPreviewActivePageSlot(*n);
 					if(page != Designer_NULL && page != drag_candidate_)
@@ -1026,17 +1058,22 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				int body_height = (int)DesignerPreviewNodeProperty(child_node, "body_height", -1);
 				if(body_height > 0)
 					accordion->SetSectionBodyHeight(section, DPI(body_height));
-				accordion->GetSectionContent(section).Add(child.SizePos());
+				accordion->GetSectionContent(section).Add(child);
+				DesignerPreviewApplyDirectChildLayout(child, child_node);
 			}
-			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent))
-				scroll->Content().Add(child.SizePos());
+			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent)) {
+				scroll->Content().Add(child);
+				DesignerPreviewApplyDirectChildLayout(child, child_node);
+			}
 			else if(DesignerGroupPanelAdapter *group = dynamic_cast<DesignerGroupPanelAdapter *>(&parent)) {
 				if(!group->GetContent())
 					group->SetContent(child);
-				child.SizePos();
+				DesignerPreviewApplyDirectChildLayout(child, child_node);
 			}
-			else
-				parent_ctrl.Add(child.SizePos());
+			else {
+				parent_ctrl.Add(child);
+				DesignerPreviewApplyDirectChildLayout(child, child_node);
+			}
 		}
 
 void DesignerPreview::FinalizeRealNode(DesignerAdapter& adapter, const DesignerNode& node)
@@ -1128,6 +1165,16 @@ void DesignerPreview::RefreshRealPreviewTree(Ctrl& ctrl)
 
 void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 {
+			if(!ctrl.IsShown()) {
+				if(DesignerAdapter *adapter = AsDesignerAdapter(ctrl)) {
+					DesignerNode* n = model_ ? model_->Find(adapter->GetNodeId()) : nullptr;
+					if(n)
+						n->last_rect = Rect(0, 0, 0, 0);
+				}
+				for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())
+					UpdateRealRects(*child, Point(0, 0));
+				return;
+			}
 			if(DesignerAdapter *adapter = AsDesignerAdapter(ctrl)) {
 				DesignerNode* n = model_ ? model_->Find(adapter->GetNodeId()) : nullptr;
 				if(n)

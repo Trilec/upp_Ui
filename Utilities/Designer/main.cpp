@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.48";
+static const char* DESIGNER_VERSION = "v0.1.49";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static String DesignerCrumbPropertyKey(int i)
