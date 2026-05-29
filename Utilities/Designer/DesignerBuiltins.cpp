@@ -537,6 +537,18 @@ static DesignerType MakeAccordionType()
 		n.properties.Set("face_enabled", false);
 		n.properties.Set("frame_enabled", false);
 		n.properties.Set("radius", 0);
+		n.properties.Set("header_face_enabled", false);
+		n.properties.Set("header_frame_enabled", false);
+		n.properties.Set("header_radius", 8);
+		n.properties.Set("header_face", Color(248, 250, 252));
+		n.properties.Set("header_frame", Color(203, 213, 225));
+		n.properties.Set("header_title", Color(0, 120, 212));
+		n.properties.Set("header_subtitle", Color(100, 116, 139));
+		n.properties.Set("body_face_enabled", false);
+		n.properties.Set("body_frame_enabled", false);
+		n.properties.Set("body_radius", 0);
+		n.properties.Set("body_face", Color(255, 255, 255));
+		n.properties.Set("body_frame", Color(226, 232, 240));
 	};
 	return t;
 }

@@ -249,8 +249,98 @@ static String ShadowCurveExpr(const String& curve)
 	return "ShadowSoft()";
 }
 
+
+static void EmitSurfaceOverrideFields(String& out, const String& target, const DesignerNode& n, const String& prefix)
+{
+	String face_enabled_key = prefix.IsEmpty() ? String("face_enabled") : prefix + "_face_enabled";
+	String face_key = prefix.IsEmpty() ? String("face") : prefix + "_face";
+	String frame_enabled_key = prefix.IsEmpty() ? String("frame_enabled") : prefix + "_frame_enabled";
+	String frame_key = prefix.IsEmpty() ? String("frame") : prefix + "_frame";
+	String radius_key = prefix.IsEmpty() ? String("radius") : prefix + "_radius";
+	String var_prefix = prefix.IsEmpty() ? String("surface") : prefix;
+	if(CodeGenHasProperty(n, face_enabled_key)) {
+		bool face_enabled = (bool)CodeGenNodeProperty(n, face_enabled_key, false);
+		out << "\t\t\t" << target << ".metrics.face_enabled = " << (face_enabled ? "true" : "false") << ";\n";
+		if(face_enabled) {
+			Color face = CodeGenNodeProperty(n, face_key, SColorFace());
+			out << "\t\t\tColor " << var_prefix << "_face = " << ColorExpr(face) << ";\n"
+			    << "\t\t\t" << target << ".palette.face[ST_NORMAL] = UiFill::Solid(" << var_prefix << "_face);\n"
+			    << "\t\t\t" << target << ".palette.face[ST_HOT] = UiFill::Solid(Blend(" << var_prefix << "_face, White(), 24));\n"
+			    << "\t\t\t" << target << ".palette.face[ST_PRESSED] = UiFill::Solid(Blend(" << var_prefix << "_face, Black(), 16));\n"
+			    << "\t\t\t" << target << ".palette.face[ST_DISABLED] = UiFill::Solid(Blend(" << var_prefix << "_face, SColorFace(), 90));\n";
+		}
+	}
+	if(CodeGenHasProperty(n, frame_enabled_key)) {
+		bool frame_enabled = (bool)CodeGenNodeProperty(n, frame_enabled_key, false);
+		out << "\t\t\t" << target << ".metrics.frame_enabled = " << (frame_enabled ? "true" : "false") << ";\n";
+		if(frame_enabled) {
+			Color frame = CodeGenNodeProperty(n, frame_key, SColorShadow());
+			out << "\t\t\tfor(int i = 0; i < 4; i++)\n"
+			    << "\t\t\t\t" << target << ".palette.frame[i] = " << ColorExpr(frame) << ";\n"
+			    << "\t\t\t" << target << ".metrics.frame_width = max(DPI(1), " << target << ".metrics.frame_width);\n";
+		}
+	}
+	if(CodeGenHasProperty(n, radius_key))
+		out << "\t\t\t" << target << ".metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, radius_key, 0)) << ");\n";
+}
+
+static void EmitAccordionThemeStyle(String& out, const String& var, const DesignerNode& n)
+{
+	if(!(bool)CodeGenNodeProperty(n, "theme_override", false))
+		return;
+	String role = CodeGenNodeProperty(n, "role", "Standard");
+	String role_expr = RoleExpr(role);
+	out << "\t\t{\n"
+	    << "\t\t\tUiAccordion::Style s = UiAccordion::StyleDefault();\n"
+	    << "\t\t\tUiPanel::Style panel = UiTheme::ResolvePanel(" << role_expr << ");\n"
+	    << "\t\t\ts.palette = panel.palette;\n"
+	    << "\t\t\ts.metrics = panel.metrics;\n"
+	    << "\t\t\ts.metrics.radius = max(DPI(8), panel.metrics.radius);\n"
+	    << "\t\t\ts.transparent = true;\n"
+	    << "\t\t\ts.metrics.face_enabled = false;\n"
+	    << "\t\t\ts.metrics.frame_enabled = false;\n"
+	    << "\t\t\ts.metrics.frame_width = 0;\n"
+	    << "\t\t\ts.metrics.shadow.enabled = false;\n"
+	    << "\t\t\ts.body_style = UiTheme::ResolvePanel(" << role_expr << ");\n"
+	    << "\t\t\ts.body_style.transparent = true;\n"
+	    << "\t\t\ts.body_style.metrics.face_enabled = false;\n"
+	    << "\t\t\ts.body_style.metrics.frame_enabled = false;\n"
+	    << "\t\t\ts.body_style.metrics.frame_width = 0;\n"
+	    << "\t\t\ts.body_style.metrics.radius = 0;\n"
+	    << "\t\t\ts.body_style.metrics.focus_enabled = false;\n"
+	    << "\t\t\ts.body_style.metrics.content_margin = Rect(0, 0, 0, 0);\n"
+	    << "\t\t\ts.body_style.metrics.shadow.enabled = false;\n"
+	    << "\t\t\ts.header_style = UiTheme::ResolveTitleCard(" << role_expr << ");\n"
+	    << "\t\t\ts.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));\n"
+	    << "\t\t\ts.header_style.hover_enabled = false;\n"
+	    << "\t\t\ts.header_style.metrics.focus_enabled = false;\n"
+	    << "\t\t\ts.header_style.title_line = false;\n"
+	    << "\t\t\ts.header_style.card_line = true;\n"
+	    << "\t\t\ts.header_style.media_tint_mono = true;\n";
+	EmitSurfaceOverrideFields(out, "s", n, "");
+	EmitSurfaceOverrideFields(out, "s.header_style", n, "header");
+	EmitSurfaceOverrideFields(out, "s.body_style", n, "body");
+	if(CodeGenHasProperty(n, "header_title")) {
+		out << "\t\t\tColor header_title = " << ColorExpr(CodeGenNodeProperty(n, "header_title", Color(0, 120, 212))) << ";\n"
+		    << "\t\t\ts.header_style.title_color = header_title;\n"
+		    << "\t\t\tfor(int i = 0; i < 4; i++) {\n"
+		    << "\t\t\t\ts.header_style.palette.ink[i] = header_title;\n"
+		    << "\t\t\t\ts.header_style.palette.icon[i] = header_title;\n"
+		    << "\t\t\t}\n";
+	}
+	if(CodeGenHasProperty(n, "header_subtitle"))
+		out << "\t\t\ts.header_style.subtitle_color = " << ColorExpr(CodeGenNodeProperty(n, "header_subtitle", Color(100, 116, 139))) << ";\n";
+	out << "\t\t\t" << var << ".SetCustomStyle(s);\n"
+	    << "\t\t}\n";
+}
+
 static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n, bool emit_designer_appearance)
 {
+	if(n.type_id == "UiAccordion") {
+		if(emit_designer_appearance)
+			EmitAccordionThemeStyle(out, var, n);
+		return;
+	}
 	String role = CodeGenNodeProperty(n, "role", "Standard");
 	String role_expr = RoleExpr(role);
 	String style_type = StyleTypeExpr(n);

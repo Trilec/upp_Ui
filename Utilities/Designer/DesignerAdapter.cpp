@@ -401,6 +401,54 @@ static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 	}
 }
 
+
+static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics& metrics,
+                                           const DesignerNode& n, const String& prefix)
+{
+	if(!DesignerBoolProperty(n, "theme_override", false))
+		return;
+	String face_key = prefix + "_face";
+	String frame_key = prefix + "_frame";
+	String face_enabled_key = prefix + "_face_enabled";
+	String frame_enabled_key = prefix + "_frame_enabled";
+	String radius_key = prefix + "_radius";
+	if(DesignerBoolProperty(n, face_enabled_key, false)) {
+		Color face = GetColorProperty(n, face_key, SColorFace());
+		palette.face[ST_NORMAL] = UiFill::Solid(face);
+		palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
+		palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
+		palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
+		metrics.face_enabled = true;
+	}
+	if(DesignerBoolProperty(n, frame_enabled_key, false)) {
+		Color frame = GetColorProperty(n, frame_key, SColorShadow());
+		for(int i = 0; i < 4; i++)
+			palette.frame[i] = frame;
+		metrics.frame_enabled = true;
+		metrics.frame_width = max(DPI(1), metrics.frame_width);
+	}
+	if(DesignerHasProperty(n, radius_key))
+		metrics.radius = max(0, (int)AdapterNodeProperty(n, radius_key, metrics.radius));
+}
+
+static void ApplyAccordionPartOverrides(UiAccordion::Style& s, const DesignerNode& n)
+{
+	if(!DesignerBoolProperty(n, "theme_override", false))
+		return;
+	ApplyPrefixedSurfaceOverrides(s.header_style.palette, s.header_style.metrics, n, "header");
+	ApplyPrefixedSurfaceOverrides(s.body_style.palette, s.body_style.metrics, n, "body");
+	if(DesignerHasProperty(n, "header_title")) {
+		Color title = GetColorProperty(n, "header_title", s.header_style.title_color);
+		s.header_style.title_color = title;
+		for(int i = 0; i < 4; i++) {
+			s.header_style.palette.ink[i] = title;
+			s.header_style.palette.icon[i] = title;
+		}
+	}
+	if(DesignerHasProperty(n, "header_subtitle"))
+		s.header_style.subtitle_color = GetColorProperty(n, "header_subtitle", s.header_style.subtitle_color);
+}
+
 static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 {
 	UiPanel::Style s = UiTheme::ResolvePanel(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
@@ -481,6 +529,7 @@ static UiAccordion::Style DesignerAccordionStyle(const DesignerNode& n)
 	s.header_style.subtitle_font = DesignerFontChoice(n, "header_font", max(7, (int)AdapterNodeProperty(n, "subtitle_font_size", 8)));
 
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyAccordionPartOverrides(s, n);
 	s.single_open = DesignerBoolProperty(n, "single_open", false);
 	s.enforce_one = DesignerBoolProperty(n, "enforce_one", false);
 	s.show_chevron = DesignerBoolProperty(n, "show_chevron", true);
@@ -1805,6 +1854,31 @@ void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	      "Shows a header drag affordance when reordering is enabled.");
 	b.Add("drag_reorder", "Drag reorder", DesignerEditorKind::Bool, "UiAccordion::EnableDragReorder",
 	      "Allows users to reorder sections at runtime.");
+	static const char *theme_group = "Theme Overrides";
+	b.Add("header_face_enabled", "Header fill", DesignerEditorKind::Bool, "UiAccordion::Style::header_style.metrics.face_enabled",
+	      "Uses an explicit fill for section headers.").group = theme_group;
+	b.Add("header_face", "Header face", DesignerEditorKind::Color, "UiAccordion::Style::header_style.palette.face",
+	      "Explicit section header fill color.").group = theme_group;
+	b.Add("header_frame_enabled", "Header frame", DesignerEditorKind::Bool, "UiAccordion::Style::header_style.metrics.frame_enabled",
+	      "Uses an explicit frame for section headers.").group = theme_group;
+	b.Add("header_frame", "Header frame color", DesignerEditorKind::Color, "UiAccordion::Style::header_style.palette.frame",
+	      "Explicit section header frame color.").group = theme_group;
+	b.AddInt("header_radius", "Header radius", DesignerEditorKind::Slider, "UiAccordion::Style::header_style.metrics.radius",
+	         "Explicit section header corner radius.", 0, 64).group = theme_group;
+	b.Add("header_title", "Header title", DesignerEditorKind::Color, "UiAccordion::Style::header_style.title_color",
+	      "Explicit section header title/icon color.").group = theme_group;
+	b.Add("header_subtitle", "Header subtitle", DesignerEditorKind::Color, "UiAccordion::Style::header_style.subtitle_color",
+	      "Explicit section header subtitle color.").group = theme_group;
+	b.Add("body_face_enabled", "Body fill", DesignerEditorKind::Bool, "UiAccordion::Style::body_style.metrics.face_enabled",
+	      "Uses an explicit fill for section bodies.").group = theme_group;
+	b.Add("body_face", "Body face", DesignerEditorKind::Color, "UiAccordion::Style::body_style.palette.face",
+	      "Explicit section body fill color.").group = theme_group;
+	b.Add("body_frame_enabled", "Body frame", DesignerEditorKind::Bool, "UiAccordion::Style::body_style.metrics.frame_enabled",
+	      "Uses an explicit frame for section bodies.").group = theme_group;
+	b.Add("body_frame", "Body frame color", DesignerEditorKind::Color, "UiAccordion::Style::body_style.palette.frame",
+	      "Explicit section body frame color.").group = theme_group;
+	b.AddInt("body_radius", "Body radius", DesignerEditorKind::Slider, "UiAccordion::Style::body_style.metrics.radius",
+	         "Explicit section body corner radius.", 0, 64).group = theme_group;
 }
 
 void DesignerAccordionAdapter::Paint(Draw& w)
