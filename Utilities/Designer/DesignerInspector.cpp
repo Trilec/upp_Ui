@@ -66,6 +66,10 @@ static DesignerInspectorSurfaceDefault DesignerInspectorThemeSurfaceDefault(cons
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveTitleCard(role));
 	if(n.type_id == "UiButton")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveButton(role));
+	if(n.type_id == "UiToolButton")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveToolButton(role));
+	if(n.type_id == "UiAccordion")
+		return DesignerInspectorSurfaceFromStyle(UiAccordion::StyleDefault());
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveEdit(role));
 	if(n.type_id == "UiDropdown")
@@ -111,6 +115,12 @@ String DesignerInspector::RuntimeTypeName(const String& type_id) const
 		return "UiQuadSplitter";
 	if(type_id == "UiStack")
 		return "UiStack";
+	if(type_id == "UiAccordion")
+		return "UiAccordion";
+	if(type_id == "AccordionSectionSlot")
+		return "ParentCtrl";
+	if(type_id == "UiToolButton")
+		return "UiToolButton";
 	if(type_id == "PageSlot")
 		return "ParentCtrl";
 	if(type_id == "Item" || type_id == "Generic")
@@ -165,6 +175,32 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return 8;
 	if(b.property_id == "scroll_mode")
 		return "Auto";
+	if(b.property_id == "single_open" || b.property_id == "enforce_one" ||
+	   b.property_id == "drag_reorder" || b.property_id == "show_drag_handle")
+		return false;
+	if(b.property_id == "show_chevron" || b.property_id == "animation" || b.property_id == "open")
+		return true;
+	if(b.property_id == "chevron_side")
+		return "Right";
+	if(b.property_id == "open_ms")
+		return 120;
+	if(b.property_id == "close_ms")
+		return 0;
+	if(b.property_id == "item_spacing")
+		return 8;
+	if(b.property_id == "header_body_gap")
+		return 4;
+	if(b.property_id == "body_min_height")
+		return 88;
+	if(b.property_id == "section_title")
+		return "Section";
+	if(b.property_id == "section_subtitle")
+		return "";
+	if(b.property_id == "lock")
+		return "None";
+	if(b.property_id == "body_height")
+		return 0;
+
 	if(b.property_id == "min" || b.property_id == "max" || b.property_id == "step")
 		return b.property_id == "max" ? 100 : b.property_id == "step" ? 1 : 0;
 	if(b.property_id == "value")

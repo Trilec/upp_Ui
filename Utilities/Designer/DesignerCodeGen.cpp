@@ -198,6 +198,10 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiTitleCard::Style";
 	if(n.type_id == "UiButton")
 		return "UiButton::Style";
+	if(n.type_id == "UiToolButton")
+		return "UiToolButton::Style";
+	if(n.type_id == "UiAccordion")
+		return "UiAccordion::Style";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
 		return "UiBaseEdit::Style";
 	if(n.type_id == "UiDropdown")
@@ -221,6 +225,10 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		return "UiTheme::ResolveTitleCard(" + role_expr + ")";
 	if(n.type_id == "UiButton")
 		return "UiTheme::ResolveButton(" + role_expr + ")";
+	if(n.type_id == "UiToolButton")
+		return "UiTheme::ResolveToolButton(" + role_expr + ")";
+	if(n.type_id == "UiAccordion")
+		return "UiAccordion::StyleDefault()";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
 		return "UiTheme::ResolveEdit(" + role_expr + ")";
 	if(n.type_id == "UiDropdown")
@@ -251,6 +259,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		return;
 	bool override = emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
 	if(!override) {
+		if(n.type_id == "UiAccordion")
+			return;
 		if(role != "Standard" && n.type_id != "UiScrollPanel")
 			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
 		return;
@@ -382,6 +392,10 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiGroupPanel " << var << ";\n";
 	else if(n.type_id == "UiButton")
 		out << "\tUiButton " << var << ";\n";
+	else if(n.type_id == "UiToolButton")
+		out << "\tUiToolButton " << var << ";\n";
+	else if(n.type_id == "UiAccordion")
+		out << "\tUiAccordion " << var << ";\n";
 	else if(n.type_id == "UiLineEdit")
 		out << "\tUiLineEdit " << var << ";\n";
 	else if(n.type_id == "UiIntEdit")
@@ -408,7 +422,7 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiTree " << var << ";\n";
 	else if(n.type_id == "UiScrollPanel")
 		out << "\tUiScrollPanel " << var << ";\n";
-	else if(n.type_id == "PaneSlot" || n.type_id == "PageSlot")
+	else if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
 		out << "\tParentCtrl " << var << ";\n";
 	else if(n.type_id == "Spacer")
 		return;
@@ -463,7 +477,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
                       const DesignerNode& n, bool emit_designer_appearance)
 {
 	String var = VarName(names, n.id);
-	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "Spacer")
+	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
 		return;
 	EmitThemeStyle(out, var, n, emit_designer_appearance);
 	if(n.type_id == "BoxLayout") {
@@ -588,6 +602,14 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
 	}
+	else if(n.type_id == "UiToolButton") {
+		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ");\n";
+		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
+			    << (int)CodeGenNodeProperty(n, "icon_size", 20) << "), DPI("
+			    << (int)CodeGenNodeProperty(n, "icon_size", 20) << "));\n";
+	}
 	else if(n.type_id == "UiLineEdit") {
 		out << "\t\t" << var << ".SetTextUtf8(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
 		String placeholder = CodeGenNodeProperty(n, "placeholder", "");
@@ -643,6 +665,17 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 			out << "\t\t" << var << ".SetPathIcon(" << icon << ", UiAlign::LEFT, Size(DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << ")));\n";
+	}
+	else if(n.type_id == "UiAccordion") {
+		out << "\t\t" << var << ".SetSingleOpen(" << ((bool)CodeGenNodeProperty(n, "single_open", false) ? "true" : "false") << ")"
+		    << ".SetEnforceOne(" << ((bool)CodeGenNodeProperty(n, "enforce_one", false) ? "true" : "false") << ")"
+		    << ".ShowChevron(" << ((bool)CodeGenNodeProperty(n, "show_chevron", true) ? "true" : "false") << ")"
+		    << ".SetChevronSide(" << AlignSideExpr(CodeGenNodeProperty(n, "chevron_side", "Right"), "Right") << ")"
+		    << ".SetAnimation(" << ((bool)CodeGenNodeProperty(n, "animation", true) ? "true" : "false") << ", "
+		    << (int)CodeGenNodeProperty(n, "open_ms", 120) << ", "
+		    << (int)CodeGenNodeProperty(n, "close_ms", 0) << ")"
+		    << ".ShowDragHandle(" << ((bool)CodeGenNodeProperty(n, "show_drag_handle", false) ? "true" : "false") << ")"
+		    << ".EnableDragReorder(" << ((bool)CodeGenNodeProperty(n, "drag_reorder", false) ? "true" : "false") << ");\n";
 	}
 	else if(n.type_id == "UiTab") {
 		String visual = CodeGenNodeProperty(n, "visual", "Underline");
@@ -785,13 +818,32 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 	}
 	else if(parent.type_id == "UiStack")
 		out << "\t\t" << p << ".AddPage(" << c << ", " << CppString(CodeGenNodeProperty(child, "page_title", child.name)) << ");\n";
+	else if(parent.type_id == "UiAccordion") {
+        String title = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_title", child.name)) : child.name;
+        String subtitle = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_subtitle", "")) : String();
+
+		bool open = child.type_id == "AccordionSectionSlot" ? (bool)CodeGenNodeProperty(child, "open", true) : true;
+		out << "\t\t{\n";
+		out << "\t\t\tint section = " << p << ".AddSection(" << CppString(title) << ", "
+		    << CppString(subtitle) << ", String(), " << (open ? "true" : "false") << ");\n";
+		if(child.type_id == "AccordionSectionSlot") {
+			String lock = CodeGenNodeProperty(child, "lock", "None");
+			if(lock != "None")
+				out << "\t\t\t" << p << ".SetLockMode(section, UiAccordion::Lock::" << lock << ");\n";
+			int body_height = (int)CodeGenNodeProperty(child, "body_height", -1);
+			if(body_height > 0)
+				out << "\t\t\t" << p << ".SetSectionBodyHeight(section, DPI(" << body_height << "));\n";
+		}
+		out << "\t\t\t" << p << ".GetSectionContent(section).Add(" << c << ".SizePos());\n";
+		out << "\t\t}\n";
+	}
 	else if(parent.type_id == "UiScrollPanel")
 		out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
 	else if(parent.type_id == "UiGroupPanel")
 		out << "\t\t" << p << ".SetContent(" << c << ");\n";
 	else if(parent.type_id == "UiPanel")
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
-	else if(parent.type_id == "PaneSlot" || parent.type_id == "PageSlot")
+	else if(parent.type_id == "PaneSlot" || parent.type_id == "PageSlot" || parent.type_id == "AccordionSectionSlot")
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
 }
 

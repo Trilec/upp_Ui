@@ -229,6 +229,28 @@ private:
 	DesignerOverlayState overlay_;
 };
 
+
+// Designer wrapper for UiToolButton.
+// Tool buttons are button-family controls for compact icon command surfaces.
+class DesignerToolButtonAdapter : public UiToolButton, public DesignerAdapter {
+public:
+	typedef DesignerToolButtonAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiToolButton"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
 // Designer wrapper for UiLineEdit.
 // Used to validate field sizing, text editing appearance, and generated edit code.
 class DesignerLineEditAdapter : public UiLineEdit, public DesignerAdapter {
@@ -463,6 +485,29 @@ public:
 private:
 	DesignerNodeId node_id_ = Designer_NULL;
 	UiTreeModel preview_model_;
+	DesignerOverlayState overlay_;
+};
+
+
+// Designer wrapper for UiAccordion.
+// Section children stay explicit model nodes so hierarchy, drag/drop, and codegen
+// all see the same structure.
+class DesignerAccordionAdapter : public UiAccordion, public DesignerAdapter {
+public:
+	typedef DesignerAccordionAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiAccordion"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
 	DesignerOverlayState overlay_;
 };
 

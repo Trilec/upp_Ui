@@ -425,6 +425,77 @@ static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 	button.SetCustomStyle(s);
 }
 
+static void ApplyToolButtonAppearance(UiToolButton& button, const DesignerNode& n)
+{
+	UiToolButton::Style s = UiTheme::ResolveToolButton(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Center")), UiAlign::CENTER);
+	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
+	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Center"), UiAlign::CENTER);
+	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
+	button.SetCustomStyle(s);
+}
+
+static UiAccordion::Lock DesignerAccordionLockChoice(const Value& value)
+{
+	String lock = AsString(value);
+	if(lock == "Open")
+		return UiAccordion::Lock::Open;
+	if(lock == "Closed")
+		return UiAccordion::Lock::Closed;
+	return UiAccordion::Lock::None;
+}
+
+static UiAccordion::Style DesignerAccordionStyle(const DesignerNode& n)
+{
+	UiRole role = DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard"));
+	UiAccordion::Style s = UiAccordion::StyleDefault();
+	UiPanel::Style panel = UiTheme::ResolvePanel(role);
+	s.palette = panel.palette;
+	s.metrics = panel.metrics;
+	s.metrics.radius = max(DPI(8), panel.metrics.radius);
+	s.transparent = true;
+	s.metrics.face_enabled = false;
+	s.metrics.frame_enabled = false;
+	s.metrics.frame_width = 0;
+	s.metrics.shadow.enabled = false;
+
+	s.body_style = UiTheme::ResolvePanel(role);
+	s.body_style.transparent = true;
+	s.body_style.metrics.face_enabled = false;
+	s.body_style.metrics.frame_enabled = false;
+	s.body_style.metrics.frame_width = 0;
+	s.body_style.metrics.radius = 0;
+	s.body_style.metrics.focus_enabled = false;
+	s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
+	s.body_style.metrics.shadow.enabled = false;
+
+	s.header_style = UiTheme::ResolveTitleCard(role);
+	s.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+	s.header_style.hover_enabled = false;
+	s.header_style.metrics.focus_enabled = false;
+	s.header_style.title_line = false;
+	s.header_style.card_line = true;
+	s.header_style.media_tint_mono = true;
+	s.header_style.title_font = DesignerFontChoice(n, "header_font", max(7, (int)AdapterNodeProperty(n, "header_font_size", 11)), true);
+	s.header_style.subtitle_font = DesignerFontChoice(n, "header_font", max(7, (int)AdapterNodeProperty(n, "subtitle_font_size", 8)));
+
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	s.single_open = DesignerBoolProperty(n, "single_open", false);
+	s.enforce_one = DesignerBoolProperty(n, "enforce_one", false);
+	s.show_chevron = DesignerBoolProperty(n, "show_chevron", true);
+	s.chevron_side = DesignerSideChoice(AdapterNodeProperty(n, "chevron_side", "Right"), UiAlign::RIGHT);
+	s.animation_enabled = DesignerBoolProperty(n, "animation", true);
+	s.anim_open_ms = max(0, (int)AdapterNodeProperty(n, "open_ms", 120));
+	s.anim_close_ms = max(0, (int)AdapterNodeProperty(n, "close_ms", 0));
+	s.item_spacing = DPI(max(0, (int)AdapterNodeProperty(n, "item_spacing", 8)));
+	s.header_body_gap = DPI(max(0, (int)AdapterNodeProperty(n, "header_body_gap", 4)));
+	s.body_min_height = DPI(max(0, (int)AdapterNodeProperty(n, "body_min_height", 88)));
+	s.show_drag_handle = DesignerBoolProperty(n, "show_drag_handle", false);
+	s.drag_side = DesignerSideChoice(AdapterNodeProperty(n, "drag_side", "Right"), UiAlign::RIGHT);
+	return s;
+}
+
 static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 {
 	UiBaseEdit::Style s = UiTheme::ResolveEdit(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
@@ -470,6 +541,12 @@ String DesignerAdapterHelp(const String& type_id)
 		return "Compact header/card content with title, subtitle, optional line, radius, and themed face/frame controls.";
 	if(type_id == "UiButton")
 		return "Clickable command control. Use this to test text alignment, sizing, and button placement inside layouts.";
+	if(type_id == "UiToolButton")
+		return "Compact icon command control for toolbar and chrome surfaces.";
+	if(type_id == "UiAccordion")
+		return "Section container with real UiAccordion headers and measured body content.";
+	if(type_id == "AccordionSectionSlot")
+		return "Accordion section body slot. Drop controls or layouts here to populate one accordion section.";
 	if(type_id == "UiLineEdit")
 		return "Single-line text field. Use it to test form rows, fixed heights, and edit theming.";
 	if(type_id == "UiIntEdit")
@@ -703,7 +780,7 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		         "Expander weight relative to other expanding items.", 1, 12);
 		return;
 	}
-	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot") {
+	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot" || node.type_id == "AccordionSectionSlot") {
 		b.Hide("role");
 		HideThemeOverrideBindings(b);
 		b.Hide("theme_override");
@@ -712,11 +789,23 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("radius");
 		b.Hide("face_enabled");
 		b.Hide("frame_enabled");
-		String owner = node.type_id == "PaneSlot" ? "splitter" : "page container";
+		String owner = node.type_id == "PaneSlot" ? "splitter" : node.type_id == "AccordionSectionSlot" ? "accordion" : "page container";
 		b.Disable("h_sizing", "Slot size is owned by the " + owner + ".");
 		b.Disable("v_sizing", "Slot size is owned by the " + owner + ".");
 		b.Disable("width", "Slot width is owned by the " + owner + ".");
 		b.Disable("height", "Slot height is owned by the " + owner + ".");
+		if(node.type_id == "AccordionSectionSlot") {
+			b.Add("section_title", "Section title", DesignerEditorKind::Text, "UiAccordion::AddSection",
+			      "Title shown in the accordion header.");
+			b.Add("section_subtitle", "Subtitle", DesignerEditorKind::Text, "UiAccordion::SetSectionText",
+			      "Optional secondary header text.");
+			b.Add("open", "Open", DesignerEditorKind::Bool, "UiAccordion::Open",
+			      "Initial open state for this section.");
+			b.AddChoice("lock", "Lock", "UiAccordion::SetLockMode",
+			            "Optional section open/closed lock.", {{"None", "None"}, {"Open", "Open"}, {"Closed", "Closed"}});
+			b.AddInt("body_height", "Body height", DesignerEditorKind::Slider, "UiAccordion::SetSectionBodyHeight",
+			         "Explicit body height. Use 0 to clear the explicit height.", 0, 500);
+		}
 		if(node.type_id == "PageSlot") {
 			b.Add("page_title", "Page title", DesignerEditorKind::Text, "UiTab::Add / UiStack::AddPage key",
 			      "Title/key used by the owning tab or stack page.");
@@ -1041,6 +1130,49 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 void DesignerButtonAdapter::Paint(Draw& w)
 {
 	UiButton::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerToolButtonAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyToolButtonAppearance(*this, node);
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearIcon();
+	else
+		SetIcon(icon).SetIconSize(DPI((int)AdapterNodeProperty(node, "icon_size", 20)),
+		                          DPI((int)AdapterNodeProperty(node, "icon_size", 20)))
+		             .SetIconRenderMode(UiIconRenderMode::MonoTint);
+	SetIconScaleToContent((bool)AdapterNodeProperty(node, "icon_scale", false));
+	SetText(TextProperty(node));
+	NoWantFocus();
+}
+
+void DesignerToolButtonAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerToolButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("text", "Text", DesignerEditorKind::Text, "UiToolButton::SetText",
+	      "Optional caption for the tool button.");
+	AddIconBinding(b);
+	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiToolButton::SetIconScaleToContent",
+	      "When enabled, the icon scales to the tool button content box and overrides Icon size.");
+	b.AddChoice("icon_side", "Icon side", "UiToolButton::SetIconSide",
+	            "Where the icon sits relative to optional text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}, {"Center", "Center"}});
+	AddHorizontalAlignmentBinding(b);
+	AddVerticalAlignmentBinding(b);
+}
+
+void DesignerToolButtonAdapter::Paint(Draw& w)
+{
+	UiToolButton::Paint(w);
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -1622,6 +1754,65 @@ void DesignerTreeAdapter::Paint(Draw& w)
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
+void DesignerAccordionAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	Clear();
+	SetCustomStyle(DesignerAccordionStyle(node));
+	SetSingleOpen(DesignerBoolProperty(node, "single_open", false));
+	SetEnforceOne(DesignerBoolProperty(node, "enforce_one", false));
+	ShowChevron(DesignerBoolProperty(node, "show_chevron", true));
+	SetChevronSide(DesignerSideChoice(AdapterNodeProperty(node, "chevron_side", "Right"), UiAlign::RIGHT));
+	SetAnimation(DesignerBoolProperty(node, "animation", true),
+	             max(0, (int)AdapterNodeProperty(node, "open_ms", 120)),
+	             max(0, (int)AdapterNodeProperty(node, "close_ms", 0)));
+	ShowDragHandle(DesignerBoolProperty(node, "show_drag_handle", false));
+	EnableDragReorder(DesignerBoolProperty(node, "drag_reorder", false));
+	NoWantFocus();
+}
+
+void DesignerAccordionAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("single_open", "Single open", DesignerEditorKind::Bool, "UiAccordion::SetSingleOpen",
+	      "Only one section can be open at a time.");
+	b.Add("enforce_one", "Keep one open", DesignerEditorKind::Bool, "UiAccordion::SetEnforceOne",
+	      "Prevents all sections from being closed.");
+	b.Add("show_chevron", "Chevron", DesignerEditorKind::Bool, "UiAccordion::ShowChevron",
+	      "Shows the open/closed affordance in each header.");
+	b.AddChoice("chevron_side", "Chevron side", "UiAccordion::SetChevronSide",
+	            "Header side used by the chevron.", {{"Left", "Left"}, {"Right", "Right"}});
+	b.Add("animation", "Animation", DesignerEditorKind::Bool, "UiAccordion::SetAnimation",
+	      "Animates section open and close changes.");
+	b.AddInt("open_ms", "Open ms", DesignerEditorKind::Slider, "UiAccordion::SetAnimation",
+	         "Open animation duration.", 0, 600);
+	b.AddInt("close_ms", "Close ms", DesignerEditorKind::Slider, "UiAccordion::SetAnimation",
+	         "Close animation duration.", 0, 600);
+	b.AddInt("item_spacing", "Item gap", DesignerEditorKind::Slider, "UiAccordion::Style::item_spacing",
+	         "Spacing between sections.", 0, 48);
+	b.AddInt("header_body_gap", "Header/body gap", DesignerEditorKind::Slider, "UiAccordion::Style::header_body_gap",
+	         "Spacing between a section header and body.", 0, 32);
+	b.AddInt("body_min_height", "Body min", DesignerEditorKind::Slider, "UiAccordion::Style::body_min_height",
+	         "Minimum body height when content has no measured height.", 0, 300);
+	b.Add("show_drag_handle", "Drag handle", DesignerEditorKind::Bool, "UiAccordion::ShowDragHandle",
+	      "Shows a header drag affordance when reordering is enabled.");
+	b.Add("drag_reorder", "Drag reorder", DesignerEditorKind::Bool, "UiAccordion::EnableDragReorder",
+	      "Allows users to reorder sections at runtime.");
+}
+
+void DesignerAccordionAdapter::Paint(Draw& w)
+{
+	UiAccordion::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
 void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
@@ -1986,6 +2177,11 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		ctrl = p;
 		a = p;
 	}
+	else if(node.type_id == "UiAccordion") {
+		DesignerAccordionAdapter *p = new DesignerAccordionAdapter;
+		ctrl = p;
+		a = p;
+	}
 	else if(node.type_id == "UiLabel") {
 		DesignerLabelAdapter *p = new DesignerLabelAdapter;
 		ctrl = p;
@@ -2008,6 +2204,11 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 	}
 	else if(node.type_id == "UiButton") {
 		DesignerButtonAdapter *p = new DesignerButtonAdapter;
+		ctrl = p;
+		a = p;
+	}
+	else if(node.type_id == "UiToolButton") {
+		DesignerToolButtonAdapter *p = new DesignerToolButtonAdapter;
 		ctrl = p;
 		a = p;
 	}
@@ -2090,6 +2291,7 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerTitleCardAdapter *p = dynamic_cast<DesignerTitleCardAdapter *>(&ctrl)) return p;
 	if(DesignerSliderAdapter *p = dynamic_cast<DesignerSliderAdapter *>(&ctrl)) return p;
 	if(DesignerButtonAdapter *p = dynamic_cast<DesignerButtonAdapter *>(&ctrl)) return p;
+	if(DesignerToolButtonAdapter *p = dynamic_cast<DesignerToolButtonAdapter *>(&ctrl)) return p;
 	if(DesignerLineEditAdapter *p = dynamic_cast<DesignerLineEditAdapter *>(&ctrl)) return p;
 	if(DesignerIntEditAdapter *p = dynamic_cast<DesignerIntEditAdapter *>(&ctrl)) return p;
 	if(DesignerFloatEditAdapter *p = dynamic_cast<DesignerFloatEditAdapter *>(&ctrl)) return p;
@@ -2101,6 +2303,7 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerStackAdapter *p = dynamic_cast<DesignerStackAdapter *>(&ctrl)) return p;
 	if(DesignerTableAdapter *p = dynamic_cast<DesignerTableAdapter *>(&ctrl)) return p;
 	if(DesignerTreeAdapter *p = dynamic_cast<DesignerTreeAdapter *>(&ctrl)) return p;
+	if(DesignerAccordionAdapter *p = dynamic_cast<DesignerAccordionAdapter *>(&ctrl)) return p;
 	if(DesignerScrollPanelAdapter *p = dynamic_cast<DesignerScrollPanelAdapter *>(&ctrl)) return p;
 	if(DesignerBoxLayoutAdapter *p = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) return p;
 	if(DesignerGridLayoutAdapter *p = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) return p;

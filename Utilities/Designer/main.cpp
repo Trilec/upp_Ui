@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.45";
+static const char* DESIGNER_VERSION = "v0.1.46";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static String DesignerCrumbPropertyKey(int i)
@@ -111,6 +111,9 @@ static String DesignerDefaultBaseName(const String& type_id)
 	if(type_id == "UiLabel") return "label";
 	if(type_id == "UiTitleCard") return "titleCard";
 	if(type_id == "UiButton") return "button";
+	if(type_id == "UiToolButton") return "toolButton";
+	if(type_id == "UiAccordion") return "accordion";
+	if(type_id == "AccordionSectionSlot") return "section";
 	if(type_id == "UiLineEdit") return "lineEdit";
 	if(type_id == "UiIntEdit") return "intEdit";
 	if(type_id == "UiFloatEdit") return "floatEdit";
@@ -442,6 +445,18 @@ private:
 				if(DesignerNode* p = model_.Find(page)) {
 					p->name = name[i];
 					p->properties.Set("page_title", title[i]);
+				}
+			}
+		}
+		else if(n->type_id == "UiAccordion") {
+			static const char *name[] = { "sectionA", "sectionB", "sectionC" };
+			static const char *title[] = { "Section A", "Section B", "Section C" };
+			for(int i = 0; i < 3; i++) {
+				DesignerNodeId section = AddInitializedNode("AccordionSectionSlot", id, i);
+				if(DesignerNode* p = model_.Find(section)) {
+					p->name = name[i];
+					p->properties.Set("section_title", title[i]);
+					p->properties.Set("open", i == 0);
 				}
 			}
 		}
@@ -2159,7 +2174,7 @@ private:
 
 	bool IsPanelType(const DesignerType* t) const
 	{
-		return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot");
+		return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "AccordionSectionSlot");
 	}
 
 	Color CategoryColor(const DesignerType* t) const

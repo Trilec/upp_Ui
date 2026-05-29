@@ -38,7 +38,7 @@ static bool DesignerPreviewIsLayoutType(const DesignerType *t)
 
 static bool DesignerPreviewIsPanelType(const DesignerType *t)
 {
-	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "PageSlot");
+	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "PageSlot" || t->id == "AccordionSectionSlot");
 }
 
 static bool DesignerPreviewIsPageContainer(const DesignerNode& n)
@@ -645,7 +645,8 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 					natural = Size(w, h);
 				}
 				else if(n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" ||
-				        n.type_id == "UiGroupPanel" || n.type_id == "PageSlot" || n.type_id == "PaneSlot") {
+				        n.type_id == "UiGroupPanel" || n.type_id == "UiAccordion" || n.type_id == "PageSlot" ||
+			        n.type_id == "PaneSlot" || n.type_id == "AccordionSectionSlot") {
 					Size child_max(0, 0);
 					for(DesignerNodeId child_id : n.children) {
 						const DesignerNode* child = model_->Find(child_id);
@@ -1001,6 +1002,27 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			else if(DesignerStackAdapter *stack = dynamic_cast<DesignerStackAdapter *>(&parent)) {
 				String title = DesignerPreviewNodeProperty(child_node, "page_title", child_node.name);
 				stack->AddPage(child, title);
+			}
+			else if(DesignerAccordionAdapter *accordion = dynamic_cast<DesignerAccordionAdapter *>(&parent)) {
+				String title = child_node.type_id == "AccordionSectionSlot"
+                    ? AsString(DesignerPreviewNodeProperty(child_node, "section_title", child_node.name))
+                    : child_node.name;
+             
+				String subtitle = child_node.type_id == "AccordionSectionSlot"
+                    ? AsString(DesignerPreviewNodeProperty(child_node, "section_subtitle", ""))
+                    : String();
+                
+				bool open = child_node.type_id == "AccordionSectionSlot"
+				          ? (bool)DesignerPreviewNodeProperty(child_node, "open", true)
+				          : true;
+				int section = accordion->AddSection(title, subtitle, String(), open);
+				accordion->SetLockMode(section, DesignerPreviewNodeProperty(child_node, "lock", "None") == "Open" ? UiAccordion::Lock::Open :
+				                               DesignerPreviewNodeProperty(child_node, "lock", "None") == "Closed" ? UiAccordion::Lock::Closed :
+				                               UiAccordion::Lock::None);
+				int body_height = (int)DesignerPreviewNodeProperty(child_node, "body_height", -1);
+				if(body_height > 0)
+					accordion->SetSectionBodyHeight(section, DPI(body_height));
+				accordion->GetSectionContent(section).Add(child.SizePos());
 			}
 			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent))
 				scroll->Content().Add(child.SizePos());

@@ -6,7 +6,7 @@
 
 namespace Upp {
 
-static constexpr int DESIGNER_HIERARCHY_DRAG_TIMER_ID = 7021;
+static constexpr int DESIGNER_HIERARCHY_DRAG_TIMER_ID = 101;
 
 void DesignerToolboxTree::LeftDown(Point p, dword flags)
 {

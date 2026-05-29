@@ -30,13 +30,15 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_PANEL_48();
 	if(id == "UiGroupPanel")
 		return ICON_DESIGN_BORDER_OUTER_48();
+	if(id == "UiAccordion" || id == "AccordionSectionSlot")
+		return ICON_DESIGN_EXPANSION_PANELS_48();
 	if(id == "UiScrollPanel")
 		return ICON_DESIGN_EXPANSION_PANELS_48();
 	if(id == "UiLabel")
 		return ICON_DESIGN_LABEL_48();
 	if(id == "UiTitleCard")
 		return ICON_DESIGN_ID_CARD_48();
-	if(id == "UiButton")
+	if(id == "UiButton" || id == "UiToolButton")
 		return ICON_DESIGN_BUTTON_48();
 	if(id == "UiLineEdit")
 		return ICON_DESIGN_EDIT_TEXT_48();
@@ -109,7 +111,7 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(7, 3, 9, 13, blue);
 		rect(5, 7, 11, 9, blue);
 	}
-	else if(id == "UiButton") {
+	else if(id == "UiButton" || id == "UiToolButton") {
 		frame(2, 5, 14, 12, green);
 		rect(5, 8, 11, 9, green);
 	}
@@ -131,7 +133,7 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(2, 8, 14, 10, green);
 		circle(9, 9, 3, green);
 	}
-	else if(id == "UiPanel" || id == "UiScrollPanel") {
+	else if(id == "UiPanel" || id == "UiScrollPanel" || id == "UiAccordion") {
 		frame(2, 3, 14, 13, green);
 		if(id == "UiScrollPanel")
 			rect(11, 4, 13, 12, green);
@@ -333,8 +335,13 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		n.properties.Set("align", "Left");
 		n.properties.Set("icon", "None");
 		n.properties.Set("icon_size", 18);
-		if(id == "UiButton")
+		if(id == "UiButton" || id == "UiToolButton")
 			n.properties.Set("align", "Center");
+		if(id == "UiToolButton") {
+			n.properties.Set("text", "");
+			n.properties.Set("icon", "Settings");
+			n.properties.Set("icon_size", 20);
+		}
 		if(id == "UiLineEdit")
 			n.properties.Set("placeholder", "Placeholder");
 		if(id == "UiToggle")
@@ -499,6 +506,68 @@ static DesignerType MakeGroupPanelType()
 	return t;
 }
 
+
+static DesignerType MakeAccordionType()
+{
+	DesignerType t = MakeControlType("UiAccordion", "Accordion", Size(300, 220));
+	t.toolbox_group = "Containers";
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(300, 220);
+	t.min_size = Size(120, 80);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("text", "Accordion");
+		n.properties.Set("role", "Standard");
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 300);
+		n.properties.Set("height", 220);
+		n.properties.Set("single_open", false);
+		n.properties.Set("enforce_one", false);
+		n.properties.Set("show_chevron", true);
+		n.properties.Set("chevron_side", "Right");
+		n.properties.Set("animation", true);
+		n.properties.Set("open_ms", 120);
+		n.properties.Set("close_ms", 0);
+		n.properties.Set("item_spacing", 8);
+		n.properties.Set("header_body_gap", 4);
+		n.properties.Set("body_min_height", 88);
+		n.properties.Set("show_drag_handle", false);
+		n.properties.Set("drag_reorder", false);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
+	};
+	return t;
+}
+
+static DesignerType MakeAccordionSectionSlotType()
+{
+	DesignerType t;
+	t.id = "AccordionSectionSlot";
+	t.display_name = "Accordion Section";
+	t.icon = MakeDesignerTypeIcon(t.id);
+	t.is_container = true;
+	t.can_have_children = true;
+	t.default_size = Size(240, 120);
+	t.min_size = Size(40, 30);
+	t.init_defaults = [](DesignerNode& n) {
+		n.properties.Set("section_title", "Section");
+		n.properties.Set("section_subtitle", "");
+		n.properties.Set("open", true);
+		n.properties.Set("lock", "None");
+		n.properties.Set("body_height", -1);
+		n.properties.Set("h_sizing", "Expand");
+		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("width", 240);
+		n.properties.Set("height", 120);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
+	};
+	return t;
+}
+
 static DesignerType MakePageSlotType()
 {
 	DesignerType t;
@@ -572,15 +641,18 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeQuadSplitterType());
 	registry.Register(MakePaneSlotType());
 	registry.Register(MakePageSlotType());
+	registry.Register(MakeAccordionSectionSlotType());
 	registry.Register(MakeGenericType());
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
 	registry.Register(MakeGroupPanelType());
 	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
+	registry.Register(MakeAccordionType());
 	registry.Register(MakePageContainerType("UiTab", "Tab", Size(300, 180)));
 	registry.Register(MakePageContainerType("UiStack", "Stack", Size(300, 180)));
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
 	registry.Register(MakeControlType("UiTitleCard", "Title Card", Size(220, 72)));
 	registry.Register(MakeControlType("UiButton", "Button", DesignerDefaultSize()));
+	registry.Register(MakeControlType("UiToolButton", "Tool Button", Size(40, 34)));
 	registry.Register(MakeControlType("UiLineEdit", "Edit", Size(180, 32)));
 	registry.Register(MakeControlType("UiIntEdit", "Integer Edit", Size(140, 32)));
 	registry.Register(MakeControlType("UiFloatEdit", "Float Edit", Size(140, 32)));
