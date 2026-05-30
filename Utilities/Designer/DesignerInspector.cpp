@@ -1,4 +1,4 @@
-#include "DesignerInspector.h"
+﻿#include "DesignerInspector.h"
 #include "DesignerDefaults.h"
 
 // DesignerInspector.cpp - descriptor-driven property editor.
@@ -355,11 +355,15 @@ void DesignerInspector::SetNode(DesignerNodeId id)
 
 	Vector<DesignerApiBinding> bindings;
 	Describe(bindings, *n);
-	String type_text = RuntimeTypeName(n->type_id);
+		String type_text = RuntimeTypeName(n->type_id);
 	if(n->last_rect.GetWidth() > 0 && n->last_rect.GetHeight() > 0)
-		type_text << Format(" (%dx%d Actual)", n->last_rect.GetWidth(), n->last_rect.GetHeight());
+		type_text << " (" << AsString(n->last_rect.GetWidth()) << "x"
+		          << AsString(n->last_rect.GetHeight()) << ") WH";
 	else if(n->id == Designer_ROOT)
-		type_text << Format(" (%dx%d Virtual)", model_->GetVirtualSize().cx, model_->GetVirtualSize().cy);
+		type_text << " (" << AsString(model_->GetVirtualSize().cx) << "x"
+		          << AsString(model_->GetVirtualSize().cy) << ") WH";
+	else
+		type_text << " (size pending) WH";
 
 	String key = PageKey(*n, bindings);
 	syncing_ = true;

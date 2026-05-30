@@ -1,4 +1,4 @@
-#include "DesignerAdapter.h"
+﻿#include "DesignerAdapter.h"
 #include "DesignerDefaults.h"
 
 // DesignerAdapter.cpp - real Ui control wrappers for the visual designer.
@@ -735,12 +735,12 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	            "Positions a fit-width item inside its grid cell.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
 	            "Positions a fit-height item inside its grid cell.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
-	b.AddInt("width", "Width", DesignerEditorKind::Slider,
-	         "UiGridLayout::Add(... fixed) / generated fixed size",
-	         "Fixed width is applied when sizing is Fixed; otherwise it is shown as design intent only.", 10, 1600);
-	b.AddInt("height", "Height", DesignerEditorKind::Slider,
-	         "UiBoxLayout::ItemRef::Fixed / UiGridLayout::Add(... fixed)",
-	         "Fixed height is applied when sizing is Fixed; otherwise actual height is computed by the parent layout.", 10, 900);
+		b.AddInt("width", "Fixed width", DesignerEditorKind::Slider,
+	         "fixed parent layout width",
+	         "Used when Width mode is Fixed. The actual width is clamped by Min width.", 10, 1600);
+	b.AddInt("height", "Fixed height", DesignerEditorKind::Slider,
+	         "fixed parent layout height",
+	         "Used when Height mode is Fixed. The actual height is clamped by Min height.", 10, 900);
 	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
 	         "Minimum width used by preview and generated code when the parent layout compresses this control.", 10, 1600);
 	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
