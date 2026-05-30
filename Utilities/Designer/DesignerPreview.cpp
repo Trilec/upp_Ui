@@ -1,4 +1,4 @@
-﻿#include "DesignerPreview.h"
+#include "DesignerPreview.h"
 #include "DesignerDefaults.h"
 
 // DesignerPreview.cpp - virtual-window preview and pointer interaction surface.
@@ -52,10 +52,17 @@ static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNod
 {
 	String hs = DesignerPreviewAxisSizing(n, "h_sizing");
 	String vs = DesignerPreviewAxisSizing(n, "v_sizing");
+
+	if(hs == "Expand" && vs == "Expand") {
+		child.SizePos();
+		return;
+	}
+
 	if(hs == "Expand")
 		child.HSizePosZ(0, 0);
 	else
 		child.LeftPosZ(0, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+
 	if(vs == "Expand")
 		child.VSizePosZ(0, 0);
 	else
@@ -1011,7 +1018,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					else if(vs == "Fit")
 						ref.MinCross(min_h).AlignSelf(UiBoxLayout::Align::Start);
 					else
-						ref.MinCross(min_h);
+						ref.MinCross(min_h).AlignSelf(UiBoxLayout::Align::Stretch);
 				}
 				else {
 					ref.MinMain(min_h);
@@ -1020,7 +1027,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					else if(hs == "Fit")
 						ref.MinCross(min_w).AlignSelf(UiBoxLayout::Align::Start);
 					else
-						ref.MinCross(min_w);
+						ref.MinCross(min_w).AlignSelf(UiBoxLayout::Align::Stretch);
 				}
 			}
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {

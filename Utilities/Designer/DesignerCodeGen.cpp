@@ -607,7 +607,7 @@ static String BoxMinCall(const DesignerNode& parent, const DesignerNode& child)
 	else if(cross == "Fit")
 		out << Format(".MinCross(DPI(%d)).AlignSelf(UiBoxLayout::Align::Start)", cross_min);
 	else
-		out << Format(".MinCross(DPI(%d))", cross_min);
+		out << Format(".MinCross(DPI(%d)).AlignSelf(UiBoxLayout::Align::Stretch)", cross_min);
 	return out;
 }
 
