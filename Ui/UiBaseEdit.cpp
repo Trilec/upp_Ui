@@ -1716,12 +1716,22 @@ void UiBaseEdit::Paint(Draw& w)
        && IsReadOnly() && style.show_readonly_bg)
         w.DrawRect(text_r, SColorFace());
 
+    Color text_bg = Null;
+    if(IsReadOnly() && style.show_readonly_bg)
+        text_bg = SColorFace();
+    else if(paint_palette.face[st].IsSolid())
+        text_bg = paint_palette.face[st].color;
+    if(!IsNull(text_bg))
+        w.DrawRect(text_r, text_bg);
+
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();
 
     Font fnt = style.font;
     if(IsNull(fnt))
         fnt = StdFont();
+
+    EnsureTextMetricsCache();
 
     w.Clip(text_r);
 
