@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "DesignerRegistry.h"
 
@@ -208,6 +208,42 @@ private:
 	DesignerOverlayState overlay_;
 };
 
+
+// Designer wrapper for stable Ui composite controls.
+// The wrapper owns the real composite as a child so design-time overlay behavior
+// stays outside the reusable composite implementation.
+class DesignerCompositeAdapter : public ParentCtrl, public DesignerAdapter {
+public:
+	typedef DesignerCompositeAdapter CLASSNAME;
+
+	DesignerCompositeAdapter();
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return type_id_; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Layout() override;
+	Size GetMinSize() const override;
+	void Paint(Draw& w) override;
+	void PaintTopOverlay(Draw& w) const;
+
+private:
+	class OverlayCtrl : public Ctrl {
+	public:
+		DesignerCompositeAdapter *owner = nullptr;
+		void Paint(Draw& w) override { if(owner) owner->PaintTopOverlay(w); }
+	};
+
+	DesignerNodeId node_id_ = Designer_NULL;
+	String type_id_;
+	One<Ctrl> inner_;
+	OverlayCtrl overlay_ctrl_;
+	DesignerOverlayState overlay_;
+};
 // Designer wrapper for UiButton.
 // Provides a simple command-control example for layout testing and generated code.
 class DesignerButtonAdapter : public UiButton, public DesignerAdapter {

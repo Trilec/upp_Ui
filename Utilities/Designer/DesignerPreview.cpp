@@ -1002,10 +1002,26 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 
 				int min_w = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10)));
 				int min_h = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10)));
-				if(horizontal)
-					ref.MinMain(min_w).MinCross(min_h);
-				else
-					ref.MinMain(min_h).MinCross(min_w);
+				int fixed_w = max(DPI(DesignerClampMin(DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH))), min_w);
+				int fixed_h = max(DPI(DesignerClampMin(DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))), min_h);
+				if(horizontal) {
+					ref.MinMain(min_w);
+					if(vs == "Fixed")
+						ref.MinMaxCross(fixed_h, fixed_h).AlignSelf(UiBoxLayout::Align::Start);
+					else if(vs == "Fit")
+						ref.MinCross(min_h).AlignSelf(UiBoxLayout::Align::Start);
+					else
+						ref.MinCross(min_h);
+				}
+				else {
+					ref.MinMain(min_h);
+					if(hs == "Fixed")
+						ref.MinMaxCross(fixed_w, fixed_w).AlignSelf(UiBoxLayout::Align::Start);
+					else if(hs == "Fit")
+						ref.MinCross(min_w).AlignSelf(UiBoxLayout::Align::Start);
+					else
+						ref.MinCross(min_w);
+				}
 			}
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
 				Size fixed(0, 0);

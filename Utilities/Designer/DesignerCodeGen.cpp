@@ -493,7 +493,18 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 	else if(n.type_id == "UiFloatEdit")
 		out << "\tUiFloatEdit " << var << ";\n";
 	else if(n.type_id == "UiSlider")
-		out << "\tUiSlider " << var << ";\n";
+		out << "\tUiSlider " << var << ";\n";	else if(n.type_id == "UiCompositeLabel")
+		out << "\tUiCompositeLabel " << var << ";\n";
+	else if(n.type_id == "UiCompositeEdit")
+		out << "\tUiCompositeEdit " << var << ";\n";
+	else if(n.type_id == "UiCompositeDropdown")
+		out << "\tUiCompositeDropdown " << var << ";\n";
+	else if(n.type_id == "UiCompositeToggle")
+		out << "\tUiCompositeToggle " << var << ";\n";
+	else if(n.type_id == "UiCompositeSlider")
+		out << "\tUiCompositeSlider " << var << ";\n";
+	else if(n.type_id == "UiSliderEdit")
+		out << "\tUiSliderEdit " << var << ";\n";
 	else if(n.type_id == "UiToggle")
 		out << "\tUiToggle " << var << ";\n";
 	else if(n.type_id == "UiDropdown")
@@ -576,13 +587,28 @@ static String BoxMinCall(const DesignerNode& parent, const DesignerNode& child)
 {
 	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
 	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
-	if(min_w == DESIGNER_MIN_CLAMP && min_h == DESIGNER_MIN_CLAMP)
-		return String();
-
 	bool horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
+	String hs = AxisSizing(child, "h_sizing");
+	String vs = AxisSizing(child, "v_sizing");
+	String out;
 	if(horizontal)
-		return Format(".MinMain(DPI(%d)).MinCross(DPI(%d))", min_w, min_h);
-	return Format(".MinMain(DPI(%d)).MinCross(DPI(%d))", min_h, min_w);
+		out << Format(".MinMain(DPI(%d))", min_w);
+	else
+		out << Format(".MinMain(DPI(%d))", min_h);
+
+	String cross = horizontal ? vs : hs;
+	int cross_min = horizontal ? min_h : min_w;
+	int fixed = horizontal ? DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))
+	                       : DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+	fixed = max(fixed, cross_min);
+
+	if(cross == "Fixed")
+		out << Format(".MinMaxCross(DPI(%d), DPI(%d)).AlignSelf(UiBoxLayout::Align::Start)", fixed, fixed);
+	else if(cross == "Fit")
+		out << Format(".MinCross(DPI(%d)).AlignSelf(UiBoxLayout::Align::Start)", cross_min);
+	else
+		out << Format(".MinCross(DPI(%d))", cross_min);
+	return out;
 }
 
 static void EmitDirectChildLayout(String& out, const String& var, const DesignerNode& child)
@@ -610,7 +636,74 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	else
 		out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".GetMinSize().cy, DPI(" << min_h << ")));\n";
 }
-static bool HasDesignerMinSizeOverride(const DesignerNode& n)
+
+static String CompositeLayoutExpr(const String& mode)
+{
+	return mode == "Stacked" ? "UICOMPOSITE_STACKED" : "UICOMPOSITE_INLINE";
+}
+
+static String FieldAlignExpr(const String& side)
+{
+	if(side == "Left") return "UiAlign::LEFT";
+	if(side == "Top") return "UiAlign::TOP";
+	if(side == "Bottom") return "UiAlign::BOTTOM";
+	return "UiAlign::RIGHT";
+}
+
+static void EmitCompositeSetup(String& out, const String& var, const DesignerNode& n)
+{
+	String label = CodeGenNodeProperty(n, "label", n.name);
+	String value = CodeGenNodeProperty(n, "value_text", "Value");
+	int label_w = DesignerClampMin((int)CodeGenNodeProperty(n, "label_width", 112));
+	int field_gap = max(0, (int)CodeGenNodeProperty(n, "field_gap", 8));
+	int stack_gap = max(0, (int)CodeGenNodeProperty(n, "stack_gap", 4));
+	if(n.type_id == "UiCompositeLabel") {
+		out << "\t\t" << var << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
+		    << ".SetLabelWidth(DPI(" << label_w << ")).SetFieldGap(DPI(" << field_gap << "));\n";
+	}
+	else if(n.type_id == "UiCompositeEdit") {
+		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
+		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
+		    << "\t\t" << var << ".SetData(" << CppString(value) << ");\n";
+	}
+	else if(n.type_id == "UiCompositeDropdown") {
+		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
+		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
+		    << "\t\t" << var << ".Clear().Add(\"First\", \"First\").Add(\"Second\", \"Second\").Add(\"Third\", \"Third\");\n"
+		    << "\t\t" << var << ".SelectByData(" << CppString(CodeGenNodeProperty(n, "selected", "First")) << ");\n";
+	}
+	else if(n.type_id == "UiCompositeToggle") {
+		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
+		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", false) ? "true" : "false") << ")"
+		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 42)) << "))"
+		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
+		    << "\t\t" << var << ".SetData(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
+	}
+	else if(n.type_id == "UiCompositeSlider") {
+		int mn = (int)CodeGenNodeProperty(n, "min", 0);
+		int mx = (int)CodeGenNodeProperty(n, "max", 100);
+		int val = minmax((int)CodeGenNodeProperty(n, "value", 42), mn, mx);
+		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(AsString(val)) << ")"
+		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
+		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 48)) << "))"
+		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
+		    << "\t\t" << var << ".Slider().SetRange(" << mn << ", " << mx << ");\n"
+		    << "\t\t" << var << ".SetData(" << val << ");\n";
+	}
+	else if(n.type_id == "UiSliderEdit") {
+		out << "\t\t" << var << ".SetRange(" << (double)CodeGenNodeProperty(n, "minf", 0.0) << ", "
+		    << (double)CodeGenNodeProperty(n, "maxf", 100.0) << ")"
+		    << ".SetStep(" << (double)CodeGenNodeProperty(n, "stepf", 1.0) << ")"
+		    << ".SetValue(" << (double)CodeGenNodeProperty(n, "valuef", 42.0) << ")"
+		    << ".SetFieldAlign(" << FieldAlignExpr(CodeGenNodeProperty(n, "field_align", "Right")) << ")"
+		    << ".SetFieldWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "field_width", 72)) << "))"
+		    << ".SetGap(DPI(" << field_gap << "));\n";
+	}
+}static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 {
 	return DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP ||
 	       DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP;
@@ -661,6 +754,10 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		if((bool)CodeGenNodeProperty(n, "debug", false))
 			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
 		out << ";\n";
+	}	else if(n.type_id == "UiCompositeLabel" || n.type_id == "UiCompositeEdit" ||
+	        n.type_id == "UiCompositeDropdown" || n.type_id == "UiCompositeToggle" ||
+	        n.type_id == "UiCompositeSlider" || n.type_id == "UiSliderEdit") {
+		EmitCompositeSetup(out, var, n);
 	}
 	else if(n.type_id == "GridLayout") {
 		out << "\t\t" << var << ".SetGridSize("

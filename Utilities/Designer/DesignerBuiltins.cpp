@@ -1,4 +1,4 @@
-#include "DesignerBuiltins.h"
+﻿#include "DesignerBuiltins.h"
 
 // DesignerBuiltins.cpp - stock toolbox/control catalog for the designer.
 // Add new built-in controls here by registering a DesignerType, default model
@@ -398,7 +398,45 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 	return t;
 }
 
-static DesignerType MakeGenericType()
+
+static DesignerType MakeCompositeType(const String& id, const String& name, Size size)
+{
+	DesignerType t = MakeControlType(id, name, size);
+	t.toolbox_group = "Composites";
+	t.default_size = size;
+	t.min_size = DesignerMinSize();
+	t.init_defaults = [=](DesignerNode& n) {
+		n.properties.Set("label", name);
+		n.properties.Set("value_text", "Value");
+		n.properties.Set("selected", "First");
+		n.properties.Set("on", true);
+		n.properties.Set("min", 0);
+		n.properties.Set("max", 100);
+		n.properties.Set("value", 42);
+		n.properties.Set("minf", 0.0);
+		n.properties.Set("maxf", 100.0);
+		n.properties.Set("valuef", 42.0);
+		n.properties.Set("stepf", 1.0);
+		n.properties.Set("show_value", id == "UiCompositeSlider");
+		n.properties.Set("layout_mode", "Inline");
+		n.properties.Set("label_width", 112);
+		n.properties.Set("value_width", 48);
+		n.properties.Set("field_width", 72);
+		n.properties.Set("field_align", "Right");
+		n.properties.Set("field_gap", 8);
+		n.properties.Set("stack_gap", 4);
+		n.properties.Set("h_sizing", "Fit");
+		n.properties.Set("v_sizing", "Fit");
+		n.properties.Set("fixed_width", size.cx);
+		n.properties.Set("fixed_height", size.cy);
+		n.properties.Set("width", size.cx);
+		n.properties.Set("height", size.cy);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
+		n.properties.Set("radius", 0);
+	};
+	return t;
+}static DesignerType MakeGenericType()
 {
 	DesignerType t = MakeControlType("Generic", "Generic", Size(140, 48));
 	t.toolbox_group.Clear();
@@ -654,7 +692,12 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakePaneSlotType());
 	registry.Register(MakePageSlotType());
 	registry.Register(MakeAccordionSectionSlotType());
-	registry.Register(MakeGenericType());
+	registry.Register(MakeGenericType());	registry.Register(MakeCompositeType("UiCompositeLabel", "Composite Label", Size(220, 32)));
+	registry.Register(MakeCompositeType("UiCompositeEdit", "Composite Edit", Size(260, 32)));
+	registry.Register(MakeCompositeType("UiCompositeDropdown", "Composite Dropdown", Size(260, 32)));
+	registry.Register(MakeCompositeType("UiCompositeToggle", "Composite Toggle", Size(240, 32)));
+	registry.Register(MakeCompositeType("UiCompositeSlider", "Composite Slider", Size(280, 32)));
+	registry.Register(MakeCompositeType("UiSliderEdit", "Slider Edit", Size(280, 32)));
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
 	registry.Register(MakeGroupPanelType());
 	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));

@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.53";
+static const char* DESIGNER_VERSION = "v0.1.55";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static String DesignerCrumbPropertyKey(int i)
@@ -118,8 +118,14 @@ static String DesignerDefaultBaseName(const String& type_id)
 	if(type_id == "UiIntEdit") return "intEdit";
 	if(type_id == "UiFloatEdit") return "floatEdit";
 	if(type_id == "UiSlider") return "slider";
+	if(type_id == "UiCompositeSlider") return "compositeSlider";
+	if(type_id == "UiSliderEdit") return "sliderEdit";
 	if(type_id == "UiToggle") return "toggle";
+	if(type_id == "UiCompositeToggle") return "compositeToggle";
 	if(type_id == "UiDropdown") return "dropdown";
+	if(type_id == "UiCompositeDropdown") return "compositeDropdown";
+	if(type_id == "UiCompositeLabel") return "compositeLabel";
+	if(type_id == "UiCompositeEdit") return "compositeEdit";
 	if(type_id == "UiCheckBox") return "checkBox";
 	if(type_id == "UiBreadcrumbs") return "breadcrumbs";
 	if(type_id == "UiTable") return "table";

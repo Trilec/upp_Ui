@@ -1931,6 +1931,186 @@ void DesignerScrollPanelAdapter::Paint(Draw& w)
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
+
+static bool DesignerIsCompositeType(const String& type_id)
+{
+	return type_id == "UiCompositeLabel" ||
+	       type_id == "UiCompositeEdit" ||
+	       type_id == "UiCompositeDropdown" ||
+	       type_id == "UiCompositeToggle" ||
+	       type_id == "UiCompositeSlider" ||
+	       type_id == "UiSliderEdit";
+}
+
+static UiCompositeLayoutMode DesignerCompositeLayoutModeChoice(const Value& value)
+{
+	return AsString(value) == "Stacked" ? UICOMPOSITE_STACKED : UICOMPOSITE_INLINE;
+}
+
+static UiAlign DesignerFieldAlignChoice(const Value& value)
+{
+	String side = AsString(value);
+	if(side == "Left") return UiAlign::LEFT;
+	if(side == "Top") return UiAlign::TOP;
+	if(side == "Bottom") return UiAlign::BOTTOM;
+	return UiAlign::RIGHT;
+}
+
+DesignerCompositeAdapter::DesignerCompositeAdapter()
+{
+	Transparent();
+	overlay_ctrl_.owner = this;
+	overlay_ctrl_.IgnoreMouse().NoWantFocus();
+}
+void DesignerCompositeAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	type_id_ = node.type_id;
+	if(inner_)
+		inner_->Remove();
+	inner_.Clear();
+
+	String label = AdapterNodeProperty(node, "label", node.name);
+	String value = AdapterNodeProperty(node, "value_text", "Value");
+	int label_w = DPI(max(0, (int)AdapterNodeProperty(node, "label_width", 112)));
+	int field_gap = DPI(max(0, (int)AdapterNodeProperty(node, "field_gap", 8)));
+	UiCompositeLayoutMode layout = DesignerCompositeLayoutModeChoice(AdapterNodeProperty(node, "layout_mode", "Inline"));
+
+	if(type_id_ == "UiCompositeLabel") {
+		UiCompositeLabel *c = new UiCompositeLabel;
+		c->SetLabel(label).SetValueText(value).SetLabelWidth(label_w).SetFieldGap(field_gap);
+		inner_.Attach(c);
+	}
+	else if(type_id_ == "UiCompositeEdit") {
+		UiCompositeEdit *c = new UiCompositeEdit;
+		c->SetLayoutMode(layout).SetLabel(label).SetLabelWidth(label_w).SetFieldGap(field_gap)
+		 .SetStackGap(DPI(max(0, (int)AdapterNodeProperty(node, "stack_gap", 4))));
+		c->SetData(value);
+		inner_.Attach(c);
+	}
+	else if(type_id_ == "UiCompositeDropdown") {
+		UiCompositeDropdown *c = new UiCompositeDropdown;
+		c->SetLayoutMode(layout).SetLabel(label).SetLabelWidth(label_w).SetFieldGap(field_gap)
+		 .SetStackGap(DPI(max(0, (int)AdapterNodeProperty(node, "stack_gap", 4))));
+		c->Clear().Add("First", "First").Add("Second", "Second").Add("Third", "Third");
+		c->SelectByData(AdapterNodeProperty(node, "selected", "First"));
+		inner_.Attach(c);
+	}
+	else if(type_id_ == "UiCompositeToggle") {
+		UiCompositeToggle *c = new UiCompositeToggle;
+		c->SetLayoutMode(layout).SetLabel(label).SetValueText(value).ShowValue((bool)AdapterNodeProperty(node, "show_value", false))
+		 .SetLabelWidth(label_w).SetValueWidth(DPI(max(0, (int)AdapterNodeProperty(node, "value_width", 42))))
+		 .SetFieldGap(field_gap).SetStackGap(DPI(max(0, (int)AdapterNodeProperty(node, "stack_gap", 4))));
+		c->SetData((bool)AdapterNodeProperty(node, "on", true));
+		inner_.Attach(c);
+	}
+	else if(type_id_ == "UiCompositeSlider") {
+		UiCompositeSlider *c = new UiCompositeSlider;
+		int mn = (int)AdapterNodeProperty(node, "min", 0);
+		int mx = (int)AdapterNodeProperty(node, "max", 100);
+		int val = minmax((int)AdapterNodeProperty(node, "value", 42), mn, mx);
+		c->SetLayoutMode(layout).SetLabel(label).SetValueText(AsString(val)).ShowValue((bool)AdapterNodeProperty(node, "show_value", true))
+		 .SetLabelWidth(label_w).SetValueWidth(DPI(max(0, (int)AdapterNodeProperty(node, "value_width", 48))))
+		 .SetFieldGap(field_gap).SetStackGap(DPI(max(0, (int)AdapterNodeProperty(node, "stack_gap", 4))));
+		c->Slider().SetRange(mn, mx);
+		c->SetData(val);
+		inner_.Attach(c);
+	}
+	else {
+		UiSliderEdit *c = new UiSliderEdit;
+		double mn = (double)AdapterNodeProperty(node, "minf", 0.0);
+		double mx = (double)AdapterNodeProperty(node, "maxf", 100.0);
+		double val = minmax((double)AdapterNodeProperty(node, "valuef", 42.0), mn, mx);
+		c->SetRange(mn, mx).SetStep((double)AdapterNodeProperty(node, "stepf", 1.0)).SetValue(val)
+		 .SetFieldAlign(DesignerFieldAlignChoice(AdapterNodeProperty(node, "field_align", "Right")))
+		 .SetFieldWidth(DPI(max(0, (int)AdapterNodeProperty(node, "field_width", 72))))
+		 .SetGap(DPI(max(0, (int)AdapterNodeProperty(node, "field_gap", 8))));
+		c->SetMinSize(Size(DPI(180), DPI(32)));
+		inner_.Attach(c);
+	}
+	Add(*inner_);
+	Add(overlay_ctrl_);
+	NoWantFocus();
+	RefreshLayout();
+	Refresh();
+}
+
+void DesignerCompositeAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
+	b.Hide("theme_override");
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Hide("role");
+
+	if(node.type_id != "UiSliderEdit") {
+		b.Add("label", "Label", DesignerEditorKind::Text, "composite SetLabel", "Label text shown on the left or above.");
+		b.AddChoice("layout_mode", "Layout", "UiComposite::SetLayoutMode", "Inline or stacked composite layout.",
+		            {{"Inline", "Inline"}, {"Stacked", "Stacked"}});
+		b.AddInt("label_width", "Label width", DesignerEditorKind::Slider, "SetLabelWidth", "Fixed label column width.", 0, 320);
+	}
+	if(node.type_id == "UiCompositeLabel" || node.type_id == "UiCompositeEdit" || node.type_id == "UiCompositeToggle")
+		b.Add("value_text", "Value text", DesignerEditorKind::Text, "composite value text/data", "Preview value text.");
+	if(node.type_id == "UiCompositeDropdown")
+		b.AddChoice("selected", "Selected", "UiCompositeDropdown::SelectByData", "Preview selected item.",
+		            {{"First", "First"}, {"Second", "Second"}, {"Third", "Third"}});
+	if(node.type_id == "UiCompositeToggle") {
+		b.Add("on", "On", DesignerEditorKind::Bool, "UiCompositeToggle::SetData", "Preview toggle state.");
+		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeToggle::ShowValue", "Shows the value label.");
+		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "SetValueWidth", "Width of the value label.", 0, 180);
+	}
+	if(node.type_id == "UiCompositeSlider") {
+		b.AddInt("min", "Min", DesignerEditorKind::Slider, "UiSlider::SetRange", "Slider minimum.", 0, 500);
+		b.AddInt("max", "Max", DesignerEditorKind::Slider, "UiSlider::SetRange", "Slider maximum.", 1, 1000);
+		b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiCompositeSlider::SetData", "Preview slider value.", 0, 1000);
+		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeSlider::ShowValue", "Shows the value label.");
+		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "SetValueWidth", "Width of the value label.", 0, 180);
+	}
+	if(node.type_id == "UiSliderEdit") {
+		b.AddChoice("field_align", "Field side", "UiSliderEdit::SetFieldAlign", "Side used by the numeric edit field.",
+		            {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+		b.AddInt("field_width", "Field width", DesignerEditorKind::Slider, "UiSliderEdit::SetFieldWidth", "Numeric field width.", 36, 180);
+		b.AddInt("minf", "Min", DesignerEditorKind::Slider, "UiSliderEdit::SetRange", "Minimum value.", 0, 500);
+		b.AddInt("maxf", "Max", DesignerEditorKind::Slider, "UiSliderEdit::SetRange", "Maximum value.", 1, 1000);
+		b.AddInt("valuef", "Value", DesignerEditorKind::Slider, "UiSliderEdit::SetValue", "Preview value.", 0, 1000);
+		b.AddInt("stepf", "Step", DesignerEditorKind::Slider, "UiSliderEdit::SetStep", "Edit increment.", 1, 100);
+	}
+	if(node.type_id != "UiCompositeLabel")
+		b.AddInt("stack_gap", "Stack gap", DesignerEditorKind::Slider, "SetStackGap", "Gap used by stacked layout.", 0, 32);
+	b.AddInt("field_gap", "Field gap", DesignerEditorKind::Slider, "SetFieldGap / SetGap", "Gap between label/field/value parts.", 0, 64);
+}
+
+void DesignerCompositeAdapter::Layout()
+{
+	if(inner_)
+		inner_->SetRect(GetSize());
+	overlay_ctrl_.SetRect(GetSize());
+}
+
+Size DesignerCompositeAdapter::GetMinSize() const
+{
+	return inner_ ? inner_->GetMinSize() : Size(DPI(120), DPI(32));
+}
+
+void DesignerCompositeAdapter::Paint(Draw& w)
+{
+}
+
+void DesignerCompositeAdapter::PaintTopOverlay(Draw& w) const
+{
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
 DesignerBoxLayoutAdapter::DesignerBoxLayoutAdapter()
 	: UiBoxLayout(UiDirection::V)
 {
@@ -2290,6 +2470,10 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		DesignerGroupPanelAdapter *p = new DesignerGroupPanelAdapter;
 		ctrl = p;
 		a = p;
+	}	else if(DesignerIsCompositeType(node.type_id)) {
+		DesignerCompositeAdapter *p = new DesignerCompositeAdapter;
+		ctrl = p;
+		a = p;
 	}
 	else if(node.type_id == "UiSlider") {
 		DesignerSliderAdapter *p = new DesignerSliderAdapter;
@@ -2383,7 +2567,8 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 	if(DesignerPanelAdapter *p = dynamic_cast<DesignerPanelAdapter *>(&ctrl)) return p;
 	if(DesignerGroupPanelAdapter *p = dynamic_cast<DesignerGroupPanelAdapter *>(&ctrl)) return p;
 	if(DesignerLabelAdapter *p = dynamic_cast<DesignerLabelAdapter *>(&ctrl)) return p;
-	if(DesignerTitleCardAdapter *p = dynamic_cast<DesignerTitleCardAdapter *>(&ctrl)) return p;
+	if(DesignerTitleCardAdapter *p = dynamic_cast<DesignerTitleCardAdapter *>(&ctrl)) return p;	if(DesignerCompositeAdapter *p = dynamic_cast<DesignerCompositeAdapter *>(&ctrl)) return p;
+
 	if(DesignerSliderAdapter *p = dynamic_cast<DesignerSliderAdapter *>(&ctrl)) return p;
 	if(DesignerButtonAdapter *p = dynamic_cast<DesignerButtonAdapter *>(&ctrl)) return p;
 	if(DesignerToolButtonAdapter *p = dynamic_cast<DesignerToolButtonAdapter *>(&ctrl)) return p;
