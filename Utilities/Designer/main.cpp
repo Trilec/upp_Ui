@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.52";
+static const char* DESIGNER_VERSION = "v0.1.53";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 
 static String DesignerCrumbPropertyKey(int i)
@@ -847,7 +847,7 @@ private:
 		item.description = "Preset";
 		item.icon = ICON_DESIGN_DASHBOARD_EDIT_48();
 		item.icon_render_mode = UiIconRenderMode::MonoTint;
-		item.custom_ink_color = CategoryColor(nullptr);
+		item.custom_ink_color = ToolboxCategoryColor(4);
 		toolbox_model_.AddChild(parent, item);
 	}
 
@@ -913,9 +913,47 @@ private:
 		button.WhenAction = [=] { SetToolboxCategory(category); };
 	}
 
-	UiButton::Style ToolboxCategoryButtonStyle(bool active) const
+	Color ToolboxCategoryColor(int category) const
 	{
-		UiButton::Style s = UiTheme::ResolveButton(active ? UiRole::Accent : UiRole::Standard);
+		bool dark = theme_mode_ == UiThemeMode::Dark;
+		switch(category) {
+		case 0: return dark ? Color(245, 158, 66) : Color(217, 119, 6);     // Layouts: orange
+		case 1: return dark ? Color(74, 222, 128) : Color(34, 150, 91);     // Containers: green
+		case 2: return dark ? Color(96, 165, 250) : Color(54, 116, 210);    // Controls: blue
+		case 3: return dark ? Color(248, 113, 113) : Color(190, 70, 70);    // Composites: warm red
+		case 4: return dark ? Color(196, 181, 253) : Color(124, 58, 237);   // Presets: purple
+		default: return dark ? Color(148, 163, 184) : Color(100, 116, 139);
+		}
+	}
+
+	Color ToolboxCategoryFill(Color base, bool active) const
+	{
+		Color bg = DesignerShellBackground(theme_mode_);
+		return Blend(bg, base, active ? 72 : 32);
+	}
+
+	UiButton::Style ToolboxCategoryButtonStyle(bool active, int category) const
+	{
+		UiButton::Style s = UiTheme::ResolveButton(UiRole::Standard);
+		Color base = ToolboxCategoryColor(category);
+		Color fill = ToolboxCategoryFill(base, active);
+		Color hot = Blend(fill, base, active ? 42 : 28);
+		Color pressed = Blend(fill, base, active ? 74 : 54);
+		Color frame = Blend(fill, base, active ? 154 : 104);
+
+		for(int i = 0; i < 4; i++) {
+			s.palette.face[i] = UiFill::Solid(fill);
+			s.palette.frame[i] = frame;
+			s.palette.ink[i] = base;
+			s.palette.icon[i] = base;
+		}
+		s.palette.face[ST_HOT] = UiFill::Solid(hot);
+		s.palette.face[ST_PRESSED] = UiFill::Solid(pressed);
+		s.palette.frame[ST_HOT] = base;
+		s.palette.frame[ST_PRESSED] = base;
+		s.metrics.face_enabled = true;
+		s.metrics.frame_enabled = true;
+		s.metrics.frame_width = active ? DPI(2) : DPI(1);
 		s.metrics.content_margin = Rect(3, 3, 3, 3);
 		s.metrics.radius = DPI(8);
 		s.content_gap = 0;
@@ -927,11 +965,11 @@ private:
 
 	void RefreshToolboxCategoryButtons()
 	{
-		toolbox_layouts_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 0));
-		toolbox_containers_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 1));
-		toolbox_controls_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 2));
-		toolbox_composites_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 3));
-		toolbox_presets_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 4));
+		toolbox_layouts_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 0, 0));
+		toolbox_containers_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 1, 1));
+		toolbox_controls_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 2, 2));
+		toolbox_composites_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 3, 3));
+		toolbox_presets_button_.SetCustomStyle(ToolboxCategoryButtonStyle(active_toolbox_category_ == 4, 4));
 	}
 
 	void RefreshOverlayButton()
@@ -2179,12 +2217,15 @@ private:
 
 	Color CategoryColor(const DesignerType* t) const
 	{
-		bool dark = theme_mode_ == UiThemeMode::Dark;
-		if(IsLayoutType(t))
-			return dark ? Color(245, 158, 66) : Color(217, 119, 6);
-		if(IsPanelType(t))
-			return dark ? Color(74, 222, 128) : Color(34, 150, 91);
-		return dark ? Color(96, 165, 250) : Color(54, 116, 210);
+		if(!t)
+			return ToolboxCategoryColor(4);
+		if(t->toolbox_group == "Layouts")
+			return ToolboxCategoryColor(0);
+		if(t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "AccordionSectionSlot")
+			return ToolboxCategoryColor(1);
+		if(t->toolbox_group == "Composites")
+			return ToolboxCategoryColor(3);
+		return ToolboxCategoryColor(2);
 	}
 
 	Image CategoryFallbackIcon(const DesignerType* t) const
