@@ -27,12 +27,21 @@ static String DesignerPreviewAxisSizing(const DesignerNode& n, const String& axi
 }
 
 
+static int DesignerPreviewFixedMetric(const DesignerNode& n, const String& axis_key, int fallback)
+{
+	String explicit_key = axis_key == "width" ? "fixed_width" : "fixed_height";
+	int q = n.properties.Find(explicit_key);
+	if(q >= 0)
+		return (int)n.properties.GetValue(q);
+	q = n.properties.Find(axis_key);
+	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
+}
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
 {
 	String sizing = DesignerPreviewAxisSizing(n, axis);
 	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 10)));
 	if(sizing == "Fixed")
-		return max(DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(n, value_key, fallback))), user_min);
+		return max(DPI(DesignerClampMin((int)DesignerPreviewFixedMetric(n, value_key, fallback))), user_min);
 
 	Size minsz = child.GetMinSize();
 	int natural = value_key == "width" ? minsz.cx : minsz.cy;
@@ -982,8 +991,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				String main_sizing = horizontal ? hs : vs;
 				if(main_sizing == "Fixed") {
 					int fixed = horizontal
-					          ? (int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH)
-					          : (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT);
+					          ? (int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH)
+					          : (int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT);
 					ref.Fixed(DPI(DesignerClampMin(fixed)));
 				}
 				else if(main_sizing == "Expand")
@@ -1001,8 +1010,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
 				Size fixed(0, 0);
 				if(hs == "Fixed" || vs == "Fixed") {
-					int fixed_w = DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
-					int fixed_h = DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+					int fixed_w = DesignerClampMin((int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+					int fixed_h = DesignerClampMin((int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
 					int min_w = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10));
 					int min_h = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10));
 					fixed = Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h)));
@@ -1022,8 +1031,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				String pane_sizing = DesignerPreviewAxisSizing(child_node, vertical ? "v_sizing" : "h_sizing");
 				if(pane_sizing == "Fixed") {
 					int fixed = vertical
-					          ? (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT)
-					          : (int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH);
+					          ? (int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT)
+					          : (int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH);
 					splitter->SetMinPixels(pane, DPI(DesignerClampMin(fixed)));
 				}
 			}
@@ -1036,8 +1045,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				quad->SetMinPixels(3, DPI((int)DesignerPreviewNodeProperty(parent_node, "min_d", 60)));
 				if(DesignerPreviewAxisSizing(child_node, "h_sizing") == "Fixed" ||
 				   DesignerPreviewAxisSizing(child_node, "v_sizing") == "Fixed") {
-					int fixed = max((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH),
-					                (int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT));
+					int fixed = max((int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH),
+					                (int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_SPLITTER_FALLBACK_HEIGHT));
 					quad->SetMinPixels(pane, DPI(DesignerClampMin(fixed)));
 				}
 			}

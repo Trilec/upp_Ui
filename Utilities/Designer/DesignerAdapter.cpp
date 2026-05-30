@@ -735,10 +735,10 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	            "Positions a fit-width item inside its grid cell.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
 	            "Positions a fit-height item inside its grid cell.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
-		b.AddInt("width", "Fixed width", DesignerEditorKind::Slider,
+			b.AddInt("fixed_width", "Fixed width", DesignerEditorKind::Slider,
 	         "fixed parent layout width",
 	         "Used when Width mode is Fixed. The actual width is clamped by Min width.", 10, 1600);
-	b.AddInt("height", "Fixed height", DesignerEditorKind::Slider,
+	b.AddInt("fixed_height", "Fixed height", DesignerEditorKind::Slider,
 	         "fixed parent layout height",
 	         "Used when Height mode is Fixed. The actual height is clamped by Min height.", 10, 900);
 	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",

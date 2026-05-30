@@ -217,9 +217,9 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return 2;
 	if(b.property_id == "spin")
 		return true;
-	if(b.property_id == "width")
+	if(b.property_id == "width" || b.property_id == "fixed_width")
 		return t.default_size.cx;
-	if(b.property_id == "height")
+	if(b.property_id == "height" || b.property_id == "fixed_height")
 		return t.default_size.cy;
 	if(b.property_id == "min_width" || b.property_id == "min_height")
 		return DESIGNER_MIN_CLAMP;

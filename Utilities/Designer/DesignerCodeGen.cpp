@@ -525,6 +525,15 @@ static String AxisSizing(const DesignerNode& n, const String& axis_key)
 	return CodeGenNodeProperty(n, axis_key, "Fit");
 }
 
+static int CodeGenFixedMetric(const DesignerNode& n, const String& axis_key, int fallback)
+{
+	String explicit_key = axis_key == "width" ? "fixed_width" : "fixed_height";
+	int q = n.properties.Find(explicit_key);
+	if(q >= 0)
+		return (int)n.properties.GetValue(q);
+	q = n.properties.Find(axis_key);
+	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
+}
 static String GridItemAlignHExpr(const DesignerNode& n)
 {
 	String align = CodeGenNodeProperty(n, "cell_align_h", "Auto");
@@ -554,8 +563,8 @@ static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& chil
 	bool horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
 	String sizing = AxisSizing(child, horizontal ? "h_sizing" : "v_sizing");
 	if(sizing == "Fixed") {
-		int v = horizontal ? DesignerClampMin((int)CodeGenNodeProperty(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH))
-		                   : DesignerClampMin((int)CodeGenNodeProperty(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+		int v = horizontal ? DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH))
+		                   : DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
 		return Format(".Fixed(DPI(%d))", v);
 	}
 	if(sizing == "Expand")
@@ -586,7 +595,7 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	if(hs == "Expand")
 		out << "\t\t" << var << ".HSizePosZ(0, 0);\n";
 	else if(hs == "Fixed") {
-		int w = max(DesignerClampMin((int)CodeGenNodeProperty(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
+		int w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
 		out << "\t\t" << var << ".LeftPosZ(0, DPI(" << w << "));\n";
 	}
 	else
@@ -595,7 +604,7 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	if(vs == "Expand")
 		out << "\t\t" << var << ".VSizePosZ(0, 0);\n";
 	else if(vs == "Fixed") {
-		int h = max(DesignerClampMin((int)CodeGenNodeProperty(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
+		int h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
 		out << "\t\t" << var << ".TopPosZ(0, DPI(" << h << "));\n";
 	}
 	else
@@ -916,8 +925,8 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		String hs = AxisSizing(child, "h_sizing");
 		String vs = AxisSizing(child, "v_sizing");
 		if(hs == "Fixed" || vs == "Fixed") {
-			int w = DesignerClampMin((int)CodeGenNodeProperty(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
-			int h = DesignerClampMin((int)CodeGenNodeProperty(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+			int w = DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+			int h = DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
 			out << "\t\t{\n";
 			out << "\t\t\tint item = " << p << ".Add(" << c << ", " << row << ", " << col
 			    << ", " << (hs == "Expand" ? "true" : "false")
