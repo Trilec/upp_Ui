@@ -1,4 +1,4 @@
-#include "DesignerCodeGen.h"
+﻿#include "DesignerCodeGen.h"
 #include "DesignerDefaults.h"
 
 // DesignerCodeGen.cpp - converts the model tree into standalone U++ code.
@@ -563,6 +563,44 @@ static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& chil
 	return ".Fit()";
 }
 
+static String BoxMinCall(const DesignerNode& parent, const DesignerNode& child)
+{
+	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
+	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
+	if(min_w == DESIGNER_MIN_CLAMP && min_h == DESIGNER_MIN_CLAMP)
+		return String();
+
+	bool horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
+	if(horizontal)
+		return Format(".MinMain(DPI(%d)).MinCross(DPI(%d))", min_w, min_h);
+	return Format(".MinMain(DPI(%d)).MinCross(DPI(%d))", min_h, min_w);
+}
+
+static void EmitDirectChildLayout(String& out, const String& var, const DesignerNode& child)
+{
+	String hs = AxisSizing(child, "h_sizing");
+	String vs = AxisSizing(child, "v_sizing");
+	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
+	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
+
+	if(hs == "Expand")
+		out << "\t\t" << var << ".HSizePosZ(0, 0);\n";
+	else if(hs == "Fixed") {
+		int w = max(DesignerClampMin((int)CodeGenNodeProperty(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
+		out << "\t\t" << var << ".LeftPosZ(0, DPI(" << w << "));\n";
+	}
+	else
+		out << "\t\t" << var << ".LeftPosZ(0, max(" << var << ".GetMinSize().cx, DPI(" << min_w << ")));\n";
+
+	if(vs == "Expand")
+		out << "\t\t" << var << ".VSizePosZ(0, 0);\n";
+	else if(vs == "Fixed") {
+		int h = max(DesignerClampMin((int)CodeGenNodeProperty(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
+		out << "\t\t" << var << ".TopPosZ(0, DPI(" << h << "));\n";
+	}
+	else
+		out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".GetMinSize().cy, DPI(" << min_h << ")));\n";
+}
 static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 {
 	return DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP ||

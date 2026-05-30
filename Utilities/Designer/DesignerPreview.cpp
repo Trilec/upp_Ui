@@ -1,4 +1,4 @@
-#include "DesignerPreview.h"
+﻿#include "DesignerPreview.h"
 #include "DesignerDefaults.h"
 
 // DesignerPreview.cpp - virtual-window preview and pointer interaction surface.
@@ -30,11 +30,12 @@ static String DesignerPreviewAxisSizing(const DesignerNode& n, const String& axi
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
 {
 	String sizing = DesignerPreviewAxisSizing(n, axis);
+	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 10)));
 	if(sizing == "Fixed")
-		return DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(n, value_key, fallback)));
+		return max(DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(n, value_key, fallback))), user_min);
+
 	Size minsz = child.GetMinSize();
 	int natural = value_key == "width" ? minsz.cx : minsz.cy;
-	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 10)));
 	return max(natural, user_min);
 }
 
@@ -989,12 +990,23 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					ref.Expand(1);
 				else
 					ref.Fit();
+
+				int min_w = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10)));
+				int min_h = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10)));
+				if(horizontal)
+					ref.MinMain(min_w).MinCross(min_h);
+				else
+					ref.MinMain(min_h).MinCross(min_w);
 			}
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
 				Size fixed(0, 0);
-				if(hs == "Fixed" || vs == "Fixed")
-					fixed = Size(DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH))),
-					             DPI(DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))));
+				if(hs == "Fixed" || vs == "Fixed") {
+					int fixed_w = DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+					int fixed_h = DesignerClampMin((int)DesignerPreviewNodeProperty(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+					int min_w = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10));
+					int min_h = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10));
+					fixed = Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h)));
+				}
 				int columns = max(1, (int)DesignerPreviewNodeProperty(parent_node, "columns", 2));
 				int row = (int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns);
 				int col = (int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns);
