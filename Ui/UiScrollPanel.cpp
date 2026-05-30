@@ -335,19 +335,29 @@ void UiScrollPanel::MouseWheel(Point, int zdelta, dword)
     ApplyScroll();
     Refresh();
 }
+
 void UiScrollPanel::Layout()
 {
     const Style& style = GetEffectiveStyle();
-    Rect content_area = GetViewportRect();
-    content_bounds_ = MeasureContentBounds();
-
-    int logical_w = max(content_area.GetWidth(), content_bounds_.GetWidth());
-    int logical_h = max(content_area.GetHeight(), content_bounds_.GetHeight());
-    content_size_ = Size(max(0, logical_w), max(0, logical_h));
-
-    UpdateScrollbars();
 
     Rect view = GetFaceRect();
+    Rect seed_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_margin));
+    Size seed_size(max(0, seed_view.GetWidth()), max(0, seed_view.GetHeight()));
+
+    // Seed the content host with the viewport before measuring. This prevents
+    // expanding children from feeding a stale, oversized content width back into
+    // the next scroll-panel measurement pass.
+    content_size_ = seed_size;
+    content_bounds_ = Rect(0, 0, seed_size.cx, seed_size.cy);
+    content_.SetRect(seed_view.left, seed_view.top, seed_size.cx, seed_size.cy);
+    content_.Layout();
+    content_bounds_ = MeasureContentBounds();
+
+    content_size_ = Size(max(seed_size.cx, content_bounds_.GetWidth()),
+                         max(seed_size.cy, content_bounds_.GetHeight()));
+    UpdateScrollbars();
+
+    view = GetFaceRect();
     int vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
     int hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
     if(vbarw)
@@ -356,10 +366,9 @@ void UiScrollPanel::Layout()
         view.bottom -= hbarh;
     Rect content_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_margin));
 
-    // The content surface must size to the post-scrollbar viewport, otherwise
-    // child controls can end up laid out underneath the bars and lose input.
-    content_size_.cx = max(content_view.GetWidth(), content_bounds_.GetWidth());
-    content_size_.cy = max(content_view.GetHeight(), content_bounds_.GetHeight());
+    Size page_size(max(0, content_view.GetWidth()), max(0, content_view.GetHeight()));
+    content_size_ = Size(max(page_size.cx, content_bounds_.GetWidth()),
+                         max(page_size.cy, content_bounds_.GetHeight()));
     UpdateScrollbars();
 
     view = GetFaceRect();
@@ -376,7 +385,22 @@ void UiScrollPanel::Layout()
         sby_.SetRect(view.right + vgap, view.top + hgap, max(0, vbarw - vgap), max(0, view.GetHeight() - hgap));
     if(sbx_.IsShown())
         sbx_.SetRect(view.left, view.bottom + hgap, max(0, view.GetWidth() - vgap), max(0, hbarh - hgap));
+
     ApplyScroll();
+    content_.Layout();
+
+    // Re-measure after children have been laid out against the final content
+    // size. If real content is wider/taller, update once more and keep bars in sync.
+    Rect final_bounds = MeasureContentBounds();
+    Size final_size(max(content_size_.cx, final_bounds.GetWidth()),
+                    max(content_size_.cy, final_bounds.GetHeight()));
+    if(final_size != content_size_ || final_bounds != content_bounds_) {
+        content_bounds_ = final_bounds;
+        content_size_ = final_size;
+        UpdateScrollbars();
+        ApplyScroll();
+        content_.Layout();
+    }
 
     // A restore/fullscreen transition can move the bars under a stationary
     // mouse cursor without generating a fresh enter event. Resync hover state
