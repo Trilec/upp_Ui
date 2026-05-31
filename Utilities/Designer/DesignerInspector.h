@@ -72,6 +72,7 @@ private:
 	void RefreshPage(Page& page, const DesignerNode& n, const DesignerType& t,
 	                 const Vector<DesignerApiBinding>& bindings, const String& type_text);
 	void SetRowValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b, Row& row);
+	Value QuadFaceValue(const DesignerNode& n, Color face) const;
 	void CommitChoice(const String& property_id, const Value& value, const char *source);
 	void CommitChoice(const String& property_id, UiCompositeDropdown *row, const char *source);
 

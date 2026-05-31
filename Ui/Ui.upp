@@ -51,6 +51,8 @@ file
 	UiButton.cpp,
 	UiToolButton.h,
 	UiToolButton.cpp,
+	UiSplitButton.h,
+	UiSplitButton.cpp,
 	UiBaseEdit.h,
 	UiBaseEdit.cpp,
 	UiLineEdit.h,

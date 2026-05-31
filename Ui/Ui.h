@@ -59,6 +59,7 @@
 #include <Ui/UiMenu.h>
 #include <Ui/UiButton.h>
 #include <Ui/UiToolButton.h>
+#include <Ui/UiSplitButton.h>
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiIntEdit.h>

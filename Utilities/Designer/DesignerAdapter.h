@@ -32,6 +32,7 @@ enum class DesignerEditorKind {
 	Bool,
 	Choice,
 	Color,
+	QuadColor,
 	Slider
 };
 
@@ -254,6 +255,28 @@ public:
 	const Ctrl& GetCtrl() const override { return *this; }
 	DesignerNodeId GetNodeId() const override { return node_id_; }
 	String GetTypeId() const override { return "UiButton"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+// Designer wrapper for UiSplitButton.
+// Shows the primary command area plus split dropdown affordance as a real
+// runtime control while keeping popup choices simple for layout/codegen tests.
+class DesignerSplitButtonAdapter : public UiSplitButton, public DesignerAdapter {
+public:
+	typedef DesignerSplitButtonAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiSplitButton"; }
 	void SyncFromNode(const DesignerNode& node) override;
 	void SetOverlayState(const DesignerOverlayState& state) override;
 	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }

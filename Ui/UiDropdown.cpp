@@ -68,6 +68,7 @@ const UiDropdown::Style& UiDropdown::StyleDefault()
         // Popup styling
         s.popup_item_style = UiLabel::StyleDefault();
         s.popup_max_height = DPI(300);
+        s.popup_min_width = DPI(120);
         s.popup_item_height = DPI(32);
         s.item_spacing = 0;
         s.popup_show_scrollbar = true;
@@ -845,6 +846,15 @@ UiDropdown& UiDropdown::SetPopupMaxHeight(int height)
     return *this;
 }
 
+UiDropdown& UiDropdown::SetPopupMinWidth(int width)
+{
+    Style& s = StyleEdit();
+    s.popup_min_width = max(0, width);
+    if(popup_open_)
+        UpdatePopupPosition();
+    return *this;
+}
+
 UiDropdown& UiDropdown::SetPopupMaxItems(int count)
 {
     Style& s = StyleEdit();
@@ -1249,9 +1259,9 @@ Size UiDropdown::ComputeNaturalSize() const
     // Compute size based on current text or placeholder
     String display_text = text_;
     if(display_text.IsEmpty() && items_.GetCount() > 0)
-        display_text = "Select...";
+        display_text = placeholder_text_;
     else if(display_text.IsEmpty())
-        display_text = "Empty";
+        display_text = empty_text_;
     
     Font font = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
     if(IsNull(font))
@@ -1464,7 +1474,7 @@ void UiDropdown::UpdatePopupPosition()
     
     Rect outer = GetScreenRect();
     Rect screen = GetVirtualScreenArea();
-    int popup_width = max(outer.GetWidth(), DPI(120));
+    int popup_width = max(outer.GetWidth(), max(DPI(120), style_.popup_min_width));
     int item_h = max(style_.popup_item_height, DPI(16));
     int content_h = items_.GetCount() * item_h;
     int max_by_items = style_.popup_max_items > 0 ? style_.popup_max_items * item_h : content_h;
@@ -1711,9 +1721,9 @@ void UiDropdown::Paint(Draw& w)
         String display_text = text_;
         if(display_text.IsEmpty()) {
             if(items_.GetCount() > 0)
-                display_text = "Select...";
+                display_text = placeholder_text_;
             else
-                display_text = "Empty";
+                display_text = empty_text_;
         }
 
         Size ts = GetTextSize(display_text, font);
@@ -1990,7 +2000,8 @@ void UiDropdown::PopupWindow::Paint(Draw& w)
     Font item_font = owner->style_.popup_item_style.font;
     if(IsNull(item_font))
         item_font = StdFont();
-    Font meta_font = StdFont();
+    Font meta_font = item_font;
+    meta_font.Height(max(DPI(7), item_font.GetHeight() - DPI(1)));
     const int item_h = max(owner->style_.popup_item_height, DPI(16));
     const int item_sp = max(0, owner->style_.item_spacing);
     const int icon_side = DPI(16);
@@ -2557,6 +2568,24 @@ UiDropdown& UiDropdown::SetSizeMin(Size sz)
 {
     user_min_size_.cx = max(0, sz.cx);
     user_min_size_.cy = max(0, sz.cy);
+    layout_dirty_ = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiDropdown& UiDropdown::SetPlaceholderText(const String& text)
+{
+    placeholder_text_ = text;
+    layout_dirty_ = true;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiDropdown& UiDropdown::SetEmptyText(const String& text)
+{
+    empty_text_ = text;
     layout_dirty_ = true;
     RefreshLayout();
     Refresh();

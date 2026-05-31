@@ -193,11 +193,12 @@ Rect UiSplitter::GetTrackRect(int index) const
     Rect r = GetHitRect(index);
     r.Deflate(style.track_inset);
     int thick = max(1, style.track_thickness);
+    int p = PosToClient(pos_[index]);
     if(vertical_) {
-        int y = r.top + (r.GetHeight() - thick) / 2;
+        int y = p - (thick >> 1);
         return RectC(r.left, y, r.GetWidth(), thick);
     }
-    int x = r.left + (r.GetWidth() - thick) / 2;
+    int x = p - (thick >> 1);
     return RectC(x, r.top, thick, r.GetHeight());
 }
 
@@ -207,15 +208,16 @@ Rect UiSplitter::GetThumbRect(int index) const
     Rect hit = GetHitRect(index);
     int main = max(DPI(8), style.thumb_main);
     int cross = max(1, style.thumb_cross);
+    int p = PosToClient(pos_[index]);
     if(vertical_) {
         Rect r = RectC(hit.left + (hit.GetWidth() - main) / 2,
-                       hit.top + (hit.GetHeight() - cross) / 2,
+                       p - (cross >> 1),
                        min(main, hit.GetWidth()),
                        cross);
         r.Deflate(style.thumb_inset);
         return r;
     }
-    Rect r = RectC(hit.left + (hit.GetWidth() - cross) / 2,
+    Rect r = RectC(p - (cross >> 1),
                    hit.top + (hit.GetHeight() - main) / 2,
                    cross,
                    min(main, hit.GetHeight()));

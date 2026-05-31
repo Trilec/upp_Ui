@@ -355,6 +355,14 @@ static UiFill DesignerFaceFillChoice(const DesignerNode& n, Color face)
 	Color tr = GetColorProperty(n, "face_tr", face);
 	Color bl = GetColorProperty(n, "face_bl", face);
 	Color br = GetColorProperty(n, "face_br", face);
+	Value quad = AdapterNodeProperty(n, "face_quad", Value());
+	if(quad.Is<ValueArray>()) {
+		ValueArray a = quad;
+		if(a.GetCount() > 0 && !IsNull(a[0])) tl = a[0];
+		if(a.GetCount() > 1 && !IsNull(a[1])) tr = a[1];
+		if(a.GetCount() > 2 && !IsNull(a[2])) bl = a[2];
+		if(a.GetCount() > 3 && !IsNull(a[3])) br = a[3];
+	}
 	return UiFill::ImageFill(MakeQuadGradientTile(48, tl, tr, bl, br, 0));
 }
 
@@ -590,6 +598,8 @@ String DesignerAdapterHelp(const String& type_id)
 		return "Compact header/card content with title, subtitle, optional line, radius, and themed face/frame controls.";
 	if(type_id == "UiButton")
 		return "Clickable command control. Use this to test text alignment, sizing, and button placement inside layouts.";
+	if(type_id == "UiSplitButton")
+		return "Primary command plus dropdown choices. Use it for save/load recent lists, history commands, and compact option buttons.";
 	if(type_id == "UiToolButton")
 		return "Compact icon command control for toolbar and chrome surfaces.";
 	if(type_id == "UiAccordion")
@@ -690,10 +700,7 @@ static void HideThemeOverrideBindings(DesignerApiBuilder& b)
 	b.Hide("theme_override");
 	b.Hide("face");
 	b.Hide("face_mode");
-	b.Hide("face_tl");
-	b.Hide("face_tr");
-	b.Hide("face_bl");
-	b.Hide("face_br");
+	b.Hide("face_quad");
 	b.Hide("frame");
 	b.Hide("radius");
 	b.Hide("face_enabled");
@@ -710,10 +717,7 @@ static void HideThemeOverrideBindings(DesignerApiBuilder& b)
 static void HideQuadFaceBindings(DesignerApiBuilder& b)
 {
 	b.Hide("face_mode");
-	b.Hide("face_tl");
-	b.Hide("face_tr");
-	b.Hide("face_bl");
-	b.Hide("face_br");
+	b.Hide("face_quad");
 }
 
 static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNode& n)
@@ -751,14 +755,8 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Explicit fill color used when theme overrides and Fill are enabled.").group = theme_group;
 	b.AddChoice("face_mode", "Face mode", "StyledPalette::face",
 	            "Solid fill or four-corner gradient fill.", {{"Solid", "Solid"}, {"Quad", "Quad"}}).group = theme_group;
-	b.Add("face_tl", "Face top left", DesignerEditorKind::Color, "SetFaceQuadGradient",
-	      "Top-left gradient color.").group = theme_group;
-	b.Add("face_tr", "Face top right", DesignerEditorKind::Color, "SetFaceQuadGradient",
-	      "Top-right gradient color.").group = theme_group;
-	b.Add("face_bl", "Face bottom left", DesignerEditorKind::Color, "SetFaceQuadGradient",
-	      "Bottom-left gradient color.").group = theme_group;
-	b.Add("face_br", "Face bottom right", DesignerEditorKind::Color, "SetFaceQuadGradient",
-	      "Bottom-right gradient color.").group = theme_group;
+	b.Add("face_quad", "Quad face", DesignerEditorKind::QuadColor, "SetFaceQuadGradient",
+	      "Four-corner gradient colors used when Face mode is Quad.").group = theme_group;
 	b.Add("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Explicit frame color used when theme overrides and Frame are enabled.").group = theme_group;
 	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
@@ -1192,6 +1190,65 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 void DesignerButtonAdapter::Paint(Draw& w)
 {
 	UiButton::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerSplitButtonAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyButtonAppearance(*this, node);
+	Image icon = DesignerIconChoice(node);
+	if(IsNull(icon))
+		ClearIcon();
+	else
+		SetIcon(icon).SetIconSize(DPI((int)AdapterNodeProperty(node, "icon_size", 16)),
+		                          DPI((int)AdapterNodeProperty(node, "icon_size", 16)))
+		             .SetIconRenderMode(UiIconRenderMode::MonoTint);
+	SetIconScaleToContent((bool)AdapterNodeProperty(node, "icon_scale", false));
+	SetText(TextProperty(node));
+	SetSplitWidth(DPI((int)AdapterNodeProperty(node, "split_width", 28)));
+	SetPopupMinWidth(DPI((int)AdapterNodeProperty(node, "popup_min_width", 220)));
+	ClearItems();
+	Add(AdapterNodeProperty(node, "choice_a", "Recent A"), "a");
+	Add(AdapterNodeProperty(node, "choice_b", "Recent B"), "b");
+	Add(AdapterNodeProperty(node, "choice_c", "Recent C"), "c");
+	NoWantFocus();
+}
+
+void DesignerSplitButtonAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerSplitButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("text", "Text", DesignerEditorKind::Text, "UiSplitButton::SetText",
+	      "Sets the primary command caption.");
+	AddIconBinding(b);
+	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiSplitButton::SetIconScaleToContent",
+	      "When enabled, the icon scales to the button content box and overrides Icon size.");
+	b.AddChoice("icon_side", "Icon side", "UiSplitButton::SetIconSide",
+	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	AddHorizontalAlignmentBinding(b);
+	AddVerticalAlignmentBinding(b);
+	b.AddInt("split_width", "Split width", DesignerEditorKind::Slider, "UiSplitButton::SetSplitWidth",
+	         "Width of the dropdown hit target on the right side.", 18, 60);
+	b.AddInt("popup_min_width", "Popup width", DesignerEditorKind::Slider, "UiSplitButton::SetPopupMinWidth",
+	         "Minimum width of the opened selection popup.", 120, 520);
+	b.Add("choice_a", "Choice A", DesignerEditorKind::Text, "UiSplitButton::Add",
+	      "First preview dropdown row.");
+	b.Add("choice_b", "Choice B", DesignerEditorKind::Text, "UiSplitButton::Add",
+	      "Second preview dropdown row.");
+	b.Add("choice_c", "Choice C", DesignerEditorKind::Text, "UiSplitButton::Add",
+	      "Third preview dropdown row.");
+}
+
+void DesignerSplitButtonAdapter::Paint(Draw& w)
+{
+	UiSplitButton::Paint(w);
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -2302,13 +2359,12 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 	if(AdapterNodeProperty(node, "direction", "H") == "V") {
 		s.thumb_main = thumb_w;
 		s.thumb_cross = thumb_h;
-		s.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_VERT_48();
 	}
 	else {
 		s.thumb_main = thumb_h;
 		s.thumb_cross = thumb_w;
-		s.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();
 	}
+	s.thumb_icon = Image();
 	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", 8));
 	s.label.Clear();
 	SetCustomStyle(s);
@@ -2485,6 +2541,11 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		ctrl = p;
 		a = p;
 	}
+	else if(node.type_id == "UiSplitButton") {
+		DesignerSplitButtonAdapter *p = new DesignerSplitButtonAdapter;
+		ctrl = p;
+		a = p;
+	}
 	else if(node.type_id == "UiToolButton") {
 		DesignerToolButtonAdapter *p = new DesignerToolButtonAdapter;
 		ctrl = p;
@@ -2571,6 +2632,7 @@ DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 
 	if(DesignerSliderAdapter *p = dynamic_cast<DesignerSliderAdapter *>(&ctrl)) return p;
 	if(DesignerButtonAdapter *p = dynamic_cast<DesignerButtonAdapter *>(&ctrl)) return p;
+	if(DesignerSplitButtonAdapter *p = dynamic_cast<DesignerSplitButtonAdapter *>(&ctrl)) return p;
 	if(DesignerToolButtonAdapter *p = dynamic_cast<DesignerToolButtonAdapter *>(&ctrl)) return p;
 	if(DesignerLineEditAdapter *p = dynamic_cast<DesignerLineEditAdapter *>(&ctrl)) return p;
 	if(DesignerIntEditAdapter *p = dynamic_cast<DesignerIntEditAdapter *>(&ctrl)) return p;

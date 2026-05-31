@@ -184,6 +184,20 @@ static String CodeGenBreadcrumbCrumbText(const DesignerNode& n, int i)
 	return Format("Crumb %d", i + 1);
 }
 
+static Color CodeGenQuadFaceColor(const DesignerNode& n, int i, Color fallback)
+{
+	Value quad = CodeGenNodeProperty(n, "face_quad", Value());
+	if(quad.Is<ValueArray>()) {
+		ValueArray a = quad;
+		if(i >= 0 && i < a.GetCount() && !IsNull(a[i]))
+			return a[i];
+	}
+	static const char *legacy[] = { "face_tl", "face_tr", "face_bl", "face_br" };
+	if(i >= 0 && i < 4)
+		return CodeGenNodeProperty(n, legacy[i], fallback);
+	return fallback;
+}
+
 static String StyleTypeExpr(const DesignerNode& n)
 {
 	if(n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic")
@@ -196,7 +210,7 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiLabel::Style";
 	if(n.type_id == "UiTitleCard")
 		return "UiTitleCard::Style";
-	if(n.type_id == "UiButton")
+	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
 		return "UiButton::Style";
 	if(n.type_id == "UiToolButton")
 		return "UiToolButton::Style";
@@ -223,7 +237,7 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		return "UiTheme::ResolveLabel(" + role_expr + ")";
 	if(n.type_id == "UiTitleCard")
 		return "UiTheme::ResolveTitleCard(" + role_expr + ")";
-	if(n.type_id == "UiButton")
+	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
 		return "UiTheme::ResolveButton(" + role_expr + ")";
 	if(n.type_id == "UiToolButton")
 		return "UiTheme::ResolveToolButton(" + role_expr + ")";
@@ -365,10 +379,10 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			Color face = CodeGenNodeProperty(n, "face", SColorFace());
 			if(CodeGenNodeProperty(n, "face_mode", "Solid") == "Quad") {
 				out << "\t\t\tUiFill face_fill = UiFill::ImageFill(MakeQuadGradientTile(48, "
-				    << ColorExpr(CodeGenNodeProperty(n, "face_tl", face)) << ", "
-				    << ColorExpr(CodeGenNodeProperty(n, "face_tr", face)) << ", "
-				    << ColorExpr(CodeGenNodeProperty(n, "face_bl", face)) << ", "
-				    << ColorExpr(CodeGenNodeProperty(n, "face_br", face)) << ", 0));\n"
+				    << ColorExpr(CodeGenQuadFaceColor(n, 0, face)) << ", "
+				    << ColorExpr(CodeGenQuadFaceColor(n, 1, face)) << ", "
+				    << ColorExpr(CodeGenQuadFaceColor(n, 2, face)) << ", "
+				    << ColorExpr(CodeGenQuadFaceColor(n, 3, face)) << ", 0));\n"
 				    << "\t\t\tfor(int i = 0; i < 4; i++)\n"
 				    << "\t\t\t\ts.palette.face[i] = face_fill;\n";
 			}
@@ -482,6 +496,8 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiGroupPanel " << var << ";\n";
 	else if(n.type_id == "UiButton")
 		out << "\tUiButton " << var << ";\n";
+	else if(n.type_id == "UiSplitButton")
+		out << "\tUiSplitButton " << var << ";\n";
 	else if(n.type_id == "UiToolButton")
 		out << "\tUiToolButton " << var << ";\n";
 	else if(n.type_id == "UiAccordion")
@@ -787,13 +803,11 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		int thumb_h = (int)CodeGenNodeProperty(n, "thumb_height", 64);
 		if(dir == "V") {
 			out << "\t\t\ts.thumb_main = DPI(" << thumb_w << ");\n"
-			    << "\t\t\ts.thumb_cross = DPI(" << thumb_h << ");\n"
-			    << "\t\t\ts.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_VERT_48();\n";
+			    << "\t\t\ts.thumb_cross = DPI(" << thumb_h << ");\n";
 		}
 		else {
 			out << "\t\t\ts.thumb_main = DPI(" << thumb_h << ");\n"
-			    << "\t\t\ts.thumb_cross = DPI(" << thumb_w << ");\n"
-			    << "\t\t\ts.thumb_icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48();\n";
+			    << "\t\t\ts.thumb_cross = DPI(" << thumb_w << ");\n";
 		}
 		out << "\t\t\ts.thumb_metrics.radius = DPI(" << (int)CodeGenNodeProperty(n, "thumb_radius", 8) << ");\n"
 		    << "\t\t\t" << var << ".SetCustomStyle(s);\n"
@@ -856,6 +870,19 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
+	}
+	else if(n.type_id == "UiSplitButton") {
+		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
+		    << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 28) << "))"
+		    << ".SetPopupMinWidth(DPI(" << (int)CodeGenNodeProperty(n, "popup_min_width", 220) << "));\n";
+		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
+			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
+			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
+		out << "\t\t" << var << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_a", "Recent A")) << ", \"a\")"
+		    << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_b", "Recent B")) << ", \"b\")"
+		    << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_c", "Recent C")) << ", \"c\");\n";
 	}
 	else if(n.type_id == "UiToolButton") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ");\n";
@@ -1017,8 +1044,9 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << ";\n";
 	else if(parent.type_id == "GridLayout") {
 		int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
-		int row = max(0, (int)CodeGenNodeProperty(child, "grid_row", index / columns));
-		int col = max(0, (int)CodeGenNodeProperty(child, "grid_col", index % columns));
+		int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
+		int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
+		int col = clamp((int)CodeGenNodeProperty(child, "grid_col", index % columns), 0, columns - 1);
 		String hs = AxisSizing(child, "h_sizing");
 		String vs = AxisSizing(child, "v_sizing");
 		if(hs == "Fixed" || vs == "Fixed") {

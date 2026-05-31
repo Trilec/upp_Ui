@@ -1040,8 +1040,9 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					fixed = Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h)));
 				}
 				int columns = max(1, (int)DesignerPreviewNodeProperty(parent_node, "columns", 2));
-				int row = (int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns);
-				int col = (int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns);
+				int rows = max(1, (int)DesignerPreviewNodeProperty(parent_node, "rows", 2));
+				int row = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns), 0, rows - 1);
+				int col = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns), 0, columns - 1);
 				int item = grid->Add(child, row, col, hs == "Expand", vs == "Expand", fixed);
 				grid->SetItemAlign(item, DesignerPreviewGridAlignH(child_node), DesignerPreviewGridAlignV(child_node));
 			}

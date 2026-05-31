@@ -87,6 +87,7 @@ public:
         // Popup list style
         UiLabel::Style popup_item_style;
         int popup_max_height = DPI(300);
+        int popup_min_width = DPI(120);
         int popup_item_height = DPI(32);
         int item_spacing = 0;
         bool popup_show_scrollbar = true;
@@ -130,7 +131,7 @@ public:
               % content_gap
               % font % transparent
               % popup_item_style
-              % popup_max_height % popup_item_height % item_spacing % popup_show_scrollbar % popup_space % popup_max_items
+              % popup_max_height % popup_min_width % popup_item_height % item_spacing % popup_show_scrollbar % popup_space % popup_max_items
               % drag_size % drag_gap % show_drag_handle % drag_side % drag_glyph % drag_marker
               % show_popup_selection_marker % popup_selection_icon % popup_check_checked_icon
               % popup_check_unchecked_icon % popup_marker_render_mode % popup_marker_side
@@ -168,6 +169,8 @@ private:
     mutable uint64 theme_revision_ = 0;
     bool has_custom_style_ = false;
     String text_;                 // Current displayed text
+    String placeholder_text_ = "Select...";
+    String empty_text_ = "Empty";
     Image  indicator_;           // Current indicator image (open/closed state)
     
     Vector<Item> items_;
@@ -355,6 +358,7 @@ public:
     UiDropdown& SetContentGap(int gap);
     
     UiDropdown& SetPopupMaxHeight(int height);
+    UiDropdown& SetPopupMinWidth(int width);
     UiDropdown& SetPopupMaxItems(int count);
     UiDropdown& SetPopupItemHeight(int height);
     UiDropdown& SetPopupShowScrollbar(bool on = true);
@@ -418,6 +422,8 @@ public:
     UiDropdown& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
     UiDropdown& SetSizeFixed(Size sz)        { return SetSizeMin(sz); }
     UiDropdown& SetSizeFixed(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
+    UiDropdown& SetPlaceholderText(const String& text);
+    UiDropdown& SetEmptyText(const String& text);
     
     // ------------------------------------------------------------------------
     // Painting hooks

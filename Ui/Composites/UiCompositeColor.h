@@ -87,7 +87,7 @@ public:
     const UiLabel& LabelCtrl() const { return label_; }
     UiLabel& ValueCtrl() { return value_; }
     const UiLabel& ValueCtrl() const { return value_; }
-    UiCompositeColorSwatch& ColorCtrl(int index) { return color_[index]; }
+    UiCompositeColorSwatch& ColorCtrl(int index);
     const UiCompositeColorSwatch& ColorCtrl(int index) const { return color_[index]; }
 
     virtual Size GetMinSize() const override;
@@ -99,13 +99,14 @@ public:
 private:
     void SyncValueVisibility();
     void SyncColorVisibility();
+    void EnsureColorStorage(int count);
     void OpenColorPicker(int active);
 
 private:
     UiLabel label_;
     UiLabel value_;
-    UiCompositeColorSwatch color_[4];
-    bool separator_before_[4] = { false, false, false, false };
+    Array<UiCompositeColorSwatch> color_;
+    Vector<bool> separator_before_;
 
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     bool show_value_ = true;

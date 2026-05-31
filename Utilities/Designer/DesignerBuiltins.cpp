@@ -38,7 +38,7 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_LABEL_48();
 	if(id == "UiTitleCard")
 		return ICON_DESIGN_ID_CARD_48();
-	if(id == "UiButton" || id == "UiToolButton")
+	if(id == "UiButton" || id == "UiToolButton" || id == "UiSplitButton")
 		return ICON_DESIGN_BUTTON_48();
 	if(id == "UiLineEdit")
 		return ICON_DESIGN_EDIT_TEXT_48();
@@ -111,9 +111,13 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(7, 3, 9, 13, blue);
 		rect(5, 7, 11, 9, blue);
 	}
-	else if(id == "UiButton" || id == "UiToolButton") {
+	else if(id == "UiButton" || id == "UiToolButton" || id == "UiSplitButton") {
 		frame(2, 5, 14, 12, green);
 		rect(5, 8, 11, 9, green);
+		if(id == "UiSplitButton") {
+			rect(11, 5, 12, 12, green);
+			dot(12, 8, green);
+		}
 	}
 	else if(id == "UiLineEdit") {
 		frame(2, 4, 14, 12, green);
@@ -335,8 +339,16 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		n.properties.Set("align", "Left");
 		n.properties.Set("icon", "None");
 		n.properties.Set("icon_size", 18);
-		if(id == "UiButton" || id == "UiToolButton")
+		if(id == "UiButton" || id == "UiToolButton" || id == "UiSplitButton")
 			n.properties.Set("align", "Center");
+		if(id == "UiSplitButton") {
+			n.properties.Set("text", "Save");
+			n.properties.Set("split_width", 28);
+			n.properties.Set("popup_min_width", 220);
+			n.properties.Set("choice_a", "Recent A");
+			n.properties.Set("choice_b", "Recent B");
+			n.properties.Set("choice_c", "Recent C");
+		}
 		if(id == "UiToolButton") {
 			n.properties.Set("text", "");
 			n.properties.Set("icon", "Settings");
@@ -707,6 +719,7 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeControlType("UiLabel", "Label", Size(120, 24)));
 	registry.Register(MakeControlType("UiTitleCard", "Title Card", Size(220, 72)));
 	registry.Register(MakeControlType("UiButton", "Button", DesignerDefaultSize()));
+	registry.Register(MakeControlType("UiSplitButton", "Split Button", Size(112, 34)));
 	registry.Register(MakeControlType("UiToolButton", "Tool Button", Size(40, 34)));
 	registry.Register(MakeControlType("UiLineEdit", "Edit", Size(180, 32)));
 	registry.Register(MakeControlType("UiIntEdit", "Integer Edit", Size(140, 32)));

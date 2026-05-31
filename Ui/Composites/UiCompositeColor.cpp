@@ -90,11 +90,6 @@ UiCompositeColor::UiCompositeColor()
 {
     Add(label_);
     Add(value_);
-    for(int i = 0; i < 4; i++) {
-        Add(color_[i]);
-        int ii = i;
-        color_[i].WhenAction = [=] { OpenColorPicker(ii); };
-    }
     label_.NoWantFocus();
     value_.NoWantFocus();
     UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
@@ -103,6 +98,7 @@ UiCompositeColor::UiCompositeColor()
     value_style.font = SansSerifZ(9);
     label_.SetCustomStyle(label_style);
     value_.SetCustomStyle(value_style);
+    EnsureColorStorage(color_count_);
     SyncValueVisibility();
     SyncColorVisibility();
     BackPaint();
@@ -181,7 +177,8 @@ UiCompositeColor& UiCompositeColor::SetStackGap(int px)
 
 UiCompositeColor& UiCompositeColor::SetColorCount(int count)
 {
-    color_count_ = clamp(count, 1, 4);
+    color_count_ = max(1, count);
+    EnsureColorStorage(color_count_);
     SyncColorVisibility();
     RefreshLayout();
     Refresh();
@@ -204,21 +201,25 @@ UiCompositeColor& UiCompositeColor::SetValueStyle(const UiLabel::Style& style)
 
 UiCompositeColor& UiCompositeColor::SetColor(int index, Color color)
 {
-    if(index < 0 || index >= 4)
+    if(index < 0)
         return *this;
+    EnsureColorStorage(index + 1);
+    if(index >= color_count_)
+        color_count_ = index + 1;
     color_[index].SetColor(color);
+    SyncColorVisibility();
     Refresh();
     return *this;
 }
 
 Color UiCompositeColor::GetColor(int index) const
 {
-    return (index >= 0 && index < 4) ? color_[index].GetColor() : Null;
+    return (index >= 0 && index < color_.GetCount()) ? color_[index].GetColor() : Null;
 }
 
 UiCompositeColor& UiCompositeColor::SetColors(const Vector<Color>& colors)
 {
-    int count = min(4, colors.GetCount());
+    int count = colors.GetCount();
     SetColorCount(max(1, count));
     for(int i = 0; i < count; i++)
         color_[i].SetColor(colors[i]);
@@ -237,8 +238,9 @@ Vector<Color> UiCompositeColor::GetColors() const
 
 UiCompositeColor& UiCompositeColor::SetColorLabel(int index, const String& label)
 {
-    if(index < 0 || index >= 4)
+    if(index < 0)
         return *this;
+    EnsureColorStorage(index + 1);
     color_[index].SetSlotLabel(label);
     Refresh();
     return *this;
@@ -246,13 +248,14 @@ UiCompositeColor& UiCompositeColor::SetColorLabel(int index, const String& label
 
 String UiCompositeColor::GetColorLabel(int index) const
 {
-    return (index >= 0 && index < 4) ? color_[index].GetSlotLabel() : String();
+    return (index >= 0 && index < color_.GetCount()) ? color_[index].GetSlotLabel() : String();
 }
 
 UiCompositeColor& UiCompositeColor::SetSeparatorBefore(int index, bool on)
 {
-    if(index <= 0 || index >= 4)
+    if(index <= 0)
         return *this;
+    EnsureColorStorage(index + 1);
     separator_before_[index] = on;
     RefreshLayout();
     Refresh();
@@ -261,7 +264,7 @@ UiCompositeColor& UiCompositeColor::SetSeparatorBefore(int index, bool on)
 
 bool UiCompositeColor::HasSeparatorBefore(int index) const
 {
-    return index > 0 && index < 4 && separator_before_[index];
+    return index > 0 && index < separator_before_.GetCount() && separator_before_[index];
 }
 
 Size UiCompositeColor::GetMinSize() const
@@ -367,8 +370,26 @@ void UiCompositeColor::SyncValueVisibility()
 
 void UiCompositeColor::SyncColorVisibility()
 {
-    for(int i = 0; i < 4; i++)
+    for(int i = 0; i < color_.GetCount(); i++)
         color_[i].Show(i < color_count_);
+}
+
+void UiCompositeColor::EnsureColorStorage(int count)
+{
+    count = max(1, count);
+    while(color_.GetCount() < count) {
+        int ii = color_.GetCount();
+        UiCompositeColorSwatch& swatch = color_.Add();
+        Add(swatch);
+        swatch.WhenAction = [=] { OpenColorPicker(ii); };
+        separator_before_.Add(false);
+    }
+}
+
+UiCompositeColorSwatch& UiCompositeColor::ColorCtrl(int index)
+{
+    EnsureColorStorage(index + 1);
+    return color_[index];
 }
 
 void UiCompositeColor::OpenColorPicker(int active)
@@ -380,17 +401,20 @@ void UiCompositeColor::OpenColorPicker(int active)
     dlg.Title("Color");
     dlg.Sizeable().Zoomable();
     UiColorPicker picker;
-    picker.SetSlotCount(color_count_);
-    picker.SetActiveSlot(active);
+    int slot_start = (active / 4) * 4;
+    int picker_count = min(4, color_count_ - slot_start);
+    picker.SetSlotCount(picker_count);
+    picker.SetActiveSlot(active - slot_start);
     picker.SetAlphaEnabled(true);
-    for(int i = 0; i < color_count_; i++) {
-        Color c = color_[i].GetColor();
+    for(int i = 0; i < picker_count; i++) {
+        int ci = slot_start + i;
+        Color c = color_[ci].GetColor();
         picker.SetSlotColor(i, IsNull(c) ? White() : c, false);
-        picker.SetSlotLabel(i, color_[i].GetSlotLabel());
+        picker.SetSlotLabel(i, color_[ci].GetSlotLabel());
     }
     picker.WhenAccept = [&] {
-        for(int i = 0; i < color_count_; i++)
-            color_[i].SetColor(picker.GetSlotColor(i));
+        for(int i = 0; i < picker_count; i++)
+            color_[slot_start + i].SetColor(picker.GetSlotColor(i));
         Refresh();
         WhenAction();
         dlg.Break(IDOK);

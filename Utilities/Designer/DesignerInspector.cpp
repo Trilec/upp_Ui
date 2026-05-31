@@ -64,7 +64,7 @@ static DesignerInspectorSurfaceDefault DesignerInspectorThemeSurfaceDefault(cons
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveLabel(role));
 	if(n.type_id == "UiTitleCard")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveTitleCard(role));
-	if(n.type_id == "UiButton")
+	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveButton(role));
 	if(n.type_id == "UiToolButton")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveToolButton(role));
@@ -282,18 +282,10 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
 		return surface.found ? surface.face : Color(203, 224, 255);
 	}
-	if(b.property_id == "face_tl" || b.property_id == "face_tr" ||
-	   b.property_id == "face_bl" || b.property_id == "face_br")
-	{
+	if(b.property_id == "face_quad") {
 		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
 		Color face = surface.found ? surface.face : Color(203, 224, 255);
-		if(b.property_id == "face_tr")
-			return Blend(face, White(), 18);
-		if(b.property_id == "face_bl")
-			return Blend(face, Black(), 10);
-		if(b.property_id == "face_br")
-			return Blend(face, White(), 8);
-		return face;
+		return QuadFaceValue(n, face);
 	}
 	if(b.property_id == "frame")
 	{
@@ -601,6 +593,35 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		return;
 	}
 
+	if(b.editor == DesignerEditorKind::QuadColor) {
+		ValueArray colors = value.Is<ValueArray>() ? ValueArray(value) : ValueArray();
+		while(colors.GetCount() < 4)
+			colors.Add(Color(214, 231, 255));
+		One<Ctrl> ctrl;
+		UiCompositeColor *row = new UiCompositeColor;
+		ctrl.Attach(row);
+		Ptr<UiCompositeColor> self = row;
+		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetColorCount(4).ShowValue(false);
+		row->SetColorLabel(0, "Top left").SetColorLabel(1, "Top right")
+		   .SetColorLabel(2, "Bottom left").SetColorLabel(3, "Bottom right");
+		for(int i = 0; i < 4; i++)
+			row->SetColor(i, IsNull(colors[i]) ? Color(214, 231, 255) : (Color)colors[i]);
+		row->WhenAction = [=] {
+			if(!syncing_ && self && node_id_ == row_node) {
+				ValueArray out;
+				for(int i = 0; i < 4; i++)
+					out.Add(self->GetColor(i));
+				WhenProperty(row_node, property_id, out);
+			}
+		};
+		Row& r = page.rows.Add();
+		r.property_id = property_id;
+		r.editor = b.editor;
+		r.ctrl = row;
+		AddOwned(page, pick(ctrl));
+		return;
+	}
+
 	One<Ctrl> ctrl;
 	UiCompositeEdit *row = new UiCompositeEdit;
 	ctrl.Attach(row);
@@ -673,10 +694,37 @@ void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t
 		c->SetData(v);
 		c->SetValueText(AsString(v));
 	}
-	else if(UiCompositeColor *c = dynamic_cast<UiCompositeColor *>(row.ctrl))
-		c->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+	else if(UiCompositeColor *c = dynamic_cast<UiCompositeColor *>(row.ctrl)) {
+		if(row.editor == DesignerEditorKind::QuadColor) {
+			ValueArray colors = value.Is<ValueArray>() ? ValueArray(value) : ValueArray();
+			while(colors.GetCount() < 4)
+				colors.Add(Color(214, 231, 255));
+			c->SetColorCount(4);
+			for(int i = 0; i < 4; i++)
+				c->SetColor(i, IsNull(colors[i]) ? Color(214, 231, 255) : (Color)colors[i]);
+		}
+		else
+			c->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+	}
 	else if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
 		c->SetData(value);
+}
+
+Value DesignerInspector::QuadFaceValue(const DesignerNode& n, Color face) const
+{
+	Value quad = NodeProperty(n, "face_quad", Value());
+	if(quad.Is<ValueArray>()) {
+		ValueArray a = quad;
+		while(a.GetCount() < 4)
+			a.Add(face);
+		return a;
+	}
+	ValueArray a;
+	a.Add(NodeProperty(n, "face_tl", face));
+	a.Add(NodeProperty(n, "face_tr", Blend(face, White(), 18)));
+	a.Add(NodeProperty(n, "face_bl", Blend(face, Black(), 10)));
+	a.Add(NodeProperty(n, "face_br", Blend(face, White(), 8)));
+	return a;
 }
 
 void DesignerInspector::CommitChoice(const String& property_id, const Value& value, const char *source)

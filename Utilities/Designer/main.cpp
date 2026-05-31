@@ -17,8 +17,9 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.56";
+static const char* DESIGNER_VERSION = "v0.1.63";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
+static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
 static String DesignerCrumbPropertyKey(int i)
 {
@@ -526,11 +527,23 @@ private:
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
 		save_button_.WhenAction = [=] { SaveDesignAs(); };
+		SetupRecentSplitButton(save_button_, "Recent save paths");
+		save_button_.WhenSelect = [=](int, const Value& v) {
+			if(syncing_recent_ || IsNull(v))
+				return;
+			SaveDesignToPath(AsString(v));
+		};
 		load_button_.SetIcon(CtrlImg::open())
 		            .SetText("Load")
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
 		load_button_.WhenAction = [=] { LoadDesignFromFile(); };
+		SetupRecentSplitButton(load_button_, "Recent load paths");
+		load_button_.WhenSelect = [=](int, const Value& v) {
+			if(syncing_recent_ || IsNull(v))
+				return;
+			LoadDesignPath(AsString(v));
+		};
 		overlay_button_.SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48())
 		               .SetText("")
 		               .SetIconSize(DPI(18), DPI(18))
@@ -699,6 +712,7 @@ private:
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
 		toolbox_help_text_.NoWantFocus().IgnoreMouse();
 		UpdateToolboxHelp(String());
+		LoadRecentFiles();
 		ApplyTheme(theme_preset_, UiThemeMode::Light);
 	}
 
@@ -708,11 +722,20 @@ private:
 		fs.Type("Designer JSON", "*.json").DefaultExt("json").DefaultName("design.json");
 		if(!fs.ExecuteSaveAs("Save designer document"))
 			return;
-		String path = ~fs;
+		SaveDesignToPath(~fs);
+	}
+
+	void SaveDesignToPath(const String& path)
+	{
+		if(path.IsEmpty())
+			return;
 		if(!SaveFile(path, StoreDesignerModelJson(model_))) {
 			Exclamation("Unable to save designer document.");
 			return;
 		}
+		AddRecentPath(recent_saves_, path);
+		StoreRecentFiles();
+		SyncRecentDropdowns();
 		SetWarningNotes("Saved " + GetFileName(path));
 	}
 
@@ -722,7 +745,13 @@ private:
 		fs.Type("Designer JSON", "*.json").AllFilesType();
 		if(!fs.ExecuteOpen("Load designer document"))
 			return;
-		String path = ~fs;
+		LoadDesignPath(~fs);
+	}
+
+	void LoadDesignPath(const String& path)
+	{
+		if(path.IsEmpty())
+			return;
 		String json = LoadFile(path);
 		if(json.IsVoid()) {
 			Exclamation("Unable to read designer document.");
@@ -735,6 +764,8 @@ private:
 			return;
 		}
 		commands_.Clear();
+		AddRecentPath(recent_loads_, path);
+		StoreRecentFiles();
 		RefreshAll();
 		String note_text;
 		for(const String& note : notes) {
@@ -743,6 +774,102 @@ private:
 			note_text << note;
 		}
 		SetWarningNotes(note_text.IsEmpty() ? "Loaded " + GetFileName(path) : note_text);
+	}
+
+	void SetupRecentSplitButton(UiSplitButton& button, const String& tip)
+	{
+		button.SetSplitWidth(DPI(28));
+		ApplyRecentSplitPopup(button);
+		button.Tip(tip);
+	}
+
+	void ApplyRecentSplitPopup(UiSplitButton& button)
+	{
+		button.SetPopupMinWidth(DPI(360));
+		button.SetPopupMaxItems(DESIGNER_RECENT_LIMIT);
+	}
+
+	void AddRecentPath(Vector<String>& list, const String& path)
+	{
+		String p = NormalizePath(path);
+		if(p.IsEmpty())
+			return;
+		for(int i = list.GetCount() - 1; i >= 0; i--)
+			if(NormalizePath(list[i]) == p)
+				list.Remove(i);
+		list.Insert(0, p);
+		if(list.GetCount() > DESIGNER_RECENT_LIMIT)
+			list.SetCount(DESIGNER_RECENT_LIMIT);
+	}
+
+	void SyncRecentSplitButton(UiSplitButton& button, const Vector<String>& list, const String& empty)
+	{
+		button.ClearItems();
+		if(list.IsEmpty())
+			button.Add(empty, Value(), false);
+		else {
+			for(const String& path : list) {
+				button.Add(GetFileName(path), path);
+				button.SetItemDescription(button.GetCount() - 1, path);
+			}
+		}
+	}
+
+	void SyncRecentDropdowns()
+	{
+		syncing_recent_ = true;
+		SyncRecentSplitButton(save_button_, recent_saves_, "No recent saves");
+		SyncRecentSplitButton(load_button_, recent_loads_, "No recent loads");
+		syncing_recent_ = false;
+	}
+
+	void LoadRecentFiles()
+	{
+		recent_saves_.Clear();
+		recent_loads_.Clear();
+		String text = LoadFile(ConfigFile("DesignerConfig.json"));
+		if(!text.IsVoid() && !TrimBoth(text).IsEmpty()) {
+			Value parsed = ParseJSON(text);
+			if(parsed.Is<ValueMap>()) {
+				ValueMap cfg = parsed;
+				LoadRecentList(ConfigValue(cfg, "recent_saves"), recent_saves_);
+				LoadRecentList(ConfigValue(cfg, "recent_loads"), recent_loads_);
+			}
+		}
+		SyncRecentDropdowns();
+	}
+
+	void StoreRecentFiles()
+	{
+		ValueMap cfg;
+		cfg.Set("schema", 1);
+		cfg.Set("recent_saves", StoreRecentList(recent_saves_));
+		cfg.Set("recent_loads", StoreRecentList(recent_loads_));
+		SaveFile(ConfigFile("DesignerConfig.json"), AsJSON(cfg, true));
+	}
+
+	Value ConfigValue(const ValueMap& cfg, const String& key) const
+	{
+		int q = cfg.Find(key);
+		return q >= 0 ? cfg.GetValue(q) : Value();
+	}
+
+	ValueArray StoreRecentList(const Vector<String>& list) const
+	{
+		ValueArray out;
+		for(const String& path : list)
+			out.Add(path);
+		return out;
+	}
+
+	void LoadRecentList(const Value& value, Vector<String>& list)
+	{
+		if(!value.Is<ValueArray>())
+			return;
+		ValueArray items = value;
+		for(int i = 0; i < items.GetCount(); i++)
+			if(!IsNull(items[i]))
+				AddRecentPath(list, AsString(items[i]));
 	}
 
 	// Full rebuild after structural edits or template changes.
@@ -1853,6 +1980,34 @@ private:
 		commands_.Execute(MakeDesignerSetPropertyCommand(id, "grid_row", index / columns), model_);
 	}
 
+	int RequiredGridColumns(const DesignerNode& grid) const
+	{
+		int current_columns = max(1, (int)DesignerNodePropertyOr(grid, "columns", 2));
+		int required = 1;
+		for(int i = 0; i < grid.children.GetCount(); i++) {
+			const DesignerNode* child = model_.Find(grid.children[i]);
+			if(!child)
+				continue;
+			int col = max(0, (int)DesignerNodePropertyOr(*child, "grid_col", i % current_columns));
+			required = max(required, col + 1);
+		}
+		return required;
+	}
+
+	int RequiredGridRows(const DesignerNode& grid) const
+	{
+		int current_columns = max(1, (int)DesignerNodePropertyOr(grid, "columns", 2));
+		int required = 1;
+		for(int i = 0; i < grid.children.GetCount(); i++) {
+			const DesignerNode* child = model_.Find(grid.children[i]);
+			if(!child)
+				continue;
+			int row = max(0, (int)DesignerNodePropertyOr(*child, "grid_row", i / current_columns));
+			required = max(required, row + 1);
+		}
+		return required;
+	}
+
 	void AdjustGridCellForNode(DesignerNodeId id)
 	{
 		DesignerNode* n = model_.Find(id);
@@ -2018,6 +2173,15 @@ private:
 		if(!binding || !binding->visible || !binding->enabled)
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		if(n->type_id == "GridLayout" && (property_id == "columns" || property_id == "rows")) {
+			int requested = IsNumber(normalized) ? (int)normalized : StrInt(AsString(normalized));
+			int required = property_id == "columns" ? RequiredGridColumns(*n) : RequiredGridRows(*n);
+			if(requested < required) {
+				normalized = required;
+				SetWarningNotes(Format("Grid %s kept at %d because existing children occupy that %s. Move or delete those children before reducing it further.",
+				                       property_id, required, property_id == "columns" ? "column" : "row"));
+			}
+		}
 		String auto_name = AutoNameForPropertyEdit(*n, property_id, normalized);
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
@@ -2265,7 +2429,9 @@ private:
 		theme_preset_row_.SetLabelRole(UiRole::Subtle);
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
 		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+		ApplyRecentSplitPopup(save_button_);
 		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Standard));
+		ApplyRecentSplitPopup(load_button_);
 		container_add_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 		container_remove_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 		container_action_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body));
@@ -2369,8 +2535,8 @@ private:
 
 	UiTitleCard header_;
 	UiLabel version_badge_;
-	UiButton save_button_;
-	UiButton load_button_;
+	UiSplitButton save_button_;
+	UiSplitButton load_button_;
 	UiButton overlay_button_;
 	UiCompositeDropdown theme_preset_row_;
 	UiPanel theme_shell_;
@@ -2432,9 +2598,12 @@ private:
 	bool refresh_posted_ = false;
 	bool pending_inspector_refresh_ = false;
 	bool syncing_theme_ = false;
+	bool syncing_recent_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
 	int active_toolbox_category_ = 0;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;
+	Vector<String> recent_saves_;
+	Vector<String> recent_loads_;
 };
 
 }
@@ -2443,4 +2612,3 @@ GUI_APP_MAIN
 {
 	Upp::DesignerWindow().Run();
 }
-

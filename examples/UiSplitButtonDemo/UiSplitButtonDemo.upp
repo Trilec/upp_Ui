@@ -1,0 +1,14 @@
+description "UiSplitButton Demo\377";
+
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
