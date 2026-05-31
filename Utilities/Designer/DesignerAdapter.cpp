@@ -724,6 +724,26 @@ static void HideQuadFaceBindings(DesignerApiBuilder& b)
 	b.Hide("face_quad");
 }
 
+// Theme override audit snapshot for the controls already exposed in the Designer.
+// Keep this narrow: the goal is to document what the inspector and codegen
+// should treat as first-class overrideable surface, not to invent extra knobs.
+//
+// Control          | Theme overrides? | Surface fields         | Notes
+// ---------------- | ---------------- | ---------------------- | ----------------------------
+// UiButton         | yes              | face/frame/radius      | icon/text color not surfaced
+// UiToolButton     | yes              | face/frame/radius      | compact button variant
+// UiSplitButton    | yes              | face/frame/radius      | split lane uses same surface
+// UiLabel          | yes              | face/frame/radius      | content layout only; icon tint stays theme-driven
+// UiCheckBox       | no               | -                      | theme override group intentionally hidden
+// UiToggle         | no               | -                      | theme override group intentionally hidden
+// UiSlider         | yes              | face/frame/radius      | track/thumb preview must honor explicit override flag
+// UiDropdown       | yes              | face/frame/radius      | popup chrome uses shared edit/dropdown styling
+// UiLineEdit       | yes              | face/frame/radius      | edit-family shared surface
+// UiIntEdit        | yes              | face/frame/radius      | edit-family shared surface
+// UiFloatEdit      | yes              | face/frame/radius      | edit-family shared surface
+// UiSliderEdit     | yes              | face/frame/radius      | edit-family shared surface
+// Unsupported controls should keep showing: "No overrides available".
+
 static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNode& n)
 {
 	static const char *theme_group = "Theme Overrides";
@@ -1100,13 +1120,14 @@ void DesignerTitleCardAdapter::Paint(Draw& w)
 void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
+	UiSlider::Style s = UiTheme::ResolveSlider();
+	bool theme_override = DesignerBoolProperty(node, "theme_override", false);
 	face_ = GetColorProperty(node, "face", Color(214, 231, 255));
 	frame_ = GetColorProperty(node, "frame", Color(54, 116, 210));
-	radius_ = max(0, (int)AdapterNodeProperty(node, "radius", 0));
-	face_enabled_ = (bool)AdapterNodeProperty(node, "face_enabled", true);
-	frame_enabled_ = (bool)AdapterNodeProperty(node, "frame_enabled", true);
-	UiSlider::Style s = UiTheme::ResolveSlider();
-	if(face_enabled_ || frame_enabled_) {
+	radius_ = theme_override ? max(0, (int)AdapterNodeProperty(node, "radius", 0)) : 0;
+	face_enabled_ = theme_override && DesignerBoolProperty(node, "face_enabled", false);
+	frame_enabled_ = theme_override && DesignerBoolProperty(node, "frame_enabled", false);
+	if(theme_override && (face_enabled_ || frame_enabled_)) {
 		for(int i = 0; i < 4; i++) {
 			if(face_enabled_)
 				s.track_palette.face[i] = UiFill::Solid(Blend(face_, White(), 30));
@@ -1121,7 +1142,7 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 	s.track_metrics.radius = max(DPI(2), min(radius_, DPI(8)));
 	s.track_metrics.frame_width = DPI(1);
 	SetCustomStyle(s);
-	if(radius_ > 0)
+	if(theme_override && radius_ > 0)
 		Transparent();
 	SetRange(0, 100).SetValue(50);
 	NoWantFocus();

@@ -887,6 +887,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
 		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
@@ -917,6 +920,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ")"
 		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 4)) << "))"
 		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Center"), "Center") << ");\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
