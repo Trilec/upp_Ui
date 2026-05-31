@@ -178,6 +178,15 @@ static String RoleExpr(const String& role)
 	return "UiRole::Standard";
 }
 
+static String CheckVisualExpr(const String& visual)
+{
+	if(visual == "Chip")
+		return "UICHECKVIS_CHIP";
+	if(visual == "List")
+		return "UICHECKVIS_LIST";
+	return "UICHECKVIS_CLASSIC";
+}
+
 static UiRole CodeGenRoleChoice(const DesignerNode& n)
 {
 	String role = AsString(CodeGenNodeProperty(n, "role", "Standard"));
@@ -246,6 +255,10 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiButton::Style";
 	if(n.type_id == "UiToolButton")
 		return "UiToolButton::Style";
+	if(n.type_id == "UiCheckBox")
+		return "UiCheckBox::Style";
+	if(n.type_id == "UiToggle")
+		return "UiToggle::Style";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::Style";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
@@ -273,6 +286,11 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		return "UiTheme::ResolveButton(" + role_expr + ")";
 	if(n.type_id == "UiToolButton")
 		return "UiTheme::ResolveToolButton(" + role_expr + ")";
+	if(n.type_id == "UiCheckBox")
+		return "UiTheme::ResolveCheckBox(" + role_expr + ", " +
+		       CheckVisualExpr(AsString(CodeGenNodeProperty(n, "visual", "Classic"))) + ")";
+	if(n.type_id == "UiToggle")
+		return "UiTheme::ResolveToggle(" + role_expr + ")";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::StyleDefault()";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
@@ -321,6 +339,14 @@ static void EmitButtonInkOverrideFields(String& out, const DesignerNode& n, bool
 		    << "\t\t\ts.palette.icon[ST_PRESSED] = " << ColorExpr(icon) << ";\n"
 		    << "\t\t\ts.palette.icon[ST_DISABLED] = DisabledColor(" << ColorExpr(icon) << ");\n";
 	}
+}
+
+static void EmitPaletteColorOverrideFields(String& out, const String& target, const String& field, Color color)
+{
+	out << "\t\t\t" << target << "." << field << "[ST_NORMAL] = " << ColorExpr(color) << ";\n"
+	    << "\t\t\t" << target << "." << field << "[ST_HOT] = " << ColorExpr(color) << ";\n"
+	    << "\t\t\t" << target << "." << field << "[ST_PRESSED] = " << ColorExpr(color) << ";\n"
+	    << "\t\t\t" << target << "." << field << "[ST_DISABLED] = DisabledColor(" << ColorExpr(color) << ");\n";
 }
 
 
@@ -422,12 +448,20 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(style_type.IsEmpty() || resolve_expr.IsEmpty())
 		return;
 	bool override = emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+	bool custom_align = false;
+	if(n.type_id == "UiCheckBox" || n.type_id == "UiToggle")
+		custom_align = CodeGenNodeProperty(n, "align_h", "Left") != "Left" || CodeGenNodeProperty(n, "align_v", "Center") != "Center";
 	if(!override) {
 		if(n.type_id == "UiAccordion")
 			return;
-		if(role != "Standard" && n.type_id != "UiScrollPanel")
+		if(!custom_align && role != "Standard" && n.type_id != "UiScrollPanel") {
 			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
-		return;
+			return;
+		}
+		else if(custom_align)
+			override = true;
+		else
+			return;
 	}
 
 	out << "\t\t{\n"
@@ -478,6 +512,58 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			    << "\t\t\ts.metrics.shadow.color = " << ColorExpr(CodeGenNodeProperty(n, "shadow_color", Black())) << ";\n"
 			    << "\t\t\ts.metrics.shadow.mode = SHADOW_CURVE;\n"
 			    << "\t\t\ts.metrics.shadow.curve = " << ShadowCurveExpr(CodeGenNodeProperty(n, "shadow_curve", "Soft")) << ";\n";
+		}
+	}
+	if(custom_align) {
+		if(n.type_id == "UiCheckBox" || n.type_id == "UiToggle") {
+			out << "\t\t\ts.align_h = " << AlignHExpr(CodeGenNodeProperty(n, "align_h", "Left"), "Left") << ";\n"
+			    << "\t\t\ts.align_v = " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center"), "Center") << ";\n";
+		}
+	}
+	if(n.type_id == "UiCheckBox") {
+		EmitSurfaceOverrideFields(out, "s.indicator_palette", n, "indicator");
+	}
+	else if(n.type_id == "UiToggle") {
+		EmitSurfaceOverrideFields(out, "s.track_palette", n, "track");
+		EmitSurfaceOverrideFields(out, "s.thumb_palette", n, "thumb");
+	}
+	if(n.type_id == "UiLabel") {
+		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+			Color base_ink = UiTheme::ResolveLabel(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
+			if(IsNull(base_ink))
+				base_ink = SColorText();
+			Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
+		}
+		if(CodeGenHasProperty(n, "icon_ink_enabled") && (bool)CodeGenNodeProperty(n, "icon_ink_enabled", false)) {
+			StyledPalette pal = UiTheme::ResolveLabel(CodeGenRoleChoice(n)).palette;
+			Color base_icon = UiResolveIconColor(pal, ST_NORMAL);
+			if(IsNull(base_icon))
+				base_icon = pal.ink[ST_NORMAL];
+			if(IsNull(base_icon))
+				base_icon = SColorText();
+			Color icon = CodeGenNodeProperty(n, "icon_ink", base_icon);
+			EmitPaletteColorOverrideFields(out, "s.palette", "icon", icon);
+		}
+	}
+	else if(n.type_id == "UiCheckBox") {
+		String visual = AsString(CodeGenNodeProperty(n, "visual", "Classic"));
+		UiCheckVisual vis = visual == "Chip" ? UICHECKVIS_CHIP :
+		                    visual == "List" ? UICHECKVIS_LIST : UICHECKVIS_CLASSIC;
+		UiCheckBox::Style base = UiTheme::ResolveCheckBox(CodeGenRoleChoice(n), vis);
+		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+			Color base_ink = IsNull(base.palette.ink[ST_NORMAL]) ? SColorText() : base.palette.ink[ST_NORMAL];
+			Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
+		}
+		if(CodeGenHasProperty(n, "indicator_ink_enabled") && (bool)CodeGenNodeProperty(n, "indicator_ink_enabled", false)) {
+			Color base_indicator = UiResolveIconColor(base.indicator_palette, ST_NORMAL);
+			if(IsNull(base_indicator))
+				base_indicator = base.indicator_palette.ink[ST_NORMAL];
+			if(IsNull(base_indicator))
+				base_indicator = SColorText();
+			Color indicator = CodeGenNodeProperty(n, "indicator_ink", base_indicator);
+			EmitPaletteColorOverrideFields(out, "s.indicator_palette", "ink", indicator);
 		}
 	}
 	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
@@ -888,7 +974,11 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiLabel") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
+		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Left")), "Left")
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center"), "Center") << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
 		out << "\t\t" << var << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 6)) << "));\n";
+		out << "\t\t" << var << ".SetIconScaleToContent(" << ((bool)CodeGenNodeProperty(n, "icon_scale", false) ? "true" : "false") << ");\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ", UiIconRenderMode::MonoTint)"
@@ -1005,6 +1095,13 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	else if(n.type_id == "UiCheckBox") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetTriState(" << ((bool)CodeGenNodeProperty(n, "tri_state", false) ? "true" : "false") << ");\n";
+		String visual = CodeGenNodeProperty(n, "visual", "Classic");
+		if(visual == "Chip")
+			out << "\t\t" << var << ".SetVisual(UICHECKVIS_CHIP);\n";
+		else if(visual == "List")
+			out << "\t\t" << var << ".SetVisual(UICHECKVIS_LIST);\n";
+		else
+			out << "\t\t" << var << ".SetVisual(UICHECKVIS_CLASSIC);\n";
 		String state = CodeGenNodeProperty(n, "state", "Checked");
 		out << "\t\t" << var << ".SetState(" << (state == "Indeterminate" ? "UICHECK_INDETERMINATE" :
 		                                       state == "Unchecked" ? "UICHECK_UNCHECKED" : "UICHECK_CHECKED") << ");\n";

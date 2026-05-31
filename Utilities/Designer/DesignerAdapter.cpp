@@ -436,6 +436,25 @@ static void ApplyExplicitInkOverrides(StyledPalette& palette, const DesignerNode
 	}
 }
 
+static void ApplyPrefixedInkOverrides(StyledPalette& palette, const DesignerNode& n, const String& prefix)
+{
+	if(!DesignerBoolProperty(n, "theme_override", false))
+		return;
+	String key = prefix + "_ink_enabled";
+	if(!DesignerBoolProperty(n, key, false))
+		return;
+	Color base = palette.ink[ST_NORMAL];
+	if(IsNull(base))
+		base = SColorText();
+	Color ink = GetColorProperty(n, prefix + "_ink", base);
+	for(int i = 0; i < 4; i++) {
+		palette.ink[i] = ink;
+		palette.icon[i] = ink;
+	}
+	palette.ink[ST_DISABLED] = DisabledColor(ink);
+	palette.icon[ST_DISABLED] = DisabledColor(ink);
+}
+
 
 static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics& metrics,
                                            const DesignerNode& n, const String& prefix)
@@ -753,6 +772,22 @@ static void HideQuadFaceBindings(DesignerApiBuilder& b)
 	b.Hide("face_quad");
 }
 
+static void HideSurfaceOverrideBindings(DesignerApiBuilder& b)
+{
+	b.Hide("face");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Hide("face_enabled");
+	b.Hide("frame_enabled");
+	b.Hide("shadow_enabled");
+	b.Hide("shadow_distance");
+	b.Hide("shadow_offset_x");
+	b.Hide("shadow_offset_y");
+	b.Hide("shadow_alpha");
+	b.Hide("shadow_color");
+	b.Hide("shadow_curve");
+}
+
 static void SetButtonThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
                                       DesignerApiBinding& icon_enabled, DesignerApiBinding& icon_color,
                                       const DesignerNode& n, bool tool_button)
@@ -771,6 +806,58 @@ static void SetButtonThemeInkDefaults(DesignerApiBinding& text_enabled, Designer
 	icon_color.default_value = icon_default;
 }
 
+static void SetLabelThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
+                                     DesignerApiBinding& icon_enabled, DesignerApiBinding& icon_color,
+                                     const DesignerNode& n)
+{
+	UiLabel::Style s = UiTheme::ResolveLabel(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	Color text_default = IsNull(s.palette.ink[ST_NORMAL]) ? SColorText() : s.palette.ink[ST_NORMAL];
+	Color icon_default = UiResolveIconColor(s.palette, ST_NORMAL);
+	if(IsNull(icon_default))
+		icon_default = text_default;
+	text_enabled.default_value = false;
+	text_color.default_value = text_default;
+	icon_enabled.default_value = false;
+	icon_color.default_value = icon_default;
+}
+
+static void SetCheckBoxThemeDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
+                                     DesignerApiBinding& indicator_face_enabled, DesignerApiBinding& indicator_face,
+                                     DesignerApiBinding& indicator_frame_enabled, DesignerApiBinding& indicator_frame,
+                                     DesignerApiBinding& indicator_ink_enabled, DesignerApiBinding& indicator_ink,
+                                     const DesignerNode& n)
+{
+	String visual = AdapterNodeProperty(n, "visual", "Classic");
+	UiCheckVisual vis = visual == "Chip" ? UICHECKVIS_CHIP :
+	                    visual == "List" ? UICHECKVIS_LIST : UICHECKVIS_CLASSIC;
+	UiCheckBox::Style s = UiTheme::ResolveCheckBox(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")), vis);
+	text_enabled.default_value = false;
+	text_color.default_value = IsNull(s.palette.ink[ST_NORMAL]) ? SColorText() : s.palette.ink[ST_NORMAL];
+	indicator_face_enabled.default_value = false;
+	indicator_face.default_value = s.indicator_palette.face[ST_NORMAL].IsSolid() ? s.indicator_palette.face[ST_NORMAL].color : Null;
+	indicator_frame_enabled.default_value = false;
+	indicator_frame.default_value = IsNull(s.indicator_palette.frame[ST_NORMAL]) ? Null : s.indicator_palette.frame[ST_NORMAL];
+	indicator_ink_enabled.default_value = false;
+	indicator_ink.default_value = IsNull(s.indicator_palette.ink[ST_NORMAL]) ? SColorText() : s.indicator_palette.ink[ST_NORMAL];
+}
+
+static void SetToggleThemeDefaults(DesignerApiBinding& track_face_enabled, DesignerApiBinding& track_face,
+                                   DesignerApiBinding& track_frame_enabled, DesignerApiBinding& track_frame,
+                                   DesignerApiBinding& thumb_face_enabled, DesignerApiBinding& thumb_face,
+                                   DesignerApiBinding& thumb_frame_enabled, DesignerApiBinding& thumb_frame,
+                                   const DesignerNode& n)
+{
+	UiToggle::Style s = UiTheme::ResolveToggle(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	track_face_enabled.default_value = false;
+	track_face.default_value = s.track_palette.face[ST_NORMAL].IsSolid() ? s.track_palette.face[ST_NORMAL].color : Null;
+	track_frame_enabled.default_value = false;
+	track_frame.default_value = IsNull(s.track_palette.frame[ST_NORMAL]) ? Null : s.track_palette.frame[ST_NORMAL];
+	thumb_face_enabled.default_value = false;
+	thumb_face.default_value = s.thumb_palette.face[ST_NORMAL].IsSolid() ? s.thumb_palette.face[ST_NORMAL].color : Null;
+	thumb_frame_enabled.default_value = false;
+	thumb_frame.default_value = IsNull(s.thumb_palette.frame[ST_NORMAL]) ? Null : s.thumb_palette.frame[ST_NORMAL];
+}
+
 // Theme override audit snapshot for the controls already exposed in the Designer.
 // Keep this narrow: the goal is to document what the inspector and codegen
 // should treat as first-class overrideable surface, not to invent extra knobs.
@@ -780,9 +867,9 @@ static void SetButtonThemeInkDefaults(DesignerApiBinding& text_enabled, Designer
 // UiButton         | yes              | face/frame/radius/ink/icon | button-family override base
 // UiToolButton     | yes              | face/frame/radius/ink/icon | compact button variant
 // UiSplitButton    | yes              | face/frame/radius/ink/icon | split lane uses same surface
-// UiLabel          | yes              | face/frame/radius      | content layout only; icon tint stays theme-driven
-// UiCheckBox       | no               | -                      | theme override group intentionally hidden
-// UiToggle         | no               | -                      | theme override group intentionally hidden
+// UiLabel          | yes              | face/frame/radius/ink/icon | content layout stays separate from theme overrides
+// UiCheckBox       | yes              | text + indicator face/frame/tick | inspector only exposes useful visual parts
+// UiToggle         | yes              | track/thumb face/frame  | part-specific overrides only
 // UiSlider         | yes              | face/frame/radius      | track/thumb preview must honor explicit override flag
 // UiDropdown       | yes              | face/frame/radius      | popup chrome uses shared edit/dropdown styling
 // UiLineEdit       | yes              | face/frame/radius      | edit-family shared surface
@@ -1032,6 +1119,7 @@ void DesignerLabelAdapter::SyncFromNode(const DesignerNode& node)
 	node_id_ = node.id;
 	UiLabel::Style s = UiTheme::ResolveLabel(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
+	ApplyExplicitInkOverrides(s.palette, node);
 	int inset = max(0, (int)AdapterNodeProperty(node, "inset", 6));
 	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(node, "align_h", AdapterNodeProperty(node, "align", "Left")), UiAlign::LEFT);
@@ -1073,6 +1161,23 @@ void DesignerLabelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	      "When enabled, the icon scales to the label content box and overrides Icon size.");
 	b.AddChoice("icon_side", "Icon side", "UiLabel::SetIconSide",
 	            "Where the icon sits relative to label text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiLabel::SetInkColor",
+	                                             "Enables an explicit label text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiLabel::SetInkColor",
+	                                     "Explicit label text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& icon_ink_enabled = b.Add("icon_ink_enabled", "Icon color", DesignerEditorKind::Bool,
+	                                              "UiLabel::SetIconColor",
+	                                              "Enables an explicit label icon color override.");
+	icon_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& icon_ink = b.Add("icon_ink", "Icon color", DesignerEditorKind::Color,
+	                                     "UiLabel::SetIconColor",
+	                                     "Explicit label icon color used when theme overrides are active.");
+	icon_ink.group = "Theme Overrides";
+	SetLabelThemeInkDefaults(text_ink_enabled, text_ink, icon_ink_enabled, icon_ink, node);
 	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiLabel::SetContentGap",
 	         "Gap between the label icon and text.", 0, 64);
 	b.AddInt("inset", "Inset", DesignerEditorKind::Slider, "UiLabel::SetMargin",
@@ -1568,6 +1673,8 @@ void DesignerToggleAdapter::SyncFromNode(const DesignerNode& node)
 	UiToggle::Style s = UiTheme::ResolveToggle(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(node, "align_h", "Left"), UiAlign::LEFT);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(node, "align_v", "Center"), UiAlign::CENTER);
+	ApplyPrefixedSurfaceOverrides(s.track_palette, s.track_metrics, node, "track");
+	ApplyPrefixedSurfaceOverrides(s.thumb_palette, s.thumb_metrics, node, "thumb");
 	SetCustomStyle(s);
 	SetOn((bool)AdapterNodeProperty(node, "on", true));
 	NoWantFocus();
@@ -1584,15 +1691,46 @@ void DesignerToggleAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
 	b.Hide("text");
-	HideThemeOverrideBindings(b);
-	b.Hide("theme_override");
-	b.Hide("face");
-	b.Hide("frame");
-	b.Hide("radius");
-	b.Hide("face_enabled");
-	b.Hide("frame_enabled");
+	HideSurfaceOverrideBindings(b);
 	b.Add("on", "On", DesignerEditorKind::Bool, "UiToggle::SetOn",
 	      "Sets the preview toggle state.");
+	DesignerApiBinding& track_face_enabled = b.Add("track_face_enabled", "Track face", DesignerEditorKind::Bool,
+	                                              "UiToggle::TrackPalette::face",
+	                                              "Enables an explicit track fill override.");
+	track_face_enabled.group = "Theme Overrides";
+	DesignerApiBinding& track_face = b.Add("track_face", "Track face", DesignerEditorKind::Color,
+	                                     "UiToggle::TrackPalette::face",
+	                                     "Explicit track fill color used when theme overrides are active.");
+	track_face.group = "Theme Overrides";
+	DesignerApiBinding& track_frame_enabled = b.Add("track_frame_enabled", "Track frame", DesignerEditorKind::Bool,
+	                                               "UiToggle::TrackPalette::frame",
+	                                               "Enables an explicit track frame override.");
+	track_frame_enabled.group = "Theme Overrides";
+	DesignerApiBinding& track_frame = b.Add("track_frame", "Track frame", DesignerEditorKind::Color,
+	                                        "UiToggle::TrackPalette::frame",
+	                                        "Explicit track frame color used when theme overrides are active.");
+	track_frame.group = "Theme Overrides";
+	DesignerApiBinding& thumb_face_enabled = b.Add("thumb_face_enabled", "Thumb face", DesignerEditorKind::Bool,
+	                                               "UiToggle::ThumbPalette::face",
+	                                               "Enables an explicit thumb fill override.");
+	thumb_face_enabled.group = "Theme Overrides";
+	DesignerApiBinding& thumb_face = b.Add("thumb_face", "Thumb face", DesignerEditorKind::Color,
+	                                      "UiToggle::ThumbPalette::face",
+	                                      "Explicit thumb fill color used when theme overrides are active.");
+	thumb_face.group = "Theme Overrides";
+	DesignerApiBinding& thumb_frame_enabled = b.Add("thumb_frame_enabled", "Thumb frame", DesignerEditorKind::Bool,
+	                                                "UiToggle::ThumbPalette::frame",
+	                                                "Enables an explicit thumb frame override.");
+	thumb_frame_enabled.group = "Theme Overrides";
+	DesignerApiBinding& thumb_frame = b.Add("thumb_frame", "Thumb frame", DesignerEditorKind::Color,
+	                                       "UiToggle::ThumbPalette::frame",
+	                                       "Explicit thumb frame color used when theme overrides are active.");
+	thumb_frame.group = "Theme Overrides";
+	SetToggleThemeDefaults(track_face_enabled, track_face,
+	                       track_frame_enabled, track_frame,
+	                       thumb_face_enabled, thumb_face,
+	                       thumb_frame_enabled, thumb_frame,
+	                       node);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 }
@@ -1655,7 +1793,9 @@ void DesignerCheckBoxAdapter::SyncFromNode(const DesignerNode& node)
 	s.font = SansSerifZ(11);
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(node, "align_h", "Left"), UiAlign::LEFT);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(node, "align_v", "Center"), UiAlign::CENTER);
-	s.indicator_metrics.radius = DPI(4);
+	ApplyExplicitInkOverrides(s.palette, node);
+	ApplyPrefixedSurfaceOverrides(s.indicator_palette, s.indicator_metrics, node, "indicator");
+	ApplyPrefixedInkOverrides(s.indicator_palette, node, "indicator");
 	SetCustomStyle(s);
 	SetText(TextProperty(node));
 	SetTriState((bool)AdapterNodeProperty(node, "tri_state", false));
@@ -1675,13 +1815,7 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	HideThemeOverrideBindings(b);
-	b.Hide("theme_override");
-	b.Hide("face");
-	b.Hide("frame");
-	b.Hide("radius");
-	b.Hide("face_enabled");
-	b.Hide("frame_enabled");
+	HideSurfaceOverrideBindings(b);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiCheckBox::SetText",
 	      "Sets the checkbox label.");
 	b.AddChoice("state", "State", "UiCheckBox::SetState",
@@ -1690,6 +1824,43 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	      "Allows the indeterminate state.");
 	b.AddChoice("visual", "Visual", "UiCheckBox::SetVisual",
 	            "Checkbox visual style.", {{"Classic", "Classic"}, {"Chip", "Chip"}, {"List", "List"}});
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiCheckBox::SetInkColor",
+	                                             "Enables an explicit checkbox text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiCheckBox::SetInkColor",
+	                                     "Explicit checkbox text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& indicator_face_enabled = b.Add("indicator_face_enabled", "Indicator face", DesignerEditorKind::Bool,
+	                                                  "UiCheckBox::IndicatorPalette::face",
+	                                                  "Enables an explicit checkbox indicator fill override.");
+	indicator_face_enabled.group = "Theme Overrides";
+	DesignerApiBinding& indicator_face = b.Add("indicator_face", "Indicator face", DesignerEditorKind::Color,
+	                                           "UiCheckBox::IndicatorPalette::face",
+	                                           "Explicit checkbox indicator fill color used when theme overrides are active.");
+	indicator_face.group = "Theme Overrides";
+	DesignerApiBinding& indicator_frame_enabled = b.Add("indicator_frame_enabled", "Indicator frame", DesignerEditorKind::Bool,
+	                                                   "UiCheckBox::IndicatorPalette::frame",
+	                                                   "Enables an explicit checkbox indicator frame override.");
+	indicator_frame_enabled.group = "Theme Overrides";
+	DesignerApiBinding& indicator_frame = b.Add("indicator_frame", "Indicator frame", DesignerEditorKind::Color,
+	                                          "UiCheckBox::IndicatorPalette::frame",
+	                                          "Explicit checkbox indicator frame color used when theme overrides are active.");
+	indicator_frame.group = "Theme Overrides";
+	DesignerApiBinding& indicator_ink_enabled = b.Add("indicator_ink_enabled", "Tick color", DesignerEditorKind::Bool,
+	                                                 "UiCheckBox::IndicatorPalette::ink",
+	                                                 "Enables an explicit checkbox tick/mark color override.");
+	indicator_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& indicator_ink = b.Add("indicator_ink", "Tick color", DesignerEditorKind::Color,
+	                                        "UiCheckBox::IndicatorPalette::ink",
+	                                        "Explicit checkbox tick/mark color used when theme overrides are active.");
+	indicator_ink.group = "Theme Overrides";
+	SetCheckBoxThemeDefaults(text_ink_enabled, text_ink,
+	                         indicator_face_enabled, indicator_face,
+	                         indicator_frame_enabled, indicator_frame,
+	                         indicator_ink_enabled, indicator_ink,
+	                         node);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 }
@@ -2245,13 +2416,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	HideThemeOverrideBindings(b);
-	b.Hide("theme_override");
-	b.Hide("face");
-	b.Hide("frame");
-	b.Hide("radius");
-	b.Hide("face_enabled");
-	b.Hide("frame_enabled");
+	HideSurfaceOverrideBindings(b);
 	b.Hide("role");
 
 	if(node.type_id != "UiSliderEdit") {
