@@ -223,16 +223,8 @@ void UiSplitButton::DrawSplitAffordance(Draw& w, const Rect& r)
                          : split_hot_ ? ST_HOT
                          : visual_state_;
 
-    // UiButton lays text/icon out using the full button rect. Until UiButton has
-    // a content-rect hook for split controls, repaint the split lane before the
-    // divider/arrow so main content cannot visually crash into the affordance.
-    Rect lane(max(r.left, split.left - DPI(4)), r.top + DPI(1), max(r.left, split.right - DPI(1)), max(r.top, r.bottom - DPI(1)));
-    UiFill face = st.palette.face[state];
-    if(face.IsSolid())
-        w.DrawRect(lane, face.color);
-    else if(!st.transparent && st.metrics.face_enabled)
-        w.DrawRect(lane, SColorFace());
-
+    // Draw only the semantic split affordance here; UiButton owns the shared
+    // face/frame/focus paint for the complete rounded button surface.
     Color line = st.palette.frame[state];
     if(IsNull(line))
         line = Blend(SColorShadow(), SColorPaper(), 130);
@@ -254,8 +246,86 @@ void UiSplitButton::DrawSplitAffordance(Draw& w, const Rect& r)
 
 void UiSplitButton::Paint(Draw& w)
 {
-    UiButton::Paint(w);
-    DrawSplitAffordance(w, GetSize());
+    const Style& style = GetEffectiveStyle();
+    Rect outer = GetSize();
+    if(outer.IsEmpty())
+        return;
+
+    // The split button is still one visual button. Only the text/icon content
+    // layout is narrowed to the main command region so it cannot enter the
+    // divider/arrow lane.
+    Rect main = GetMainRect();
+    main.right = max(main.left, main.right - DPI(4));
+    Rect content = UiStyledInnerRect(main, style.metrics, style.skin);
+    if(layout_dirty_ || content != layout_content_) {
+        layout_content_ = content;
+        UpdateLayout(content);
+    }
+
+    UpdateVisualState();
+
+    const bool has_focus = HasFocus();
+    const StyledState st = visual_state_;
+    const StyledPalette& p = style.palette;
+    const StyledMetrics& m = style.metrics;
+    const StyledSkin& s = style.skin;
+
+    if(WhenPaintBackground)
+        WhenPaintBackground(w, outer, p, m, s, st, has_focus);
+    else
+        UiPaintStyledBackground(w, outer, p, m, s, st, has_focus);
+
+    Font font = m.use_text_font ? m.text_font : style.font;
+    if(IsNull(font))
+        font = StdFont();
+
+    Color ink = AdjustInk(p.ink[st], st);
+    Color icon_ink = has_assigned_icon_colors_ ? assigned_icon_colors_[st] : UiResolveIconColor(p, st);
+    UiIconRenderMode icon_render_mode = has_assigned_icon_render_mode_ ? assigned_icon_render_mode_ : style.icon_render_mode;
+    const bool explicit_icon_size = icon_size_.cx > 0 && icon_size_.cy > 0 && !icon_scale_to_content_;
+    if(IsNull(icon_ink))
+        icon_ink = ink;
+
+    Rect icon_r = layout_.support;
+    Rect text_r = layout_.main;
+    if(pressed_) {
+        icon_r.Offset(style.press_offset);
+        text_r.Offset(style.press_offset);
+    }
+
+    Image icon_img = ResolveIconForState(st);
+    if(!IsNull(icon_img) && !icon_r.IsEmpty()) {
+        UiPaintStyledIcon(w,
+                          icon_r,
+                          icon_img,
+                          true,
+                          icon_scale_to_content_ || !explicit_icon_size,
+                          icon_render_mode,
+                          icon_ink,
+                          IsEnabled());
+    }
+
+    if(!lines_.IsEmpty() && !text_r.IsEmpty()) {
+        UiPaintStyledText(w,
+                          text_r,
+                          lines_,
+                          line_sizes_,
+                          style.align_h,
+                          style.align_v,
+                          font,
+                          ink,
+                          has_access_mnemonic_ ? accesskey_ : 0,
+                          style.underline,
+                          style.underline_width,
+                          style.underline_offset);
+    }
+
+    if(WhenPaintForeground)
+        WhenPaintForeground(w, outer, p, m, s, st, has_focus);
+    else
+        UiPaintStyledForeground(w, outer, p, m, s, st, has_focus);
+
+    DrawSplitAffordance(w, outer);
 }
 
 void UiSplitButton::LeftDown(Point p, dword keyflags)
