@@ -223,8 +223,16 @@ void UiSplitButton::DrawSplitAffordance(Draw& w, const Rect& r)
                          : split_hot_ ? ST_HOT
                          : visual_state_;
 
-    // Draw only the semantic split affordance here; UiButton already owns the
-    // shared face/frame/focus paint for the complete button surface.
+    // UiButton lays text/icon out using the full button rect. Until UiButton has
+    // a content-rect hook for split controls, repaint the split lane before the
+    // divider/arrow so main content cannot visually crash into the affordance.
+    Rect lane(max(r.left, split.left - DPI(4)), r.top + DPI(1), max(r.left, split.right - DPI(1)), max(r.top, r.bottom - DPI(1)));
+    UiFill face = st.palette.face[state];
+    if(face.IsSolid())
+        w.DrawRect(lane, face.color);
+    else if(!st.transparent && st.metrics.face_enabled)
+        w.DrawRect(lane, SColorFace());
+
     Color line = st.palette.frame[state];
     if(IsNull(line))
         line = Blend(SColorShadow(), SColorPaper(), 130);
