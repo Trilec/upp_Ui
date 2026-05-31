@@ -479,6 +479,8 @@ static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Left"), UiAlign::LEFT);
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	button.SetCustomStyle(s);
+	button.SetContentInset(DPI(max(0, (int)AdapterNodeProperty(n, "content_inset", 6))));
+	button.SetContentGap(DPI(max(0, (int)AdapterNodeProperty(n, "content_gap", 4))));
 }
 
 static void ApplyToolButtonAppearance(UiToolButton& button, const DesignerNode& n)
@@ -490,6 +492,8 @@ static void ApplyToolButtonAppearance(UiToolButton& button, const DesignerNode& 
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Center"), UiAlign::CENTER);
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	button.SetCustomStyle(s);
+	button.SetContentInset(DPI(max(0, (int)AdapterNodeProperty(n, "content_inset", 4))));
+	button.SetContentGap(DPI(max(0, (int)AdapterNodeProperty(n, "content_gap", 4))));
 }
 
 static UiAccordion::Lock DesignerAccordionLockChoice(const Value& value)
@@ -1176,6 +1180,10 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	      "When enabled, the icon scales to the button content box and overrides Icon size.");
 	b.AddChoice("icon_side", "Icon side", "UiButton::SetIconSide",
 	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiButton::SetContentInset",
+	         "Padding inside the button surface.", 0, 32);
+	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiButton::SetContentGap",
+	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 	b.AddChoice("font", "Font", "UiButton::Style::font",
@@ -1297,6 +1305,10 @@ void DesignerToolButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 	      "When enabled, the icon scales to the tool button content box and overrides Icon size.");
 	b.AddChoice("icon_side", "Icon side", "UiToolButton::SetIconSide",
 	            "Where the icon sits relative to optional text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}, {"Center", "Center"}});
+	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiToolButton::SetContentInset",
+	         "Padding inside the tool button surface.", 0, 32);
+	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiToolButton::SetContentGap",
+	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 }

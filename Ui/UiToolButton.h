@@ -69,6 +69,8 @@ public:
     UiToolButton& SetAlign(UiAlign h, UiAlign v) { UiButton::SetAlign(h, v); return *this; }
     UiToolButton& SetAlignH(UiAlign h) { UiButton::SetAlignH(h); return *this; }
     UiToolButton& SetAlignV(UiAlign v) { UiButton::SetAlignV(v); return *this; }
+    UiToolButton& SetContentInset(const Rect& inset) { UiButton::SetContentInset(inset); return *this; }
+    UiToolButton& SetContentInset(int all) { UiButton::SetContentInset(all); return *this; }
     UiToolButton& SetContentGap(int gap) { UiButton::SetContentGap(gap); return *this; }
     UiToolButton& ClickFocus(bool on = true) { UiButton::ClickFocus(on); return *this; }
     UiToolButton& SetCheckable(bool on = true) { UiButton::SetCheckable(on); return *this; }

@@ -349,6 +349,14 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("align_h", "Center");
 			n.properties.Set("align_v", "Center");
 		}
+		if(id == "UiButton") {
+			n.properties.Set("content_inset", 6);
+			n.properties.Set("content_gap", 4);
+		}
+		if(id == "UiToolButton") {
+			n.properties.Set("content_inset", 4);
+			n.properties.Set("content_gap", 4);
+		}
 		if(id == "UiSplitButton") {
 			n.properties.Set("text", "Save");
 			n.properties.Set("icon_size", 16);

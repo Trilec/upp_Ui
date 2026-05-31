@@ -884,7 +884,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
 	}
 	else if(n.type_id == "UiButton") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
+		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
@@ -912,7 +914,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		    << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_c", "Recent C")) << ", \"c\");\n";
 	}
 	else if(n.type_id == "UiToolButton") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ");\n";
+		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 4)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
