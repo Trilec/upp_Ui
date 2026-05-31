@@ -409,6 +409,33 @@ static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 	}
 }
 
+static void ApplyExplicitInkOverrides(StyledPalette& palette, const DesignerNode& n)
+{
+	if(!DesignerBoolProperty(n, "theme_override", false))
+		return;
+
+	Color base_ink = palette.ink[ST_NORMAL];
+	if(IsNull(base_ink))
+		base_ink = SColorText();
+	Color base_icon = UiResolveIconColor(palette, ST_NORMAL);
+	if(IsNull(base_icon))
+		base_icon = base_ink;
+
+	if(DesignerHasProperty(n, "ink_enabled") && DesignerBoolProperty(n, "ink_enabled", false)) {
+		Color ink = GetColorProperty(n, "ink", base_ink);
+		for(int i = 0; i < 4; i++)
+			palette.ink[i] = ink;
+		palette.ink[ST_DISABLED] = DisabledColor(ink);
+	}
+
+	if(DesignerHasProperty(n, "icon_ink_enabled") && DesignerBoolProperty(n, "icon_ink_enabled", false)) {
+		Color icon = GetColorProperty(n, "icon_ink", base_icon);
+		for(int i = 0; i < 4; i++)
+			palette.icon[i] = icon;
+		palette.icon[ST_DISABLED] = DisabledColor(icon);
+	}
+}
+
 
 static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics& metrics,
                                            const DesignerNode& n, const String& prefix)
@@ -474,6 +501,7 @@ static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 {
 	UiButton::Style s = UiTheme::ResolveButton(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyExplicitInkOverrides(s.palette, n);
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Center")), UiAlign::CENTER);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Left"), UiAlign::LEFT);
@@ -487,6 +515,7 @@ static void ApplyToolButtonAppearance(UiToolButton& button, const DesignerNode& 
 {
 	UiToolButton::Style s = UiTheme::ResolveToolButton(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyExplicitInkOverrides(s.palette, n);
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Center")), UiAlign::CENTER);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(n, "icon_side", "Center"), UiAlign::CENTER);
@@ -724,15 +753,33 @@ static void HideQuadFaceBindings(DesignerApiBuilder& b)
 	b.Hide("face_quad");
 }
 
+static void SetButtonThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
+                                      DesignerApiBinding& icon_enabled, DesignerApiBinding& icon_color,
+                                      const DesignerNode& n, bool tool_button)
+{
+	UiRole role = DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard"));
+	Color text_default = tool_button ? UiTheme::ResolveToolButton(role).palette.ink[ST_NORMAL]
+	                                 : UiTheme::ResolveButton(role).palette.ink[ST_NORMAL];
+	Color icon_default = tool_button ? UiResolveIconColor(UiTheme::ResolveToolButton(role).palette, ST_NORMAL)
+	                                 : UiResolveIconColor(UiTheme::ResolveButton(role).palette, ST_NORMAL);
+	if(IsNull(icon_default))
+		icon_default = text_default;
+
+	text_enabled.default_value = false;
+	text_color.default_value = text_default;
+	icon_enabled.default_value = false;
+	icon_color.default_value = icon_default;
+}
+
 // Theme override audit snapshot for the controls already exposed in the Designer.
 // Keep this narrow: the goal is to document what the inspector and codegen
 // should treat as first-class overrideable surface, not to invent extra knobs.
 //
 // Control          | Theme overrides? | Surface fields         | Notes
 // ---------------- | ---------------- | ---------------------- | ----------------------------
-// UiButton         | yes              | face/frame/radius      | icon/text color not surfaced
-// UiToolButton     | yes              | face/frame/radius      | compact button variant
-// UiSplitButton    | yes              | face/frame/radius      | split lane uses same surface
+// UiButton         | yes              | face/frame/radius/ink/icon | button-family override base
+// UiToolButton     | yes              | face/frame/radius/ink/icon | compact button variant
+// UiSplitButton    | yes              | face/frame/radius/ink/icon | split lane uses same surface
 // UiLabel          | yes              | face/frame/radius      | content layout only; icon tint stays theme-driven
 // UiCheckBox       | no               | -                      | theme override group intentionally hidden
 // UiToggle         | no               | -                      | theme override group intentionally hidden
@@ -1207,6 +1254,23 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	                                             "UiButton::SetInkColor",
+	                                             "Enables an explicit text ink override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiButton::SetInkColor",
+	                                     "Explicit text ink color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& icon_ink_enabled = b.Add("icon_ink_enabled", "Use icon color", DesignerEditorKind::Bool,
+	                                              "UiButton::SetIconColor",
+	                                              "Enables an explicit icon ink override.");
+	icon_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& icon_ink = b.Add("icon_ink", "Icon color", DesignerEditorKind::Color,
+	                                     "UiButton::SetIconColor",
+	                                     "Explicit icon ink color used when theme overrides are active.");
+	icon_ink.group = "Theme Overrides";
+	SetButtonThemeInkDefaults(text_ink_enabled, text_ink, icon_ink_enabled, icon_ink, node, false);
 	b.AddChoice("font", "Font", "UiButton::Style::font",
 	            "Preview button font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -1279,6 +1343,23 @@ void DesignerSplitButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	         "Chevron size inside the split lane.", 8, 32);
 	b.AddInt("popup_min_width", "Popup width", DesignerEditorKind::Slider, "UiSplitButton::SetPopupMinWidth",
 	         "Minimum width of the opened selection popup.", 120, 520);
+	DesignerApiBinding& split_text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	                                                   "UiSplitButton::SetInkColor",
+	                                                   "Enables an explicit text ink override.");
+	split_text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& split_text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                           "UiSplitButton::SetInkColor",
+	                                           "Explicit text ink color used when theme overrides are active.");
+	split_text_ink.group = "Theme Overrides";
+	DesignerApiBinding& split_icon_ink_enabled = b.Add("icon_ink_enabled", "Use icon color", DesignerEditorKind::Bool,
+	                                                   "UiSplitButton::SetIconColor",
+	                                                   "Enables an explicit icon ink override.");
+	split_icon_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& split_icon_ink = b.Add("icon_ink", "Icon color", DesignerEditorKind::Color,
+	                                           "UiSplitButton::SetIconColor",
+	                                           "Explicit icon ink color used when theme overrides are active.");
+	split_icon_ink.group = "Theme Overrides";
+	SetButtonThemeInkDefaults(split_text_ink_enabled, split_text_ink, split_icon_ink_enabled, split_icon_ink, node, false);
 	b.Add("choice_a", "Choice A", DesignerEditorKind::Text, "UiSplitButton::Add",
 	      "First preview dropdown row.");
 	b.Add("choice_b", "Choice B", DesignerEditorKind::Text, "UiSplitButton::Add",
@@ -1332,6 +1413,23 @@ void DesignerToolButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
+	DesignerApiBinding& tool_text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	                                                  "UiToolButton::SetInkColor",
+	                                                  "Enables an explicit text ink override.");
+	tool_text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& tool_text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                          "UiToolButton::SetInkColor",
+	                                          "Explicit text ink color used when theme overrides are active.");
+	tool_text_ink.group = "Theme Overrides";
+	DesignerApiBinding& tool_icon_ink_enabled = b.Add("icon_ink_enabled", "Use icon color", DesignerEditorKind::Bool,
+	                                                  "UiToolButton::SetIconColor",
+	                                                  "Enables an explicit icon ink override.");
+	tool_icon_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& tool_icon_ink = b.Add("icon_ink", "Icon color", DesignerEditorKind::Color,
+	                                          "UiToolButton::SetIconColor",
+	                                          "Explicit icon ink color used when theme overrides are active.");
+	tool_icon_ink.group = "Theme Overrides";
+	SetButtonThemeInkDefaults(tool_text_ink_enabled, tool_text_ink, tool_icon_ink_enabled, tool_icon_ink, node, true);
 }
 
 void DesignerToolButtonAdapter::Paint(Draw& w)

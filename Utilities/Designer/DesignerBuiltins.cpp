@@ -352,10 +352,14 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		if(id == "UiButton") {
 			n.properties.Set("content_inset", 6);
 			n.properties.Set("content_gap", 4);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
 		}
 		if(id == "UiToolButton") {
 			n.properties.Set("content_inset", 4);
 			n.properties.Set("content_gap", 4);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
 		}
 		if(id == "UiSplitButton") {
 			n.properties.Set("text", "Save");
@@ -366,6 +370,8 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("split_content_gap", 4);
 			n.properties.Set("split_icon_size", 16);
 			n.properties.Set("popup_min_width", 220);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
 			n.properties.Set("choice_a", "Recent A");
 			n.properties.Set("choice_b", "Recent B");
 			n.properties.Set("choice_c", "Recent C");

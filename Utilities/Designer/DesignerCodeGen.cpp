@@ -178,6 +178,18 @@ static String RoleExpr(const String& role)
 	return "UiRole::Standard";
 }
 
+static UiRole CodeGenRoleChoice(const DesignerNode& n)
+{
+	String role = AsString(CodeGenNodeProperty(n, "role", "Standard"));
+	if(role == "Subtle")
+		return UiRole::Subtle;
+	if(role == "Accent")
+		return UiRole::Accent;
+	if(role == "Alert")
+		return UiRole::Alert;
+	return UiRole::Standard;
+}
+
 static String ColorExpr(Color c);
 
 static int CodeGenBreadcrumbCount(const DesignerNode& n)
@@ -281,6 +293,34 @@ static String ShadowCurveExpr(const String& curve)
 	if(curve == "Hard")
 		return "ShadowHardCurve()";
 	return "ShadowSoft()";
+}
+
+static void EmitButtonInkOverrideFields(String& out, const DesignerNode& n, bool tool_button)
+{
+	if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+		Color base_ink = tool_button
+			? UiTheme::ResolveToolButton(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL]
+			: UiTheme::ResolveButton(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
+		Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+		out << "\t\t\ts.palette.ink[ST_NORMAL] = " << ColorExpr(ink) << ";\n"
+		    << "\t\t\ts.palette.ink[ST_HOT] = " << ColorExpr(ink) << ";\n"
+		    << "\t\t\ts.palette.ink[ST_PRESSED] = " << ColorExpr(ink) << ";\n"
+		    << "\t\t\ts.palette.ink[ST_DISABLED] = DisabledColor(" << ColorExpr(ink) << ");\n";
+	}
+
+	if(CodeGenHasProperty(n, "icon_ink_enabled") && (bool)CodeGenNodeProperty(n, "icon_ink_enabled", false)) {
+		StyledPalette pal = tool_button
+			? UiTheme::ResolveToolButton(CodeGenRoleChoice(n)).palette
+			: UiTheme::ResolveButton(CodeGenRoleChoice(n)).palette;
+		Color base_icon = UiResolveIconColor(pal, ST_NORMAL);
+		if(IsNull(base_icon))
+			base_icon = pal.ink[ST_NORMAL];
+		Color icon = CodeGenNodeProperty(n, "icon_ink", base_icon);
+		out << "\t\t\ts.palette.icon[ST_NORMAL] = " << ColorExpr(icon) << ";\n"
+		    << "\t\t\ts.palette.icon[ST_HOT] = " << ColorExpr(icon) << ";\n"
+		    << "\t\t\ts.palette.icon[ST_PRESSED] = " << ColorExpr(icon) << ";\n"
+		    << "\t\t\ts.palette.icon[ST_DISABLED] = DisabledColor(" << ColorExpr(icon) << ");\n";
+	}
 }
 
 
@@ -440,6 +480,10 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			    << "\t\t\ts.metrics.shadow.curve = " << ShadowCurveExpr(CodeGenNodeProperty(n, "shadow_curve", "Soft")) << ";\n";
 		}
 	}
+	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
+		EmitButtonInkOverrideFields(out, n, false);
+	else if(n.type_id == "UiToolButton")
+		EmitButtonInkOverrideFields(out, n, true);
 	out << "\t\t\t" << var << ".SetCustomStyle(s);\n"
 	    << "\t\t}\n";
 }
