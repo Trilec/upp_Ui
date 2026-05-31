@@ -778,6 +778,7 @@ private:
 
 	void SetupRecentSplitButton(UiSplitButton& button, const String& tip)
 	{
+		button.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 		button.SetContentInset(DPI(6));
 		button.SetContentGap(DPI(4));
 		button.SetSplitWidth(DPI(30));
