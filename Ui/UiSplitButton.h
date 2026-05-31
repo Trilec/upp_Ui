@@ -87,6 +87,7 @@ private:
     int hot_item_ = -1;
 
     int split_width_ = DPI(30);
+    int split_icon_size_ = DPI(16);
     int popup_min_width_ = DPI(180);
     int popup_max_items_ = 10;
     int popup_item_height_ = DPI(30);
@@ -139,6 +140,8 @@ public:
     UiSplitButton& SetItemEnabled(int index, bool enabled = true);
 
     UiSplitButton& SetSplitWidth(int width);
+    UiSplitButton& SetSplitIconSize(int size);
+    int            GetSplitIconSize() const { return split_icon_size_; }
     UiSplitButton& SetPopupMinWidth(int width);
     UiSplitButton& SetPopupMaxItems(int count);
     UiSplitButton& SetPopupItemHeight(int height);
