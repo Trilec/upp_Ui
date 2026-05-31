@@ -31,11 +31,14 @@
     - Use WhenAction for the primary command.
     - Add popup rows with Add(), then handle WhenSelect for dropdown choices.
     - Use SetPopupMinWidth() when popup row text is wider than the button.
+    - Use SetSplitContentGap() and SetSplitIconSize() to tune the split lane.
 
     Changelog
     - 2026-05: introduced as a dedicated split-button control after Designer
       save/load recent-file handling needed a compact primary action plus a
       wider history popup.
+    - 2026-05: added independent split-gap and split-chevron sizing so the
+      Designer can expose body inset and split lane spacing without hacks.
 */
 
 #include <Ui/UiButton.h>
@@ -88,6 +91,7 @@ private:
 
     int split_width_ = DPI(30);
     int split_icon_size_ = DPI(16);
+    int split_content_gap_ = DPI(4);
     int popup_min_width_ = DPI(180);
     int popup_max_items_ = 10;
     int popup_item_height_ = DPI(30);
@@ -142,6 +146,8 @@ public:
     UiSplitButton& SetSplitWidth(int width);
     UiSplitButton& SetSplitIconSize(int size);
     int            GetSplitIconSize() const { return split_icon_size_; }
+    UiSplitButton& SetSplitContentGap(int gap);
+    int            GetSplitContentGap() const { return split_content_gap_; }
     UiSplitButton& SetPopupMinWidth(int width);
     UiSplitButton& SetPopupMaxItems(int count);
     UiSplitButton& SetPopupItemHeight(int height);

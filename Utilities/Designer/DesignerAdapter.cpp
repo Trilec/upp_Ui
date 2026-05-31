@@ -1197,6 +1197,8 @@ void DesignerSplitButtonAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	ApplyButtonAppearance(*this, node);
+	SetContentInset(DPI(max(0, (int)AdapterNodeProperty(node, "content_inset", 6))));
+	SetContentGap(DPI(max(0, (int)AdapterNodeProperty(node, "content_gap", 4))));
 	Image icon = DesignerIconChoice(node);
 	if(IsNull(icon))
 		ClearIcon();
@@ -1206,7 +1208,9 @@ void DesignerSplitButtonAdapter::SyncFromNode(const DesignerNode& node)
 		             .SetIconRenderMode(UiIconRenderMode::MonoTint);
 	SetIconScaleToContent((bool)AdapterNodeProperty(node, "icon_scale", false));
 	SetText(TextProperty(node));
-	SetSplitWidth(DPI((int)AdapterNodeProperty(node, "split_width", 28)));
+	SetSplitWidth(DPI((int)AdapterNodeProperty(node, "split_width", 30)));
+	SetSplitContentGap(DPI(max(0, (int)AdapterNodeProperty(node, "split_content_gap", 4))));
+	SetSplitIconSize(DPI(max(8, (int)AdapterNodeProperty(node, "split_icon_size", 16))));
 	SetPopupMinWidth(DPI((int)AdapterNodeProperty(node, "popup_min_width", 220)));
 	ClearItems();
 	Add(AdapterNodeProperty(node, "choice_a", "Recent A"), "a");
@@ -1232,10 +1236,18 @@ void DesignerSplitButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	      "When enabled, the icon scales to the button content box and overrides Icon size.");
 	b.AddChoice("icon_side", "Icon side", "UiSplitButton::SetIconSide",
 	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiSplitButton::SetContentInset",
+	         "Padding inside the primary button surface.", 0, 32);
+	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiSplitButton::SetContentGap",
+	         "Gap between the icon and text inside the primary button area.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 	b.AddInt("split_width", "Split width", DesignerEditorKind::Slider, "UiSplitButton::SetSplitWidth",
 	         "Width of the dropdown hit target on the right side.", 18, 60);
+	b.AddInt("split_content_gap", "Split gap", DesignerEditorKind::Slider, "UiSplitButton::SetSplitContentGap",
+	         "Gap between the main content area and the split divider.", 0, 24);
+	b.AddInt("split_icon_size", "Split icon size", DesignerEditorKind::Slider, "UiSplitButton::SetSplitIconSize",
+	         "Chevron size inside the split lane.", 8, 32);
 	b.AddInt("popup_min_width", "Popup width", DesignerEditorKind::Slider, "UiSplitButton::SetPopupMinWidth",
 	         "Minimum width of the opened selection popup.", 120, 520);
 	b.Add("choice_a", "Choice A", DesignerEditorKind::Text, "UiSplitButton::Add",

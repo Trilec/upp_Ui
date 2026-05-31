@@ -19,7 +19,7 @@ Rect UiSplitButton::GetContentLayoutRect(const Rect& outer, const Style& style) 
 {
     Rect main = outer;
     Rect split = GetSplitRect();
-    main.right = max(main.left, split.left - DPI(4));
+    main.right = max(main.left, split.left - split_content_gap_);
     return UiStyledInnerRect(main, style.metrics, style.skin);
 }
 
@@ -105,6 +105,14 @@ UiSplitButton& UiSplitButton::SetSplitWidth(int width)
 UiSplitButton& UiSplitButton::SetSplitIconSize(int size)
 {
     split_icon_size_ = max(DPI(8), size);
+    Refresh();
+    return *this;
+}
+
+UiSplitButton& UiSplitButton::SetSplitContentGap(int gap)
+{
+    split_content_gap_ = max(0, gap);
+    RefreshLayout();
     Refresh();
     return *this;
 }

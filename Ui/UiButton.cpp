@@ -432,6 +432,13 @@ UiButton& UiButton::SetContentGap(int gap)
     return *this;
 }
 
+UiButton& UiButton::SetContentInset(const Rect& inset)
+{
+    StyleEdit().metrics.content_margin = UiNonNegativeThickness(inset);
+    OnStyleChanged();
+    return *this;
+}
+
 UiButton& UiButton::SetText(const String& text)
 {
     text_.Clear();

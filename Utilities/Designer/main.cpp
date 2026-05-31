@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.63";
+static const char* DESIGNER_VERSION = "v0.1.64";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
@@ -778,7 +778,11 @@ private:
 
 	void SetupRecentSplitButton(UiSplitButton& button, const String& tip)
 	{
-		button.SetSplitWidth(DPI(28));
+		button.SetContentInset(DPI(6));
+		button.SetContentGap(DPI(4));
+		button.SetSplitWidth(DPI(30));
+		button.SetSplitContentGap(DPI(4));
+		button.SetSplitIconSize(DPI(16));
 		ApplyRecentSplitPopup(button);
 		button.Tip(tip);
 	}

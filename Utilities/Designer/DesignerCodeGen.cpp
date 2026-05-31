@@ -125,6 +125,26 @@ static String AlignSideExpr(const String& side, const String& def = "Left")
 	return "UiAlign::LEFT";
 }
 
+static String AlignHExpr(const String& align, const String& def = "Center")
+{
+	String s = align.IsEmpty() ? def : align;
+	if(s == "Left")
+		return "UiAlign::LEFT";
+	if(s == "Right")
+		return "UiAlign::RIGHT";
+	return "UiAlign::CENTER";
+}
+
+static String AlignVExpr(const String& align, const String& def = "Center")
+{
+	String s = align.IsEmpty() ? def : align;
+	if(s == "Top")
+		return "UiAlign::TOP";
+	if(s == "Bottom")
+		return "UiAlign::BOTTOM";
+	return "UiAlign::CENTER";
+}
+
 static String TabVisualExpr(const String& visual)
 {
 	if(visual == "Classic")
@@ -873,8 +893,15 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiSplitButton") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 28) << "))"
+		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "))"
+		    << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 30) << "))"
+		    << ".SetSplitContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "split_content_gap", 4)) << "))"
+		    << ".SetSplitIconSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "split_icon_size", 16)) << "))"
 		    << ".SetPopupMinWidth(DPI(" << (int)CodeGenNodeProperty(n, "popup_min_width", 220) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("

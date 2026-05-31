@@ -116,7 +116,9 @@ static Image MakeDesignerTypeIcon(const String& id)
 		rect(5, 8, 11, 9, green);
 		if(id == "UiSplitButton") {
 			rect(11, 5, 12, 12, green);
-			dot(12, 8, green);
+			dot(13, 7, green);
+			dot(14, 8, green);
+			dot(13, 9, green);
 		}
 	}
 	else if(id == "UiLineEdit") {
@@ -343,7 +345,12 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("align", "Center");
 		if(id == "UiSplitButton") {
 			n.properties.Set("text", "Save");
-			n.properties.Set("split_width", 28);
+			n.properties.Set("icon_size", 16);
+			n.properties.Set("content_inset", 6);
+			n.properties.Set("content_gap", 4);
+			n.properties.Set("split_width", 30);
+			n.properties.Set("split_content_gap", 4);
+			n.properties.Set("split_icon_size", 16);
 			n.properties.Set("popup_min_width", 220);
 			n.properties.Set("choice_a", "Recent A");
 			n.properties.Set("choice_b", "Recent B");

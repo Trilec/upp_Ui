@@ -24,7 +24,7 @@
     - GUI thread only.
 
     Usage
-    - Use SetText(), SetIcon(), SetIconRenderMode(), SetMargin(), SetContentGap(), SetCheckable(), and
+    - Use SetText(), SetIcon(), SetIconRenderMode(), SetContentInset(), SetContentGap(), SetCheckable(), and
       SetCustomStyle() to configure button behavior and appearance.
     - Setters and style/theme changes drive cache invalidation and layout
       refresh; Paint() also repairs stale layout before drawing.
@@ -38,6 +38,8 @@
       scale toggling so icon rendering uses the target icon size directly.
     - 2026-04: simplified public content spacing to outer content_margin plus
       one content_gap so buttons no longer expose separate icon/text margins.
+    - 2026-05: exposed explicit content inset setters so split-button and
+      other button-like controls can tune body padding without style hacks.
 */
 
 #include <type_traits>
@@ -197,6 +199,9 @@ public:
 
     UiButton& SetContentGap(int gap);
     int       GetContentGap() const { return max(0, GetEffectiveStyle().content_gap); }
+    UiButton& SetContentInset(const Rect& inset);
+    UiButton& SetContentInset(int all) { return SetContentInset(Rect(all, all, all, all)); }
+    Rect      GetContentInset() const { return GetEffectiveStyle().metrics.content_margin; }
 
     UiButton& ClickFocus(bool on = true);
 
