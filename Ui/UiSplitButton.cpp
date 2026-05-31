@@ -102,6 +102,13 @@ UiSplitButton& UiSplitButton::SetSplitWidth(int width)
     return *this;
 }
 
+UiSplitButton& UiSplitButton::SetSplitIconSize(int size)
+{
+    split_icon_size_ = max(DPI(8), size);
+    Refresh();
+    return *this;
+}
+
 UiSplitButton& UiSplitButton::SetPopupMinWidth(int width)
 {
     popup_min_width_ = max(0, width);
@@ -239,7 +246,7 @@ void UiSplitButton::DrawSplitAffordance(Draw& w, const Rect& r)
     int divider_w = max(1, st.metrics.frame_width);
     w.DrawRect(split.left, r.top + DPI(5), divider_w, max(0, r.GetHeight() - DPI(10)), line);
 
-    int side = min(DPI(16), max(DPI(8), split.GetWidth() - DPI(10)));
+    int side = min(max(DPI(8), split_icon_size_), max(DPI(8), split.GetWidth() - DPI(10)));
     Rect ir(split.left + (split.GetWidth() - side) / 2,
             split.top + (split.GetHeight() - side) / 2,
             split.left + (split.GetWidth() + side) / 2,
