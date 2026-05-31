@@ -159,6 +159,11 @@ UiButton::Style UiButton::ResolveThemeStyle() const
     return UiTheme::ResolveButton();
 }
 
+Rect UiButton::GetContentLayoutRect(const Rect& outer, const Style& style) const
+{
+    return UiStyledInnerRect(outer, style.metrics, style.skin);
+}
+
 void UiButton::InvalidateStyleCache()
 {
     theme_revision_ = 0;
@@ -610,7 +615,7 @@ void UiButton::Layout()
 {
     const Style& style = GetEffectiveStyle();
     Rect outer = GetSize();
-    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
+    Rect content = GetContentLayoutRect(outer, style);
 
     if(!layout_dirty_ && content == layout_content_)
         return;
@@ -710,7 +715,7 @@ void UiButton::Paint(Draw& w)
     if(outer.IsEmpty())
         return;
 
-    Rect content = UiStyledInnerRect(outer, style.metrics, style.skin);
+    Rect content = GetContentLayoutRect(outer, style);
     if(layout_dirty_ || content != layout_content_) {
         layout_content_ = content;
         UpdateLayout(content);
