@@ -7,6 +7,7 @@
 
     License
     - Apache License 2.0, matching this repository's LICENSE file.
+
     UiSplitButton
     =============
 
@@ -101,6 +102,7 @@ private:
 
 protected:
     virtual Style ResolveThemeStyle() const override;
+    virtual Rect GetContentLayoutRect(const Rect& outer, const Style& style) const override;
 
 public:
     UiSplitButton();
