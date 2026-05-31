@@ -7,6 +7,7 @@
 
     License
     - Apache License 2.0, matching this repository's LICENSE file.
+
     UiButton
     ========
 
@@ -142,6 +143,7 @@ protected:
 
     virtual Color AdjustInk(Color base_ink, StyledState st) const { return base_ink; }
     virtual Style ResolveThemeStyle() const;
+    virtual Rect GetContentLayoutRect(const Rect& outer, const Style& style) const;
 
     // Text and block layout helpers feed GetMinSize() and Paint().
     void RebuildTextLines();
@@ -324,4 +326,3 @@ UiButton& UiButton::Animate(const T& from, const T& to, int ms, Event<const T&> 
 } // namespace Upp
 
 #endif
-
