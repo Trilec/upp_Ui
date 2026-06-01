@@ -609,6 +609,11 @@ static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 {
 	UiBaseEdit::Style s = UiTheme::ResolveEdit(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyExplicitInkOverrides(s.palette, n);
+	if(DesignerBoolProperty(n, "theme_override", false)) {
+		if(DesignerBoolProperty(n, "placeholder_ink_enabled", false))
+			s.placeholder_ink = GetColorProperty(n, "placeholder_ink", s.placeholder_ink);
+	}
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.text_align = AdapterNodeProperty(n, "align", "Left") == "Right" ? UiAlign::RIGHT
 	             : AdapterNodeProperty(n, "align", "Left") == "Center" ? UiAlign::CENTER
@@ -620,6 +625,7 @@ static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 {
 	UiDropdown::Style s = UiTheme::ResolveDropdown(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyExplicitInkOverrides(s.palette, n);
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Left")), UiAlign::LEFT);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
@@ -821,6 +827,26 @@ static void SetLabelThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerA
 	icon_color.default_value = icon_default;
 }
 
+static void SetEditThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
+                                    DesignerApiBinding& placeholder_enabled, DesignerApiBinding& placeholder_color,
+                                    const DesignerNode& n)
+{
+	UiBaseEdit::Style s = UiTheme::ResolveEdit(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	Color text_default = IsNull(s.palette.ink[ST_NORMAL]) ? SColorText() : s.palette.ink[ST_NORMAL];
+	text_enabled.default_value = false;
+	text_color.default_value = text_default;
+	placeholder_enabled.default_value = false;
+	placeholder_color.default_value = IsNull(s.placeholder_ink) ? SColorDisabled() : s.placeholder_ink;
+}
+
+static void SetDropdownThemeInkDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
+                                        const DesignerNode& n)
+{
+	UiDropdown::Style s = UiTheme::ResolveDropdown(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	text_enabled.default_value = false;
+	text_color.default_value = IsNull(s.palette.ink[ST_NORMAL]) ? SColorText() : s.palette.ink[ST_NORMAL];
+}
+
 static void SetCheckBoxThemeDefaults(DesignerApiBinding& text_enabled, DesignerApiBinding& text_color,
                                      DesignerApiBinding& indicator_face_enabled, DesignerApiBinding& indicator_face,
                                      DesignerApiBinding& indicator_frame_enabled, DesignerApiBinding& indicator_frame,
@@ -871,11 +897,11 @@ static void SetToggleThemeDefaults(DesignerApiBinding& track_face_enabled, Desig
 // UiCheckBox       | yes              | text + indicator face/frame/tick | inspector only exposes useful visual parts
 // UiToggle         | yes              | track/thumb face/frame  | part-specific overrides only
 // UiSlider         | yes              | face/frame/radius      | track/thumb preview must honor explicit override flag
-// UiDropdown       | yes              | face/frame/radius      | popup chrome uses shared edit/dropdown styling
-// UiLineEdit       | yes              | face/frame/radius      | edit-family shared surface
-// UiIntEdit        | yes              | face/frame/radius      | edit-family shared surface
-// UiFloatEdit      | yes              | face/frame/radius      | edit-family shared surface
-// UiSliderEdit     | yes              | face/frame/radius      | edit-family shared surface
+// UiDropdown       | yes              | face/frame/radius/ink  | popup chrome uses shared edit/dropdown styling
+// UiLineEdit       | yes              | face/frame/radius/ink/placeholder | edit-family shared surface
+// UiIntEdit        | yes              | face/frame/radius/ink/placeholder | edit-family shared surface
+// UiFloatEdit      | yes              | face/frame/radius/ink/placeholder | edit-family shared surface
+// UiSliderEdit     | no               | -                      | composite path; not part of this pass
 // Unsupported controls should keep showing: "No overrides available".
 
 static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNode& n)
@@ -1177,6 +1203,8 @@ void DesignerLabelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	                                     "UiLabel::SetIconColor",
 	                                     "Explicit label icon color used when theme overrides are active.");
 	icon_ink.group = "Theme Overrides";
+	text_ink_enabled.label = "Use text color";
+	icon_ink_enabled.label = "Use icon color";
 	SetLabelThemeInkDefaults(text_ink_enabled, text_ink, icon_ink_enabled, icon_ink, node);
 	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiLabel::SetContentGap",
 	         "Gap between the label icon and text.", 0, 64);
@@ -1575,6 +1603,23 @@ void DesignerLineEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	             {"Times New Roman", "Times New Roman"}, {"Consolas", "Consolas"}, {"Courier New", "Courier New"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiBaseEdit::Style::palette.ink",
+	                                             "Enables an explicit edit text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiBaseEdit::Style::palette.ink",
+	                                     "Explicit edit text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	                                                   "UiBaseEdit::Style::placeholder_ink",
+	                                                   "Enables an explicit placeholder text color override.");
+	placeholder_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink = b.Add("placeholder_ink", "Placeholder color", DesignerEditorKind::Color,
+	                                            "UiBaseEdit::Style::placeholder_ink",
+	                                            "Explicit placeholder text color used when theme overrides are active.");
+	placeholder_ink.group = "Theme Overrides";
+	SetEditThemeInkDefaults(text_ink_enabled, text_ink, placeholder_ink_enabled, placeholder_ink, node);
 }
 
 void DesignerLineEditAdapter::Paint(Draw& w)
@@ -1616,6 +1661,23 @@ void DesignerIntEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const 
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiBaseEdit::Style::palette.ink",
+	                                             "Enables an explicit edit text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiBaseEdit::Style::palette.ink",
+	                                     "Explicit edit text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	                                                   "UiBaseEdit::Style::placeholder_ink",
+	                                                   "Enables an explicit placeholder text color override.");
+	placeholder_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink = b.Add("placeholder_ink", "Placeholder color", DesignerEditorKind::Color,
+	                                            "UiBaseEdit::Style::placeholder_ink",
+	                                            "Explicit placeholder text color used when theme overrides are active.");
+	placeholder_ink.group = "Theme Overrides";
+	SetEditThemeInkDefaults(text_ink_enabled, text_ink, placeholder_ink_enabled, placeholder_ink, node);
 }
 
 void DesignerIntEditAdapter::Paint(Draw& w)
@@ -1659,6 +1721,23 @@ void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiBaseEdit::Style::palette.ink",
+	                                             "Enables an explicit edit text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiBaseEdit::Style::palette.ink",
+	                                     "Explicit edit text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	                                                   "UiBaseEdit::Style::placeholder_ink",
+	                                                   "Enables an explicit placeholder text color override.");
+	placeholder_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& placeholder_ink = b.Add("placeholder_ink", "Placeholder color", DesignerEditorKind::Color,
+	                                            "UiBaseEdit::Style::placeholder_ink",
+	                                            "Explicit placeholder text color used when theme overrides are active.");
+	placeholder_ink.group = "Theme Overrides";
+	SetEditThemeInkDefaults(text_ink_enabled, text_ink, placeholder_ink_enabled, placeholder_ink, node);
 }
 
 void DesignerFloatEditAdapter::Paint(Draw& w)
@@ -1775,6 +1854,15 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	             {"Times New Roman", "Times New Roman"}, {"Consolas", "Consolas"}, {"Courier New", "Courier New"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiDropdown::Style::font",
 	         "Preview dropdown font size.", 7, 32);
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	                                             "UiDropdown::Style::palette.ink",
+	                                             "Enables an explicit dropdown text color override.");
+	text_ink_enabled.group = "Theme Overrides";
+	DesignerApiBinding& text_ink = b.Add("ink", "Text color", DesignerEditorKind::Color,
+	                                     "UiDropdown::Style::palette.ink",
+	                                     "Explicit dropdown text color used when theme overrides are active.");
+	text_ink.group = "Theme Overrides";
+	SetDropdownThemeInkDefaults(text_ink_enabled, text_ink, node);
 }
 
 void DesignerDropdownAdapter::Paint(Draw& w)

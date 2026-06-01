@@ -566,6 +566,27 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			EmitPaletteColorOverrideFields(out, "s.indicator_palette", "ink", indicator);
 		}
 	}
+	else if(n.type_id == "UiDropdown") {
+		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+			Color base_ink = UiTheme::ResolveDropdown(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
+			if(IsNull(base_ink))
+				base_ink = SColorText();
+			Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
+		}
+	}
+	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit") {
+		UiBaseEdit::Style base = UiTheme::ResolveEdit(CodeGenRoleChoice(n));
+		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+			Color base_ink = IsNull(base.palette.ink[ST_NORMAL]) ? SColorText() : base.palette.ink[ST_NORMAL];
+			Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
+		}
+		if(CodeGenHasProperty(n, "placeholder_ink_enabled") && (bool)CodeGenNodeProperty(n, "placeholder_ink_enabled", false)) {
+			Color placeholder = CodeGenNodeProperty(n, "placeholder_ink", base.placeholder_ink);
+			out << "\t\t\ts.placeholder_ink = " << ColorExpr(placeholder) << ";\n";
+		}
+	}
 	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
 		EmitButtonInkOverrideFields(out, n, false);
 	else if(n.type_id == "UiToolButton")
