@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.64";
+static const char* DESIGNER_VERSION = "v0.1.65";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
@@ -86,7 +86,6 @@ public:
 
 	DesignerModeButton()
 	{
-		SetCheckable();
 		ClickFocus(false);
 		NoWantFocus();
 		SetText("");
@@ -108,7 +107,7 @@ public:
 
 	DesignerModeButton& SetActive(bool on)
 	{
-		SetChecked(on);
+		active_ = on;
 		UpdateChrome();
 		return *this;
 	}
@@ -142,11 +141,14 @@ public:
 private:
 	void UpdateChrome()
 	{
-		UiRole role = IsChecked() ? UiRole::Accent : hover_ ? UiRole::Standard : UiRole::Subtle;
+		UiRole role = active_ ? UiRole::Accent : hover_ ? UiRole::Standard : UiRole::Subtle;
 		UiButton::Style s = UiTheme::ResolveButton(role);
+		s.metrics.content_margin = Rect(DPI(3), DPI(3), DPI(3), DPI(3));
+		s.metrics.radius = DPI(8);
+		s.content_gap = 0;
 		s.metrics.focus_enabled = false;
 		SetCustomStyle(s);
-		target_icon_size_ = IsChecked() ? 21 : hover_ ? 20 : 18;
+		target_icon_size_ = active_ ? 21 : hover_ ? 20 : 18;
 		StartIconAnimation();
 	}
 
@@ -173,6 +175,7 @@ private:
 	}
 
 	bool hover_ = false;
+	bool active_ = false;
 	bool animating_ = false;
 	int current_icon_size_ = 18;
 	int target_icon_size_ = 18;
@@ -370,11 +373,12 @@ public:
 		int body_y = top_y + header_h + gap;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int left_w = DPI(190);
-		int right_w = DPI(365);
+		int right_w = right_collapsed_
+		    ? max(DPI(48), right_mode_bar_.GetMinSize().cx + DPI(16))
+		    : DPI(365);
 		toolbox_panel_.SetRect(gap, body_y, left_w, body_h);
 		preview_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
 		                  max(0, r.Width() - left_w - right_w - gap * 4), body_h);
-		side_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
 		if(drag_status_visible_) {
 			Size status_sz = GetTextSize(drag_status_text_, SansSerifZ(11).Bold()) + Size(DPI(24), DPI(12));
 			Point p = drag_status_screen_ - GetScreenRect().TopLeft() + Point(DPI(14), DPI(14));
@@ -444,11 +448,9 @@ public:
 			toolbox_help_text_.SetRect(DPI(14), DPI(30), max(0, hp.GetWidth() - DPI(28)), max(0, hp.GetHeight() - DPI(38)));
 			RefreshToolboxHelpText();
 		}
-		side_.Layout();
-		Rect vp = side_.GetViewportRect();
-		right_box_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), DPI(640)));
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
+		right_box_.Layout();
 		side_.RefreshLayout();
 		side_.Layout();
 	}
@@ -595,7 +597,7 @@ private:
 		Add(warning_panel_);
 		Add(warning_icon_);
 		Add(warning_text_);
-		Add(side_);
+		Add(right_box_);
 		toolbox_panel_.Add(toolbox_layouts_button_);
 		toolbox_panel_.Add(toolbox_containers_button_);
 		toolbox_panel_.Add(toolbox_controls_button_);
@@ -608,7 +610,6 @@ private:
 		toolbox_help_panel_.Add(toolbox_help_title_);
 		toolbox_help_panel_.Add(toolbox_help_text_);
 		side_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-		side_.Content().Add(right_box_);
 		header_.SetTitle("Designer - Box/Grid Layout Builder")
 		       .SetSubTitle("Model-first designer skeleton with registered Ui types.")
 		       .SetMedia(DesignerAssetsImg::DESIGNER_LOGO_V5())
@@ -793,7 +794,7 @@ private:
 			RefreshRightPanel();
 		};
 		right_root_.Add(right_mode_bar_).Fit();
-		right_root_.Add(right_stack_).Expand(1);
+		right_root_.Add(side_).Expand(1);
 
 		auto setup_heading = [&](UiLabel& label, const char *text) {
 			UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
@@ -847,6 +848,7 @@ private:
 		code_page_.Add(code_header_).Fit();
 		code_page_.Add(code_scroll_).Expand(1);
 
+		side_.Content().Add(right_stack_.SizePos());
 		right_stack_.AddPage(hierarchy_page_, "hierarchy");
 		right_stack_.AddPage(inspector_page_, "inspector");
 		right_stack_.AddPage(overrides_page_, "overrides");
@@ -874,11 +876,11 @@ private:
 		container_actions_.Add(container_remove_button_).Fixed(DPI(30));
 		container_actions_.Hide();
 		code_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
-		code_scroll_.Content().Add(code_box_);
+		code_scroll_.Content().Add(code_box_.SizePos());
 		code_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
 		code_box_.Add(code_).Fit();
 		hierarchy_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
-		hierarchy_scroll_.Content().Add(hierarchy_);
+		hierarchy_scroll_.Content().Add(hierarchy_.SizePos());
 		RefreshRightModeUi();
 		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
@@ -1748,8 +1750,6 @@ private:
 
 	void SetRightMode(DesignerRightMode mode)
 	{
-		if(right_mode_ == mode)
-			return;
 		if(right_collapsed_)
 			right_collapsed_ = false;
 		right_mode_ = mode;
@@ -1775,33 +1775,29 @@ private:
 	{
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
+		right_box_.Layout();
 		side_.RefreshLayout();
-		side_.Layout();
 		side_.Refresh();
 	}
 
 	void LayoutRightPanel()
 	{
-		int gap = DPI(8);
-		Rect r = right_box_.GetSize();
-		Rect vp = side_.GetViewportRect();
+		Rect r = GetSize();
+		int gap = DPI(10);
+		int header_h = DPI(58);
+		int top_y = gap;
+		int body_y = top_y + header_h + gap;
+		int warning_h = warning_visible_ ? DPI(30) : 0;
+		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int right_w = right_collapsed_
 		    ? max(DPI(48), right_mode_bar_.GetMinSize().cx + DPI(16))
-		    : max(DPI(120), vp.GetWidth() + DPI(5));
-		right_box_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
-		right_root_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
+		    : DPI(365);
+		right_box_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
+		right_root_.SetRect(0, 0, right_box_.GetSize().cx, right_box_.GetSize().cy);
 		right_root_.Layout();
-		right_mode_bar_.Layout();
-		right_stack_.Show(!right_collapsed_);
-		Rect content = right_root_.GetRect();
-		Rect bar = right_mode_bar_.GetRect();
-		content.top = bar.bottom + gap;
-		content.left += gap;
-		content.right -= gap;
-		content.bottom -= gap;
-		right_stack_.SetRect(content);
-		if(!right_collapsed_)
-			right_stack_.Layout();
+		side_.Show(!right_collapsed_);
+		side_.Layout();
+		RefreshCollapseButton();
 	}
 
 	void RefreshCollapseButton()
