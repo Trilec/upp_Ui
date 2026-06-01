@@ -73,6 +73,82 @@ public:
 	}
 };
 
+enum DesignerRightMode {
+	RIGHT_HIERARCHY = 0,
+	RIGHT_INSPECTOR,
+	RIGHT_OVERRIDES,
+	RIGHT_CODE
+};
+
+class DesignerModeButton : public UiButton {
+public:
+	typedef DesignerModeButton CLASSNAME;
+
+	DesignerModeButton()
+	{
+		SetCheckable();
+		ClickFocus(false);
+		NoWantFocus();
+		SetText("");
+		SetIconRenderMode(UiIconRenderMode::MonoTint);
+		SetIconSize(DPI(18), DPI(18));
+		SetContentInset(DPI(4));
+		SetContentGap(DPI(0));
+		SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	}
+
+	DesignerModeButton& SetModeIcon(const Image& icon)
+	{
+		SetIcon(icon);
+		UpdateChrome();
+		return *this;
+	}
+
+	DesignerModeButton& SetActive(bool on)
+	{
+		SetChecked(on);
+		UpdateChrome();
+		return *this;
+	}
+
+	virtual void MouseEnter(Point p, dword keyflags) override
+	{
+		UiButton::MouseEnter(p, keyflags);
+		hover_ = true;
+		UpdateChrome();
+	}
+
+	virtual void MouseLeave() override
+	{
+		UiButton::MouseLeave();
+		hover_ = false;
+		UpdateChrome();
+	}
+
+	virtual void LeftDown(Point p, dword keyflags) override
+	{
+		UiButton::LeftDown(p, keyflags);
+		UpdateChrome();
+	}
+
+	virtual void LeftUp(Point p, dword keyflags) override
+	{
+		UiButton::LeftUp(p, keyflags);
+		UpdateChrome();
+	}
+
+private:
+	void UpdateChrome()
+	{
+		UiRole role = IsChecked() ? UiRole::Accent : hover_ ? UiRole::Standard : UiRole::Subtle;
+		SetCustomStyle(UiTheme::ResolveButton(role));
+		int icon = DPI(IsChecked() ? 21 : hover_ ? 20 : 18);
+		SetIconSize(icon, icon);
+	}
+
+	bool hover_ = false;
+};
+
 static String DesignerNameFromTitle(String text)
 {
 	text = TrimBoth(text);
@@ -265,7 +341,7 @@ public:
 		int body_y = top_y + header_h + gap;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int left_w = DPI(190);
-		int right_w = DPI(360);
+		int right_w = DPI(365);
 		toolbox_panel_.SetRect(gap, body_y, left_w, body_h);
 		preview_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
 		                  max(0, r.Width() - left_w - right_w - gap * 4), body_h);
@@ -648,7 +724,7 @@ private:
 		};
 		hierarchy_.WhenNodeCancel = [=] { CancelToolDrag(); };
 
-		right_box_.Add(right_accordion_);
+		right_box_.Add(right_root_);
 		inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.SetBindingGroup("Theme Overrides");
@@ -664,6 +740,80 @@ private:
 		theme_override_inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
+		right_root_.SetGap(DPI(8)).SetInset(Rect(DPI(8), DPI(8), DPI(8), DPI(8)));
+		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		auto setup_mode_button = [&](DesignerModeButton& button, const Image& icon, const char *tip, DesignerRightMode mode) {
+			button.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+			button.SetModeIcon(icon);
+			button.Tip(tip);
+			button.WhenAction = [=] { SetRightMode(mode); };
+			right_mode_bar_.Add(button).Fixed(DPI(34));
+		};
+		setup_mode_button(hierarchy_mode_button_, ICON_DESIGN_TREE_48(), "Show hierarchy", RIGHT_HIERARCHY);
+		setup_mode_button(inspector_mode_button_, ICON_DESIGN_SLIDERS_48(), "Show inspector", RIGHT_INSPECTOR);
+		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
+		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
+		right_root_.Add(right_mode_bar_).Fit();
+		right_root_.Add(right_stack_).Expand(1);
+
+		auto setup_heading = [&](UiLabel& label, const char *text) {
+			UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
+			s.font = SansSerifZ(11).Bold();
+			s.transparent = true;
+			s.align_h = UiAlign::LEFT;
+			s.align_v = UiAlign::TOP;
+			s.metrics.content_margin = Rect(0, 0, 0, 0);
+			label.SetCustomStyle(s);
+			label.SetText(text).NoWantFocus().IgnoreMouse();
+		};
+		setup_heading(hierarchy_heading_, "HIERARCHY");
+		setup_heading(inspector_heading_, "INSPECTOR");
+		setup_heading(overrides_heading_, "THEME OVERRIDES");
+		setup_heading(code_heading_, "CODE");
+
+		hierarchy_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		inspector_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		overrides_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		code_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		code_header_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(0, 0, 0, 0));
+
+		code_setup_button_.SetText("Setup")
+		                  .SetIcon(ICON_DESIGN_SETTINGS_48())
+		                  .SetIconSize(DPI(14), DPI(14))
+		                  .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                  .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle))
+		                  .NoWantFocus()
+		                  .Tip("Configure UMK path and U++ root");
+		code_build_run_button_.SetText("Build/Run")
+		                     .SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48())
+		                     .SetIconSize(DPI(14), DPI(14))
+		                     .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                     .SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent))
+		                     .NoWantFocus()
+		                     .Tip("Build and run the generated code");
+		code_setup_button_.WhenAction = [=] { ShowBuildSettingsDialog(); };
+		code_build_run_button_.WhenAction = [=] { BuildAndRunGeneratedCode(); };
+
+		code_header_.Add(code_heading_).Expand(1);
+		code_header_.Add(code_setup_button_).Fit();
+		code_header_.Add(code_build_run_button_).Fit();
+
+		hierarchy_page_.Add(hierarchy_heading_).Fit();
+		hierarchy_page_.Add(hierarchy_scroll_).Expand(1);
+		inspector_page_.Add(inspector_heading_).Fit();
+		inspector_page_.Add(container_actions_).Fit();
+		inspector_page_.Add(inspector_).Expand(1);
+		overrides_page_.Add(overrides_heading_).Fit();
+		overrides_page_.Add(theme_override_inspector_).Expand(1);
+		code_page_.Add(code_header_).Fit();
+		code_page_.Add(code_scroll_).Expand(1);
+
+		right_stack_.AddPage(hierarchy_page_, "hierarchy");
+		right_stack_.AddPage(inspector_page_, "inspector");
+		right_stack_.AddPage(overrides_page_, "overrides");
+		right_stack_.AddPage(code_page_, "code");
+		right_stack_.SetActivePage(0);
+
 		container_actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(DPI(8), DPI(4), DPI(8), DPI(4)));
 		container_action_label_.SetText("Pages").NoWantFocus();
 		container_add_button_.SetIcon(ICON_CONTENT_OUTLINED_ADD_48())
@@ -686,28 +836,9 @@ private:
 		code_scroll_.Content().Add(code_box_);
 		code_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
 		code_box_.Add(code_).Fit();
-		right_accordion_.SetSingleOpen(false).SetEnforceOne(false);
-		hierarchy_section_ = right_accordion_.AddSection("HIERARCHY", true);
-		inspector_section_ = right_accordion_.AddSection("INSPECTOR", true);
-		theme_override_section_ = right_accordion_.AddSection("THEME OVERRIDES", false);
-		code_section_ = right_accordion_.AddSection("CODE", false);
 		hierarchy_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
 		hierarchy_scroll_.Content().Add(hierarchy_);
-		right_accordion_.GetSectionContent(hierarchy_section_).Add(hierarchy_scroll_.SizePos());
-		right_accordion_.GetSectionContent(inspector_section_).Add(container_actions_);
-		right_accordion_.GetSectionContent(inspector_section_).Add(inspector_.SizePos());
-		right_accordion_.GetSectionContent(theme_override_section_).Add(theme_override_inspector_.SizePos());
-		right_accordion_.GetSectionContent(code_section_).Add(code_scroll_.SizePos());
-		right_accordion_.WhenSectionToggled = [=](int section, bool open) {
-			PostCallback([=] {
-				if((section == inspector_section_ || section == theme_override_section_) && open)
-					RefreshInspector();
-				else if(section == code_section_ && open)
-					RefreshCode();
-				else
-					RefreshRightPanel();
-			});
-		};
+		RefreshRightModeUi();
 		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
 		toolbox_help_text_.NoWantFocus().IgnoreMouse();
@@ -839,6 +970,10 @@ private:
 				ValueMap cfg = parsed;
 				LoadRecentList(ConfigValue(cfg, "recent_saves"), recent_saves_);
 				LoadRecentList(ConfigValue(cfg, "recent_loads"), recent_loads_);
+				umk_path_ = AsString(ConfigValue(cfg, "umk_path"));
+				u_root_ = AsString(ConfigValue(cfg, "u_root"));
+				if(umk_path_.IsEmpty() && !u_root_.IsEmpty())
+					umk_path_ = InferUmkPath(u_root_);
 			}
 		}
 		SyncRecentDropdowns();
@@ -850,7 +985,133 @@ private:
 		cfg.Set("schema", 1);
 		cfg.Set("recent_saves", StoreRecentList(recent_saves_));
 		cfg.Set("recent_loads", StoreRecentList(recent_loads_));
+		cfg.Set("umk_path", umk_path_);
+		cfg.Set("u_root", u_root_);
 		SaveFile(ConfigFile("DesignerConfig.json"), AsJSON(cfg, true));
+	}
+
+	String InferUmkPath(const String& root) const
+	{
+		if(root.IsEmpty())
+			return String();
+		String p = AppendFileName(root, "umk.exe");
+		if(FileExists(p))
+			return p;
+		String alt = AppendFileName(root, "umk");
+		if(FileExists(alt))
+			return alt;
+		return p;
+	}
+
+	void ShowBuildSettingsDialog()
+	{
+		class BuildSettingsDialog : public TopWindow {
+		public:
+			typedef BuildSettingsDialog CLASSNAME;
+
+			BuildSettingsDialog(String& umk, String& root)
+			    : umk_path_(umk), u_root_(root)
+			{
+				Title("Designer Build Settings");
+				Sizeable().Zoomable();
+				SetRect(0, 0, DPI(560), DPI(190));
+				SetMinSize(Size(DPI(500), DPI(180)));
+
+				Add(box_);
+				box_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(Rect(DPI(12), DPI(12), DPI(12), DPI(12)));
+				box_.Add(info_).Fit();
+				box_.Add(umk_row_).Fit();
+				box_.Add(root_row_).Fit();
+				box_.Add(button_row_).Fit();
+
+				info_.SetText("Configure the UMK executable or U++ root used by Designer build/run actions.")
+				     .SetAlign(UiAlign::LEFT, UiAlign::TOP)
+				     .NoWantFocus();
+
+				umk_label_.SetText("UMK path").NoWantFocus();
+				umk_edit_.SetText(umk_path_.ToWString());
+				umk_browse_.SetText("Browse").SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(14), DPI(14));
+				umk_browse_.WhenAction = [=] { PickUmk(); };
+				umk_row_.Add(umk_label_).Fixed(DPI(96));
+				umk_row_.Add(umk_edit_).Expand(1);
+				umk_row_.Add(umk_browse_).Fixed(DPI(78));
+
+				root_label_.SetText("U++ root").NoWantFocus();
+				root_edit_.SetText(u_root_.ToWString());
+				root_browse_.SetText("Browse").SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(14), DPI(14));
+				root_browse_.WhenAction = [=] { PickRoot(); };
+				root_row_.Add(root_label_).Fixed(DPI(96));
+				root_row_.Add(root_edit_).Expand(1);
+				root_row_.Add(root_browse_).Fixed(DPI(78));
+
+				apply_.SetText("Apply").SetIcon(ICON_ACTION_CHECK_CIRCLE_48()).SetIconSize(DPI(14), DPI(14));
+				cancel_.SetText("Cancel").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48()).SetIconSize(DPI(14), DPI(14));
+				apply_.WhenAction = [=] {
+					umk_path_ = TrimBoth(umk_edit_.GetText().ToString());
+					u_root_ = TrimBoth(root_edit_.GetText().ToString());
+					Break(IDOK);
+				};
+				cancel_.WhenAction = [=] { Break(IDCANCEL); };
+				button_row_.Add(spacer_).Expand(1);
+				button_row_.Add(apply_).Fixed(DPI(82));
+				button_row_.Add(cancel_).Fixed(DPI(82));
+			}
+
+			private:
+			void PickUmk()
+			{
+				FileSel fs;
+				fs.Types("Executable files\t*.exe").AllFilesType();
+				if(fs.ExecuteOpen("Select umk.exe"))
+					umk_edit_.SetText((~fs).ToWString());
+			}
+
+			void PickRoot()
+			{
+				FileSel fs;
+				if(fs.ExecuteSelectDir("Select U++ root"))
+					root_edit_.SetText((~fs).ToWString());
+			}
+
+			String& umk_path_;
+			String& u_root_;
+			UiBoxLayout box_ { UiDirection::V };
+			UiLabel info_;
+			UiBoxLayout umk_row_ { UiDirection::H };
+			UiBoxLayout root_row_ { UiDirection::H };
+			UiBoxLayout button_row_ { UiDirection::H };
+			UiLabel umk_label_;
+			UiLineEdit umk_edit_;
+			UiButton umk_browse_;
+			UiLabel root_label_;
+			UiLineEdit root_edit_;
+			UiButton root_browse_;
+			UiLabel spacer_;
+			UiButton apply_;
+			UiButton cancel_;
+		};
+
+		String umk = umk_path_;
+		String root = u_root_;
+		BuildSettingsDialog dlg(umk, root);
+		if(dlg.Run() == IDOK) {
+			umk_path_ = umk;
+			u_root_ = root;
+			if(umk_path_.IsEmpty() && !u_root_.IsEmpty())
+				umk_path_ = InferUmkPath(u_root_);
+			StoreRecentFiles();
+		}
+	}
+
+	void BuildAndRunGeneratedCode()
+	{
+		if(umk_path_.IsEmpty() && u_root_.IsEmpty())
+			ShowBuildSettingsDialog();
+		if(umk_path_.IsEmpty() && u_root_.IsEmpty()) {
+			Exclamation("Set an UMK path or U++ root first.");
+			return;
+		}
+		Exclamation("Build/Run is not wired up yet.\n\nThe right-panel code actions and persisted setup paths are in place, but the actual project build/run step needs one more pass.");
 	}
 
 	Value ConfigValue(const ValueMap& cfg, const String& key) const
@@ -1444,73 +1705,30 @@ private:
 		});
 	}
 
-	void SyncAccordionBodyHeights()
+	void SetRightMode(DesignerRightMode mode)
 	{
-		if(hierarchy_section_ < 0 || inspector_section_ < 0 || theme_override_section_ < 0 || code_section_ < 0)
+		if(right_mode_ == mode)
 			return;
-		int body_w = max(DPI(120), right_accordion_.GetSize().cx - DPI(18));
-		inspector_.Layout();
-		theme_override_inspector_.Layout();
-		int hierarchy_h = DPI(255);
-		int actions_h = container_actions_.IsShown() ? DPI(34) : 0;
-		int inspector_h = max(DPI(44), inspector_.MeasureHeightForWidth(body_w)) + actions_h;
-		int overrides_h = max(DPI(44), theme_override_inspector_.MeasureHeightForWidth(body_w));
-		int code_h = DPI(320);
-		right_accordion_.SetSectionBodyHeight(hierarchy_section_, hierarchy_h);
-		right_accordion_.SetSectionBodyHeight(inspector_section_, inspector_h);
-		right_accordion_.SetSectionBodyHeight(theme_override_section_, overrides_h);
-		right_accordion_.SetSectionBodyHeight(code_section_, code_h);
+		right_mode_ = mode;
+		RefreshRightModeUi();
 	}
 
-	void LayoutAccordionBodies()
+	void RefreshRightModeUi()
 	{
-		if(hierarchy_section_ < 0 || inspector_section_ < 0 || theme_override_section_ < 0 || code_section_ < 0)
-			return;
-		ParentCtrl& hierarchy_content = right_accordion_.GetSectionContent(hierarchy_section_);
-		ParentCtrl& inspector_content = right_accordion_.GetSectionContent(inspector_section_);
-		ParentCtrl& overrides_content = right_accordion_.GetSectionContent(theme_override_section_);
-		ParentCtrl& code_content = right_accordion_.GetSectionContent(code_section_);
-		Size hsz = hierarchy_content.GetSize();
-		Size isz = inspector_content.GetSize();
-		Size osz = overrides_content.GetSize();
-		Size csz = code_content.GetSize();
-		int hw = max(DPI(120), hsz.cx);
-		int hh = max(DPI(120), hsz.cy);
-		int iw = max(DPI(120), isz.cx);
-		int ow = max(DPI(120), osz.cx);
-		int cw = max(DPI(120), csz.cx);
-		int actions_h = container_actions_.IsShown() ? DPI(34) : 0;
-		int ih = max(DPI(44), inspector_.MeasureHeightForWidth(iw));
-		int oh = max(DPI(44), theme_override_inspector_.MeasureHeightForWidth(ow));
-		int ch = max(DPI(120), csz.cy);
-		Size code_size = code_.GetContentSize();
-		int code_inner_w = max(cw, code_size.cx + DPI(18));
-		int code_inner_h = max(ch, code_size.cy + DPI(18));
-		Size hierarchy_size = hierarchy_.GetContentSize();
-		int hierarchy_inner_w = max(hw, hierarchy_size.cx + DPI(18));
-		int hierarchy_inner_h = max(hh + DPI(20), hierarchy_size.cy + DPI(38));
-		hierarchy_scroll_.SetRect(0, 0, hw, hh);
-		hierarchy_.SetRect(0, 0, hierarchy_inner_w, hierarchy_inner_h);
-		if(container_actions_.IsShown())
-			container_actions_.SetRect(0, 0, iw, actions_h);
-		inspector_.SetRect(0, actions_h, iw, ih);
-		theme_override_inspector_.SetRect(0, 0, ow, oh);
-		code_scroll_.SetRect(0, 0, cw, ch);
-		code_box_.SetRect(0, 0, code_inner_w, code_inner_h);
-		hierarchy_.Layout();
-		hierarchy_scroll_.Layout();
-		inspector_.Layout();
-		theme_override_inspector_.Layout();
-		code_box_.Layout();
-		code_scroll_.Layout();
+		hierarchy_mode_button_.SetActive(right_mode_ == RIGHT_HIERARCHY);
+		inspector_mode_button_.SetActive(right_mode_ == RIGHT_INSPECTOR);
+		overrides_mode_button_.SetActive(right_mode_ == RIGHT_OVERRIDES);
+		code_mode_button_.SetActive(right_mode_ == RIGHT_CODE);
+		right_stack_.SetActivePage((int)right_mode_);
+		if(right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES)
+			RefreshInspector();
+		if(right_mode_ == RIGHT_CODE)
+			RefreshCode();
+		LayoutRightPanel();
 	}
 
 	void RefreshRightPanel()
 	{
-		SyncAccordionBodyHeights();
-		right_accordion_.RefreshLayout();
-		right_accordion_.Layout();
-		LayoutAccordionBodies();
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
 		side_.RefreshLayout();
@@ -1522,18 +1740,13 @@ private:
 	{
 		int gap = DPI(8);
 		Rect r = right_box_.GetSize();
-		int y = gap;
-		int accordion_w = max(0, r.GetWidth() - gap * 2);
-		right_accordion_.SetRect(gap, y, accordion_w, max(DPI(320), r.GetHeight() - y - gap));
-		SyncAccordionBodyHeights();
-		right_accordion_.RefreshLayout();
-		int accordion_h = max(DPI(320), right_accordion_.GetMinSize().cy);
-		right_accordion_.SetRect(gap, y, accordion_w, accordion_h);
-		right_accordion_.Layout();
-		LayoutAccordionBodies();
-		int content_h = y + accordion_h + gap;
 		Rect vp = side_.GetViewportRect();
-		right_box_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), content_h));
+		int right_w = max(DPI(120), vp.GetWidth() + DPI(5));
+		right_box_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
+		right_root_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
+		right_root_.Layout();
+		right_mode_bar_.Layout();
+		right_stack_.Layout();
 	}
 
 	void StoreHierarchyExpandedState()
@@ -2482,35 +2695,6 @@ private:
 		warn_text_style.font = SansSerifZ(11);
 		warning_text_.SetCustomStyle(warn_text_style);
 		right_box_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-		UiAccordion::Style accordion_style = UiAccordion::StyleDefault();
-		UiPanel::Style accordion_panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
-		accordion_style.palette = accordion_panel.palette;
-		accordion_style.metrics = accordion_panel.metrics;
-		accordion_style.metrics.radius = max(DPI(8), accordion_style.metrics.radius);
-		accordion_style.metrics.frame_enabled = true;
-		accordion_style.metrics.face_enabled = true;
-		accordion_style.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
-		accordion_style.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-		accordion_style.header_style.hover_enabled = false;
-		accordion_style.header_style.metrics.focus_enabled = false;
-		accordion_style.header_style.title_line = false;
-		accordion_style.header_style.card_line = true;
-		accordion_style.header_style.media_tint_mono = true;
-		accordion_style.header_style.title_font = SansSerifZ(11).Bold();
-		accordion_style.header_style.subtitle_font = SansSerifZ(8);
-		accordion_style.animation_enabled = false;
-		accordion_style.anim_open_ms = 0;
-		accordion_style.anim_close_ms = 0;
-		accordion_style.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
-		accordion_style.body_style.transparent = true;
-		accordion_style.body_style.metrics.face_enabled = false;
-		accordion_style.body_style.metrics.frame_enabled = false;
-		accordion_style.body_style.metrics.frame_width = 0;
-		accordion_style.body_style.metrics.radius = 0;
-		accordion_style.body_style.metrics.focus_enabled = false;
-		accordion_style.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
-		accordion_style.body_style.metrics.shadow.enabled = false;
-		right_accordion_.SetCustomStyle(accordion_style);
 		UiScrollPanel::Style code_scroll_style = UiScrollPanel::StyleDefault();
 		for(int i = 0; i < 4; i++) {
 			code_scroll_style.palette.face[i] = UiFill::Solid(Color(20, 20, 20));
@@ -2570,16 +2754,29 @@ private:
 	UiLabel warning_text_;
 	UiScrollPanel side_;
 	UiPanel right_box_;
+	UiBoxLayout right_root_ { UiDirection::V };
+	UiBoxLayout right_mode_bar_ { UiDirection::H };
+	UiStack right_stack_;
+	UiBoxLayout hierarchy_page_ { UiDirection::V };
+	UiBoxLayout inspector_page_ { UiDirection::V };
+	UiBoxLayout overrides_page_ { UiDirection::V };
+	UiBoxLayout code_page_ { UiDirection::V };
+	UiBoxLayout code_header_ { UiDirection::H };
+	UiLabel hierarchy_heading_;
+	UiLabel inspector_heading_;
+	UiLabel overrides_heading_;
+	UiLabel code_heading_;
+	DesignerModeButton hierarchy_mode_button_;
+	DesignerModeButton inspector_mode_button_;
+	DesignerModeButton overrides_mode_button_;
+	DesignerModeButton code_mode_button_;
+	UiButton code_setup_button_;
+	UiButton code_build_run_button_;
 	UiScrollPanel hierarchy_scroll_;
 	DesignerHierarchyTree hierarchy_;
 	UiTreeModel hierarchy_model_;
 	VectorMap<DesignerNodeId, UiTreeNodeRef> hierarchy_refs_;
 	bool syncing_hierarchy_ = false;
-	UiAccordion right_accordion_;
-	int hierarchy_section_ = -1;
-	int inspector_section_ = -1;
-	int theme_override_section_ = -1;
-	int code_section_ = -1;
 	UiBoxLayout container_actions_ { UiDirection::H };
 	UiLabel container_action_label_;
 	UiButton container_add_button_;
@@ -2606,9 +2803,12 @@ private:
 	bool syncing_recent_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
 	int active_toolbox_category_ = 0;
+	DesignerRightMode right_mode_ = RIGHT_HIERARCHY;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;
 	Vector<String> recent_saves_;
 	Vector<String> recent_loads_;
+	String umk_path_;
+	String u_root_;
 };
 
 }
