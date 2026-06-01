@@ -91,7 +91,9 @@ public:
 		NoWantFocus();
 		SetText("");
 		SetIconRenderMode(UiIconRenderMode::MonoTint);
-		SetIconSize(DPI(18), DPI(18));
+		target_icon_size_ = 18;
+		current_icon_size_ = 18;
+		SetIconSize(DPI(current_icon_size_), DPI(current_icon_size_));
 		SetContentInset(DPI(4));
 		SetContentGap(DPI(0));
 		SetAlign(UiAlign::CENTER, UiAlign::CENTER);
@@ -141,12 +143,39 @@ private:
 	void UpdateChrome()
 	{
 		UiRole role = IsChecked() ? UiRole::Accent : hover_ ? UiRole::Standard : UiRole::Subtle;
-		SetCustomStyle(UiTheme::ResolveButton(role));
-		int icon = DPI(IsChecked() ? 21 : hover_ ? 20 : 18);
-		SetIconSize(icon, icon);
+		UiButton::Style s = UiTheme::ResolveButton(role);
+		s.metrics.focus_enabled = false;
+		SetCustomStyle(s);
+		target_icon_size_ = IsChecked() ? 21 : hover_ ? 20 : 18;
+		StartIconAnimation();
+	}
+
+	void StartIconAnimation()
+	{
+		if(animating_)
+			return;
+		animating_ = true;
+		SetTimeCallback(16, [=] { AnimateIconStep(); });
+	}
+
+	void AnimateIconStep()
+	{
+		if(current_icon_size_ < target_icon_size_)
+			++current_icon_size_;
+		else if(current_icon_size_ > target_icon_size_)
+			--current_icon_size_;
+		SetIconSize(DPI(current_icon_size_), DPI(current_icon_size_));
+		Refresh();
+		if(current_icon_size_ != target_icon_size_)
+			SetTimeCallback(16, [=] { AnimateIconStep(); });
+		else
+			animating_ = false;
 	}
 
 	bool hover_ = false;
+	bool animating_ = false;
+	int current_icon_size_ = 18;
+	int target_icon_size_ = 18;
 };
 
 static String DesignerNameFromTitle(String text)
@@ -724,7 +753,7 @@ private:
 		};
 		hierarchy_.WhenNodeCancel = [=] { CancelToolDrag(); };
 
-		right_box_.Add(right_root_);
+		right_box_.Add(right_root_.SizePos());
 		inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.SetBindingGroup("Theme Overrides");
@@ -753,6 +782,16 @@ private:
 		setup_mode_button(inspector_mode_button_, ICON_DESIGN_SLIDERS_48(), "Show inspector", RIGHT_INSPECTOR);
 		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
 		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
+		collapse_button_.SetText("")
+		                .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle))
+		                .NoWantFocus()
+		                .ClickFocus(false);
+		collapse_button_.WhenAction = [=] {
+			right_collapsed_ = !right_collapsed_;
+			RefreshCollapseButton();
+			RefreshRightPanel();
+		};
 		right_root_.Add(right_mode_bar_).Fit();
 		right_root_.Add(right_stack_).Expand(1);
 
@@ -813,6 +852,8 @@ private:
 		right_stack_.AddPage(overrides_page_, "overrides");
 		right_stack_.AddPage(code_page_, "code");
 		right_stack_.SetActivePage(0);
+		right_mode_bar_.Add(collapse_button_).Fixed(DPI(34));
+		RefreshCollapseButton();
 
 		container_actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(DPI(8), DPI(4), DPI(8), DPI(4)));
 		container_action_label_.SetText("Pages").NoWantFocus();
@@ -1709,6 +1750,8 @@ private:
 	{
 		if(right_mode_ == mode)
 			return;
+		if(right_collapsed_)
+			right_collapsed_ = false;
 		right_mode_ = mode;
 		RefreshRightModeUi();
 	}
@@ -1720,6 +1763,7 @@ private:
 		overrides_mode_button_.SetActive(right_mode_ == RIGHT_OVERRIDES);
 		code_mode_button_.SetActive(right_mode_ == RIGHT_CODE);
 		right_stack_.SetActivePage((int)right_mode_);
+		RefreshCollapseButton();
 		if(right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES)
 			RefreshInspector();
 		if(right_mode_ == RIGHT_CODE)
@@ -1741,12 +1785,35 @@ private:
 		int gap = DPI(8);
 		Rect r = right_box_.GetSize();
 		Rect vp = side_.GetViewportRect();
-		int right_w = max(DPI(120), vp.GetWidth() + DPI(5));
+		int right_w = right_collapsed_
+		    ? max(DPI(48), right_mode_bar_.GetMinSize().cx + DPI(16))
+		    : max(DPI(120), vp.GetWidth() + DPI(5));
 		right_box_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
 		right_root_.SetRect(0, 0, right_w, max(vp.GetHeight(), right_root_.GetMinSize().cy));
 		right_root_.Layout();
 		right_mode_bar_.Layout();
-		right_stack_.Layout();
+		right_stack_.Show(!right_collapsed_);
+		Rect content = right_root_.GetRect();
+		Rect bar = right_mode_bar_.GetRect();
+		content.top = bar.bottom + gap;
+		content.left += gap;
+		content.right -= gap;
+		content.bottom -= gap;
+		right_stack_.SetRect(content);
+		if(!right_collapsed_)
+			right_stack_.Layout();
+	}
+
+	void RefreshCollapseButton()
+	{
+		UiButton::Style s = UiTheme::ResolveButton(UiRole::Subtle);
+		s.metrics.focus_enabled = false;
+		collapse_button_.SetCustomStyle(s);
+		collapse_button_.SetIconRenderMode(UiIconRenderMode::MonoTint);
+		collapse_button_.SetIconSize(DPI(18), DPI(18));
+		collapse_button_.SetIcon(right_collapsed_ ? ICON_NAVIGATION_OUTLINED_ARROW_RIGHT_48()
+		                                          : ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48());
+		collapse_button_.Tip(right_collapsed_ ? "Expand right panel" : "Collapse right panel");
 	}
 
 	void StoreHierarchyExpandedState()
@@ -2770,6 +2837,7 @@ private:
 	DesignerModeButton inspector_mode_button_;
 	DesignerModeButton overrides_mode_button_;
 	DesignerModeButton code_mode_button_;
+	UiButton collapse_button_;
 	UiButton code_setup_button_;
 	UiButton code_build_run_button_;
 	UiScrollPanel hierarchy_scroll_;
@@ -2777,6 +2845,7 @@ private:
 	UiTreeModel hierarchy_model_;
 	VectorMap<DesignerNodeId, UiTreeNodeRef> hierarchy_refs_;
 	bool syncing_hierarchy_ = false;
+	bool right_collapsed_ = false;
 	UiBoxLayout container_actions_ { UiDirection::H };
 	UiLabel container_action_label_;
 	UiButton container_add_button_;
