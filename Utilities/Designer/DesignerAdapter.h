@@ -71,9 +71,9 @@ public:
 	                             const String& api_call, const String& help, int min_value, int max_value);
 	void Disable(const String& id, const String& reason);
 	void Hide(const String& id);
+	DesignerApiBinding* Find(const String& id);
 
 private:
-	DesignerApiBinding* Find(const String& id);
 	Vector<DesignerApiBinding>& out;
 };
 
