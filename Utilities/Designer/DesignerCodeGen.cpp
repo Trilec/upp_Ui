@@ -980,6 +980,32 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 			out << "\t\t\ts.thumb_main = DPI(" << thumb_h << ");\n"
 			    << "\t\t\ts.thumb_cross = DPI(" << thumb_w << ");\n";
 		}
+		String grip_visual = CodeGenNodeProperty(n, "grip_visual", "");
+		if(grip_visual.IsEmpty()) {
+			if(CodeGenHasProperty(n, "show_grip") && !(bool)CodeGenNodeProperty(n, "show_grip", true))
+				grip_visual = "None";
+			else if(!IconExpr(CodeGenNodeProperty(n, "thumb_icon", "None")).IsEmpty())
+				grip_visual = "Icon";
+			else
+				grip_visual = "Lines";
+		}
+		out << "\t\t\ts.grip_visual = " << (grip_visual == "None" ? "UISPLITTER_GRIP_NONE"
+		                                    : grip_visual == "Dots" ? "UISPLITTER_GRIP_DOTS"
+		                                    : grip_visual == "Icon" ? "UISPLITTER_GRIP_ICON"
+		                                    : "UISPLITTER_GRIP_LINES") << ";\n"
+		    << "\t\t\ts.grip_count = " << max(1, (int)CodeGenNodeProperty(n, "grip_count", 2)) << ";\n"
+		    << "\t\t\ts.grip_size = DPI(" << max(1, (int)CodeGenNodeProperty(n, "grip_size", 2)) << ");\n"
+		    << "\t\t\ts.grip_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "grip_gap", 3)) << ");\n";
+		if(CodeGenHasProperty(n, "grip_color_enabled") && (bool)CodeGenNodeProperty(n, "grip_color_enabled", false))
+			out << "\t\t\ts.grip_color = " << ColorExpr(CodeGenNodeProperty(n, "grip_color", Null)) << ";\n";
+		else
+			out << "\t\t\ts.grip_color = Null;\n";
+		String icon = IconExpr(CodeGenNodeProperty(n, "thumb_icon", "None"));
+		if(!icon.IsEmpty()) {
+			out << "\t\t\ts.thumb_icon = " << icon << ";\n"
+			    << "\t\t\ts.grip_visual = UISPLITTER_GRIP_ICON;\n";
+		}
+		out << "\t\t\ts.thumb_icon_size = DPI(" << max(1, (int)CodeGenNodeProperty(n, "thumb_icon_size", 14)) << ");\n";
 		out << "\t\t\ts.thumb_metrics.radius = DPI(" << (int)CodeGenNodeProperty(n, "thumb_radius", 8) << ");\n"
 		    << "\t\t\t" << var << ".SetCustomStyle(s);\n"
 		    << "\t\t}\n";

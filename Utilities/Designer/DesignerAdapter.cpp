@@ -896,7 +896,7 @@ static void SetToggleThemeDefaults(DesignerApiBinding& track_face_enabled, Desig
 // UiLabel          | yes              | face/frame/radius/ink/icon | content layout stays separate from theme overrides
 // UiCheckBox       | yes              | text + indicator face/frame/tick | inspector only exposes useful visual parts
 // UiToggle         | yes              | track/thumb face/frame  | part-specific overrides only
-// UiSlider         | yes              | face/frame/radius      | track/thumb preview must honor explicit override flag
+// UiSlider         | yes              | track face/frame/radius | track thumb still follows current runtime theme path
 // UiDropdown       | yes              | face/frame/radius/ink  | popup chrome uses shared edit/dropdown styling
 // UiLineEdit       | yes              | face/frame/radius/ink/placeholder | edit-family shared surface
 // UiIntEdit        | yes              | face/frame/radius/ink/placeholder | edit-family shared surface
@@ -1337,8 +1337,26 @@ void DesignerSliderAdapter::SetOverlayState(const DesignerOverlayState& state)
 void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
 {
 	AddCommonBindings(out, node);
-	DesignerApiBuilder(out).AddInt("value", "Value", DesignerEditorKind::Slider, "UiSlider::SetValue",
-	                                 "Sets the preview slider value. Full slider API is intentionally not exposed yet.", 0, 100);
+	DesignerApiBuilder b(out);
+	b.Hide("face_mode");
+	b.Hide("face_quad");
+	b.Hide("face_enabled");
+	b.Hide("face");
+	b.Hide("frame_enabled");
+	b.Hide("frame");
+	b.Hide("radius");
+	b.Add("face_enabled", "Track face", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
+	      "Uses Track face as an explicit track fill override.").group = "Theme Overrides";
+	b.Add("face", "Track face", DesignerEditorKind::Color, "explicit designer appearance",
+	      "Explicit track fill color used when theme overrides are enabled.").group = "Theme Overrides";
+	b.Add("frame_enabled", "Track frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
+	      "Uses Track frame as an explicit track frame override. The thumb preview still derives from this color in the current slider runtime path.").group = "Theme Overrides";
+	b.Add("frame", "Track frame", DesignerEditorKind::Color, "explicit designer appearance",
+	      "Explicit track frame color used when theme overrides are enabled. The thumb preview still derives from this color in the current slider runtime path.").group = "Theme Overrides";
+	b.AddInt("radius", "Track radius", DesignerEditorKind::Slider, "explicit designer appearance",
+	         "Explicit track corner radius used when theme overrides are enabled.", 0, 64).group = "Theme Overrides";
+	b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiSlider::SetValue",
+	         "Sets the preview slider value. Full slider API is intentionally not exposed yet.", 0, 100);
 }
 
 void DesignerSliderAdapter::Paint(Draw& w)
@@ -1603,7 +1621,7 @@ void DesignerLineEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	             {"Times New Roman", "Times New Roman"}, {"Consolas", "Consolas"}, {"Courier New", "Courier New"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
-	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	                                             "UiBaseEdit::Style::palette.ink",
 	                                             "Enables an explicit edit text color override.");
 	text_ink_enabled.group = "Theme Overrides";
@@ -1611,7 +1629,7 @@ void DesignerLineEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	                                     "UiBaseEdit::Style::palette.ink",
 	                                     "Explicit edit text color used when theme overrides are active.");
 	text_ink.group = "Theme Overrides";
-	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Use placeholder color", DesignerEditorKind::Bool,
 	                                                   "UiBaseEdit::Style::placeholder_ink",
 	                                                   "Enables an explicit placeholder text color override.");
 	placeholder_ink_enabled.group = "Theme Overrides";
@@ -1661,7 +1679,7 @@ void DesignerIntEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const 
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
-	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	                                             "UiBaseEdit::Style::palette.ink",
 	                                             "Enables an explicit edit text color override.");
 	text_ink_enabled.group = "Theme Overrides";
@@ -1669,7 +1687,7 @@ void DesignerIntEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const 
 	                                     "UiBaseEdit::Style::palette.ink",
 	                                     "Explicit edit text color used when theme overrides are active.");
 	text_ink.group = "Theme Overrides";
-	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Use placeholder color", DesignerEditorKind::Bool,
 	                                                   "UiBaseEdit::Style::placeholder_ink",
 	                                                   "Enables an explicit placeholder text color override.");
 	placeholder_ink_enabled.group = "Theme Overrides";
@@ -1721,7 +1739,7 @@ void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
 	         "Preview edit font size.", 7, 32);
-	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	                                             "UiBaseEdit::Style::palette.ink",
 	                                             "Enables an explicit edit text color override.");
 	text_ink_enabled.group = "Theme Overrides";
@@ -1729,7 +1747,7 @@ void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	                                     "UiBaseEdit::Style::palette.ink",
 	                                     "Explicit edit text color used when theme overrides are active.");
 	text_ink.group = "Theme Overrides";
-	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Placeholder color", DesignerEditorKind::Bool,
+	DesignerApiBinding& placeholder_ink_enabled = b.Add("placeholder_ink_enabled", "Use placeholder color", DesignerEditorKind::Bool,
 	                                                   "UiBaseEdit::Style::placeholder_ink",
 	                                                   "Enables an explicit placeholder text color override.");
 	placeholder_ink_enabled.group = "Theme Overrides";
@@ -1854,7 +1872,7 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	             {"Times New Roman", "Times New Roman"}, {"Consolas", "Consolas"}, {"Courier New", "Courier New"}});
 	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiDropdown::Style::font",
 	         "Preview dropdown font size.", 7, 32);
-	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Text color", DesignerEditorKind::Bool,
+	DesignerApiBinding& text_ink_enabled = b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	                                             "UiDropdown::Style::palette.ink",
 	                                             "Enables an explicit dropdown text color override.");
 	text_ink_enabled.group = "Theme Overrides";
@@ -2760,9 +2778,37 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 		s.thumb_main = thumb_h;
 		s.thumb_cross = thumb_w;
 	}
-	s.thumb_icon = Image();
+	String grip_visual = AdapterNodeProperty(node, "grip_visual", "");
+	bool has_thumb_icon = DesignerHasProperty(node, "thumb_icon");
+	bool show_grip = DesignerHasProperty(node, "show_grip") ? (bool)AdapterNodeProperty(node, "show_grip", true) : true;
+	if(grip_visual.IsEmpty()) {
+		if(show_grip)
+			grip_visual = has_thumb_icon && AdapterNodeProperty(node, "thumb_icon", "None") != "None" ? "Icon" : "Lines";
+		else
+			grip_visual = "None";
+	}
+	if(grip_visual == "None")
+		s.grip_visual = UISPLITTER_GRIP_NONE;
+	else if(grip_visual == "Dots")
+		s.grip_visual = UISPLITTER_GRIP_DOTS;
+	else if(grip_visual == "Icon")
+		s.grip_visual = UISPLITTER_GRIP_ICON;
+	else
+		s.grip_visual = UISPLITTER_GRIP_LINES;
+	s.grip_count = max(1, (int)AdapterNodeProperty(node, "grip_count", 2));
+	s.grip_size = DPI(max(1, (int)AdapterNodeProperty(node, "grip_size", 2)));
+	s.grip_gap = DPI(max(0, (int)AdapterNodeProperty(node, "grip_gap", 3)));
+	s.grip_color = DesignerBoolProperty(node, "grip_color_enabled", false)
+	             ? GetColorProperty(node, "grip_color", Null)
+	             : Null;
+	if(!has_thumb_icon || AdapterNodeProperty(node, "thumb_icon", "None") == "None")
+		s.thumb_icon = Image();
+	else
+		s.thumb_icon = DesignerIconChoice(node, "thumb_icon");
+	if(!IsNull(s.thumb_icon))
+		s.grip_visual = UISPLITTER_GRIP_ICON;
+	s.thumb_icon_size = DPI((int)AdapterNodeProperty(node, "thumb_icon_size", 14));
 	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", 8));
-	s.label.Clear();
 	SetCustomStyle(s);
 	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 80)));
 	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 80)));
@@ -2802,10 +2848,38 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	         "Visible splitter track thickness.", 1, 18);
 	b.AddInt("track_inset", "Track inset", DesignerEditorKind::Slider, "UiSplitter::Style::track_inset",
 	         "Inset applied to the visible track.", 0, 32);
+	b.AddChoice("grip_visual", "Grip visual", "UiSplitterGripVisual",
+	            "Which splitter affordance to draw.",
+	            {{"None", "None"}, {"Lines", "Lines"}, {"Dots", "Dots"}, {"Icon", "Icon"}});
+	b.AddInt("grip_count", "Grip count", DesignerEditorKind::Slider, "UiSplitter::Style::grip_count",
+	         "Number of grip elements drawn in the selected visual mode.", 1, 6);
+	b.AddInt("grip_size", "Grip size", DesignerEditorKind::Slider, "UiSplitter::Style::grip_size",
+	         "Thickness or dot diameter used by the grip visual.", 1, 8);
+	b.AddInt("grip_gap", "Grip gap", DesignerEditorKind::Slider, "UiSplitter::Style::grip_gap",
+	         "Spacing between grip elements.", 0, 12);
+	DesignerApiBinding& grip_color_enabled = b.Add("grip_color_enabled", "Use grip color", DesignerEditorKind::Bool,
+	                                              "UiSplitter::Style::grip_color",
+	                                              "Enables an explicit splitter grip color override.");
+	grip_color_enabled.group = "Theme Overrides";
+	DesignerApiBinding& grip_color = b.Add("grip_color", "Grip color", DesignerEditorKind::Color,
+	                                     "UiSplitter::Style::grip_color",
+	                                     "Explicit splitter grip color used when theme overrides are active.");
+	grip_color.group = "Theme Overrides";
 	b.AddInt("thumb_width", "Thumb width", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_cross/main",
 	         "Visual thumb width in screen orientation.", 4, 80);
 	b.AddInt("thumb_height", "Thumb height", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_main/cross",
 	         "Visual thumb height in screen orientation.", 12, 180);
+	DesignerApiBinding& thumb_icon = b.Add("thumb_icon", "Thumb icon", DesignerEditorKind::Choice,
+	                                       "UiSplitter::SetThumbIcon",
+	                                       "Icon used when Grip visual is Icon; otherwise ignored.");
+	thumb_icon.choices.Add("None", "None");
+	{
+		const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
+		for(int i = 0; i < catalog.GetCount(); i++)
+			thumb_icon.choices.Add(catalog[i].name, catalog[i].display_name);
+	}
+	b.AddInt("thumb_icon_size", "Thumb icon size", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_icon_size",
+	         "Icon size used when Grip visual is Icon.", 8, 64);
 	b.AddInt("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_metrics.radius",
 	         "Corner radius for the splitter thumb.", 0, 32);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "designer overlay",

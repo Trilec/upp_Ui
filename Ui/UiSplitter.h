@@ -31,6 +31,7 @@
     - 2026-05: initial Ui style-system splitter.
     - 2026-05: public split position API uses percentages; raw internal split
       units stay private.
+    - 2026-06: added explicit grip visuals for lines, dots, and icon modes.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -38,6 +39,13 @@
 #include <Ui/UiDraw.h>
 
 namespace Upp {
+
+enum UiSplitterGripVisual {
+    UISPLITTER_GRIP_NONE,
+    UISPLITTER_GRIP_LINES,
+    UISPLITTER_GRIP_DOTS,
+    UISPLITTER_GRIP_ICON,
+};
 
 class UiSplitter : public Ctrl, public CtrlStyled<UiSplitter> {
 public:
@@ -65,10 +73,14 @@ public:
         Rect thumb_inset = Rect(0, 0, 0, 0);
         bool paint_background = false;
         bool show_grip = true;
+        UiSplitterGripVisual grip_visual = UISPLITTER_GRIP_LINES;
+        int  grip_count = 2;
+        int  grip_size = DPI(2);
+        int  grip_gap = DPI(3);
+        Color grip_color = Null;
         int  grip_dot_count = 6;
         int  grip_dot_gap = DPI(3);
         int  grip_dot_size = DPI(2);
-        Color grip_color = Null;
 
         String label;
         Font   label_font;
@@ -80,6 +92,8 @@ public:
 
         void Serialize(Stream& s)
         {
+            int version = 2;
+            s / version;
             s % track_palette
               % track_metrics
               % track_skin
@@ -96,18 +110,37 @@ public:
               % thumb_cross
               % thumb_inset
               % paint_background
-              % show_grip
-              % grip_dot_count
-              % grip_dot_gap
-              % grip_dot_size
-              % grip_color
-              % label
+              % show_grip;
+            if(version >= 2) {
+                int gv = (int)grip_visual;
+                s % gv
+                  % grip_count
+                  % grip_size
+                  % grip_gap
+                  % grip_color;
+                if(s.IsLoading())
+                    grip_visual = (UiSplitterGripVisual)minmax(gv, (int)UISPLITTER_GRIP_NONE, (int)UISPLITTER_GRIP_ICON);
+            }
+            else {
+                s % grip_dot_count
+                  % grip_dot_gap
+                  % grip_dot_size
+                  % grip_color;
+                if(s.IsLoading())
+                    grip_visual = show_grip ? UISPLITTER_GRIP_DOTS : UISPLITTER_GRIP_NONE;
+                grip_count = grip_dot_count > 0 ? grip_dot_count : 2;
+                grip_size = grip_dot_size > 0 ? grip_dot_size : DPI(2);
+                grip_gap = grip_dot_gap > 0 ? grip_dot_gap : DPI(3);
+            }
+            s % label
               % label_font
               % label_color
               % label_gap
               % thumb_icon
               % thumb_icon_size
               % thumb_icon_render_mode;
+            if(version < 2 && s.IsLoading() && !IsNull(thumb_icon))
+                grip_visual = UISPLITTER_GRIP_ICON;
         }
     };
 
@@ -202,6 +235,12 @@ public:
     UiSplitter& SetMinPixels(int i, int w) { minpx_.At(i, 0) = w; SyncMin(); return *this; }
     UiSplitter& SetLabel(const String& s);
     UiSplitter& SetThumbIcon(const Image& img);
+    UiSplitter& SetGripVisual(UiSplitterGripVisual visual);
+    UiSplitterGripVisual GetGripVisual() const { return GetEffectiveStyle().grip_visual; }
+    UiSplitter& SetGripCount(int count);
+    UiSplitter& SetGripSize(int size);
+    UiSplitter& SetGripGap(int gap);
+    UiSplitter& SetGripColor(Color c);
     UiSplitter& SetThumbSize(int main, int cross);
     UiSplitter& SetThumbSizePixels(int width, int height);
     UiSplitter& SetTrackThickness(int px);

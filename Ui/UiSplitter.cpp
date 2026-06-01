@@ -55,10 +55,14 @@ const UiSplitter::Style& UiSplitter::StyleDefault()
         s.thumb_inset = Rect(0, 0, 0, 0);
         s.paint_background = false;
         s.show_grip = true;
+        s.grip_visual = UISPLITTER_GRIP_LINES;
+        s.grip_count = 2;
+        s.grip_size = DPI(2);
+        s.grip_gap = DPI(3);
+        s.grip_color = Null;
         s.grip_dot_count = 6;
         s.grip_dot_gap = DPI(3);
         s.grip_dot_size = DPI(2);
-        s.grip_color = Null;
         s.label_font = SansSerifZ(11);
         s.label_color = Null;
         s.label_gap = DPI(6);
@@ -301,45 +305,92 @@ void UiSplitter::Layout()
 void UiSplitter::PaintGrip(Draw& w, const Rect& r, StyledState st) const
 {
     const Style& style = GetEffectiveStyle();
-    if(!style.show_grip || style.grip_dot_count <= 0 || style.grip_dot_size <= 0)
+    if(!style.show_grip || style.grip_visual == UISPLITTER_GRIP_NONE)
         return;
 
     Color c = IsNull(style.grip_color) ? style.thumb_palette.ink[st] : style.grip_color;
     if(IsNull(c))
         return;
 
-    int count = max(1, style.grip_dot_count);
-    int dot = max(1, style.grip_dot_size);
-    int gap = max(1, style.grip_dot_gap);
-    int total = count * dot + (count - 1) * gap;
+    auto DrawRoundedPill = [&](const Rect& rr) {
+        if(rr.IsEmpty())
+            return;
+        ImageBuffer ib(rr.GetSize());
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Clear(RGBAZero());
+        p.Begin();
+        p.RoundedRectangle(0.5, 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0,
+                           min<double>(rr.GetWidth(), rr.GetHeight()) * 0.5);
+        p.Fill(c);
+        p.End();
+        w.DrawImage(rr.left, rr.top, ib);
+    };
 
-    Size label_sz(0, 0);
-    if(!style.label.IsEmpty())
-        label_sz = GetTextSize(style.label, style.label_font);
+    auto DrawCircle = [&](const Rect& rr) {
+        if(rr.IsEmpty())
+            return;
+        ImageBuffer ib(rr.GetSize());
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Clear(RGBAZero());
+        p.Begin();
+        p.Circle(rr.GetWidth() * 0.5, rr.GetHeight() * 0.5, min(rr.GetWidth(), rr.GetHeight()) * 0.5);
+        p.Fill(c);
+        p.End();
+        w.DrawImage(rr.left, rr.top, ib);
+    };
 
-    int icon = !IsNull(style.thumb_icon) ? max(1, style.thumb_icon_size) : 0;
-    int reserve = (vertical_ ? label_sz.cx : label_sz.cy) + (icon ? icon + style.label_gap : 0);
-    Rect grip_area = r;
-    if(reserve > 0) {
-        if(vertical_)
-            grip_area.left += reserve / 2;
-        else
-            grip_area.top += reserve / 2;
+    int count = max(1, style.grip_count);
+    int size = max(1, style.grip_size);
+    int gap = max(0, style.grip_gap);
+
+    if(style.grip_visual == UISPLITTER_GRIP_ICON) {
+        if(IsNull(style.thumb_icon))
+            return;
+        int icon = max(1, style.thumb_icon_size);
+        Rect ir = RectC(r.CenterPoint().x - icon / 2, r.CenterPoint().y - icon / 2, icon, icon);
+        UiPaintStyledIcon(w, ir, style.thumb_icon, true, true, style.thumb_icon_render_mode, c, IsEnabled());
+        return;
     }
 
-    int x = grip_area.left + (grip_area.GetWidth() - dot) / 2;
-    int y = grip_area.top + (grip_area.GetHeight() - dot) / 2;
-    if(vertical_)
-        x = grip_area.left + (grip_area.GetWidth() - total) / 2;
-    else
-        y = grip_area.top + (grip_area.GetHeight() - total) / 2;
+    int long_len = max(size * 3, size + DPI(4));
+    int total_main = count * long_len + (count - 1) * gap;
+    if(style.grip_visual == UISPLITTER_GRIP_DOTS) {
+        int total_dot = count * size + (count - 1) * gap;
+        if(vertical_) {
+            int y = r.top + (r.GetHeight() - size) / 2;
+            int x = r.left + (r.GetWidth() - total_dot) / 2;
+            for(int i = 0; i < count; i++) {
+                DrawCircle(RectC(x, y, size, size));
+                x += size + gap;
+            }
+        }
+        else {
+            int x = r.left + (r.GetWidth() - size) / 2;
+            int y = r.top + (r.GetHeight() - total_dot) / 2;
+            for(int i = 0; i < count; i++) {
+                DrawCircle(RectC(x, y, size, size));
+                y += size + gap;
+            }
+        }
+        return;
+    }
 
-    for(int i = 0; i < count; i++) {
-        w.DrawRect(RectC(x, y, dot, dot), c);
-        if(vertical_)
-            x += dot + gap;
-        else
-            y += dot + gap;
+    // Default lines mode.
+    if(vertical_) {
+        int y = r.top + (r.GetHeight() - size) / 2;
+        int x = r.left + (r.GetWidth() - total_main) / 2;
+        for(int i = 0; i < count; i++) {
+            DrawRoundedPill(RectC(x, y, long_len, size));
+            x += long_len + gap;
+        }
+    }
+    else {
+        int x = r.left + (r.GetWidth() - size) / 2;
+        int y = r.top + (r.GetHeight() - total_main) / 2;
+        for(int i = 0; i < count; i++) {
+            DrawRoundedPill(RectC(x, y, size, long_len));
+            y += long_len + gap;
+        }
     }
 }
 
@@ -369,29 +420,6 @@ void UiSplitter::Paint(Draw& w)
         Rect thumb = GetThumbRect(i);
         UiPaintStyledSurface(w, thumb, style.thumb_palette, style.thumb_metrics, style.thumb_skin, st, false, false, false);
 
-        Color ink = IsNull(style.label_color) ? style.thumb_palette.ink[st] : style.label_color;
-        int cursor = vertical_ ? thumb.left + style.label_gap : thumb.top + style.label_gap;
-        if(!IsNull(style.thumb_icon)) {
-            int icon = max(1, style.thumb_icon_size);
-            Rect ir = vertical_
-                    ? RectC(cursor, thumb.top + (thumb.GetHeight() - icon) / 2, icon, icon)
-                    : RectC(thumb.left + (thumb.GetWidth() - icon) / 2, cursor, icon, icon);
-            UiPaintStyledIcon(w, ir, style.thumb_icon, true, true, style.thumb_icon_render_mode, ink, IsEnabled());
-            cursor += icon + style.label_gap;
-        }
-        if(!style.label.IsEmpty()) {
-            Size tsz = GetTextSize(style.label, style.label_font);
-            w.Clip(thumb);
-            if(vertical_) {
-                int y = thumb.top + (thumb.GetHeight() - tsz.cy) / 2;
-                w.DrawText(cursor, y, style.label, style.label_font, ink);
-            }
-            else {
-                int x = thumb.left + (thumb.GetWidth() - tsz.cx) / 2;
-                w.DrawText(x, cursor, style.label, style.label_font, ink);
-            }
-            w.End();
-        }
         PaintGrip(w, thumb, st);
     }
 }
@@ -629,7 +657,44 @@ UiSplitter& UiSplitter::SetLabel(const String& s)
 
 UiSplitter& UiSplitter::SetThumbIcon(const Image& img)
 {
-    StyleEdit().thumb_icon = img;
+    Style& s = StyleEdit();
+    s.thumb_icon = img;
+    s.grip_visual = UISPLITTER_GRIP_ICON;
+    OnStyleChanged();
+    return *this;
+}
+
+UiSplitter& UiSplitter::SetGripVisual(UiSplitterGripVisual visual)
+{
+    StyleEdit().grip_visual = visual;
+    OnStyleChanged();
+    return *this;
+}
+
+UiSplitter& UiSplitter::SetGripCount(int count)
+{
+    StyleEdit().grip_count = max(1, count);
+    OnStyleChanged();
+    return *this;
+}
+
+UiSplitter& UiSplitter::SetGripSize(int size)
+{
+    StyleEdit().grip_size = max(1, size);
+    OnStyleChanged();
+    return *this;
+}
+
+UiSplitter& UiSplitter::SetGripGap(int gap)
+{
+    StyleEdit().grip_gap = max(0, gap);
+    OnStyleChanged();
+    return *this;
+}
+
+UiSplitter& UiSplitter::SetGripColor(Color c)
+{
+    StyleEdit().grip_color = c;
     OnStyleChanged();
     return *this;
 }

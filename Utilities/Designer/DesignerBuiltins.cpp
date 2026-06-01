@@ -271,9 +271,17 @@ static DesignerType MakeSplitterType()
 		n.properties.Set("hit_width", 14);
 		n.properties.Set("track_thickness", 2);
 		n.properties.Set("track_inset", 0);
+		n.properties.Set("grip_visual", "Lines");
+		n.properties.Set("grip_count", 2);
+		n.properties.Set("grip_size", 2);
+		n.properties.Set("grip_gap", 3);
+		n.properties.Set("grip_color_enabled", false);
+		n.properties.Set("grip_color", Color());
 		n.properties.Set("thumb_width", 14);
 		n.properties.Set("thumb_height", 64);
 		n.properties.Set("thumb_radius", 8);
+		n.properties.Set("thumb_icon", "None");
+		n.properties.Set("thumb_icon_size", 14);
 		n.properties.Set("debug", false);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
