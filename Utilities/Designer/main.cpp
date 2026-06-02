@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.66";
+static const char* DESIGNER_VERSION = "v0.1.67";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
@@ -855,7 +855,6 @@ private:
 		right_stack_.AddPage(overrides_page_, "overrides");
 		right_stack_.AddPage(code_page_, "code");
 		right_stack_.SetActivePage(0);
-		right_mode_bar_.Add(collapse_button_).Fixed(DPI(34));
 		RefreshCollapseButton();
 
 		container_actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(DPI(8), DPI(4), DPI(8), DPI(4)));
@@ -1764,6 +1763,11 @@ private:
 		overrides_mode_button_.SetActive(right_mode_ == RIGHT_OVERRIDES);
 		code_mode_button_.SetActive(right_mode_ == RIGHT_CODE);
 		right_stack_.SetActivePage((int)right_mode_);
+		hierarchy_mode_button_.Show(!right_collapsed_);
+		inspector_mode_button_.Show(!right_collapsed_);
+		overrides_mode_button_.Show(!right_collapsed_);
+		code_mode_button_.Show(!right_collapsed_);
+		side_.Show(!right_collapsed_);
 		RefreshCollapseButton();
 		if(right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES)
 			RefreshInspector();
@@ -1790,13 +1794,14 @@ private:
 		int body_y = top_y + header_h + gap;
 		int warning_h = warning_visible_ ? DPI(30) : 0;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
-		int right_w = right_collapsed_
-		    ? max(DPI(48), right_mode_bar_.GetMinSize().cx + DPI(16))
-		    : DPI(365);
+		int right_w = right_collapsed_ ? DPI(48) : DPI(365);
 		right_box_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
 		right_root_.SetRect(0, 0, right_box_.GetSize().cx, right_box_.GetSize().cy);
 		right_root_.Layout();
-		side_.Show(!right_collapsed_);
+		if(right_collapsed_)
+			side_.Hide();
+		else
+			side_.Show();
 		side_.Layout();
 		RefreshCollapseButton();
 	}
