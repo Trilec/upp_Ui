@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.65";
+static const char* DESIGNER_VERSION = "v0.1.66";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
@@ -93,7 +93,7 @@ public:
 		target_icon_size_ = 18;
 		current_icon_size_ = 18;
 		SetIconSize(DPI(current_icon_size_), DPI(current_icon_size_));
-		SetContentInset(DPI(4));
+		SetContentInset(DPI(3));
 		SetContentGap(DPI(0));
 		SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 	}
@@ -772,6 +772,17 @@ private:
 		};
 		right_root_.SetGap(DPI(8)).SetInset(Rect(DPI(8), DPI(8), DPI(8), DPI(8)));
 		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		collapse_button_.SetText("")
+		                .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		                .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle))
+		                .NoWantFocus()
+		                .ClickFocus(false);
+		collapse_button_.WhenAction = [=] {
+			right_collapsed_ = !right_collapsed_;
+			RefreshCollapseButton();
+			RefreshRightPanel();
+		};
+		right_mode_bar_.Add(collapse_button_).Fixed(DPI(34));
 		auto setup_mode_button = [&](DesignerModeButton& button, const Image& icon, const char *tip, DesignerRightMode mode) {
 			button.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 			button.SetModeIcon(icon);
@@ -783,16 +794,6 @@ private:
 		setup_mode_button(inspector_mode_button_, ICON_DESIGN_SLIDERS_48(), "Show inspector", RIGHT_INSPECTOR);
 		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
 		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
-		collapse_button_.SetText("")
-		                .SetIconRenderMode(UiIconRenderMode::MonoTint)
-		                .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle))
-		                .NoWantFocus()
-		                .ClickFocus(false);
-		collapse_button_.WhenAction = [=] {
-			right_collapsed_ = !right_collapsed_;
-			RefreshCollapseButton();
-			RefreshRightPanel();
-		};
 		right_root_.Add(right_mode_bar_).Fit();
 		right_root_.Add(side_).Expand(1);
 
