@@ -17,7 +17,7 @@
 
 namespace Upp {
 
-static const char* DESIGNER_VERSION = "v0.1.67";
+static const char* DESIGNER_VERSION = "v0.1.69";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
@@ -373,9 +373,7 @@ public:
 		int body_y = top_y + header_h + gap;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int left_w = DPI(190);
-		int right_w = right_collapsed_
-		    ? max(DPI(48), right_mode_bar_.GetMinSize().cx + DPI(16))
-		    : DPI(365);
+		int right_w = right_collapsed_ ? DPI(48) : DPI(365);
 		toolbox_panel_.SetRect(gap, body_y, left_w, body_h);
 		preview_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
 		                  max(0, r.Width() - left_w - right_w - gap * 4), body_h);
@@ -450,9 +448,6 @@ public:
 		}
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
-		right_box_.Layout();
-		side_.RefreshLayout();
-		side_.Layout();
 	}
 
 private:
@@ -754,7 +749,6 @@ private:
 		};
 		hierarchy_.WhenNodeCancel = [=] { CancelToolDrag(); };
 
-		right_box_.Add(right_root_.SizePos());
 		inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.Set(&model_, &registry_);
 		theme_override_inspector_.SetBindingGroup("Theme Overrides");
@@ -770,7 +764,6 @@ private:
 		theme_override_inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
-		right_root_.SetGap(DPI(8)).SetInset(Rect(DPI(8), DPI(8), DPI(8), DPI(8)));
 		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		collapse_button_.SetText("")
 		                .SetIconRenderMode(UiIconRenderMode::MonoTint)
@@ -780,7 +773,7 @@ private:
 		collapse_button_.WhenAction = [=] {
 			right_collapsed_ = !right_collapsed_;
 			RefreshCollapseButton();
-			RefreshRightPanel();
+			RelayoutDesignerShell();
 		};
 		right_mode_bar_.Add(collapse_button_).Fixed(DPI(34));
 		auto setup_mode_button = [&](DesignerModeButton& button, const Image& icon, const char *tip, DesignerRightMode mode) {
@@ -794,8 +787,9 @@ private:
 		setup_mode_button(inspector_mode_button_, ICON_DESIGN_SLIDERS_48(), "Show inspector", RIGHT_INSPECTOR);
 		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
 		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
-		right_root_.Add(right_mode_bar_).Fit();
-		right_root_.Add(side_).Expand(1);
+		right_box_.Add(right_mode_bar_);
+		right_box_.Add(right_content_card_);
+		right_content_card_.Add(side_);
 
 		auto setup_heading = [&](UiLabel& label, const char *text) {
 			UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
@@ -1756,6 +1750,12 @@ private:
 		RefreshRightModeUi();
 	}
 
+	void RelayoutDesignerShell()
+	{
+		Layout();
+		Refresh();
+	}
+
 	void RefreshRightModeUi()
 	{
 		hierarchy_mode_button_.SetActive(right_mode_ == RIGHT_HIERARCHY);
@@ -1780,7 +1780,6 @@ private:
 	{
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
-		right_box_.Layout();
 		side_.RefreshLayout();
 		side_.Refresh();
 	}
@@ -1796,13 +1795,35 @@ private:
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int right_w = right_collapsed_ ? DPI(48) : DPI(365);
 		right_box_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
-		right_root_.SetRect(0, 0, right_box_.GetSize().cx, right_box_.GetSize().cy);
-		right_root_.Layout();
+		Rect shell = right_box_.GetSize();
+		int pad = DPI(8);
+		int button_h = DPI(34);
+		int content_w = max(0, shell.GetWidth() - pad * 2);
+		int content_h = max(0, shell.GetHeight() - button_h - DPI(8) - pad * 2);
+		right_mode_bar_.SetRect(pad, pad, max(0, shell.GetWidth() - pad * 2), button_h);
+		right_mode_bar_.Layout();
 		if(right_collapsed_)
+		{
 			side_.Hide();
+			right_content_card_.Hide();
+			hierarchy_mode_button_.Hide();
+			inspector_mode_button_.Hide();
+			overrides_mode_button_.Hide();
+			code_mode_button_.Hide();
+		}
 		else
+		{
+			right_content_card_.Show();
 			side_.Show();
-		side_.Layout();
+			hierarchy_mode_button_.Show();
+			inspector_mode_button_.Show();
+			overrides_mode_button_.Show();
+			code_mode_button_.Show();
+			right_content_card_.SetRect(pad, pad + button_h + DPI(8), content_w, content_h);
+			side_.SetRect(0, 0, content_w, content_h);
+			right_stack_.SetRect(0, 0, content_w, max(content_h, right_stack_.GetContentSize().cy));
+			side_.Layout();
+		}
 		RefreshCollapseButton();
 	}
 
@@ -2763,7 +2784,10 @@ private:
 		UiLabel::Style warn_text_style = UiTheme::ResolveLabel(UiRole::Standard, UiTextSize::Body);
 		warn_text_style.font = SansSerifZ(11);
 		warning_text_.SetCustomStyle(warn_text_style);
-		right_box_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		UiPanel::Style shell_style = UiPanel::StyleDefault();
+		shell_style.transparent = true;
+		right_box_.SetCustomStyle(shell_style);
+		right_content_card_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
 		UiScrollPanel::Style code_scroll_style = UiScrollPanel::StyleDefault();
 		for(int i = 0; i < 4; i++) {
 			code_scroll_style.palette.face[i] = UiFill::Solid(Color(20, 20, 20));
@@ -2823,6 +2847,7 @@ private:
 	UiLabel warning_text_;
 	UiScrollPanel side_;
 	UiPanel right_box_;
+	UiPanel right_content_card_;
 	UiBoxLayout right_root_ { UiDirection::V };
 	UiBoxLayout right_mode_bar_ { UiDirection::H };
 	UiStack right_stack_;
