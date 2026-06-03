@@ -2,6 +2,95 @@
 
 namespace Upp {
 
+static Color SpacerLinePresetColor(UiSpacerLineStyle style)
+{
+    switch(style) {
+    case SPACER_LINE_STANDARD:
+        return Blend(SColorShadow(), SColorPaper(), 150);
+    case SPACER_LINE_ACCENT:
+        return SColorHighlight();
+    case SPACER_LINE_ALERT:
+        return Color(220, 38, 38);
+    case SPACER_LINE_CUSTOM:
+        return Blend(SColorShadow(), SColorPaper(), 150);
+    case SPACER_LINE_SUBTLE:
+    default:
+        return Blend(SColorShadow(), SColorPaper(), 205);
+    }
+}
+
+static Color SpacerLineColor(const UiBoxLayout::Item& it)
+{
+    if(it.line_color_enabled && !IsNull(it.line_color))
+        return it.line_color;
+    return SpacerLinePresetColor(it.line_style);
+}
+
+static void PaintSpacerLine(Draw& w, const Rect& r, const UiBoxLayout::Item& it)
+{
+    if(r.IsEmpty() || !it.line_enabled)
+        return;
+
+    int thickness = max(1, it.line_thickness);
+    int inset = max(0, it.line_inset);
+    Color c = SpacerLineColor(it);
+    bool vertical = r.GetWidth() >= r.GetHeight();
+    int dash_main = max(DPI(6), thickness * 3);
+    int dash_gap = max(DPI(4), thickness * 2);
+
+    auto DrawSolid = [&](const Rect& rr) {
+        if(!rr.IsEmpty())
+            w.DrawRect(rr, c);
+    };
+
+    auto DrawDashed = [&](int x, int y, int len, bool along_x) {
+        int pos = 0;
+        while(pos < len) {
+            int seg = min(dash_main, len - pos);
+            if(along_x)
+                w.DrawRect(x + pos, y, seg, thickness, c);
+            else
+                w.DrawRect(x, y + pos, thickness, seg, c);
+            pos += dash_main + dash_gap;
+        }
+    };
+
+    if(vertical) {
+        int len = max(0, r.GetHeight() - inset * 2);
+        if(len <= 0)
+            return;
+        int x = r.left + inset;
+        if(it.line_align == UiBoxLayout::Align::Center)
+            x = r.left + max(0, (r.GetWidth() - thickness) / 2);
+        else if(it.line_align == UiBoxLayout::Align::End)
+            x = r.right - inset - thickness;
+        else
+            x = r.left + inset;
+        Rect rr(x, r.top + inset, x + thickness, r.top + inset + len);
+        if(it.line_dash == DASHED)
+            DrawDashed(rr.left, rr.top, rr.GetHeight(), false);
+        else
+            DrawSolid(rr);
+    }
+    else {
+        int len = max(0, r.GetWidth() - inset * 2);
+        if(len <= 0)
+            return;
+        int y = r.top + inset;
+        if(it.line_align == UiBoxLayout::Align::Center)
+            y = r.top + max(0, (r.GetHeight() - thickness) / 2);
+        else if(it.line_align == UiBoxLayout::Align::End)
+            y = r.bottom - inset - thickness;
+        else
+            y = r.top + inset;
+        Rect rr(r.left + inset, y, r.left + inset + len, y + thickness);
+        if(it.line_dash == DASHED)
+            DrawDashed(rr.left, rr.top, rr.GetWidth(), true);
+        else
+            DrawSolid(rr);
+    }
+}
+
 UiBoxLayout& UiBoxLayout::ClearItems()
 {
     for(Ctrl *q = GetFirstChild(); q; ) {
@@ -342,51 +431,70 @@ void UiBoxLayout::Layout()
 void UiBoxLayout::Paint(Draw& w)
 {
     Rect r = GetSize();
+    bool has_separator = false;
+    for(const Item& it : items) {
+        if(it.line_enabled) {
+            has_separator = true;
+            break;
+        }
+    }
 
-    if(!debug)
+    if(!debug && !has_separator)
         return;
 
     Rect irc = r.Deflated(inset.left, inset.top, inset.right, inset.bottom);
     Color line = IsNull(debug_color) ? Color(220, 38, 38) : debug_color;
     Color fill = Blend(line, SColorPaper(), 205);
 
-    if(inset.top > 0)
-        w.DrawRect(Rect(r.left, r.top, r.right, irc.top), fill);
-    if(inset.bottom > 0)
-        w.DrawRect(Rect(r.left, irc.bottom, r.right, r.bottom), fill);
-    if(inset.left > 0)
-        w.DrawRect(Rect(r.left, irc.top, irc.left, irc.bottom), fill);
-    if(inset.right > 0)
-        w.DrawRect(Rect(irc.right, irc.top, r.right, irc.bottom), fill);
+    if(debug) {
+        if(inset.top > 0)
+            w.DrawRect(Rect(r.left, r.top, r.right, irc.top), fill);
+        if(inset.bottom > 0)
+            w.DrawRect(Rect(r.left, irc.bottom, r.right, r.bottom), fill);
+        if(inset.left > 0)
+            w.DrawRect(Rect(r.left, irc.top, irc.left, irc.bottom), fill);
+        if(inset.right > 0)
+            w.DrawRect(Rect(irc.right, irc.top, r.right, irc.bottom), fill);
 
-    w.DrawRect(irc.left, irc.top, irc.GetWidth(), 1, line);
-    w.DrawRect(irc.left, irc.bottom - 1, irc.GetWidth(), 1, line);
-    w.DrawRect(irc.left, irc.top, 1, irc.GetHeight(), line);
-    w.DrawRect(irc.right - 1, irc.top, 1, irc.GetHeight(), line);
+        w.DrawRect(irc.left, irc.top, irc.GetWidth(), 1, line);
+        w.DrawRect(irc.left, irc.bottom - 1, irc.GetWidth(), 1, line);
+        w.DrawRect(irc.left, irc.top, 1, irc.GetHeight(), line);
+        w.DrawRect(irc.right - 1, irc.top, 1, irc.GetHeight(), line);
+    }
 
-    Rect prev;
-    bool have_prev = false;
+    if(debug) {
+        Rect prev;
+        bool have_prev = false;
 
-    for(const Item& it : items) {
-        if(!it.cl.visible || it.cl.rect.IsEmpty())
-            continue;
-        Rect cr = it.cl.rect;
-        int main_gap = GetMainGap();
-        if(have_prev && main_gap > 0) {
-            Rect gr;
-            if(dir == UiDirection::H)
-                gr = Rect(prev.right, max(prev.top, cr.top), cr.left, min(prev.bottom, cr.bottom));
-            else
-                gr = Rect(max(prev.left, cr.left), prev.bottom, min(prev.right, cr.right), cr.top);
-            if(!gr.IsEmpty())
-                w.DrawRect(gr, fill);
+        for(const Item& it : items) {
+            if(!it.cl.visible || it.cl.rect.IsEmpty())
+                continue;
+            Rect cr = it.cl.rect;
+            int main_gap = GetMainGap();
+            if(have_prev && main_gap > 0) {
+                Rect gr;
+                if(dir == UiDirection::H)
+                    gr = Rect(prev.right, max(prev.top, cr.top), cr.left, min(prev.bottom, cr.bottom));
+                else
+                    gr = Rect(max(prev.left, cr.left), prev.bottom, min(prev.right, cr.right), cr.top);
+                if(!gr.IsEmpty())
+                    w.DrawRect(gr, fill);
+            }
+            w.DrawRect(cr.left, cr.top, cr.GetWidth(), 1, line);
+            w.DrawRect(cr.left, cr.bottom - 1, cr.GetWidth(), 1, line);
+            w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), line);
+            w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), line);
+            prev = cr;
+            have_prev = true;
         }
-        w.DrawRect(cr.left, cr.top, cr.GetWidth(), 1, line);
-        w.DrawRect(cr.left, cr.bottom - 1, cr.GetWidth(), 1, line);
-        w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), line);
-        w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), line);
-        prev = cr;
-        have_prev = true;
+    }
+
+    if(has_separator) {
+        for(const Item& it : items) {
+            if(!it.line_enabled || it.cl.rect.IsEmpty())
+                continue;
+            PaintSpacerLine(w, it.cl.rect, it);
+        }
     }
 }
 

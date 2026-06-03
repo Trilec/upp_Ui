@@ -241,6 +241,14 @@ static DesignerType MakeSpacerType()
 		n.properties.Set("space", 24);
 		n.properties.Set("max_space", 1000000);
 		n.properties.Set("weight", 1);
+		n.properties.Set("line_enabled", false);
+		n.properties.Set("line_style", "Subtle");
+		n.properties.Set("line_align", "Center");
+		n.properties.Set("line_thickness", 1);
+		n.properties.Set("line_dash", "Solid");
+		n.properties.Set("line_inset", 0);
+		n.properties.Set("line_color_enabled", false);
+		n.properties.Set("line_color", Null);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", 24);
@@ -394,7 +402,9 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		if(id == "UiToggle")
 			n.properties.Set("on", true);
 		if(id == "UiDropdown")
-			n.properties.Set("selected", "First");
+			n.properties.Set("item_text", "First");
+		if(id == "UiDropdown")
+			n.properties.Set("selected_item", "First");
 		if(id == "UiCheckBox") {
 			n.properties.Set("state", "Checked");
 			n.properties.Set("tri_state", false);

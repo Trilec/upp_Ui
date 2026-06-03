@@ -522,10 +522,112 @@ void DesignerPreview::DrawDashed(Draw& w, const Rect& r, Color c)
 			UiPaintFaceFrameDash(w, r.Deflated(DPI(2)), pal, m, ST_NORMAL);
 		}
 
+static Color DesignerSpacerPresetColor(const DesignerNode& n)
+{
+	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
+	if(style == "Accent")
+		return Color(37, 99, 235);
+	if(style == "Alert")
+		return Color(220, 38, 38);
+	if(style == "Standard")
+		return Color(148, 163, 184);
+	return Color(203, 213, 225);
+}
+
+static Color DesignerSpacerLineColor(const DesignerNode& n)
+{
+	if(DesignerPreviewNodeProperty(n, "line_style", "Subtle") == "Custom" &&
+	   (bool)DesignerPreviewNodeProperty(n, "line_color_enabled", false)) {
+		Value v = DesignerPreviewNodeProperty(n, "line_color", Null);
+		if(!IsNull(v))
+			return (Color)v;
+	}
+	return DesignerSpacerPresetColor(n);
+}
+
+static UiSpacerLineStyle DesignerSpacerLineStyle(const DesignerNode& n)
+{
+	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
+	if(style == "Standard")
+		return SPACER_LINE_STANDARD;
+	if(style == "Accent")
+		return SPACER_LINE_ACCENT;
+	if(style == "Alert")
+		return SPACER_LINE_ALERT;
+	if(style == "Custom")
+		return SPACER_LINE_CUSTOM;
+	return SPACER_LINE_SUBTLE;
+}
+
+static UiLineStyle DesignerSpacerLineDash(const DesignerNode& n)
+{
+	return DesignerPreviewNodeProperty(n, "line_dash", "Solid") == "Dashed" ? DASHED : SOLID;
+}
+
+static UiCrossAlign DesignerSpacerLineAlign(const DesignerNode& n)
+{
+	String align = DesignerPreviewNodeProperty(n, "line_align", "Center");
+	if(align == "Start")
+		return UiCrossAlign::Start;
+	if(align == "End")
+		return UiCrossAlign::End;
+	return UiCrossAlign::Center;
+}
+
+static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& n)
+{
+	if(r.IsEmpty() || !(bool)DesignerPreviewNodeProperty(n, "line_enabled", false))
+		return;
+	Rect rr = r;
+	int inset = max(0, (int)DesignerPreviewNodeProperty(n, "line_inset", 0));
+	int thickness = max(1, (int)DesignerPreviewNodeProperty(n, "line_thickness", 1));
+	bool vertical = rr.GetWidth() >= rr.GetHeight();
+	if(vertical)
+		rr = rr.Deflated(0, inset, 0, inset);
+	else
+		rr = rr.Deflated(inset, 0, inset, 0);
+	if(rr.IsEmpty())
+		return;
+	Color c = DesignerSpacerLineColor(n);
+	bool dashed = DesignerPreviewNodeProperty(n, "line_dash", "Solid") == "Dashed";
+	int align = DesignerPreviewNodeProperty(n, "line_align", "Center") == "Start" ? 0 :
+	            DesignerPreviewNodeProperty(n, "line_align", "Center") == "End" ? 2 : 1;
+	if(vertical) {
+		int x = align == 0 ? rr.left : align == 2 ? rr.right - thickness : rr.left + (rr.GetWidth() - thickness) / 2;
+		x = clamp(x, rr.left, max(rr.left, rr.right - thickness));
+		if(dashed) {
+			int seg = max(4, thickness * 4);
+			int gap = max(2, seg);
+			for(int y = rr.top; y < rr.bottom; y += seg + gap)
+				w.DrawLine(x, y, x, min(rr.bottom, y + seg), thickness, c);
+		}
+		else
+			w.DrawLine(x, rr.top, x, rr.bottom, thickness, c);
+	}
+	else {
+		int y = align == 0 ? rr.top : align == 2 ? rr.bottom - thickness : rr.top + (rr.GetHeight() - thickness) / 2;
+		y = clamp(y, rr.top, max(rr.top, rr.bottom - thickness));
+		if(dashed) {
+			int seg = max(4, thickness * 4);
+			int gap = max(2, seg);
+			for(int x = rr.left; x < rr.right; x += seg + gap)
+				w.DrawLine(x, y, min(rr.right, x + seg), y, thickness, c);
+		}
+		else
+			w.DrawLine(rr.left, y, rr.right, y, thickness, c);
+	}
+}
+
 void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, int depth)
 {
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
 			bool selected = show_overlays_ && DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0;
+			if(n.type_id == "Spacer") {
+				DesignerPaintSpacerLine(w, r, n);
+				if(selected)
+					DrawDashed(w, r, SColorHighlight());
+				return;
+			}
 			Color default_face = DesignerPreviewCategoryFace(t, theme_mode_);
 			Color default_frame = DesignerPreviewCategoryFrame(t, theme_mode_);
 			Color face = DesignerPreviewNodeProperty(n, "face", default_face);
@@ -993,6 +1095,32 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			String hs = DesignerPreviewAxisSizing(child_node, "h_sizing");
 			String vs = DesignerPreviewAxisSizing(child_node, "v_sizing");
 			if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&parent)) {
+				if(child_node.type_id == "Spacer") {
+					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
+					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
+					int max_size = max(size, (int)DesignerPreviewNodeProperty(child_node, "max_space", 1000000));
+					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
+					UiBoxLayout::ItemRef ref;
+					if(kind == "Break")
+						ref = box->AddBreak(weight);
+					else if(kind == "Fixed")
+						ref = box->AddSpacer(1).Fixed(DPI(size));
+					else if(kind == "Bounded")
+						ref = box->AddSpacer(weight).MinMain(DPI(size)).MaxMain(DPI(max_size));
+					else
+						ref = box->AddSpacer(weight);
+					if((bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
+						ref.LineEnabled(true)
+						   .LineStyle(DesignerSpacerLineStyle(child_node))
+						   .LineAlign(DesignerSpacerLineAlign(child_node))
+						   .LineThickness(DPI(max(1, (int)DesignerPreviewNodeProperty(child_node, "line_thickness", 1))))
+						   .LineDash(DesignerSpacerLineDash(child_node))
+						   .LineInset(DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))));
+						if((bool)DesignerPreviewNodeProperty(child_node, "line_color_enabled", false))
+							ref.LineColorEnabled(true).LineColor(DesignerSpacerLineColor(child_node));
+					}
+					return;
+				}
 				UiBoxLayout::ItemRef ref = box->Add(child);
 				bool horizontal = DesignerPreviewNodeProperty(parent_node, "direction", "V") == "H";
 				String main_sizing = horizontal ? hs : vs;
@@ -1031,6 +1159,35 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				}
 			}
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
+				if(child_node.type_id == "Spacer") {
+					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
+					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
+					int max_size = max(size, (int)DesignerPreviewNodeProperty(child_node, "max_space", 1000000));
+					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
+					int item = -1;
+					if(kind == "Break")
+						return;
+					else if(kind == "Fixed")
+						item = grid->AddGap(DPI(size));
+					else if(kind == "Bounded")
+						item = grid->AddSpacer(DPI(size), DPI(max_size));
+					else
+						item = grid->AddExpand(weight);
+					if(item >= 0 && (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
+						Color color = DesignerSpacerLineColor(child_node);
+						if(!(bool)DesignerPreviewNodeProperty(child_node, "line_color_enabled", false))
+							color = Null;
+						grid->SetItemSeparatorLine(item,
+						                           true,
+						                           DesignerSpacerLineStyle(child_node),
+						                           DesignerSpacerLineAlign(child_node),
+						                           DPI(max(1, (int)DesignerPreviewNodeProperty(child_node, "line_thickness", 1))),
+						                           DesignerSpacerLineDash(child_node),
+						                           DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))),
+						                           color);
+					}
+					return;
+				}
 				Size fixed(0, 0);
 				if(hs == "Fixed" || vs == "Fixed") {
 					int fixed_w = DesignerClampMin((int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH));

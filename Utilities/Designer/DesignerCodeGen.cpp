@@ -648,9 +648,69 @@ static String IconExpr(const String& icon)
 	return String();
 }
 
+static int SpacerLineThickness(const DesignerNode& n)
+{
+	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
+	if(style == "Custom")
+		return max(1, (int)CodeGenNodeProperty(n, "line_thickness", 1));
+	if(style == "Alert")
+		return 4;
+	if(style == "Accent" || style == "Standard")
+		return 2;
+	return 1;
+}
+
+static String SpacerLineStyleExpr(const DesignerNode& n)
+{
+	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
+	if(style == "Standard")
+		return "SPACER_LINE_STANDARD";
+	if(style == "Accent")
+		return "SPACER_LINE_ACCENT";
+	if(style == "Alert")
+		return "SPACER_LINE_ALERT";
+	if(style == "Custom")
+		return "SPACER_LINE_CUSTOM";
+	return "SPACER_LINE_SUBTLE";
+}
+
+static String SpacerLineColorExpr(const DesignerNode& n)
+{
+	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
+	if(style == "Custom") {
+		if(CodeGenHasProperty(n, "line_color_enabled") && (bool)CodeGenNodeProperty(n, "line_color_enabled", false))
+			return ColorExpr((Color)CodeGenNodeProperty(n, "line_color", Color(148, 163, 184)));
+		return "SColorShadow()";
+	}
+	if(style == "Accent")
+		return "UiTheme::ResolveButton(UiRole::Accent).palette.frame[ST_NORMAL]";
+	if(style == "Alert")
+		return "UiTheme::ResolveButton(UiRole::Alert).palette.frame[ST_NORMAL]";
+	if(style == "Standard")
+		return "UiTheme::ResolvePanel(UiPanelRole::Surface).palette.frame[ST_NORMAL]";
+	return "UiTheme::ResolvePanel(UiPanelRole::Subtle).palette.frame[ST_NORMAL]";
+}
+
+static String SpacerLineAlignExpr(const DesignerNode& n)
+{
+	String align = AsString(CodeGenNodeProperty(n, "line_align", "Center"));
+	if(align == "Start")
+		return "0";
+	if(align == "End")
+		return "2";
+	return "1";
+}
+
+static String SpacerLineDashExpr(const DesignerNode& n)
+{
+	return CodeGenNodeProperty(n, "line_dash", "Solid") == "Dashed" ? "DASHED" : "SOLID";
+}
+
 static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
 {
 	String var = VarName(names, n.id);
+	if(n.type_id == "Spacer")
+		return;
 	if(n.type_id == "BoxLayout")
 		out << "\tUiBoxLayout " << var << ";\n";
 	else if(n.type_id == "GridLayout")
@@ -712,8 +772,12 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiScrollPanel " << var << ";\n";
 	else if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
 		out << "\tParentCtrl " << var << ";\n";
-	else if(n.type_id == "Spacer")
-		return;
+	else if(n.type_id == "Spacer") {
+		if((bool)CodeGenNodeProperty(n, "line_enabled", false))
+			out << "\tUiPanel " << var << ";\n";
+		else
+			return;
+	}
 	else
 		out << "\tUiPanel " << var << ";\n";
 }
@@ -914,7 +978,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
                       const DesignerNode& n, bool emit_designer_appearance)
 {
 	String var = VarName(names, n.id);
-	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
+	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
 		return;
 	EmitThemeStyle(out, var, n, emit_designer_appearance);
 	EmitDesignerMinSize(out, var, n);
@@ -1136,8 +1200,10 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	else if(n.type_id == "UiToggle")
 		out << "\t\t" << var << ".SetOn(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
 	else if(n.type_id == "UiDropdown") {
-		out << "\t\t" << var << ".UseInternalModel().Add(\"First\", \"First\").Add(\"Second\", \"Second\").Add(\"Third\", \"Third\");\n";
-		out << "\t\t" << var << ".SetData(" << CppString(CodeGenNodeProperty(n, "selected", "First")) << ");\n";
+		String item_text = CodeGenNodeProperty(n, "item_text", "First");
+		String selected_item = CodeGenNodeProperty(n, "selected_item", CodeGenNodeProperty(n, "selected", item_text));
+		out << "\t\t" << var << ".UseInternalModel().Clear().Add(" << CppString(item_text) << ", " << CppString(item_text) << ");\n";
+		out << "\t\t" << var << ".SelectByData(" << CppString(selected_item) << ");\n";
 	}
 	else if(n.type_id == "UiCheckBox") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
@@ -1261,10 +1327,70 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 	String c = VarName(names, child.id);
 	if(child.type_id == "Spacer" && parent.id == Designer_ROOT)
 		return;
+	if(child.type_id == "Spacer") {
+		String kind = CodeGenNodeProperty(child, "spacer_kind", "Expander");
+		int size = max(0, (int)CodeGenNodeProperty(child, "space", 24));
+		int max_size = max(size, (int)CodeGenNodeProperty(child, "max_space", 1000000));
+		int weight = max(1, (int)CodeGenNodeProperty(child, "weight", 1));
+		if(parent.type_id == "BoxLayout") {
+			if(kind == "Break")
+				out << "\t\t" << p << ".AddBreak(" << weight << ");\n";
+			else {
+				out << "\t\t{\n";
+				if(kind == "Fixed")
+					out << "\t\t\tauto spacer = " << p << ".AddSpacer(1).Fixed(DPI(" << size << "));\n";
+				else if(kind == "Bounded")
+					out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ").MinMain(DPI(" << size << ")).MaxMain(DPI(" << max_size << "));\n";
+				else
+					out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ");\n";
+				if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
+					out << "\t\t\tspacer.LineEnabled(true)"
+					    << ".LineStyle(" << SpacerLineStyleExpr(child) << ")"
+					    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
+					    << ".LineThickness(DPI(" << SpacerLineThickness(child) << "))"
+					    << ".LineDash(" << SpacerLineDashExpr(child) << ")"
+					    << ".LineInset(DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << "))";
+					if(CodeGenHasProperty(child, "line_color_enabled") &&
+					   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))
+						out << ".LineColorEnabled(true).LineColor(" << SpacerLineColorExpr(child) << ")";
+					out << ";\n";
+				}
+				out << "\t\t}\n";
+			}
+			return;
+		}
+		if(parent.type_id == "GridLayout") {
+			int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
+			int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
+			int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
+			int col = clamp((int)CodeGenNodeProperty(child, "grid_col", index % columns), 0, columns - 1);
+			if(kind == "Break")
+				return;
+			out << "\t\t{\n";
+			if(kind == "Fixed")
+				out << "\t\t\tint item = " << p << ".AddGap(DPI(" << size << "));\n";
+			else if(kind == "Bounded")
+				out << "\t\t\tint item = " << p << ".AddSpacer(DPI(" << size << "), DPI(" << max_size << "));\n";
+			else
+				out << "\t\t\tint item = " << p << ".AddExpand(" << weight << ");\n";
+			if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
+				out << "\t\t\t" << p << ".SetItemSeparatorLine(item, true, " << SpacerLineStyleExpr(child)
+				    << ", " << SpacerLineAlignExpr(child) << ", DPI(" << SpacerLineThickness(child)
+				    << "), " << SpacerLineDashExpr(child) << ", DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << ")";
+				if(CodeGenHasProperty(child, "line_color_enabled") &&
+				   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))
+					out << ", " << SpacerLineColorExpr(child);
+				else
+					out << ", Null";
+				out << ");\n";
+			}
+			out << "\t\t}\n";
+			return;
+		}
+		return;
+	}
 	if(parent.id == Designer_ROOT)
 		out << "\t\tAdd(" << c << ".SizePos());\n";
-	else if(child.type_id == "Spacer" && (parent.type_id == "BoxLayout" || parent.type_id == "GridLayout"))
-		EmitAddSpacer(out, p, parent, child);
 	else if(parent.type_id == "BoxLayout")
 		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << ";\n";
 	else if(parent.type_id == "GridLayout") {

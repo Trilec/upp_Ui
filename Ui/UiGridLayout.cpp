@@ -2,6 +2,92 @@
 
 namespace Upp {
 
+static Color GridSeparatorPresetColor(UiSpacerLineStyle style)
+{
+    switch(style) {
+    case SPACER_LINE_STANDARD:
+        return Blend(SColorShadow(), SColorPaper(), 150);
+    case SPACER_LINE_ACCENT:
+        return SColorHighlight();
+    case SPACER_LINE_ALERT:
+        return Color(220, 38, 38);
+    case SPACER_LINE_CUSTOM:
+        return Blend(SColorShadow(), SColorPaper(), 150);
+    case SPACER_LINE_SUBTLE:
+    default:
+        return Blend(SColorShadow(), SColorPaper(), 205);
+    }
+}
+
+static Color GridSeparatorColor(bool color_enabled, Color color, UiSpacerLineStyle style)
+{
+    if(color_enabled && !IsNull(color))
+        return color;
+    return GridSeparatorPresetColor(style);
+}
+
+static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiSpacerLineStyle style, UiCrossAlign align,
+                               int thickness, UiLineStyle dash, int inset, bool color_enabled, Color color)
+{
+    if(r.IsEmpty() || !enabled)
+        return;
+
+    thickness = max(1, thickness);
+    inset = max(0, inset);
+    Color c = GridSeparatorColor(color_enabled, color, style);
+    bool vertical = r.GetWidth() >= r.GetHeight();
+    int dash_main = max(DPI(6), thickness * 3);
+    int dash_gap = max(DPI(4), thickness * 2);
+
+    auto DrawSolid = [&](const Rect& rr) {
+        if(!rr.IsEmpty())
+            w.DrawRect(rr, c);
+    };
+
+    auto DrawDashed = [&](int x, int y, int len, bool along_x) {
+        int pos = 0;
+        while(pos < len) {
+            int seg = min(dash_main, len - pos);
+            if(along_x)
+                w.DrawRect(x + pos, y, seg, thickness, c);
+            else
+                w.DrawRect(x, y + pos, thickness, seg, c);
+            pos += dash_main + dash_gap;
+        }
+    };
+
+    if(vertical) {
+        int len = max(0, r.GetHeight() - inset * 2);
+        if(len <= 0)
+            return;
+        int x = r.left + inset;
+        if(align == UiCrossAlign::Center)
+            x = r.left + max(0, (r.GetWidth() - thickness) / 2);
+        else if(align == UiCrossAlign::End)
+            x = r.right - inset - thickness;
+        Rect rr(x, r.top + inset, x + thickness, r.top + inset + len);
+        if(dash == DASHED)
+            DrawDashed(rr.left, rr.top, rr.GetHeight(), false);
+        else
+            DrawSolid(rr);
+    }
+    else {
+        int len = max(0, r.GetWidth() - inset * 2);
+        if(len <= 0)
+            return;
+        int y = r.top + inset;
+        if(align == UiCrossAlign::Center)
+            y = r.top + max(0, (r.GetHeight() - thickness) / 2);
+        else if(align == UiCrossAlign::End)
+            y = r.bottom - inset - thickness;
+        Rect rr(r.left + inset, y, r.left + inset + len, y + thickness);
+        if(dash == DASHED)
+            DrawDashed(rr.left, rr.top, rr.GetWidth(), true);
+        else
+            DrawSolid(rr);
+    }
+}
+
 const UiGridLayout::Style& UiGridLayout::Style::StyleDefault()
 {
     static Style s;
@@ -180,6 +266,23 @@ int UiGridLayout::AddGap(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -
 int UiGridLayout::AddBreak() { return -1; }
 int UiGridLayout::AddSeparator(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
 
+UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, UiSpacerLineStyle style, Align align, int thickness, UiLineStyle dash, int inset, Color c)
+{
+    if(index >= 0 && index < items.GetCount()) {
+        Item& it = items[index];
+        it.separator_enabled = on;
+        it.separator_style = style;
+        it.separator_align = align;
+        it.separator_thickness = max(1, thickness);
+        it.separator_dash = dash;
+        it.separator_inset = max(0, inset);
+        it.separator_color_enabled = !IsNull(c);
+        it.separator_color = c;
+        RefreshGridLayout();
+    }
+    return *this;
+}
+
 UiGridLayout& UiGridLayout::SetItemAlign(int index, Align x, Align y)
 {
     if(index >= 0 && index < items.GetCount()) {
@@ -357,7 +460,25 @@ void UiGridLayout::RefreshGridLayout()
 
 void UiGridLayout::Paint(Draw& w)
 {
+    bool has_separator = false;
+    for(const Item& it : items) {
+        if(it.separator_enabled) {
+            has_separator = true;
+            break;
+        }
+    }
+    if(!debug && !has_separator)
+        return;
     PaintDebugOverlay(w);
+    if(has_separator) {
+        for(const Item& it : items) {
+            if(!it.separator_enabled || it.rect.IsEmpty())
+                continue;
+            PaintGridSeparator(w, it.rect, it.separator_enabled, it.separator_style, it.separator_align,
+                               it.separator_thickness, it.separator_dash, it.separator_inset,
+                               it.separator_color_enabled, it.separator_color);
+        }
+    }
 }
 
 void UiGridLayout::PaintDebugOverlay(Draw& w) const

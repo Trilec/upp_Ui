@@ -28,6 +28,7 @@
     - 2026-03: added release-standard file documentation.
     - 2026-04: added explicit content sizing helpers so parent containers can
       query layout extent without overloading GetMinSize().
+    - 2026-06: added runtime separator-line support to spacer items.
 */
 
 // -----------------------------------------------------------------------------
@@ -141,6 +142,14 @@ public:
         int    maxh            = INT_MAX;     // max cross-axis size
         Align  align_self      = Align::Auto; // per-item cross-axis alignment
         bool   is_break        = false;       // true => row/column break marker
+        bool   line_enabled    = false;      // draw a separator line in this spacer
+        UiSpacerLineStyle line_style = SPACER_LINE_SUBTLE;
+        Align  line_align      = Align::Center; // line position on cross axis
+        int    line_thickness   = DPI(1);
+        UiLineStyle line_dash   = SOLID;
+        int    line_inset       = 0;
+        bool   line_color_enabled = false;
+        Color  line_color       = Null;
 
         // --- Transient, per-pass layout cache -------------------------------
         struct TransientLayoutCache {
@@ -283,6 +292,78 @@ public:
         ItemRef& AlignSelf(Align a) {
             if(ok()) {
                 owner->items[index].align_self = a;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineEnabled(bool on = true) {
+            if(ok()) {
+                owner->items[index].line_enabled = on;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineStyle(UiSpacerLineStyle s) {
+            if(ok()) {
+                owner->items[index].line_style = s;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineAlign(Align a) {
+            if(ok()) {
+                owner->items[index].line_align = a;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineThickness(int px) {
+            if(ok()) {
+                owner->items[index].line_thickness = max(1, px);
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineDash(UiLineStyle s) {
+            if(ok()) {
+                owner->items[index].line_dash = s;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineInset(int px) {
+            if(ok()) {
+                owner->items[index].line_inset = max(0, px);
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineColorEnabled(bool on = true) {
+            if(ok()) {
+                owner->items[index].line_color_enabled = on;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) owner->Layout();
+            }
+            return *this;
+        }
+
+        ItemRef& LineColor(Color c) {
+            if(ok()) {
+                owner->items[index].line_color = c;
                 owner->cur_gen++;
                 if(owner->layout_pause == 0) owner->Layout();
             }

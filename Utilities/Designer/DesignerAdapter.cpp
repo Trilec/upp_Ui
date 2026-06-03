@@ -516,6 +516,73 @@ static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 	panel.SetCustomStyle(s);
 }
 
+static Color SpacerLinePresetColor(const DesignerNode& n)
+{
+	String style = AdapterNodeProperty(n, "line_style", "Subtle");
+	if(style == "Accent")
+		return UiTheme::ResolveButton(UiRole::Accent).palette.frame[ST_NORMAL];
+	if(style == "Alert")
+		return UiTheme::ResolveButton(UiRole::Alert).palette.frame[ST_NORMAL];
+	if(style == "Standard")
+		return UiTheme::ResolvePanel(UiPanelRole::Surface).palette.frame[ST_NORMAL];
+	return UiTheme::ResolvePanel(UiPanelRole::Subtle).palette.frame[ST_NORMAL];
+}
+
+static Color SpacerLineColor(const DesignerNode& n)
+{
+	if(AdapterNodeProperty(n, "line_style", "Subtle") == "Custom" &&
+	   (bool)AdapterNodeProperty(n, "line_color_enabled", false)) {
+		Color c = GetColorProperty(n, "line_color", Null);
+		if(!IsNull(c))
+			return c;
+	}
+	Color c = SpacerLinePresetColor(n);
+	if(IsNull(c))
+		c = SColorShadow();
+	return c;
+}
+
+static void PaintSpacerSeparator(Draw& w, const Rect& r, int inset, int thickness, bool dashed, int align, Color c)
+{
+	if(r.IsEmpty())
+		return;
+
+	Rect rr = r;
+	bool vertical = rr.GetWidth() >= rr.GetHeight();
+	if(vertical)
+		rr = rr.Deflated(0, inset, 0, inset);
+	else {
+		rr = rr.Deflated(inset, 0, inset, 0);
+	}
+	if(rr.IsEmpty())
+		return;
+
+	if(vertical) {
+		int x = align == 0 ? rr.left : align == 2 ? rr.right - thickness : rr.left + (rr.GetWidth() - thickness) / 2;
+		x = clamp(x, rr.left, max(rr.left, rr.right - thickness));
+		if(dashed) {
+			int seg = max(4, thickness * 4);
+			int gap = max(2, seg);
+			for(int y = rr.top; y < rr.bottom; y += seg + gap)
+				w.DrawLine(x, y, x, min(rr.bottom, y + seg), thickness, c);
+		}
+		else
+			w.DrawLine(x, rr.top, x, rr.bottom, thickness, c);
+	}
+	else {
+		int y = align == 0 ? rr.top : align == 2 ? rr.bottom - thickness : rr.top + (rr.GetHeight() - thickness) / 2;
+		y = clamp(y, rr.top, max(rr.top, rr.bottom - thickness));
+		if(dashed) {
+			int seg = max(4, thickness * 4);
+			int gap = max(2, seg);
+			for(int x = rr.left; x < rr.right; x += seg + gap)
+				w.DrawLine(x, y, min(rr.right, x + seg), y, thickness, c);
+		}
+		else
+			w.DrawLine(rr.left, y, rr.right, y, thickness, c);
+	}
+}
+
 static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
 {
 	UiButton::Style s = UiTheme::ResolveButton(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
@@ -639,7 +706,7 @@ String DesignerAdapterHelp(const String& type_id)
 	if(type_id == "GridLayout")
 		return "Places children into stable cells. Use rows, columns, cell size, gap, and per-axis expand settings to inspect grid behavior.";
 	if(type_id == "Spacer")
-		return "Design-time entry for layout space. In box layouts it emits AddSpacer/AddBreak; in grid layouts it emits AddExpand/AddGap/AddSpacer.";
+		return "Design-time entry for layout space. In box layouts it emits AddSpacer/AddBreak; in grid layouts it emits AddExpand/AddGap/AddSpacer. Optional separator-line mode draws a runtime line instead of blank space.";
 	if(type_id == "UiSplitter")
 		return "Divides an area into two pane slots. Drop layouts or controls into each pane, then adjust orientation, split, and minimum pane sizes.";
 	if(type_id == "UiQuadSplitter")
@@ -992,12 +1059,26 @@ void DesignerPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	type_id_ = node.type_id;
-	ApplyPanelAppearance(*this, node);
-	if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic")
+	if(node.type_id == "Spacer") {
+		UiPanel::Style s = UiPanel::StyleDefault();
+		s.transparent = true;
+		s.metrics.face_enabled = false;
+		s.metrics.frame_enabled = false;
+		s.metrics.focus_enabled = false;
+		s.metrics.radius = 0;
+		SetCustomStyle(s);
+		WhenPaintForeground.Clear();
+		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "width", 24))),
+		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "height", 24))));
+	}
+	else {
+		ApplyPanelAppearance(*this, node);
+		if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic")
 		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_width", DESIGNER_MIN_CLAMP))),
 		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP))));
-	else
-		SetSizeMin(Size(0, 0));
+		else
+			SetSizeMin(Size(0, 0));
+	}
 }
 
 void DesignerPanelAdapter::SetOverlayState(const DesignerOverlayState& state)
@@ -1022,6 +1103,29 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("frame_enabled");
 		b.Hide("min_width");
 		b.Hide("min_height");
+		b.Add("line_enabled", "Line enabled", DesignerEditorKind::Bool,
+		      "UiBoxLayout::ItemRef",
+		      "Draws a separator line instead of a blank spacer.").group = "Separator";
+		b.AddChoice("line_style", "Line style", "UiBoxLayout::ItemRef",
+		            "Separator line style.",
+		            {{"Subtle", "Subtle"}, {"Standard", "Standard"}, {"Accent", "Accent"},
+		             {"Alert", "Alert"}, {"Custom", "Custom"}}).group = "Separator";
+		b.AddChoice("line_align", "Line align", "UiBoxLayout::ItemRef",
+		            "Aligns the separator inside its spacer rect.",
+		            {{"Start", "Start"}, {"Center", "Center"}, {"End", "End"}}).group = "Separator";
+		b.AddInt("line_thickness", "Line thickness", DesignerEditorKind::Slider, "UiBoxLayout::ItemRef",
+		         "Separator thickness in pixels.", 1, 12).group = "Separator";
+		b.AddChoice("line_dash", "Line dash", "UiBoxLayout::ItemRef",
+		            "Separator dash mode.",
+		            {{"Solid", "Solid"}, {"Dashed", "Dashed"}}).group = "Separator";
+		b.AddInt("line_inset", "Line inset", DesignerEditorKind::Slider, "UiBoxLayout::ItemRef",
+		         "Inset applied along the separator's long axis.", 0, 64).group = "Separator";
+		b.Add("line_color_enabled", "Use line color", DesignerEditorKind::Bool,
+		      "UiBoxLayout::ItemRef",
+		      "Enables an explicit separator color override.").group = "Separator";
+		b.Add("line_color", "Line color", DesignerEditorKind::Color,
+		      "UiBoxLayout::ItemRef",
+		      "Explicit separator color used when custom line color is enabled.").group = "Separator";
 		b.AddChoice("spacer_kind", "Spacer", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
 		            "Semantic layout spacer kind.",
 		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
@@ -1813,10 +1917,10 @@ void DesignerDropdownAdapter::SyncFromNode(const DesignerNode& node)
 	ApplyDropdownAppearance(*this, node);
 	UseInternalModel();
 	Clear();
-	Add("First", "First");
-	Add("Second", "Second");
-	Add("Third", "Third");
-	SetData(AdapterNodeProperty(node, "selected", "First"));
+	String item_text = AdapterNodeProperty(node, "item_text", "First");
+	String selected_item = AdapterNodeProperty(node, "selected_item", AdapterNodeProperty(node, "selected", item_text));
+	Add(item_text, item_text);
+	SelectByData(selected_item);
 	NoWantFocus();
 }
 
@@ -1830,8 +1934,10 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.AddChoice("selected", "Selected", "UiDropdown::SetData",
-	            "Sets the selected preview item.", {{"First", "First"}, {"Second", "Second"}, {"Third", "Third"}});
+	b.Add("selected_item", "Selected item", DesignerEditorKind::Text, "UiDropdown::SelectByData",
+	      "Selected item text used by the preview dropdown.");
+	b.Add("item_text", "Item text", DesignerEditorKind::Text, "UiDropdown::SetItemText",
+	      "Visible text of the default dropdown item.");
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 	b.AddChoice("font", "Font", "UiDropdown::Style::font",

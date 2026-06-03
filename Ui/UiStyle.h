@@ -277,6 +277,14 @@ enum UiLineStyle : byte {
     DOTTED,
 };
 
+enum UiSpacerLineStyle : byte {
+    SPACER_LINE_SUBTLE = 0,
+    SPACER_LINE_STANDARD,
+    SPACER_LINE_ACCENT,
+    SPACER_LINE_ALERT,
+    SPACER_LINE_CUSTOM,
+};
+
 enum UiSpan : byte {
     NONE = 0,
     SMALL,

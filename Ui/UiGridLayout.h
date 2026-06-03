@@ -11,6 +11,9 @@ class UiGridLayout : public Ctrl {
 public:
     using Align = UiCrossAlign;
 
+    // Changelog
+    // - 2026-06: added separator-line support for blank grid spacer items.
+
     struct Style : ChStyle<Style> {
         StyledPalette palette;
         StyledMetrics metrics;
@@ -70,6 +73,9 @@ public:
     int AddGap(int px);
     int AddBreak();
     int AddSeparator(int px = DPI(1));
+    UiGridLayout& SetItemSeparatorLine(int index, bool on = true, UiSpacerLineStyle style = SPACER_LINE_SUBTLE,
+                                       Align align = Align::Center, int thickness = DPI(1),
+                                       UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
 
     const Vector<int>& GetSelection() const { return selection; }
     void ClearSelection();
@@ -102,6 +108,14 @@ private:
         int   col = -1;
         Rect  rect;
         bool  visible = true;
+        bool  separator_enabled = false;
+        UiSpacerLineStyle separator_style = SPACER_LINE_SUBTLE;
+        Align separator_align = Align::Center;
+        int   separator_thickness = DPI(1);
+        UiLineStyle separator_dash = SOLID;
+        int   separator_inset = 0;
+        bool  separator_color_enabled = false;
+        Color separator_color = Null;
     };
 
     Point FindNextFreeCell() const;
