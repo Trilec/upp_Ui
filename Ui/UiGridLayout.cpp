@@ -26,13 +26,29 @@ static Color GridSeparatorColor(bool color_enabled, Color color, UiSpacerLineSty
     return GridSeparatorPresetColor(style);
 }
 
+static int GridSeparatorThickness(UiSpacerLineStyle style, int custom_thickness)
+{
+    switch(style) {
+    case SPACER_LINE_STANDARD:
+    case SPACER_LINE_ACCENT:
+        return DPI(2);
+    case SPACER_LINE_ALERT:
+        return DPI(4);
+    case SPACER_LINE_CUSTOM:
+        return max(1, custom_thickness);
+    case SPACER_LINE_SUBTLE:
+    default:
+        return DPI(1);
+    }
+}
+
 static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiSpacerLineStyle style, UiCrossAlign align,
                                int thickness, UiLineStyle dash, int inset, bool color_enabled, Color color)
 {
     if(r.IsEmpty() || !enabled)
         return;
 
-    thickness = max(1, thickness);
+    thickness = GridSeparatorThickness(style, thickness);
     inset = max(0, inset);
     Color c = GridSeparatorColor(color_enabled, color, style);
     bool vertical = r.GetWidth() >= r.GetHeight();
@@ -334,8 +350,10 @@ static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<bool>& e
     for(int i = 0; i < count; i++)
         if(expand[i])
             targets.Add(i);
-    if(targets.IsEmpty())
-        return;
+    if(targets.IsEmpty()) {
+        for(int i = 0; i < count; i++)
+            targets.Add(i);
+    }
 
     int per = extra / targets.GetCount();
     int rem = extra % targets.GetCount();

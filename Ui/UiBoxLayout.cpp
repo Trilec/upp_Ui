@@ -26,12 +26,28 @@ static Color SpacerLineColor(const UiBoxLayout::Item& it)
     return SpacerLinePresetColor(it.line_style);
 }
 
+static int SpacerLineThickness(const UiBoxLayout::Item& it)
+{
+    switch(it.line_style) {
+    case SPACER_LINE_STANDARD:
+    case SPACER_LINE_ACCENT:
+        return DPI(2);
+    case SPACER_LINE_ALERT:
+        return DPI(4);
+    case SPACER_LINE_CUSTOM:
+        return max(1, it.line_thickness);
+    case SPACER_LINE_SUBTLE:
+    default:
+        return DPI(1);
+    }
+}
+
 static void PaintSpacerLine(Draw& w, const Rect& r, const UiBoxLayout::Item& it)
 {
     if(r.IsEmpty() || !it.line_enabled)
         return;
 
-    int thickness = max(1, it.line_thickness);
+    int thickness = SpacerLineThickness(it);
     int inset = max(0, it.line_inset);
     Color c = SpacerLineColor(it);
     bool vertical = r.GetWidth() >= r.GetHeight();

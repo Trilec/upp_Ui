@@ -518,13 +518,24 @@ static Color DesignerSpacerPresetColor(const DesignerNode& n)
 
 static Color DesignerSpacerLineColor(const DesignerNode& n)
 {
-	if(DesignerPreviewNodeProperty(n, "line_style", "Subtle") == "Custom" &&
-	   (bool)DesignerPreviewNodeProperty(n, "line_color_enabled", false)) {
+	if((bool)DesignerPreviewNodeProperty(n, "line_color_enabled", false)) {
 		Value v = DesignerPreviewNodeProperty(n, "line_color", Null);
 		if(!IsNull(v))
 			return (Color)v;
 	}
 	return DesignerSpacerPresetColor(n);
+}
+
+static int DesignerSpacerLineThickness(const DesignerNode& n)
+{
+	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
+	if(style == "Alert")
+		return DPI(4);
+	if(style == "Accent" || style == "Standard")
+		return DPI(2);
+	if(style == "Custom")
+		return DPI(max(1, (int)DesignerPreviewNodeProperty(n, "line_thickness", 1)));
+	return DPI(1);
 }
 
 static UiSpacerLineStyle DesignerSpacerLineStyle(const DesignerNode& n)
@@ -562,7 +573,7 @@ static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& 
 		return;
 	Rect rr = r;
 	int inset = max(0, (int)DesignerPreviewNodeProperty(n, "line_inset", 0));
-	int thickness = max(1, (int)DesignerPreviewNodeProperty(n, "line_thickness", 1));
+	int thickness = DesignerSpacerLineThickness(n);
 	bool vertical = rr.GetWidth() >= rr.GetHeight();
 	if(vertical)
 		rr = rr.Deflated(0, inset, 0, inset);
@@ -623,7 +634,6 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
 			bool selected = show_overlays_ && DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0;
 			if(n.type_id == "Spacer") {
-				DesignerPaintSpacerLine(w, r, n);
 				if(selected)
 					DesignerPaintSpacerSelection(w, r);
 				return;
@@ -670,8 +680,14 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			}
 		}
 
-static void DesignerSyncSpacerItemRects(DesignerModel& model, const DesignerNode& parent, Ctrl& ctrl)
+static void DesignerSyncSpacerItemRects(DesignerModel& model, const DesignerNode& parent, Ctrl& ctrl, Point absolute_offset)
 {
+	for(DesignerNodeId child_id : parent.children) {
+		DesignerNode* child = model.Find(child_id);
+		if(child && child->type_id == "Spacer")
+			child->last_rect = Rect(0, 0, 0, 0);
+	}
+
 	if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) {
 		int count = min(parent.children.GetCount(), box->GetItemCount());
 		for(int i = 0; i < count; i++) {
@@ -679,7 +695,7 @@ static void DesignerSyncSpacerItemRects(DesignerModel& model, const DesignerNode
 			if(!child)
 				continue;
 			if(child->type_id == "Spacer")
-				child->last_rect = box->GetItemRect(i);
+				child->last_rect = box->GetItemRect(i) + absolute_offset;
 		}
 	}
 	else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) {
@@ -689,7 +705,7 @@ static void DesignerSyncSpacerItemRects(DesignerModel& model, const DesignerNode
 			if(!child)
 				continue;
 			if(child->type_id == "Spacer")
-				child->last_rect = grid->GetItemRect(i);
+				child->last_rect = grid->GetItemRect(i) + absolute_offset;
 		}
 	}
 }
@@ -1137,7 +1153,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						ref.LineEnabled(true)
 						   .LineStyle(DesignerSpacerLineStyle(child_node))
 						   .LineAlign(DesignerSpacerLineAlign(child_node))
-						   .LineThickness(DPI(max(1, (int)DesignerPreviewNodeProperty(child_node, "line_thickness", 1))))
+						   .LineThickness(DesignerSpacerLineThickness(child_node))
 						   .LineDash(DesignerSpacerLineDash(child_node))
 						   .LineInset(DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))));
 						if((bool)DesignerPreviewNodeProperty(child_node, "line_color_enabled", false))
@@ -1205,7 +1221,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						                           true,
 						                           DesignerSpacerLineStyle(child_node),
 						                           DesignerSpacerLineAlign(child_node),
-						                           DPI(max(1, (int)DesignerPreviewNodeProperty(child_node, "line_thickness", 1))),
+						                           DesignerSpacerLineThickness(child_node),
 						                           DesignerSpacerLineDash(child_node),
 						                           DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))),
 						                           color);
@@ -1406,7 +1422,7 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 				if(n)
 					n->last_rect = ctrl.GetRect() + offset;
 				if(n)
-					DesignerSyncSpacerItemRects(*model_, *n, ctrl);
+					DesignerSyncSpacerItemRects(*model_, *n, ctrl, offset + ctrl.GetRect().TopLeft());
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())

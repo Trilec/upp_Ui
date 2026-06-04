@@ -676,10 +676,11 @@ static String SpacerLineStyleExpr(const DesignerNode& n)
 
 static String SpacerLineColorExpr(const DesignerNode& n)
 {
+	if(CodeGenHasProperty(n, "line_color_enabled") && (bool)CodeGenNodeProperty(n, "line_color_enabled", false))
+		return ColorExpr((Color)CodeGenNodeProperty(n, "line_color", Color(148, 163, 184)));
+
 	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
 	if(style == "Custom") {
-		if(CodeGenHasProperty(n, "line_color_enabled") && (bool)CodeGenNodeProperty(n, "line_color_enabled", false))
-			return ColorExpr((Color)CodeGenNodeProperty(n, "line_color", Color(148, 163, 184)));
 		return "SColorShadow()";
 	}
 	if(style == "Accent")
