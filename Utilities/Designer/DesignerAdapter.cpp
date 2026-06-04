@@ -1105,27 +1105,27 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("min_height");
 		b.Add("line_enabled", "Line enabled", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
-		      "Draws a separator line instead of a blank spacer.").group = "Separator";
+		      "Draws a separator line instead of a blank spacer.");
 		b.AddChoice("line_style", "Line style", "UiBoxLayout::ItemRef",
 		            "Separator line style.",
 		            {{"Subtle", "Subtle"}, {"Standard", "Standard"}, {"Accent", "Accent"},
-		             {"Alert", "Alert"}, {"Custom", "Custom"}}).group = "Separator";
+		             {"Alert", "Alert"}, {"Custom", "Custom"}});
 		b.AddChoice("line_align", "Line align", "UiBoxLayout::ItemRef",
 		            "Aligns the separator inside its spacer rect.",
-		            {{"Start", "Start"}, {"Center", "Center"}, {"End", "End"}}).group = "Separator";
+		            {{"Start", "Start"}, {"Center", "Center"}, {"End", "End"}});
 		b.AddInt("line_thickness", "Line thickness", DesignerEditorKind::Slider, "UiBoxLayout::ItemRef",
-		         "Separator thickness in pixels.", 1, 12).group = "Separator";
+		         "Separator thickness in pixels.", 1, 12);
 		b.AddChoice("line_dash", "Line dash", "UiBoxLayout::ItemRef",
 		            "Separator dash mode.",
-		            {{"Solid", "Solid"}, {"Dashed", "Dashed"}}).group = "Separator";
+		            {{"Solid", "Solid"}, {"Dashed", "Dashed"}});
 		b.AddInt("line_inset", "Line inset", DesignerEditorKind::Slider, "UiBoxLayout::ItemRef",
-		         "Inset applied along the separator's long axis.", 0, 64).group = "Separator";
+		         "Inset applied along the separator's long axis.", 0, 64);
 		b.Add("line_color_enabled", "Use line color", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
-		      "Enables an explicit separator color override.").group = "Separator";
+		      "Enables an explicit separator color override.");
 		b.Add("line_color", "Line color", DesignerEditorKind::Color,
 		      "UiBoxLayout::ItemRef",
-		      "Explicit separator color used when custom line color is enabled.").group = "Separator";
+		      "Explicit separator color used when custom line color is enabled.");
 		b.AddChoice("spacer_kind", "Spacer", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
 		            "Semantic layout spacer kind.",
 		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
@@ -1918,9 +1918,8 @@ void DesignerDropdownAdapter::SyncFromNode(const DesignerNode& node)
 	UseInternalModel();
 	Clear();
 	String item_text = AdapterNodeProperty(node, "item_text", "First");
-	String selected_item = AdapterNodeProperty(node, "selected_item", AdapterNodeProperty(node, "selected", item_text));
 	Add(item_text, item_text);
-	SelectByData(selected_item);
+	Select(0);
 	NoWantFocus();
 }
 
@@ -1934,8 +1933,6 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.Add("selected_item", "Selected item", DesignerEditorKind::Text, "UiDropdown::SelectByData",
-	      "Selected item text used by the preview dropdown.");
 	b.Add("item_text", "Item text", DesignerEditorKind::Text, "UiDropdown::SetItemText",
 	      "Visible text of the default dropdown item.");
 	AddHorizontalAlignmentBinding(b);

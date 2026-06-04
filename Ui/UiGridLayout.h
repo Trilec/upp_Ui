@@ -76,6 +76,9 @@ public:
     UiGridLayout& SetItemSeparatorLine(int index, bool on = true, UiSpacerLineStyle style = SPACER_LINE_SUBTLE,
                                        Align align = Align::Center, int thickness = DPI(1),
                                        UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
+    int  GetItemCount() const { return items.GetCount(); }
+    Rect GetItemRect(int index) const { return index >= 0 && index < items.GetCount() ? items[index].rect : Rect(0, 0, 0, 0); }
+    bool IsItemVisible(int index) const { return index >= 0 && index < items.GetCount() ? items[index].visible && !items[index].rect.IsEmpty() : false; }
 
     const Vector<int>& GetSelection() const { return selection; }
     void ClearSelection();

@@ -264,7 +264,16 @@ int UiGridLayout::AddSpacer(int, int) { Point p = FindNextFreeCell(); return p.x
 int UiGridLayout::AddExpand(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
 int UiGridLayout::AddGap(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
 int UiGridLayout::AddBreak() { return -1; }
-int UiGridLayout::AddSeparator(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
+int UiGridLayout::AddSeparator(int px)
+{
+    Point p = FindNextFreeCell();
+    if(p.x < 0)
+        return -1;
+    int item = AddBlankGrid(p.y, p.x);
+    if(item >= 0)
+        SetItemSeparatorLine(item, true, SPACER_LINE_SUBTLE, Align::Center, max(1, px), SOLID, 0, Null);
+    return item;
+}
 
 UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, UiSpacerLineStyle style, Align align, int thickness, UiLineStyle dash, int inset, Color c)
 {

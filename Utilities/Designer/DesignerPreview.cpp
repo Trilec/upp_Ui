@@ -212,24 +212,6 @@ void DesignerPreview::Layout()
 			LayoutRealPreview();
 		}
 
-void DesignerPreview::Paint(Draw& w)
-{
-			w.DrawRect(GetSize(), DesignerPreviewBackground(theme_mode_));
-			if(!model_)
-				return;
-			LayoutRealPreview();
-			Rect root = GetVirtualWindowRect();
-			Size vsz = model_->GetVirtualSize();
-			if(show_overlays_) {
-				DrawRoundedOutline(w, root, DesignerPreviewWindowOutline(SColorHighlight(), theme_mode_), DPI(8), DPI(4));
-				DrawDropIndicator(w, root);
-				DrawResizeHandle(w, root);
-			}
-			if(show_overlays_ && !placement_type_.IsEmpty())
-				w.DrawText(root.left + DPI(10), root.bottom + DPI(8),
-				           "Release over a highlighted layout or insert line to place " + placement_type_,
-				           SansSerifZ(9), SColorHighlight());
-		}
 
 void DesignerPreview::LeftDown(Point p, dword)
 {
@@ -618,6 +600,24 @@ static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& 
 	}
 }
 
+static void DesignerPaintSpacerSelection(Draw& w, const Rect& r)
+{
+	if(r.IsEmpty())
+		return;
+	Color c = SColorHighlight();
+	int step = DPI(7);
+	int dot = DPI(3);
+	int thick = DPI(2);
+	for(int x = r.left; x < r.right; x += step) {
+		w.DrawRect(x, r.top, min(dot, r.right - x), thick, c);
+		w.DrawRect(x, r.bottom - thick, min(dot, r.right - x), thick, c);
+	}
+	for(int y = r.top; y < r.bottom; y += step) {
+		w.DrawRect(r.left, y, thick, min(dot, r.bottom - y), c);
+		w.DrawRect(r.right - thick, y, thick, min(dot, r.bottom - y), c);
+	}
+}
+
 void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, int depth)
 {
 			const DesignerType* t = registry_ ? registry_->Find(n.type_id) : nullptr;
@@ -625,7 +625,7 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 			if(n.type_id == "Spacer") {
 				DesignerPaintSpacerLine(w, r, n);
 				if(selected)
-					DrawDashed(w, r, SColorHighlight());
+					DesignerPaintSpacerSelection(w, r);
 				return;
 			}
 			Color default_face = DesignerPreviewCategoryFace(t, theme_mode_);
@@ -669,6 +669,30 @@ void DesignerPreview::PaintNode(Draw& w, const DesignerNode& n, const Rect& r, i
 					DrawLayoutDebug(w, n, content);
 			}
 		}
+
+static void DesignerSyncSpacerItemRects(DesignerModel& model, const DesignerNode& parent, Ctrl& ctrl)
+{
+	if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) {
+		int count = min(parent.children.GetCount(), box->GetItemCount());
+		for(int i = 0; i < count; i++) {
+			DesignerNode* child = model.Find(parent.children[i]);
+			if(!child)
+				continue;
+			if(child->type_id == "Spacer")
+				child->last_rect = box->GetItemRect(i);
+		}
+	}
+	else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) {
+		int count = min(parent.children.GetCount(), grid->GetItemCount());
+		for(int i = 0; i < count; i++) {
+			DesignerNode* child = model.Find(parent.children[i]);
+			if(!child)
+				continue;
+			if(child->type_id == "Spacer")
+				child->last_rect = grid->GetItemRect(i);
+		}
+	}
+}
 
 void DesignerPreview::DrawLayoutDebug(Draw& w, const DesignerNode& n, Rect content)
 {
@@ -1381,6 +1405,8 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 				DesignerNode* n = model_ ? model_->Find(adapter->GetNodeId()) : nullptr;
 				if(n)
 					n->last_rect = ctrl.GetRect() + offset;
+				if(n)
+					DesignerSyncSpacerItemRects(*model_, *n, ctrl);
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())
@@ -1419,4 +1445,27 @@ void DesignerPreview::ApplyRealOverlay()
 			}
 		}
 
-}
+void DesignerPreview::Paint(Draw& w)
+{
+			w.DrawRect(GetSize(), DesignerPreviewBackground(theme_mode_));
+			if(!model_)
+				return;
+			LayoutRealPreview();
+			Rect root = GetVirtualWindowRect();
+			Size vsz = model_->GetVirtualSize();
+			if(show_overlays_) {
+				DrawRoundedOutline(w, root, DesignerPreviewWindowOutline(SColorHighlight(), theme_mode_), DPI(8), DPI(4));
+				DrawDropIndicator(w, root);
+				DrawResizeHandle(w, root);
+				for(const DesignerNode& n : model_->GetNodes()) {
+					if(n.type_id == "Spacer" && DesignerPreviewFindNodeId(model_->GetSelection(), n.id) >= 0 && !n.last_rect.IsEmpty())
+						DesignerPaintSpacerSelection(w, n.last_rect);
+				}
+			}
+			if(show_overlays_ && !placement_type_.IsEmpty())
+				w.DrawText(root.left + DPI(10), root.bottom + DPI(8),
+				           "Release over a highlighted layout or insert line to place " + placement_type_,
+				           SansSerifZ(9), SColorHighlight());
+		}
+
+} // namespace Upp

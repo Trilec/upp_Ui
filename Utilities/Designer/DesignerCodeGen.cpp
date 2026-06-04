@@ -695,10 +695,10 @@ static String SpacerLineAlignExpr(const DesignerNode& n)
 {
 	String align = AsString(CodeGenNodeProperty(n, "line_align", "Center"));
 	if(align == "Start")
-		return "0";
+		return "UiCrossAlign::Start";
 	if(align == "End")
-		return "2";
-	return "1";
+		return "UiCrossAlign::End";
+	return "UiCrossAlign::Center";
 }
 
 static String SpacerLineDashExpr(const DesignerNode& n)
@@ -1201,9 +1201,8 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << "\t\t" << var << ".SetOn(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
 	else if(n.type_id == "UiDropdown") {
 		String item_text = CodeGenNodeProperty(n, "item_text", "First");
-		String selected_item = CodeGenNodeProperty(n, "selected_item", CodeGenNodeProperty(n, "selected", item_text));
 		out << "\t\t" << var << ".UseInternalModel().Clear().Add(" << CppString(item_text) << ", " << CppString(item_text) << ");\n";
-		out << "\t\t" << var << ".SelectByData(" << CppString(selected_item) << ");\n";
+		out << "\t\t" << var << ".Select(0);\n";
 	}
 	else if(n.type_id == "UiCheckBox") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"

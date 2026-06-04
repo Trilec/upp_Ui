@@ -560,6 +560,14 @@ public:
         return ItemRef(this, items.GetCount() - 1);
     }
 
+    int  GetItemCount() const { return items.GetCount(); }
+    Rect GetItemRect(int index) const {
+        return index >= 0 && index < items.GetCount() ? items[index].cl.rect : Rect(0, 0, 0, 0);
+    }
+    bool IsItemVisible(int index) const {
+        return index >= 0 && index < items.GetCount() ? items[index].cl.visible && !items[index].cl.rect.IsEmpty() : false;
+    }
+
     // -------------------------------------------------------------------------
     // Batch edits / throttling
     // -------------------------------------------------------------------------
