@@ -77,6 +77,7 @@ public:
                                        Align align = Align::Center, int thickness = DPI(1),
                                        UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
     int  GetItemCount() const { return items.GetCount(); }
+    Rect GetCellRect(int row, int col) const;
     Rect GetItemRect(int index) const { return index >= 0 && index < items.GetCount() ? items[index].rect : Rect(0, 0, 0, 0); }
     bool IsItemVisible(int index) const { return index >= 0 && index < items.GetCount() ? items[index].visible && !items[index].rect.IsEmpty() : false; }
 

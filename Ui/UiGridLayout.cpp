@@ -409,6 +409,29 @@ Rect UiGridLayout::GetClientGridRect() const
     return Rect(GetSize()).Deflated(inset.left, inset.top, inset.right, inset.bottom);
 }
 
+Rect UiGridLayout::GetCellRect(int row, int col) const
+{
+    int cols = max(1, grid_cols);
+    int rows = max(1, grid_rows);
+    if(row < 0 || col < 0 || row >= rows || col >= cols)
+        return Rect(0, 0, 0, 0);
+
+    Rect area = GetClientGridRect();
+    int gap = style.spacing;
+    Vector<int> col_widths, row_heights;
+    ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
+
+    int x = area.left;
+    for(int i = 0; i < col; i++)
+        x += col_widths[i] + gap;
+
+    int y = area.top;
+    for(int i = 0; i < row; i++)
+        y += row_heights[i] + gap;
+
+    return RectC(x, y, col_widths[col], row_heights[row]);
+}
+
 void UiGridLayout::Layout()
 {
     Rect area = GetClientGridRect();

@@ -44,6 +44,7 @@ private:
 		void DrawResizeHandle(Draw& w, const Rect& root);
 		void DrawDropIndicator(Draw& w, const Rect& root);
 		Rect GetInsertMarkerRect(const DesignerNode& parent, const Rect& root) const;
+		Rect GetDropTagRect(const DesignerNode& target, const Rect& root, const Rect& marker, const String& label) const;
 		Rect GetContainerContentRect(const DesignerNode& parent, const Rect& root) const;
 		int GetSplitterPaneIndex(const DesignerNode& parent, Point p) const;
 		Rect GetSplitterPaneRect(const DesignerNode& parent, int pane) const;

@@ -2722,8 +2722,7 @@ void DesignerBoxLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 
 void DesignerBoxLayoutAdapter::Paint(Draw& w)
 {
-	if(overlay_.debug)
-		UiBoxLayout::Paint(w);
+	UiBoxLayout::Paint(w);
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 
@@ -2791,8 +2790,7 @@ void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 
 void DesignerGridLayoutAdapter::Paint(Draw& w)
 {
-	if(overlay_.debug)
-		UiGridLayout::Paint(w);
+	UiGridLayout::Paint(w);
 }
 
 void DesignerGridLayoutAdapter::Layout()
