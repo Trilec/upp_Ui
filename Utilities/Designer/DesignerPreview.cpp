@@ -588,6 +588,18 @@ static UiCrossAlign DesignerSpacerLineAlign(const DesignerNode& n)
 	return UiCrossAlign::Center;
 }
 
+static bool DesignerSpacerLineOrientationAuto(const DesignerNode& n)
+{
+	return DesignerPreviewNodeProperty(n, "line_orientation", "Auto") == "Auto";
+}
+
+static UiDirection DesignerSpacerLineOrientation(const DesignerNode& n)
+{
+	return DesignerPreviewNodeProperty(n, "line_orientation", "Auto") == "H"
+	     ? UiDirection::H
+	     : UiDirection::V;
+}
+
 static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& n)
 {
 	if(r.IsEmpty() || !(bool)DesignerPreviewNodeProperty(n, "line_enabled", false))
@@ -1190,6 +1202,10 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						ref = box->AddSpacer(weight);
 					if((bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
 						ref.LineEnabled(true)
+						   .LineOrientationAuto(DesignerSpacerLineOrientationAuto(child_node));
+						if(!DesignerSpacerLineOrientationAuto(child_node))
+							ref.LineOrientation(DesignerSpacerLineOrientation(child_node));
+						ref
 						   .LineStyle(DesignerSpacerLineStyle(child_node))
 						   .LineAlign(DesignerSpacerLineAlign(child_node))
 						   .LineThickness(DesignerSpacerLineThickness(child_node))
@@ -1260,6 +1276,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						                           true,
 						                           DesignerSpacerLineStyle(child_node),
 						                           DesignerSpacerLineAlign(child_node),
+						                           DesignerSpacerLineOrientationAuto(child_node),
+						                           DesignerSpacerLineOrientation(child_node),
 						                           DesignerSpacerLineThickness(child_node),
 						                           DesignerSpacerLineDash(child_node),
 						                           DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))),

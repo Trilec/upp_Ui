@@ -113,16 +113,69 @@ static Value PropertyFromJson(const Value& v)
 	Value value = JsonGet(m, "value");
 	if(type == "null")
 		return Null;
-	if(type == "bool")
-		return (bool)value;
-	if(type == "int")
-		return (int)value;
-	if(type == "int64")
-		return (int64)value;
-	if(type == "number")
-		return (double)value;
-	if(type == "color")
-		return HexToColor(value);
+	if(type == "bool") {
+		if(value.Is<bool>())
+			return value;
+		if(value.Is<int>())
+			return (int)value != 0;
+		if(value.Is<String>()) {
+			String s = ToLower(TrimBoth((String)value));
+			if(s == "true" || s == "1")
+				return true;
+			if(s == "false" || s == "0")
+				return false;
+		}
+		return Null;
+	}
+	if(type == "int") {
+		if(value.Is<int>())
+			return value;
+		if(value.Is<int64>())
+			return (int)(int64)value;
+		if(value.Is<double>())
+			return (int)(double)value;
+		if(value.Is<String>()) {
+			String s = TrimBoth((String)value);
+			if(IsNumber(s))
+				return ScanInt(s);
+		}
+		return Null;
+	}
+	if(type == "int64") {
+		if(value.Is<int64>())
+			return value;
+		if(value.Is<int>())
+			return (int64)(int)value;
+		if(value.Is<double>())
+			return (int64)(double)value;
+		if(value.Is<String>()) {
+			String s = TrimBoth((String)value);
+			if(IsNumber(s))
+				return (int64)ScanInt64(s);
+		}
+		return Null;
+	}
+	if(type == "number") {
+		if(value.Is<double>())
+			return value;
+		if(value.Is<int>())
+			return (double)(int)value;
+		if(value.Is<int64>())
+			return (double)(int64)value;
+		if(value.Is<String>()) {
+			String s = TrimBoth((String)value);
+			if(IsNumber(s))
+				return ScanDouble(s);
+		}
+		return Null;
+	}
+	if(type == "color") {
+		if(value.Is<Color>())
+			return value;
+		if(value.Is<String>())
+			return HexToColor((String)value);
+		return Null;
+	}
 	return AsString(value);
 }
 
@@ -141,6 +194,14 @@ static void ApplyJsonProperties(ValueMap& props, const Value& v)
 	ValueMap in = v;
 	for(int i = 0; i < in.GetCount(); i++)
 		props.Set(AsString(in.GetKey(i)), PropertyFromJson(in.GetValue(i)));
+}
+
+static bool ContainsId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
+{
+	for(DesignerNodeId q : ids)
+		if(q == id)
+			return true;
+	return false;
 }
 
 static ValueArray IdsToJson(const Vector<DesignerNodeId>& ids)
@@ -227,8 +288,9 @@ bool LoadDesignerModelJson(DesignerModel& model, const DesignerRegistry& registr
 	Vector<DesignerNodeState> states;
 	for(int i = 0; i < node_items.GetCount(); i++) {
 		if(!IsValueMap(node_items[i])) {
-			error = Format("Node entry %d is not an object.", i);
-			return false;
+			if(notes)
+				notes->Add(Format("Skipped invalid node entry %d.", i));
+			continue;
 		}
 		ValueMap item = node_items[i];
 		DesignerNodeState& s = states.Add();
@@ -252,9 +314,34 @@ bool LoadDesignerModelJson(DesignerModel& model, const DesignerRegistry& registr
 		s.expanded = (bool)JsonGet(item, "expanded", true);
 		s.last_rect = RectFromJson(JsonGet(item, "last_rect"));
 	}
+	Vector<DesignerNodeId> known_ids;
+	for(const DesignerNodeState& s : states)
+		if(!ContainsId(known_ids, s.id))
+			known_ids.Add(s.id);
+	for(DesignerNodeState& s : states) {
+		Vector<DesignerNodeId> clean_children;
+		for(DesignerNodeId child_id : s.children) {
+			if(ContainsId(known_ids, child_id) && !ContainsId(clean_children, child_id))
+				clean_children.Add(child_id);
+			else if(notes)
+				notes->Add(Format("Dropped invalid child reference %d from node %d.", child_id, s.id));
+		}
+		s.children = pick(clean_children);
+		if(s.id != Designer_ROOT && !ContainsId(known_ids, s.parent)) {
+			if(notes)
+				notes->Add(Format("Reparented node %d to root because parent %d is missing.", s.id, s.parent));
+			s.parent = Designer_ROOT;
+		}
+	}
 	Size virtual_size = SizeFromJson(JsonGet(doc, "virtual_size"), DesignerWindowSize());
 	Vector<DesignerNodeId> selection = IdsFromJson(JsonGet(doc, "selection"));
-	return model.ReplaceDocument(states, virtual_size, selection, error);
+	Vector<DesignerNodeId> clean_selection;
+	for(DesignerNodeId id : selection)
+		if(ContainsId(known_ids, id) && !ContainsId(clean_selection, id))
+			clean_selection.Add(id);
+		else if(notes)
+			notes->Add(Format("Dropped invalid selection node %d.", id));
+	return model.ReplaceDocument(states, virtual_size, clean_selection, error);
 }
 
 }

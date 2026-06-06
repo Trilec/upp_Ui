@@ -131,6 +131,9 @@ public:
     UiTitleCard& SetMediaReserve(int px);
     UiTitleCard& SetMediaSharePercent(int pct);
     UiTitleCard& SetMediaAutoFit(bool on = true);
+    UiTitleCard& SetContentInset(int px);
+    UiTitleCard& SetContentInset(const Rect& r);
+    UiTitleCard& SetMediaGap(int px);
 
     UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);

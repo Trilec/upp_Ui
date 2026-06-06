@@ -144,6 +144,8 @@ public:
         bool   is_break        = false;       // true => row/column break marker
         bool   line_enabled    = false;      // draw a separator line in this spacer
         UiSpacerLineStyle line_style = SPACER_LINE_SUBTLE;
+        bool   line_orientation_auto = true;
+        UiDirection line_orientation = UiDirection::V;
         Align  line_align      = Align::Center; // line position on cross axis
         int    line_thickness   = DPI(1);
         UiLineStyle line_dash   = SOLID;
@@ -302,7 +304,35 @@ public:
             if(ok()) {
                 owner->items[index].line_enabled = on;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
+            }
+            return *this;
+        }
+
+        ItemRef& LineOrientationAuto(bool on = true) {
+            if(ok()) {
+                owner->items[index].line_orientation_auto = on;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
+            }
+            return *this;
+        }
+
+        ItemRef& LineOrientation(UiDirection d) {
+            if(ok()) {
+                owner->items[index].line_orientation_auto = false;
+                owner->items[index].line_orientation = d;
+                owner->cur_gen++;
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -311,7 +341,10 @@ public:
             if(ok()) {
                 owner->items[index].line_style = s;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -320,7 +353,10 @@ public:
             if(ok()) {
                 owner->items[index].line_align = a;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -329,7 +365,10 @@ public:
             if(ok()) {
                 owner->items[index].line_thickness = max(1, px);
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -338,7 +377,10 @@ public:
             if(ok()) {
                 owner->items[index].line_dash = s;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -347,7 +389,10 @@ public:
             if(ok()) {
                 owner->items[index].line_inset = max(0, px);
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -356,7 +401,10 @@ public:
             if(ok()) {
                 owner->items[index].line_color_enabled = on;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }
@@ -365,7 +413,10 @@ public:
             if(ok()) {
                 owner->items[index].line_color = c;
                 owner->cur_gen++;
-                if(owner->layout_pause == 0) owner->Layout();
+                if(owner->layout_pause == 0) {
+                    owner->Layout();
+                    owner->Refresh();
+                }
             }
             return *this;
         }

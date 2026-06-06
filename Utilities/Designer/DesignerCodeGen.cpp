@@ -702,6 +702,18 @@ static String SpacerLineAlignExpr(const DesignerNode& n)
 	return "UiCrossAlign::Center";
 }
 
+static String SpacerLineOrientationAutoExpr(const DesignerNode& n)
+{
+	return AsString(CodeGenNodeProperty(n, "line_orientation", "Auto")) == "Auto" ? "true" : "false";
+}
+
+static String SpacerLineOrientationExpr(const DesignerNode& n)
+{
+	return AsString(CodeGenNodeProperty(n, "line_orientation", "Auto")) == "H"
+	     ? "UiDirection::H"
+	     : "UiDirection::V";
+}
+
 static String SpacerLineDashExpr(const DesignerNode& n)
 {
 	return CodeGenNodeProperty(n, "line_dash", "Solid") == "Dashed" ? "DASHED" : "SOLID";
@@ -1100,7 +1112,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	else if(n.type_id == "UiTitleCard")
 	{
 		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ");\n";
+		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 8)) << "))"
+		    << ".SetMediaGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "media_gap", 10)) << "));\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetMedia(" << icon << ", Size(DPI("
@@ -1345,6 +1359,10 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 					out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ");\n";
 				if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
 					out << "\t\t\tspacer.LineEnabled(true)"
+					    << ".LineOrientationAuto(" << SpacerLineOrientationAutoExpr(child) << ")";
+					if(AsString(CodeGenNodeProperty(child, "line_orientation", "Auto")) != "Auto")
+						out << ".LineOrientation(" << SpacerLineOrientationExpr(child) << ")";
+					out
 					    << ".LineStyle(" << SpacerLineStyleExpr(child) << ")"
 					    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
 					    << ".LineThickness(DPI(" << SpacerLineThickness(child) << "))"
@@ -1375,7 +1393,8 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 				out << "\t\t\tint item = " << p << ".AddExpand(" << weight << ");\n";
 			if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
 				out << "\t\t\t" << p << ".SetItemSeparatorLine(item, true, " << SpacerLineStyleExpr(child)
-				    << ", " << SpacerLineAlignExpr(child) << ", DPI(" << SpacerLineThickness(child)
+				    << ", " << SpacerLineAlignExpr(child) << ", " << SpacerLineOrientationAutoExpr(child)
+				    << ", " << SpacerLineOrientationExpr(child) << ", DPI(" << SpacerLineThickness(child)
 				    << "), " << SpacerLineDashExpr(child) << ", DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << ")";
 				if(CodeGenHasProperty(child, "line_color_enabled") &&
 				   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))

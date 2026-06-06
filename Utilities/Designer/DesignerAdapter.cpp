@@ -1094,6 +1094,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	if(node.type_id == "Spacer") {
 		b.Hide("text");
 		b.Hide("role");
+		b.Hide("width");
+		b.Hide("height");
 		HideThemeOverrideBindings(b);
 		b.Hide("theme_override");
 		b.Hide("face");
@@ -1103,9 +1105,16 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("frame_enabled");
 		b.Hide("min_width");
 		b.Hide("min_height");
+		b.Disable("h_sizing", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
+		b.Disable("v_sizing", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
+		b.Disable("fixed_width", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
+		b.Disable("fixed_height", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
 		b.Add("line_enabled", "Line enabled", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
 		      "Draws a separator line instead of a blank spacer.");
+		b.AddChoice("line_orientation", "Line orientation", "UiBoxLayout::ItemRef",
+		            "Controls whether the separator is vertical, horizontal, or chosen automatically from the spacer shape.",
+		            {{"Auto", "Auto"}, {"V", "Vertical"}, {"H", "Horizontal"}});
 		b.AddChoice("line_style", "Line style", "UiBoxLayout::ItemRef",
 		            "Separator line style.",
 		            {{"Subtle", "Subtle"}, {"Standard", "Standard"}, {"Accent", "Accent"},
@@ -1337,7 +1346,9 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	node_id_ = node.id;
 	UiTitleCard::Style s = UiTheme::ResolveTitleCard(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
-	s.metrics.content_margin = Rect(DPI(8), DPI(6), DPI(8), DPI(6));
+	int inset = max(0, (int)AdapterNodeProperty(node, "content_inset", 8));
+	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
+	s.media_gap = DPI(max(0, (int)AdapterNodeProperty(node, "media_gap", 10)));
 	s.text_align_h = AdapterNodeProperty(node, "align", "Left") == "Right" ? UiAlign::RIGHT
 	               : AdapterNodeProperty(node, "align", "Left") == "Center" ? UiAlign::CENTER
 	               : UiAlign::LEFT;
@@ -1374,6 +1385,10 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	b.Add("subtitle", "Subtitle", DesignerEditorKind::Text, "UiTitleCard::SetSubTitle",
 	      "Sets the subtitle shown by the title card.");
 	AddIconBinding(b);
+	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiTitleCard::SetContentInset",
+	         "Padding between the title card frame and its content.", 0, 32);
+	b.AddInt("media_gap", "Media gap", DesignerEditorKind::Slider, "UiTitleCard::SetMediaGap",
+	         "Gap between the icon or media and the title text block.", 0, 32);
 	b.AddChoice("align", "Justify", "UiTitleCard::Style::text_align_h",
 	            "Horizontal title/subtitle justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.Add("title_line", "Title line", DesignerEditorKind::Bool, "UiTitleCard::ShowTitleLine",
@@ -2677,6 +2692,7 @@ void DesignerBoxLayoutAdapter::SyncFromNode(const DesignerNode& node)
 void DesignerBoxLayoutAdapter::SetOverlayState(const DesignerOverlayState& state)
 {
 	overlay_ = state;
+	SetDebug(state.debug);
 	Refresh();
 }
 
@@ -2750,6 +2766,7 @@ void DesignerGridLayoutAdapter::SyncFromNode(const DesignerNode& node)
 void DesignerGridLayoutAdapter::SetOverlayState(const DesignerOverlayState& state)
 {
 	overlay_ = state;
+	SetDebug(state.debug);
 	debug_overlay_.Refresh();
 	Refresh();
 }

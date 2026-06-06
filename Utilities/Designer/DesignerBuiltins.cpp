@@ -242,6 +242,7 @@ static DesignerType MakeSpacerType()
 		n.properties.Set("max_space", 1000000);
 		n.properties.Set("weight", 1);
 		n.properties.Set("line_enabled", false);
+		n.properties.Set("line_orientation", "Auto");
 		n.properties.Set("line_style", "Subtle");
 		n.properties.Set("line_align", "Center");
 		n.properties.Set("line_thickness", 1);
@@ -391,6 +392,10 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("choice_a", "Recent A");
 			n.properties.Set("choice_b", "Recent B");
 			n.properties.Set("choice_c", "Recent C");
+		}
+		if(id == "UiTitleCard") {
+			n.properties.Set("content_inset", 8);
+			n.properties.Set("media_gap", 10);
 		}
 		if(id == "UiToolButton") {
 			n.properties.Set("text", "");

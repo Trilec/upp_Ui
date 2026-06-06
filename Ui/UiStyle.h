@@ -415,6 +415,7 @@ inline ShadowCurve ShadowLinear()
     return ShadowCurve { 0.000, 0.000, 1.000, 1.000 };
 }
 
+
 inline ShadowCurve ShadowSoft()
 {
     return ShadowCurve { 0.011, 0.491, 0.925, 1.000 };

@@ -206,6 +206,30 @@ UiTitleCard& UiTitleCard::SetMediaAutoFit(bool on)
     return *this;
 }
 
+UiTitleCard& UiTitleCard::SetContentInset(int px)
+{
+    int v = max(0, px);
+    return SetContentInset(Rect(DPI(v), DPI(v), DPI(v), DPI(v)));
+}
+
+UiTitleCard& UiTitleCard::SetContentInset(const Rect& r)
+{
+    Style& style = StyleEdit();
+    style.metrics.content_margin = r;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiTitleCard& UiTitleCard::SetMediaGap(int px)
+{
+    Style& style = StyleEdit();
+    style.media_gap = max(0, px);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
 UiTitleCard& UiTitleCard::SetTitleLine(UiSpan ex, int thickness, UiLineStyle style, Color c)
 {
     Style& st = StyleEdit();
