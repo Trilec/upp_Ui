@@ -182,6 +182,15 @@ UiTitleCard& UiTitleCard::SetMediaReserve(int px)
     return *this;
 }
 
+UiTitleCard& UiTitleCard::SetMediaMin(int px)
+{
+    Style& style = StyleEdit();
+    style.media_min = max(0, px);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
 UiTitleCard& UiTitleCard::SetMediaSharePercent(int pct)
 {
     Style& style = StyleEdit();

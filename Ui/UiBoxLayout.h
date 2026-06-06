@@ -144,8 +144,7 @@ public:
         bool   is_break        = false;       // true => row/column break marker
         bool   line_enabled    = false;      // draw a separator line in this spacer
         UiSpacerLineStyle line_style = SPACER_LINE_SUBTLE;
-        bool   line_orientation_auto = true;
-        UiDirection line_orientation = UiDirection::V;
+        UiSpacerLineOrientation line_orientation = UiSpacerLineOrientation::Auto;
         Align  line_align      = Align::Center; // line position on cross axis
         int    line_thickness   = DPI(1);
         UiLineStyle line_dash   = SOLID;
@@ -312,22 +311,9 @@ public:
             return *this;
         }
 
-        ItemRef& LineOrientationAuto(bool on = true) {
+        ItemRef& LineOrientation(UiSpacerLineOrientation o) {
             if(ok()) {
-                owner->items[index].line_orientation_auto = on;
-                owner->cur_gen++;
-                if(owner->layout_pause == 0) {
-                    owner->Layout();
-                    owner->Refresh();
-                }
-            }
-            return *this;
-        }
-
-        ItemRef& LineOrientation(UiDirection d) {
-            if(ok()) {
-                owner->items[index].line_orientation_auto = false;
-                owner->items[index].line_orientation = d;
+                owner->items[index].line_orientation = o;
                 owner->cur_gen++;
                 if(owner->layout_pause == 0) {
                     owner->Layout();

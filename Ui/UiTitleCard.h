@@ -129,6 +129,7 @@ public:
     UiTitleCard& SetMediaSide(UiAlign side);
     UiTitleCard& SetMediaAlign(UiAlign h, UiAlign v);
     UiTitleCard& SetMediaReserve(int px);
+    UiTitleCard& SetMediaMin(int px);
     UiTitleCard& SetMediaSharePercent(int pct);
     UiTitleCard& SetMediaAutoFit(bool on = true);
     UiTitleCard& SetContentInset(int px);

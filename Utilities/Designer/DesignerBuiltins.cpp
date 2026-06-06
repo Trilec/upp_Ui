@@ -396,6 +396,12 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		if(id == "UiTitleCard") {
 			n.properties.Set("content_inset", 8);
 			n.properties.Set("media_gap", 10);
+			n.properties.Set("media_reserve", 24);
+			n.properties.Set("media_min", 16);
+			n.properties.Set("media_auto_fit", false);
+			n.properties.Set("media_side", "Left");
+			n.properties.Set("media_align_h", "Center");
+			n.properties.Set("media_align_v", "Center");
 		}
 		if(id == "UiToolButton") {
 			n.properties.Set("text", "");

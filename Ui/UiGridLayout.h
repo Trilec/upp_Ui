@@ -75,8 +75,7 @@ public:
     int AddSeparator(int px = DPI(1));
     UiGridLayout& SetItemSeparatorLine(int index, bool on = true, UiSpacerLineStyle style = SPACER_LINE_SUBTLE,
                                        Align align = Align::Center,
-                                       bool orientation_auto = true,
-                                       UiDirection orientation = UiDirection::V,
+                                       UiSpacerLineOrientation orientation = UiSpacerLineOrientation::Auto,
                                        int thickness = DPI(1),
                                        UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
     int  GetItemCount() const { return items.GetCount(); }
@@ -118,8 +117,7 @@ private:
         bool  separator_enabled = false;
         UiSpacerLineStyle separator_style = SPACER_LINE_SUBTLE;
         Align separator_align = Align::Center;
-        bool  separator_orientation_auto = true;
-        UiDirection separator_orientation = UiDirection::V;
+        UiSpacerLineOrientation separator_orientation = UiSpacerLineOrientation::Auto;
         int   separator_thickness = DPI(1);
         UiLineStyle separator_dash = SOLID;
         int   separator_inset = 0;

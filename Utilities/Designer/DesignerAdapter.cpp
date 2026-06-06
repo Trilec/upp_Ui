@@ -1114,7 +1114,7 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		      "Draws a separator line instead of a blank spacer.");
 		b.AddChoice("line_orientation", "Line orientation", "UiBoxLayout::ItemRef",
 		            "Controls whether the separator is vertical, horizontal, or chosen automatically from the spacer shape.",
-		            {{"Auto", "Auto"}, {"V", "Vertical"}, {"H", "Horizontal"}});
+		            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}});
 		b.AddChoice("line_style", "Line style", "UiBoxLayout::ItemRef",
 		            "Separator line style.",
 		            {{"Subtle", "Subtle"}, {"Standard", "Standard"}, {"Accent", "Accent"},
@@ -1135,15 +1135,15 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Add("line_color", "Line color", DesignerEditorKind::Color,
 		      "UiBoxLayout::ItemRef",
 		      "Explicit separator color used when custom line color is enabled.");
-		b.AddChoice("spacer_kind", "Spacer", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
+		b.AddChoice("spacer_kind", "Spacer kind", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
 		            "Semantic layout spacer kind.",
 		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
-		b.AddInt("space", "Space", DesignerEditorKind::Slider, "AddGap / AddSpacer min",
-		         "Fixed size or bounded minimum in pixels before DPI scaling.", 0, 400);
+		b.AddInt("space", "Min space", DesignerEditorKind::Slider, "AddGap / AddSpacer min",
+		         "Minimum size on the parent layout's main axis.", 0, 400);
 		b.AddInt("max_space", "Max space", DesignerEditorKind::Slider, "UiGridLayout::AddSpacer max",
-		         "Bounded spacer maximum in pixels before DPI scaling.", 0, 1600);
+		         "Maximum size for bounded or limited expand spacers. Use 0 for unlimited.", 0, 1600);
 		b.AddInt("weight", "Weight", DesignerEditorKind::Slider, "AddSpacer / AddExpand weight",
-		         "Expander weight relative to other expanding items.", 1, 12);
+		         "How much remaining space this expander receives relative to other expanders.", 1, 12);
 		return;
 	}
 	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot" || node.type_id == "AccordionSectionSlot") {
@@ -1349,6 +1349,16 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	int inset = max(0, (int)AdapterNodeProperty(node, "content_inset", 8));
 	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	s.media_gap = DPI(max(0, (int)AdapterNodeProperty(node, "media_gap", 10)));
+	s.media_reserve = DPI(max(0, (int)AdapterNodeProperty(node, "media_reserve", 24)));
+	s.media_min = DPI(max(0, (int)AdapterNodeProperty(node, "media_min", 16)));
+	s.media_auto_fit = (bool)AdapterNodeProperty(node, "media_auto_fit", false);
+	s.media_side = DesignerSideChoice(AdapterNodeProperty(node, "media_side", "Left"), UiAlign::LEFT);
+	s.media_align_h = AdapterNodeProperty(node, "media_align_h", "Center") == "Right" ? UiAlign::RIGHT
+	                 : AdapterNodeProperty(node, "media_align_h", "Center") == "Left" ? UiAlign::LEFT
+	                 : UiAlign::CENTER;
+	s.media_align_v = AdapterNodeProperty(node, "media_align_v", "Center") == "Bottom" ? UiAlign::BOTTOM
+	                 : AdapterNodeProperty(node, "media_align_v", "Center") == "Top" ? UiAlign::TOP
+	                 : UiAlign::CENTER;
 	s.text_align_h = AdapterNodeProperty(node, "align", "Left") == "Right" ? UiAlign::RIGHT
 	               : AdapterNodeProperty(node, "align", "Left") == "Center" ? UiAlign::CENTER
 	               : UiAlign::LEFT;
@@ -1389,6 +1399,21 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	         "Padding between the title card frame and its content.", 0, 32);
 	b.AddInt("media_gap", "Media gap", DesignerEditorKind::Slider, "UiTitleCard::SetMediaGap",
 	         "Gap between the icon or media and the title text block.", 0, 32);
+	b.AddInt("media_reserve", "Media reserve", DesignerEditorKind::Slider, "UiTitleCard::SetMediaReserve",
+	         "Reserved media column or row size before DPI scaling.", 0, 160);
+	b.AddInt("media_min", "Media min", DesignerEditorKind::Slider, "UiTitleCard::Style::media_min",
+	         "Minimum media size before DPI scaling.", 0, 96);
+	b.Add("media_auto_fit", "Media auto fit", DesignerEditorKind::Bool, "UiTitleCard::SetMediaAutoFit",
+	      "Automatically size the media area from the text block and image aspect.");
+	b.AddChoice("media_side", "Media side", "UiTitleCard::SetMediaSide",
+	            "Side where the icon or media is placed.",
+	            {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	b.AddChoice("media_align_h", "Media align X", "UiTitleCard::SetMediaAlign",
+	            "Horizontal alignment for top or bottom media placement.",
+	            {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("media_align_v", "Media align Y", "UiTitleCard::SetMediaAlign",
+	            "Vertical alignment for left or right media placement.",
+	            {{"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
 	b.AddChoice("align", "Justify", "UiTitleCard::Style::text_align_h",
 	            "Horizontal title/subtitle justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.Add("title_line", "Title line", DesignerEditorKind::Bool, "UiTitleCard::ShowTitleLine",

@@ -43,7 +43,7 @@ static int GridSeparatorThickness(UiSpacerLineStyle style, int custom_thickness)
 }
 
 static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiSpacerLineStyle style, UiCrossAlign align,
-                               bool orientation_auto, UiDirection orientation, int thickness, UiLineStyle dash, int inset,
+                               UiSpacerLineOrientation orientation, int thickness, UiLineStyle dash, int inset,
                                bool color_enabled, Color color)
 {
     if(r.IsEmpty() || !enabled)
@@ -52,8 +52,10 @@ static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiSpacerLin
     thickness = GridSeparatorThickness(style, thickness);
     inset = max(0, inset);
     Color c = GridSeparatorColor(color_enabled, color, style);
-    bool vertical = !orientation_auto ? (orientation == UiDirection::V)
-                                      : (r.GetWidth() >= r.GetHeight());
+    bool vertical = orientation == UiSpacerLineOrientation::Vertical
+                 || (orientation == UiSpacerLineOrientation::Auto && r.GetWidth() >= r.GetHeight());
+    if(orientation == UiSpacerLineOrientation::Horizontal)
+        vertical = false;
     int dash_main = max(DPI(6), thickness * 3);
     int dash_gap = max(DPI(4), thickness * 2);
 
@@ -289,12 +291,12 @@ int UiGridLayout::AddSeparator(int px)
         return -1;
     int item = AddBlankGrid(p.y, p.x);
     if(item >= 0)
-        SetItemSeparatorLine(item, true, SPACER_LINE_SUBTLE, Align::Center, true, UiDirection::V, max(1, px), SOLID, 0, Null);
+        SetItemSeparatorLine(item, true, SPACER_LINE_SUBTLE, Align::Center, UiSpacerLineOrientation::Auto, max(1, px), SOLID, 0, Null);
     return item;
 }
 
 UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, UiSpacerLineStyle style, Align align,
-                                                 bool orientation_auto, UiDirection orientation, int thickness,
+                                                 UiSpacerLineOrientation orientation, int thickness,
                                                  UiLineStyle dash, int inset, Color c)
 {
     if(index >= 0 && index < items.GetCount()) {
@@ -302,7 +304,6 @@ UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, UiSpacerLin
         it.separator_enabled = on;
         it.separator_style = style;
         it.separator_align = align;
-        it.separator_orientation_auto = orientation_auto;
         it.separator_orientation = orientation;
         it.separator_thickness = max(1, thickness);
         it.separator_dash = dash;
@@ -532,7 +533,7 @@ void UiGridLayout::Paint(Draw& w)
             if(!it.separator_enabled || it.rect.IsEmpty())
                 continue;
             PaintGridSeparator(w, it.rect, it.separator_enabled, it.separator_style, it.separator_align,
-                               it.separator_orientation_auto, it.separator_orientation,
+                               it.separator_orientation,
                                it.separator_thickness, it.separator_dash, it.separator_inset,
                                it.separator_color_enabled, it.separator_color);
         }

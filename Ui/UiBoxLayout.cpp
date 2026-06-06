@@ -50,8 +50,10 @@ static void PaintSpacerLine(Draw& w, const Rect& r, const UiBoxLayout::Item& it)
     int thickness = SpacerLineThickness(it);
     int inset = max(0, it.line_inset);
     Color c = SpacerLineColor(it);
-    bool vertical = !it.line_orientation_auto ? (it.line_orientation == UiDirection::V)
-                                              : (r.GetWidth() >= r.GetHeight());
+    bool vertical = it.line_orientation == UiSpacerLineOrientation::Vertical
+                 || (it.line_orientation == UiSpacerLineOrientation::Auto && r.GetWidth() >= r.GetHeight());
+    if(it.line_orientation == UiSpacerLineOrientation::Horizontal)
+        vertical = false;
     int dash_main = max(DPI(6), thickness * 3);
     int dash_gap = max(DPI(4), thickness * 2);
 

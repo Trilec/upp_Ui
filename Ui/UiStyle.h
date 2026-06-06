@@ -285,6 +285,12 @@ enum UiSpacerLineStyle : byte {
     SPACER_LINE_CUSTOM,
 };
 
+enum class UiSpacerLineOrientation : byte {
+    Auto = 0,
+    Vertical,
+    Horizontal,
+};
+
 enum UiSpan : byte {
     NONE = 0,
     SMALL,
@@ -293,6 +299,7 @@ enum UiSpan : byte {
 };
 
 inline dword GetHashValue(UiCrossAlign a) { return (byte)a; }
+inline dword GetHashValue(UiSpacerLineOrientation a) { return (byte)a; }
 
 inline Stream& operator%(Stream& s, UiCrossAlign& a)
 {
@@ -413,6 +420,18 @@ struct ShadowCurve {
 inline ShadowCurve ShadowLinear()
 {
     return ShadowCurve { 0.000, 0.000, 1.000, 1.000 };
+}
+
+inline Stream& operator%(Stream& s, UiSpacerLineOrientation& a)
+{
+    if(s.IsStoring())
+        s % (byte&)a;
+    else {
+        byte b;
+        s % b;
+        a = (UiSpacerLineOrientation)b;
+    }
+    return s;
 }
 
 

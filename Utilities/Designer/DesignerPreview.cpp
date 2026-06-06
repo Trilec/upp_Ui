@@ -588,16 +588,14 @@ static UiCrossAlign DesignerSpacerLineAlign(const DesignerNode& n)
 	return UiCrossAlign::Center;
 }
 
-static bool DesignerSpacerLineOrientationAuto(const DesignerNode& n)
+static UiSpacerLineOrientation DesignerSpacerLineOrientation(const DesignerNode& n)
 {
-	return DesignerPreviewNodeProperty(n, "line_orientation", "Auto") == "Auto";
-}
-
-static UiDirection DesignerSpacerLineOrientation(const DesignerNode& n)
-{
-	return DesignerPreviewNodeProperty(n, "line_orientation", "Auto") == "H"
-	     ? UiDirection::H
-	     : UiDirection::V;
+	String orientation = DesignerPreviewNodeProperty(n, "line_orientation", "Auto");
+	if(orientation == "Vertical")
+		return UiSpacerLineOrientation::Vertical;
+	if(orientation == "Horizontal")
+		return UiSpacerLineOrientation::Horizontal;
+	return UiSpacerLineOrientation::Auto;
 }
 
 static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& n)
@@ -1189,8 +1187,14 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				if(child_node.type_id == "Spacer") {
 					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
 					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
-					int max_size = max(size, (int)DesignerPreviewNodeProperty(child_node, "max_space", 1000000));
+					int raw_max = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_space", 0));
+					int max_size = raw_max <= 0 ? INT_MAX : max(size, raw_max);
 					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
+					UiSpacerLineOrientation orientation = DesignerSpacerLineOrientation(child_node);
+					int line_min = (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)
+					             ? DesignerSpacerLineThickness(child_node)
+					             : 0;
+					size = max(size, line_min);
 					UiBoxLayout::ItemRef ref;
 					if(kind == "Break")
 						ref = box->AddBreak(weight);
@@ -1198,14 +1202,27 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						ref = box->AddSpacer(1).Fixed(DPI(size));
 					else if(kind == "Bounded")
 						ref = box->AddSpacer(weight).MinMain(DPI(size)).MaxMain(DPI(max_size));
-					else
-						ref = box->AddSpacer(weight);
+					else {
+						ref = box->AddSpacer(weight).MinMain(DPI(size));
+						if(max_size != INT_MAX)
+							ref.MaxMain(DPI(max_size));
+					}
+					bool parent_horizontal = DesignerPreviewNodeProperty(parent_node, "direction", "V") == "H";
+					if(orientation == UiSpacerLineOrientation::Vertical) {
+						if(parent_horizontal)
+							ref.MinMain(DPI(max(size, line_min)));
+						else
+							ref.MinCross(DPI(line_min));
+					}
+					else if(orientation == UiSpacerLineOrientation::Horizontal) {
+						if(parent_horizontal)
+							ref.MinCross(DPI(line_min));
+						else
+							ref.MinMain(DPI(max(size, line_min)));
+					}
 					if((bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
 						ref.LineEnabled(true)
-						   .LineOrientationAuto(DesignerSpacerLineOrientationAuto(child_node));
-						if(!DesignerSpacerLineOrientationAuto(child_node))
-							ref.LineOrientation(DesignerSpacerLineOrientation(child_node));
-						ref
+						   .LineOrientation(DesignerSpacerLineOrientation(child_node))
 						   .LineStyle(DesignerSpacerLineStyle(child_node))
 						   .LineAlign(DesignerSpacerLineAlign(child_node))
 						   .LineThickness(DesignerSpacerLineThickness(child_node))
@@ -1257,7 +1274,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				if(child_node.type_id == "Spacer") {
 					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
 					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
-					int max_size = max(size, (int)DesignerPreviewNodeProperty(child_node, "max_space", 1000000));
+					int raw_max = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_space", 0));
+					int max_size = raw_max <= 0 ? INT_MAX : max(size, raw_max);
 					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
 					int item = -1;
 					if(kind == "Break")
@@ -1265,7 +1283,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					else if(kind == "Fixed")
 						item = grid->AddGap(DPI(size));
 					else if(kind == "Bounded")
-						item = grid->AddSpacer(DPI(size), DPI(max_size));
+						item = grid->AddSpacer(DPI(size), max_size == INT_MAX ? INT_MAX : DPI(max_size));
 					else
 						item = grid->AddExpand(weight);
 					if(item >= 0 && (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
@@ -1276,7 +1294,6 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 						                           true,
 						                           DesignerSpacerLineStyle(child_node),
 						                           DesignerSpacerLineAlign(child_node),
-						                           DesignerSpacerLineOrientationAuto(child_node),
 						                           DesignerSpacerLineOrientation(child_node),
 						                           DesignerSpacerLineThickness(child_node),
 						                           DesignerSpacerLineDash(child_node),
