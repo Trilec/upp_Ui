@@ -7,6 +7,32 @@
 
 namespace Upp {
 
+static void DesignerMultiSelectLog(const String& text)
+{
+	String folder = GetFileFolder(GetExeFilePath());
+	String leaf = ToLower(GetFileName(folder));
+	if(leaf == "designer" || leaf == "designerruntests")
+		folder = GetFileFolder(folder);
+	if(ToLower(GetFileName(folder)) != "out")
+		folder = AppendFileName(GetCurrentDirectory(), "out");
+	String path = NormalizePath(AppendFileName(folder, "designer_multiselect.log"));
+	FileAppend fa(path);
+	if(!fa.IsOpen())
+		return;
+	fa.PutLine(AsString(GetSysTime()) + " " + text);
+}
+
+static bool DesignerIsSafeMultiSelectProperty(const String& id)
+{
+	return id == "role" ||
+	       id == "h_sizing" || id == "v_sizing" ||
+	       id == "fixed_width" || id == "fixed_height" ||
+	       id == "min_width" || id == "max_width" ||
+	       id == "min_height" || id == "max_height" ||
+	       id == "cell_align_h" || id == "cell_align_v" ||
+	       id == "theme_override";
+}
+
 static UiRole DesignerInspectorRoleChoice(const Value& role)
 {
 	String s = AsString(role);
@@ -502,6 +528,9 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 	for(const DesignerApiBinding& b : first) {
 		if(!b.visible || !b.enabled || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
 			continue;
+		if(!DesignerIsSafeMultiSelectProperty(b.property_id)) {
+			continue;
+		}
 		bool common = true;
 		for(int i = 1; i < nodes.GetCount() && common; i++) {
 			Vector<DesignerApiBinding> other;
@@ -533,8 +562,9 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 					common = false;
 			}
 		}
-		if(common)
+		if(common) {
 			bindings.Add(DesignerCloneBinding(b));
+		}
 	}
 }
 
@@ -809,6 +839,9 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 {
 	if(!b.visible || !b.enabled || b.property_id == "name")
 		return;
+	if(!DesignerIsSafeMultiSelectProperty(b.property_id)) {
+		return;
+	}
 	int label_w = DPI(88);
 	int gap = DPI(8);
 	bool mixed = false;
@@ -835,6 +868,12 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && !syncing_ && !IsNull(data))
 				WhenPropertyMany(selection_, property_id, data);
+		};
+		row->WhenClose = [=] {
+			PostCallback([=] {
+				if(self && !syncing_ && !IsNull(self->GetData()))
+					WhenPropertyMany(selection_, property_id, self->GetData());
+			});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;

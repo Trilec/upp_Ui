@@ -17,6 +17,21 @@
 
 namespace Upp {
 
+static void DesignerMultiSelectCommandLog(const String& text)
+{
+	String folder = GetFileFolder(GetExeFilePath());
+	String leaf = ToLower(GetFileName(folder));
+	if(leaf == "designer" || leaf == "designerruntests")
+		folder = GetFileFolder(folder);
+	if(ToLower(GetFileName(folder)) != "out")
+		folder = AppendFileName(GetCurrentDirectory(), "out");
+	String path = NormalizePath(AppendFileName(folder, "designer_multiselect.log"));
+	FileAppend fa(path);
+	if(!fa.IsOpen())
+		return;
+	fa.PutLine(AsString(GetSysTime()) + " " + text);
+}
+
 static const char* DESIGNER_VERSION = "v0.1.70";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
@@ -2537,37 +2552,43 @@ private:
 	{
 		if(ids.IsEmpty())
 			return;
+		DesignerMultiSelectCommandLog("SaveInspectorPropertyValues property=" + property_id + " ids=" + AsString(ids.GetCount()) + " value=" + StdFormat(value));
 		Vector<DesignerNodeId> changed_ids;
 		bool grouped = false;
+		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
+		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
 				continue;
-			Vector<DesignerApiBinding> bindings;
-			DesignerAdapter *adapter = nullptr;
-			One<Ctrl> ctrl;
-			ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
-			if(adapter)
-				adapter->DescribeApi(bindings, *n);
-			const DesignerApiBinding* binding = FindApiBinding(bindings, property_id);
-			if(!binding || !binding->visible || !binding->enabled)
-				continue;
 			Value normalized = NormalizeInspectorValue(*n, property_id, value);
 			int q = n->properties.Find(property_id);
-			if(q >= 0 && n->properties.GetValue(q) == normalized)
+			if(q >= 0 && n->properties.GetValue(q) == normalized) {
+				DesignerMultiSelectCommandLog(Format("  skip id=%d unchanged", id));
 				continue;
+			}
 			if(!grouped) {
 				commands_.BeginGroup("Set " + property_id + " on selection");
 				grouped = true;
+				DesignerMultiSelectCommandLog("  begin_group");
 			}
-			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, normalized, binding->api_call), model_))
+			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, normalized, "Set " + property_id), model_)) {
 				changed_ids.Add(id);
+				DesignerMultiSelectCommandLog(Format("  changed id=%d", id));
+			}
+			else
+				DesignerMultiSelectCommandLog(Format("  execute_failed id=%d", id));
 		}
 		if(grouped)
 			commands_.EndGroup();
+		DesignerMultiSelectCommandLog(Format("  end_group changed=%d", changed_ids.GetCount()));
 		if(!changed_ids.IsEmpty()) {
 			model_.SetSelection(ids);
-			PostDesignerRefresh(property_id == "theme_override");
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+			if(needs_hierarchy)
+				RefreshHierarchy();
+			PostDesignerRefresh(needs_inspector);
 		}
 	}
 
