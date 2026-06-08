@@ -650,45 +650,13 @@ static String IconExpr(const String& icon)
 
 static int SpacerLineThickness(const DesignerNode& n)
 {
-	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
-	if(style == "Custom")
-		return max(1, (int)CodeGenNodeProperty(n, "line_thickness", 1));
-	if(style == "Alert")
-		return 4;
-	if(style == "Accent" || style == "Standard")
-		return 2;
-	return 1;
-}
-
-static String SpacerLineStyleExpr(const DesignerNode& n)
-{
-	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
-	if(style == "Standard")
-		return "SPACER_LINE_STANDARD";
-	if(style == "Accent")
-		return "SPACER_LINE_ACCENT";
-	if(style == "Alert")
-		return "SPACER_LINE_ALERT";
-	if(style == "Custom")
-		return "SPACER_LINE_CUSTOM";
-	return "SPACER_LINE_SUBTLE";
+	return max(1, (int)CodeGenNodeProperty(n, "line_thickness", 1));
 }
 
 static String SpacerLineColorExpr(const DesignerNode& n)
 {
 	if(CodeGenHasProperty(n, "line_color_enabled") && (bool)CodeGenNodeProperty(n, "line_color_enabled", false))
 		return ColorExpr((Color)CodeGenNodeProperty(n, "line_color", Color(148, 163, 184)));
-
-	String style = AsString(CodeGenNodeProperty(n, "line_style", "Subtle"));
-	if(style == "Custom") {
-		return "SColorShadow()";
-	}
-	if(style == "Accent")
-		return "UiTheme::ResolveButton(UiRole::Accent).palette.frame[ST_NORMAL]";
-	if(style == "Alert")
-		return "UiTheme::ResolveButton(UiRole::Alert).palette.frame[ST_NORMAL]";
-	if(style == "Standard")
-		return "UiTheme::ResolvePanel(UiPanelRole::Surface).palette.frame[ST_NORMAL]";
 	return "UiTheme::ResolvePanel(UiPanelRole::Subtle).palette.frame[ST_NORMAL]";
 }
 
@@ -796,6 +764,16 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 static String AxisSizing(const DesignerNode& n, const String& axis_key)
 {
 	return CodeGenNodeProperty(n, axis_key, "Fit");
+}
+
+static int SpacerAxisMin(const DesignerNode& n, bool width_axis)
+{
+	return max(0, (int)CodeGenNodeProperty(n, width_axis ? "min_width" : "min_height", DESIGNER_MIN_CLAMP));
+}
+
+static int SpacerAxisMax(const DesignerNode& n, bool width_axis)
+{
+	return max(0, (int)CodeGenNodeProperty(n, width_axis ? "max_width" : "max_height", 0));
 }
 
 static int CodeGenFixedMetric(const DesignerNode& n, const String& axis_key, int fallback)
@@ -1311,33 +1289,6 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 }
 
-static void EmitAddSpacer(String& out, const String& parent_var, const DesignerNode& parent,
-                          const DesignerNode& child)
-{
-	String kind = CodeGenNodeProperty(child, "spacer_kind", "Expander");
-	int size = max(0, (int)CodeGenNodeProperty(child, "space", 24));
-	int max_size = max(size, (int)CodeGenNodeProperty(child, "max_space", 1000000));
-	int weight = max(1, (int)CodeGenNodeProperty(child, "weight", 1));
-	if(parent.type_id == "BoxLayout") {
-		if(kind == "Break")
-			out << "\t\t" << parent_var << ".AddBreak(" << weight << ");\n";
-		else if(kind == "Fixed")
-			out << "\t\t" << parent_var << ".AddSpacer(1).Fixed(DPI(" << size << "));\n";
-		else
-			out << "\t\t" << parent_var << ".AddSpacer(" << weight << ");\n";
-	}
-	else if(parent.type_id == "GridLayout") {
-		if(kind == "Break")
-			out << "\t\t" << parent_var << ".AddBreak();\n";
-		else if(kind == "Fixed")
-			out << "\t\t" << parent_var << ".AddGap(DPI(" << size << "));\n";
-		else if(kind == "Bounded")
-			out << "\t\t" << parent_var << ".AddSpacer(DPI(" << size << "), DPI(" << max_size << "));\n";
-		else
-			out << "\t\t" << parent_var << ".AddExpand(" << weight << ");\n";
-	}
-}
-
 static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& names,
                          const DesignerNode& parent, const DesignerNode& child, int index)
 {
@@ -1346,43 +1297,60 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 	if(child.type_id == "Spacer" && parent.id == Designer_ROOT)
 		return;
 	if(child.type_id == "Spacer") {
-		String kind = CodeGenNodeProperty(child, "spacer_kind", "Expander");
-		int size = max(0, (int)CodeGenNodeProperty(child, "space", 24));
-		int raw_max = max(0, (int)CodeGenNodeProperty(child, "max_space", 0));
-		int max_size = raw_max <= 0 ? INT_MAX : max(size, raw_max);
 		int weight = max(1, (int)CodeGenNodeProperty(child, "weight", 1));
 		int line_min = (bool)CodeGenNodeProperty(child, "line_enabled", false) ? SpacerLineThickness(child) : 0;
-		size = max(size, line_min);
+		bool layout_break = (bool)CodeGenNodeProperty(child, "layout_break", false);
 		if(parent.type_id == "BoxLayout") {
-			if(kind == "Break")
+			if(layout_break)
 				out << "\t\t" << p << ".AddBreak(" << weight << ");\n";
 			else {
-				out << "\t\t{\n";
-				if(kind == "Fixed")
-					out << "\t\t\tauto spacer = " << p << ".AddSpacer(1).Fixed(DPI(" << size << "));\n";
-				else if(kind == "Bounded")
-					out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ").MinMain(DPI(" << size << ")).MaxMain(DPI(" << max_size << "));\n";
-				else
-					out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ").MinMain(DPI(" << size << "))"
-					    << (max_size != INT_MAX ? ".MaxMain(DPI(" + AsString(max_size) + "))" : String()) << ";\n";
 				bool parent_horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
+				String main_sizing = parent_horizontal ? AxisSizing(child, "h_sizing") : AxisSizing(child, "v_sizing");
+				String cross_sizing = parent_horizontal ? AxisSizing(child, "v_sizing") : AxisSizing(child, "h_sizing");
+				int min_w = SpacerAxisMin(child, true);
+				int min_h = SpacerAxisMin(child, false);
+				int max_w = SpacerAxisMax(child, true);
+				int max_h = SpacerAxisMax(child, false);
+				int fixed_w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
+				int fixed_h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
 				String orientation = AsString(CodeGenNodeProperty(child, "line_orientation", "Auto"));
-				if(orientation == "Vertical") {
-					if(parent_horizontal)
-						out << "\t\t\tspacer.MinMain(DPI(" << max(size, line_min) << "));\n";
+				if(orientation == "Vertical")
+					min_w = max(min_w, line_min);
+				else if(orientation == "Horizontal")
+					min_h = max(min_h, line_min);
+				int min_main = parent_horizontal ? min_w : min_h;
+				int max_main = parent_horizontal ? max_w : max_h;
+				int fixed_main = parent_horizontal ? fixed_w : fixed_h;
+				int min_cross = parent_horizontal ? min_h : min_w;
+				int max_cross = parent_horizontal ? max_h : max_w;
+				int fixed_cross = parent_horizontal ? fixed_h : fixed_w;
+				out << "\t\t{\n";
+				out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ");\n";
+				if(main_sizing == "Fixed")
+					out << "\t\t\tspacer.Fixed(DPI(" << fixed_main << "));\n";
+				else if(main_sizing == "Expand")
+					out << "\t\t\tspacer.Expand(" << weight << ").MinMain(DPI(" << min_main << "));\n";
+				else
+					out << "\t\t\tspacer.Fit().MinMain(DPI(" << min_main << "));\n";
+				if(max_main > 0)
+					out << "\t\t\tspacer.MaxMain(DPI(" << max(max_main, min_main) << "));\n";
+				if(cross_sizing == "Fixed")
+					out << "\t\t\tspacer.MinMaxCross(DPI(" << fixed_cross << "), DPI(" << fixed_cross << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
+				else if(cross_sizing == "Expand") {
+					if(max_cross > 0)
+						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(UiBoxLayout::Align::Stretch);\n";
 					else
-						out << "\t\t\tspacer.MinCross(DPI(" << line_min << "));\n";
+						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(UiBoxLayout::Align::Stretch);\n";
 				}
-				else if(orientation == "Horizontal") {
-					if(parent_horizontal)
-						out << "\t\t\tspacer.MinCross(DPI(" << line_min << "));\n";
+				else {
+					if(max_cross > 0)
+						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
 					else
-						out << "\t\t\tspacer.MinMain(DPI(" << max(size, line_min) << "));\n";
+						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
 				}
 				if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
 					out << "\t\t\tspacer.LineEnabled(true)"
 					    << ".LineOrientation(" << SpacerLineOrientationExpr(child) << ")"
-					    << ".LineStyle(" << SpacerLineStyleExpr(child) << ")"
 					    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
 					    << ".LineThickness(DPI(" << SpacerLineThickness(child) << "))"
 					    << ".LineDash(" << SpacerLineDashExpr(child) << ")"
@@ -1401,26 +1369,60 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 			int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
 			int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
 			int col = clamp((int)CodeGenNodeProperty(child, "grid_col", index % columns), 0, columns - 1);
-			if(kind == "Break")
+			int min_w = SpacerAxisMin(child, true);
+			int min_h = SpacerAxisMin(child, false);
+			int max_w = SpacerAxisMax(child, true);
+			int max_h = SpacerAxisMax(child, false);
+			int fixed_w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
+			int fixed_h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
+			String hs = AxisSizing(child, "h_sizing");
+			String vs = AxisSizing(child, "v_sizing");
+			String orientation = AsString(CodeGenNodeProperty(child, "line_orientation", "Auto"));
+			if(orientation == "Vertical")
+				min_w = max(min_w, line_min);
+			else if(orientation == "Horizontal")
+				min_h = max(min_h, line_min);
+			else {
+				min_w = max(min_w, line_min);
+				min_h = max(min_h, line_min);
+			}
+			if(layout_break)
 				return;
 			out << "\t\t{\n";
-			if(kind == "Fixed")
-				out << "\t\t\tint item = " << p << ".AddGap(DPI(" << size << "));\n";
-			else if(kind == "Bounded")
-				out << "\t\t\tint item = " << p << ".AddSpacer(DPI(" << size << "), "
-				    << (max_size == INT_MAX ? "INT_MAX" : "DPI(" + AsString(max_size) + ")") << ");\n";
-			else
-				out << "\t\t\tint item = " << p << ".AddExpand(" << weight << ");\n";
+			out << "\t\t\tauto blank = " << p << ".AddBlank(" << row << ", " << col << ");\n";
+			if(hs == "Expand")
+				out << "\t\t\tblank.ExpandX(true);\n";
+			if(vs == "Expand")
+				out << "\t\t\tblank.ExpandY(true);\n";
+			if(hs == "Fixed")
+				out << "\t\t\tblank.FixedWidth(DPI(" << fixed_w << "));\n";
+			else {
+				out << "\t\t\tblank.MinWidth(DPI(" << min_w << "));\n";
+				if(max_w > 0)
+					out << "\t\t\tblank.MaxWidth(DPI(" << max(max_w, min_w) << "));\n";
+			}
+			if(vs == "Fixed")
+				out << "\t\t\tblank.FixedHeight(DPI(" << fixed_h << "));\n";
+			else {
+				out << "\t\t\tblank.MinHeight(DPI(" << min_h << "));\n";
+				if(max_h > 0)
+					out << "\t\t\tblank.MaxHeight(DPI(" << max(max_h, min_h) << "));\n";
+			}
+			out << "\t\t\tblank.Align("
+			    << (hs == "Expand" ? "UiGridLayout::Align::Stretch" : "UiGridLayout::Align::Start") << ", "
+			    << (vs == "Expand" ? "UiGridLayout::Align::Stretch" : "UiGridLayout::Align::Start") << ");\n";
 			if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
-				out << "\t\t\t" << p << ".SetItemSeparatorLine(item, true, " << SpacerLineStyleExpr(child)
-				    << ", " << SpacerLineAlignExpr(child) << ", " << SpacerLineOrientationExpr(child) << ", DPI(" << SpacerLineThickness(child)
-				    << "), " << SpacerLineDashExpr(child) << ", DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << ")";
+				out << "\t\t\tblank.LineEnabled(true)"
+				    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
+				    << ".LineOrientation(" << SpacerLineOrientationExpr(child) << ")"
+				    << ".LineThickness(DPI(" << SpacerLineThickness(child)
+				    << "))"
+				    << ".LineDash(" << SpacerLineDashExpr(child) << ")"
+				    << ".LineInset(DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << "))";
 				if(CodeGenHasProperty(child, "line_color_enabled") &&
 				   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))
-					out << ", " << SpacerLineColorExpr(child);
-				else
-					out << ", Null";
-				out << ");\n";
+					out << ".LineColorEnabled(true).LineColor(" << SpacerLineColorExpr(child) << ")";
+				out << ";\n";
 			}
 			out << "\t\t}\n";
 			return;

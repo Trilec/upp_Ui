@@ -143,7 +143,6 @@ public:
         Align  align_self      = Align::Auto; // per-item cross-axis alignment
         bool   is_break        = false;       // true => row/column break marker
         bool   line_enabled    = false;      // draw a separator line in this spacer
-        UiSpacerLineStyle line_style = SPACER_LINE_SUBTLE;
         UiSpacerLineOrientation line_orientation = UiSpacerLineOrientation::Auto;
         Align  line_align      = Align::Center; // line position on cross axis
         int    line_thickness   = DPI(1);
@@ -314,18 +313,6 @@ public:
         ItemRef& LineOrientation(UiSpacerLineOrientation o) {
             if(ok()) {
                 owner->items[index].line_orientation = o;
-                owner->cur_gen++;
-                if(owner->layout_pause == 0) {
-                    owner->Layout();
-                    owner->Refresh();
-                }
-            }
-            return *this;
-        }
-
-        ItemRef& LineStyle(UiSpacerLineStyle s) {
-            if(ok()) {
-                owner->items[index].line_style = s;
                 owner->cur_gen++;
                 if(owner->layout_pause == 0) {
                     owner->Layout();

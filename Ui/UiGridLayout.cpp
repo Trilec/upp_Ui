@@ -2,56 +2,28 @@
 
 namespace Upp {
 
-static Color GridSeparatorPresetColor(UiSpacerLineStyle style)
+static Color GridSeparatorDefaultColor()
 {
-    switch(style) {
-    case SPACER_LINE_STANDARD:
-        return Blend(SColorShadow(), SColorPaper(), 150);
-    case SPACER_LINE_ACCENT:
-        return SColorHighlight();
-    case SPACER_LINE_ALERT:
-        return Color(220, 38, 38);
-    case SPACER_LINE_CUSTOM:
-        return Blend(SColorShadow(), SColorPaper(), 150);
-    case SPACER_LINE_SUBTLE:
-    default:
-        return Blend(SColorShadow(), SColorPaper(), 205);
-    }
+    return Blend(SColorShadow(), SColorPaper(), 205);
 }
 
-static Color GridSeparatorColor(bool color_enabled, Color color, UiSpacerLineStyle style)
+static Color GridSeparatorColor(bool color_enabled, Color color)
 {
     if(color_enabled && !IsNull(color))
         return color;
-    return GridSeparatorPresetColor(style);
+    return GridSeparatorDefaultColor();
 }
 
-static int GridSeparatorThickness(UiSpacerLineStyle style, int custom_thickness)
-{
-    switch(style) {
-    case SPACER_LINE_STANDARD:
-    case SPACER_LINE_ACCENT:
-        return DPI(2);
-    case SPACER_LINE_ALERT:
-        return DPI(4);
-    case SPACER_LINE_CUSTOM:
-        return max(1, custom_thickness);
-    case SPACER_LINE_SUBTLE:
-    default:
-        return DPI(1);
-    }
-}
-
-static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiSpacerLineStyle style, UiCrossAlign align,
+static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiCrossAlign align,
                                UiSpacerLineOrientation orientation, int thickness, UiLineStyle dash, int inset,
                                bool color_enabled, Color color)
 {
     if(r.IsEmpty() || !enabled)
         return;
 
-    thickness = GridSeparatorThickness(style, thickness);
+    thickness = max(1, thickness);
     inset = max(0, inset);
-    Color c = GridSeparatorColor(color_enabled, color, style);
+    Color c = GridSeparatorColor(color_enabled, color);
     bool vertical = orientation == UiSpacerLineOrientation::Vertical
                  || (orientation == UiSpacerLineOrientation::Auto && r.GetWidth() >= r.GetHeight());
     if(orientation == UiSpacerLineOrientation::Horizontal)
@@ -280,29 +252,40 @@ int UiGridLayout::AddBlankGrid(int row, int col)
     return items.GetCount() - 1;
 }
 
-int UiGridLayout::AddSpacer(int, int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
-int UiGridLayout::AddExpand(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
-int UiGridLayout::AddGap(int) { Point p = FindNextFreeCell(); return p.x < 0 ? -1 : AddBlankGrid(p.y, p.x); }
-int UiGridLayout::AddBreak() { return -1; }
+UiGridLayout::BlankRef UiGridLayout::AddBlank(int row, int col)
+{
+    return BlankRef(this, AddBlankGrid(row, col));
+}
+
+UiGridLayout::BlankRef UiGridLayout::AddBlank()
+{
+    Point p = FindNextFreeCell();
+    return p.x < 0 ? BlankRef() : AddBlank(p.y, p.x);
+}
+
 int UiGridLayout::AddSeparator(int px)
 {
     Point p = FindNextFreeCell();
     if(p.x < 0)
         return -1;
-    int item = AddBlankGrid(p.y, p.x);
-    if(item >= 0)
-        SetItemSeparatorLine(item, true, SPACER_LINE_SUBTLE, Align::Center, UiSpacerLineOrientation::Auto, max(1, px), SOLID, 0, Null);
-    return item;
+    BlankRef item = AddBlank(p.y, p.x);
+    item.LineEnabled(true)
+        .LineAlign(Align::Center)
+        .LineOrientation(UiSpacerLineOrientation::Auto)
+        .LineThickness(max(1, px))
+        .LineDash(SOLID)
+        .LineInset(0)
+        .LineColorEnabled(false);
+    return item.GetIndex();
 }
 
-UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, UiSpacerLineStyle style, Align align,
+UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, Align align,
                                                  UiSpacerLineOrientation orientation, int thickness,
                                                  UiLineStyle dash, int inset, Color c)
 {
     if(index >= 0 && index < items.GetCount()) {
         Item& it = items[index];
         it.separator_enabled = on;
-        it.separator_style = style;
         it.separator_align = align;
         it.separator_orientation = orientation;
         it.separator_thickness = max(1, thickness);
@@ -329,10 +312,15 @@ UiGridLayout& UiGridLayout::SetItemAlign(int index, Align x, Align y)
 Size UiGridLayout::NaturalItemSize(const Item& it) const
 {
     Size sz = min_cell_size;
+    if(it.kind == Kind::BlankGrid)
+        sz = Size(0, 0);
     if(it.ctrl)
         sz = max(sz, it.ctrl->GetMinSize());
+    sz = max(sz, it.min_size);
     if(!it.fixed.IsEmpty())
         sz = max(sz, it.fixed);
+    sz.cx = min(sz.cx, it.max_size.cx);
+    sz.cy = min(sz.cy, it.max_size.cy);
     if(unified) {
         if(unified_size.cx > 0) sz.cx = unified_size.cx;
         if(unified_size.cy > 0) sz.cy = unified_size.cy;
@@ -463,9 +451,6 @@ void UiGridLayout::Layout()
         if(it.row < 0 || it.col < 0 || it.row >= row_heights.GetCount() || it.col >= col_widths.GetCount())
             continue;
         Rect cell = RectC(col_pos[it.col], row_pos[it.row], col_widths[it.col], row_heights[it.row]);
-        it.rect = cell;
-        if(!it.ctrl)
-            continue;
         Size want = NaturalItemSize(it);
         want.cx = min(want.cx, cell.GetWidth());
         want.cy = min(want.cy, cell.GetHeight());
@@ -488,6 +473,9 @@ void UiGridLayout::Layout()
             else cr.top = cell.top;
             cr.bottom = cr.top + want.cy;
         }
+        it.rect = cr;
+        if(!it.ctrl)
+            continue;
         it.ctrl->Show();
         it.ctrl->SetRect(cr);
     }
@@ -532,7 +520,7 @@ void UiGridLayout::Paint(Draw& w)
         for(const Item& it : items) {
             if(!it.separator_enabled || it.rect.IsEmpty())
                 continue;
-            PaintGridSeparator(w, it.rect, it.separator_enabled, it.separator_style, it.separator_align,
+            PaintGridSeparator(w, it.rect, it.separator_enabled, it.separator_align,
                                it.separator_orientation,
                                it.separator_thickness, it.separator_dash, it.separator_inset,
                                it.separator_color_enabled, it.separator_color);
@@ -649,6 +637,176 @@ int UiGridLayout::MeasureHeightForWidth(int total_width)
 String UiGridLayout::ToString() const
 {
     return Format("UiGridLayout{%d x %d, items=%d}", grid_cols, grid_rows, items.GetCount());
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::ExpandX(bool on)
+{
+    if(ok()) {
+        owner->items[index].scale_x = on;
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::ExpandY(bool on)
+{
+    if(ok()) {
+        owner->items[index].scale_y = on;
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::FixedWidth(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.fixed.cx = max(0, px);
+        it.min_size.cx = max(it.min_size.cx, it.fixed.cx);
+        if(it.max_size.cx > 0)
+            it.max_size.cx = max(it.max_size.cx, it.fixed.cx);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::FixedHeight(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.fixed.cy = max(0, px);
+        it.min_size.cy = max(it.min_size.cy, it.fixed.cy);
+        if(it.max_size.cy > 0)
+            it.max_size.cy = max(it.max_size.cy, it.fixed.cy);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::MinWidth(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.min_size.cx = max(0, px);
+        if(it.max_size.cx > 0)
+            it.max_size.cx = max(it.max_size.cx, it.min_size.cx);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::MinHeight(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.min_size.cy = max(0, px);
+        if(it.max_size.cy > 0)
+            it.max_size.cy = max(it.max_size.cy, it.min_size.cy);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::MaxWidth(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.max_size.cx = px <= 0 ? INT_MAX : max(it.min_size.cx, px);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::MaxHeight(int px)
+{
+    if(ok()) {
+        UiGridLayout::Item& it = owner->items[index];
+        it.max_size.cy = px <= 0 ? INT_MAX : max(it.min_size.cy, px);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::Align(UiGridLayout::Align x, UiGridLayout::Align y)
+{
+    if(ok()) {
+        owner->items[index].align_x = x;
+        owner->items[index].align_y = y;
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineEnabled(bool on)
+{
+    if(ok()) {
+        owner->items[index].separator_enabled = on;
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineAlign(UiGridLayout::Align align)
+{
+    if(ok()) {
+        owner->items[index].separator_align = align;
+        owner->Refresh();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineOrientation(UiSpacerLineOrientation orientation)
+{
+    if(ok()) {
+        owner->items[index].separator_orientation = orientation;
+        owner->Refresh();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineThickness(int px)
+{
+    if(ok()) {
+        owner->items[index].separator_thickness = max(1, px);
+        owner->RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineDash(UiLineStyle dash)
+{
+    if(ok()) {
+        owner->items[index].separator_dash = dash;
+        owner->Refresh();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineInset(int px)
+{
+    if(ok()) {
+        owner->items[index].separator_inset = max(0, px);
+        owner->Refresh();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineColorEnabled(bool on)
+{
+    if(ok()) {
+        owner->items[index].separator_color_enabled = on;
+        owner->Refresh();
+    }
+    return *this;
+}
+
+UiGridLayout::BlankRef& UiGridLayout::BlankRef::LineColor(Color c)
+{
+    if(ok()) {
+        owner->items[index].separator_color = c;
+        owner->Refresh();
+    }
+    return *this;
 }
 
 } // namespace Upp

@@ -518,20 +518,12 @@ static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 
 static Color SpacerLinePresetColor(const DesignerNode& n)
 {
-	String style = AdapterNodeProperty(n, "line_style", "Subtle");
-	if(style == "Accent")
-		return UiTheme::ResolveButton(UiRole::Accent).palette.frame[ST_NORMAL];
-	if(style == "Alert")
-		return UiTheme::ResolveButton(UiRole::Alert).palette.frame[ST_NORMAL];
-	if(style == "Standard")
-		return UiTheme::ResolvePanel(UiPanelRole::Surface).palette.frame[ST_NORMAL];
 	return UiTheme::ResolvePanel(UiPanelRole::Subtle).palette.frame[ST_NORMAL];
 }
 
 static Color SpacerLineColor(const DesignerNode& n)
 {
-	if(AdapterNodeProperty(n, "line_style", "Subtle") == "Custom" &&
-	   (bool)AdapterNodeProperty(n, "line_color_enabled", false)) {
+	if((bool)AdapterNodeProperty(n, "line_color_enabled", false)) {
 		Color c = GetColorProperty(n, "line_color", Null);
 		if(!IsNull(c))
 			return c;
@@ -706,7 +698,7 @@ String DesignerAdapterHelp(const String& type_id)
 	if(type_id == "GridLayout")
 		return "Places children into stable cells. Use rows, columns, cell size, gap, and per-axis expand settings to inspect grid behavior.";
 	if(type_id == "Spacer")
-		return "Design-time entry for layout space. In box layouts it emits AddSpacer/AddBreak; in grid layouts it emits AddExpand/AddGap/AddSpacer. Optional separator-line mode draws a runtime line instead of blank space.";
+		return "Design-time entry for layout space. In box layouts it emits AddSpacer/AddBreak; in grid layouts it emits a direct blank-item layout entry. Optional separator-line mode draws a runtime line instead of blank space.";
 	if(type_id == "UiSplitter")
 		return "Divides an area into two pane slots. Drop layouts or controls into each pane, then adjust orientation, split, and minimum pane sizes.";
 	if(type_id == "UiQuadSplitter")
@@ -997,16 +989,20 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	            "Positions a fit-width item inside its grid cell.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
 	            "Positions a fit-height item inside its grid cell.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
-			b.AddInt("fixed_width", "Fixed width", DesignerEditorKind::Slider,
+	b.AddInt("fixed_width", "Fixed width", DesignerEditorKind::Slider,
 	         "fixed parent layout width",
-	         "Used when Width mode is Fixed. The actual width is clamped by Min width.", 10, 1600);
+	         "Used when Width mode is Fixed. The actual width is clamped by Min width.", 1, 1600);
 	b.AddInt("fixed_height", "Fixed height", DesignerEditorKind::Slider,
 	         "fixed parent layout height",
-	         "Used when Height mode is Fixed. The actual height is clamped by Min height.", 10, 900);
+	         "Used when Height mode is Fixed. The actual height is clamped by Min height.", 1, 900);
 	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Minimum width used by preview and generated code when the parent layout compresses this control.", 10, 1600);
+	         "Minimum width used by preview and generated code when the parent layout compresses this control.", 1, 1600);
 	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Minimum height used by preview and generated code when the parent layout compresses this control.", 10, 900);
+	         "Minimum height used by preview and generated code when the parent layout compresses this control.", 1, 900);
+	b.AddInt("max_width", "Max width", DesignerEditorKind::Slider, "parent layout width cap",
+	         "Maximum width used by preview and generated code when the parent layout expands this control. Use 0 for unlimited.", 0, 1600);
+	b.AddInt("max_height", "Max height", DesignerEditorKind::Slider, "parent layout height cap",
+	         "Maximum height used by preview and generated code when the parent layout expands this control. Use 0 for unlimited.", 0, 900);
 	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
 	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
 	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
@@ -1103,22 +1099,12 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("radius");
 		b.Hide("face_enabled");
 		b.Hide("frame_enabled");
-		b.Hide("min_width");
-		b.Hide("min_height");
-		b.Disable("h_sizing", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
-		b.Disable("v_sizing", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
-		b.Disable("fixed_width", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
-		b.Disable("fixed_height", "Spacer sizing is controlled by Spacer kind, Space, Max space, and Weight.");
 		b.Add("line_enabled", "Line enabled", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
 		      "Draws a separator line instead of a blank spacer.");
 		b.AddChoice("line_orientation", "Line orientation", "UiBoxLayout::ItemRef",
 		            "Controls whether the separator is vertical, horizontal, or chosen automatically from the spacer shape.",
 		            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}});
-		b.AddChoice("line_style", "Line style", "UiBoxLayout::ItemRef",
-		            "Separator line style.",
-		            {{"Subtle", "Subtle"}, {"Standard", "Standard"}, {"Accent", "Accent"},
-		             {"Alert", "Alert"}, {"Custom", "Custom"}});
 		b.AddChoice("line_align", "Line align", "UiBoxLayout::ItemRef",
 		            "Aligns the separator inside its spacer rect.",
 		            {{"Start", "Start"}, {"Center", "Center"}, {"End", "End"}});
@@ -1135,15 +1121,29 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Add("line_color", "Line color", DesignerEditorKind::Color,
 		      "UiBoxLayout::ItemRef",
 		      "Explicit separator color used when custom line color is enabled.");
-		b.AddChoice("spacer_kind", "Spacer kind", "UiBoxLayout::AddSpacer / UiGridLayout::AddExpand",
-		            "Semantic layout spacer kind.",
-		            {{"Expander", "Expander"}, {"Fixed", "Fixed"}, {"Bounded", "Bounded"}, {"Break", "Break"}});
-		b.AddInt("space", "Min space", DesignerEditorKind::Slider, "AddGap / AddSpacer min",
-		         "Minimum size on the parent layout's main axis.", 0, 400);
-		b.AddInt("max_space", "Max space", DesignerEditorKind::Slider, "UiGridLayout::AddSpacer max",
-		         "Maximum size for bounded or limited expand spacers. Use 0 for unlimited.", 0, 1600);
+		b.Add("layout_break", "Layout break", DesignerEditorKind::Bool, "UiBoxLayout::AddBreak",
+		      "Acts as a flow break marker instead of a visible spacer rectangle.");
 		b.AddInt("weight", "Weight", DesignerEditorKind::Slider, "AddSpacer / AddExpand weight",
 		         "How much remaining space this expander receives relative to other expanders.", 1, 12);
+		if((bool)AdapterNodeProperty(node, "layout_break", false)) {
+			b.Disable("h_sizing", "Layout breaks do not use width or height sizing.");
+			b.Disable("v_sizing", "Layout breaks do not use width or height sizing.");
+			b.Disable("fixed_width", "Layout breaks do not use fixed sizing.");
+			b.Disable("fixed_height", "Layout breaks do not use fixed sizing.");
+			b.Disable("min_width", "Layout breaks do not use minimum sizing.");
+			b.Disable("min_height", "Layout breaks do not use minimum sizing.");
+			b.Disable("max_width", "Layout breaks do not use maximum sizing.");
+			b.Disable("max_height", "Layout breaks do not use maximum sizing.");
+			b.Disable("weight", "Layout breaks do not expand.");
+			b.Disable("line_enabled", "Layout breaks do not draw separator lines.");
+			b.Disable("line_orientation", "Layout breaks do not draw separator lines.");
+			b.Disable("line_align", "Layout breaks do not draw separator lines.");
+			b.Disable("line_thickness", "Layout breaks do not draw separator lines.");
+			b.Disable("line_dash", "Layout breaks do not draw separator lines.");
+			b.Disable("line_inset", "Layout breaks do not draw separator lines.");
+			b.Disable("line_color_enabled", "Layout breaks do not draw separator lines.");
+			b.Disable("line_color", "Layout breaks do not draw separator lines.");
+		}
 		return;
 	}
 	if(node.type_id == "PaneSlot" || node.type_id == "PageSlot" || node.type_id == "AccordionSectionSlot") {

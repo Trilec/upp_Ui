@@ -237,13 +237,10 @@ static DesignerType MakeSpacerType()
 	t.default_size = Size(32, 32);
 	t.min_size = Size(1, 1);
 	t.init_defaults = [](DesignerNode& n) {
-		n.properties.Set("spacer_kind", "Expander");
-		n.properties.Set("space", 24);
-		n.properties.Set("max_space", 1000000);
 		n.properties.Set("weight", 1);
+		n.properties.Set("layout_break", false);
 		n.properties.Set("line_enabled", false);
 		n.properties.Set("line_orientation", "Auto");
-		n.properties.Set("line_style", "Subtle");
 		n.properties.Set("line_align", "Center");
 		n.properties.Set("line_thickness", 1);
 		n.properties.Set("line_dash", "Solid");
@@ -254,6 +251,12 @@ static DesignerType MakeSpacerType()
 		n.properties.Set("v_sizing", "Expand");
 		n.properties.Set("width", 24);
 		n.properties.Set("height", 24);
+		n.properties.Set("fixed_width", 24);
+		n.properties.Set("fixed_height", 24);
+		n.properties.Set("min_width", 10);
+		n.properties.Set("min_height", 10);
+		n.properties.Set("max_width", 0);
+		n.properties.Set("max_height", 0);
 		n.properties.Set("face_enabled", false);
 		n.properties.Set("frame_enabled", false);
 		n.properties.Set("radius", 0);

@@ -2549,7 +2549,8 @@ private:
 	{
 		String type = t ? t->display_name : n.type_id;
 		if(n.type_id == "Spacer") {
-			type << " " << AsString(DesignerNodePropertyOr(n, "spacer_kind", "Expander"));
+			if((bool)DesignerNodePropertyOr(n, "layout_break", false))
+				type << " Break";
 		}
 		else if(n.type_id == "Generic") {
 			String original = AsString(DesignerNodePropertyOr(n, "original_type", ""));

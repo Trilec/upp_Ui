@@ -10,6 +10,7 @@ namespace Upp {
 class UiGridLayout : public Ctrl {
 public:
     using Align = UiCrossAlign;
+    struct BlankRef;
 
     // Changelog
     // - 2026-06: added separator-line support for blank grid spacer items.
@@ -65,16 +66,12 @@ public:
     int AddGrid(Ctrl& c, int row, int col, bool scale_to_cell = false, Size fixed = Size(0, 0));
     int AddGrid(Ctrl& c, int row, int col, bool scale_x, bool scale_y, Size fixed = Size(0, 0));
     int AddBlankGrid(int row, int col);
+    BlankRef AddBlank(int row, int col);
+    BlankRef AddBlank();
     UiGridLayout& SetItemAlign(int index, Align x, Align y);
 
-    // Stable grid placeholders. They reserve addressed cells, not ordered layout space.
-    int AddSpacer(int min_px = 0, int max_px = INT_MAX);
-    int AddExpand(int weight = 1);
-    int AddGap(int px);
-    int AddBreak();
     int AddSeparator(int px = DPI(1));
-    UiGridLayout& SetItemSeparatorLine(int index, bool on = true, UiSpacerLineStyle style = SPACER_LINE_SUBTLE,
-                                       Align align = Align::Center,
+    UiGridLayout& SetItemSeparatorLine(int index, bool on = true, Align align = Align::Center,
                                        UiSpacerLineOrientation orientation = UiSpacerLineOrientation::Auto,
                                        int thickness = DPI(1),
                                        UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
@@ -99,6 +96,39 @@ public:
     Function<void(Size)> WhenContentSize;
     String ToString() const;
 
+    struct BlankRef {
+        BlankRef() = default;
+        BlankRef(UiGridLayout* owner, int index) : owner(owner), index(index) {}
+
+        BlankRef& ExpandX(bool on = true);
+        BlankRef& ExpandY(bool on = true);
+        BlankRef& Expand(bool on = true) { ExpandX(on); return ExpandY(on); }
+        BlankRef& FixedWidth(int px);
+        BlankRef& FixedHeight(int px);
+        BlankRef& FixedSize(Size sz) { FixedWidth(sz.cx); return FixedHeight(sz.cy); }
+        BlankRef& MinWidth(int px);
+        BlankRef& MinHeight(int px);
+        BlankRef& MinSize(Size sz) { MinWidth(sz.cx); return MinHeight(sz.cy); }
+        BlankRef& MaxWidth(int px);
+        BlankRef& MaxHeight(int px);
+        BlankRef& MaxSize(Size sz) { MaxWidth(sz.cx); return MaxHeight(sz.cy); }
+        BlankRef& Align(UiGridLayout::Align x, UiGridLayout::Align y);
+        BlankRef& LineEnabled(bool on = true);
+        BlankRef& LineAlign(UiGridLayout::Align align);
+        BlankRef& LineOrientation(UiSpacerLineOrientation orientation);
+        BlankRef& LineThickness(int px);
+        BlankRef& LineDash(UiLineStyle dash);
+        BlankRef& LineInset(int px);
+        BlankRef& LineColorEnabled(bool on = true);
+        BlankRef& LineColor(Color c);
+        int       GetIndex() const { return index; }
+
+    private:
+        bool ok() const { return owner && index >= 0 && index < owner->GetItemCount(); }
+        UiGridLayout* owner = nullptr;
+        int           index = -1;
+    };
+
 private:
     enum class Kind : byte { CtrlItem, BlankGrid };
 
@@ -114,8 +144,9 @@ private:
         int   col = -1;
         Rect  rect;
         bool  visible = true;
+        Size  min_size = Size(0, 0);
+        Size  max_size = Size(INT_MAX, INT_MAX);
         bool  separator_enabled = false;
-        UiSpacerLineStyle separator_style = SPACER_LINE_SUBTLE;
         Align separator_align = Align::Center;
         UiSpacerLineOrientation separator_orientation = UiSpacerLineOrientation::Auto;
         int   separator_thickness = DPI(1);

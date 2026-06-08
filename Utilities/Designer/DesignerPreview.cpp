@@ -527,13 +527,6 @@ void DesignerPreview::DrawDashed(Draw& w, const Rect& r, Color c)
 
 static Color DesignerSpacerPresetColor(const DesignerNode& n)
 {
-	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
-	if(style == "Accent")
-		return Color(37, 99, 235);
-	if(style == "Alert")
-		return Color(220, 38, 38);
-	if(style == "Standard")
-		return Color(148, 163, 184);
 	return Color(203, 213, 225);
 }
 
@@ -549,28 +542,7 @@ static Color DesignerSpacerLineColor(const DesignerNode& n)
 
 static int DesignerSpacerLineThickness(const DesignerNode& n)
 {
-	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
-	if(style == "Alert")
-		return DPI(4);
-	if(style == "Accent" || style == "Standard")
-		return DPI(2);
-	if(style == "Custom")
-		return DPI(max(1, (int)DesignerPreviewNodeProperty(n, "line_thickness", 1)));
-	return DPI(1);
-}
-
-static UiSpacerLineStyle DesignerSpacerLineStyle(const DesignerNode& n)
-{
-	String style = DesignerPreviewNodeProperty(n, "line_style", "Subtle");
-	if(style == "Standard")
-		return SPACER_LINE_STANDARD;
-	if(style == "Accent")
-		return SPACER_LINE_ACCENT;
-	if(style == "Alert")
-		return SPACER_LINE_ALERT;
-	if(style == "Custom")
-		return SPACER_LINE_CUSTOM;
-	return SPACER_LINE_SUBTLE;
+	return DPI(max(1, (int)DesignerPreviewNodeProperty(n, "line_thickness", 1)));
 }
 
 static UiLineStyle DesignerSpacerLineDash(const DesignerNode& n)
@@ -596,6 +568,21 @@ static UiSpacerLineOrientation DesignerSpacerLineOrientation(const DesignerNode&
 	if(orientation == "Horizontal")
 		return UiSpacerLineOrientation::Horizontal;
 	return UiSpacerLineOrientation::Auto;
+}
+
+static int DesignerPreviewSpacerAxisFixed(const DesignerNode& n, bool width_axis, int fallback)
+{
+	return DesignerClampMin((int)DesignerPreviewFixedMetric(n, width_axis ? "width" : "height", fallback));
+}
+
+static int DesignerPreviewSpacerAxisMin(const DesignerNode& n, bool width_axis)
+{
+	return max(0, (int)DesignerPreviewNodeProperty(n, width_axis ? "min_width" : "min_height", DESIGNER_MIN_CLAMP));
+}
+
+static int DesignerPreviewSpacerAxisMax(const DesignerNode& n, bool width_axis)
+{
+	return max(0, (int)DesignerPreviewNodeProperty(n, width_axis ? "max_width" : "max_height", 0));
 }
 
 static void DesignerPaintSpacerLine(Draw& w, const Rect& r, const DesignerNode& n)
@@ -1185,45 +1172,66 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			String vs = DesignerPreviewAxisSizing(child_node, "v_sizing");
 			if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&parent)) {
 				if(child_node.type_id == "Spacer") {
-					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
-					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
-					int raw_max = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_space", 0));
-					int max_size = raw_max <= 0 ? INT_MAX : max(size, raw_max);
 					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
 					UiSpacerLineOrientation orientation = DesignerSpacerLineOrientation(child_node);
 					int line_min = (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)
 					             ? DesignerSpacerLineThickness(child_node)
 					             : 0;
-					size = max(size, line_min);
-					UiBoxLayout::ItemRef ref;
-					if(kind == "Break")
-						ref = box->AddBreak(weight);
-					else if(kind == "Fixed")
-						ref = box->AddSpacer(1).Fixed(DPI(size));
-					else if(kind == "Bounded")
-						ref = box->AddSpacer(weight).MinMain(DPI(size)).MaxMain(DPI(max_size));
-					else {
-						ref = box->AddSpacer(weight).MinMain(DPI(size));
-						if(max_size != INT_MAX)
-							ref.MaxMain(DPI(max_size));
-					}
+					bool layout_break = (bool)DesignerPreviewNodeProperty(child_node, "layout_break", false);
 					bool parent_horizontal = DesignerPreviewNodeProperty(parent_node, "direction", "V") == "H";
-					if(orientation == UiSpacerLineOrientation::Vertical) {
-						if(parent_horizontal)
-							ref.MinMain(DPI(max(size, line_min)));
+					String main_sizing = parent_horizontal ? hs : vs;
+					String cross_sizing = parent_horizontal ? vs : hs;
+					int min_w = DesignerPreviewSpacerAxisMin(child_node, true);
+					int min_h = DesignerPreviewSpacerAxisMin(child_node, false);
+					int max_w = DesignerPreviewSpacerAxisMax(child_node, true);
+					int max_h = DesignerPreviewSpacerAxisMax(child_node, false);
+					int fixed_w = max(DesignerPreviewSpacerAxisFixed(child_node, true, 24), min_w);
+					int fixed_h = max(DesignerPreviewSpacerAxisFixed(child_node, false, 24), min_h);
+					if(orientation == UiSpacerLineOrientation::Vertical)
+						min_w = max(min_w, line_min);
+					else if(orientation == UiSpacerLineOrientation::Horizontal)
+						min_h = max(min_h, line_min);
+					int min_main = parent_horizontal ? min_w : min_h;
+					int max_main = parent_horizontal ? max_w : max_h;
+					int fixed_main = parent_horizontal ? fixed_w : fixed_h;
+					int min_cross = parent_horizontal ? min_h : min_w;
+					int max_cross = parent_horizontal ? max_h : max_w;
+					int fixed_cross = parent_horizontal ? fixed_h : fixed_w;
+					UiBoxLayout::ItemRef ref;
+					if(layout_break)
+						ref = box->AddBreak(weight);
+					else
+						ref = box->AddSpacer(weight);
+					if(!layout_break) {
+						if(main_sizing == "Fixed")
+							ref.Fixed(DPI(fixed_main));
+						else if(main_sizing == "Expand")
+							ref.Expand(weight).MinMain(DPI(min_main));
 						else
-							ref.MinCross(DPI(line_min));
+							ref.Fit().MinMain(DPI(min_main));
+						if(max_main > 0)
+							ref.MaxMain(DPI(max(max_main, min_main)));
+
+						if(cross_sizing == "Fixed")
+							ref.MinMaxCross(DPI(fixed_cross), DPI(fixed_cross)).AlignSelf(UiBoxLayout::Align::Start);
+						else if(cross_sizing == "Expand") {
+							if(max_cross > 0)
+								ref.MinMaxCross(DPI(min_cross), DPI(max(max_cross, min_cross)));
+							else
+								ref.MinCross(DPI(min_cross));
+							ref.AlignSelf(UiBoxLayout::Align::Stretch);
+						}
+						else {
+							if(max_cross > 0)
+								ref.MinMaxCross(DPI(min_cross), DPI(max(max_cross, min_cross)));
+							else
+								ref.MinCross(DPI(min_cross));
+							ref.AlignSelf(UiBoxLayout::Align::Start);
+						}
 					}
-					else if(orientation == UiSpacerLineOrientation::Horizontal) {
-						if(parent_horizontal)
-							ref.MinCross(DPI(line_min));
-						else
-							ref.MinMain(DPI(max(size, line_min)));
-					}
-					if((bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
+					if(!layout_break && (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
 						ref.LineEnabled(true)
 						   .LineOrientation(DesignerSpacerLineOrientation(child_node))
-						   .LineStyle(DesignerSpacerLineStyle(child_node))
 						   .LineAlign(DesignerSpacerLineAlign(child_node))
 						   .LineThickness(DesignerSpacerLineThickness(child_node))
 						   .LineDash(DesignerSpacerLineDash(child_node))
@@ -1272,33 +1280,58 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			}
 			else if(DesignerGridLayoutAdapter *grid = dynamic_cast<DesignerGridLayoutAdapter *>(&parent)) {
 				if(child_node.type_id == "Spacer") {
-					String kind = DesignerPreviewNodeProperty(child_node, "spacer_kind", "Expander");
-					int size = max(0, (int)DesignerPreviewNodeProperty(child_node, "space", 24));
-					int raw_max = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_space", 0));
-					int max_size = raw_max <= 0 ? INT_MAX : max(size, raw_max);
 					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));
-					int item = -1;
-					if(kind == "Break")
+					bool layout_break = (bool)DesignerPreviewNodeProperty(child_node, "layout_break", false);
+					if(layout_break)
 						return;
-					else if(kind == "Fixed")
-						item = grid->AddGap(DPI(size));
-					else if(kind == "Bounded")
-						item = grid->AddSpacer(DPI(size), max_size == INT_MAX ? INT_MAX : DPI(max_size));
+					int columns = max(1, (int)DesignerPreviewNodeProperty(parent_node, "columns", 2));
+					int rows = max(1, (int)DesignerPreviewNodeProperty(parent_node, "rows", 2));
+					int row = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns), 0, rows - 1);
+					int col = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns), 0, columns - 1);
+					int min_w = DesignerPreviewSpacerAxisMin(child_node, true);
+					int min_h = DesignerPreviewSpacerAxisMin(child_node, false);
+					int max_w = DesignerPreviewSpacerAxisMax(child_node, true);
+					int max_h = DesignerPreviewSpacerAxisMax(child_node, false);
+					int fixed_w = max(DesignerPreviewSpacerAxisFixed(child_node, true, 24), min_w);
+					int fixed_h = max(DesignerPreviewSpacerAxisFixed(child_node, false, 24), min_h);
+					UiSpacerLineOrientation orientation = DesignerSpacerLineOrientation(child_node);
+					int line_min = (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)
+					             ? DesignerSpacerLineThickness(child_node)
+					             : 0;
+					if(orientation == UiSpacerLineOrientation::Vertical)
+						min_w = max(min_w, line_min);
+					else if(orientation == UiSpacerLineOrientation::Horizontal)
+						min_h = max(min_h, line_min);
+					else {
+						min_w = max(min_w, line_min);
+						min_h = max(min_h, line_min);
+					}
+
+					auto blank = grid->AddBlank(row, col);
+					if(hs == "Expand")
+						blank.ExpandX(true);
+					if(vs == "Expand")
+						blank.ExpandY(true);
+					if(hs == "Fixed")
+						blank.FixedWidth(DPI(fixed_w));
 					else
-						item = grid->AddExpand(weight);
+						blank.MinWidth(DPI(min_w)).MaxWidth(max_w > 0 ? DPI(max(max_w, min_w)) : 0);
+					if(vs == "Fixed")
+						blank.FixedHeight(DPI(fixed_h));
+					else
+						blank.MinHeight(DPI(min_h)).MaxHeight(max_h > 0 ? DPI(max(max_h, min_h)) : 0);
+					blank.Align(hs == "Expand" ? UiGridLayout::Align::Stretch : UiGridLayout::Align::Start,
+					            vs == "Expand" ? UiGridLayout::Align::Stretch : UiGridLayout::Align::Start);
+					int item = blank.GetIndex();
 					if(item >= 0 && (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
-						Color color = DesignerSpacerLineColor(child_node);
-						if(!(bool)DesignerPreviewNodeProperty(child_node, "line_color_enabled", false))
-							color = Null;
-						grid->SetItemSeparatorLine(item,
-						                           true,
-						                           DesignerSpacerLineStyle(child_node),
-						                           DesignerSpacerLineAlign(child_node),
-						                           DesignerSpacerLineOrientation(child_node),
-						                           DesignerSpacerLineThickness(child_node),
-						                           DesignerSpacerLineDash(child_node),
-						                           DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))),
-						                           color);
+						blank.LineEnabled(true)
+						     .LineAlign(DesignerSpacerLineAlign(child_node))
+						     .LineOrientation(orientation)
+						     .LineThickness(DesignerSpacerLineThickness(child_node))
+						     .LineDash(DesignerSpacerLineDash(child_node))
+						     .LineInset(DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "line_inset", 0))));
+						if((bool)DesignerPreviewNodeProperty(child_node, "line_color_enabled", false))
+							blank.LineColorEnabled(true).LineColor(DesignerSpacerLineColor(child_node));
 					}
 					return;
 				}

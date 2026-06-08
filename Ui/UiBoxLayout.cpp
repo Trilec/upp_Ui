@@ -2,44 +2,16 @@
 
 namespace Upp {
 
-static Color SpacerLinePresetColor(UiSpacerLineStyle style)
-{
-    switch(style) {
-    case SPACER_LINE_STANDARD:
-        return Blend(SColorShadow(), SColorPaper(), 150);
-    case SPACER_LINE_ACCENT:
-        return SColorHighlight();
-    case SPACER_LINE_ALERT:
-        return Color(220, 38, 38);
-    case SPACER_LINE_CUSTOM:
-        return Blend(SColorShadow(), SColorPaper(), 150);
-    case SPACER_LINE_SUBTLE:
-    default:
-        return Blend(SColorShadow(), SColorPaper(), 205);
-    }
-}
-
 static Color SpacerLineColor(const UiBoxLayout::Item& it)
 {
     if(it.line_color_enabled && !IsNull(it.line_color))
         return it.line_color;
-    return SpacerLinePresetColor(it.line_style);
+    return Blend(SColorShadow(), SColorPaper(), 205);
 }
 
 static int SpacerLineThickness(const UiBoxLayout::Item& it)
 {
-    switch(it.line_style) {
-    case SPACER_LINE_STANDARD:
-    case SPACER_LINE_ACCENT:
-        return DPI(2);
-    case SPACER_LINE_ALERT:
-        return DPI(4);
-    case SPACER_LINE_CUSTOM:
-        return max(1, it.line_thickness);
-    case SPACER_LINE_SUBTLE:
-    default:
-        return DPI(1);
-    }
+    return max(1, it.line_thickness);
 }
 
 static void PaintSpacerLine(Draw& w, const Rect& r, const UiBoxLayout::Item& it)
