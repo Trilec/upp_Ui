@@ -19,6 +19,27 @@ static UiRole DesignerInspectorRoleChoice(const Value& role)
 	return UiRole::Standard;
 }
 
+static DesignerApiBinding DesignerCloneBinding(const DesignerApiBinding& src)
+{
+	DesignerApiBinding out;
+	out.property_id = src.property_id;
+	out.label = src.label;
+	out.editor = src.editor;
+	out.help = src.help;
+	out.api_call = src.api_call;
+	out.codegen_hint = src.codegen_hint;
+	out.group = src.group;
+	out.default_value = src.default_value;
+	out.min_value = src.min_value;
+	out.max_value = src.max_value;
+	out.visible = src.visible;
+	out.enabled = src.enabled;
+	out.disabled_reason = src.disabled_reason;
+	for(int i = 0; i < src.choices.GetCount(); i++)
+		out.choices.Add(src.choices.GetKey(i), src.choices[i]);
+	return out;
+}
+
 struct DesignerInspectorSurfaceDefault {
 	Color face = SColorFace();
 	Color frame = SColorShadow();
@@ -93,6 +114,72 @@ void DesignerInspector::Set(DesignerModel *model, const DesignerRegistry *regist
 void DesignerInspector::SetBindingGroup(const String& group)
 {
 	binding_group_ = group;
+}
+
+void DesignerInspector::SetSelection(const Vector<DesignerNodeId>& ids)
+{
+	selection_ = clone(ids);
+	node_id_ = selection_.IsEmpty() ? Designer_NULL : selection_[0];
+	if(selection_.GetCount() == 1) {
+		SetNode(selection_[0]);
+		return;
+	}
+	if(!model_ || !registry_)
+		return;
+
+	Vector<const DesignerNode *> nodes;
+	Vector<const DesignerType *> types;
+	for(DesignerNodeId id : selection_) {
+		const DesignerNode *n = model_->Find(id);
+		const DesignerType *t = n ? registry_->Find(n->type_id) : nullptr;
+		if(n && t) {
+			nodes.Add(n);
+			types.Add(t);
+		}
+	}
+	if(nodes.GetCount() <= 1) {
+		if(!nodes.IsEmpty())
+			SetNode(nodes[0]->id);
+		return;
+	}
+
+	Vector<DesignerApiBinding> bindings;
+	DescribeCommon(bindings, nodes);
+	bool same_type = true;
+	for(int i = 1; i < nodes.GetCount(); i++)
+		if(nodes[i]->type_id != nodes[0]->type_id)
+			same_type = false;
+	String type_text;
+	if(same_type)
+		type_text = RuntimeTypeName(nodes[0]->type_id);
+
+	String key = "multi";
+	if(same_type)
+		key << ":" << nodes[0]->type_id;
+	for(const DesignerApiBinding& b : bindings)
+		key << "|" << b.property_id;
+
+	syncing_ = true;
+	stack_.ClearPages();
+	pages_.Clear();
+	Page& page = AddPage(key);
+	AddMultiSelectionHeader(page, nodes.GetCount());
+	if(binding_group_.IsEmpty() && same_type)
+		AddTypeRow(page, type_text);
+	else if(!binding_group_.IsEmpty() && bindings.IsEmpty())
+		AddMessageRow(page, "No common overrides available.");
+	for(const DesignerApiBinding& b : bindings)
+		AddBindingRow(page, nodes, types, b);
+	WhenNotes(BuildNoteText(bindings));
+	RefreshMultiPage(page, nodes, types, bindings);
+	stack_.SetActiveKey(key);
+	if(Ctrl *active = stack_.GetActiveCtrl())
+		active->Show();
+	page.layout.Layout();
+	stack_.Layout();
+	RefreshLayout();
+	Refresh();
+	syncing_ = false;
 }
 
 Value DesignerInspector::NodeProperty(const DesignerNode& n, const String& key, const Value& def) const
@@ -337,6 +424,8 @@ String DesignerInspector::PageKey(const DesignerNode& n, const Vector<DesignerAp
 
 void DesignerInspector::SetNode(DesignerNodeId id)
 {
+	selection_.Clear();
+	selection_.Add(id);
 	node_id_ = id;
 	if(!model_ || !registry_)
 		return;
@@ -380,6 +469,55 @@ void DesignerInspector::SetNode(DesignerNodeId id)
 	RefreshLayout();
 	Refresh();
 	syncing_ = false;
+}
+
+Value DesignerInspector::SelectionProperty(const Vector<const DesignerNode *>& nodes, const DesignerApiBinding& b, bool& mixed) const
+{
+	mixed = false;
+	if(nodes.IsEmpty() || !registry_)
+		return Value();
+	const DesignerType *t0 = registry_->Find(nodes[0]->type_id);
+	if(!t0)
+		return Value();
+	Value first = PropertyValue(*nodes[0], *t0, b);
+	for(int i = 1; i < nodes.GetCount(); i++) {
+		const DesignerType *ti = registry_->Find(nodes[i]->type_id);
+		if(!ti)
+			continue;
+		Value v = PropertyValue(*nodes[i], *ti, b);
+		if(v != first) {
+			mixed = true;
+			break;
+		}
+	}
+	return first;
+}
+
+void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, const Vector<const DesignerNode *>& nodes) const
+{
+	if(nodes.IsEmpty())
+		return;
+	Vector<DesignerApiBinding> first;
+	Describe(first, *nodes[0]);
+	for(const DesignerApiBinding& b : first) {
+		if(!b.visible || !b.enabled || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
+			continue;
+		bool common = true;
+		for(int i = 1; i < nodes.GetCount() && common; i++) {
+			Vector<DesignerApiBinding> other;
+			Describe(other, *nodes[i]);
+			const DesignerApiBinding *match = nullptr;
+			for(const DesignerApiBinding& candidate : other)
+				if(candidate.property_id == b.property_id) {
+					match = &candidate;
+					break;
+				}
+			if(!match || !match->visible || !match->enabled || match->editor != b.editor)
+				common = false;
+		}
+		if(common)
+			bindings.Add(DesignerCloneBinding(b));
+	}
 }
 
 int DesignerInspector::FindPage(const String& key) const
@@ -475,6 +613,11 @@ void DesignerInspector::AddMessageRow(Page& page, const String& text)
 	r.editor = DesignerEditorKind::ReadOnly;
 	r.ctrl = row;
 	AddOwned(page, pick(ctrl));
+}
+
+void DesignerInspector::AddMultiSelectionHeader(Page& page, int count)
+{
+	AddMessageRow(page, Format("Multiple selection (%d)", count));
 }
 
 void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const DesignerType& t,
@@ -643,6 +786,139 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	AddOwned(page, pick(ctrl));
 }
 
+void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNode *>& nodes,
+                                      const Vector<const DesignerType *>& types, const DesignerApiBinding& b)
+{
+	if(!b.visible || !b.enabled || b.property_id == "name")
+		return;
+	int label_w = DPI(88);
+	int gap = DPI(8);
+	bool mixed = false;
+	Value value = SelectionProperty(nodes, b, mixed);
+	String property_id = b.property_id;
+
+	if(b.editor == DesignerEditorKind::Choice) {
+		One<Ctrl> ctrl;
+		UiCompositeDropdown *row = new UiCompositeDropdown;
+		ctrl.Attach(row);
+		Ptr<UiCompositeDropdown> self = row;
+		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap);
+		if(mixed)
+			row->Add("Mixed", Value());
+		for(int i = 0; i < b.choices.GetCount(); i++) {
+			row->Add(AsString(b.choices[i]), b.choices.GetKey(i));
+			if(property_id == "icon" || property_id.EndsWith("_icon")) {
+				Image icon = UiIconFromName(b.choices.GetKey(i));
+				if(!IsNull(icon))
+					row->Dropdown().SetItemIcon(mixed ? i + 1 : i, icon, UiIconRenderMode::MonoTint);
+			}
+		}
+		row->SetData(mixed ? Value() : value);
+		row->WhenSelectData = [=](const Value& data) {
+			if(self && !syncing_ && !IsNull(data))
+				WhenPropertyMany(selection_, property_id, data);
+		};
+		Row& r = page.rows.Add();
+		r.property_id = property_id;
+		r.editor = b.editor;
+		r.ctrl = row;
+		AddOwned(page, pick(ctrl));
+		return;
+	}
+
+	if(b.editor == DesignerEditorKind::Bool) {
+		One<Ctrl> ctrl;
+		UiCompositeToggle *row = new UiCompositeToggle;
+		ctrl.Attach(row);
+		Ptr<UiCompositeToggle> self = row;
+		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).ShowValue(false);
+		row->SetData(mixed ? false : (bool)value);
+		row->WhenAction = [=] {
+			if(!syncing_ && self)
+				WhenPropertyMany(selection_, property_id, (bool)self->GetData());
+		};
+		Row& r = page.rows.Add();
+		r.property_id = property_id;
+		r.editor = b.editor;
+		r.ctrl = row;
+		AddOwned(page, pick(ctrl));
+		return;
+	}
+
+	if(b.editor == DesignerEditorKind::Int || b.editor == DesignerEditorKind::Slider) {
+		int min_value = IsNumber(b.min_value) ? (int)b.min_value : 0;
+		int max_value = IsNumber(b.max_value) ? (int)b.max_value : 1000;
+		int ivalue = IsNumber(value) ? (int)value : min_value;
+		One<Ctrl> ctrl;
+		UiCompositeSlider *row = new UiCompositeSlider;
+		ctrl.Attach(row);
+		Ptr<UiCompositeSlider> self = row;
+		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetValueWidth(DPI(44));
+		row->Slider().SetRange(min_value, max_value);
+		row->SetData(ivalue);
+		row->SetValueText(mixed ? "Mixed" : AsString(ivalue));
+		row->WhenChanging = [=] {
+			if(syncing_ || !self)
+				return;
+			int v = max(min_value, min(max_value, (int)self->GetData()));
+			self->SetValueText(AsString(v));
+			WhenPropertyMany(selection_, property_id, v);
+		};
+		row->WhenAction = [=] {
+			if(syncing_ || !self)
+				return;
+			int v = max(min_value, min(max_value, (int)self->GetData()));
+			self->SetValueText(AsString(v));
+			WhenPropertyMany(selection_, property_id, v);
+		};
+		Row& r = page.rows.Add();
+		r.property_id = property_id;
+		r.editor = b.editor;
+		r.ctrl = row;
+		AddOwned(page, pick(ctrl));
+		return;
+	}
+
+	if(b.editor == DesignerEditorKind::Color) {
+		One<Ctrl> ctrl;
+		UiCompositeColor *row = new UiCompositeColor;
+		ctrl.Attach(row);
+		Ptr<UiCompositeColor> self = row;
+		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetColorCount(1).ShowValue(true);
+		row->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+		row->WhenAction = [=] {
+			if(!syncing_ && self)
+				WhenPropertyMany(selection_, property_id, self->GetColor(0));
+		};
+		Row& r = page.rows.Add();
+		r.property_id = property_id;
+		r.editor = b.editor;
+		r.ctrl = row;
+		AddOwned(page, pick(ctrl));
+		return;
+	}
+
+	One<Ctrl> ctrl;
+	UiCompositeEdit *row = new UiCompositeEdit;
+	ctrl.Attach(row);
+	Ptr<UiCompositeEdit> self = row;
+	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
+	row->SetData(mixed ? Value("Mixed") : value);
+	row->WhenAction = [=] {
+		if(!syncing_ && self)
+			WhenPropertyMany(selection_, property_id, self->GetData());
+	};
+	row->WhenChange = [=] {
+		if(!syncing_ && self)
+			WhenPropertyMany(selection_, property_id, self->GetData());
+	};
+	Row& r = page.rows.Add();
+	r.property_id = property_id;
+	r.editor = b.editor;
+	r.ctrl = row;
+	AddOwned(page, pick(ctrl));
+}
+
 String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindings) const
 {
 	String note;
@@ -681,6 +957,22 @@ void DesignerInspector::RefreshPage(Page& page, const DesignerNode& n, const Des
 	}
 }
 
+void DesignerInspector::RefreshMultiPage(Page& page, const Vector<const DesignerNode *>& nodes,
+                                         const Vector<const DesignerType *>& types,
+                                         const Vector<DesignerApiBinding>& bindings)
+{
+	for(Row& row : page.rows) {
+		if(row.property_id == "$message" || row.property_id == "$type")
+			continue;
+		for(const DesignerApiBinding& b : bindings) {
+			if(b.property_id == row.property_id) {
+				SetRowValue(nodes, types, b, row);
+				break;
+			}
+		}
+	}
+}
+
 void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t,
                                       const DesignerApiBinding& b, Row& row)
 {
@@ -708,6 +1000,26 @@ void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t
 	}
 	else if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
 		c->SetData(value);
+}
+
+void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>&,
+                                    const DesignerApiBinding& b, Row& row)
+{
+	bool mixed = false;
+	Value value = SelectionProperty(nodes, b, mixed);
+	if(UiCompositeDropdown *c = dynamic_cast<UiCompositeDropdown *>(row.ctrl))
+		c->SetData(mixed ? Value() : value);
+	else if(UiCompositeToggle *c = dynamic_cast<UiCompositeToggle *>(row.ctrl))
+		c->SetData(mixed ? false : (bool)value);
+	else if(UiCompositeSlider *c = dynamic_cast<UiCompositeSlider *>(row.ctrl)) {
+		int v = IsNumber(value) ? (int)value : 0;
+		c->SetData(v);
+		c->SetValueText(mixed ? "Mixed" : AsString(v));
+	}
+	else if(UiCompositeColor *c = dynamic_cast<UiCompositeColor *>(row.ctrl))
+		c->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+	else if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
+		c->SetData(mixed ? Value("Mixed") : value);
 }
 
 Value DesignerInspector::QuadFaceValue(const DesignerNode& n, Color face) const

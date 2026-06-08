@@ -31,6 +31,7 @@
 
 #include <Ui/UiLabel.h>
 #include <Ui/UiSlider.h>
+#include <Ui/UiLineEdit.h>
 
 namespace Upp {
 
@@ -55,6 +56,8 @@ public:
 
     UiCompositeSlider& SetValueSelectable(bool selectable = true);
     bool IsValueSelectable() const { return value_selectable_; }
+    UiCompositeSlider& EnableValueEdit(bool on = true);
+    bool IsValueEditEnabled() const { return value_edit_enabled_; }
 
     UiCompositeSlider& SetLabelWidth(int cx);
     UiCompositeSlider& SetValueWidth(int cx);
@@ -75,21 +78,59 @@ public:
     virtual Value GetData() const override;
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
+    virtual void LeftDouble(Point p, dword keyflags) override;
 
     Event<> WhenAction;
     Event<> WhenChanging;
 
 private:
+    struct ValueLabel : UiLabel {
+        Event<Point, dword> WhenDoubleClick;
+        virtual void LeftDouble(Point p, dword keyflags) override
+        {
+            if(WhenDoubleClick)
+                WhenDoubleClick(p, keyflags);
+        }
+    };
+
+    struct ValueEdit : UiLineEdit {
+        Event<> WhenEscape;
+        Event<> WhenLoseFocus;
+        virtual bool Key(dword key, int count) override
+        {
+            if(key == K_ESCAPE) {
+                if(WhenEscape)
+                    WhenEscape();
+                return true;
+            }
+            return UiLineEdit::Key(key, count);
+        }
+        virtual void LostFocus() override
+        {
+            UiLineEdit::LostFocus();
+            if(WhenLoseFocus)
+                WhenLoseFocus();
+        }
+    };
+
     void SyncValueVisibility();
+    void BeginValueEdit();
+    void CommitValueEdit();
+    void CancelValueEdit();
+    void SyncValueEditRect();
+    bool IsEditingValue() const { return editing_value_; }
 
 private:
     UiLabel label_;
     UiSlider slider_;
-    UiLabel value_;
+    ValueLabel value_;
+    ValueEdit value_edit_;
 
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     bool show_value_ = true;
     bool value_selectable_ = false;
+    bool value_edit_enabled_ = true;
+    bool editing_value_ = false;
     int label_width_ = DPI(112);
     int value_width_ = DPI(48);
     int field_gap_ = DPI(8);

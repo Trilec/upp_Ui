@@ -23,6 +23,7 @@ public:
 	void Set(DesignerModel *model, const DesignerRegistry *registry);
 	void SetBindingGroup(const String& group);
 	void SetNode(DesignerNodeId id);
+	void SetSelection(const Vector<DesignerNodeId>& ids);
 	DesignerNodeId GetNode() const { return node_id_; }
 
 	Size GetContentSize() const;
@@ -32,6 +33,7 @@ public:
 	virtual void Layout() override;
 
 	Event<DesignerNodeId, String, Value> WhenProperty;
+	Event<const Vector<DesignerNodeId>&, String, Value> WhenPropertyMany;
 	Event<DesignerNodeId, String> WhenName;
 	Event<String> WhenNotes;
 
@@ -52,11 +54,13 @@ private:
 	};
 
 	Value NodeProperty(const DesignerNode& n, const String& key, const Value& def) const;
+	Value SelectionProperty(const Vector<const DesignerNode *>& nodes, const DesignerApiBinding& b, bool& mixed) const;
 	Value DefaultValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b) const;
 	Value PropertyValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b) const;
 	String RuntimeTypeName(const String& type_id) const;
 	String PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const;
 	void Describe(Vector<DesignerApiBinding>& bindings, const DesignerNode& n) const;
+	void DescribeCommon(Vector<DesignerApiBinding>& bindings, const Vector<const DesignerNode *>& nodes) const;
 	bool ShouldShowBinding(const DesignerApiBinding& b) const;
 
 	Page& EnsurePage(const DesignerNode& n, const DesignerType& t, const Vector<DesignerApiBinding>& bindings,
@@ -67,11 +71,18 @@ private:
 	void AddTypeRow(Page& page, const String& type_text);
 	void AddNameRow(Page& page, const DesignerNode& n);
 	void AddMessageRow(Page& page, const String& text);
+	void AddMultiSelectionHeader(Page& page, int count);
 	void AddBindingRow(Page& page, const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b);
+	void AddBindingRow(Page& page, const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>& types,
+	                   const DesignerApiBinding& b);
 	String BuildNoteText(const Vector<DesignerApiBinding>& bindings) const;
 	void RefreshPage(Page& page, const DesignerNode& n, const DesignerType& t,
 	                 const Vector<DesignerApiBinding>& bindings, const String& type_text);
+	void RefreshMultiPage(Page& page, const Vector<const DesignerNode *>& nodes,
+	                      const Vector<const DesignerType *>& types, const Vector<DesignerApiBinding>& bindings);
 	void SetRowValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b, Row& row);
+	void SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>& types,
+	                 const DesignerApiBinding& b, Row& row);
 	Value QuadFaceValue(const DesignerNode& n, Color face) const;
 	void CommitChoice(const String& property_id, const Value& value, const char *source);
 	void CommitChoice(const String& property_id, UiCompositeDropdown *row, const char *source);
@@ -81,6 +92,7 @@ private:
 	DesignerModel *model_ = nullptr;
 	const DesignerRegistry *registry_ = nullptr;
 	DesignerNodeId node_id_ = Designer_NULL;
+	Vector<DesignerNodeId> selection_;
 	String binding_group_;
 	bool syncing_ = false;
 };

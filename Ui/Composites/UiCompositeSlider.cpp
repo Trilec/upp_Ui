@@ -8,10 +8,22 @@ UiCompositeSlider::UiCompositeSlider()
     Add(label_);
     Add(slider_);
     Add(value_);
+    Add(value_edit_);
     slider_.WhenAction = [=] { WhenAction(); };
     slider_.WhenChanging = [=] { WhenChanging(); };
     label_.NoWantFocus();
     value_.NoWantFocus();
+    value_.WhenDoubleClick = [=](Point, dword) {
+        if(value_edit_enabled_)
+            BeginValueEdit();
+    };
+    value_edit_.Hide();
+    value_edit_.WhenAction = [=] { CommitValueEdit(); };
+    value_edit_.WhenEscape = [=] { CancelValueEdit(); };
+    value_edit_.WhenLoseFocus = [=] {
+        if(editing_value_)
+            CommitValueEdit();
+    };
     UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
     label_style.font = SansSerifZ(9);
     UiLabel::Style value_style = UiTheme::ResolveLabel(UiRole::Standard);
@@ -43,7 +55,9 @@ UiCompositeSlider& UiCompositeSlider::SetLabel(const String& text)
 
 UiCompositeSlider& UiCompositeSlider::SetValueText(const String& text)
 {
-    value_.SetText(text);
+	value_.SetText(text);
+	if(!editing_value_)
+		value_edit_.SetTextUtf8(text);
     value_.RefreshLayout();
     RefreshLayout();
     Refresh();
@@ -65,6 +79,14 @@ UiCompositeSlider& UiCompositeSlider::SetValueSelectable(bool selectable)
 {
     value_selectable_ = selectable;
     value_.SetSelectable(selectable);
+    return *this;
+}
+
+UiCompositeSlider& UiCompositeSlider::EnableValueEdit(bool on)
+{
+    value_edit_enabled_ = on;
+    if(!value_edit_enabled_ && editing_value_)
+        CancelValueEdit();
     return *this;
 }
 
@@ -154,6 +176,7 @@ void UiCompositeSlider::Layout()
         if(show_value_)
             value_.SetRect(max(0, r.right - vw), top_y, vw, top_h);
         slider_.SetRect(0, slider_y, r.GetWidth(), slider_h);
+        SyncValueEditRect();
         return;
     }
 
@@ -165,12 +188,73 @@ void UiCompositeSlider::Layout()
     slider_.SetRect(slider_x, 0, slider_w, r.GetHeight());
     if(show_value_)
         value_.SetRect(max(0, r.right - vw), 0, vw, r.GetHeight());
+    SyncValueEditRect();
 }
 
 void UiCompositeSlider::SyncValueVisibility()
 {
     value_.SetSelectable(value_selectable_);
     value_.Show(show_value_);
+    if(!show_value_)
+        value_edit_.Hide();
+    else if(editing_value_)
+        value_edit_.Show();
+}
+
+void UiCompositeSlider::LeftDouble(Point p, dword keyflags)
+{
+    Ctrl::LeftDouble(p, keyflags);
+    if(value_edit_enabled_ && show_value_ && value_.GetRect().Contains(p))
+        BeginValueEdit();
+}
+
+void UiCompositeSlider::BeginValueEdit()
+{
+    if(!show_value_ || editing_value_)
+        return;
+    editing_value_ = true;
+    value_edit_.SetTextUtf8(AsString((int)slider_.GetValue()));
+    SyncValueEditRect();
+    value_.Hide();
+    value_edit_.Show();
+    value_edit_.SetFocus();
+    value_edit_.SetSelection(0, INT_MAX);
+}
+
+void UiCompositeSlider::CommitValueEdit()
+{
+    if(!editing_value_)
+        return;
+    int v = fround(slider_.GetValue());
+    String text = value_edit_.GetTextUtf8();
+    if(!text.IsEmpty()) {
+        v = ScanInt(text);
+        v = minmax(v, (int)slider_.GetMin(), (int)slider_.GetMax());
+    }
+    editing_value_ = false;
+    value_edit_.Hide();
+    value_.Show(show_value_);
+    slider_.SetValue(v);
+    SetValueText(AsString(v));
+    WhenAction();
+    Refresh();
+}
+
+void UiCompositeSlider::CancelValueEdit()
+{
+    if(!editing_value_)
+        return;
+    editing_value_ = false;
+    value_edit_.Hide();
+    value_.Show(show_value_);
+    SetValueText(AsString((int)slider_.GetValue()));
+    Refresh();
+}
+
+void UiCompositeSlider::SyncValueEditRect()
+{
+    if(show_value_)
+        value_edit_.SetRect(value_.GetRect());
 }
 
 }

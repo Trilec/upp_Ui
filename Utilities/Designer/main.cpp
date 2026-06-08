@@ -676,8 +676,13 @@ private:
 		exit_button_.WhenAction = [=] { Close(); };
 
 		preview_.Set(&model_, &registry_);
-		preview_.WhenSelect = [=](DesignerNodeId id) {
-			model_.SelectOne(id);
+		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
+			if(keyflags & K_CTRL)
+				model_.ToggleSelection(id);
+			else if(keyflags & K_SHIFT)
+				model_.AddToSelection(id);
+			else
+				model_.SelectOne(id);
 			RefreshSelectionUi();
 		};
 		preview_.WhenMoveNode = [=](DesignerNodeId id, DesignerNodeId target, int index) {
@@ -714,7 +719,7 @@ private:
 		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), 4);
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
-		hierarchy_.SetSelectionMode(UITREESEL_SINGLE);
+		hierarchy_.SetSelectionMode(UITREESEL_MULTI);
 		hierarchy_.ShowConnectorLines(true);
 		hierarchy_.EnableInternalMutation(false);
 		hierarchy_.EnableRenameOnDblClick(true);
@@ -724,11 +729,14 @@ private:
 		hierarchy_.WhenSelection = [=] {
 			if(syncing_hierarchy_)
 				return;
-			Value v = hierarchy_.GetData();
-			if(IsNumber(v)) {
-				model_.SelectOne((int)v);
-				RefreshInspectorPreview();
+			Vector<DesignerNodeId> ids;
+			for(UiTreeNodeRef ref : hierarchy_.GetSelection()) {
+				DesignerNodeId id = GetHierarchyNodeId(ref);
+				if(id != Designer_NULL)
+					ids.Add(id);
 			}
+			model_.SetSelection(ids);
+			RefreshInspectorPreview();
 		};
 		hierarchy_.WhenRename = [=](UiTreeNodeRef ref, const String& name) {
 			DesignerNodeId id = GetHierarchyNodeId(ref);
@@ -755,6 +763,9 @@ private:
 		inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
+		inspector_.WhenPropertyMany = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
+			SaveInspectorPropertyValues(ids, property, value);
+		};
 		inspector_.WhenName = [=](DesignerNodeId id, String name) {
 			SaveInspectorNameValue(id, name);
 		};
@@ -763,6 +774,9 @@ private:
 		};
 		theme_override_inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
+		};
+		theme_override_inspector_.WhenPropertyMany = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
+			SaveInspectorPropertyValues(ids, property, value);
 		};
 		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		collapse_button_.SetText("")
@@ -1493,13 +1507,14 @@ private:
 		};
 		add(hierarchy_model_.Root(), Designer_ROOT, String());
 		RestoreHierarchyExpandedState(hierarchy_model_.Root());
-		if(!model_.GetSelection().IsEmpty()) {
-			int q = hierarchy_refs_.Find(model_.GetSelection()[0]);
-			if(q >= 0) {
-				hierarchy_.SelectNode(hierarchy_refs_[q]);
-				hierarchy_.ScrollToSelection();
-			}
+		ValueArray selection_data;
+		for(DesignerNodeId id : model_.GetSelection()) {
+			int q = hierarchy_refs_.Find(id);
+			if(q >= 0)
+				selection_data.Add(id);
 		}
+		hierarchy_.SetData(selection_data);
+		hierarchy_.ScrollToSelection();
 		hierarchy_.Refresh();
 		syncing_hierarchy_ = false;
 	}
@@ -1521,13 +1536,14 @@ private:
 			item.custom_ink_color = CategoryColor(t);
 			hierarchy_model_.Set(ref, item);
 		}
-		if(!model_.GetSelection().IsEmpty()) {
-			int q = hierarchy_refs_.Find(model_.GetSelection()[0]);
-			if(q >= 0) {
-				hierarchy_.SelectNode(hierarchy_refs_[q]);
-				hierarchy_.ScrollToSelection();
-			}
+		ValueArray selection_data;
+		for(DesignerNodeId id : model_.GetSelection()) {
+			int q = hierarchy_refs_.Find(id);
+			if(q >= 0)
+				selection_data.Add(id);
 		}
+		hierarchy_.SetData(selection_data);
+		hierarchy_.ScrollToSelection();
 		hierarchy_.Refresh();
 		syncing_hierarchy_ = false;
 	}
@@ -1541,8 +1557,8 @@ private:
 			SetWarningNotes(String());
 			return;
 		}
-		inspector_.SetNode(model_.GetSelection()[0]);
-		theme_override_inspector_.SetNode(model_.GetSelection()[0]);
+		inspector_.SetSelection(model_.GetSelection());
+		theme_override_inspector_.SetSelection(model_.GetSelection());
 		RefreshContainerActions();
 		RefreshRightPanel();
 	}
@@ -2514,6 +2530,37 @@ private:
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
 			PostDesignerRefresh(true);
+		}
+	}
+
+	void SaveInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
+	{
+		if(ids.IsEmpty())
+			return;
+		bool changed = false;
+		for(DesignerNodeId id : ids) {
+			DesignerNode* n = model_.Find(id);
+			if(!n || n->id == Designer_ROOT)
+				continue;
+			Vector<DesignerApiBinding> bindings;
+			DesignerAdapter *adapter = nullptr;
+			One<Ctrl> ctrl;
+			ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
+			if(adapter)
+				adapter->DescribeApi(bindings, *n);
+			const DesignerApiBinding* binding = FindApiBinding(bindings, property_id);
+			if(!binding || !binding->visible || !binding->enabled)
+				continue;
+			Value normalized = NormalizeInspectorValue(*n, property_id, value);
+			int q = n->properties.Find(property_id);
+			if(q >= 0 && n->properties.GetValue(q) == normalized)
+				continue;
+			n->properties.Set(property_id, normalized);
+			changed = true;
+		}
+		if(changed) {
+			model_.WhenChanged();
+			PostDesignerRefresh(property_id == "theme_override");
 		}
 	}
 

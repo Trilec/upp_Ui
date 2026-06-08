@@ -71,6 +71,11 @@ public:
 	const Vector<DesignerNodeId>& GetSelection() const { return selection_; }
 	void SetSelection(const Vector<DesignerNodeId>& ids);
 	void SelectOne(DesignerNodeId id);
+	void AddToSelection(DesignerNodeId id);
+	void RemoveFromSelection(DesignerNodeId id);
+	void ToggleSelection(DesignerNodeId id);
+	bool IsSelected(DesignerNodeId id) const;
+	bool SetPropertyMany(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value);
 	bool Validate(String& error) const;
 	bool Validate() const { String error; return Validate(error); }
 

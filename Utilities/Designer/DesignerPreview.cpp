@@ -147,6 +147,20 @@ static UiGridLayout::Align DesignerPreviewGridAlignV(const DesignerNode& n)
 	return UiGridLayout::Align::Start;
 }
 
+static UiBoxLayout::Align DesignerPreviewBoxCrossAlign(const DesignerNode& n, bool horizontal_parent)
+{
+	String align = horizontal_parent
+	             ? DesignerPreviewNodeProperty(n, "cell_align_v", "Auto")
+	             : DesignerPreviewNodeProperty(n, "cell_align_h", "Auto");
+	if(align == "Auto")
+		return UiBoxLayout::Align::Start;
+	if(align == "Center")
+		return UiBoxLayout::Align::Center;
+	if(align == "Bottom" || align == "Right")
+		return UiBoxLayout::Align::End;
+	return UiBoxLayout::Align::Start;
+}
+
 void DesignerPreview::Set(DesignerModel* model, DesignerRegistry* registry)
 {
 			model_ = model;
@@ -213,7 +227,7 @@ void DesignerPreview::Layout()
 		}
 
 
-void DesignerPreview::LeftDown(Point p, dword)
+void DesignerPreview::LeftDown(Point p, dword keyflags)
 {
 			SetFocus();
 			Rect root = GetVirtualWindowRect();
@@ -226,7 +240,7 @@ void DesignerPreview::LeftDown(Point p, dword)
 			drag_candidate_ = id;
 			drag_start_ = p;
 			dragging_node_ = false;
-			WhenSelect(id ? id : Designer_ROOT);
+			WhenSelect(id ? id : Designer_ROOT, keyflags);
 		}
 
 void DesignerPreview::MouseMove(Point p, dword)
@@ -1179,6 +1193,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					             : 0;
 					bool layout_break = (bool)DesignerPreviewNodeProperty(child_node, "layout_break", false);
 					bool parent_horizontal = DesignerPreviewNodeProperty(parent_node, "direction", "V") == "H";
+					UiBoxLayout::Align cross_align = DesignerPreviewBoxCrossAlign(child_node, parent_horizontal);
 					String main_sizing = parent_horizontal ? hs : vs;
 					String cross_sizing = parent_horizontal ? vs : hs;
 					int min_w = DesignerPreviewSpacerAxisMin(child_node, true);
@@ -1213,7 +1228,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 							ref.MaxMain(DPI(max(max_main, min_main)));
 
 						if(cross_sizing == "Fixed")
-							ref.MinMaxCross(DPI(fixed_cross), DPI(fixed_cross)).AlignSelf(UiBoxLayout::Align::Start);
+							ref.MinMaxCross(DPI(fixed_cross), DPI(fixed_cross)).AlignSelf(cross_align);
 						else if(cross_sizing == "Expand") {
 							if(max_cross > 0)
 								ref.MinMaxCross(DPI(min_cross), DPI(max(max_cross, min_cross)));
@@ -1226,7 +1241,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 								ref.MinMaxCross(DPI(min_cross), DPI(max(max_cross, min_cross)));
 							else
 								ref.MinCross(DPI(min_cross));
-							ref.AlignSelf(UiBoxLayout::Align::Start);
+							ref.AlignSelf(cross_align);
 						}
 					}
 					if(!layout_break && (bool)DesignerPreviewNodeProperty(child_node, "line_enabled", false)) {
@@ -1243,6 +1258,7 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				}
 				UiBoxLayout::ItemRef ref = box->Add(child);
 				bool horizontal = DesignerPreviewNodeProperty(parent_node, "direction", "V") == "H";
+				UiBoxLayout::Align cross_align = DesignerPreviewBoxCrossAlign(child_node, horizontal);
 				String main_sizing = horizontal ? hs : vs;
 				if(main_sizing == "Fixed") {
 					int fixed = horizontal
@@ -1262,18 +1278,18 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				if(horizontal) {
 					ref.MinMain(min_w);
 					if(vs == "Fixed")
-						ref.MinMaxCross(fixed_h, fixed_h).AlignSelf(UiBoxLayout::Align::Start);
+						ref.MinMaxCross(fixed_h, fixed_h).AlignSelf(cross_align);
 					else if(vs == "Fit")
-						ref.MinCross(min_h).AlignSelf(UiBoxLayout::Align::Start);
+						ref.MinCross(min_h).AlignSelf(cross_align);
 					else
 						ref.MinCross(min_h).AlignSelf(UiBoxLayout::Align::Stretch);
 				}
 				else {
 					ref.MinMain(min_h);
 					if(hs == "Fixed")
-						ref.MinMaxCross(fixed_w, fixed_w).AlignSelf(UiBoxLayout::Align::Start);
+						ref.MinMaxCross(fixed_w, fixed_w).AlignSelf(cross_align);
 					else if(hs == "Fit")
-						ref.MinCross(min_w).AlignSelf(UiBoxLayout::Align::Start);
+						ref.MinCross(min_w).AlignSelf(cross_align);
 					else
 						ref.MinCross(min_w).AlignSelf(UiBoxLayout::Align::Stretch);
 				}

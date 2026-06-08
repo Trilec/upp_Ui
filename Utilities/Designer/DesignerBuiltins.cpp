@@ -419,6 +419,14 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("item_text", "First");
 		if(id == "UiDropdown")
 			n.properties.Set("selected_item", "First");
+		if(id == "UiDropdown")
+			n.properties.Set("indicator_side", "Right");
+		if(id == "UiDropdown")
+			n.properties.Set("indicator_closed_icon", "None");
+		if(id == "UiDropdown")
+			n.properties.Set("indicator_opened_icon", "None");
+		if(id == "UiDropdown")
+			n.properties.Set("indicator_size", 14);
 		if(id == "UiCheckBox") {
 			n.properties.Set("state", "Checked");
 			n.properties.Set("tri_state", false);

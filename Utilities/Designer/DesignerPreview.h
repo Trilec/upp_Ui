@@ -17,7 +17,7 @@ namespace Upp {
 // rectangles for hit testing, and emits events for selection, resize, and moves.
 class DesignerPreview : public Ctrl {
 public:
-		Event<DesignerNodeId> WhenSelect;
+		Event<DesignerNodeId, dword> WhenSelect;
 		Event<> WhenChanged;
 		Event<DesignerNodeId, DesignerNodeId, int> WhenMoveNode;
 		void Set(DesignerModel* model, DesignerRegistry* registry);

@@ -305,6 +305,62 @@ void DesignerModel::SelectOne(DesignerNodeId id)
 	SetSelection(ids);
 }
 
+void DesignerModel::AddToSelection(DesignerNodeId id)
+{
+	id = Find(id) ? id : Designer_ROOT;
+	if(FindId(selection_, id) >= 0)
+		return;
+	selection_.Add(id);
+	WhenSelectionChanged();
+}
+
+void DesignerModel::RemoveFromSelection(DesignerNodeId id)
+{
+	int q = FindId(selection_, id);
+	if(q < 0)
+		return;
+	selection_.Remove(q);
+	if(selection_.IsEmpty())
+		selection_.Add(Designer_ROOT);
+	WhenSelectionChanged();
+}
+
+void DesignerModel::ToggleSelection(DesignerNodeId id)
+{
+	id = Find(id) ? id : Designer_ROOT;
+	int q = FindId(selection_, id);
+	if(q >= 0)
+		selection_.Remove(q);
+	else
+		selection_.Add(id);
+	if(selection_.IsEmpty())
+		selection_.Add(Designer_ROOT);
+	WhenSelectionChanged();
+}
+
+bool DesignerModel::IsSelected(DesignerNodeId id) const
+{
+	return FindId(selection_, id) >= 0;
+}
+
+bool DesignerModel::SetPropertyMany(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
+{
+	bool changed = false;
+	for(DesignerNodeId id : ids) {
+		DesignerNode* n = Find(id);
+		if(!n)
+			continue;
+		int q = n->properties.Find(property_id);
+		if(q >= 0 && n->properties.GetValue(q) == value)
+			continue;
+		n->properties.Set(property_id, value);
+		changed = true;
+	}
+	if(changed)
+		WhenChanged();
+	return changed;
+}
+
 bool DesignerModel::ValidateVisit(DesignerNodeId id, Vector<DesignerNodeId>& visiting,
                                     Vector<DesignerNodeId>& visited, String& error) const
 {

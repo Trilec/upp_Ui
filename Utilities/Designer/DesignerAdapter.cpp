@@ -1960,6 +1960,13 @@ void DesignerDropdownAdapter::SyncFromNode(const DesignerNode& node)
 	String item_text = AdapterNodeProperty(node, "item_text", "First");
 	Add(item_text, item_text);
 	Select(0);
+	SetIndicatorSide(DesignerSideChoice(AdapterNodeProperty(node, "indicator_side", "Right"), UiAlign::RIGHT));
+	SetIndicatorSize(DPI(max(0, (int)AdapterNodeProperty(node, "indicator_size", 14))));
+	Image closed_icon = DesignerIconChoice(node, "indicator_closed_icon");
+	Image opened_icon = DesignerIconChoice(node, "indicator_opened_icon");
+	if(!IsNull(closed_icon) || !IsNull(opened_icon))
+		SetIndicatorGlyphs(IsNull(closed_icon) ? ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48() : closed_icon,
+		                   IsNull(opened_icon) ? ICON_NAVIGATION_OUTLINED_ARROW_DROP_UP_48() : opened_icon);
 	NoWantFocus();
 }
 
@@ -1975,6 +1982,17 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	DesignerApiBuilder b(out);
 	b.Add("item_text", "Item text", DesignerEditorKind::Text, "UiDropdown::SetItemText",
 	      "Visible text of the default dropdown item.");
+	b.AddChoice("indicator_side", "Chevron side", "UiDropdown::SetIndicatorSide",
+	            "Side used by the collapsed dropdown chevron.", {{"Left", "Left"}, {"Right", "Right"}});
+	AddIconChoiceBinding(b, "indicator_closed_icon", "Closed chevron",
+	                     "UiDropdown::SetIndicatorGlyphs",
+	                     "Icon used when the dropdown is closed.");
+	AddIconChoiceBinding(b, "indicator_opened_icon", "Opened chevron",
+	                     "UiDropdown::SetIndicatorGlyphs",
+	                     "Icon used when the dropdown popup is open.");
+	b.AddInt("indicator_size", "Chevron size", DesignerEditorKind::Slider,
+	         "UiDropdown::SetIndicatorSize",
+	         "Preview size of the collapsed dropdown chevron.", 8, 48);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 	b.AddChoice("font", "Font", "UiDropdown::Style::font",

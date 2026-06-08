@@ -809,6 +809,16 @@ static String GridItemAlignVExpr(const DesignerNode& n)
 	return "UiGridLayout::Align::Start";
 }
 
+static String BoxCrossAlignExpr(const DesignerNode& n, bool horizontal_parent)
+{
+	String align = CodeGenNodeProperty(n, horizontal_parent ? "cell_align_v" : "cell_align_h", "Auto");
+	if(align == "Center")
+		return "UiBoxLayout::Align::Center";
+	if(align == "Bottom" || align == "Right")
+		return "UiBoxLayout::Align::End";
+	return "UiBoxLayout::Align::Start";
+}
+
 static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& child)
 {
 	bool horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
@@ -838,14 +848,15 @@ static String BoxMinCall(const DesignerNode& parent, const DesignerNode& child)
 
 	String cross = horizontal ? vs : hs;
 	int cross_min = horizontal ? min_h : min_w;
+	String cross_align = BoxCrossAlignExpr(child, horizontal);
 	int fixed = horizontal ? DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))
 	                       : DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
 	fixed = max(fixed, cross_min);
 
 	if(cross == "Fixed")
-		out << Format(".MinMaxCross(DPI(%d), DPI(%d)).AlignSelf(UiBoxLayout::Align::Start)", fixed, fixed);
+		out << Format(".MinMaxCross(DPI(%d), DPI(%d)).AlignSelf(", fixed, fixed) << cross_align << ")";
 	else if(cross == "Fit")
-		out << Format(".MinCross(DPI(%d)).AlignSelf(UiBoxLayout::Align::Start)", cross_min);
+		out << Format(".MinCross(DPI(%d)).AlignSelf(", cross_min) << cross_align << ")";
 	else
 		out << Format(".MinCross(DPI(%d)).AlignSelf(UiBoxLayout::Align::Stretch)", cross_min);
 	return out;
@@ -1200,6 +1211,17 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		String item_text = CodeGenNodeProperty(n, "item_text", "First");
 		out << "\t\t" << var << ".UseInternalModel().Clear().Add(" << CppString(item_text) << ", " << CppString(item_text) << ");\n";
 		out << "\t\t" << var << ".Select(0);\n";
+		out << "\t\t" << var << ".SetIndicatorSide(" << AlignSideExpr(CodeGenNodeProperty(n, "indicator_side", "Right"), "Right") << ");\n";
+		out << "\t\t" << var << ".SetIndicatorSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "indicator_size", 14)) << "));\n";
+		String closed_icon = IconExpr(CodeGenNodeProperty(n, "indicator_closed_icon", "None"));
+		String opened_icon = IconExpr(CodeGenNodeProperty(n, "indicator_opened_icon", "None"));
+		if(!closed_icon.IsEmpty() || !opened_icon.IsEmpty()) {
+			if(closed_icon.IsEmpty())
+				closed_icon = "ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48()";
+			if(opened_icon.IsEmpty())
+				opened_icon = "ICON_NAVIGATION_OUTLINED_ARROW_DROP_UP_48()";
+			out << "\t\t" << var << ".SetIndicatorGlyphs(" << closed_icon << ", " << opened_icon << ");\n";
+		}
 	}
 	else if(n.type_id == "UiCheckBox") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
@@ -1324,6 +1346,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 				int min_cross = parent_horizontal ? min_h : min_w;
 				int max_cross = parent_horizontal ? max_h : max_w;
 				int fixed_cross = parent_horizontal ? fixed_h : fixed_w;
+				String cross_align = BoxCrossAlignExpr(child, parent_horizontal);
 				out << "\t\t{\n";
 				out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ");\n";
 				if(main_sizing == "Fixed")
@@ -1335,7 +1358,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 				if(max_main > 0)
 					out << "\t\t\tspacer.MaxMain(DPI(" << max(max_main, min_main) << "));\n";
 				if(cross_sizing == "Fixed")
-					out << "\t\t\tspacer.MinMaxCross(DPI(" << fixed_cross << "), DPI(" << fixed_cross << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
+					out << "\t\t\tspacer.MinMaxCross(DPI(" << fixed_cross << "), DPI(" << fixed_cross << ")).AlignSelf(" << cross_align << ");\n";
 				else if(cross_sizing == "Expand") {
 					if(max_cross > 0)
 						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(UiBoxLayout::Align::Stretch);\n";
@@ -1344,9 +1367,9 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 				}
 				else {
 					if(max_cross > 0)
-						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
+						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(" << cross_align << ");\n";
 					else
-						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(UiBoxLayout::Align::Start);\n";
+						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(" << cross_align << ");\n";
 				}
 				if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
 					out << "\t\t\tspacer.LineEnabled(true)"
