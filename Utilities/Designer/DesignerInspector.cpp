@@ -512,8 +512,26 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 					match = &candidate;
 					break;
 				}
-			if(!match || !match->visible || !match->enabled || match->editor != b.editor)
+			if(!match || !match->visible || !match->enabled || match->editor != b.editor) {
 				common = false;
+				continue;
+			}
+			if(b.editor == DesignerEditorKind::Choice) {
+				if(match->choices.GetCount() != b.choices.GetCount()) {
+					common = false;
+					continue;
+				}
+				for(int q = 0; q < b.choices.GetCount(); q++) {
+					if(match->choices.GetKey(q) != b.choices.GetKey(q)) {
+						common = false;
+						break;
+					}
+				}
+			}
+			else if(b.editor == DesignerEditorKind::Int || b.editor == DesignerEditorKind::Slider) {
+				if(match->min_value != b.min_value || match->max_value != b.max_value)
+					common = false;
+			}
 		}
 		if(common)
 			bindings.Add(DesignerCloneBinding(b));
@@ -903,7 +921,14 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
-	row->SetData(mixed ? Value("Mixed") : value);
+	if(mixed) {
+		row->SetData(Value());
+		row->Edit().SetPlaceholder("Mixed");
+	}
+	else {
+		row->Edit().SetPlaceholder("");
+		row->SetData(value);
+	}
 	row->WhenAction = [=] {
 		if(!syncing_ && self)
 			WhenPropertyMany(selection_, property_id, self->GetData());
@@ -1019,7 +1044,16 @@ void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, c
 	else if(UiCompositeColor *c = dynamic_cast<UiCompositeColor *>(row.ctrl))
 		c->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
 	else if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
-		c->SetData(mixed ? Value("Mixed") : value);
+	{
+		if(mixed) {
+			c->SetData(Value());
+			c->Edit().SetPlaceholder("Mixed");
+		}
+		else {
+			c->Edit().SetPlaceholder("");
+			c->SetData(value);
+		}
+	}
 }
 
 Value DesignerInspector::QuadFaceValue(const DesignerNode& n, Color face) const

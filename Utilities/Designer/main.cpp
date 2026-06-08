@@ -2537,7 +2537,8 @@ private:
 	{
 		if(ids.IsEmpty())
 			return;
-		bool changed = false;
+		Vector<DesignerNodeId> changed_ids;
+		bool grouped = false;
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
@@ -2555,11 +2556,17 @@ private:
 			int q = n->properties.Find(property_id);
 			if(q >= 0 && n->properties.GetValue(q) == normalized)
 				continue;
-			n->properties.Set(property_id, normalized);
-			changed = true;
+			if(!grouped) {
+				commands_.BeginGroup("Set " + property_id + " on selection");
+				grouped = true;
+			}
+			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, normalized, binding->api_call), model_))
+				changed_ids.Add(id);
 		}
-		if(changed) {
-			model_.WhenChanged();
+		if(grouped)
+			commands_.EndGroup();
+		if(!changed_ids.IsEmpty()) {
+			model_.SetSelection(ids);
 			PostDesignerRefresh(property_id == "theme_override");
 		}
 	}

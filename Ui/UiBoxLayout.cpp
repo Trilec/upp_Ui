@@ -1,4 +1,5 @@
 #include <Ui/UiBoxLayout.h>
+#include <Ui/UiGridLayout.h>
 
 namespace Upp {
 
@@ -259,8 +260,16 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             w = min(max(w, it.minw), it.maxw);
             if(wrap == UiBoxWrap::Snap)
                 w = GetSnapMainSize(row.GetCount(), w);
-
-            int h = min(max(ms.cy, it.minh), it.maxh);
+            int measured_h = ms.cy;
+            if(it.c) {
+                if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
+                    if(box->wrap_auto_resize)
+                        measured_h = max(measured_h, box->MeasureHeightForWidth(w));
+                }
+                else if(UiGridLayout *grid = dynamic_cast<UiGridLayout *>(it.c))
+                    measured_h = max(measured_h, grid->MeasureHeightForWidth(w));
+            }
+            int h = min(max(measured_h, it.minh), it.maxh);
 
             int need = row.IsEmpty() ? w : x_cursor + main_gap + w;
             bool wrap_on = wrap != UiBoxWrap::None;

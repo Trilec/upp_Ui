@@ -1004,6 +1004,8 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		}
 		if((bool)CodeGenNodeProperty(n, "debug", false))
 			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
+		if(wrap != "None")
+			out << ".SetWrapAutoResize(true)";
 		out << ";\n";
 	}	else if(n.type_id == "UiCompositeLabel" || n.type_id == "UiCompositeEdit" ||
 	        n.type_id == "UiCompositeDropdown" || n.type_id == "UiCompositeToggle" ||
@@ -1455,7 +1457,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 	if(parent.id == Designer_ROOT)
 		out << "\t\tAdd(" << c << ".SizePos());\n";
 	else if(parent.type_id == "BoxLayout")
-		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << ";\n";
+		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << BoxMinCall(parent, child) << ";\n";
 	else if(parent.type_id == "GridLayout") {
 		int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
 		int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
