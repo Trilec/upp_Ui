@@ -60,8 +60,12 @@ private:
 	String RuntimeTypeName(const String& type_id) const;
 	String PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const;
 	void Describe(Vector<DesignerApiBinding>& bindings, const DesignerNode& n) const;
+	void AppendBinding(Vector<DesignerApiBinding>& bindings, const DesignerApiBinding& binding) const;
+	void DescribeSelection(Vector<Vector<DesignerApiBinding>>& all_bindings, const Vector<const DesignerNode *>& nodes) const;
 	void DescribeCommon(Vector<DesignerApiBinding>& bindings, const Vector<const DesignerNode *>& nodes) const;
 	bool ShouldShowBinding(const DesignerApiBinding& b) const;
+	bool CanCacheDescriptorShape(const DesignerNode& n) const;
+	String DescriptorCacheKey(const DesignerNode& n) const;
 
 	Page& EnsurePage(const DesignerNode& n, const DesignerType& t, const Vector<DesignerApiBinding>& bindings,
 	                 const String& type_text, const String& key);
@@ -95,6 +99,7 @@ private:
 	Vector<DesignerNodeId> selection_;
 	String binding_group_;
 	bool syncing_ = false;
+	mutable VectorMap<String, Vector<DesignerApiBinding>> descriptor_cache_;
 };
 
 }

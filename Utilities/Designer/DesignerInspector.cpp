@@ -7,8 +7,12 @@
 
 namespace Upp {
 
+static constexpr bool DESIGNER_MULTISELECT_DEBUG = false;
+
 static void DesignerMultiSelectLog(const String& text)
 {
+	if(!DESIGNER_MULTISELECT_DEBUG)
+		return;
 	String folder = GetFileFolder(GetExeFilePath());
 	String leaf = ToLower(GetFileName(folder));
 	if(leaf == "designer" || leaf == "designerruntests")
@@ -64,6 +68,14 @@ static DesignerApiBinding DesignerCloneBinding(const DesignerApiBinding& src)
 	for(int i = 0; i < src.choices.GetCount(); i++)
 		out.choices.Add(src.choices.GetKey(i), src.choices[i]);
 	return out;
+}
+
+static const DesignerApiBinding* FindCommonBindingById(const Vector<DesignerApiBinding>& bindings, const String& id)
+{
+	for(const DesignerApiBinding& binding : bindings)
+		if(binding.property_id == id)
+			return &binding;
+	return nullptr;
 }
 
 struct DesignerInspectorSurfaceDefault {
@@ -140,6 +152,7 @@ void DesignerInspector::Set(DesignerModel *model, const DesignerRegistry *regist
 void DesignerInspector::SetBindingGroup(const String& group)
 {
 	binding_group_ = group;
+	descriptor_cache_.Clear();
 }
 
 void DesignerInspector::SetSelection(const Vector<DesignerNodeId>& ids)
@@ -422,6 +435,15 @@ void DesignerInspector::Describe(Vector<DesignerApiBinding>& bindings, const Des
 {
 	if(!registry_ || n.id == Designer_ROOT)
 		return;
+	if(CanCacheDescriptorShape(n)) {
+		String key = DescriptorCacheKey(n);
+		int q = descriptor_cache_.Find(key);
+		if(q >= 0) {
+			for(const DesignerApiBinding& binding : descriptor_cache_[q])
+				AppendBinding(bindings, binding);
+			return;
+		}
+	}
 	DesignerAdapter *adapter = nullptr;
 	One<Ctrl> ctrl;
 	ctrl.Attach(CreateDesignerAdapterCtrl(n, &adapter));
@@ -430,13 +452,52 @@ void DesignerInspector::Describe(Vector<DesignerApiBinding>& bindings, const Des
 		adapter->DescribeApi(all, n);
 		for(int i = 0; i < all.GetCount(); i++)
 			if(ShouldShowBinding(all[i]))
-				bindings.Add(pick(all[i]));
+				AppendBinding(bindings, all[i]);
+		if(CanCacheDescriptorShape(n)) {
+			String key = DescriptorCacheKey(n);
+			Vector<DesignerApiBinding> cached;
+			for(const DesignerApiBinding& binding : bindings)
+				AppendBinding(cached, binding);
+			int q = descriptor_cache_.Find(key);
+			if(q >= 0)
+				descriptor_cache_[q] = pick(cached);
+			else
+				descriptor_cache_.Add(key, pick(cached));
+		}
 	}
+}
+
+void DesignerInspector::AppendBinding(Vector<DesignerApiBinding>& bindings, const DesignerApiBinding& binding) const
+{
+	bindings.Add(DesignerCloneBinding(binding));
+}
+
+void DesignerInspector::DescribeSelection(Vector<Vector<DesignerApiBinding>>& all_bindings,
+                                          const Vector<const DesignerNode *>& nodes) const
+{
+	all_bindings.SetCount(nodes.GetCount());
+	for(int i = 0; i < nodes.GetCount(); i++)
+		Describe(all_bindings[i], *nodes[i]);
 }
 
 bool DesignerInspector::ShouldShowBinding(const DesignerApiBinding& b) const
 {
 	return binding_group_.IsEmpty() ? b.group.IsEmpty() : b.group == binding_group_;
+}
+
+bool DesignerInspector::CanCacheDescriptorShape(const DesignerNode& n) const
+{
+	if(n.type_id == "Spacer")
+		return false;
+	return true;
+}
+
+String DesignerInspector::DescriptorCacheKey(const DesignerNode& n) const
+{
+	String key = n.type_id + "|" + binding_group_;
+	if(n.type_id == "Spacer")
+		key << "|break=" << ((bool)NodeProperty(n, "layout_break", false) ? "1" : "0");
+	return key;
 }
 
 String DesignerInspector::PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const
@@ -523,24 +584,19 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 {
 	if(nodes.IsEmpty())
 		return;
-	Vector<DesignerApiBinding> first;
-	Describe(first, *nodes[0]);
+	Vector<Vector<DesignerApiBinding>> all_bindings;
+	DescribeSelection(all_bindings, nodes);
+	if(all_bindings.IsEmpty())
+		return;
+	const Vector<DesignerApiBinding>& first = all_bindings[0];
 	for(const DesignerApiBinding& b : first) {
 		if(!b.visible || !b.enabled || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
 			continue;
-		if(!DesignerIsSafeMultiSelectProperty(b.property_id)) {
+		if(!DesignerIsSafeMultiSelectProperty(b.property_id))
 			continue;
-		}
 		bool common = true;
-		for(int i = 1; i < nodes.GetCount() && common; i++) {
-			Vector<DesignerApiBinding> other;
-			Describe(other, *nodes[i]);
-			const DesignerApiBinding *match = nullptr;
-			for(const DesignerApiBinding& candidate : other)
-				if(candidate.property_id == b.property_id) {
-					match = &candidate;
-					break;
-				}
+		for(int i = 1; i < all_bindings.GetCount() && common; i++) {
+			const DesignerApiBinding *match = FindCommonBindingById(all_bindings[i], b.property_id);
 			if(!match || !match->visible || !match->enabled || match->editor != b.editor) {
 				common = false;
 				continue;
@@ -562,9 +618,8 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 					common = false;
 			}
 		}
-		if(common) {
-			bindings.Add(DesignerCloneBinding(b));
-		}
+		if(common)
+			AppendBinding(bindings, b);
 	}
 }
 
@@ -919,7 +974,6 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			WhenPropertyMany(selection_, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self)
@@ -959,6 +1013,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	UiCompositeEdit *row = new UiCompositeEdit;
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
+	bool row_mixed = mixed;
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
 	if(mixed) {
 		row->SetData(Value());
@@ -969,11 +1024,11 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(value);
 	}
 	row->WhenAction = [=] {
-		if(!syncing_ && self)
+		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
 			WhenPropertyMany(selection_, property_id, self->GetData());
 	};
 	row->WhenChange = [=] {
-		if(!syncing_ && self)
+		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
 			WhenPropertyMany(selection_, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();

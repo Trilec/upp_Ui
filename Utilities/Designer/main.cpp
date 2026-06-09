@@ -17,8 +17,12 @@
 
 namespace Upp {
 
+static constexpr bool DESIGNER_MULTISELECT_DEBUG = false;
+
 static void DesignerMultiSelectCommandLog(const String& text)
 {
+	if(!DESIGNER_MULTISELECT_DEBUG)
+		return;
 	String folder = GetFileFolder(GetExeFilePath());
 	String leaf = ToLower(GetFileName(folder));
 	if(leaf == "designer" || leaf == "designerruntests")
@@ -2552,8 +2556,8 @@ private:
 	{
 		if(ids.IsEmpty())
 			return;
-		DesignerMultiSelectCommandLog("SaveInspectorPropertyValues property=" + property_id + " ids=" + AsString(ids.GetCount()) + " value=" + StdFormat(value));
 		Vector<DesignerNodeId> changed_ids;
+		Vector<Value> changed_values;
 		bool grouped = false;
 		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
 		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
@@ -2563,26 +2567,34 @@ private:
 				continue;
 			Value normalized = NormalizeInspectorValue(*n, property_id, value);
 			int q = n->properties.Find(property_id);
-			if(q >= 0 && n->properties.GetValue(q) == normalized) {
-				DesignerMultiSelectCommandLog(Format("  skip id=%d unchanged", id));
+			if(q >= 0 && n->properties.GetValue(q) == normalized)
 				continue;
-			}
 			if(!grouped) {
 				commands_.BeginGroup("Set " + property_id + " on selection");
 				grouped = true;
-				DesignerMultiSelectCommandLog("  begin_group");
 			}
 			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, normalized, "Set " + property_id), model_)) {
 				changed_ids.Add(id);
-				DesignerMultiSelectCommandLog(Format("  changed id=%d", id));
+				changed_values.Add(normalized);
 			}
-			else
-				DesignerMultiSelectCommandLog(Format("  execute_failed id=%d", id));
 		}
 		if(grouped)
 			commands_.EndGroup();
-		DesignerMultiSelectCommandLog(Format("  end_group changed=%d", changed_ids.GetCount()));
 		if(!changed_ids.IsEmpty()) {
+			String failed_apply;
+			for(int i = 0; i < changed_ids.GetCount(); i++) {
+				const DesignerNode* changed = model_.Find(changed_ids[i]);
+				if(!changed)
+					continue;
+				int q = changed->properties.Find(property_id);
+				if(q < 0 || changed->properties.GetValue(q) != changed_values[i]) {
+					if(!failed_apply.IsEmpty())
+						failed_apply << ", ";
+					failed_apply << changed->name;
+				}
+			}
+			if(!failed_apply.IsEmpty())
+				SetWarningNotes("Multi-edit did not apply " + property_id + " to: " + failed_apply);
 			model_.SetSelection(ids);
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
