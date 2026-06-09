@@ -64,6 +64,8 @@ private:
 	void DescribeSelection(Vector<Vector<DesignerApiBinding>>& all_bindings, const Vector<const DesignerNode *>& nodes) const;
 	void DescribeCommon(Vector<DesignerApiBinding>& bindings, const Vector<const DesignerNode *>& nodes) const;
 	bool ShouldShowBinding(const DesignerApiBinding& b) const;
+	// Shape cache only: property values still come from the selected nodes.
+	// Do not use this for types whose visible/enabled bindings depend on node state.
 	bool CanCacheDescriptorShape(const DesignerNode& n) const;
 	String DescriptorCacheKey(const DesignerNode& n) const;
 

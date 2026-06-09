@@ -2581,6 +2581,9 @@ private:
 		if(grouped)
 			commands_.EndGroup();
 		if(!changed_ids.IsEmpty()) {
+			// Temporary safety check while multi-select is still being stabilized.
+			// Once the grouped edit path is fully trusted this can be removed or
+			// put behind a dedicated debug flag.
 			String failed_apply;
 			for(int i = 0; i < changed_ids.GetCount(); i++) {
 				const DesignerNode* changed = model_.Find(changed_ids[i]);

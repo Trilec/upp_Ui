@@ -26,15 +26,30 @@ static void DesignerMultiSelectLog(const String& text)
 	fa.PutLine(AsString(GetSysTime()) + " " + text);
 }
 
-static bool DesignerIsSafeMultiSelectProperty(const String& id)
+static bool DesignerIsSafeMultiSelectProperty(const String& type_id, bool same_type, const String& id)
 {
-	return id == "role" ||
-	       id == "h_sizing" || id == "v_sizing" ||
-	       id == "fixed_width" || id == "fixed_height" ||
-	       id == "min_width" || id == "max_width" ||
-	       id == "min_height" || id == "max_height" ||
-	       id == "cell_align_h" || id == "cell_align_v" ||
-	       id == "theme_override";
+	if(id == "role" ||
+	   id == "h_sizing" || id == "v_sizing" ||
+	   id == "fixed_width" || id == "fixed_height" ||
+	   id == "min_width" || id == "max_width" ||
+	   id == "min_height" || id == "max_height" ||
+	   id == "cell_align_h" || id == "cell_align_v" ||
+	   id == "theme_override")
+		return true;
+
+	if(!same_type)
+		return false;
+
+	if(type_id == "UiButton" || type_id == "UiToolButton" || type_id == "UiSplitButton")
+		return id == "text" || id == "icon" || id == "icon_size" || id == "icon_side" ||
+		       id == "content_inset" || id == "content_gap" || id == "align_h" || id == "align_v";
+
+	if(type_id == "UiLabel")
+		return id == "text" || id == "icon" || id == "icon_size" || id == "icon_side" ||
+		       id == "content_gap" || id == "inset" || id == "align_h" || id == "align_v" ||
+		       id == "font" || id == "font_size";
+
+	return false;
 }
 
 static UiRole DesignerInspectorRoleChoice(const Value& role)
@@ -487,6 +502,9 @@ bool DesignerInspector::ShouldShowBinding(const DesignerApiBinding& b) const
 
 bool DesignerInspector::CanCacheDescriptorShape(const DesignerNode& n) const
 {
+	// Descriptor cache stores descriptor shape only. It is safe only when
+	// visible/enabled state does not vary with node state. Spacer is excluded
+	// because layout_break changes which inspector rows are valid.
 	if(n.type_id == "Spacer")
 		return false;
 	return true;
@@ -584,6 +602,11 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 {
 	if(nodes.IsEmpty())
 		return;
+	bool same_type = true;
+	String type_id = nodes[0]->type_id;
+	for(int i = 1; i < nodes.GetCount(); i++)
+		if(nodes[i]->type_id != type_id)
+			same_type = false;
 	Vector<Vector<DesignerApiBinding>> all_bindings;
 	DescribeSelection(all_bindings, nodes);
 	if(all_bindings.IsEmpty())
@@ -592,7 +615,7 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 	for(const DesignerApiBinding& b : first) {
 		if(!b.visible || !b.enabled || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
 			continue;
-		if(!DesignerIsSafeMultiSelectProperty(b.property_id))
+		if(!DesignerIsSafeMultiSelectProperty(type_id, same_type, b.property_id))
 			continue;
 		bool common = true;
 		for(int i = 1; i < all_bindings.GetCount() && common; i++) {
@@ -894,7 +917,12 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 {
 	if(!b.visible || !b.enabled || b.property_id == "name")
 		return;
-	if(!DesignerIsSafeMultiSelectProperty(b.property_id)) {
+	bool same_type = true;
+	String type_id = nodes.IsEmpty() ? String() : nodes[0]->type_id;
+	for(int i = 1; i < nodes.GetCount(); i++)
+		if(nodes[i]->type_id != type_id)
+			same_type = false;
+	if(!DesignerIsSafeMultiSelectProperty(type_id, same_type, b.property_id)) {
 		return;
 	}
 	int label_w = DPI(88);
@@ -1024,10 +1052,6 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(value);
 	}
 	row->WhenAction = [=] {
-		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
-			WhenPropertyMany(selection_, property_id, self->GetData());
-	};
-	row->WhenChange = [=] {
 		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
 			WhenPropertyMany(selection_, property_id, self->GetData());
 	};

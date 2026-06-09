@@ -868,15 +868,22 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	String vs = AxisSizing(child, "v_sizing");
 	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
 	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
+	String width_expr;
 
 	if(hs == "Expand")
+	{
 		out << "\t\t" << var << ".HSizePosZ(0, 0);\n";
+		width_expr = "GetSize().cx";
+	}
 	else if(hs == "Fixed") {
 		int w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
 		out << "\t\t" << var << ".LeftPosZ(0, DPI(" << w << "));\n";
+		width_expr = "DPI(" + AsString(w) + ")";
 	}
-	else
+	else {
 		out << "\t\t" << var << ".LeftPosZ(0, max(" << var << ".GetMinSize().cx, DPI(" << min_w << ")));\n";
+		width_expr = "max(" + var + ".GetMinSize().cx, DPI(" + AsString(min_w) + "))";
+	}
 
 	if(vs == "Expand")
 		out << "\t\t" << var << ".VSizePosZ(0, 0);\n";
@@ -884,8 +891,15 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 		int h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
 		out << "\t\t" << var << ".TopPosZ(0, DPI(" << h << "));\n";
 	}
-	else
-		out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".GetMinSize().cy, DPI(" << min_h << ")));\n";
+	else {
+		bool wrapped_horizontal_box = child.type_id == "BoxLayout" &&
+		                              CodeGenNodeProperty(child, "direction", "V") == "H" &&
+		                              CodeGenNodeProperty(child, "wrap", "None") != "None";
+		if(wrapped_horizontal_box)
+			out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".MeasureHeightForWidth(" << width_expr << "), DPI(" << min_h << ")));\n";
+		else
+			out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".GetMinSize().cy, DPI(" << min_h << ")));\n";
+	}
 }
 
 static String CompositeLayoutExpr(const String& mode)
@@ -1454,8 +1468,10 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		}
 		return;
 	}
-	if(parent.id == Designer_ROOT)
-		out << "\t\tAdd(" << c << ".SizePos());\n";
+	if(parent.id == Designer_ROOT) {
+		out << "\t\tAdd(" << c << ");\n";
+		EmitDirectChildLayout(out, c, child);
+	}
 	else if(parent.type_id == "BoxLayout")
 		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << BoxMinCall(parent, child) << ";\n";
 	else if(parent.type_id == "GridLayout") {
