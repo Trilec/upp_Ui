@@ -1325,6 +1325,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	else {
 		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));\n";
 	}
+	String tooltip = CodeGenNodeProperty(n, "tooltip", String());
+	if(!tooltip.IsEmpty() && n.type_id != "Spacer")
+		out << "\t\t" << var << ".Tip(" << CppString(tooltip) << ");\n";
 }
 
 static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& names,

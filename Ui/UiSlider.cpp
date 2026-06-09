@@ -465,10 +465,6 @@ void UiSlider::Paint(Draw& w)
     if(WhenPaintThumb)
         WhenPaintThumb(w, ctx, handled);
     if(!handled && style.thumb_inner_ring && style.thumb_inner_ring_width > 0) {
-        ImageBuffer ib(th.GetSize());
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Clear(RGBAZero());
-
         Color face = style.thumb_palette.face[st].IsSolid() ? style.thumb_palette.face[st].color : style.thumb_palette.ink[st];
         Color frame = style.thumb_palette.frame[st];
         if(IsNull(face))
@@ -476,28 +472,25 @@ void UiSlider::Paint(Draw& w)
         if(IsNull(frame))
             frame = face;
 
-        double cx = th.GetWidth() * 0.5;
-        double cy = th.GetHeight() * 0.5;
-        double r = max(0.0, min(th.GetWidth(), th.GetHeight()) * 0.5 - 0.5);
-        double frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
-        double ring_w = max(0, style.thumb_inner_ring_width);
+        int side = min(th.GetWidth(), th.GetHeight());
+        int frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
+        int ring_w = max(0, style.thumb_inner_ring_width);
+        Rect outer = RectC(th.CenterPoint().x - side / 2, th.CenterPoint().y - side / 2, side, side);
+        w.DrawEllipse(outer, frame);
 
-        p.Begin();
-        p.Circle(cx, cy, r);
-        p.Fill(frame);
-        p.End();
+        int inner_side = max(0, side - frame_w * 2);
+        if(inner_side > 0) {
+            Rect ring = RectC(th.CenterPoint().x - inner_side / 2, th.CenterPoint().y - inner_side / 2,
+                              inner_side, inner_side);
+            w.DrawEllipse(ring, style.thumb_inner_ring_color);
 
-        p.Begin();
-        p.Circle(cx, cy, max(0.0, r - frame_w));
-        p.Fill(style.thumb_inner_ring_color);
-        p.End();
-
-        p.Begin();
-        p.Circle(cx, cy, max(0.0, r - frame_w - ring_w));
-        p.Fill(face);
-        p.End();
-
-        w.DrawImage(th.left, th.top, ib);
+            int core_side = max(0, inner_side - ring_w * 2);
+            if(core_side > 0) {
+                Rect core = RectC(th.CenterPoint().x - core_side / 2, th.CenterPoint().y - core_side / 2,
+                                  core_side, core_side);
+                w.DrawEllipse(core, face);
+            }
+        }
     }
     else if(!handled)
         UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);

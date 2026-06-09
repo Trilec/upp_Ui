@@ -1749,25 +1749,12 @@ void UiDropdown::Paint(Draw& w)
             WhenPaintSelectionBadge(w, badge_rect, checked_count, style_);
         }
         else {
-            Size sz = badge_rect.GetSize();
-            ImageBuffer ib(sz);
-            Fill(~ib, RGBAZero(), ib.GetLength());
-            {
-                BufferPainter p(ib, MODE_ANTIALIASED);
-                double inset = 0.5;
-                double x = inset;
-                double y = inset;
-                double wdt = sz.cx - 2 * inset;
-                double hgt = sz.cy - 2 * inset;
-                int max_r = min(sz.cx, sz.cy) / 2;
-                double rad = (double)min(style_.selection_badge_radius, max_r);
-                p.Begin();
-                p.RoundedRectangle(x, y, wdt, hgt, rad);
-                p.Fill(style_.selection_badge_face);
-                p.Stroke(1.0, Blend(style_.selection_badge_face, Black(), 110));
-                p.End();
-            }
-            w.DrawImage(badge_rect.left, badge_rect.top, ib);
+            const Image& badge = UiGetCachedRoundedBadgeImage(badge_rect.GetSize(),
+                                                              style_.selection_badge_radius,
+                                                              style_.selection_badge_face,
+                                                              1,
+                                                              Blend(style_.selection_badge_face, Black(), 110));
+            w.DrawImage(badge_rect.left, badge_rect.top, badge);
             String badge_txt = AsString(checked_count);
             Size bs = GetTextSize(badge_txt, font);
             int tx = badge_rect.left + (badge_rect.GetWidth() - bs.cx) / 2;

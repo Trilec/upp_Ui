@@ -315,28 +315,13 @@ void UiSplitter::PaintGrip(Draw& w, const Rect& r, StyledState st) const
     auto DrawRoundedPill = [&](const Rect& rr) {
         if(rr.IsEmpty())
             return;
-        ImageBuffer ib(rr.GetSize());
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Clear(RGBAZero());
-        p.Begin();
-        p.RoundedRectangle(0.5, 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0,
-                           min<double>(rr.GetWidth(), rr.GetHeight()) * 0.5);
-        p.Fill(c);
-        p.End();
-        w.DrawImage(rr.left, rr.top, ib);
+        UiPaintCapsule(w, rr, c);
     };
 
     auto DrawCircle = [&](const Rect& rr) {
         if(rr.IsEmpty())
             return;
-        ImageBuffer ib(rr.GetSize());
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Clear(RGBAZero());
-        p.Begin();
-        p.Circle(rr.GetWidth() * 0.5, rr.GetHeight() * 0.5, min(rr.GetWidth(), rr.GetHeight()) * 0.5);
-        p.Fill(c);
-        p.End();
-        w.DrawImage(rr.left, rr.top, ib);
+        w.DrawEllipse(rr, c);
     };
 
     int count = max(1, style.grip_count);

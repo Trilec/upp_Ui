@@ -1470,6 +1470,79 @@ inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
     w.DrawImage(dx, dy, Image(ib));
 }
 
+inline void UiPaintCapsule(Draw& w, const Rect& r, Color fill)
+{
+    if(r.IsEmpty() || IsNull(fill))
+        return;
+
+    if(r.GetWidth() <= 2 || r.GetHeight() <= 2) {
+        w.DrawRect(r, fill);
+        return;
+    }
+
+    if(r.GetWidth() == r.GetHeight()) {
+        w.DrawEllipse(r, fill);
+        return;
+    }
+
+    if(r.GetWidth() > r.GetHeight()) {
+        int cap = r.GetHeight();
+        int body_w = max(0, r.GetWidth() - cap);
+        if(body_w > 0)
+            w.DrawRect(r.left + cap / 2, r.top, body_w, r.GetHeight(), fill);
+        w.DrawEllipse(RectC(r.left, r.top, cap, cap), fill);
+        w.DrawEllipse(RectC(r.right - cap, r.top, cap, cap), fill);
+        return;
+    }
+
+    int cap = r.GetWidth();
+    int body_h = max(0, r.GetHeight() - cap);
+    if(body_h > 0)
+        w.DrawRect(r.left, r.top + cap / 2, r.GetWidth(), body_h, fill);
+    w.DrawEllipse(RectC(r.left, r.top, cap, cap), fill);
+    w.DrawEllipse(RectC(r.left, r.bottom - cap, cap, cap), fill);
+}
+
+inline const Image& UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
+                                                 int stroke_width = 1, Color stroke = Null)
+{
+    static VectorMap<String, Image> cache;
+
+    sz.cx = max(1, sz.cx);
+    sz.cy = max(1, sz.cy);
+    radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
+    stroke_width = max(0, stroke_width);
+
+    String key = Format("%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+                        sz.cx, sz.cy, radius, stroke_width,
+                        face.GetR(), face.GetG(), face.GetB(),
+                        stroke.GetR(), stroke.GetG(), stroke.GetB(), IsNull(stroke) ? 1 : 0);
+    int ix = cache.Find(key);
+    if(ix >= 0)
+        return cache[ix];
+
+    ImageBuffer ib(sz);
+    ib.SetKind(IMAGE_ALPHA);
+    Fill(~ib, RGBAZero(), ib.GetLength());
+    {
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        double inset = stroke_width > 0 ? max(0.5, stroke_width * 0.5) : 0.5;
+        double x = inset;
+        double y = inset;
+        double wdt = sz.cx - 2 * inset;
+        double hgt = sz.cy - 2 * inset;
+        p.Begin();
+        p.RoundedRectangle(x, y, wdt, hgt, radius);
+        p.Fill(face);
+        if(stroke_width > 0 && !IsNull(stroke))
+            p.Stroke(stroke_width, stroke);
+        p.End();
+    }
+
+    cache.Add(key, Image(ib));
+    return cache[cache.Find(key)];
+}
+
 // -------------------------------------------------------------------------
 // Rounded popup compositor (single-call internal draw path)
 // -------------------------------------------------------------------------

@@ -516,63 +516,9 @@ static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 	panel.SetCustomStyle(s);
 }
 
-static Color SpacerLinePresetColor(const DesignerNode& n)
+static void ApplyDesignerTooltip(Ctrl& ctrl, const DesignerNode& n)
 {
-	return UiTheme::ResolvePanel(UiPanelRole::Subtle).palette.frame[ST_NORMAL];
-}
-
-static Color SpacerLineColor(const DesignerNode& n)
-{
-	if((bool)AdapterNodeProperty(n, "line_color_enabled", false)) {
-		Color c = GetColorProperty(n, "line_color", Null);
-		if(!IsNull(c))
-			return c;
-	}
-	Color c = SpacerLinePresetColor(n);
-	if(IsNull(c))
-		c = SColorShadow();
-	return c;
-}
-
-static void PaintSpacerSeparator(Draw& w, const Rect& r, int inset, int thickness, bool dashed, int align, Color c)
-{
-	if(r.IsEmpty())
-		return;
-
-	Rect rr = r;
-	bool vertical = rr.GetWidth() >= rr.GetHeight();
-	if(vertical)
-		rr = rr.Deflated(0, inset, 0, inset);
-	else {
-		rr = rr.Deflated(inset, 0, inset, 0);
-	}
-	if(rr.IsEmpty())
-		return;
-
-	if(vertical) {
-		int x = align == 0 ? rr.left : align == 2 ? rr.right - thickness : rr.left + (rr.GetWidth() - thickness) / 2;
-		x = clamp(x, rr.left, max(rr.left, rr.right - thickness));
-		if(dashed) {
-			int seg = max(4, thickness * 4);
-			int gap = max(2, seg);
-			for(int y = rr.top; y < rr.bottom; y += seg + gap)
-				w.DrawLine(x, y, x, min(rr.bottom, y + seg), thickness, c);
-		}
-		else
-			w.DrawLine(x, rr.top, x, rr.bottom, thickness, c);
-	}
-	else {
-		int y = align == 0 ? rr.top : align == 2 ? rr.bottom - thickness : rr.top + (rr.GetHeight() - thickness) / 2;
-		y = clamp(y, rr.top, max(rr.top, rr.bottom - thickness));
-		if(dashed) {
-			int seg = max(4, thickness * 4);
-			int gap = max(2, seg);
-			for(int x = rr.left; x < rr.right; x += seg + gap)
-				w.DrawLine(x, y, min(rr.right, x + seg), y, thickness, c);
-		}
-		else
-			w.DrawLine(rr.left, y, rr.right, y, thickness, c);
-	}
+	ctrl.Tip((String)AdapterNodeProperty(n, "tooltip", String()));
 }
 
 static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
@@ -976,33 +922,40 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	DesignerApiBuilder b(out);
 	b.Add("name", "Name", DesignerEditorKind::Text, "designer model name",
 	      "Designer-only identifier used by hierarchy and generated variable naming.");
+	b.Add("tooltip", "Tooltip", DesignerEditorKind::Text, "Ctrl::Tip",
+	      "Shown on hover for visible controls. Leave empty to omit Tip(...) in generated code.");
 	b.AddChoice("role", "Role", "UiTheme role resolver",
 	            "Semantic theme role used by role-aware controls.",
 	            {{"Standard", "Standard"}, {"Subtle", "Subtle"}, {"Accent", "Accent"}, {"Alert", "Alert"}});
+	// V1 sizing vocabulary:
+	// - Fit uses the control's natural/minimum size on that axis.
+	// - Fixed uses the exact fixed width/height on that axis.
+	// - Expand consumes parent-distributed extra space, subject to min/max caps.
+	// - Cell align places the item inside the allocated rect; it is not stretch or weight.
 	b.AddChoice("h_sizing", "Width mode", "parent layout horizontal item sizing",
-	            "Controls whether the parent layout treats this node width as fit, fixed, or expanding.",
+	            "Fit uses natural width, Fixed uses exact fixed width, Expand consumes parent-distributed extra width.",
 	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
 	b.AddChoice("v_sizing", "Height mode", "parent layout vertical item sizing",
-	            "Controls whether the parent layout treats this node height as fit, fixed, or expanding.",
+	            "Fit uses natural height, Fixed uses exact fixed height, Expand consumes parent-distributed extra height.",
 	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
 	b.AddChoice("cell_align_h", "Cell align X", "UiGridLayout::SetItemAlign horizontal",
-	            "Positions a fit-width item inside its grid cell.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	            "Places a non-stretched item horizontally inside its allocated rect.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
-	            "Positions a fit-height item inside its grid cell.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
+	            "Places a non-stretched item vertically inside its allocated rect.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
 	b.AddInt("fixed_width", "Fixed width", DesignerEditorKind::Slider,
 	         "fixed parent layout width",
-	         "Used when Width mode is Fixed. The actual width is clamped by Min width.", 1, 1600);
+	         "Used only when Width mode is Fixed.", 1, 1600);
 	b.AddInt("fixed_height", "Fixed height", DesignerEditorKind::Slider,
 	         "fixed parent layout height",
-	         "Used when Height mode is Fixed. The actual height is clamped by Min height.", 1, 900);
+	         "Used only when Height mode is Fixed.", 1, 900);
 	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Minimum width used by preview and generated code when the parent layout compresses this control.", 1, 1600);
+	         "Lower bound used by Fit and Expand width.", 1, 1600);
 	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Minimum height used by preview and generated code when the parent layout compresses this control.", 1, 900);
+	         "Lower bound used by Fit and Expand height.", 1, 900);
 	b.AddInt("max_width", "Max width", DesignerEditorKind::Slider, "parent layout width cap",
-	         "Maximum width used by preview and generated code when the parent layout expands this control. Use 0 for unlimited.", 0, 1600);
+	         "Expand width cap. Use 0 for unlimited.", 0, 1600);
 	b.AddInt("max_height", "Max height", DesignerEditorKind::Slider, "parent layout height cap",
-	         "Maximum height used by preview and generated code when the parent layout expands this control. Use 0 for unlimited.", 0, 900);
+	         "Expand height cap. Use 0 for unlimited.", 0, 900);
 	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
 	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
 	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
@@ -1090,6 +1043,7 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	if(node.type_id == "Spacer") {
 		b.Hide("text");
 		b.Hide("role");
+		b.Hide("tooltip");
 		b.Hide("width");
 		b.Hide("height");
 		HideThemeOverrideBindings(b);
@@ -3208,6 +3162,7 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		a = p;
 	}
 	a->SyncFromNode(node);
+	ApplyDesignerTooltip(*ctrl, node);
 	ApplyDesignerControlMinSize(*ctrl, node);
 	if(adapter)
 		*adapter = a;

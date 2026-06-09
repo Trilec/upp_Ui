@@ -100,38 +100,6 @@ const UiGridLayout::Style& UiGridLayout::Style::StyleDefault()
     return s;
 }
 
-const UiGridLayout::Style& UiGridLayout::StyleStandard() { return Style::StyleDefault(); }
-const UiGridLayout::Style& UiGridLayout::StyleMinimal()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style::StyleDefault();
-        s.metrics.face_enabled = false;
-        s.metrics.radius = DPI(4);
-    }
-    return s;
-}
-const UiGridLayout::Style& UiGridLayout::StyleSoft()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style::StyleDefault();
-        s.metrics.radius = DPI(10);
-    }
-    return s;
-}
-const UiGridLayout::Style& UiGridLayout::StyleStrong()
-{
-    static Style s;
-    ONCELOCK {
-        s = Style::StyleDefault();
-        Color face = Blend(SColorHighlight(), SColorPaper(), 225);
-        for(int i = 0; i < 4; i++)
-            s.palette.face[i] = UiFill::Solid(face);
-    }
-    return s;
-}
-
 UiGridLayout::UiGridLayout()
 {
     Transparent();

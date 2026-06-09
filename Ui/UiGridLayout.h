@@ -36,10 +36,6 @@ public:
 
     UiGridLayout& SetCustomStyle(const Style& s);
     const Style&  GetStyle() const { return style; }
-    static const Style& StyleStandard();
-    static const Style& StyleMinimal();
-    static const Style& StyleSoft();
-    static const Style& StyleStrong();
 
     UiGridLayout& SetGap(int px);
     UiGridLayout& SetInset(int all);

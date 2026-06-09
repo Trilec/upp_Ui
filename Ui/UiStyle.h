@@ -277,14 +277,6 @@ enum UiLineStyle : byte {
     DOTTED,
 };
 
-enum UiSpacerLineStyle : byte {
-    SPACER_LINE_SUBTLE = 0,
-    SPACER_LINE_STANDARD,
-    SPACER_LINE_ACCENT,
-    SPACER_LINE_ALERT,
-    SPACER_LINE_CUSTOM,
-};
-
 enum class UiSpacerLineOrientation : byte {
     Auto = 0,
     Vertical,
@@ -533,6 +525,10 @@ struct StyledMetrics {
 
     // Geometry-only content margin applied inside the skin "face" bounds.
     // This is the one public outer spacing contract for controls.
+    // V1 spacing vocabulary:
+    // - Margin is the generic inherited control-margin API.
+    // - Content controls should prefer control-specific ContentInset naming.
+    // - Container/layout inner padding should prefer Inset naming.
     // Public API: SetMargin(...)
     // This is for density / breathing room (NOT for compensating skin shadows).
     // Thickness-rect semantics (l/t/r/b). Negative values are not allowed.
