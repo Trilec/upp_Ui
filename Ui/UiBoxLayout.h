@@ -54,7 +54,9 @@
 // â€¢ Item sizing (main axis):
 //     Add(ctrl)    â€“ attach a child, default sizing (Fit)
 //     Fixed(px)   â€“ use exactly px on the main axis (never grows/shrinks)
-//     Fit()       â€“ use the childâ€™s *minimum* size on the main axis
+//     Fit()       â€“ prefer the childâ€™s natural content size on the main axis;
+//                    wrapped horizontal UiBoxLayout children may shrink toward
+//                    their minimum wrap width when parent space is constrained
 //     Expand(w)   â€“ share the remaining space in proportion to weight w
 //
 // â€¢ Cross-axis alignment (secondary axis):
@@ -97,8 +99,10 @@
 // â€¢ This control deliberately does **not** participate in Ui Face/Frame/Ink
 //   styling. It is purely a layout engine. If you need a styled panel, wrap
 //   UiBoxLayout inside a UiCard or another styled container.
-// â€¢ Layout decisions are driven by childrenâ€™s GetMinSize() and the explicit
-//   per-item flags. There is no implicit â€œstretch everythingâ€ magic.
+// â€¢ Layout decisions are driven by childrenâ€™s preferred/minimum content size
+//   and the explicit per-item flags. Wrapped horizontal Fit children are
+//   measured from their final assigned width so height can grow with wrapping.
+//   There is no implicit â€œstretch everythingâ€ magic.
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
@@ -134,7 +138,7 @@ public:
         // --- Persistent API-facing state (sticks across passes) ---------------
         Ctrl*  c               = nullptr;     // the child (nullptr => spacer/break)
         int    fixed           = -1;          // >=0 => fixed size on main axis
-        bool   fit             = false;       // use GetMinSize on main axis
+        bool   fit             = false;       // prefer natural content size on main axis
         int    expandingWeight = 0;           // >0 => shares leftover space
         int    minw            = 0;           // min main-axis size (0 => none)
         int    maxw            = INT_MAX;     // max main-axis size
@@ -191,7 +195,9 @@ public:
             return *this;
         }
 
-        // Set this item to fit its childâ€™s GetMinSize() on the main axis.
+        // Set this item to prefer its childâ€™s natural content size on the main
+        // axis. Wrapped horizontal UiBoxLayout children may shrink under
+        // parent constraint and will then re-measure height from final width.
         ItemRef& Fit() {
             if(ok()) {
                 Item& it     = owner->items[index];

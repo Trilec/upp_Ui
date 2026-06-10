@@ -2596,7 +2596,7 @@ private:
 					failed_apply << changed->name;
 				}
 			}
-			if(!failed_apply.IsEmpty())
+			if(DESIGNER_MULTISELECT_DEBUG && !failed_apply.IsEmpty())
 				SetWarningNotes("Multi-edit did not apply " + property_id + " to: " + failed_apply);
 			model_.SetSelection(ids);
 			preview_.InvalidateRealPreview();
