@@ -649,6 +649,8 @@ public:
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
     Size GetContentSize() const;
+    Size GetPreferredSize() const;
+    int  GetMinWrapWidth() const;
     int  MeasureHeightForWidth(int total_width) const;
     virtual Size GetMinSize() const override;
 

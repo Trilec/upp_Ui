@@ -171,14 +171,15 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
         Vector<int> row;
         Vector<int> main;
         Vector<int> cross;
+        Vector<int> min_main;
+        Vector<bool> shrinkable;
 
         auto FlushRow = [&]() {
             if(row.IsEmpty())
                 return;
 
             int n = row.GetCount();
-            if(wrap == UiBoxWrap::None)
-                row_h = max(row_h, inner_h);
+            row_h = 0;
             int base_sum = 0;
             int weight_sum = 0;
             for(int i = 0; i < n; i++) {
@@ -187,6 +188,44 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                     weight_sum += items[row[i]].expandingWeight;
             }
             int used_main = base_sum + main_gap * max(0, n - 1);
+
+            if(used_main > inner_w) {
+                int deficit = used_main - inner_w;
+                int shrink_room = 0;
+                for(int i = 0; i < n; i++)
+                    if(shrinkable[i])
+                        shrink_room += max(0, main[i] - min_main[i]);
+
+                if(shrink_room > 0) {
+                    int consumed = 0;
+                    for(int i = 0; i < n; i++) {
+                        if(!shrinkable[i])
+                            continue;
+                        int room = max(0, main[i] - min_main[i]);
+                        if(room <= 0)
+                            continue;
+                        int cut = min(room, (deficit * room) / shrink_room);
+                        main[i] -= cut;
+                        consumed += cut;
+                    }
+                    if(consumed < deficit) {
+                        for(int i = n - 1; i >= 0 && consumed < deficit; i--) {
+                            if(!shrinkable[i])
+                                continue;
+                            int room = max(0, main[i] - min_main[i]);
+                            if(room <= 0)
+                                continue;
+                            int cut = min(room, deficit - consumed);
+                            main[i] -= cut;
+                            consumed += cut;
+                        }
+                    }
+                    used_main = main_gap * max(0, n - 1);
+                    for(int i = 0; i < n; i++)
+                        used_main += main[i];
+                }
+            }
+
             int extra = max(0, inner_w - used_main);
 
             Vector<int> grow;
@@ -211,11 +250,35 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 }
             }
 
+            Vector<int> final_h;
+            final_h.SetCount(n, 0);
+            for(int i = 0; i < n; i++) {
+                Item& it = items[row[i]];
+                int w = main[i] + grow[i];
+                int h = cross[i];
+                if(it.c) {
+                    Size ms = GetCtrlMinSize(it);
+                    int measured_h = ms.cy;
+                    if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
+                        if(box->wrap_auto_resize)
+                            measured_h = max(measured_h, box->MeasureHeightForWidth(w));
+                    }
+                    else if(UiGridLayout *grid = dynamic_cast<UiGridLayout *>(it.c))
+                        measured_h = max(measured_h, grid->MeasureHeightForWidth(w));
+                    h = min(max(measured_h, it.minh), it.maxh);
+                }
+                final_h[i] = h;
+                row_h = max(row_h, h);
+            }
+
+            if(wrap == UiBoxWrap::None)
+                row_h = max(row_h, inner_h);
+
             int cx = irc.left;
             for(int i = 0; i < n; i++) {
                 Item& it = items[row[i]];
                 int w = main[i] + grow[i];
-                int h = min(cross[i], row_h);
+                int h = min(final_h[i], row_h);
                 Align a = it.align_self == Align::Auto ? align_items : it.align_self;
 
                 Rect rr;
@@ -239,6 +302,8 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             row.Clear();
             main.Clear();
             cross.Clear();
+            min_main.Clear();
+            shrinkable.Clear();
             row_h = 0;
         };
 
@@ -255,21 +320,26 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
 
             Size ms = GetCtrlMinSize(it);
             int w = it.fixed >= 0 ? it.fixed : ms.cx;
+            int min_w = it.minw;
+            bool can_shrink = false;
             if(fixed_column > 0)
                 w = min(w, fixed_column);
-            w = min(max(w, it.minw), it.maxw);
+            if(it.c && it.fixed < 0 && it.fit) {
+                if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
+                    if(box->wrap_auto_resize && box->dir == UiBoxLayout::Direction::H && box->wrap != UiBoxWrap::None) {
+                        w = box->GetPreferredSize().cx;
+                        min_w = max(min_w, box->GetMinWrapWidth());
+                        can_shrink = true;
+                    }
+                }
+            }
+            w = min(max(w, min_w), it.maxw);
             if(wrap == UiBoxWrap::Snap)
                 w = GetSnapMainSize(row.GetCount(), w);
-            int measured_h = ms.cy;
-            if(it.c) {
-                if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
-                    if(box->wrap_auto_resize)
-                        measured_h = max(measured_h, box->MeasureHeightForWidth(w));
-                }
-                else if(UiGridLayout *grid = dynamic_cast<UiGridLayout *>(it.c))
-                    measured_h = max(measured_h, grid->MeasureHeightForWidth(w));
-            }
-            int h = min(max(measured_h, it.minh), it.maxh);
+            min_w = min(max(min_w, 0), it.maxw);
+            if(wrap == UiBoxWrap::Snap)
+                min_w = min(max(GetSnapMainSize(row.GetCount(), min_w), 0), it.maxw);
+            int h = min(max(ms.cy, it.minh), it.maxh);
 
             int need = row.IsEmpty() ? w : x_cursor + main_gap + w;
             bool wrap_on = wrap != UiBoxWrap::None;
@@ -282,6 +352,8 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             row.Add(i);
             main.Add(max(0, w));
             cross.Add(max(0, h));
+            min_main.Add(max(0, min_w));
+            shrinkable.Add(can_shrink);
             row_h = max(row_h, h);
             x_cursor = row.IsEmpty() ? 0 : (x_cursor + (row.GetCount() > 1 ? main_gap : 0) + w);
         }
@@ -517,11 +589,47 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
 
     Rect irc = RectC(0, 0, max(0, total_width - inset.left - inset.right), INT_MAX / 8);
     UiBoxLayout *self = const_cast<UiBoxLayout*>(this);
+    Vector<Rect> saved_rect;
+    Vector<Size> saved_minsize;
+    Vector<int> saved_row;
+    Vector<byte> saved_visible, saved_break, saved_has_minsize;
+    int count = self->items.GetCount();
+    saved_rect.SetCount(count);
+    saved_minsize.SetCount(count);
+    saved_row.SetCount(count);
+    saved_visible.SetCount(count);
+    saved_break.SetCount(count);
+    saved_has_minsize.SetCount(count);
+    for(int i = 0; i < count; i++) {
+        saved_rect[i] = self->items[i].cl.rect;
+        saved_minsize[i] = self->items[i].cl.minsize;
+        saved_row[i] = self->items[i].cl.rowOrCol;
+        saved_visible[i] = self->items[i].cl.visible;
+        saved_break[i] = self->items[i].cl.breakMark;
+        saved_has_minsize[i] = self->items[i].cl.has_minsize;
+    }
+    int saved_used_w = self->used_w;
+    int saved_used_h = self->used_h;
+    int saved_layout_gen = self->layout_gen;
+    Rect saved_irc = self->last_layout_irc_;
     self->RebuildLayoutCache(irc);
-    return max(0, self->used_h) + inset.top + inset.bottom;
+    int measured = max(0, self->used_h) + inset.top + inset.bottom;
+    for(int i = 0; i < count; i++) {
+        self->items[i].cl.rect = saved_rect[i];
+        self->items[i].cl.minsize = saved_minsize[i];
+        self->items[i].cl.rowOrCol = saved_row[i];
+        self->items[i].cl.visible = saved_visible[i];
+        self->items[i].cl.breakMark = saved_break[i];
+        self->items[i].cl.has_minsize = saved_has_minsize[i];
+    }
+    self->used_w = saved_used_w;
+    self->used_h = saved_used_h;
+    self->layout_gen = saved_layout_gen;
+    self->last_layout_irc_ = saved_irc;
+    return measured;
 }
 
-Size UiBoxLayout::GetMinSize() const
+Size UiBoxLayout::GetPreferredSize() const
 {
     int main_total = 0;
     int cross_max = 0;
@@ -565,6 +673,42 @@ Size UiBoxLayout::GetMinSize() const
 
     return Size(cross_max + inset.left + inset.right,
                 main_total + inset.top + inset.bottom);
+}
+
+int UiBoxLayout::GetMinWrapWidth() const
+{
+    if(dir != Direction::H || wrap == UiBoxWrap::None)
+        return GetMinSize().cx;
+
+    int max_main = 0;
+    for(int i = 0; i < items.GetCount(); i++) {
+        Item& it = const_cast<Item&>(items[i]);
+        if(it.is_break)
+            continue;
+        Size ms = const_cast<UiBoxLayout*>(this)->GetCtrlMinSize(it);
+        int w = it.fixed >= 0 ? it.fixed : ms.cx;
+        if(it.c && it.fixed < 0 && it.fit) {
+            if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
+                if(box->wrap_auto_resize && box->dir == UiBoxLayout::Direction::H && box->wrap != UiBoxWrap::None)
+                    w = box->GetMinWrapWidth();
+            }
+        }
+        if(fixed_column > 0)
+            w = min(w, fixed_column);
+        w = min(max(w, it.minw), it.maxw);
+        if(wrap == UiBoxWrap::Snap)
+            w = GetSnapMainSize(i, w);
+        max_main = max(max_main, max(0, w));
+    }
+    return max_main + inset.left + inset.right;
+}
+
+Size UiBoxLayout::GetMinSize() const
+{
+    Size preferred = GetPreferredSize();
+    if(dir == Direction::H && wrap != UiBoxWrap::None)
+        return Size(preferred.cx, wrap_auto_resize ? MeasureHeightForWidth(preferred.cx) : preferred.cy);
+    return preferred;
 }
 
 } // namespace Upp
