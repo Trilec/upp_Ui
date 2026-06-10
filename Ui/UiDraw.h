@@ -1509,38 +1509,156 @@ inline void UiPaintCapsule(Draw& w, const Rect& r, Color fill)
     w.DrawEllipse(RectC(r.left, r.bottom - cap, cap, cap), fill);
 }
 
-inline Image UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
-                                          int stroke_width = 1, Color stroke = Null)
+inline Image UiGetCachedAACircleImage(Size sz, Color fill)
 {
     sz.cx = max(1, sz.cx);
     sz.cy = max(1, sz.cy);
-    radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
-    stroke_width = max(0, stroke_width);
-
-    String key = Format("%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
-                        sz.cx, sz.cy, radius, stroke_width,
-                        face.GetR(), face.GetG(), face.GetB(),
-                        stroke.GetR(), stroke.GetG(), stroke.GetB(), IsNull(stroke) ? 1 : 0);
+    String key = Format("aa-circle|%d|%d|%d|%d|%d|%d",
+                        sz.cx, sz.cy, fill.GetR(), fill.GetG(), fill.GetB(), IsNull(fill) ? 1 : 0);
     return UiGetCachedImage(key, [=] {
         ImageBuffer ib(sz);
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
-        {
-            BufferPainter p(ib, MODE_ANTIALIASED);
-            double inset = stroke_width > 0 ? max(0.5, stroke_width * 0.5) : 0.5;
-            double x = inset;
-            double y = inset;
-            double wdt = sz.cx - 2 * inset;
-            double hgt = sz.cy - 2 * inset;
-            p.Begin();
-            p.RoundedRectangle(x, y, wdt, hgt, radius);
-            p.Fill(face);
-            if(stroke_width > 0 && !IsNull(stroke))
-                p.Stroke(stroke_width, stroke);
-            p.End();
-        }
+        if(IsNull(fill))
+            return Image(ib);
+
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Begin();
+        p.Ellipse(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0));
+        p.Fill(fill);
+        p.End();
         return Image(ib);
     });
+}
+
+inline Image UiGetCachedAACapsuleImage(Size sz, Color fill)
+{
+    sz.cx = max(1, sz.cx);
+    sz.cy = max(1, sz.cy);
+    String key = Format("aa-capsule|%d|%d|%d|%d|%d|%d",
+                        sz.cx, sz.cy, fill.GetR(), fill.GetG(), fill.GetB(), IsNull(fill) ? 1 : 0);
+    return UiGetCachedImage(key, [=] {
+        ImageBuffer ib(sz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+        if(IsNull(fill))
+            return Image(ib);
+
+        int radius = max(0, min(sz.cx, sz.cy) / 2);
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Begin();
+        if(radius > 0)
+            p.RoundedRectangle(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0), radius);
+        else
+            p.Rectangle(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0));
+        p.Fill(fill);
+        p.End();
+        return Image(ib);
+    });
+}
+
+inline Image UiGetCachedAARingImage(Size sz,
+                                    Color frame,
+                                    Color ring,
+                                    Color face,
+                                    int frame_width,
+                                    int ring_width)
+{
+    sz.cx = max(1, sz.cx);
+    sz.cy = max(1, sz.cy);
+    frame_width = max(0, frame_width);
+    ring_width = max(0, ring_width);
+    String key = Format("aa-ring|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+                        sz.cx, sz.cy,
+                        frame.GetR(), frame.GetG(), frame.GetB(), IsNull(frame) ? 1 : 0,
+                        ring.GetR(), ring.GetG(), ring.GetB(), IsNull(ring) ? 1 : 0,
+                        face.GetR(), face.GetG(), face.GetB(), IsNull(face) ? 1 : 0,
+                        frame_width, ring_width);
+    return UiGetCachedImage(key, [=] {
+        ImageBuffer ib(sz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        if(!IsNull(frame)) {
+            double fw = max(1, frame_width);
+            p.Begin();
+            p.Ellipse(fw * 0.5, fw * 0.5, max(1.0, sz.cx - fw), max(1.0, sz.cy - fw));
+            p.Fill(frame);
+            p.End();
+        }
+
+        int inner_cx = max(0, sz.cx - frame_width * 2);
+        int inner_cy = max(0, sz.cy - frame_width * 2);
+        if(inner_cx > 0 && inner_cy > 0 && !IsNull(ring)) {
+            p.Begin();
+            p.Ellipse(frame_width + 0.5, frame_width + 0.5,
+                      max(1.0, inner_cx - 1.0), max(1.0, inner_cy - 1.0));
+            p.Fill(ring);
+            p.End();
+        }
+
+        int core_cx = max(0, inner_cx - ring_width * 2);
+        int core_cy = max(0, inner_cy - ring_width * 2);
+        if(core_cx > 0 && core_cy > 0 && !IsNull(face)) {
+            p.Begin();
+            p.Ellipse(frame_width + ring_width + 0.5,
+                      frame_width + ring_width + 0.5,
+                      max(1.0, core_cx - 1.0), max(1.0, core_cy - 1.0));
+            p.Fill(face);
+            p.End();
+        }
+
+        return Image(ib);
+    });
+}
+
+inline Image UiGetCachedAARoundedRectImage(Size sz,
+                                           int radius,
+                                           Color face,
+                                           Color frame,
+                                           int frame_width)
+{
+    sz.cx = max(1, sz.cx);
+    sz.cy = max(1, sz.cy);
+    radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
+    frame_width = max(0, frame_width);
+    String key = Format("aa-rounded|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+                        sz.cx, sz.cy, radius, frame_width,
+                        face.GetR(), face.GetG(), face.GetB(), IsNull(face) ? 1 : 0,
+                        frame.GetR(), frame.GetG(), frame.GetB(), IsNull(frame) ? 1 : 0);
+    return UiGetCachedImage(key, [=] {
+        ImageBuffer ib(sz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        double fw = frame_width > 0 ? max(1.0, (double)frame_width) : 0.0;
+        double inset = fw > 0 ? fw * 0.5 : 0.5;
+        double x = inset;
+        double y = inset;
+        double cx = max(1.0, sz.cx - inset * 2);
+        double cy = max(1.0, sz.cy - inset * 2);
+        double rr = max(0.0, (double)radius - (fw > 0 ? fw * 0.5 : 0.0));
+
+        p.Begin();
+        if(radius > 0)
+            p.RoundedRectangle(x, y, cx, cy, rr);
+        else
+            p.Rectangle(x, y, cx, cy);
+        if(!IsNull(face))
+            p.Fill(face);
+        if(frame_width > 0 && !IsNull(frame))
+            p.Stroke(fw, frame);
+        p.End();
+        return Image(ib);
+    });
+}
+
+inline Image UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
+                                          int stroke_width = 1, Color stroke = Null)
+{
+    return UiGetCachedAARoundedRectImage(sz, radius, face, stroke, stroke_width);
 }
 
 // -------------------------------------------------------------------------

@@ -99,6 +99,8 @@ private:
 
     Rect GetSplitRect() const;
     Rect GetMainRect() const;
+    int  GetPopupRowHeight() const;
+    int  GetPopupHeightForVisibleItems() const;
     void OpenPopupInternal();
     void ClosePopupInternal();
     void UpdatePopupPosition();

@@ -10,6 +10,35 @@ UiSplitButton::UiSplitButton()
     popup_.SetFrame(NullFrame());
 }
 
+int UiSplitButton::GetPopupRowHeight() const
+{
+    UiButton::Style bs = GetEffectiveStyle();
+    Font font = bs.metrics.use_text_font ? bs.metrics.text_font : bs.font;
+    if(IsNull(font))
+        font = StdFont();
+    Font desc_font = font;
+    desc_font.Height(max(DPI(7), font.GetHeight() - DPI(1)));
+
+    int pad_y = DPI(6);
+    int icon_side = DPI(18);
+    int configured_min = max(DPI(18), popup_item_height_);
+    int measured = configured_min;
+    for(const Item& it : items_) {
+        int title_h = GetTextSize(it.text, font).cy;
+        int desc_h = it.description.IsEmpty() ? 0 : GetTextSize(it.description, desc_font).cy + DPI(1);
+        int text_h = title_h + desc_h;
+        int content_h = max(text_h, IsNull(it.icon) ? 0 : icon_side);
+        measured = max(measured, content_h + pad_y * 2);
+    }
+    return measured;
+}
+
+int UiSplitButton::GetPopupHeightForVisibleItems() const
+{
+    int visible_items = min(items_.GetCount(), max(1, popup_max_items_));
+    return max(GetPopupRowHeight(), visible_items * GetPopupRowHeight());
+}
+
 UiSplitButton::Style UiSplitButton::ResolveThemeStyle() const
 {
     return UiTheme::ResolveButton();
@@ -67,8 +96,10 @@ UiSplitButton& UiSplitButton::SetItemDescription(int index, const String& desc)
 {
     if(index >= 0 && index < items_.GetCount()) {
         items_[index].description = desc;
-        if(popup_open_)
+        if(popup_open_) {
+            UpdatePopupPosition();
             popup_.Refresh();
+        }
     }
     return *this;
 }
@@ -78,8 +109,10 @@ UiSplitButton& UiSplitButton::SetItemIcon(int index, const Image& icon, UiIconRe
     if(index >= 0 && index < items_.GetCount()) {
         items_[index].icon = icon;
         items_[index].icon_render_mode = mode;
-        if(popup_open_)
+        if(popup_open_) {
+            UpdatePopupPosition();
             popup_.Refresh();
+        }
     }
     return *this;
 }
@@ -179,9 +212,8 @@ void UiSplitButton::UpdatePopupPosition()
     // makes compact recent/history buttons usable with long paths.
     Rect outer = GetScreenRect();
     Rect screen = GetVirtualScreenArea();
-    int item_h = max(DPI(18), popup_item_height_);
-    int visible_items = min(items_.GetCount(), max(1, popup_max_items_));
-    int popup_h = max(item_h, visible_items * item_h);
+    int item_h = GetPopupRowHeight();
+    int popup_h = GetPopupHeightForVisibleItems();
     int popup_w = max(outer.GetWidth(), max(DPI(120), popup_min_width_));
     int space = max(0, popup_space_);
 
@@ -367,7 +399,7 @@ Rect UiSplitButton::PopupWindow::GetItemRect(int index) const
 {
     if(!owner)
         return Rect(0, 0, 0, 0);
-    int h = max(DPI(18), owner->popup_item_height_);
+    int h = owner->GetPopupRowHeight();
     return Rect(0, index * h, GetSize().cx, (index + 1) * h);
 }
 
@@ -375,7 +407,7 @@ int UiSplitButton::PopupWindow::HitTest(Point p) const
 {
     if(!owner)
         return -1;
-    int h = max(DPI(18), owner->popup_item_height_);
+    int h = owner->GetPopupRowHeight();
     if(h <= 0)
         return -1;
     int q = p.y / h;
@@ -385,24 +417,32 @@ int UiSplitButton::PopupWindow::HitTest(Point p) const
 void UiSplitButton::PopupWindow::Paint(Draw& w)
 {
     Rect r = GetSize();
-    w.DrawRect(r, SColorPaper());
     if(!owner)
         return;
 
     UiButton::Style bs = owner->GetEffectiveStyle();
+    int popup_radius = min(DPI(10), max(DPI(6), bs.metrics.radius));
+    Color popup_base = bs.palette.face[ST_NORMAL].IsSolid() ? bs.palette.face[ST_NORMAL].color : SColorPaper();
+    if(IsNull(popup_base))
+        popup_base = SColorPaper();
+    int frame_w = bs.metrics.frame_enabled ? max(0, bs.metrics.frame_width) : 0;
     Color frame = bs.palette.frame[ST_NORMAL];
     if(IsNull(frame))
-        frame = Blend(SColorShadow(), SColorPaper(), 120);
-    w.DrawRect(r.left, r.top, r.GetWidth(), 1, frame);
-    w.DrawRect(r.left, r.bottom - 1, r.GetWidth(), 1, frame);
-    w.DrawRect(r.left, r.top, 1, r.GetHeight(), frame);
-    w.DrawRect(r.right - 1, r.top, 1, r.GetHeight(), frame);
+        frame = Blend(SColorShadow(), popup_base, 120);
 
     Font font = bs.metrics.use_text_font ? bs.metrics.text_font : bs.font;
     if(IsNull(font))
         font = StdFont();
     Font desc_font = font;
     desc_font.Height(max(DPI(7), font.GetHeight() - DPI(1)));
+    Color subtitle_ink = bs.palette.ink[ST_DISABLED];
+    if(IsNull(subtitle_ink))
+        subtitle_ink = DisabledColor(SColorText());
+
+    ImageDraw popup_buf(r.GetWidth(), r.GetHeight());
+    Draw& __popup_draw = popup_buf;
+#define w __popup_draw
+    w.DrawRect(r, popup_base);
 
     // Rows are deliberately simple: text, optional description, optional icon,
     // disabled state, and hot tracking. Nested menus belong in UiMenu.
@@ -423,9 +463,9 @@ void UiSplitButton::PopupWindow::Paint(Draw& w)
                 w.DrawRect(row.Deflated(1, 0), Blend(SColorHighlight(), SColorPaper(), 220));
         }
 
-        Rect text = row.Deflated(DPI(10), DPI(3));
+        Rect text = row.Deflated(DPI(10), DPI(6));
         if(!IsNull(it.icon)) {
-            int side = min(DPI(18), max(DPI(12), text.GetHeight() - DPI(2)));
+            int side = DPI(18);
             Rect ir(text.left, text.top + (text.GetHeight() - side) / 2, text.left + side, text.top + (text.GetHeight() + side) / 2);
             if(it.icon_render_mode == UiIconRenderMode::MonoTint)
                 UiPaintStyledIcon(w, ir, it.icon, true, true, UiIconRenderMode::MonoTint, bs.palette.icon[state], it.enabled);
@@ -440,13 +480,16 @@ void UiSplitButton::PopupWindow::Paint(Draw& w)
         Size title_sz = GetTextSize(it.text, font);
         int ty = it.description.IsEmpty()
                ? row.top + (row.GetHeight() - title_sz.cy) / 2
-               : row.top + DPI(4);
+               : text.top;
         w.Clip(text);
         w.DrawText(text.left, ty, it.text, font, ink);
         if(!it.description.IsEmpty())
-            w.DrawText(text.left, ty + title_sz.cy + DPI(1), it.description, desc_font, DisabledColor(ink));
+            w.DrawText(text.left, ty + title_sz.cy + DPI(1), it.description, desc_font, subtitle_ink);
         w.End();
     }
+
+#undef w
+    UiPaintRoundedPopupComposited(w, r, popup_buf, popup_radius, popup_base, frame_w, frame);
 }
 
 void UiSplitButton::PopupWindow::LeftDown(Point p, dword)

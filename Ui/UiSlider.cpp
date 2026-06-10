@@ -476,21 +476,13 @@ void UiSlider::Paint(Draw& w)
         int frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
         int ring_w = max(0, style.thumb_inner_ring_width);
         Rect outer = RectC(th.CenterPoint().x - side / 2, th.CenterPoint().y - side / 2, side, side);
-        w.DrawEllipse(outer, frame);
-
-        int inner_side = max(0, side - frame_w * 2);
-        if(inner_side > 0) {
-            Rect ring = RectC(th.CenterPoint().x - inner_side / 2, th.CenterPoint().y - inner_side / 2,
-                              inner_side, inner_side);
-            w.DrawEllipse(ring, style.thumb_inner_ring_color);
-
-            int core_side = max(0, inner_side - ring_w * 2);
-            if(core_side > 0) {
-                Rect core = RectC(th.CenterPoint().x - core_side / 2, th.CenterPoint().y - core_side / 2,
-                                  core_side, core_side);
-                w.DrawEllipse(core, face);
-            }
-        }
+        const Image& thumb = UiGetCachedAARingImage(outer.GetSize(),
+                                                    frame,
+                                                    style.thumb_inner_ring_color,
+                                                    face,
+                                                    frame_w,
+                                                    ring_w);
+        w.DrawImage(outer.left, outer.top, thumb);
     }
     else if(!handled)
         UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);
