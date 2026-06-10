@@ -2148,6 +2148,7 @@ private:
 			return;
 		DesignerNodeId first = Designer_NULL;
 		int at = insert_index;
+		commands_.BeginGroup("Add " + PresetDisplayName(preset_id));
 		for(DesignerNodeId child : seed_root->children) {
 			DesignerNodeId id = ClonePresetSubtree(seed, child, parent->id, at);
 			if(first == Designer_NULL)
@@ -2155,6 +2156,7 @@ private:
 			if(at >= 0)
 				at++;
 		}
+		commands_.EndGroup();
 		if(first != Designer_NULL)
 			model_.SelectOne(first);
 		RefreshAll();
@@ -2165,7 +2167,7 @@ private:
 		const DesignerNode* source = seed.Find(source_id);
 		if(!source)
 			return Designer_NULL;
-		DesignerNodeId id = model_.AddNode(source->type_id, parent_id, index);
+		DesignerNodeId id = commands_.AddNode(model_, source->type_id, parent_id, index);
 		DesignerNode* target = model_.Find(id);
 		if(!target)
 			return id;

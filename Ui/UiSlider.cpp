@@ -332,6 +332,25 @@ Rect UiSlider::GetThumbRect() const
     return RectC(tr.CenterPoint().x - thumb.cx / 2, tr.top + pos, thumb.cx, thumb.cy);
 }
 
+static Rect UiSliderGetThumbVisualRect_(Rect thumb, const UiSlider::Style& style)
+{
+    if(thumb.IsEmpty())
+        return thumb;
+
+    int side = min(thumb.GetWidth(), thumb.GetHeight());
+    int inset = max(DPI(1), side / 8);
+    Rect visual = thumb.Deflated(inset, inset);
+    int max_visual = max(DPI(10), side - inset * 2);
+    if(visual.GetWidth() > max_visual || visual.GetHeight() > max_visual) {
+        int cx = thumb.CenterPoint().x;
+        int cy = thumb.CenterPoint().y;
+        int vw = min(visual.GetWidth(), max_visual);
+        int vh = min(visual.GetHeight(), max_visual);
+        visual = RectC(cx - vw / 2, cy - vh / 2, vw, vh);
+    }
+    return visual;
+}
+
 void UiSlider::SetValueInternal(double v, bool fire_action, bool fire_changing)
 {
     double nv = UiSliderClamp_(v, min_, max_);
@@ -465,6 +484,7 @@ void UiSlider::Paint(Draw& w)
     if(WhenPaintThumb)
         WhenPaintThumb(w, ctx, handled);
     if(!handled && style.thumb_inner_ring && style.thumb_inner_ring_width > 0) {
+        Rect visual = UiSliderGetThumbVisualRect_(th, style);
         Color face = style.thumb_palette.face[st].IsSolid() ? style.thumb_palette.face[st].color : style.thumb_palette.ink[st];
         Color frame = style.thumb_palette.frame[st];
         if(IsNull(face))
@@ -472,10 +492,10 @@ void UiSlider::Paint(Draw& w)
         if(IsNull(frame))
             frame = face;
 
-        int side = min(th.GetWidth(), th.GetHeight());
+        int side = min(visual.GetWidth(), visual.GetHeight());
         int frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
-        int ring_w = max(0, style.thumb_inner_ring_width);
-        Rect outer = RectC(th.CenterPoint().x - side / 2, th.CenterPoint().y - side / 2, side, side);
+        int ring_w = min(max(0, style.thumb_inner_ring_width), max(DPI(1), side / 6));
+        Rect outer = RectC(visual.CenterPoint().x - side / 2, visual.CenterPoint().y - side / 2, side, side);
         const Image& thumb = UiGetCachedAARingImage(outer.GetSize(),
                                                     frame,
                                                     style.thumb_inner_ring_color,

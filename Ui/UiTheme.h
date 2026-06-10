@@ -809,11 +809,9 @@ inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
         return s;
     case UiButtonRole::Accent: {
         Color accent = Color(37, 99, 235);
-        SetFace(s.palette, accent, LtColor(accent, 10), DkColor(accent, 10), Blend(accent, White(), 170));
         SetFrame(s.palette, accent, LtColor(accent, 6), DkColor(accent, 14), Blend(accent, White(), 170));
-        SetInk(s.palette, White(), White(), White(), Color(226, 232, 240));
-        SetIcon(s.palette, White(), White(), White(), Color(226, 232, 240));
-        s.metrics.radius = max(s.metrics.radius, DPI(8));
+        SetInk(s.palette, accent, LtColor(accent, 6), DkColor(accent, 14), Color(148, 163, 184));
+        SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
         return s;
     }
     case UiButtonRole::Subtle:
@@ -834,11 +832,9 @@ inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
         return s;
     case UiButtonRole::Danger: {
         Color danger = Color(220, 38, 38);
-        SetFace(s.palette, danger, LtColor(danger, 8), DkColor(danger, 10), Blend(danger, White(), 170));
         SetFrame(s.palette, danger, LtColor(danger, 6), DkColor(danger, 12), Blend(danger, White(), 170));
-        SetInk(s.palette, White(), White(), White(), Color(226, 232, 240));
-        SetIcon(s.palette, White(), White(), White(), Color(226, 232, 240));
-        s.metrics.radius = max(s.metrics.radius, DPI(8));
+        SetInk(s.palette, danger, LtColor(danger, 6), DkColor(danger, 12), Color(148, 163, 184));
+        SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
         return s;
     }
     }
