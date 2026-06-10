@@ -1370,6 +1370,12 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, int radius, Color color, in
     w.DrawImage(outer.left, outer.top, ib);
 }
 
+// Later V1 audit pass:
+// Recheck cached-vs-hot usage for UiPaintFlash, UiPaintIndicatorRadioDot,
+// UiPaintFaceFrameDashAlpha, and rounded popup compositor helpers. They are
+// acceptable only when their raster work is cached or clearly off the steady
+// state Paint() hot path.
+
 inline void UiPaintFlash(Draw& w, const Rect& outer, const StyledMetrics& m,
                          Color color, int alpha)
 {
@@ -1503,11 +1509,9 @@ inline void UiPaintCapsule(Draw& w, const Rect& r, Color fill)
     w.DrawEllipse(RectC(r.left, r.bottom - cap, cap, cap), fill);
 }
 
-inline const Image& UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
-                                                 int stroke_width = 1, Color stroke = Null)
+inline Image UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
+                                          int stroke_width = 1, Color stroke = Null)
 {
-    static VectorMap<String, Image> cache;
-
     sz.cx = max(1, sz.cx);
     sz.cy = max(1, sz.cy);
     radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
@@ -1517,30 +1521,26 @@ inline const Image& UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face
                         sz.cx, sz.cy, radius, stroke_width,
                         face.GetR(), face.GetG(), face.GetB(),
                         stroke.GetR(), stroke.GetG(), stroke.GetB(), IsNull(stroke) ? 1 : 0);
-    int ix = cache.Find(key);
-    if(ix >= 0)
-        return cache[ix];
-
-    ImageBuffer ib(sz);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        double inset = stroke_width > 0 ? max(0.5, stroke_width * 0.5) : 0.5;
-        double x = inset;
-        double y = inset;
-        double wdt = sz.cx - 2 * inset;
-        double hgt = sz.cy - 2 * inset;
-        p.Begin();
-        p.RoundedRectangle(x, y, wdt, hgt, radius);
-        p.Fill(face);
-        if(stroke_width > 0 && !IsNull(stroke))
-            p.Stroke(stroke_width, stroke);
-        p.End();
-    }
-
-    cache.Add(key, Image(ib));
-    return cache[cache.Find(key)];
+    return UiGetCachedImage(key, [=] {
+        ImageBuffer ib(sz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+        {
+            BufferPainter p(ib, MODE_ANTIALIASED);
+            double inset = stroke_width > 0 ? max(0.5, stroke_width * 0.5) : 0.5;
+            double x = inset;
+            double y = inset;
+            double wdt = sz.cx - 2 * inset;
+            double hgt = sz.cy - 2 * inset;
+            p.Begin();
+            p.RoundedRectangle(x, y, wdt, hgt, radius);
+            p.Fill(face);
+            if(stroke_width > 0 && !IsNull(stroke))
+                p.Stroke(stroke_width, stroke);
+            p.End();
+        }
+        return Image(ib);
+    });
 }
 
 // -------------------------------------------------------------------------

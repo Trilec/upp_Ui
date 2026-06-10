@@ -516,9 +516,14 @@ static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 	panel.SetCustomStyle(s);
 }
 
-static void ApplyDesignerTooltip(Ctrl& ctrl, const DesignerNode& n)
+static void DesignerApplyTooltip(Ctrl& ctrl, const DesignerNode& node)
 {
-	ctrl.Tip((String)AdapterNodeProperty(n, "tooltip", String()));
+	if(node.type_id == "Spacer") {
+		ctrl.Tip(String());
+		return;
+	}
+	String tooltip = (String)AdapterNodeProperty(node, "tooltip", String());
+	ctrl.Tip(tooltip);
 }
 
 static void ApplyButtonAppearance(UiButton& button, const DesignerNode& n)
@@ -3162,7 +3167,10 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 		a = p;
 	}
 	a->SyncFromNode(node);
-	ApplyDesignerTooltip(*ctrl, node);
+	// Real preview controls are recreated on InvalidateRealPreview(), so applying
+	// tooltip once in the shared adapter creation path keeps preview behavior and
+	// generated code aligned without per-adapter duplication.
+	DesignerApplyTooltip(*ctrl, node);
 	ApplyDesignerControlMinSize(*ctrl, node);
 	if(adapter)
 		*adapter = a;
