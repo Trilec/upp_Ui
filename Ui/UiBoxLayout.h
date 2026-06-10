@@ -53,11 +53,14 @@
 //
 // â€¢ Item sizing (main axis):
 //     Add(ctrl)    â€“ attach a child, default sizing (Fit)
-//     Fixed(px)   â€“ use exactly px on the main axis (never grows/shrinks)
-//     Fit()       â€“ prefer the childâ€™s natural content size on the main axis;
-//                    wrapped horizontal UiBoxLayout children may shrink toward
-//                    their minimum wrap width when parent space is constrained
-//     Expand(w)   â€“ share the remaining space in proportion to weight w
+//     Fixed(px)   â€“ exact size on the main axis; does not shrink
+//     Fit()       â€“ prefers the childâ€™s natural/content size on the main axis;
+//                    for a wrapped horizontal UiBoxLayout child, preferred
+//                    width may shrink toward minimum wrap width when parent
+//                    space is constrained, then final height is measured from
+//                    the final assigned width
+//     Expand(w)   â€“ share the remaining parent-distributed space in
+//                    proportion to weight w
 //
 // â€¢ Cross-axis alignment (secondary axis):
 //     Container default via SetAlignItems(Align), overridable per item with
