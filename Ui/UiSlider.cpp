@@ -250,8 +250,8 @@ Size UiSlider::GetMinSize() const
     int cross = dir_ == UiDirection::H ? max(DPI(18), max(track.cy, thumb.cy))
                                        : max(DPI(18), max(track.cx, thumb.cx));
     int tick_span = style.show_ticks ? (style.tick_gap + max(style.tick_len_major, style.tick_len_minor)) : 0;
-    int major = dir_ == UiDirection::H ? track.cx + thumb.cx + DPI(8)
-                                       : track.cy + thumb.cy + DPI(8);
+    int major = dir_ == UiDirection::H ? max(track.cx + DPI(16), thumb.cx + DPI(16))
+                                       : max(track.cy + DPI(16), thumb.cy + DPI(16));
     Size natural = dir_ == UiDirection::H
                  ? Size(major + DPI(16), cross + tick_span + DPI(10))
                  : Size(cross + tick_span + DPI(10), major + DPI(16));
@@ -278,15 +278,14 @@ Rect UiSlider::GetTrackRect() const
         return outer;
 
     Size track = Size(max(DPI(20), style.track_size.cx), max(1, style.track_size.cy));
-    Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
     if(dir_ == UiDirection::H) {
-        int pad = max(DPI(8), thumb.cx / 2 + DPI(2));
+        int pad = max(DPI(8), track.cy * 2 + DPI(2));
         int width = min(max(0, outer.GetWidth() - 2 * pad), track.cx);
         int x = outer.left + (outer.GetWidth() - width) / 2;
         int y = outer.CenterPoint().y - track.cy / 2;
         return RectC(x, y, width, track.cy);
     }
-    int pad = max(DPI(8), thumb.cy / 2 + DPI(2));
+    int pad = max(DPI(8), track.cx * 2 + DPI(2));
     int height = min(max(0, outer.GetHeight() - 2 * pad), track.cy);
     int x = outer.CenterPoint().x - track.cx / 2;
     int y = outer.top + (outer.GetHeight() - height) / 2;
@@ -295,11 +294,9 @@ Rect UiSlider::GetTrackRect() const
 
 int UiSlider::ValueToPos(double v) const
 {
-    const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
     int len = dir_ == UiDirection::H ? tr.GetWidth() : tr.GetHeight();
-    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
-    int usable = max(0, len - thumb);
+    int usable = max(0, len - 1);
     if(usable <= 0 || max_ <= min_)
         return 0;
 
@@ -309,11 +306,9 @@ int UiSlider::ValueToPos(double v) const
 
 double UiSlider::PosToValue(int pos) const
 {
-    const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
     int len = dir_ == UiDirection::H ? tr.GetWidth() : tr.GetHeight();
-    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
-    int usable = max(0, len - thumb);
+    int usable = max(0, len - 1);
     if(usable <= 0 || max_ <= min_)
         return min_;
 
@@ -335,9 +330,9 @@ Rect UiSlider::GetThumbRect() const
     int pos = ValueToPos(value_);
 
     if(dir_ == UiDirection::H)
-        return RectC(tr.left + pos, tr.CenterPoint().y - thumb.cy / 2, thumb.cx, thumb.cy);
+        return RectC(tr.left + pos - thumb.cx / 2, tr.CenterPoint().y - thumb.cy / 2, thumb.cx, thumb.cy);
 
-    return RectC(tr.CenterPoint().x - thumb.cx / 2, tr.top + pos, thumb.cx, thumb.cy);
+    return RectC(tr.CenterPoint().x - thumb.cx / 2, tr.top + pos - thumb.cy / 2, thumb.cx, thumb.cy);
 }
 
 static Rect UiSliderGetThumbVisualRect_(Rect thumb, const UiSlider::Style& style)
@@ -541,19 +536,17 @@ void UiSlider::LeftDown(Point p, dword)
     if(th.Contains(p)) {
         dragging_ = true;
         drag_start_value_ = value_;
-        drag_offset_ = dir_ == UiDirection::H ? (p.x - th.left) : (p.y - th.top);
+        drag_offset_ = dir_ == UiDirection::H ? (p.x - th.CenterPoint().x) : (p.y - th.CenterPoint().y);
         SetCapture();
         Refresh();
         return;
     }
 
-    const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
-    int thumb = dir_ == UiDirection::H ? max(1, style.thumb_size.cx) : max(1, style.thumb_size.cy);
-    int pos = dir_ == UiDirection::H ? (p.x - tr.left - thumb / 2) : (p.y - tr.top - thumb / 2);
+    int pos = dir_ == UiDirection::H ? (p.x - tr.left) : (p.y - tr.top);
     dragging_ = true;
     drag_start_value_ = value_;
-    drag_offset_ = thumb / 2;
+    drag_offset_ = 0;
     SetCapture();
     SetValueInternal(PosToValue(pos), false, true);
     Refresh();

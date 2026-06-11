@@ -36,7 +36,7 @@ static void DesignerMultiSelectCommandLog(const String& text)
 	fa.PutLine(AsString(GetSysTime()) + " " + text);
 }
 
-static const char* DESIGNER_VERSION = "v0.1.70";
+static const char* DESIGNER_VERSION = "v1.0.1 Alpha";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
