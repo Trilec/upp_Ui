@@ -58,7 +58,7 @@ public:
         Color   tick_color = SColorShadow();
         UiAlign tick_side = UiAlign::BOTTOM;
         Size    track_size = Size(DPI(120), DPI(4));
-        Size    thumb_size = Size(DPI(14), DPI(18));
+        Size    thumb_size = Size(DPI(20), DPI(20));
         bool    thumb_inner_ring = false;
         int     thumb_inner_ring_width = DPI(2);
         Color   thumb_inner_ring_color = White();

@@ -415,6 +415,15 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("placeholder", "Placeholder");
 		if(id == "UiToggle")
 			n.properties.Set("on", true);
+		if(id == "UiSlider") {
+			n.properties.Set("track_width", 120);
+			n.properties.Set("track_height", 3);
+			n.properties.Set("thumb_width", 20);
+			n.properties.Set("thumb_height", 20);
+			n.properties.Set("track_radius", 8);
+			n.properties.Set("thumb_radius", 8);
+			n.properties.Set("value", 50);
+		}
 		if(id == "UiDropdown")
 			n.properties.Set("item_text", "First");
 		if(id == "UiDropdown")
@@ -791,7 +800,7 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeControlType("UiLineEdit", "Edit", Size(180, 32)));
 	registry.Register(MakeControlType("UiIntEdit", "Integer Edit", Size(140, 32)));
 	registry.Register(MakeControlType("UiFloatEdit", "Float Edit", Size(140, 32)));
-	registry.Register(MakeControlType("UiSlider", "Slider", Size(180, 32)));
+	registry.Register(MakeControlType("UiSlider", "Slider", Size(100, 25)));
 	registry.Register(MakeControlType("UiToggle", "Toggle", Size(54, 28)));
 	registry.Register(MakeControlType("UiDropdown", "Dropdown", Size(180, 32)));
 	registry.Register(MakeControlType("UiCheckBox", "Checkbox", Size(150, 28)));

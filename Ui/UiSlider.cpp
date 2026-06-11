@@ -75,7 +75,7 @@ const UiSlider::Style& UiSlider::StyleDefault()
         s.tick_len_minor = DPI(3);
         s.tick_gap = DPI(4);
         s.track_size = Size(DPI(120), DPI(3));
-        s.thumb_size = Size(DPI(16), DPI(16));
+        s.thumb_size = Size(DPI(20), DPI(20));
         s.thumb_inner_ring = true;
         s.thumb_inner_ring_width = DPI(2);
         s.thumb_inner_ring_color = White();
@@ -244,16 +244,24 @@ Value UiSlider::GetData() const
 
 Size UiSlider::GetMinSize() const
 {
-    if(!IsNull(user_min_size_) && user_min_size_.cx > 0 && user_min_size_.cy > 0)
-        return user_min_size_;
-
     const Style& style = GetEffectiveStyle();
-    int cross = dir_ == UiDirection::H ? max(DPI(18), style.thumb_size.cy) : max(DPI(18), style.thumb_size.cx);
+    Size track = Size(max(DPI(50), style.track_size.cx), max(1, style.track_size.cy));
+    Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    int cross = dir_ == UiDirection::H ? max(DPI(18), max(track.cy, thumb.cy))
+                                       : max(DPI(18), max(track.cx, thumb.cx));
     int tick_span = style.show_ticks ? (style.tick_gap + max(style.tick_len_major, style.tick_len_minor)) : 0;
-    int major = dir_ == UiDirection::H ? max(DPI(40), style.track_size.cx) : max(DPI(40), style.track_size.cy);
-    return dir_ == UiDirection::H
-           ? Size(major + DPI(16), cross + tick_span + DPI(10))
-           : Size(cross + tick_span + DPI(10), major + DPI(16));
+    int major = dir_ == UiDirection::H ? track.cx + thumb.cx + DPI(8)
+                                       : track.cy + thumb.cy + DPI(8);
+    Size natural = dir_ == UiDirection::H
+                 ? Size(major + DPI(16), cross + tick_span + DPI(10))
+                 : Size(cross + tick_span + DPI(10), major + DPI(16));
+    if(!IsNull(user_min_size_)) {
+        if(user_min_size_.cx > 0)
+            natural.cx = max(natural.cx, user_min_size_.cx);
+        if(user_min_size_.cy > 0)
+            natural.cy = max(natural.cy, user_min_size_.cy);
+    }
+    return natural;
 }
 
 void UiSlider::SetMinSize(Size sz)
@@ -337,18 +345,18 @@ static Rect UiSliderGetThumbVisualRect_(Rect thumb, const UiSlider::Style& style
     if(thumb.IsEmpty())
         return thumb;
 
-    int side = min(thumb.GetWidth(), thumb.GetHeight());
-    int inset = max(DPI(1), side / 8);
-    Rect visual = thumb.Deflated(inset, inset);
-    int max_visual = max(DPI(10), side - inset * 2);
-    if(visual.GetWidth() > max_visual || visual.GetHeight() > max_visual) {
-        int cx = thumb.CenterPoint().x;
-        int cy = thumb.CenterPoint().y;
-        int vw = min(visual.GetWidth(), max_visual);
-        int vh = min(visual.GetHeight(), max_visual);
-        visual = RectC(cx - vw / 2, cy - vh / 2, vw, vh);
-    }
-    return visual;
+    int track_cross = max(1, min(style.track_size.cx, style.track_size.cy));
+    int min_w = max(DPI(8), track_cross * 2 + DPI(4));
+    int min_h = max(DPI(8), track_cross * 2 + DPI(4));
+    int inset_x = max(DPI(1), thumb.GetWidth() / 8);
+    int inset_y = max(DPI(1), thumb.GetHeight() / 8);
+    int visual_w = max(min_w, thumb.GetWidth() - inset_x * 2);
+    int visual_h = max(min_h, thumb.GetHeight() - inset_y * 2);
+    visual_w = min(thumb.GetWidth(), visual_w);
+    visual_h = min(thumb.GetHeight(), visual_h);
+    int x = thumb.left + (thumb.GetWidth() - visual_w) / 2;
+    int y = thumb.top + (thumb.GetHeight() - visual_h) / 2;
+    return RectC(x, y, visual_w, visual_h);
 }
 
 void UiSlider::SetValueInternal(double v, bool fire_action, bool fire_changing)
@@ -492,17 +500,29 @@ void UiSlider::Paint(Draw& w)
         if(IsNull(frame))
             frame = face;
 
-        int side = min(visual.GetWidth(), visual.GetHeight());
         int frame_w = style.thumb_metrics.frame_enabled ? max(0, style.thumb_metrics.frame_width) : 0;
-        int ring_w = min(max(0, style.thumb_inner_ring_width), max(DPI(1), side / 6));
-        Rect outer = RectC(visual.CenterPoint().x - side / 2, visual.CenterPoint().y - side / 2, side, side);
-        const Image& thumb = UiGetCachedAARingImage(outer.GetSize(),
-                                                    frame,
-                                                    style.thumb_inner_ring_color,
-                                                    face,
-                                                    frame_w,
-                                                    ring_w);
-        w.DrawImage(outer.left, outer.top, thumb);
+        int ring_w = min(max(0, style.thumb_inner_ring_width),
+                         max(DPI(1), min(visual.GetWidth(), visual.GetHeight()) / 6));
+        int radius = max(0, min(max(0, style.thumb_metrics.radius),
+                                min(visual.GetWidth(), visual.GetHeight()) / 2));
+        const Image& thumb_face = UiGetCachedAARoundedRectImage(visual.GetSize(),
+                                                                radius,
+                                                                face,
+                                                                frame,
+                                                                frame_w);
+        w.DrawImage(visual.left, visual.top, thumb_face);
+
+        int ring_inset = frame_w + max(DPI(1), ring_w);
+        Rect ring_rect = visual.Deflated(ring_inset);
+        if(!ring_rect.IsEmpty() && !IsNull(style.thumb_inner_ring_color)) {
+            int ring_radius = max(0, min(radius - ring_inset, min(ring_rect.GetWidth(), ring_rect.GetHeight()) / 2));
+            const Image& ring = UiGetCachedAARoundedRectImage(ring_rect.GetSize(),
+                                                              ring_radius,
+                                                              Null,
+                                                              style.thumb_inner_ring_color,
+                                                              ring_w);
+            w.DrawImage(ring_rect.left, ring_rect.top, ring);
+        }
     }
     else if(!handled)
         UiPaintFaceFrameDash(w, th, style.thumb_palette, style.thumb_metrics, st);

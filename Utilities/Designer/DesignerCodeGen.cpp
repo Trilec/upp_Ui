@@ -527,6 +527,14 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		EmitSurfaceOverrideFields(out, "s.track_palette", n, "track");
 		EmitSurfaceOverrideFields(out, "s.thumb_palette", n, "thumb");
 	}
+	if(n.type_id == "UiSlider") {
+		out << "\t\t\ts.track_size = Size(DPI(" << max(20, (int)CodeGenNodeProperty(n, "track_width", 120))
+		    << "), DPI(" << max(1, (int)CodeGenNodeProperty(n, "track_height", 3)) << "));\n"
+		    << "\t\t\ts.thumb_size = Size(DPI(" << max(6, (int)CodeGenNodeProperty(n, "thumb_width", 20))
+		    << "), DPI(" << max(6, (int)CodeGenNodeProperty(n, "thumb_height", 20)) << "));\n"
+		    << "\t\t\ts.track_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "track_radius", CodeGenNodeProperty(n, "radius", 8))) << ");\n"
+		    << "\t\t\ts.thumb_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "thumb_radius", 8)) << ");\n";
+	}
 	if(n.type_id == "UiLabel") {
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = UiTheme::ResolveLabel(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];

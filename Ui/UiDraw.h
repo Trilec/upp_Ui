@@ -1580,31 +1580,28 @@ inline Image UiGetCachedAARingImage(Size sz,
         Fill(~ib, RGBAZero(), ib.GetLength());
 
         BufferPainter p(ib, MODE_ANTIALIASED);
+        double cx = sz.cx * 0.5;
+        double cy = sz.cy * 0.5;
+        double radius = max(0.5, min(sz.cx, sz.cy) * 0.5 - 0.5);
         if(!IsNull(frame)) {
-            double fw = max(1, frame_width);
             p.Begin();
-            p.Ellipse(fw * 0.5, fw * 0.5, max(1.0, sz.cx - fw), max(1.0, sz.cy - fw));
+            p.Circle(cx, cy, radius);
             p.Fill(frame);
             p.End();
         }
 
-        int inner_cx = max(0, sz.cx - frame_width * 2);
-        int inner_cy = max(0, sz.cy - frame_width * 2);
-        if(inner_cx > 0 && inner_cy > 0 && !IsNull(ring)) {
+        double ring_radius = radius - max(0, frame_width);
+        if(ring_radius > 0.0 && !IsNull(ring)) {
             p.Begin();
-            p.Ellipse(frame_width + 0.5, frame_width + 0.5,
-                      max(1.0, inner_cx - 1.0), max(1.0, inner_cy - 1.0));
+            p.Circle(cx, cy, ring_radius);
             p.Fill(ring);
             p.End();
         }
 
-        int core_cx = max(0, inner_cx - ring_width * 2);
-        int core_cy = max(0, inner_cy - ring_width * 2);
-        if(core_cx > 0 && core_cy > 0 && !IsNull(face)) {
+        double core_radius = ring_radius - max(0, ring_width);
+        if(core_radius > 0.0 && !IsNull(face)) {
             p.Begin();
-            p.Ellipse(frame_width + ring_width + 0.5,
-                      frame_width + ring_width + 0.5,
-                      max(1.0, core_cx - 1.0), max(1.0, core_cy - 1.0));
+            p.Circle(cx, cy, core_radius);
             p.Fill(face);
             p.End();
         }

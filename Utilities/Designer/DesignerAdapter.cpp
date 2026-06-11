@@ -1408,7 +1408,7 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 	bool theme_override = DesignerBoolProperty(node, "theme_override", false);
 	face_ = GetColorProperty(node, "face", Color(214, 231, 255));
 	frame_ = GetColorProperty(node, "frame", Color(54, 116, 210));
-	radius_ = theme_override ? max(0, (int)AdapterNodeProperty(node, "radius", 0)) : 0;
+	radius_ = theme_override ? max(0, (int)AdapterNodeProperty(node, "track_radius", AdapterNodeProperty(node, "radius", 0))) : 0;
 	face_enabled_ = theme_override && DesignerBoolProperty(node, "face_enabled", false);
 	frame_enabled_ = theme_override && DesignerBoolProperty(node, "frame_enabled", false);
 	if(theme_override && (face_enabled_ || frame_enabled_)) {
@@ -1423,12 +1423,17 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 		s.track_metrics.face_enabled = face_enabled_;
 		s.track_metrics.frame_enabled = frame_enabled_;
 	}
-	s.track_metrics.radius = max(DPI(2), min(radius_, DPI(8)));
+	s.track_size = Size(DPI(max(20, (int)AdapterNodeProperty(node, "track_width", 120))),
+	                    DPI(max(1, (int)AdapterNodeProperty(node, "track_height", 3))));
+	s.thumb_size = Size(DPI(max(6, (int)AdapterNodeProperty(node, "thumb_width", 20))),
+	                    DPI(max(6, (int)AdapterNodeProperty(node, "thumb_height", 20))));
+	s.track_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "track_radius", theme_override ? radius_ : 8)));
+	s.thumb_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "thumb_radius", 8)));
 	s.track_metrics.frame_width = DPI(1);
 	SetCustomStyle(s);
 	if(theme_override && radius_ > 0)
 		Transparent();
-	SetRange(0, 100).SetValue(50);
+	SetRange(0, 100).SetValue((int)AdapterNodeProperty(node, "value", 50));
 	NoWantFocus();
 }
 
@@ -1459,6 +1464,18 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	      "Explicit track frame color used when theme overrides are enabled. The thumb preview still derives from this color in the current slider runtime path.").group = "Theme Overrides";
 	b.AddInt("radius", "Track radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit track corner radius used when theme overrides are enabled.", 0, 64).group = "Theme Overrides";
+	b.AddInt("track_width", "Track width", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
+	         "Track length used by the slider preview style.", 20, 400).group = "Theme Overrides";
+	b.AddInt("track_height", "Track height", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
+	         "Track thickness used by the slider preview style.", 1, 24).group = "Theme Overrides";
+	b.AddInt("thumb_width", "Thumb width", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
+	         "Thumb width used by the slider preview style.", 6, 80).group = "Theme Overrides";
+	b.AddInt("thumb_height", "Thumb height", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
+	         "Thumb height used by the slider preview style.", 6, 80).group = "Theme Overrides";
+	b.AddInt("track_radius", "Track radius", DesignerEditorKind::Slider, "UiSlider::Style::track_metrics.radius",
+	         "Track corner radius for the slider preview style.", 0, 64).group = "Theme Overrides";
+	b.AddInt("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSlider::Style::thumb_metrics.radius",
+	         "Thumb corner radius for the slider preview style.", 0, 64).group = "Theme Overrides";
 	b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiSlider::SetValue",
 	         "Sets the preview slider value. Full slider API is intentionally not exposed yet.", 0, 100);
 }

@@ -1786,6 +1786,7 @@ inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole
                        role == UiButtonRole::Danger ? UiRole::Alert : UiRole::Standard;
     MinimalRoleColors c = MinimalRole(mode, universal);
     MinimalRoleColors standard = MinimalRole(mode, UiRole::Standard);
+    MinimalRoleColors subtle = MinimalRole(mode, UiRole::Subtle);
     s.metrics.radius = DPI(8);
     s.metrics.shadow.enabled = false;
     s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
@@ -1796,7 +1797,10 @@ inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole
     switch(role) {
     case UiButtonRole::Accent:
         s.font = SansSerifZ(11).Bold();
-        ApplyPalette(s.palette, c);
+        SetFace(s.palette, Null, standard.face_hot, standard.face_pressed, Null);
+        SetFrame(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.frame_disabled);
+        SetInk(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.ink_disabled);
+        SetIcon(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.ink_disabled);
         return;
     case UiButtonRole::Icon:
         s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
@@ -1812,7 +1816,11 @@ inline void TuneMinimalButton(UiButton::Style& s, UiThemeMode mode, UiButtonRole
         ApplyPalette(s.palette, c);
         return;
     case UiButtonRole::Danger:
-        ApplyPalette(s.palette, c);
+        s.font = SansSerifZ(11).Bold();
+        SetFace(s.palette, Null, standard.face_hot, standard.face_pressed, Null);
+        SetFrame(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.frame_disabled);
+        SetInk(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.ink_disabled);
+        SetIcon(s.palette, c.accent, c.accent_hot, c.accent_pressed, subtle.ink_disabled);
         return;
     case UiButtonRole::Standard:
     default:
@@ -1923,7 +1931,7 @@ inline void TuneMinimalSlider(UiSlider::Style& s, UiThemeMode mode)
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
     MinimalRoleColors c = MinimalRole(mode, UiRole::Accent);
     s.track_size = Size(DPI(120), DPI(3));
-    s.thumb_size = Size(DPI(16), DPI(16));
+    s.thumb_size = Size(DPI(20), DPI(20));
     s.track_metrics.radius = DPI(999);
     s.thumb_metrics.radius = DPI(999);
     s.thumb_metrics.frame_enabled = true;
