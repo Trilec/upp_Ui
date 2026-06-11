@@ -208,6 +208,8 @@ private:
 
 struct UiRasterCachePolicy {
     String tag;
+    // Reserved for future per-tag/category budget enforcement.
+    // The current cache uses only the global byte budget.
     int category_budget_bytes = 0;
     int max_single_image_bytes = 512 * 1024;
     int max_axis = 512;
@@ -1837,7 +1839,7 @@ inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
     Size requested(max(1, dot + 4), max(1, dot + 4));
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/indicator");
     UiRasterCacheKeyBuilder kb("aa/indicator");
-    kb.Add(requested).Add(ink).Add(inset).Add(radius_percent).Add(min_side);
+    kb.Add(ink).Add(radius_percent).Add(min_side);
     Image img = UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
         ImageBuffer ib(qsz);
         ib.SetKind(IMAGE_ALPHA);
@@ -1845,7 +1847,9 @@ inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
 
         BufferPainter p(ib, MODE_ANTIALIASED);
         p.Clear(RGBAZero());
-        double draw_dot = max(1.0, min<double>(dot, min(qsz.cx, qsz.cy) - 4.0));
+        double draw_dot = max<double>(min_side, (min(qsz.cx, qsz.cy) * 76) / 100.0);
+        draw_dot = min<double>(draw_dot, min(qsz.cx, qsz.cy) - 4.0);
+        draw_dot = max(1.0, draw_dot);
         if(radius_percent >= 95) {
             p.Circle(qsz.cx * 0.5, qsz.cy * 0.5, draw_dot * 0.5);
         }
