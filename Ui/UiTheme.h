@@ -2097,6 +2097,51 @@ inline void TuneMinimalPanel(UiPanel::Style& s, UiThemeMode mode, UiPanelRole ro
     s.metrics.frame_enabled = true;
     s.metrics.frame_width = DPI(1);
 }
+
+inline void TuneMinimalPanel(UiPanel::Style& s, UiThemeMode mode, UiRole role)
+{
+    bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
+    Color neutral_face = dark ? Color(36, 36, 38) : Color(252, 252, 252);
+    Color neutral_frame = dark ? Color(76, 76, 80) : Color(226, 226, 226);
+    Color subtle_face = dark ? Color(34, 34, 36) : Color(252, 252, 252);
+    Color subtle_frame = dark ? Color(84, 84, 88) : Color(232, 232, 232);
+    Color accent_face = dark ? Color(32, 38, 56) : Color(240, 240, 255);
+    Color alert_face = dark ? Color(56, 34, 38) : Color(255, 228, 230);
+
+    s.transparent = false;
+    s.metrics.shadow.enabled = false;
+    s.metrics.radius = DPI(8);
+    s.metrics.face_enabled = true;
+    s.metrics.frame_enabled = true;
+    s.metrics.frame_width = DPI(1);
+
+    Color face = neutral_face;
+    Color frame = neutral_frame;
+    switch(role) {
+    case UiRole::Subtle:
+        face = subtle_face;
+        frame = subtle_frame;
+        break;
+    case UiRole::Accent:
+        face = accent_face;
+        frame = neutral_frame;
+        break;
+    case UiRole::Alert:
+        face = alert_face;
+        frame = neutral_frame;
+        break;
+    case UiRole::Standard:
+    default:
+        face = neutral_face;
+        frame = neutral_frame;
+        break;
+    }
+
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(face);
+        s.palette.frame[i] = frame;
+    }
+}
 inline void TuneMinimalRadioButton(UiRadioButton::Style& s, UiThemeMode mode, UiRadioVisual visual, UiRole role = UiRole::Standard)
 {
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
@@ -2624,7 +2669,15 @@ public:
     static UiPanel::Style ResolvePanel(const UiThemeContext& ctx, UiRole role)
     {
         if(!UiIsValid(role)) role = UiRole::Standard;
-        return ResolvePanel(ctx, UiThemeDetail::ToPanelRole(role));
+        UiThemeContext normalized = NormalizeContext(ctx);
+        UiPanel::Style s = UiThemeDetail::ResolvePanelBase(normalized.preset);
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
+            UiThemeDetail::TuneMinimalPanel(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
+            return s;
+        }
+        return ResolvePanel(normalized, UiThemeDetail::ToPanelRole(role));
     }
 
     static UiPanel::Style ResolvePanel(const UiThemeContext& ctx, UiPanelRole role = UiPanelRole::Surface)
