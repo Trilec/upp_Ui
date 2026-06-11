@@ -747,11 +747,67 @@ inline Image ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48()
     return UiIconsImg::ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48();
 }
 
+// Source: designs\custom_typography_32.svg
+// Size: 48x48
+inline Image ICON_DESIGN_CUSTOM_TYPOGRAPHY_48()
+{
+    return UiIconsImg::ICON_DESIGN_CUSTOM_TYPOGRAPHY_48();
+}
+
+// Source: designs\help_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_HELP_48()
+{
+    return UiIconsImg::ICON_DESIGN_HELP_48();
+}
+
+// Source: designs\info_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_INFO_48()
+{
+    return UiIconsImg::ICON_DESIGN_INFO_48();
+}
+
+// Source: designs\format_paint_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_FORMAT_PAINT_48()
+{
+    return UiIconsImg::ICON_DESIGN_FORMAT_PAINT_48();
+}
+
+// Source: designs\code_blocks_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_CODE_BLOCKS_48()
+{
+    return UiIconsImg::ICON_DESIGN_CODE_BLOCKS_48();
+}
+
+// Source: designs\desktop_mac_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_DESKTOP_MAC_48()
+{
+    return UiIconsImg::ICON_DESIGN_DESKTOP_MAC_48();
+}
+
+// Source: designs\splitscreen_landscape_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48()
+{
+    return UiIconsImg::ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48();
+}
+
+// Source: designs\splitscreen_portrait_48.svg
+// Size: 48x48
+inline Image ICON_DESIGN_SPLITSCREEN_PORTRAIT_48()
+{
+    return UiIconsImg::ICON_DESIGN_SPLITSCREEN_PORTRAIT_48();
+}
+
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
         Vector<UiIconCatalogEntry> out;
-        out.Reserve(112);
+        out.Reserve(120);
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48", &ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MENU_48", &ICON_NAVIGATION_OUTLINED_MENU_48));
         out.Add(UiIconCatalogEntry("ICON_NAVIGATION_OUTLINED_MORE_VERT_48", &ICON_NAVIGATION_OUTLINED_MORE_VERT_48));
@@ -884,6 +940,14 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TOOLBAR_48", &ICON_DESIGN_TOOLBAR_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_TRIP_ORIGIN_48", &ICON_DESIGN_TRIP_ORIGIN_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48", &ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_FORMAT_PAINT_48", &ICON_DESIGN_FORMAT_PAINT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_CODE_BLOCKS_48", &ICON_DESIGN_CODE_BLOCKS_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DESKTOP_MAC_48", &ICON_DESIGN_DESKTOP_MAC_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48", &ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SPLITSCREEN_PORTRAIT_48", &ICON_DESIGN_SPLITSCREEN_PORTRAIT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_CUSTOM_TYPOGRAPHY_48", &ICON_DESIGN_CUSTOM_TYPOGRAPHY_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_HELP_48", &ICON_DESIGN_HELP_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_INFO_48", &ICON_DESIGN_INFO_48));
 
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
