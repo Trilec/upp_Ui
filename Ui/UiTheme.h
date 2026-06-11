@@ -57,6 +57,7 @@
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
 #include <Ui/UiMenu.h>
+#include <Ui/UiDraw.h>
 
 namespace Upp {
 
@@ -2366,6 +2367,7 @@ public:
             return;
         current = normalized;
         ++UiThemeDetail::ThemeRevisionRef();
+        UiRasterCacheClear();
     }
 
     static UiThemeContext GetContext()

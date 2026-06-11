@@ -505,7 +505,7 @@ void UiSlider::Paint(Draw& w)
                                                                 face,
                                                                 frame,
                                                                 frame_w);
-        w.DrawImage(visual.left, visual.top, thumb_face);
+        UiDrawCachedRaster(w, visual, thumb_face);
 
         int ring_inset = frame_w + max(DPI(1), ring_w);
         Rect ring_rect = visual.Deflated(ring_inset);
@@ -516,7 +516,7 @@ void UiSlider::Paint(Draw& w)
                                                               Null,
                                                               style.thumb_inner_ring_color,
                                                               ring_w);
-            w.DrawImage(ring_rect.left, ring_rect.top, ring);
+            UiDrawCachedRaster(w, ring_rect, ring);
         }
     }
     else if(!handled)

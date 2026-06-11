@@ -316,14 +316,14 @@ void UiSplitter::PaintGrip(Draw& w, const Rect& r, StyledState st) const
         if(rr.IsEmpty())
             return;
         const Image& pill = UiGetCachedAACapsuleImage(rr.GetSize(), c);
-        w.DrawImage(rr.left, rr.top, pill);
+        UiDrawCachedRaster(w, rr, pill);
     };
 
     auto DrawCircle = [&](const Rect& rr) {
         if(rr.IsEmpty())
             return;
         const Image& dot = UiGetCachedAACircleImage(rr.GetSize(), c);
-        w.DrawImage(rr.left, rr.top, dot);
+        UiDrawCachedRaster(w, rr, dot);
     };
 
     int count = max(1, style.grip_count);

@@ -302,26 +302,6 @@ static void PrepValueEdit(UiFloatEdit& e, int precision, double mn, double mx)
     e.SetTextAlign(UiAlign::RIGHT);
 }
 
-struct ColorFieldCacheKey : Moveable<ColorFieldCacheKey> {
-    Size sz;
-    int  mode = 0;
-    Color color;
-    int  hue = 0;
-
-    bool operator==(const ColorFieldCacheKey& b) const
-    {
-        return sz == b.sz && mode == b.mode && color == b.color && hue == b.hue;
-    }
-};
-
-inline hash_t GetHashValue(const ColorFieldCacheKey& k)
-{
-    CombineHash h;
-    h << k.sz.cx << k.sz.cy << k.mode << k.color.GetRaw() << k.hue;
-    return h;
-}
-
-
 class ColorChip : public Ctrl {
 public:
     typedef ColorChip CLASSNAME;
@@ -538,14 +518,15 @@ private:
         if(sz.IsEmpty())
             return cache_;
 
-        ColorFieldCacheKey key;
-        key.sz = sz;
-        key.mode = (int)mode_;
-        key.color = color_;
-        key.hue = hue_;
+        UiRasterCacheKeyBuilder kb("colorfield");
+        kb.Add(sz).Add((int)mode_).Add(color_).Add(hue_);
+        UiRasterCacheKey key = kb.Build();
 
         if(cache_.IsEmpty() || !(key == cache_key_)) {
-            cache_ = UiGetCachedImage(key, [=] {
+            UiRasterCachePolicy policy = UiRasterPolicyAA("colorfield");
+            policy.allow_scale_from_bucket = false;
+            policy.max_single_image_bytes = 512 * 1024;
+            cache_ = UiRasterCache::Get(key, policy, [=] {
                 ImageBuffer ib(sz);
                 for(int y = 0; y < sz.cy; y++) {
                     RGBA *q = ib[y];
@@ -553,7 +534,7 @@ private:
                         q[x] = RGBA(SampleAt(Point(x, y)));
                 }
                 return Image(ib);
-            }, 32);
+            });
             cache_key_ = key;
         }
         return cache_;
@@ -611,7 +592,7 @@ private:
     UiColorPicker::SpectrumMode mode_ = UiColorPicker::SPECTRUM_HSV_RECT;
     Color color_ = Color(0, 120, 212);
     int   hue_ = 0;
-    mutable ColorFieldCacheKey cache_key_;
+    mutable UiRasterCacheKey cache_key_;
     mutable Image cache_;
 };
 

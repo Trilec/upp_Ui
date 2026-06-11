@@ -1754,7 +1754,7 @@ void UiDropdown::Paint(Draw& w)
                                                               style_.selection_badge_face,
                                                               1,
                                                               Blend(style_.selection_badge_face, Black(), 110));
-            w.DrawImage(badge_rect.left, badge_rect.top, badge);
+            UiDrawCachedRaster(w, badge_rect, badge);
             String badge_txt = AsString(checked_count);
             Size bs = GetTextSize(badge_txt, font);
             int tx = badge_rect.left + (badge_rect.GetWidth() - bs.cx) / 2;

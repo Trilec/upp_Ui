@@ -91,26 +91,421 @@ inline hash_t GetHashValue(const UiShadowCacheKey& k)
     return h;
 }
 
-template <class Key, class Factory>
-inline Image UiGetCachedImage(const Key& key, Factory factory, int max_items = 128)
-{
-    static StaticMutex s_mutex;
-    static Index<Key>   s_keys;
-    static Vector<Image> s_images;
+struct UiRasterCacheKey : Moveable<UiRasterCacheKey> {
+    String tag;
+    String encoded;
+    hash_t hash = 0;
 
-    Mutex::Lock __(s_mutex);
-    int idx = s_keys.Find(key);
-    if(idx >= 0)
-        return s_images[idx];
-
-    Image img = factory();
-    if(s_keys.GetCount() >= max_items) {
-        s_keys.Remove(0);
-        s_images.Remove(0);
+    bool operator==(const UiRasterCacheKey& b) const
+    {
+        return hash == b.hash && tag == b.tag && encoded == b.encoded;
     }
-    s_keys.Add(key);
-    s_images.Add(img);
-    return img;
+};
+
+inline hash_t GetHashValue(const UiRasterCacheKey& k)
+{
+    return k.hash;
+}
+
+class UiRasterCacheKeyBuilder {
+public:
+    UiRasterCacheKeyBuilder(const char* tag)
+    {
+        tag_ = tag ? tag : "raster";
+        AddTag(tag_);
+    }
+
+    UiRasterCacheKeyBuilder(const String& tag)
+    {
+        tag_ = IsNull(tag) || tag.IsEmpty() ? String("raster") : tag;
+        AddTag(tag_);
+    }
+
+    UiRasterCacheKeyBuilder& Add(int v)              { return AddInt(v); }
+    UiRasterCacheKeyBuilder& Add(bool v)             { return AddBool(v); }
+    UiRasterCacheKeyBuilder& Add(const Color& c)     { return AddColor(c); }
+    UiRasterCacheKeyBuilder& Add(const Size& sz)     { return AddSize(sz); }
+    UiRasterCacheKeyBuilder& Add(const Rect& r)      { return AddRect(r); }
+    UiRasterCacheKeyBuilder& Add(const String& s)    { return AddString(s); }
+    UiRasterCacheKeyBuilder& Add(const char* s)      { return AddString(s ? String(s) : String()); }
+    UiRasterCacheKeyBuilder& Add(double v, int q = 1000) { return AddQuantizedDouble(v, q); }
+
+    UiRasterCacheKey Build() const
+    {
+        UiRasterCacheKey out;
+        out.tag = tag_;
+        out.encoded = encoded_;
+        out.hash = hash_;
+        return out;
+    }
+
+private:
+    void AddToken(const String& type, const String& value)
+    {
+        encoded_ << "|" << type << ":" << value.GetCount() << ":" << value;
+        CombineHash h;
+        h << hash_ << type << value;
+        hash_ = h;
+    }
+
+    void AddTag(const String& s)
+    {
+        encoded_ << "tag:" << s.GetCount() << ":" << s;
+        hash_ = GetHashValue(encoded_);
+    }
+
+    UiRasterCacheKeyBuilder& AddInt(int v)
+    {
+        AddToken("i", AsString(v));
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddBool(bool v)
+    {
+        AddToken("b", v ? "1" : "0");
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddColor(Color c)
+    {
+        if(IsNull(c))
+            AddToken("c", "null");
+        else
+            AddToken("c", Format("%d,%d,%d", c.GetR(), c.GetG(), c.GetB()));
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddSize(Size sz)
+    {
+        AddToken("sz", Format("%d,%d", sz.cx, sz.cy));
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddRect(const Rect& r)
+    {
+        AddToken("rc", Format("%d,%d,%d,%d", r.left, r.top, r.right, r.bottom));
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddString(const String& s)
+    {
+        AddToken("s", s);
+        return *this;
+    }
+
+    UiRasterCacheKeyBuilder& AddQuantizedDouble(double v, int q)
+    {
+        int scaled = fround(v * q);
+        AddToken("d", Format("%d@%d", scaled, q));
+        return *this;
+    }
+
+private:
+    String tag_;
+    String encoded_;
+    hash_t hash_ = 0;
+};
+
+struct UiRasterCachePolicy {
+    String tag;
+    int category_budget_bytes = 0;
+    int max_single_image_bytes = 512 * 1024;
+    int max_axis = 512;
+    bool exact_small = true;
+    int exact_until_px = 32;
+    int small_step_px = 2;
+    int medium_step_px = 4;
+    int large_step_px = 8;
+    bool allow_scale_from_bucket = true;
+    bool allow_cache_large = false;
+    bool prefer_nine_slice = false;
+};
+
+struct UiRasterCacheStats : Moveable<UiRasterCacheStats> {
+    int entries = 0;
+    int64 bytes = 0;
+    int64 hits = 0;
+    int64 misses = 0;
+    int64 evictions = 0;
+    int64 skipped_too_large = 0;
+};
+
+inline UiRasterCachePolicy UiRasterPolicyAA(const char* tag)
+{
+    UiRasterCachePolicy p;
+    p.tag = tag ? tag : "aa";
+    p.max_single_image_bytes = 512 * 1024;
+    p.max_axis = 512;
+    p.exact_small = true;
+    p.exact_until_px = 32;
+    p.small_step_px = 2;
+    p.medium_step_px = 4;
+    p.large_step_px = 8;
+    p.allow_scale_from_bucket = true;
+    p.allow_cache_large = false;
+    return p;
+}
+
+inline UiRasterCachePolicy UiRasterPolicyShadow(const char* tag = "shadow")
+{
+    UiRasterCachePolicy p;
+    p.tag = tag;
+    p.max_single_image_bytes = 512 * 1024;
+    p.max_axis = 512;
+    p.exact_small = false;
+    p.exact_until_px = 0;
+    p.small_step_px = 4;
+    p.medium_step_px = 8;
+    p.large_step_px = 16;
+    p.allow_scale_from_bucket = false;
+    p.allow_cache_large = false;
+    p.prefer_nine_slice = true;
+    return p;
+}
+
+inline UiRasterCachePolicy UiRasterPolicyIcon(const char* tag = "icon")
+{
+    UiRasterCachePolicy p;
+    p.tag = tag;
+    p.max_single_image_bytes = 256 * 1024;
+    p.max_axis = 128;
+    p.exact_small = true;
+    p.exact_until_px = 256;
+    p.small_step_px = 1;
+    p.medium_step_px = 1;
+    p.large_step_px = 1;
+    p.allow_scale_from_bucket = false;
+    p.allow_cache_large = false;
+    return p;
+}
+
+inline int64 UiRasterImageBytes(Size sz)
+{
+    return max<int64>(0, (int64)max(1, sz.cx) * (int64)max(1, sz.cy) * 4);
+}
+
+inline Size UiQuantizeRasterSize(Size requested, const UiRasterCachePolicy& policy)
+{
+    requested.cx = max(1, requested.cx);
+    requested.cy = max(1, requested.cy);
+
+    if(!policy.allow_scale_from_bucket) {
+        if(policy.max_axis > 0 && (requested.cx > policy.max_axis || requested.cy > policy.max_axis) && !policy.allow_cache_large)
+            return Size(0, 0);
+        if(UiRasterImageBytes(requested) > policy.max_single_image_bytes && !policy.allow_cache_large)
+            return Size(0, 0);
+        return requested;
+    }
+
+    int longest = max(requested.cx, requested.cy);
+    int step = 1;
+    if(policy.exact_small && longest <= policy.exact_until_px)
+        step = 1;
+    else if(longest <= 96)
+        step = max(1, policy.small_step_px);
+    else if(longest <= 256)
+        step = max(1, policy.medium_step_px);
+    else
+        step = max(1, policy.large_step_px);
+
+    auto QuantizeUp = [&](int v) {
+        if(step <= 1)
+            return max(1, v);
+        return max(1, ((v + step - 1) / step) * step);
+    };
+
+    Size q(QuantizeUp(requested.cx), QuantizeUp(requested.cy));
+    if(policy.max_axis > 0 && (q.cx > policy.max_axis || q.cy > policy.max_axis) && !policy.allow_cache_large)
+        return Size(0, 0);
+    if(UiRasterImageBytes(q) > policy.max_single_image_bytes && !policy.allow_cache_large)
+        return Size(0, 0);
+    return q;
+}
+
+class UiRasterCache {
+public:
+    template <class Factory>
+    static Image Get(const UiRasterCacheKey& key, const UiRasterCachePolicy& policy, Factory factory)
+    {
+        String lookup = key.encoded;
+        {
+            Mutex::Lock __(MutexRef());
+            int idx = EntriesRef().Find(lookup);
+            if(idx >= 0) {
+                StatsRef().hits++;
+                Entry& e = EntriesRef().GetValues()[idx];
+                e.last_use = ++UseClockRef();
+                return e.image;
+            }
+            StatsRef().misses++;
+        }
+
+        Image img = factory();
+        Size sz = img.GetSize();
+        int64 bytes = UiRasterImageBytes(sz);
+        if(bytes > policy.max_single_image_bytes && !policy.allow_cache_large) {
+            Mutex::Lock __(MutexRef());
+            StatsRef().skipped_too_large++;
+            return img;
+        }
+
+        Mutex::Lock __(MutexRef());
+        int idx = EntriesRef().Find(lookup);
+        if(idx >= 0) {
+            Entry& e = EntriesRef().GetValues()[idx];
+            e.last_use = ++UseClockRef();
+            return e.image;
+        }
+        Entry e;
+        e.lookup = lookup;
+        e.tag = policy.tag.IsEmpty() ? key.tag : policy.tag;
+        e.image = img;
+        e.bytes = bytes;
+        e.last_use = ++UseClockRef();
+        EntriesRef().Add(lookup, e);
+        TrimLocked();
+        return img;
+    }
+
+    static void Clear()
+    {
+        Mutex::Lock __(MutexRef());
+        EntriesRef().Clear();
+    }
+
+    static void ClearTag(const String& tag)
+    {
+        Mutex::Lock __(MutexRef());
+        for(int i = EntriesRef().GetCount() - 1; i >= 0; --i)
+            if(EntriesRef()[i].tag == tag)
+                EntriesRef().Remove(i);
+    }
+
+    static void Trim()
+    {
+        Mutex::Lock __(MutexRef());
+        TrimLocked();
+    }
+
+    static void SetBudget(int64 bytes)
+    {
+        Mutex::Lock __(MutexRef());
+        BudgetRef() = max<int64>(256 * 1024, bytes);
+        TrimLocked();
+    }
+
+    static UiRasterCacheStats GetStats()
+    {
+        Mutex::Lock __(MutexRef());
+        UiRasterCacheStats out = StatsRef();
+        out.entries = EntriesRef().GetCount();
+        out.bytes = 0;
+        for(int i = 0; i < EntriesRef().GetCount(); i++)
+            out.bytes += EntriesRef()[i].bytes;
+        return out;
+    }
+
+    static void NoteSkippedTooLarge()
+    {
+        Mutex::Lock __(MutexRef());
+        StatsRef().skipped_too_large++;
+    }
+
+#ifdef _DEBUG
+    static String DumpStats()
+    {
+        UiRasterCacheStats s = GetStats();
+        return Format("UiRasterCache entries=%d bytes=%lld hits=%lld misses=%lld evictions=%lld skipped=%lld",
+                      s.entries, s.bytes, s.hits, s.misses, s.evictions, s.skipped_too_large);
+    }
+#endif
+
+private:
+    struct Entry : Moveable<Entry> {
+        String lookup;
+        String tag;
+        Image image;
+        int64 bytes = 0;
+        uint64 last_use = 0;
+    };
+
+    static StaticMutex& MutexRef()
+    {
+        static StaticMutex m;
+        return m;
+    }
+
+    static VectorMap<String, Entry>& EntriesRef()
+    {
+        static VectorMap<String, Entry> e;
+        return e;
+    }
+
+    static UiRasterCacheStats& StatsRef()
+    {
+        static UiRasterCacheStats s;
+        return s;
+    }
+
+    static uint64& UseClockRef()
+    {
+        static uint64 c = 0;
+        return c;
+    }
+
+    static int64& BudgetRef()
+    {
+        static int64 budget = 16 * 1024 * 1024;
+        return budget;
+    }
+
+    static int64 CurrentBytesLocked()
+    {
+        int64 total = 0;
+        for(int i = 0; i < EntriesRef().GetCount(); i++)
+            total += EntriesRef()[i].bytes;
+        return total;
+    }
+
+    static void TrimLocked()
+    {
+        int64 total = CurrentBytesLocked();
+        while(total > BudgetRef() && EntriesRef().GetCount() > 0) {
+            int oldest = 0;
+            uint64 oldest_use = EntriesRef()[0].last_use;
+            for(int i = 1; i < EntriesRef().GetCount(); i++) {
+                if(EntriesRef()[i].last_use < oldest_use) {
+                    oldest_use = EntriesRef()[i].last_use;
+                    oldest = i;
+                }
+            }
+            total -= EntriesRef()[oldest].bytes;
+            EntriesRef().Remove(oldest);
+            StatsRef().evictions++;
+        }
+    }
+};
+
+inline void UiRasterCacheClear()
+{
+    UiRasterCache::Clear();
+}
+
+inline void UiRasterCacheClearTag(const String& tag)
+{
+    UiRasterCache::ClearTag(tag);
+}
+
+inline void UiDrawCachedRaster(Draw& w, const Rect& target, const Image& cached)
+{
+    if(target.IsEmpty() || IsNull(cached))
+        return;
+    if(cached.GetSize() == target.GetSize()) {
+        w.DrawImage(target.left, target.top, cached);
+        return;
+    }
+    Image scaled = CachedRescale(cached, target.GetSize());
+    w.DrawImage(target.left, target.top, scaled);
 }
 
 inline UiAlign UiCapOpenSide(UiAlign tab_side)
@@ -729,27 +1124,22 @@ inline void UiPaintStyledBackground(Draw& w,
 
     Rect surface_outer = UiStyledSurfaceRect(outer, metrics);
 
-    static StaticMutex s_shadow_cache_mutex;
-    static Index<UiShadowCacheKey> s_shadow_cache_keys;
-    static Vector<Image> s_shadow_cache_images;
-
-    auto MakeShadowCacheKey = [&](const StyledShadow& ly, Size sz, int radius) -> UiShadowCacheKey {
-        UiShadowCacheKey key;
-        key.width = sz.cx;
-        key.height = sz.cy;
-        key.radius = radius;
-        key.inset = ly.inset;
-        key.mode = (int)ly.mode;
-        key.alpha = ly.alpha;
-        key.color = ly.color;
-        key.distance = ly.distance;
-        key.offset_x = ly.offset_x;
-        key.offset_y = ly.offset_y;
-        key.curve_x1 = (int)std::round(ly.curve.x1 * 1000.0);
-        key.curve_y1 = (int)std::round(ly.curve.y1 * 1000.0);
-        key.curve_x2 = (int)std::round(ly.curve.x2 * 1000.0);
-        key.curve_y2 = (int)std::round(ly.curve.y2 * 1000.0);
-        return key;
+    auto MakeShadowCacheKey = [&](const StyledShadow& ly, Size sz, int radius) -> UiRasterCacheKey {
+        UiRasterCacheKeyBuilder kb("shadow");
+        kb.Add(sz);
+        kb.Add(radius);
+        kb.Add(ly.inset);
+        kb.Add((int)ly.mode);
+        kb.Add(ly.alpha);
+        kb.Add(ly.color);
+        kb.Add(ly.distance);
+        kb.Add(ly.offset_x);
+        kb.Add(ly.offset_y);
+        kb.Add(ly.curve.x1, 1000);
+        kb.Add(ly.curve.y1, 1000);
+        kb.Add(ly.curve.x2, 1000);
+        kb.Add(ly.curve.y2, 1000);
+        return kb.Build();
     };
 
     auto PaintShadow = [&](const StyledShadow& ly) {
@@ -767,185 +1157,159 @@ inline void UiPaintStyledBackground(Draw& w,
 
         int pad = ly.inset ? 0 : (extent + max(abs(off.x), abs(off.y)) + 2);
         Size cache_sz = ly.inset ? osz : Size(osz.cx + pad * 2, osz.cy + pad * 2);
-        UiShadowCacheKey cache_key = MakeShadowCacheKey(ly, cache_sz, metrics.radius);
-        {
-            Mutex::Lock __(s_shadow_cache_mutex);
-            int idx = s_shadow_cache_keys.Find(cache_key);
-            if(idx >= 0) {
-                const Image& img = s_shadow_cache_images[idx];
-                if(ly.inset)
-                    w.DrawImage(surface_outer.left, surface_outer.top, img);
-                else
-                    w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
-                return;
-            }
-        }
-
-        Image img;
-                if(ly.inset) {
-            ImageBuffer ib(osz);
-            Fill(~ib, RGBAZero(), ib.GetLength());
-            {
-                BufferPainter p(ib, MODE_ANTIALIASED);
-                Rect base(0, 0, osz.cx, osz.cy);
-                for(int i = 0; i < extent; i++) {
-                    // Sample at the center of each shadow band. Sampling the
-                    // outer edge directly causes distance=1 to evaluate at 1.0,
-                    // which collapses the first visible step to zero alpha.
-                    double t = ((double)i + 0.5) / (double)max(1, extent);
-                    double curve_alpha = ly.mode == SHADOW_HARD ? 1.0 : (1.0 - UiShadowCurveEval(ly.curve, t));
-                    int alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
-                    if(alpha <= 0)
-                        continue;
-                    Rect rr = base;
-                    rr.Deflate(i, i);
-                    rr.Offset(off);
-                    if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
-                        break;
-                    double rad = (double)max(0, metrics.radius - i);
-                    RGBA c = alpha * ly.color;
-                    p.Begin();
-                    if(rad > 0)
-                        p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
-                    else
-                        p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
-                    if(ly.mode == SHADOW_HARD)
-                        p.Fill(c);
-                    else
-                        p.Stroke(1.0, c);
-                    p.End();
-                }
-            }
-            Premultiply(ib);
-            img = Image(ib);
-            w.DrawImage(surface_outer.left, surface_outer.top, img);
-        }
-        else {
-            Size sz(osz.cx + pad * 2, osz.cy + pad * 2);
-            if(sz.cx <= 0 || sz.cy <= 0)
-                return;
-            ImageBuffer seed_ib(sz);
-            seed_ib.SetKind(IMAGE_ALPHA);
-            Fill(~seed_ib, RGBAZero(), seed_ib.GetLength());
-            Rect base(pad, pad, pad + osz.cx, pad + osz.cy);
-            Rect seed = base;
-            double rad = (double)max(0, metrics.radius);
-            RGBA c = White();
-            c.a = 255;
-            {
-                BufferPainter p(seed_ib, MODE_ANTIALIASED);
-                p.Begin();
-                if(rad > 0)
-                    p.RoundedRectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0, min<double>(rad, min(seed.GetWidth(), seed.GetHeight()) / 2.0));
-                else
-                    p.Rectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0);
-                p.Fill(c);
-                p.End();
-            }
-            // Cut only the true interior so the shadow can meet the control edge cleanly.
-            ImageBuffer cutoff_ib(sz);
-            cutoff_ib.SetKind(IMAGE_ALPHA);
-            Fill(~cutoff_ib, RGBAZero(), cutoff_ib.GetLength());
-            {
-                BufferPainter p(cutoff_ib, MODE_ANTIALIASED);
-                Rect cutoff = seed;
-                cutoff.Deflate(1, 1);
-                double cutoff_rad = max(0.0, rad - 1.0);
-                if(cutoff.GetWidth() > 1 && cutoff.GetHeight() > 1) {
-                    p.Begin();
-                    if(cutoff_rad > 0)
-                        p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
-                    else
-                        p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
-                    p.Fill(c);
-                    p.End();
-                }
-            }
-            ImageBuffer ib(sz);
-            Fill(~ib, RGBAZero(), ib.GetLength());
-            Rect cutoff = seed;
-            cutoff.Deflate(1, 1);
-            double cutoff_rad = max(0.0, rad - 1.0);
-            bool smooth_shells = false;
-            {
-                BufferPainter p(ib, MODE_ANTIALIASED);
-                if(ly.mode == SHADOW_HARD) {
-                    Rect rr = seed;
-                    rr.Inflate(extent, extent);
-                    rr.Offset(off);
-                    double rr_rad = max(0.0, rad + extent);
-                    RGBA fill = clamp(ly.alpha, 0, 255) * ly.color;
-                    p.Begin();
-                    if(rr_rad > 0)
-                        p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
-                    else
-                        p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
-                    p.Fill(fill);
-                    p.End();
-                }
-                else {
-                    smooth_shells = true;
-                    int next_alpha = 0;
-                    for(int d = extent; d >= 1; --d) {
-                        // Build the shadow from differential filled shells.
-                        // Each band contributes only the opacity needed to
-                        // reach the target alpha at that distance, which keeps
-                        // the edge full-strength and avoids visible ring gaps.
-                        double t = ((double)d - 0.5) / (double)max(1, extent);
-                        double curve_alpha = 1.0 - UiShadowCurveEval(ly.curve, t);
-                        int target_alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
-                        int shell_alpha = max(0, target_alpha - next_alpha);
-                        next_alpha = target_alpha;
-                        if(shell_alpha <= 0)
+        UiRasterCachePolicy policy = UiRasterPolicyShadow();
+        Image img = UiRasterCache::Get(MakeShadowCacheKey(ly, cache_sz, metrics.radius), policy, [=] {
+            Image img;
+            if(ly.inset) {
+                ImageBuffer ib(osz);
+                Fill(~ib, RGBAZero(), ib.GetLength());
+                {
+                    BufferPainter p(ib, MODE_ANTIALIASED);
+                    Rect base(0, 0, osz.cx, osz.cy);
+                    for(int i = 0; i < extent; i++) {
+                        double t = ((double)i + 0.5) / (double)max(1, extent);
+                        double curve_alpha = ly.mode == SHADOW_HARD ? 1.0 : (1.0 - UiShadowCurveEval(ly.curve, t));
+                        int alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
+                        if(alpha <= 0)
                             continue;
-
-                        double ox = (double)off.x * (double)d / (double)max(1, extent);
-                        double oy = (double)off.y * (double)d / (double)max(1, extent);
-                        double x = (double)seed.left - d + ox + 0.5;
-                        double y = (double)seed.top - d + oy + 0.5;
-                        double wdt = seed.GetWidth() + d * 2 - 1.0;
-                        double hgt = seed.GetHeight() + d * 2 - 1.0;
-                        double rr_rad = max(0.0, rad + d);
-                        RGBA fill = shell_alpha * ly.color;
+                        Rect rr = base;
+                        rr.Deflate(i, i);
+                        rr.Offset(off);
+                        if(rr.GetWidth() <= 1 || rr.GetHeight() <= 1)
+                            break;
+                        double rad = (double)max(0, metrics.radius - i);
+                        RGBA c = alpha * ly.color;
                         p.Begin();
-                        if(rr_rad > 0)
-                            p.RoundedRectangle(x, y, wdt, hgt, min<double>(rr_rad, min(wdt, hgt) / 2.0));
+                        if(rad > 0)
+                            p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
                         else
-                            p.Rectangle(x, y, wdt, hgt);
-                        p.Fill(fill);
+                            p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                        if(ly.mode == SHADOW_HARD)
+                            p.Fill(c);
+                        else
+                            p.Stroke(1.0, c);
                         p.End();
                     }
                 }
+                Premultiply(ib);
+                img = Image(ib);
             }
-            if(smooth_shells && extent > 1)
-                FastBlur(ib, 1);
-            {
-                // Cut interior after smoothing so the shadow meets the control
-                // edge cleanly without reintroducing visible shell steps.
-                BufferPainter p(ib, MODE_ANTIALIASED);
-                RGBA erase = RGBAZero();
-                p.Begin();
-                if(rad > 0)
-                    p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
-                else
-                    p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
-                p.Fill(erase);
-                p.End();
-            }
-            Premultiply(ib);
-            img = Image(ib);
-            w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
-        }
+            else {
+                Size sz(osz.cx + pad * 2, osz.cy + pad * 2);
+                if(sz.cx <= 0 || sz.cy <= 0)
+                    return Image();
+                ImageBuffer seed_ib(sz);
+                seed_ib.SetKind(IMAGE_ALPHA);
+                Fill(~seed_ib, RGBAZero(), seed_ib.GetLength());
+                Rect base(pad, pad, pad + osz.cx, pad + osz.cy);
+                Rect seed = base;
+                double rad = (double)max(0, metrics.radius);
+                RGBA c = White();
+                c.a = 255;
+                {
+                    BufferPainter p(seed_ib, MODE_ANTIALIASED);
+                    p.Begin();
+                    if(rad > 0)
+                        p.RoundedRectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0, min<double>(rad, min(seed.GetWidth(), seed.GetHeight()) / 2.0));
+                    else
+                        p.Rectangle(seed.left + 0.5, seed.top + 0.5, seed.GetWidth() - 1.0, seed.GetHeight() - 1.0);
+                    p.Fill(c);
+                    p.End();
+                }
+                ImageBuffer cutoff_ib(sz);
+                cutoff_ib.SetKind(IMAGE_ALPHA);
+                Fill(~cutoff_ib, RGBAZero(), cutoff_ib.GetLength());
+                {
+                    BufferPainter p(cutoff_ib, MODE_ANTIALIASED);
+                    Rect cutoff = seed;
+                    cutoff.Deflate(1, 1);
+                    double cutoff_rad = max(0.0, rad - 1.0);
+                    if(cutoff.GetWidth() > 1 && cutoff.GetHeight() > 1) {
+                        p.Begin();
+                        if(cutoff_rad > 0)
+                            p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
+                        else
+                            p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
+                        p.Fill(c);
+                        p.End();
+                    }
+                }
+                ImageBuffer ib(sz);
+                Fill(~ib, RGBAZero(), ib.GetLength());
+                Rect cutoff = seed;
+                cutoff.Deflate(1, 1);
+                double cutoff_rad = max(0.0, rad - 1.0);
+                bool smooth_shells = false;
+                {
+                    BufferPainter p(ib, MODE_ANTIALIASED);
+                    if(ly.mode == SHADOW_HARD) {
+                        Rect rr = seed;
+                        rr.Inflate(extent, extent);
+                        rr.Offset(off);
+                        double rr_rad = max(0.0, rad + extent);
+                        RGBA fill = clamp(ly.alpha, 0, 255) * ly.color;
+                        p.Begin();
+                        if(rr_rad > 0)
+                            p.RoundedRectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0, min<double>(rr_rad, min(rr.GetWidth(), rr.GetHeight()) / 2.0));
+                        else
+                            p.Rectangle(rr.left + 0.5, rr.top + 0.5, rr.GetWidth() - 1.0, rr.GetHeight() - 1.0);
+                        p.Fill(fill);
+                        p.End();
+                    }
+                    else {
+                        smooth_shells = true;
+                        int next_alpha = 0;
+                        for(int d = extent; d >= 1; --d) {
+                            double t = ((double)d - 0.5) / (double)max(1, extent);
+                            double curve_alpha = 1.0 - UiShadowCurveEval(ly.curve, t);
+                            int target_alpha = clamp((int)std::round(ly.alpha * curve_alpha), 0, 255);
+                            int shell_alpha = max(0, target_alpha - next_alpha);
+                            next_alpha = target_alpha;
+                            if(shell_alpha <= 0)
+                                continue;
 
-        Mutex::Lock __(s_shadow_cache_mutex);
-        if(s_shadow_cache_keys.GetCount() >= 128) {
-            s_shadow_cache_keys.Remove(0);
-            s_shadow_cache_images.Remove(0);
-        }
-        if(s_shadow_cache_keys.Find(cache_key) < 0) {
-            s_shadow_cache_keys.Add(cache_key);
-            s_shadow_cache_images.Add(img);
-        }
+                            double ox = (double)off.x * (double)d / (double)max(1, extent);
+                            double oy = (double)off.y * (double)d / (double)max(1, extent);
+                            double x = (double)seed.left - d + ox + 0.5;
+                            double y = (double)seed.top - d + oy + 0.5;
+                            double wdt = seed.GetWidth() + d * 2 - 1.0;
+                            double hgt = seed.GetHeight() + d * 2 - 1.0;
+                            double rr_rad = max(0.0, rad + d);
+                            RGBA fill = shell_alpha * ly.color;
+                            p.Begin();
+                            if(rr_rad > 0)
+                                p.RoundedRectangle(x, y, wdt, hgt, min<double>(rr_rad, min(wdt, hgt) / 2.0));
+                            else
+                                p.Rectangle(x, y, wdt, hgt);
+                            p.Fill(fill);
+                            p.End();
+                        }
+                    }
+                }
+                if(smooth_shells && extent > 1)
+                    FastBlur(ib, 1);
+                {
+                    BufferPainter p(ib, MODE_ANTIALIASED);
+                    RGBA erase = RGBAZero();
+                    p.Begin();
+                    if(rad > 0)
+                        p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
+                    else
+                        p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
+                    p.Fill(erase);
+                    p.End();
+                }
+                Premultiply(ib);
+                img = Image(ib);
+            }
+            return img;
+        });
+        if(IsNull(img))
+            return;
+        if(ly.inset)
+            w.DrawImage(surface_outer.left, surface_outer.top, img);
+        else
+            w.DrawImage(surface_outer.left - pad, surface_outer.top - pad, img);
     };
 
     auto PaintShadowStack = [&](const StyledShadow& sh, bool inset_only) {
@@ -1148,6 +1512,24 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
     }
 
     w.DrawImage(outer.left, outer.top, ib);
+}
+
+template <class Factory>
+inline Image UiGetCachedRasterImage(const UiRasterCachePolicy& policy,
+                                    const UiRasterCacheKeyBuilder& builder,
+                                    Size requested,
+                                    Factory factory)
+{
+    Size cache_sz = UiQuantizeRasterSize(requested, policy);
+    if(cache_sz.IsEmpty()) {
+        UiRasterCache::NoteSkippedTooLarge();
+        return factory(requested);
+    }
+    UiRasterCacheKeyBuilder kb = builder;
+    kb.Add(cache_sz);
+    return UiRasterCache::Get(kb.Build(), policy, [=] {
+        return factory(cache_sz);
+    });
 }
 
 // -------------------------------------------------------------------------
@@ -1452,28 +1834,35 @@ inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
     double x = cx - dot * 0.5;
     double y = cy - dot * 0.5;
 
-    ImageBuffer ib(max(1, dot + 4), max(1, dot + 4));
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
+    Size requested(max(1, dot + 4), max(1, dot + 4));
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/indicator");
+    UiRasterCacheKeyBuilder kb("aa/indicator");
+    kb.Add(requested).Add(ink).Add(inset).Add(radius_percent).Add(min_side);
+    Image img = UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        ImageBuffer ib(qsz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
 
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    p.Clear(RGBAZero());
-    if(radius_percent >= 95) {
-        p.Circle(ib.GetWidth() * 0.5, ib.GetHeight() * 0.5, dot * 0.5);
-    }
-    else {
-        double rr = max(0.0, dot * clamp(radius_percent, 0, 100) / 200.0);
-        p.RoundedRectangle((ib.GetWidth() - dot) * 0.5,
-                           (ib.GetHeight() - dot) * 0.5,
-                           dot,
-                           dot,
-                           rr);
-    }
-    p.Fill(ink);
-
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        p.Clear(RGBAZero());
+        double draw_dot = max(1.0, min<double>(dot, min(qsz.cx, qsz.cy) - 4.0));
+        if(radius_percent >= 95) {
+            p.Circle(qsz.cx * 0.5, qsz.cy * 0.5, draw_dot * 0.5);
+        }
+        else {
+            double rr = max(0.0, draw_dot * clamp(radius_percent, 0, 100) / 200.0);
+            p.RoundedRectangle((qsz.cx - draw_dot) * 0.5,
+                               (qsz.cy - draw_dot) * 0.5,
+                               draw_dot,
+                               draw_dot,
+                               rr);
+        }
+        p.Fill(ink);
+        return Image(ib);
+    });
     int dx = fround(x) - 2;
     int dy = fround(y) - 2;
-    w.DrawImage(dx, dy, Image(ib));
+    UiDrawCachedRaster(w, RectC(dx, dy, requested.cx, requested.cy), img);
 }
 
 inline void UiPaintCapsule(Draw& w, const Rect& r, Color fill)
@@ -1511,12 +1900,12 @@ inline void UiPaintCapsule(Draw& w, const Rect& r, Color fill)
 
 inline Image UiGetCachedAACircleImage(Size sz, Color fill)
 {
-    sz.cx = max(1, sz.cx);
-    sz.cy = max(1, sz.cy);
-    String key = Format("aa-circle|%d|%d|%d|%d|%d|%d",
-                        sz.cx, sz.cy, fill.GetR(), fill.GetG(), fill.GetB(), IsNull(fill) ? 1 : 0);
-    return UiGetCachedImage(key, [=] {
-        ImageBuffer ib(sz);
+    Size requested(max(1, sz.cx), max(1, sz.cy));
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/circle");
+    UiRasterCacheKeyBuilder kb("aa/circle");
+    kb.Add(fill);
+    return UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        ImageBuffer ib(qsz);
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
         if(IsNull(fill))
@@ -1524,7 +1913,7 @@ inline Image UiGetCachedAACircleImage(Size sz, Color fill)
 
         BufferPainter p(ib, MODE_ANTIALIASED);
         p.Begin();
-        p.Ellipse(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0));
+        p.Ellipse(0.5, 0.5, max(1.0, qsz.cx - 1.0), max(1.0, qsz.cy - 1.0));
         p.Fill(fill);
         p.End();
         return Image(ib);
@@ -1533,24 +1922,24 @@ inline Image UiGetCachedAACircleImage(Size sz, Color fill)
 
 inline Image UiGetCachedAACapsuleImage(Size sz, Color fill)
 {
-    sz.cx = max(1, sz.cx);
-    sz.cy = max(1, sz.cy);
-    String key = Format("aa-capsule|%d|%d|%d|%d|%d|%d",
-                        sz.cx, sz.cy, fill.GetR(), fill.GetG(), fill.GetB(), IsNull(fill) ? 1 : 0);
-    return UiGetCachedImage(key, [=] {
-        ImageBuffer ib(sz);
+    Size requested(max(1, sz.cx), max(1, sz.cy));
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/capsule");
+    UiRasterCacheKeyBuilder kb("aa/capsule");
+    kb.Add(fill);
+    return UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        ImageBuffer ib(qsz);
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
         if(IsNull(fill))
             return Image(ib);
 
-        int radius = max(0, min(sz.cx, sz.cy) / 2);
+        int radius = max(0, min(qsz.cx, qsz.cy) / 2);
         BufferPainter p(ib, MODE_ANTIALIASED);
         p.Begin();
         if(radius > 0)
-            p.RoundedRectangle(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0), radius);
+            p.RoundedRectangle(0.5, 0.5, max(1.0, qsz.cx - 1.0), max(1.0, qsz.cy - 1.0), radius);
         else
-            p.Rectangle(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0));
+            p.Rectangle(0.5, 0.5, max(1.0, qsz.cx - 1.0), max(1.0, qsz.cy - 1.0));
         p.Fill(fill);
         p.End();
         return Image(ib);
@@ -1564,25 +1953,21 @@ inline Image UiGetCachedAARingImage(Size sz,
                                     int frame_width,
                                     int ring_width)
 {
-    sz.cx = max(1, sz.cx);
-    sz.cy = max(1, sz.cy);
+    Size requested(max(1, sz.cx), max(1, sz.cy));
     frame_width = max(0, frame_width);
     ring_width = max(0, ring_width);
-    String key = Format("aa-ring|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
-                        sz.cx, sz.cy,
-                        frame.GetR(), frame.GetG(), frame.GetB(), IsNull(frame) ? 1 : 0,
-                        ring.GetR(), ring.GetG(), ring.GetB(), IsNull(ring) ? 1 : 0,
-                        face.GetR(), face.GetG(), face.GetB(), IsNull(face) ? 1 : 0,
-                        frame_width, ring_width);
-    return UiGetCachedImage(key, [=] {
-        ImageBuffer ib(sz);
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ring");
+    UiRasterCacheKeyBuilder kb("aa/ring");
+    kb.Add(frame).Add(ring).Add(face).Add(frame_width).Add(ring_width);
+    return UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        ImageBuffer ib(qsz);
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
 
         BufferPainter p(ib, MODE_ANTIALIASED);
-        double cx = sz.cx * 0.5;
-        double cy = sz.cy * 0.5;
-        double radius = max(0.5, min(sz.cx, sz.cy) * 0.5 - 0.5);
+        double cx = qsz.cx * 0.5;
+        double cy = qsz.cy * 0.5;
+        double radius = max(0.5, min(qsz.cx, qsz.cy) * 0.5 - 0.5);
         if(!IsNull(frame)) {
             p.Begin();
             p.Circle(cx, cy, radius);
@@ -1616,16 +2001,15 @@ inline Image UiGetCachedAARoundedRectImage(Size sz,
                                            Color frame,
                                            int frame_width)
 {
-    sz.cx = max(1, sz.cx);
-    sz.cy = max(1, sz.cy);
-    radius = max(0, min(radius, min(sz.cx, sz.cy) / 2));
+    Size requested(max(1, sz.cx), max(1, sz.cy));
+    radius = max(0, min(radius, min(requested.cx, requested.cy) / 2));
     frame_width = max(0, frame_width);
-    String key = Format("aa-rounded|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
-                        sz.cx, sz.cy, radius, frame_width,
-                        face.GetR(), face.GetG(), face.GetB(), IsNull(face) ? 1 : 0,
-                        frame.GetR(), frame.GetG(), frame.GetB(), IsNull(frame) ? 1 : 0);
-    return UiGetCachedImage(key, [=] {
-        ImageBuffer ib(sz);
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/rounded");
+    UiRasterCacheKeyBuilder kb("aa/rounded");
+    kb.Add(radius).Add(face).Add(frame).Add(frame_width);
+    return UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        int qr = max(0, min(radius, min(qsz.cx, qsz.cy) / 2));
+        ImageBuffer ib(qsz);
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
 
@@ -1634,12 +2018,12 @@ inline Image UiGetCachedAARoundedRectImage(Size sz,
         double inset = fw > 0 ? fw * 0.5 : 0.5;
         double x = inset;
         double y = inset;
-        double cx = max(1.0, sz.cx - inset * 2);
-        double cy = max(1.0, sz.cy - inset * 2);
-        double rr = max(0.0, (double)radius - (fw > 0 ? fw * 0.5 : 0.0));
+        double cx = max(1.0, qsz.cx - inset * 2);
+        double cy = max(1.0, qsz.cy - inset * 2);
+        double rr = max(0.0, (double)qr - (fw > 0 ? fw * 0.5 : 0.0));
 
         p.Begin();
-        if(radius > 0)
+        if(qr > 0)
             p.RoundedRectangle(x, y, cx, cy, rr);
         else
             p.Rectangle(x, y, cx, cy);
@@ -1655,7 +2039,37 @@ inline Image UiGetCachedAARoundedRectImage(Size sz,
 inline Image UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
                                           int stroke_width = 1, Color stroke = Null)
 {
-    return UiGetCachedAARoundedRectImage(sz, radius, face, stroke, stroke_width);
+    Size requested(max(1, sz.cx), max(1, sz.cy));
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/badge");
+    UiRasterCacheKeyBuilder kb("aa/badge");
+    kb.Add(radius).Add(face).Add(stroke_width).Add(stroke);
+    return UiGetCachedRasterImage(policy, kb, requested, [=](Size qsz) {
+        int qr = max(0, min(radius, min(qsz.cx, qsz.cy) / 2));
+        ImageBuffer ib(qsz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        double fw = stroke_width > 0 ? max(1.0, (double)stroke_width) : 0.0;
+        double inset = fw > 0 ? fw * 0.5 : 0.5;
+        double x = inset;
+        double y = inset;
+        double cx = max(1.0, qsz.cx - inset * 2);
+        double cy = max(1.0, qsz.cy - inset * 2);
+        double rr = max(0.0, (double)qr - (fw > 0 ? fw * 0.5 : 0.0));
+
+        p.Begin();
+        if(qr > 0)
+            p.RoundedRectangle(x, y, cx, cy, rr);
+        else
+            p.Rectangle(x, y, cx, cy);
+        if(!IsNull(face))
+            p.Fill(face);
+        if(stroke_width > 0 && !IsNull(stroke))
+            p.Stroke(fw, stroke);
+        p.End();
+        return Image(ib);
+    });
 }
 
 // -------------------------------------------------------------------------
@@ -1799,6 +2213,43 @@ inline Image UiDecodeInlineIconRle(const unsigned char* payload, int w, int h)
     return Image(ib);
 }
 
+inline UiRasterCacheKey UiMakeInlineIconCacheKey(const unsigned char* data)
+{
+    if(!data)
+        return UiRasterCacheKeyBuilder("icon/inline").Build();
+
+    unsigned int w_raw = (unsigned int)data[0] | ((unsigned int)data[1] << 8);
+    unsigned int h     = (unsigned int)data[2] | ((unsigned int)data[3] << 8);
+    bool is_rle = (w_raw & 0x8000u) != 0;
+    int  w      = (int)(w_raw & 0x7FFFu);
+    const unsigned char* payload = data + 4;
+
+    UiRasterCacheKeyBuilder kb("icon/inline");
+    kb.Add(is_rle).Add(w).Add((int)h);
+
+    if(!is_rle) {
+        int bytes = max(0, w) * max(0, (int)h) * 4;
+        for(int i = 0; i < bytes; i++)
+            kb.Add((int)payload[i]);
+        return kb.Build();
+    }
+
+    int total = max(0, w) * max(0, (int)h);
+    int written = 0;
+    const unsigned char* src = payload;
+    while(written < total) {
+        int count = (int)src[0] | ((int)src[1] << 8);
+        src += 2;
+        kb.Add(count);
+        kb.Add((int)src[0]).Add((int)src[1]).Add((int)src[2]).Add((int)src[3]);
+        src += 4;
+        written += min(max(0, count), total - written);
+        if(count <= 0)
+            break;
+    }
+    return kb.Build();
+}
+
 inline Image UiMakeIcon(const unsigned char* data)
 {
     if(!data)
@@ -1814,12 +2265,12 @@ inline Image UiMakeIcon(const unsigned char* data)
         return Image();
 
     const unsigned char* payload = data + 4;
-
-    return UiGetCachedImage(data, [=] {
+    UiRasterCachePolicy policy = UiRasterPolicyIcon("icon/inline");
+    return UiRasterCache::Get(UiMakeInlineIconCacheKey(data), policy, [=] {
         return is_rle
             ? UiDecodeInlineIconRle(payload, w, (int)h)
             : UiDecodeInlineIconRaw(payload, w, (int)h);
-    }, 256);
+    });
 }
 
 inline Image UiMakeIcon(const void* data)
