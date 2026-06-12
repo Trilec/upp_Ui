@@ -49,6 +49,22 @@ static bool WriteExportFile(const String& path, const String& data)
 	return WriteFileAtomic(path, data);
 }
 
+static bool RemovePathIfExists(const String& path)
+{
+	if(DirectoryExists(path))
+		return DeleteFolderDeep(path);
+	if(FileExists(path))
+		return FileDelete(path);
+	return true;
+}
+
+static bool MovePath(const String& from, const String& to)
+{
+	if(!RemovePathIfExists(to))
+		return false;
+	return FileMove(from, to);
+}
+
 static String BuildUppFile(const DesignerProjectExportOptions& options, const String& project_name)
 {
 	String out;
@@ -202,37 +218,54 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 		return false;
 	}
 
-	if(DirectoryExists(result.package_dir) && options.overwrite_existing) {
-		if(!DeleteFolderDeep(result.package_dir)) {
-			result.error = "Unable to clear existing export directory.";
+	String backup_dir = result.package_dir + ".backup";
+	bool final_exists = DirectoryExists(result.package_dir) || FileExists(result.package_dir);
+	bool final_has_files = DirectoryExists(result.package_dir) && DirectoryHasFiles(result.package_dir);
+	bool use_backup = final_exists && options.overwrite_existing && final_has_files;
+	if(DirectoryExists(backup_dir) && !DeleteFolderDeep(backup_dir)) {
+		result.error = "Unable to clear backup directory.";
+		DeleteFolderDeep(stage_dir);
+		return false;
+	}
+	if(use_backup) {
+		if(!MovePath(result.package_dir, backup_dir)) {
+			result.error = "Unable to save existing export directory.";
 			DeleteFolderDeep(stage_dir);
 			return false;
 		}
 	}
-	if(!EnsureDirectoryPath(result.package_dir)) {
-		result.error = "Unable to create export directory.";
-		DeleteFolderDeep(stage_dir);
-		return false;
+	else if(final_exists && !final_has_files) {
+		if(!RemovePathIfExists(result.package_dir)) {
+			result.error = "Unable to clear existing empty export directory.";
+			DeleteFolderDeep(stage_dir);
+			return false;
+		}
 	}
 
-	auto CommitFile = [&](const String& stage_path, const String& final_path) -> bool {
-		if(!FileExists(stage_path))
-			return true;
-		if(FileExists(final_path) && !FileDelete(final_path))
-			return false;
-		return FileMove(stage_path, final_path);
+	auto RestoreBackup = [&]() {
+		RemovePathIfExists(result.package_dir);
+		if(DirectoryExists(backup_dir) || FileExists(backup_dir))
+			MovePath(backup_dir, result.package_dir);
 	};
 
-	if(!CommitFile(stage_upp_path, result.upp_path) ||
-	   !CommitFile(stage_main_cpp_path, result.main_cpp_path) ||
-	   !CommitFile(stage_design_json_path, result.design_json_path) ||
-	   !CommitFile(stage_readme_path, result.readme_path)) {
-		result.error = "Unable to finalize exported project.";
-		DeleteFolderDeep(result.package_dir);
+	if(options.simulate_commit_failure) {
+		result.error = "Simulated export commit failure.";
+		RestoreBackup();
 		DeleteFolderDeep(stage_dir);
+		RemovePathIfExists(backup_dir);
 		return false;
 	}
-	DeleteFolderDeep(stage_dir);
+
+	if(!MovePath(stage_dir, result.package_dir)) {
+		result.error = "Unable to finalize exported project.";
+		if(use_backup)
+			RestoreBackup();
+		DeleteFolderDeep(stage_dir);
+		RemovePathIfExists(backup_dir);
+		return false;
+	}
+
+	RemovePathIfExists(backup_dir);
 	return true;
 }
 
