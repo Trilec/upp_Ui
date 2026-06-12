@@ -4,6 +4,7 @@
 #include "DesignerPreview.h"
 #include "DesignerTemplates.h"
 #include "DesignerCodeGen.h"
+#include "DesignerExport.h"
 #include "DesignerSerialization.h"
 #include "DesignerInspector.h"
 #include "DesignerHierarchy.h"
@@ -852,15 +853,15 @@ private:
 		                  .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle))
 		                  .NoWantFocus()
 		                  .Tip("Configure UMK path and U++ root");
-		code_build_run_button_.SetText("Build/Run")
+		code_build_run_button_.SetText("Export U++ Project...")
 		                     .SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48())
 		                     .SetIconSize(DPI(14), DPI(14))
 		                     .SetIconRenderMode(UiIconRenderMode::MonoTint)
 		                     .SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent))
 		                     .NoWantFocus()
-		                     .Tip("Build and run the generated code");
+		                     .Tip("Export a ready-to-open U++ package");
 		code_setup_button_.WhenAction = [=] { ShowBuildSettingsDialog(); };
-		code_build_run_button_.WhenAction = [=] { BuildAndRunGeneratedCode(); };
+		code_build_run_button_.WhenAction = [=] { ExportGeneratedProject(); };
 
 		code_header_.Add(code_heading_).Expand(1);
 		code_header_.Add(code_setup_button_).Fit();
@@ -935,6 +936,7 @@ private:
 			return;
 		}
 		AddRecentPath(recent_saves_, path);
+		current_design_path_ = NormalizePath(path);
 		StoreRecentFiles();
 		SyncRecentDropdowns();
 		SetWarningNotes("Saved " + GetFileName(path));
@@ -965,6 +967,7 @@ private:
 			return;
 		}
 		commands_.Clear();
+		current_design_path_ = NormalizePath(path);
 		AddRecentPath(recent_loads_, path);
 		StoreRecentFiles();
 		RefreshAll();
@@ -1042,6 +1045,20 @@ private:
 				LoadRecentList(ConfigValue(cfg, "recent_loads"), recent_loads_);
 				umk_path_ = AsString(ConfigValue(cfg, "umk_path"));
 				u_root_ = AsString(ConfigValue(cfg, "u_root"));
+				export_output_dir_ = AsString(ConfigValue(cfg, "export_output_dir"));
+				export_project_name_ = AsString(ConfigValue(cfg, "export_project_name"));
+				export_class_name_ = AsString(ConfigValue(cfg, "export_class_name"));
+				export_build_method_ = AsString(ConfigValue(cfg, "export_build_method"));
+				export_output_exe_path_ = AsString(ConfigValue(cfg, "export_output_exe_path"));
+				Value export_design_json = ConfigValue(cfg, "export_include_design_json");
+				Value export_readme = ConfigValue(cfg, "export_include_readme");
+				Value export_appearance = ConfigValue(cfg, "export_include_appearance");
+				if(!IsNull(export_design_json))
+					export_include_design_json_ = (bool)export_design_json;
+				if(!IsNull(export_readme))
+					export_include_readme_ = (bool)export_readme;
+				if(!IsNull(export_appearance))
+					export_include_appearance_ = (bool)export_appearance;
 				if(umk_path_.IsEmpty() && !u_root_.IsEmpty())
 					umk_path_ = InferUmkPath(u_root_);
 			}
@@ -1057,7 +1074,21 @@ private:
 		cfg.Set("recent_loads", StoreRecentList(recent_loads_));
 		cfg.Set("umk_path", umk_path_);
 		cfg.Set("u_root", u_root_);
+		cfg.Set("export_output_dir", export_output_dir_);
+		cfg.Set("export_project_name", export_project_name_);
+		cfg.Set("export_class_name", export_class_name_);
+		cfg.Set("export_build_method", export_build_method_);
+		cfg.Set("export_output_exe_path", export_output_exe_path_);
+		cfg.Set("export_include_design_json", export_include_design_json_);
+		cfg.Set("export_include_readme", export_include_readme_);
+		cfg.Set("export_include_appearance", export_include_appearance_);
 		SaveFile(ConfigFile("DesignerConfig.json"), AsJSON(cfg, true));
+	}
+
+	bool DirectoryHasFiles(const String& path) const
+	{
+		FindFile ff(AppendFileName(path, "*"));
+		return ff;
 	}
 
 	String InferUmkPath(const String& root) const
@@ -1173,15 +1204,221 @@ private:
 		}
 	}
 
-	void BuildAndRunGeneratedCode()
+	void ExportGeneratedProject()
 	{
-		if(umk_path_.IsEmpty() && u_root_.IsEmpty())
-			ShowBuildSettingsDialog();
-		if(umk_path_.IsEmpty() && u_root_.IsEmpty()) {
-			Exclamation("Set an UMK path or U++ root first.");
+		class ExportProjectDialog : public TopWindow {
+		public:
+			typedef ExportProjectDialog CLASSNAME;
+
+			ExportProjectDialog(DesignerWindow& owner)
+			    : owner_(owner)
+			{
+				Title("Export U++ Project");
+				Sizeable().Zoomable();
+				SetRect(0, 0, DPI(720), DPI(420));
+				SetMinSize(Size(DPI(680), DPI(380)));
+
+				Add(box_);
+				box_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(Rect(DPI(12), DPI(12), DPI(12), DPI(12)));
+				box_.Add(info_).Fit();
+				box_.Add(project_row_).Fit();
+				box_.Add(output_row_).Fit();
+				box_.Add(class_row_).Fit();
+				box_.Add(include_row_).Fit();
+				box_.Add(umk_row_).Fit();
+				box_.Add(method_row_).Fit();
+				box_.Add(exe_row_).Fit();
+				box_.Add(button_row_).Fit();
+
+				info_.SetText("Export a ready-to-open U++ package with main.cpp, .upp, design.json, and README.")
+				     .SetAlign(UiAlign::LEFT, UiAlign::TOP)
+				     .NoWantFocus();
+
+				project_label_.SetText("Project/package").NoWantFocus();
+				project_edit_.SetText(owner_.SuggestedExportProjectName().ToWString());
+				project_row_.Add(project_label_).Fixed(DPI(130));
+				project_row_.Add(project_edit_).Expand(1);
+
+				output_label_.SetText("Output directory").NoWantFocus();
+				output_edit_.SetText(owner_.SuggestedExportOutputDirectory().ToWString());
+				output_browse_.SetText("Browse").SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(14), DPI(14));
+				output_browse_.WhenAction = [=] { PickOutputDir(); };
+				output_row_.Add(output_label_).Fixed(DPI(130));
+				output_row_.Add(output_edit_).Expand(1);
+				output_row_.Add(output_browse_).Fixed(DPI(78));
+
+				class_label_.SetText("Generated class").NoWantFocus();
+				class_edit_.SetText(owner_.SuggestedExportClassName().ToWString());
+				class_row_.Add(class_label_).Fixed(DPI(130));
+				class_row_.Add(class_edit_).Expand(1);
+
+				include_design_json_.SetText("Include design.json").SetData(owner_.export_include_design_json_);
+				include_readme_.SetText("Include README.md").SetData(owner_.export_include_readme_);
+				include_appearance_.SetText("Include Designer appearance overrides").SetData(owner_.export_include_appearance_);
+				include_row_.Add(include_design_json_).Fit();
+				include_row_.Add(include_readme_).Fit();
+				include_row_.Add(include_appearance_).Fit();
+
+				umk_label_.SetText("UMK path").NoWantFocus();
+				umk_edit_.SetText(owner_.umk_path_.ToWString());
+				umk_row_.Add(umk_label_).Fixed(DPI(130));
+				umk_row_.Add(umk_edit_).Expand(1);
+
+				method_label_.SetText("Build method").NoWantFocus();
+				method_edit_.SetText(owner_.SuggestedExportBuildMethod().ToWString());
+				method_row_.Add(method_label_).Fixed(DPI(130));
+				method_row_.Add(method_edit_).Expand(1);
+
+				exe_label_.SetText("Executable path").NoWantFocus();
+				exe_edit_.SetText(owner_.export_output_exe_path_.ToWString());
+				exe_row_.Add(exe_label_).Fixed(DPI(130));
+				exe_row_.Add(exe_edit_).Expand(1);
+
+				export_button_.SetText("Export").SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48()).SetIconSize(DPI(14), DPI(14));
+				cancel_button_.SetText("Cancel").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48()).SetIconSize(DPI(14), DPI(14));
+				export_button_.WhenAction = [=] { Accept(); };
+				cancel_button_.WhenAction = [=] { Break(IDCANCEL); };
+				button_row_.Add(spacer_).Expand(1);
+				button_row_.Add(export_button_).Fixed(DPI(92));
+				button_row_.Add(cancel_button_).Fixed(DPI(92));
+			}
+
+			String GetProjectName() const { return TrimBoth(project_edit_.GetText().ToString()); }
+			String GetOutputDirectory() const { return TrimBoth(output_edit_.GetText().ToString()); }
+			String GetClassName() const { return TrimBoth(class_edit_.GetText().ToString()); }
+			String GetUmkPath() const { return TrimBoth(umk_edit_.GetText().ToString()); }
+			String GetBuildMethod() const { return TrimBoth(method_edit_.GetText().ToString()); }
+			String GetOutputExePath() const { return TrimBoth(exe_edit_.GetText().ToString()); }
+			bool IncludeDesignJson() const { return (bool)include_design_json_.GetData(); }
+			bool IncludeReadme() const { return (bool)include_readme_.GetData(); }
+			bool IncludeAppearance() const { return (bool)include_appearance_.GetData(); }
+
+		private:
+			void PickOutputDir()
+			{
+				FileSel fs;
+				if(fs.ExecuteSelectDir("Select export output directory"))
+					output_edit_.SetText((~fs).ToWString());
+			}
+
+			bool Accept() override
+			{
+				if(GetProjectName().IsEmpty()) {
+					Exclamation("Project/package name is required.");
+					return false;
+				}
+				if(GetOutputDirectory().IsEmpty()) {
+					Exclamation("Output directory is required.");
+					return false;
+				}
+				Break(IDOK);
+				return true;
+			}
+
+			DesignerWindow& owner_;
+			UiBoxLayout box_ { UiDirection::V };
+			UiLabel info_;
+			UiBoxLayout project_row_ { UiDirection::H };
+			UiBoxLayout output_row_ { UiDirection::H };
+			UiBoxLayout class_row_ { UiDirection::H };
+			UiBoxLayout include_row_ { UiDirection::H };
+			UiBoxLayout umk_row_ { UiDirection::H };
+			UiBoxLayout method_row_ { UiDirection::H };
+			UiBoxLayout exe_row_ { UiDirection::H };
+			UiBoxLayout button_row_ { UiDirection::H };
+			UiLabel project_label_;
+			UiLabel output_label_;
+			UiLabel class_label_;
+			UiLabel umk_label_;
+			UiLabel method_label_;
+			UiLabel exe_label_;
+			UiLineEdit project_edit_;
+			UiLineEdit output_edit_;
+			UiLineEdit class_edit_;
+			UiLineEdit umk_edit_;
+			UiLineEdit method_edit_;
+			UiLineEdit exe_edit_;
+			UiButton output_browse_;
+			UiCheckBox include_design_json_;
+			UiCheckBox include_readme_;
+			UiCheckBox include_appearance_;
+			UiLabel spacer_;
+			UiButton export_button_;
+			UiButton cancel_button_;
+		};
+
+		ExportProjectDialog dlg(*this);
+		if(dlg.Run() != IDOK)
+			return;
+
+		export_project_name_ = dlg.GetProjectName();
+		export_output_dir_ = dlg.GetOutputDirectory();
+		export_class_name_ = dlg.GetClassName();
+		export_build_method_ = dlg.GetBuildMethod();
+		export_output_exe_path_ = dlg.GetOutputExePath();
+		export_include_design_json_ = dlg.IncludeDesignJson();
+		export_include_readme_ = dlg.IncludeReadme();
+		export_include_appearance_ = dlg.IncludeAppearance();
+		if(!dlg.GetUmkPath().IsEmpty())
+			umk_path_ = dlg.GetUmkPath();
+		StoreRecentFiles();
+
+		DesignerProjectExportOptions options;
+		options.project_name = export_project_name_;
+		options.output_directory = export_output_dir_;
+		options.class_name = export_class_name_;
+		options.include_designer_appearance = export_include_appearance_;
+		options.include_design_json = export_include_design_json_;
+		options.include_readme = export_include_readme_;
+		options.umk_path = umk_path_;
+		options.build_method = export_build_method_;
+		options.output_exe_path = export_output_exe_path_;
+		options.source_design_filename = current_design_path_.IsEmpty() ? String("design.json") : GetFileName(current_design_path_);
+
+		String project_name = SanitizeDesignerPackageName(options.project_name);
+		String package_dir = AppendFileName(options.output_directory, project_name);
+		if(DirectoryExists(package_dir) && DirectoryHasFiles(package_dir) &&
+		   !PromptYesNo(Format("Overwrite files in '%s'?", package_dir))) {
 			return;
 		}
-		Exclamation("Build/Run is not wired up yet.\n\nThe right-panel code actions and persisted setup paths are in place, but the actual project build/run step needs one more pass.");
+
+		DesignerProjectExportResult result;
+		if(!ExportDesignerProject(model_, registry_, options, StoreDesignerModelJson(model_), result)) {
+			Exclamation(result.error.IsEmpty() ? "Export failed." : result.error);
+			return;
+		}
+		SetWarningNotes("Exported U++ project to " + result.package_dir);
+	}
+
+	String SuggestedExportProjectName() const
+	{
+		if(!TrimBoth(export_project_name_).IsEmpty())
+			return export_project_name_;
+		String base = model_.GetNodes().GetCount() > 1 ? "DesignerWorkbenchExport" : "ExportedDesignerProject";
+		return SanitizeDesignerPackageName(base);
+	}
+
+	String SuggestedExportOutputDirectory() const
+	{
+		if(!TrimBoth(export_output_dir_).IsEmpty())
+			return export_output_dir_;
+		if(!current_design_path_.IsEmpty())
+			return GetFileFolder(current_design_path_);
+		return GetCurrentDirectory();
+	}
+
+	String SuggestedExportClassName() const
+	{
+		if(!TrimBoth(export_class_name_).IsEmpty())
+			return export_class_name_;
+		return SanitizeDesignerClassName(SuggestedExportProjectName() + "Window");
+	}
+
+	String SuggestedExportBuildMethod() const
+	{
+		if(!TrimBoth(export_build_method_).IsEmpty())
+			return export_build_method_;
+		return "CLANGx64";
 	}
 
 	Value ConfigValue(const ValueMap& cfg, const String& key) const
@@ -3000,6 +3237,15 @@ private:
 	Vector<String> recent_loads_;
 	String umk_path_;
 	String u_root_;
+	String current_design_path_;
+	String export_output_dir_;
+	String export_project_name_;
+	String export_class_name_;
+	String export_build_method_;
+	String export_output_exe_path_;
+	bool export_include_design_json_ = true;
+	bool export_include_readme_ = true;
+	bool export_include_appearance_ = false;
 };
 
 }

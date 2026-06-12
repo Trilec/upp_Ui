@@ -7,6 +7,12 @@
 
 namespace Upp {
 
+static String ExportPlaceholder(const String& value, const char *placeholder)
+{
+	String text = TrimBoth(value);
+	return text.IsEmpty() ? String("[") + placeholder + "]" : text;
+}
+
 static Value CodeGenNodeProperty(const DesignerNode& n, const String& key, const Value& def)
 {
 	int q = n.properties.Find(key);
@@ -106,6 +112,54 @@ static String VarName(const VectorMap<DesignerNodeId, String>& names, DesignerNo
 {
 	int q = names.Find(id);
 	return q >= 0 ? names[q] : VarName(id);
+}
+
+static String PostProcessGeneratedCode(const String& code,
+                                       const DesignerModel& model,
+                                       const VectorMap<DesignerNodeId, String>& names)
+{
+	Vector<String> spacer_vars;
+	Vector<String> split_vars;
+	for(const DesignerNode& n : model.GetNodes()) {
+		if(n.id == Designer_ROOT)
+			continue;
+		String var = VarName(names, n.id);
+		if(n.type_id == "Spacer")
+			spacer_vars.Add(var);
+		else if(n.type_id == "UiSplitButton")
+			split_vars.Add(var);
+	}
+
+	Vector<String> lines = Split(code, '\n');
+	String out;
+	for(String line : lines) {
+		bool skip = false;
+		for(const String& var : spacer_vars) {
+			if(line.StartsWith("\t\t" + var + ".")) {
+				skip = true;
+				break;
+			}
+		}
+		if(skip)
+			continue;
+
+		bool rewritten = false;
+		for(const String& var : split_vars) {
+			String prefix = "\t\t" + var + ".";
+			if(line.StartsWith(prefix)) {
+				int q = line.Find(".SetSplitWidth(");
+				if(q >= 0 && line.Find(".SetText(") >= 0) {
+					out << line.Left(q) << ";\n";
+					out << "\t\t" << var << line.Mid(q) << "\n";
+					rewritten = true;
+					break;
+				}
+			}
+		}
+		if(!rewritten)
+			out << line << "\n";
+	}
+	return out;
 }
 
 static String DirectionExpr(const DesignerNode& n, const String& def)
@@ -464,9 +518,17 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			return;
 	}
 
+	if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false)) {
+		out << "\t\t// Designer appearance override for " << (n.name.IsEmpty() ? n.type_id : n.name) << ".\n"
+		    << "\t\t// Role base: " << AsString(CodeGenNodeProperty(n, "role", "Standard")) << ".\n"
+		    << "\t\t// Remove this block to return to theme defaults.\n";
+	}
+
 	out << "\t\t{\n"
 	    << "\t\t\t" << style_type << " s = " << resolve_expr << ";\n";
 	if(CodeGenHasProperty(n, "face_enabled")) {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Surface override.\n";
 		bool face_enabled = (bool)CodeGenNodeProperty(n, "face_enabled", false);
 		out << "\t\t\ts.metrics.face_enabled = " << (face_enabled ? "true" : "false") << ";\n";
 		if(face_enabled) {
@@ -502,6 +564,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(CodeGenHasProperty(n, "radius"))
 		out << "\t\t\ts.metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "radius", 0)) << ");\n";
 	if(CodeGenHasProperty(n, "shadow_enabled")) {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Shadow override.\n";
 		bool shadow = (bool)CodeGenNodeProperty(n, "shadow_enabled", false);
 		out << "\t\t\ts.metrics.shadow.enabled = " << (shadow ? "true" : "false") << ";\n";
 		if(shadow) {
@@ -521,13 +585,19 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	if(n.type_id == "UiCheckBox") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Indicator override.\n";
 		EmitSurfaceOverrideFields(out, "s.indicator_palette", n, "indicator");
 	}
 	else if(n.type_id == "UiToggle") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Indicator override.\n";
 		EmitSurfaceOverrideFields(out, "s.track_palette", n, "track");
 		EmitSurfaceOverrideFields(out, "s.thumb_palette", n, "thumb");
 	}
 	if(n.type_id == "UiSlider") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Layout-specific override.\n";
 		out << "\t\t\ts.track_size = Size(DPI(" << max(20, (int)CodeGenNodeProperty(n, "track_width", 120))
 		    << "), DPI(" << max(1, (int)CodeGenNodeProperty(n, "track_height", 3)) << "));\n"
 		    << "\t\t\ts.thumb_size = Size(DPI(" << max(6, (int)CodeGenNodeProperty(n, "thumb_width", 20))
@@ -536,6 +606,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		    << "\t\t\ts.thumb_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "thumb_radius", 8)) << ");\n";
 	}
 	if(n.type_id == "UiLabel") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Text/icon override.\n";
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = UiTheme::ResolveLabel(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
 			if(IsNull(base_ink))
@@ -555,6 +627,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiCheckBox") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Text/icon override.\n";
 		String visual = AsString(CodeGenNodeProperty(n, "visual", "Classic"));
 		UiCheckVisual vis = visual == "Chip" ? UICHECKVIS_CHIP :
 		                    visual == "List" ? UICHECKVIS_LIST : UICHECKVIS_CLASSIC;
@@ -575,6 +649,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiDropdown") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Text/icon override.\n";
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = UiTheme::ResolveDropdown(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
 			if(IsNull(base_ink))
@@ -584,6 +660,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit") {
+		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Text/icon override.\n";
 		UiBaseEdit::Style base = UiTheme::ResolveEdit(CodeGenRoleChoice(n));
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = IsNull(base.palette.ink[ST_NORMAL]) ? SColorText() : base.palette.ink[ST_NORMAL];
@@ -696,8 +774,6 @@ static String SpacerLineDashExpr(const DesignerNode& n)
 static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
 {
 	String var = VarName(names, n.id);
-	if(n.type_id == "Spacer")
-		return;
 	if(n.type_id == "BoxLayout")
 		out << "\tUiBoxLayout " << var << ";\n";
 	else if(n.type_id == "GridLayout")
@@ -1000,7 +1076,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
                       const DesignerNode& n, bool emit_designer_appearance)
 {
 	String var = VarName(names, n.id);
-	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
+	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
 		return;
 	EmitThemeStyle(out, var, n, emit_designer_appearance);
 	EmitDesignerMinSize(out, var, n);
@@ -1176,11 +1252,11 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	else if(n.type_id == "UiSplitButton") {
 		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
-		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "))"
-		    << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 30) << "))"
-		    << ".SetSplitContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "split_content_gap", 4)) << "))"
-		    << ".SetSplitIconSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "split_icon_size", 16)) << "))"
-		    << ".SetPopupMinWidth(DPI(" << (int)CodeGenNodeProperty(n, "popup_min_width", 220) << "));\n";
+		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 30) << "));\n"
+		    << "\t\t" << var << ".SetSplitContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "split_content_gap", 4)) << "));\n"
+		    << "\t\t" << var << ".SetSplitIconSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "split_icon_size", 16)) << "));\n"
+		    << "\t\t" << var << ".SetPopupMinWidth(DPI(" << (int)CodeGenNodeProperty(n, "popup_min_width", 220) << "));\n";
 		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
 		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
 		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
@@ -1598,18 +1674,30 @@ static void EmitPostAddSetup(String& out, const VectorMap<DesignerNodeId, String
 }
 
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
-                              const String& class_name, bool emit_designer_appearance)
+                            const DesignerCodeGenOptions& options)
 {
 	(void)registry;
 	VectorMap<DesignerNodeId, String> names = BuildCodeNames(model);
 	String out;
+	if(options.emit_export_header) {
+		out << "// Generated by U++ Ui Designer.\n"
+		    << "// Source design: " << ExportPlaceholder(options.source_design_filename, "SOURCE_DESIGN_JSON") << "\n"
+		    << "// Package: " << ExportPlaceholder(options.package_name, "PACKAGE_NAME") << "\n"
+		    << "// UMK path: " << ExportPlaceholder(options.umk_path, "PATH_TO_UPP_OR_UMK") << "\n"
+		    << "// Exported package: " << ExportPlaceholder(options.exported_package_path, "PATH_TO_EXPORTED_PACKAGE") << "\n"
+		    << "// Build method: " << ExportPlaceholder(options.build_method, "BUILD_METHOD") << "\n"
+		    << "// Output executable: " << ExportPlaceholder(options.output_exe_path, "PATH_TO_OUTPUT_EXE") << "\n"
+		    << "// Regenerate from design.json when the Designer model changes.\n"
+		    << "// This file is theme-first generated output.\n"
+		    << "// Explicit Designer appearance overrides are marked in code.\n\n";
+	}
 	out << "#include <CtrlLib/CtrlLib.h>\n"
 	    << "#include <Ui/Ui.h>\n\n"
 	    << "using namespace Upp;\n\n"
-	    << "class " << class_name << " : public TopWindow {\n"
+	    << "class " << options.class_name << " : public TopWindow {\n"
 	    << "public:\n"
-	    << "\ttypedef " << class_name << " CLASSNAME;\n\n"
-	    << "\t" << class_name << "()\n"
+	    << "\ttypedef " << options.class_name << " CLASSNAME;\n\n"
+	    << "\t" << options.class_name << "()\n"
 	    << "\t{\n"
 	    << "\t\tTitle(\"Generated Designer Layout\");\n"
 	    << "\t\tSizeable().Zoomable();\n";
@@ -1619,15 +1707,18 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	    << "\t}\n\n"
 	    << "private:\n"
 	    << "\tvoid Build()\n"
-	    << "\t{\n";
+	    << "\t{\n"
+	    << "\t\t// Control setup.\n";
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitSetup(out, names, n, emit_designer_appearance);
+		EmitSetup(out, names, n, options.emit_designer_appearance);
 	}
 	const DesignerNode* root = model.Find(Designer_ROOT);
+	out << "\n\t\t// Layout tree.\n";
 	if(root)
 		EmitAdds(out, names, model, *root);
+	out << "\n\t\t// Post-add setup.\n";
 	EmitPostAddSetup(out, names, model);
 	out << "\t}\n\n";
 	for(const DesignerNode& n : model.GetNodes()) {
@@ -1638,9 +1729,18 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	out << "};\n\n"
 	    << "GUI_APP_MAIN\n"
 	    << "{\n"
-	    << "\t" << class_name << "().Run();\n"
+	    << "\t" << options.class_name << "().Run();\n"
 	    << "}\n";
-	return out;
+	return PostProcessGeneratedCode(out, model, names);
+}
+
+String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
+                            const String& class_name, bool emit_designer_appearance)
+{
+	DesignerCodeGenOptions options;
+	options.class_name = class_name;
+	options.emit_designer_appearance = emit_designer_appearance;
+	return GenerateDesignerCode(model, registry, options);
 }
 
 }

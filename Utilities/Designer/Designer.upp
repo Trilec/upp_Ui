@@ -25,6 +25,8 @@ file
 	DesignerTemplates.cpp,
 	DesignerCodeGen.h,
 	DesignerCodeGen.cpp,
+	DesignerExport.h,
+	DesignerExport.cpp,
 	DesignerSerialization.h,
 	DesignerSerialization.cpp,
 	DesignerInspector.h,
@@ -40,4 +42,3 @@ file
 
 mainconfig
 	"" = "GUI";
-
