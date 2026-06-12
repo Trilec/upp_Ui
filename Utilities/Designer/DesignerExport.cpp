@@ -242,26 +242,34 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 		}
 	}
 
-	auto RestoreBackup = [&]() {
+	auto RestoreBackup = [&]() -> bool {
 		RemovePathIfExists(result.package_dir);
+		if(options.simulate_restore_failure)
+			return false;
 		if(DirectoryExists(backup_dir) || FileExists(backup_dir))
-			MovePath(backup_dir, result.package_dir);
+			return MovePath(backup_dir, result.package_dir);
+		return true;
 	};
 
 	if(options.simulate_commit_failure) {
 		result.error = "Simulated export commit failure.";
-		RestoreBackup();
+		bool restored = RestoreBackup();
 		DeleteFolderDeep(stage_dir);
-		RemovePathIfExists(backup_dir);
+		if(restored)
+			RemovePathIfExists(backup_dir);
+		else
+			result.error << " Existing export backup could not be restored; backup left at " << backup_dir;
 		return false;
 	}
 
 	if(!MovePath(stage_dir, result.package_dir)) {
 		result.error = "Unable to finalize exported project.";
-		if(use_backup)
-			RestoreBackup();
+		bool restored = !use_backup || RestoreBackup();
 		DeleteFolderDeep(stage_dir);
-		RemovePathIfExists(backup_dir);
+		if(restored)
+			RemovePathIfExists(backup_dir);
+		else
+			result.error << " Existing export backup could not be restored; backup left at " << backup_dir;
 		return false;
 	}
 

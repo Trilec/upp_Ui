@@ -15,6 +15,7 @@ struct DesignerProjectExportOptions {
 	bool include_readme = true;
 	bool overwrite_existing = false;
 	bool simulate_commit_failure = false; // test hook only; keeps rollback path verifiable.
+	bool simulate_restore_failure = false; // test hook only; keeps backup-preservation verifiable.
 	String umk_path;
 	String build_method;
 	String output_exe_path;
