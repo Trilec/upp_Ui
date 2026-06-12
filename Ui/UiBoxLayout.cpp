@@ -1,5 +1,7 @@
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>
+#include <Ui/UiMeasure.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -257,14 +259,8 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 int w = main[i] + grow[i];
                 int h = cross[i];
                 if(it.c) {
-                    Size ms = GetCtrlMinSize(it);
-                    int measured_h = ms.cy;
-                    if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
-                        if(box->wrap_auto_resize)
-                            measured_h = max(measured_h, box->MeasureHeightForWidth(w));
-                    }
-                    else if(UiGridLayout *grid = dynamic_cast<UiGridLayout *>(it.c))
-                        measured_h = max(measured_h, grid->MeasureHeightForWidth(w));
+                    UiLayoutMeasureResult measure = UiMeasureLayout(*it.c, {w});
+                    int measured_h = max(measure.preferred.cy, measure.measured.cy);
                     h = min(max(measured_h, it.minh), it.maxh);
                 }
                 final_h[i] = h;
@@ -318,20 +314,17 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 continue;
             }
 
-            Size ms = GetCtrlMinSize(it);
+            UiLayoutMeasureResult measure = it.c ? UiMeasureLayout(*it.c) : UiLayoutMeasureResult();
+            Size ms = it.c ? measure.preferred : Size(0, 0);
             int w = it.fixed >= 0 ? it.fixed : ms.cx;
             int min_w = it.minw;
             bool can_shrink = false;
             if(fixed_column > 0)
                 w = min(w, fixed_column);
-            if(it.c && it.fixed < 0 && it.fit) {
-                if(UiBoxLayout *box = dynamic_cast<UiBoxLayout *>(it.c)) {
-                    if(box->wrap_auto_resize && box->dir == UiBoxLayout::Direction::H && box->wrap != UiBoxWrap::None) {
-                        w = box->GetPreferredSize().cx;
-                        min_w = max(min_w, box->GetMinWrapWidth());
-                        can_shrink = true;
-                    }
-                }
+            if(it.c && it.fixed < 0 && it.fit && measure.width_dependent) {
+                w = measure.preferred.cx;
+                min_w = max(min_w, measure.min.cx);
+                can_shrink = true;
             }
             w = min(max(w, min_w), it.maxw);
             if(wrap == UiBoxWrap::Snap)
@@ -587,6 +580,12 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     if(dir == Direction::V || wrap == UiBoxWrap::None)
         return GetMinSize().cy;
 
+    const uint64 theme_revision = UiTheme::GetRevision();
+    if(measure_cache_width_ == total_width &&
+       measure_cache_gen_ == cur_gen &&
+       measure_cache_theme_revision_ == theme_revision)
+        return measure_cache_result_;
+
     Rect irc = RectC(0, 0, max(0, total_width - inset.left - inset.right), INT_MAX / 8);
     UiBoxLayout *self = const_cast<UiBoxLayout*>(this);
     Vector<Rect> saved_rect;
@@ -626,6 +625,10 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     self->used_h = saved_used_h;
     self->layout_gen = saved_layout_gen;
     self->last_layout_irc_ = saved_irc;
+    self->measure_cache_width_ = total_width;
+    self->measure_cache_result_ = measured;
+    self->measure_cache_gen_ = self->cur_gen;
+    self->measure_cache_theme_revision_ = theme_revision;
     return measured;
 }
 

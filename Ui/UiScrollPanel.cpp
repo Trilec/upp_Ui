@@ -1,4 +1,5 @@
 #include <Ui/UiScrollPanel.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -177,7 +178,7 @@ Rect UiScrollPanel::MeasureContentBounds() const
         if(!q->IsShown())
             continue;
         Rect r = q->GetRect();
-        Size min_size = q->GetMinSize();
+        Size min_size = UiMeasureLayout(*q).min;
         r.right = max(r.right, r.left + min_size.cx);
         r.bottom = max(r.bottom, r.top + min_size.cy);
         if(first) {

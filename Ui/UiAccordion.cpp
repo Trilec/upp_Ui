@@ -1,8 +1,7 @@
 #include <Ui/UiAccordion.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiScrollPanel.h>
-#include <Ui/UiBoxLayout.h>
-#include <Ui/UiGridLayout.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiLabel.h>
 #include <Ui/UiPanel.h>
@@ -32,15 +31,11 @@ static int MeasureAccordionChildHeight(Ctrl* q, int width)
 
     width = max(0, width);
 
-    if(UiBoxLayout* box = dynamic_cast<UiBoxLayout*>(q)) {
+    UiLayoutMeasureResult measure = UiMeasureLayout(*q, {width > 0 ? width : -1});
+    if(measure.width_dependent) {
         if(width > 0)
-            return box->MeasureHeightForWidth(width);
-        return box->GetContentSize().cy;
-    }
-    if(UiGridLayout* grid = dynamic_cast<UiGridLayout*>(q)) {
-        if(width > 0)
-            return grid->MeasureHeightForWidth(width);
-        return grid->GetContentSize().cy;
+            return max(measure.min.cy, measure.measured.cy);
+        return max(measure.min.cy, measure.preferred.cy);
     }
     if(UiTree* tree = dynamic_cast<UiTree*>(q))
         return max(tree->GetMinSize().cy, tree->GetContentSize().cy);

@@ -514,14 +514,14 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	DesignerNodeId save = AddTemplateNode(model, registry, "UiSplitButton", top, "save_button");
 	SetTemplateText(model, save, "Save");
 	SetTemplateRole(model, save, "Accent");
-	SetTemplateSizing(model, save, "Fixed", "Expand");
+	SetTemplateSizing(model, save, "Fit", "Fit");
 	SetTemplateFixedSize(model, save, 112, 34);
 	SetTemplateMinSize(model, save, 1, 24);
 
 	DesignerNodeId load = AddTemplateNode(model, registry, "UiSplitButton", top, "load_button");
 	SetTemplateText(model, load, "Load");
 	SetTemplateRole(model, load, "Accent");
-	SetTemplateSizing(model, load, "Fixed", "Expand");
+	SetTemplateSizing(model, load, "Fit", "Fit");
 	SetTemplateFixedSize(model, load, 112, 34);
 	SetTemplateMinSize(model, load, 1, 24);
 
@@ -543,7 +543,7 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	DesignerNodeId theme = AddTemplateNode(model, registry, "UiDropdown", top, "theme_dropdown");
 	SetTemplateText(model, theme, "Theme");
 	SetTemplateRole(model, theme, "Accent");
-	SetTemplateSizing(model, theme, "Fit", "Expand");
+	SetTemplateSizing(model, theme, "Fit", "Fit");
 	SetTemplateFixedSize(model, theme, 180, 32);
 	SetTemplateProperty(model, theme, "item_count", 2);
 	SetTemplateProperty(model, theme, "item_0_text", "Minimal");
@@ -551,21 +551,25 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	SetTemplateProperty(model, theme, "selected_index", 0);
 
 	DesignerNodeId dark = AddTemplateNode(model, registry, "UiToolButton", top, "dark_toggle");
+	SetTemplateText(model, dark, "Dark");
 	SetTemplateRole(model, dark, "Accent");
-	SetTemplateSizing(model, dark, "Fixed", "Fit");
-	SetTemplateFixedSize(model, dark, 40, 34);
+	SetTemplateSizing(model, dark, "Fit", "Fit");
+	SetTemplateFixedSize(model, dark, 72, 34);
+	SetTemplateMinSize(model, dark, 65, 24);
 	SetTemplateIcon(model, dark, "ICON_ACTION_DARK_MODE_48");
 
 	DesignerNodeId help = AddTemplateNode(model, registry, "UiToolButton", top, "help_button");
+	SetTemplateText(model, help, "Help");
 	SetTemplateRole(model, help, "Accent");
-	SetTemplateSizing(model, help, "Fixed", "Fit");
-	SetTemplateFixedSize(model, help, 40, 34);
+	SetTemplateSizing(model, help, "Fit", "Fit");
+	SetTemplateFixedSize(model, help, 72, 34);
+	SetTemplateMinSize(model, help, 65, 24);
 	SetTemplateIcon(model, help, "ICON_DESIGN_HELP_48");
 
 	DesignerNodeId exit = AddTemplateNode(model, registry, "UiButton", top, "exit_button");
 	SetTemplateText(model, exit, "Exit");
 	SetTemplateRole(model, exit, "Alert");
-	SetTemplateSizing(model, exit, "Fixed", "Expand");
+	SetTemplateSizing(model, exit, "Fit", "Fit");
 	SetTemplateFixedSize(model, exit, 120, 32);
 	SetTemplateMinSize(model, exit, 1, 1);
 	SetTemplateIcon(model, exit, "ICON_ACTION_CANCEL_48");
@@ -608,11 +612,12 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	DesignerNodeId left_gap = AddTemplateNode(model, registry, "Spacer", left_tools, "left_panel_spacer");
 	SetTemplateSizing(model, left_gap, "Fit", "Expand");
 	SetTemplateFixedSize(model, left_gap, 24, 24);
-	SetTemplateMinSize(model, left_gap, 28, 10);
-	DesignerNodeId left_toggle = AddTemplateNode(model, registry, "UiToolButton", left_tools, "opencloseleftlayout");
+	SetTemplateMinSize(model, left_gap, 10, 10);
+	DesignerNodeId left_toggle = AddTemplateNode(model, registry, "UiToolButton", left_tools, "close_left");
+	SetTemplateText(model, left_toggle, "Close");
 	SetTemplateRole(model, left_toggle, "Standard");
 	SetTemplateSizing(model, left_toggle, "Fit", "Fit");
-	SetTemplateFixedSize(model, left_toggle, 40, 34);
+	SetTemplateFixedSize(model, left_toggle, 72, 34);
 	SetTemplateIcon(model, left_toggle, "ICON_DESIGN_LEFT_PANEL_CLOSE_48");
 
 	DesignerNodeId left_scroll = AddTemplateNode(model, registry, "UiScrollPanel", left, "scrollpanel");
@@ -676,6 +681,12 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	SetTemplateGap(model, right_tools, 8);
 	SetTemplateInset(model, right_tools, 8);
 	SetTemplateProperty(model, right_tools, "wrap", "Flow");
+	DesignerNodeId right_toggle = AddTemplateNode(model, registry, "UiToolButton", right_tools, "close_right");
+	SetTemplateText(model, right_toggle, "Close");
+	SetTemplateRole(model, right_toggle, "Standard");
+	SetTemplateSizing(model, right_toggle, "Fit", "Fit");
+	SetTemplateFixedSize(model, right_toggle, 72, 34);
+	SetTemplateIcon(model, right_toggle, "ICON_DESIGN_RIGHT_PANEL_CLOSE_48");
 	for(const char* icon_name : {
 		"ICON_DESIGN_CODE_BLOCKS_48",
 		"ICON_DESIGN_FORMAT_PAINT_48",
@@ -691,12 +702,7 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	DesignerNodeId right_gap = AddTemplateNode(model, registry, "Spacer", right_tools, "right_panel_spacer");
 	SetTemplateSizing(model, right_gap, "Fit", "Expand");
 	SetTemplateFixedSize(model, right_gap, 24, 24);
-	SetTemplateMinSize(model, right_gap, 75, 10);
-	DesignerNodeId right_toggle = AddTemplateNode(model, registry, "UiToolButton", right_tools, "opencloserightlayout");
-	SetTemplateRole(model, right_toggle, "Standard");
-	SetTemplateSizing(model, right_toggle, "Fit", "Fit");
-	SetTemplateFixedSize(model, right_toggle, 40, 34);
-	SetTemplateIcon(model, right_toggle, "ICON_DESIGN_RIGHT_PANEL_CLOSE_48");
+	SetTemplateMinSize(model, right_gap, 10, 10);
 
 	DesignerNodeId right_scroll = AddTemplateNode(model, registry, "UiScrollPanel", right, "scrollpanel_02");
 	SetTemplateRole(model, right_scroll, "Subtle");

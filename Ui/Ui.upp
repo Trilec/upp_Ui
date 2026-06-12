@@ -18,6 +18,8 @@ file
 	UiDataModels.h,
 	UiDataModels.cpp,
 	UiLayoutCursor.h,
+	UiMeasure.h,
+	UiMeasure.cpp,
 	UiIcons.h,
 	UiIcons.iml,
 	UiIcons.cpp,
@@ -109,4 +111,3 @@ file
 	UiMenu.cpp,
 	UiColorPicker.h,
 	UiColorPicker.cpp;
-

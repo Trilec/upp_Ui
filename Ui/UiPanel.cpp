@@ -1,4 +1,5 @@
 #include <Ui/UiPanel.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -138,7 +139,8 @@ Size UiPanel::GetMinSize() const
     for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
         if(!q->IsShown())
             continue;
-        Size sz = q->GetMinSize();
+        UiLayoutMeasureResult measure = UiMeasureLayout(*q);
+        Size sz = measure.min;
         Rect r = q->GetRect();
         int right = r.IsEmpty() ? sz.cx : max(0, r.left) + sz.cx;
         int bottom = r.IsEmpty() ? sz.cy : max(0, r.top) + sz.cy;
@@ -169,7 +171,8 @@ Size UiPanel::GetContentSize() const
             continue;
         Rect r = q->GetRect();
         if(r.IsEmpty()) {
-            Size sz = q->GetMinSize();
+            UiLayoutMeasureResult measure = UiMeasureLayout(*q);
+            Size sz = measure.min;
             r = RectC(0, 0, sz.cx, sz.cy);
         }
         if(any)
