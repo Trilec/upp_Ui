@@ -178,9 +178,10 @@ Rect UiScrollPanel::MeasureContentBounds() const
         if(!q->IsShown())
             continue;
         Rect r = q->GetRect();
-        Size min_size = UiMeasureLayout(*q).min;
-        r.right = max(r.right, r.left + min_size.cx);
-        r.bottom = max(r.bottom, r.top + min_size.cy);
+        UiLayoutMeasureResult measure = UiMeasureLayout(*q, {r.GetWidth() > 0 ? r.GetWidth() : -1});
+        Size needed = measure.width_dependent ? measure.measured : measure.min;
+        r.right = max(r.right, r.left + needed.cx);
+        r.bottom = max(r.bottom, r.top + needed.cy);
         if(first) {
             b = r;
             first = false;
