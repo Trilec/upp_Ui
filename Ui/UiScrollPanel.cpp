@@ -174,11 +174,27 @@ Rect UiScrollPanel::MeasureContentBounds() const
 {
     Rect b(0, 0, 0, 0);
     bool first = true;
+    int host_w = content_.GetRect().GetWidth();
+    int viewport_w = GetViewportRect().GetWidth();
     for(Ctrl* q = content_.GetFirstChild(); q; q = q->GetNext()) {
         if(!q->IsShown())
             continue;
         Rect r = q->GetRect();
-        UiLayoutMeasureResult measure = UiMeasureLayout(*q, {r.GetWidth() > 0 ? r.GetWidth() : -1});
+        int available_w = r.GetWidth();
+        if(available_w <= 0)
+            available_w = host_w;
+        if(available_w <= 0)
+            available_w = viewport_w;
+        UiLayoutMeasureResult measure = UiMeasureLayout(*q, {available_w > 0 ? available_w : -1});
+        if(measure.width_dependent) {
+            int constrained_w = available_w;
+            if(host_w > 0)
+                constrained_w = constrained_w > 0 ? min(constrained_w, host_w) : host_w;
+            if(viewport_w > 0)
+                constrained_w = constrained_w > 0 ? min(constrained_w, viewport_w) : viewport_w;
+            if(constrained_w > 0 && constrained_w != available_w)
+                measure = UiMeasureLayout(*q, {constrained_w});
+        }
         Size needed = measure.width_dependent ? measure.measured : measure.min;
         r.right = max(r.right, r.left + needed.cx);
         r.bottom = max(r.bottom, r.top + needed.cy);
