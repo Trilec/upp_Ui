@@ -1285,6 +1285,7 @@ private:
 			AddPresetToolboxItem(group_ref, "Card Grid", "CardGrid");
 			AddPresetToolboxItem(group_ref, "Split Screen", "SplitScreen");
 			AddPresetToolboxItem(group_ref, "F-Pattern", "FPattern");
+			AddPresetToolboxItem(group_ref, "Designer Workbench", "DesignerWorkbench");
 			toolbox_tree_.Refresh();
 			UpdateToolboxHelp(IsNull(toolbox_tree_.GetData()) ? String() : AsString(toolbox_tree_.GetData()));
 			return;
@@ -1481,6 +1482,7 @@ private:
 		if(id == "CardGrid") return "Card Grid";
 		if(id == "SplitScreen") return "Split Screen";
 		if(id == "FPattern") return "F-Pattern";
+		if(id == "DesignerWorkbench") return "Designer Workbench";
 		return id;
 	}
 
