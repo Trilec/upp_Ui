@@ -88,7 +88,7 @@ public:
     void LostFocus() override;
     Size GetMinSize() const override;
     Size GetContentSize() const { return content; }
-    int  MeasureHeightForWidth(int total_width);
+    int  MeasureHeightForWidth(int total_width) const;
     Function<void(Size)> WhenContentSize;
     String ToString() const;
 

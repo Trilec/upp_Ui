@@ -131,6 +131,25 @@ Size UiBoxLayout::GetCtrlMinSize(Item& it)
     return it.c->GetMinSize();
 }
 
+uint64 UiBoxLayout::MeasureCacheSignature() const
+{
+    CombineHash h;
+    h << dir << gap_x << gap_y << inset << (int)wrap << wrap_snap_count << wrap_auto_resize << wrap_rows_expand
+      << align_items << fixed_column << fixed_row << wrap_snap_sizes.GetCount();
+    for(int i = 0; i < wrap_snap_sizes.GetCount(); i++)
+        h << wrap_snap_sizes[i];
+    for(const Item& it : items) {
+        h << it.fixed << it.fit << it.expandingWeight << it.minw << it.maxw << it.minh << it.maxh
+          << it.align_self << it.is_break << it.line_enabled << it.line_orientation << it.line_align
+          << it.line_thickness << it.line_dash << it.line_inset << it.line_color_enabled << it.line_color;
+        if(it.c)
+            h << it.c->IsShown() << it.c->GetMinSize();
+        else
+            h << false;
+    }
+    return h;
+}
+
 int UiBoxLayout::GetMainGap() const
 {
     return dir == Direction::H ? gap_x : gap_y;
@@ -581,10 +600,12 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
         return GetMinSize().cy;
 
     const uint64 theme_revision = UiTheme::GetRevision();
+    const uint64 sig = MeasureCacheSignature();
     for(int i = 0; i < 4; i++) {
         if(measure_cache_width_[i] == total_width &&
            measure_cache_gen_[i] == cur_gen &&
            measure_cache_theme_revision_[i] == theme_revision &&
+           measure_cache_sig_[i] == sig &&
            measure_cache_result_[i] != INT_MIN)
             return measure_cache_result_[i];
     }
@@ -636,6 +657,7 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     self->measure_cache_result_[slot] = measured;
     self->measure_cache_gen_[slot] = self->cur_gen;
     self->measure_cache_theme_revision_[slot] = theme_revision;
+    self->measure_cache_sig_[slot] = sig;
     self->measure_cache_slot_ = (byte)((slot + 1) & 3);
     return measured;
 }

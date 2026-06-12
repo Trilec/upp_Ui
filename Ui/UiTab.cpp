@@ -1,4 +1,5 @@
 #include <Ui/UiTab.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
 
@@ -549,7 +550,7 @@ Size UiTab::GetMinSize() const
     int h = DPI(140);
     for(int i = 0; i < tabs_.GetCount(); i++) {
         if(tabs_[i].page) {
-            Size ms = tabs_[i].page->GetMinSize();
+            Size ms = UiMeasureLayout(*tabs_[i].page).min;
             w = max(w, ms.cx);
             h = max(h, ms.cy);
         }

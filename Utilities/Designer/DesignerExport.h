@@ -2,7 +2,6 @@
 
 #include "DesignerModel.h"
 #include "DesignerRegistry.h"
-#include "DesignerCodeGen.h"
 
 namespace Upp {
 

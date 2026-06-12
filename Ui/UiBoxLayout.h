@@ -119,6 +119,8 @@ enum class UiBoxWrap : byte {
     Snap
 };
 
+inline dword GetHashValue(UiBoxWrap a) { return (byte)a; }
+
 class UiBoxLayout : public Ctrl {
 public:
     typedef UiBoxLayout CLASSNAME;
@@ -669,6 +671,7 @@ public:
 private:
     // Helpers
     Size GetCtrlMinSize(Item& it);
+    uint64 MeasureCacheSignature() const;
     void RebuildLayoutCache(const Rect& irc);
     int  GetMainGap() const;
     int  GetCrossGap() const;
@@ -702,6 +705,7 @@ private:
     mutable int  measure_cache_result_[4] = { INT_MIN, INT_MIN, INT_MIN, INT_MIN };
     mutable int  measure_cache_gen_[4] = { INT_MIN, INT_MIN, INT_MIN, INT_MIN };
     mutable uint64 measure_cache_theme_revision_[4] = { 0, 0, 0, 0 };
+    mutable uint64 measure_cache_sig_[4] = { 0, 0, 0, 0 };
     mutable byte measure_cache_slot_ = 0;
 };
 

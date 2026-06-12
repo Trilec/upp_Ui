@@ -1,4 +1,5 @@
 #include <Ui/UiStack.h>
+#include <Ui/UiMeasure.h>
 
 namespace Upp {
 
@@ -225,7 +226,7 @@ int UiStack::FindKey(const String& key) const
 
 Size UiStack::MeasurePage(Ctrl *page) const
 {
-    return page ? page->GetMinSize() : Size(0, 0);
+    return page ? UiMeasureLayout(*page).min : Size(0, 0);
 }
 
 Size UiStack::GetMinSize() const

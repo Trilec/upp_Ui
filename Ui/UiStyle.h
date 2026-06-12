@@ -291,6 +291,7 @@ enum UiSpan : byte {
 };
 
 inline dword GetHashValue(UiCrossAlign a) { return (byte)a; }
+inline dword GetHashValue(UiLineStyle a) { return (byte)a; }
 inline dword GetHashValue(UiSpacerLineOrientation a) { return (byte)a; }
 
 inline Stream& operator%(Stream& s, UiCrossAlign& a)

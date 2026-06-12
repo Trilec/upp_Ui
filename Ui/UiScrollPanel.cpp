@@ -195,9 +195,14 @@ Rect UiScrollPanel::MeasureContentBounds() const
             if(constrained_w > 0 && constrained_w != available_w)
                 measure = UiMeasureLayout(*q, {constrained_w});
         }
-        Size needed = measure.width_dependent ? measure.measured : measure.min;
-        r.right = max(r.right, r.left + needed.cx);
-        r.bottom = max(r.bottom, r.top + needed.cy);
+        if(measure.width_dependent) {
+            r.right = r.left + max(0, measure.measured.cx);
+            r.bottom = r.top + max(0, measure.measured.cy);
+        }
+        else {
+            r.right = r.left + max(r.GetWidth(), measure.min.cx);
+            r.bottom = r.top + max(r.GetHeight(), measure.min.cy);
+        }
         if(first) {
             b = r;
             first = false;

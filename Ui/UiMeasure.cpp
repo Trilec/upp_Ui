@@ -29,7 +29,7 @@ UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& 
 	if(const UiGridLayout* grid = dynamic_cast<const UiGridLayout*>(&c)) {
 		if(spec.available_width >= 0) {
 			int measure_w = max(1, spec.available_width);
-			out.measured = Size(measure_w, max(0, const_cast<UiGridLayout*>(grid)->MeasureHeightForWidth(measure_w)));
+			out.measured = Size(measure_w, max(0, grid->MeasureHeightForWidth(measure_w)));
 			out.width_dependent = true;
 		}
 		return out;

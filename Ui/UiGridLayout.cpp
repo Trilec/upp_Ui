@@ -590,7 +590,7 @@ Size UiGridLayout::GetMinSize() const
     return Size(w, h);
 }
 
-int UiGridLayout::MeasureHeightForWidth(int total_width)
+int UiGridLayout::MeasureHeightForWidth(int total_width) const
 {
     int gap = style.spacing;
     int inner_w = max(0, total_width - inset.left - inset.right);

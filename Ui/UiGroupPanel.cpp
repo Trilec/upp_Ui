@@ -1,4 +1,5 @@
 #include <Ui/UiGroupPanel.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -251,7 +252,7 @@ Size UiGroupPanel::GetMinSize() const
 {
     const Style& s = GetEffectiveStyle();
     Size hs = GetHeaderSize();
-    Size cs = content_ ? content_->GetMinSize() : Size(DPI(40), DPI(28));
+    Size cs = content_ ? UiMeasureLayout(*content_).min : Size(DPI(40), DPI(28));
     cs.cx += s.inset.left + s.inset.right;
     cs.cy += s.inset.top + s.inset.bottom;
     bool vertical = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;

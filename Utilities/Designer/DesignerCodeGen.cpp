@@ -114,54 +114,6 @@ static String VarName(const VectorMap<DesignerNodeId, String>& names, DesignerNo
 	return q >= 0 ? names[q] : VarName(id);
 }
 
-static String PostProcessGeneratedCode(const String& code,
-                                       const DesignerModel& model,
-                                       const VectorMap<DesignerNodeId, String>& names)
-{
-	Vector<String> spacer_vars;
-	Vector<String> split_vars;
-	for(const DesignerNode& n : model.GetNodes()) {
-		if(n.id == Designer_ROOT)
-			continue;
-		String var = VarName(names, n.id);
-		if(n.type_id == "Spacer")
-			spacer_vars.Add(var);
-		else if(n.type_id == "UiSplitButton")
-			split_vars.Add(var);
-	}
-
-	Vector<String> lines = Split(code, '\n');
-	String out;
-	for(String line : lines) {
-		bool skip = false;
-		for(const String& var : spacer_vars) {
-			if(line.StartsWith("\t\t" + var + ".")) {
-				skip = true;
-				break;
-			}
-		}
-		if(skip)
-			continue;
-
-		bool rewritten = false;
-		for(const String& var : split_vars) {
-			String prefix = "\t\t" + var + ".";
-			if(line.StartsWith(prefix)) {
-				int q = line.Find(".SetSplitWidth(");
-				if(q >= 0 && line.Find(".SetText(") >= 0) {
-					out << line.Left(q) << ";\n";
-					out << "\t\t" << var << line.Mid(q) << "\n";
-					rewritten = true;
-					break;
-				}
-			}
-		}
-		if(!rewritten)
-			out << line << "\n";
-	}
-	return out;
-}
-
 static String DirectionExpr(const DesignerNode& n, const String& def)
 {
 	return CodeGenNodeProperty(n, "direction", def) == "H" ? "UiDirection::H" : "UiDirection::V";
@@ -803,7 +755,8 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 	else if(n.type_id == "UiFloatEdit")
 		out << "\tUiFloatEdit " << var << ";\n";
 	else if(n.type_id == "UiSlider")
-		out << "\tUiSlider " << var << ";\n";	else if(n.type_id == "UiCompositeLabel")
+		out << "\tUiSlider " << var << ";\n";
+	else if(n.type_id == "UiCompositeLabel")
 		out << "\tUiCompositeLabel " << var << ";\n";
 	else if(n.type_id == "UiCompositeEdit")
 		out << "\tUiCompositeEdit " << var << ";\n";
@@ -1731,7 +1684,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	    << "{\n"
 	    << "\t" << options.class_name << "().Run();\n"
 	    << "}\n";
-	return PostProcessGeneratedCode(out, model, names);
+	return out;
 }
 
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,

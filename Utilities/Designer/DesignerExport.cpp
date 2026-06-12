@@ -44,6 +44,11 @@ static bool WriteFileAtomic(const String& path, const String& data)
 	return true;
 }
 
+static bool WriteExportFile(const String& path, const String& data)
+{
+	return WriteFileAtomic(path, data);
+}
+
 static String BuildUppFile(const DesignerProjectExportOptions& options, const String& project_name)
 {
 	String out;
@@ -143,11 +148,16 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 		return false;
 	}
 	result.package_dir = AppendFileName(out_dir, result.project_name);
+	String stage_dir = result.package_dir + ".staging";
 	if(DirectoryExists(result.package_dir) && DirectoryHasFiles(result.package_dir) && !options.overwrite_existing) {
 		result.error = "Export directory already exists and is not empty.";
 		return false;
 	}
-	if(!EnsureDirectoryPath(result.package_dir)) {
+	if(DirectoryExists(stage_dir) && !DeleteFolderDeep(stage_dir)) {
+		result.error = "Unable to clear staging directory.";
+		return false;
+	}
+	if(!EnsureDirectoryPath(stage_dir)) {
 		result.error = "Unable to create export directory.";
 		return false;
 	}
@@ -156,6 +166,10 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 	result.main_cpp_path = AppendFileName(result.package_dir, "main.cpp");
 	result.design_json_path = AppendFileName(result.package_dir, "design.json");
 	result.readme_path = AppendFileName(result.package_dir, "README.md");
+	String stage_upp_path = AppendFileName(stage_dir, result.project_name + ".upp");
+	String stage_main_cpp_path = AppendFileName(stage_dir, "main.cpp");
+	String stage_design_json_path = AppendFileName(stage_dir, "design.json");
+	String stage_readme_path = AppendFileName(stage_dir, "README.md");
 
 	DesignerCodeGenOptions gen;
 	gen.class_name = result.class_name;
@@ -172,18 +186,53 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 	String upp = BuildUppFile(options, result.project_name);
 	String readme = BuildReadme(options, result);
 
-	if(!WriteFileAtomic(result.upp_path, upp) || !WriteFileAtomic(result.main_cpp_path, main_cpp)) {
+	if(!WriteExportFile(stage_upp_path, upp) || !WriteExportFile(stage_main_cpp_path, main_cpp)) {
 		result.error = "Unable to write exported project files.";
+		DeleteFolderDeep(stage_dir);
 		return false;
 	}
-	if(options.include_design_json && !WriteFileAtomic(result.design_json_path, design_json)) {
+	if(options.include_design_json && !WriteExportFile(stage_design_json_path, design_json)) {
 		result.error = "Unable to write design.json.";
+		DeleteFolderDeep(stage_dir);
 		return false;
 	}
-	if(options.include_readme && !WriteFileAtomic(result.readme_path, readme)) {
+	if(options.include_readme && !WriteExportFile(stage_readme_path, readme)) {
 		result.error = "Unable to write README.md.";
+		DeleteFolderDeep(stage_dir);
 		return false;
 	}
+
+	if(DirectoryExists(result.package_dir) && options.overwrite_existing) {
+		if(!DeleteFolderDeep(result.package_dir)) {
+			result.error = "Unable to clear existing export directory.";
+			DeleteFolderDeep(stage_dir);
+			return false;
+		}
+	}
+	if(!EnsureDirectoryPath(result.package_dir)) {
+		result.error = "Unable to create export directory.";
+		DeleteFolderDeep(stage_dir);
+		return false;
+	}
+
+	auto CommitFile = [&](const String& stage_path, const String& final_path) -> bool {
+		if(!FileExists(stage_path))
+			return true;
+		if(FileExists(final_path) && !FileDelete(final_path))
+			return false;
+		return FileMove(stage_path, final_path);
+	};
+
+	if(!CommitFile(stage_upp_path, result.upp_path) ||
+	   !CommitFile(stage_main_cpp_path, result.main_cpp_path) ||
+	   !CommitFile(stage_design_json_path, result.design_json_path) ||
+	   !CommitFile(stage_readme_path, result.readme_path)) {
+		result.error = "Unable to finalize exported project.";
+		DeleteFolderDeep(result.package_dir);
+		DeleteFolderDeep(stage_dir);
+		return false;
+	}
+	DeleteFolderDeep(stage_dir);
 	return true;
 }
 
