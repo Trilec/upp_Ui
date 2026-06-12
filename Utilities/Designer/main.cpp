@@ -1370,6 +1370,7 @@ private:
 		options.include_designer_appearance = export_include_appearance_;
 		options.include_design_json = export_include_design_json_;
 		options.include_readme = export_include_readme_;
+		options.overwrite_existing = false;
 		options.umk_path = umk_path_;
 		options.build_method = export_build_method_;
 		options.output_exe_path = export_output_exe_path_;
@@ -1381,6 +1382,7 @@ private:
 		   !PromptYesNo(Format("Overwrite files in '%s'?", package_dir))) {
 			return;
 		}
+		options.overwrite_existing = true;
 
 		DesignerProjectExportResult result;
 		if(!ExportDesignerProject(model_, registry_, options, StoreDesignerModelJson(model_), result)) {

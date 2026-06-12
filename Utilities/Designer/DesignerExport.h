@@ -2,20 +2,9 @@
 
 #include "DesignerModel.h"
 #include "DesignerRegistry.h"
+#include "DesignerCodeGen.h"
 
 namespace Upp {
-
-struct DesignerCodeGenOptions {
-	String class_name = "GeneratedDesignerWindow";
-	bool emit_designer_appearance = false;
-	bool emit_export_header = false;
-	String source_design_filename;
-	String package_name;
-	String umk_path;
-	String exported_package_path;
-	String build_method;
-	String output_exe_path;
-};
 
 struct DesignerProjectExportOptions {
 	String project_name;
@@ -25,6 +14,7 @@ struct DesignerProjectExportOptions {
 	bool include_designer_appearance = false;
 	bool include_design_json = true;
 	bool include_readme = true;
+	bool overwrite_existing = false;
 	String umk_path;
 	String build_method;
 	String output_exe_path;

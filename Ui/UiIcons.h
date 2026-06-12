@@ -13,6 +13,13 @@
     Purpose
     - Public icon catalog and thin ICON_* wrappers over the shared IML-backed
       Ui icon image class.
+
+    V1 contract
+    - Icons are source-neutral at the control boundary.
+    - Designer stores stable icon ids/names and codegen resolves through this
+      catalog.
+    - Future SVG/vector sources must plug in behind the same cache-aware image
+      path; controls should not depend on icon source format.
 */
 
 #include <CtrlCore/CtrlCore.h>

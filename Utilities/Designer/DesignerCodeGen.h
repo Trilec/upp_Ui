@@ -2,7 +2,6 @@
 
 #include "DesignerModel.h"
 #include "DesignerRegistry.h"
-#include "DesignerExport.h"
 
 // Ui Designer generated-code exporter.
 // Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
@@ -12,6 +11,18 @@
 // preview-only state.
 
 namespace Upp {
+
+struct DesignerCodeGenOptions {
+	String class_name = "GeneratedDesignerWindow";
+	bool emit_designer_appearance = false;
+	bool emit_export_header = false;
+	String source_design_filename;
+	String package_name;
+	String umk_path;
+	String exported_package_path;
+	String build_method;
+	String output_exe_path;
+};
 
 // Produce a standalone GUI window class and entry point from the current model.
 // Appearance metadata is omitted by default and only emitted when explicitly

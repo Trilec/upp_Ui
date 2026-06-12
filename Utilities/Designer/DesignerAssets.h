@@ -12,6 +12,13 @@
     - Keep application branding close to the utility without promoting it into
       the shared Ui icon catalog used by controls and demos.
 
+    V1 icon note
+    - The public icon pipeline stays source-neutral.
+    - Designer stores stable icon ids/names and codegen resolves through the
+      shared icon catalog/cache path.
+    - Keep controls agnostic to whether the backing source is .iml, SVG, or a
+      future vector backend.
+
     Changelog
     - 2026-05: added local Designer logo image class for the window/header icon.
 */

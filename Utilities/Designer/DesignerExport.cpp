@@ -22,6 +22,12 @@ static bool EnsureDirectoryPath(const String& path)
 	return DirectoryCreate(p) || DirectoryExists(p);
 }
 
+static bool DirectoryHasFiles(const String& path)
+{
+	FindFile ff(AppendFileName(path, "*"));
+	return ff;
+}
+
 static bool WriteFileAtomic(const String& path, const String& data)
 {
 	String tmp = path + ".tmp";
@@ -137,6 +143,10 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 		return false;
 	}
 	result.package_dir = AppendFileName(out_dir, result.project_name);
+	if(DirectoryExists(result.package_dir) && DirectoryHasFiles(result.package_dir) && !options.overwrite_existing) {
+		result.error = "Export directory already exists and is not empty.";
+		return false;
+	}
 	if(!EnsureDirectoryPath(result.package_dir)) {
 		result.error = "Unable to create export directory.";
 		return false;

@@ -581,10 +581,13 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
         return GetMinSize().cy;
 
     const uint64 theme_revision = UiTheme::GetRevision();
-    if(measure_cache_width_ == total_width &&
-       measure_cache_gen_ == cur_gen &&
-       measure_cache_theme_revision_ == theme_revision)
-        return measure_cache_result_;
+    for(int i = 0; i < 4; i++) {
+        if(measure_cache_width_[i] == total_width &&
+           measure_cache_gen_[i] == cur_gen &&
+           measure_cache_theme_revision_[i] == theme_revision &&
+           measure_cache_result_[i] != INT_MIN)
+            return measure_cache_result_[i];
+    }
 
     Rect irc = RectC(0, 0, max(0, total_width - inset.left - inset.right), INT_MAX / 8);
     UiBoxLayout *self = const_cast<UiBoxLayout*>(this);
@@ -611,6 +614,8 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     int saved_used_h = self->used_h;
     int saved_layout_gen = self->layout_gen;
     Rect saved_irc = self->last_layout_irc_;
+    bool saved_wrap_rows_expand = self->wrap_rows_expand;
+    self->wrap_rows_expand = false;
     self->RebuildLayoutCache(irc);
     int measured = max(0, self->used_h) + inset.top + inset.bottom;
     for(int i = 0; i < count; i++) {
@@ -625,10 +630,13 @@ int UiBoxLayout::MeasureHeightForWidth(int total_width) const
     self->used_h = saved_used_h;
     self->layout_gen = saved_layout_gen;
     self->last_layout_irc_ = saved_irc;
-    self->measure_cache_width_ = total_width;
-    self->measure_cache_result_ = measured;
-    self->measure_cache_gen_ = self->cur_gen;
-    self->measure_cache_theme_revision_ = theme_revision;
+    self->wrap_rows_expand = saved_wrap_rows_expand;
+    int slot = self->measure_cache_slot_ & 3;
+    self->measure_cache_width_[slot] = total_width;
+    self->measure_cache_result_[slot] = measured;
+    self->measure_cache_gen_[slot] = self->cur_gen;
+    self->measure_cache_theme_revision_[slot] = theme_revision;
+    self->measure_cache_slot_ = (byte)((slot + 1) & 3);
     return measured;
 }
 
