@@ -1230,7 +1230,7 @@ private:
 				box_.Add(exe_row_).Fit();
 				box_.Add(button_row_).Fit();
 
-				info_.SetText("Export a ready-to-open U++ package with main.cpp, .upp, design.json, and README.")
+				info_.SetText("Export a ready-to-open U++ package with main.cpp and .upp. design.json and README are optional.")
 				     .SetAlign(UiAlign::LEFT, UiAlign::TOP)
 				     .NoWantFocus();
 
@@ -1378,11 +1378,20 @@ private:
 
 		String project_name = SanitizeDesignerPackageName(options.project_name);
 		String package_dir = AppendFileName(options.output_directory, project_name);
-		if(DirectoryExists(package_dir) && DirectoryHasFiles(package_dir) &&
-		   !PromptYesNo(Format("Overwrite files in '%s'?", package_dir))) {
-			return;
+		bool package_is_dir = DirectoryExists(package_dir);
+		bool package_is_file = FileExists(package_dir);
+		bool should_overwrite = false;
+		if(package_is_file) {
+			if(!PromptYesNo(Format("'%s' exists as a file. Replace it with an export package directory?", package_dir)))
+				return;
+			should_overwrite = true;
 		}
-		options.overwrite_existing = true;
+		else if(package_is_dir && DirectoryHasFiles(package_dir)) {
+			if(!PromptYesNo(Format("Overwrite files in '%s'?", package_dir)))
+				return;
+			should_overwrite = true;
+		}
+		options.overwrite_existing = should_overwrite;
 
 		DesignerProjectExportResult result;
 		if(!ExportDesignerProject(model_, registry_, options, StoreDesignerModelJson(model_), result)) {

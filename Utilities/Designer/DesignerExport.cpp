@@ -104,7 +104,9 @@ static String BuildReadme(const DesignerProjectExportOptions& options,
 	    << umk_path << " " << package_path << " " << result.project_name << " " << build_method << " -br +GUI " << output_exe << "\n"
 	    << "```\n\n"
 	    << "- `main.cpp` is generated output.\n"
-	    << "- `design.json` is the source design model for regeneration.\n";
+	    << (options.include_design_json
+	            ? "- `design.json` is the source design model for regeneration.\n"
+	            : "- The package was generated from the Designer model, but the source `design.json` was not included.\n");
 	return out;
 }
 
