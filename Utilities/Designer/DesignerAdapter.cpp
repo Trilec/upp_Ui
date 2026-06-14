@@ -1467,6 +1467,7 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.Hide("role");
 	b.Hide("face_mode");
 	b.Hide("face_quad");
 	b.Hide("face_enabled");
@@ -1474,6 +1475,13 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	b.Hide("frame_enabled");
 	b.Hide("frame");
 	b.Hide("radius");
+	b.Hide("shadow_enabled");
+	b.Hide("shadow_distance");
+	b.Hide("shadow_offset_x");
+	b.Hide("shadow_offset_y");
+	b.Hide("shadow_alpha");
+	b.Hide("shadow_color");
+	b.Hide("shadow_curve");
 	b.Add("face_enabled", "Track face", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
 	      "Uses Track face as an explicit track fill override.").group = "Theme Overrides";
 	b.Add("face", "Track face", DesignerEditorKind::Color, "explicit designer appearance",
@@ -1905,6 +1913,7 @@ void DesignerToggleAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
 	b.Hide("text");
+	HideQuadFaceBindings(b);
 	HideSurfaceOverrideBindings(b);
 	b.Add("on", "On", DesignerEditorKind::Bool, "UiToggle::SetOn",
 	      "Sets the preview toggle state.");
@@ -2045,6 +2054,7 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideQuadFaceBindings(b);
 	HideSurfaceOverrideBindings(b);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiCheckBox::SetText",
 	      "Sets the checkbox label.");
@@ -2142,6 +2152,7 @@ void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	HideThemeOverrideBindings(b);
 	b.Hide("role");
 	int count = DesignerBreadcrumbCount(node);
 	b.AddInt("crumb_count", "Crumbs", DesignerEditorKind::Slider, "UiBreadcrumbs::AddCrumb count",
@@ -2637,7 +2648,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	HideSurfaceOverrideBindings(b);
+	HideThemeOverrideBindings(b);
 	b.Hide("role");
 
 	if(node.type_id != "UiSliderEdit") {

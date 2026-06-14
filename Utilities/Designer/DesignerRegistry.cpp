@@ -25,6 +25,14 @@ const DesignerType* DesignerRegistry::Find(const String& type_id) const
 	return q >= 0 ? &types_[q] : nullptr;
 }
 
+Vector<const DesignerType*> DesignerRegistry::GetTypes() const
+{
+	Vector<const DesignerType*> out;
+	for(int i = 0; i < types_.GetCount(); i++)
+		out.Add(&types_[i]);
+	return out;
+}
+
 Vector<String> DesignerRegistry::GetToolboxGroups() const
 {
 	Vector<String> groups;

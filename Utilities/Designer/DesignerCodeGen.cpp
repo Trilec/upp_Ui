@@ -265,6 +265,8 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiCheckBox::Style";
 	if(n.type_id == "UiToggle")
 		return "UiToggle::Style";
+	if(n.type_id == "UiSlider")
+		return "UiSlider::Style";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::Style";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
@@ -273,6 +275,8 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiDropdown::Style";
 	if(n.type_id == "UiBreadcrumbs")
 		return "UiBreadcrumbs::Style";
+	if(n.type_id == "UiTab")
+		return "UiTab::Style";
 	return String();
 }
 
@@ -297,6 +301,8 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		       CheckVisualExpr(AsString(CodeGenNodeProperty(n, "visual", "Classic"))) + ")";
 	if(n.type_id == "UiToggle")
 		return "UiTheme::ResolveToggle(" + role_expr + ")";
+	if(n.type_id == "UiSlider")
+		return "UiTheme::ResolveSlider()";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::StyleDefault()";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
@@ -305,6 +311,8 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		return "UiTheme::ResolveDropdown(" + role_expr + ")";
 	if(n.type_id == "UiBreadcrumbs")
 		return "UiBreadcrumbs::StyleDefault()";
+	if(n.type_id == "UiTab")
+		return "UiTheme::ResolveTab(" + role_expr + ", " + TabVisualExpr(AsString(CodeGenNodeProperty(n, "visual", "Document"))) + ")";
 	return String();
 }
 

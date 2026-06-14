@@ -36,6 +36,7 @@ class DesignerRegistry {
 public:
 	void Register(const DesignerType& type);
 	const DesignerType* Find(const String& type_id) const;
+	Vector<const DesignerType*> GetTypes() const;
 	Vector<String> GetToolboxGroups() const;
 	Vector<const DesignerType*> GetToolboxTypes(const String& group) const;
 	bool CanDrop(const DesignerNode& parent, const DesignerNode& child) const;
