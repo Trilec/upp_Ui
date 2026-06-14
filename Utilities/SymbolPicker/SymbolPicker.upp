@@ -1,0 +1,22 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	SymbolPickerModel.h,
+	SymbolPickerModel.cpp,
+	SymbolPickerCommands.h,
+	SymbolPickerCommands.cpp,
+	SymbolPickerView.h,
+	SymbolPickerView.cpp,
+	SymbolPickerApp.h,
+	SymbolPickerApp.cpp,
+	README.md,
+	CHANGELOG.md,
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
