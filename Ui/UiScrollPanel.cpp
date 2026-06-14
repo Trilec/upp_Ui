@@ -81,9 +81,7 @@ void UiScrollPanel::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    Style resolved = StyleDefault();
-    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    resolved.palette = panel.palette;
+    Style resolved = UiTheme::ResolveScrollPanel(UiRole::Standard);
     resolved.metrics.radius = 0;
     resolved.metrics.frame_width = 0;
     resolved.metrics.frame_enabled = false;

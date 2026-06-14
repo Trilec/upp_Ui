@@ -22,6 +22,7 @@ static void PaintDesignerAppearanceValues(Draw& w, const Rect& r, Color face, Co
 static void PaintDesignerAppearance(Draw& w, const Rect& r, const DesignerNode& n,
                                     Color default_face, Color default_frame);
 static Color DesignerDebugColor(const DesignerNode& n);
+static void ApplyTitleCardInkOverrides(UiTitleCard::Style& style, const DesignerNode& n);
 
 static int DesignerBreadcrumbCount(const DesignerNode& n)
 {
@@ -190,6 +191,16 @@ static Color DesignerDebugColor(const DesignerNode& n)
 	};
 	int q = abs((int)n.id) % (int)(sizeof(palette) / sizeof(palette[0]));
 	return palette[q];
+}
+
+static void ApplyTitleCardInkOverrides(UiTitleCard::Style& style, const DesignerNode& n)
+{
+	if(!(bool)AdapterNodeProperty(n, "theme_override", false))
+		return;
+	if((bool)AdapterNodeProperty(n, "title_color_enabled", false))
+		style.title_color = GetColorProperty(n, "title_color", style.title_color);
+	if((bool)AdapterNodeProperty(n, "subtitle_color_enabled", false))
+		style.subtitle_color = GetColorProperty(n, "subtitle_color", style.subtitle_color);
 }
 
 static Font DesignerFontChoice(const DesignerNode& n, const String& key, int size, bool bold = false)
@@ -1305,6 +1316,7 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	node_id_ = node.id;
 	UiTitleCard::Style s = UiTheme::ResolveTitleCard(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
+	ApplyTitleCardInkOverrides(s, node);
 	int inset = max(0, (int)AdapterNodeProperty(node, "content_inset", 8));
 	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	s.media_gap = DPI(max(0, (int)AdapterNodeProperty(node, "media_gap", 10)));
@@ -1393,6 +1405,14 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	             {"Times New Roman", "Times New Roman"}, {"Consolas", "Consolas"}, {"Courier New", "Courier New"}});
 	b.AddInt("subtitle_size", "Subtitle size", DesignerEditorKind::Slider, "UiTitleCard::Style::subtitle_font",
 	         "Preview subtitle font size.", 7, 24);
+	b.Add("title_color_enabled", "Title color enabled", DesignerEditorKind::Bool, "UiTitleCard::Style::title_color",
+	      "Enables an explicit title color override when theme overrides are active.").group = "Theme Overrides";
+	b.Add("title_color", "Title color", DesignerEditorKind::Color, "UiTitleCard::Style::title_color",
+	      "Explicit title color used when theme overrides are active.").group = "Theme Overrides";
+	b.Add("subtitle_color_enabled", "Subtitle color enabled", DesignerEditorKind::Bool, "UiTitleCard::Style::subtitle_color",
+	      "Enables an explicit subtitle color override when theme overrides are active.").group = "Theme Overrides";
+	b.Add("subtitle_color", "Subtitle color", DesignerEditorKind::Color, "UiTitleCard::Style::subtitle_color",
+	      "Explicit subtitle color used when theme overrides are active.").group = "Theme Overrides";
 }
 
 void DesignerTitleCardAdapter::Paint(Draw& w)
@@ -2473,7 +2493,7 @@ void DesignerAccordionAdapter::Paint(Draw& w)
 void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
-	UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
+	UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	SetCustomStyle(s);
 	String mode = AdapterNodeProperty(node, "scroll_mode", "Auto");
@@ -2492,7 +2512,6 @@ void DesignerScrollPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.Hide("role");
 	b.AddChoice("scroll_mode", "Scroll mode", "UiScrollPanel::SetScrollMode",
 	            "Controls which scroll directions are available.",
 	            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}, {"None", "None"}});

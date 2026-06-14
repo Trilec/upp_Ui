@@ -58,6 +58,8 @@ private:
 	Value DefaultValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b) const;
 	Value PropertyValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b) const;
 	String RuntimeTypeName(const String& type_id) const;
+	String NodeContextText(const DesignerNode& n, const DesignerType& t) const;
+	Size NodeContextSize(const DesignerNode& n, const DesignerType& t) const;
 	String PageKey(const DesignerNode& n, const Vector<DesignerApiBinding>& bindings) const;
 	void Describe(Vector<DesignerApiBinding>& bindings, const DesignerNode& n) const;
 	void AppendBinding(Vector<DesignerApiBinding>& bindings, const DesignerApiBinding& binding) const;
@@ -75,7 +77,7 @@ private:
 	int FindPage(const String& key) const;
 	void AddOwned(Page& page, One<Ctrl> ctrl);
 	void AddTypeRow(Page& page, const String& type_text);
-	void AddNameRow(Page& page, const DesignerNode& n);
+	void AddContextRow(Page& page, const DesignerNode& n, const DesignerType& t);
 	void AddMessageRow(Page& page, const String& text);
 	void AddMultiSelectionHeader(Page& page, int count);
 	void AddBindingRow(Page& page, const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b);

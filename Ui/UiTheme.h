@@ -49,6 +49,7 @@
 #include <Ui/UiToggle.h>
 #include <Ui/UiRadioButton.h>
 #include <Ui/UiSlider.h>
+#include <Ui/UiScrollPanel.h>
 #include <Ui/UiScrollBar.h>
 #include <Ui/UiSplitter.h>
 #include <Ui/UiDropdown.h>
@@ -2445,6 +2446,8 @@ public:
     static UiSplitter::Style ResolveSplitter() { return ResolveSplitter(GetContext()); }
     static UiPanel::Style ResolvePanel(UiRole role) { return ResolvePanel(GetContext(), role); }
     static UiPanel::Style ResolvePanel(UiPanelRole role = UiPanelRole::Surface) { return ResolvePanel(GetContext(), role); }
+    static UiScrollPanel::Style ResolveScrollPanel(UiRole role) { return ResolveScrollPanel(GetContext(), role); }
+    static UiScrollPanel::Style ResolveScrollPanel() { return ResolveScrollPanel(GetContext(), UiRole::Standard); }
     static UiDropdown::Style ResolveDropdown(UiRole role) { return ResolveDropdown(GetContext(), role); }
     static UiDropdown::Style ResolveDropdown() { return ResolveDropdown(GetContext()); }
     static UiTab::Style ResolveTab(UiRole role, UiTabVisual visual = UITAB_CLASSIC) { return ResolveTab(GetContext(), role, visual); }
@@ -2693,6 +2696,17 @@ public:
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
+        return s;
+    }
+
+    static UiScrollPanel::Style ResolveScrollPanel(const UiThemeContext& ctx, UiRole role)
+    {
+        UiPanel::Style panel = ResolvePanel(ctx, role);
+        UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
+        s.palette = panel.palette;
+        s.metrics = panel.metrics;
+        s.skin = panel.skin;
+        s.transparent = panel.transparent;
         return s;
     }
 

@@ -411,9 +411,9 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
         int h = it.fixed >= 0 ? it.fixed : ms.cy;
         if(fixed_row > 0)
             h = min(h, fixed_row);
-        h = min(max(h, it.minh), it.maxh);
+        h = min(max(h, it.minw), it.maxw);
 
-        int w = min(max(ms.cx, it.minw), it.maxw);
+        int w = min(max(ms.cx, it.minh), it.maxh);
 
         base_h[i] = max(0, h);
         base_w[i] = max(0, w);
@@ -688,8 +688,8 @@ Size UiBoxLayout::GetPreferredSize() const
             int h = it.fixed >= 0 ? it.fixed : ms.cy;
             if(fixed_row > 0)
                 h = min(h, fixed_row);
-            h = min(max(h, it.minh), it.maxh);
-            int w = min(max(ms.cx, it.minw), it.maxw);
+            h = min(max(h, it.minw), it.maxw);
+            int w = min(max(ms.cx, it.minh), it.maxh);
 
             main_total += max(0, h);
             cross_max = max(cross_max, max(0, w));

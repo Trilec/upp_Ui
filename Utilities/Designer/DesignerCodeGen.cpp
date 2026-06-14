@@ -281,7 +281,7 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 	if(n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic")
 		return "UiTheme::ResolvePanel(" + role_expr + ")";
 	if(n.type_id == "UiScrollPanel")
-		return "UiScrollPanel::StyleDefault()";
+		return "UiTheme::ResolveScrollPanel(" + role_expr + ")";
 	if(n.type_id == "UiGroupPanel")
 		return "UiTheme::ResolveGroupPanel(" + role_expr + ")";
 	if(n.type_id == "UiLabel")
@@ -460,7 +460,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(!override) {
 		if(n.type_id == "UiAccordion")
 			return;
-		if(!custom_align && role != "Standard" && n.type_id != "UiScrollPanel") {
+		if(!custom_align && role != "Standard") {
 			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
 			return;
 		}
@@ -515,6 +515,22 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	}
 	if(CodeGenHasProperty(n, "radius"))
 		out << "\t\t\ts.metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "radius", 0)) << ");\n";
+	if(n.type_id == "UiTitleCard") {
+		if(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)) {
+			if(emit_designer_appearance)
+				out << "\t\t\t// Text/icon override.\n";
+			out << "\t\t\ts.title_color = "
+			    << ColorExpr(CodeGenNodeProperty(n, "title_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).title_color))
+			    << ";\n";
+		}
+		if(CodeGenHasProperty(n, "subtitle_color_enabled") && (bool)CodeGenNodeProperty(n, "subtitle_color_enabled", false)) {
+			if(emit_designer_appearance && !(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)))
+				out << "\t\t\t// Text/icon override.\n";
+			out << "\t\t\ts.subtitle_color = "
+			    << ColorExpr(CodeGenNodeProperty(n, "subtitle_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).subtitle_color))
+			    << ";\n";
+		}
+	}
 	if(CodeGenHasProperty(n, "shadow_enabled")) {
 		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Shadow override.\n";

@@ -129,9 +129,11 @@ static DesignerInspectorSurfaceDefault DesignerInspectorThemeSurfaceDefault(cons
 {
 	int role_pos = n.properties.Find("role");
 	UiRole role = DesignerInspectorRoleChoice(role_pos >= 0 ? n.properties.GetValue(role_pos) : Value("Standard"));
-	if(n.type_id == "Window" || n.type_id == "UiPanel" || n.type_id == "UiScrollPanel" ||
+	if(n.type_id == "Window" || n.type_id == "UiPanel" ||
 	   n.type_id == "Item" || n.type_id == "Generic")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolvePanel(role));
+	if(n.type_id == "UiScrollPanel")
+		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveScrollPanel(role));
 	if(n.type_id == "UiGroupPanel")
 		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveGroupPanel(role));
 	if(n.type_id == "UiLabel")
@@ -269,6 +271,34 @@ String DesignerInspector::RuntimeTypeName(const String& type_id) const
 	return type_id;
 }
 
+Size DesignerInspector::NodeContextSize(const DesignerNode& n, const DesignerType& t) const
+{
+	if(n.last_rect.GetWidth() > 0 && n.last_rect.GetHeight() > 0)
+		return n.last_rect.GetSize();
+	if(n.id == Designer_ROOT)
+		return model_ ? model_->GetVirtualSize() : t.default_size;
+
+	Size fallback = t.default_size;
+	String h_sizing = AsString(NodeProperty(n, "h_sizing", "Fit"));
+	String v_sizing = AsString(NodeProperty(n, "v_sizing", "Fit"));
+	if(h_sizing == "Fixed")
+		fallback.cx = max(1, (int)NodeProperty(n, "fixed_width", NodeProperty(n, "width", fallback.cx)));
+	else
+		fallback.cx = max((int)NodeProperty(n, "min_width", DESIGNER_MIN_CLAMP), fallback.cx);
+	if(v_sizing == "Fixed")
+		fallback.cy = max(1, (int)NodeProperty(n, "fixed_height", NodeProperty(n, "height", fallback.cy)));
+	else
+		fallback.cy = max((int)NodeProperty(n, "min_height", DESIGNER_MIN_CLAMP), fallback.cy);
+	return fallback;
+}
+
+String DesignerInspector::NodeContextText(const DesignerNode& n, const DesignerType& t) const
+{
+	Size sz = NodeContextSize(n, t);
+	String type_text = RuntimeTypeName(n.type_id);
+	return Format("%s [%d x %d]  %s", ~type_text, sz.cx, sz.cy, ~n.name);
+}
+
 Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType& t,
                                         const DesignerApiBinding& b) const
 {
@@ -370,6 +400,8 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 	}
 	if(b.property_id == "theme_override")
 		return false;
+	if(b.property_id == "title_color_enabled" || b.property_id == "subtitle_color_enabled")
+		return false;
 	if(b.property_id == "face_mode")
 		return "Solid";
 	if(b.property_id == "face_enabled" || b.property_id == "frame_enabled")
@@ -433,6 +465,10 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
 		return surface.found ? surface.frame : Color(54, 116, 210);
 	}
+	if(b.property_id == "title_color")
+		return UiTheme::ResolveTitleCard(DesignerInspectorRoleChoice(NodeProperty(n, "role", "Standard"))).title_color;
+	if(b.property_id == "subtitle_color")
+		return UiTheme::ResolveTitleCard(DesignerInspectorRoleChoice(NodeProperty(n, "role", "Standard"))).subtitle_color;
 	if(b.property_id == "text")
 		return n.name;
 	if(b.property_id == "value")
@@ -541,31 +577,18 @@ void DesignerInspector::SetNode(DesignerNodeId id)
 
 	Vector<DesignerApiBinding> bindings;
 	Describe(bindings, *n);
-		String type_text = RuntimeTypeName(n->type_id);
-	if(n->last_rect.GetWidth() > 0 && n->last_rect.GetHeight() > 0)
-		type_text << " (" << AsString(n->last_rect.GetWidth()) << "x"
-		          << AsString(n->last_rect.GetHeight()) << ") WH";
-	else if(n->id == Designer_ROOT)
-		type_text << " (" << AsString(model_->GetVirtualSize().cx) << "x"
-		          << AsString(model_->GetVirtualSize().cy) << ") WH";
-	else
-		type_text << " (size pending) WH";
-
 	String key = PageKey(*n, bindings);
 	syncing_ = true;
 	stack_.ClearPages();
 	pages_.Clear();
 	Page& page = AddPage(key);
-	if(binding_group_.IsEmpty()) {
-		AddTypeRow(page, type_text);
-		AddNameRow(page, *n);
-	}
-	else if(bindings.IsEmpty())
+	AddContextRow(page, *n, *t);
+	if(!binding_group_.IsEmpty() && bindings.IsEmpty())
 		AddMessageRow(page, "No overrides available");
 	for(const DesignerApiBinding& b : bindings)
 		AddBindingRow(page, *n, *t, b);
 	WhenNotes(BuildNoteText(bindings));
-	RefreshPage(page, *n, *t, bindings, type_text);
+	RefreshPage(page, *n, *t, bindings, NodeContextText(*n, *t));
 	stack_.SetActiveKey(key);
 	if(Ctrl *active = stack_.GetActiveCtrl())
 		active->Show();
@@ -671,11 +694,8 @@ DesignerInspector::Page& DesignerInspector::EnsurePage(const DesignerNode& n, co
 	if(q >= 0)
 		return pages_[q];
 	Page& page = AddPage(key);
-	if(binding_group_.IsEmpty()) {
-		AddTypeRow(page, type_text);
-		AddNameRow(page, n);
-	}
-	else if(bindings.IsEmpty())
+	AddContextRow(page, n, t);
+	if(!binding_group_.IsEmpty() && bindings.IsEmpty())
 		AddMessageRow(page, "No overrides available");
 	for(const DesignerApiBinding& b : bindings)
 		AddBindingRow(page, n, t, b);
@@ -703,26 +723,19 @@ void DesignerInspector::AddTypeRow(Page& page, const String& type_text)
 	AddOwned(page, pick(ctrl));
 }
 
-void DesignerInspector::AddNameRow(Page& page, const DesignerNode& n)
+void DesignerInspector::AddContextRow(Page& page, const DesignerNode& n, const DesignerType& t)
 {
 	One<Ctrl> ctrl;
-	UiCompositeEdit *row = new UiCompositeEdit;
+	UiLabel *row = new UiLabel;
 	ctrl.Attach(row);
-	DesignerNodeId row_node = n.id;
-	Ptr<UiCompositeEdit> self = row;
-	row->SetLabel("Name").SetLabelWidth(DPI(88)).SetFieldGap(DPI(8)).SetEditRole(UiRole::Accent);
-	row->SetData(n.name);
-	row->WhenAction = [=] {
-		if(!syncing_ && self && node_id_ == row_node)
-			WhenName(row_node, AsString(self->GetData()));
-	};
-	row->WhenChange = [=] {
-		if(!syncing_ && self && node_id_ == row_node)
-			WhenName(row_node, AsString(self->GetData()));
-	};
+	UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Subtle);
+	s.font = SansSerifZ(9).Bold();
+	row->SetCustomStyle(s);
+	row->SetText(NodeContextText(n, t));
+	row->NoWantFocus();
 	Row& r = page.rows.Add();
-	r.property_id = "name";
-	r.editor = DesignerEditorKind::Text;
+	r.property_id = "$context";
+	r.editor = DesignerEditorKind::ReadOnly;
 	r.ctrl = row;
 	AddOwned(page, pick(ctrl));
 }
@@ -1081,14 +1094,9 @@ void DesignerInspector::RefreshPage(Page& page, const DesignerNode& n, const Des
                                       const Vector<DesignerApiBinding>& bindings, const String& type_text)
 {
 	for(Row& row : page.rows) {
-		if(row.property_id == "$type") {
-			if(UiCompositeLabel *c = dynamic_cast<UiCompositeLabel *>(row.ctrl))
-				c->SetValueText(type_text);
-			continue;
-		}
-		if(row.property_id == "name") {
-			if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
-				c->SetData(n.name);
+		if(row.property_id == "$context") {
+			if(UiLabel *c = dynamic_cast<UiLabel *>(row.ctrl))
+				c->SetText(type_text);
 			continue;
 		}
 		for(const DesignerApiBinding& b : bindings) {
@@ -1105,7 +1113,7 @@ void DesignerInspector::RefreshMultiPage(Page& page, const Vector<const Designer
                                          const Vector<DesignerApiBinding>& bindings)
 {
 	for(Row& row : page.rows) {
-		if(row.property_id == "$message" || row.property_id == "$type")
+		if(row.property_id == "$message" || row.property_id == "$type" || row.property_id == "$context")
 			continue;
 		for(const DesignerApiBinding& b : bindings) {
 			if(b.property_id == row.property_id) {
