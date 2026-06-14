@@ -76,6 +76,7 @@ public:
         UiLineStyle card_line_style = SOLID;
         UiSpan card_line_length = LARGE;
         int  card_line_thickness = DPI(1);
+        int  card_line_gap = 0;
         UiAlign card_line_side = UiAlign::BOTTOM;
         bool card_line_color_enabled = false;
         Color card_line_color;
@@ -99,7 +100,7 @@ public:
               % text_align_h % text_align_v % media_side % media_align_h % media_align_v
               % media_reserve % media_share_percent % media_gap % media_min % media_auto_fit % preserve_media_aspect % media_tint_mono
               % title_line % rs % re % title_line_thickness % title_line_color % title_line_gap_above % title_line_gap_below
-              % card_line % bls % ble % bss % card_line_thickness % card_line_color_enabled % card_line_color
+              % card_line % bls % ble % bss % card_line_thickness % card_line_gap % card_line_color_enabled % card_line_color
               % title_subtitle_gap % subtitle_copy_gap
               % transparent % hover_enabled;
             title_line_style = (UiLineStyle)rs;
@@ -145,6 +146,7 @@ public:
     UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLineSide(UiAlign side);
+    UiTitleCard& SetCardLineGap(int px);
     UiTitleCard& ShowTitleLine(bool on = true);
     UiTitleCard& ShowCardLine(bool on = true);
     UiTitleCard& EnableHover(bool on = true);

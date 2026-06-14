@@ -470,6 +470,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		           || CodeGenNodeProperty(n, "card_line_length", "Large") != "Large"
 		           || CodeGenNodeProperty(n, "card_line_style", "Solid") != "Solid"
 		           || (int)CodeGenNodeProperty(n, "card_line_thickness", 1) != 1
+		           || (int)CodeGenNodeProperty(n, "card_line_gap", 0) != 0
 		           || (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
 	}
 	bool custom_align = false;
@@ -562,6 +563,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			out << "\t\t\ts.card_line_style = " << LineStyleExpr(AsString(CodeGenNodeProperty(n, "card_line_style", "Solid"))) << ";\n";
 		if(CodeGenHasProperty(n, "card_line_thickness"))
 			out << "\t\t\ts.card_line_thickness = DPI(" << max(1, (int)CodeGenNodeProperty(n, "card_line_thickness", 1)) << ");\n";
+		if(CodeGenHasProperty(n, "card_line_gap"))
+			out << "\t\t\ts.card_line_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "card_line_gap", 0)) << ");\n";
 		if(CodeGenHasProperty(n, "card_line_color_enabled")) {
 			bool enabled = (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
 			out << "\t\t\ts.card_line_color_enabled = " << (enabled ? "true" : "false") << ";\n";

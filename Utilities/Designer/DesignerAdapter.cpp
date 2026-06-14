@@ -1370,6 +1370,7 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	s.card_line_style = DesignerLineStyleChoice(AdapterNodeProperty(node, "card_line_style", "Solid"), SOLID);
 	s.card_line_length = DesignerSpanChoice(AdapterNodeProperty(node, "card_line_length", "Large"), LARGE);
 	s.card_line_thickness = DPI(max(1, (int)AdapterNodeProperty(node, "card_line_thickness", 1)));
+	s.card_line_gap = DPI(max(0, (int)AdapterNodeProperty(node, "card_line_gap", 0)));
 	s.card_line_color_enabled = (bool)AdapterNodeProperty(node, "card_line_color_enabled", false);
 	if(s.card_line_color_enabled)
 		s.card_line_color = GetColorProperty(node, "card_line_color", s.card_line_color);
@@ -1440,6 +1441,8 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	            {{"Solid", "Solid"}, {"Dashed", "Dashed"}, {"Dotted", "Dotted"}});
 	b.AddInt("card_line_thickness", "Card line thickness", DesignerEditorKind::Slider,
 	         "UiTitleCard::Style::card_line_thickness", "Thickness of the card separator line.", 1, 12);
+	b.AddInt("card_line_gap", "Card line gap", DesignerEditorKind::Slider,
+	         "UiTitleCard::Style::card_line_gap", "Gap between the card line and the content area.", 0, 64);
 	b.Add("card_line_color_enabled", "Use card line color", DesignerEditorKind::Bool,
 	      "UiTitleCard::Style::card_line_color",
 	      "Enables an explicit card separator color override when theme overrides are active.").group = "Theme Overrides";
