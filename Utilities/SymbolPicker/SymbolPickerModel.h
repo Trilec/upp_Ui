@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_SymbolPicker_SymbolPickerModel_h_
+#define _Utilities_SymbolPicker_SymbolPickerModel_h_
 
 #include <Ui/Ui.h>
 
@@ -45,3 +46,5 @@ private:
 };
 
 }
+
+#endif

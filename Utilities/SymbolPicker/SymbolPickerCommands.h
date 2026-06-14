@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_SymbolPicker_SymbolPickerCommands_h_
+#define _Utilities_SymbolPicker_SymbolPickerCommands_h_
 
 #include "SymbolPickerModel.h"
 
@@ -46,3 +47,5 @@ One<SymbolPickerCommand> MakeSymbolPickerClearSelectionCommand();
 bool RunSymbolPickerCommandSmokeTests(String& error);
 
 }
+
+#endif

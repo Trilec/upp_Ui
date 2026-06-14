@@ -21,7 +21,7 @@ void SymbolPickerApp::Wire()
 
 void SymbolPickerApp::Run()
 {
-	view_.OpenMain();
+	view_.Run();
 }
 
 }
