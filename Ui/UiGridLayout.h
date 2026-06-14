@@ -12,18 +12,11 @@ public:
     using Align = UiCrossAlign;
     struct BlankRef;
 
+    // UiGridLayout is a transparent layout engine. Wrap it in UiPanel,
+    // UiGroupPanel, or UiScrollPanel when an app needs visible chrome.
+
     // Changelog
     // - 2026-06: added separator-line support for blank grid spacer items.
-
-    struct Style : ChStyle<Style> {
-        StyledPalette palette;
-        StyledMetrics metrics;
-        StyledSkin    skin;
-        int           padding = DPI(8);
-        int           spacing = DPI(6);
-
-        static const Style& StyleDefault();
-    };
 
     UiGridLayout();
 
@@ -33,9 +26,6 @@ public:
     static int ComputeColumns(int available_width, int approx_cell_width, int gap = 0);
     static int ComputeRows(int available_height, int approx_cell_height, int gap = 0);
     static Size ComputeGrid(Size available, Size approx_cell, Size gap = Size(0, 0));
-
-    UiGridLayout& SetCustomStyle(const Style& s);
-    const Style&  GetStyle() const { return style; }
 
     UiGridLayout& SetGap(int px);
     UiGridLayout& SetInset(int all);
@@ -163,8 +153,8 @@ private:
     void  ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const;
     void  PaintDebug(Draw& w) const;
 
-    Style style;
     Rect  inset = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
+    int   gap = DPI(6);
     int   grid_cols = 2;
     int   grid_rows = 2;
     Size  min_cell_size = Size(DPI(25), DPI(25));

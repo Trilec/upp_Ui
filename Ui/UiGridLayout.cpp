@@ -80,31 +80,10 @@ static void PaintGridSeparator(Draw& w, const Rect& r, bool enabled, UiCrossAlig
     }
 }
 
-const UiGridLayout::Style& UiGridLayout::Style::StyleDefault()
-{
-    static Style s;
-    ONCELOCK {
-        Color face = SColorFace();
-        Color frame = SColorShadow();
-        Color ink = SColorText();
-        for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::None();
-            s.palette.frame[i] = frame;
-            s.palette.ink[i] = ink;
-        }
-        s.metrics.face_enabled = false;
-        s.metrics.frame_enabled = false;
-        s.metrics.frame_width = DPI(1);
-        s.metrics.radius = DPI(8);
-    }
-    return s;
-}
-
 UiGridLayout::UiGridLayout()
 {
     Transparent();
     WantFocus();
-    style = Style::StyleDefault();
 }
 
 UiGridLayout& UiGridLayout::SetGridSize(int columns, int rows)
@@ -142,9 +121,8 @@ Size UiGridLayout::ComputeGrid(Size available, Size approx_cell, Size gap)
                 ComputeRows(available.cy, approx_cell.cy, gap.cy));
 }
 
-UiGridLayout& UiGridLayout::SetCustomStyle(const Style& s) { style = s; RefreshGridLayout(); Refresh(); return *this; }
-UiGridLayout& UiGridLayout::SetGap(int px) { style.spacing = max(0, px); RefreshGridLayout(); return *this; }
-UiGridLayout& UiGridLayout::SetInset(int all) { int v = max(0, all); inset = Rect(v, v, v, v); style.padding = v; RefreshGridLayout(); return *this; }
+UiGridLayout& UiGridLayout::SetGap(int px) { gap = max(0, px); RefreshGridLayout(); return *this; }
+UiGridLayout& UiGridLayout::SetInset(int all) { int v = max(0, all); inset = Rect(v, v, v, v); RefreshGridLayout(); return *this; }
 UiGridLayout& UiGridLayout::SetInset(int w, int h) { int x = max(0, w), y = max(0, h); inset = Rect(x, y, x, y); RefreshGridLayout(); return *this; }
 UiGridLayout& UiGridLayout::SetInset(int l, int t, int r, int b) { inset = Rect(max(0, l), max(0, t), max(0, r), max(0, b)); RefreshGridLayout(); return *this; }
 UiGridLayout& UiGridLayout::SetUnifiedItemSize(Size sz, bool on) { unified = on; unified_size = sz; RefreshGridLayout(); return *this; }
@@ -329,7 +307,7 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
 {
     int cols = max(1, grid_cols);
     int rows = max(1, grid_rows);
-    int gap = style.spacing;
+    int gap = this->gap;
 
     col_widths.SetCount(cols);
     row_heights.SetCount(rows);
@@ -381,7 +359,7 @@ Rect UiGridLayout::GetCellRect(int row, int col) const
         return Rect(0, 0, 0, 0);
 
     Rect area = GetClientGridRect();
-    int gap = style.spacing;
+    int gap = this->gap;
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
 
@@ -399,7 +377,7 @@ Rect UiGridLayout::GetCellRect(int row, int col) const
 void UiGridLayout::Layout()
 {
     Rect area = GetClientGridRect();
-    int gap = style.spacing;
+    int gap = this->gap;
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
     Vector<int> col_pos, row_pos;
@@ -508,7 +486,7 @@ void UiGridLayout::PaintDebug(Draw& w) const
     Color fill = Blend(c, SColorPaper(), 205);
     Rect outer = GetSize();
     Rect area = GetClientGridRect();
-    int gap = style.spacing;
+    int gap = this->gap;
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
     Vector<int> col_pos, row_pos;
@@ -578,7 +556,7 @@ void UiGridLayout::LostFocus() { Refresh(); }
 
 Size UiGridLayout::GetMinSize() const
 {
-    int gap = style.spacing;
+    int gap = this->gap;
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(Size(0, 0), col_widths, row_heights);
     int w = inset.left + inset.right + gap * max(0, col_widths.GetCount() - 1);
@@ -592,7 +570,7 @@ Size UiGridLayout::GetMinSize() const
 
 int UiGridLayout::MeasureHeightForWidth(int total_width) const
 {
-    int gap = style.spacing;
+    int gap = this->gap;
     int inner_w = max(0, total_width - inset.left - inset.right);
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(Size(inner_w, 0), col_widths, row_heights);
