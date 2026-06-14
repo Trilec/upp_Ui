@@ -874,9 +874,9 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 				}
 			}
 			if(DesignerPreviewAxisSizing(n, "h_sizing") == "Fixed")
-				natural.cx = (int)DesignerPreviewNodeProperty(n, "width", natural.cx);
+				natural.cx = (int)DesignerPreviewFixedMetric(n, "width", natural.cx);
 			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
-				natural.cy = (int)DesignerPreviewNodeProperty(n, "height", natural.cy);
+				natural.cy = (int)DesignerPreviewFixedMetric(n, "height", natural.cy);
 			if(n.type_id != "Spacer" && n.type_id != "PaneSlot" && n.type_id != "PageSlot" && n.type_id != "AccordionSectionSlot") {
 				minsz.cx = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP));
 				minsz.cy = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP));

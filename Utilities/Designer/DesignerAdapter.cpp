@@ -994,9 +994,9 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
 	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
 	if(h_sizing != "Fixed")
-		b.Disable("width", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
+		b.Disable("fixed_width", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
 	if(v_sizing != "Fixed")
-		b.Disable("height", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
+		b.Disable("fixed_height", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
 }
 
 static String TextProperty(const DesignerNode& n)
@@ -1022,8 +1022,8 @@ void DesignerPanelAdapter::SyncFromNode(const DesignerNode& node)
 		s.metrics.radius = 0;
 		SetCustomStyle(s);
 		WhenPaintForeground.Clear();
-		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "width", 24))),
-		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "height", 24))));
+		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "fixed_width", (int)AdapterNodeProperty(node, "width", 24)))),
+		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "fixed_height", (int)AdapterNodeProperty(node, "height", 24)))));
 	}
 	else {
 		ApplyPanelAppearance(*this, node);
@@ -1117,8 +1117,8 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		String owner = node.type_id == "PaneSlot" ? "splitter" : node.type_id == "AccordionSectionSlot" ? "accordion" : "page container";
 		b.Disable("h_sizing", "Slot size is owned by the " + owner + ".");
 		b.Disable("v_sizing", "Slot size is owned by the " + owner + ".");
-		b.Disable("width", "Slot width is owned by the " + owner + ".");
-		b.Disable("height", "Slot height is owned by the " + owner + ".");
+		b.Disable("fixed_width", "Slot width is owned by the " + owner + ".");
+		b.Disable("fixed_height", "Slot height is owned by the " + owner + ".");
 		b.Disable("min_width", "Slot minimum width is owned by the " + owner + ".");
 		b.Disable("min_height", "Slot minimum height is owned by the " + owner + ".");
 		if(node.type_id == "AccordionSectionSlot") {

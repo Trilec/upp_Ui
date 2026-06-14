@@ -349,6 +349,8 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 		n.properties.Set("role", "Standard");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
+		n.properties.Set("fixed_width", size.cx);
+		n.properties.Set("fixed_height", size.cy);
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
 		n.properties.Set("face", DesignerControlFace());
@@ -534,6 +536,8 @@ static DesignerType MakeCompositeType(const String& id, const String& name, Size
 		n.properties.Set("original_type", "");
 		n.properties.Set("h_sizing", "Fit");
 		n.properties.Set("v_sizing", "Fit");
+		n.properties.Set("fixed_width", 140);
+		n.properties.Set("fixed_height", 48);
 		n.properties.Set("width", 140);
 		n.properties.Set("height", 48);
 		n.properties.Set("face", DesignerControlFace());
@@ -555,6 +559,8 @@ static DesignerType MakePageContainerType(const String& id, const String& name, 
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", size.cx);
+		n.properties.Set("fixed_height", size.cy);
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
 		n.properties.Set("face_enabled", false);
@@ -586,6 +592,8 @@ static DesignerType MakePanelControlType(const String& id, const String& name, S
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", size.cx);
+		n.properties.Set("fixed_height", size.cy);
 		n.properties.Set("width", size.cx);
 		n.properties.Set("height", size.cy);
 		n.properties.Set("face", DesignerPanelFace());
@@ -621,6 +629,8 @@ static DesignerType MakeGroupPanelType()
 		n.properties.Set("line_thickness", 1);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", 260);
+		n.properties.Set("fixed_height", 160);
 		n.properties.Set("width", 260);
 		n.properties.Set("height", 160);
 		n.properties.Set("face", DesignerPanelFace());
@@ -646,6 +656,8 @@ static DesignerType MakeAccordionType()
 		n.properties.Set("role", "Standard");
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", 300);
+		n.properties.Set("fixed_height", 220);
 		n.properties.Set("width", 300);
 		n.properties.Set("height", 220);
 		n.properties.Set("single_open", false);
@@ -697,6 +709,8 @@ static DesignerType MakeAccordionSectionSlotType()
 		n.properties.Set("body_height", -1);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", 240);
+		n.properties.Set("fixed_height", 120);
 		n.properties.Set("width", 240);
 		n.properties.Set("height", 120);
 		n.properties.Set("face_enabled", false);
@@ -723,6 +737,8 @@ static DesignerType MakePageSlotType()
 		n.properties.Set("icon_size", 16);
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", 220);
+		n.properties.Set("fixed_height", 140);
 		n.properties.Set("width", 220);
 		n.properties.Set("height", 140);
 		n.properties.Set("face_enabled", false);
@@ -745,6 +761,8 @@ static DesignerType MakePaneSlotType()
 	t.init_defaults = [](DesignerNode& n) {
 		n.properties.Set("h_sizing", "Expand");
 		n.properties.Set("v_sizing", "Expand");
+		n.properties.Set("fixed_width", 180);
+		n.properties.Set("fixed_height", 120);
 		n.properties.Set("width", 180);
 		n.properties.Set("height", 120);
 		n.properties.Set("face_enabled", false);
