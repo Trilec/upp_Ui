@@ -29,6 +29,8 @@ const UiTitleCard::Style& UiTitleCard::StyleDefault()
         s.title_line_thickness = DPI(1);
         s.title_line_gap_above = DPI(5);
         s.title_line_gap_below = DPI(5);
+        s.card_line_side = UiAlign::BOTTOM;
+        s.card_line_color_enabled = false;
         s.media_side = UiAlign::LEFT;
         s.media_reserve = DPI(48);
         s.media_gap = DPI(8);
@@ -155,6 +157,17 @@ UiTitleCard& UiTitleCard::ClearMedia()
     return *this;
 }
 
+UiTitleCard& UiTitleCard::SetTextAlign(UiAlign h, UiAlign v)
+{
+    Style& style = StyleEdit();
+    if(h == UiAlign::LEFT || h == UiAlign::CENTER || h == UiAlign::RIGHT)
+        style.text_align_h = h;
+    if(v == UiAlign::TOP || v == UiAlign::CENTER || v == UiAlign::BOTTOM)
+        style.text_align_v = v;
+    Refresh();
+    return *this;
+}
+
 UiTitleCard& UiTitleCard::SetMediaSide(UiAlign side)
 {
     if(side == UiAlign::LEFT || side == UiAlign::RIGHT || side == UiAlign::TOP || side == UiAlign::BOTTOM)
@@ -258,8 +271,18 @@ UiTitleCard& UiTitleCard::SetCardLine(UiSpan ex, int thickness, UiLineStyle styl
     st.card_line_length = ex;
     st.card_line_thickness = max(1, thickness);
     st.card_line_style = style;
+    st.card_line_color_enabled = !IsNull(c);
     st.card_line_color = c;
     Refresh();
+    return *this;
+}
+
+UiTitleCard& UiTitleCard::SetCardLineSide(UiAlign side)
+{
+    if(side == UiAlign::TOP || side == UiAlign::BOTTOM || side == UiAlign::LEFT || side == UiAlign::RIGHT) {
+        StyleEdit().card_line_side = side;
+        Refresh();
+    }
     return *this;
 }
 
@@ -493,21 +516,34 @@ Size UiTitleCard::GetMinSize() const
     return out;
 }
 
-void UiTitleCard::DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style) const
+void UiTitleCard::DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style, bool vertical) const
 {
     int th = max(1, thickness);
     if(style == SOLID) {
-        w.DrawRect(x, y, cx, th, c);
+        if(vertical)
+            w.DrawRect(x, y, th, cx, c);
+        else
+            w.DrawRect(x, y, cx, th, c);
         return;
     }
 
     int dot = (style == DOTTED) ? th : max(DPI(6), th * 3);
     int gap = (style == DOTTED) ? max(DPI(3), th * 2) : max(DPI(4), th * 2);
-    int cur = x;
-    while(cur < x + cx) {
-        int seg = min(dot, x + cx - cur);
-        w.DrawRect(cur, y, seg, th, c);
-        cur += dot + gap;
+    if(vertical) {
+        int cur = y;
+        while(cur < y + cx) {
+            int seg = min(dot, y + cx - cur);
+            w.DrawRect(x, cur, th, seg, c);
+            cur += dot + gap;
+        }
+    }
+    else {
+        int cur = x;
+        while(cur < x + cx) {
+            int seg = min(dot, x + cx - cur);
+            w.DrawRect(cur, y, seg, th, c);
+            cur += dot + gap;
+        }
     }
 }
 
@@ -612,7 +648,12 @@ void UiTitleCard::Paint(Draw& w)
     Color subtitle_ink = IsNull(style.subtitle_color) ? Blend(ink, SColorPaper(), 40) : style.subtitle_color;
     Color copy_ink = IsNull(style.copy_color) ? Blend(ink, SColorPaper(), 35) : style.copy_color;
 
-    int y = text_r.top + max(0, (text_r.GetHeight() - text_block_size_.cy) / 2);
+    int y = text_r.top;
+    if(style.text_align_v == UiAlign::CENTER)
+        y = text_r.top + max(0, (text_r.GetHeight() - text_block_size_.cy) / 2);
+    else if(style.text_align_v == UiAlign::BOTTOM)
+        y = text_r.bottom - text_block_size_.cy;
+    y = max(y, text_r.top);
 
     if(!title_.IsEmpty()) {
         Size ts = title_size_;
@@ -673,20 +714,30 @@ void UiTitleCard::Paint(Draw& w)
     }
 
     if(style.card_line && style.card_line_length != NONE) {
-        int cx = style.card_line_length == LARGE ? outer.GetWidth() : max(0, content.GetWidth() - DPI(8));
+        bool vertical = style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT;
+        int len = vertical ? content.GetHeight() : content.GetWidth();
         if(style.card_line_length == SMALL)
-            cx = min(cx, DPI(40));
+            len = min(len, DPI(40));
         else if(style.card_line_length == MEDIUM)
-            cx = min(cx, (content.GetWidth() * 60) / 100);
+            len = min(len, (vertical ? content.GetHeight() : content.GetWidth()) * 60 / 100);
+        else if(!vertical)
+            len = max(0, content.GetWidth() - DPI(8));
 
-        if(cx > 0) {
-            int x = style.card_line_length == LARGE ? outer.left : content.left + (content.GetWidth() - cx) / 2;
-            int line_y = content.bottom - max(1, style.card_line_thickness);
-            Color lc = IsNull(style.card_line_color)
-                           ? Blend(ink, SColorShadow(), 80)
-                           : style.card_line_color;
-
-            DrawLine(w, x, line_y, cx, lc, style.card_line_thickness, style.card_line_style);
+        if(len > 0) {
+            int th = max(1, style.card_line_thickness);
+            Color lc = style.card_line_color_enabled && !IsNull(style.card_line_color)
+                           ? style.card_line_color
+                           : Blend(ink, SColorShadow(), 80);
+            if(vertical) {
+                int x = style.card_line_side == UiAlign::RIGHT ? content.right - th : content.left;
+                int y = content.top + max(0, (content.GetHeight() - len) / 2);
+                DrawLine(w, x, y, len, lc, th, style.card_line_style, true);
+            }
+            else {
+                int x = content.left + max(0, (content.GetWidth() - len) / 2);
+                int line_y = style.card_line_side == UiAlign::TOP ? content.top : content.bottom - th;
+                DrawLine(w, x, line_y, len, lc, th, style.card_line_style);
+            }
         }
     }
 

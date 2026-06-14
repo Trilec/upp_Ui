@@ -51,6 +51,7 @@ public:
         Color copy_color;
 
         UiAlign text_align_h = UiAlign::LEFT;
+        UiAlign text_align_v = UiAlign::CENTER;
         UiAlign media_side   = UiAlign::LEFT; // LEFT/RIGHT/TOP/BOTTOM
         UiAlign media_align_h = UiAlign::CENTER;
         UiAlign media_align_v = UiAlign::CENTER;
@@ -75,6 +76,8 @@ public:
         UiLineStyle card_line_style = SOLID;
         UiSpan card_line_length = LARGE;
         int  card_line_thickness = DPI(1);
+        UiAlign card_line_side = UiAlign::BOTTOM;
+        bool card_line_color_enabled = false;
         Color card_line_color;
 
         int title_subtitle_gap = DPI(3);
@@ -89,19 +92,21 @@ public:
             int re = (int)title_line_length;
             int bls = (int)card_line_style;
             int ble = (int)card_line_length;
+            int bss = (int)card_line_side;
             s % palette % metrics % skin
               % title_font % subtitle_font % copy_font
               % title_color % subtitle_color % copy_color
-              % text_align_h % media_side % media_align_h % media_align_v
+              % text_align_h % text_align_v % media_side % media_align_h % media_align_v
               % media_reserve % media_share_percent % media_gap % media_min % media_auto_fit % preserve_media_aspect % media_tint_mono
               % title_line % rs % re % title_line_thickness % title_line_color % title_line_gap_above % title_line_gap_below
-              % card_line % bls % ble % card_line_thickness % card_line_color
+              % card_line % bls % ble % bss % card_line_thickness % card_line_color_enabled % card_line_color
               % title_subtitle_gap % subtitle_copy_gap
               % transparent % hover_enabled;
             title_line_style = (UiLineStyle)rs;
             title_line_length = (UiSpan)re;
             card_line_style = (UiLineStyle)bls;
             card_line_length = (UiSpan)ble;
+            card_line_side = (UiAlign)bss;
         }
     };
 
@@ -126,6 +131,7 @@ public:
 
     UiTitleCard& SetMedia(const Image& img, Size preferred = Size(0, 0));
     UiTitleCard& ClearMedia();
+    UiTitleCard& SetTextAlign(UiAlign h, UiAlign v);
     UiTitleCard& SetMediaSide(UiAlign side);
     UiTitleCard& SetMediaAlign(UiAlign h, UiAlign v);
     UiTitleCard& SetMediaReserve(int px);
@@ -138,6 +144,7 @@ public:
 
     UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
+    UiTitleCard& SetCardLineSide(UiAlign side);
     UiTitleCard& ShowTitleLine(bool on = true);
     UiTitleCard& ShowCardLine(bool on = true);
     UiTitleCard& EnableHover(bool on = true);
@@ -170,7 +177,7 @@ private:
     void InvalidateTextCache();
     void RebuildTextCache();
 
-    void DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style) const;
+    void DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style, bool vertical = false) const;
     int  GetLineWidth(UiSpan length, int title_cx, int text_cx) const;
     Size GetTextBlockSize() const;
     Rect GetMediaRect(const Rect& content) const;

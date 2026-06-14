@@ -164,6 +164,8 @@ static String TabVisualExpr(const String& visual)
 	return "UITAB_UNDERLINE";
 }
 
+static String LineStyleExpr(const String& style);
+
 static String GroupHeaderModeExpr(const String& mode)
 {
 	if(mode == "Outside")
@@ -462,17 +464,27 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(style_type.IsEmpty() || resolve_expr.IsEmpty())
 		return;
 	bool override = emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+	bool force_style = false;
+	if(n.type_id == "UiTitleCard") {
+		force_style = CodeGenNodeProperty(n, "card_line_side", "Bottom") != "Bottom"
+		           || CodeGenNodeProperty(n, "card_line_length", "Large") != "Large"
+		           || CodeGenNodeProperty(n, "card_line_style", "Solid") != "Solid"
+		           || (int)CodeGenNodeProperty(n, "card_line_thickness", 1) != 1
+		           || (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
+	}
 	bool custom_align = false;
 	if(n.type_id == "UiCheckBox" || n.type_id == "UiToggle")
 		custom_align = CodeGenNodeProperty(n, "align_h", "Left") != "Left" || CodeGenNodeProperty(n, "align_v", "Center") != "Center";
+	if(force_style)
+		override = true;
 	if(!override) {
 		if(n.type_id == "UiAccordion")
 			return;
-		if(!custom_align && role != "Standard") {
+		if(!custom_align && role != "Standard" && !force_style) {
 			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
 			return;
 		}
-		else if(custom_align)
+		else if(custom_align || force_style)
 			override = true;
 		else
 			return;
@@ -537,6 +549,26 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			out << "\t\t\ts.subtitle_color = "
 			    << ColorExpr(CodeGenNodeProperty(n, "subtitle_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).subtitle_color))
 			    << ";\n";
+		}
+		if(CodeGenHasProperty(n, "card_line_side")) {
+			if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+				out << "\t\t\t// Layout-specific override.\n";
+			out << "\t\t\ts.card_line_side = " << AlignSideExpr(CodeGenNodeProperty(n, "card_line_side", "Bottom"), "Bottom") << ";\n";
+		}
+		if(CodeGenHasProperty(n, "card_line_length"))
+			out << "\t\t\ts.card_line_length = " << (CodeGenNodeProperty(n, "card_line_length", "Large") == "Small" ? "SMALL" :
+			                                              CodeGenNodeProperty(n, "card_line_length", "Large") == "Medium" ? "MEDIUM" : "LARGE") << ";\n";
+		if(CodeGenHasProperty(n, "card_line_style"))
+			out << "\t\t\ts.card_line_style = " << LineStyleExpr(AsString(CodeGenNodeProperty(n, "card_line_style", "Solid"))) << ";\n";
+		if(CodeGenHasProperty(n, "card_line_thickness"))
+			out << "\t\t\ts.card_line_thickness = DPI(" << max(1, (int)CodeGenNodeProperty(n, "card_line_thickness", 1)) << ");\n";
+		if(CodeGenHasProperty(n, "card_line_color_enabled")) {
+			bool enabled = (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
+			out << "\t\t\ts.card_line_color_enabled = " << (enabled ? "true" : "false") << ";\n";
+			if(enabled)
+				out << "\t\t\ts.card_line_color = "
+				    << ColorExpr(CodeGenNodeProperty(n, "card_line_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).card_line_color))
+				    << ";\n";
 		}
 	}
 	if(CodeGenHasProperty(n, "shadow_enabled")) {
@@ -745,6 +777,15 @@ static String SpacerLineOrientationExpr(const DesignerNode& n)
 static String SpacerLineDashExpr(const DesignerNode& n)
 {
 	return CodeGenNodeProperty(n, "line_dash", "Solid") == "Dashed" ? "DASHED" : "SOLID";
+}
+
+static String LineStyleExpr(const String& style)
+{
+	if(style == "Dashed" || style == "DASHED")
+		return "DASHED";
+	if(style == "Dotted" || style == "DOTTED")
+		return "DOTTED";
+	return "SOLID";
 }
 
 static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
@@ -1175,6 +1216,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiTitleCard")
 	{
+		String text_align_v = CodeGenNodeProperty(n, "text_align_v", "Center");
 		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
 		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 8)) << "))"
@@ -1184,7 +1226,11 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		    << ".SetMediaAutoFit(" << ((bool)CodeGenNodeProperty(n, "media_auto_fit", false) ? "true" : "false") << ")"
 		    << ".SetMediaSide(" << AlignSideExpr(CodeGenNodeProperty(n, "media_side", "Left"), "Left") << ")"
 		    << ".SetMediaAlign(" << AlignHExpr(CodeGenNodeProperty(n, "media_align_h", "Center"), "Center")
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ");\n";
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ")";
+		if(emit_designer_appearance || text_align_v != "Center")
+			out << ".SetTextAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align", "Left"), "Left")
+			    << ", " << AlignVExpr(text_align_v, "Center") << ")";
+		out << ";\n";
 		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetMedia(" << icon << ", Size(DPI("

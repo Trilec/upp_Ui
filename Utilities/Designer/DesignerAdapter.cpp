@@ -201,6 +201,8 @@ static void ApplyTitleCardInkOverrides(UiTitleCard::Style& style, const Designer
 		style.title_color = GetColorProperty(n, "title_color", style.title_color);
 	if((bool)AdapterNodeProperty(n, "subtitle_color_enabled", false))
 		style.subtitle_color = GetColorProperty(n, "subtitle_color", style.subtitle_color);
+	if((bool)AdapterNodeProperty(n, "card_line_color_enabled", false))
+		style.card_line_color = GetColorProperty(n, "card_line_color", style.card_line_color);
 }
 
 static Font DesignerFontChoice(const DesignerNode& n, const String& key, int size, bool bold = false)
@@ -289,6 +291,32 @@ static UiAlign DesignerAlignVChoice(const Value& value, UiAlign def)
 		return UiAlign::CENTER;
 	if(align == "Bottom")
 		return UiAlign::BOTTOM;
+	return def;
+}
+
+static UiLineStyle DesignerLineStyleChoice(const Value& value, UiLineStyle def = SOLID)
+{
+	String style = AsString(value);
+	if(style == "Dashed" || style == "DASHED")
+		return DASHED;
+	if(style == "Dotted" || style == "DOTTED")
+		return DOTTED;
+	if(style == "Solid" || style == "SOLID")
+		return SOLID;
+	return def;
+}
+
+static UiSpan DesignerSpanChoice(const Value& value, UiSpan def = LARGE)
+{
+	String span = AsString(value);
+	if(span == "Small")
+		return SMALL;
+	if(span == "Medium")
+		return MEDIUM;
+	if(span == "Large")
+		return LARGE;
+	if(span == "None")
+		return NONE;
 	return def;
 }
 
@@ -1333,10 +1361,18 @@ void DesignerTitleCardAdapter::SyncFromNode(const DesignerNode& node)
 	s.text_align_h = AdapterNodeProperty(node, "align", "Left") == "Right" ? UiAlign::RIGHT
 	               : AdapterNodeProperty(node, "align", "Left") == "Center" ? UiAlign::CENTER
 	               : UiAlign::LEFT;
+	s.text_align_v = DesignerAlignVChoice(AdapterNodeProperty(node, "text_align_v", "Center"), UiAlign::CENTER);
 	s.title_font = DesignerFontChoice(node, "title_font", max(8, (int)AdapterNodeProperty(node, "title_size", 12)), true);
 	s.subtitle_font = DesignerFontChoice(node, "subtitle_font", max(7, (int)AdapterNodeProperty(node, "subtitle_size", 10)));
 	s.title_line = (bool)AdapterNodeProperty(node, "title_line", true);
 	s.card_line = (bool)AdapterNodeProperty(node, "card_line", false);
+	s.card_line_side = DesignerSideChoice(AdapterNodeProperty(node, "card_line_side", "Bottom"), UiAlign::BOTTOM);
+	s.card_line_style = DesignerLineStyleChoice(AdapterNodeProperty(node, "card_line_style", "Solid"), SOLID);
+	s.card_line_length = DesignerSpanChoice(AdapterNodeProperty(node, "card_line_length", "Large"), LARGE);
+	s.card_line_thickness = DPI(max(1, (int)AdapterNodeProperty(node, "card_line_thickness", 1)));
+	s.card_line_color_enabled = (bool)AdapterNodeProperty(node, "card_line_color_enabled", false);
+	if(s.card_line_color_enabled)
+		s.card_line_color = GetColorProperty(node, "card_line_color", s.card_line_color);
 	s.transparent = !s.metrics.face_enabled && !s.metrics.frame_enabled;
 	SetCustomStyle(s);
 	Image icon = DesignerIconChoice(node);
@@ -1387,10 +1423,29 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	            {{"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
 	b.AddChoice("align", "Justify", "UiTitleCard::Style::text_align_h",
 	            "Horizontal title/subtitle justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("text_align_v", "Text align Y", "UiTitleCard::Style::text_align_v",
+	            "Vertical title/subtitle block alignment.", {{"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
 	b.Add("title_line", "Title line", DesignerEditorKind::Bool, "UiTitleCard::ShowTitleLine",
 	      "Shows the title underline rule.");
 	b.Add("card_line", "Card line", DesignerEditorKind::Bool, "UiTitleCard::ShowCardLine",
 	      "Shows the card separator rule.");
+	b.AddChoice("card_line_side", "Card line side", "UiTitleCard::Style::card_line_side",
+	            "Side used for the card separator line.",
+	            {{"Top", "Top"}, {"Bottom", "Bottom"}, {"Left", "Left"}, {"Right", "Right"}});
+	b.AddChoice("card_line_length", "Card line length", "UiTitleCard::Style::card_line_length",
+	            "Length of the card separator line.",
+	            {{"Small", "Small"}, {"Medium", "Medium"}, {"Large", "Large"}});
+	b.AddChoice("card_line_style", "Card line style", "UiTitleCard::Style::card_line_style",
+	            "Dash style for the card separator line.",
+	            {{"Solid", "Solid"}, {"Dashed", "Dashed"}, {"Dotted", "Dotted"}});
+	b.AddInt("card_line_thickness", "Card line thickness", DesignerEditorKind::Slider,
+	         "UiTitleCard::Style::card_line_thickness", "Thickness of the card separator line.", 1, 12);
+	b.Add("card_line_color_enabled", "Use card line color", DesignerEditorKind::Bool,
+	      "UiTitleCard::Style::card_line_color",
+	      "Enables an explicit card separator color override when theme overrides are active.").group = "Theme Overrides";
+	b.Add("card_line_color", "Card line color", DesignerEditorKind::Color,
+	      "UiTitleCard::Style::card_line_color",
+	      "Explicit card separator color used when theme overrides are active.").group = "Theme Overrides";
 	b.AddChoice("title_font", "Title font", "UiTitleCard::Style::title_font",
 	            "Preview title font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
