@@ -736,6 +736,65 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	model.SelectOne(root);
 }
 
+static void BuildHeaderWithActionsTemplate(DesignerModel& model, const DesignerRegistry& registry)
+{
+	DesignerNodeId root = AddTemplateNode(model, registry, "UiPanel", Designer_ROOT, "header_shell");
+	SetTemplateRole(model, root, "Standard");
+	SetTemplateSizing(model, root, "Expand", "Fit");
+	SetTemplateInset(model, root, 10);
+
+	DesignerNodeId row = AddTemplateNode(model, registry, "BoxLayout", root, "header_row");
+	SetTemplateDirection(model, row, "H");
+	SetTemplateSizing(model, row, "Expand", "Fit");
+	SetTemplateGap(model, row, 8);
+	SetTemplateInset(model, row, 0);
+
+	DesignerNodeId title = AddTemplateNode(model, registry, "UiTitleCard", row, "Page Header");
+	SetTemplateText(model, title, "Project Overview");
+	SetTemplateSubtitle(model, title, "Summary, context, and primary page heading");
+	SetTemplateRole(model, title, "Standard");
+	SetTemplateSizing(model, title, "Expand", "Fit");
+	SetTemplateMinSize(model, title, 180, 56);
+	SetTemplateIcon(model, title, "ICON_DESIGN_INFO_48");
+	SetTemplateProperty(model, title, "media_reserve", 24);
+	SetTemplateProperty(model, title, "media_gap", 8);
+	SetTemplateProperty(model, title, "content_inset", 8);
+
+	DesignerNodeId actions = AddTemplateNode(model, registry, "BoxLayout", row, "action_cluster");
+	SetTemplateDirection(model, actions, "H");
+	SetTemplateSizing(model, actions, "Fit", "Fit");
+	SetTemplateGap(model, actions, 6);
+	SetTemplateInset(model, actions, 0);
+	SetTemplateProperty(model, actions, "align_items", "Center");
+
+	DesignerNodeId refresh = AddTemplateNode(model, registry, "UiToolButton", actions, "refresh_button");
+	SetTemplateText(model, refresh, "Refresh");
+	SetTemplateRole(model, refresh, "Subtle");
+	SetTemplateSizing(model, refresh, "Fit", "Fit");
+	SetTemplateFixedSize(model, refresh, 80, 34);
+	SetTemplateIcon(model, refresh, "ICON_ACTION_REFRESH_48");
+
+	DesignerNodeId publish = AddTemplateNode(model, registry, "UiButton", actions, "publish_button");
+	SetTemplateText(model, publish, "Publish");
+	SetTemplateRole(model, publish, "Accent");
+	SetTemplateSizing(model, publish, "Fit", "Fit");
+	SetTemplateFixedSize(model, publish, 96, 34);
+	SetTemplateIcon(model, publish, "ICON_ACTION_SAVE_48");
+
+	DesignerNodeId more = AddTemplateNode(model, registry, "UiDropdown", actions, "more_actions");
+	SetTemplateText(model, more, "More");
+	SetTemplateRole(model, more, "Standard");
+	SetTemplateSizing(model, more, "Fit", "Fit");
+	SetTemplateFixedSize(model, more, 110, 34);
+	SetTemplateProperty(model, more, "item_count", 3);
+	SetTemplateProperty(model, more, "item_0_text", "Share");
+	SetTemplateProperty(model, more, "item_1_text", "Duplicate");
+	SetTemplateProperty(model, more, "item_2_text", "Archive");
+	SetTemplateProperty(model, more, "selected_index", 0);
+
+	model.SelectOne(root);
+}
+
 bool ApplyDesignerTemplate(DesignerModel& model, const DesignerRegistry& registry, const String& id)
 {
 	if(id.IsEmpty() || id == "Current")
@@ -755,6 +814,8 @@ bool ApplyDesignerTemplate(DesignerModel& model, const DesignerRegistry& registr
 		BuildFPatternTemplate(model, registry);
 	else if(id == "DesignerWorkbench")
 		BuildDesignerWorkbenchTemplate(model, registry);
+	else if(id == "HeaderWithActions")
+		BuildHeaderWithActionsTemplate(model, registry);
 	else
 		return false;
 	return true;
