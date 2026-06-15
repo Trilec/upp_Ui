@@ -849,7 +849,7 @@ private:
 		setup_heading(overrides_heading_, "THEME OVERRIDES");
 		setup_heading(code_heading_, "CODE");
 
-		hierarchy_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		hierarchy_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, DPI(5), 0));
 		inspector_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		overrides_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		code_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
@@ -2181,7 +2181,7 @@ private:
 		int body_y = top_y + header_h + gap;
 		int warning_h = warning_visible_ ? DPI(30) : 0;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
-		int right_w = right_collapsed_ ? DPI(48) : DPI(365);
+		int right_w = right_collapsed_ ? DPI(48) : DPI(370);
 		right_box_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
 		Rect shell = right_box_.GetSize();
 		int pad = DPI(8);
