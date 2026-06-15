@@ -410,27 +410,42 @@ static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 {
 	if(!DesignerBoolProperty(n, "theme_override", false))
 		return;
-	if(allow_face && DesignerBoolProperty(n, "face_enabled", false)) {
-		Color face = GetColorProperty(n, "face", SColorFace());
-		if(AsString(AdapterNodeProperty(n, "face_mode", "Solid")) == "Quad") {
-			UiFill fill = DesignerFaceFillChoice(n, face);
-			for(int i = 0; i < 4; i++)
-				palette.face[i] = fill;
+	if(allow_face && DesignerHasProperty(n, "face_enabled")) {
+		bool face_enabled = DesignerBoolProperty(n, "face_enabled", false);
+		metrics.face_enabled = face_enabled;
+		if(face_enabled) {
+			Color face = GetColorProperty(n, "face", SColorFace());
+			if(AsString(AdapterNodeProperty(n, "face_mode", "Solid")) == "Quad") {
+				UiFill fill = DesignerFaceFillChoice(n, face);
+				for(int i = 0; i < 4; i++)
+					palette.face[i] = fill;
+			}
+			else {
+				palette.face[ST_NORMAL] = UiFill::Solid(face);
+				palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
+				palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
+				palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
+			}
 		}
 		else {
-			palette.face[ST_NORMAL] = UiFill::Solid(face);
-			palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
-			palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
-			palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
+			for(int i = 0; i < 4; i++)
+				palette.face[i] = UiFill::None();
 		}
-		metrics.face_enabled = true;
 	}
-	if(allow_frame && DesignerBoolProperty(n, "frame_enabled", false)) {
-		Color frame = GetColorProperty(n, "frame", SColorShadow());
-		for(int i = 0; i < 4; i++)
-			palette.frame[i] = frame;
-		metrics.frame_enabled = true;
-		metrics.frame_width = max(DPI(1), metrics.frame_width);
+	if(allow_frame && DesignerHasProperty(n, "frame_enabled")) {
+		bool frame_enabled = DesignerBoolProperty(n, "frame_enabled", false);
+		metrics.frame_enabled = frame_enabled;
+		if(frame_enabled) {
+			Color frame = GetColorProperty(n, "frame", SColorShadow());
+			for(int i = 0; i < 4; i++)
+				palette.frame[i] = frame;
+			metrics.frame_width = max(DPI(1), metrics.frame_width);
+		}
+		else {
+			for(int i = 0; i < 4; i++)
+				palette.frame[i] = Null;
+			metrics.frame_width = 0;
+		}
 	}
 	if(DesignerHasProperty(n, "radius"))
 		metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", metrics.radius));
@@ -505,20 +520,35 @@ static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 	String face_enabled_key = prefix + "_face_enabled";
 	String frame_enabled_key = prefix + "_frame_enabled";
 	String radius_key = prefix + "_radius";
-	if(DesignerBoolProperty(n, face_enabled_key, false)) {
-		Color face = GetColorProperty(n, face_key, SColorFace());
-		palette.face[ST_NORMAL] = UiFill::Solid(face);
-		palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
-		palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
-		palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
-		metrics.face_enabled = true;
+	if(DesignerHasProperty(n, face_enabled_key)) {
+		bool face_enabled = DesignerBoolProperty(n, face_enabled_key, false);
+		metrics.face_enabled = face_enabled;
+		if(face_enabled) {
+			Color face = GetColorProperty(n, face_key, SColorFace());
+			palette.face[ST_NORMAL] = UiFill::Solid(face);
+			palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 24));
+			palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, Black(), 16));
+			palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, SColorFace(), 90));
+		}
+		else {
+			for(int i = 0; i < 4; i++)
+				palette.face[i] = UiFill::None();
+		}
 	}
-	if(DesignerBoolProperty(n, frame_enabled_key, false)) {
-		Color frame = GetColorProperty(n, frame_key, SColorShadow());
-		for(int i = 0; i < 4; i++)
-			palette.frame[i] = frame;
-		metrics.frame_enabled = true;
-		metrics.frame_width = max(DPI(1), metrics.frame_width);
+	if(DesignerHasProperty(n, frame_enabled_key)) {
+		bool frame_enabled = DesignerBoolProperty(n, frame_enabled_key, false);
+		metrics.frame_enabled = frame_enabled;
+		if(frame_enabled) {
+			Color frame = GetColorProperty(n, frame_key, SColorShadow());
+			for(int i = 0; i < 4; i++)
+				palette.frame[i] = frame;
+			metrics.frame_width = max(DPI(1), metrics.frame_width);
+		}
+		else {
+			for(int i = 0; i < 4; i++)
+				palette.frame[i] = Null;
+			metrics.frame_width = 0;
+		}
 	}
 	if(DesignerHasProperty(n, radius_key))
 		metrics.radius = max(0, (int)AdapterNodeProperty(n, radius_key, metrics.radius));
@@ -1003,19 +1033,19 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
 	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
 	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
-	      "Explicit fill color used when theme overrides and Fill are enabled.").group = theme_group;
+	      "Fill color used when Fill is on.").group = theme_group;
 	b.AddChoice("face_mode", "Face mode", "StyledPalette::face",
 	            "Solid fill or four-corner gradient fill.", {{"Solid", "Solid"}, {"Quad", "Quad"}}).group = theme_group;
 	b.Add("face_quad", "Quad face", DesignerEditorKind::QuadColor, "SetFaceQuadGradient",
 	      "Four-corner gradient colors used when Face mode is Quad.").group = theme_group;
 	b.Add("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
-	      "Explicit frame color used when theme overrides and Frame are enabled.").group = theme_group;
+	      "Frame color used when Frame is on.").group = theme_group;
 	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit corner radius used when theme overrides are enabled.", 0, 64).group = theme_group;
 	b.Add("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
-	      "Uses Face color as an explicit fill override.").group = theme_group;
+	      "When overrides are active, turns the surface fill on or off.").group = theme_group;
 	b.Add("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
-	      "Uses Frame color as an explicit frame override.").group = theme_group;
+	      "When overrides are active, turns the surface frame on or off.").group = theme_group;
 	b.Add("shadow_enabled", "Shadow", DesignerEditorKind::Bool, "StyledMetrics::shadow.enabled",
 	      "Uses explicit shadow settings when theme overrides are active.").group = theme_group;
 	b.AddInt("shadow_distance", "Shadow size", DesignerEditorKind::Slider, "StyledShadow::distance",
@@ -1036,6 +1066,17 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 		b.Disable("fixed_width", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
 	if(v_sizing != "Fixed")
 		b.Disable("fixed_height", "Visible size is currently owned by the parent layout because sizing is not Fixed.");
+
+	bool theme_override = DesignerBoolProperty(n, "theme_override", false);
+	bool face_enabled = theme_override && DesignerHasProperty(n, "face_enabled") && DesignerBoolProperty(n, "face_enabled", false);
+	bool frame_enabled = theme_override && DesignerHasProperty(n, "frame_enabled") && DesignerBoolProperty(n, "frame_enabled", false);
+	if(!face_enabled) {
+		b.Disable("face", "Fill is off.");
+		b.Disable("face_mode", "Fill is off.");
+		b.Disable("face_quad", "Fill is off.");
+	}
+	if(!frame_enabled)
+		b.Disable("frame", "Frame is off.");
 }
 
 static String TextProperty(const DesignerNode& n)
