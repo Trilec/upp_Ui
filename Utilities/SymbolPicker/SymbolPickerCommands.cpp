@@ -21,6 +21,8 @@ static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
 	return out;
 }
 
+static SymbolPickerCollection CopyCollection(const SymbolPickerCollection& src);
+
 static Vector<String> CopyStringVector(const Vector<String>& src)
 {
 	Vector<String> out;
@@ -34,6 +36,14 @@ static Vector<SymbolPickerIconRef> CopyIconRefVector(const Vector<SymbolPickerIc
 	Vector<SymbolPickerIconRef> out;
 	for(const auto& item : src)
 		out.Add(CopyIconRef(item));
+	return out;
+}
+
+static Vector<SymbolPickerCollection> CopyCollections(const Vector<SymbolPickerCollection>& src)
+{
+	Vector<SymbolPickerCollection> out;
+	for(const auto& collection : src)
+		out.Add(CopyCollection(collection));
 	return out;
 }
 
@@ -59,6 +69,25 @@ static void RestoreIconRefVector(SymbolPickerModel& model, int collection_index,
 	model.ClearCollection(collection_index);
 	for(const auto& item : src)
 		model.AddIconToCollection(collection_index, item);
+}
+
+static void RestoreCollectionsSnapshot(SymbolPickerModel& model,
+	const Vector<SymbolPickerCollection>& collections,
+	int active_collection_index)
+{
+	while(!model.GetCollections().IsEmpty())
+		model.RemoveCollection(model.GetCollections().GetCount() - 1);
+
+	for(const auto& collection : collections) {
+		int index = model.CreateCollection(collection.name, collection.file_path);
+		for(const auto& item : collection.items)
+			model.AddIconToCollection(index, item);
+	}
+
+	if(collections.IsEmpty())
+		model.SetActiveCollection(-1);
+	else if(active_collection_index >= 0 && active_collection_index < collections.GetCount())
+		model.SetActiveCollection(active_collection_index);
 }
 
 class SymbolPickerCommandGroup final : public SymbolPickerCommand {
@@ -420,24 +449,13 @@ public:
 			return false;
 		old_active_ = model.GetActiveCollectionIndex();
 		backup_ = CopyCollection(model.GetCollections()[index_]);
+		snapshot_ = CopyCollections(model.GetCollections());
 		return model.RemoveCollection(index_);
 	}
 
 	void Undo(SymbolPickerModel& model) override
 	{
-		int inserted = model.CreateCollection(backup_.name, backup_.file_path);
-		if(inserted < 0)
-			return;
-		while(inserted > index_) {
-			SymbolPickerCollection tmp = CopyCollection(model.GetCollections()[inserted - 1]);
-			model.RemoveCollection(inserted - 1);
-			model.CreateCollection(tmp.name, tmp.file_path);
-			RestoreIconRefVector(model, inserted - 1, tmp.items);
-			inserted--;
-		}
-		RestoreIconRefVector(model, index_, backup_.items);
-		model.RenameCollection(index_, backup_.name);
-		model.SetActiveCollection(min(old_active_, model.GetCollections().GetCount() - 1));
+		RestoreCollectionsSnapshot(model, snapshot_, old_active_);
 	}
 
 	String Label() const override { return "Remove collection"; }
@@ -446,6 +464,7 @@ private:
 	int index_;
 	int old_active_ = -1;
 	SymbolPickerCollection backup_;
+	Vector<SymbolPickerCollection> snapshot_;
 };
 
 class RenameCollectionCommand final : public SymbolPickerCommand {
@@ -722,6 +741,10 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("SetIconStyle command did not execute.");
 	if(model.GetIconStyle() != SymbolPickerIconStyle::Rounded)
 		return Fail("SetIconStyle command did not update icon style.");
+	if(!stack.Undo(model) || model.GetIconStyle() != SymbolPickerIconStyle::Outlined)
+		return Fail("SetIconStyle undo failed.");
+	if(!stack.Redo(model) || model.GetIconStyle() != SymbolPickerIconStyle::Rounded)
+		return Fail("SetIconStyle redo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerSetCategoryCommand("Actions"), model))
 		return Fail("SetCategory command did not execute.");
@@ -764,6 +787,10 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("RemoveFromBin command did not remove icon.");
 	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") < 0)
 		return Fail("RemoveFromBin undo failed.");
+	if(!stack.Redo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") >= 0)
+		return Fail("RemoveFromBin redo failed.");
+	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") < 0)
+		return Fail("RemoveFromBin second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerClearBinCommand(), model))
 		return Fail("ClearBin command did not execute.");
@@ -771,11 +798,19 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("ClearBin command did not clear bin.");
 	if(!stack.Undo(model) || model.GetBinIconIds().GetCount() != 2)
 		return Fail("ClearBin undo failed.");
+	if(!stack.Redo(model) || !model.GetBinIconIds().IsEmpty())
+		return Fail("ClearBin redo failed.");
+	if(!stack.Undo(model) || model.GetBinIconIds().GetCount() != 2)
+		return Fail("ClearBin second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Core Set"), model))
 		return Fail("CreateCollection command did not execute.");
 	if(model.GetCollections().GetCount() != 1)
 		return Fail("CreateCollection command did not create a collection.");
+	if(!stack.Undo(model) || !model.GetCollections().IsEmpty())
+		return Fail("CreateCollection undo failed.");
+	if(!stack.Redo(model) || model.GetCollections().GetCount() != 1)
+		return Fail("CreateCollection redo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerRenameCollectionCommand(0, "Primary Set"), model))
 		return Fail("RenameCollection command did not execute.");
@@ -783,6 +818,10 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("RenameCollection command did not rename collection.");
 	if(!stack.Undo(model) || model.GetCollections()[0].name != "Core Set")
 		return Fail("RenameCollection undo failed.");
+	if(!stack.Redo(model) || model.GetCollections()[0].name != "Primary Set")
+		return Fail("RenameCollection redo failed.");
+	if(!stack.Undo(model) || model.GetCollections()[0].name != "Core Set")
+		return Fail("RenameCollection second undo failed.");
 
 	SymbolPickerIconRef unresolved;
 	unresolved.source_id = "legacy/missing_icon";
@@ -797,6 +836,12 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("AddIconToCollection command did not add item.");
 	if(!model.GetCollections()[0].items[0].unresolved)
 		return Fail("Unresolved icon ref was not preserved.");
+	if(!stack.Undo(model) || !model.GetCollections()[0].items.IsEmpty())
+		return Fail("AddIconToCollection undo failed.");
+	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("AddIconToCollection redo failed.");
+	if(!model.GetCollections()[0].items[0].unresolved)
+		return Fail("Unresolved icon ref was not preserved after redo.");
 
 	if(!stack.Execute(MakeSymbolPickerRenameCollectionIconAliasCommand(0, 0, "RenamedGlyph"), model))
 		return Fail("RenameCollectionIconAlias command did not execute.");
@@ -813,6 +858,10 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("RemoveIconFromCollection undo failed.");
 	if(!model.GetCollections()[0].items[0].unresolved)
 		return Fail("Unresolved icon ref was not restored after undo.");
+	if(!stack.Redo(model) || !model.GetCollections()[0].items.IsEmpty())
+		return Fail("RemoveIconFromCollection redo failed.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("RemoveIconFromCollection second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Secondary"), model))
 		return Fail("Second CreateCollection command did not execute.");
@@ -822,6 +871,10 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("SetActiveCollection command did not update active collection.");
 	if(!stack.Undo(model) || model.GetActiveCollectionIndex() != 0)
 		return Fail("SetActiveCollection undo failed.");
+	if(!stack.Redo(model) || model.GetActiveCollectionIndex() != 1)
+		return Fail("SetActiveCollection redo failed.");
+	if(!stack.Undo(model) || model.GetActiveCollectionIndex() != 0)
+		return Fail("SetActiveCollection second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerClearCollectionCommand(0), model))
 		return Fail("ClearCollection command did not execute.");
@@ -829,11 +882,19 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("ClearCollection command did not clear items.");
 	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
 		return Fail("ClearCollection undo failed.");
+	if(!stack.Redo(model) || !model.GetCollections()[0].items.IsEmpty())
+		return Fail("ClearCollection redo failed.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("ClearCollection second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerRemoveCollectionCommand(1), model))
 		return Fail("RemoveCollection command did not execute.");
 	if(model.GetCollections().GetCount() != 1)
 		return Fail("RemoveCollection command did not remove collection.");
+	if(!stack.Undo(model) || model.GetCollections().GetCount() != 2)
+		return Fail("RemoveCollection undo failed.");
+	if(!stack.Redo(model) || model.GetCollections().GetCount() != 1)
+		return Fail("RemoveCollection redo failed.");
 
 	return true;
 }

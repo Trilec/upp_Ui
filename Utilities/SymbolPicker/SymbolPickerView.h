@@ -59,6 +59,7 @@ private:
 
 	Label      title_;
 	Label      subtitle_;
+	Label      filter_label_;
 	DropList   theme_preset_drop_;
 	DropList   icon_style_drop_;
 	EditString filter_edit_;

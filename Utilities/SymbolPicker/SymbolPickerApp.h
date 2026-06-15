@@ -16,6 +16,7 @@ public:
 
 private:
 	void Wire();
+	void SeedDemoData();
 
 	SymbolPickerModel model_;
 	SymbolPickerCommandStack commands_;

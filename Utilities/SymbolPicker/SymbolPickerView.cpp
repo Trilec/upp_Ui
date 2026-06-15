@@ -77,6 +77,7 @@ void SymbolPickerView::BuildHeader()
 	header_row_.Add(subtitle_.LeftPosZ(12, 420).TopPosZ(32, 18));
 	header_row_.Add(theme_preset_drop_.LeftPosZ(420, 120).TopPosZ(14, 24));
 	header_row_.Add(icon_style_drop_.LeftPosZ(548, 120).TopPosZ(14, 24));
+	header_row_.Add(filter_label_.LeftPosZ(676, 60).TopPosZ(0, 12));
 	header_row_.Add(filter_edit_.LeftPosZ(676, 180).TopPosZ(14, 24));
 	header_row_.Add(tint_ctrl_.RightPosZ(148, 108).TopPosZ(14, 24));
 	header_row_.Add(new_collection_button_.RightPosZ(12, 128).TopPosZ(14, 24));
@@ -86,6 +87,8 @@ void SymbolPickerView::BuildHeader()
 	title_.SetFont(ArialZ(20).Bold());
 	subtitle_.SetLabel("v0.2 layout and collection-model foundation");
 	subtitle_.SetFont(StdFont());
+	filter_label_.SetLabel("Filter");
+	filter_label_.SetFont(StdFont());
 
 	theme_preset_drop_.Add((int)UiThemePreset::Minimal, "Minimal");
 	theme_preset_drop_.Add((int)UiThemePreset::Pill, "Pill");
@@ -95,14 +98,14 @@ void SymbolPickerView::BuildHeader()
 	icon_style_drop_.Add((int)SymbolPickerIconStyle::Rounded,  "Rounded");
 	icon_style_drop_.Add((int)SymbolPickerIconStyle::Sharp,    "Sharp");
 
-	filter_edit_.SetText("Filter");
+	filter_edit_.SetText(String());
 
 	new_collection_button_.SetLabel("New Collection");
 	clear_bin_button_.SetLabel("Clear Bin");
 
 	tint_ctrl_.WhenAction = [=] {
-		if(model_)
-			model_->SetTintColor(tint_ctrl_.GetColor());
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetTintCommand(tint_ctrl_.GetColor()), *model_);
 	};
 
 	theme_preset_drop_.WhenAction = [=] {

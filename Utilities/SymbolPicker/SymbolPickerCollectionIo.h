@@ -10,6 +10,9 @@ namespace Upp {
 // - generated .h is a derived output artifact.
 // - generated .h may include a metadata block for provenance.
 // - generated .h is not the primary editable source.
+// - JSON remains the source of truth for v1.
+// - generated header metadata is only for provenance/recovery.
+// - parsing arbitrary edited C++ is not part of v1.
 
 bool SaveSymbolPickerCollectionJsonStub(const SymbolPickerCollection& collection);
 bool LoadSymbolPickerCollectionJsonStub(const String& path, SymbolPickerCollection& out);
