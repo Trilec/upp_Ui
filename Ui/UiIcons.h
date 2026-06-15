@@ -836,6 +836,90 @@ inline Image ICON_DESIGN_SPLITSCREEN_PORTRAIT_48()
     return UiIconsImg::ICON_DESIGN_SPLITSCREEN_PORTRAIT_48();
 }
 
+// Source: designs\cancel.svg
+// Size: 48x48
+inline Image ICON_DESIGN_CANCEL_48()
+{
+    return UiIconsImg::ICON_DESIGN_CANCEL_48();
+}
+
+// Source: designs\clear_all.svg
+// Size: 48x48
+inline Image ICON_DESIGN_CLEAR_ALL_48()
+{
+    return UiIconsImg::ICON_DESIGN_CLEAR_ALL_48();
+}
+
+// Source: designs\download.svg
+// Size: 48x48
+inline Image ICON_DESIGN_DOWNLOAD_48()
+{
+    return UiIconsImg::ICON_DESIGN_DOWNLOAD_48();
+}
+
+// Source: designs\download_for_offline.svg
+// Size: 48x48
+inline Image ICON_DESIGN_DOWNLOAD_FOR_OFFLINE_48()
+{
+    return UiIconsImg::ICON_DESIGN_DOWNLOAD_FOR_OFFLINE_48();
+}
+
+// Source: designs\mode_off_on.svg
+// Size: 48x48
+inline Image ICON_DESIGN_MODE_OFF_ON_48()
+{
+    return UiIconsImg::ICON_DESIGN_MODE_OFF_ON_48();
+}
+
+// Source: designs\outbox.svg
+// Size: 48x48
+inline Image ICON_DESIGN_OUTBOX_48()
+{
+    return UiIconsImg::ICON_DESIGN_OUTBOX_48();
+}
+
+// Source: designs\pending.svg
+// Size: 48x48
+inline Image ICON_DESIGN_PENDING_48()
+{
+    return UiIconsImg::ICON_DESIGN_PENDING_48();
+}
+
+// Source: designs\publish.svg
+// Size: 48x48
+inline Image ICON_DESIGN_PUBLISH_48()
+{
+    return UiIconsImg::ICON_DESIGN_PUBLISH_48();
+}
+
+// Source: designs\save.svg
+// Size: 48x48
+inline Image ICON_DESIGN_SAVE_48()
+{
+    return UiIconsImg::ICON_DESIGN_SAVE_48();
+}
+
+// Source: designs\storage.svg
+// Size: 48x48
+inline Image ICON_DESIGN_STORAGE_48()
+{
+    return UiIconsImg::ICON_DESIGN_STORAGE_48();
+}
+
+// Source: designs\system_update_alt.svg
+// Size: 48x48
+inline Image ICON_DESIGN_SYSTEM_UPDATE_ALT_48()
+{
+    return UiIconsImg::ICON_DESIGN_SYSTEM_UPDATE_ALT_48();
+}
+
+// Source: designs\upload.svg
+// Size: 48x48
+inline Image ICON_DESIGN_UPLOAD_48()
+{
+    return UiIconsImg::ICON_DESIGN_UPLOAD_48();
+}
+
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
@@ -981,6 +1065,19 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_CUSTOM_TYPOGRAPHY_48", &ICON_DESIGN_CUSTOM_TYPOGRAPHY_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_HELP_48", &ICON_DESIGN_HELP_48));
         out.Add(UiIconCatalogEntry("ICON_DESIGN_INFO_48", &ICON_DESIGN_INFO_48));
+
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_CANCEL_48", &ICON_DESIGN_CANCEL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_CLEAR_ALL_48", &ICON_DESIGN_CLEAR_ALL_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DOWNLOAD_48", &ICON_DESIGN_DOWNLOAD_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_DOWNLOAD_FOR_OFFLINE_48", &ICON_DESIGN_DOWNLOAD_FOR_OFFLINE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_MODE_OFF_ON_48", &ICON_DESIGN_MODE_OFF_ON_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_OUTBOX_48", &ICON_DESIGN_OUTBOX_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_PENDING_48", &ICON_DESIGN_PENDING_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_PUBLISH_48", &ICON_DESIGN_PUBLISH_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SAVE_48", &ICON_DESIGN_SAVE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_STORAGE_48", &ICON_DESIGN_STORAGE_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_SYSTEM_UPDATE_ALT_48", &ICON_DESIGN_SYSTEM_UPDATE_ALT_48));
+        out.Add(UiIconCatalogEntry("ICON_DESIGN_UPLOAD_48", &ICON_DESIGN_UPLOAD_48));
 
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
         return out;
