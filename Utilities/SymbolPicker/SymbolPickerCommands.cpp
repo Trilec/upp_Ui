@@ -10,6 +10,57 @@ static int FindStringIndex(const Vector<String>& values, const String& value)
 	return -1;
 }
 
+static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
+{
+	SymbolPickerIconRef out;
+	out.source_id = src.source_id;
+	out.alias = src.alias;
+	out.size = src.size;
+	out.tint = src.tint;
+	out.unresolved = src.unresolved;
+	return out;
+}
+
+static Vector<String> CopyStringVector(const Vector<String>& src)
+{
+	Vector<String> out;
+	for(const String& s : src)
+		out.Add(s);
+	return out;
+}
+
+static Vector<SymbolPickerIconRef> CopyIconRefVector(const Vector<SymbolPickerIconRef>& src)
+{
+	Vector<SymbolPickerIconRef> out;
+	for(const auto& item : src)
+		out.Add(CopyIconRef(item));
+	return out;
+}
+
+static SymbolPickerCollection CopyCollection(const SymbolPickerCollection& src)
+{
+	SymbolPickerCollection out;
+	out.name = src.name;
+	out.file_path = src.file_path;
+	out.items = CopyIconRefVector(src.items);
+	out.dirty = src.dirty;
+	return out;
+}
+
+static void RestoreStringVector(SymbolPickerModel& model, const Vector<String>& src)
+{
+	model.ClearBin();
+	for(const String& s : src)
+		model.AddIconToBin(s);
+}
+
+static void RestoreIconRefVector(SymbolPickerModel& model, int collection_index, const Vector<SymbolPickerIconRef>& src)
+{
+	model.ClearCollection(collection_index);
+	for(const auto& item : src)
+		model.AddIconToCollection(collection_index, item);
+}
+
 class SymbolPickerCommandGroup final : public SymbolPickerCommand {
 public:
 	SymbolPickerCommandGroup(const String& label, Vector<One<SymbolPickerCommand>> commands)
@@ -111,26 +162,48 @@ void SymbolPickerCommandStack::Clear()
 	grouping_ = false;
 }
 
-class SetStyleCommand final : public SymbolPickerCommand {
+class SetThemePresetCommand final : public SymbolPickerCommand {
 public:
-	SetStyleCommand(UiThemePreset preset) : preset_(preset) {}
+	SetThemePresetCommand(UiThemePreset preset) : preset_(preset) {}
 
 	bool Do(SymbolPickerModel& model) override
 	{
-		old_ = model.GetCurrentStyle();
-		return model.SetCurrentStyle(preset_);
+		old_ = model.GetThemePreset();
+		return model.SetThemePreset(preset_);
 	}
 
 	void Undo(SymbolPickerModel& model) override
 	{
-		model.SetCurrentStyle(old_);
+		model.SetThemePreset(old_);
 	}
 
-	String Label() const override { return "Set style"; }
+	String Label() const override { return "Set theme preset"; }
 
 private:
 	UiThemePreset preset_;
 	UiThemePreset old_ = UiThemePreset::Minimal;
+};
+
+class SetIconStyleCommand final : public SymbolPickerCommand {
+public:
+	SetIconStyleCommand(SymbolPickerIconStyle style) : style_(style) {}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		old_ = model.GetIconStyle();
+		return model.SetIconStyle(style_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		model.SetIconStyle(old_);
+	}
+
+	String Label() const override { return "Set icon style"; }
+
+private:
+	SymbolPickerIconStyle style_;
+	SymbolPickerIconStyle old_ = SymbolPickerIconStyle::Outlined;
 };
 
 class SetCategoryCommand final : public SymbolPickerCommand {
@@ -243,85 +316,307 @@ private:
 	int old_ = 48;
 };
 
-class AddSelectionCommand final : public SymbolPickerCommand {
+class AddToBinCommand final : public SymbolPickerCommand {
 public:
-	AddSelectionCommand(const String& id) : id_(id) {}
+	AddToBinCommand(const String& id) : id_(id) {}
 
 	bool Do(SymbolPickerModel& model) override
 	{
-		return model.AddSelectedIconId(id_);
+		return model.AddIconToBin(id_);
 	}
 
 	void Undo(SymbolPickerModel& model) override
 	{
-		model.RemoveSelectedIconId(id_);
+		model.RemoveIconFromBin(id_);
 	}
 
-	String Label() const override { return "Add selection"; }
+	String Label() const override { return "Add to bin"; }
 
 private:
 	String id_;
 };
 
-class RemoveSelectionCommand final : public SymbolPickerCommand {
+class RemoveFromBinCommand final : public SymbolPickerCommand {
 public:
-	RemoveSelectionCommand(const String& id) : id_(id) {}
+	RemoveFromBinCommand(const String& id) : id_(id) {}
 
 	bool Do(SymbolPickerModel& model) override
 	{
-		int q = FindStringIndex(model.GetSelectedIconIds(), id_);
-		if(q < 0)
-			return false;
-		index_ = q;
-		return model.RemoveSelectedIconId(id_);
+		index_ = model.FindBinIconIndex(id_);
+		return model.RemoveIconFromBin(id_);
 	}
 
 	void Undo(SymbolPickerModel& model) override
 	{
-		if(index_ < 0) {
-			model.AddSelectedIconId(id_);
+		if(index_ < 0)
 			return;
-		}
-		Vector<String> ids = clone(model.GetSelectedIconIds());
+		Vector<String> ids = CopyStringVector(model.GetBinIconIds());
 		if(FindStringIndex(ids, id_) >= 0)
 			return;
 		ids.Insert(index_, id_);
-		model.ClearSelectedIconIds();
-		for(const String& id : ids)
-			model.AddSelectedIconId(id);
+		RestoreStringVector(model, ids);
 	}
 
-	String Label() const override { return "Remove selection"; }
+	String Label() const override { return "Remove from bin"; }
 
 private:
 	String id_;
 	int index_ = -1;
 };
 
-class ClearSelectionCommand final : public SymbolPickerCommand {
+class ClearBinCommand final : public SymbolPickerCommand {
 public:
 	bool Do(SymbolPickerModel& model) override
 	{
-		old_ = clone(model.GetSelectedIconIds());
-		return model.ClearSelectedIconIds();
+		old_ = CopyStringVector(model.GetBinIconIds());
+		return model.ClearBin();
 	}
 
 	void Undo(SymbolPickerModel& model) override
 	{
-		model.ClearSelectedIconIds();
-		for(const String& id : old_)
-			model.AddSelectedIconId(id);
+		RestoreStringVector(model, old_);
 	}
 
-	String Label() const override { return "Clear selection"; }
+	String Label() const override { return "Clear bin"; }
 
 private:
 	Vector<String> old_;
 };
 
-One<SymbolPickerCommand> MakeSymbolPickerSetStyleCommand(UiThemePreset preset)
+class CreateCollectionCommand final : public SymbolPickerCommand {
+public:
+	CreateCollectionCommand(const String& name, const String& file_path)
+		: name_(name), file_path_(file_path)
+	{
+	}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		index_ = model.CreateCollection(name_, file_path_);
+		return index_ >= 0;
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		if(index_ >= 0)
+			model.RemoveCollection(index_);
+	}
+
+	String Label() const override { return "Create collection"; }
+
+private:
+	String name_;
+	String file_path_;
+	int index_ = -1;
+};
+
+class RemoveCollectionCommand final : public SymbolPickerCommand {
+public:
+	RemoveCollectionCommand(int index) : index_(index) {}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidCollectionIndex(index_))
+			return false;
+		old_active_ = model.GetActiveCollectionIndex();
+		backup_ = CopyCollection(model.GetCollections()[index_]);
+		return model.RemoveCollection(index_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		int inserted = model.CreateCollection(backup_.name, backup_.file_path);
+		if(inserted < 0)
+			return;
+		while(inserted > index_) {
+			SymbolPickerCollection tmp = CopyCollection(model.GetCollections()[inserted - 1]);
+			model.RemoveCollection(inserted - 1);
+			model.CreateCollection(tmp.name, tmp.file_path);
+			RestoreIconRefVector(model, inserted - 1, tmp.items);
+			inserted--;
+		}
+		RestoreIconRefVector(model, index_, backup_.items);
+		model.RenameCollection(index_, backup_.name);
+		model.SetActiveCollection(min(old_active_, model.GetCollections().GetCount() - 1));
+	}
+
+	String Label() const override { return "Remove collection"; }
+
+private:
+	int index_;
+	int old_active_ = -1;
+	SymbolPickerCollection backup_;
+};
+
+class RenameCollectionCommand final : public SymbolPickerCommand {
+public:
+	RenameCollectionCommand(int index, const String& name) : index_(index), name_(name) {}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidCollectionIndex(index_))
+			return false;
+		old_ = model.GetCollections()[index_].name;
+		return model.RenameCollection(index_, name_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		model.RenameCollection(index_, old_);
+	}
+
+	String Label() const override { return "Rename collection"; }
+
+private:
+	int index_;
+	String name_;
+	String old_;
+};
+
+class SetActiveCollectionCommand final : public SymbolPickerCommand {
+public:
+	SetActiveCollectionCommand(int index) : index_(index) {}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		old_ = model.GetActiveCollectionIndex();
+		return model.SetActiveCollection(index_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		model.SetActiveCollection(old_);
+	}
+
+	String Label() const override { return "Set active collection"; }
+
+private:
+	int index_;
+	int old_ = -1;
+};
+
+class AddIconToCollectionCommand final : public SymbolPickerCommand {
+public:
+	AddIconToCollectionCommand(int collection_index, const SymbolPickerIconRef& ref)
+		: collection_index_(collection_index), ref_(CopyIconRef(ref))
+	{
+	}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		return model.AddIconToCollection(collection_index_, ref_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		const SymbolPickerCollection* collection = model.GetActiveCollectionIndex() == collection_index_
+			? model.GetActiveCollection()
+			: (model.IsValidCollectionIndex(collection_index_) ? &model.GetCollections()[collection_index_] : nullptr);
+		if(collection && !collection->items.IsEmpty())
+			model.RemoveIconFromCollection(collection_index_, collection->items.GetCount() - 1);
+	}
+
+	String Label() const override { return "Add icon to collection"; }
+
+private:
+	int collection_index_;
+	SymbolPickerIconRef ref_;
+};
+
+class RemoveIconFromCollectionCommand final : public SymbolPickerCommand {
+public:
+	RemoveIconFromCollectionCommand(int collection_index, int item_index)
+		: collection_index_(collection_index), item_index_(item_index)
+	{
+	}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidItemIndex(collection_index_, item_index_))
+			return false;
+		backup_ = CopyIconRef(model.GetCollections()[collection_index_].items[item_index_]);
+		return model.RemoveIconFromCollection(collection_index_, item_index_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidCollectionIndex(collection_index_))
+			return;
+		Vector<SymbolPickerIconRef> items = CopyIconRefVector(model.GetCollections()[collection_index_].items);
+		items.Insert(item_index_, CopyIconRef(backup_));
+		RestoreIconRefVector(model, collection_index_, items);
+	}
+
+	String Label() const override { return "Remove icon from collection"; }
+
+private:
+	int collection_index_;
+	int item_index_;
+	SymbolPickerIconRef backup_;
+};
+
+class ClearCollectionCommand final : public SymbolPickerCommand {
+public:
+	ClearCollectionCommand(int collection_index) : collection_index_(collection_index) {}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidCollectionIndex(collection_index_))
+			return false;
+		old_ = CopyIconRefVector(model.GetCollections()[collection_index_].items);
+		return model.ClearCollection(collection_index_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		if(model.IsValidCollectionIndex(collection_index_))
+			RestoreIconRefVector(model, collection_index_, old_);
+	}
+
+	String Label() const override { return "Clear collection"; }
+
+private:
+	int collection_index_;
+	Vector<SymbolPickerIconRef> old_;
+};
+
+class RenameCollectionIconAliasCommand final : public SymbolPickerCommand {
+public:
+	RenameCollectionIconAliasCommand(int collection_index, int item_index, const String& alias)
+		: collection_index_(collection_index), item_index_(item_index), alias_(alias)
+	{
+	}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidItemIndex(collection_index_, item_index_))
+			return false;
+		old_ = model.GetCollections()[collection_index_].items[item_index_].alias;
+		return model.RenameCollectionIconAlias(collection_index_, item_index_, alias_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		model.RenameCollectionIconAlias(collection_index_, item_index_, old_);
+	}
+
+	String Label() const override { return "Rename collection icon alias"; }
+
+private:
+	int collection_index_;
+	int item_index_;
+	String alias_;
+	String old_;
+};
+
+One<SymbolPickerCommand> MakeSymbolPickerSetThemePresetCommand(UiThemePreset preset)
 {
-	return MakeOne<SetStyleCommand>(preset);
+	return MakeOne<SetThemePresetCommand>(preset);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerSetIconStyleCommand(SymbolPickerIconStyle style)
+{
+	return MakeOne<SetIconStyleCommand>(style);
 }
 
 One<SymbolPickerCommand> MakeSymbolPickerSetCategoryCommand(const String& category)
@@ -349,19 +644,59 @@ One<SymbolPickerCommand> MakeSymbolPickerSetExportSizeCommand(int px)
 	return MakeOne<SetExportSizeCommand>(px);
 }
 
-One<SymbolPickerCommand> MakeSymbolPickerAddSelectionCommand(const String& id)
+One<SymbolPickerCommand> MakeSymbolPickerAddToBinCommand(const String& id)
 {
-	return MakeOne<AddSelectionCommand>(id);
+	return MakeOne<AddToBinCommand>(id);
 }
 
-One<SymbolPickerCommand> MakeSymbolPickerRemoveSelectionCommand(const String& id)
+One<SymbolPickerCommand> MakeSymbolPickerRemoveFromBinCommand(const String& id)
 {
-	return MakeOne<RemoveSelectionCommand>(id);
+	return MakeOne<RemoveFromBinCommand>(id);
 }
 
-One<SymbolPickerCommand> MakeSymbolPickerClearSelectionCommand()
+One<SymbolPickerCommand> MakeSymbolPickerClearBinCommand()
 {
-	return MakeOne<ClearSelectionCommand>();
+	return MakeOne<ClearBinCommand>();
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerCreateCollectionCommand(const String& name, const String& file_path)
+{
+	return MakeOne<CreateCollectionCommand>(name, file_path);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerRemoveCollectionCommand(int index)
+{
+	return MakeOne<RemoveCollectionCommand>(index);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerRenameCollectionCommand(int index, const String& name)
+{
+	return MakeOne<RenameCollectionCommand>(index, name);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerSetActiveCollectionCommand(int index)
+{
+	return MakeOne<SetActiveCollectionCommand>(index);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerAddIconToCollectionCommand(int collection_index, const SymbolPickerIconRef& ref)
+{
+	return MakeOne<AddIconToCollectionCommand>(collection_index, ref);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerRemoveIconFromCollectionCommand(int collection_index, int item_index)
+{
+	return MakeOne<RemoveIconFromCollectionCommand>(collection_index, item_index);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerClearCollectionCommand(int collection_index)
+{
+	return MakeOne<ClearCollectionCommand>(collection_index);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerRenameCollectionIconAliasCommand(int collection_index, int item_index, const String& alias)
+{
+	return MakeOne<RenameCollectionIconAliasCommand>(collection_index, item_index, alias);
 }
 
 bool RunSymbolPickerCommandSmokeTests(String& error)
@@ -374,14 +709,19 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 	SymbolPickerModel model;
 	SymbolPickerCommandStack stack;
 
-	if(!stack.Execute(MakeSymbolPickerSetStyleCommand(UiThemePreset::Pill), model))
-		return Fail("SetStyle command did not execute.");
-	if(model.GetCurrentStyle() != UiThemePreset::Pill)
-		return Fail("SetStyle command did not update style.");
-	if(!stack.Undo(model) || model.GetCurrentStyle() != UiThemePreset::Minimal)
-		return Fail("SetStyle undo failed.");
-	if(!stack.Redo(model) || model.GetCurrentStyle() != UiThemePreset::Pill)
-		return Fail("SetStyle redo failed.");
+	if(!stack.Execute(MakeSymbolPickerSetThemePresetCommand(UiThemePreset::Pill), model))
+		return Fail("SetThemePreset command did not execute.");
+	if(model.GetThemePreset() != UiThemePreset::Pill)
+		return Fail("SetThemePreset command did not update theme preset.");
+	if(!stack.Undo(model) || model.GetThemePreset() != UiThemePreset::Minimal)
+		return Fail("SetThemePreset undo failed.");
+	if(!stack.Redo(model) || model.GetThemePreset() != UiThemePreset::Pill)
+		return Fail("SetThemePreset redo failed.");
+
+	if(!stack.Execute(MakeSymbolPickerSetIconStyleCommand(SymbolPickerIconStyle::Rounded), model))
+		return Fail("SetIconStyle command did not execute.");
+	if(model.GetIconStyle() != SymbolPickerIconStyle::Rounded)
+		return Fail("SetIconStyle command did not update icon style.");
 
 	if(!stack.Execute(MakeSymbolPickerSetCategoryCommand("Actions"), model))
 		return Fail("SetCategory command did not execute.");
@@ -408,29 +748,92 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 	if(model.GetExportSize() != 64)
 		return Fail("SetExportSize command did not update export size.");
 
-	if(!stack.Execute(MakeSymbolPickerAddSelectionCommand("ICON_ACTION_SAVE_48"), model))
-		return Fail("AddSelection command did not execute.");
-	if(model.GetSelectedIconIds().GetCount() != 1)
-		return Fail("AddSelection command did not update selection.");
+	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("ICON_ACTION_SAVE_48"), model))
+		return Fail("AddToBin command did not execute.");
+	if(model.GetBinIconIds().GetCount() != 1)
+		return Fail("AddToBin command did not update bin.");
 
-	if(!stack.Execute(MakeSymbolPickerAddSelectionCommand("ICON_ACTION_REFRESH_48"), model))
-		return Fail("Second AddSelection command did not execute.");
-	if(model.GetSelectedIconIds().GetCount() != 2)
-		return Fail("Second AddSelection command did not update selection.");
+	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("ICON_ACTION_REFRESH_48"), model))
+		return Fail("Second AddToBin command did not execute.");
+	if(model.GetBinIconIds().GetCount() != 2)
+		return Fail("Second AddToBin command did not update bin.");
 
-	if(!stack.Execute(MakeSymbolPickerRemoveSelectionCommand("ICON_ACTION_SAVE_48"), model))
-		return Fail("RemoveSelection command did not execute.");
-	if(FindStringIndex(model.GetSelectedIconIds(), "ICON_ACTION_SAVE_48") >= 0)
-		return Fail("RemoveSelection command did not remove selection.");
-	if(!stack.Undo(model) || FindStringIndex(model.GetSelectedIconIds(), "ICON_ACTION_SAVE_48") < 0)
-		return Fail("RemoveSelection undo failed.");
+	if(!stack.Execute(MakeSymbolPickerRemoveFromBinCommand("ICON_ACTION_SAVE_48"), model))
+		return Fail("RemoveFromBin command did not execute.");
+	if(FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") >= 0)
+		return Fail("RemoveFromBin command did not remove icon.");
+	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") < 0)
+		return Fail("RemoveFromBin undo failed.");
 
-	if(!stack.Execute(MakeSymbolPickerClearSelectionCommand(), model))
-		return Fail("ClearSelection command did not execute.");
-	if(!model.GetSelectedIconIds().IsEmpty())
-		return Fail("ClearSelection command did not clear selection.");
-	if(!stack.Undo(model) || model.GetSelectedIconIds().GetCount() != 2)
-		return Fail("ClearSelection undo failed.");
+	if(!stack.Execute(MakeSymbolPickerClearBinCommand(), model))
+		return Fail("ClearBin command did not execute.");
+	if(!model.GetBinIconIds().IsEmpty())
+		return Fail("ClearBin command did not clear bin.");
+	if(!stack.Undo(model) || model.GetBinIconIds().GetCount() != 2)
+		return Fail("ClearBin undo failed.");
+
+	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Core Set"), model))
+		return Fail("CreateCollection command did not execute.");
+	if(model.GetCollections().GetCount() != 1)
+		return Fail("CreateCollection command did not create a collection.");
+
+	if(!stack.Execute(MakeSymbolPickerRenameCollectionCommand(0, "Primary Set"), model))
+		return Fail("RenameCollection command did not execute.");
+	if(model.GetCollections()[0].name != "Primary Set")
+		return Fail("RenameCollection command did not rename collection.");
+	if(!stack.Undo(model) || model.GetCollections()[0].name != "Core Set")
+		return Fail("RenameCollection undo failed.");
+
+	SymbolPickerIconRef unresolved;
+	unresolved.source_id = "legacy/missing_icon";
+	unresolved.alias = "MissingGlyph";
+	unresolved.size = 32;
+	unresolved.tint = Color(12, 34, 56);
+	unresolved.unresolved = true;
+
+	if(!stack.Execute(MakeSymbolPickerAddIconToCollectionCommand(0, unresolved), model))
+		return Fail("AddIconToCollection command did not execute.");
+	if(model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("AddIconToCollection command did not add item.");
+	if(!model.GetCollections()[0].items[0].unresolved)
+		return Fail("Unresolved icon ref was not preserved.");
+
+	if(!stack.Execute(MakeSymbolPickerRenameCollectionIconAliasCommand(0, 0, "RenamedGlyph"), model))
+		return Fail("RenameCollectionIconAlias command did not execute.");
+	if(model.GetCollections()[0].items[0].alias != "RenamedGlyph")
+		return Fail("RenameCollectionIconAlias command did not update alias.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items[0].alias != "MissingGlyph")
+		return Fail("RenameCollectionIconAlias undo failed.");
+
+	if(!stack.Execute(MakeSymbolPickerRemoveIconFromCollectionCommand(0, 0), model))
+		return Fail("RemoveIconFromCollection command did not execute.");
+	if(!model.GetCollections()[0].items.IsEmpty())
+		return Fail("RemoveIconFromCollection command did not remove item.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("RemoveIconFromCollection undo failed.");
+	if(!model.GetCollections()[0].items[0].unresolved)
+		return Fail("Unresolved icon ref was not restored after undo.");
+
+	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Secondary"), model))
+		return Fail("Second CreateCollection command did not execute.");
+	if(!stack.Execute(MakeSymbolPickerSetActiveCollectionCommand(1), model))
+		return Fail("SetActiveCollection command did not execute.");
+	if(model.GetActiveCollectionIndex() != 1)
+		return Fail("SetActiveCollection command did not update active collection.");
+	if(!stack.Undo(model) || model.GetActiveCollectionIndex() != 0)
+		return Fail("SetActiveCollection undo failed.");
+
+	if(!stack.Execute(MakeSymbolPickerClearCollectionCommand(0), model))
+		return Fail("ClearCollection command did not execute.");
+	if(!model.GetCollections()[0].items.IsEmpty())
+		return Fail("ClearCollection command did not clear items.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("ClearCollection undo failed.");
+
+	if(!stack.Execute(MakeSymbolPickerRemoveCollectionCommand(1), model))
+		return Fail("RemoveCollection command did not execute.");
+	if(model.GetCollections().GetCount() != 1)
+		return Fail("RemoveCollection command did not remove collection.");
 
 	return true;
 }

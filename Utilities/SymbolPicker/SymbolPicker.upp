@@ -10,6 +10,8 @@ file
 	SymbolPickerModel.cpp,
 	SymbolPickerCommands.h,
 	SymbolPickerCommands.cpp,
+	SymbolPickerCollectionIo.h,
+	SymbolPickerCollectionIo.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,
@@ -20,4 +22,3 @@ file
 
 mainconfig
 	"" = "GUI";
-
