@@ -1,4 +1,5 @@
 #include "DesignerTemplates.h"
+#include "DesignerVersion.h"
 #include "DesignerDefaults.h"
 
 // DesignerTemplates.cpp - starter model seeds for common layout shapes.
@@ -526,7 +527,7 @@ static void BuildDesignerWorkbenchTemplate(DesignerModel& model, const DesignerR
 	SetTemplateMinSize(model, load, 1, 24);
 
 	DesignerNodeId version = AddTemplateNode(model, registry, "UiLabel", top, "version_badge");
-	SetTemplateText(model, version, "v1.0.1 Alpha");
+	SetTemplateText(model, version, DESIGNER_VERSION);
 	SetTemplateRole(model, version, "Accent");
 	SetTemplateSizing(model, version, "Fit", "Fixed");
 	SetTemplateFixedSize(model, version, 120, 24);

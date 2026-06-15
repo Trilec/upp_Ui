@@ -42,6 +42,7 @@ struct DesignerCodeGenOptions {
 	String class_name = "GeneratedDesignerWindow";
 	bool emit_designer_appearance = false;
 	bool emit_export_header = false;
+	String designer_version;
 	String source_design_filename;
 	String package_name;
 	String umk_path;

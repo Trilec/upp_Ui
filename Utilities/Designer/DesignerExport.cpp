@@ -1,5 +1,6 @@
 #include "DesignerExport.h"
 #include "DesignerCodeGen.h"
+#include "DesignerVersion.h"
 
 namespace Upp {
 
@@ -193,6 +194,7 @@ bool ExportDesignerProject(const DesignerModel& model, const DesignerRegistry& r
 	gen.class_name = result.class_name;
 	gen.emit_designer_appearance = options.include_designer_appearance;
 	gen.emit_export_header = true;
+	gen.designer_version = DESIGNER_VERSION;
 	gen.source_design_filename = options.source_design_filename;
 	gen.package_name = result.project_name;
 	gen.umk_path = options.umk_path;

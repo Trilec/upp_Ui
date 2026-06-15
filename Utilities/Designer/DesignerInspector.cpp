@@ -38,6 +38,20 @@ static bool DesignerIsSafeMultiSelectProperty(const String& type_id, bool same_t
 	return false;
 }
 
+static bool DesignerIsSafeSizingProperty(const String& id)
+{
+	return id == "h_sizing" || id == "v_sizing" ||
+	       id == "fixed_width" || id == "fixed_height" ||
+	       id == "min_width" || id == "min_height" ||
+	       id == "max_width" || id == "max_height" ||
+	       id == "cell_align_h" || id == "cell_align_v";
+}
+
+static bool DesignerBindingEditableInMultiSelect(const DesignerApiBinding& binding)
+{
+	return DesignerIsSafeSizingProperty(binding.property_id) || binding.enabled;
+}
+
 static UiRole DesignerInspectorRoleChoice(const Value& role)
 {
 	String s = AsString(role);
@@ -226,6 +240,24 @@ void DesignerInspector::SetSelection(const Vector<DesignerNodeId>& ids)
 	RefreshLayout();
 	Refresh();
 	syncing_ = false;
+}
+
+bool DesignerInspector::HasRow(const String& property_id) const
+{
+	for(const Page& page : pages_)
+		for(const Row& row : page.rows)
+			if(row.property_id == property_id)
+				return true;
+	return false;
+}
+
+bool DesignerInspector::IsRowEnabled(const String& property_id) const
+{
+	for(const Page& page : pages_)
+		for(const Row& row : page.rows)
+			if(row.property_id == property_id)
+				return row.ctrl && row.ctrl->IsEnabled();
+	return false;
 }
 
 Value DesignerInspector::NodeProperty(const DesignerNode& n, const String& key, const Value& def) const
@@ -630,14 +662,20 @@ void DesignerInspector::DescribeCommon(Vector<DesignerApiBinding>& bindings, con
 		return;
 	const Vector<DesignerApiBinding>& first = all_bindings[0];
 	for(const DesignerApiBinding& b : first) {
-		if(!b.visible || !b.enabled || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
+		if(!b.visible || b.property_id == "name" || b.editor == DesignerEditorKind::ReadOnly)
 			continue;
 		if(!DesignerIsSafeMultiSelectProperty(type_id, same_type, b.property_id))
+			continue;
+		if(!DesignerBindingEditableInMultiSelect(b))
 			continue;
 		bool common = true;
 		for(int i = 1; i < all_bindings.GetCount() && common; i++) {
 			const DesignerApiBinding *match = FindCommonBindingById(all_bindings[i], b.property_id);
-			if(!match || !match->visible || !match->enabled || match->editor != b.editor) {
+			if(!match || !match->visible || match->editor != b.editor) {
+				common = false;
+				continue;
+			}
+			if(!DesignerBindingEditableInMultiSelect(*match)) {
 				common = false;
 				continue;
 			}
@@ -860,6 +898,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		Ptr<UiCompositeColor> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetColorCount(1).ShowValue(true);
 		row->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self && node_id_ == row_node)
 				WhenProperty(row_node, property_id, self->GetColor(0));
@@ -908,6 +947,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	Ptr<UiCompositeEdit> self = row;
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
 	row->SetData(value);
+	row->Enable(b.enabled);
 	row->WhenAction = [=] {
 		if(!syncing_ && self && node_id_ == row_node)
 			WhenProperty(row_node, property_id, self->GetData());
@@ -959,7 +999,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 			}
 		}
 		row->SetData(mixed ? Value() : value);
-		row->Enable(b.enabled);
+		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && !syncing_ && !IsNull(data))
 				WhenPropertyMany(selection_, property_id, data);
@@ -985,7 +1025,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		Ptr<UiCompositeToggle> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).ShowValue(false);
 		row->SetData(mixed ? false : (bool)value);
-		row->Enable(b.enabled);
+		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(!syncing_ && self)
 				WhenPropertyMany(selection_, property_id, (bool)self->GetData());
@@ -1010,7 +1050,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Slider().SetRange(min_value, max_value);
 		row->SetData(ivalue);
 		row->SetValueText(mixed ? "Mixed" : AsString(ivalue));
-		row->Enable(b.enabled);
+		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenChanging = [=] {
 			if(syncing_ || !self)
 				return;
@@ -1039,7 +1079,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		Ptr<UiCompositeColor> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetColorCount(1).ShowValue(true);
 		row->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
-		row->Enable(b.enabled);
+		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(!syncing_ && self)
 				WhenPropertyMany(selection_, property_id, self->GetColor(0));
@@ -1066,7 +1106,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Edit().SetPlaceholder("");
 		row->SetData(value);
 	}
-	row->Enable(b.enabled);
+	row->Enable(DesignerBindingEditableInMultiSelect(b));
 	row->WhenAction = [=] {
 		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
 			WhenPropertyMany(selection_, property_id, self->GetData());
@@ -1131,6 +1171,8 @@ void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t
                                       const DesignerApiBinding& b, Row& row)
 {
 	Value value = PropertyValue(n, t, b);
+	if(row.ctrl)
+		row.ctrl->Enable(b.enabled);
 	if(UiCompositeDropdown *c = dynamic_cast<UiCompositeDropdown *>(row.ctrl))
 		c->SetData(value);
 	else if(UiCompositeToggle *c = dynamic_cast<UiCompositeToggle *>(row.ctrl))
@@ -1161,6 +1203,8 @@ void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, c
 {
 	bool mixed = false;
 	Value value = SelectionProperty(nodes, b, mixed);
+	if(row.ctrl)
+		row.ctrl->Enable(DesignerBindingEditableInMultiSelect(b));
 	if(UiCompositeDropdown *c = dynamic_cast<UiCompositeDropdown *>(row.ctrl))
 		c->SetData(mixed ? Value() : value);
 	else if(UiCompositeToggle *c = dynamic_cast<UiCompositeToggle *>(row.ctrl))

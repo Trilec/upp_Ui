@@ -11,6 +11,7 @@
 #include "DesignerDragController.h"
 #include "DesignerAssets.h"
 #include "DesignerDefaults.h"
+#include "DesignerVersion.h"
 
 // Designer utility app - Box/Grid/Splitter layout builder for U++ Ui controls.
 // This file wires the subsystems together: model, commands, adapters, preview,
@@ -23,8 +24,8 @@ static void DesignerMultiSelectCommandLog(const String& text)
 	return;
 }
 
-static const char* DESIGNER_VERSION = "v1.0.1 Alpha";
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
+static constexpr int SAVE_STATUS_TIMER_ID = 102;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
 static String DesignerCrumbPropertyKey(int i)
@@ -341,12 +342,14 @@ public:
 		RegisterDesignerBuiltins(registry_);
 		BuildInitialModel();
 		BuildUi();
+		SetDocumentDirty(false);
 		RefreshAll();
 	}
 
 	~DesignerWindow()
 	{
 	    KillTimeCallback(TOOL_DRAG_TIMER_ID);
+	    KillTimeCallback(SAVE_STATUS_TIMER_ID);
 	}
 
 	void Layout() override
@@ -357,16 +360,18 @@ public:
 		int top_y = gap;
 		int control_y = top_y + DPI(12);
 		int version_w = DPI(82);
+		int save_status_w = DPI(96);
 		int save_w = DPI(92);
 		int load_w = DPI(92);
 		int overlay_w = DPI(42);
 		int preset_w = DPI(170);
 		int theme_w = DPI(96);
 		int exit_w = DPI(94);
-		int controls_w = save_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 7;
+		int controls_w = save_w + save_status_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 8;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
 		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
-		load_button_.SetRect(save_button_.GetRect().right + gap, control_y, load_w, DPI(34));
+		save_status_label_.SetRect(save_button_.GetRect().right + gap, control_y + DPI(8), save_status_w, DPI(18));
+		load_button_.SetRect(save_status_label_.GetRect().right + gap, control_y, load_w, DPI(34));
 		overlay_button_.SetRect(load_button_.GetRect().right + gap, control_y, overlay_w, DPI(34));
 		theme_preset_row_.SetRect(overlay_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
 		theme_shell_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, theme_w, DPI(34));
@@ -457,6 +462,12 @@ public:
 	}
 
 private:
+	enum SaveStatusKind {
+		SAVE_STATUS_NONE,
+		SAVE_STATUS_DIRTY,
+		SAVE_STATUS_SAVED
+	};
+
 	void Paint(Draw& w) override
 	{
 		w.DrawRect(GetSize(), DesignerShellBackground(theme_mode_));
@@ -477,13 +488,17 @@ private:
 			return true;
 		}
 		if(key == K_CTRL_Z) {
-			if(commands_.Undo(model_))
+			if(commands_.Undo(model_)) {
+				SetDocumentDirty();
 				RefreshAll();
+			}
 			return true;
 		}
 		if(key == K_CTRL_Y) {
-			if(commands_.Redo(model_))
+			if(commands_.Redo(model_)) {
+				SetDocumentDirty();
 				RefreshAll();
+			}
 			return true;
 		}
 		return TopWindow::Key(key, count);
@@ -585,6 +600,7 @@ private:
 		Add(header_);
 		Add(version_badge_);
 		Add(save_button_);
+		Add(save_status_label_);
 		Add(load_button_);
 		Add(overlay_button_);
 		Add(theme_preset_row_);
@@ -629,11 +645,18 @@ private:
 		warning_icon_.Hide();
 		warning_text_.Hide();
 		version_badge_.SetText(DESIGNER_VERSION).NoWantFocus();
+		save_status_label_.NoWantFocus().IgnoreMouse();
+		save_status_label_.SetText("");
 		save_button_.SetIcon(CtrlImg::save())
 		            .SetText("Save")
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
-		save_button_.WhenAction = [=] { SaveDesignAs(); };
+		save_button_.WhenAction = [=] {
+			if(!current_design_path_.IsEmpty())
+				SaveDesignToPath(current_design_path_);
+			else
+				SaveDesignAs();
+		};
 		SetupRecentSplitButton(save_button_, "Recent save paths");
 		save_button_.WhenSelect = [=](int, const Value& v) {
 			if(syncing_recent_ || IsNull(v))
@@ -910,7 +933,12 @@ private:
 		fs.Type("Designer JSON", "*.json").DefaultExt("json").DefaultName("design.json");
 		if(!fs.ExecuteSaveAs("Save designer document"))
 			return;
-		SaveDesignToPath(~fs);
+		String path = ~fs;
+		if(path.IsEmpty())
+			return;
+		if(FileExists(path) && !PromptYesNo(Format("Overwrite existing design file '%s'?", GetFileName(path))))
+			return;
+		SaveDesignToPath(path);
 	}
 
 	void SaveDesignToPath(const String& path)
@@ -918,6 +946,7 @@ private:
 		if(path.IsEmpty())
 			return;
 		if(!SaveFile(path, StoreDesignerModelJson(model_))) {
+			ShowSaveError("Unable to save designer document.");
 			Exclamation("Unable to save designer document.");
 			return;
 		}
@@ -925,7 +954,8 @@ private:
 		current_design_path_ = NormalizePath(path);
 		StoreRecentFiles();
 		SyncRecentDropdowns();
-		SetWarningNotes("Saved " + GetFileName(path));
+		SetDocumentDirty(false);
+		ShowSaveSuccess("Saved");
 	}
 
 	void LoadDesignFromFile()
@@ -956,6 +986,7 @@ private:
 		current_design_path_ = NormalizePath(path);
 		AddRecentPath(recent_loads_, path);
 		StoreRecentFiles();
+		SetDocumentDirty(false);
 		RefreshAll();
 		String note_text;
 		for(const String& note : notes) {
@@ -964,6 +995,78 @@ private:
 			note_text << note;
 		}
 		SetWarningNotes(note_text.IsEmpty() ? "Loaded " + GetFileName(path) : note_text);
+	}
+
+	void ShowSaveSuccess(const String& text)
+	{
+		save_status_kind_ = SAVE_STATUS_SAVED;
+		save_status_text_ = text;
+		RefreshSaveStatusUi();
+		KillTimeCallback(SAVE_STATUS_TIMER_ID);
+		SetTimeCallback(1500, [=] {
+			if(save_status_kind_ == SAVE_STATUS_SAVED) {
+				save_status_kind_ = document_dirty_ ? SAVE_STATUS_DIRTY : SAVE_STATUS_NONE;
+				save_status_text_ = document_dirty_ ? "Unsaved" : String();
+				RefreshSaveStatusUi();
+			}
+		}, SAVE_STATUS_TIMER_ID);
+	}
+
+	void ShowSaveError(const String&)
+	{
+		KillTimeCallback(SAVE_STATUS_TIMER_ID);
+		RefreshSaveStatusUi();
+	}
+
+	void SetDocumentDirty(bool dirty = true)
+	{
+		document_dirty_ = dirty;
+		if(document_dirty_) {
+			save_status_kind_ = SAVE_STATUS_DIRTY;
+			save_status_text_ = "Unsaved";
+			KillTimeCallback(SAVE_STATUS_TIMER_ID);
+		}
+		else if(save_status_kind_ != SAVE_STATUS_SAVED) {
+			save_status_kind_ = SAVE_STATUS_NONE;
+			save_status_text_.Clear();
+		}
+		RefreshSaveStatusUi();
+	}
+
+	void RefreshSaveStatusUi()
+	{
+		UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body);
+		label_style.font = SansSerifZ(9).Bold();
+		label_style.align_h = UiAlign::LEFT;
+		label_style.align_v = UiAlign::CENTER;
+
+		UiButton::Style save_style = UiTheme::ResolveButton(UiRole::Accent);
+		if(save_status_kind_ == SAVE_STATUS_DIRTY) {
+			label_style.palette.ink[ST_NORMAL] = theme_mode_ == UiThemeMode::Dark ? Color(255, 191, 128) : Color(180, 83, 9);
+			for(int i = 0; i < 4; i++) {
+				save_style.palette.frame[i] = theme_mode_ == UiThemeMode::Dark ? Color(234, 179, 8) : Color(217, 119, 6);
+				if(save_style.palette.face[i].IsSolid())
+					save_style.palette.face[i] = UiFill::Solid(Blend(save_style.palette.face[i].color,
+					                                               theme_mode_ == UiThemeMode::Dark ? Color(120, 68, 8) : Color(255, 237, 213), 36));
+			}
+		}
+		else if(save_status_kind_ == SAVE_STATUS_SAVED) {
+			label_style.palette.ink[ST_NORMAL] = theme_mode_ == UiThemeMode::Dark ? Color(134, 239, 172) : Color(21, 128, 61);
+			for(int i = 0; i < 4; i++) {
+				save_style.palette.frame[i] = theme_mode_ == UiThemeMode::Dark ? Color(34, 197, 94) : Color(22, 163, 74);
+				if(save_style.palette.face[i].IsSolid())
+					save_style.palette.face[i] = UiFill::Solid(Blend(save_style.palette.face[i].color,
+					                                               theme_mode_ == UiThemeMode::Dark ? Color(20, 83, 45) : Color(220, 252, 231), 32));
+			}
+		}
+
+		save_button_.SetCustomStyle(save_style);
+		ApplyRecentSplitPopup(save_button_);
+		save_status_label_.SetCustomStyle(label_style);
+		save_status_label_.SetText(save_status_text_);
+		save_status_label_.Show(!save_status_text_.IsEmpty());
+		save_status_label_.Refresh();
+		save_button_.Refresh();
 	}
 
 	void SetupRecentSplitButton(UiSplitButton& button, const String& tip)
@@ -1733,6 +1836,7 @@ private:
 	// parent/children tree underneath.
 	void RefreshHierarchy()
 	{
+		DesignerNodeId current_primary = model_.GetSelection().IsEmpty() ? Designer_ROOT : model_.GetSelection()[0];
 		syncing_hierarchy_ = true;
 		StoreHierarchyExpandedState();
 		hierarchy_refs_.Clear();
@@ -1771,13 +1875,17 @@ private:
 				selection_data.Add(id);
 		}
 		hierarchy_.SetData(selection_data);
-		hierarchy_.ScrollToSelection();
+		if(current_primary != last_hierarchy_primary_selection_) {
+			hierarchy_.ScrollToSelection();
+			last_hierarchy_primary_selection_ = current_primary;
+		}
 		hierarchy_.Refresh();
 		syncing_hierarchy_ = false;
 	}
 
 	void SyncHierarchySelection()
 	{
+		DesignerNodeId current_primary = model_.GetSelection().IsEmpty() ? Designer_ROOT : model_.GetSelection()[0];
 		syncing_hierarchy_ = true;
 		for(int i = 0; i < hierarchy_refs_.GetCount(); i++) {
 			DesignerNodeId id = hierarchy_refs_.GetKey(i);
@@ -1800,7 +1908,10 @@ private:
 				selection_data.Add(id);
 		}
 		hierarchy_.SetData(selection_data);
-		hierarchy_.ScrollToSelection();
+		if(current_primary != last_hierarchy_primary_selection_) {
+			hierarchy_.ScrollToSelection();
+			last_hierarchy_primary_selection_ = current_primary;
+		}
 		hierarchy_.Refresh();
 		syncing_hierarchy_ = false;
 	}
@@ -1922,6 +2033,7 @@ private:
 			                                                 Format("Crumb %d", next), "Set crumb text"), model_);
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", crumbs, "Select crumb"), model_);
 			commands_.EndGroup();
+			SetDocumentDirty();
 			RefreshAll();
 			return;
 		}
@@ -1950,6 +2062,7 @@ private:
 		commands_.Execute(MakeDesignerSetPropertyCommand(container_id, "active", insert, "Select page"), model_);
 		commands_.EndGroup();
 		model_.SelectOne(page);
+		SetDocumentDirty();
 		RefreshAll();
 	}
 
@@ -1967,6 +2080,7 @@ private:
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "crumb_count", next, "Set crumb count"), model_);
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", min(current, next - 1), "Select crumb"), model_);
 			commands_.EndGroup();
+			SetDocumentDirty();
 			RefreshAll();
 			return;
 		}
@@ -1987,6 +2101,7 @@ private:
 		commands_.Execute(MakeDesignerSetPropertyCommand(container_id, "active", next_active, "Select page"), model_);
 		commands_.EndGroup();
 		model_.SelectOne(next_page);
+		SetDocumentDirty();
 		RefreshAll();
 	}
 
@@ -2345,6 +2460,7 @@ private:
 		commands_.EndGroup();
 		model_.SelectOne(id);
 		preview_.SetPlacementType(String());
+		SetDocumentDirty();
 		RefreshAll();
 	}
 
@@ -2397,6 +2513,7 @@ private:
 		commands_.EndGroup();
 		if(first != Designer_NULL)
 			model_.SelectOne(first);
+		SetDocumentDirty();
 		RefreshAll();
 	}
 
@@ -2534,6 +2651,7 @@ private:
 		bool changed = commands_.EndGroup();
 		if(changed && !pasted.IsEmpty()) {
 			model_.SetSelection(pasted);
+			SetDocumentDirty();
 			RefreshAll();
 		}
 	}
@@ -2624,6 +2742,7 @@ private:
 			String error;
 			if(!model_.Validate(error))
 				SetWarningNotes("Model validation failed after move: " + error);
+			SetDocumentDirty();
 			RefreshAll();
 		}
 	}
@@ -2735,6 +2854,7 @@ private:
 		String error;
 		if(!model_.Validate(error))
 			SetWarningNotes("Model validation failed after hierarchy move: " + error);
+		SetDocumentDirty();
 		RefreshAll();
 	}
 
@@ -2753,7 +2873,12 @@ private:
 		if(adapter)
 			adapter->DescribeApi(bindings, *n);
 		const DesignerApiBinding* binding = FindApiBinding(bindings, property_id);
-		if(!binding || !binding->visible || !binding->enabled)
+		bool safe_sizing = property_id == "h_sizing" || property_id == "v_sizing" ||
+		                   property_id == "fixed_width" || property_id == "fixed_height" ||
+		                   property_id == "min_width" || property_id == "min_height" ||
+		                   property_id == "max_width" || property_id == "max_height" ||
+		                   property_id == "cell_align_h" || property_id == "cell_align_v";
+		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing))
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
 		if(n->type_id == "GridLayout" && (property_id == "columns" || property_id == "rows")) {
@@ -2769,6 +2894,7 @@ private:
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, normalized, binding->api_call), model_)) {
+			SetDocumentDirty();
 			if(!auto_name.IsEmpty())
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
@@ -2826,6 +2952,7 @@ private:
 		if(grouped)
 			commands_.EndGroup();
 		if(!changed_ids.IsEmpty()) {
+			SetDocumentDirty();
 			// Temporary safety check while multi-select is still being stabilized.
 			// Once the grouped edit path is fully trusted this can be removed or
 			// put behind a dedicated debug flag.
@@ -2979,6 +3106,7 @@ private:
 			return;
 		String normalized = UniqueDesignerName(new_name, node_id);
 		if(commands_.Execute(MakeDesignerRenameCommand(node_id, normalized), model_)) {
+			SetDocumentDirty();
 			RefreshHierarchy();
 			RefreshCode();
 			preview_.InvalidateRealPreview();
@@ -2993,8 +3121,10 @@ private:
 		for(DesignerNodeId id : ids)
 			if(id != Designer_ROOT)
 				changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
-		if(changed)
+		if(changed) {
+			SetDocumentDirty();
 			RefreshAll();
+		}
 	}
 
 	Image MakeTypeIcon(bool layout, Color c) const
@@ -3143,10 +3273,14 @@ private:
 		control_icon_ = MakeTypeIcon(false, mode == UiThemeMode::Dark ? Color(96, 165, 250) : Color(54, 116, 210));
 		header_.SetCustomStyle(UiTheme::ResolveTitleCard());
 		version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
+		UiLabel::Style save_status_style = UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body);
+		save_status_style.font = SansSerifZ(9).Bold();
+		save_status_style.align_h = UiAlign::LEFT;
+		save_status_style.align_v = UiAlign::CENTER;
+		save_status_label_.SetCustomStyle(save_status_style);
 		theme_preset_row_.SetLabelRole(UiRole::Subtle);
 		theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-		ApplyRecentSplitPopup(save_button_);
+		RefreshSaveStatusUi();
 		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Standard));
 		ApplyRecentSplitPopup(load_button_);
 		container_add_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
@@ -3227,6 +3361,7 @@ private:
 	UiTitleCard header_;
 	UiLabel version_badge_;
 	UiSplitButton save_button_;
+	UiLabel save_status_label_;
 	UiSplitButton load_button_;
 	UiButton overlay_button_;
 	UiCompositeDropdown theme_preset_row_;
@@ -3302,8 +3437,12 @@ private:
 	Point drag_status_screen_;
 	bool warning_visible_ = false;
 	String warning_text_value_;
+	bool document_dirty_ = false;
+	SaveStatusKind save_status_kind_ = SAVE_STATUS_NONE;
+	String save_status_text_;
 	bool refresh_posted_ = false;
 	bool pending_inspector_refresh_ = false;
+	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	bool syncing_theme_ = false;
 	bool syncing_recent_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;

@@ -51,6 +51,8 @@ public:
 	void SetNode(DesignerNodeId id);
 	void SetSelection(const Vector<DesignerNodeId>& ids);
 	DesignerNodeId GetNode() const { return node_id_; }
+	bool HasRow(const String& property_id) const;
+	bool IsRowEnabled(const String& property_id) const;
 
 	Size GetContentSize() const;
 	int MeasureHeightForWidth(int width) const;
