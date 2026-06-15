@@ -55,12 +55,18 @@ UiCompositeSlider& UiCompositeSlider::SetLabel(const String& text)
 
 UiCompositeSlider& UiCompositeSlider::SetValueText(const String& text)
 {
+	String current = value_.GetText();
+	if(current == text) {
+		if(!editing_value_)
+			value_edit_.SetTextUtf8(text);
+		return *this;
+	}
 	value_.SetText(text);
 	if(!editing_value_)
 		value_edit_.SetTextUtf8(text);
-    value_.RefreshLayout();
-    RefreshLayout();
-    Refresh();
+	value_.Refresh();
+	if(show_value_ && editing_value_)
+		value_edit_.Refresh();
     return *this;
 }
 

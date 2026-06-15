@@ -74,6 +74,7 @@ public:
 	Event<DesignerNodeId, Point> WhenNodeDrag;
 	Event<DesignerNodeId, UiTreeNodeRef, Point> WhenNodeDrop;
 	Event<> WhenNodeCancel;
+	Event<bool> WhenMouseAction;
 
 	UiTree::DropInfo TrackExternalDrop(Point p);
 

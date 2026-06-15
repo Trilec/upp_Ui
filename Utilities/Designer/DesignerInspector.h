@@ -61,7 +61,9 @@ public:
 	virtual void Layout() override;
 
 	Event<DesignerNodeId, String, Value> WhenProperty;
+	Event<DesignerNodeId, String, Value> WhenPropertyPreview;
 	Event<const Vector<DesignerNodeId>&, String, Value> WhenPropertyMany;
+	Event<const Vector<DesignerNodeId>&, String, Value> WhenPropertyManyPreview;
 	Event<DesignerNodeId, String> WhenName;
 	Event<String> WhenNotes;
 

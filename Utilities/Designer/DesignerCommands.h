@@ -79,6 +79,9 @@ private:
 // directly, so validation and undo behavior remain predictable.
 One<DesignerCommand> MakeDesignerSetPropertyCommand(DesignerNodeId id, const String& property,
                                                      const Value& value, const String& label = String());
+One<DesignerCommand> MakeDesignerSetPropertyCommand(DesignerNodeId id, const String& property,
+                                                     const Value& old_value, bool had_old,
+                                                     const Value& value, const String& label);
 One<DesignerCommand> MakeDesignerRenameCommand(DesignerNodeId id, const String& name);
 One<DesignerCommand> MakeDesignerMoveNodeCommand(DesignerNodeId id, DesignerNodeId parent,
                                                  int insert_index = -1);

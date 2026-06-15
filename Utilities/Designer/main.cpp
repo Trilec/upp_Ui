@@ -26,6 +26,7 @@ static void DesignerMultiSelectCommandLog(const String& text)
 
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
+static constexpr int LIVE_PREVIEW_TIMER_ID = 103;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 
 static String DesignerCrumbPropertyKey(int i)
@@ -350,6 +351,7 @@ public:
 	{
 	    KillTimeCallback(TOOL_DRAG_TIMER_ID);
 	    KillTimeCallback(SAVE_STATUS_TIMER_ID);
+	    KillTimeCallback(LIVE_PREVIEW_TIMER_ID);
 	}
 
 	void Layout() override
@@ -775,6 +777,13 @@ private:
 		hierarchy_.WhenColumnAction = [=](UiTreeNodeRef ref, int column) {
 			HandleHierarchyColumnAction(ref, column);
 		};
+		hierarchy_.WhenMouseAction = [=](bool active) {
+			hierarchy_mouse_action_ = active;
+			if(!active && refresh_deferred_) {
+				refresh_deferred_ = false;
+				PostDesignerRefresh(pending_inspector_refresh_);
+			}
+		};
 		hierarchy_.WhenMoveRequest = [=](UiTreeMoveRequest& request) {
 			HandleHierarchyMoveRequest(request);
 		};
@@ -792,8 +801,14 @@ private:
 		inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
+		inspector_.WhenPropertyPreview = [=](DesignerNodeId id, String property, Value value) {
+			PreviewInspectorPropertyValue(id, property, value);
+		};
 		inspector_.WhenPropertyMany = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
 			SaveInspectorPropertyValues(ids, property, value);
+		};
+		inspector_.WhenPropertyManyPreview = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
+			PreviewInspectorPropertyValues(ids, property, value);
 		};
 		inspector_.WhenName = [=](DesignerNodeId id, String name) {
 			SaveInspectorNameValue(id, name);
@@ -804,8 +819,14 @@ private:
 		theme_override_inspector_.WhenProperty = [=](DesignerNodeId id, String property, Value value) {
 			SaveInspectorPropertyValue(id, property, value);
 		};
+		theme_override_inspector_.WhenPropertyPreview = [=](DesignerNodeId id, String property, Value value) {
+			PreviewInspectorPropertyValue(id, property, value);
+		};
 		theme_override_inspector_.WhenPropertyMany = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
 			SaveInspectorPropertyValues(ids, property, value);
+		};
+		theme_override_inspector_.WhenPropertyManyPreview = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
+			PreviewInspectorPropertyValues(ids, property, value);
 		};
 		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		collapse_button_.SetText("")
@@ -1564,6 +1585,11 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
+		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+			refresh_deferred_ = true;
+			pending_inspector_refresh_ = true;
+			return;
+		}
 		refresh_posted_ = false;
 		SyncHierarchySelection();
 		RefreshInspector();
@@ -1572,6 +1598,11 @@ private:
 
 	void RefreshInspectorPreview()
 	{
+		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+			refresh_deferred_ = true;
+			pending_inspector_refresh_ = true;
+			return;
+		}
 		refresh_posted_ = false;
 		SyncHierarchySelection();
 		RefreshInspector();
@@ -2111,6 +2142,10 @@ private:
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
+		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+			refresh_deferred_ = true;
+			return;
+		}
 		if(refresh_posted_)
 			return;
 		refresh_posted_ = true;
@@ -2780,35 +2815,37 @@ private:
 	void HandleHierarchyColumnAction(UiTreeNodeRef ref, int column)
 	{
 		DesignerNodeId id = GetHierarchyNodeId(ref);
-		DesignerNode* n = model_.Find(id);
-		if(!n || id == Designer_ROOT)
-			return;
+		PostCallback([=] {
+			DesignerNode* n = model_.Find(id);
+			if(!n || id == Designer_ROOT)
+				return;
 
-		if(column == 0) {
-			if(n->type_id == "BoxLayout") {
-				String d = AsString(DesignerNodePropertyOr(*n, "direction", "V"));
-				SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+			if(column == 0) {
+				if(n->type_id == "BoxLayout") {
+					String d = AsString(DesignerNodePropertyOr(*n, "direction", "V"));
+					SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+				}
+				else if(n->type_id == "UiSplitter" || n->type_id == "UiQuadSplitter") {
+					String d = AsString(DesignerNodePropertyOr(*n, "direction", "H"));
+					SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+				}
+				return;
 			}
-			else if(n->type_id == "UiSplitter" || n->type_id == "UiQuadSplitter") {
-				String d = AsString(DesignerNodePropertyOr(*n, "direction", "H"));
-				SaveInspectorPropertyValue(id, "direction", d == "H" ? "V" : "H");
+
+			if(column == 1 || column == 2) {
+				const char *key = column == 1 ? "h_sizing" : "v_sizing";
+				String sizing = AsString(DesignerNodePropertyOr(*n, key, "Fit"));
+				String next = sizing == "Fit" ? "Expand" : sizing == "Expand" ? "Fixed" : "Fit";
+				SaveInspectorPropertyValue(id, key, next);
+				return;
 			}
-			return;
-		}
 
-		if(column == 1 || column == 2) {
-			const char *key = column == 1 ? "h_sizing" : "v_sizing";
-			String sizing = AsString(DesignerNodePropertyOr(*n, key, "Fit"));
-			String next = sizing == "Fit" ? "Expand" : sizing == "Expand" ? "Fixed" : "Fit";
-			SaveInspectorPropertyValue(id, key, next);
-			return;
-		}
-
-		if(column == 3 && n->type_id == "BoxLayout") {
-			String wrap = AsString(DesignerNodePropertyOr(*n, "wrap", "None"));
-			String next = wrap == "None" ? "Flow" : wrap == "Flow" ? "Snap" : "None";
-			SaveInspectorPropertyValue(id, "wrap", next);
-		}
+			if(column == 3 && n->type_id == "BoxLayout") {
+				String wrap = AsString(DesignerNodePropertyOr(*n, "wrap", "None"));
+				String next = wrap == "None" ? "Flow" : wrap == "Flow" ? "Snap" : "None";
+				SaveInspectorPropertyValue(id, "wrap", next);
+			}
+		});
 	}
 
 	void HandleHierarchyMoveRequest(UiTreeMoveRequest& request)
@@ -2863,6 +2900,62 @@ private:
 	// be changed by stale inspector widgets.
 	void SaveInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
 	{
+		CommitPreviewInspectorPropertyValue(node_id, property_id, value);
+	}
+
+	void ScheduleLivePreviewRefresh()
+	{
+		if(live_preview_refresh_pending_)
+			return;
+		live_preview_refresh_pending_ = true;
+		SetTimeCallback(16, [=] {
+			live_preview_refresh_pending_ = false;
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+		}, LIVE_PREVIEW_TIMER_ID);
+	}
+
+	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	{
+		DesignerNode* n = model_.Find(node_id);
+		if(!n || n->id == Designer_ROOT)
+			return;
+		inspector_live_editing_ = true;
+		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		String preview_key = Format("%d:%s", (int)node_id, property_id);
+		if(live_preview_old_values_.Find(preview_key) < 0) {
+			int q = n->properties.Find(property_id);
+			live_preview_old_values_.Add(preview_key, q >= 0 ? n->properties.GetValue(q) : Value());
+			live_preview_had_old_.Add(preview_key, q >= 0);
+		}
+		model_.SetProperty(node_id, property_id, normalized);
+		ScheduleLivePreviewRefresh();
+	}
+
+	void PreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
+	{
+		if(ids.IsEmpty())
+			return;
+		inspector_live_editing_ = true;
+		for(DesignerNodeId id : ids) {
+			DesignerNode* n = model_.Find(id);
+			if(!n || n->id == Designer_ROOT)
+				continue;
+			Value normalized = NormalizeInspectorValue(*n, property_id, value);
+			String preview_key = Format("%d:%s", (int)id, property_id);
+			if(live_preview_old_values_.Find(preview_key) < 0) {
+				int q = n->properties.Find(property_id);
+				live_preview_old_values_.Add(preview_key, q >= 0 ? n->properties.GetValue(q) : Value());
+				live_preview_had_old_.Add(preview_key, q >= 0);
+			}
+			model_.SetProperty(id, property_id, normalized);
+		}
+		ScheduleLivePreviewRefresh();
+	}
+
+	void CommitPreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	{
+		inspector_live_editing_ = false;
 		DesignerNode* n = model_.Find(node_id);
 		if(!n || n->id == Designer_ROOT)
 			return;
@@ -2881,6 +2974,11 @@ private:
 		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing))
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		String preview_key = Format("%d:%s", (int)node_id, property_id);
+		int preview_q = live_preview_old_values_.Find(preview_key);
+		bool has_preview_old = preview_q >= 0;
+		Value old_value = has_preview_old ? live_preview_old_values_[preview_q] : Value();
+		bool had_old = has_preview_old ? live_preview_had_old_[preview_q] : (n->properties.Find(property_id) >= 0);
 		if(n->type_id == "GridLayout" && (property_id == "columns" || property_id == "rows")) {
 			int requested = IsNumber(normalized) ? (int)normalized : StrInt(AsString(normalized));
 			int required = property_id == "columns" ? RequiredGridColumns(*n) : RequiredGridRows(*n);
@@ -2893,8 +2991,12 @@ private:
 		String auto_name = AutoNameForPropertyEdit(*n, property_id, normalized);
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
-		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, normalized, binding->api_call), model_)) {
+		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
 			SetDocumentDirty();
+			if(has_preview_old) {
+				live_preview_old_values_.Remove(preview_q);
+				live_preview_had_old_.Remove(preview_q);
+			}
 			if(!auto_name.IsEmpty())
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
@@ -2915,6 +3017,10 @@ private:
 			PostDesignerRefresh(needs_inspector);
 		}
 		else {
+			if(has_preview_old) {
+				live_preview_old_values_.Remove(preview_q);
+				live_preview_had_old_.Remove(preview_q);
+			}
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
 			PostDesignerRefresh(true);
@@ -2923,6 +3029,12 @@ private:
 
 	void SaveInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
 	{
+		CommitPreviewInspectorPropertyValues(ids, property_id, value);
+	}
+
+	void CommitPreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
+	{
+		inspector_live_editing_ = false;
 		if(ids.IsEmpty())
 			return;
 		Vector<DesignerNodeId> changed_ids;
@@ -2940,13 +3052,22 @@ private:
 			int q = n->properties.Find(property_id);
 			if(q >= 0 && n->properties.GetValue(q) == normalized)
 				continue;
+			String preview_key = Format("%d:%s", (int)id, property_id);
+			int preview_q = live_preview_old_values_.Find(preview_key);
+			bool has_preview_old = preview_q >= 0;
+			Value old_value = has_preview_old ? live_preview_old_values_[preview_q] : Value();
+			bool had_old = has_preview_old ? live_preview_had_old_[preview_q] : (q >= 0);
 			if(!grouped) {
 				commands_.BeginGroup("Set " + property_id + " on selection");
 				grouped = true;
 			}
-			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, normalized, "Set " + property_id), model_)) {
+			if(commands_.Execute(MakeDesignerSetPropertyCommand(id, property_id, old_value, had_old, normalized, "Set " + property_id), model_)) {
 				changed_ids.Add(id);
 				changed_values.Add(normalized);
+				if(has_preview_old) {
+					live_preview_old_values_.Remove(preview_q);
+					live_preview_had_old_.Remove(preview_q);
+				}
 			}
 		}
 		if(grouped)
@@ -3442,7 +3563,13 @@ private:
 	String save_status_text_;
 	bool refresh_posted_ = false;
 	bool pending_inspector_refresh_ = false;
+	bool inspector_live_editing_ = false;
+	bool hierarchy_mouse_action_ = false;
+	bool refresh_deferred_ = false;
+	bool live_preview_refresh_pending_ = false;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
+	VectorMap<String, Value> live_preview_old_values_;
+	VectorMap<String, bool> live_preview_had_old_;
 	bool syncing_theme_ = false;
 	bool syncing_recent_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;

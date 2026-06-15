@@ -874,7 +874,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			WhenProperty(row_node, property_id, v);
+			WhenPropertyPreview(row_node, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self || node_id_ != row_node)
@@ -1056,6 +1056,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
+			WhenPropertyManyPreview(selection_, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self)

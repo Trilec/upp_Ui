@@ -174,14 +174,23 @@ public:
 	{
 	}
 
+	DesignerSetPropertyCommand(DesignerNodeId id, const String& property, const Value& old_value,
+	                           bool had_old, const Value& value, const String& label)
+		: id_(id), property_(property), value_(value), old_(old_value), had_old_(had_old),
+		  label_(label), explicit_old_(true)
+	{
+	}
+
 	bool Do(DesignerModel& model) override
 	{
 		DesignerNode* n = model.Find(id_);
 		if(!n)
 			return false;
-		int q = n->properties.Find(property_);
-		had_old_ = q >= 0;
-		old_ = had_old_ ? n->properties.GetValue(q) : Value();
+		if(!explicit_old_) {
+			int q = n->properties.Find(property_);
+			had_old_ = q >= 0;
+			old_ = had_old_ ? n->properties.GetValue(q) : Value();
+		}
 		if(had_old_ && old_ == value_)
 			return false;
 		if(!had_old_ && IsNull(value_))
@@ -209,6 +218,7 @@ private:
 	Value old_;
 	bool had_old_ = false;
 	String label_;
+	bool explicit_old_ = false;
 };
 
 class DesignerRenameCommand final : public DesignerCommand {
@@ -318,6 +328,13 @@ One<DesignerCommand> MakeDesignerSetPropertyCommand(DesignerNodeId id, const Str
                                                      const Value& value, const String& label)
 {
 	return MakeOne<DesignerSetPropertyCommand>(id, property, value, label);
+}
+
+One<DesignerCommand> MakeDesignerSetPropertyCommand(DesignerNodeId id, const String& property,
+                                                     const Value& old_value, bool had_old,
+                                                     const Value& value, const String& label)
+{
+	return MakeOne<DesignerSetPropertyCommand>(id, property, old_value, had_old, value, label);
 }
 
 One<DesignerCommand> MakeDesignerRenameCommand(DesignerNodeId id, const String& name)

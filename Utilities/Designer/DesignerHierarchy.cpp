@@ -127,6 +127,8 @@ UiTree::DropInfo DesignerHierarchyTree::TrackExternalDrop(Point p)
 
 void DesignerHierarchyTree::LeftDown(Point p, dword flags)
 {
+	if(WhenMouseAction)
+		WhenMouseAction(true);
 	UiTreeNodeRef ref = GetNodeAt(p);
 	DesignerNodeId pressed_id = Designer_NULL;
 	if(GetModel().IsValid(ref)) {
@@ -195,6 +197,8 @@ void DesignerHierarchyTree::LeftUp(Point p, dword flags)
 	ResetDragState();
 	if(HasCapture())
 		ReleaseCapture();
+	if(WhenMouseAction)
+		WhenMouseAction(false);
 }
 
 void DesignerHierarchyTree::CancelMode()
@@ -202,6 +206,8 @@ void DesignerHierarchyTree::CancelMode()
 	KillTimeCallback(DESIGNER_HIERARCHY_DRAG_TIMER_ID);
 	CancelDragNoRelease();
 	UiTree::CancelMode();
+	if(WhenMouseAction)
+		WhenMouseAction(false);
 }
 
 bool DesignerHierarchyTree::BeginFromSelection()
