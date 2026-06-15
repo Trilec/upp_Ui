@@ -110,4 +110,7 @@ file
 	UiMenu.h,
 	UiMenu.cpp,
 	UiColorPicker.h,
-	UiColorPicker.cpp;
+	UiColorPicker.cpp,
+	src.tpp,
+	srcdoc.tpp;
+

@@ -1546,8 +1546,9 @@ void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 	                    DPI(max(1, (int)AdapterNodeProperty(node, "track_height", 3))));
 	s.thumb_size = Size(DPI(max(6, (int)AdapterNodeProperty(node, "thumb_width", 20))),
 	                    DPI(max(6, (int)AdapterNodeProperty(node, "thumb_height", 20))));
-	s.track_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "track_radius", theme_override ? radius_ : 8)));
-	s.thumb_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "thumb_radius", 8)));
+	s.track_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "track_radius",
+	                                                           theme_override ? radius_ : (int)s.track_metrics.radius)));
+	s.thumb_metrics.radius = DPI(max(0, (int)AdapterNodeProperty(node, "thumb_radius", (int)s.thumb_metrics.radius)));
 	s.track_metrics.frame_width = DPI(1);
 	SetCustomStyle(s);
 	if(theme_override && radius_ > 0)
@@ -2989,9 +2990,14 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 	else
 		Horz();
 
-	UiSplitter::Style s = UiTheme::ResolveSplitter();
+	UiRole role = DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard"));
+	UiSplitter::Style s = UiTheme::ResolveSplitter(role);
 	s.hit_width = DPI((int)AdapterNodeProperty(node, "hit_width", 14));
 	s.track_thickness = DPI((int)AdapterNodeProperty(node, "track_thickness", 2));
+	s.hot_track_thickness = DPI(max(0, (int)AdapterNodeProperty(node, "hot_track_thickness", 0)));
+	s.pressed_track_thickness = DPI(max(0, (int)AdapterNodeProperty(node, "pressed_track_thickness", 0)));
+	s.expand_track_on_hot = DesignerBoolProperty(node, "expand_track_on_hot", true);
+	s.expand_track_on_pressed = DesignerBoolProperty(node, "expand_track_on_pressed", true);
 	int inset = DPI((int)AdapterNodeProperty(node, "track_inset", 0));
 	s.track_inset = Rect(inset, inset, inset, inset);
 	int thumb_w = DPI((int)AdapterNodeProperty(node, "thumb_width", 14));
@@ -3034,7 +3040,7 @@ void DesignerSplitterAdapter::SyncFromNode(const DesignerNode& node)
 	if(!IsNull(s.thumb_icon))
 		s.grip_visual = UISPLITTER_GRIP_ICON;
 	s.thumb_icon_size = DPI((int)AdapterNodeProperty(node, "thumb_icon_size", 14));
-	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", 8));
+	s.thumb_metrics.radius = DPI((int)AdapterNodeProperty(node, "thumb_radius", (int)s.thumb_metrics.radius));
 	SetCustomStyle(s);
 	SetMinPixels(0, DPI((int)AdapterNodeProperty(node, "min_a", 80)));
 	SetMinPixels(1, DPI((int)AdapterNodeProperty(node, "min_b", 80)));
@@ -3058,7 +3064,6 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
-	b.Hide("role");
 	b.AddChoice("direction", "Orientation", "UiSplitter::Horz / UiSplitter::Vert",
 	            "Controls whether panes split left/right or top/bottom.",
 	            {{"H", "Left / Right"}, {"V", "Top / Bottom"}});
@@ -3072,8 +3077,20 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	         "Mouse hit area around the split track.", 4, 40);
 	b.AddInt("track_thickness", "Track thick", DesignerEditorKind::Slider, "UiSplitter::Style::track_thickness",
 	         "Visible splitter track thickness.", 1, 18);
+	b.Add("expand_track_on_hot", "Expand hot track", DesignerEditorKind::Bool, "UiSplitter::Style::expand_track_on_hot",
+	      "Expands the visible track band while the splitter is hovered.");
+	b.AddInt("hot_track_thickness", "Hot track thick", DesignerEditorKind::Slider, "UiSplitter::Style::hot_track_thickness",
+	         "Optional hover track thickness; zero uses the theme-derived hot band.", 0, 40);
+	b.Add("expand_track_on_pressed", "Expand pressed track", DesignerEditorKind::Bool, "UiSplitter::Style::expand_track_on_pressed",
+	      "Expands the visible track band while the splitter is being dragged.");
+	b.AddInt("pressed_track_thickness", "Pressed track thick", DesignerEditorKind::Slider, "UiSplitter::Style::pressed_track_thickness",
+	         "Optional pressed track thickness; zero uses the hit band width.", 0, 40);
 	b.AddInt("track_inset", "Track inset", DesignerEditorKind::Slider, "UiSplitter::Style::track_inset",
 	         "Inset applied to the visible track.", 0, 32);
+	if(!(bool)AdapterNodeProperty(node, "expand_track_on_hot", true))
+		b.Disable("hot_track_thickness", "Hot track thickness is only used when the hot band is expanded.");
+	if(!(bool)AdapterNodeProperty(node, "expand_track_on_pressed", true))
+		b.Disable("pressed_track_thickness", "Pressed track thickness is only used when the pressed band is expanded.");
 	b.AddChoice("grip_visual", "Grip visual", "UiSplitterGripVisual",
 	            "Which splitter affordance to draw.",
 	            {{"None", "None"}, {"Lines", "Lines"}, {"Dots", "Dots"}, {"Icon", "Icon"}});
@@ -3115,6 +3132,10 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 void DesignerSplitterAdapter::Paint(Draw& w)
 {
 	UiSplitter::Paint(w);
+	if(overlay_.selected || overlay_.hovered || overlay_.debug) {
+		for(int i = 0; i < GetCount(); i++)
+			DrawDottedDesignerOverlay(w, GetFeedbackTrackRect(i, overlay_.selected ? ST_PRESSED : overlay_.hovered ? ST_HOT : ST_NORMAL), overlay_);
+	}
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
 }
 

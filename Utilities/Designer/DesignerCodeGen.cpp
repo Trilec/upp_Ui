@@ -1145,12 +1145,13 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiSplitter") {
 		String dir = CodeGenNodeProperty(n, "direction", "H");
+		String role_expr = RoleExpr(AsString(CodeGenNodeProperty(n, "role", "Standard")));
 		out << "\t\t" << var << "." << (dir == "V" ? "Vert" : "Horz") << "();\n";
 		out << "\t\t" << var << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(n, "min_a", 80) << "))"
 		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 80) << "))"
 		    << ".SetSplitPercent(" << (int)CodeGenNodeProperty(n, "split_percent", 50) << ");\n";
 		out << "\t\t{\n"
-		    << "\t\t\tUiSplitter::Style s = UiTheme::ResolveSplitter();\n"
+		    << "\t\t\tUiSplitter::Style s = UiTheme::ResolveSplitter(" << role_expr << ");\n"
 		    << "\t\t\ts.hit_width = DPI(" << (int)CodeGenNodeProperty(n, "hit_width", 14) << ");\n"
 		    << "\t\t\ts.track_thickness = DPI(" << (int)CodeGenNodeProperty(n, "track_thickness", 2) << ");\n"
 		    << "\t\t\tint track_inset = DPI(" << (int)CodeGenNodeProperty(n, "track_inset", 0) << ");\n"

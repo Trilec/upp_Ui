@@ -1,6 +1,32 @@
 #ifndef _Ui_UiColorPicker_h_ 
 #define _Ui_UiColorPicker_h_ 
 
+/*
+    Author
+    - C Edwards (dodobar)
+
+    License
+    - Apache License 2.0, matching this repository's LICENSE file.
+
+    UiColorPicker
+    =============
+
+    Purpose
+    - Public header for the UiColorPicker component.
+
+    Intent
+    - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
+
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Include this header where the component is used or extended. Keep implementation details in the matching .cpp when present.
+
+    Changelog
+    - 2026-06: normalized the top-level header documentation.
+*/
+
 #include <Ui/Ui.h>
 
 namespace Upp {

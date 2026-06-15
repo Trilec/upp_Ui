@@ -7,23 +7,9 @@
 
 namespace Upp {
 
-static constexpr bool DESIGNER_MULTISELECT_DEBUG = false;
-
 static void DesignerMultiSelectLog(const String& text)
 {
-	if(!DESIGNER_MULTISELECT_DEBUG)
-		return;
-	String folder = GetFileFolder(GetExeFilePath());
-	String leaf = ToLower(GetFileName(folder));
-	if(leaf == "designer" || leaf == "designerruntests")
-		folder = GetFileFolder(folder);
-	if(ToLower(GetFileName(folder)) != "out")
-		folder = AppendFileName(GetCurrentDirectory(), "out");
-	String path = NormalizePath(AppendFileName(folder, "designer_multiselect.log"));
-	FileAppend fa(path);
-	if(!fa.IsOpen())
-		return;
-	fa.PutLine(AsString(GetSysTime()) + " " + text);
+	return;
 }
 
 static bool DesignerIsSafeMultiSelectProperty(const String& type_id, bool same_type, const String& id)
@@ -97,6 +83,8 @@ struct DesignerInspectorSurfaceDefault {
 	Color face = SColorFace();
 	Color frame = SColorShadow();
 	int radius = 0;
+	bool face_enabled = false;
+	bool frame_enabled = false;
 	bool shadow_enabled = false;
 	int shadow_distance = 6;
 	int shadow_offset_x = 0;
@@ -114,6 +102,8 @@ static DesignerInspectorSurfaceDefault DesignerInspectorSurfaceFromStyle(const S
 	out.face = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorFace();
 	out.frame = s.palette.frame[ST_NORMAL];
 	out.radius = s.metrics.radius;
+	out.face_enabled = s.metrics.face_enabled;
+	out.frame_enabled = s.metrics.frame_enabled;
 	out.shadow_enabled = s.metrics.shadow.enabled;
 	out.shadow_distance = s.metrics.shadow.distance;
 	out.shadow_offset_x = s.metrics.shadow.offset_x;
@@ -404,8 +394,12 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return false;
 	if(b.property_id == "face_mode")
 		return "Solid";
-	if(b.property_id == "face_enabled" || b.property_id == "frame_enabled")
-		return false;
+	if(b.property_id == "face_enabled" || b.property_id == "frame_enabled") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		if(!surface.found)
+			return false;
+		return b.property_id == "face_enabled" ? surface.face_enabled : surface.frame_enabled;
+	}
 	if(b.property_id == "shadow_enabled") {
 		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
 		return surface.found ? surface.shadow_enabled : false;
@@ -762,7 +756,7 @@ void DesignerInspector::AddMultiSelectionHeader(Page& page, int count)
 void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const DesignerType& t,
                                         const DesignerApiBinding& b)
 {
-	if(!b.visible || !b.enabled || b.property_id == "name")
+	if(!b.visible || b.property_id == "name")
 		return;
 	int label_w = DPI(88);
 	int gap = DPI(8);
@@ -785,6 +779,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			}
 		}
 		row->SetData(value);
+		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && node_id_ == row_node)
 				CommitChoice(property_id, data, "select");
@@ -810,6 +805,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		Ptr<UiCompositeToggle> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).ShowValue(false);
 		row->SetData((bool)value);
+		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self && node_id_ == row_node)
 				WhenProperty(row_node, property_id, (bool)self->GetData());
@@ -834,6 +830,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Slider().SetRange(min_value, max_value);
 		row->SetData(ivalue);
 		row->SetValueText(AsString(ivalue));
+		row->Enable(b.enabled);
 		row->WhenChanging = [=] {
 			if(syncing_ || !self || node_id_ != row_node)
 				return;
@@ -888,6 +885,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		   .SetColorLabel(2, "Bottom left").SetColorLabel(3, "Bottom right");
 		for(int i = 0; i < 4; i++)
 			row->SetColor(i, IsNull(colors[i]) ? Color(214, 231, 255) : (Color)colors[i]);
+		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self && node_id_ == row_node) {
 				ValueArray out;
@@ -928,7 +926,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNode *>& nodes,
                                       const Vector<const DesignerType *>& types, const DesignerApiBinding& b)
 {
-	if(!b.visible || !b.enabled || b.property_id == "name")
+	if(!b.visible || b.property_id == "name")
 		return;
 	bool same_type = true;
 	String type_id = nodes.IsEmpty() ? String() : nodes[0]->type_id;
@@ -961,6 +959,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 			}
 		}
 		row->SetData(mixed ? Value() : value);
+		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && !syncing_ && !IsNull(data))
 				WhenPropertyMany(selection_, property_id, data);
@@ -986,6 +985,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		Ptr<UiCompositeToggle> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).ShowValue(false);
 		row->SetData(mixed ? false : (bool)value);
+		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self)
 				WhenPropertyMany(selection_, property_id, (bool)self->GetData());
@@ -1010,6 +1010,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Slider().SetRange(min_value, max_value);
 		row->SetData(ivalue);
 		row->SetValueText(mixed ? "Mixed" : AsString(ivalue));
+		row->Enable(b.enabled);
 		row->WhenChanging = [=] {
 			if(syncing_ || !self)
 				return;
@@ -1038,6 +1039,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		Ptr<UiCompositeColor> self = row;
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetColorCount(1).ShowValue(true);
 		row->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
+		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self)
 				WhenPropertyMany(selection_, property_id, self->GetColor(0));
@@ -1064,6 +1066,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Edit().SetPlaceholder("");
 		row->SetData(value);
 	}
+	row->Enable(b.enabled);
 	row->WhenAction = [=] {
 		if(!syncing_ && self && !(row_mixed && IsNull(self->GetData())))
 			WhenPropertyMany(selection_, property_id, self->GetData());

@@ -1953,6 +1953,49 @@ inline void TuneMinimalSlider(UiSlider::Style& s, UiThemeMode mode)
     SetFrame(s.thumb_palette, c.thumb_outer, c.frame_hot, c.frame_pressed, c.frame_disabled);
 }
 
+inline void TuneMinimalSplitter(UiSplitter::Style& s, UiThemeMode mode, UiRole role = UiRole::Accent)
+{
+    bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
+    if(!UiIsValid(role))
+        role = UiRole::Accent;
+    MinimalRoleColors c = MinimalRole(mode, role);
+    Color hot_face = dark ? Color(44, 44, 44) : Color(229, 241, 255);
+    Color hot_frame = dark ? Color(96, 165, 250) : Color(147, 197, 253);
+    Color pressed_face = dark ? Color(30, 64, 175) : Color(191, 219, 254);
+    Color pressed_frame = dark ? Color(96, 165, 250) : Color(37, 99, 235);
+    if(role == UiRole::Subtle) {
+        hot_face = c.face_hot;
+        hot_frame = c.frame_hot;
+        pressed_face = c.face_pressed;
+        pressed_frame = c.frame_pressed;
+    }
+    else if(role == UiRole::Alert) {
+        hot_face = dark ? Color(58, 35, 35) : Color(255, 235, 236);
+        hot_frame = dark ? Color(248, 113, 113) : Color(248, 113, 113);
+        pressed_face = dark ? Color(127, 29, 29) : Color(254, 226, 226);
+        pressed_frame = dark ? Color(248, 113, 113) : Color(239, 68, 68);
+    }
+    else if(role == UiRole::Standard) {
+        hot_face = c.face_hot;
+        hot_frame = c.frame_hot;
+        pressed_face = c.face_pressed;
+        pressed_frame = c.frame_pressed;
+    }
+
+    s.hot_track_thickness = 0;
+    s.pressed_track_thickness = 0;
+    s.expand_track_on_hot = true;
+    s.expand_track_on_pressed = true;
+
+    SetFace(s.track_palette, c.face, hot_face, pressed_face, c.face_disabled);
+    SetFrame(s.track_palette, c.frame, hot_frame, pressed_frame, c.frame_disabled);
+    SetInk(s.track_palette, c.ink, c.ink_hot, c.accent, c.ink_disabled);
+
+    SetFace(s.thumb_palette, c.thumb_center, hot_face, pressed_face, c.face_disabled);
+    SetFrame(s.thumb_palette, c.thumb_outer, hot_frame, pressed_frame, c.frame_disabled);
+    SetInk(s.thumb_palette, c.ink, c.accent_hot, c.accent_pressed, c.ink_disabled);
+}
+
 inline void TuneMinimalToggle(UiToggle::Style& s, UiThemeMode mode, UiRole role = UiRole::Accent)
 {
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
@@ -2657,16 +2700,28 @@ public:
         return s;
     }
 
-    static UiSplitter::Style ResolveSplitter(const UiThemeContext& ctx)
+    static UiSplitter::Style ResolveSplitter(const UiThemeContext& ctx, UiRole role = UiRole::Accent)
     {
+        if(!UiIsValid(role)) role = UiRole::Accent;
         UiThemeContext normalized = NormalizeContext(ctx);
         UiSplitter::Style s = UiThemeDetail::ResolveSplitterBase(normalized.preset);
+        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
+            UiThemeDetail::TuneMinimalSplitter(s, normalized.mode, role);
+            if(UiThemeDetail::IsPillPreset(normalized.preset))
+                UiThemeDetail::ApplyPillGeometry(s);
+            return s;
+        }
         if(UiThemeDetail::IsPillPreset(normalized.preset))
             UiThemeDetail::ApplyPillGeometry(s);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.background_palette, normalized.mode);
         return s;
+    }
+
+    static UiSplitter::Style ResolveSplitter(UiRole role)
+    {
+        return ResolveSplitter(GetContext(), role);
     }
 
     static UiPanel::Style ResolvePanel(const UiThemeContext& ctx, UiRole role)
@@ -3353,9 +3408,9 @@ public:
     {
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveScrollBar(ctx);
     }
-    static UiSplitter::Style ResolveSplitter(UiThemePreset preset, UiThemeMode mode)
+    static UiSplitter::Style ResolveSplitter(UiThemePreset preset, UiThemeMode mode, UiRole role = UiRole::Accent)
     {
-        UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveSplitter(ctx);
+        UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveSplitter(ctx, role);
     }
 
     static UiDropdown::Style ResolveDropdown(UiThemePreset preset, UiThemeMode mode)

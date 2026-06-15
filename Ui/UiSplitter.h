@@ -32,6 +32,8 @@
     - 2026-05: public split position API uses percentages; raw internal split
       units stay private.
     - 2026-06: added explicit grip visuals for lines, dots, and icon modes.
+    - 2026-06: added hover/pressed feedback-band thickness controls to make the
+      interactive splitter area visually obvious.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -66,6 +68,10 @@ public:
 
         int  hit_width = DPI(8);
         int  track_thickness = DPI(1);
+        int  hot_track_thickness = 0;
+        int  pressed_track_thickness = 0;
+        bool expand_track_on_hot = true;
+        bool expand_track_on_pressed = true;
         Rect track_inset = Rect(0, 0, 0, 0);
 
         int  thumb_main = DPI(42);
@@ -92,7 +98,7 @@ public:
 
         void Serialize(Stream& s)
         {
-            int version = 2;
+            int version = 3;
             s / version;
             s % track_palette
               % track_metrics
@@ -104,8 +110,20 @@ public:
               % background_metrics
               % background_skin
               % hit_width
-              % track_thickness
-              % track_inset
+              % track_thickness;
+            if(version >= 3) {
+                s % hot_track_thickness
+                  % pressed_track_thickness
+                  % expand_track_on_hot
+                  % expand_track_on_pressed;
+            }
+            else if(s.IsLoading()) {
+                hot_track_thickness = 0;
+                pressed_track_thickness = 0;
+                expand_track_on_hot = true;
+                expand_track_on_pressed = true;
+            }
+            s % track_inset
               % thumb_main
               % thumb_cross
               % thumb_inset
@@ -210,6 +228,7 @@ public:
 
     int GetCount() const { return GetChildCount(); }
     int GetSplitWidth() const { return max(1, GetEffectiveStyle().hit_width); }
+    Rect GetFeedbackTrackRect(int index, StyledState st) const;
 
     void Add(Ctrl& pane);
     UiSplitter& operator<<(Ctrl& pane) { Add(pane); return *this; }

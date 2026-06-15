@@ -49,6 +49,10 @@ const UiSplitter::Style& UiSplitter::StyleDefault()
 
         s.hit_width = DPI(8);
         s.track_thickness = DPI(1);
+        s.hot_track_thickness = 0;
+        s.pressed_track_thickness = 0;
+        s.expand_track_on_hot = true;
+        s.expand_track_on_pressed = true;
         s.track_inset = Rect(0, 0, 0, 0);
         s.thumb_main = DPI(42);
         s.thumb_cross = DPI(8);
@@ -204,6 +208,42 @@ Rect UiSplitter::GetTrackRect(int index) const
     }
     int x = p - (thick >> 1);
     return RectC(x, r.top, thick, r.GetHeight());
+}
+
+Rect UiSplitter::GetFeedbackTrackRect(int index, StyledState st) const
+{
+    const Style& style = GetEffectiveStyle();
+    Rect track = GetTrackRect(index);
+    int thick = max(1, style.track_thickness);
+    bool expand = false;
+
+    switch(st) {
+    case ST_HOT:
+        expand = style.expand_track_on_hot;
+        thick = style.hot_track_thickness > 0 ? style.hot_track_thickness
+                                             : max(thick, min(GetSplitWidth(), DPI(6)));
+        break;
+    case ST_PRESSED:
+        expand = style.expand_track_on_pressed;
+        thick = style.pressed_track_thickness > 0 ? style.pressed_track_thickness
+                                                  : max(thick, GetSplitWidth());
+        break;
+    default:
+        break;
+    }
+
+    if(!expand || thick <= 0)
+        return track;
+
+    Rect hit = GetHitRect(index);
+    int p = PosToClient(pos_[index]);
+    thick = max(1, thick);
+    if(vertical_) {
+        int y = p - (thick >> 1);
+        return RectC(hit.left, y, hit.GetWidth(), thick);
+    }
+    int x = p - (thick >> 1);
+    return RectC(x, hit.top, thick, hit.GetHeight());
 }
 
 Rect UiSplitter::GetThumbRect(int index) const
@@ -402,7 +442,11 @@ void UiSplitter::Paint(Draw& w)
             st = ST_HOT;
 
         Rect track = GetTrackRect(i);
-        UiPaintStyledSurface(w, track, style.track_palette, style.track_metrics, style.track_skin, st, false, false, false);
+        Rect feedback = GetFeedbackTrackRect(i, st);
+        if(feedback != track)
+            UiPaintStyledSurface(w, feedback, style.track_palette, style.track_metrics, style.track_skin, st, false, false, false);
+        UiPaintStyledSurface(w, track, style.track_palette, style.track_metrics, style.track_skin,
+                             feedback != track ? ST_NORMAL : st, false, false, false);
 
         Rect thumb = GetThumbRect(i);
         UiPaintStyledSurface(w, thumb, style.thumb_palette, style.thumb_metrics, style.thumb_skin, st, false, false, false);
@@ -413,7 +457,7 @@ void UiSplitter::Paint(Draw& w)
 
 void UiSplitter::MouseMove(Point p, dword)
 {
-    if(HasCapture() && drag_index_ >= 0 && drag_index_ < pos_.GetCount()) {
+    if(drag_index_ >= 0 && drag_index_ < pos_.GetCount()) {
         SetSplitUnits(ClientToPos(p), drag_index_);
         Refresh();
         WhenAction();
@@ -429,7 +473,7 @@ void UiSplitter::MouseMove(Point p, dword)
 
 void UiSplitter::MouseLeave()
 {
-    if(HasCapture())
+    if(drag_index_ >= 0)
         return;
     if(hot_index_ >= 0) {
         hot_index_ = -1;
@@ -448,7 +492,7 @@ void UiSplitter::LeftDown(Point p, dword)
 
 void UiSplitter::LeftUp(Point, dword)
 {
-    bool was_dragging = HasCapture() && drag_index_ >= 0;
+    bool was_dragging = drag_index_ >= 0;
     ReleaseCapture();
     drag_index_ = -1;
     if(was_dragging)

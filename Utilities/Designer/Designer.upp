@@ -38,6 +38,8 @@ file
 	Designer.iml,
 	README.md,
 	CHANGELOG.md,
+	srcdoc.tpp,
+	src.tpp,
 	main.cpp;
 
 mainconfig

@@ -18,23 +18,9 @@
 
 namespace Upp {
 
-static constexpr bool DESIGNER_MULTISELECT_DEBUG = false;
-
 static void DesignerMultiSelectCommandLog(const String& text)
 {
-	if(!DESIGNER_MULTISELECT_DEBUG)
-		return;
-	String folder = GetFileFolder(GetExeFilePath());
-	String leaf = ToLower(GetFileName(folder));
-	if(leaf == "designer" || leaf == "designerruntests")
-		folder = GetFileFolder(folder);
-	if(ToLower(GetFileName(folder)) != "out")
-		folder = AppendFileName(GetCurrentDirectory(), "out");
-	String path = NormalizePath(AppendFileName(folder, "designer_multiselect.log"));
-	FileAppend fa(path);
-	if(!fa.IsOpen())
-		return;
-	fa.PutLine(AsString(GetSysTime()) + " " + text);
+	return;
 }
 
 static const char* DESIGNER_VERSION = "v1.0.1 Alpha";
@@ -2787,16 +2773,19 @@ private:
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
-			bool needs_inspector = property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
+			bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
+			bool layout_affecting = IsLayoutAffectingProperty(*n, property_id);
+			if(layout_affecting)
+				TraceLayoutAffectingChange(*n, property_id);
+			if(layout_affecting) {
+				RefreshAll();
+				return;
+			}
 			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
 			if(needs_hierarchy)
 				RefreshHierarchy();
-			if(needs_inspector) {
-				PostDesignerRefresh(true);
-				return;
-			}
 			PostDesignerRefresh(needs_inspector);
 		}
 		else {
@@ -2814,11 +2803,13 @@ private:
 		Vector<Value> changed_values;
 		bool grouped = false;
 		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
+		bool layout_affecting = false;
 		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
 				continue;
+			layout_affecting = layout_affecting || IsLayoutAffectingProperty(*n, property_id);
 			Value normalized = NormalizeInspectorValue(*n, property_id, value);
 			int q = n->properties.Find(property_id);
 			if(q >= 0 && n->properties.GetValue(q) == normalized)
@@ -2850,8 +2841,13 @@ private:
 					failed_apply << changed->name;
 				}
 			}
-			if(DESIGNER_MULTISELECT_DEBUG && !failed_apply.IsEmpty())
-				SetWarningNotes("Multi-edit did not apply " + property_id + " to: " + failed_apply);
+			if(layout_affecting) {
+				if(const DesignerNode* first = model_.Find(changed_ids[0]))
+					TraceLayoutAffectingChange(*first, property_id);
+				model_.SetSelection(ids);
+				RefreshAll();
+				return;
+			}
 			model_.SetSelection(ids);
 			preview_.InvalidateRealPreview();
 			preview_.Refresh();
@@ -2968,7 +2964,7 @@ private:
 			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
 		if(property_id == "icon_size" || property_id == "tab_icon_size" || property_id == "tab_font_size" ||
 		   property_id == "font_size" || property_id == "current_font_size" || property_id == "min_width" ||
-		   property_id == "min_height")
+		   property_id == "min_height" || property_id == "fixed_width" || property_id == "fixed_height")
 			return max(0, IsNumber(value) ? (int)value : StrInt(AsString(value)));
 		if(property_id == "cell_width" || property_id == "cell_height" ||
 		   property_id == "width" || property_id == "height")
@@ -3036,6 +3032,74 @@ private:
 	bool IsPanelType(const DesignerType* t) const
 	{
 		return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "AccordionSectionSlot");
+	}
+
+	bool IsLayoutOwnerType(const DesignerType* t) const
+	{
+		return t && t->can_have_children && (t->toolbox_group == "Layouts" || t->id == "Window");
+	}
+
+	DesignerNodeId FindNearestLayoutOwner(DesignerNodeId node_id) const
+	{
+		while(node_id != Designer_NULL) {
+			const DesignerNode* n = model_.Find(node_id);
+			if(!n)
+				break;
+			const DesignerType* t = registry_.Find(n->type_id);
+			if(IsLayoutOwnerType(t))
+				return n->id;
+			node_id = n->parent;
+		}
+		return Designer_NULL;
+	}
+
+	bool IsLayoutAffectingProperty(const DesignerNode& n, const String& property_id) const
+	{
+		if(n.type_id == "Spacer" &&
+		   (property_id == "line_enabled" || property_id == "line_orientation" || property_id == "line_align" ||
+		    property_id == "line_thickness" || property_id == "line_dash" || property_id == "line_inset" ||
+		    property_id == "layout_break"))
+			return true;
+		if(n.type_id == "UiTitleCard" &&
+		   (property_id == "content_inset" || property_id == "media_reserve" || property_id == "media_min" ||
+		    property_id == "media_gap" || property_id == "media_side" || property_id == "media_align_x" ||
+		    property_id == "media_align_y" || property_id == "title_line" || property_id == "title_line_thickness" ||
+		    property_id == "title_line_gap_above" || property_id == "title_line_gap_below" ||
+		    property_id == "card_line" || property_id == "card_line_side" || property_id == "card_line_length" ||
+		    property_id == "card_line_style" || property_id == "card_line_thickness" || property_id == "card_line_gap" ||
+		    property_id == "text_align_v"))
+			return true;
+		if(property_id == "direction" || property_id == "wrap" || property_id == "columns" || property_id == "rows" ||
+		   property_id == "cell_width" || property_id == "cell_height" || property_id == "split_percent" ||
+		   property_id == "min_a" || property_id == "min_b" || property_id == "min_c" || property_id == "min_d" ||
+		   property_id == "split_width" || property_id == "split_content_gap" || property_id == "popup_min_width")
+			return true;
+		if(property_id == "h_sizing" || property_id == "v_sizing" ||
+		   property_id == "fixed_width" || property_id == "fixed_height" ||
+		   property_id == "min_width" || property_id == "min_height" ||
+		   property_id == "max_width" || property_id == "max_height" ||
+		   property_id == "cell_align_h" || property_id == "cell_align_v" ||
+		   property_id == "weight" || property_id == "layout_break")
+			return true;
+		if(property_id == "gap" || property_id == "inset" || property_id == "content_inset" ||
+		   property_id == "content_gap" || property_id == "icon_size" || property_id == "font_size" ||
+		   property_id == "title_size" || property_id == "subtitle_size" || property_id == "copy_size")
+			return true;
+		return false;
+	}
+
+	void TraceLayoutAffectingChange(const DesignerNode& n, const String& property_id) const
+	{
+#ifdef _DEBUG
+		DesignerNodeId owner_id = FindNearestLayoutOwner(n.parent);
+		const DesignerNode* owner = model_.Find(owner_id);
+		String owner_text = owner ? Format("%s/%s", owner->type_id, owner->name) : String("<none>");
+		String owner_dir = owner ? AsString(DesignerNodePropertyOr(*owner, "direction", "")) : String();
+		String msg = Format("Designer relayout %s/%s.%s owner=%s", n.type_id, n.name, property_id, owner_text);
+		if(!owner_dir.IsEmpty())
+			msg << " dir=" << owner_dir;
+		RLOG(msg);
+#endif
 	}
 
 	Color CategoryColor(const DesignerType* t) const
