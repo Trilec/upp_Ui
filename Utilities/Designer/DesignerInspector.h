@@ -96,8 +96,12 @@ private:
 	void DescribeSelection(Vector<Vector<DesignerApiBinding>>& all_bindings, const Vector<const DesignerNode *>& nodes) const;
 	void DescribeCommon(Vector<DesignerApiBinding>& bindings, const Vector<const DesignerNode *>& nodes) const;
 	bool ShouldShowBinding(const DesignerApiBinding& b) const;
-	// Shape cache only: property values still come from the selected nodes.
-	// Do not use this for types whose visible/enabled bindings depend on node state.
+	// Descriptor caching is disabled for now.
+	// The current descriptor set carries node-state-dependent enabled/visible
+	// information for theme overrides, sizing, and control-specific parts.
+	// Reusing cached bindings here is what caused stale Theme Overrides rows and
+	// misleading multi-select editability. After V1 this can come back as a
+	// true shape-only cache with node-state facts excluded from the cached copy.
 	bool CanCacheDescriptorShape(const DesignerNode& n) const;
 	String DescriptorCacheKey(const DesignerNode& n) const;
 

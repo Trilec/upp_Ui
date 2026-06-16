@@ -439,7 +439,10 @@ static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 			Color frame = GetColorProperty(n, "frame", SColorShadow());
 			for(int i = 0; i < 4; i++)
 				palette.frame[i] = frame;
-			metrics.frame_width = max(DPI(1), metrics.frame_width);
+			int frame_width = DesignerHasProperty(n, "frame_width")
+			                ? max(0, (int)AdapterNodeProperty(n, "frame_width", 1))
+			                : max(1, metrics.frame_width / max(1, DPI(1)));
+			metrics.frame_width = DPI(frame_width);
 		}
 		else {
 			for(int i = 0; i < 4; i++)
@@ -1040,6 +1043,8 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Four-corner gradient colors used when Face mode is Quad.").group = theme_group;
 	b.Add("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Frame color used when Frame is on.").group = theme_group;
+	b.AddInt("frame_width", "Frame thickness", DesignerEditorKind::Slider, "StyledMetrics::frame_width",
+	         "Frame thickness used when Frame is on and overrides are active.", 0, 16).group = theme_group;
 	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit corner radius used when theme overrides are enabled.", 0, 64).group = theme_group;
 	b.Add("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
@@ -1073,6 +1078,7 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 		b.Disable("face_quad", "Activate overrides to edit explicit quad face.");
 		b.Disable("frame_enabled", "Activate overrides to edit explicit surface frame.");
 		b.Disable("frame", "Activate overrides to edit explicit frame color.");
+		b.Disable("frame_width", "Activate overrides to edit explicit frame thickness.");
 		b.Disable("radius", "Activate overrides to edit explicit radius.");
 		b.Disable("shadow_enabled", "Activate overrides to edit explicit shadow settings.");
 		b.Disable("shadow_distance", "Activate overrides to edit explicit shadow settings.");
@@ -1089,6 +1095,8 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	}
 	if(theme_override && !frame_enabled)
 		b.Disable("frame", "Frame is off.");
+	if(theme_override && !frame_enabled)
+		b.Disable("frame_width", "Frame is off.");
 	if(theme_override && !shadow_enabled) {
 		b.Disable("shadow_distance", "Shadow is off.");
 		b.Disable("shadow_offset_x", "Shadow is off.");
@@ -1543,7 +1551,7 @@ void DesignerTitleCardAdapter::Paint(Draw& w)
 void DesignerSliderAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
-	UiSlider::Style s = UiTheme::ResolveSlider();
+	UiSlider::Style s = UiTheme::ResolveSlider(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
 	bool theme_override = DesignerBoolProperty(node, "theme_override", false);
 	face_ = GetColorProperty(node, "face", Color(214, 231, 255));
 	frame_ = GetColorProperty(node, "frame", Color(54, 116, 210));
@@ -1587,7 +1595,6 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.Hide("role");
 	b.Hide("face_mode");
 	b.Hide("face_quad");
 	b.Hide("face_enabled");
@@ -2328,6 +2335,7 @@ void DesignerTabAdapter::SyncFromNode(const DesignerNode& node)
 	s.tab_font = DesignerFontChoice(node, "tab_font", max(7, (int)AdapterNodeProperty(node, "tab_font_size", 11)));
 	s.icon_size = DPI(max(0, (int)AdapterNodeProperty(node, "tab_icon_size", 16)));
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(node, "tab_icon_side", "Left"), UiAlign::LEFT);
+	s.content_gap = DPI(max(0, (int)AdapterNodeProperty(node, "content_gap", 6)));
 	SetCustomStyle(s);
 	SetPlacement(placement == "Bottom" ? UiAlign::BOTTOM :
 	             placement == "Left" ? UiAlign::LEFT :
@@ -2375,6 +2383,8 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	         "Shared icon size used by tab page icons and tab affordances.", 8, 64);
 	b.AddChoice("tab_icon_side", "Icon side", "UiTab::SetTabIconSide",
 	            "Where page icons sit relative to tab text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiTab::Style::content_gap",
+	         "Gap between a tab icon and its title text.", 0, 32);
 	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiTab::SetActiveTab",
 	                                   "Visible tab page. Rename individual Page Slot children to change tab labels.");
 	int pages = max(1, node.children.GetCount());

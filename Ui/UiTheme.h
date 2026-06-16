@@ -1928,10 +1928,12 @@ inline void TuneMinimalEdit(UiBaseEdit::Style& s, UiThemeMode mode, UiRole role 
     s.selection_ink = dark ? White() : Color(17, 24, 39);
 }
 
-inline void TuneMinimalSlider(UiSlider::Style& s, UiThemeMode mode)
+inline void TuneMinimalSlider(UiSlider::Style& s, UiThemeMode mode, UiRole role = UiRole::Standard)
 {
     bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
-    MinimalRoleColors c = MinimalRole(mode, UiRole::Accent);
+    if(!UiIsValid(role))
+        role = UiRole::Standard;
+    MinimalRoleColors c = MinimalRole(mode, role);
     s.track_size = Size(DPI(120), DPI(3));
     s.thumb_size = Size(DPI(20), DPI(20));
     s.track_metrics.radius = DPI(999);
@@ -2484,7 +2486,8 @@ public:
     static UiToggle::Style ResolveToggle() { return ResolveToggle(GetContext()); }
     static UiRadioButton::Style ResolveRadioButton(UiRole role, UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return ResolveRadioButton(GetContext(), role, visual); }
     static UiRadioButton::Style ResolveRadioButton(UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return ResolveRadioButton(GetContext(), visual); }
-    static UiSlider::Style ResolveSlider() { return ResolveSlider(GetContext()); }
+    static UiSlider::Style ResolveSlider(UiRole role) { return ResolveSlider(GetContext(), role); }
+    static UiSlider::Style ResolveSlider() { return ResolveSlider(GetContext(), UiRole::Standard); }
     static UiScrollBar::Style ResolveScrollBar() { return ResolveScrollBar(GetContext()); }
     static UiSplitter::Style ResolveSplitter() { return ResolveSplitter(GetContext()); }
     static UiPanel::Style ResolvePanel(UiRole role) { return ResolvePanel(GetContext(), role); }
@@ -2671,12 +2674,12 @@ public:
         return s;
     }
 
-    static UiSlider::Style ResolveSlider(const UiThemeContext& ctx)
+    static UiSlider::Style ResolveSlider(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiSlider::Style s = UiThemeDetail::ResolveSliderBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
-            UiThemeDetail::TuneMinimalSlider(s, normalized.mode);
+            UiThemeDetail::TuneMinimalSlider(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
             return s;

@@ -304,7 +304,7 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 	if(n.type_id == "UiToggle")
 		return "UiTheme::ResolveToggle(" + role_expr + ")";
 	if(n.type_id == "UiSlider")
-		return "UiTheme::ResolveSlider()";
+		return "UiTheme::ResolveSlider(" + RoleExpr(AsString(CodeGenNodeProperty(n, "role", "Standard"))) + ")";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::StyleDefault()";
 	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
@@ -372,6 +372,7 @@ static void EmitSurfaceOverrideFields(String& out, const String& target, const D
 	String face_key = prefix.IsEmpty() ? String("face") : prefix + "_face";
 	String frame_enabled_key = prefix.IsEmpty() ? String("frame_enabled") : prefix + "_frame_enabled";
 	String frame_key = prefix.IsEmpty() ? String("frame") : prefix + "_frame";
+	String frame_width_key = prefix.IsEmpty() ? String("frame_width") : prefix + "_frame_width";
 	String radius_key = prefix.IsEmpty() ? String("radius") : prefix + "_radius";
 	String var_prefix = prefix.IsEmpty() ? String("surface") : prefix;
 	if(CodeGenHasProperty(n, face_enabled_key)) {
@@ -391,9 +392,10 @@ static void EmitSurfaceOverrideFields(String& out, const String& target, const D
 		out << "\t\t\t" << target << ".metrics.frame_enabled = " << (frame_enabled ? "true" : "false") << ";\n";
 		if(frame_enabled) {
 			Color frame = CodeGenNodeProperty(n, frame_key, SColorShadow());
+			int frame_width = max(0, (int)CodeGenNodeProperty(n, frame_width_key, 1));
 			out << "\t\t\tfor(int i = 0; i < 4; i++)\n"
 			    << "\t\t\t\t" << target << ".palette.frame[i] = " << ColorExpr(frame) << ";\n"
-			    << "\t\t\t" << target << ".metrics.frame_width = max(DPI(1), " << target << ".metrics.frame_width);\n";
+			    << "\t\t\t" << target << ".metrics.frame_width = DPI(" << frame_width << ");\n";
 		}
 	}
 	if(CodeGenHasProperty(n, radius_key))
@@ -473,6 +475,9 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		           || (int)CodeGenNodeProperty(n, "card_line_gap", 0) != 0
 		           || (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
 	}
+	else if(n.type_id == "UiTab") {
+		force_style = (int)CodeGenNodeProperty(n, "content_gap", 6) != 6;
+	}
 	bool custom_align = false;
 	if(n.type_id == "UiCheckBox" || n.type_id == "UiToggle")
 		custom_align = CodeGenNodeProperty(n, "align_h", "Left") != "Left" || CodeGenNodeProperty(n, "align_v", "Center") != "Center";
@@ -531,7 +536,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			Color frame = CodeGenNodeProperty(n, "frame", SColorShadow());
 			out << "\t\t\tfor(int i = 0; i < 4; i++)\n"
 			    << "\t\t\t\ts.palette.frame[i] = " << ColorExpr(frame) << ";\n"
-			    << "\t\t\ts.metrics.frame_width = max(DPI(1), s.metrics.frame_width);\n";
+			    << "\t\t\ts.metrics.frame_width = DPI(" << max(0, (int)CodeGenNodeProperty(n, "frame_width", 1)) << ");\n";
 		}
 	}
 	if(CodeGenHasProperty(n, "radius"))
@@ -615,6 +620,9 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		    << "), DPI(" << max(6, (int)CodeGenNodeProperty(n, "thumb_height", 20)) << "));\n"
 		    << "\t\t\ts.track_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "track_radius", CodeGenNodeProperty(n, "radius", 8))) << ");\n"
 		    << "\t\t\ts.thumb_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "thumb_radius", 8)) << ");\n";
+	}
+	else if(n.type_id == "UiTab") {
+		out << "\t\t\ts.content_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 6)) << ");\n";
 	}
 	if(n.type_id == "UiLabel") {
 		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))

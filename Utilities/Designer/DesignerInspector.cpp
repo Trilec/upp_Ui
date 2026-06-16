@@ -564,12 +564,7 @@ bool DesignerInspector::ShouldShowBinding(const DesignerApiBinding& b) const
 
 bool DesignerInspector::CanCacheDescriptorShape(const DesignerNode& n) const
 {
-	// Descriptor cache stores descriptor shape only. It is safe only when
-	// visible/enabled state does not vary with node state. Spacer is excluded
-	// because layout_break changes which inspector rows are valid.
-	if(n.type_id == "Spacer")
-		return false;
-	return true;
+	return false;
 }
 
 String DesignerInspector::DescriptorCacheKey(const DesignerNode& n) const
@@ -819,8 +814,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetData(value);
 		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
-			if(self && node_id_ == row_node)
-				CommitChoice(property_id, data, "select");
+			PostCallback([=] {
+				if(self && node_id_ == row_node)
+					CommitChoice(property_id, data, "select");
+			});
 		};
 		row->WhenClose = [=] {
 			PostCallback([=] {
@@ -1001,8 +998,10 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(mixed ? Value() : value);
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenSelectData = [=](const Value& data) {
-			if(self && !syncing_ && !IsNull(data))
-				WhenPropertyMany(selection_, property_id, data);
+			PostCallback([=] {
+				if(self && !syncing_ && !IsNull(data))
+					WhenPropertyMany(selection_, property_id, data);
+			});
 		};
 		row->WhenClose = [=] {
 			PostCallback([=] {

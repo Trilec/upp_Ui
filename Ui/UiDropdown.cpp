@@ -1427,9 +1427,9 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
         apply_index = highlight_index_;
     
     popup_open_ = false;
+    popup_.Close();
     RebuildIndicator();
     OnStyleChanged();
-    popup_.Close();
 
     if(apply_index >= 0 && apply_index != selected_index_) {
         // Defer selection event dispatch until after popup window teardown.
@@ -1800,8 +1800,7 @@ bool UiDropdown::PopupWindow::Key(dword key, int count)
                     owner->ClosePopupInternal(false);
             }
             else {
-                owner->Select(owner->highlight_index_);
-                owner->ClosePopupInternal(false);
+                owner->ClosePopupInternal(true);
             }
         }
         return true;
@@ -2255,8 +2254,8 @@ void UiDropdown::PopupWindow::LeftDown(Point p, dword flags)
                 Refresh(GetItemRect(idx));
         }
         else {
-            owner->Select(idx);
-            owner->ClosePopupInternal(false);
+            owner->highlight_index_ = idx;
+            owner->ClosePopupInternal(true);
         }
     }
 }
