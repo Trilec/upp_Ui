@@ -8,6 +8,9 @@ bool SymbolPickerApp::Init(String& error)
 {
 	if(!RunSymbolPickerCommandSmokeTests(error))
 		return false;
+	if(!RunSymbolPickerCatalogSmokeTests(error))
+		return false;
+	SeedSymbolPickerCatalog(catalog_);
 	Wire();
 	if(kEnableLocalDemoData)
 		SeedDemoData();
@@ -17,6 +20,7 @@ bool SymbolPickerApp::Init(String& error)
 void SymbolPickerApp::Wire()
 {
 	view_.SetModel(&model_);
+	view_.SetCatalog(&catalog_);
 	view_.SetCommands(&commands_);
 	model_.WhenChanged = [=] {
 		view_.RefreshFromModel();

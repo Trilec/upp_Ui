@@ -2,6 +2,7 @@
 #define _Utilities_SymbolPicker_SymbolPickerView_h_
 
 #include "SymbolPickerModel.h"
+#include "SymbolPickerCatalog.h"
 #include "SymbolPickerCommands.h"
 
 #include <CtrlLib/CtrlLib.h>
@@ -32,6 +33,7 @@ public:
 	SymbolPickerView();
 
 	void SetModel(SymbolPickerModel* model);
+	void SetCatalog(const SymbolPickerCatalog* catalog);
 	void SetCommands(SymbolPickerCommandStack* commands);
 	void RefreshFromModel();
 
@@ -45,6 +47,9 @@ private:
 	void RefreshCollections();
 	void RefreshCollectionItems();
 	void RefreshBin();
+	void RefreshCategories();
+	void RefreshLibrary();
+	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
 
 	ParentCtrl root_;
 	StaticRect header_row_;
@@ -69,9 +74,11 @@ private:
 	SymbolPickerTintCtrl tint_ctrl_;
 	Button     new_collection_button_;
 	Button     clear_bin_button_;
+	Button     add_to_bin_button_;
+	Button     add_to_collection_button_;
 
 	ArrayCtrl  categories_list_;
-	ArrayCtrl  library_placeholder_list_;
+	ArrayCtrl  library_list_;
 	ArrayCtrl  collections_list_;
 	TabCtrl    collections_tabs_;
 	ParentCtrl collection_items_page_;
@@ -86,6 +93,7 @@ private:
 	bool       refreshing_collections_ = false;
 
 	SymbolPickerModel* model_ = nullptr;
+	const SymbolPickerCatalog* catalog_ = nullptr;
 	SymbolPickerCommandStack* commands_ = nullptr;
 };
 

@@ -12,6 +12,21 @@ static const char* SymbolPickerIconStyleText(SymbolPickerIconStyle style)
 	return "Outlined";
 }
 
+static String SafeAliasPart(const String& text)
+{
+	String out;
+	for(int i = 0; i < text.GetCount(); ++i) {
+		int c = (byte)text[i];
+		if(IsAlNum(c))
+			out.Cat(ToUpper((wchar)c));
+		else if(out.IsEmpty() || out[out.GetCount() - 1] != '_')
+			out.Cat('_');
+	}
+	while(!out.IsEmpty() && out[out.GetCount() - 1] == '_')
+		out.Trim(out.GetCount() - 1);
+	return out;
+}
+
 SymbolPickerTintCtrl::SymbolPickerTintCtrl()
 {
 	Add(label_.LeftPosZ(0, 32).VCenterPosZ(20));
@@ -134,14 +149,9 @@ void SymbolPickerView::BuildCategoryStrip()
 {
 	category_strip_.Add(categories_list_.SizePos());
 	categories_list_.AddColumn("Categories");
-	static const char* categories[] = {
-		"Actions", "Alert", "Communication", "Content", "Device", "Image", "Navigation", "Search", "Toggle"
-	};
-	for(const char* category : categories)
-		categories_list_.Add(category);
 	categories_list_.WhenSel = [=] {
 		if(model_ && commands_ && categories_list_.IsCursor())
-			commands_->Execute(MakeSymbolPickerSetCategoryCommand(categories_list_.Get(categories_list_.GetCursor(), 0)), *model_);
+			commands_->Execute(MakeSymbolPickerSetCategoryCommand(categories_list_.Get(categories_list_.GetCursor(), 1)), *model_);
 	};
 }
 
@@ -149,17 +159,49 @@ void SymbolPickerView::BuildLibraryPanel()
 {
 	library_panel_.Add(library_title_.LeftPosZ(12, 140).TopPosZ(8, 20));
 	library_panel_.Add(library_subtitle_.LeftPosZ(12, 240).TopPosZ(28, 16));
-	library_panel_.Add(library_placeholder_list_.HSizePosZ(12, 12).VSizePosZ(52, 12));
+	library_panel_.Add(add_to_bin_button_.RightPosZ(128, 110).TopPosZ(8, 22));
+	library_panel_.Add(add_to_collection_button_.RightPosZ(12, 110).TopPosZ(8, 22));
+	library_panel_.Add(library_list_.HSizePosZ(12, 12).VSizePosZ(52, 12));
 
 	library_title_.SetLabel("Library");
 	library_title_.SetFont(ArialZ(16).Bold());
 	library_subtitle_.SetLabel("Browse the full icon library.");
+	add_to_bin_button_.SetLabel("Add To Bin");
+	add_to_collection_button_.SetLabel("Add To Collection");
 
-	library_placeholder_list_.AddColumn("Library Placeholder");
-	library_placeholder_list_.Add("Icon grid placeholder");
-	library_placeholder_list_.Add("Real icon loading is out of scope for this pass");
-	library_placeholder_list_.Add("Drag and drop is intentionally deferred");
-	library_placeholder_list_.Add("Export/header generation is intentionally deferred");
+	library_list_.AddColumn("Name");
+	library_list_.AddColumn("Category");
+	library_list_.AddColumn("Style");
+	library_list_.AddColumn("Source Id");
+	library_list_.WhenLeftDouble = [=] {
+		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
+			return;
+		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
+		commands_->Execute(MakeSymbolPickerAddToBinCommand(source_id), *model_);
+	};
+	add_to_bin_button_.WhenAction = [=] {
+		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
+			return;
+		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
+		commands_->Execute(MakeSymbolPickerAddToBinCommand(source_id), *model_);
+	};
+	add_to_collection_button_.WhenAction = [=] {
+		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
+			return;
+		if(model_->GetActiveCollectionIndex() < 0)
+			return;
+		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
+		const SymbolPickerIconEntry* entry = catalog_->FindBySourceId(source_id);
+		if(!entry)
+			return;
+		SymbolPickerIconRef ref;
+		ref.source_id = entry->source_id;
+		ref.alias = MakeCollectionAlias(*entry);
+		ref.size = model_->GetExportSize();
+		ref.tint = model_->GetTintColor();
+		ref.unresolved = false;
+		commands_->Execute(MakeSymbolPickerAddIconToCollectionCommand(model_->GetActiveCollectionIndex(), ref), *model_);
+	};
 }
 
 void SymbolPickerView::BuildCollectionsPanel()
@@ -207,6 +249,12 @@ void SymbolPickerView::SetModel(SymbolPickerModel* model)
 	RefreshFromModel();
 }
 
+void SymbolPickerView::SetCatalog(const SymbolPickerCatalog* catalog)
+{
+	catalog_ = catalog;
+	RefreshFromModel();
+}
+
 void SymbolPickerView::SetCommands(SymbolPickerCommandStack* commands)
 {
 	commands_ = commands;
@@ -248,6 +296,44 @@ void SymbolPickerView::RefreshBin()
 		bin_list_.Add(id);
 }
 
+void SymbolPickerView::RefreshCategories()
+{
+	categories_list_.Clear();
+	categories_list_.Add("All", "All");
+	if(!catalog_)
+		return;
+	Vector<SymbolPickerCategory> categories = catalog_->GetCategories();
+	for(const auto& category : categories)
+		categories_list_.Add(Format("%s (%d)", category.display_name, category.icon_count), category.id);
+
+	String current = model_ ? model_->GetCurrentCategory() : String("All");
+	for(int i = 0; i < categories_list_.GetCount(); ++i) {
+		if(categories_list_.Get(i, 1) == current) {
+			categories_list_.SetCursor(i);
+			return;
+		}
+	}
+	categories_list_.SetCursor(0);
+}
+
+void SymbolPickerView::RefreshLibrary()
+{
+	library_list_.Clear();
+	if(!catalog_ || !model_)
+		return;
+	Vector<int> rows = catalog_->Filter(model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
+	for(int row : rows) {
+		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
+		library_list_.Add(entry.display_name, entry.category, SymbolPickerIconStyleText(entry.style), entry.source_id);
+	}
+}
+
+String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
+{
+	String alias = "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(SymbolPickerIconStyleText(entry.style));
+	return alias;
+}
+
 void SymbolPickerView::RefreshFromModel()
 {
 	if(!model_)
@@ -256,6 +342,8 @@ void SymbolPickerView::RefreshFromModel()
 	icon_style_drop_ <<= (int)model_->GetIconStyle();
 	filter_edit_.SetText(model_->GetFilterText());
 	tint_ctrl_.SetColor(model_->GetTintColor());
+	RefreshCategories();
+	RefreshLibrary();
 	RefreshCollections();
 	RefreshCollectionItems();
 	RefreshBin();
