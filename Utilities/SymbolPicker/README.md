@@ -1,31 +1,17 @@
 # SymbolPicker
 
-`SymbolPicker` is the current `Ui`-based rebuild of the symbol/icon picker utility.
+`SymbolPicker` is the new V1 skeleton package for the icon/symbol picker utility.
 
-## Current v0.3 scope
+Current scope:
+- minimal Ui-based window
+- small app-state model
+- undo/redo command stack
+- startup smoke tests for command do/undo/redo
 
-- Library / Collections / Bin UI shell
-- read-only seeded Library catalog
-- Bin model and Bin command helpers
-- collection model scaffolding
-- command stack with Bin and Collection commands
-- startup smoke tests for Bin, Collections, theme preset, icon style, and catalog flows
-- `catalog_id` identifies one exact selectable icon/style row
-- `source_id` identifies the shared base icon concept behind those variants
-- Library rows use `catalog_id`
-- Bin stores `catalog_id`
-- Collections store both `catalog_id` and `source_id`
-- `.uppicons.json` is documented as the future editable source format
-- generated `.h` is documented as the future output artifact
+Deliberately not included yet:
+- generated icon header loading
+- old drag/drop behavior
+- full legacy UI port
+- export implementation details beyond model state
 
-## Still out of scope
-
-- real generated icon loading
-- image rendering
-- tint rendering pipeline
-- drag and drop
-- save/load UI
-- generated header output
-- parsing generated or hand-edited C++ headers
-
-This pass is about getting identity, catalog boundaries, and command behavior right before the generated catalog bridge turns up and starts asking for receipts.
+Reference behavior can be taken from the older `upp_symbols_picker` code in `OLD_CODE`, but this package is intended to be rebuilt cleanly around the current `Ui` layer.
