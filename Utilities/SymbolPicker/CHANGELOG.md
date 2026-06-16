@@ -1,5 +1,11 @@
 # SymbolPicker Changelog
 
+## 0.3.2
+
+- fixed `SymbolPickerIconRef` copy paths to preserve `catalog_id`
+- strengthened command smoke tests for `catalog_id` / `source_id` preservation
+- clarified README around catalog identity
+
 ## 0.3.1
 
 - added unique `catalog_id` per icon/style variant

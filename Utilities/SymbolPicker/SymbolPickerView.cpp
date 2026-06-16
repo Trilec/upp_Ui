@@ -224,6 +224,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 		commands_->Execute(MakeSymbolPickerSetActiveCollectionCommand(collections_list_.GetCursor()), *model_);
 	};
 
+	collection_items_list_.AddColumn("Catalog Id");
 	collection_items_list_.AddColumn("Source Id");
 	collection_items_list_.AddColumn("Alias");
 	collection_items_list_.AddColumn("Size");
@@ -286,7 +287,11 @@ void SymbolPickerView::RefreshCollectionItems()
 	if(!collection)
 		return;
 	for(const auto& item : collection->items)
-		collection_items_list_.Add(item.catalog_id.IsEmpty() ? item.source_id : item.catalog_id, item.alias, item.size, item.unresolved ? "Yes" : "No");
+		collection_items_list_.Add(item.catalog_id.IsEmpty() ? item.source_id : item.catalog_id,
+			item.source_id,
+			item.alias,
+			item.size,
+			item.unresolved ? "Yes" : "No");
 }
 
 void SymbolPickerView::RefreshBin()

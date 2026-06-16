@@ -13,6 +13,7 @@ static int FindStringIndex(const Vector<String>& values, const String& value)
 static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
 {
 	SymbolPickerIconRef out;
+	out.catalog_id = src.catalog_id;
 	out.source_id = src.source_id;
 	out.alias = src.alias;
 	out.size = src.size;
@@ -826,48 +827,71 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 	if(!stack.Undo(model) || model.GetCollections()[0].name != "Core Set")
 		return Fail("RenameCollection second undo failed.");
 
+	SymbolPickerIconRef rounded;
+	rounded.catalog_id = "action/save/rounded";
+	rounded.source_id = "action/save";
+	rounded.alias = "ICON_ACTION_SAVE_ROUNDED";
+	rounded.size = 48;
+	rounded.tint = Color(12, 34, 56);
+	rounded.unresolved = false;
+
+	if(!stack.Execute(MakeSymbolPickerAddIconToCollectionCommand(0, rounded), model))
+		return Fail("AddIconToCollection command did not execute.");
+	if(model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("AddIconToCollection command did not add item.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded")
+		return Fail("Catalog id was not preserved on collection item add.");
+	if(model.GetCollections()[0].items[0].source_id != "action/save")
+		return Fail("Source id was not preserved on collection item add.");
+	if(!stack.Undo(model) || !model.GetCollections()[0].items.IsEmpty())
+		return Fail("AddIconToCollection undo failed.");
+	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)
+		return Fail("AddIconToCollection redo failed.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[0].source_id != "action/save")
+		return Fail("Catalog/source id were not preserved after redo.");
+
 	SymbolPickerIconRef unresolved;
 	unresolved.catalog_id = "legacy/missing_icon/outlined";
 	unresolved.source_id = "legacy/missing_icon";
 	unresolved.alias = "MissingGlyph";
 	unresolved.size = 32;
-	unresolved.tint = Color(12, 34, 56);
+	unresolved.tint = Color(200, 10, 10);
 	unresolved.unresolved = true;
-
 	if(!stack.Execute(MakeSymbolPickerAddIconToCollectionCommand(0, unresolved), model))
-		return Fail("AddIconToCollection command did not execute.");
-	if(model.GetCollections()[0].items.GetCount() != 1)
-		return Fail("AddIconToCollection command did not add item.");
-	if(!model.GetCollections()[0].items[0].unresolved)
+		return Fail("Second AddIconToCollection command did not execute.");
+	if(model.GetCollections()[0].items.GetCount() != 2)
+		return Fail("Second AddIconToCollection command did not add item.");
+	if(!model.GetCollections()[0].items[1].unresolved)
 		return Fail("Unresolved icon ref was not preserved.");
-	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
-		return Fail("Catalog id was not preserved on collection item add.");
-	if(!stack.Undo(model) || !model.GetCollections()[0].items.IsEmpty())
-		return Fail("AddIconToCollection undo failed.");
-	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)
-		return Fail("AddIconToCollection redo failed.");
-	if(!model.GetCollections()[0].items[0].unresolved)
-		return Fail("Unresolved icon ref was not preserved after redo.");
 
 	if(!stack.Execute(MakeSymbolPickerRenameCollectionIconAliasCommand(0, 0, "RenamedGlyph"), model))
 		return Fail("RenameCollectionIconAlias command did not execute.");
 	if(model.GetCollections()[0].items[0].alias != "RenamedGlyph")
 		return Fail("RenameCollectionIconAlias command did not update alias.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items[0].alias != "MissingGlyph")
+	if(!stack.Undo(model) || model.GetCollections()[0].items[0].alias != "ICON_ACTION_SAVE_ROUNDED")
 		return Fail("RenameCollectionIconAlias undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerRemoveIconFromCollectionCommand(0, 0), model))
 		return Fail("RemoveIconFromCollection command did not execute.");
-	if(!model.GetCollections()[0].items.IsEmpty())
+	if(model.GetCollections()[0].items.GetCount() != 1)
 		return Fail("RemoveIconFromCollection command did not remove item.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("RemoveIconFromCollection removed wrong variant.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("RemoveIconFromCollection undo failed.");
-	if(!model.GetCollections()[0].items[0].unresolved)
-		return Fail("Unresolved icon ref was not restored after undo.");
-	if(!stack.Redo(model) || !model.GetCollections()[0].items.IsEmpty())
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("RemoveIconFromCollection undo did not restore both identities.");
+	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)
 		return Fail("RemoveIconFromCollection redo failed.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("RemoveIconFromCollection redo restored wrong item state.");
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("RemoveIconFromCollection second undo failed.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("RemoveIconFromCollection second undo did not preserve identities.");
 
 	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Secondary"), model))
 		return Fail("Second CreateCollection command did not execute.");
@@ -886,12 +910,18 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("ClearCollection command did not execute.");
 	if(!model.GetCollections()[0].items.IsEmpty())
 		return Fail("ClearCollection command did not clear items.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("ClearCollection undo failed.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("ClearCollection undo did not preserve identities.");
 	if(!stack.Redo(model) || !model.GetCollections()[0].items.IsEmpty())
 		return Fail("ClearCollection redo failed.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 1)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("ClearCollection second undo failed.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("ClearCollection second undo did not preserve identities.");
 
 	if(!stack.Execute(MakeSymbolPickerRemoveCollectionCommand(1), model))
 		return Fail("RemoveCollection command did not execute.");
