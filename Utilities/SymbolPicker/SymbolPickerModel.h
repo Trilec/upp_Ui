@@ -18,6 +18,7 @@ enum class SymbolPickerIconStyle : byte {
 };
 
 struct SymbolPickerIconRef : Moveable<SymbolPickerIconRef> {
+	String catalog_id;
 	String source_id;
 	String alias;
 	int    size = 24;

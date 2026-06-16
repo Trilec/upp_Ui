@@ -38,6 +38,7 @@ void SymbolPickerApp::SeedDemoData()
 	model_.AddIconToBin("demo/alert_placeholder");
 
 	SymbolPickerIconRef unresolved;
+	unresolved.catalog_id = "demo/unresolved_placeholder/outlined";
 	unresolved.source_id = "demo/unresolved_placeholder";
 	unresolved.alias = "DemoMissing";
 	unresolved.unresolved = true;

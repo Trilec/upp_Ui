@@ -6,6 +6,7 @@
 namespace Upp {
 
 struct SymbolPickerIconEntry : Moveable<SymbolPickerIconEntry> {
+	String                catalog_id;
 	String                source_id;
 	String                category;
 	String                display_name;
@@ -32,6 +33,7 @@ public:
 		const String& text,
 		SymbolPickerIconStyle style) const;
 
+	const SymbolPickerIconEntry* FindByCatalogId(const String& catalog_id) const;
 	const SymbolPickerIconEntry* FindBySourceId(const String& source_id) const;
 
 private:

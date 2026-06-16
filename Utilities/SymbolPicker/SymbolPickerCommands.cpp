@@ -771,25 +771,28 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 	if(model.GetExportSize() != 64)
 		return Fail("SetExportSize command did not update export size.");
 
-	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("ICON_ACTION_SAVE_48"), model))
+	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("action/save/outlined"), model))
 		return Fail("AddToBin command did not execute.");
 	if(model.GetBinIconIds().GetCount() != 1)
 		return Fail("AddToBin command did not update bin.");
 
-	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("ICON_ACTION_REFRESH_48"), model))
+	if(!stack.Execute(MakeSymbolPickerAddToBinCommand("action/save/rounded"), model))
 		return Fail("Second AddToBin command did not execute.");
 	if(model.GetBinIconIds().GetCount() != 2)
 		return Fail("Second AddToBin command did not update bin.");
+	if(FindStringIndex(model.GetBinIconIds(), "action/save/outlined") < 0
+	|| FindStringIndex(model.GetBinIconIds(), "action/save/rounded") < 0)
+		return Fail("Bin did not retain separate style variants.");
 
-	if(!stack.Execute(MakeSymbolPickerRemoveFromBinCommand("ICON_ACTION_SAVE_48"), model))
+	if(!stack.Execute(MakeSymbolPickerRemoveFromBinCommand("action/save/outlined"), model))
 		return Fail("RemoveFromBin command did not execute.");
-	if(FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") >= 0)
+	if(FindStringIndex(model.GetBinIconIds(), "action/save/outlined") >= 0)
 		return Fail("RemoveFromBin command did not remove icon.");
-	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") < 0)
+	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "action/save/outlined") < 0)
 		return Fail("RemoveFromBin undo failed.");
-	if(!stack.Redo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") >= 0)
+	if(!stack.Redo(model) || FindStringIndex(model.GetBinIconIds(), "action/save/outlined") >= 0)
 		return Fail("RemoveFromBin redo failed.");
-	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "ICON_ACTION_SAVE_48") < 0)
+	if(!stack.Undo(model) || FindStringIndex(model.GetBinIconIds(), "action/save/outlined") < 0)
 		return Fail("RemoveFromBin second undo failed.");
 
 	if(!stack.Execute(MakeSymbolPickerClearBinCommand(), model))
@@ -824,6 +827,7 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("RenameCollection second undo failed.");
 
 	SymbolPickerIconRef unresolved;
+	unresolved.catalog_id = "legacy/missing_icon/outlined";
 	unresolved.source_id = "legacy/missing_icon";
 	unresolved.alias = "MissingGlyph";
 	unresolved.size = 32;
@@ -836,6 +840,8 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("AddIconToCollection command did not add item.");
 	if(!model.GetCollections()[0].items[0].unresolved)
 		return Fail("Unresolved icon ref was not preserved.");
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
+		return Fail("Catalog id was not preserved on collection item add.");
 	if(!stack.Undo(model) || !model.GetCollections()[0].items.IsEmpty())
 		return Fail("AddIconToCollection undo failed.");
 	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)

@@ -1,5 +1,18 @@
 # SymbolPicker Changelog
 
+## 0.3.1
+
+- added unique `catalog_id` per icon/style variant
+- fixed Library row identity so style variants no longer collapse
+
+## 0.3.0
+
+- added read-only `SymbolPickerCatalog`
+- added seeded catalog data
+- added category and library filtering
+- added Library-to-Bin and Library-to-Collection actions
+- added catalog smoke tests
+
 ## 0.2.0
 
 - renamed selection model to Bin

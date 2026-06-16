@@ -6,6 +6,7 @@ namespace Upp {
 static SymbolPickerIconEntry CopyEntry(const SymbolPickerIconEntry& src)
 {
 	SymbolPickerIconEntry out;
+	out.catalog_id = src.catalog_id;
 	out.source_id = src.source_id;
 	out.category = src.category;
 	out.display_name = src.display_name;
@@ -80,13 +81,21 @@ Vector<int> SymbolPickerCatalog::Filter(const String& category,
 		if(!want_category.IsEmpty() && want_category != "All" && icon.category != want_category)
 			continue;
 		if(!want_text.IsEmpty()) {
-			String hay = ToLower(icon.display_name + " " + icon.source_id + " " + icon.category);
+			String hay = ToLower(icon.display_name + " " + icon.source_id + " " + icon.catalog_id + " " + icon.category);
 			if(hay.Find(want_text) < 0)
 				continue;
 		}
 		out.Add(i);
 	}
 	return out;
+}
+
+const SymbolPickerIconEntry* SymbolPickerCatalog::FindByCatalogId(const String& catalog_id) const
+{
+	for(const auto& icon : icons_)
+		if(icon.catalog_id == catalog_id)
+			return &icon;
+	return nullptr;
 }
 
 const SymbolPickerIconEntry* SymbolPickerCatalog::FindBySourceId(const String& source_id) const
@@ -136,10 +145,28 @@ bool RunSymbolPickerCatalogSmokeTests(String& error)
 	if(filtered_style.GetCount() != 8)
 		return Fail("Catalog style filtering failed.");
 
+	Index<String> ids;
+	for(const auto& icon : catalog.GetIcons()) {
+		if(ids.FindAdd(icon.catalog_id) != ids.GetCount() - 1)
+			return Fail("Catalog ids are not unique.");
+	}
+
+	const SymbolPickerIconEntry* save_outlined = catalog.FindByCatalogId("action/save/outlined");
+	if(!save_outlined || save_outlined->style != SymbolPickerIconStyle::Outlined)
+		return Fail("FindByCatalogId did not resolve outlined variant.");
+	const SymbolPickerIconEntry* save_rounded = catalog.FindByCatalogId("action/save/rounded");
+	if(!save_rounded || save_rounded->style != SymbolPickerIconStyle::Rounded)
+		return Fail("FindByCatalogId did not resolve rounded variant.");
+	const SymbolPickerIconEntry* save_sharp = catalog.FindByCatalogId("action/save/sharp");
+	if(!save_sharp || save_sharp->style != SymbolPickerIconStyle::Sharp)
+		return Fail("FindByCatalogId did not resolve sharp variant.");
+
 	if(!catalog.FindBySourceId("action/save"))
 		return Fail("FindBySourceId did not find existing id.");
 	if(catalog.FindBySourceId("missing/id"))
 		return Fail("FindBySourceId should return null for missing id.");
+	if(catalog.FindByCatalogId("missing/id/outlined"))
+		return Fail("FindByCatalogId should return null for missing id.");
 
 	return true;
 }

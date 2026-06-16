@@ -13,6 +13,7 @@ static int FindStringIndex(const Vector<String>& values, const String& value)
 static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
 {
 	SymbolPickerIconRef out;
+	out.catalog_id = src.catalog_id;
 	out.source_id = src.source_id;
 	out.alias = src.alias;
 	out.size = src.size;
@@ -187,7 +188,10 @@ bool SymbolPickerModel::AddIconToCollection(int collection_index, const SymbolPi
 {
 	if(!IsValidCollectionIndex(collection_index))
 		return false;
-	collections_[collection_index].items.Add(CopyIconRef(ref));
+	SymbolPickerIconRef copy = CopyIconRef(ref);
+	if(copy.catalog_id.IsEmpty() && !copy.source_id.IsEmpty())
+		copy.unresolved = true;
+	collections_[collection_index].items.Add(copy);
 	collections_[collection_index].dirty = true;
 	Changed();
 	return true;

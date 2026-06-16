@@ -172,29 +172,31 @@ void SymbolPickerView::BuildLibraryPanel()
 	library_list_.AddColumn("Name");
 	library_list_.AddColumn("Category");
 	library_list_.AddColumn("Style");
+	library_list_.AddColumn("Catalog Id");
 	library_list_.AddColumn("Source Id");
 	library_list_.WhenLeftDouble = [=] {
 		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
 			return;
-		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
-		commands_->Execute(MakeSymbolPickerAddToBinCommand(source_id), *model_);
+		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
+		commands_->Execute(MakeSymbolPickerAddToBinCommand(catalog_id), *model_);
 	};
 	add_to_bin_button_.WhenAction = [=] {
 		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
 			return;
-		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
-		commands_->Execute(MakeSymbolPickerAddToBinCommand(source_id), *model_);
+		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
+		commands_->Execute(MakeSymbolPickerAddToBinCommand(catalog_id), *model_);
 	};
 	add_to_collection_button_.WhenAction = [=] {
 		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
 			return;
 		if(model_->GetActiveCollectionIndex() < 0)
 			return;
-		String source_id = library_list_.Get(library_list_.GetCursor(), 3);
-		const SymbolPickerIconEntry* entry = catalog_->FindBySourceId(source_id);
+		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
+		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(catalog_id);
 		if(!entry)
 			return;
 		SymbolPickerIconRef ref;
+		ref.catalog_id = entry->catalog_id;
 		ref.source_id = entry->source_id;
 		ref.alias = MakeCollectionAlias(*entry);
 		ref.size = model_->GetExportSize();
@@ -284,7 +286,7 @@ void SymbolPickerView::RefreshCollectionItems()
 	if(!collection)
 		return;
 	for(const auto& item : collection->items)
-		collection_items_list_.Add(item.source_id, item.alias, item.size, item.unresolved ? "Yes" : "No");
+		collection_items_list_.Add(item.catalog_id.IsEmpty() ? item.source_id : item.catalog_id, item.alias, item.size, item.unresolved ? "Yes" : "No");
 }
 
 void SymbolPickerView::RefreshBin()
@@ -324,7 +326,7 @@ void SymbolPickerView::RefreshLibrary()
 	Vector<int> rows = catalog_->Filter(model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
 	for(int row : rows) {
 		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
-		library_list_.Add(entry.display_name, entry.category, SymbolPickerIconStyleText(entry.style), entry.source_id);
+		library_list_.Add(entry.display_name, entry.category, SymbolPickerIconStyleText(entry.style), entry.catalog_id, entry.source_id);
 	}
 }
 

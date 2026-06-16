@@ -2,6 +2,16 @@
 
 namespace Upp {
 
+static const char* CatalogStyleSuffix(SymbolPickerIconStyle style)
+{
+	switch(style) {
+	case SymbolPickerIconStyle::Outlined: return "outlined";
+	case SymbolPickerIconStyle::Rounded:  return "rounded";
+	case SymbolPickerIconStyle::Sharp:    return "sharp";
+	}
+	return "outlined";
+}
+
 static void AddSeed(SymbolPickerCatalog& catalog,
 	const char* category,
 	const char* name,
@@ -12,6 +22,7 @@ static void AddSeed(SymbolPickerCatalog& catalog,
 	e.category = category;
 	e.display_name = name;
 	e.source_id = String(category) + "/" + name;
+	e.catalog_id = e.source_id + "/" + CatalogStyleSuffix(style);
 	e.style = style;
 	e.source_symbol = symbol;
 	catalog.Add(e);
