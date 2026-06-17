@@ -463,6 +463,8 @@ static DesignerType MakeControlType(const String& id, const String& name, Size s
 			n.properties.Set("tab_font_size", 11);
 			n.properties.Set("tab_icon_size", 16);
 			n.properties.Set("tab_icon_side", "Left");
+			n.properties.Set("content_gap", 6);
+			n.properties.Set("affordance_gap", 4);
 			n.properties.Set("active", 0);
 			n.properties.Set("tab_a", "TabA");
 			n.properties.Set("tab_b", "TabB");
@@ -577,6 +579,8 @@ static DesignerType MakePageContainerType(const String& id, const String& name, 
 			n.properties.Set("tab_font_size", 11);
 			n.properties.Set("tab_icon_size", 16);
 			n.properties.Set("tab_icon_side", "Left");
+			n.properties.Set("content_gap", 6);
+			n.properties.Set("affordance_gap", 4);
 		}
 	};
 	return t;

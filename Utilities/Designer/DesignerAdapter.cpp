@@ -2336,6 +2336,7 @@ void DesignerTabAdapter::SyncFromNode(const DesignerNode& node)
 	s.icon_size = DPI(max(0, (int)AdapterNodeProperty(node, "tab_icon_size", 16)));
 	s.icon_side = DesignerSideChoice(AdapterNodeProperty(node, "tab_icon_side", "Left"), UiAlign::LEFT);
 	s.content_gap = DPI(max(0, (int)AdapterNodeProperty(node, "content_gap", 6)));
+	s.affordance_gap = DPI(max(0, (int)AdapterNodeProperty(node, "affordance_gap", 4)));
 	SetCustomStyle(s);
 	SetPlacement(placement == "Bottom" ? UiAlign::BOTTOM :
 	             placement == "Left" ? UiAlign::LEFT :
@@ -2383,8 +2384,10 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	         "Shared icon size used by tab page icons and tab affordances.", 8, 64);
 	b.AddChoice("tab_icon_side", "Icon side", "UiTab::SetTabIconSide",
 	            "Where page icons sit relative to tab text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
-	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiTab::Style::content_gap",
-	         "Gap between a tab icon and its title text.", 0, 32);
+	b.AddInt("content_gap", "Page icon gap", DesignerEditorKind::Slider, "UiTab::Style::content_gap",
+	         "Gap between a PageSlot icon and the tab title. Only visible when the page has an icon.", 0, 32);
+	b.AddInt("affordance_gap", "Action icon gap", DesignerEditorKind::Slider, "UiTab::Style::affordance_gap",
+	         "Gap before and between built-in tab action icons such as drag and close.", 0, 32);
 	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiTab::SetActiveTab",
 	                                   "Visible tab page. Rename individual Page Slot children to change tab labels.");
 	int pages = max(1, node.children.GetCount());

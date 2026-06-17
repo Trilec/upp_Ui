@@ -476,7 +476,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		           || (bool)CodeGenNodeProperty(n, "card_line_color_enabled", false);
 	}
 	else if(n.type_id == "UiTab") {
-		force_style = (int)CodeGenNodeProperty(n, "content_gap", 6) != 6;
+		force_style = (int)CodeGenNodeProperty(n, "content_gap", 6) != 6
+		           || (int)CodeGenNodeProperty(n, "affordance_gap", 4) != 4;
 	}
 	bool custom_align = false;
 	if(n.type_id == "UiCheckBox" || n.type_id == "UiToggle")
@@ -622,7 +623,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		    << "\t\t\ts.thumb_metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "thumb_radius", 8)) << ");\n";
 	}
 	else if(n.type_id == "UiTab") {
-		out << "\t\t\ts.content_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 6)) << ");\n";
+		out << "\t\t\ts.content_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 6)) << ");\n"
+		    << "\t\t\ts.affordance_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "affordance_gap", 4)) << ");\n";
 	}
 	if(n.type_id == "UiLabel") {
 		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
