@@ -306,6 +306,23 @@ static UiLineStyle DesignerLineStyleChoice(const Value& value, UiLineStyle def =
 	return def;
 }
 
+static void ApplyFrameStyle(StyledMetrics& metrics, const Value& value)
+{
+	String style = AsString(value);
+	if(style == "Dashed" || style == "DASHED") {
+		metrics.dashed = true;
+		metrics.dash_pattern = "6,4";
+	}
+	else if(style == "Dotted" || style == "DOTTED") {
+		metrics.dashed = true;
+		metrics.dash_pattern = "1,3";
+	}
+	else {
+		metrics.dashed = false;
+		metrics.dash_pattern.Clear();
+	}
+}
+
 static UiSpan DesignerSpanChoice(const Value& value, UiSpan def = LARGE)
 {
 	String span = AsString(value);
@@ -450,6 +467,8 @@ static void ApplyExplicitSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 			metrics.frame_width = 0;
 		}
 	}
+	if(DesignerHasProperty(n, "frame_style"))
+		ApplyFrameStyle(metrics, AdapterNodeProperty(n, "frame_style", "Solid"));
 	if(DesignerHasProperty(n, "radius"))
 		metrics.radius = max(0, (int)AdapterNodeProperty(n, "radius", metrics.radius));
 	if(DesignerHasProperty(n, "shadow_enabled")) {
@@ -522,6 +541,7 @@ static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 	String frame_key = prefix + "_frame";
 	String face_enabled_key = prefix + "_face_enabled";
 	String frame_enabled_key = prefix + "_frame_enabled";
+	String frame_style_key = prefix + "_frame_style";
 	String radius_key = prefix + "_radius";
 	if(DesignerHasProperty(n, face_enabled_key)) {
 		bool face_enabled = DesignerBoolProperty(n, face_enabled_key, false);
@@ -553,6 +573,8 @@ static void ApplyPrefixedSurfaceOverrides(StyledPalette& palette, StyledMetrics&
 			metrics.frame_width = 0;
 		}
 	}
+	if(DesignerHasProperty(n, frame_style_key))
+		ApplyFrameStyle(metrics, AdapterNodeProperty(n, frame_style_key, "Solid"));
 	if(DesignerHasProperty(n, radius_key))
 		metrics.radius = max(0, (int)AdapterNodeProperty(n, radius_key, metrics.radius));
 }
@@ -708,6 +730,11 @@ static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 	UiDropdown::Style s = UiTheme::ResolveDropdown(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
 	ApplyExplicitInkOverrides(s.palette, n);
+	if(DesignerBoolProperty(n, "theme_override", false) &&
+	   (DesignerBoolProperty(n, "face_enabled", false) ||
+	    DesignerBoolProperty(n, "frame_enabled", false) ||
+	    DesignerBoolProperty(n, "shadow_enabled", false)))
+		s.transparent = false;
 	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
 	s.align_h = DesignerAlignHChoice(AdapterNodeProperty(n, "align_h", AdapterNodeProperty(n, "align", "Left")), UiAlign::LEFT);
 	s.align_v = DesignerAlignVChoice(AdapterNodeProperty(n, "align_v", "Center"), UiAlign::CENTER);
@@ -842,6 +869,7 @@ static void HideThemeOverrideBindings(DesignerApiBuilder& b)
 	b.Hide("face_mode");
 	b.Hide("face_quad");
 	b.Hide("frame");
+	b.Hide("frame_style");
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
@@ -864,6 +892,7 @@ static void HideSurfaceOverrideBindings(DesignerApiBuilder& b)
 {
 	b.Hide("face");
 	b.Hide("frame");
+	b.Hide("frame_style");
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
@@ -1045,6 +1074,9 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Frame color used when Frame is on.").group = theme_group;
 	b.AddInt("frame_width", "Frame thickness", DesignerEditorKind::Slider, "StyledMetrics::frame_width",
 	         "Frame thickness used when Frame is on and overrides are active.", 0, 16).group = theme_group;
+	b.AddChoice("frame_style", "Frame style", "StyledMetrics::dashed",
+	            "Frame line style used when Frame is on and overrides are active.",
+	            {{"Solid", "Solid"}, {"Dashed", "Dashed"}, {"Dotted", "Dotted"}}).group = theme_group;
 	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit corner radius used when theme overrides are enabled.", 0, 64).group = theme_group;
 	b.Add("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
@@ -1563,6 +1595,7 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	b.Hide("face");
 	b.Hide("frame_enabled");
 	b.Hide("frame");
+	b.Hide("frame_style");
 	b.Hide("radius");
 	b.Hide("shadow_enabled");
 	b.Hide("shadow_distance");

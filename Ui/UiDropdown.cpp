@@ -1676,10 +1676,11 @@ void UiDropdown::Paint(Draw& w)
     StyledMetrics& met  = style_.metrics;
     StyledSkin&    skin = style_.skin;
 
+    bool has_visible_surface = !style_.transparent || met.face_enabled || met.frame_enabled || met.shadow.enabled;
     if(WhenPaintBackground) {
         WhenPaintBackground(w, outer, pal, met, skin, st, has_focus);
     }
-    else if(!style_.transparent) {
+    else if(has_visible_surface) {
         UiPaintStyledBackground(w, outer, pal, met, skin, st, has_focus);
     }
     

@@ -365,6 +365,22 @@ static void EmitPaletteColorOverrideFields(String& out, const String& target, co
 	    << "\t\t\t" << target << "." << field << "[ST_DISABLED] = DisabledColor(" << ColorExpr(color) << ");\n";
 }
 
+static void EmitFrameStyleOverrideFields(String& out, const String& target, const String& key, const DesignerNode& n)
+{
+	if(!CodeGenHasProperty(n, key))
+		return;
+	String style = AsString(CodeGenNodeProperty(n, key, "Solid"));
+	if(style == "Dashed" || style == "DASHED")
+		out << "\t\t\t" << target << ".dashed = true;\n"
+		    << "\t\t\t" << target << ".dash_pattern = \"6,4\";\n";
+	else if(style == "Dotted" || style == "DOTTED")
+		out << "\t\t\t" << target << ".dashed = true;\n"
+		    << "\t\t\t" << target << ".dash_pattern = \"1,3\";\n";
+	else
+		out << "\t\t\t" << target << ".dashed = false;\n"
+		    << "\t\t\t" << target << ".dash_pattern.Clear();\n";
+}
+
 
 static void EmitSurfaceOverrideFields(String& out, const String& target, const DesignerNode& n, const String& prefix)
 {
@@ -373,6 +389,7 @@ static void EmitSurfaceOverrideFields(String& out, const String& target, const D
 	String frame_enabled_key = prefix.IsEmpty() ? String("frame_enabled") : prefix + "_frame_enabled";
 	String frame_key = prefix.IsEmpty() ? String("frame") : prefix + "_frame";
 	String frame_width_key = prefix.IsEmpty() ? String("frame_width") : prefix + "_frame_width";
+	String frame_style_key = prefix.IsEmpty() ? String("frame_style") : prefix + "_frame_style";
 	String radius_key = prefix.IsEmpty() ? String("radius") : prefix + "_radius";
 	String var_prefix = prefix.IsEmpty() ? String("surface") : prefix;
 	if(CodeGenHasProperty(n, face_enabled_key)) {
@@ -398,6 +415,7 @@ static void EmitSurfaceOverrideFields(String& out, const String& target, const D
 			    << "\t\t\t" << target << ".metrics.frame_width = DPI(" << frame_width << ");\n";
 		}
 	}
+	EmitFrameStyleOverrideFields(out, target + ".metrics", frame_style_key, n);
 	if(CodeGenHasProperty(n, radius_key))
 		out << "\t\t\t" << target << ".metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, radius_key, 0)) << ");\n";
 }
@@ -542,6 +560,14 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	}
 	if(CodeGenHasProperty(n, "radius"))
 		out << "\t\t\ts.metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "radius", 0)) << ");\n";
+	if(n.type_id == "UiDropdown") {
+		bool theme_override = (bool)CodeGenNodeProperty(n, "theme_override", false);
+		bool draws_surface = (bool)CodeGenNodeProperty(n, "face_enabled", false)
+		                  || (bool)CodeGenNodeProperty(n, "frame_enabled", false)
+		                  || (bool)CodeGenNodeProperty(n, "shadow_enabled", false);
+		if(theme_override && draws_surface)
+			out << "\t\t\ts.transparent = false;\n";
+	}
 	if(n.type_id == "UiTitleCard") {
 		if(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)) {
 			if(emit_designer_appearance)
