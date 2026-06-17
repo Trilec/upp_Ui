@@ -14,6 +14,13 @@ static int FindId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 	return -1;
 }
 
+static int NormalizeInsertIndex(int requested, int child_count)
+{
+	if(requested < 0)
+		return child_count;
+	return clamp(requested, 0, child_count);
+}
+
 DesignerModel::DesignerModel()
 {
 	DesignerNode& root = nodes_.Add();
@@ -60,7 +67,7 @@ DesignerNodeId DesignerModel::AddNode(const String& type_id, DesignerNodeId pare
 	n.name = Format("%s%d", type_id, n.id);
 
 	parent_index = FindIndex(parent);
-	insert_index = clamp(insert_index, 0, child_count);
+	insert_index = NormalizeInsertIndex(insert_index, child_count);
 	if(insert_index < 0 || insert_index >= nodes_[parent_index].children.GetCount())
 		nodes_[parent_index].children.Add(n.id);
 	else
@@ -103,7 +110,7 @@ bool DesignerModel::MoveNode(DesignerNodeId id, DesignerNodeId new_parent, int i
 
 	RemoveFromParent(id);
 	n->parent = new_parent;
-	insert_index = clamp(insert_index, 0, p->children.GetCount());
+	insert_index = NormalizeInsertIndex(insert_index, p->children.GetCount());
 	if(insert_index < 0 || insert_index >= p->children.GetCount())
 		p->children.Add(id);
 	else
@@ -211,7 +218,7 @@ bool DesignerModel::RestoreSubtree(const Vector<DesignerNodeState>& states, Desi
 		return false;
 	restored->parent = parent;
 	restored->children = pick(top_children);
-	insert_index = clamp(insert_index, 0, p->children.GetCount());
+	insert_index = NormalizeInsertIndex(insert_index, p->children.GetCount());
 	if(insert_index < 0 || insert_index >= p->children.GetCount())
 		p->children.Add(restored->id);
 	else
