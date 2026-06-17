@@ -773,14 +773,14 @@ void UiDropdown::SetData(const Value& v)
 
     int idx = FindItemByData(v);
     if(idx >= 0) {
-        Select(idx);
+        ApplySelectionInternal(idx, false);
         return;
     }
 
     String s = AsString(v);
     idx = FindItem(s, false);
     if(idx >= 0)
-        Select(idx);
+        ApplySelectionInternal(idx, false);
     else
         ClearSelection();
 }
