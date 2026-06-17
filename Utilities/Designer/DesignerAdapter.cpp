@@ -1067,44 +1067,6 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	            "Explicit shadow falloff curve.", {{"Soft", "Soft"}, {"Linear", "Linear"}, {"Tight", "Tight"}, {"Hard", "Hard"}}).group = theme_group;
 	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
 	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
-	bool theme_override = DesignerBoolProperty(n, "theme_override", false);
-	bool face_enabled = theme_override && DesignerHasProperty(n, "face_enabled") && DesignerBoolProperty(n, "face_enabled", false);
-	bool frame_enabled = theme_override && DesignerHasProperty(n, "frame_enabled") && DesignerBoolProperty(n, "frame_enabled", false);
-	bool shadow_enabled = theme_override && DesignerHasProperty(n, "shadow_enabled") && DesignerBoolProperty(n, "shadow_enabled", false);
-	if(!theme_override) {
-		b.Disable("face_enabled", "Activate overrides to edit explicit surface fill.");
-		b.Disable("face", "Activate overrides to edit explicit face color.");
-		b.Disable("face_mode", "Activate overrides to edit explicit face mode.");
-		b.Disable("face_quad", "Activate overrides to edit explicit quad face.");
-		b.Disable("frame_enabled", "Activate overrides to edit explicit surface frame.");
-		b.Disable("frame", "Activate overrides to edit explicit frame color.");
-		b.Disable("frame_width", "Activate overrides to edit explicit frame thickness.");
-		b.Disable("radius", "Activate overrides to edit explicit radius.");
-		b.Disable("shadow_enabled", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_distance", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_offset_x", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_offset_y", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_alpha", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_color", "Activate overrides to edit explicit shadow settings.");
-		b.Disable("shadow_curve", "Activate overrides to edit explicit shadow settings.");
-	}
-	if(theme_override && !face_enabled) {
-		b.Disable("face", "Fill is off.");
-		b.Disable("face_mode", "Fill is off.");
-		b.Disable("face_quad", "Fill is off.");
-	}
-	if(theme_override && !frame_enabled)
-		b.Disable("frame", "Frame is off.");
-	if(theme_override && !frame_enabled)
-		b.Disable("frame_width", "Frame is off.");
-	if(theme_override && !shadow_enabled) {
-		b.Disable("shadow_distance", "Shadow is off.");
-		b.Disable("shadow_offset_x", "Shadow is off.");
-		b.Disable("shadow_offset_y", "Shadow is off.");
-		b.Disable("shadow_alpha", "Shadow is off.");
-		b.Disable("shadow_color", "Shadow is off.");
-		b.Disable("shadow_curve", "Shadow is off.");
-	}
 }
 
 static String TextProperty(const DesignerNode& n)

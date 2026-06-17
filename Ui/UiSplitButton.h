@@ -54,6 +54,8 @@ public:
         String text;
         Value  data;
         bool   enabled = true;
+        bool   separator_before = false;
+        bool   group_header = false;
         String description;
         Image  icon;
         UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
@@ -88,6 +90,7 @@ private:
     bool split_hot_ = false;
     bool popup_open_ = false;
     int hot_item_ = -1;
+    bool pending_separator_ = false;
 
     int split_width_ = DPI(30);
     int split_icon_size_ = DPI(16);
@@ -105,6 +108,8 @@ private:
     void ClosePopupInternal();
     void UpdatePopupPosition();
     void SelectPopupItem(int index);
+    bool IsSelectableItem(int index) const;
+    int  FindNextSelectable(int start, int step) const;
     void DrawSplitAffordance(Draw& w, const Rect& r);
 
 protected:
@@ -137,6 +142,8 @@ public:
 
     UiSplitButton& Add(const String& text, const Value& data = Value(), bool enabled = true);
     UiSplitButton& Add(const Item& item);
+    UiSplitButton& AddSeparator();
+    UiSplitButton& AddGroupHeader(const String& text);
     UiSplitButton& ClearItems();
     int            GetCount() const { return items_.GetCount(); }
     const Item&    GetItem(int i) const { return items_[i]; }
@@ -144,6 +151,8 @@ public:
     UiSplitButton& SetItemDescription(int index, const String& desc);
     UiSplitButton& SetItemIcon(int index, const Image& icon, UiIconRenderMode mode = UiIconRenderMode::PreserveColor);
     UiSplitButton& SetItemEnabled(int index, bool enabled = true);
+    UiSplitButton& SetItemSeparatorBefore(int index, bool on = true);
+    UiSplitButton& SetItemGroupHeader(int index, bool on = true);
 
     UiSplitButton& SetSplitWidth(int width);
     UiSplitButton& SetSplitIconSize(int size);

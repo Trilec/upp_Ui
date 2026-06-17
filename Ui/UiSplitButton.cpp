@@ -24,6 +24,10 @@ int UiSplitButton::GetPopupRowHeight() const
     int configured_min = max(DPI(18), popup_item_height_);
     int measured = configured_min;
     for(const Item& it : items_) {
+        if(it.group_header) {
+            measured = max(measured, font.GetCy() + pad_y * 2);
+            continue;
+        }
         int title_h = GetTextSize(it.text, font).cy;
         int desc_h = it.description.IsEmpty() ? 0 : GetTextSize(it.description, desc_font).cy + DPI(1);
         int text_h = title_h + desc_h;
@@ -71,14 +75,41 @@ Rect UiSplitButton::GetMainRect() const
 
 UiSplitButton& UiSplitButton::Add(const String& text, const Value& data, bool enabled)
 {
-    items_.Add(Item(text, data, enabled));
+    Item it(text, data, enabled);
+    if(pending_separator_ && items_.GetCount() > 0) {
+        it.separator_before = true;
+        pending_separator_ = false;
+    }
+    items_.Add(it);
     Refresh();
     return *this;
 }
 
 UiSplitButton& UiSplitButton::Add(const Item& item)
 {
-    items_.Add(item);
+    Item it = item;
+    if(pending_separator_ && items_.GetCount() > 0) {
+        it.separator_before = true;
+        pending_separator_ = false;
+    }
+    items_.Add(it);
+    Refresh();
+    return *this;
+}
+
+UiSplitButton& UiSplitButton::AddSeparator()
+{
+    pending_separator_ = items_.GetCount() > 0;
+    return *this;
+}
+
+UiSplitButton& UiSplitButton::AddGroupHeader(const String& text)
+{
+    Item it(text, Value(), false);
+    it.group_header = true;
+    it.separator_before = pending_separator_ || items_.GetCount() > 0;
+    pending_separator_ = false;
+    items_.Add(it);
     Refresh();
     return *this;
 }
@@ -87,6 +118,7 @@ UiSplitButton& UiSplitButton::ClearItems()
 {
     items_.Clear();
     hot_item_ = -1;
+    pending_separator_ = false;
     ClosePopupInternal();
     Refresh();
     return *this;
@@ -121,6 +153,28 @@ UiSplitButton& UiSplitButton::SetItemEnabled(int index, bool enabled)
 {
     if(index >= 0 && index < items_.GetCount()) {
         items_[index].enabled = enabled;
+        if(popup_open_)
+            popup_.Refresh();
+    }
+    return *this;
+}
+
+UiSplitButton& UiSplitButton::SetItemSeparatorBefore(int index, bool on)
+{
+    if(index >= 0 && index < items_.GetCount()) {
+        items_[index].separator_before = on;
+        if(popup_open_)
+            popup_.Refresh();
+    }
+    return *this;
+}
+
+UiSplitButton& UiSplitButton::SetItemGroupHeader(int index, bool on)
+{
+    if(index >= 0 && index < items_.GetCount()) {
+        items_[index].group_header = on;
+        if(on)
+            items_[index].enabled = false;
         if(popup_open_)
             popup_.Refresh();
     }
@@ -238,11 +292,36 @@ void UiSplitButton::UpdatePopupPosition()
 
 void UiSplitButton::SelectPopupItem(int index)
 {
-    if(index < 0 || index >= items_.GetCount() || !items_[index].enabled)
+    if(!IsSelectableItem(index))
         return;
     Value data = items_[index].data;
     ClosePopupInternal();
     WhenSelect(index, data);
+}
+
+bool UiSplitButton::IsSelectableItem(int index) const
+{
+    return index >= 0 && index < items_.GetCount() &&
+           items_[index].enabled &&
+           !items_[index].group_header;
+}
+
+int UiSplitButton::FindNextSelectable(int start, int step) const
+{
+    int count = items_.GetCount();
+    if(count <= 0 || step == 0)
+        return -1;
+    int index = start;
+    for(int probe = 0; probe < count; probe++) {
+        index += step;
+        if(index < 0)
+            index = count - 1;
+        else if(index >= count)
+            index = 0;
+        if(IsSelectableItem(index))
+            return index;
+    }
+    return -1;
 }
 
 UiSplitButton& UiSplitButton::OpenPopup()
@@ -452,7 +531,20 @@ void UiSplitButton::PopupWindow::Paint(Draw& w)
         if(row.top >= r.bottom || row.bottom <= r.top)
             continue;
 
+        if(it.separator_before && i > 0) {
+            Color sep = Blend(SColorShadow(), popup_base, 200);
+            w.DrawRect(row.left + DPI(8), row.top, max(0, row.GetWidth() - DPI(16)), 1, sep);
+        }
+
         StyledState state = !it.enabled ? ST_DISABLED : owner->hot_item_ == i ? ST_HOT : ST_NORMAL;
+        if(it.group_header) {
+            Rect text = row.Deflated(DPI(10), DPI(6));
+            int hy = text.top + max(0, (text.GetHeight() - desc_font.Bold().GetCy()) / 2);
+            Color hdr = Blend(SColorFace(), popup_base, 20);
+            w.DrawRect(row.Deflated(1, 0), hdr);
+            w.DrawText(text.left, hy, ToUpper(it.text), desc_font.Bold(), Blend(SColorText(), popup_base, 120));
+            continue;
+        }
         if(state == ST_HOT) {
             UiFill face = bs.palette.face[ST_HOT];
             if(face.IsNone())
@@ -524,18 +616,14 @@ bool UiSplitButton::PopupWindow::Key(dword key, int)
         return true;
     }
     if(key == K_DOWN || key == K_UP) {
-        int count = owner->items_.GetCount();
-        if(count <= 0)
+        if(owner->items_.IsEmpty())
             return true;
-        int next = owner->hot_item_;
-        for(int step = 0; step < count; step++) {
-            next = key == K_DOWN ? (next + 1 + count) % count
-                                 : (next - 1 + count) % count;
-            if(owner->items_[next].enabled) {
-                SetHot(next);
-                break;
-            }
-        }
+        int seed = owner->hot_item_;
+        if(seed < 0)
+            seed = key == K_DOWN ? owner->items_.GetCount() - 1 : 0;
+        int next = owner->FindNextSelectable(seed, key == K_DOWN ? +1 : -1);
+        if(next >= 0)
+            SetHot(next);
         return true;
     }
     return false;
