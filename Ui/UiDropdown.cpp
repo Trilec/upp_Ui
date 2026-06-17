@@ -548,10 +548,10 @@ String UiDropdown::GetItemRightText(int index) const
 // Selection management
 // ----------------------------------------------------------------------------
 
-UiDropdown& UiDropdown::Select(int index)
+bool UiDropdown::ApplySelectionInternal(int index, bool fire_events)
 {
     if(multi_select_)
-        return ToggleItemChecked(index, true);
+        return false;
 
     if(index >= 0 && index < items_.GetCount() && IsSelectableItem(index)) {
         bool changed = selected_index_ != index;
@@ -559,12 +559,22 @@ UiDropdown& UiDropdown::Select(int index)
         UpdateDisplayText();
         Refresh();
 
-        if(changed) {
+        if(changed && fire_events) {
             WhenSelect(index);
             WhenSelectText(text_);
             WhenSelectData(items_[index].data);
         }
+        return changed;
     }
+    return false;
+}
+
+UiDropdown& UiDropdown::Select(int index)
+{
+    if(multi_select_)
+        return ToggleItemChecked(index, true);
+
+    ApplySelectionInternal(index, true);
     return *this;
 }
 
@@ -1426,19 +1436,34 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
     if(!multi_select_ && apply_selection && highlight_index_ >= 0 && highlight_index_ < items_.GetCount() && IsSelectableItem(highlight_index_))
         apply_index = highlight_index_;
     
+    bool selection_changed = false;
+    Value selected_data;
+    String selected_text;
+
     popup_open_ = false;
     popup_.Close();
     RebuildIndicator();
     OnStyleChanged();
 
-    if(apply_index >= 0 && apply_index != selected_index_) {
-        // Defer selection event dispatch until after popup window teardown.
-        // This avoids reentrancy issues with modal actions in user callbacks.
+    if(apply_index >= 0) {
+        selection_changed = ApplySelectionInternal(apply_index, false);
+        if(selection_changed) {
+            selected_data = items_[apply_index].data;
+            selected_text = items_[apply_index].text;
+        }
+    }
+
+    if(selection_changed) {
+        // External callbacks stay deferred so popup teardown is complete first,
+        // but the selected data is already committed internally at this point.
         Ptr<UiDropdown> self = this;
         const int idx = apply_index;
-        PostCallback([self, idx] {
-            if(self)
-                self->Select(idx);
+        PostCallback([self, idx, selected_text, selected_data] {
+            if(!self)
+                return;
+            self->WhenSelect(idx);
+            self->WhenSelectText(selected_text);
+            self->WhenSelectData(selected_data);
         });
     }
     

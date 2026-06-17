@@ -364,15 +364,17 @@ public:
 		int version_w = DPI(82);
 		int save_status_w = DPI(96);
 		int save_w = DPI(92);
+		int save_as_w = DPI(94);
 		int load_w = DPI(92);
 		int overlay_w = DPI(42);
 		int preset_w = DPI(170);
 		int theme_w = DPI(96);
 		int exit_w = DPI(94);
-		int controls_w = save_w + save_status_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 8;
+		int controls_w = save_w + save_as_w + save_status_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 9;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
 		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
-		save_status_label_.SetRect(save_button_.GetRect().right + gap, control_y + DPI(8), save_status_w, DPI(18));
+		save_as_button_.SetRect(save_button_.GetRect().right + gap, control_y, save_as_w, DPI(34));
+		save_status_label_.SetRect(save_as_button_.GetRect().right + gap, control_y + DPI(8), save_status_w, DPI(18));
 		load_button_.SetRect(save_status_label_.GetRect().right + gap, control_y, load_w, DPI(34));
 		overlay_button_.SetRect(load_button_.GetRect().right + gap, control_y, overlay_w, DPI(34));
 		theme_preset_row_.SetRect(overlay_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
@@ -602,6 +604,7 @@ private:
 		Add(header_);
 		Add(version_badge_);
 		Add(save_button_);
+		Add(save_as_button_);
 		Add(save_status_label_);
 		Add(load_button_);
 		Add(overlay_button_);
@@ -652,19 +655,26 @@ private:
 		save_button_.SetIcon(CtrlImg::save())
 		            .SetText("Save")
 		            .SetIconSize(DPI(15), DPI(15))
-		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
+		            .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		            .Tip("Save current design");
 		save_button_.WhenAction = [=] {
 			if(!current_design_path_.IsEmpty())
 				SaveDesignToPath(current_design_path_);
 			else
 				SaveDesignAs();
 		};
-		SetupRecentSplitButton(save_button_, "Recent save paths");
+		SetupRecentSplitButton(save_button_, "Save As or choose recent save path");
 		save_button_.WhenSelect = [=](int, const Value& v) {
 			if(syncing_recent_ || IsNull(v))
 				return;
 			SaveDesignToPath(AsString(v));
 		};
+		save_as_button_.SetIcon(CtrlImg::save())
+		               .SetText("Save As")
+		               .SetIconSize(DPI(15), DPI(15))
+		               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+		               .Tip("Save a copy or choose a new design file path");
+		save_as_button_.WhenAction = [=] { SaveDesignAs(); };
 		load_button_.SetIcon(CtrlImg::open())
 		            .SetText("Load")
 		            .SetIconSize(DPI(15), DPI(15))
@@ -1081,11 +1091,13 @@ private:
 
 		save_button_.SetCustomStyle(save_style);
 		ApplyRecentSplitPopup(save_button_);
+		save_as_button_.SetCustomStyle(save_style);
 		save_status_label_.SetCustomStyle(label_style);
 		save_status_label_.SetText(save_status_text_);
 		save_status_label_.Show(!save_status_text_.IsEmpty());
 		save_status_label_.Refresh();
 		save_button_.Refresh();
+		save_as_button_.Refresh();
 	}
 
 	void SetupRecentSplitButton(UiSplitButton& button, const String& tip)
@@ -3501,6 +3513,7 @@ private:
 	UiTitleCard header_;
 	UiLabel version_badge_;
 	UiSplitButton save_button_;
+	UiButton save_as_button_;
 	UiLabel save_status_label_;
 	UiSplitButton load_button_;
 	UiButton overlay_button_;

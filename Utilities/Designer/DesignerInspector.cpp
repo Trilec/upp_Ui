@@ -1,5 +1,6 @@
 ﻿#include "DesignerInspector.h"
 #include "DesignerDefaults.h"
+#include <memory>
 
 // DesignerInspector.cpp - descriptor-driven property editor.
 // Adapter bindings become themed composite rows on UiStack pages; edits are
@@ -809,6 +810,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		UiCompositeDropdown *row = new UiCompositeDropdown;
 		ctrl.Attach(row);
 		Ptr<UiCompositeDropdown> self = row;
+		auto select_seen = std::make_shared<bool>(false);
+		auto close_snapshot = std::make_shared<Value>(value);
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap);
 		for(int i = 0; i < b.choices.GetCount(); i++) {
 			row->Add(AsString(b.choices[i]), b.choices.GetKey(i));
@@ -821,12 +824,20 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetData(value);
 		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
-			PostCallback([=] {
-				if(self && node_id_ == row_node)
-					CommitChoice(property_id, data, "select");
-			});
+			*select_seen = true;
+			if(self && node_id_ == row_node)
+				CommitChoice(property_id, data, "select");
 		};
-		row->WhenClose = [=] {};
+		row->WhenClose = [=] {
+			if(!self || node_id_ != row_node)
+				return;
+			Value data = self->GetData();
+			bool changed = data != *close_snapshot;
+			if(!*select_seen && changed)
+				CommitChoice(property_id, data, "close");
+			*select_seen = false;
+			*close_snapshot = data;
+		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
 		r.editor = b.editor;
@@ -986,6 +997,8 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		UiCompositeDropdown *row = new UiCompositeDropdown;
 		ctrl.Attach(row);
 		Ptr<UiCompositeDropdown> self = row;
+		auto select_seen = std::make_shared<bool>(false);
+		auto close_snapshot = std::make_shared<Value>(mixed ? Value() : value);
 		row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap);
 		if(mixed)
 			row->Add("Mixed", Value());
@@ -1000,12 +1013,20 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(mixed ? Value() : value);
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenSelectData = [=](const Value& data) {
-			PostCallback([=] {
-				if(self && !syncing_ && !IsNull(data))
-					WhenPropertyMany(selection_, property_id, data);
-			});
+			*select_seen = true;
+			if(self && !syncing_ && !IsNull(data))
+				WhenPropertyMany(selection_, property_id, data);
 		};
-		row->WhenClose = [=] {};
+		row->WhenClose = [=] {
+			if(!self || syncing_)
+				return;
+			Value data = self->GetData();
+			bool changed = data != *close_snapshot;
+			if(!*select_seen && !IsNull(data) && changed)
+				WhenPropertyMany(selection_, property_id, data);
+			*select_seen = false;
+			*close_snapshot = data;
+		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
 		r.editor = b.editor;

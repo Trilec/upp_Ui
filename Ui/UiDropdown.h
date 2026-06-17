@@ -255,6 +255,7 @@ private:
     Size ComputeNaturalSize() const;
     void OpenPopupInternal();
     void ClosePopupInternal(bool apply_selection = true);
+    bool ApplySelectionInternal(int index, bool fire_events);
     void UpdatePopupPosition();
     void SyncPopupSelection();
     
