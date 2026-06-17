@@ -14,6 +14,14 @@ static int FindCommandChildPos(const DesignerNode& parent, DesignerNodeId child)
 	return -1;
 }
 
+static bool AllowsExplicitEmptyText(const String& property)
+{
+	return property == "text" || property == "subtitle" || property == "side_title" ||
+	       property == "page_title" || property == "section_title" || property == "section_subtitle" ||
+	       property == "placeholder" || property == "choice_a" || property == "choice_b" ||
+	       property == "choice_c" || property.StartsWith("crumb_");
+}
+
 class DesignerCommandGroup final : public DesignerCommand {
 public:
 	DesignerCommandGroup(const String& label, Vector<One<DesignerCommand>> commands)
@@ -193,7 +201,7 @@ public:
 		}
 		if(had_old_ && old_ == value_)
 			return false;
-		if(!had_old_ && IsNull(value_))
+		if(!had_old_ && IsNull(value_) && !AllowsExplicitEmptyText(property_))
 			return false;
 		return model.SetProperty(id_, property_, value_);
 	}

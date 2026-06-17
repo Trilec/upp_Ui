@@ -1071,7 +1071,7 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 
 static String TextProperty(const DesignerNode& n)
 {
-	return AdapterNodeProperty(n, "text", n.name);
+	return DesignerHasProperty(n, "text") ? AsString(AdapterNodeProperty(n, "text", String())) : n.name;
 }
 
 DesignerPanelAdapter::DesignerPanelAdapter()

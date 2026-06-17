@@ -3249,6 +3249,16 @@ private:
 
 	Value NormalizeInspectorValue(const DesignerNode& n, const String& property_id, const Value& value) const
 	{
+		auto normalize_text = [&](const Value& v) -> Value {
+			if(IsNull(v))
+				return String();
+			return AsString(v);
+		};
+		if(property_id == "text" || property_id == "subtitle" || property_id == "side_title" ||
+		   property_id == "page_title" || property_id == "section_title" || property_id == "section_subtitle" ||
+		   property_id == "placeholder" || property_id == "choice_a" || property_id == "choice_b" ||
+		   property_id == "choice_c" || property_id.StartsWith("crumb_"))
+			return normalize_text(value);
 		if(property_id == "rows" || property_id == "columns")
 			return max(1, IsNumber(value) ? (int)value : 1);
 		if(property_id == "gap" || property_id == "inset" || property_id == "radius")

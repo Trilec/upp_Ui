@@ -1321,9 +1321,8 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiLineEdit") {
 		out << "\t\t" << var << ".SetTextUtf8(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
-		String placeholder = CodeGenNodeProperty(n, "placeholder", "");
-		if(!placeholder.IsEmpty())
-			out << "\t\t" << var << ".SetPlaceholder(" << CppString(placeholder) << ");\n";
+		if(CodeGenHasProperty(n, "placeholder"))
+			out << "\t\t" << var << ".SetPlaceholder(" << CppString(AsString(CodeGenNodeProperty(n, "placeholder", ""))) << ");\n";
 	}
 	else if(n.type_id == "UiIntEdit") {
 		out << "\t\t" << var << ".MinMax(" << (int)CodeGenNodeProperty(n, "min", 0)
