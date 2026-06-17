@@ -189,6 +189,8 @@ void UiSplitter::SyncMin()
 
 Rect UiSplitter::GetHitRect(int index) const
 {
+    if(index < 0 || index >= pos_.GetCount())
+        return Rect(0, 0, 0, 0);
     Size sz = GetSize();
     int width = GetSplitWidth();
     int p = PosToClient(pos_[index]) - (width >> 1);
@@ -199,6 +201,8 @@ Rect UiSplitter::GetTrackRect(int index) const
 {
     const Style& style = GetEffectiveStyle();
     Rect r = GetHitRect(index);
+    if(r.IsEmpty())
+        return r;
     r.Deflate(style.track_inset);
     int thick = max(1, style.track_thickness);
     int p = PosToClient(pos_[index]);
@@ -214,6 +218,8 @@ Rect UiSplitter::GetFeedbackTrackRect(int index, StyledState st) const
 {
     const Style& style = GetEffectiveStyle();
     Rect track = GetTrackRect(index);
+    if(track.IsEmpty())
+        return track;
     int thick = max(1, style.track_thickness);
     bool expand = false;
 
@@ -236,6 +242,8 @@ Rect UiSplitter::GetFeedbackTrackRect(int index, StyledState st) const
         return track;
 
     Rect hit = GetHitRect(index);
+    if(hit.IsEmpty())
+        return hit;
     int p = PosToClient(pos_[index]);
     thick = max(1, thick);
     if(vertical_) {
@@ -250,6 +258,8 @@ Rect UiSplitter::GetThumbRect(int index) const
 {
     const Style& style = GetEffectiveStyle();
     Rect hit = GetHitRect(index);
+    if(hit.IsEmpty())
+        return hit;
     int main = max(DPI(8), style.thumb_main);
     int cross = max(1, style.thumb_cross);
     int p = PosToClient(pos_[index]);

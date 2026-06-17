@@ -3166,7 +3166,7 @@ void DesignerSplitterAdapter::Paint(Draw& w)
 {
 	UiSplitter::Paint(w);
 	if(overlay_.selected || overlay_.hovered || overlay_.debug) {
-		for(int i = 0; i < GetCount(); i++)
+		for(int i = 0, handles = max(0, GetCount() - 1); i < handles; i++)
 			DrawDottedDesignerOverlay(w, GetFeedbackTrackRect(i, overlay_.selected ? ST_PRESSED : overlay_.hovered ? ST_HOT : ST_NORMAL), overlay_);
 	}
 	DrawDottedDesignerOverlay(w, GetSize(), overlay_);
