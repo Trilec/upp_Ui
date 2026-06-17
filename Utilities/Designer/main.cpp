@@ -2971,9 +2971,19 @@ private:
 		                   property_id == "min_width" || property_id == "min_height" ||
 		                   property_id == "max_width" || property_id == "max_height" ||
 		                   property_id == "cell_align_h" || property_id == "cell_align_v";
+#ifdef _DEBUG
+		RLOG(Format("CommitPreviewInspectorPropertyValue node=%d type=%s property=%s value=%s binding=%d visible=%d enabled=%d safe=%d",
+		            (int)node_id, n->type_id, property_id, StdFormat(value), binding ? 1 : 0,
+		            binding ? (binding->visible ? 1 : 0) : 0,
+		            binding ? (binding->enabled ? 1 : 0) : 0,
+		            safe_sizing ? 1 : 0));
+#endif
 		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing))
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+#ifdef _DEBUG
+		RLOG(Format("CommitPreviewInspectorPropertyValue normalized=%s", StdFormat(normalized)));
+#endif
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		int preview_q = live_preview_old_values_.Find(preview_key);
 		bool has_preview_old = preview_q >= 0;
@@ -2992,6 +3002,11 @@ private:
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
+#ifdef _DEBUG
+			const DesignerNode* changed = model_.Find(node_id);
+			Value after = changed ? DesignerNodePropertyOr(*changed, property_id, Value()) : Value();
+			RLOG(Format("CommitPreviewInspectorPropertyValue executed property=%s after=%s", property_id, StdFormat(after)));
+#endif
 			SetDocumentDirty();
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
@@ -3049,6 +3064,10 @@ private:
 				continue;
 			layout_affecting = layout_affecting || IsLayoutAffectingProperty(*n, property_id);
 			Value normalized = NormalizeInspectorValue(*n, property_id, value);
+#ifdef _DEBUG
+			RLOG(Format("CommitPreviewInspectorPropertyValues node=%d type=%s property=%s value=%s normalized=%s",
+			            (int)id, n->type_id, property_id, StdFormat(value), StdFormat(normalized)));
+#endif
 			int q = n->properties.Find(property_id);
 			if(q >= 0 && n->properties.GetValue(q) == normalized)
 				continue;

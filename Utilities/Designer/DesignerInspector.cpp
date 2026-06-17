@@ -12,6 +12,13 @@ static void DesignerMultiSelectLog(const String& text)
 	return;
 }
 
+static void DesignerChoiceCommitLog(const String& text)
+{
+#ifdef _DEBUG
+	RLOG(text);
+#endif
+}
+
 static bool DesignerIsSafeMultiSelectProperty(const String& type_id, bool same_type, const String& id)
 {
 	if(id == "role" ||
@@ -819,12 +826,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 					CommitChoice(property_id, data, "select");
 			});
 		};
-		row->WhenClose = [=] {
-			PostCallback([=] {
-				if(self && node_id_ == row_node)
-					CommitChoice(property_id, self->GetData(), "close");
-			});
-		};
+		row->WhenClose = [=] {};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
 		r.editor = b.editor;
@@ -1003,12 +1005,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 					WhenPropertyMany(selection_, property_id, data);
 			});
 		};
-		row->WhenClose = [=] {
-			PostCallback([=] {
-				if(self && !syncing_ && !IsNull(self->GetData()))
-					WhenPropertyMany(selection_, property_id, self->GetData());
-			});
-		};
+		row->WhenClose = [=] {};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
 		r.editor = b.editor;
@@ -1248,14 +1245,19 @@ Value DesignerInspector::QuadFaceValue(const DesignerNode& n, Color face) const
 
 void DesignerInspector::CommitChoice(const String& property_id, const Value& value, const char *source)
 {
+	DesignerChoiceCommitLog(Format("Designer CommitChoice property=%s source=%s node=%d value=%s syncing=%d",
+	                               property_id, source ? source : "", (int)node_id_, StdFormat(value), syncing_ ? 1 : 0));
 	if(syncing_ || IsNull(value) || !model_)
 		return;
 	const DesignerNode *n = model_->Find(node_id_);
 	if(!n || n->id == Designer_ROOT)
 		return;
 	Value current = NodeProperty(*n, property_id, Value());
+	DesignerChoiceCommitLog(Format("Designer CommitChoice current=%s equal=%d",
+	                               StdFormat(current), (!IsNull(current) && current == value) ? 1 : 0));
 	if(!IsNull(current) && current == value)
 		return;
+	DesignerChoiceCommitLog("Designer CommitChoice dispatch WhenProperty");
 	WhenProperty(node_id_, property_id, value);
 }
 
