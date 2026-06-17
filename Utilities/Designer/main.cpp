@@ -898,7 +898,7 @@ private:
 		code_header_.Add(code_build_run_button_).Fit();
 
 		hierarchy_page_.Add(hierarchy_heading_).Fit();
-		hierarchy_page_.Add(hierarchy_scroll_).Expand(1);
+		hierarchy_page_.Add(hierarchy_).Expand(1);
 		inspector_page_.Add(inspector_heading_).Fit();
 		inspector_page_.Add(container_actions_).Fit();
 		inspector_page_.Add(inspector_).Expand(1);
@@ -937,8 +937,6 @@ private:
 		code_scroll_.Content().Add(code_box_.SizePos());
 		code_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
 		code_box_.Add(code_).Fit();
-		hierarchy_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
-		hierarchy_scroll_.Content().Add(hierarchy_.SizePos());
 		RefreshRightModeUi();
 		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
@@ -2186,6 +2184,7 @@ private:
 		overrides_mode_button_.SetActive(right_mode_ == RIGHT_OVERRIDES);
 		code_mode_button_.SetActive(right_mode_ == RIGHT_CODE);
 		right_stack_.SetActivePage((int)right_mode_);
+		side_.SetScrollMode(right_mode_ == RIGHT_HIERARCHY ? UIPANELSCROLL_NONE : UIPANELSCROLL_VERTICAL);
 		hierarchy_mode_button_.Show(!right_collapsed_);
 		inspector_mode_button_.Show(!right_collapsed_);
 		overrides_mode_button_.Show(!right_collapsed_);
@@ -2244,7 +2243,8 @@ private:
 			code_mode_button_.Show();
 			right_content_card_.SetRect(pad, pad + button_h + DPI(8), content_w, content_h);
 			side_.SetRect(0, 0, content_w, content_h);
-			right_stack_.SetRect(0, 0, content_w, max(content_h, right_stack_.GetContentSize().cy));
+			int stack_h = right_mode_ == RIGHT_HIERARCHY ? content_h : max(content_h, right_stack_.GetContentSize().cy);
+			right_stack_.SetRect(0, 0, content_w, stack_h);
 			side_.Layout();
 		}
 		RefreshCollapseButton();
@@ -3551,7 +3551,6 @@ private:
 	UiButton collapse_button_;
 	UiButton code_setup_button_;
 	UiButton code_build_run_button_;
-	UiScrollPanel hierarchy_scroll_;
 	DesignerHierarchyTree hierarchy_;
 	UiTreeModel hierarchy_model_;
 	VectorMap<DesignerNodeId, UiTreeNodeRef> hierarchy_refs_;
