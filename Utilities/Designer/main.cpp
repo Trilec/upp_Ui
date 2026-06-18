@@ -724,7 +724,7 @@ private:
 		preview_.Set(&model_, &registry_);
 		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
 #ifdef _DEBUG
-			RLOG(Format("Preview selection id=%d keyflags=%u", (int)id, (unsigned)keyflags));
+			RLOG(Format("Preview selection id=%d keyflags=%d", (int)id, (int)keyflags));
 #endif
 			if(keyflags & K_CTRL)
 				model_.ToggleSelection(id);
