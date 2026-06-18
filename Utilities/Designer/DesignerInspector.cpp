@@ -1138,8 +1138,31 @@ void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_n
 	// the inspector stack during the originating control callback.
 	Ptr<DesignerInspector> self = this;
 	PostCallback([=] {
-		if(!self || self->syncing_ || generation != self->inspector_generation_ || self->node_id_ != row_node)
+		if(!self) {
+#ifdef _DEBUG
+			RLOG("Inspector commit dropped: inspector destroyed");
+#endif
 			return;
+		}
+		if(self->syncing_) {
+#ifdef _DEBUG
+			RLOG("Inspector commit dropped: syncing property=" << property_id);
+#endif
+			return;
+		}
+		if(generation != self->inspector_generation_) {
+#ifdef _DEBUG
+			RLOG(Format("Inspector commit dropped: generation old=%d current=%d property=%s node=%d current_node=%d",
+			            generation, self->inspector_generation_, property_id, (int)row_node, (int)self->node_id_));
+#endif
+		}
+		if(self->node_id_ != row_node) {
+#ifdef _DEBUG
+			RLOG(Format("Inspector commit dropped: node mismatch property=%s row_node=%d current_node=%d",
+			            property_id, (int)row_node, (int)self->node_id_));
+#endif
+			return;
+		}
 #ifdef _DEBUG
 		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
 #endif
@@ -1161,8 +1184,25 @@ void DesignerInspector::PostInspectorManyCommit(int generation, const String& pr
 {
 	Ptr<DesignerInspector> self = this;
 	PostCallback([=] {
-		if(!self || self->syncing_ || generation != self->inspector_generation_)
+		if(!self) {
+#ifdef _DEBUG
+			RLOG("Inspector commit dropped: inspector destroyed");
+#endif
 			return;
+		}
+		if(self->syncing_) {
+#ifdef _DEBUG
+			RLOG("Inspector commit dropped: syncing property=" << property_id);
+#endif
+			return;
+		}
+		if(generation != self->inspector_generation_) {
+#ifdef _DEBUG
+			RLOG(Format("Inspector commit dropped: generation old=%d current=%d property=%s",
+			            generation, self->inspector_generation_, property_id));
+#endif
+			return;
+		}
 #ifdef _DEBUG
 		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
 #endif

@@ -1184,6 +1184,15 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			Ctrl& parent_ctrl = parent.GetCtrl();
 			String hs = DesignerPreviewAxisSizing(child_node, "h_sizing");
 			String vs = DesignerPreviewAxisSizing(child_node, "v_sizing");
+#ifdef _DEBUG
+			int fixed_w_log = (int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH);
+			int fixed_h_log = (int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT);
+			int min_w_log = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 0));
+			int min_h_log = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 0));
+			RLOG(Format("AddRealChild node=%s parent=%s hs=%s vs=%s fixed_w=%d fixed_h=%d min_w=%d min_h=%d",
+			            child_node.type_id, parent_node.type_id, hs, vs,
+			            fixed_w_log, fixed_h_log, min_w_log, min_h_log));
+#endif
 			if(DesignerBoxLayoutAdapter *box = dynamic_cast<DesignerBoxLayoutAdapter *>(&parent)) {
 				if(child_node.type_id == "Spacer") {
 					int weight = max(1, (int)DesignerPreviewNodeProperty(child_node, "weight", 1));

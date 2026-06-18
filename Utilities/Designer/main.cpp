@@ -3180,9 +3180,12 @@ private:
 			}
 		}
 		String auto_name = AutoNameForPropertyEdit(*n, property_id, normalized);
-		if(!auto_name.IsEmpty())
+		bool grouped = false;
+		if(!auto_name.IsEmpty()) {
 			commands_.BeginGroup("Set " + property_id);
-			if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
+			grouped = true;
+		}
+		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
 #ifdef _DEBUG
 				RLOG(Format("CommitPreviewInspectorPropertyValue command executed: node=%d property=%s",
 				            (int)node_id, property_id));
@@ -3194,7 +3197,7 @@ private:
 			}
 			if(!auto_name.IsEmpty())
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
-			if(!auto_name.IsEmpty())
+			if(grouped)
 				commands_.EndGroup();
 			const DesignerNode* changed = model_.Find(node_id);
 			bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
@@ -3208,6 +3211,10 @@ private:
 			if(layout_affecting && changed)
 				TraceLayoutAffectingChange(*changed, property_id);
 			if(layout_affecting) {
+#ifdef _DEBUG
+				RLOG("Layout-affecting inspector commit: forcing projection refresh");
+#endif
+				ForceDesignerProjectionRefresh("layout inspector commit");
 				RequestDesignerRefresh(true, true);
 				return;
 			}
@@ -3223,7 +3230,7 @@ private:
 				live_preview_old_values_.Remove(preview_q);
 				live_preview_had_old_.Remove(preview_q);
 			}
-			if(!auto_name.IsEmpty())
+			if(grouped)
 				commands_.EndGroup();
 			RequestDesignerRefresh(true, true);
 		}
