@@ -723,6 +723,9 @@ private:
 
 		preview_.Set(&model_, &registry_);
 		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
+#ifdef _DEBUG
+			RLOG(Format("Preview selection id=%d keyflags=%u", (int)id, (unsigned)keyflags));
+#endif
 			if(keyflags & K_CTRL)
 				model_.ToggleSelection(id);
 			else if(keyflags & K_SHIFT)
@@ -1012,6 +1015,9 @@ private:
 	{
 		if(path.IsEmpty())
 			return;
+#ifdef _DEBUG
+		RLOG("LoadDesignPath: " << path);
+#endif
 		String json = LoadFile(path);
 		if(json.IsVoid()) {
 			Exclamation("Unable to read designer document.");
@@ -1028,7 +1034,7 @@ private:
 		AddRecentPath(recent_loads_, path);
 		StoreRecentFiles();
 		SetDocumentDirty(false);
-		RequestDesignerRefresh(true, true);
+		ForceDesignerProjectionRefresh("load");
 		String note_text;
 		for(const String& note : notes) {
 			if(!note_text.IsEmpty())
@@ -1617,16 +1623,49 @@ private:
 		return hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_;
 	}
 
+	String DesignerRefreshBlockReason() const
+	{
+		String s;
+		if(hierarchy_mouse_action_) s << "hierarchy_mouse_action ";
+		if(preview_mouse_action_) s << "preview_mouse_action ";
+		if(inspector_live_editing_) s << "inspector_live_editing ";
+		return s;
+	}
+
+	void CancelDesignerInteractionGuards()
+	{
+		hierarchy_mouse_action_ = false;
+		preview_mouse_action_ = false;
+		inspector_live_editing_ = false;
+		refresh_deferred_ = false;
+		refresh_posted_ = false;
+		full_refresh_requested_ = false;
+		pending_inspector_refresh_ = false;
+	}
+
+	void ForceDesignerProjectionRefresh(const char *reason)
+	{
+#ifdef _DEBUG
+		RLOG(Format("ForceDesignerProjectionRefresh(%s)", reason ? reason : ""));
+#endif
+		CancelDesignerInteractionGuards();
+		RunRefreshAllNow();
+	}
+
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
 	{
 #ifdef _DEBUG
-		RLOG(Format("RequestDesignerRefresh requested rebuild_inspector=%d full=%d blocked=%d",
-		            rebuild_inspector ? 1 : 0, full ? 1 : 0, IsDesignerRefreshBlocked() ? 1 : 0));
+		RLOG(Format("RequestDesignerRefresh requested rebuild_inspector=%d full=%d blocked=%d reason=%s",
+		            rebuild_inspector ? 1 : 0, full ? 1 : 0, IsDesignerRefreshBlocked() ? 1 : 0,
+		            DesignerRefreshBlockReason()));
 #endif
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		full_refresh_requested_ = full_refresh_requested_ || full;
 
 		if(IsDesignerRefreshBlocked()) {
+#ifdef _DEBUG
+			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+#endif
 			refresh_deferred_ = true;
 			return;
 		}
@@ -1650,6 +1689,10 @@ private:
 	void RefreshSelectionUi()
 	{
 		if(IsDesignerRefreshBlocked()) {
+#ifdef _DEBUG
+			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+#endif
+			SyncHierarchySelection();
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -1663,6 +1706,10 @@ private:
 	void RefreshInspectorPreview()
 	{
 		if(IsDesignerRefreshBlocked()) {
+#ifdef _DEBUG
+			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+#endif
+			SyncHierarchySelection();
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -2209,7 +2256,14 @@ private:
 			return;
 
 		if(IsDesignerRefreshBlocked())
+#ifdef _DEBUG
+		{
+			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
 			return;
+		}
+#else
+			return;
+#endif
 
 		bool rebuild_inspector = pending_inspector_refresh_;
 		refresh_deferred_ = false;
@@ -2239,6 +2293,9 @@ private:
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		if(IsDesignerRefreshBlocked()) {
+#ifdef _DEBUG
+			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+#endif
 			refresh_deferred_ = true;
 			return;
 		}
@@ -2251,6 +2308,9 @@ private:
 				return;
 			self->refresh_posted_ = false;
 			if(self->IsDesignerRefreshBlocked()) {
+#ifdef _DEBUG
+				RLOG("Designer refresh deferred: " << self->DesignerRefreshBlockReason());
+#endif
 				self->refresh_deferred_ = true;
 				return;
 			}
@@ -2302,6 +2362,8 @@ private:
 		RefreshCollapseButton();
 		if(right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES)
 			RefreshInspector();
+		if(right_mode_ == RIGHT_HIERARCHY)
+			SyncHierarchySelection();
 		if(right_mode_ == RIGHT_CODE)
 			RefreshCode();
 		LayoutRightPanel();
@@ -3099,6 +3161,10 @@ private:
 		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing && !safe_theme_override))
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+#ifdef _DEBUG
+		RLOG(Format("CommitPreviewInspectorPropertyValue delivered: node=%d property=%s normalized=%s",
+		            (int)node_id, property_id, StdFormat(normalized)));
+#endif
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		int preview_q = live_preview_old_values_.Find(preview_key);
 		bool has_preview_old = preview_q >= 0;
@@ -3116,8 +3182,12 @@ private:
 		String auto_name = AutoNameForPropertyEdit(*n, property_id, normalized);
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
-		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
-			SetDocumentDirty();
+			if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
+#ifdef _DEBUG
+				RLOG(Format("CommitPreviewInspectorPropertyValue command executed: node=%d property=%s",
+				            (int)node_id, property_id));
+#endif
+				SetDocumentDirty();
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
 				live_preview_had_old_.Remove(preview_q);
