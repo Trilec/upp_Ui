@@ -105,7 +105,7 @@ private:
     int  GetPopupRowHeight() const;
     int  GetPopupHeightForVisibleItems() const;
     void OpenPopupInternal();
-    void ClosePopupInternal();
+    void ClosePopupInternal(int select_index = -1, bool fire_select = false);
     void UpdatePopupPosition();
     void SelectPopupItem(int index);
     bool IsSelectableItem(int index) const;

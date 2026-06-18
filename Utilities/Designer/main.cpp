@@ -3387,6 +3387,12 @@ private:
 
 	bool IsLayoutAffectingProperty(const DesignerNode& n, const String& property_id) const
 	{
+		auto text_affects_size = [&](const String& id) {
+			return id == "text" || id == "subtitle" || id == "side_title" ||
+			       id == "page_title" || id == "section_title" || id == "section_subtitle" ||
+			       id == "placeholder" || id == "choice_a" || id == "choice_b" ||
+			       id == "choice_c" || id.StartsWith("crumb_");
+		};
 		if(n.type_id == "Spacer" &&
 		   (property_id == "line_enabled" || property_id == "line_orientation" || property_id == "line_align" ||
 		    property_id == "line_thickness" || property_id == "line_dash" || property_id == "line_inset" ||
@@ -3416,6 +3422,8 @@ private:
 		if(property_id == "gap" || property_id == "inset" || property_id == "content_inset" ||
 		   property_id == "content_gap" || property_id == "icon_size" || property_id == "font_size" ||
 		   property_id == "title_size" || property_id == "subtitle_size" || property_id == "copy_size")
+			return true;
+		if(text_affects_size(property_id))
 			return true;
 		return false;
 	}

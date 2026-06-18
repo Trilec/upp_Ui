@@ -560,6 +560,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	}
 	if(CodeGenHasProperty(n, "radius"))
 		out << "\t\t\ts.metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, "radius", 0)) << ");\n";
+	EmitFrameStyleOverrideFields(out, "s.metrics", "frame_style", n);
 	if(n.type_id == "UiDropdown") {
 		bool theme_override = (bool)CodeGenNodeProperty(n, "theme_override", false);
 		bool draws_surface = (bool)CodeGenNodeProperty(n, "face_enabled", false)
@@ -909,7 +910,7 @@ static String AxisSizing(const DesignerNode& n, const String& axis_key)
 
 static int SpacerAxisMin(const DesignerNode& n, bool width_axis)
 {
-	return max(0, (int)CodeGenNodeProperty(n, width_axis ? "min_width" : "min_height", DESIGNER_MIN_CLAMP));
+	return max(0, (int)CodeGenNodeProperty(n, width_axis ? "min_width" : "min_height", 0));
 }
 
 static int SpacerAxisMax(const DesignerNode& n, bool width_axis)
@@ -925,6 +926,11 @@ static int CodeGenFixedMetric(const DesignerNode& n, const String& axis_key, int
 		return (int)n.properties.GetValue(q);
 	q = n.properties.Find(axis_key);
 	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
+}
+
+static int CodeGenMinMetric(const DesignerNode& n, const char* key)
+{
+	return max(0, (int)CodeGenNodeProperty(n, key, 0));
 }
 static String GridItemAlignHExpr(const DesignerNode& n)
 {
@@ -976,8 +982,8 @@ static String BoxSizingCall(const DesignerNode& parent, const DesignerNode& chil
 
 static String BoxMinCall(const DesignerNode& parent, const DesignerNode& child)
 {
-	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
-	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
+	int min_w = CodeGenMinMetric(child, "min_width");
+	int min_h = CodeGenMinMetric(child, "min_height");
 	bool horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
 	String hs = AxisSizing(child, "h_sizing");
 	String vs = AxisSizing(child, "v_sizing");
@@ -1007,8 +1013,8 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 {
 	String hs = AxisSizing(child, "h_sizing");
 	String vs = AxisSizing(child, "v_sizing");
-	int min_w = DesignerClampMin((int)CodeGenNodeProperty(child, "min_width", DESIGNER_MIN_CLAMP));
-	int min_h = DesignerClampMin((int)CodeGenNodeProperty(child, "min_height", DESIGNER_MIN_CLAMP));
+	int min_w = CodeGenMinMetric(child, "min_width");
+	int min_h = CodeGenMinMetric(child, "min_height");
 	String width_expr;
 
 	if(hs == "Expand")
@@ -1111,8 +1117,8 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 	}
 }static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 {
-	return DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP ||
-	       DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP)) != DESIGNER_MIN_CLAMP;
+	return CodeGenMinMetric(n, "min_width") > 0 ||
+	       CodeGenMinMetric(n, "min_height") > 0;
 }
 
 static void EmitDesignerMinSize(String& out, const String& var, const DesignerNode& n)
@@ -1123,9 +1129,9 @@ static void EmitDesignerMinSize(String& out, const String& var, const DesignerNo
 	if(!HasDesignerMinSizeOverride(n))
 		return;
 	out << "\t\t" << var << ".SetMinSize(Size(DPI("
-	    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP))
+	    << CodeGenMinMetric(n, "min_width")
 	    << "), DPI("
-	    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP))
+	    << CodeGenMinMetric(n, "min_height")
 	    << ")));\n";
 }
 
@@ -1463,9 +1469,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	}
 	else if(n.type_id == "UiPanel") {
 		out << "\t\t" << var << ".SetSizeMin(DPI("
-		    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP))
+		    << CodeGenMinMetric(n, "min_width")
 		    << "), DPI("
-		    << DesignerClampMin((int)CodeGenNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP))
+		    << CodeGenMinMetric(n, "min_height")
 		    << "));\n";
 	}
 	else {

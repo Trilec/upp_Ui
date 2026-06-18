@@ -39,7 +39,7 @@ static int DesignerPreviewFixedMetric(const DesignerNode& n, const String& axis_
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
 {
 	String sizing = DesignerPreviewAxisSizing(n, axis);
-	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 10)));
+	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 0)));
 	if(sizing == "Fixed")
 		return max(DPI(DesignerClampMin((int)DesignerPreviewFixedMetric(n, value_key, fallback))), user_min);
 
@@ -591,7 +591,7 @@ static int DesignerPreviewSpacerAxisFixed(const DesignerNode& n, bool width_axis
 
 static int DesignerPreviewSpacerAxisMin(const DesignerNode& n, bool width_axis)
 {
-	return max(0, (int)DesignerPreviewNodeProperty(n, width_axis ? "min_width" : "min_height", DESIGNER_MIN_CLAMP));
+	return max(0, (int)DesignerPreviewNodeProperty(n, width_axis ? "min_width" : "min_height", 0));
 }
 
 static int DesignerPreviewSpacerAxisMax(const DesignerNode& n, bool width_axis)
@@ -878,8 +878,8 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 			if(DesignerPreviewAxisSizing(n, "v_sizing") == "Fixed")
 				natural.cy = (int)DesignerPreviewFixedMetric(n, "height", natural.cy);
 			if(n.type_id != "Spacer" && n.type_id != "PaneSlot" && n.type_id != "PageSlot" && n.type_id != "AccordionSectionSlot") {
-				minsz.cx = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_width", DESIGNER_MIN_CLAMP));
-				minsz.cy = DesignerClampMin((int)DesignerPreviewNodeProperty(n, "min_height", DESIGNER_MIN_CLAMP));
+				minsz.cx = max(0, (int)DesignerPreviewNodeProperty(n, "min_width", 0));
+				minsz.cy = max(0, (int)DesignerPreviewNodeProperty(n, "min_height", 0));
 			}
 			return Size(max(minsz.cx, natural.cx), max(minsz.cy, natural.cy));
 		}
@@ -1271,8 +1271,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				else
 					ref.Fit();
 
-				int min_w = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10)));
-				int min_h = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10)));
+				int min_w = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 0)));
+				int min_h = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 0)));
 				int fixed_w = max(DPI(DesignerClampMin(DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH))), min_w);
 				int fixed_h = max(DPI(DesignerClampMin(DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT))), min_h);
 				if(horizontal) {
@@ -1355,8 +1355,8 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				if(hs == "Fixed" || vs == "Fixed") {
 					int fixed_w = DesignerClampMin((int)DesignerPreviewFixedMetric(child_node, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
 					int fixed_h = DesignerClampMin((int)DesignerPreviewFixedMetric(child_node, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
-					int min_w = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 10));
-					int min_h = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 10));
+					int min_w = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 0));
+					int min_h = max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 0));
 					fixed = Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h)));
 				}
 				int columns = max(1, (int)DesignerPreviewNodeProperty(parent_node, "columns", 2));

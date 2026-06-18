@@ -244,16 +244,29 @@ void UiSplitButton::OpenPopupInternal()
     Refresh();
 }
 
-void UiSplitButton::ClosePopupInternal()
+void UiSplitButton::ClosePopupInternal(int select_index, bool fire_select)
 {
     if(!popup_open_)
         return;
+
+    Value selected_data;
+    if(fire_select && select_index >= 0 && select_index < items_.GetCount())
+        selected_data = items_[select_index].data;
 
     popup_open_ = false;
     split_pressed_ = false;
     hot_item_ = -1;
     popup_.Close();
-    WhenClose();
+    Ptr<UiSplitButton> self = this;
+    PostCallback([self, select_index, fire_select, selected_data] {
+        if(!self)
+            return;
+        if(fire_select && select_index >= 0)
+            self->WhenSelect(select_index, selected_data);
+        if(!self)
+            return;
+        self->WhenClose();
+    });
     Refresh();
 }
 
@@ -294,9 +307,7 @@ void UiSplitButton::SelectPopupItem(int index)
 {
     if(!IsSelectableItem(index))
         return;
-    Value data = items_[index].data;
-    ClosePopupInternal();
-    WhenSelect(index, data);
+    ClosePopupInternal(index, true);
 }
 
 bool UiSplitButton::IsSelectableItem(int index) const

@@ -827,7 +827,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && generation == inspector_generation_ && node_id_ == row_node)
-				CommitChoice(property_id, data, "select");
+				PostInspectorCommit(generation, row_node, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -847,7 +847,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self && generation == inspector_generation_ && node_id_ == row_node)
-				WhenProperty(row_node, property_id, (bool)self->GetData());
+				PostInspectorCommit(generation, row_node, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -875,18 +875,14 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			WhenPropertyPreview(row_node, property_id, v);
+			PostInspectorPreview(generation, row_node, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self || generation != inspector_generation_ || node_id_ != row_node)
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostCallback([=] {
-				if(syncing_ || !self || generation != inspector_generation_ || node_id_ != row_node)
-					return;
-				WhenProperty(row_node, property_id, v);
-			});
+			PostInspectorCommit(generation, row_node, property_id, v);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -906,7 +902,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!syncing_ && self && generation == inspector_generation_ && node_id_ == row_node)
-				WhenProperty(row_node, property_id, self->GetColor(0));
+				PostInspectorCommit(generation, row_node, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -935,7 +931,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				ValueArray out;
 				for(int i = 0; i < 4; i++)
 					out.Add(self->GetColor(i));
-				WhenProperty(row_node, property_id, out);
+				PostInspectorCommit(generation, row_node, property_id, out);
 			}
 		};
 		Row& r = page.rows.Add();
@@ -955,11 +951,11 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	row->Enable(b.enabled);
 	row->WhenAction = [=] {
 		if(!syncing_ && self && generation == inspector_generation_ && node_id_ == row_node)
-			WhenProperty(row_node, property_id, self->GetData());
+			PostInspectorCommit(generation, row_node, property_id, self->GetData());
 	};
 	row->WhenChange = [=] {
 		if(!syncing_ && self && generation == inspector_generation_ && node_id_ == row_node)
-			WhenProperty(row_node, property_id, self->GetData());
+			PostInspectorCommit(generation, row_node, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
@@ -1008,7 +1004,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenSelectData = [=](const Value& data) {
 			if(self && !syncing_ && generation == inspector_generation_ && !IsNull(data))
-				WhenPropertyMany(selection_, property_id, data);
+				PostInspectorManyCommit(generation, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1028,7 +1024,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(!syncing_ && self && generation == inspector_generation_)
-				WhenPropertyMany(selection_, property_id, (bool)self->GetData());
+				PostInspectorManyCommit(generation, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1056,18 +1052,14 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			WhenPropertyManyPreview(selection_, property_id, v);
+			PostInspectorManyPreview(generation, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(syncing_ || !self || generation != inspector_generation_)
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostCallback([=] {
-				if(syncing_ || !self || generation != inspector_generation_)
-					return;
-				WhenPropertyMany(selection_, property_id, v);
-			});
+			PostInspectorManyCommit(generation, property_id, v);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1087,7 +1079,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(!syncing_ && self && generation == inspector_generation_)
-				WhenPropertyMany(selection_, property_id, self->GetColor(0));
+				PostInspectorManyCommit(generation, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1114,7 +1106,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	row->Enable(DesignerBindingEditableInMultiSelect(b));
 	row->WhenAction = [=] {
 		if(!syncing_ && self && generation == inspector_generation_ && !(row_mixed && IsNull(self->GetData())))
-			WhenPropertyMany(selection_, property_id, self->GetData());
+			PostInspectorManyCommit(generation, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
@@ -1136,6 +1128,40 @@ String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindin
 		}
 	}
 	return note;
+}
+
+void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value)
+{
+	Ptr<DesignerInspector> self = this;
+	PostCallback([=] {
+		if(!self || self->syncing_ || generation != self->inspector_generation_ || self->node_id_ != row_node)
+			return;
+		self->WhenProperty(row_node, property_id, value);
+	});
+}
+
+void DesignerInspector::PostInspectorPreview(int generation, DesignerNodeId row_node, const String& property_id, const Value& value)
+{
+	if(syncing_ || generation != inspector_generation_ || node_id_ != row_node)
+		return;
+	WhenPropertyPreview(row_node, property_id, value);
+}
+
+void DesignerInspector::PostInspectorManyCommit(int generation, const String& property_id, const Value& value)
+{
+	Ptr<DesignerInspector> self = this;
+	PostCallback([=] {
+		if(!self || self->syncing_ || generation != self->inspector_generation_)
+			return;
+		self->WhenPropertyMany(clone(self->selection_), property_id, value);
+	});
+}
+
+void DesignerInspector::PostInspectorManyPreview(int generation, const String& property_id, const Value& value)
+{
+	if(syncing_ || generation != inspector_generation_)
+		return;
+	WhenPropertyManyPreview(selection_, property_id, value);
 }
 
 void DesignerInspector::RefreshPage(Page& page, const DesignerNode& n, const DesignerType& t,

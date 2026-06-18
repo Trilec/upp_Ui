@@ -1055,9 +1055,9 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	         "fixed parent layout height",
 	         "Used only when Height mode is Fixed.", 1, 900);
 	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Lower bound used by Fit and Expand width.", 1, 1600);
+	         "Lower bound used by Fit and Expand width. Use 0 for no explicit lower bound.", 0, 1600);
 	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
-	         "Lower bound used by Fit and Expand height.", 1, 900);
+	         "Lower bound used by Fit and Expand height. Use 0 for no explicit lower bound.", 0, 900);
 	b.AddInt("max_width", "Max width", DesignerEditorKind::Slider, "parent layout width cap",
 	         "Expand width cap. Use 0 for unlimited.", 0, 1600);
 	b.AddInt("max_height", "Max height", DesignerEditorKind::Slider, "parent layout height cap",
@@ -1130,8 +1130,8 @@ void DesignerPanelAdapter::SyncFromNode(const DesignerNode& node)
 	else {
 		ApplyPanelAppearance(*this, node);
 		if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic")
-		SetSizeMin(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_width", DESIGNER_MIN_CLAMP))),
-		           DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP))));
+		SetSizeMin(DPI(max(0, (int)AdapterNodeProperty(node, "min_width", 0))),
+		           DPI(max(0, (int)AdapterNodeProperty(node, "min_height", 0))));
 		else
 			SetSizeMin(Size(0, 0));
 	}
@@ -2259,8 +2259,8 @@ void DesignerBreadcrumbsAdapter::SyncFromNode(const DesignerNode& node)
 	else
 		SetPathIcon(icon, UiAlign::LEFT, Size(DPI((int)AdapterNodeProperty(node, "icon_size", 16)),
 		                                      DPI((int)AdapterNodeProperty(node, "icon_size", 16))));
-	SetMinSize(Size(DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_width", 180))),
-	                DPI(DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP)))));
+	SetMinSize(Size(DPI(max(0, (int)AdapterNodeProperty(node, "min_width", 180))),
+	                DPI(max(0, (int)AdapterNodeProperty(node, "min_height", 0)))));
 	NoWantFocus();
 }
 
@@ -3223,8 +3223,8 @@ static void ApplyDesignerControlMinSize(Ctrl& ctrl, const DesignerNode& node)
 	if(node.type_id == "Spacer" || node.type_id == "PaneSlot" ||
 	   node.type_id == "PageSlot" || node.type_id == "AccordionSectionSlot")
 		return;
-	int min_w = DesignerClampMin((int)AdapterNodeProperty(node, "min_width", DESIGNER_MIN_CLAMP));
-	int min_h = DesignerClampMin((int)AdapterNodeProperty(node, "min_height", DESIGNER_MIN_CLAMP));
+	int min_w = max(0, (int)AdapterNodeProperty(node, "min_width", 0));
+	int min_h = max(0, (int)AdapterNodeProperty(node, "min_height", 0));
 	ctrl.SetMinSize(Size(DPI(min_w), DPI(min_h)));
 }
 
