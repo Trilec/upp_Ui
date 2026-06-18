@@ -1,4 +1,4 @@
-﻿#include "DesignerBuiltins.h"
+#include "DesignerBuiltins.h"
 #include "DesignerAdapter.h"
 #include "DesignerCommands.h"
 #include "DesignerPreview.h"
@@ -3024,9 +3024,6 @@ private:
 		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing && !safe_theme_override))
 			return;
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
-#ifdef _DEBUG
-		RLOG(Format("CommitPreviewInspectorPropertyValue normalized=%s", StdFormat(normalized)));
-#endif
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		int preview_q = live_preview_old_values_.Find(preview_key);
 		bool has_preview_old = preview_q >= 0;
@@ -3045,11 +3042,6 @@ private:
 		if(!auto_name.IsEmpty())
 			commands_.BeginGroup("Set " + property_id);
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
-#ifdef _DEBUG
-			const DesignerNode* changed = model_.Find(node_id);
-			Value after = changed ? DesignerNodePropertyOr(*changed, property_id, Value()) : Value();
-			RLOG(Format("CommitPreviewInspectorPropertyValue executed property=%s after=%s", property_id, StdFormat(after)));
-#endif
 			SetDocumentDirty();
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
