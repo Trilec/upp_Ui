@@ -1584,15 +1584,28 @@ private:
 	// Full rebuild after structural edits or template changes.
 	// Use this when hierarchy, inspector, generated code, and preview can all be
 	// affected; narrower refresh helpers are used for pure selection changes.
-	void RefreshAll()
+	void RunRefreshAllNow()
 	{
-		refresh_posted_ = false;
+		full_refresh_requested_ = false;
+		pending_inspector_refresh_ = false;
 		RefreshToolbox();
 		RefreshHierarchy();
 		RefreshInspector();
 		RefreshCode();
 		preview_.InvalidateRealPreview();
 		preview_.Refresh();
+	}
+
+	void RefreshAll()
+	{
+		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+			refresh_deferred_ = true;
+			pending_inspector_refresh_ = true;
+			full_refresh_requested_ = true;
+			return;
+		}
+		refresh_posted_ = false;
+		RunRefreshAllNow();
 	}
 
 	// Refresh only the views affected by selection.
@@ -2169,6 +2182,10 @@ private:
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
+			if(self->full_refresh_requested_) {
+				self->RunRefreshAllNow();
+				return;
+			}
 			self->RefreshHierarchy();
 			self->RefreshCode();
 			self->preview_.InvalidateRealPreview();
@@ -3042,12 +3059,20 @@ private:
 				commands_.Execute(MakeDesignerRenameCommand(n->id, auto_name), model_);
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
+			const DesignerNode* changed = model_.Find(node_id);
 			bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
-			bool layout_affecting = IsLayoutAffectingProperty(*n, property_id);
-			if(layout_affecting)
-				TraceLayoutAffectingChange(*n, property_id);
+			bool layout_affecting = changed ? IsLayoutAffectingProperty(*changed, property_id)
+			                               : (property_id == "h_sizing" || property_id == "v_sizing" ||
+			                                  property_id == "fixed_width" || property_id == "fixed_height" ||
+			                                  property_id == "min_width" || property_id == "min_height" ||
+			                                  property_id == "max_width" || property_id == "max_height" ||
+			                                  property_id == "cell_align_h" || property_id == "cell_align_v" ||
+			                                  property_id == "weight");
+			if(layout_affecting && changed)
+				TraceLayoutAffectingChange(*changed, property_id);
 			if(layout_affecting) {
-				RefreshAll();
+				full_refresh_requested_ = true;
+				PostDesignerRefresh(true);
 				return;
 			}
 			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
@@ -3138,7 +3163,8 @@ private:
 				if(const DesignerNode* first = model_.Find(changed_ids[0]))
 					TraceLayoutAffectingChange(*first, property_id);
 				model_.SetSelection(ids);
-				RefreshAll();
+				full_refresh_requested_ = true;
+				PostDesignerRefresh(true);
 				return;
 			}
 			model_.SetSelection(ids);
@@ -3620,6 +3646,7 @@ private:
 	bool inspector_live_editing_ = false;
 	bool hierarchy_mouse_action_ = false;
 	bool refresh_deferred_ = false;
+	bool full_refresh_requested_ = false;
 	bool live_preview_refresh_pending_ = false;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	VectorMap<String, Value> live_preview_old_values_;

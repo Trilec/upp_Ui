@@ -137,6 +137,7 @@ private:
 	Vector<DesignerNodeId> selection_;
 	String binding_group_;
 	bool syncing_ = false;
+	int inspector_generation_ = 0;
 	mutable VectorMap<String, Vector<DesignerApiBinding>> descriptor_cache_;
 };
 
