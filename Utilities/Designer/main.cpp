@@ -2189,6 +2189,25 @@ private:
 		PostDesignerRefresh(rebuild_inspector);
 	}
 
+	void SetInspectorLiveEditing(bool active)
+	{
+		inspector_live_editing_ = active;
+		if(!active)
+			FlushDeferredDesignerRefresh();
+	}
+
+	void BeginInspectorLiveEditing()
+	{
+		SetInspectorLiveEditing(true);
+
+		Ptr<DesignerWindow> self = this;
+		PostCallback([self] {
+			if(!self)
+				return;
+			self->SetInspectorLiveEditing(false);
+		});
+	}
+
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
@@ -2204,6 +2223,10 @@ private:
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
+			if(self->hierarchy_mouse_action_ || self->preview_mouse_action_ || self->inspector_live_editing_) {
+				self->refresh_deferred_ = true;
+				return;
+			}
 			if(self->full_refresh_requested_) {
 				self->RunRefreshAllNow();
 				return;
@@ -2976,7 +2999,7 @@ private:
 		DesignerNode* n = model_.Find(node_id);
 		if(!n || n->id == Designer_ROOT)
 			return;
-		inspector_live_editing_ = true;
+		BeginInspectorLiveEditing();
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		if(live_preview_old_values_.Find(preview_key) < 0) {
@@ -2992,7 +3015,7 @@ private:
 	{
 		if(ids.IsEmpty())
 			return;
-		inspector_live_editing_ = true;
+		BeginInspectorLiveEditing();
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
@@ -3011,7 +3034,7 @@ private:
 
 	void CommitPreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
 	{
-		inspector_live_editing_ = false;
+		SetInspectorLiveEditing(false);
 		DesignerNode* n = model_.Find(node_id);
 		if(!n || n->id == Designer_ROOT)
 			return;
@@ -3114,7 +3137,7 @@ private:
 
 	void CommitPreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
 	{
-		inspector_live_editing_ = false;
+		SetInspectorLiveEditing(false);
 		if(ids.IsEmpty())
 			return;
 		Vector<DesignerNodeId> changed_ids;
