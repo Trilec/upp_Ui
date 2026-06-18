@@ -557,9 +557,12 @@ void UiSlider::LeftUp(Point, dword)
     if(dragging_) {
         dragging_ = false;
         ReleaseCapture();
-        if(std::fabs(value_ - drag_start_value_) >= 1e-12 && WhenAction)
+        bool changed = std::fabs(value_ - drag_start_value_) >= 1e-12;
+        Ptr<UiSlider> self = this;
+        if(changed && WhenAction)
             WhenAction();
-        Refresh();
+        if(self)
+            Refresh();
     }
 }
 
