@@ -645,8 +645,11 @@ void UiSplitButton::PopupWindow::Deactivate()
     if(GetScreenRect().Contains(GetMousePos()))
         return;
 
-    if(owner)
-        owner->ClosePopupInternal();
+    Ptr<UiSplitButton> self = owner;
+    PostCallback([self] {
+        if(self && self->IsPopupOpen())
+            self->ClosePopup();
+    });
 }
 
 } // namespace Upp

@@ -731,8 +731,16 @@ private:
 		preview_.WhenChanged = [=] {
 			preview_mouse_action_ = true;
 			full_refresh_requested_ = true;
-			PostDesignerRefresh(true);
-			PostCallback([=] { preview_mouse_action_ = false; });
+			pending_inspector_refresh_ = true;
+			refresh_deferred_ = true;
+
+			Ptr<DesignerWindow> self = this;
+			PostCallback([self] {
+				if(!self)
+					return;
+				self->preview_mouse_action_ = false;
+				self->FlushDeferredDesignerRefresh();
+			});
 		};
 
 		toolbox_tree_.SetModel(toolbox_model_);
@@ -791,10 +799,8 @@ private:
 		};
 		hierarchy_.WhenMouseAction = [=](bool active) {
 			hierarchy_mouse_action_ = active;
-			if(!active && refresh_deferred_) {
-				refresh_deferred_ = false;
-				PostDesignerRefresh(pending_inspector_refresh_);
-			}
+			if(!active)
+				FlushDeferredDesignerRefresh();
 		};
 		hierarchy_.WhenMoveRequest = [=](UiTreeMoveRequest& request) {
 			HandleHierarchyMoveRequest(request);
@@ -2170,6 +2176,19 @@ private:
 	// Coalesce refreshes posted by property callbacks.
 	// Dropdowns and composite controls can fire while handling input, so posted
 	// refresh avoids destroying/rebuilding controls inside their own callbacks.
+	void FlushDeferredDesignerRefresh()
+	{
+		if(!refresh_deferred_)
+			return;
+
+		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_)
+			return;
+
+		bool rebuild_inspector = pending_inspector_refresh_;
+		refresh_deferred_ = false;
+		PostDesignerRefresh(rebuild_inspector);
+	}
+
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
