@@ -700,11 +700,7 @@ private:
 				return;
 			ApplyTheme(DesignerThemePresetFromId(id), theme_mode_);
 		};
-		theme_preset_row_.WhenClose = [=] {
-			if(syncing_theme_)
-				return;
-			ApplyTheme(DesignerThemePresetFromId(theme_preset_row_.GetData()), theme_mode_);
-		};
+		theme_preset_row_.WhenClose = Null;
 		theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
 		theme_toggle_.WhenAction = [=] {
 			ApplyTheme(theme_preset_, (bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
@@ -729,7 +725,10 @@ private:
 			MovePreviewNode(id, target, index);
 		};
 		preview_.WhenChanged = [=] {
-			RefreshAll();
+			preview_mouse_action_ = true;
+			full_refresh_requested_ = true;
+			PostDesignerRefresh(true);
+			PostCallback([=] { preview_mouse_action_ = false; });
 		};
 
 		toolbox_tree_.SetModel(toolbox_model_);
@@ -781,7 +780,7 @@ private:
 		hierarchy_.WhenRename = [=](UiTreeNodeRef ref, const String& name) {
 			DesignerNodeId id = GetHierarchyNodeId(ref);
 			if(id != Designer_NULL && id != Designer_ROOT)
-				SaveInspectorNameValue(id, name);
+				PostCallback([=] { SaveInspectorNameValue(id, name); });
 		};
 		hierarchy_.WhenColumnAction = [=](UiTreeNodeRef ref, int column) {
 			HandleHierarchyColumnAction(ref, column);
@@ -820,7 +819,7 @@ private:
 			PreviewInspectorPropertyValues(ids, property, value);
 		};
 		inspector_.WhenName = [=](DesignerNodeId id, String name) {
-			SaveInspectorNameValue(id, name);
+			PostCallback([=] { SaveInspectorNameValue(id, name); });
 		};
 		inspector_.WhenNotes = [=](String notes) {
 			SetWarningNotes(notes);
@@ -1598,7 +1597,7 @@ private:
 
 	void RefreshAll()
 	{
-		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			full_refresh_requested_ = true;
@@ -1613,7 +1612,7 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
-		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -1626,7 +1625,7 @@ private:
 
 	void RefreshInspectorPreview()
 	{
-		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -2170,7 +2169,7 @@ private:
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
-		if(hierarchy_mouse_action_ || inspector_live_editing_) {
+		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
 			refresh_deferred_ = true;
 			return;
 		}
@@ -3645,6 +3644,7 @@ private:
 	bool pending_inspector_refresh_ = false;
 	bool inspector_live_editing_ = false;
 	bool hierarchy_mouse_action_ = false;
+	bool preview_mouse_action_ = false;
 	bool refresh_deferred_ = false;
 	bool full_refresh_requested_ = false;
 	bool live_preview_refresh_pending_ = false;

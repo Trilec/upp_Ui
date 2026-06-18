@@ -130,8 +130,6 @@ private:
 	void PostInspectorPreview(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);
 	void PostInspectorManyCommit(int generation, const String& property_id, const Value& value);
 	void PostInspectorManyPreview(int generation, const String& property_id, const Value& value);
-	void CommitChoice(const String& property_id, const Value& value, const char *source);
-	void CommitChoice(const String& property_id, UiCompositeDropdown *row, const char *source);
 
 	UiStack stack_;
 	Array<Page> pages_;

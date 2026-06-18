@@ -132,6 +132,8 @@ public:
     UiSlider& SetSizeFixed(Size sz)      { return SetSizeMin(sz); }
     UiSlider& SetSizeFixed(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
+    // Slider value events remain synchronous. Use WhenChanging for live
+    // feedback and WhenAction for the committed release/action point.
     Event<> WhenAction;
     Event<> WhenChanging;
 

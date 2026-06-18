@@ -236,6 +236,9 @@ public:
     UiButton& Animate(const T& from, const T& to, int ms, Event<const T&> setter,
                       Easing::Fn curve = Easing::OutCubic(), Event<> on_finish = {});
 
+    // Button actions remain synchronous. Callers that rebuild surrounding UI
+    // should defer heavy refresh themselves if they are inside sensitive input
+    // paths.
     Event<> WhenPush;
     Event<> WhenAction;
 

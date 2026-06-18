@@ -1453,14 +1453,12 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
         }
     }
 
-	if(selection_changed) {
-		// External callbacks stay deferred so popup teardown is complete first,
-		// but the selected data is already committed internally at this point.
-		Ptr<UiDropdown> self = this;
-		const int idx = apply_index;
-		PostCallback([self, idx, selected_text, selected_data] {
-			if(!self)
-				return;
+	Ptr<UiDropdown> self = this;
+	const int idx = apply_index;
+	PostCallback([self, selection_changed, idx, selected_text, selected_data] {
+		if(!self)
+			return;
+		if(selection_changed) {
 			self->WhenSelect(idx);
 			if(!self)
 				return;
@@ -1468,13 +1466,10 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
 			if(!self)
 				return;
 			self->WhenSelectData(selected_data);
-		});
-	}
-
-	Ptr<UiDropdown> self = this;
-	PostCallback([self] {
-		if(self)
-			self->WhenClose();
+			if(!self)
+				return;
+		}
+		self->WhenClose();
 	});
 	Refresh();
 }

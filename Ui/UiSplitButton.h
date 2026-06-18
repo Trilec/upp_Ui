@@ -167,7 +167,11 @@ public:
     UiSplitButton& OpenPopup();
     UiSplitButton& ClosePopup();
     UiSplitButton& TogglePopup();
+    void DebugSelectPopupItem(int index) { SelectPopupItem(index); }
 
+    // Popup callbacks are posted after popup teardown so callers can rebuild
+    // surrounding UI safely. Primary button actions still follow UiButton's
+    // normal synchronous action model.
     Event<int, const Value&> WhenSelect;
     Event<> WhenOpen;
     Event<> WhenClose;

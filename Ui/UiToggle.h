@@ -124,6 +124,8 @@ public:
     virtual void CancelMode() override;
     virtual void  SetData(const Value& v) override;
     virtual Value GetData() const override;
+    // Toggle actions remain synchronous. SetData() updates state silently;
+    // callers that trigger broad UI rebuilds should defer that work.
     Event<> WhenAction;
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintBackground;
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&, const StyledSkin&, StyledState, bool> WhenPaintForeground;

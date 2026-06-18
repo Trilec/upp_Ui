@@ -1132,6 +1132,10 @@ String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindin
 
 void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value)
 {
+	// Inspector user edits must be posted rather than committed synchronously.
+	// Row callbacks may be triggered while popup/row controls are still unwinding.
+	// Posting plus generation checks prevents stale row callbacks from rebuilding
+	// the inspector stack during the originating control callback.
 	Ptr<DesignerInspector> self = this;
 	PostCallback([=] {
 		if(!self || self->syncing_ || generation != self->inspector_generation_ || self->node_id_ != row_node)
@@ -1275,31 +1279,6 @@ Value DesignerInspector::QuadFaceValue(const DesignerNode& n, Color face) const
 	a.Add(NodeProperty(n, "face_bl", Blend(face, Black(), 10)));
 	a.Add(NodeProperty(n, "face_br", Blend(face, White(), 8)));
 	return a;
-}
-
-void DesignerInspector::CommitChoice(const String& property_id, const Value& value, const char *source)
-{
-	DesignerChoiceCommitLog(Format("Designer CommitChoice property=%s source=%s node=%d value=%s syncing=%d",
-	                               property_id, source ? source : "", (int)node_id_, StdFormat(value), syncing_ ? 1 : 0));
-	if(syncing_ || IsNull(value) || !model_)
-		return;
-	const DesignerNode *n = model_->Find(node_id_);
-	if(!n || n->id == Designer_ROOT)
-		return;
-	Value current = NodeProperty(*n, property_id, Value());
-	DesignerChoiceCommitLog(Format("Designer CommitChoice current=%s equal=%d",
-	                               StdFormat(current), (!IsNull(current) && current == value) ? 1 : 0));
-	if(!IsNull(current) && current == value)
-		return;
-	DesignerChoiceCommitLog("Designer CommitChoice dispatch WhenProperty");
-	WhenProperty(node_id_, property_id, value);
-}
-
-void DesignerInspector::CommitChoice(const String& property_id, UiCompositeDropdown *row, const char *source)
-{
-	if(!row)
-		return;
-	CommitChoice(property_id, row->GetData(), source);
 }
 
 void DesignerInspector::Layout()

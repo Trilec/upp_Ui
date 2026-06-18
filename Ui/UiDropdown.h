@@ -459,6 +459,8 @@ public:
     // ------------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------------
+    // Popup selection and close callbacks are posted after popup teardown so
+    // surrounding UI can rebuild safely from application handlers.
     Event<int>            WhenSelect;      // index
     Event<const String&>  WhenSelectText;  // text
     Event<const Value&>   WhenSelectData;  // data
