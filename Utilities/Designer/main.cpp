@@ -700,7 +700,11 @@ private:
 				return;
 			ApplyTheme(DesignerThemePresetFromId(id), theme_mode_);
 		};
-		theme_preset_row_.WhenClose = Null;
+		theme_preset_row_.WhenClose = [=] {
+			if(syncing_theme_)
+				return;
+			ApplyTheme(DesignerThemePresetFromId(theme_preset_row_.GetData()), theme_mode_);
+		};
 		theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
 		theme_toggle_.WhenAction = [=] {
 			ApplyTheme(theme_preset_, (bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
