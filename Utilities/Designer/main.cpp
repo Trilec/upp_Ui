@@ -492,14 +492,14 @@ private:
 		if(key == K_CTRL_Z) {
 			if(commands_.Undo(model_)) {
 				SetDocumentDirty();
-				RefreshAll();
+				RequestDesignerRefresh(true, true);
 			}
 			return true;
 		}
 		if(key == K_CTRL_Y) {
 			if(commands_.Redo(model_)) {
 				SetDocumentDirty();
-				RefreshAll();
+				RequestDesignerRefresh(true, true);
 			}
 			return true;
 		}
@@ -730,9 +730,7 @@ private:
 		};
 		preview_.WhenChanged = [=] {
 			preview_mouse_action_ = true;
-			full_refresh_requested_ = true;
-			pending_inspector_refresh_ = true;
-			refresh_deferred_ = true;
+			RequestDesignerRefresh(true, true);
 
 			Ptr<DesignerWindow> self = this;
 			PostCallback([self] {
@@ -1024,7 +1022,7 @@ private:
 		AddRecentPath(recent_loads_, path);
 		StoreRecentFiles();
 		SetDocumentDirty(false);
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 		String note_text;
 		for(const String& note : notes) {
 			if(!note_text.IsEmpty())
@@ -1605,12 +1603,28 @@ private:
 		preview_.Refresh();
 	}
 
+	bool IsDesignerRefreshBlocked() const
+	{
+		return hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_;
+	}
+
+	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
+	{
+		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
+		full_refresh_requested_ = full_refresh_requested_ || full;
+
+		if(IsDesignerRefreshBlocked()) {
+			refresh_deferred_ = true;
+			return;
+		}
+
+		PostDesignerRefresh(rebuild_inspector);
+	}
+
 	void RefreshAll()
 	{
-		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
-			refresh_deferred_ = true;
-			pending_inspector_refresh_ = true;
-			full_refresh_requested_ = true;
+		if(IsDesignerRefreshBlocked()) {
+			RequestDesignerRefresh(true, true);
 			return;
 		}
 		refresh_posted_ = false;
@@ -1622,7 +1636,7 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
-		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
+		if(IsDesignerRefreshBlocked()) {
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -1635,7 +1649,7 @@ private:
 
 	void RefreshInspectorPreview()
 	{
-		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
+		if(IsDesignerRefreshBlocked()) {
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -2102,7 +2116,7 @@ private:
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", crumbs, "Select crumb"), model_);
 			commands_.EndGroup();
 			SetDocumentDirty();
-			RefreshAll();
+			RequestDesignerRefresh(true, true);
 			return;
 		}
 		DesignerNodeId container_id = SelectedPageContainerId();
@@ -2131,7 +2145,7 @@ private:
 		commands_.EndGroup();
 		model_.SelectOne(page);
 		SetDocumentDirty();
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 	}
 
 	void RemovePageSlotForSelection()
@@ -2149,7 +2163,7 @@ private:
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", min(current, next - 1), "Select crumb"), model_);
 			commands_.EndGroup();
 			SetDocumentDirty();
-			RefreshAll();
+			RequestDesignerRefresh(true, true);
 			return;
 		}
 		DesignerNodeId container_id = SelectedPageContainerId();
@@ -2170,7 +2184,7 @@ private:
 		commands_.EndGroup();
 		model_.SelectOne(next_page);
 		SetDocumentDirty();
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 	}
 
 	// Coalesce refreshes posted by property callbacks.
@@ -2181,7 +2195,7 @@ private:
 		if(!refresh_deferred_)
 			return;
 
-		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_)
+		if(IsDesignerRefreshBlocked())
 			return;
 
 		bool rebuild_inspector = pending_inspector_refresh_;
@@ -2211,7 +2225,7 @@ private:
 	void PostDesignerRefresh(bool rebuild_inspector)
 	{
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
-		if(hierarchy_mouse_action_ || preview_mouse_action_ || inspector_live_editing_) {
+		if(IsDesignerRefreshBlocked()) {
 			refresh_deferred_ = true;
 			return;
 		}
@@ -2223,7 +2237,7 @@ private:
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
-			if(self->hierarchy_mouse_action_ || self->preview_mouse_action_ || self->inspector_live_editing_) {
+			if(self->IsDesignerRefreshBlocked()) {
 				self->refresh_deferred_ = true;
 				return;
 			}
@@ -2575,7 +2589,7 @@ private:
 		model_.SelectOne(id);
 		preview_.SetPlacementType(String());
 		SetDocumentDirty();
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 	}
 
 	void PlacePreset(const String& preset_id, Point screen)
@@ -2628,7 +2642,7 @@ private:
 		if(first != Designer_NULL)
 			model_.SelectOne(first);
 		SetDocumentDirty();
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 	}
 
 	DesignerNodeId ClonePresetSubtree(const DesignerModel& seed, DesignerNodeId source_id, DesignerNodeId parent_id, int index)
@@ -2766,7 +2780,7 @@ private:
 		if(changed && !pasted.IsEmpty()) {
 			model_.SetSelection(pasted);
 			SetDocumentDirty();
-			RefreshAll();
+			RequestDesignerRefresh(true, true);
 		}
 	}
 
@@ -2857,7 +2871,7 @@ private:
 			if(!model_.Validate(error))
 				SetWarningNotes("Model validation failed after move: " + error);
 			SetDocumentDirty();
-			RefreshAll();
+			RequestDesignerRefresh(true, true);
 		}
 	}
 
@@ -2971,7 +2985,7 @@ private:
 		if(!model_.Validate(error))
 			SetWarningNotes("Model validation failed after hierarchy move: " + error);
 		SetDocumentDirty();
-		RefreshAll();
+		RequestDesignerRefresh(true, true);
 	}
 
 	// Commit an inspector property edit through a command.
@@ -3108,8 +3122,7 @@ private:
 			if(layout_affecting && changed)
 				TraceLayoutAffectingChange(*changed, property_id);
 			if(layout_affecting) {
-				full_refresh_requested_ = true;
-				PostDesignerRefresh(true);
+				RequestDesignerRefresh(true, true);
 				return;
 			}
 			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
@@ -3126,7 +3139,7 @@ private:
 			}
 			if(!auto_name.IsEmpty())
 				commands_.EndGroup();
-			PostDesignerRefresh(true);
+			RequestDesignerRefresh(true, true);
 		}
 	}
 
@@ -3200,8 +3213,7 @@ private:
 				if(const DesignerNode* first = model_.Find(changed_ids[0]))
 					TraceLayoutAffectingChange(*first, property_id);
 				model_.SetSelection(ids);
-				full_refresh_requested_ = true;
-				PostDesignerRefresh(true);
+				RequestDesignerRefresh(true, true);
 				return;
 			}
 			model_.SetSelection(ids);
@@ -3362,7 +3374,7 @@ private:
 				changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
 		if(changed) {
 			SetDocumentDirty();
-			RefreshAll();
+			RequestDesignerRefresh(true, true);
 		}
 	}
 
