@@ -697,10 +697,8 @@ void UiMenu::ActivateItem(UiMenuNodeRef node)
     UiMenuItem fire = model_->Get(node);
     EndSession(true);
     Ptr<UiMenu> self = this;
-    PostCallback([self, node, fire] {
-        if(self && self->WhenAction)
-            self->WhenAction(node, fire);
-    });
+    if(self && self->WhenAction)
+        self->WhenAction(node, fire);
 }
 
 void UiMenu::HandlePopupKey(int level, dword key)
