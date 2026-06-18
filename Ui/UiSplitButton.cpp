@@ -258,16 +258,15 @@ void UiSplitButton::ClosePopupInternal(int select_index, bool fire_select)
     hot_item_ = -1;
     popup_.Close();
     Ptr<UiSplitButton> self = this;
-    PostCallback([self, select_index, fire_select, selected_data] {
-        if(!self)
-            return;
-        if(fire_select && select_index >= 0)
-            self->WhenSelect(select_index, selected_data);
-        if(!self)
-            return;
+
+    if(fire_select && select_index >= 0 && self)
+        self->WhenSelect(select_index, selected_data);
+
+    if(self)
         self->WhenClose();
-    });
-    Refresh();
+
+    if(self)
+        self->Refresh();
 }
 
 void UiSplitButton::UpdatePopupPosition()

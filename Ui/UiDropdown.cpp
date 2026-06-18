@@ -1445,7 +1445,7 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
     RebuildIndicator();
     OnStyleChanged();
 
-    if(apply_index >= 0) {
+	if(apply_index >= 0) {
         selection_changed = ApplySelectionInternal(apply_index, false);
         if(selection_changed) {
             selected_data = items_[apply_index].data;
@@ -1455,23 +1455,17 @@ void UiDropdown::ClosePopupInternal(bool apply_selection)
 
 	Ptr<UiDropdown> self = this;
 	const int idx = apply_index;
-	PostCallback([self, selection_changed, idx, selected_text, selected_data] {
-		if(!self)
-			return;
-		if(selection_changed) {
-			self->WhenSelect(idx);
-			if(!self)
-				return;
+	if(selection_changed && self) {
+		self->WhenSelect(idx);
+		if(self)
 			self->WhenSelectText(selected_text);
-			if(!self)
-				return;
+		if(self)
 			self->WhenSelectData(selected_data);
-			if(!self)
-				return;
-		}
+	}
+	if(self)
 		self->WhenClose();
-	});
-	Refresh();
+	if(self)
+		self->Refresh();
 }
 
 UiDropdown& UiDropdown::OpenPopup()

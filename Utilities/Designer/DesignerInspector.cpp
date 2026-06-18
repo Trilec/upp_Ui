@@ -1140,7 +1140,13 @@ void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_n
 	PostCallback([=] {
 		if(!self || self->syncing_ || generation != self->inspector_generation_ || self->node_id_ != row_node)
 			return;
+#ifdef _DEBUG
+		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
+#endif
 		self->WhenProperty(row_node, property_id, value);
+#ifdef _DEBUG
+		RLOG("Inspector commit delivered: " << property_id);
+#endif
 	});
 }
 
@@ -1157,7 +1163,13 @@ void DesignerInspector::PostInspectorManyCommit(int generation, const String& pr
 	PostCallback([=] {
 		if(!self || self->syncing_ || generation != self->inspector_generation_)
 			return;
+#ifdef _DEBUG
+		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
+#endif
 		self->WhenPropertyMany(clone(self->selection_), property_id, value);
+#ifdef _DEBUG
+		RLOG("Inspector commit delivered: " << property_id);
+#endif
 	});
 }
 

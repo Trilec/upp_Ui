@@ -680,6 +680,9 @@ private:
 			if(syncing_recent_ || IsNull(v))
 				return;
 			String cmd = AsString(v);
+#ifdef _DEBUG
+			RLOG("UiSplitButton WhenSelect fired: load=" << cmd);
+#endif
 			if(cmd == "cmd:open")
 				LoadDesignFromFile();
 			else
@@ -698,6 +701,9 @@ private:
 		theme_preset_row_.WhenSelectData = [=](const Value& id) {
 			if(syncing_theme_)
 				return;
+#ifdef _DEBUG
+			RLOG("UiDropdown WhenSelectData fired: theme=" << StdFormat(id));
+#endif
 			ApplyTheme(DesignerThemePresetFromId(id), theme_mode_);
 		};
 		theme_preset_row_.WhenClose = [=] {
@@ -1593,6 +1599,9 @@ private:
 	// affected; narrower refresh helpers are used for pure selection changes.
 	void RunRefreshAllNow()
 	{
+#ifdef _DEBUG
+		RLOG("RunRefreshAllNow executing");
+#endif
 		full_refresh_requested_ = false;
 		pending_inspector_refresh_ = false;
 		RefreshToolbox();
@@ -1610,6 +1619,10 @@ private:
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
 	{
+#ifdef _DEBUG
+		RLOG(Format("RequestDesignerRefresh requested rebuild_inspector=%d full=%d blocked=%d",
+		            rebuild_inspector ? 1 : 0, full ? 1 : 0, IsDesignerRefreshBlocked() ? 1 : 0));
+#endif
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		full_refresh_requested_ = full_refresh_requested_ || full;
 
@@ -2241,6 +2254,9 @@ private:
 				self->refresh_deferred_ = true;
 				return;
 			}
+#ifdef _DEBUG
+			RLOG("PostDesignerRefresh callback executing");
+#endif
 			if(self->full_refresh_requested_) {
 				self->RunRefreshAllNow();
 				return;
