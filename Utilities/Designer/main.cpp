@@ -1688,36 +1688,41 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
+		SyncHierarchySelection();
+		RefreshInspector();
+		preview_.Refresh();
+#ifdef _DEBUG
+		RLOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
+		            model_.GetSelection().GetCount(),
+		            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+		            IsDesignerRefreshBlocked() ? 1 : 0,
+		            DesignerRefreshBlockReason()));
+#endif
 		if(IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
-			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+			RLOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 #endif
-			SyncHierarchySelection();
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
 		}
 		refresh_posted_ = false;
-		SyncHierarchySelection();
-		RefreshInspector();
-		preview_.Refresh();
 	}
 
 	void RefreshInspectorPreview()
 	{
+		SyncHierarchySelection();
+		RefreshInspector();
+		preview_.Refresh();
 		if(IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
-			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
+			RLOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 #endif
-			SyncHierarchySelection();
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
 		}
 		refresh_posted_ = false;
-		SyncHierarchySelection();
-		RefreshInspector();
-		preview_.Refresh();
 	}
 
 	Image NodeIcon(const DesignerType* t) const
@@ -2067,6 +2072,9 @@ private:
 			SetWarningNotes(String());
 			return;
 		}
+#ifdef _DEBUG
+		RLOG("RefreshInspector primary=" << (int)model_.GetSelection()[0]);
+#endif
 		inspector_.SetSelection(model_.GetSelection());
 		theme_override_inspector_.SetSelection(model_.GetSelection());
 		RefreshContainerActions();
