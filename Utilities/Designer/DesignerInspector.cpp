@@ -826,8 +826,27 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetData(value);
 		row->Enable(b.enabled);
 		row->WhenSelectData = [=](const Value& data) {
-			if(self && generation == inspector_generation_ && node_id_ == row_node)
-				PostInspectorCommit(generation, row_node, property_id, data);
+			if(!self) {
+#ifdef _DEBUG
+				RLOG("Inspector choice row blocked: control destroyed property=" << property_id);
+#endif
+				return;
+			}
+			if(generation != inspector_generation_) {
+#ifdef _DEBUG
+				RLOG(Format("Inspector choice row blocked: generation old=%d current=%d property=%s node=%d current_node=%d",
+				            generation, inspector_generation_, property_id, (int)row_node, (int)node_id_));
+#endif
+				return;
+			}
+			if(node_id_ != row_node) {
+#ifdef _DEBUG
+				RLOG(Format("Inspector choice row blocked: node mismatch property=%s row_node=%d current_node=%d",
+				            property_id, (int)row_node, (int)node_id_));
+#endif
+				return;
+			}
+			PostInspectorCommit(generation, row_node, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1003,8 +1022,32 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(mixed ? Value() : value);
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenSelectData = [=](const Value& data) {
-			if(self && !syncing_ && generation == inspector_generation_ && !IsNull(data))
-				PostInspectorManyCommit(generation, property_id, data);
+			if(!self) {
+#ifdef _DEBUG
+				RLOG("Inspector multi choice row blocked: control destroyed property=" << property_id);
+#endif
+				return;
+			}
+			if(syncing_) {
+#ifdef _DEBUG
+				RLOG("Inspector multi choice row blocked: syncing property=" << property_id);
+#endif
+				return;
+			}
+			if(generation != inspector_generation_) {
+#ifdef _DEBUG
+				RLOG(Format("Inspector multi choice row blocked: generation old=%d current=%d property=%s",
+				            generation, inspector_generation_, property_id));
+#endif
+				return;
+			}
+			if(IsNull(data)) {
+#ifdef _DEBUG
+				RLOG("Inspector multi choice row blocked: null data property=" << property_id);
+#endif
+				return;
+			}
+			PostInspectorManyCommit(generation, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;

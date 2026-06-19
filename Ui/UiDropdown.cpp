@@ -594,6 +594,23 @@ UiDropdown& UiDropdown::SelectByData(const Value& data)
     return *this;
 }
 
+UiDropdown& UiDropdown::SetDataSilently(const Value& data)
+{
+    int idx = FindItemByData(data);
+    if(idx >= 0) {
+        ApplySelectionInternal(idx, false);
+        return *this;
+    }
+
+    String s = AsString(data);
+    idx = FindItem(s, false);
+    if(idx >= 0)
+        ApplySelectionInternal(idx, false);
+    else
+        ClearSelection();
+    return *this;
+}
+
 UiDropdown& UiDropdown::ClearSelection()
 {
     selected_index_ = -1;
@@ -771,18 +788,7 @@ void UiDropdown::SetData(const Value& v)
         return;
     }
 
-    int idx = FindItemByData(v);
-    if(idx >= 0) {
-        ApplySelectionInternal(idx, false);
-        return;
-    }
-
-    String s = AsString(v);
-    idx = FindItem(s, false);
-    if(idx >= 0)
-        ApplySelectionInternal(idx, false);
-    else
-        ClearSelection();
+    SetDataSilently(v);
 }
 
 Value UiDropdown::GetData() const

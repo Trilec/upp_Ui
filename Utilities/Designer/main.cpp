@@ -1611,6 +1611,18 @@ private:
 		full_refresh_requested_ = false;
 		pending_inspector_refresh_ = false;
 		RefreshToolbox();
+		RebuildModelProjection();
+	}
+
+	void ApplySelectionProjection()
+	{
+		SyncHierarchySelection();
+		RefreshInspector();
+		preview_.Refresh();
+	}
+
+	void RebuildModelProjection()
+	{
 		RefreshHierarchy();
 		RefreshInspector();
 		RefreshCode();
@@ -1688,9 +1700,7 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
-		SyncHierarchySelection();
-		RefreshInspector();
-		preview_.Refresh();
+		ApplySelectionProjection();
 #ifdef _DEBUG
 		RLOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
 		            model_.GetSelection().GetCount(),
@@ -1711,9 +1721,7 @@ private:
 
 	void RefreshInspectorPreview()
 	{
-		SyncHierarchySelection();
-		RefreshInspector();
-		preview_.Refresh();
+		ApplySelectionProjection();
 		if(IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
 			RLOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());

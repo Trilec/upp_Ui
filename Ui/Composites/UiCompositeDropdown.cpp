@@ -127,7 +127,7 @@ UiCompositeDropdown& UiCompositeDropdown::SelectByData(const Value& data)
 
 void UiCompositeDropdown::SetData(const Value& v)
 {
-    drop_.SetData(v);
+    drop_.SetDataSilently(v);
     drop_.Refresh();
     Refresh();
 }

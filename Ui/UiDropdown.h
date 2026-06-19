@@ -331,6 +331,7 @@ public:
     UiDropdown& Select(int index);
     UiDropdown& Select(const String& text, bool case_sensitive = false);
     UiDropdown& SelectByData(const Value& data);
+    UiDropdown& SetDataSilently(const Value& data);
     UiDropdown& ClearSelection();
     
     int         GetSelection() const { return selected_index_; }
