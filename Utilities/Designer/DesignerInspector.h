@@ -126,6 +126,8 @@ private:
 	void SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>& types,
 	                 const DesignerApiBinding& b, Row& row);
 	Value QuadFaceValue(const DesignerNode& n, Color face) const;
+	bool CanDeliverRowCommit(int generation, DesignerNodeId row_node, const String& property_id, const char *editor_kind) const;
+	bool CanDeliverManyRowCommit(int generation, const String& property_id, const char *editor_kind) const;
 	void PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);
 	void PostInspectorPreview(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);
 	void PostInspectorManyCommit(int generation, const String& property_id, const Value& value);
