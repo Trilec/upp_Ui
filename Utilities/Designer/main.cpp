@@ -1614,6 +1614,15 @@ private:
 		RebuildModelProjection();
 	}
 
+	struct DesignerProjectionRequest {
+		bool preview = true;
+		bool hierarchy = false;
+		bool inspector = false;
+		bool code = true;
+		bool full = false;
+		String reason;
+	};
+
 	void ApplySelectionProjection()
 	{
 		SyncHierarchySelection();
@@ -1662,6 +1671,36 @@ private:
 #endif
 		CancelDesignerInteractionGuards();
 		RunRefreshAllNow();
+	}
+
+	void LogProjectionRequest(const DesignerProjectionRequest& r) const
+	{
+#ifdef _DEBUG
+		RLOG(Format("Projection requested: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		            r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0,
+		            r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
+	}
+
+	void ApplyDesignerProjection(const DesignerProjectionRequest& r)
+	{
+		LogProjectionRequest(r);
+		if(r.full) {
+			ForceDesignerProjectionRefresh(r.reason);
+			RequestDesignerRefresh(true, true);
+			return;
+		}
+
+		if(r.hierarchy)
+			RefreshHierarchy();
+		if(r.code)
+			RefreshCode();
+		if(r.preview) {
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+		}
+		if(r.inspector)
+			PostDesignerRefresh(true);
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
@@ -3144,8 +3183,13 @@ private:
 	{
 		SetInspectorLiveEditing(false);
 		DesignerNode* n = model_.Find(node_id);
-		if(!n || n->id == Designer_ROOT)
+		if(!n || n->id == Designer_ROOT) {
+#ifdef _DEBUG
+			RLOG(Format("Commit rejected: node=%d property=%s reason=%s",
+			            (int)node_id, property_id, !n ? "node not found" : "root node"));
+#endif
 			return;
+		}
 		Vector<DesignerApiBinding> bindings;
 		DesignerAdapter *adapter = nullptr;
 		One<Ctrl> ctrl;
@@ -3174,8 +3218,16 @@ private:
 		            binding ? (binding->enabled ? 1 : 0) : 0,
 		            safe_sizing ? 1 : 0, safe_theme_override ? 1 : 0));
 #endif
-		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing && !safe_theme_override))
+		if(!binding || !binding->visible || (!binding->enabled && !safe_sizing && !safe_theme_override)) {
+#ifdef _DEBUG
+			String reason = !binding ? "missing binding"
+			              : !binding->visible ? "binding hidden"
+			              : "binding disabled";
+			RLOG(Format("Commit rejected: node=%d property=%s reason=%s",
+			            (int)node_id, property_id, reason));
+#endif
 			return;
+		}
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
 #ifdef _DEBUG
 		RLOG(Format("CommitPreviewInspectorPropertyValue delivered: node=%d property=%s normalized=%s",
@@ -3203,8 +3255,8 @@ private:
 		}
 		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
 #ifdef _DEBUG
-				RLOG(Format("CommitPreviewInspectorPropertyValue command executed: node=%d property=%s",
-				            (int)node_id, property_id));
+				RLOG(Format("Command executed: node=%d property=%s old=%s new=%s",
+				            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
 #endif
 				SetDocumentDirty();
 			if(has_preview_old) {
@@ -3216,7 +3268,6 @@ private:
 			if(grouped)
 				commands_.EndGroup();
 			const DesignerNode* changed = model_.Find(node_id);
-			bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
 			bool layout_affecting = changed ? IsLayoutAffectingProperty(*changed, property_id)
 			                               : (property_id == "h_sizing" || property_id == "v_sizing" ||
 			                                  property_id == "fixed_width" || property_id == "fixed_height" ||
@@ -3226,20 +3277,16 @@ private:
 			                                  property_id == "weight");
 			if(layout_affecting && changed)
 				TraceLayoutAffectingChange(*changed, property_id);
-			if(layout_affecting) {
-#ifdef _DEBUG
-				RLOG("Layout-affecting inspector commit: forcing projection refresh");
-#endif
-				ForceDesignerProjectionRefresh("layout inspector commit");
-				RequestDesignerRefresh(true, true);
-				return;
+			if(changed)
+				ApplyDesignerProjection(GetProjectionForInspectorCommit(*changed, property_id));
+			else {
+				DesignerProjectionRequest projection;
+				projection.full = true;
+				projection.hierarchy = true;
+				projection.inspector = true;
+				projection.reason = "inspector commit fallback";
+				ApplyDesignerProjection(projection);
 			}
-			bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
-			preview_.InvalidateRealPreview();
-			preview_.Refresh();
-			if(needs_hierarchy)
-				RefreshHierarchy();
-			PostDesignerRefresh(needs_inspector);
 		}
 		else {
 			if(has_preview_old) {
@@ -3248,6 +3295,10 @@ private:
 			}
 			if(grouped)
 				commands_.EndGroup();
+#ifdef _DEBUG
+			RLOG(Format("Command no-op / failed: node=%d property=%s old=%s new=%s",
+			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
+#endif
 			RequestDesignerRefresh(true, true);
 		}
 	}
@@ -3457,6 +3508,60 @@ private:
 		   property_id == "width" || property_id == "height")
 			return DesignerClampMin(IsNumber(value) ? (int)value : DESIGNER_MIN_CLAMP);
 		return value;
+	}
+
+	DesignerProjectionRequest GetProjectionForInspectorCommit(const DesignerNode& node, const String& property_id) const
+	{
+		DesignerProjectionRequest r;
+		r.reason = "inspector commit";
+
+		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" ||
+		                      property_id == "v_sizing" || property_id == "crumb_count";
+		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap" ||
+		                      property_id == "name" || property_id == "page_title";
+		bool layout_affecting = IsLayoutAffectingProperty(node, property_id);
+		bool safe_sizing = property_id == "h_sizing" || property_id == "v_sizing" ||
+		                   property_id == "fixed_width" || property_id == "fixed_height" ||
+		                   property_id == "min_width" || property_id == "min_height" ||
+		                   property_id == "max_width" || property_id == "max_height" ||
+		                   property_id == "cell_align_h" || property_id == "cell_align_v";
+		bool theme_or_display = property_id == "theme_override" ||
+		                        property_id == "face_enabled" || property_id == "face" ||
+		                        property_id == "face_mode" || property_id == "face_quad" ||
+		                        property_id == "frame_enabled" || property_id == "frame" ||
+		                        property_id == "frame_width" || property_id == "radius" ||
+		                        property_id == "shadow_enabled" || property_id == "shadow_distance" ||
+		                        property_id == "shadow_offset_x" || property_id == "shadow_offset_y" ||
+		                        property_id == "shadow_alpha" || property_id == "shadow_color" ||
+		                        property_id == "shadow_curve" || property_id == "icon" ||
+		                        property_id == "role";
+
+		if(layout_affecting) {
+			r.full = true;
+			r.inspector = true;
+			r.hierarchy = true;
+			r.reason = "layout inspector commit";
+			return r;
+		}
+		if(safe_sizing) {
+			r.inspector = true;
+			r.reason = "sizing inspector commit";
+			return r;
+		}
+		if(theme_or_display) {
+			r.inspector = true;
+			r.reason = "theme/display inspector commit";
+			return r;
+		}
+		if(needs_hierarchy) {
+			r.preview = false;
+			r.hierarchy = true;
+			r.inspector = true;
+			r.reason = "hierarchy-visible inspector commit";
+			return r;
+		}
+		r.reason = "visual inspector commit";
+		return r;
 	}
 
 	void SaveInspectorNameValue(DesignerNodeId node_id, const String& new_name)
