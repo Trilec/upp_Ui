@@ -42,6 +42,7 @@ struct DesignerInspectorEditIntent {
 	String property_id;
 	Value value;
 	bool preview = false;
+	bool final_commit = true;
 	String editor_kind;
 	int row_generation = 0;
 	int inspector_generation = 0;
@@ -64,6 +65,7 @@ public:
 	DesignerNodeId GetNode() const { return node_id_; }
 	bool HasRow(const String& property_id) const;
 	bool IsRowEnabled(const String& property_id) const;
+	Value GetRowValue(const String& property_id) const;
 
 	Size GetContentSize() const;
 	int MeasureHeightForWidth(int width) const;
@@ -138,7 +140,7 @@ private:
 	void SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>& types,
 	                 const DesignerApiBinding& b, Row& row);
 	Value QuadFaceValue(const DesignerNode& n, Color face) const;
-	bool IsDesignerStateControlledProperty(const String& property_id) const;
+	bool IsSingleNodeInspectorStateControlled(const DesignerApiBinding& binding) const;
 	void PostInspectorIntent(const DesignerInspectorEditIntent& intent);
 	bool CanDeliverRowCommit(int generation, DesignerNodeId row_node, const String& property_id, const char *editor_kind) const;
 	bool CanDeliverManyRowCommit(int generation, const String& property_id, const char *editor_kind) const;

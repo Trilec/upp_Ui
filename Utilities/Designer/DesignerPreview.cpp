@@ -36,6 +36,44 @@ static int DesignerPreviewFixedMetric(const DesignerNode& n, const String& axis_
 	q = n.properties.Find(axis_key);
 	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
 }
+
+#ifdef _DEBUG
+static bool DesignerPreviewTraceType(const String& type_id)
+{
+	return type_id == "UiTitleCard" ||
+	       type_id == "UiScrollPanel" ||
+	       type_id == "UiLineEdit" ||
+	       type_id == "UiButton" ||
+	       type_id == "UiLabel";
+}
+
+static String DesignerPreviewTraceValue(const DesignerNode& n, const String& key, const Value& def)
+{
+	Value v = DesignerPreviewNodeProperty(n, key, def);
+	return AsString(v);
+}
+
+static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n, const Rect& rect = Null)
+{
+	if(!DesignerPreviewTraceType(n.type_id))
+		return;
+	String line = Format("Preview readback stage=%s node=%d type=%s h_sizing=%s v_sizing=%s fixed_width=%s fixed_height=%s role=%s icon=%s",
+	                     stage,
+	                     (int)n.id,
+	                     n.type_id,
+	                     DesignerPreviewTraceValue(n, "h_sizing", "Fit"),
+	                     DesignerPreviewTraceValue(n, "v_sizing", "Fit"),
+	                     DesignerPreviewTraceValue(n, "fixed_width", DesignerPreviewNodeProperty(n, "width", DESIGNER_FIXED_FALLBACK_WIDTH)),
+	                     DesignerPreviewTraceValue(n, "fixed_height", DesignerPreviewNodeProperty(n, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)),
+	                     DesignerPreviewTraceValue(n, "role", "Standard"),
+	                     DesignerPreviewTraceValue(n, "icon", "None"));
+	if(!IsNull(rect))
+		line << Format(" computed_rect=%d,%d,%d,%d", rect.left, rect.top, rect.right, rect.bottom);
+	line << Format(" adapter_role=%s", DesignerPreviewTraceValue(n, "role", "Standard"));
+	RLOG(line);
+}
+#endif
+
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
 {
 	String sizing = DesignerPreviewAxisSizing(n, axis);
@@ -1160,6 +1198,9 @@ Ctrl* DesignerPreview::BuildRealNode(DesignerNodeId id)
 			DesignerNode* n = model_ ? model_->Find(id) : nullptr;
 			if(!n || id == Designer_ROOT)
 				return nullptr;
+#ifdef _DEBUG
+			DesignerPreviewLogReadback("build", *n);
+#endif
 			DesignerAdapter *adapter = nullptr;
 			Ctrl *raw = CreateDesignerAdapterCtrl(*n, &adapter);
 			if(!raw || !adapter)
@@ -1555,6 +1596,10 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 					n->last_rect = ctrl.GetRect() + offset;
 				if(n)
 					DesignerSyncSpacerItemRects(*model_, *n, ctrl, offset + ctrl.GetRect().TopLeft());
+#ifdef _DEBUG
+				if(n)
+					DesignerPreviewLogReadback("layout", *n, n->last_rect);
+#endif
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())

@@ -55,13 +55,6 @@ static bool DesignerIsSafeSizingProperty(const String& id)
 	       id == "cell_align_h" || id == "cell_align_v";
 }
 
-static bool DesignerIsStateControlledProperty(const String& id)
-{
-	return id == "h_sizing" || id == "v_sizing" ||
-	       id == "fixed_width" || id == "fixed_height" ||
-	       id == "role" || id == "icon";
-}
-
 static bool DesignerBindingEditableInMultiSelect(const DesignerApiBinding& binding)
 {
 	return DesignerIsSafeSizingProperty(binding.property_id) || binding.enabled;
@@ -275,6 +268,27 @@ bool DesignerInspector::IsRowEnabled(const String& property_id) const
 			if(row.property_id == property_id)
 				return row.ctrl && row.ctrl->IsEnabled();
 	return false;
+}
+
+Value DesignerInspector::GetRowValue(const String& property_id) const
+{
+	for(const Page& page : pages_) {
+		for(const Row& row : page.rows) {
+			if(row.property_id != property_id || !row.ctrl)
+				continue;
+			if(const UiCompositeDropdown* c = dynamic_cast<const UiCompositeDropdown*>(row.ctrl))
+				return c->GetData();
+			if(const UiCompositeToggle* c = dynamic_cast<const UiCompositeToggle*>(row.ctrl))
+				return c->GetData();
+			if(const UiCompositeSlider* c = dynamic_cast<const UiCompositeSlider*>(row.ctrl))
+				return c->GetData();
+			if(const UiCompositeColor* c = dynamic_cast<const UiCompositeColor*>(row.ctrl))
+				return c->GetColor(0);
+			if(const UiCompositeEdit* c = dynamic_cast<const UiCompositeEdit*>(row.ctrl))
+				return c->GetData();
+		}
+	}
+	return Value();
 }
 
 Value DesignerInspector::NodeProperty(const DesignerNode& n, const String& key, const Value& def) const
@@ -815,7 +829,6 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	String property_id = b.property_id;
 	DesignerNodeId row_node = n.id;
 	int generation = inspector_generation_;
-	bool state_controlled = IsDesignerStateControlledProperty(property_id);
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -836,10 +849,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenSelectData = [=](const Value& data) {
 			if(!self)
 				return;
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, data, false, "choice", generation, inspector_generation_, syncing_});
-			else if(CanDeliverRowCommit(generation, row_node, property_id, "choice"))
-				PostInspectorCommit(generation, row_node, property_id, data);
+			PostInspectorIntent({row_node, property_id, data, false, true, "choice", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -860,10 +870,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenAction = [=] {
 			if(!self)
 				return;
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, (bool)self->GetData(), false, "bool", generation, inspector_generation_, syncing_});
-			else if(CanDeliverRowCommit(generation, row_node, property_id, "bool"))
-				PostInspectorCommit(generation, row_node, property_id, (bool)self->GetData());
+			PostInspectorIntent({row_node, property_id, (bool)self->GetData(), false, true, "bool", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -891,26 +898,14 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, v, true, "slider-preview", generation, inspector_generation_, syncing_});
-			else {
-				if(!CanDeliverRowCommit(generation, row_node, property_id, "slider-preview"))
-					return;
-				PostInspectorPreview(generation, row_node, property_id, v);
-			}
+			PostInspectorIntent({row_node, property_id, v, true, false, "slider-preview", generation, inspector_generation_, syncing_});
 		};
 		row->WhenAction = [=] {
 			if(!self)
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, v, false, "slider", generation, inspector_generation_, syncing_});
-			else {
-				if(!CanDeliverRowCommit(generation, row_node, property_id, "slider"))
-					return;
-				PostInspectorCommit(generation, row_node, property_id, v);
-			}
+			PostInspectorIntent({row_node, property_id, v, false, true, "slider", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -931,10 +926,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenAction = [=] {
 			if(!self)
 				return;
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, self->GetColor(0), false, "color", generation, inspector_generation_, syncing_});
-			else if(CanDeliverRowCommit(generation, row_node, property_id, "color"))
-				PostInspectorCommit(generation, row_node, property_id, self->GetColor(0));
+			PostInspectorIntent({row_node, property_id, self->GetColor(0), false, true, "color", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -964,10 +956,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			ValueArray out;
 			for(int i = 0; i < 4; i++)
 				out.Add(self->GetColor(i));
-			if(state_controlled)
-				PostInspectorIntent({row_node, property_id, out, false, "quadcolor", generation, inspector_generation_, syncing_});
-			else if(CanDeliverRowCommit(generation, row_node, property_id, "quadcolor"))
-				PostInspectorCommit(generation, row_node, property_id, out);
+			PostInspectorIntent({row_node, property_id, out, false, true, "quadcolor", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -987,18 +976,12 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	row->WhenAction = [=] {
 		if(!self)
 			return;
-		if(state_controlled)
-			PostInspectorIntent({row_node, property_id, self->GetData(), false, "edit-action", generation, inspector_generation_, syncing_});
-		else if(CanDeliverRowCommit(generation, row_node, property_id, "edit-action"))
-			PostInspectorCommit(generation, row_node, property_id, self->GetData());
+		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-action", generation, inspector_generation_, syncing_});
 	};
 	row->WhenChange = [=] {
 		if(!self)
 			return;
-		if(state_controlled)
-			PostInspectorIntent({row_node, property_id, self->GetData(), false, "edit-change", generation, inspector_generation_, syncing_});
-		else if(CanDeliverRowCommit(generation, row_node, property_id, "edit-change"))
-			PostInspectorCommit(generation, row_node, property_id, self->GetData());
+		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-change", generation, inspector_generation_, syncing_});
 	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
@@ -1180,9 +1163,15 @@ String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindin
 	return note;
 }
 
-bool DesignerInspector::IsDesignerStateControlledProperty(const String& property_id) const
+bool DesignerInspector::IsSingleNodeInspectorStateControlled(const DesignerApiBinding& binding) const
 {
-	return DesignerIsStateControlledProperty(property_id);
+	if(!binding.visible)
+		return false;
+	if(binding.property_id == "name")
+		return false;
+	if(binding.editor == DesignerEditorKind::ReadOnly)
+		return false;
+	return true;
 }
 
 void DesignerInspector::PostInspectorIntent(const DesignerInspectorEditIntent& intent)
@@ -1196,6 +1185,8 @@ void DesignerInspector::PostInspectorIntent(const DesignerInspectorEditIntent& i
 	RLOG(Format("RAW inspector intent: node=%d type=%s property=%s value=%s editor=%s row_generation=%d inspector_generation=%d syncing=%d preview=%d",
 	            (int)intent.node_id, type_id, intent.property_id, StdFormat(intent.value), intent.editor_kind,
 	            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, intent.preview ? 1 : 0));
+	RLOG(Format("RAW inspector intent flags: node=%d property=%s final_commit=%d",
+	            (int)intent.node_id, intent.property_id, intent.final_commit ? 1 : 0));
 #endif
 	WhenInspectorIntent(intent);
 }

@@ -39,11 +39,28 @@ static const char *DESIGNER_EVENT_COMMAND_APPLIED = "command_applied";
 static const char *DESIGNER_EVENT_COMMAND_REJECTED = "command_rejected";
 static const char *DESIGNER_EVENT_PROJECTION_DONE = "projection_done";
 
-static bool IsDesignerStateControlledProperty(const String& property_id)
+static bool IsSingleNodeInspectorStateControlled(const DesignerApiBinding& binding)
 {
-	return property_id == "h_sizing" || property_id == "v_sizing" ||
-	       property_id == "fixed_width" || property_id == "fixed_height" ||
-	       property_id == "role" || property_id == "icon";
+	if(!binding.visible)
+		return false;
+	if(binding.property_id == "name")
+		return false;
+	if(binding.editor == DesignerEditorKind::ReadOnly)
+		return false;
+	return true;
+}
+
+static bool IsSingleNodeInspectorStateControlledProperty(const DesignerNode& node, const Vector<DesignerApiBinding>& bindings,
+                                                         const String& property_id)
+{
+	for(const DesignerApiBinding& binding : bindings)
+		if(binding.property_id == property_id)
+			return IsSingleNodeInspectorStateControlled(binding);
+#ifdef _DEBUG
+	RLOG(Format("Single-node inspector property excluded from DSM control: node=%d type=%s property=%s reason=%s",
+	            (int)node.id, node.type_id, property_id, "binding not found"));
+#endif
+	return false;
 }
 
 static String DesignerCrumbPropertyKey(int i)
@@ -855,9 +872,9 @@ private:
 		};
 		inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
 #ifdef _DEBUG
-			RLOG(Format("DesignerWindow received inspector intent: node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
-			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
-			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+			RLOG(Format("DesignerWindow received inspector intent: node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+			            intent.editor_kind, intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
 			SubmitInspectorIntent(intent, intent.preview ? "raw inspector preview intent" : "raw inspector commit intent");
 		};
@@ -881,9 +898,9 @@ private:
 		};
 		theme_override_inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
 #ifdef _DEBUG
-			RLOG(Format("DesignerWindow received theme override inspector intent: node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
-			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
-			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+			RLOG(Format("DesignerWindow received theme override inspector intent: node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+			            intent.editor_kind, intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
 			SubmitInspectorIntent(intent, intent.preview ? "raw theme override preview intent" : "raw theme override commit intent");
 		};
@@ -1661,6 +1678,7 @@ private:
 		bool active = false;
 		bool preview = false;
 		bool commit = false;
+		bool final_commit = true;
 		DesignerNodeId node_id = Designer_NULL;
 		String property_id;
 		Value value;
@@ -1680,13 +1698,20 @@ private:
 		DesignerProjectionRequest projection;
 	};
 
+	struct InspectorCommitReadback {
+		bool active = false;
+		DesignerNodeId node_id = Designer_NULL;
+		String property_id;
+		Value intended_value;
+	};
+
+	struct DeferredInspectorIntent {
+		bool active = false;
+		DesignerInspectorEditIntent intent;
+	};
+
 	bool CanAcceptInspectorIntent(const DesignerInspectorEditIntent& intent, String& reason) const
 	{
-		if(designer_fsm_.IsTransitioning()) {
-			reason = "fsm transitioning";
-			return false;
-		}
-
 		String current = designer_fsm_.GetCurrent();
 		if(intent.preview) {
 			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING) {
@@ -1703,8 +1728,68 @@ private:
 		return true;
 	}
 
+	void ProcessDeferredInspectorIntentIfReady()
+	{
+		if(!deferred_inspector_intent_.active)
+			return;
+		if(designer_fsm_.IsTransitioning() || designer_fsm_.GetCurrent() != DESIGNER_STATE_IDLE)
+			return;
+#ifdef _DEBUG
+		RLOG(Format("Processing deferred inspector intent: node=%d property=%s preview=%d final_commit=%d value=%s",
+		            (int)deferred_inspector_intent_.intent.node_id,
+		            deferred_inspector_intent_.intent.property_id,
+		            deferred_inspector_intent_.intent.preview ? 1 : 0,
+		            deferred_inspector_intent_.intent.final_commit ? 1 : 0,
+		            StdFormat(deferred_inspector_intent_.intent.value)));
+#endif
+		DesignerInspectorEditIntent intent = deferred_inspector_intent_.intent;
+		deferred_inspector_intent_.active = false;
+		SubmitInspectorIntent(intent, intent.preview ? "deferred inspector preview intent" : "deferred inspector commit intent");
+	}
+
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
+		auto merge_intent = [&](DesignerInspectorEditIntent& dst, const DesignerInspectorEditIntent& src) {
+			dst.value = src.value;
+			dst.preview = src.preview;
+			dst.final_commit = src.final_commit;
+			dst.editor_kind = src.editor_kind;
+			dst.row_generation = src.row_generation;
+			dst.inspector_generation = src.inspector_generation;
+			dst.syncing = src.syncing;
+		};
+
+		if(designer_fsm_.IsTransitioning()) {
+			bool same_target = pending_inspector_txn_.active &&
+			                  pending_inspector_txn_.node_id == intent.node_id &&
+			                  pending_inspector_txn_.property_id == intent.property_id;
+			if(same_target) {
+				if(deferred_inspector_intent_.active &&
+				   deferred_inspector_intent_.intent.node_id == intent.node_id &&
+				   deferred_inspector_intent_.intent.property_id == intent.property_id) {
+					merge_intent(deferred_inspector_intent_.intent, intent);
+				}
+				else {
+					deferred_inspector_intent_.active = true;
+					deferred_inspector_intent_.intent = intent;
+				}
+#ifdef _DEBUG
+				RLOG(Format("DesignerState intent coalesced: current=%s node=%d property=%s preview=%d final_commit=%d value=%s",
+				            designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
+				            intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, StdFormat(intent.value)));
+#endif
+				return;
+			}
+			String reject_reason = "fsm busy different property";
+#ifdef _DEBUG
+			RLOG(Format("DesignerState intent rejected loudly: reason=%s current=%s transitioning=%d node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            reject_reason, designer_fsm_.GetCurrent(), 1,
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
+			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+#endif
+			return;
+		}
+
 		String reject_reason;
 		if(!CanAcceptInspectorIntent(intent, reject_reason)) {
 #ifdef _DEBUG
@@ -1718,7 +1803,8 @@ private:
 
 		pending_inspector_txn_.active = true;
 		pending_inspector_txn_.preview = intent.preview;
-		pending_inspector_txn_.commit = !intent.preview;
+		pending_inspector_txn_.commit = intent.final_commit;
+		pending_inspector_txn_.final_commit = intent.final_commit;
 		pending_inspector_txn_.node_id = intent.node_id;
 		pending_inspector_txn_.property_id = intent.property_id;
 		pending_inspector_txn_.value = intent.value;
@@ -1754,7 +1840,8 @@ private:
 			ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
 			if(adapter)
 				adapter->DescribeApi(bindings, *n);
-			const DesignerApiBinding* binding = FindApiBinding(bindings, pending_inspector_txn_.property_id);
+		const DesignerApiBinding* binding = FindApiBinding(bindings, pending_inspector_txn_.property_id);
+		bool state_controlled = binding ? IsSingleNodeInspectorStateControlled(*binding) : false;
 			bool safe_sizing = pending_inspector_txn_.property_id == "h_sizing" || pending_inspector_txn_.property_id == "v_sizing" ||
 			                   pending_inspector_txn_.property_id == "fixed_width" || pending_inspector_txn_.property_id == "fixed_height" ||
 			                   pending_inspector_txn_.property_id == "min_width" || pending_inspector_txn_.property_id == "min_height" ||
@@ -1772,9 +1859,9 @@ private:
 			bool binding_visible = binding ? binding->visible : false;
 			bool binding_enabled = binding ? binding->enabled : false;
 #ifdef _DEBUG
-			RLOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
+			RLOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d state_controlled=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
 			            (int)pending_inspector_txn_.node_id, n->type_id, pending_inspector_txn_.property_id,
-			            binding ? 1 : 0, binding_visible ? 1 : 0, binding_enabled ? 1 : 0, safe_sizing ? 1 : 0,
+			            binding ? 1 : 0, binding_visible ? 1 : 0, binding_enabled ? 1 : 0, safe_sizing ? 1 : 0, state_controlled ? 1 : 0,
 			            pending_inspector_txn_.row_generation, pending_inspector_txn_.inspector_generation,
 			            pending_inspector_txn_.inspector_syncing ? 1 : 0, stage ? stage : ""));
 #endif
@@ -1899,6 +1986,27 @@ private:
 #endif
 	}
 
+	void ApplyPreviewProjectionDuringEdit(const DesignerProjectionRequest& r)
+	{
+#ifdef _DEBUG
+		RLOG(Format("PreviewProjectionDuringEdit: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		            r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, 0, r.code ? 1 : 0, 0));
+#endif
+		if(r.hierarchy)
+			RefreshHierarchy();
+		if(r.code)
+			RefreshCode();
+		if(r.preview) {
+			preview_.InvalidateRealPreview();
+			preview_.Refresh();
+		}
+	}
+
+	void ApplyCommitProjectionAfterEdit(const DesignerProjectionRequest& r)
+	{
+		ApplyDesignerProjection(r);
+	}
+
 	void ResetPendingInspectorTransaction()
 	{
 		pending_inspector_txn_ = PendingInspectorTransaction();
@@ -1925,6 +2033,7 @@ private:
 	void ContinueInspectorProjectionStateMachine()
 	{
 		TriggerDesignerStateEvent(DESIGNER_EVENT_PROJECTION_DONE, "projection complete");
+		ProcessDeferredInspectorIntentIfReady();
 	}
 
 	void InitDesignerStateMachine()
@@ -1941,6 +2050,8 @@ private:
 #ifdef _DEBUG
 			RLOG(Format("DSM transition finished: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
+			if(ctx.toState == DESIGNER_STATE_IDLE)
+				ProcessDeferredInspectorIntentIfReady();
 		};
 
 		designer_fsm_.AddState({DESIGNER_STATE_IDLE,
@@ -2418,6 +2529,21 @@ private:
 #endif
 		inspector_.SetSelection(model_.GetSelection());
 		theme_override_inspector_.SetSelection(model_.GetSelection());
+#ifdef _DEBUG
+		if(last_inspector_readback_.active &&
+		   model_.GetSelection()[0] == last_inspector_readback_.node_id) {
+			const DesignerNode* n = model_.Find(last_inspector_readback_.node_id);
+			int q = n ? n->properties.Find(last_inspector_readback_.property_id) : -1;
+			Value model_value = q >= 0 ? n->properties.GetValue(q) : Value();
+			Value inspector_value = inspector_.GetRowValue(last_inspector_readback_.property_id);
+			RLOG(Format("Inspector readback: node=%d property=%s model_value=%s inspector_value=%s equals_model=%d equals_intended=%d",
+			            (int)last_inspector_readback_.node_id, last_inspector_readback_.property_id,
+			            q >= 0 ? StdFormat(model_value) : String("<missing>"),
+			            StdFormat(inspector_value),
+			            inspector_value == model_value ? 1 : 0,
+			            model_value == last_inspector_readback_.intended_value ? 1 : 0));
+		}
+#endif
 		RefreshContainerActions();
 		RefreshRightPanel();
 	}
@@ -3441,20 +3567,12 @@ private:
 			return;
 		if(!ValidatePendingInspectorIntent("preview", true))
 			return;
-		if(IsDesignerStateControlledProperty(pending_inspector_txn_.property_id)) {
+		if(pending_inspector_txn_.editor_kind == "slider-preview" && !pending_inspector_txn_.final_commit) {
 #ifdef _DEBUG
-			RLOG(Format("Controlled preview escalated to durable commit: node=%d property=%s value=%s",
+			RLOG(Format("DSM preview deferred to final slider action: node=%d property=%s value=%s editor=%s",
 			            (int)pending_inspector_txn_.node_id, pending_inspector_txn_.property_id,
-			            StdFormat(pending_inspector_txn_.value)));
+			            StdFormat(pending_inspector_txn_.value), pending_inspector_txn_.editor_kind));
 #endif
-			pending_inspector_txn_.preview = false;
-			pending_inspector_txn_.commit = true;
-			ApplyPendingInspectorCommit();
-			Ptr<DesignerWindow> self = this;
-			PostCallback([self] {
-				if(self)
-					self->ContinueInspectorCommitStateMachine();
-			});
 			return;
 		}
 		DesignerNodeId node_id = pending_inspector_txn_.node_id;
@@ -3480,7 +3598,15 @@ private:
 		}
 #endif
 		model_.SetProperty(node_id, property_id, normalized);
-		ScheduleLivePreviewRefresh();
+		DesignerProjectionRequest preview_projection;
+		preview_projection.preview = true;
+		preview_projection.hierarchy = property_id == "direction" || property_id == "wrap" ||
+		                               property_id == "name" || property_id == "page_title";
+		preview_projection.inspector = false;
+		preview_projection.code = false;
+		preview_projection.full = false;
+		preview_projection.reason = "preview during edit";
+		ApplyPreviewProjectionDuringEdit(preview_projection);
 	}
 
 	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
@@ -3490,6 +3616,7 @@ private:
 		intent.property_id = property_id;
 		intent.value = value;
 		intent.preview = true;
+		intent.final_commit = false;
 		SubmitInspectorIntent(intent, "single-node preview");
 	}
 
@@ -3539,6 +3666,7 @@ private:
 		if(adapter)
 			adapter->DescribeApi(bindings, *n);
 		const DesignerApiBinding* binding = FindApiBinding(bindings, property_id);
+		bool state_controlled = binding ? IsSingleNodeInspectorStateControlled(*binding) : false;
 		bool safe_sizing = property_id == "h_sizing" || property_id == "v_sizing" ||
 		                   property_id == "fixed_width" || property_id == "fixed_height" ||
 		                   property_id == "min_width" || property_id == "min_height" ||
@@ -3619,7 +3747,7 @@ private:
 		int after_q = after_command ? after_command->properties.Find(property_id) : -1;
 		Value model_after = after_q >= 0 ? after_command->properties.GetValue(after_q) : Value();
 		bool accepted_already_applied = !command_result &&
-		                               IsDesignerStateControlledProperty(property_id) &&
+		                               state_controlled &&
 		                               after_q >= 0 && model_after == normalized;
 #ifdef _DEBUG
 		RLOG(Format("DSM command: node=%d type=%s property=%s old=%s new=%s execute=%d model_after=%s equals_intended=%d accepted_already_applied=%d",
@@ -3637,6 +3765,10 @@ private:
 			if(command_result)
 				SetDocumentDirty();
 			pending_inspector_txn_.commit_succeeded = true;
+			last_inspector_readback_.active = true;
+			last_inspector_readback_.node_id = node_id;
+			last_inspector_readback_.property_id = property_id;
+			last_inspector_readback_.intended_value = normalized;
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
 				live_preview_had_old_.Remove(preview_q);
@@ -3707,6 +3839,7 @@ private:
 		intent.property_id = property_id;
 		intent.value = value;
 		intent.preview = false;
+		intent.final_commit = true;
 		SubmitInspectorIntent(intent, "single-node commit");
 	}
 
@@ -3724,7 +3857,7 @@ private:
 		            pending_inspector_txn_.projection.code ? 1 : 0,
 		            pending_inspector_txn_.projection.full ? 1 : 0));
 #endif
-		ApplyDesignerProjection(pending_inspector_txn_.projection);
+		ApplyCommitProjectionAfterEdit(pending_inspector_txn_.projection);
 #ifdef _DEBUG
 		int projection_q = changed ? changed->properties.Find(pending_inspector_txn_.property_id) : -1;
 		RLOG(Format("DSM final: state=%s model property still=%s selected node=%d inspector_refresh_requested=%d",
@@ -3968,7 +4101,17 @@ private:
 		                        property_id == "shadow_alpha" || property_id == "shadow_color" ||
 		                        property_id == "shadow_curve" || property_id == "icon" ||
 		                        property_id == "role";
-		bool controlled_property = IsDesignerStateControlledProperty(property_id);
+		bool controlled_property = false;
+		{
+			DesignerAdapter *adapter = nullptr;
+			One<Ctrl> ctrl;
+			ctrl.Attach(CreateDesignerAdapterCtrl(node, &adapter));
+			if(adapter) {
+				Vector<DesignerApiBinding> bindings;
+				adapter->DescribeApi(bindings, node);
+				controlled_property = IsSingleNodeInspectorStateControlledProperty(node, bindings, property_id);
+			}
+		}
 
 #ifdef _DEBUG
 		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d safe_sizing=%d controlled=%d",
@@ -4395,6 +4538,8 @@ private:
 	bool live_preview_refresh_pending_ = false;
 	StateMachine designer_fsm_;
 	PendingInspectorTransaction pending_inspector_txn_;
+	DeferredInspectorIntent deferred_inspector_intent_;
+	InspectorCommitReadback last_inspector_readback_;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	VectorMap<String, Value> live_preview_old_values_;
 	VectorMap<String, bool> live_preview_had_old_;
