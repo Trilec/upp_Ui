@@ -3,6 +3,12 @@
 #### Utilities/Designer Dev Notes.
 This Doc is ment for short but specific notes for: recording behavior changes, architectural decisions, and follow-up work that affects future development.
 
+## 2026-06-26
+
+- Bumped Designer to `v1.0.3 Alpha`.
+- Added a runtime diagnostics channel for inspector transactions so supervisor testing can see raw intent, DSM admission, validation, command, projection, and readback outside `_DEBUG`.
+- Continued moving single-node inspector ownership under the Designer state machine, including clearer preview vs final-commit intent handling.
+
 ## 2026-05-20
 
 - Established `Utilities/Designer` as the active app path, superseding the prototype demo for new work.

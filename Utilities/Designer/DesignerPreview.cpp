@@ -37,7 +37,6 @@ static int DesignerPreviewFixedMetric(const DesignerNode& n, const String& axis_
 	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
 }
 
-#ifdef _DEBUG
 static bool DesignerPreviewTraceType(const String& type_id)
 {
 	return type_id == "UiTitleCard" ||
@@ -51,6 +50,17 @@ static String DesignerPreviewTraceValue(const DesignerNode& n, const String& key
 {
 	Value v = DesignerPreviewNodeProperty(n, key, def);
 	return AsString(v);
+}
+
+static void DesignerPreviewAppendTrace(const String& line)
+{
+	String path = AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
+	FileAppend out(path);
+	if(!out.IsOpen())
+		return;
+	out.PutLine("PREVIEW READBACK:");
+	out.PutLine(line);
+	out.PutLine("");
 }
 
 static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n, const Rect& rect = Null)
@@ -70,9 +80,11 @@ static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n,
 	if(!IsNull(rect))
 		line << Format(" computed_rect=%d,%d,%d,%d", rect.left, rect.top, rect.right, rect.bottom);
 	line << Format(" adapter_role=%s", DesignerPreviewTraceValue(n, "role", "Standard"));
+	DesignerPreviewAppendTrace(line);
+#ifdef _DEBUG
 	RLOG(line);
-}
 #endif
+}
 
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
 {
@@ -1198,9 +1210,7 @@ Ctrl* DesignerPreview::BuildRealNode(DesignerNodeId id)
 			DesignerNode* n = model_ ? model_->Find(id) : nullptr;
 			if(!n || id == Designer_ROOT)
 				return nullptr;
-#ifdef _DEBUG
 			DesignerPreviewLogReadback("build", *n);
-#endif
 			DesignerAdapter *adapter = nullptr;
 			Ctrl *raw = CreateDesignerAdapterCtrl(*n, &adapter);
 			if(!raw || !adapter)
@@ -1596,10 +1606,8 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 					n->last_rect = ctrl.GetRect() + offset;
 				if(n)
 					DesignerSyncSpacerItemRects(*model_, *n, ctrl, offset + ctrl.GetRect().TopLeft());
-#ifdef _DEBUG
 				if(n)
 					DesignerPreviewLogReadback("layout", *n, n->last_rect);
-#endif
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())

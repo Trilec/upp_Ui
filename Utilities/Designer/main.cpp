@@ -119,7 +119,8 @@ enum DesignerRightMode {
 	RIGHT_HIERARCHY = 0,
 	RIGHT_INSPECTOR,
 	RIGHT_OVERRIDES,
-	RIGHT_CODE
+	RIGHT_CODE,
+	RIGHT_DIAGNOSTICS
 };
 
 class DesignerModeButton : public UiButton {
@@ -927,6 +928,7 @@ private:
 		setup_mode_button(inspector_mode_button_, ICON_DESIGN_SLIDERS_48(), "Show inspector", RIGHT_INSPECTOR);
 		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
 		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
+		setup_mode_button(diagnostics_mode_button_, ICON_DESIGN_INFO_48(), "Show inspector diagnostics", RIGHT_DIAGNOSTICS);
 		right_box_.Add(right_mode_bar_);
 		right_box_.Add(right_content_card_);
 		right_content_card_.Add(side_);
@@ -945,11 +947,13 @@ private:
 		setup_heading(inspector_heading_, "INSPECTOR");
 		setup_heading(overrides_heading_, "THEME OVERRIDES");
 		setup_heading(code_heading_, "CODE");
+		setup_heading(diagnostics_heading_, "DIAGNOSTICS");
 
 		hierarchy_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, DPI(5), 0));
 		inspector_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		overrides_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		code_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+		diagnostics_page_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		code_header_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(Rect(0, 0, 0, 0));
 
 		code_setup_button_.SetText("Setup")
@@ -982,12 +986,15 @@ private:
 		overrides_page_.Add(theme_override_inspector_).Expand(1);
 		code_page_.Add(code_header_).Fit();
 		code_page_.Add(code_scroll_).Expand(1);
+		diagnostics_page_.Add(diagnostics_heading_).Fit();
+		diagnostics_page_.Add(diagnostics_scroll_).Expand(1);
 
 		side_.Content().Add(right_stack_.SizePos());
 		right_stack_.AddPage(hierarchy_page_, "hierarchy");
 		right_stack_.AddPage(inspector_page_, "inspector");
 		right_stack_.AddPage(overrides_page_, "overrides");
 		right_stack_.AddPage(code_page_, "code");
+		right_stack_.AddPage(diagnostics_page_, "diagnostics");
 		right_stack_.SetActivePage(0);
 		RefreshCollapseButton();
 
@@ -1013,6 +1020,12 @@ private:
 		code_scroll_.Content().Add(code_box_.SizePos());
 		code_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
 		code_box_.Add(code_).Fit();
+		diagnostics_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
+		diagnostics_scroll_.Content().Add(diagnostics_box_.SizePos());
+		diagnostics_box_.SetDirection(UiDirection::V).SetGap(0).SetInset(DPI(8));
+		diagnostics_box_.Add(diagnostics_).Fit();
+		SaveFile(InspectorTracePath(), "Designer " + String(DESIGNER_VERSION) + " inspector trace\n\n");
+		SetDiagnosticsText("Designer inspector diagnostics will appear here.\nTrace file: " + InspectorTracePath());
 		RefreshRightModeUi();
 		toolbox_help_icon_.SetText("i").NoWantFocus().IgnoreMouse();
 		toolbox_help_title_.NoWantFocus().IgnoreMouse();
@@ -1679,6 +1692,10 @@ private:
 		bool preview = false;
 		bool commit = false;
 		bool final_commit = true;
+		String node_type;
+		String fsm_state_before;
+		bool fsm_transition_accepted = false;
+		String fsm_reject_reason;
 		DesignerNodeId node_id = Designer_NULL;
 		String property_id;
 		Value value;
@@ -1694,6 +1711,14 @@ private:
 		bool command_result = false;
 		bool commit_succeeded = false;
 		bool inspector_refresh_requested = false;
+		bool validation_binding_found = false;
+		bool validation_binding_visible = false;
+		bool validation_binding_enabled = false;
+		Value command_model_after;
+		bool command_model_equals_intended = false;
+		Value readback_model_value;
+		Value readback_inspector_value;
+		bool readback_equals_intended = false;
 		String failure_reason;
 		DesignerProjectionRequest projection;
 	};
@@ -1714,13 +1739,13 @@ private:
 	{
 		String current = designer_fsm_.GetCurrent();
 		if(intent.preview) {
-			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING) {
+			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING && current != DESIGNER_STATE_PROJECTING) {
 				reason = "fsm not ready for preview";
 				return false;
 			}
 		}
 		else {
-			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING) {
+			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING && current != DESIGNER_STATE_PROJECTING) {
 				reason = "fsm not ready for commit";
 				return false;
 			}
@@ -1749,6 +1774,7 @@ private:
 
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
+		String state_before = designer_fsm_.GetCurrent();
 		auto merge_intent = [&](DesignerInspectorEditIntent& dst, const DesignerInspectorEditIntent& src) {
 			dst.value = src.value;
 			dst.preview = src.preview;
@@ -1763,6 +1789,24 @@ private:
 			bool same_target = pending_inspector_txn_.active &&
 			                  pending_inspector_txn_.node_id == intent.node_id &&
 			                  pending_inspector_txn_.property_id == intent.property_id;
+			if(intent.final_commit) {
+				if(deferred_inspector_intent_.active &&
+				   deferred_inspector_intent_.intent.final_commit &&
+				   deferred_inspector_intent_.intent.node_id == intent.node_id &&
+				   deferred_inspector_intent_.intent.property_id == intent.property_id) {
+					merge_intent(deferred_inspector_intent_.intent, intent);
+				}
+				else {
+					deferred_inspector_intent_.active = true;
+					deferred_inspector_intent_.intent = intent;
+				}
+#ifdef _DEBUG
+				RLOG(Format("DesignerState final commit queued: current=%s node=%d property=%s preview=%d final_commit=%d value=%s",
+				            designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
+				            intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, StdFormat(intent.value)));
+#endif
+				return;
+			}
 			if(same_target) {
 				if(deferred_inspector_intent_.active &&
 				   deferred_inspector_intent_.intent.node_id == intent.node_id &&
@@ -1787,17 +1831,29 @@ private:
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
 			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
+			PublishInspectorTrace(intent, nullptr, state_before, false, reject_reason);
 			return;
 		}
 
 		String reject_reason;
 		if(!CanAcceptInspectorIntent(intent, reject_reason)) {
+			if(intent.final_commit) {
+				deferred_inspector_intent_.active = true;
+				deferred_inspector_intent_.intent = intent;
+#ifdef _DEBUG
+				RLOG(Format("DesignerState final commit deferred: reason=%s current=%s node=%d property=%s value=%s",
+				            reject_reason, designer_fsm_.GetCurrent(),
+				            (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
+#endif
+				return;
+			}
 #ifdef _DEBUG
 			RLOG(Format("DesignerState intent rejected loudly: reason=%s current=%s transitioning=%d node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
 			            reject_reason, designer_fsm_.GetCurrent(), designer_fsm_.IsTransitioning() ? 1 : 0,
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
 			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
+			PublishInspectorTrace(intent, nullptr, state_before, false, reject_reason);
 			return;
 		}
 
@@ -1805,6 +1861,9 @@ private:
 		pending_inspector_txn_.preview = intent.preview;
 		pending_inspector_txn_.commit = intent.final_commit;
 		pending_inspector_txn_.final_commit = intent.final_commit;
+		pending_inspector_txn_.fsm_state_before = state_before;
+		pending_inspector_txn_.fsm_transition_accepted = false;
+		pending_inspector_txn_.fsm_reject_reason.Clear();
 		pending_inspector_txn_.node_id = intent.node_id;
 		pending_inspector_txn_.property_id = intent.property_id;
 		pending_inspector_txn_.value = intent.value;
@@ -1812,7 +1871,14 @@ private:
 		pending_inspector_txn_.row_generation = intent.row_generation;
 		pending_inspector_txn_.inspector_generation = intent.inspector_generation;
 		pending_inspector_txn_.inspector_syncing = intent.syncing;
-		TriggerDesignerStateEvent(intent.preview ? DESIGNER_EVENT_INSPECTOR_PREVIEW : DESIGNER_EVENT_INSPECTOR_COMMIT, reason);
+		if(const DesignerNode* n = model_.Find(intent.node_id))
+			pending_inspector_txn_.node_type = n->type_id;
+		bool accepted = TriggerDesignerStateEvent(intent.preview ? DESIGNER_EVENT_INSPECTOR_PREVIEW : DESIGNER_EVENT_INSPECTOR_COMMIT, reason);
+		pending_inspector_txn_.fsm_transition_accepted = accepted;
+		if(!accepted) {
+			pending_inspector_txn_.fsm_reject_reason = designer_fsm_.GetLastErrorText();
+			PublishInspectorTrace(intent, &pending_inspector_txn_, state_before, false, pending_inspector_txn_.fsm_reject_reason);
+		}
 	}
 
 	bool ValidatePendingInspectorIntent(const char *stage, bool allow_selection_mismatch = true)
@@ -1842,6 +1908,7 @@ private:
 				adapter->DescribeApi(bindings, *n);
 		const DesignerApiBinding* binding = FindApiBinding(bindings, pending_inspector_txn_.property_id);
 		bool state_controlled = binding ? IsSingleNodeInspectorStateControlled(*binding) : false;
+			pending_inspector_txn_.validation_binding_found = binding != nullptr;
 			bool safe_sizing = pending_inspector_txn_.property_id == "h_sizing" || pending_inspector_txn_.property_id == "v_sizing" ||
 			                   pending_inspector_txn_.property_id == "fixed_width" || pending_inspector_txn_.property_id == "fixed_height" ||
 			                   pending_inspector_txn_.property_id == "min_width" || pending_inspector_txn_.property_id == "min_height" ||
@@ -1858,6 +1925,8 @@ private:
 			                           pending_inspector_txn_.property_id == "shadow_curve";
 			bool binding_visible = binding ? binding->visible : false;
 			bool binding_enabled = binding ? binding->enabled : false;
+			pending_inspector_txn_.validation_binding_visible = binding_visible;
+			pending_inspector_txn_.validation_binding_enabled = binding_enabled;
 #ifdef _DEBUG
 			RLOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d state_controlled=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
 			            (int)pending_inspector_txn_.node_id, n->type_id, pending_inspector_txn_.property_id,
@@ -2544,6 +2613,37 @@ private:
 			            model_value == last_inspector_readback_.intended_value ? 1 : 0));
 		}
 #endif
+		if(pending_inspector_txn_.active &&
+		   pending_inspector_txn_.commit_succeeded &&
+		   pending_inspector_txn_.projection.inspector &&
+		   model_.GetSelection()[0] == pending_inspector_txn_.node_id) {
+			const DesignerNode* n = model_.Find(pending_inspector_txn_.node_id);
+			int q = n ? n->properties.Find(pending_inspector_txn_.property_id) : -1;
+			pending_inspector_txn_.readback_model_value = q >= 0 ? n->properties.GetValue(q) : Value();
+			pending_inspector_txn_.readback_inspector_value = inspector_.GetRowValue(pending_inspector_txn_.property_id);
+			pending_inspector_txn_.readback_equals_intended = q >= 0 &&
+				pending_inspector_txn_.readback_model_value == pending_inspector_txn_.normalized &&
+				pending_inspector_txn_.readback_inspector_value == pending_inspector_txn_.normalized;
+			if(q >= 0 &&
+			   pending_inspector_txn_.readback_model_value == pending_inspector_txn_.normalized &&
+			   pending_inspector_txn_.readback_inspector_value != pending_inspector_txn_.normalized) {
+				inspector_.SetSelection(model_.GetSelection());
+				theme_override_inspector_.SetSelection(model_.GetSelection());
+				pending_inspector_txn_.readback_inspector_value = inspector_.GetRowValue(pending_inspector_txn_.property_id);
+				pending_inspector_txn_.readback_equals_intended =
+					pending_inspector_txn_.readback_inspector_value == pending_inspector_txn_.normalized;
+				if(!pending_inspector_txn_.readback_equals_intended)
+					ReportInspectorReadbackFailure(pending_inspector_txn_, "after inspector refresh");
+			}
+			DesignerInspectorEditIntent intent;
+			intent.node_id = pending_inspector_txn_.node_id;
+			intent.property_id = pending_inspector_txn_.property_id;
+			intent.value = pending_inspector_txn_.value;
+			intent.preview = pending_inspector_txn_.preview;
+			intent.final_commit = pending_inspector_txn_.final_commit;
+			intent.editor_kind = pending_inspector_txn_.editor_kind;
+			PublishInspectorTrace(intent, &pending_inspector_txn_, pending_inspector_txn_.fsm_state_before, true, String());
+		}
 		RefreshContainerActions();
 		RefreshRightPanel();
 	}
@@ -2827,12 +2927,14 @@ private:
 		inspector_mode_button_.SetActive(right_mode_ == RIGHT_INSPECTOR);
 		overrides_mode_button_.SetActive(right_mode_ == RIGHT_OVERRIDES);
 		code_mode_button_.SetActive(right_mode_ == RIGHT_CODE);
+		diagnostics_mode_button_.SetActive(right_mode_ == RIGHT_DIAGNOSTICS);
 		right_stack_.SetActivePage((int)right_mode_);
 		side_.SetScrollMode(right_mode_ == RIGHT_HIERARCHY ? UIPANELSCROLL_NONE : UIPANELSCROLL_VERTICAL);
 		hierarchy_mode_button_.Show(!right_collapsed_);
 		inspector_mode_button_.Show(!right_collapsed_);
 		overrides_mode_button_.Show(!right_collapsed_);
 		code_mode_button_.Show(!right_collapsed_);
+		diagnostics_mode_button_.Show(!right_collapsed_);
 		side_.Show(!right_collapsed_);
 		RefreshCollapseButton();
 		if(right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES)
@@ -2841,6 +2943,8 @@ private:
 			SyncHierarchySelection();
 		if(right_mode_ == RIGHT_CODE)
 			RefreshCode();
+		if(right_mode_ == RIGHT_DIAGNOSTICS)
+			RefreshRightPanel();
 		LayoutRightPanel();
 	}
 
@@ -2878,6 +2982,7 @@ private:
 			inspector_mode_button_.Hide();
 			overrides_mode_button_.Hide();
 			code_mode_button_.Hide();
+			diagnostics_mode_button_.Hide();
 		}
 		else
 		{
@@ -2887,6 +2992,7 @@ private:
 			inspector_mode_button_.Show();
 			overrides_mode_button_.Show();
 			code_mode_button_.Show();
+			diagnostics_mode_button_.Show();
 			right_content_card_.SetRect(pad, pad + button_h + DPI(8), content_w, content_h);
 			side_.SetRect(0, 0, content_w, content_h);
 			int stack_h = right_mode_ == RIGHT_HIERARCHY ? content_h : max(content_h, right_stack_.GetContentSize().cy);
@@ -3440,6 +3546,153 @@ private:
 		Refresh();
 	}
 
+	String InspectorTracePath() const
+	{
+		return AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
+	}
+
+	void AppendInspectorTraceFile(const String& text)
+	{
+		FileAppend out(InspectorTracePath());
+		if(!out.IsOpen())
+			return;
+		out.PutLine("==== " + AsString(GetSysTime()) + " ====");
+		out.PutLine(text);
+		out.PutLine("");
+	}
+
+	void SetDiagnosticsText(const String& text)
+	{
+		diagnostics_text_ = text;
+		diagnostics_.SetText(text);
+		if(right_mode_ == RIGHT_DIAGNOSTICS)
+			RefreshRightPanel();
+	}
+
+	String BuildInspectorTraceText(const DesignerInspectorEditIntent& intent,
+	                               const PendingInspectorTransaction* txn,
+	                               const String& state_before,
+	                               bool transition_accepted,
+	                               const String& rejected_reason) const
+	{
+		String type_id;
+		if(const DesignerNode* n = model_.Find(intent.node_id))
+			type_id = n->type_id;
+		String out;
+		out << "RAW INTENT:\n";
+		out << "node id: " << (int)intent.node_id << "\n";
+		out << "node type: " << type_id << "\n";
+		out << "property: " << intent.property_id << "\n";
+		out << "value: " << StdFormat(intent.value) << "\n";
+		out << "preview/final: " << (intent.preview ? "preview" : "commit") << " / "
+		    << (intent.final_commit ? "final" : "non-final") << "\n";
+		out << "editor kind: " << intent.editor_kind << "\n\n";
+		out << "DSM:\n";
+		out << "current state before: " << state_before << "\n";
+		out << "transition accepted: " << (transition_accepted ? "yes" : "no") << "\n";
+		out << "rejected reason: " << rejected_reason << "\n\n";
+		out << "VALIDATION:\n";
+		out << "binding found: " << (txn && txn->validation_binding_found ? "yes" : "no") << "\n";
+		out << "visible: " << (txn && txn->validation_binding_visible ? "yes" : "no") << "\n";
+		out << "enabled: " << (txn && txn->validation_binding_enabled ? "yes" : "no") << "\n";
+		out << "normalised value: " << (txn ? StdFormat(txn->normalized) : String()) << "\n\n";
+		out << "COMMAND:\n";
+		out << "old model value: " << (txn ? StdFormat(txn->old_model_value) : String()) << "\n";
+		out << "intended value: " << (txn ? StdFormat(txn->normalized) : StdFormat(intent.value)) << "\n";
+		out << "command result: " << (txn && txn->command_result ? "true" : "false") << "\n";
+		out << "model_after: " << (txn ? StdFormat(txn->command_model_after) : String()) << "\n";
+		out << "model_after == intended: " << (txn && txn->command_model_equals_intended ? "yes" : "no") << "\n\n";
+		out << "PROJECTION:\n";
+		out << "preview refreshed: " << (txn && txn->projection.preview ? "yes" : "no") << "\n";
+		out << "inspector refreshed: " << (txn && txn->projection.inspector ? "yes" : "no") << "\n";
+		out << "hierarchy refreshed: " << (txn && txn->projection.hierarchy ? "yes" : "no") << "\n";
+		out << "code refreshed: " << (txn && txn->projection.code ? "yes" : "no") << "\n\n";
+		out << "READBACK:\n";
+		out << "inspector row value after refresh: " << (txn ? StdFormat(txn->readback_inspector_value) : String()) << "\n";
+		out << "model value after refresh: " << (txn ? StdFormat(txn->readback_model_value) : String()) << "\n";
+		out << "equals intended: " << (txn && txn->readback_equals_intended ? "yes" : "no") << "\n";
+		out << "\nTRACE ANSWERS:\n";
+		out << "Did RAW INTENT appear? yes\n";
+		out << "Did DSM transition to Committing? "
+		    << ((!intent.preview && transition_accepted) ? "yes" : "no") << "\n";
+		out << "Did validation pass? "
+		    << (txn && txn->failure_reason.IsEmpty() &&
+		        txn->validation_binding_found &&
+		        txn->validation_binding_visible &&
+		        (txn->validation_binding_enabled ||
+		         txn->property_id == "h_sizing" || txn->property_id == "v_sizing" ||
+		         txn->property_id == "fixed_width" || txn->property_id == "fixed_height" ||
+		         txn->property_id == "min_width" || txn->property_id == "min_height" ||
+		         txn->property_id == "max_width" || txn->property_id == "max_height" ||
+		         txn->property_id == "cell_align_h" || txn->property_id == "cell_align_v")
+		        ? "yes" : "no") << "\n";
+		out << "Did command execute? " << (txn && txn->command_result ? "yes" : "no") << "\n";
+		out << "Was model_after the intended value? "
+		    << (txn && txn->command_model_equals_intended ? "yes" : "no") << "\n";
+		out << "Did projection run? "
+		    << (txn && (txn->projection.preview || txn->projection.hierarchy ||
+		                txn->projection.inspector || txn->projection.code || txn->projection.full)
+		        ? "yes" : "no") << "\n";
+		out << "Did inspector readback match the model? "
+		    << (txn && txn->readback_inspector_value == txn->readback_model_value ? "yes" : "no") << "\n";
+		return out;
+	}
+
+	void PublishInspectorTrace(const DesignerInspectorEditIntent& intent,
+	                           const PendingInspectorTransaction* txn,
+	                           const String& state_before,
+	                           bool transition_accepted,
+	                           const String& rejected_reason)
+	{
+		String text = BuildInspectorTraceText(intent, txn, state_before, transition_accepted, rejected_reason);
+		SetDiagnosticsText(text);
+		AppendInspectorTraceFile(text);
+	}
+
+	void ReportInspectorCommitFailure(const PendingInspectorTransaction& txn, const char *stage)
+	{
+		String text;
+		text << "INSPECTOR COMMIT FAILED:\n";
+		text << "node=" << (int)txn.node_id << "\n";
+		text << "type=" << txn.node_type << "\n";
+		text << "property=" << txn.property_id << "\n";
+		text << "intended=" << StdFormat(txn.normalized) << "\n";
+		text << "model_after=" << StdFormat(txn.command_model_after) << "\n";
+		text << "stage=" << (stage ? stage : "") << "\n";
+		SetDiagnosticsText(text);
+		AppendInspectorTraceFile(text);
+		SetWarningNotes(Format("INSPECTOR COMMIT FAILED: node=%d type=%s property=%s intended=%s model_after=%s stage=%s",
+		                       (int)txn.node_id,
+		                       txn.node_type,
+		                       txn.property_id,
+		                       StdFormat(txn.normalized),
+		                       StdFormat(txn.command_model_after),
+		                       stage ? stage : ""));
+	}
+
+	void ReportInspectorReadbackFailure(const PendingInspectorTransaction& txn, const char *stage)
+	{
+		String text;
+		text << "INSPECTOR READBACK FAILED:\n";
+		text << "node=" << (int)txn.node_id << "\n";
+		text << "type=" << txn.node_type << "\n";
+		text << "property=" << txn.property_id << "\n";
+		text << "intended=" << StdFormat(txn.normalized) << "\n";
+		text << "model_after=" << StdFormat(txn.readback_model_value) << "\n";
+		text << "inspector_after=" << StdFormat(txn.readback_inspector_value) << "\n";
+		text << "stage=" << (stage ? stage : "") << "\n";
+		SetDiagnosticsText(text);
+		AppendInspectorTraceFile(text);
+		SetWarningNotes(Format("INSPECTOR READBACK FAILED: node=%d type=%s property=%s intended=%s model=%s inspector=%s stage=%s",
+		                       (int)txn.node_id,
+		                       txn.node_type,
+		                       txn.property_id,
+		                       StdFormat(txn.normalized),
+		                       StdFormat(txn.readback_model_value),
+		                       StdFormat(txn.readback_inspector_value),
+		                       stage ? stage : ""));
+	}
+
 	DesignerNodeId GetHierarchyNodeId(UiTreeNodeRef ref) const
 	{
 		if(!ref.IsValid())
@@ -3567,14 +3820,6 @@ private:
 			return;
 		if(!ValidatePendingInspectorIntent("preview", true))
 			return;
-		if(pending_inspector_txn_.editor_kind == "slider-preview" && !pending_inspector_txn_.final_commit) {
-#ifdef _DEBUG
-			RLOG(Format("DSM preview deferred to final slider action: node=%d property=%s value=%s editor=%s",
-			            (int)pending_inspector_txn_.node_id, pending_inspector_txn_.property_id,
-			            StdFormat(pending_inspector_txn_.value), pending_inspector_txn_.editor_kind));
-#endif
-			return;
-		}
 		DesignerNodeId node_id = pending_inspector_txn_.node_id;
 		const String& property_id = pending_inspector_txn_.property_id;
 		const Value& value = pending_inspector_txn_.value;
@@ -3591,10 +3836,12 @@ private:
 #ifdef _DEBUG
 		if(property_id == "h_sizing" || property_id == "v_sizing" || property_id == "fixed_width" || property_id == "fixed_height") {
 			int q = n->properties.Find(property_id);
-			RLOG(Format("PreviewInspectorPropertyValue node=%d type=%s property=%s raw=%s normalized=%s model_before=%s preview_old=%s",
+			RLOG(Format("PreviewInspectorPropertyValue node=%d type=%s property=%s raw=%s normalized=%s model_before=%s preview_old=%s editor=%s final_commit=%d",
 			            (int)node_id, n->type_id, property_id, StdFormat(value), StdFormat(normalized),
 			            q >= 0 ? StdFormat(n->properties.GetValue(q)) : String("<missing>"),
-			            StdFormat(live_preview_old_values_.Get(preview_key, Value()))));
+			            StdFormat(live_preview_old_values_.Get(preview_key, Value())),
+			            pending_inspector_txn_.editor_kind,
+			            pending_inspector_txn_.final_commit ? 1 : 0));
 		}
 #endif
 		model_.SetProperty(node_id, property_id, normalized);
@@ -3606,7 +3853,16 @@ private:
 		preview_projection.code = false;
 		preview_projection.full = false;
 		preview_projection.reason = "preview during edit";
+		pending_inspector_txn_.projection = preview_projection;
 		ApplyPreviewProjectionDuringEdit(preview_projection);
+		DesignerInspectorEditIntent intent;
+		intent.node_id = pending_inspector_txn_.node_id;
+		intent.property_id = pending_inspector_txn_.property_id;
+		intent.value = pending_inspector_txn_.value;
+		intent.preview = pending_inspector_txn_.preview;
+		intent.final_commit = pending_inspector_txn_.final_commit;
+		intent.editor_kind = pending_inspector_txn_.editor_kind;
+		PublishInspectorTrace(intent, &pending_inspector_txn_, pending_inspector_txn_.fsm_state_before, true, String());
 	}
 
 	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
@@ -3746,9 +4002,15 @@ private:
 		const DesignerNode* after_command = model_.Find(node_id);
 		int after_q = after_command ? after_command->properties.Find(property_id) : -1;
 		Value model_after = after_q >= 0 ? after_command->properties.GetValue(after_q) : Value();
+		pending_inspector_txn_.command_model_after = model_after;
 		bool accepted_already_applied = !command_result &&
 		                               state_controlled &&
 		                               after_q >= 0 && model_after == normalized;
+		pending_inspector_txn_.command_model_equals_intended = after_q >= 0 && model_after == normalized;
+		if((command_result || accepted_already_applied) && !pending_inspector_txn_.command_model_equals_intended) {
+			pending_inspector_txn_.failure_reason = "model_after != intended";
+			ReportInspectorCommitFailure(pending_inspector_txn_, "after command");
+		}
 #ifdef _DEBUG
 		RLOG(Format("DSM command: node=%d type=%s property=%s old=%s new=%s execute=%d model_after=%s equals_intended=%d accepted_already_applied=%d",
 		            (int)node_id, n->type_id, property_id, StdFormat(old_value), StdFormat(normalized), command_result ? 1 : 0,
@@ -3756,7 +4018,7 @@ private:
 		            after_q >= 0 && model_after == normalized ? 1 : 0,
 		            accepted_already_applied ? 1 : 0));
 #endif
-		if(command_result || accepted_already_applied) {
+		if((command_result || accepted_already_applied) && pending_inspector_txn_.command_model_equals_intended) {
 #ifdef _DEBUG
 				RLOG(Format("%s: node=%d property=%s old=%s new=%s",
 				            command_result ? "Command executed" : "Command accepted already applied",
@@ -3828,6 +4090,14 @@ private:
 			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized), reason));
 #endif
 			pending_inspector_txn_.failure_reason = reason;
+			DesignerInspectorEditIntent intent;
+			intent.node_id = pending_inspector_txn_.node_id;
+			intent.property_id = pending_inspector_txn_.property_id;
+			intent.value = pending_inspector_txn_.value;
+			intent.preview = pending_inspector_txn_.preview;
+			intent.final_commit = pending_inspector_txn_.final_commit;
+			intent.editor_kind = pending_inspector_txn_.editor_kind;
+			PublishInspectorTrace(intent, &pending_inspector_txn_, pending_inspector_txn_.fsm_state_before, true, reason);
 			RequestDesignerRefresh(true, true);
 		}
 	}
@@ -3858,6 +4128,16 @@ private:
 		            pending_inspector_txn_.projection.full ? 1 : 0));
 #endif
 		ApplyCommitProjectionAfterEdit(pending_inspector_txn_.projection);
+		if(!pending_inspector_txn_.projection.inspector) {
+			DesignerInspectorEditIntent intent;
+			intent.node_id = pending_inspector_txn_.node_id;
+			intent.property_id = pending_inspector_txn_.property_id;
+			intent.value = pending_inspector_txn_.value;
+			intent.preview = pending_inspector_txn_.preview;
+			intent.final_commit = pending_inspector_txn_.final_commit;
+			intent.editor_kind = pending_inspector_txn_.editor_kind;
+			PublishInspectorTrace(intent, &pending_inspector_txn_, pending_inspector_txn_.fsm_state_before, true, String());
+		}
 #ifdef _DEBUG
 		int projection_q = changed ? changed->properties.Find(pending_inspector_txn_.property_id) : -1;
 		RLOG(Format("DSM final: state=%s model property still=%s selected node=%d inspector_refresh_requested=%d",
@@ -4431,6 +4711,7 @@ private:
 		code_scroll_style.metrics.face_enabled = true;
 		code_scroll_style.metrics.content_margin = Rect(0, 0, 0, 0);
 		code_scroll_.SetCustomStyle(code_scroll_style);
+		diagnostics_scroll_.SetCustomStyle(code_scroll_style);
 		UiLabel::Style code_style = UiLabel::StyleDefault();
 		for(int i = 0; i < 4; i++)
 			code_style.palette.ink[i] = Color(74, 254, 174);
@@ -4440,6 +4721,7 @@ private:
 		code_style.transparent = true;
 		code_style.metrics.content_margin = Rect(0, 0, 0, 0);
 		code_.SetCustomStyle(code_style).SetSelectable(true).NoWantFocus();
+		diagnostics_.SetCustomStyle(code_style).SetSelectable(true).NoWantFocus();
 		preview_.SetThemeMode(mode);
 		RefreshAll();
 	}
@@ -4488,15 +4770,18 @@ private:
 	UiBoxLayout inspector_page_ { UiDirection::V };
 	UiBoxLayout overrides_page_ { UiDirection::V };
 	UiBoxLayout code_page_ { UiDirection::V };
+	UiBoxLayout diagnostics_page_ { UiDirection::V };
 	UiBoxLayout code_header_ { UiDirection::H };
 	UiLabel hierarchy_heading_;
 	UiLabel inspector_heading_;
 	UiLabel overrides_heading_;
 	UiLabel code_heading_;
+	UiLabel diagnostics_heading_;
 	DesignerModeButton hierarchy_mode_button_;
 	DesignerModeButton inspector_mode_button_;
 	DesignerModeButton overrides_mode_button_;
 	DesignerModeButton code_mode_button_;
+	DesignerModeButton diagnostics_mode_button_;
 	UiButton collapse_button_;
 	UiButton code_setup_button_;
 	UiButton code_build_run_button_;
@@ -4516,6 +4801,9 @@ private:
 	UiScrollPanel code_scroll_;
 	UiBoxLayout code_box_;
 	UiLabel code_;
+	UiScrollPanel diagnostics_scroll_;
+	UiBoxLayout diagnostics_box_ { UiDirection::V };
+	UiLabel diagnostics_;
 	Image layout_icon_;
 	Image panel_icon_;
 	Image control_icon_;
@@ -4536,6 +4824,7 @@ private:
 	bool refresh_deferred_ = false;
 	bool full_refresh_requested_ = false;
 	bool live_preview_refresh_pending_ = false;
+	String diagnostics_text_;
 	StateMachine designer_fsm_;
 	PendingInspectorTransaction pending_inspector_txn_;
 	DeferredInspectorIntent deferred_inspector_intent_;
