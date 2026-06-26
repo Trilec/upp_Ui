@@ -204,7 +204,7 @@ static void DesignerTraceBumpCount(VectorMap<String, int>& counts, const String&
 	if(q < 0)
 		counts.Add(key, 1);
 	else
-		counts.Set(q, counts[q] + 1);
+		counts[q] = counts[q] + 1;
 }
 
 void DesignerTraceRecordRefreshSource(const String& kind, const String& caller, const String& reason)
@@ -228,7 +228,9 @@ void DesignerTraceRecordPreviewLayoutSource(const String& caller, const String& 
 
 static void DesignerTraceEmitRefreshLoopSummary()
 {
-	if(designer_refresh_source_counts.IsEmpty() && designer_preview_layout_source_counts.IsEmpty())
+	if(designer_invalidate_source_counts.IsEmpty() &&
+	   designer_preview_refresh_source_counts.IsEmpty() &&
+	   designer_preview_layout_source_counts.IsEmpty())
 		return;
 	String out;
 	out << "REFRESH_LOOP_SUMMARY 2000ms\n";
@@ -319,13 +321,6 @@ void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
 static constexpr int LIVE_PREVIEW_TIMER_ID = 103;
-static constexpr int INSPECTOR_COMMIT_CONTINUE_TIMER_ID = 104;
-static constexpr int INSPECTOR_PROJECTION_CONTINUE_TIMER_ID = 105;
-static constexpr int INSPECTOR_COMMIT_WATCHDOG_TIMER_ID = 106;
-static constexpr int INSPECTOR_PROJECTION_WATCHDOG_TIMER_ID = 107;
-static constexpr int INSPECTOR_STATE_WARN_TIMER_ID = 108;
-static constexpr int INSPECTOR_STATE_RECOVER_TIMER_ID = 109;
-static constexpr int REFRESH_LOOP_SUMMARY_TIMER_ID = 110;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
 static const char *DESIGNER_STATE_IDLE = "Idle";
 static const char *DESIGNER_STATE_PREVIEWING = "Previewing";
@@ -691,13 +686,6 @@ public:
 	    KillTimeCallback(TOOL_DRAG_TIMER_ID);
 	    KillTimeCallback(SAVE_STATUS_TIMER_ID);
 	    KillTimeCallback(LIVE_PREVIEW_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_COMMIT_CONTINUE_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_PROJECTION_CONTINUE_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_COMMIT_WATCHDOG_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_PROJECTION_WATCHDOG_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_STATE_WARN_TIMER_ID);
-	    KillTimeCallback(INSPECTOR_STATE_RECOVER_TIMER_ID);
-	    KillTimeCallback(REFRESH_LOOP_SUMMARY_TIMER_ID);
 		if(designer_window_current == this)
 			designer_window_current = nullptr;
 	}
@@ -2552,7 +2540,7 @@ private:
 		SetTimeCallback(2000, [self] {
 			if(self)
 				self->RefreshLoopSummaryTick();
-		}, 110);
+		});
 	}
 
 	void ResetPendingInspectorTransaction()
@@ -2615,7 +2603,7 @@ private:
 					       self->pending_inspector_txn_.state_enter_commit_succeeded ? 1 : 0),
 					true);
 			}
-		}, INSPECTOR_STATE_WARN_TIMER_ID);
+		});
 		SetTimeCallback(2000, [self, state] {
 			if(!self || !self->pending_inspector_txn_.active)
 				return;
@@ -2642,7 +2630,7 @@ private:
 				else
 					designer_trace_current_state = DESIGNER_STATE_IDLE;
 			}
-		}, INSPECTOR_STATE_RECOVER_TIMER_ID);
+		});
 	}
 
 	void ContinueInspectorCommitStateMachine()
@@ -2716,7 +2704,7 @@ private:
 				SetTimeCallback(0, [self] {
 					if(self)
 						self->ContinueInspectorCommitStateMachine();
-				}, INSPECTOR_COMMIT_CONTINUE_TIMER_ID);
+				});
 				SetTimeCallback(250, [self] {
 					if(!self)
 						return;
@@ -2729,7 +2717,7 @@ private:
 							                                                        : DESIGNER_EVENT_COMMAND_REJECTED));
 						self->ContinueInspectorCommitStateMachine();
 					}
-				}, INSPECTOR_COMMIT_WATCHDOG_TIMER_ID);
+				});
 			},
 			{}
 		});
@@ -2741,7 +2729,7 @@ private:
 				SetTimeCallback(0, [self] {
 					if(self)
 						self->ContinueInspectorProjectionStateMachine();
-				}, INSPECTOR_PROJECTION_CONTINUE_TIMER_ID);
+				});
 				SetTimeCallback(250, [self] {
 					if(!self)
 						return;
@@ -2751,7 +2739,7 @@ private:
 							       self->designer_fsm_.GetCurrent(), DESIGNER_EVENT_PROJECTION_DONE));
 						self->ContinueInspectorProjectionStateMachine();
 					}
-				}, INSPECTOR_PROJECTION_WATCHDOG_TIMER_ID);
+				});
 			},
 			{}
 		});

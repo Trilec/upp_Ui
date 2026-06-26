@@ -7,7 +7,7 @@
 namespace Upp {
 
 int DesignerTraceSeq();
-void DesignerConsoleTrace(const String& tag, const String& msg, bool force = false);
+void DesignerConsoleTrace(const String& tag, const String& msg, bool force);
 
 static int FindId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {
@@ -285,7 +285,8 @@ bool DesignerModel::SetProperty(DesignerNodeId id, const String& property_id, co
 	DesignerConsoleTrace("MODEL_SET",
 		Format("node=%d type=%s property=%s old=%s new=%s changed=%d",
 		       (int)id, n->type_id, property_id, q >= 0 ? StdFormat(old) : String("<missing>"),
-		       StdFormat(value), changed ? 1 : 0));
+		       StdFormat(value), changed ? 1 : 0),
+		false);
 	n->properties.Set(property_id, value);
 	WhenChanged();
 	return true;
@@ -301,7 +302,8 @@ bool DesignerModel::RemoveProperty(DesignerNodeId id, const String& property_id)
 		return false;
 	DesignerConsoleTrace("MODEL_REMOVE",
 		Format("node=%d type=%s property=%s old=%s",
-		       (int)id, n->type_id, property_id, StdFormat(n->properties.GetValue(q))));
+		       (int)id, n->type_id, property_id, StdFormat(n->properties.GetValue(q))),
+		false);
 	n->properties.Remove(q);
 	WhenChanged();
 	return true;
