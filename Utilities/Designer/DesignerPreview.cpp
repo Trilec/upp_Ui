@@ -64,7 +64,8 @@ static void DesignerPreviewLogReadback(const DesignerNode& n, const Rect& rect =
                                        DesignerNodeId parent_id = Designer_NULL)
 {
 	if(!DesignerTraceActive()) {
-		DesignerTraceNotifyIdlePreviewRebuild();
+		if(IsNull(rect))
+			DesignerTraceNotifyIdlePreviewRebuild();
 		return;
 	}
 	if(!DesignerTraceWantsPreviewReadback(n.id, parent_id))

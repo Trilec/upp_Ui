@@ -59,6 +59,8 @@ struct DesignerTraceContext {
 	int preview_rebuild_lines = 0;
 	int preview_rect_lines = 0;
 	int repeated_preview_count = 0;
+	int repeated_preview_rect_count = 0;
+	String last_preview_rect_line;
 	String last_preview_trace_line;
 	String last_preview_trace_tag;
 	String block_text;
@@ -82,6 +84,8 @@ bool DesignerTraceInspectorLiveEditing();
 DesignerNodeId DesignerTraceSelection();
 bool DesignerTraceWantsPreviewReadback(DesignerNodeId node_id, DesignerNodeId parent_id = Designer_NULL);
 void DesignerTraceNotifyIdlePreviewRebuild();
+void DesignerTraceRecordRefreshSource(const String& kind, const String& caller, const String& reason = String());
+void DesignerTraceRecordPreviewLayoutSource(const String& caller, const String& reason = String());
 void DesignerConsoleTrace(const String& tag, const String& msg, bool force = false);
 
 struct DesignerInspectorEditIntent {
