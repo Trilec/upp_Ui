@@ -7,7 +7,7 @@
 namespace Upp {
 
 int DesignerTraceSeq();
-void DesignerConsoleTrace(const String& tag, const String& msg);
+void DesignerConsoleTrace(const String& tag, const String& msg, bool force = false);
 
 static int FindId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {

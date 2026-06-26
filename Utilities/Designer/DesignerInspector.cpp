@@ -1206,6 +1206,12 @@ bool DesignerInspector::IsSingleNodeInspectorStateControlled(const DesignerApiBi
 
 void DesignerInspector::PostInspectorIntent(const DesignerInspectorEditIntent& intent)
 {
+	DesignerNodeId related_id = Designer_NULL;
+	if(model_) {
+		if(const DesignerNode* n = model_->Find(intent.node_id))
+			related_id = n->parent;
+	}
+	DesignerBeginTrace(TRACE_TRANSACTION, intent.node_id, related_id, intent.property_id, "inspector-row");
 	DesignerConsoleTrace("INTENT_POST",
 		Format("node=%d property=%s value=%s preview=%d final=%d editor=%s row_gen=%d inspector_gen=%d syncing=%d",
 		       (int)intent.node_id, intent.property_id, StdFormat(intent.value),

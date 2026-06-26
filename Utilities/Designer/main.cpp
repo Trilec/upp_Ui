@@ -31,15 +31,199 @@ int DesignerTraceSeq()
 	return ++seq;
 }
 
-void DesignerConsoleTrace(const String& tag, const String& msg)
+static DesignerTraceContext designer_trace_;
+static class DesignerWindow *designer_window_current = nullptr;
+static int designer_idle_preview_rebuild_count = 0;
+static int designer_idle_preview_last_warn_msecs = 0;
+static String designer_idle_preview_last_warn_message;
+static String designer_trace_current_state = "Idle";
+static bool designer_trace_refresh_posted = false;
+static bool designer_trace_full_refresh_requested = false;
+static bool designer_trace_inspector_live_editing = false;
+static DesignerNodeId designer_trace_selection = Designer_NULL;
+static String designer_trace_summary_text;
+static bool designer_trace_summary_pending = false;
+
+static void DesignerTraceAppendBlockLine(const String& line)
 {
+	if(!designer_trace_.block_text.IsEmpty())
+		designer_trace_.block_text << "\n";
+	designer_trace_.block_text << line;
+}
+
+void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id, DesignerNodeId related_node_id,
+                        const String& property_id, const String& reason)
+{
+	designer_trace_.active = true;
+	designer_trace_.tx_id = DesignerTraceSeq();
+	designer_trace_.mode = mode;
+	designer_trace_.node_id = node_id;
+	designer_trace_.related_node_id = related_node_id;
+	designer_trace_.property_id = property_id;
+	designer_trace_.reason = reason;
+	designer_trace_.lines = 0;
+	designer_trace_.preview_rebuild_lines = 0;
+	designer_trace_.preview_rect_lines = 0;
+	designer_trace_.repeated_preview_count = 0;
+	designer_trace_.last_preview_trace_line.Clear();
+	designer_trace_.last_preview_trace_tag.Clear();
+	designer_trace_.block_text.Clear();
+	designer_trace_.summary_text.Clear();
+	designer_trace_.capped = false;
+	designer_trace_.begin_msecs = msecs();
+	String begin = Format("=== DESIGNER TRACE BEGIN tx=%03d reason=%s node=%d property=%s ===",
+	                      designer_trace_.tx_id, reason, (int)node_id, property_id);
+	DesignerConsoleTrace("TRACE_BEGIN", begin, true);
+}
+
+void DesignerEndTrace()
+{
+	if(!designer_trace_.active)
+		return;
+	if(designer_trace_.repeated_preview_count > 0) {
+		String repeat = Format("PREVIEW_REBUILD repeated %dx suppressed",
+		                       designer_trace_.repeated_preview_count);
+		String repeat_tag = designer_trace_.last_preview_trace_tag.IsEmpty() ? String("PREVIEW_REBUILD")
+		                                                                   : designer_trace_.last_preview_trace_tag;
+		String repeat_line = Format("#%05d tx=%03d %-14s %s", DesignerTraceSeq(), designer_trace_.tx_id, repeat_tag, repeat);
+		Cout() << repeat_line << "\n";
+		RLOG(repeat_line);
+		DesignerTraceAppendBlockLine(repeat_line);
+		designer_trace_.lines++;
+		designer_trace_.repeated_preview_count = 0;
+	}
+	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s lines=%d ===",
+	                    designer_trace_.tx_id,
+	                    designer_trace_.capped ? "CAPPED" : "OK",
+	                    designer_trace_.lines);
+	DesignerConsoleTrace("TRACE_END", end, true);
+	DesignerTraceAppendBlockLine(end);
+	designer_trace_ = DesignerTraceContext();
+}
+
+bool DesignerTraceActive()
+{
+	return designer_trace_.active;
+}
+
+DesignerTraceMode DesignerGetTraceMode()
+{
+	return designer_trace_.mode;
+}
+
+DesignerNodeId DesignerTraceNodeId()
+{
+	return designer_trace_.node_id;
+}
+
+DesignerNodeId DesignerTraceRelatedNodeId()
+{
+	return designer_trace_.related_node_id;
+}
+
+String DesignerTraceCurrentState()
+{
+	return designer_trace_current_state;
+}
+
+bool DesignerTraceRefreshPosted()
+{
+	return designer_trace_refresh_posted;
+}
+
+bool DesignerTraceFullRefreshRequested()
+{
+	return designer_trace_full_refresh_requested;
+}
+
+bool DesignerTraceInspectorLiveEditing()
+{
+	return designer_trace_inspector_live_editing;
+}
+
+DesignerNodeId DesignerTraceSelection()
+{
+	return designer_trace_selection;
+}
+
+bool DesignerTraceWantsPreviewReadback(DesignerNodeId node_id, DesignerNodeId parent_id)
+{
+	if(!designer_trace_.active)
+		return false;
+	if(designer_trace_.mode != TRACE_TRANSACTION)
+		return false;
+	return node_id == designer_trace_.node_id ||
+	       node_id == designer_trace_.related_node_id ||
+	       parent_id == designer_trace_.node_id ||
+	       parent_id == designer_trace_.related_node_id;
+}
+
+void DesignerTraceNotifyIdlePreviewRebuild()
+{
+	designer_idle_preview_rebuild_count++;
+	int now = msecs();
+	if(designer_idle_preview_rebuild_count < 50)
+		return;
+	if(designer_idle_preview_last_warn_msecs && msecs(designer_idle_preview_last_warn_msecs) < 2000)
+		return;
+	designer_idle_preview_last_warn_msecs = now;
+	String msg = Format("rebuilds=%d in 2000ms selected=%d current_state=%s refresh_posted=%d full_refresh=%d inspector_live_editing=%d",
+	                    designer_idle_preview_rebuild_count,
+	                    (int)DesignerTraceSelection(),
+	                    DesignerTraceCurrentState(),
+	                    DesignerTraceRefreshPosted() ? 1 : 0,
+	                    DesignerTraceFullRefreshRequested() ? 1 : 0,
+	                    DesignerTraceInspectorLiveEditing() ? 1 : 0);
+	if(msg != designer_idle_preview_last_warn_message) {
+		designer_idle_preview_last_warn_message = msg;
+		DesignerConsoleTrace("IDLE_PREVIEW_LOOP", msg, true);
+	}
+	designer_idle_preview_rebuild_count = 0;
+}
+
+void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
+{
+	if(!force && !DesignerTraceActive())
+		return;
+	if(!force && designer_trace_.active && designer_trace_.capped)
+		return;
+	if(!force && designer_trace_.lines >= designer_trace_.max_lines) {
+		if(!designer_trace_.capped) {
+			designer_trace_.capped = true;
+			String capped = Format("TRACE_CAPPED tx=%03d lines=%d reason=max_lines",
+			                       designer_trace_.tx_id, designer_trace_.lines);
+			Cout() << capped << "\n";
+			RLOG(capped);
+			DesignerTraceAppendBlockLine(capped);
+		}
+		DesignerEndTrace();
+		return;
+	}
+	if(designer_trace_.active && tag.StartsWith("PREVIEW_")) {
+		if(designer_trace_.last_preview_trace_line == msg) {
+			designer_trace_.repeated_preview_count++;
+			return;
+		}
+		if(designer_trace_.repeated_preview_count > 0) {
+			String repeat = Format("PREVIEW_REBUILD repeated %dx suppressed",
+			                       designer_trace_.repeated_preview_count);
+			String repeat_tag = designer_trace_.last_preview_trace_tag.IsEmpty() ? String("PREVIEW_REBUILD")
+			                                                                   : designer_trace_.last_preview_trace_tag;
+			String repeat_line = Format("#%05d tx=%03d %-14s %s", DesignerTraceSeq(), designer_trace_.tx_id, repeat_tag, repeat);
+			Cout() << repeat_line << "\n";
+			RLOG(repeat_line);
+			DesignerTraceAppendBlockLine(repeat_line);
+			designer_trace_.lines++;
+			designer_trace_.repeated_preview_count = 0;
+		}
+		designer_trace_.last_preview_trace_line = msg;
+		designer_trace_.last_preview_trace_tag = tag;
+	}
 	String line = Format("#%05d %-14s %s", DesignerTraceSeq(), tag, msg);
 	Cout() << line << "\n";
 	RLOG(line);
-	String path = AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
-	FileAppend out(path);
-	if(out.IsOpen())
-		out.PutLine(line);
+	designer_trace_.lines++;
+	DesignerTraceAppendBlockLine(line);
 }
 
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
@@ -385,7 +569,10 @@ public:
 
 	DesignerWindow()
 	{
+		designer_window_current = this;
+		DesignerBeginTrace(TRACE_LOAD, Designer_ROOT, Designer_NULL, String(), "app-start");
 		DesignerConsoleTrace("APP", "Designer " + String(DESIGNER_VERSION) + " start");
+		DesignerEndTrace();
 		Title("Designer - Box/Grid Layout Builder");
 		Icon(DesignerAssetsImg::DESIGNER_LOGO_V5())
 		    .LargeIcon(DesignerAssetsImg::DESIGNER_LOGO_V5());
@@ -406,6 +593,8 @@ public:
 	    KillTimeCallback(TOOL_DRAG_TIMER_ID);
 	    KillTimeCallback(SAVE_STATUS_TIMER_ID);
 	    KillTimeCallback(LIVE_PREVIEW_TIMER_ID);
+		if(designer_window_current == this)
+			designer_window_current = nullptr;
 	}
 
 	void Layout() override
@@ -558,7 +747,11 @@ private:
 			return true;
 		}
 		if(key == (K_CTRL | K_SHIFT | K_D)) {
+			DesignerBeginTrace(TRACE_DUMP,
+				model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0],
+				Designer_NULL, String(), "dump-selected");
 			DumpSelectedNodeState();
+			DesignerEndTrace();
 			return true;
 		}
 		return TopWindow::Key(key, count);
@@ -781,6 +974,8 @@ private:
 
 		preview_.Set(&model_, &registry_);
 		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
+			DesignerNodeId old_primary = model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0];
+			DesignerBeginTrace(TRACE_SELECTION, id, old_primary, String(), "preview-selection");
 			Vector<DesignerNodeId> old_selection = clone(model_.GetSelection());
 			String old_text;
 			for(int i = 0; i < old_selection.GetCount(); i++) {
@@ -807,6 +1002,7 @@ private:
 			DesignerConsoleTrace("SELECT_PREVIEW",
 				Format("node=%d new_selection=%s", (int)id, new_text));
 			RefreshSelectionUi();
+			DesignerEndTrace();
 		};
 		preview_.WhenMoveNode = [=](DesignerNodeId id, DesignerNodeId target, int index) {
 			MovePreviewNode(id, target, index);
@@ -861,6 +1057,7 @@ private:
 		hierarchy_.WhenSelection = [=] {
 			if(syncing_hierarchy_)
 				return;
+			DesignerNodeId old_primary = model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0];
 			Vector<DesignerNodeId> old_selection = clone(model_.GetSelection());
 			Vector<DesignerNodeId> ids;
 			for(UiTreeNodeRef ref : hierarchy_.GetSelection()) {
@@ -877,10 +1074,12 @@ private:
 				if(i) new_text << ",";
 				new_text << (int)ids[i];
 			}
+			DesignerBeginTrace(TRACE_SELECTION, ids.IsEmpty() ? Designer_NULL : ids[0], old_primary, String(), "hierarchy-selection");
 			DesignerConsoleTrace("SELECT_HIER",
 				Format("old_selection=%s new_selection=%s", old_text, new_text));
 			model_.SetSelection(ids);
 			RefreshInspectorPreview();
+			DesignerEndTrace();
 		};
 		hierarchy_.WhenRename = [=](UiTreeNodeRef ref, const String& name) {
 			DesignerNodeId id = GetHierarchyNodeId(ref);
@@ -1147,6 +1346,7 @@ private:
 	{
 		if(path.IsEmpty())
 			return;
+		DesignerBeginTrace(TRACE_LOAD, Designer_ROOT, Designer_NULL, String(), "load");
 		DesignerConsoleTrace("LOAD", "path=" + path);
 #ifdef _DEBUG
 		RLOG("LoadDesignPath: " << path);
@@ -1154,12 +1354,14 @@ private:
 		String json = LoadFile(path);
 		if(json.IsVoid()) {
 			Exclamation("Unable to read designer document.");
+			DesignerEndTrace();
 			return;
 		}
 		String error;
 		Vector<String> notes;
 		if(!LoadDesignerModelJson(model_, registry_, json, error, &notes)) {
 			Exclamation("Unable to load designer document:\n" + error);
+			DesignerEndTrace();
 			return;
 		}
 		commands_.Clear();
@@ -1173,6 +1375,7 @@ private:
 			       model_.GetNodes().GetCount(),
 			       model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
 			       path));
+		DesignerEndTrace();
 		String note_text;
 		for(const String& note : notes) {
 			if(!note_text.IsEmpty())
@@ -2200,6 +2403,14 @@ private:
 
 	void ResetPendingInspectorTransaction()
 	{
+		if(designer_trace_.active && designer_trace_.mode == TRACE_TRANSACTION)
+			DesignerEndTrace();
+		if(designer_trace_summary_pending) {
+			SetDiagnosticsText(designer_trace_summary_text);
+			AppendInspectorTraceFile(designer_trace_summary_text);
+			designer_trace_summary_text.Clear();
+			designer_trace_summary_pending = false;
+		}
 		pending_inspector_txn_ = PendingInspectorTransaction();
 	}
 
@@ -2233,11 +2444,13 @@ private:
 		designer_fsm_.SetEventPolicy(EventPolicy::RejectWhileTransitioning);
 		designer_fsm_.SetMaxQueuedEvents(0);
 		designer_fsm_.WhenTransitionStarted = [=](const TransitionContext& ctx) {
+			designer_trace_current_state = ctx.fromState;
 #ifdef _DEBUG
 			RLOG(Format("DSM transition: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
 		};
 		designer_fsm_.WhenTransitionFinished = [=](const TransitionContext& ctx) {
+			designer_trace_current_state = ctx.toState;
 #ifdef _DEBUG
 			RLOG(Format("DSM transition finished: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
@@ -2297,6 +2510,7 @@ private:
 		designer_fsm_.AddTransition({DESIGNER_EVENT_PROJECTION_DONE, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_IDLE});
 		designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
 		designer_fsm_.Start();
+		designer_trace_current_state = DESIGNER_STATE_IDLE;
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
@@ -2308,6 +2522,8 @@ private:
 #endif
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		full_refresh_requested_ = full_refresh_requested_ || full;
+		designer_trace_refresh_posted = true;
+		designer_trace_full_refresh_requested = full_refresh_requested_;
 
 		if(IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
@@ -2327,6 +2543,7 @@ private:
 			return;
 		}
 		refresh_posted_ = false;
+		designer_trace_refresh_posted = false;
 		RunRefreshAllNow();
 	}
 
@@ -2335,6 +2552,7 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
+		designer_trace_selection = model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0];
 		ApplySelectionProjection();
 #ifdef _DEBUG
 		RLOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
@@ -2352,6 +2570,7 @@ private:
 			return;
 		}
 		refresh_posted_ = false;
+		designer_trace_refresh_posted = false;
 	}
 
 	void RefreshInspectorPreview()
@@ -3009,6 +3228,7 @@ private:
 	void SetInspectorLiveEditing(bool active)
 	{
 		inspector_live_editing_ = active;
+		designer_trace_inspector_live_editing = active;
 		if(!active)
 			FlushDeferredDesignerRefresh();
 	}
@@ -3038,11 +3258,13 @@ private:
 		if(refresh_posted_)
 			return;
 		refresh_posted_ = true;
+		designer_trace_refresh_posted = true;
 		Ptr<DesignerWindow> self(this);
 		PostCallback([=] {
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
+			designer_trace_refresh_posted = false;
 			if(self->IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
 				RLOG("Designer refresh deferred: " << self->DesignerRefreshBlockReason());
@@ -3806,8 +4028,8 @@ private:
 	                           const String& rejected_reason)
 	{
 		String text = BuildInspectorTraceText(intent, txn, state_before, transition_accepted, rejected_reason);
-		SetDiagnosticsText(text);
-		AppendInspectorTraceFile(text);
+		designer_trace_summary_text = text;
+		designer_trace_summary_pending = true;
 	}
 
 	void ReportInspectorCommitFailure(const PendingInspectorTransaction& txn, const char *stage)

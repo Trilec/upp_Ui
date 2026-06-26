@@ -1,4 +1,5 @@
 #include "DesignerPreview.h"
+#include "DesignerInspector.h"
 #include "DesignerDefaults.h"
 
 // DesignerPreview.cpp - virtual-window preview and pointer interaction surface.
@@ -8,7 +9,7 @@
 namespace Upp {
 
 int DesignerTraceSeq();
-void DesignerConsoleTrace(const String& tag, const String& msg);
+void DesignerConsoleTrace(const String& tag, const String& msg, bool force);
 
 static int DesignerPreviewFindNodeId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {
@@ -40,15 +41,6 @@ static int DesignerPreviewFixedMetric(const DesignerNode& n, const String& axis_
 	return q >= 0 ? (int)n.properties.GetValue(q) : fallback;
 }
 
-static bool DesignerPreviewTraceType(const String& type_id)
-{
-	return type_id == "UiTitleCard" ||
-	       type_id == "UiScrollPanel" ||
-	       type_id == "UiLineEdit" ||
-	       type_id == "UiButton" ||
-	       type_id == "UiLabel";
-}
-
 static String DesignerPreviewTraceValue(const DesignerNode& n, const String& key, const Value& def)
 {
 	Value v = DesignerPreviewNodeProperty(n, key, def);
@@ -57,6 +49,8 @@ static String DesignerPreviewTraceValue(const DesignerNode& n, const String& key
 
 static void DesignerPreviewAppendTrace(const String& line)
 {
+	if(!DesignerTraceActive())
+		return;
 	String path = AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
 	FileAppend out(path);
 	if(!out.IsOpen())
@@ -66,12 +60,17 @@ static void DesignerPreviewAppendTrace(const String& line)
 	out.PutLine("");
 }
 
-static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n, const Rect& rect = Null)
+static void DesignerPreviewLogReadback(const DesignerNode& n, const Rect& rect = Null,
+                                       DesignerNodeId parent_id = Designer_NULL)
 {
-	if(!DesignerPreviewTraceType(n.type_id))
+	if(!DesignerTraceActive()) {
+		DesignerTraceNotifyIdlePreviewRebuild();
+		return;
+	}
+	if(!DesignerTraceWantsPreviewReadback(n.id, parent_id))
 		return;
 	String line;
-	if(!IsNull(rect) || (String)stage == "rect")
+	if(!IsNull(rect))
 		line = Format("PREVIEW_RECT node=%d type=%s rect=%d,%d,%d,%d",
 		              (int)n.id, n.type_id, rect.left, rect.top, rect.right, rect.bottom);
 	else
@@ -88,9 +87,6 @@ static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n,
 	line << Format(" style_role_applied=%s", DesignerPreviewTraceValue(n, "role", "Standard"));
 	DesignerConsoleTrace(line.StartsWith("PREVIEW_RECT") ? "PREVIEW_RECT" : "PREVIEW_REBUILD", line);
 	DesignerPreviewAppendTrace(line);
-#ifdef _DEBUG
-	RLOG(line);
-#endif
 }
 
 static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const String& axis, const String& value_key, int fallback)
@@ -1217,7 +1213,7 @@ Ctrl* DesignerPreview::BuildRealNode(DesignerNodeId id)
 			DesignerNode* n = model_ ? model_->Find(id) : nullptr;
 			if(!n || id == Designer_ROOT)
 				return nullptr;
-			DesignerPreviewLogReadback("build", *n);
+			DesignerPreviewLogReadback(*n, Null, n->parent);
 			DesignerAdapter *adapter = nullptr;
 			Ctrl *raw = CreateDesignerAdapterCtrl(*n, &adapter);
 			if(!raw || !adapter)
@@ -1614,7 +1610,7 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 				if(n)
 					DesignerSyncSpacerItemRects(*model_, *n, ctrl, offset + ctrl.GetRect().TopLeft());
 				if(n)
-					DesignerPreviewLogReadback("rect", *n, n->last_rect);
+					DesignerPreviewLogReadback(*n, n->last_rect, n->parent);
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())
