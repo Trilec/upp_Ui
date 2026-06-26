@@ -12,6 +12,7 @@
 #include "DesignerAssets.h"
 #include "DesignerDefaults.h"
 #include "DesignerVersion.h"
+#include <statemachine/statemachine.h>
 
 // Designer utility app - Box/Grid/Splitter layout builder for U++ Ui controls.
 // This file wires the subsystems together: model, commands, adapters, preview,
@@ -28,6 +29,15 @@ static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
 static constexpr int LIVE_PREVIEW_TIMER_ID = 103;
 static constexpr int DESIGNER_RECENT_LIMIT = 10;
+static const char *DESIGNER_STATE_IDLE = "Idle";
+static const char *DESIGNER_STATE_PREVIEWING = "Previewing";
+static const char *DESIGNER_STATE_COMMITTING = "Committing";
+static const char *DESIGNER_STATE_PROJECTING = "Projecting";
+static const char *DESIGNER_EVENT_INSPECTOR_PREVIEW = "inspector_preview";
+static const char *DESIGNER_EVENT_INSPECTOR_COMMIT = "inspector_commit";
+static const char *DESIGNER_EVENT_COMMAND_APPLIED = "command_applied";
+static const char *DESIGNER_EVENT_COMMAND_REJECTED = "command_rejected";
+static const char *DESIGNER_EVENT_PROJECTION_DONE = "projection_done";
 
 static String DesignerCrumbPropertyKey(int i)
 {
@@ -343,6 +353,7 @@ public:
 		RegisterDesignerBuiltins(registry_);
 		BuildInitialModel();
 		BuildUi();
+		InitDesignerStateMachine();
 		SetDocumentDirty(false);
 		RefreshAll();
 	}
@@ -1623,6 +1634,25 @@ private:
 		String reason;
 	};
 
+	struct PendingInspectorTransaction {
+		bool active = false;
+		bool preview = false;
+		bool commit = false;
+		DesignerNodeId node_id = Designer_NULL;
+		String property_id;
+		Value value;
+		Value normalized;
+		Value old_model_value;
+		Value preview_old_value;
+		bool had_old = false;
+		bool has_preview_old = false;
+		bool command_result = false;
+		bool commit_succeeded = false;
+		bool inspector_refresh_requested = false;
+		String failure_reason;
+		DesignerProjectionRequest projection;
+	};
+
 	void ApplySelectionProjection()
 	{
 		SyncHierarchySelection();
@@ -1709,6 +1739,102 @@ private:
 		RLOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=%d",
 		            r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0], r.inspector ? 1 : 0));
 #endif
+	}
+
+	void ResetPendingInspectorTransaction()
+	{
+		pending_inspector_txn_ = PendingInspectorTransaction();
+	}
+
+	bool TriggerDesignerStateEvent(const char *event, const char *reason)
+	{
+		bool ok = designer_fsm_.TriggerEvent(event);
+#ifdef _DEBUG
+		RLOG(Format("DesignerState Trigger event=%s reason=%s ok=%d current=%s error=%s",
+		            event ? event : "", reason ? reason : "", ok ? 1 : 0,
+		            designer_fsm_.GetCurrent(), designer_fsm_.GetLastErrorText()));
+#endif
+		return ok;
+	}
+
+	void ContinueInspectorCommitStateMachine()
+	{
+		const char *event = pending_inspector_txn_.commit_succeeded ? DESIGNER_EVENT_COMMAND_APPLIED
+		                                                           : DESIGNER_EVENT_COMMAND_REJECTED;
+		TriggerDesignerStateEvent(event, "commit complete");
+	}
+
+	void ContinueInspectorProjectionStateMachine()
+	{
+		TriggerDesignerStateEvent(DESIGNER_EVENT_PROJECTION_DONE, "projection complete");
+	}
+
+	void InitDesignerStateMachine()
+	{
+		designer_fsm_.EnableLogging(false);
+		designer_fsm_.SetEventPolicy(EventPolicy::QueueWhileTransitioning);
+		designer_fsm_.SetMaxQueuedEvents(16);
+		designer_fsm_.WhenTransitionStarted = [=](const TransitionContext& ctx) {
+#ifdef _DEBUG
+			RLOG(Format("DesignerState started: %s -> %s (%s)", ctx.fromState, ctx.toState, ctx.event));
+#endif
+		};
+		designer_fsm_.WhenTransitionFinished = [=](const TransitionContext& ctx) {
+#ifdef _DEBUG
+			RLOG(Format("DesignerState finished: %s -> %s (%s)", ctx.fromState, ctx.toState, ctx.event));
+#endif
+		};
+
+		designer_fsm_.AddState({DESIGNER_STATE_IDLE,
+			[=](StateMachine&, Function<void(bool)> done) {
+				ResetPendingInspectorTransaction();
+				done(true);
+			},
+			{}
+		});
+		designer_fsm_.AddState({DESIGNER_STATE_PREVIEWING,
+			[=](StateMachine&, Function<void(bool)> done) {
+				ApplyPendingInspectorPreview();
+				done(true);
+			},
+			{}
+		});
+		designer_fsm_.AddState({DESIGNER_STATE_COMMITTING,
+			[=](StateMachine&, Function<void(bool)> done) {
+				ApplyPendingInspectorCommit();
+				Ptr<DesignerWindow> self = this;
+				PostCallback([self] {
+					if(self)
+						self->ContinueInspectorCommitStateMachine();
+				});
+				done(true);
+			},
+			{}
+		});
+		designer_fsm_.AddState({DESIGNER_STATE_PROJECTING,
+			[=](StateMachine&, Function<void(bool)> done) {
+				ApplyPendingInspectorProjection();
+				Ptr<DesignerWindow> self = this;
+				PostCallback([self] {
+					if(self)
+						self->ContinueInspectorProjectionStateMachine();
+				});
+				done(true);
+			},
+			{}
+		});
+
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_PREVIEW, DESIGNER_STATE_IDLE, DESIGNER_STATE_PREVIEWING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_PREVIEW, DESIGNER_STATE_PREVIEWING, DESIGNER_STATE_PREVIEWING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_PREVIEW, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_PREVIEWING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_IDLE, DESIGNER_STATE_COMMITTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_PREVIEWING, DESIGNER_STATE_COMMITTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_COMMITTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_APPLIED, DESIGNER_STATE_COMMITTING, DESIGNER_STATE_PROJECTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_REJECTED, DESIGNER_STATE_COMMITTING, DESIGNER_STATE_IDLE});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_PROJECTION_DONE, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_IDLE});
+		designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
+		designer_fsm_.Start();
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
@@ -3149,13 +3275,19 @@ private:
 		}, LIVE_PREVIEW_TIMER_ID);
 	}
 
-	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	void ApplyPendingInspectorPreview()
 	{
+		if(!pending_inspector_txn_.active || !pending_inspector_txn_.preview)
+			return;
+		DesignerNodeId node_id = pending_inspector_txn_.node_id;
+		const String& property_id = pending_inspector_txn_.property_id;
+		const Value& value = pending_inspector_txn_.value;
 		DesignerNode* n = model_.Find(node_id);
 		if(!n || n->id == Designer_ROOT)
 			return;
 		BeginInspectorLiveEditing();
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		pending_inspector_txn_.normalized = normalized;
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		if(live_preview_old_values_.Find(preview_key) < 0) {
 			int q = n->properties.Find(property_id);
@@ -3173,6 +3305,17 @@ private:
 #endif
 		model_.SetProperty(node_id, property_id, normalized);
 		ScheduleLivePreviewRefresh();
+	}
+
+	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	{
+		pending_inspector_txn_.active = true;
+		pending_inspector_txn_.preview = true;
+		pending_inspector_txn_.commit = false;
+		pending_inspector_txn_.node_id = node_id;
+		pending_inspector_txn_.property_id = property_id;
+		pending_inspector_txn_.value = value;
+		TriggerDesignerStateEvent(DESIGNER_EVENT_INSPECTOR_PREVIEW, "single-node preview");
 	}
 
 	void PreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
@@ -3196,8 +3339,18 @@ private:
 		ScheduleLivePreviewRefresh();
 	}
 
-	void CommitPreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	void ApplyPendingInspectorCommit()
 	{
+		if(!pending_inspector_txn_.active || !pending_inspector_txn_.commit)
+			return;
+		DesignerNodeId node_id = pending_inspector_txn_.node_id;
+		const String property_id = pending_inspector_txn_.property_id;
+		const Value value = pending_inspector_txn_.value;
+		pending_inspector_txn_.commit_succeeded = false;
+		pending_inspector_txn_.command_result = false;
+		pending_inspector_txn_.failure_reason.Clear();
+		pending_inspector_txn_.projection = DesignerProjectionRequest();
+		pending_inspector_txn_.inspector_refresh_requested = false;
 		SetInspectorLiveEditing(false);
 		DesignerNode* n = model_.Find(node_id);
 		if(!n || n->id == Designer_ROOT) {
@@ -3205,6 +3358,7 @@ private:
 			RLOG(Format("Commit rejected: node=%d property=%s reason=%s",
 			            (int)node_id, property_id, !n ? "node not found" : "root node"));
 #endif
+			pending_inspector_txn_.failure_reason = !n ? "wrong node" : "root node";
 			return;
 		}
 		Vector<DesignerApiBinding> bindings;
@@ -3243,6 +3397,9 @@ private:
 			RLOG(Format("Commit rejected: node=%d property=%s reason=%s",
 			            (int)node_id, property_id, reason));
 #endif
+			pending_inspector_txn_.failure_reason = !binding ? "missing binding"
+			                                   : !binding->visible ? "hidden binding"
+			                                   : "disabled binding";
 			return;
 		}
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
@@ -3260,6 +3417,11 @@ private:
 		bool has_preview_old = preview_q >= 0;
 		Value old_value = has_preview_old ? live_preview_old_values_[preview_q] : Value();
 		bool had_old = has_preview_old ? live_preview_had_old_[preview_q] : (n->properties.Find(property_id) >= 0);
+		pending_inspector_txn_.normalized = normalized;
+		pending_inspector_txn_.old_model_value = model_before;
+		pending_inspector_txn_.preview_old_value = old_value;
+		pending_inspector_txn_.had_old = had_old;
+		pending_inspector_txn_.has_preview_old = has_preview_old;
 #ifdef _DEBUG
 		RLOG(Format("Commit live preview state: node=%d property=%s has_preview_old=%d preview_old=%s had_old=%d",
 		            (int)node_id, property_id, has_preview_old ? 1 : 0,
@@ -3281,6 +3443,7 @@ private:
 			grouped = true;
 		}
 		bool command_result = commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_);
+		pending_inspector_txn_.command_result = command_result;
 		const DesignerNode* after_command = model_.Find(node_id);
 		int after_q = after_command ? after_command->properties.Find(property_id) : -1;
 		Value model_after = after_q >= 0 ? after_command->properties.GetValue(after_q) : Value();
@@ -3295,7 +3458,8 @@ private:
 				RLOG(Format("Command executed: node=%d property=%s old=%s new=%s",
 				            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
 #endif
-				SetDocumentDirty();
+			SetDocumentDirty();
+			pending_inspector_txn_.commit_succeeded = true;
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
 				live_preview_had_old_.Remove(preview_q);
@@ -3315,16 +3479,8 @@ private:
 			if(layout_affecting && changed)
 				TraceLayoutAffectingChange(*changed, property_id);
 			if(changed) {
-				ApplyDesignerProjection(GetProjectionForInspectorCommit(*changed, property_id));
-#ifdef _DEBUG
-				const DesignerNode* after_projection = model_.Find(node_id);
-				int projection_q = after_projection ? after_projection->properties.Find(property_id) : -1;
-				RLOG(Format("After ApplyDesignerProjection: node=%d property=%s model_value=%s selected=%d inspector_refresh_requested=%d",
-				            (int)node_id, property_id,
-				            projection_q >= 0 ? StdFormat(after_projection->properties.GetValue(projection_q)) : String("<missing>"),
-				            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
-				            1));
-#endif
+				pending_inspector_txn_.projection = GetProjectionForInspectorCommit(*changed, property_id);
+				pending_inspector_txn_.inspector_refresh_requested = pending_inspector_txn_.projection.inspector;
 			}
 			else {
 				DesignerProjectionRequest projection;
@@ -3332,7 +3488,8 @@ private:
 				projection.hierarchy = true;
 				projection.inspector = true;
 				projection.reason = "inspector commit fallback";
-				ApplyDesignerProjection(projection);
+				pending_inspector_txn_.projection = projection;
+				pending_inspector_txn_.inspector_refresh_requested = true;
 			}
 		}
 		else {
@@ -3342,7 +3499,6 @@ private:
 			}
 			if(grouped)
 				commands_.EndGroup();
-#ifdef _DEBUG
 			String reason;
 			if(had_old && old_value == normalized)
 				reason = "old value == new value";
@@ -3358,11 +3514,41 @@ private:
 				reason = "null/invalid value";
 			else
 				reason = "command returned false";
+#ifdef _DEBUG
 			RLOG(Format("Command no-op / failed: node=%d property=%s old=%s new=%s reason=%s",
 			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized), reason));
 #endif
+			pending_inspector_txn_.failure_reason = reason;
 			RequestDesignerRefresh(true, true);
 		}
+	}
+
+	void CommitPreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
+	{
+		pending_inspector_txn_.active = true;
+		pending_inspector_txn_.preview = false;
+		pending_inspector_txn_.commit = true;
+		pending_inspector_txn_.node_id = node_id;
+		pending_inspector_txn_.property_id = property_id;
+		pending_inspector_txn_.value = value;
+		TriggerDesignerStateEvent(DESIGNER_EVENT_INSPECTOR_COMMIT, "single-node commit");
+	}
+
+	void ApplyPendingInspectorProjection()
+	{
+		if(!pending_inspector_txn_.active || !pending_inspector_txn_.commit_succeeded)
+			return;
+		const DesignerNode* changed = model_.Find(pending_inspector_txn_.node_id);
+		ApplyDesignerProjection(pending_inspector_txn_.projection);
+#ifdef _DEBUG
+		int projection_q = changed ? changed->properties.Find(pending_inspector_txn_.property_id) : -1;
+		RLOG(Format("After ApplyDesignerProjection: node=%d property=%s model_value=%s selected=%d inspector_refresh_requested=%d",
+		            (int)pending_inspector_txn_.node_id, pending_inspector_txn_.property_id,
+		            projection_q >= 0 ? StdFormat(changed->properties.GetValue(projection_q)) : String("<missing>"),
+		            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+		            pending_inspector_txn_.inspector_refresh_requested ? 1 : 0));
+#endif
+		ResetPendingInspectorTransaction();
 	}
 
 	void SaveInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
@@ -4007,6 +4193,8 @@ private:
 	bool refresh_deferred_ = false;
 	bool full_refresh_requested_ = false;
 	bool live_preview_refresh_pending_ = false;
+	StateMachine designer_fsm_;
+	PendingInspectorTransaction pending_inspector_txn_;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	VectorMap<String, Value> live_preview_old_values_;
 	VectorMap<String, bool> live_preview_had_old_;

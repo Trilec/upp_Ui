@@ -3,7 +3,8 @@ uses
 	Draw,
 	CtrlCore,
 	CtrlLib,
-	Ui;
+	Ui,
+	statemachine;
 
 file
 	DesignerModel.h,
