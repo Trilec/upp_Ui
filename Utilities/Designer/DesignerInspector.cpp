@@ -1145,6 +1145,10 @@ String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindin
 
 bool DesignerInspector::CanDeliverRowCommit(int generation, DesignerNodeId row_node, const String& property_id, const char *editor_kind) const
 {
+#ifdef _DEBUG
+	RLOG(Format("Inspector CanDeliverRowCommit node=%d property=%s row_generation=%d inspector_generation=%d syncing=%d editor=%s",
+	            (int)row_node, property_id, generation, inspector_generation_, syncing_ ? 1 : 0, editor_kind));
+#endif
 	if(syncing_) {
 		RLOG(Format("Inspector row commit blocked: syncing editor=%s property=%s",
 		            editor_kind, property_id));
@@ -1184,6 +1188,10 @@ bool DesignerInspector::CanDeliverManyRowCommit(int generation, const String& pr
 
 void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value)
 {
+#ifdef _DEBUG
+	RLOG(Format("Inspector commit post queued: node=%d property=%s raw=%s row_generation=%d inspector_generation=%d syncing=%d",
+	            (int)row_node, property_id, StdFormat(value), generation, inspector_generation_, syncing_ ? 1 : 0));
+#endif
 	// Inspector user edits must be posted rather than committed synchronously.
 	// Row callbacks may be triggered while popup/row controls are still unwinding.
 	// Posting plus generation checks prevents stale row callbacks from rebuilding
@@ -1192,31 +1200,35 @@ void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_n
 	PostCallback([=] {
 		if(!self) {
 #ifdef _DEBUG
-			RLOG("Inspector commit dropped: inspector destroyed");
+			RLOG(Format("PostInspectorCommit node=%d property=%s value=%s dropped=1 reason=inspector destroyed",
+			            (int)row_node, property_id, StdFormat(value)));
 #endif
 			return;
 		}
 		if(self->syncing_) {
 #ifdef _DEBUG
-			RLOG("Inspector commit dropped: syncing property=" << property_id);
+			RLOG(Format("PostInspectorCommit node=%d property=%s value=%s dropped=1 reason=syncing",
+			            (int)row_node, property_id, StdFormat(value)));
 #endif
 			return;
 		}
 		if(generation != self->inspector_generation_) {
 #ifdef _DEBUG
-			RLOG(Format("Inspector commit dropped: generation old=%d current=%d property=%s node=%d current_node=%d",
-			            generation, self->inspector_generation_, property_id, (int)row_node, (int)self->node_id_));
+			RLOG(Format("PostInspectorCommit node=%d property=%s value=%s dropped=1 reason=generation mismatch row_generation=%d inspector_generation=%d current_node=%d",
+			            (int)row_node, property_id, StdFormat(value),
+			            generation, self->inspector_generation_, (int)self->node_id_));
 #endif
 		}
 		if(self->node_id_ != row_node) {
 #ifdef _DEBUG
-			RLOG(Format("Inspector commit dropped: node mismatch property=%s row_node=%d current_node=%d",
-			            property_id, (int)row_node, (int)self->node_id_));
+			RLOG(Format("PostInspectorCommit node=%d property=%s value=%s dropped=1 reason=node mismatch current_node=%d",
+			            (int)row_node, property_id, StdFormat(value), (int)self->node_id_));
 #endif
 			return;
 		}
 #ifdef _DEBUG
-		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
+		RLOG(Format("PostInspectorCommit node=%d property=%s value=%s dropped=0",
+		            (int)row_node, property_id, StdFormat(value)));
 #endif
 		self->WhenProperty(row_node, property_id, value);
 #ifdef _DEBUG

@@ -1688,6 +1688,10 @@ private:
 		if(r.full) {
 			ForceDesignerProjectionRefresh(r.reason);
 			RequestDesignerRefresh(true, true);
+#ifdef _DEBUG
+			RLOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=1 selected_value=<n/a>",
+			            r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0]));
+#endif
 			return;
 		}
 
@@ -1701,6 +1705,10 @@ private:
 		}
 		if(r.inspector)
 			PostDesignerRefresh(true);
+#ifdef _DEBUG
+		RLOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=%d",
+		            r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0], r.inspector ? 1 : 0));
+#endif
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
@@ -3154,6 +3162,15 @@ private:
 			live_preview_old_values_.Add(preview_key, q >= 0 ? n->properties.GetValue(q) : Value());
 			live_preview_had_old_.Add(preview_key, q >= 0);
 		}
+#ifdef _DEBUG
+		if(property_id == "h_sizing" || property_id == "v_sizing" || property_id == "fixed_width" || property_id == "fixed_height") {
+			int q = n->properties.Find(property_id);
+			RLOG(Format("PreviewInspectorPropertyValue node=%d type=%s property=%s raw=%s normalized=%s model_before=%s preview_old=%s",
+			            (int)node_id, n->type_id, property_id, StdFormat(value), StdFormat(normalized),
+			            q >= 0 ? StdFormat(n->properties.GetValue(q)) : String("<missing>"),
+			            StdFormat(live_preview_old_values_.Get(preview_key, Value()))));
+		}
+#endif
 		model_.SetProperty(node_id, property_id, normalized);
 		ScheduleLivePreviewRefresh();
 	}
@@ -3229,15 +3246,25 @@ private:
 			return;
 		}
 		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		int old_q = n->properties.Find(property_id);
+		Value model_before = old_q >= 0 ? n->properties.GetValue(old_q) : Value();
 #ifdef _DEBUG
-		RLOG(Format("CommitPreviewInspectorPropertyValue delivered: node=%d property=%s normalized=%s",
-		            (int)node_id, property_id, StdFormat(normalized)));
+		RLOG(Format("Commit received: node=%d type=%s property=%s incoming=%s normalized=%s binding=%d visible=%d enabled=%d safe_sizing=%d old_model=%s",
+		            (int)node_id, n->type_id, property_id, StdFormat(value), StdFormat(normalized),
+		            binding ? 1 : 0, binding ? (binding->visible ? 1 : 0) : 0,
+		            binding ? (binding->enabled ? 1 : 0) : 0, safe_sizing ? 1 : 0,
+		            old_q >= 0 ? StdFormat(model_before) : String("<missing>")));
 #endif
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		int preview_q = live_preview_old_values_.Find(preview_key);
 		bool has_preview_old = preview_q >= 0;
 		Value old_value = has_preview_old ? live_preview_old_values_[preview_q] : Value();
 		bool had_old = has_preview_old ? live_preview_had_old_[preview_q] : (n->properties.Find(property_id) >= 0);
+#ifdef _DEBUG
+		RLOG(Format("Commit live preview state: node=%d property=%s has_preview_old=%d preview_old=%s had_old=%d",
+		            (int)node_id, property_id, has_preview_old ? 1 : 0,
+		            has_preview_old ? StdFormat(old_value) : String("<missing>"), had_old ? 1 : 0));
+#endif
 		if(n->type_id == "GridLayout" && (property_id == "columns" || property_id == "rows")) {
 			int requested = IsNumber(normalized) ? (int)normalized : StrInt(AsString(normalized));
 			int required = property_id == "columns" ? RequiredGridColumns(*n) : RequiredGridRows(*n);
@@ -3253,7 +3280,17 @@ private:
 			commands_.BeginGroup("Set " + property_id);
 			grouped = true;
 		}
-		if(commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_)) {
+		bool command_result = commands_.Execute(MakeDesignerSetPropertyCommand(n->id, property_id, old_value, had_old, normalized, binding->api_call), model_);
+		const DesignerNode* after_command = model_.Find(node_id);
+		int after_q = after_command ? after_command->properties.Find(property_id) : -1;
+		Value model_after = after_q >= 0 ? after_command->properties.GetValue(after_q) : Value();
+#ifdef _DEBUG
+		RLOG(Format("Command result: node=%d property=%s result=%d model_after=%s equals_intended=%d",
+		            (int)node_id, property_id, command_result ? 1 : 0,
+		            after_q >= 0 ? StdFormat(model_after) : String("<missing>"),
+		            after_q >= 0 && model_after == normalized ? 1 : 0));
+#endif
+		if(command_result) {
 #ifdef _DEBUG
 				RLOG(Format("Command executed: node=%d property=%s old=%s new=%s",
 				            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
@@ -3277,8 +3314,18 @@ private:
 			                                  property_id == "weight");
 			if(layout_affecting && changed)
 				TraceLayoutAffectingChange(*changed, property_id);
-			if(changed)
+			if(changed) {
 				ApplyDesignerProjection(GetProjectionForInspectorCommit(*changed, property_id));
+#ifdef _DEBUG
+				const DesignerNode* after_projection = model_.Find(node_id);
+				int projection_q = after_projection ? after_projection->properties.Find(property_id) : -1;
+				RLOG(Format("After ApplyDesignerProjection: node=%d property=%s model_value=%s selected=%d inspector_refresh_requested=%d",
+				            (int)node_id, property_id,
+				            projection_q >= 0 ? StdFormat(after_projection->properties.GetValue(projection_q)) : String("<missing>"),
+				            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+				            1));
+#endif
+			}
 			else {
 				DesignerProjectionRequest projection;
 				projection.full = true;
@@ -3296,8 +3343,23 @@ private:
 			if(grouped)
 				commands_.EndGroup();
 #ifdef _DEBUG
-			RLOG(Format("Command no-op / failed: node=%d property=%s old=%s new=%s",
-			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
+			String reason;
+			if(had_old && old_value == normalized)
+				reason = "old value == new value";
+			else if(old_q >= 0 && model_before == normalized)
+				reason = "model property already had value because live preview wrote it";
+			else if(!binding)
+				reason = "missing binding";
+			else if(!binding->visible)
+				reason = "hidden binding";
+			else if(!binding->enabled && !safe_sizing && !safe_theme_override)
+				reason = "disabled binding";
+			else if(IsNull(normalized))
+				reason = "null/invalid value";
+			else
+				reason = "command returned false";
+			RLOG(Format("Command no-op / failed: node=%d property=%s old=%s new=%s reason=%s",
+			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized), reason));
 #endif
 			RequestDesignerRefresh(true, true);
 		}
@@ -3536,21 +3598,38 @@ private:
 		                        property_id == "shadow_curve" || property_id == "icon" ||
 		                        property_id == "role";
 
+#ifdef _DEBUG
+		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d safe_sizing=%d",
+		            (int)node.id, node.type_id, property_id, layout_affecting ? 1 : 0, safe_sizing ? 1 : 0));
+#endif
+
 		if(layout_affecting) {
 			r.full = true;
 			r.inspector = true;
 			r.hierarchy = true;
 			r.reason = "layout inspector commit";
+#ifdef _DEBUG
+			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
 			return r;
 		}
 		if(safe_sizing) {
 			r.inspector = true;
 			r.reason = "sizing inspector commit";
+#ifdef _DEBUG
+			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
 			return r;
 		}
 		if(theme_or_display) {
 			r.inspector = true;
 			r.reason = "theme/display inspector commit";
+#ifdef _DEBUG
+			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
 			return r;
 		}
 		if(needs_hierarchy) {
@@ -3558,9 +3637,17 @@ private:
 			r.hierarchy = true;
 			r.inspector = true;
 			r.reason = "hierarchy-visible inspector commit";
+#ifdef _DEBUG
+			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
 			return r;
 		}
 		r.reason = "visual inspector commit";
+#ifdef _DEBUG
+		RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
 		return r;
 	}
 

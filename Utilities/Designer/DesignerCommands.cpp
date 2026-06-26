@@ -194,15 +194,19 @@ public:
 		DesignerNode* n = model.Find(id_);
 		if(!n)
 			return false;
+		int q_current = n->properties.Find(property_);
+		bool has_current = q_current >= 0;
+		Value current = has_current ? n->properties.GetValue(q_current) : Value();
 		if(!explicit_old_) {
-			int q = n->properties.Find(property_);
-			had_old_ = q >= 0;
-			old_ = had_old_ ? n->properties.GetValue(q) : Value();
+			had_old_ = has_current;
+			old_ = has_current ? current : Value();
 		}
 		if(had_old_ && old_ == value_)
 			return false;
 		if(!had_old_ && IsNull(value_) && !AllowsExplicitEmptyText(property_))
 			return false;
+		if(explicit_old_ && has_current && current == value_)
+			return true;
 		return model.SetProperty(id_, property_, value_);
 	}
 
