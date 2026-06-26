@@ -849,6 +849,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenSelectData = [=](const Value& data) {
 			if(!self)
 				return;
+			DesignerConsoleTrace("ROW_CHOICE",
+				Format("node=%d property=%s value=%s editor=choice generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, StdFormat(data),
+				       generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, data, false, true, "choice", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
@@ -870,6 +874,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenAction = [=] {
 			if(!self)
 				return;
+			DesignerConsoleTrace("ROW_BOOL",
+				Format("node=%d property=%s value=%s generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, StdFormat(self->GetData()),
+				       generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, (bool)self->GetData(), false, true, "bool", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
@@ -898,6 +906,9 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
+			DesignerConsoleTrace("ROW_SLIDER_PRE",
+				Format("node=%d property=%s value=%d generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, v, generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, v, true, false, "slider-preview", generation, inspector_generation_, syncing_});
 		};
 		row->WhenAction = [=] {
@@ -905,6 +916,9 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
+			DesignerConsoleTrace("ROW_SLIDER_COM",
+				Format("node=%d property=%s value=%d generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, v, generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, v, false, true, "slider", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
@@ -926,6 +940,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenAction = [=] {
 			if(!self)
 				return;
+			DesignerConsoleTrace("ROW_COLOR",
+				Format("node=%d property=%s value=%s generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, StdFormat(self->GetColor(0)),
+				       generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, self->GetColor(0), false, true, "color", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
@@ -956,6 +974,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			ValueArray out;
 			for(int i = 0; i < 4; i++)
 				out.Add(self->GetColor(i));
+			DesignerConsoleTrace("ROW_QUAD",
+				Format("node=%d property=%s value=%s generation=%d inspector_generation=%d syncing=%d",
+				       (int)row_node, property_id, StdFormat(out),
+				       generation, inspector_generation_, syncing_ ? 1 : 0));
 			PostInspectorIntent({row_node, property_id, out, false, true, "quadcolor", generation, inspector_generation_, syncing_});
 		};
 		Row& r = page.rows.Add();
@@ -976,11 +998,19 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	row->WhenAction = [=] {
 		if(!self)
 			return;
+		DesignerConsoleTrace("ROW_EDIT",
+			Format("node=%d property=%s value=%s editor=edit-action generation=%d inspector_generation=%d syncing=%d",
+			       (int)row_node, property_id, StdFormat(self->GetData()),
+			       generation, inspector_generation_, syncing_ ? 1 : 0));
 		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-action", generation, inspector_generation_, syncing_});
 	};
 	row->WhenChange = [=] {
 		if(!self)
 			return;
+		DesignerConsoleTrace("ROW_EDIT",
+			Format("node=%d property=%s value=%s editor=edit-change generation=%d inspector_generation=%d syncing=%d",
+			       (int)row_node, property_id, StdFormat(self->GetData()),
+			       generation, inspector_generation_, syncing_ ? 1 : 0));
 		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-change", generation, inspector_generation_, syncing_});
 	};
 	Row& r = page.rows.Add();
@@ -1176,6 +1206,16 @@ bool DesignerInspector::IsSingleNodeInspectorStateControlled(const DesignerApiBi
 
 void DesignerInspector::PostInspectorIntent(const DesignerInspectorEditIntent& intent)
 {
+	DesignerConsoleTrace("INTENT_POST",
+		Format("node=%d property=%s value=%s preview=%d final=%d editor=%s row_gen=%d inspector_gen=%d syncing=%d",
+		       (int)intent.node_id, intent.property_id, StdFormat(intent.value),
+		       intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, intent.editor_kind,
+		       intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0));
+	DesignerConsoleTrace("INSP_INTENT",
+		Format("node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+		       (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+		       intent.editor_kind, intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0,
+		       StdFormat(intent.value)));
 #ifdef _DEBUG
 	String type_id;
 	if(model_) {

@@ -7,6 +7,9 @@
 
 namespace Upp {
 
+int DesignerTraceSeq();
+void DesignerConsoleTrace(const String& tag, const String& msg);
+
 static int DesignerPreviewFindNodeId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {
 	for(int i = 0; i < ids.GetCount(); i++)
@@ -67,19 +70,23 @@ static void DesignerPreviewLogReadback(const char *stage, const DesignerNode& n,
 {
 	if(!DesignerPreviewTraceType(n.type_id))
 		return;
-	String line = Format("Preview readback stage=%s node=%d type=%s h_sizing=%s v_sizing=%s fixed_width=%s fixed_height=%s role=%s icon=%s",
-	                     stage,
-	                     (int)n.id,
-	                     n.type_id,
-	                     DesignerPreviewTraceValue(n, "h_sizing", "Fit"),
-	                     DesignerPreviewTraceValue(n, "v_sizing", "Fit"),
-	                     DesignerPreviewTraceValue(n, "fixed_width", DesignerPreviewNodeProperty(n, "width", DESIGNER_FIXED_FALLBACK_WIDTH)),
-	                     DesignerPreviewTraceValue(n, "fixed_height", DesignerPreviewNodeProperty(n, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)),
-	                     DesignerPreviewTraceValue(n, "role", "Standard"),
-	                     DesignerPreviewTraceValue(n, "icon", "None"));
+	String line;
+	if(!IsNull(rect) || (String)stage == "rect")
+		line = Format("PREVIEW_RECT node=%d type=%s rect=%d,%d,%d,%d",
+		              (int)n.id, n.type_id, rect.left, rect.top, rect.right, rect.bottom);
+	else
+		line = Format("PREVIEW_REBUILD node=%d type=%s h_sizing=%s fixed_width=%s v_sizing=%s fixed_height=%s role=%s icon=%s",
+		              (int)n.id, n.type_id,
+		              DesignerPreviewTraceValue(n, "h_sizing", "Fit"),
+		              DesignerPreviewTraceValue(n, "fixed_width", DesignerPreviewNodeProperty(n, "width", DESIGNER_FIXED_FALLBACK_WIDTH)),
+		              DesignerPreviewTraceValue(n, "v_sizing", "Fit"),
+		              DesignerPreviewTraceValue(n, "fixed_height", DesignerPreviewNodeProperty(n, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)),
+		              DesignerPreviewTraceValue(n, "role", "Standard"),
+		              DesignerPreviewTraceValue(n, "icon", "None"));
 	if(!IsNull(rect))
 		line << Format(" computed_rect=%d,%d,%d,%d", rect.left, rect.top, rect.right, rect.bottom);
-	line << Format(" adapter_role=%s", DesignerPreviewTraceValue(n, "role", "Standard"));
+	line << Format(" style_role_applied=%s", DesignerPreviewTraceValue(n, "role", "Standard"));
+	DesignerConsoleTrace(line.StartsWith("PREVIEW_RECT") ? "PREVIEW_RECT" : "PREVIEW_REBUILD", line);
 	DesignerPreviewAppendTrace(line);
 #ifdef _DEBUG
 	RLOG(line);
@@ -1607,7 +1614,7 @@ void DesignerPreview::UpdateRealRects(Ctrl& ctrl, Point offset)
 				if(n)
 					DesignerSyncSpacerItemRects(*model_, *n, ctrl, offset + ctrl.GetRect().TopLeft());
 				if(n)
-					DesignerPreviewLogReadback("layout", *n, n->last_rect);
+					DesignerPreviewLogReadback("rect", *n, n->last_rect);
 			}
 			Point child_offset = offset + ctrl.GetRect().TopLeft();
 			for(Ctrl *child = ctrl.GetFirstChild(); child; child = child->GetNext())

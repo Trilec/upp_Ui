@@ -25,6 +25,23 @@ static void DesignerMultiSelectCommandLog(const String& text)
 	return;
 }
 
+int DesignerTraceSeq()
+{
+	static int seq = 0;
+	return ++seq;
+}
+
+void DesignerConsoleTrace(const String& tag, const String& msg)
+{
+	String line = Format("#%05d %-14s %s", DesignerTraceSeq(), tag, msg);
+	Cout() << line << "\n";
+	RLOG(line);
+	String path = AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
+	FileAppend out(path);
+	if(out.IsOpen())
+		out.PutLine(line);
+}
+
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
 static constexpr int LIVE_PREVIEW_TIMER_ID = 103;
@@ -368,6 +385,7 @@ public:
 
 	DesignerWindow()
 	{
+		DesignerConsoleTrace("APP", "Designer " + String(DESIGNER_VERSION) + " start");
 		Title("Designer - Box/Grid Layout Builder");
 		Icon(DesignerAssetsImg::DESIGNER_LOGO_V5())
 		    .LargeIcon(DesignerAssetsImg::DESIGNER_LOGO_V5());
@@ -537,6 +555,10 @@ private:
 				SetDocumentDirty();
 				RequestDesignerRefresh(true, true);
 			}
+			return true;
+		}
+		if(key == (K_CTRL | K_SHIFT | K_D)) {
+			DumpSelectedNodeState();
 			return true;
 		}
 		return TopWindow::Key(key, count);
@@ -759,6 +781,15 @@ private:
 
 		preview_.Set(&model_, &registry_);
 		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
+			Vector<DesignerNodeId> old_selection = clone(model_.GetSelection());
+			String old_text;
+			for(int i = 0; i < old_selection.GetCount(); i++) {
+				if(i) old_text << ",";
+				old_text << (int)old_selection[i];
+			}
+			DesignerConsoleTrace("SELECT_PREVIEW",
+				Format("node=%d keyflags=%d old_selection=%s",
+				       (int)id, (int)keyflags, old_text));
 #ifdef _DEBUG
 			RLOG(Format("Preview selection id=%d keyflags=%d", (int)id, (int)keyflags));
 #endif
@@ -768,6 +799,13 @@ private:
 				model_.AddToSelection(id);
 			else
 				model_.SelectOne(id);
+			String new_text;
+			for(int i = 0; i < model_.GetSelection().GetCount(); i++) {
+				if(i) new_text << ",";
+				new_text << (int)model_.GetSelection()[i];
+			}
+			DesignerConsoleTrace("SELECT_PREVIEW",
+				Format("node=%d new_selection=%s", (int)id, new_text));
 			RefreshSelectionUi();
 		};
 		preview_.WhenMoveNode = [=](DesignerNodeId id, DesignerNodeId target, int index) {
@@ -823,12 +861,24 @@ private:
 		hierarchy_.WhenSelection = [=] {
 			if(syncing_hierarchy_)
 				return;
+			Vector<DesignerNodeId> old_selection = clone(model_.GetSelection());
 			Vector<DesignerNodeId> ids;
 			for(UiTreeNodeRef ref : hierarchy_.GetSelection()) {
 				DesignerNodeId id = GetHierarchyNodeId(ref);
 				if(id != Designer_NULL)
 					ids.Add(id);
 			}
+			String old_text, new_text;
+			for(int i = 0; i < old_selection.GetCount(); i++) {
+				if(i) old_text << ",";
+				old_text << (int)old_selection[i];
+			}
+			for(int i = 0; i < ids.GetCount(); i++) {
+				if(i) new_text << ",";
+				new_text << (int)ids[i];
+			}
+			DesignerConsoleTrace("SELECT_HIER",
+				Format("old_selection=%s new_selection=%s", old_text, new_text));
 			model_.SetSelection(ids);
 			RefreshInspectorPreview();
 		};
@@ -872,6 +922,15 @@ private:
 			PreviewInspectorPropertyValues(ids, property, value);
 		};
 		inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
+			DesignerConsoleTrace("INTENT_RECV",
+				Format("node=%d property=%s value=%s preview=%d final=%d editor=%s",
+				       (int)intent.node_id, intent.property_id, StdFormat(intent.value),
+				       intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, intent.editor_kind));
+			DesignerConsoleTrace("WIN_INTENT",
+				Format("node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+				       (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+				       intent.editor_kind, intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0,
+				       StdFormat(intent.value)));
 #ifdef _DEBUG
 			RLOG(Format("DesignerWindow received inspector intent: node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
@@ -898,6 +957,15 @@ private:
 			PreviewInspectorPropertyValues(ids, property, value);
 		};
 		theme_override_inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
+			DesignerConsoleTrace("INTENT_RECV",
+				Format("theme_override node=%d property=%s value=%s preview=%d final=%d editor=%s",
+				       (int)intent.node_id, intent.property_id, StdFormat(intent.value),
+				       intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, intent.editor_kind));
+			DesignerConsoleTrace("WIN_INTENT",
+				Format("theme_override node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+				       (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+				       intent.editor_kind, intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0,
+				       StdFormat(intent.value)));
 #ifdef _DEBUG
 			RLOG(Format("DesignerWindow received theme override inspector intent: node=%d property=%s preview=%d final_commit=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
@@ -1079,6 +1147,7 @@ private:
 	{
 		if(path.IsEmpty())
 			return;
+		DesignerConsoleTrace("LOAD", "path=" + path);
 #ifdef _DEBUG
 		RLOG("LoadDesignPath: " << path);
 #endif
@@ -1099,6 +1168,11 @@ private:
 		StoreRecentFiles();
 		SetDocumentDirty(false);
 		ForceDesignerProjectionRefresh("load");
+		DesignerConsoleTrace("LOAD_DONE",
+			Format("nodes=%d selected=%d path=%s",
+			       model_.GetNodes().GetCount(),
+			       model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+			       path));
 		String note_text;
 		for(const String& note : notes) {
 			if(!note_text.IsEmpty())
@@ -1775,6 +1849,11 @@ private:
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
 		String state_before = designer_fsm_.GetCurrent();
+		DesignerConsoleTrace("DSM_SUBMIT",
+			Format("current=%s transitioning=%d node=%d property=%s value=%s preview=%d final=%d",
+			       state_before, designer_fsm_.IsTransitioning() ? 1 : 0,
+			       (int)intent.node_id, intent.property_id, StdFormat(intent.value),
+			       intent.preview ? 1 : 0, intent.final_commit ? 1 : 0));
 		auto merge_intent = [&](DesignerInspectorEditIntent& dst, const DesignerInspectorEditIntent& src) {
 			dst.value = src.value;
 			dst.preview = src.preview;
@@ -1805,6 +1884,11 @@ private:
 				            designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
 				            intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, StdFormat(intent.value)));
 #endif
+				DesignerConsoleTrace("DSM_COALESCE",
+					Format("current=%s node=%d property=%s old_pending=%s new_value=%s",
+					       designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
+					       deferred_inspector_intent_.active ? StdFormat(deferred_inspector_intent_.intent.value) : String("<none>"),
+					       StdFormat(intent.value)));
 				return;
 			}
 			if(same_target) {
@@ -1822,6 +1906,11 @@ private:
 				            designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
 				            intent.preview ? 1 : 0, intent.final_commit ? 1 : 0, StdFormat(intent.value)));
 #endif
+				DesignerConsoleTrace("DSM_COALESCE",
+					Format("current=%s node=%d property=%s old_pending=%s new_value=%s",
+					       designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
+					       deferred_inspector_intent_.active ? StdFormat(deferred_inspector_intent_.intent.value) : String("<none>"),
+					       StdFormat(intent.value)));
 				return;
 			}
 			String reject_reason = "fsm busy different property";
@@ -1831,6 +1920,10 @@ private:
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
 			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
+			DesignerConsoleTrace("DSM_REJECT",
+				Format("current=%s reason=%s node=%d property=%s value=%s",
+				       designer_fsm_.GetCurrent(), reject_reason,
+				       (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
 			PublishInspectorTrace(intent, nullptr, state_before, false, reject_reason);
 			return;
 		}
@@ -1845,6 +1938,11 @@ private:
 				            reject_reason, designer_fsm_.GetCurrent(),
 				            (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
 #endif
+				DesignerConsoleTrace("DSM_COALESCE",
+					Format("current=%s node=%d property=%s old_pending=%s new_value=%s",
+					       designer_fsm_.GetCurrent(), (int)intent.node_id, intent.property_id,
+					       deferred_inspector_intent_.active ? StdFormat(deferred_inspector_intent_.intent.value) : String("<none>"),
+					       StdFormat(intent.value)));
 				return;
 			}
 #ifdef _DEBUG
@@ -1853,6 +1951,10 @@ private:
 			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
 			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
 #endif
+			DesignerConsoleTrace("DSM_REJECT",
+				Format("current=%s reason=%s node=%d property=%s value=%s",
+				       designer_fsm_.GetCurrent(), reject_reason,
+				       (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
 			PublishInspectorTrace(intent, nullptr, state_before, false, reject_reason);
 			return;
 		}
@@ -1874,6 +1976,11 @@ private:
 		if(const DesignerNode* n = model_.Find(intent.node_id))
 			pending_inspector_txn_.node_type = n->type_id;
 		bool accepted = TriggerDesignerStateEvent(intent.preview ? DESIGNER_EVENT_INSPECTOR_PREVIEW : DESIGNER_EVENT_INSPECTOR_COMMIT, reason);
+		DesignerConsoleTrace("DSM_ACCEPT",
+			Format("node=%d property=%s preview=%d final_commit=%d accepted=%d state_before=%s state_after=%s reason=%s error=%s",
+			       (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.final_commit ? 1 : 0,
+			       accepted ? 1 : 0, state_before, designer_fsm_.GetCurrent(), reason ? reason : "",
+			       designer_fsm_.GetLastErrorText()));
 		pending_inspector_txn_.fsm_transition_accepted = accepted;
 		if(!accepted) {
 			pending_inspector_txn_.fsm_reject_reason = designer_fsm_.GetLastErrorText();
@@ -1951,6 +2058,12 @@ private:
 		}
 
 		if(!pending_inspector_txn_.failure_reason.IsEmpty()) {
+			DesignerConsoleTrace("VALIDATE_FAIL",
+				Format("node=%d type=%s property=%s reason=%s",
+				       (int)pending_inspector_txn_.node_id,
+				       n ? n->type_id : String("<missing>"),
+				       pending_inspector_txn_.property_id,
+				       pending_inspector_txn_.failure_reason));
 #ifdef _DEBUG
 			RLOG(Format("DSM rejected: reason=%s node id=%d property=%s current selection=%d row generation=%d inspector generation=%d syncing=%d stage=%s",
 			            pending_inspector_txn_.failure_reason,
@@ -1964,6 +2077,15 @@ private:
 #endif
 			return false;
 		}
+		DesignerConsoleTrace("VALIDATE",
+			Format("node=%d type=%s property=%s binding=%d visible=%d enabled=%d normalized=%s result=OK",
+			       (int)pending_inspector_txn_.node_id,
+			       n ? n->type_id : String("<missing>"),
+			       pending_inspector_txn_.property_id,
+			       pending_inspector_txn_.validation_binding_found ? 1 : 0,
+			       pending_inspector_txn_.validation_binding_visible ? 1 : 0,
+			       pending_inspector_txn_.validation_binding_enabled ? 1 : 0,
+			       StdFormat(pending_inspector_txn_.normalized)));
 		return true;
 	}
 
@@ -2593,6 +2715,11 @@ private:
 			SetWarningNotes(String());
 			return;
 		}
+		const DesignerNode* selected_node = model_.Find(model_.GetSelection()[0]);
+		DesignerConsoleTrace("INSPECT_REFRESH",
+			Format("selected=%d type=%s",
+			       (int)model_.GetSelection()[0],
+			       selected_node ? selected_node->type_id : String("<missing>")));
 #ifdef _DEBUG
 		RLOG("RefreshInspector primary=" << (int)model_.GetSelection()[0]);
 #endif
@@ -2605,12 +2732,27 @@ private:
 			int q = n ? n->properties.Find(last_inspector_readback_.property_id) : -1;
 			Value model_value = q >= 0 ? n->properties.GetValue(q) : Value();
 			Value inspector_value = inspector_.GetRowValue(last_inspector_readback_.property_id);
+			DesignerConsoleTrace("INSPECT_READBACK",
+				Format("node=%d property=%s model=%s row=%s equals_model=%d equals_intended=%d",
+				       (int)last_inspector_readback_.node_id,
+				       last_inspector_readback_.property_id,
+				       q >= 0 ? StdFormat(model_value) : String("<missing>"),
+				       StdFormat(inspector_value),
+				       inspector_value == model_value ? 1 : 0,
+				       model_value == last_inspector_readback_.intended_value ? 1 : 0));
 			RLOG(Format("Inspector readback: node=%d property=%s model_value=%s inspector_value=%s equals_model=%d equals_intended=%d",
 			            (int)last_inspector_readback_.node_id, last_inspector_readback_.property_id,
 			            q >= 0 ? StdFormat(model_value) : String("<missing>"),
 			            StdFormat(inspector_value),
 			            inspector_value == model_value ? 1 : 0,
 			            model_value == last_inspector_readback_.intended_value ? 1 : 0));
+			if(inspector_value != model_value || model_value != last_inspector_readback_.intended_value)
+				DesignerConsoleTrace("INSPECT_FAIL",
+					Format("property=%s stage=readback model=%s row=%s intended=%s",
+					       last_inspector_readback_.property_id,
+					       q >= 0 ? StdFormat(model_value) : String("<missing>"),
+					       StdFormat(inspector_value),
+					       StdFormat(last_inspector_readback_.intended_value)));
 		}
 #endif
 		if(pending_inspector_txn_.active &&
@@ -2646,6 +2788,25 @@ private:
 		}
 		RefreshContainerActions();
 		RefreshRightPanel();
+	}
+
+	void DumpSelectedNodeState()
+	{
+		if(model_.GetSelection().IsEmpty())
+			return;
+		DesignerNodeId id = model_.GetSelection()[0];
+		const DesignerNode* n = model_.Find(id);
+		if(!n)
+			return;
+		DesignerConsoleTrace("DUMP_SELECTED",
+			Format("node=%d type=%s name=%s h_sizing=%s fixed_width=%s v_sizing=%s fixed_height=%s role=%s icon=%s",
+			       (int)id, n->type_id, n->name,
+			       StdFormat(DesignerNodePropertyOr(*n, "h_sizing", "Fit")),
+			       StdFormat(DesignerNodePropertyOr(*n, "fixed_width", Value("<missing>"))),
+			       StdFormat(DesignerNodePropertyOr(*n, "v_sizing", "Fit")),
+			       StdFormat(DesignerNodePropertyOr(*n, "fixed_height", Value("<missing>"))),
+			       StdFormat(DesignerNodePropertyOr(*n, "role", "Standard")),
+			       StdFormat(DesignerNodePropertyOr(*n, "icon", "None"))));
 	}
 
 	void RefreshCode()
@@ -3977,6 +4138,11 @@ private:
 		pending_inspector_txn_.preview_old_value = old_value;
 		pending_inspector_txn_.had_old = had_old;
 		pending_inspector_txn_.has_preview_old = has_preview_old;
+		DesignerConsoleTrace("CMD_BEFORE",
+			Format("node=%d type=%s property=%s old=%s intended=%s had_old=%d preview_old=%s",
+			       (int)node_id, n->type_id, property_id,
+			       StdFormat(old_value), StdFormat(normalized), had_old ? 1 : 0,
+			       has_preview_old ? StdFormat(old_value) : String("<missing>")));
 #ifdef _DEBUG
 		RLOG(Format("Commit live preview state: node=%d property=%s has_preview_old=%d preview_old=%s had_old=%d",
 		            (int)node_id, property_id, has_preview_old ? 1 : 0,
@@ -4007,6 +4173,13 @@ private:
 		                               state_controlled &&
 		                               after_q >= 0 && model_after == normalized;
 		pending_inspector_txn_.command_model_equals_intended = after_q >= 0 && model_after == normalized;
+		DesignerConsoleTrace("CMD_AFTER",
+			Format("node=%d property=%s result=%d model_after=%s equals_intended=%d dirty=%d",
+			       (int)node_id, property_id,
+			       command_result ? 1 : 0,
+			       StdFormat(model_after),
+			       pending_inspector_txn_.command_model_equals_intended ? 1 : 0,
+			       command_result ? 1 : 0));
 		if((command_result || accepted_already_applied) && !pending_inspector_txn_.command_model_equals_intended) {
 			pending_inspector_txn_.failure_reason = "model_after != intended";
 			ReportInspectorCommitFailure(pending_inspector_txn_, "after command");
@@ -4089,6 +4262,9 @@ private:
 			RLOG(Format("Command no-op / failed: node=%d property=%s old=%s new=%s reason=%s",
 			            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized), reason));
 #endif
+			DesignerConsoleTrace("CMD_FAIL",
+				Format("node=%d property=%s reason=%s model_after=%s intended=%s",
+				       (int)node_id, property_id, reason, StdFormat(model_after), StdFormat(normalized)));
 			pending_inspector_txn_.failure_reason = reason;
 			DesignerInspectorEditIntent intent;
 			intent.node_id = pending_inspector_txn_.node_id;

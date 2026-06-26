@@ -37,6 +37,9 @@
 
 namespace Upp {
 
+int DesignerTraceSeq();
+void DesignerConsoleTrace(const String& tag, const String& msg);
+
 struct DesignerInspectorEditIntent {
 	DesignerNodeId node_id = Designer_NULL;
 	String property_id;
