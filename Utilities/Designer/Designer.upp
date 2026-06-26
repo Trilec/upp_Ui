@@ -44,5 +44,6 @@ file
 	main.cpp;
 
 mainconfig
+	"" = "CONSOLE",
 	"" = "GUI";
 
