@@ -39,6 +39,13 @@ static const char *DESIGNER_EVENT_COMMAND_APPLIED = "command_applied";
 static const char *DESIGNER_EVENT_COMMAND_REJECTED = "command_rejected";
 static const char *DESIGNER_EVENT_PROJECTION_DONE = "projection_done";
 
+static bool IsDesignerStateControlledProperty(const String& property_id)
+{
+	return property_id == "h_sizing" || property_id == "v_sizing" ||
+	       property_id == "fixed_width" || property_id == "fixed_height" ||
+	       property_id == "role" || property_id == "icon";
+}
+
 static String DesignerCrumbPropertyKey(int i)
 {
 	return Format("crumb_%d", i + 1);
@@ -846,6 +853,14 @@ private:
 		inspector_.WhenPropertyManyPreview = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
 			PreviewInspectorPropertyValues(ids, property, value);
 		};
+		inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
+#ifdef _DEBUG
+			RLOG(Format("DesignerWindow received inspector intent: node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
+			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+#endif
+			SubmitInspectorIntent(intent, intent.preview ? "raw inspector preview intent" : "raw inspector commit intent");
+		};
 		inspector_.WhenName = [=](DesignerNodeId id, String name) {
 			PostCallback([=] { SaveInspectorNameValue(id, name); });
 		};
@@ -863,6 +878,14 @@ private:
 		};
 		theme_override_inspector_.WhenPropertyManyPreview = [=](const Vector<DesignerNodeId>& ids, String property, Value value) {
 			PreviewInspectorPropertyValues(ids, property, value);
+		};
+		theme_override_inspector_.WhenInspectorIntent = [=](const DesignerInspectorEditIntent& intent) {
+#ifdef _DEBUG
+			RLOG(Format("DesignerWindow received theme override inspector intent: node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
+			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+#endif
+			SubmitInspectorIntent(intent, intent.preview ? "raw theme override preview intent" : "raw theme override commit intent");
 		};
 		right_mode_bar_.SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
 		collapse_button_.SetText("")
@@ -1641,6 +1664,10 @@ private:
 		DesignerNodeId node_id = Designer_NULL;
 		String property_id;
 		Value value;
+		String editor_kind;
+		int row_generation = 0;
+		int inspector_generation = 0;
+		bool inspector_syncing = false;
 		Value normalized;
 		Value old_model_value;
 		Value preview_old_value;
@@ -1652,6 +1679,137 @@ private:
 		String failure_reason;
 		DesignerProjectionRequest projection;
 	};
+
+	bool CanAcceptInspectorIntent(const DesignerInspectorEditIntent& intent, String& reason) const
+	{
+		if(designer_fsm_.IsTransitioning()) {
+			reason = "fsm transitioning";
+			return false;
+		}
+
+		String current = designer_fsm_.GetCurrent();
+		if(intent.preview) {
+			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING) {
+				reason = "fsm not ready for preview";
+				return false;
+			}
+		}
+		else {
+			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING) {
+				reason = "fsm not ready for commit";
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
+	{
+		String reject_reason;
+		if(!CanAcceptInspectorIntent(intent, reject_reason)) {
+#ifdef _DEBUG
+			RLOG(Format("DesignerState intent rejected loudly: reason=%s current=%s transitioning=%d node=%d property=%s preview=%d editor=%s row_generation=%d inspector_generation=%d syncing=%d value=%s",
+			            reject_reason, designer_fsm_.GetCurrent(), designer_fsm_.IsTransitioning() ? 1 : 0,
+			            (int)intent.node_id, intent.property_id, intent.preview ? 1 : 0, intent.editor_kind,
+			            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, StdFormat(intent.value)));
+#endif
+			return;
+		}
+
+		pending_inspector_txn_.active = true;
+		pending_inspector_txn_.preview = intent.preview;
+		pending_inspector_txn_.commit = !intent.preview;
+		pending_inspector_txn_.node_id = intent.node_id;
+		pending_inspector_txn_.property_id = intent.property_id;
+		pending_inspector_txn_.value = intent.value;
+		pending_inspector_txn_.editor_kind = intent.editor_kind;
+		pending_inspector_txn_.row_generation = intent.row_generation;
+		pending_inspector_txn_.inspector_generation = intent.inspector_generation;
+		pending_inspector_txn_.inspector_syncing = intent.syncing;
+		TriggerDesignerStateEvent(intent.preview ? DESIGNER_EVENT_INSPECTOR_PREVIEW : DESIGNER_EVENT_INSPECTOR_COMMIT, reason);
+	}
+
+	bool ValidatePendingInspectorIntent(const char *stage, bool allow_selection_mismatch = true)
+	{
+		if(!pending_inspector_txn_.active) {
+			pending_inspector_txn_.failure_reason = "inactive intent";
+			return false;
+		}
+
+		DesignerNode* n = model_.Find(pending_inspector_txn_.node_id);
+		if(!n) {
+			pending_inspector_txn_.failure_reason = "node does not exist";
+		}
+		else if(n->id == Designer_ROOT) {
+			pending_inspector_txn_.failure_reason = "node is root";
+		}
+		else if(!allow_selection_mismatch &&
+		        (model_.GetSelection().IsEmpty() || model_.GetSelection()[0] != pending_inspector_txn_.node_id)) {
+			pending_inspector_txn_.failure_reason = "selected node mismatch";
+		}
+		else {
+			Vector<DesignerApiBinding> bindings;
+			DesignerAdapter *adapter = nullptr;
+			One<Ctrl> ctrl;
+			ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
+			if(adapter)
+				adapter->DescribeApi(bindings, *n);
+			const DesignerApiBinding* binding = FindApiBinding(bindings, pending_inspector_txn_.property_id);
+			bool safe_sizing = pending_inspector_txn_.property_id == "h_sizing" || pending_inspector_txn_.property_id == "v_sizing" ||
+			                   pending_inspector_txn_.property_id == "fixed_width" || pending_inspector_txn_.property_id == "fixed_height" ||
+			                   pending_inspector_txn_.property_id == "min_width" || pending_inspector_txn_.property_id == "min_height" ||
+			                   pending_inspector_txn_.property_id == "max_width" || pending_inspector_txn_.property_id == "max_height" ||
+			                   pending_inspector_txn_.property_id == "cell_align_h" || pending_inspector_txn_.property_id == "cell_align_v";
+			bool safe_theme_override = pending_inspector_txn_.property_id == "theme_override" ||
+			                           pending_inspector_txn_.property_id == "face_enabled" || pending_inspector_txn_.property_id == "face" ||
+			                           pending_inspector_txn_.property_id == "face_mode" || pending_inspector_txn_.property_id == "face_quad" ||
+			                           pending_inspector_txn_.property_id == "frame_enabled" || pending_inspector_txn_.property_id == "frame" ||
+			                           pending_inspector_txn_.property_id == "frame_width" || pending_inspector_txn_.property_id == "radius" ||
+			                           pending_inspector_txn_.property_id == "shadow_enabled" || pending_inspector_txn_.property_id == "shadow_distance" ||
+			                           pending_inspector_txn_.property_id == "shadow_offset_x" || pending_inspector_txn_.property_id == "shadow_offset_y" ||
+			                           pending_inspector_txn_.property_id == "shadow_alpha" || pending_inspector_txn_.property_id == "shadow_color" ||
+			                           pending_inspector_txn_.property_id == "shadow_curve";
+			bool binding_visible = binding ? binding->visible : false;
+			bool binding_enabled = binding ? binding->enabled : false;
+#ifdef _DEBUG
+			RLOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
+			            (int)pending_inspector_txn_.node_id, n->type_id, pending_inspector_txn_.property_id,
+			            binding ? 1 : 0, binding_visible ? 1 : 0, binding_enabled ? 1 : 0, safe_sizing ? 1 : 0,
+			            pending_inspector_txn_.row_generation, pending_inspector_txn_.inspector_generation,
+			            pending_inspector_txn_.inspector_syncing ? 1 : 0, stage ? stage : ""));
+#endif
+			if(!binding)
+				pending_inspector_txn_.failure_reason = "binding missing";
+			else if(!binding_visible)
+				pending_inspector_txn_.failure_reason = "binding hidden";
+			else if(!binding_enabled && !safe_sizing && !safe_theme_override)
+				pending_inspector_txn_.failure_reason = "binding disabled";
+			else {
+				Value normalized = NormalizeInspectorValue(*n, pending_inspector_txn_.property_id, pending_inspector_txn_.value);
+				pending_inspector_txn_.normalized = normalized;
+				if(IsNull(normalized) && !normalized.Is<String>())
+					pending_inspector_txn_.failure_reason = "value normalization failed";
+				else
+					pending_inspector_txn_.failure_reason.Clear();
+			}
+		}
+
+		if(!pending_inspector_txn_.failure_reason.IsEmpty()) {
+#ifdef _DEBUG
+			RLOG(Format("DSM rejected: reason=%s node id=%d property=%s current selection=%d row generation=%d inspector generation=%d syncing=%d stage=%s",
+			            pending_inspector_txn_.failure_reason,
+			            (int)pending_inspector_txn_.node_id,
+			            pending_inspector_txn_.property_id,
+			            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+			            pending_inspector_txn_.row_generation,
+			            pending_inspector_txn_.inspector_generation,
+			            pending_inspector_txn_.inspector_syncing ? 1 : 0,
+			            stage ? stage : ""));
+#endif
+			return false;
+		}
+		return true;
+	}
 
 	void ApplySelectionProjection()
 	{
@@ -1772,16 +1930,16 @@ private:
 	void InitDesignerStateMachine()
 	{
 		designer_fsm_.EnableLogging(false);
-		designer_fsm_.SetEventPolicy(EventPolicy::QueueWhileTransitioning);
-		designer_fsm_.SetMaxQueuedEvents(16);
+		designer_fsm_.SetEventPolicy(EventPolicy::RejectWhileTransitioning);
+		designer_fsm_.SetMaxQueuedEvents(0);
 		designer_fsm_.WhenTransitionStarted = [=](const TransitionContext& ctx) {
 #ifdef _DEBUG
-			RLOG(Format("DesignerState started: %s -> %s (%s)", ctx.fromState, ctx.toState, ctx.event));
+			RLOG(Format("DSM transition: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
 		};
 		designer_fsm_.WhenTransitionFinished = [=](const TransitionContext& ctx) {
 #ifdef _DEBUG
-			RLOG(Format("DesignerState finished: %s -> %s (%s)", ctx.fromState, ctx.toState, ctx.event));
+			RLOG(Format("DSM transition finished: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
 		};
 
@@ -1830,6 +1988,8 @@ private:
 		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_IDLE, DESIGNER_STATE_COMMITTING});
 		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_PREVIEWING, DESIGNER_STATE_COMMITTING});
 		designer_fsm_.AddTransition({DESIGNER_EVENT_INSPECTOR_COMMIT, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_COMMITTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_APPLIED, DESIGNER_STATE_PREVIEWING, DESIGNER_STATE_PROJECTING});
+		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_REJECTED, DESIGNER_STATE_PREVIEWING, DESIGNER_STATE_IDLE});
 		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_APPLIED, DESIGNER_STATE_COMMITTING, DESIGNER_STATE_PROJECTING});
 		designer_fsm_.AddTransition({DESIGNER_EVENT_COMMAND_REJECTED, DESIGNER_STATE_COMMITTING, DESIGNER_STATE_IDLE});
 		designer_fsm_.AddTransition({DESIGNER_EVENT_PROJECTION_DONE, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_IDLE});
@@ -3279,14 +3439,30 @@ private:
 	{
 		if(!pending_inspector_txn_.active || !pending_inspector_txn_.preview)
 			return;
+		if(!ValidatePendingInspectorIntent("preview", true))
+			return;
+		if(IsDesignerStateControlledProperty(pending_inspector_txn_.property_id)) {
+#ifdef _DEBUG
+			RLOG(Format("Controlled preview escalated to durable commit: node=%d property=%s value=%s",
+			            (int)pending_inspector_txn_.node_id, pending_inspector_txn_.property_id,
+			            StdFormat(pending_inspector_txn_.value)));
+#endif
+			pending_inspector_txn_.preview = false;
+			pending_inspector_txn_.commit = true;
+			ApplyPendingInspectorCommit();
+			Ptr<DesignerWindow> self = this;
+			PostCallback([self] {
+				if(self)
+					self->ContinueInspectorCommitStateMachine();
+			});
+			return;
+		}
 		DesignerNodeId node_id = pending_inspector_txn_.node_id;
 		const String& property_id = pending_inspector_txn_.property_id;
 		const Value& value = pending_inspector_txn_.value;
 		DesignerNode* n = model_.Find(node_id);
-		if(!n || n->id == Designer_ROOT)
-			return;
 		BeginInspectorLiveEditing();
-		Value normalized = NormalizeInspectorValue(*n, property_id, value);
+		Value normalized = pending_inspector_txn_.normalized;
 		pending_inspector_txn_.normalized = normalized;
 		String preview_key = Format("%d:%s", (int)node_id, property_id);
 		if(live_preview_old_values_.Find(preview_key) < 0) {
@@ -3309,13 +3485,12 @@ private:
 
 	void PreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
 	{
-		pending_inspector_txn_.active = true;
-		pending_inspector_txn_.preview = true;
-		pending_inspector_txn_.commit = false;
-		pending_inspector_txn_.node_id = node_id;
-		pending_inspector_txn_.property_id = property_id;
-		pending_inspector_txn_.value = value;
-		TriggerDesignerStateEvent(DESIGNER_EVENT_INSPECTOR_PREVIEW, "single-node preview");
+		DesignerInspectorEditIntent intent;
+		intent.node_id = node_id;
+		intent.property_id = property_id;
+		intent.value = value;
+		intent.preview = true;
+		SubmitInspectorIntent(intent, "single-node preview");
 	}
 
 	void PreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
@@ -3343,6 +3518,8 @@ private:
 	{
 		if(!pending_inspector_txn_.active || !pending_inspector_txn_.commit)
 			return;
+		if(!ValidatePendingInspectorIntent("commit", true))
+			return;
 		DesignerNodeId node_id = pending_inspector_txn_.node_id;
 		const String property_id = pending_inspector_txn_.property_id;
 		const Value value = pending_inspector_txn_.value;
@@ -3353,14 +3530,8 @@ private:
 		pending_inspector_txn_.inspector_refresh_requested = false;
 		SetInspectorLiveEditing(false);
 		DesignerNode* n = model_.Find(node_id);
-		if(!n || n->id == Designer_ROOT) {
-#ifdef _DEBUG
-			RLOG(Format("Commit rejected: node=%d property=%s reason=%s",
-			            (int)node_id, property_id, !n ? "node not found" : "root node"));
-#endif
-			pending_inspector_txn_.failure_reason = !n ? "wrong node" : "root node";
+		if(!n)
 			return;
-		}
 		Vector<DesignerApiBinding> bindings;
 		DesignerAdapter *adapter = nullptr;
 		One<Ctrl> ctrl;
@@ -3447,18 +3618,24 @@ private:
 		const DesignerNode* after_command = model_.Find(node_id);
 		int after_q = after_command ? after_command->properties.Find(property_id) : -1;
 		Value model_after = after_q >= 0 ? after_command->properties.GetValue(after_q) : Value();
+		bool accepted_already_applied = !command_result &&
+		                               IsDesignerStateControlledProperty(property_id) &&
+		                               after_q >= 0 && model_after == normalized;
 #ifdef _DEBUG
-		RLOG(Format("Command result: node=%d property=%s result=%d model_after=%s equals_intended=%d",
-		            (int)node_id, property_id, command_result ? 1 : 0,
+		RLOG(Format("DSM command: node=%d type=%s property=%s old=%s new=%s execute=%d model_after=%s equals_intended=%d accepted_already_applied=%d",
+		            (int)node_id, n->type_id, property_id, StdFormat(old_value), StdFormat(normalized), command_result ? 1 : 0,
 		            after_q >= 0 ? StdFormat(model_after) : String("<missing>"),
-		            after_q >= 0 && model_after == normalized ? 1 : 0));
+		            after_q >= 0 && model_after == normalized ? 1 : 0,
+		            accepted_already_applied ? 1 : 0));
 #endif
-		if(command_result) {
+		if(command_result || accepted_already_applied) {
 #ifdef _DEBUG
-				RLOG(Format("Command executed: node=%d property=%s old=%s new=%s",
+				RLOG(Format("%s: node=%d property=%s old=%s new=%s",
+				            command_result ? "Command executed" : "Command accepted already applied",
 				            (int)node_id, property_id, StdFormat(old_value), StdFormat(normalized)));
 #endif
-			SetDocumentDirty();
+			if(command_result)
+				SetDocumentDirty();
 			pending_inspector_txn_.commit_succeeded = true;
 			if(has_preview_old) {
 				live_preview_old_values_.Remove(preview_q);
@@ -3525,13 +3702,12 @@ private:
 
 	void CommitPreviewInspectorPropertyValue(DesignerNodeId node_id, const String& property_id, const Value& value)
 	{
-		pending_inspector_txn_.active = true;
-		pending_inspector_txn_.preview = false;
-		pending_inspector_txn_.commit = true;
-		pending_inspector_txn_.node_id = node_id;
-		pending_inspector_txn_.property_id = property_id;
-		pending_inspector_txn_.value = value;
-		TriggerDesignerStateEvent(DESIGNER_EVENT_INSPECTOR_COMMIT, "single-node commit");
+		DesignerInspectorEditIntent intent;
+		intent.node_id = node_id;
+		intent.property_id = property_id;
+		intent.value = value;
+		intent.preview = false;
+		SubmitInspectorIntent(intent, "single-node commit");
 	}
 
 	void ApplyPendingInspectorProjection()
@@ -3539,11 +3715,20 @@ private:
 		if(!pending_inspector_txn_.active || !pending_inspector_txn_.commit_succeeded)
 			return;
 		const DesignerNode* changed = model_.Find(pending_inspector_txn_.node_id);
+#ifdef _DEBUG
+		RLOG(Format("DSM projection: property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		            pending_inspector_txn_.property_id,
+		            pending_inspector_txn_.projection.preview ? 1 : 0,
+		            pending_inspector_txn_.projection.hierarchy ? 1 : 0,
+		            pending_inspector_txn_.projection.inspector ? 1 : 0,
+		            pending_inspector_txn_.projection.code ? 1 : 0,
+		            pending_inspector_txn_.projection.full ? 1 : 0));
+#endif
 		ApplyDesignerProjection(pending_inspector_txn_.projection);
 #ifdef _DEBUG
 		int projection_q = changed ? changed->properties.Find(pending_inspector_txn_.property_id) : -1;
-		RLOG(Format("After ApplyDesignerProjection: node=%d property=%s model_value=%s selected=%d inspector_refresh_requested=%d",
-		            (int)pending_inspector_txn_.node_id, pending_inspector_txn_.property_id,
+		RLOG(Format("DSM final: state=%s model property still=%s selected node=%d inspector_refresh_requested=%d",
+		            designer_fsm_.GetCurrent(),
 		            projection_q >= 0 ? StdFormat(changed->properties.GetValue(projection_q)) : String("<missing>"),
 		            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
 		            pending_inspector_txn_.inspector_refresh_requested ? 1 : 0));
@@ -3783,11 +3968,26 @@ private:
 		                        property_id == "shadow_alpha" || property_id == "shadow_color" ||
 		                        property_id == "shadow_curve" || property_id == "icon" ||
 		                        property_id == "role";
+		bool controlled_property = IsDesignerStateControlledProperty(property_id);
 
 #ifdef _DEBUG
-		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d safe_sizing=%d",
-		            (int)node.id, node.type_id, property_id, layout_affecting ? 1 : 0, safe_sizing ? 1 : 0));
+		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d safe_sizing=%d controlled=%d",
+		            (int)node.id, node.type_id, property_id, layout_affecting ? 1 : 0, safe_sizing ? 1 : 0, controlled_property ? 1 : 0));
 #endif
+
+		if(controlled_property) {
+			r.preview = true;
+			r.hierarchy = true;
+			r.inspector = true;
+			r.code = true;
+			r.full = safe_sizing || layout_affecting;
+			r.reason = safe_sizing ? "controlled sizing inspector commit" : "controlled inspector commit";
+#ifdef _DEBUG
+			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
+#endif
+			return r;
+		}
 
 		if(layout_affecting) {
 			r.full = true;

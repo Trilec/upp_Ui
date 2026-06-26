@@ -37,6 +37,17 @@
 
 namespace Upp {
 
+struct DesignerInspectorEditIntent {
+	DesignerNodeId node_id = Designer_NULL;
+	String property_id;
+	Value value;
+	bool preview = false;
+	String editor_kind;
+	int row_generation = 0;
+	int inspector_generation = 0;
+	bool syncing = false;
+};
+
 // Descriptor-driven property editor for the selected DesignerNode.
 // It commits changes through events only; the owning window turns those events
 // into commands and refreshes preview/code/hierarchy from the model.
@@ -64,6 +75,7 @@ public:
 	Event<DesignerNodeId, String, Value> WhenPropertyPreview;
 	Event<const Vector<DesignerNodeId>&, String, Value> WhenPropertyMany;
 	Event<const Vector<DesignerNodeId>&, String, Value> WhenPropertyManyPreview;
+	Event<const DesignerInspectorEditIntent&> WhenInspectorIntent;
 	Event<DesignerNodeId, String> WhenName;
 	Event<String> WhenNotes;
 
@@ -126,6 +138,8 @@ private:
 	void SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>& types,
 	                 const DesignerApiBinding& b, Row& row);
 	Value QuadFaceValue(const DesignerNode& n, Color face) const;
+	bool IsDesignerStateControlledProperty(const String& property_id) const;
+	void PostInspectorIntent(const DesignerInspectorEditIntent& intent);
 	bool CanDeliverRowCommit(int generation, DesignerNodeId row_node, const String& property_id, const char *editor_kind) const;
 	bool CanDeliverManyRowCommit(int generation, const String& property_id, const char *editor_kind) const;
 	void PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);

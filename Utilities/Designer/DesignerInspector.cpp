@@ -55,6 +55,13 @@ static bool DesignerIsSafeSizingProperty(const String& id)
 	       id == "cell_align_h" || id == "cell_align_v";
 }
 
+static bool DesignerIsStateControlledProperty(const String& id)
+{
+	return id == "h_sizing" || id == "v_sizing" ||
+	       id == "fixed_width" || id == "fixed_height" ||
+	       id == "role" || id == "icon";
+}
+
 static bool DesignerBindingEditableInMultiSelect(const DesignerApiBinding& binding)
 {
 	return DesignerIsSafeSizingProperty(binding.property_id) || binding.enabled;
@@ -808,6 +815,7 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	String property_id = b.property_id;
 	DesignerNodeId row_node = n.id;
 	int generation = inspector_generation_;
+	bool state_controlled = IsDesignerStateControlledProperty(property_id);
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -828,7 +836,9 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenSelectData = [=](const Value& data) {
 			if(!self)
 				return;
-			if(CanDeliverRowCommit(generation, row_node, property_id, "choice"))
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, data, false, "choice", generation, inspector_generation_, syncing_});
+			else if(CanDeliverRowCommit(generation, row_node, property_id, "choice"))
 				PostInspectorCommit(generation, row_node, property_id, data);
 		};
 		Row& r = page.rows.Add();
@@ -848,7 +858,11 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetData((bool)value);
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
-			if(self && CanDeliverRowCommit(generation, row_node, property_id, "bool"))
+			if(!self)
+				return;
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, (bool)self->GetData(), false, "bool", generation, inspector_generation_, syncing_});
+			else if(CanDeliverRowCommit(generation, row_node, property_id, "bool"))
 				PostInspectorCommit(generation, row_node, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
@@ -875,20 +889,28 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenChanging = [=] {
 			if(!self)
 				return;
-			if(!CanDeliverRowCommit(generation, row_node, property_id, "slider-preview"))
-				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorPreview(generation, row_node, property_id, v);
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, v, true, "slider-preview", generation, inspector_generation_, syncing_});
+			else {
+				if(!CanDeliverRowCommit(generation, row_node, property_id, "slider-preview"))
+					return;
+				PostInspectorPreview(generation, row_node, property_id, v);
+			}
 		};
 		row->WhenAction = [=] {
 			if(!self)
 				return;
-			if(!CanDeliverRowCommit(generation, row_node, property_id, "slider"))
-				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorCommit(generation, row_node, property_id, v);
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, v, false, "slider", generation, inspector_generation_, syncing_});
+			else {
+				if(!CanDeliverRowCommit(generation, row_node, property_id, "slider"))
+					return;
+				PostInspectorCommit(generation, row_node, property_id, v);
+			}
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -907,7 +929,11 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
-			if(self && CanDeliverRowCommit(generation, row_node, property_id, "color"))
+			if(!self)
+				return;
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, self->GetColor(0), false, "color", generation, inspector_generation_, syncing_});
+			else if(CanDeliverRowCommit(generation, row_node, property_id, "color"))
 				PostInspectorCommit(generation, row_node, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
@@ -933,12 +959,15 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			row->SetColor(i, IsNull(colors[i]) ? Color(214, 231, 255) : (Color)colors[i]);
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
-			if(self && CanDeliverRowCommit(generation, row_node, property_id, "quadcolor")) {
-				ValueArray out;
-				for(int i = 0; i < 4; i++)
-					out.Add(self->GetColor(i));
+			if(!self)
+				return;
+			ValueArray out;
+			for(int i = 0; i < 4; i++)
+				out.Add(self->GetColor(i));
+			if(state_controlled)
+				PostInspectorIntent({row_node, property_id, out, false, "quadcolor", generation, inspector_generation_, syncing_});
+			else if(CanDeliverRowCommit(generation, row_node, property_id, "quadcolor"))
 				PostInspectorCommit(generation, row_node, property_id, out);
-			}
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -956,11 +985,19 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	row->SetData(value);
 	row->Enable(b.enabled);
 	row->WhenAction = [=] {
-		if(self && CanDeliverRowCommit(generation, row_node, property_id, "edit-action"))
+		if(!self)
+			return;
+		if(state_controlled)
+			PostInspectorIntent({row_node, property_id, self->GetData(), false, "edit-action", generation, inspector_generation_, syncing_});
+		else if(CanDeliverRowCommit(generation, row_node, property_id, "edit-action"))
 			PostInspectorCommit(generation, row_node, property_id, self->GetData());
 	};
 	row->WhenChange = [=] {
-		if(self && CanDeliverRowCommit(generation, row_node, property_id, "edit-change"))
+		if(!self)
+			return;
+		if(state_controlled)
+			PostInspectorIntent({row_node, property_id, self->GetData(), false, "edit-change", generation, inspector_generation_, syncing_});
+		else if(CanDeliverRowCommit(generation, row_node, property_id, "edit-change"))
 			PostInspectorCommit(generation, row_node, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();
@@ -1141,6 +1178,26 @@ String DesignerInspector::BuildNoteText(const Vector<DesignerApiBinding>& bindin
 		}
 	}
 	return note;
+}
+
+bool DesignerInspector::IsDesignerStateControlledProperty(const String& property_id) const
+{
+	return DesignerIsStateControlledProperty(property_id);
+}
+
+void DesignerInspector::PostInspectorIntent(const DesignerInspectorEditIntent& intent)
+{
+#ifdef _DEBUG
+	String type_id;
+	if(model_) {
+		if(const DesignerNode* n = model_->Find(intent.node_id))
+			type_id = n->type_id;
+	}
+	RLOG(Format("RAW inspector intent: node=%d type=%s property=%s value=%s editor=%s row_generation=%d inspector_generation=%d syncing=%d preview=%d",
+	            (int)intent.node_id, type_id, intent.property_id, StdFormat(intent.value), intent.editor_kind,
+	            intent.row_generation, intent.inspector_generation, intent.syncing ? 1 : 0, intent.preview ? 1 : 0));
+#endif
+	WhenInspectorIntent(intent);
 }
 
 bool DesignerInspector::CanDeliverRowCommit(int generation, DesignerNodeId row_node, const String& property_id, const char *editor_kind) const
