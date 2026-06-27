@@ -38,6 +38,16 @@ class UiCompositeEdit : public Ctrl {
 public:
     typedef UiCompositeEdit CLASSNAME;
 
+    struct ValueEdit : UiLineEdit {
+        Event<> WhenLoseFocus;
+        virtual void LostFocus() override
+        {
+            UiLineEdit::LostFocus();
+            if(WhenLoseFocus)
+                WhenLoseFocus();
+        }
+    };
+
     UiCompositeEdit();
 
     UiCompositeEdit& SetLayoutMode(UiCompositeLayoutMode mode);
@@ -52,8 +62,8 @@ public:
 
     UiLabel& LabelCtrl() { return label_; }
     const UiLabel& LabelCtrl() const { return label_; }
-    UiLineEdit& Edit() { return edit_; }
-    const UiLineEdit& Edit() const { return edit_; }
+    ValueEdit& Edit() { return edit_; }
+    const ValueEdit& Edit() const { return edit_; }
 
     virtual void SetData(const Value& v) override;
     virtual Value GetData() const override;
@@ -63,12 +73,13 @@ public:
 
     Event<> WhenAction;
     Event<> WhenChange;
+    Event<> WhenLoseFocus;
 
 private:
     void SyncThemeStyle();
 
     UiLabel label_;
-    UiLineEdit edit_;
+    ValueEdit edit_;
     UiCompositeLayoutMode layout_mode_ = UICOMPOSITE_INLINE;
     UiRole label_role_ = UiRole::Subtle;
     UiRole edit_role_ = UiRole::Standard;

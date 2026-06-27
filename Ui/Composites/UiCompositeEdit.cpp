@@ -10,6 +10,7 @@ UiCompositeEdit::UiCompositeEdit()
     label_.NoWantFocus();
     edit_.WhenAction = [=] { WhenAction(); };
     edit_.WhenChange = [=] { WhenChange(); };
+    edit_.WhenLoseFocus = [=] { WhenLoseFocus(); };
     SyncThemeStyle();
 }
 

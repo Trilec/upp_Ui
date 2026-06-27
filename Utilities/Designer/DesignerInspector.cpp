@@ -851,6 +851,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenSelectData = [=](const Value& data) {
 			if(!self)
 				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "choice"))
+				return;
 			DesignerConsoleTrace("ROW_CHOICE",
 				Format("node=%d property=%s value=%s editor=choice generation=%d inspector_generation=%d syncing=%d",
 				       (int)row_node, property_id, StdFormat(data),
@@ -875,6 +877,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!self)
+				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "bool"))
 				return;
 			DesignerConsoleTrace("ROW_BOOL",
 				Format("node=%d property=%s value=%s generation=%d inspector_generation=%d syncing=%d",
@@ -906,6 +910,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenChanging = [=] {
 			if(!self)
 				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "slider-preview"))
+				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
 			DesignerConsoleTrace("ROW_SLIDER_PRE",
@@ -915,6 +921,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		};
 		row->WhenAction = [=] {
 			if(!self)
+				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "slider"))
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
@@ -941,6 +949,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->Enable(b.enabled);
 		row->WhenAction = [=] {
 			if(!self)
+				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "color"))
 				return;
 			DesignerConsoleTrace("ROW_COLOR",
 				Format("node=%d property=%s value=%s generation=%d inspector_generation=%d syncing=%d",
@@ -973,6 +983,8 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 		row->WhenAction = [=] {
 			if(!self)
 				return;
+			if(!CanDeliverRowCommit(generation, row_node, property_id, "quadcolor"))
+				return;
 			ValueArray out;
 			for(int i = 0; i < 4; i++)
 				out.Add(self->GetColor(i));
@@ -994,18 +1006,36 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	UiCompositeEdit *row = new UiCompositeEdit;
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
+	std::shared_ptr<Value> last_committed = std::make_shared<Value>(value);
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
 	row->SetData(value);
 	row->Enable(b.enabled);
-	row->WhenAction = [=] {
+	row->WhenChange = [=] {
 		if(!self)
 			return;
-		DesignerConsoleTrace("ROW_EDIT",
-			Format("node=%d property=%s value=%s editor=edit-action generation=%d inspector_generation=%d syncing=%d",
-			       (int)row_node, property_id, StdFormat(self->GetData()),
-			       generation, inspector_generation_, syncing_ ? 1 : 0));
-		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-action", generation, inspector_generation_, syncing_});
+		if(!CanDeliverRowCommit(generation, row_node, property_id, "edit-change"))
+			return;
+		PostInspectorIntent({row_node, property_id, self->GetData(), true, false, "edit-change", generation, inspector_generation_, syncing_});
 	};
+	auto commit_edit = [=] {
+		if(!self)
+			return;
+		Value data = self->GetData();
+		if(data == *last_committed)
+			return;
+		if(!CanDeliverRowCommit(generation, row_node, property_id, "edit-commit"))
+			return;
+		*last_committed = data;
+		DesignerConsoleTrace("ROW_EDIT",
+			Format("node=%d property=%s value=%s editor=edit-commit generation=%d inspector_generation=%d syncing=%d",
+			       (int)row_node, property_id, StdFormat(data),
+			       generation, inspector_generation_, syncing_ ? 1 : 0));
+		PostInspectorIntent({row_node, property_id, data, false, true, "edit-commit", generation, inspector_generation_, syncing_});
+	};
+	row->WhenAction = [=] {
+		commit_edit();
+	};
+	row->WhenLoseFocus = [=] { commit_edit(); };
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
 	r.editor = b.editor;
@@ -1149,6 +1179,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
 	bool row_mixed = mixed;
+	std::shared_ptr<Value> last_committed = std::make_shared<Value>(mixed ? Value() : value);
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
 	if(mixed) {
 		row->SetData(Value());
@@ -1159,11 +1190,27 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->SetData(value);
 	}
 	row->Enable(DesignerBindingEditableInMultiSelect(b));
-	row->WhenAction = [=] {
-		if(self && !(row_mixed && IsNull(self->GetData())) &&
-		   CanDeliverManyRowCommit(generation, property_id, "multi-edit"))
-			PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, self->GetData());
+	row->WhenChange = [=] {
+		if(!self || (row_mixed && IsNull(self->GetData())))
+			return;
+		if(CanDeliverManyRowCommit(generation, property_id, "multi-edit-change"))
+			PostInspectorManyPreview(generation, current_multi_selection_snapshot_id_, property_id, self->GetData());
 	};
+	auto commit_many_edit = [=] {
+		if(!self || (row_mixed && IsNull(self->GetData())))
+			return;
+		Value data = self->GetData();
+		if(data == *last_committed)
+			return;
+		if(!CanDeliverManyRowCommit(generation, property_id, "multi-edit"))
+			return;
+		*last_committed = data;
+		PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, data);
+	};
+	row->WhenAction = [=] {
+		commit_many_edit();
+	};
+	row->WhenLoseFocus = [=] { commit_many_edit(); };
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
 	r.editor = b.editor;
@@ -1325,8 +1372,14 @@ void DesignerInspector::PostInspectorCommit(int generation, DesignerNodeId row_n
 
 void DesignerInspector::PostInspectorPreview(int generation, DesignerNodeId row_node, const String& property_id, const Value& value)
 {
-	if(syncing_ || generation != inspector_generation_ || node_id_ != row_node)
+	if(syncing_ || node_id_ != row_node)
 		return;
+#ifdef _DEBUG
+	if(generation != inspector_generation_) {
+		RLOG(Format("PostInspectorPreview generation changed but same node: old=%d current=%d property=%s node=%d -- allowing",
+		            generation, inspector_generation_, property_id, (int)row_node));
+	}
+#endif
 	WhenPropertyPreview(row_node, property_id, value);
 }
 

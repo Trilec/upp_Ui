@@ -1,5 +1,13 @@
 # SymbolPicker Changelog
 
+## 0.3.3
+
+- rebuilt `SymbolPickerView` around the Designer hierarchy
+- removed the old splitter/table/Bin-pane shell
+- moved runtime content into the three scroll-panel hosts
+- preserved model/catalog/command behavior
+- kept generated catalog loading paused
+
 ## 0.3.2
 
 - fixed `SymbolPickerIconRef` copy paths to preserve `catalog_id`
