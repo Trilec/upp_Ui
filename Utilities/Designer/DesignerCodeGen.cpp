@@ -114,6 +114,28 @@ static String VarName(const VectorMap<DesignerNodeId, String>& names, DesignerNo
 	return q >= 0 ? names[q] : VarName(id);
 }
 
+static String StyleHelperName(const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
+{
+	return "Make" + CodeIdentifier(VarName(names, n.id)) + "Style";
+}
+
+static bool SupportsRoleSetter(const DesignerNode& n)
+{
+	return n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic" ||
+	       n.type_id == "UiScrollPanel" || n.type_id == "UiGroupPanel" ||
+	       n.type_id == "UiLabel" || n.type_id == "UiTitleCard" ||
+	       n.type_id == "UiButton" || n.type_id == "UiSplitButton" ||
+	       n.type_id == "UiToolButton" || n.type_id == "UiCheckBox" ||
+	       n.type_id == "UiToggle" || n.type_id == "UiSlider" ||
+	       n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" ||
+	       n.type_id == "UiFloatEdit" || n.type_id == "UiDropdown";
+}
+
+static bool HasThemeOverride(const DesignerNode& n, bool emit_designer_appearance)
+{
+	return emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+}
+
 static String DirectionExpr(const DesignerNode& n, const String& def)
 {
 	return CodeGenNodeProperty(n, "direction", def) == "H" ? "UiDirection::H" : "UiDirection::V";
@@ -505,12 +527,10 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(!override) {
 		if(n.type_id == "UiAccordion")
 			return;
-		if(!custom_align && role != "Standard" && !force_style) {
-			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
+		if(!custom_align && role != "Standard" && !force_style && SupportsRoleSetter(n)) {
+			out << "\t\t" << var << ".SetRole(" << role_expr << ");\n";
 			return;
 		}
-		else if(custom_align || force_style)
-			override = true;
 		else
 			return;
 	}
@@ -727,6 +747,36 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		EmitButtonInkOverrideFields(out, n, true);
 	out << "\t\t\t" << var << ".SetCustomStyle(s);\n"
 	    << "\t\t}\n";
+}
+
+static String BuildThemeHelperBody(const String& var, const DesignerNode& n)
+{
+	String temp;
+	EmitThemeStyle(temp, var, n, true);
+	temp.Replace("\t\t\t" + var + ".SetCustomStyle(s);\n", "\treturn s;\n");
+	temp.Replace("\t\t{\n", "");
+	temp.Replace("\t\t}\n", "");
+	temp.Replace("\t\t\t", "\t");
+	temp.Replace("\t\t", "\t");
+	return temp;
+}
+
+static void EmitThemeHelper(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
+{
+	if(!HasThemeOverride(n, true))
+		return;
+	String helper = StyleHelperName(names, n);
+	String style_type = StyleTypeExpr(n);
+	if(style_type.IsEmpty())
+		return;
+	out << style_type << " " << helper << "()\n"
+	    << "{\n"
+	    << "\t// Source node: " << (n.name.IsEmpty() ? String("<unnamed>") : n.name) << " / " << n.type_id << "\n"
+	    << "\t// Move this method to GeneratedDesignerTheme.cpp if splitting the generated app.\n";
+	String role = AsString(CodeGenNodeProperty(n, "role", "Standard"));
+	out << "\t// Base role: " << role << ". Designer appearance overrides applied below.\n";
+	out << BuildThemeHelperBody("__target__", n);
+	out << "}\n\n";
 }
 
 static String FontExpr(const String& family, int size)
@@ -1115,7 +1165,9 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 		    << ".SetFieldWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "field_width", 72)) << "))"
 		    << ".SetGap(DPI(" << field_gap << "));\n";
 	}
-}static bool HasDesignerMinSizeOverride(const DesignerNode& n)
+}
+
+static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 {
 	return CodeGenMinMetric(n, "min_width") > 0 ||
 	       CodeGenMinMetric(n, "min_height") > 0;
@@ -1141,7 +1193,8 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 	String var = VarName(names, n.id);
 	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
 		return;
-	EmitThemeStyle(out, var, n, emit_designer_appearance);
+	if(!HasThemeOverride(n, emit_designer_appearance))
+		EmitThemeStyle(out, var, n, emit_designer_appearance);
 	EmitDesignerMinSize(out, var, n);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
@@ -1741,6 +1794,16 @@ static void EmitPostAddSetup(String& out, const VectorMap<DesignerNodeId, String
 	}
 }
 
+static void EmitAppearanceApply(String& out, const VectorMap<DesignerNodeId, String>& names,
+                                const DesignerModel& model, bool emit_designer_appearance)
+{
+	for(const DesignerNode& n : model.GetNodes()) {
+		if(n.id == Designer_ROOT || !HasThemeOverride(n, emit_designer_appearance))
+			continue;
+		out << "\t\t" << VarName(names, n.id) << ".SetCustomStyle(" << StyleHelperName(names, n) << "());\n";
+	}
+}
+
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
                             const DesignerCodeGenOptions& options)
 {
@@ -1763,31 +1826,67 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	out << "#include <CtrlLib/CtrlLib.h>\n"
 	    << "#include <Ui/Ui.h>\n\n"
 	    << "using namespace Upp;\n\n"
-	    << "class " << options.class_name << " : public TopWindow {\n"
+	    << "// -----------------------------------------------------------------------------\n"
+	    << "// Theme candidates\n"
+	    << "// -----------------------------------------------------------------------------\n"
+	    << "// These style helpers were generated from Designer appearance overrides.\n"
+	    << "// They can be copied into a shared UiTheme preset later.\n"
+	    << "// Instance-specific text, layout, data, and event wiring remain outside this section.\n\n";
+	for(const DesignerNode& n : model.GetNodes())
+		if(n.id != Designer_ROOT)
+			EmitThemeHelper(out, names, n);
+
+	out << "class " << options.class_name << " : public TopWindow {\n"
 	    << "public:\n"
 	    << "\ttypedef " << options.class_name << " CLASSNAME;\n\n"
 	    << "\t" << options.class_name << "()\n"
+	    << "\t{\n"
+	    << "\t\tInitWindow();\n"
+	    << "\t\tInitThemeContext();\n"
+	    << "\t\tBuildControls();\n"
+	    << "\t\tApplyAppearanceOverrides();\n"
+	    << "\t\tBuildLayout();\n"
+	    << "\t\tPostBuild();\n"
+	    << "\t}\n\n"
+	    << "private:\n"
+	    << "\tvoid InitWindow()\n"
 	    << "\t{\n"
 	    << "\t\tTitle(\"Generated Designer Layout\");\n"
 	    << "\t\tSizeable().Zoomable();\n";
 	Size sz = model.GetVirtualSize();
 	out << "\t\tSetRect(0, 0, DPI(" << sz.cx << "), DPI(" << sz.cy << "));\n"
-	    << "\t\tBuild();\n"
 	    << "\t}\n\n"
-	    << "private:\n"
-	    << "\tvoid Build()\n"
+	    << "\tvoid InitThemeContext()\n"
 	    << "\t{\n"
-	    << "\t\t// Control setup.\n";
+	    << "\t\t// Move this method to GeneratedDesignerTheme.cpp if splitting the generated app.\n"
+	    << "\t\t// Theme context / preset setup.\n"
+	    << "\t}\n\n"
+	    << "\tvoid BuildControls()\n"
+	    << "\t{\n"
+	    << "\t\t// Control text, icons, values, ranges, roles, and basic behaviour.\n";
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
 		EmitSetup(out, names, n, options.emit_designer_appearance);
 	}
+	out << "\t}\n\n"
+	    << "\tvoid ApplyAppearanceOverrides()\n"
+	    << "\t{\n";
+	if(options.emit_designer_appearance)
+		EmitAppearanceApply(out, names, model, options.emit_designer_appearance);
+	else
+		out << "\t\t// Designer appearance export disabled; role/theme-first output only.\n";
+	out << "\t}\n\n"
+	    << "\tvoid BuildLayout()\n"
+	    << "\t{\n"
+	    << "\t\t// Parent-child layout tree only.\n";
 	const DesignerNode* root = model.Find(Designer_ROOT);
-	out << "\n\t\t// Layout tree.\n";
 	if(root)
 		EmitAdds(out, names, model, *root);
-	out << "\n\t\t// Post-add setup.\n";
+	out << "\t}\n\n"
+	    << "\tvoid PostBuild()\n"
+	    << "\t{\n"
+	    << "\t\t// Active tabs/pages and late setup.\n";
 	EmitPostAddSetup(out, names, model);
 	out << "\t}\n\n";
 	for(const DesignerNode& n : model.GetNodes()) {
