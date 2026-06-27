@@ -22,6 +22,12 @@
 
 namespace Upp {
 
+#ifdef _DEBUG
+#define DESIGNER_DBG_LOG(x) do { if(DesignerDiagnosticsEnabled()) RLOG(x); } while(false)
+#else
+#define DESIGNER_DBG_LOG(x) do {} while(false)
+#endif
+
 static void DesignerMultiSelectCommandLog(const String& text)
 {
 	return;
@@ -2139,13 +2145,11 @@ private:
 			bool binding_enabled = binding ? binding->enabled : false;
 			pending_inspector_txn_.validation_binding_visible = binding_visible;
 			pending_inspector_txn_.validation_binding_enabled = binding_enabled;
-#ifdef _DEBUG
-			RLOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d state_controlled=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
-			            (int)pending_inspector_txn_.node_id, n->type_id, pending_inspector_txn_.property_id,
-			            binding ? 1 : 0, binding_visible ? 1 : 0, binding_enabled ? 1 : 0, safe_sizing ? 1 : 0, state_controlled ? 1 : 0,
-			            pending_inspector_txn_.row_generation, pending_inspector_txn_.inspector_generation,
-			            pending_inspector_txn_.inspector_syncing ? 1 : 0, stage ? stage : ""));
-#endif
+			DESIGNER_DBG_LOG(Format("DSM validate: node=%d type=%s property=%s binding=%d visible=%d enabled=%d safe_sizing=%d state_controlled=%d row_generation=%d inspector_generation=%d syncing=%d stage=%s",
+			                        (int)pending_inspector_txn_.node_id, n->type_id, pending_inspector_txn_.property_id,
+			                        binding ? 1 : 0, binding_visible ? 1 : 0, binding_enabled ? 1 : 0, safe_sizing ? 1 : 0, state_controlled ? 1 : 0,
+			                        pending_inspector_txn_.row_generation, pending_inspector_txn_.inspector_generation,
+			                        pending_inspector_txn_.inspector_syncing ? 1 : 0, stage ? stage : ""));
 			if(!binding)
 				pending_inspector_txn_.failure_reason = "binding missing";
 			else if(!binding_visible)
@@ -2169,17 +2173,15 @@ private:
 				       n ? n->type_id : String("<missing>"),
 				       pending_inspector_txn_.property_id,
 				       pending_inspector_txn_.failure_reason));
-#ifdef _DEBUG
-			RLOG(Format("DSM rejected: reason=%s node id=%d property=%s current selection=%d row generation=%d inspector generation=%d syncing=%d stage=%s",
-			            pending_inspector_txn_.failure_reason,
-			            (int)pending_inspector_txn_.node_id,
-			            pending_inspector_txn_.property_id,
-			            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
-			            pending_inspector_txn_.row_generation,
-			            pending_inspector_txn_.inspector_generation,
-			            pending_inspector_txn_.inspector_syncing ? 1 : 0,
-			            stage ? stage : ""));
-#endif
+			DESIGNER_DBG_LOG(Format("DSM rejected: reason=%s node id=%d property=%s current selection=%d row generation=%d inspector generation=%d syncing=%d stage=%s",
+			                        pending_inspector_txn_.failure_reason,
+			                        (int)pending_inspector_txn_.node_id,
+			                        pending_inspector_txn_.property_id,
+			                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+			                        pending_inspector_txn_.row_generation,
+			                        pending_inspector_txn_.inspector_generation,
+			                        pending_inspector_txn_.inspector_syncing ? 1 : 0,
+			                        stage ? stage : ""));
 			return false;
 		}
 		DesignerConsoleTrace("VALIDATE",
@@ -2237,20 +2239,16 @@ private:
 
 	void ForceDesignerProjectionRefresh(const char *reason)
 	{
-#ifdef _DEBUG
-		RLOG(Format("ForceDesignerProjectionRefresh(%s)", reason ? reason : ""));
-#endif
+		DESIGNER_DBG_LOG(Format("ForceDesignerProjectionRefresh(%s)", reason ? reason : ""));
 		CancelDesignerInteractionGuards();
 		RunRefreshAllNow();
 	}
 
 	void LogProjectionRequest(const DesignerProjectionRequest& r) const
 	{
-#ifdef _DEBUG
-		RLOG(Format("Projection requested: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
-		            r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0,
-		            r.code ? 1 : 0, r.full ? 1 : 0));
-#endif
+		DESIGNER_DBG_LOG(Format("Projection requested: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		                        r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0,
+		                        r.code ? 1 : 0, r.full ? 1 : 0));
 	}
 
 	void ApplyDesignerProjection(const DesignerProjectionRequest& r)
@@ -2259,10 +2257,8 @@ private:
 		if(r.full) {
 			ForceDesignerProjectionRefresh(r.reason);
 			RequestDesignerRefresh(true, true);
-#ifdef _DEBUG
-			RLOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=1 selected_value=<n/a>",
-			            r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0]));
-#endif
+			DESIGNER_DBG_LOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=1 selected_value=<n/a>",
+			                        r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0]));
 			return;
 		}
 
@@ -2276,18 +2272,14 @@ private:
 		}
 		if(r.inspector)
 			PostDesignerRefresh(true);
-#ifdef _DEBUG
-		RLOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=%d",
-		            r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0], r.inspector ? 1 : 0));
-#endif
+		DESIGNER_DBG_LOG(Format("ApplyDesignerProjection complete reason=%s selected=%d inspector_refresh_requested=%d",
+		                        r.reason, model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0], r.inspector ? 1 : 0));
 	}
 
 	void ApplyPreviewProjectionDuringEdit(const DesignerProjectionRequest& r)
 	{
-#ifdef _DEBUG
-		RLOG(Format("PreviewProjectionDuringEdit: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
-		            r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, 0, r.code ? 1 : 0, 0));
-#endif
+		DESIGNER_DBG_LOG(Format("PreviewProjectionDuringEdit: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
+		                        r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, 0, r.code ? 1 : 0, 0));
 		if(r.hierarchy)
 			RefreshHierarchy();
 		if(r.code)
@@ -2588,20 +2580,16 @@ private:
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
 	{
-#ifdef _DEBUG
-		RLOG(Format("RequestDesignerRefresh requested rebuild_inspector=%d full=%d blocked=%d reason=%s",
-		            rebuild_inspector ? 1 : 0, full ? 1 : 0, IsDesignerRefreshBlocked() ? 1 : 0,
-		            DesignerRefreshBlockReason()));
-#endif
+		DESIGNER_DBG_LOG(Format("RequestDesignerRefresh requested rebuild_inspector=%d full=%d blocked=%d reason=%s",
+		                        rebuild_inspector ? 1 : 0, full ? 1 : 0, IsDesignerRefreshBlocked() ? 1 : 0,
+		                        DesignerRefreshBlockReason()));
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		full_refresh_requested_ = full_refresh_requested_ || full;
 		DesignerTraceSetRefreshPosted(true);
 		DesignerTraceSetFullRefreshRequested(full_refresh_requested_);
 
 		if(IsDesignerRefreshBlocked()) {
-#ifdef _DEBUG
-			RLOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
-#endif
+			DESIGNER_DBG_LOG("Designer refresh deferred: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			return;
 		}
@@ -2627,17 +2615,13 @@ private:
 	{
 		DesignerTraceSetSelection(model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0]);
 		ApplySelectionProjection();
-#ifdef _DEBUG
-		RLOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
-		            model_.GetSelection().GetCount(),
-		            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
-		            IsDesignerRefreshBlocked() ? 1 : 0,
-		            DesignerRefreshBlockReason()));
-#endif
+		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
+		                        model_.GetSelection().GetCount(),
+		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+		                        IsDesignerRefreshBlocked() ? 1 : 0,
+		                        DesignerRefreshBlockReason()));
 		if(IsDesignerRefreshBlocked()) {
-#ifdef _DEBUG
-			RLOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
-#endif
+			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -2650,9 +2634,7 @@ private:
 	{
 		ApplySelectionProjection();
 		if(IsDesignerRefreshBlocked()) {
-#ifdef _DEBUG
-			RLOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
-#endif
+			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
@@ -3013,7 +2995,7 @@ private:
 			       (int)model_.GetSelection()[0],
 			       selected_node ? selected_node->type_id : String("<missing>")));
 #ifdef _DEBUG
-		RLOG("RefreshInspector primary=" << (int)model_.GetSelection()[0]);
+		DESIGNER_DBG_LOG("RefreshInspector primary=" << (int)model_.GetSelection()[0]);
 #endif
 		inspector_.SetSelection(model_.GetSelection());
 		theme_override_inspector_.SetSelection(model_.GetSelection());
@@ -3032,12 +3014,12 @@ private:
 				       StdFormat(inspector_value),
 				       inspector_value == model_value ? 1 : 0,
 				       model_value == last_inspector_readback_.intended_value ? 1 : 0));
-			RLOG(Format("Inspector readback: node=%d property=%s model_value=%s inspector_value=%s equals_model=%d equals_intended=%d",
-			            (int)last_inspector_readback_.node_id, last_inspector_readback_.property_id,
-			            q >= 0 ? StdFormat(model_value) : String("<missing>"),
-			            StdFormat(inspector_value),
-			            inspector_value == model_value ? 1 : 0,
-			            model_value == last_inspector_readback_.intended_value ? 1 : 0));
+			DESIGNER_DBG_LOG(Format("Inspector readback: node=%d property=%s model_value=%s inspector_value=%s equals_model=%d equals_intended=%d",
+			                        (int)last_inspector_readback_.node_id, last_inspector_readback_.property_id,
+			                        q >= 0 ? StdFormat(model_value) : String("<missing>"),
+			                        StdFormat(inspector_value),
+			                        inspector_value == model_value ? 1 : 0,
+			                        model_value == last_inspector_readback_.intended_value ? 1 : 0));
 			if(inspector_value != model_value || model_value != last_inspector_readback_.intended_value)
 				DesignerConsoleTrace("INSPECT_FAIL",
 					Format("property=%s stage=readback model=%s row=%s intended=%s",

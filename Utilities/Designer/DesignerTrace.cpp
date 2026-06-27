@@ -20,6 +20,16 @@ static bool designer_console_trace_enabled = false;
 static bool designer_preview_readback_trace_enabled = false;
 static bool designer_refresh_loop_summary_enabled = false;
 
+static bool DesignerTraceTagAlwaysVisible(const String& tag)
+{
+	return tag == "CMD_FAIL" ||
+	       tag == "VALIDATE_FAIL" ||
+	       tag == "INSPECT_FAIL" ||
+	       tag == "FSM_DESYNC" ||
+	       tag == "FSM_STUCK" ||
+	       tag == "FSM_RECOVER_FAIL";
+}
+
 static void DesignerTraceAppendBlockLine(const String& line)
 {
 	if(!designer_trace_.block_text.IsEmpty())
@@ -36,6 +46,8 @@ int DesignerTraceSeq()
 void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id, DesignerNodeId related_node_id,
                         const String& property_id, const String& reason)
 {
+	if(!designer_console_trace_enabled && !designer_diagnostics_enabled)
+		return;
 	designer_trace_.active = true;
 	designer_trace_.tx_id = DesignerTraceSeq();
 	designer_trace_.mode = mode;
@@ -58,7 +70,7 @@ void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id, Designer
 	DesignerConsoleTrace("TRACE_BEGIN",
 		Format("=== DESIGNER TRACE BEGIN tx=%03d reason=%s node=%d property=%s ===",
 		       designer_trace_.tx_id, reason, (int)node_id, property_id),
-		true);
+		false);
 }
 
 void DesignerEndTrace(const String& result, const String& reason)
@@ -76,7 +88,7 @@ void DesignerEndTrace(const String& result, const String& reason)
 		       designer_trace_.tx_id, final_result, final_trace_state, final_fsm_state, designer_trace_.lines,
 		       final_reason.IsEmpty() ? "" : " reason=",
 		       final_reason.IsEmpty() ? "" : final_reason),
-		true);
+		final_result != "OK");
 	designer_trace_ = DesignerTraceContext();
 }
 
@@ -120,7 +132,7 @@ void DesignerTraceNotifyIdlePreviewRebuild()
 	                    designer_trace_inspector_live_editing ? 1 : 0);
 	if(msg != designer_idle_preview_last_warn_message) {
 		designer_idle_preview_last_warn_message = msg;
-		DesignerConsoleTrace("IDLE_PREVIEW_LOOP", msg, true);
+		DesignerConsoleTrace("IDLE_PREVIEW_LOOP", msg, false);
 	}
 	designer_idle_preview_rebuild_count = 0;
 }
@@ -176,7 +188,7 @@ void DesignerTraceEmitRefreshLoopSummary()
 		out << "- none: 0\n";
 	for(int i = 0; i < designer_preview_layout_source_counts.GetCount(); i++)
 		out << "- " << designer_preview_layout_source_counts.GetKey(i) << ": " << designer_preview_layout_source_counts[i] << "\n";
-	DesignerConsoleTrace("REFRESH_LOOP_SUMMARY", out, true);
+	DesignerConsoleTrace("REFRESH_LOOP_SUMMARY", out, false);
 	designer_invalidate_source_counts.Clear();
 	designer_preview_refresh_source_counts.Clear();
 	designer_preview_layout_source_counts.Clear();
@@ -184,13 +196,15 @@ void DesignerTraceEmitRefreshLoopSummary()
 
 void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
 {
-	if(!force && !designer_console_trace_enabled)
+	bool allow_force = force && DesignerTraceTagAlwaysVisible(tag);
+	if(!designer_console_trace_enabled && !allow_force)
 		return;
-	if(!force && !designer_trace_.active)
+	if(!allow_force && !designer_trace_.active)
 		return;
 	String line = Format("#%05d %-14s %s", DesignerTraceSeq(), tag, msg);
 	Cout() << line << "\n";
-	RLOG(line);
+	if(designer_diagnostics_enabled || allow_force)
+		RLOG(line);
 	if(designer_trace_.active)
 		designer_trace_.lines++;
 }

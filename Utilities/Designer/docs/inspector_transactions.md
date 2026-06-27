@@ -48,3 +48,36 @@ Final commit:
 ## Important Constraint
 
 The real `designer_fsm_` is intentionally not the owner of single-node inspector preview/commit transactions in the current stabilisation phase. Re-entrant GUI projection and slider preview behavior require deterministic same-call completion. Reintroduce FSM ownership only after the broader Designer coordinator is explicit and proven stable.
+
+## Smoke Checklist
+
+`UiTitleCard`
+
+- `role`
+- `h_sizing`
+- `fixed_width`
+- `v_sizing`
+- `fixed_height`
+- `icon`
+
+`UiScrollPanel`
+
+- `h_sizing`
+- `fixed_width`
+- `v_sizing`
+- `fixed_height`
+
+`UiLineEdit`
+
+- `h_sizing`
+- `v_sizing`
+- `min_height`
+- `placeholder/text`
+
+Expected for each edit:
+
+- model persists
+- inspector readback matches
+- preview changes
+- reselect shows same values
+- actual FSM remains `Idle`
