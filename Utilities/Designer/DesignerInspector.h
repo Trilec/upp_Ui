@@ -72,7 +72,7 @@ struct DesignerTraceContext {
 void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id = Designer_NULL,
                         DesignerNodeId related_node_id = Designer_NULL, const String& property_id = String(),
                         const String& reason = String());
-void DesignerEndTrace();
+void DesignerEndTrace(const String& result = String(), const String& reason = String());
 bool DesignerTraceActive();
 DesignerTraceMode DesignerGetTraceMode();
 DesignerNodeId DesignerTraceNodeId();

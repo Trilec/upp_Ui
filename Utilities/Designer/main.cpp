@@ -82,7 +82,7 @@ void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id, Designer
 	DesignerConsoleTrace("TRACE_BEGIN", begin, true);
 }
 
-void DesignerEndTrace()
+void DesignerEndTrace(const String& result, const String& reason)
 {
 	if(!designer_trace_.active)
 		return;
@@ -109,10 +109,24 @@ void DesignerEndTrace()
 		designer_trace_.lines++;
 		designer_trace_.repeated_preview_rect_count = 0;
 	}
-	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s lines=%d ===",
+	String final_state = designer_trace_current_state;
+	String final_result = result;
+	if(final_result.IsEmpty()) {
+		if(final_state == "Idle")
+			final_result = "OK";
+		else
+			final_result = "FAILED";
+	}
+	String final_reason = reason;
+	if(final_reason.IsEmpty() && final_result == "FAILED" && final_state != "Idle")
+		final_reason = "transaction did not complete";
+	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s final_state=%s lines=%d%s%s ===",
 	                    designer_trace_.tx_id,
-	                    designer_trace_.capped ? "CAPPED" : "OK",
-	                    designer_trace_.lines);
+	                    final_result,
+	                    final_state,
+	                    designer_trace_.lines,
+	                    final_reason.IsEmpty() ? "" : " reason=",
+	                    final_reason.IsEmpty() ? "" : final_reason);
 	DesignerConsoleTrace("TRACE_END", end, true);
 	DesignerTraceAppendBlockLine(end);
 	designer_trace_ = DesignerTraceContext();
@@ -257,11 +271,14 @@ static void DesignerTraceEmitRefreshLoopSummary()
 
 void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
 {
+	auto bypass_cap = [&]() {
+		return force || tag.StartsWith("FSM_") || tag == "TRACE_END" || tag == "CMD_FAIL" || tag == "INSPECT_FAIL";
+	};
 	if(!force && !DesignerTraceActive())
 		return;
-	if(!force && designer_trace_.active && designer_trace_.capped)
+	if(!bypass_cap() && designer_trace_.active && designer_trace_.capped)
 		return;
-	if(!force && designer_trace_.lines >= designer_trace_.max_lines) {
+	if(!bypass_cap() && designer_trace_.lines >= designer_trace_.max_lines) {
 		if(!designer_trace_.capped) {
 			designer_trace_.capped = true;
 			String capped = Format("TRACE_CAPPED tx=%03d lines=%d reason=max_lines",
@@ -275,6 +292,10 @@ void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
 	}
 	if(designer_trace_.active && tag.StartsWith("PREVIEW_")) {
 		if(tag == "PREVIEW_RECT") {
+			if(designer_trace_.preview_rect_lines >= 2) {
+				designer_trace_.repeated_preview_rect_count++;
+				return;
+			}
 			if(designer_trace_.last_preview_rect_line == msg) {
 				designer_trace_.repeated_preview_rect_count++;
 				return;
@@ -291,6 +312,7 @@ void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
 				designer_trace_.repeated_preview_rect_count = 0;
 			}
 			designer_trace_.last_preview_rect_line = msg;
+			designer_trace_.preview_rect_lines++;
 		}
 		if(designer_trace_.last_preview_trace_line == msg) {
 			designer_trace_.repeated_preview_count++;
@@ -2152,6 +2174,19 @@ private:
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
 		String state_before = designer_fsm_.GetCurrent();
+		if(intent.final_commit &&
+		   state_before == DESIGNER_STATE_COMMITTING &&
+		   pending_inspector_txn_.active &&
+		   pending_inspector_txn_.commit_succeeded) {
+			DesignerConsoleTrace("FSM_FORCE_IDLE",
+				Format("reason=completed command before next final commit state=%s node=%d property=%s",
+				       state_before,
+				       (int)pending_inspector_txn_.node_id,
+				       pending_inspector_txn_.property_id),
+				true);
+			ForceInspectorTransactionIdle("completed command before next final commit");
+			state_before = designer_fsm_.GetCurrent();
+		}
 		DesignerConsoleTrace("DSM_SUBMIT",
 			Format("current=%s transitioning=%d node=%d property=%s value=%s preview=%d final=%d",
 			       state_before, designer_fsm_.IsTransitioning() ? 1 : 0,
@@ -2543,10 +2578,10 @@ private:
 		});
 	}
 
-	void ResetPendingInspectorTransaction()
+	void ResetPendingInspectorTransaction(const String& trace_result = String(), const String& trace_reason = String())
 	{
 		if(designer_trace_.active && designer_trace_.mode == TRACE_TRANSACTION)
-			DesignerEndTrace();
+			DesignerEndTrace(trace_result, trace_reason);
 		if(designer_trace_summary_pending) {
 			SetDiagnosticsText(designer_trace_summary_text);
 			AppendInspectorTraceFile(designer_trace_summary_text);
@@ -2660,6 +2695,61 @@ private:
 		ProcessDeferredInspectorIntentIfReady();
 	}
 
+	void ForceInspectorTransactionIdle(const char *reason, const String& trace_result = "OK")
+	{
+		DesignerConsoleTrace("FSM_FORCE_IDLE",
+			Format("reason=%s state=%s node=%d property=%s",
+			       reason ? reason : "",
+			       designer_fsm_.GetCurrent(),
+			       pending_inspector_txn_.active ? (int)pending_inspector_txn_.node_id : 0,
+			       pending_inspector_txn_.active ? pending_inspector_txn_.property_id : String("<none>")),
+			true);
+		if(designer_fsm_.Reset()) {
+			designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
+			designer_fsm_.Start();
+		}
+		designer_trace_current_state = DESIGNER_STATE_IDLE;
+		ResetPendingInspectorTransaction(trace_result, reason ? reason : "");
+	}
+
+	bool RunInspectorCommitTransaction()
+	{
+		DesignerConsoleTrace("FSM_SYNC_BEGIN",
+			Format("current=%s node=%d property=%s",
+			       designer_fsm_.GetCurrent(),
+			       (int)pending_inspector_txn_.node_id,
+			       pending_inspector_txn_.property_id));
+
+		ApplyPendingInspectorCommit();
+
+		if(!pending_inspector_txn_.commit_succeeded) {
+			DesignerConsoleTrace("FSM_SYNC_ABORT",
+				Format("current=%s node=%d property=%s reason=%s",
+				       designer_fsm_.GetCurrent(),
+				       (int)pending_inspector_txn_.node_id,
+				       pending_inspector_txn_.property_id,
+				       pending_inspector_txn_.failure_reason.IsEmpty() ? String("commit failed")
+				                                                       : pending_inspector_txn_.failure_reason));
+			ForceInspectorTransactionIdle("commit failed", "FAILED");
+			ProcessDeferredInspectorIntentIfReady();
+			return false;
+		}
+
+		ApplyPendingInspectorProjection();
+
+		DesignerConsoleTrace("FSM_SYNC_DONE",
+			Format("current=%s node=%d property=%s inspector_refresh=%d readback=%d",
+			       designer_fsm_.GetCurrent(),
+			       (int)pending_inspector_txn_.node_id,
+			       pending_inspector_txn_.property_id,
+			       pending_inspector_txn_.projection.inspector ? 1 : 0,
+			       pending_inspector_txn_.readback_equals_intended ? 1 : 0));
+
+		ForceInspectorTransactionIdle("transaction complete", "OK");
+		ProcessDeferredInspectorIntentIfReady();
+		return true;
+	}
+
 	void InitDesignerStateMachine()
 	{
 		designer_fsm_.EnableLogging(false);
@@ -2698,26 +2788,8 @@ private:
 		});
 		designer_fsm_.AddState({DESIGNER_STATE_COMMITTING,
 			[=](StateMachine&, Function<void(bool)> done) {
-				ApplyPendingInspectorCommit();
+				RunInspectorCommitTransaction();
 				done(true);
-				Ptr<DesignerWindow> self = this;
-				SetTimeCallback(0, [self] {
-					if(self)
-						self->ContinueInspectorCommitStateMachine();
-				});
-				SetTimeCallback(250, [self] {
-					if(!self)
-						return;
-					if(self->designer_fsm_.GetCurrent() == DESIGNER_STATE_COMMITTING) {
-						DesignerConsoleTrace("FSM_CONTINUE_COMMIT",
-							Format("current=%s commit_succeeded=%d event=%s watchdog=1",
-							       self->designer_fsm_.GetCurrent(),
-							       self->pending_inspector_txn_.commit_succeeded ? 1 : 0,
-							       self->pending_inspector_txn_.commit_succeeded ? DESIGNER_EVENT_COMMAND_APPLIED
-							                                                        : DESIGNER_EVENT_COMMAND_REJECTED));
-						self->ContinueInspectorCommitStateMachine();
-					}
-				});
 			},
 			{}
 		});
@@ -2725,21 +2797,6 @@ private:
 			[=](StateMachine&, Function<void(bool)> done) {
 				ApplyPendingInspectorProjection();
 				done(true);
-				Ptr<DesignerWindow> self = this;
-				SetTimeCallback(0, [self] {
-					if(self)
-						self->ContinueInspectorProjectionStateMachine();
-				});
-				SetTimeCallback(250, [self] {
-					if(!self)
-						return;
-					if(self->designer_fsm_.GetCurrent() == DESIGNER_STATE_PROJECTING) {
-						DesignerConsoleTrace("FSM_CONTINUE_PROJECTION",
-							Format("current=%s event=%s watchdog=1",
-							       self->designer_fsm_.GetCurrent(), DESIGNER_EVENT_PROJECTION_DONE));
-						self->ContinueInspectorProjectionStateMachine();
-					}
-				});
 			},
 			{}
 		});
@@ -4791,7 +4848,6 @@ private:
 		            model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
 		            pending_inspector_txn_.inspector_refresh_requested ? 1 : 0));
 #endif
-		ResetPendingInspectorTransaction();
 	}
 
 	void SaveInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
