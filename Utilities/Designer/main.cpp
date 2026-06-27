@@ -244,8 +244,12 @@ static String DesignerNameFromTitle(String text)
 	bool last_us = false;
 	for(int i = 0; i < text.GetCount(); i++) {
 		int c = (byte)text[i];
-		if(IsAlNum(c)) {
+		if(IsAlpha(c) || IsDigit(c)) {
 			out.Cat(ToLower(c));
+			last_us = false;
+		}
+		else if(c == '.' && !out.IsEmpty()) {
+			out.Cat('.');
 			last_us = false;
 		}
 		else if(!last_us && !out.IsEmpty()) {

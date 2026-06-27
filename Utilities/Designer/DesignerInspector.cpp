@@ -190,6 +190,7 @@ void DesignerInspector::SetSelection(const Vector<DesignerNodeId>& ids)
 {
 	selection_ = clone(ids);
 	node_id_ = selection_.IsEmpty() ? Designer_NULL : selection_[0];
+	current_multi_selection_snapshot_id_ = selection_.GetCount() > 1 ? StoreMultiSelectionSnapshot(selection_) : 0;
 	inspector_generation_++;
 	if(selection_.GetCount() == 1) {
 		SetNode(selection_[0]);
@@ -1005,15 +1006,6 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			       generation, inspector_generation_, syncing_ ? 1 : 0));
 		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-action", generation, inspector_generation_, syncing_});
 	};
-	row->WhenChange = [=] {
-		if(!self)
-			return;
-		DesignerConsoleTrace("ROW_EDIT",
-			Format("node=%d property=%s value=%s editor=edit-change generation=%d inspector_generation=%d syncing=%d",
-			       (int)row_node, property_id, StdFormat(self->GetData()),
-			       generation, inspector_generation_, syncing_ ? 1 : 0));
-		PostInspectorIntent({row_node, property_id, self->GetData(), false, true, "edit-change", generation, inspector_generation_, syncing_});
-	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
 	r.editor = b.editor;
@@ -1040,7 +1032,6 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	Value value = SelectionProperty(nodes, b, mixed);
 	String property_id = b.property_id;
 	int generation = inspector_generation_;
-	int snapshot_id = StoreMultiSelectionSnapshot(selection_);
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -1064,7 +1055,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 			if(!self || IsNull(data))
 				return;
 			if(CanDeliverManyRowCommit(generation, property_id, "multi-choice"))
-				PostInspectorManyCommit(generation, snapshot_id, property_id, data);
+				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1084,7 +1075,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-bool"))
-				PostInspectorManyCommit(generation, snapshot_id, property_id, (bool)self->GetData());
+				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1114,7 +1105,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyPreview(generation, snapshot_id, property_id, v);
+			PostInspectorManyPreview(generation, current_multi_selection_snapshot_id_, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(!self)
@@ -1123,7 +1114,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyCommit(generation, snapshot_id, property_id, v);
+			PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, v);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1143,7 +1134,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-color"))
-				PostInspectorManyCommit(generation, snapshot_id, property_id, self->GetColor(0));
+				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1171,7 +1162,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	row->WhenAction = [=] {
 		if(self && !(row_mixed && IsNull(self->GetData())) &&
 		   CanDeliverManyRowCommit(generation, property_id, "multi-edit"))
-			PostInspectorManyCommit(generation, snapshot_id, property_id, self->GetData());
+			PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
@@ -1344,6 +1335,8 @@ int DesignerInspector::StoreMultiSelectionSnapshot(const Vector<DesignerNodeId>&
 	MultiSelectionSnapshot& snapshot = multi_selection_snapshots_.Add();
 	snapshot.id = next_multi_selection_snapshot_id_++;
 	snapshot.ids = clone(ids);
+	while(multi_selection_snapshots_.GetCount() > 16)
+		multi_selection_snapshots_.Remove(0);
 	return snapshot.id;
 }
 

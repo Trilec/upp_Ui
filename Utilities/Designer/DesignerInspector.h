@@ -162,6 +162,7 @@ private:
 	String binding_group_;
 	bool syncing_ = false;
 	int inspector_generation_ = 0;
+	int current_multi_selection_snapshot_id_ = 0;
 	int next_multi_selection_snapshot_id_ = 1;
 	Array<MultiSelectionSnapshot> multi_selection_snapshots_;
 	mutable VectorMap<String, Vector<DesignerApiBinding>> descriptor_cache_;
