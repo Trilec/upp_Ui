@@ -2647,6 +2647,11 @@ private:
 		});
 	}
 
+	bool IsInspectorPanelVisibleForSelection() const
+	{
+		return right_mode_ == RIGHT_INSPECTOR || right_mode_ == RIGHT_OVERRIDES;
+	}
+
 	// Refresh only the views affected by selection.
 	// This keeps tree selection, inspector page, generated code, and preview
 	// overlays synchronized without rebuilding the whole model.
@@ -2660,9 +2665,12 @@ private:
 		int preview_start = msecs();
 		preview_.Refresh();
 		int preview_ms = msecs(preview_start);
-		int inspector_post_start = msecs();
-		PostInspectorSelectionRefresh();
-		int inspector_post_ms = msecs(inspector_post_start);
+		int inspector_refresh_start = msecs();
+		if(IsInspectorPanelVisibleForSelection())
+			RefreshInspectorForActiveRightPanelOnly();
+		else
+			PostInspectorSelectionRefresh();
+		int inspector_refresh_ms = msecs(inspector_refresh_start);
 		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
 		                        model_.GetSelection().GetCount(),
 		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
@@ -2670,8 +2678,9 @@ private:
 		                        DesignerRefreshBlockReason()));
 		if(DesignerDiagnosticsEnabled()) {
 			DesignerConsoleTrace("SELECT_PROFILE",
-				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms PostInspectorSelectionRefresh=%dms",
-				       msecs(total_start), sync_ms, preview_ms, inspector_post_ms),
+				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms InspectorSelection=%dms visible=%d",
+				       msecs(total_start), sync_ms, preview_ms, inspector_refresh_ms,
+				       IsInspectorPanelVisibleForSelection() ? 1 : 0),
 				false);
 		}
 		if(IsDesignerRefreshBlocked()) {
