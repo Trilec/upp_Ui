@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerRegistry_h_
+#define _Utilities_DesignerRegistry_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerRegistry component.
+     The registry is the small catalog that tells the app which node types exist,
+     how they appear in the toolbox, whether they can contain children, and how a
+     new node should be initialized. New controls should start here plus an adapter.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -28,13 +32,6 @@
 
 #include "DesignerDefaults.h"
 #include "DesignerModel.h"
-
-// Ui Designer type registry.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// The registry is the small catalog that tells the app which node types exist,
-// how they appear in the toolbox, whether they can contain children, and how a
-// new node should be initialized. New controls should start here plus an adapter.
 
 namespace Upp {
 
@@ -72,3 +69,4 @@ private:
 };
 
 }
+#endif

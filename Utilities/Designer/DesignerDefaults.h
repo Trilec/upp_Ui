@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerDefaults_h_
+#define _Utilities_DesignerDefaults_h_
 
 /*
     Author
@@ -83,3 +84,5 @@ inline int DesignerClampMin(int value, int minimum = DESIGNER_MIN_CLAMP)
 }
 
 }
+
+#endif

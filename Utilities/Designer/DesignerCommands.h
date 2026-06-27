@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerCommands_h_
+#define _Utilities_DesignerCommands_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerCommands component.
+    Every user-visible edit should flow through this command API. Keeping structural
+    and property edits command-driven gives us undo/redo now and a clean path to
+    persistence, validation, and future scripting.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -27,13 +31,6 @@
 */
 
 #include "DesignerModel.h"
-
-// Ui Designer command layer.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// Every user-visible edit should flow through this command API. Keeping structural
-// and property edits command-driven gives us undo/redo now and a clean path to
-// persistence, validation, and future scripting.
 
 namespace Upp {
 
@@ -88,3 +85,4 @@ One<DesignerCommand> MakeDesignerMoveNodeCommand(DesignerNodeId id, DesignerNode
 One<DesignerCommand> MakeDesignerRemoveNodeCommand(DesignerNodeId id);
 
 }
+#endif

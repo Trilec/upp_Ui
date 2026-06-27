@@ -16,25 +16,6 @@
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
-
-    Thread context
-    - GUI thread only.
-
-    Usage
-    - Include this header where the component is used or extended. Keep implementation details in the matching .cpp when present.
-
-    Changelog
-    - 2026-06: normalized the top-level header documentation.
-*/
-
-/*
-    DesignerAssets
-    ==============
-
-    Purpose
-    - Local image assets for the Designer utility shell.
-
-    Intent
     - Keep application branding close to the utility without promoting it into
       the shared Ui icon catalog used by controls and demos.
 
@@ -45,9 +26,17 @@
     - Keep controls agnostic to whether the backing source is .iml, SVG, or a
       future vector backend.
 
+    Thread context
+    - GUI thread only.
+
+    Usage
+    - Include this header where the component is used or extended. Keep implementation details in the matching .cpp when present.
+
     Changelog
     - 2026-05: added local Designer logo image class for the window/header icon.
+    - 2026-06: normalized the top-level header documentation.
 */
+
 
 #include <Draw/Draw.h>
 

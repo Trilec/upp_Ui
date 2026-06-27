@@ -41,6 +41,7 @@ static VectorMap<String, int> designer_preview_refresh_source_counts;
 static VectorMap<String, int> designer_preview_layout_source_counts;
 static int designer_refresh_summary_last_msecs = 0;
 static String designer_trace_current_state = "Idle";
+static String designer_trace_current_fsm_state = "Idle";
 static bool designer_trace_refresh_posted = false;
 static bool designer_trace_full_refresh_requested = false;
 static bool designer_trace_inspector_live_editing = false;
@@ -109,21 +110,23 @@ void DesignerEndTrace(const String& result, const String& reason)
 		designer_trace_.lines++;
 		designer_trace_.repeated_preview_rect_count = 0;
 	}
-	String final_state = designer_trace_current_state;
+	String final_trace_state = designer_trace_current_state;
+	String final_fsm_state = designer_trace_current_fsm_state;
 	String final_result = result;
 	if(final_result.IsEmpty()) {
-		if(final_state == "Idle")
+		if(final_fsm_state == "Idle")
 			final_result = "OK";
 		else
 			final_result = "FAILED";
 	}
 	String final_reason = reason;
-	if(final_reason.IsEmpty() && final_result == "FAILED" && final_state != "Idle")
-		final_reason = "transaction did not complete";
-	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s final_state=%s lines=%d%s%s ===",
+	if(final_reason.IsEmpty() && final_result == "FAILED" && final_fsm_state != "Idle")
+		final_reason = "fsm did not actually return to Idle";
+	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s final_trace_state=%s final_fsm_state=%s lines=%d%s%s ===",
 	                    designer_trace_.tx_id,
 	                    final_result,
-	                    final_state,
+	                    final_trace_state,
+	                    final_fsm_state,
 	                    designer_trace_.lines,
 	                    final_reason.IsEmpty() ? "" : " reason=",
 	                    final_reason.IsEmpty() ? "" : final_reason);
@@ -2156,6 +2159,7 @@ private:
 	{
 		if(!deferred_inspector_intent_.active)
 			return;
+		designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
 		if(designer_fsm_.IsTransitioning() || designer_fsm_.GetCurrent() != DESIGNER_STATE_IDLE)
 			return;
 #ifdef _DEBUG
@@ -2174,18 +2178,18 @@ private:
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
 		String state_before = designer_fsm_.GetCurrent();
+		designer_trace_current_fsm_state = state_before;
 		if(intent.final_commit &&
 		   state_before == DESIGNER_STATE_COMMITTING &&
-		   pending_inspector_txn_.active &&
-		   pending_inspector_txn_.commit_succeeded) {
-			DesignerConsoleTrace("FSM_FORCE_IDLE",
-				Format("reason=completed command before next final commit state=%s node=%d property=%s",
-				       state_before,
-				       (int)pending_inspector_txn_.node_id,
-				       pending_inspector_txn_.property_id),
-				true);
-			ForceInspectorTransactionIdle("completed command before next final commit");
+		   !pending_inspector_txn_.active) {
+			DesignerConsoleTrace("FSM_DESYNC",
+				"current=Committing active=0 action=reset_to_idle", true);
+			if(designer_fsm_.Reset()) {
+				designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
+				designer_fsm_.Start();
+			}
 			state_before = designer_fsm_.GetCurrent();
+			designer_trace_current_fsm_state = state_before;
 		}
 		DesignerConsoleTrace("DSM_SUBMIT",
 			Format("current=%s transitioning=%d node=%d property=%s value=%s preview=%d final=%d",
@@ -2219,6 +2223,58 @@ private:
 				       pending_inspector_txn_.active ? (int)pending_inspector_txn_.node_id : 0,
 				       pending_inspector_txn_.active ? pending_inspector_txn_.property_id : String("<none>"),
 				       (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
+			return;
+		}
+
+		if(intent.final_commit) {
+			String reject_reason;
+			if(!CanAcceptInspectorIntent(intent, reject_reason)) {
+				if(state_before == DESIGNER_STATE_COMMITTING) {
+					deferred_inspector_intent_.active = true;
+					deferred_inspector_intent_.intent = intent;
+					DesignerConsoleTrace("DEFER_FINAL_COMMIT",
+						Format("current=%s active_node=%d active_property=%s new_node=%d new_property=%s value=%s",
+						       state_before,
+						       pending_inspector_txn_.active ? (int)pending_inspector_txn_.node_id : 0,
+						       pending_inspector_txn_.active ? pending_inspector_txn_.property_id : String("<none>"),
+						       (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
+					return;
+				}
+				DesignerConsoleTrace("DSM_REJECT",
+					Format("current=%s reason=%s node=%d property=%s value=%s",
+					       state_before, reject_reason,
+					       (int)intent.node_id, intent.property_id, StdFormat(intent.value)));
+				PublishInspectorTrace(intent, nullptr, state_before, false, reject_reason);
+				return;
+			}
+
+			pending_inspector_txn_.active = true;
+			pending_inspector_txn_.preview = false;
+			pending_inspector_txn_.commit = true;
+			pending_inspector_txn_.final_commit = true;
+			pending_inspector_txn_.fsm_state_before = state_before;
+			pending_inspector_txn_.fsm_transition_accepted = true;
+			pending_inspector_txn_.fsm_reject_reason.Clear();
+			pending_inspector_txn_.node_id = intent.node_id;
+			pending_inspector_txn_.property_id = intent.property_id;
+			pending_inspector_txn_.value = intent.value;
+			pending_inspector_txn_.editor_kind = intent.editor_kind;
+			pending_inspector_txn_.row_generation = intent.row_generation;
+			pending_inspector_txn_.inspector_generation = intent.inspector_generation;
+			pending_inspector_txn_.inspector_syncing = intent.syncing;
+			if(const DesignerNode* n = model_.Find(intent.node_id))
+				pending_inspector_txn_.node_type = n->type_id;
+
+			designer_trace_current_state = DESIGNER_STATE_COMMITTING;
+			designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+			DesignerConsoleTrace("FSM_LOGICAL_ENTER",
+				Format("state=Committing node=%d property=%s",
+				       (int)intent.node_id, intent.property_id));
+			RunInspectorCommitTransaction();
+			designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+			DesignerConsoleTrace("FSM_ACTUAL_STATE",
+				Format("after_sync current=%s", designer_fsm_.GetCurrent()), true);
+			ProcessDeferredInspectorIntentIfReady();
 			return;
 		}
 
@@ -2704,11 +2760,8 @@ private:
 			       pending_inspector_txn_.active ? (int)pending_inspector_txn_.node_id : 0,
 			       pending_inspector_txn_.active ? pending_inspector_txn_.property_id : String("<none>")),
 			true);
-		if(designer_fsm_.Reset()) {
-			designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
-			designer_fsm_.Start();
-		}
 		designer_trace_current_state = DESIGNER_STATE_IDLE;
+		designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
 		ResetPendingInspectorTransaction(trace_result, reason ? reason : "");
 	}
 
@@ -2757,6 +2810,7 @@ private:
 		designer_fsm_.SetMaxQueuedEvents(0);
 		designer_fsm_.WhenTransitionStarted = [=](const TransitionContext& ctx) {
 			designer_trace_current_state = ctx.fromState;
+			designer_trace_current_fsm_state = ctx.toState;
 			if(String(ctx.toState) == DESIGNER_STATE_COMMITTING || String(ctx.toState) == DESIGNER_STATE_PROJECTING)
 				RecordInspectorStateEntry(ctx.toState);
 #ifdef _DEBUG
@@ -2765,6 +2819,7 @@ private:
 		};
 		designer_fsm_.WhenTransitionFinished = [=](const TransitionContext& ctx) {
 			designer_trace_current_state = ctx.toState;
+			designer_trace_current_fsm_state = ctx.toState;
 #ifdef _DEBUG
 			RLOG(Format("DSM transition finished: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
@@ -2788,7 +2843,6 @@ private:
 		});
 		designer_fsm_.AddState({DESIGNER_STATE_COMMITTING,
 			[=](StateMachine&, Function<void(bool)> done) {
-				RunInspectorCommitTransaction();
 				done(true);
 			},
 			{}
@@ -2815,6 +2869,7 @@ private:
 		designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
 		designer_fsm_.Start();
 		designer_trace_current_state = DESIGNER_STATE_IDLE;
+		designer_trace_current_fsm_state = DESIGNER_STATE_IDLE;
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)

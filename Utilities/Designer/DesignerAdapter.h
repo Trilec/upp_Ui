@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerAdapter_h_
+#define _Utilities_DesignerAdapter_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerAdapter component.
+     Adapters keep runtime controls as real Ui controls while adding only designer
+     behavior: property descriptors, selection/drop/debug overlays, and sync from
+     DesignerNode values. This keeps design-time behavior out of production controls.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -27,13 +31,6 @@
 */
 
 #include "DesignerRegistry.h"
-
-// Ui Designer real-control adapter layer.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// Adapters keep runtime controls as real Ui controls while adding only designer
-// behavior: property descriptors, selection/drop/debug overlays, and sync from
-// DesignerNode values. This keeps design-time behavior out of production controls.
 
 namespace Upp {
 
@@ -728,3 +725,4 @@ const DesignerAdapter* AsDesignerAdapter(const Ctrl& ctrl);
 String DesignerAdapterHelp(const String& type_id);
 
 }
+#endif

@@ -1,6 +1,8 @@
-#pragma once
+#ifndef _Utilities_DesignerDragController_h_
+#define _Utilities_DesignerDragController_h_
 
 /*
+
     Author
     - C Edwards (dodobar)
 
@@ -12,6 +14,9 @@
 
     Purpose
     - Public header for the DesignerDragController component.
+     This is the one owner for drag intent. Toolbox, hierarchy, and preview can
+     report hover targets, but validation and final model edits should pass through
+     this controller so drag behavior stays consistent.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -28,13 +33,6 @@
 
 #include "DesignerCommands.h"
 #include "DesignerRegistry.h"
-
-// Ui Designer drag/drop coordinator.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// This is the one owner for drag intent. Toolbox, hierarchy, and preview can
-// report hover targets, but validation and final model edits should pass through
-// this controller so drag behavior stays consistent.
 
 namespace Upp {
 
@@ -100,3 +98,5 @@ DesignerDropTarget DesignerMakeIntoTarget(DesignerNodeId parent, int insert_inde
 DesignerDropTarget DesignerMakeSiblingTarget(DesignerNodeId sibling, DesignerDropZone zone);
 
 }
+
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerSerialization_h_
+#define _Utilities_DesignerSerialization_h_
 
 /*
     Author
@@ -36,3 +37,5 @@ bool LoadDesignerModelJson(DesignerModel& model, const DesignerRegistry& registr
                            const String& json, String& error, Vector<String>* notes = nullptr);
 
 }
+
+#endif

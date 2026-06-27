@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerHierarchy_h_
+#define _Utilities_DesignerHierarchy_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerHierarchy component.
+     These are thin UiTree specializations that translate mouse gestures into
+    designer drag events. They do not own model edits; the main window and drag
+   controller decide whether a drop is valid and which command to execute.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -27,13 +31,6 @@
 */
 
 #include "DesignerModel.h"
-
-// Ui Designer hierarchy/toolbox trees.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// These are thin UiTree specializations that translate mouse gestures into
-// designer drag events. They do not own model edits; the main window and drag
-// controller decide whether a drop is valid and which command to execute.
 
 namespace Upp {
 
@@ -97,3 +94,5 @@ private:
 };
 
 }
+
+#endif

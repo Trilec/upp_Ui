@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerBuiltins_h_
+#define _Utilities_DesignerBuiltins_h_
 
 /*
     Author
@@ -12,6 +13,8 @@
 
     Purpose
     - Public header for the DesignerBuiltins component.
+      This module declares the stock toolbox/catalog entries for the designer:
+      layouts, containers, splitter panes, and the first set of real Ui controls.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -28,12 +31,6 @@
 
 #include "DesignerRegistry.h"
 
-// Ui Designer built-in type registration.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// This module declares the stock toolbox/catalog entries for the designer:
-// layouts, containers, splitter panes, and the first set of real Ui controls.
-
 namespace Upp {
 
 // Register the built-in DesignerType records into the supplied registry.
@@ -41,3 +38,5 @@ namespace Upp {
 void RegisterDesignerBuiltins(DesignerRegistry& registry);
 
 }
+
+#endif

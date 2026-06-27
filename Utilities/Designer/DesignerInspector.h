@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerInspector_h_
+#define _Utilities_DesignerInspector_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerInspector component.
+      The inspector turns adapter property descriptors into themed composite rows.
+      Each selected type gets a stable page inside UiStack so hidden controls from
+      previous selections do not keep stale state or overlap the active editor.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -27,13 +31,6 @@
 */
 
 #include "DesignerAdapter.h"
-
-// Ui Designer inspector.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// The inspector turns adapter property descriptors into themed composite rows.
-// Each selected type gets a stable page inside UiStack so hidden controls from
-// previous selections do not keep stale state or overlap the active editor.
 
 namespace Upp {
 
@@ -213,3 +210,5 @@ private:
 };
 
 }
+
+#endif

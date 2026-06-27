@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerModel_h_
+#define _Utilities_DesignerModel_h_
 
 /*
     Author
@@ -12,6 +13,10 @@
 
     Purpose
     - Public header for the DesignerModel component.
+     This header defines the persistent document graph for the visual designer:
+     node identity, parent/child order, property values, selection, and validation.
+     UI widgets should edit this model through commands rather than keeping state
+    in the preview or inspector controls.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -28,13 +33,6 @@
 
 #include "DesignerDefaults.h"
 
-// Ui Designer model layer.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// This header defines the persistent document graph for the visual designer:
-// node identity, parent/child order, property values, selection, and validation.
-// UI widgets should edit this model through commands rather than keeping state
-// in the preview or inspector controls.
 
 namespace Upp {
 
@@ -125,3 +123,4 @@ private:
 };
 
 }
+#endif

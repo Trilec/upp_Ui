@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _Utilities_DesignerPreview_h_
+#define _Utilities_DesignerPreview_h_
 
 /*
     Author
@@ -12,6 +13,9 @@
 
     Purpose
     - Public header for the DesignerPreview component.
+    DesignerPreview is the central visual editing canvas. It renders a virtual
+    window, builds real Ui controls through adapters, tracks selection/drop hover,
+    and maps pointer gestures back into model-level node moves.
 
     Intent
     - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
@@ -28,13 +32,6 @@
 
 #include "DesignerAdapter.h"
 #include "DesignerBuiltins.h"
-
-// Ui Designer preview surface.
-// Copyright (c) 2026 C Edwards (dodobar). MIT licensed, matching the Ui package.
-//
-// DesignerPreview is the central visual editing canvas. It renders a virtual
-// window, builds real Ui controls through adapters, tracks selection/drop hover,
-// and maps pointer gestures back into model-level node moves.
 
 namespace Upp {
 
@@ -118,3 +115,5 @@ private:
 };
 
 }
+
+#endif
