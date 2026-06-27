@@ -1062,6 +1062,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	Value value = SelectionProperty(nodes, b, mixed);
 	String property_id = b.property_id;
 	int generation = inspector_generation_;
+	int snapshot_id = current_multi_selection_snapshot_id_;
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -1085,7 +1086,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 			if(!self || IsNull(data))
 				return;
 			if(CanDeliverManyRowCommit(generation, property_id, "multi-choice"))
-				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, data);
+				PostInspectorManyCommit(generation, snapshot_id, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1105,7 +1106,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-bool"))
-				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, (bool)self->GetData());
+				PostInspectorManyCommit(generation, snapshot_id, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1135,7 +1136,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyPreview(generation, current_multi_selection_snapshot_id_, property_id, v);
+			PostInspectorManyPreview(generation, snapshot_id, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(!self)
@@ -1144,7 +1145,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, v);
+			PostInspectorManyCommit(generation, snapshot_id, property_id, v);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1164,7 +1165,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-color"))
-				PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, self->GetColor(0));
+				PostInspectorManyCommit(generation, snapshot_id, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1194,7 +1195,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		if(!self || (row_mixed && IsNull(self->GetData())))
 			return;
 		if(CanDeliverManyRowCommit(generation, property_id, "multi-edit-change"))
-			PostInspectorManyPreview(generation, current_multi_selection_snapshot_id_, property_id, self->GetData());
+			PostInspectorManyPreview(generation, snapshot_id, property_id, self->GetData());
 	};
 	auto commit_many_edit = [=] {
 		if(!self || (row_mixed && IsNull(self->GetData())))
@@ -1205,7 +1206,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		if(!CanDeliverManyRowCommit(generation, property_id, "multi-edit"))
 			return;
 		*last_committed = data;
-		PostInspectorManyCommit(generation, current_multi_selection_snapshot_id_, property_id, data);
+		PostInspectorManyCommit(generation, snapshot_id, property_id, data);
 	};
 	row->WhenAction = [=] {
 		commit_many_edit();
@@ -1434,6 +1435,9 @@ void DesignerInspector::PostInspectorManyCommit(int generation, int snapshot_id,
 #endif
 			return;
 		}
+		DesignerConsoleTrace("MULTI_COMMIT",
+			Format("snapshot=%d count=%d property=%s value=%s",
+			       snapshot_id, selection_ids->GetCount(), property_id, StdFormat(value)));
 		self->WhenPropertyMany(*selection_ids, property_id, value);
 #ifdef _DEBUG
 		RLOG("Inspector commit delivered: " << property_id);

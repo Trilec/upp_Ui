@@ -931,7 +931,7 @@ private:
 		hierarchy_.WhenRename = [=](UiTreeNodeRef ref, const String& name) {
 			DesignerNodeId id = GetHierarchyNodeId(ref);
 			if(id != Designer_NULL && id != Designer_ROOT)
-				PostCallback([=] { SaveInspectorNameValue(id, name); });
+				SaveInspectorNameValue(id, name);
 		};
 		hierarchy_.WhenColumnAction = [=](UiTreeNodeRef ref, int column) {
 			HandleHierarchyColumnAction(ref, column);
@@ -5125,7 +5125,11 @@ private:
 		DesignerNode* n = model_.Find(node_id);
 		if(!n)
 			return;
+		String old_name = n->name;
 		String normalized = UniqueDesignerName(new_name, node_id);
+		DesignerConsoleTrace("RENAME",
+			Format("node=%d raw=%s normalized=%s old=%s",
+			       (int)node_id, new_name, normalized, old_name));
 		if(commands_.Execute(MakeDesignerRenameCommand(node_id, normalized), model_)) {
 			SetDocumentDirty();
 			RefreshHierarchy();

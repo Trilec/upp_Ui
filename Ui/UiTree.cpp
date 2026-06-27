@@ -1250,16 +1250,17 @@ void UiTree::CommitRename()
     UiTreeNodeRef node{editing_id_};
     UiModelItem item = model_->Get(node);
     String text = AsString(inline_editor_.GetData());
+    bool changed = item.text != text;
     if(item.text != text) {
         item.text = text;
         model_->Set(node, item);
-        if(WhenRename)
-            WhenRename(node, text);
     }
     editing_ = false;
     editing_id_ = -1;
     inline_editor_.Hide();
     Refresh();
+    if(changed && WhenRename)
+        WhenRename(node, text);
 }
 
 void UiTree::CancelRename()
