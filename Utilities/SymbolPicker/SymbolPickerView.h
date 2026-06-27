@@ -5,7 +5,7 @@
 #include "SymbolPickerCatalog.h"
 #include "SymbolPickerCommands.h"
 
-#include <CtrlLib/CtrlLib.h>
+#include <Ui/Ui.h>
 
 namespace Upp {
 
@@ -39,58 +39,64 @@ public:
 
 private:
 	void BuildUi();
-	void BuildHeader();
-	void BuildCategoryStrip();
+	void BuildTopHeading();
+	void BuildCategoriesPanel();
 	void BuildLibraryPanel();
 	void BuildCollectionsPanel();
-	void BuildBinPanel();
 	void RefreshCollections();
 	void RefreshCollectionItems();
-	void RefreshBin();
 	void RefreshCategories();
 	void RefreshLibrary();
+	void RebuildCategoryButtons();
+	void RebuildLibraryTiles();
+	void RebuildCollectionTiles();
 	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
+	void SelectLibraryCatalogId(const String& catalog_id);
 
-	ParentCtrl root_;
-	StaticRect header_row_;
-	StaticRect category_strip_;
-	StaticRect center_host_;
-	Splitter   center_split_;
-	Splitter   main_split_;
-
-	StaticRect library_panel_;
-	StaticRect collections_panel_;
-	StaticRect bin_panel_;
-
-	Label      title_;
-	Label      subtitle_;
-	Label      filter_label_;
-	DropList   theme_preset_drop_;
-	DropList   icon_style_drop_;
-	EditString filter_edit_;
-	Option     outlined_option_;
-	Option     rounded_option_;
-	Option     sharp_option_;
+	UiBoxLayout main_box_ { UiDirection::V };
+	UiBoxLayout top_heading_layout_ { UiDirection::H };
+	UiTitleCard heading_card_;
+	UiDropdown  theme_preset_drop_;
+	UiDropdown  icon_style_drop_;
+	UiLineEdit  filter_edit_;
 	SymbolPickerTintCtrl tint_ctrl_;
-	Button     new_collection_button_;
-	Button     clear_bin_button_;
-	Button     add_to_bin_button_;
-	Button     add_to_collection_button_;
+	UiButton    new_collection_button_;
+	UiButton    clear_bin_button_;
+	UiButton    add_to_bin_button_;
+	UiButton    add_to_collection_button_;
 
-	ArrayCtrl  categories_list_;
-	ArrayCtrl  library_list_;
-	ArrayCtrl  collections_list_;
-	TabCtrl    collections_tabs_;
-	ParentCtrl collection_items_page_;
-	ArrayCtrl  collection_items_list_;
-	ArrayCtrl  bin_list_;
-	Label      library_title_;
-	Label      library_subtitle_;
-	Label      collections_title_;
-	Label      collections_subtitle_;
-	Label      bin_title_;
-	Label      bin_subtitle_;
-	bool       refreshing_collections_ = false;
+	UiPanel categories_panel_;
+	UiBoxLayout category_base_layout_ { UiDirection::V };
+	UiPanel category_header_shell_;
+	UiBoxLayout category_header_layout_ { UiDirection::H };
+	UiBoxLayout categories_action_layout_ { UiDirection::H };
+	UiTitleCard category_card_;
+	UiScrollPanel category_scroll_panel_;
+
+	UiPanel library_panel_;
+	UiBoxLayout library_base_layout_ { UiDirection::V };
+	UiBoxLayout library_header_layout_ { UiDirection::H };
+	UiTitleCard library_card_;
+	UiBoxLayout library_action_cluster_ { UiDirection::H };
+	UiScrollPanel library_scroll_panel_;
+
+	UiPanel collections_panel_;
+	UiBoxLayout collections_base_layout_ { UiDirection::V };
+	UiBoxLayout collections_header_layout_ { UiDirection::H };
+	UiTitleCard collections_card_;
+	UiBoxLayout collections_action_cluster_ { UiDirection::H };
+	UiScrollPanel collections_scroll_panel_;
+
+	UiBoxLayout category_content_layout_ { UiDirection::V };
+	UiBoxLayout library_content_layout_ { UiDirection::V };
+	UiBoxLayout collections_content_layout_ { UiDirection::V };
+	UiDropdown  collections_selector_;
+	UiLineEdit  collections_filter_edit_;
+
+	Array<UiButton> category_buttons_;
+	Array<UiButton> library_tiles_;
+	Array<UiLabel>  collection_tiles_;
+	String          selected_library_catalog_id_;
 
 	SymbolPickerModel* model_ = nullptr;
 	const SymbolPickerCatalog* catalog_ = nullptr;

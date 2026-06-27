@@ -63,66 +63,83 @@ SymbolPickerView::SymbolPickerView()
 
 void SymbolPickerView::BuildUi()
 {
-	Add(root_.SizePos());
-	root_.SetFrame(InsetFrame());
+	Add(main_box_.SizePos());
+	main_box_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
 
-	BuildHeader();
-	BuildCategoryStrip();
+	BuildTopHeading();
+	BuildCategoriesPanel();
 	BuildLibraryPanel();
 	BuildCollectionsPanel();
-	BuildBinPanel();
 
-	center_split_.Horz();
-	center_split_ << library_panel_ << collections_panel_;
-	center_split_.SetPos(6000);
-	center_host_.Add(center_split_.SizePos());
-
-	main_split_.Vert();
-	main_split_ << center_host_ << bin_panel_;
-	main_split_.SetPos(7200);
-
-	root_.Add(header_row_.HSizePosZ(0, 0).TopPosZ(0, 72));
-	root_.Add(category_strip_.HSizePosZ(0, 0).TopPosZ(76, 60));
-	root_.Add(main_split_.HSizePosZ(0, 0).VSizePosZ(140, 0));
+	main_box_.Add(top_heading_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	main_box_.Add(categories_panel_).Expand(1).MinMain(DPI(130)).AlignSelf(UiBoxLayout::Align::Stretch);
+	main_box_.Add(library_panel_).Expand(2).MinMain(DPI(220)).AlignSelf(UiBoxLayout::Align::Stretch);
+	main_box_.Add(collections_panel_).Expand(2).MinMain(DPI(220)).AlignSelf(UiBoxLayout::Align::Stretch);
 }
 
-void SymbolPickerView::BuildHeader()
+void SymbolPickerView::BuildTopHeading()
 {
-	header_row_.Add(title_.LeftPosZ(12, 260).TopPosZ(8, 22));
-	header_row_.Add(subtitle_.LeftPosZ(12, 420).TopPosZ(32, 18));
-	header_row_.Add(theme_preset_drop_.LeftPosZ(420, 120).TopPosZ(14, 24));
-	header_row_.Add(icon_style_drop_.LeftPosZ(548, 120).TopPosZ(14, 24));
-	header_row_.Add(filter_label_.LeftPosZ(676, 60).TopPosZ(0, 12));
-	header_row_.Add(filter_edit_.LeftPosZ(676, 180).TopPosZ(14, 24));
-	header_row_.Add(tint_ctrl_.RightPosZ(148, 108).TopPosZ(14, 24));
-	header_row_.Add(new_collection_button_.RightPosZ(12, 128).TopPosZ(14, 24));
-	header_row_.Add(clear_bin_button_.RightPosZ(12, 96).TopPosZ(42, 22));
+	top_heading_layout_.SetDirection(UiDirection::H)
+		.SetGap(DPI(8))
+		.SetInset(0)
+		.SetWrap(UiBoxWrap::Flow)
+		.SetWrapAutoResize(true)
+		.SetAlignItems(UiCrossAlign::Center);
 
-	title_.SetLabel("Symbol Picker");
-	title_.SetFont(ArialZ(20).Bold());
-	subtitle_.SetLabel("v0.2 layout and collection-model foundation");
-	subtitle_.SetFont(StdFont());
-	filter_label_.SetLabel("Filter");
-	filter_label_.SetFont(StdFont());
+	UiTitleCard::Style heading_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+	heading_style.metrics.face_enabled = false;
+	heading_style.metrics.frame_enabled = false;
+	heading_style.metrics.radius = 0;
+	heading_style.card_line_side = UiAlign::RIGHT;
+	heading_style.card_line_thickness = DPI(2);
+	heading_style.card_line_gap = DPI(9);
+	heading_card_.SetCustomStyle(heading_style);
+	heading_card_.SetTitle("Symbols Picker")
+		.SetSubTitle("Designer layout reconciliation shell")
+		.SetContentInset(DPI(4))
+		.SetMediaGap(DPI(9))
+		.SetMediaReserve(DPI(0))
+		.SetMediaMin(DPI(15))
+		.SetMediaAutoFit(false)
+		.SetMediaSide(UiAlign::LEFT)
+		.SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER);
 
-	theme_preset_drop_.Add((int)UiThemePreset::Minimal, "Minimal");
-	theme_preset_drop_.Add((int)UiThemePreset::Pill, "Pill");
-	theme_preset_drop_.Add((int)UiThemePreset::Layered, "Layered");
+	theme_preset_drop_.SetSizeMin(DPI(110), 0);
+	theme_preset_drop_.UseInternalModel().Clear()
+		.Add("Minimal", (int)UiThemePreset::Minimal)
+		.Add("Pill", (int)UiThemePreset::Pill)
+		.Add("Layered", (int)UiThemePreset::Layered);
+	theme_preset_drop_.Select(0);
 
-	icon_style_drop_.Add((int)SymbolPickerIconStyle::Outlined, "Outlined");
-	icon_style_drop_.Add((int)SymbolPickerIconStyle::Rounded,  "Rounded");
-	icon_style_drop_.Add((int)SymbolPickerIconStyle::Sharp,    "Sharp");
+	icon_style_drop_.SetSizeMin(DPI(110), 0);
+	icon_style_drop_.UseInternalModel().Clear()
+		.Add("Outlined", (int)SymbolPickerIconStyle::Outlined)
+		.Add("Rounded", (int)SymbolPickerIconStyle::Rounded)
+		.Add("Sharp", (int)SymbolPickerIconStyle::Sharp);
+	icon_style_drop_.Select(0);
 
-	filter_edit_.SetText(String());
+	filter_edit_.SetMinSize(Size(DPI(180), 0));
+	filter_edit_.SetPlaceholder("Filter library");
 
-	new_collection_button_.SetLabel("New Collection");
-	clear_bin_button_.SetLabel("Clear Bin");
+	new_collection_button_.SetText("New Collection").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+	clear_bin_button_.SetText("Clear Bin").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+	add_to_bin_button_.SetText("Add To Bin").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+	add_to_collection_button_.SetText("Add To Collection").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+
+	top_heading_layout_.Add(heading_card_).Expand(1).MinMain(DPI(240)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(theme_preset_drop_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(icon_style_drop_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(filter_edit_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(tint_ctrl_).Fixed(DPI(112)).AlignSelf(UiBoxLayout::Align::Center);
+	top_heading_layout_.Add(add_to_bin_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(add_to_collection_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(new_collection_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	top_heading_layout_.Add(clear_bin_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 
 	tint_ctrl_.WhenAction = [=] {
 		if(model_ && commands_)
 			commands_->Execute(MakeSymbolPickerSetTintCommand(tint_ctrl_.GetColor()), *model_);
 	};
-
 	theme_preset_drop_.WhenAction = [=] {
 		if(model_ && commands_)
 			commands_->Execute(MakeSymbolPickerSetThemePresetCommand((UiThemePreset)(int)~theme_preset_drop_), *model_);
@@ -133,7 +150,7 @@ void SymbolPickerView::BuildHeader()
 	};
 	filter_edit_.WhenAction = [=] {
 		if(model_ && commands_)
-			commands_->Execute(MakeSymbolPickerSetFilterCommand(~filter_edit_), *model_);
+			commands_->Execute(MakeSymbolPickerSetFilterCommand(filter_edit_.GetTextUtf8()), *model_);
 	};
 	new_collection_button_.WhenAction = [=] {
 		if(model_ && commands_)
@@ -143,56 +160,16 @@ void SymbolPickerView::BuildHeader()
 		if(model_ && commands_)
 			commands_->Execute(MakeSymbolPickerClearBinCommand(), *model_);
 	};
-}
-
-void SymbolPickerView::BuildCategoryStrip()
-{
-	category_strip_.Add(categories_list_.SizePos());
-	categories_list_.AddColumn("Categories");
-	categories_list_.WhenSel = [=] {
-		if(model_ && commands_ && categories_list_.IsCursor())
-			commands_->Execute(MakeSymbolPickerSetCategoryCommand(categories_list_.Get(categories_list_.GetCursor(), 1)), *model_);
-	};
-}
-
-void SymbolPickerView::BuildLibraryPanel()
-{
-	library_panel_.Add(library_title_.LeftPosZ(12, 140).TopPosZ(8, 20));
-	library_panel_.Add(library_subtitle_.LeftPosZ(12, 240).TopPosZ(28, 16));
-	library_panel_.Add(add_to_bin_button_.RightPosZ(128, 110).TopPosZ(8, 22));
-	library_panel_.Add(add_to_collection_button_.RightPosZ(12, 110).TopPosZ(8, 22));
-	library_panel_.Add(library_list_.HSizePosZ(12, 12).VSizePosZ(52, 12));
-
-	library_title_.SetLabel("Library");
-	library_title_.SetFont(ArialZ(16).Bold());
-	library_subtitle_.SetLabel("Browse the full icon library.");
-	add_to_bin_button_.SetLabel("Add To Bin");
-	add_to_collection_button_.SetLabel("Add To Collection");
-
-	library_list_.AddColumn("Name");
-	library_list_.AddColumn("Category");
-	library_list_.AddColumn("Style");
-	library_list_.AddColumn("Catalog Id");
-	library_list_.AddColumn("Source Id");
-	library_list_.WhenLeftDouble = [=] {
-		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
-			return;
-		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
-		commands_->Execute(MakeSymbolPickerAddToBinCommand(catalog_id), *model_);
-	};
 	add_to_bin_button_.WhenAction = [=] {
-		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
-			return;
-		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
-		commands_->Execute(MakeSymbolPickerAddToBinCommand(catalog_id), *model_);
+		if(model_ && commands_ && !selected_library_catalog_id_.IsEmpty())
+			commands_->Execute(MakeSymbolPickerAddToBinCommand(selected_library_catalog_id_), *model_);
 	};
 	add_to_collection_button_.WhenAction = [=] {
-		if(!model_ || !catalog_ || !commands_ || !library_list_.IsCursor())
+		if(!model_ || !catalog_ || !commands_ || selected_library_catalog_id_.IsEmpty())
 			return;
 		if(model_->GetActiveCollectionIndex() < 0)
 			return;
-		String catalog_id = library_list_.Get(library_list_.GetCursor(), 3);
-		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(catalog_id);
+		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(selected_library_catalog_id_);
 		if(!entry)
 			return;
 		SymbolPickerIconRef ref;
@@ -206,44 +183,106 @@ void SymbolPickerView::BuildLibraryPanel()
 	};
 }
 
-void SymbolPickerView::BuildCollectionsPanel()
+void SymbolPickerView::BuildCategoriesPanel()
 {
-	collections_panel_.Add(collections_title_.LeftPosZ(12, 140).TopPosZ(8, 20));
-	collections_panel_.Add(collections_subtitle_.LeftPosZ(12, 220).TopPosZ(28, 16));
-	collections_panel_.Add(collections_list_.LeftPosZ(12, 220).VSizePosZ(52, 12));
-	collections_panel_.Add(collections_tabs_.HSizePosZ(240, 12).VSizePosZ(52, 12));
+	categories_panel_.Add(category_base_layout_.SizePos());
+	category_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
+	category_header_shell_.Add(category_header_layout_.SizePos());
+	category_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	categories_action_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 
-	collections_title_.SetLabel("Collections");
-	collections_title_.SetFont(ArialZ(16).Bold());
-	collections_subtitle_.SetLabel("Manage saved icon sets.");
+	category_card_.SetMinSize(Size(DPI(180), DPI(56)));
+	category_card_.SetTitle("Library Categories")
+		.SetSubTitle("Category filter host")
+		.SetContentInset(DPI(0))
+		.SetMediaGap(DPI(0))
+		.SetMediaReserve(DPI(38))
+		.SetMediaMin(DPI(15))
+		.SetMediaAutoFit(false)
+		.SetMediaSide(UiAlign::LEFT)
+		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
+		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
 
-	collections_list_.AddColumn("Collections");
-	collections_list_.WhenSel = [=] {
-		if(refreshing_collections_ || !model_ || !commands_ || !collections_list_.IsCursor())
-			return;
-		commands_->Execute(MakeSymbolPickerSetActiveCollectionCommand(collections_list_.GetCursor()), *model_);
-	};
+	category_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
+	category_scroll_panel_.Content().Add(category_content_layout_.SizePos());
+	category_content_layout_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(8));
 
-	collection_items_list_.AddColumn("Catalog Id");
-	collection_items_list_.AddColumn("Source Id");
-	collection_items_list_.AddColumn("Alias");
-	collection_items_list_.AddColumn("Size");
-	collection_items_list_.AddColumn("Unresolved");
-	collection_items_page_.Add(collection_items_list_.SizePos());
-	collections_tabs_.Add(collection_items_page_.SizePos(), "Items");
+	category_base_layout_.Add(category_header_shell_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	category_header_layout_.Add(category_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	category_header_layout_.Add(categories_action_layout_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	category_base_layout_.Add(category_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 }
 
-void SymbolPickerView::BuildBinPanel()
+void SymbolPickerView::BuildLibraryPanel()
 {
-	bin_panel_.Add(bin_title_.LeftPosZ(12, 80).TopPosZ(8, 20));
-	bin_panel_.Add(bin_subtitle_.LeftPosZ(12, 240).TopPosZ(28, 16));
-	bin_panel_.Add(bin_list_.HSizePosZ(12, 12).VSizePosZ(52, 12));
+	library_panel_.Add(library_base_layout_.SizePos());
+	library_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
+	library_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	library_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
 
-	bin_title_.SetLabel("Bin");
-	bin_title_.SetFont(ArialZ(16).Bold());
-	bin_subtitle_.SetLabel("Gather icons for export or reuse.");
+	library_card_.SetMinSize(Size(DPI(180), DPI(56)));
+	library_card_.SetTitle("Library Symbols/Icons")
+		.SetSubTitle("Browse the filtered runtime catalog.")
+		.SetContentInset(DPI(0))
+		.SetMediaGap(DPI(0))
+		.SetMediaReserve(DPI(38))
+		.SetMediaMin(DPI(16))
+		.SetMediaAutoFit(false)
+		.SetMediaSide(UiAlign::LEFT)
+		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
+		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
 
-	bin_list_.AddColumn("Bin Icons");
+	library_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
+	library_scroll_panel_.Content().Add(library_content_layout_.SizePos());
+	library_content_layout_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(8));
+
+	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	library_header_layout_.Add(library_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	library_header_layout_.Add(library_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	library_base_layout_.Add(library_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
+}
+
+void SymbolPickerView::BuildCollectionsPanel()
+{
+	collections_panel_.Add(collections_base_layout_.SizePos());
+	collections_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
+	collections_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	collections_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
+
+	collections_card_.SetMinSize(Size(DPI(180), DPI(56)));
+	collections_card_.SetTitle("Collections")
+		.SetSubTitle("Saved sets and current bin summary.")
+		.SetContentInset(DPI(0))
+		.SetMediaGap(DPI(0))
+		.SetMediaReserve(DPI(38))
+		.SetMediaMin(DPI(16))
+		.SetMediaAutoFit(false)
+		.SetMediaSide(UiAlign::LEFT)
+		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
+		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
+
+	collections_selector_.SetSizeMin(DPI(180), 0);
+	collections_filter_edit_.SetMinSize(Size(DPI(160), 0));
+	collections_filter_edit_.SetPlaceholder("Filter placeholder");
+
+	collections_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
+	collections_scroll_panel_.Content().Add(collections_content_layout_.SizePos());
+	collections_content_layout_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(8));
+
+	collections_base_layout_.Add(collections_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_header_layout_.Add(collections_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	collections_header_layout_.Add(collections_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	collections_action_cluster_.Add(collections_selector_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_action_cluster_.Add(collections_filter_edit_).Fit().MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_base_layout_.Add(collections_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
+
+	collections_selector_.WhenAction = [=] {
+		if(!model_ || !commands_)
+			return;
+		int index = collections_selector_.GetData();
+		if(index >= 0)
+			commands_->Execute(MakeSymbolPickerSetActiveCollectionCommand(index), *model_);
+	};
 }
 
 void SymbolPickerView::SetModel(SymbolPickerModel* model)
@@ -266,73 +305,124 @@ void SymbolPickerView::SetCommands(SymbolPickerCommandStack* commands)
 
 void SymbolPickerView::RefreshCollections()
 {
-	refreshing_collections_ = true;
-	collections_list_.Clear();
-	if(model_) {
-		const Vector<SymbolPickerCollection>& collections = model_->GetCollections();
-		for(const auto& collection : collections)
-			collections_list_.Add(collection.name + (collection.dirty ? " *" : String()));
-		if(model_->GetActiveCollectionIndex() >= 0 && model_->GetActiveCollectionIndex() < collections.GetCount())
-			collections_list_.SetCursor(model_->GetActiveCollectionIndex());
+	collections_selector_.UseInternalModel().Clear();
+	if(!model_)
+		return;
+	const Vector<SymbolPickerCollection>& collections = model_->GetCollections();
+	for(int i = 0; i < collections.GetCount(); ++i) {
+		const SymbolPickerCollection& collection = collections[i];
+		String label = collection.name + (collection.dirty ? " *" : String());
+		collections_selector_.Add(label, i);
 	}
-	refreshing_collections_ = false;
+	if(model_->GetActiveCollectionIndex() >= 0 && model_->GetActiveCollectionIndex() < collections.GetCount())
+		collections_selector_.SelectByData(model_->GetActiveCollectionIndex());
 }
 
 void SymbolPickerView::RefreshCollectionItems()
 {
-	collection_items_list_.Clear();
-	if(!model_)
-		return;
-	const SymbolPickerCollection* collection = model_->GetActiveCollection();
-	if(!collection)
-		return;
-	for(const auto& item : collection->items)
-		collection_items_list_.Add(item.catalog_id.IsEmpty() ? item.source_id : item.catalog_id,
-			item.source_id,
-			item.alias,
-			item.size,
-			item.unresolved ? "Yes" : "No");
-}
-
-void SymbolPickerView::RefreshBin()
-{
-	bin_list_.Clear();
-	if(!model_)
-		return;
-	for(const String& id : model_->GetBinIconIds())
-		bin_list_.Add(id);
+	RebuildCollectionTiles();
 }
 
 void SymbolPickerView::RefreshCategories()
 {
-	categories_list_.Clear();
-	categories_list_.Add("All", "All");
-	if(!catalog_)
-		return;
-	Vector<SymbolPickerCategory> categories = catalog_->GetCategories();
-	for(const auto& category : categories)
-		categories_list_.Add(Format("%s (%d)", category.display_name, category.icon_count), category.id);
-
-	String current = model_ ? model_->GetCurrentCategory() : String("All");
-	for(int i = 0; i < categories_list_.GetCount(); ++i) {
-		if(categories_list_.Get(i, 1) == current) {
-			categories_list_.SetCursor(i);
-			return;
-		}
-	}
-	categories_list_.SetCursor(0);
+	RebuildCategoryButtons();
 }
 
 void SymbolPickerView::RefreshLibrary()
 {
-	library_list_.Clear();
+	RebuildLibraryTiles();
+}
+
+void SymbolPickerView::RebuildCategoryButtons()
+{
+	category_content_layout_.ClearItems();
+	category_buttons_.Clear();
+
+	auto& all = category_buttons_.Add(new UiButton());
+	all.SetText("All").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+	category_content_layout_.Add(all).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	all.WhenAction = [=] {
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetCategoryCommand("All"), *model_);
+	};
+
+	if(!catalog_)
+		return;
+
+	Vector<SymbolPickerCategory> categories = catalog_->GetCategories();
+	for(const auto& category : categories) {
+		UiButton& button = category_buttons_.Add(new UiButton());
+		button.SetText(Format("%s (%d)", category.display_name, category.icon_count))
+			.SetContentInset(DPI(6))
+			.SetContentGap(DPI(8));
+		category_content_layout_.Add(button).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+		String category_id = category.id;
+		button.WhenAction = [=] {
+			if(model_ && commands_)
+				commands_->Execute(MakeSymbolPickerSetCategoryCommand(category_id), *model_);
+		};
+	}
+}
+
+void SymbolPickerView::RebuildLibraryTiles()
+{
+	library_content_layout_.ClearItems();
+	library_tiles_.Clear();
+
 	if(!catalog_ || !model_)
 		return;
+
 	Vector<int> rows = catalog_->Filter(model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
 	for(int row : rows) {
 		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
-		library_list_.Add(entry.display_name, entry.category, SymbolPickerIconStyleText(entry.style), entry.catalog_id, entry.source_id);
+		UiButton& tile = library_tiles_.Add(new UiButton());
+		tile.SetText(Format("%s  |  %s  |  %s", entry.display_name, entry.category, SymbolPickerIconStyleText(entry.style)))
+			.SetContentInset(DPI(6))
+			.SetContentGap(DPI(8));
+		library_content_layout_.Add(tile).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+
+		String catalog_id = entry.catalog_id;
+		tile.WhenAction = [=] {
+			SelectLibraryCatalogId(catalog_id);
+		};
 	}
+}
+
+void SymbolPickerView::RebuildCollectionTiles()
+{
+	collections_content_layout_.ClearItems();
+	collection_tiles_.Clear();
+
+	UiLabel& bin_label = collection_tiles_.Add(new UiLabel());
+	int bin_count = model_ ? model_->GetBinIconIds().GetCount() : 0;
+	bin_label.SetText(Format("Bin items: %d", bin_count));
+	collections_content_layout_.Add(bin_label).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+
+	if(!model_)
+		return;
+	const SymbolPickerCollection* collection = model_->GetActiveCollection();
+	if(!collection) {
+		UiLabel& empty = collection_tiles_.Add(new UiLabel());
+		empty.SetText("No active collection.");
+		collections_content_layout_.Add(empty).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+		return;
+	}
+
+	for(const auto& item : collection->items) {
+		UiLabel& row = collection_tiles_.Add(new UiLabel());
+		row.SetText(Format("%s  |  %s  |  %s",
+			item.catalog_id.IsEmpty() ? String("(missing catalog_id)") : item.catalog_id,
+			item.source_id,
+			item.alias));
+		collections_content_layout_.Add(row).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	}
+}
+
+void SymbolPickerView::SelectLibraryCatalogId(const String& catalog_id)
+{
+	selected_library_catalog_id_ = catalog_id;
+	String subtitle = catalog_id.IsEmpty() ? "Browse the filtered runtime catalog." : "Selected: " + catalog_id;
+	library_card_.SetSubTitle(subtitle);
 }
 
 String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
@@ -345,18 +435,33 @@ void SymbolPickerView::RefreshFromModel()
 {
 	if(!model_)
 		return;
+
 	theme_preset_drop_ <<= (int)model_->GetThemePreset();
 	icon_style_drop_ <<= (int)model_->GetIconStyle();
-	filter_edit_.SetText(model_->GetFilterText());
+	filter_edit_.SetTextUtf8(model_->GetFilterText());
 	tint_ctrl_.SetColor(model_->GetTintColor());
+
 	RefreshCategories();
 	RefreshLibrary();
 	RefreshCollections();
 	RefreshCollectionItems();
-	RefreshBin();
-	String sub = Format("Theme: %d | Icon style: %s | Category: %s",
-		(int)model_->GetThemePreset(), SymbolPickerIconStyleText(model_->GetIconStyle()), model_->GetCurrentCategory());
-	subtitle_.SetLabel(sub);
+
+	String heading_subtitle = Format("Theme: %d | Icon style: %s | Category: %s | Bin: %d",
+		(int)model_->GetThemePreset(),
+		SymbolPickerIconStyleText(model_->GetIconStyle()),
+		model_->GetCurrentCategory(),
+		model_->GetBinIconIds().GetCount());
+	heading_card_.SetSubTitle(heading_subtitle);
+
+	const SymbolPickerCollection* active = model_->GetActiveCollection();
+	if(active)
+		collections_card_.SetSubTitle(Format("%s | %d items", active->name, active->items.GetCount()));
+	else
+		collections_card_.SetSubTitle("No active collection.");
+
+	if(catalog_ && !selected_library_catalog_id_.IsEmpty() && !catalog_->FindByCatalogId(selected_library_catalog_id_))
+		selected_library_catalog_id_.Clear();
+	SelectLibraryCatalogId(selected_library_catalog_id_);
 }
 
 }
