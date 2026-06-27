@@ -4782,9 +4782,7 @@ private:
 		Vector<DesignerNodeId> changed_ids;
 		Vector<Value> changed_values;
 		bool grouped = false;
-		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" || property_id == "v_sizing" || property_id == "crumb_count";
 		bool layout_affecting = false;
-		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap";
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
@@ -4820,6 +4818,7 @@ private:
 			commands_.EndGroup();
 		if(!changed_ids.IsEmpty()) {
 			SetDocumentDirty();
+			model_.SetSelection(ids);
 			// Temporary safety check while multi-select is still being stabilized.
 			// Once the grouped edit path is fully trusted this can be removed or
 			// put behind a dedicated debug flag.
@@ -4835,19 +4834,13 @@ private:
 					failed_apply << changed->name;
 				}
 			}
+			DesignerProjectionRequest projection = GetProjectionForInspectorCommitSelection(changed_ids, property_id);
 			if(layout_affecting) {
+				projection.full = true;
 				if(const DesignerNode* first = model_.Find(changed_ids[0]))
 					TraceLayoutAffectingChange(*first, property_id);
-				model_.SetSelection(ids);
-				RequestDesignerRefresh(true, true);
-				return;
 			}
-			model_.SetSelection(ids);
-			preview_.InvalidateRealPreview();
-			preview_.Refresh();
-			if(needs_hierarchy)
-				RefreshHierarchy();
-			PostDesignerRefresh(needs_inspector);
+			ApplyDesignerProjection(projection);
 		}
 	}
 
@@ -5077,6 +5070,27 @@ private:
 		RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
 		            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
 #endif
+		return r;
+	}
+
+	DesignerProjectionRequest GetProjectionForInspectorCommitSelection(const Vector<DesignerNodeId>& ids,
+	                                                                  const String& property_id) const
+	{
+		for(DesignerNodeId id : ids) {
+			const DesignerNode* node = model_.Find(id);
+			if(node && node->id != Designer_ROOT) {
+				DesignerProjectionRequest r = GetProjectionForInspectorCommit(*node, property_id);
+				r.reason = "multi-select inspector commit";
+				return r;
+			}
+		}
+
+		DesignerProjectionRequest r;
+		r.reason = "multi-select inspector commit";
+		r.preview = true;
+		r.hierarchy = true;
+		r.inspector = true;
+		r.code = true;
 		return r;
 	}
 
