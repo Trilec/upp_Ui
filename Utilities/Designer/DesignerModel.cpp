@@ -1,13 +1,11 @@
 #include "DesignerModel.h"
+#include "DesignerTrace.h"
 
 // DesignerModel.cpp - source-of-truth document tree for the designer.
 // The model owns hierarchy, properties, selection, and validation; preview and
 // inspector state is derived from it and should not become authoritative.
 
 namespace Upp {
-
-int DesignerTraceSeq();
-void DesignerConsoleTrace(const String& tag, const String& msg, bool force);
 
 static int FindId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {

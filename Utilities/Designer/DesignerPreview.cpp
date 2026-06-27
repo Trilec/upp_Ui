@@ -1,15 +1,13 @@
 #include "DesignerPreview.h"
 #include "DesignerInspector.h"
 #include "DesignerDefaults.h"
+#include "DesignerTrace.h"
 
 // DesignerPreview.cpp - virtual-window preview and pointer interaction surface.
 // It rebuilds real Ui controls through adapters, records hit rectangles for the
 // model, and turns drag/release gestures into model-level move events.
 
 namespace Upp {
-
-int DesignerTraceSeq();
-void DesignerConsoleTrace(const String& tag, const String& msg, bool force);
 
 static int DesignerPreviewFindNodeId(const Vector<DesignerNodeId>& ids, DesignerNodeId id)
 {
@@ -49,7 +47,7 @@ static String DesignerPreviewTraceValue(const DesignerNode& n, const String& key
 
 static void DesignerPreviewAppendTrace(const String& line)
 {
-	if(!DesignerTraceActive())
+	if(!DesignerTraceActive() || !DesignerPreviewReadbackTraceEnabled())
 		return;
 	String path = AppendFileName(GetFileFolder(GetExeFilePath()), "DesignerInspectorTrace.log");
 	FileAppend out(path);

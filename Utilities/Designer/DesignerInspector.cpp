@@ -1,5 +1,6 @@
 ﻿#include "DesignerInspector.h"
 #include "DesignerDefaults.h"
+#include "DesignerTrace.h"
 #include <memory>
 
 // DesignerInspector.cpp - descriptor-driven property editor.

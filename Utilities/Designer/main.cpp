@@ -11,6 +11,8 @@
 #include "DesignerDragController.h"
 #include "DesignerAssets.h"
 #include "DesignerDefaults.h"
+#include "DesignerTrace.h"
+#include "DesignerTransaction.h"
 #include "DesignerVersion.h"
 #include <statemachine/statemachine.h>
 
@@ -25,323 +27,10 @@ static void DesignerMultiSelectCommandLog(const String& text)
 	return;
 }
 
-int DesignerTraceSeq()
-{
-	static int seq = 0;
-	return ++seq;
-}
-
-static DesignerTraceContext designer_trace_;
 static class DesignerWindow *designer_window_current = nullptr;
-static int designer_idle_preview_rebuild_count = 0;
-static int designer_idle_preview_last_warn_msecs = 0;
-static String designer_idle_preview_last_warn_message;
-static VectorMap<String, int> designer_invalidate_source_counts;
-static VectorMap<String, int> designer_preview_refresh_source_counts;
-static VectorMap<String, int> designer_preview_layout_source_counts;
 static int designer_refresh_summary_last_msecs = 0;
-static String designer_trace_current_state = "Idle";
-static String designer_trace_current_fsm_state = "Idle";
-static bool designer_trace_refresh_posted = false;
-static bool designer_trace_full_refresh_requested = false;
-static bool designer_trace_inspector_live_editing = false;
-static DesignerNodeId designer_trace_selection = Designer_NULL;
 static String designer_trace_summary_text;
 static bool designer_trace_summary_pending = false;
-
-static void DesignerTraceAppendBlockLine(const String& line)
-{
-	if(!designer_trace_.block_text.IsEmpty())
-		designer_trace_.block_text << "\n";
-	designer_trace_.block_text << line;
-}
-
-void DesignerBeginTrace(DesignerTraceMode mode, DesignerNodeId node_id, DesignerNodeId related_node_id,
-                        const String& property_id, const String& reason)
-{
-	designer_trace_.active = true;
-	designer_trace_.tx_id = DesignerTraceSeq();
-	designer_trace_.mode = mode;
-	designer_trace_.node_id = node_id;
-	designer_trace_.related_node_id = related_node_id;
-	designer_trace_.property_id = property_id;
-	designer_trace_.reason = reason;
-	designer_trace_.lines = 0;
-	designer_trace_.preview_rebuild_lines = 0;
-	designer_trace_.preview_rect_lines = 0;
-	designer_trace_.repeated_preview_count = 0;
-	designer_trace_.repeated_preview_rect_count = 0;
-	designer_trace_.last_preview_rect_line.Clear();
-	designer_trace_.last_preview_trace_line.Clear();
-	designer_trace_.last_preview_trace_tag.Clear();
-	designer_trace_.block_text.Clear();
-	designer_trace_.summary_text.Clear();
-	designer_trace_.capped = false;
-	designer_trace_.begin_msecs = msecs();
-	String begin = Format("=== DESIGNER TRACE BEGIN tx=%03d reason=%s node=%d property=%s ===",
-	                      designer_trace_.tx_id, reason, (int)node_id, property_id);
-	DesignerConsoleTrace("TRACE_BEGIN", begin, true);
-}
-
-void DesignerEndTrace(const String& result, const String& reason)
-{
-	if(!designer_trace_.active)
-		return;
-	if(designer_trace_.repeated_preview_count > 0) {
-		String repeat = Format("PREVIEW_REBUILD repeated %dx suppressed",
-		                       designer_trace_.repeated_preview_count);
-		String repeat_tag = designer_trace_.last_preview_trace_tag.IsEmpty() ? String("PREVIEW_REBUILD")
-		                                                                   : designer_trace_.last_preview_trace_tag;
-		String repeat_line = Format("#%05d tx=%03d %-14s %s", DesignerTraceSeq(), designer_trace_.tx_id, repeat_tag, repeat);
-		Cout() << repeat_line << "\n";
-		RLOG(repeat_line);
-		DesignerTraceAppendBlockLine(repeat_line);
-		designer_trace_.lines++;
-		designer_trace_.repeated_preview_count = 0;
-	}
-	if(designer_trace_.repeated_preview_rect_count > 0 && !designer_trace_.last_preview_rect_line.IsEmpty()) {
-		String repeat_line = Format("#%05d tx=%03d %-14s PREVIEW_RECT_REPEAT suppressed=%d %s",
-		                            DesignerTraceSeq(), designer_trace_.tx_id, "PREVIEW_RECT",
-		                            designer_trace_.repeated_preview_rect_count,
-		                            designer_trace_.last_preview_rect_line);
-		Cout() << repeat_line << "\n";
-		RLOG(repeat_line);
-		DesignerTraceAppendBlockLine(repeat_line);
-		designer_trace_.lines++;
-		designer_trace_.repeated_preview_rect_count = 0;
-	}
-	String final_trace_state = designer_trace_current_state;
-	String final_fsm_state = designer_trace_current_fsm_state;
-	String final_result = result;
-	if(final_result.IsEmpty()) {
-		if(final_fsm_state == "Idle")
-			final_result = "OK";
-		else
-			final_result = "FAILED";
-	}
-	String final_reason = reason;
-	if(final_reason.IsEmpty() && final_result == "FAILED" && final_fsm_state != "Idle")
-		final_reason = "fsm did not actually return to Idle";
-	String end = Format("=== DESIGNER TRACE END tx=%03d result=%s final_trace_state=%s final_fsm_state=%s lines=%d%s%s ===",
-	                    designer_trace_.tx_id,
-	                    final_result,
-	                    final_trace_state,
-	                    final_fsm_state,
-	                    designer_trace_.lines,
-	                    final_reason.IsEmpty() ? "" : " reason=",
-	                    final_reason.IsEmpty() ? "" : final_reason);
-	DesignerConsoleTrace("TRACE_END", end, true);
-	DesignerTraceAppendBlockLine(end);
-	designer_trace_ = DesignerTraceContext();
-}
-
-bool DesignerTraceActive()
-{
-	return designer_trace_.active;
-}
-
-DesignerTraceMode DesignerGetTraceMode()
-{
-	return designer_trace_.mode;
-}
-
-DesignerNodeId DesignerTraceNodeId()
-{
-	return designer_trace_.node_id;
-}
-
-DesignerNodeId DesignerTraceRelatedNodeId()
-{
-	return designer_trace_.related_node_id;
-}
-
-String DesignerTraceCurrentState()
-{
-	return designer_trace_current_state;
-}
-
-bool DesignerTraceRefreshPosted()
-{
-	return designer_trace_refresh_posted;
-}
-
-bool DesignerTraceFullRefreshRequested()
-{
-	return designer_trace_full_refresh_requested;
-}
-
-bool DesignerTraceInspectorLiveEditing()
-{
-	return designer_trace_inspector_live_editing;
-}
-
-DesignerNodeId DesignerTraceSelection()
-{
-	return designer_trace_selection;
-}
-
-bool DesignerTraceWantsPreviewReadback(DesignerNodeId node_id, DesignerNodeId parent_id)
-{
-	if(!designer_trace_.active)
-		return false;
-	if(designer_trace_.mode != TRACE_TRANSACTION)
-		return false;
-	return node_id == designer_trace_.node_id ||
-	       node_id == designer_trace_.related_node_id ||
-	       parent_id == designer_trace_.node_id ||
-	       parent_id == designer_trace_.related_node_id;
-}
-
-void DesignerTraceNotifyIdlePreviewRebuild()
-{
-	designer_idle_preview_rebuild_count++;
-	int now = msecs();
-	if(designer_idle_preview_rebuild_count < 50)
-		return;
-	if(designer_idle_preview_last_warn_msecs && msecs(designer_idle_preview_last_warn_msecs) < 2000)
-		return;
-	designer_idle_preview_last_warn_msecs = now;
-	String msg = Format("rebuilds=%d in 2000ms selected=%d current_state=%s refresh_posted=%d full_refresh=%d inspector_live_editing=%d",
-	                    designer_idle_preview_rebuild_count,
-	                    (int)DesignerTraceSelection(),
-	                    DesignerTraceCurrentState(),
-	                    DesignerTraceRefreshPosted() ? 1 : 0,
-	                    DesignerTraceFullRefreshRequested() ? 1 : 0,
-	                    DesignerTraceInspectorLiveEditing() ? 1 : 0);
-	if(msg != designer_idle_preview_last_warn_message) {
-		designer_idle_preview_last_warn_message = msg;
-		DesignerConsoleTrace("IDLE_PREVIEW_LOOP", msg, true);
-	}
-	designer_idle_preview_rebuild_count = 0;
-}
-
-static void DesignerTraceBumpCount(VectorMap<String, int>& counts, const String& key)
-{
-	int q = counts.Find(key);
-	if(q < 0)
-		counts.Add(key, 1);
-	else
-		counts[q] = counts[q] + 1;
-}
-
-void DesignerTraceRecordRefreshSource(const String& kind, const String& caller, const String& reason)
-{
-	String key = caller.IsEmpty() ? String("unknown") : caller;
-	if(!reason.IsEmpty())
-		key << " [" << reason << "]";
-	if(kind == "PreviewRefresh")
-		DesignerTraceBumpCount(designer_preview_refresh_source_counts, key);
-	else
-		DesignerTraceBumpCount(designer_invalidate_source_counts, key);
-}
-
-void DesignerTraceRecordPreviewLayoutSource(const String& caller, const String& reason)
-{
-	String key = caller.IsEmpty() ? String("paint/layout") : caller;
-	if(!reason.IsEmpty())
-		key << " [" << reason << "]";
-	DesignerTraceBumpCount(designer_preview_layout_source_counts, key);
-}
-
-static void DesignerTraceEmitRefreshLoopSummary()
-{
-	if(designer_invalidate_source_counts.IsEmpty() &&
-	   designer_preview_refresh_source_counts.IsEmpty() &&
-	   designer_preview_layout_source_counts.IsEmpty())
-		return;
-	String out;
-	out << "REFRESH_LOOP_SUMMARY 2000ms\n";
-	out << "InvalidateRealPreview:\n";
-	if(designer_invalidate_source_counts.IsEmpty())
-		out << "- none: 0\n";
-	for(int i = 0; i < designer_invalidate_source_counts.GetCount(); i++)
-		out << "- " << designer_invalidate_source_counts.GetKey(i) << ": " << designer_invalidate_source_counts[i] << "\n";
-	out << "PreviewRefresh:\n";
-	if(designer_preview_refresh_source_counts.IsEmpty())
-		out << "- none: 0\n";
-	for(int i = 0; i < designer_preview_refresh_source_counts.GetCount(); i++)
-		out << "- " << designer_preview_refresh_source_counts.GetKey(i) << ": " << designer_preview_refresh_source_counts[i] << "\n";
-	out << "PreviewLayout:\n";
-	if(designer_preview_layout_source_counts.IsEmpty())
-		out << "- none: 0\n";
-	for(int i = 0; i < designer_preview_layout_source_counts.GetCount(); i++)
-		out << "- " << designer_preview_layout_source_counts.GetKey(i) << ": " << designer_preview_layout_source_counts[i] << "\n";
-	DesignerConsoleTrace("REFRESH_LOOP_SUMMARY", out, true);
-	designer_invalidate_source_counts.Clear();
-	designer_preview_refresh_source_counts.Clear();
-	designer_preview_layout_source_counts.Clear();
-}
-
-void DesignerConsoleTrace(const String& tag, const String& msg, bool force)
-{
-	auto bypass_cap = [&]() {
-		return force || tag.StartsWith("FSM_") || tag == "TRACE_END" || tag == "CMD_FAIL" || tag == "INSPECT_FAIL";
-	};
-	if(!force && !DesignerTraceActive())
-		return;
-	if(!bypass_cap() && designer_trace_.active && designer_trace_.capped)
-		return;
-	if(!bypass_cap() && designer_trace_.lines >= designer_trace_.max_lines) {
-		if(!designer_trace_.capped) {
-			designer_trace_.capped = true;
-			String capped = Format("TRACE_CAPPED tx=%03d lines=%d reason=max_lines",
-			                       designer_trace_.tx_id, designer_trace_.lines);
-			Cout() << capped << "\n";
-			RLOG(capped);
-			DesignerTraceAppendBlockLine(capped);
-		}
-		DesignerEndTrace();
-		return;
-	}
-	if(designer_trace_.active && tag.StartsWith("PREVIEW_")) {
-		if(tag == "PREVIEW_RECT") {
-			if(designer_trace_.preview_rect_lines >= 2) {
-				designer_trace_.repeated_preview_rect_count++;
-				return;
-			}
-			if(designer_trace_.last_preview_rect_line == msg) {
-				designer_trace_.repeated_preview_rect_count++;
-				return;
-			}
-			if(designer_trace_.repeated_preview_rect_count > 0 && !designer_trace_.last_preview_rect_line.IsEmpty()) {
-				String repeat_line = Format("#%05d tx=%03d %-14s PREVIEW_RECT_REPEAT suppressed=%d %s",
-				                            DesignerTraceSeq(), designer_trace_.tx_id, "PREVIEW_RECT",
-				                            designer_trace_.repeated_preview_rect_count,
-				                            designer_trace_.last_preview_rect_line);
-				Cout() << repeat_line << "\n";
-				RLOG(repeat_line);
-				DesignerTraceAppendBlockLine(repeat_line);
-				designer_trace_.lines++;
-				designer_trace_.repeated_preview_rect_count = 0;
-			}
-			designer_trace_.last_preview_rect_line = msg;
-			designer_trace_.preview_rect_lines++;
-		}
-		if(designer_trace_.last_preview_trace_line == msg) {
-			designer_trace_.repeated_preview_count++;
-			return;
-		}
-		if(designer_trace_.repeated_preview_count > 0) {
-			String repeat = Format("PREVIEW_REBUILD repeated %dx suppressed",
-			                       designer_trace_.repeated_preview_count);
-			String repeat_tag = designer_trace_.last_preview_trace_tag.IsEmpty() ? String("PREVIEW_REBUILD")
-			                                                                   : designer_trace_.last_preview_trace_tag;
-			String repeat_line = Format("#%05d tx=%03d %-14s %s", DesignerTraceSeq(), designer_trace_.tx_id, repeat_tag, repeat);
-			Cout() << repeat_line << "\n";
-			RLOG(repeat_line);
-			DesignerTraceAppendBlockLine(repeat_line);
-			designer_trace_.lines++;
-			designer_trace_.repeated_preview_count = 0;
-		}
-		designer_trace_.last_preview_trace_line = msg;
-		designer_trace_.last_preview_trace_tag = tag;
-	}
-	String line = Format("#%05d %-14s %s", DesignerTraceSeq(), tag, msg);
-	Cout() << line << "\n";
-	RLOG(line);
-	designer_trace_.lines++;
-	DesignerTraceAppendBlockLine(line);
-}
 
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
@@ -870,6 +559,24 @@ private:
 				Designer_NULL, String(), "dump-selected");
 			DumpSelectedNodeState();
 			DesignerEndTrace();
+			return true;
+		}
+		if(key == (K_CTRL | K_SHIFT | K_T)) {
+			bool enabled = !DesignerConsoleTraceEnabled();
+			designer_diagnostics_enabled_ = enabled;
+			designer_console_trace_enabled_ = enabled;
+			designer_preview_readback_trace_enabled_ = enabled;
+			DesignerSetDiagnosticsEnabled(enabled);
+			DesignerSetConsoleTraceEnabled(enabled);
+			DesignerSetPreviewReadbackTraceEnabled(enabled);
+			SetWarningNotes(enabled ? "Designer transaction tracing enabled" : "Designer transaction tracing disabled");
+			return true;
+		}
+		if(key == (K_CTRL | K_SHIFT | K_L)) {
+			bool enabled = !DesignerRefreshLoopSummaryEnabled();
+			designer_refresh_loop_summary_enabled_ = enabled;
+			DesignerSetRefreshLoopSummaryEnabled(enabled);
+			SetWarningNotes(enabled ? "Designer refresh loop summary enabled" : "Designer refresh loop summary disabled");
 			return true;
 		}
 		return TopWindow::Key(key, count);
@@ -2073,85 +1780,16 @@ private:
 		RebuildModelProjection();
 	}
 
-	struct DesignerProjectionRequest {
-		bool preview = true;
-		bool hierarchy = false;
-		bool inspector = false;
-		bool code = true;
-		bool full = false;
-		String reason;
-	};
-
-	struct PendingInspectorTransaction {
-		bool active = false;
-		bool preview = false;
-		bool commit = false;
-		bool final_commit = true;
-		String node_type;
-		String fsm_state_before;
-		bool fsm_transition_accepted = false;
-		String fsm_reject_reason;
-		DesignerNodeId node_id = Designer_NULL;
-		String property_id;
-		Value value;
-		String editor_kind;
-		int row_generation = 0;
-		int inspector_generation = 0;
-		bool inspector_syncing = false;
-		Value normalized;
-		Value old_model_value;
-		Value preview_old_value;
-		bool had_old = false;
-		bool has_preview_old = false;
-		bool command_result = false;
-		bool commit_succeeded = false;
-		bool inspector_refresh_requested = false;
-		bool validation_binding_found = false;
-		bool validation_binding_visible = false;
-		bool validation_binding_enabled = false;
-		Value command_model_after;
-		bool command_model_equals_intended = false;
-		Value readback_model_value;
-		Value readback_inspector_value;
-		bool readback_equals_intended = false;
-		int state_enter_msecs = 0;
-		int state_enter_seq = 0;
-		DesignerNodeId state_enter_node = Designer_NULL;
-		String state_enter_property;
-		String state_enter_state;
-		bool state_enter_commit_succeeded = false;
-		bool state_enter_warning_emitted = false;
-		String failure_reason;
-		DesignerProjectionRequest projection;
-	};
-
-	struct InspectorCommitReadback {
-		bool active = false;
-		DesignerNodeId node_id = Designer_NULL;
-		String property_id;
-		Value intended_value;
-	};
-
-	struct DeferredInspectorIntent {
-		bool active = false;
-		DesignerInspectorEditIntent intent;
-	};
+	// NOTE:
+	// Single-node inspector edits are currently handled synchronously by
+	// SubmitInspectorIntent()/RunInspectorCommitTransaction()/RunInspectorPreviewTransaction().
+	// The real StateMachine is not allowed to own those edits yet because
+	// re-entrant GUI projection and slider preview events require deterministic,
+	// same-call completion. Keep designer_fsm_ for future broader coordination only.
 
 	bool CanAcceptInspectorIntent(const DesignerInspectorEditIntent& intent, String& reason) const
 	{
-		String current = designer_fsm_.GetCurrent();
-		if(intent.preview) {
-			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING && current != DESIGNER_STATE_PROJECTING) {
-				reason = "fsm not ready for preview";
-				return false;
-			}
-		}
-		else {
-			if(current != DESIGNER_STATE_IDLE && current != DESIGNER_STATE_PREVIEWING && current != DESIGNER_STATE_PROJECTING) {
-				reason = "fsm not ready for commit";
-				return false;
-			}
-		}
+		reason.Clear();
 		return true;
 	}
 
@@ -2159,7 +1797,7 @@ private:
 	{
 		if(!deferred_inspector_intent_.active)
 			return;
-		designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+		DesignerTraceSetCurrentState(DesignerTraceCurrentState(), designer_fsm_.GetCurrent());
 		if(designer_fsm_.IsTransitioning() || designer_fsm_.GetCurrent() != DESIGNER_STATE_IDLE)
 			return;
 #ifdef _DEBUG
@@ -2178,7 +1816,7 @@ private:
 	void SubmitInspectorIntent(const DesignerInspectorEditIntent& intent, const char *reason)
 	{
 		String state_before = designer_fsm_.GetCurrent();
-		designer_trace_current_fsm_state = state_before;
+		DesignerTraceSetCurrentState(DesignerTraceCurrentState(), state_before);
 		if(intent.final_commit &&
 		   state_before == DESIGNER_STATE_COMMITTING &&
 		   !pending_inspector_txn_.active) {
@@ -2189,7 +1827,7 @@ private:
 				designer_fsm_.Start();
 			}
 			state_before = designer_fsm_.GetCurrent();
-			designer_trace_current_fsm_state = state_before;
+			DesignerTraceSetCurrentState(DesignerTraceCurrentState(), state_before);
 		}
 		DesignerConsoleTrace("DSM_SUBMIT",
 			Format("current=%s transitioning=%d node=%d property=%s value=%s preview=%d final=%d",
@@ -2205,6 +1843,60 @@ private:
 			dst.inspector_generation = src.inspector_generation;
 			dst.syncing = src.syncing;
 		};
+
+		if(intent.preview && !intent.final_commit) {
+			pending_inspector_txn_.active = true;
+			pending_inspector_txn_.preview = true;
+			pending_inspector_txn_.commit = false;
+			pending_inspector_txn_.final_commit = false;
+			pending_inspector_txn_.fsm_state_before = state_before;
+			pending_inspector_txn_.fsm_transition_accepted = true;
+			pending_inspector_txn_.fsm_reject_reason.Clear();
+			pending_inspector_txn_.node_id = intent.node_id;
+			pending_inspector_txn_.property_id = intent.property_id;
+			pending_inspector_txn_.value = intent.value;
+			pending_inspector_txn_.editor_kind = intent.editor_kind;
+			pending_inspector_txn_.row_generation = intent.row_generation;
+			pending_inspector_txn_.inspector_generation = intent.inspector_generation;
+			pending_inspector_txn_.inspector_syncing = intent.syncing;
+			if(const DesignerNode* n = model_.Find(intent.node_id))
+				pending_inspector_txn_.node_type = n->type_id;
+			DesignerTraceSetCurrentState(DESIGNER_STATE_PREVIEWING, designer_fsm_.GetCurrent());
+			DesignerConsoleTrace("FSM_LOGICAL_ENTER",
+				Format("state=Previewing node=%d property=%s", (int)intent.node_id, intent.property_id));
+			if(intent.editor_kind == "slider-preview") {
+				coalesced_preview_intent_.active = true;
+				coalesced_preview_intent_.intent = intent;
+				if(!coalesced_preview_pending_) {
+					coalesced_preview_pending_ = true;
+					SetTimeCallback(16, [=] {
+						coalesced_preview_pending_ = false;
+						if(!coalesced_preview_intent_.active)
+							return;
+						DesignerInspectorEditIntent pending = coalesced_preview_intent_.intent;
+						coalesced_preview_intent_.active = false;
+						pending_inspector_txn_.active = true;
+						pending_inspector_txn_.preview = true;
+						pending_inspector_txn_.commit = false;
+						pending_inspector_txn_.final_commit = false;
+						pending_inspector_txn_.fsm_state_before = designer_fsm_.GetCurrent();
+						pending_inspector_txn_.node_id = pending.node_id;
+						pending_inspector_txn_.property_id = pending.property_id;
+						pending_inspector_txn_.value = pending.value;
+						pending_inspector_txn_.editor_kind = pending.editor_kind;
+						pending_inspector_txn_.row_generation = pending.row_generation;
+						pending_inspector_txn_.inspector_generation = pending.inspector_generation;
+						pending_inspector_txn_.inspector_syncing = pending.syncing;
+						if(const DesignerNode* n = model_.Find(pending.node_id))
+							pending_inspector_txn_.node_type = n->type_id;
+						RunInspectorPreviewTransaction();
+					});
+				}
+			}
+			else
+				RunInspectorPreviewTransaction();
+			return;
+		}
 
 		if(intent.final_commit && state_before == DESIGNER_STATE_COMMITTING) {
 			if(deferred_inspector_intent_.active &&
@@ -2265,13 +1957,12 @@ private:
 			if(const DesignerNode* n = model_.Find(intent.node_id))
 				pending_inspector_txn_.node_type = n->type_id;
 
-			designer_trace_current_state = DESIGNER_STATE_COMMITTING;
-			designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+			DesignerTraceSetCurrentState(DESIGNER_STATE_COMMITTING, designer_fsm_.GetCurrent());
 			DesignerConsoleTrace("FSM_LOGICAL_ENTER",
 				Format("state=Committing node=%d property=%s",
 				       (int)intent.node_id, intent.property_id));
 			RunInspectorCommitTransaction();
-			designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+			DesignerTraceSetCurrentState(DesignerTraceCurrentState(), designer_fsm_.GetCurrent());
 			DesignerConsoleTrace("FSM_ACTUAL_STATE",
 				Format("after_sync current=%s", designer_fsm_.GetCurrent()), true);
 			ProcessDeferredInspectorIntentIfReady();
@@ -2636,7 +2327,7 @@ private:
 
 	void ResetPendingInspectorTransaction(const String& trace_result = String(), const String& trace_reason = String())
 	{
-		if(designer_trace_.active && designer_trace_.mode == TRACE_TRANSACTION)
+		if(DesignerTraceActive() && DesignerGetTraceMode() == TRACE_TRANSACTION)
 			DesignerEndTrace(trace_result, trace_reason);
 		if(designer_trace_summary_pending) {
 			SetDiagnosticsText(designer_trace_summary_text);
@@ -2645,6 +2336,19 @@ private:
 			designer_trace_summary_pending = false;
 		}
 		pending_inspector_txn_ = PendingInspectorTransaction();
+	}
+
+	bool RunInspectorPreviewTransaction()
+	{
+		DesignerConsoleTrace("FSM_SYNC_PREVIEW",
+			Format("current=%s node=%d property=%s",
+			       designer_fsm_.GetCurrent(),
+			       (int)pending_inspector_txn_.node_id,
+			       pending_inspector_txn_.property_id));
+		ApplyPendingInspectorPreview();
+		DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, designer_fsm_.GetCurrent());
+		ResetPendingInspectorTransaction("OK", "preview complete");
+		return true;
 	}
 
 	bool TriggerDesignerStateEvent(const char *event, const char *reason)
@@ -2716,10 +2420,10 @@ private:
 				if(self->designer_fsm_.Reset()) {
 					self->designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
 					self->designer_fsm_.Start();
-					designer_trace_current_state = DESIGNER_STATE_IDLE;
+					DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, DESIGNER_STATE_IDLE);
 				}
 				else
-					designer_trace_current_state = DESIGNER_STATE_IDLE;
+					DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, DESIGNER_STATE_IDLE);
 			}
 		});
 	}
@@ -2760,8 +2464,7 @@ private:
 			       pending_inspector_txn_.active ? (int)pending_inspector_txn_.node_id : 0,
 			       pending_inspector_txn_.active ? pending_inspector_txn_.property_id : String("<none>")),
 			true);
-		designer_trace_current_state = DESIGNER_STATE_IDLE;
-		designer_trace_current_fsm_state = designer_fsm_.GetCurrent();
+		DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, designer_fsm_.GetCurrent());
 		ResetPendingInspectorTransaction(trace_result, reason ? reason : "");
 	}
 
@@ -2805,12 +2508,16 @@ private:
 
 	void InitDesignerStateMachine()
 	{
+		// NOTE:
+		// Single-node inspector edits are handled synchronously outside the real
+		// StateMachine. Keep designer_fsm_ reserved for future broader Designer
+		// coordination; do not reintroduce single-node inspector ownership here
+		// until projection and re-entrant GUI callbacks are explicitly modeled.
 		designer_fsm_.EnableLogging(false);
 		designer_fsm_.SetEventPolicy(EventPolicy::RejectWhileTransitioning);
 		designer_fsm_.SetMaxQueuedEvents(0);
 		designer_fsm_.WhenTransitionStarted = [=](const TransitionContext& ctx) {
-			designer_trace_current_state = ctx.fromState;
-			designer_trace_current_fsm_state = ctx.toState;
+			DesignerTraceSetCurrentState(ctx.fromState, ctx.toState);
 			if(String(ctx.toState) == DESIGNER_STATE_COMMITTING || String(ctx.toState) == DESIGNER_STATE_PROJECTING)
 				RecordInspectorStateEntry(ctx.toState);
 #ifdef _DEBUG
@@ -2818,8 +2525,7 @@ private:
 #endif
 		};
 		designer_fsm_.WhenTransitionFinished = [=](const TransitionContext& ctx) {
-			designer_trace_current_state = ctx.toState;
-			designer_trace_current_fsm_state = ctx.toState;
+			DesignerTraceSetCurrentState(ctx.toState, ctx.toState);
 #ifdef _DEBUG
 			RLOG(Format("DSM transition finished: %s -> %s event=%s", ctx.fromState, ctx.toState, ctx.event));
 #endif
@@ -2868,8 +2574,7 @@ private:
 		designer_fsm_.AddTransition({DESIGNER_EVENT_PROJECTION_DONE, DESIGNER_STATE_PROJECTING, DESIGNER_STATE_IDLE});
 		designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
 		designer_fsm_.Start();
-		designer_trace_current_state = DESIGNER_STATE_IDLE;
-		designer_trace_current_fsm_state = DESIGNER_STATE_IDLE;
+		DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, DESIGNER_STATE_IDLE);
 	}
 
 	void RequestDesignerRefresh(bool rebuild_inspector, bool full = false)
@@ -2881,8 +2586,8 @@ private:
 #endif
 		pending_inspector_refresh_ = pending_inspector_refresh_ || rebuild_inspector;
 		full_refresh_requested_ = full_refresh_requested_ || full;
-		designer_trace_refresh_posted = true;
-		designer_trace_full_refresh_requested = full_refresh_requested_;
+		DesignerTraceSetRefreshPosted(true);
+		DesignerTraceSetFullRefreshRequested(full_refresh_requested_);
 
 		if(IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
@@ -2902,7 +2607,7 @@ private:
 			return;
 		}
 		refresh_posted_ = false;
-		designer_trace_refresh_posted = false;
+		DesignerTraceSetRefreshPosted(false);
 		RunRefreshAllNow();
 	}
 
@@ -2911,7 +2616,7 @@ private:
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
-		designer_trace_selection = model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0];
+		DesignerTraceSetSelection(model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0]);
 		ApplySelectionProjection();
 #ifdef _DEBUG
 		RLOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
@@ -2929,7 +2634,7 @@ private:
 			return;
 		}
 		refresh_posted_ = false;
-		designer_trace_refresh_posted = false;
+		DesignerTraceSetRefreshPosted(false);
 	}
 
 	void RefreshInspectorPreview()
@@ -3587,7 +3292,7 @@ private:
 	void SetInspectorLiveEditing(bool active)
 	{
 		inspector_live_editing_ = active;
-		designer_trace_inspector_live_editing = active;
+		DesignerTraceSetInspectorLiveEditing(active);
 		if(!active)
 			FlushDeferredDesignerRefresh();
 	}
@@ -3617,13 +3322,13 @@ private:
 		if(refresh_posted_)
 			return;
 		refresh_posted_ = true;
-		designer_trace_refresh_posted = true;
+		DesignerTraceSetRefreshPosted(true);
 		Ptr<DesignerWindow> self(this);
 		PostCallback([=] {
 			if(!self)
 				return;
 			self->refresh_posted_ = false;
-			designer_trace_refresh_posted = false;
+			DesignerTraceSetRefreshPosted(false);
 			if(self->IsDesignerRefreshBlocked()) {
 #ifdef _DEBUG
 				RLOG("Designer refresh deferred: " << self->DesignerRefreshBlockReason());
@@ -5584,7 +5289,13 @@ private:
 	StateMachine designer_fsm_;
 	PendingInspectorTransaction pending_inspector_txn_;
 	DeferredInspectorIntent deferred_inspector_intent_;
+	DeferredInspectorIntent coalesced_preview_intent_;
+	bool coalesced_preview_pending_ = false;
 	InspectorCommitReadback last_inspector_readback_;
+	bool designer_diagnostics_enabled_ = false;
+	bool designer_console_trace_enabled_ = false;
+	bool designer_preview_readback_trace_enabled_ = false;
+	bool designer_refresh_loop_summary_enabled_ = false;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	VectorMap<String, Value> live_preview_old_values_;
 	VectorMap<String, bool> live_preview_had_old_;
