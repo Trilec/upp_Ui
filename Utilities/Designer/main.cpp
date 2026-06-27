@@ -585,6 +585,12 @@ private:
 			SetWarningNotes(enabled ? "Designer refresh loop summary enabled" : "Designer refresh loop summary disabled");
 			return true;
 		}
+		if(key == (K_CTRL | K_SHIFT | K_S)) {
+			structural_trace_enabled_ = !structural_trace_enabled_;
+			SetWarningNotes(structural_trace_enabled_ ? "Designer structural trace enabled"
+			                                        : "Designer structural trace disabled");
+			return true;
+		}
 		return TopWindow::Key(key, count);
 	}
 
@@ -2608,18 +2614,66 @@ private:
 		RunRefreshAllNow();
 	}
 
+	void SyncHierarchySelectionLight()
+	{
+		SyncHierarchySelection();
+	}
+
+	void RefreshInspectorForActiveRightPanelOnly()
+	{
+		if(model_.GetSelection().IsEmpty()) {
+			SetWarningNotes(String());
+			return;
+		}
+		if(right_mode_ == RIGHT_INSPECTOR)
+			inspector_.SetSelection(model_.GetSelection());
+		if(right_mode_ == RIGHT_OVERRIDES)
+			theme_override_inspector_.SetSelection(model_.GetSelection());
+		RefreshContainerActions();
+		RefreshRightPanel();
+	}
+
+	void PostInspectorSelectionRefresh()
+	{
+		if(inspector_selection_refresh_posted_)
+			return;
+		inspector_selection_refresh_posted_ = true;
+		Ptr<DesignerWindow> self = this;
+		PostCallback([self] {
+			if(!self)
+				return;
+			self->inspector_selection_refresh_posted_ = false;
+			self->RefreshInspectorForActiveRightPanelOnly();
+		});
+	}
+
 	// Refresh only the views affected by selection.
 	// This keeps tree selection, inspector page, generated code, and preview
 	// overlays synchronized without rebuilding the whole model.
 	void RefreshSelectionUi()
 	{
+		int total_start = msecs();
 		DesignerTraceSetSelection(model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0]);
-		ApplySelectionProjection();
+		int sync_start = msecs();
+		SyncHierarchySelectionLight();
+		int sync_ms = msecs(sync_start);
+		int preview_start = msecs();
+		preview_.Refresh();
+		int preview_ms = msecs(preview_start);
+		int inspector_post_start = msecs();
+		PostInspectorSelectionRefresh();
+		int inspector_post_ms = msecs(inspector_post_start);
 		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
 		                        model_.GetSelection().GetCount(),
 		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
 		                        IsDesignerRefreshBlocked() ? 1 : 0,
 		                        DesignerRefreshBlockReason()));
+		if(DesignerDiagnosticsEnabled()) {
+			DesignerConsoleTrace("SELECT_PROFILE",
+				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms PostInspectorSelectionRefresh=%dms",
+				       msecs(total_start), sync_ms, preview_ms, inspector_post_ms),
+				false);
+		}
 		if(IsDesignerRefreshBlocked()) {
 			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
@@ -2997,8 +3051,17 @@ private:
 #ifdef _DEBUG
 		DESIGNER_DBG_LOG("RefreshInspector primary=" << (int)model_.GetSelection()[0]);
 #endif
-		inspector_.SetSelection(model_.GetSelection());
-		theme_override_inspector_.SetSelection(model_.GetSelection());
+		int inspector_start = msecs();
+		if(right_mode_ == RIGHT_INSPECTOR)
+			inspector_.SetSelection(model_.GetSelection());
+		if(right_mode_ == RIGHT_OVERRIDES)
+			theme_override_inspector_.SetSelection(model_.GetSelection());
+		if(DesignerDiagnosticsEnabled()) {
+			DesignerConsoleTrace("SELECT_PROFILE",
+				Format("RefreshInspector=%dms right_mode=%d",
+				       msecs(inspector_start), (int)right_mode_),
+				false);
+		}
 #ifdef _DEBUG
 		if(last_inspector_readback_.active &&
 		   model_.GetSelection()[0] == last_inspector_readback_.node_id) {
@@ -3043,8 +3106,10 @@ private:
 			if(q >= 0 &&
 			   pending_inspector_txn_.readback_model_value == pending_inspector_txn_.normalized &&
 			   pending_inspector_txn_.readback_inspector_value != pending_inspector_txn_.normalized) {
-				inspector_.SetSelection(model_.GetSelection());
-				theme_override_inspector_.SetSelection(model_.GetSelection());
+				if(right_mode_ == RIGHT_INSPECTOR)
+					inspector_.SetSelection(model_.GetSelection());
+				if(right_mode_ == RIGHT_OVERRIDES)
+					theme_override_inspector_.SetSelection(model_.GetSelection());
 				pending_inspector_txn_.readback_inspector_value = inspector_.GetRowValue(pending_inspector_txn_.property_id);
 				pending_inspector_txn_.readback_equals_intended =
 					pending_inspector_txn_.readback_inspector_value == pending_inspector_txn_.normalized;
@@ -3440,6 +3505,43 @@ private:
 		RefreshCollapseButton();
 	}
 
+	void StructuralTrace(const String& tag, const String& msg, bool force = false) const
+	{
+		if(!structural_trace_enabled_ && !force)
+			return;
+		DesignerConsoleTrace(tag, msg, structural_trace_enabled_ || force);
+	}
+
+	int StructuralNodeCount() const
+	{
+		return model_.GetNodes().GetCount();
+	}
+
+	void ApplyStructuralModelMutationRefresh(const char *reason)
+	{
+		DESIGNER_DBG_LOG(Format("STRUCT_REFRESH reason=%s blocked=%d block_reason=%s",
+		                        reason ? reason : "",
+		                        IsDesignerRefreshBlocked() ? 1 : 0,
+		                        DesignerRefreshBlockReason()));
+		StructuralTrace("STRUCT_REFRESH",
+			Format("reason=%s blocked=%d block_reason=%s",
+			       reason ? reason : "",
+			       IsDesignerRefreshBlocked() ? 1 : 0,
+			       DesignerRefreshBlockReason()));
+
+		CancelDesignerInteractionGuards();
+		refresh_deferred_ = false;
+		refresh_posted_ = false;
+		full_refresh_requested_ = false;
+		pending_inspector_refresh_ = false;
+
+		RunRefreshAllNow();
+		preview_.SyncRealPreview();
+		preview_.Refresh();
+		RefreshContainerActions();
+		RefreshRightPanel();
+	}
+
 	void RefreshCollapseButton()
 	{
 		UiButton::Style s = UiTheme::ResolveButton(UiRole::Subtle);
@@ -3529,6 +3631,14 @@ private:
 			drag_.UpdateTarget(model_, registry_, DesignerDropTarget());
 		}
 		const DesignerDropTarget& target = drag_.GetTarget();
+		if(structural_trace_enabled_) {
+			const DesignerNode* parent = model_.Find(target.parent);
+			StructuralTrace("DROP_TARGET",
+				Format("type=%s valid=%d parent=%d parent_type=%s index=%d message=%s",
+				       type_id, target.valid ? 1 : 0, (int)target.parent,
+				       parent ? parent->type_id : String("<missing>"),
+				       target.insert_index, target.message));
+		}
 		String text = "Dragging " + t->display_name;
 		if(!target.message.IsEmpty())
 			text << " - " << target.message;
@@ -3552,11 +3662,19 @@ private:
 		}
 		DesignerDropTarget target = drag_.GetTarget();
 		KillTimeCallback(TOOL_DRAG_TIMER_ID);
+		preview_.ClearDropState();
+		hierarchy_.ClearTrackedDropTarget();
 		preview_.SetPlacementType(String());
+		preview_.Refresh();
 		HideDragStatus();
 		drag_.Cancel();
-		if(target.valid && !add_type.IsEmpty())
+		if(target.valid && !add_type.IsEmpty()) {
 			PlaceType(add_type, target.parent, target.insert_index);
+			preview_.ClearDropState();
+			hierarchy_.ClearTrackedDropTarget();
+			preview_.SetPlacementType(String());
+			preview_.Refresh();
+		}
 	}
 
 	void CancelToolDrag()
@@ -3613,11 +3731,18 @@ private:
 				drag_.UpdateTarget(model_, registry_, MakeHierarchyDropTarget(info));
 		}
 		DesignerDropTarget target = drag_.GetTarget();
+		preview_.ClearDropState();
+		hierarchy_.ClearTrackedDropTarget();
 		preview_.SetPlacementType(String());
+		preview_.Refresh();
 		HideDragStatus();
 		drag_.Cancel();
-		if(target.valid)
+		if(target.valid) {
 			MovePreviewNode(id, target.parent, target.insert_index);
+			preview_.ClearDropState();
+			hierarchy_.ClearTrackedDropTarget();
+			preview_.Refresh();
+		}
 	}
 
 	void ShowDragStatus(const String& text)
@@ -3664,6 +3789,9 @@ private:
 	// grouped as one undoable user action.
 	void PlaceType(const String& type_id, DesignerNodeId target, int index = -1)
 	{
+		int before_nodes = StructuralNodeCount();
+		StructuralTrace("STRUCT_BEGIN",
+			Format("action=PlaceType type=%s target=%d index=%d", type_id, (int)target, index));
 		const DesignerType* new_type = registry_.Find(type_id);
 		if(!new_type || new_type->toolbox_group.IsEmpty())
 			return;
@@ -3686,11 +3814,23 @@ private:
 		model_.SelectOne(id);
 		preview_.SetPlacementType(String());
 		SetDocumentDirty();
-		RequestDesignerRefresh(true, true);
+		StructuralTrace("STRUCT_MODEL",
+			Format("before_nodes=%d after_nodes=%d selected=%d",
+			       before_nodes, StructuralNodeCount(), (int)id));
+		ApplyStructuralModelMutationRefresh("PlaceType");
+		const DesignerNode* placed = model_.Find(id);
+		StructuralTrace("STRUCT_READBACK",
+			Format("selected=%d exists=%d parent=%d visible_rect=%s",
+			       (int)id, placed ? 1 : 0, placed ? (int)placed->parent : 0,
+			       placed ? AsString(placed->last_rect) : String("<missing>")));
+		StructuralTrace("STRUCT_END", "result=OK");
 	}
 
 	void PlacePreset(const String& preset_id, Point screen)
 	{
+		int before_nodes = StructuralNodeCount();
+		StructuralTrace("STRUCT_BEGIN",
+			Format("action=PlacePreset preset=%s", preset_id));
 		DesignerNodeId parent_id = Designer_ROOT;
 		int insert_index = -1;
 		Rect pr = preview_.GetScreenRect();
@@ -3739,7 +3879,11 @@ private:
 		if(first != Designer_NULL)
 			model_.SelectOne(first);
 		SetDocumentDirty();
-		RequestDesignerRefresh(true, true);
+		StructuralTrace("STRUCT_MODEL",
+			Format("before_nodes=%d after_nodes=%d selected=%d",
+			       before_nodes, StructuralNodeCount(), (int)first));
+		ApplyStructuralModelMutationRefresh("PlacePreset");
+		StructuralTrace("STRUCT_END", "result=OK");
 	}
 
 	DesignerNodeId ClonePresetSubtree(const DesignerModel& seed, DesignerNodeId source_id, DesignerNodeId parent_id, int index)
@@ -3848,6 +3992,8 @@ private:
 	{
 		if(designer_clipboard_.IsEmpty())
 			return;
+		int before_nodes = StructuralNodeCount();
+		StructuralTrace("STRUCT_BEGIN", "action=PasteClipboard");
 		DesignerNodeId parent_id;
 		int insert_index;
 		if(!ResolvePasteTarget(parent_id, insert_index))
@@ -3877,7 +4023,12 @@ private:
 		if(changed && !pasted.IsEmpty()) {
 			model_.SetSelection(pasted);
 			SetDocumentDirty();
-			RequestDesignerRefresh(true, true);
+			StructuralTrace("STRUCT_MODEL",
+				Format("before_nodes=%d after_nodes=%d selected=%d",
+				       before_nodes, StructuralNodeCount(),
+				       pasted.IsEmpty() ? 0 : (int)pasted[0]));
+			ApplyStructuralModelMutationRefresh("PasteClipboard");
+			StructuralTrace("STRUCT_END", "result=OK");
 		}
 	}
 
@@ -3952,6 +4103,8 @@ private:
 	// keep validation, undo, and refresh behavior consistent.
 	void MovePreviewNode(DesignerNodeId id, DesignerNodeId target, int index)
 	{
+		StructuralTrace("STRUCT_BEGIN",
+			Format("action=MovePreviewNode id=%d target=%d index=%d", (int)id, (int)target, index));
 		if(id == Designer_ROOT || id == Designer_NULL || id == target)
 			return;
 		if(!model_.Find(id) || !model_.Find(target))
@@ -3968,7 +4121,13 @@ private:
 			if(!model_.Validate(error))
 				SetWarningNotes("Model validation failed after move: " + error);
 			SetDocumentDirty();
-			RequestDesignerRefresh(true, true);
+			ApplyStructuralModelMutationRefresh("MovePreviewNode");
+			const DesignerNode* moved_node = model_.Find(id);
+			StructuralTrace("STRUCT_READBACK",
+				Format("selected=%d exists=%d parent=%d visible_rect=%s",
+				       (int)id, moved_node ? 1 : 0, moved_node ? (int)moved_node->parent : 0,
+				       moved_node ? AsString(moved_node->last_rect) : String("<missing>")));
+			StructuralTrace("STRUCT_END", "result=OK");
 		}
 	}
 
@@ -4930,13 +5089,25 @@ private:
 	void DeleteSelection()
 	{
 		Vector<DesignerNodeId> ids = clone(model_.GetSelection());
+		int before_nodes = StructuralNodeCount();
+		StructuralTrace("STRUCT_BEGIN",
+			Format("action=DeleteSelection ids=%s", AsString(ids)));
 		bool changed = false;
 		for(DesignerNodeId id : ids)
 			if(id != Designer_ROOT)
 				changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
 		if(changed) {
 			SetDocumentDirty();
-			RequestDesignerRefresh(true, true);
+			StructuralTrace("STRUCT_MODEL",
+				Format("before_nodes=%d after_nodes=%d selected=%d",
+				       before_nodes, StructuralNodeCount(),
+				       model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0]));
+			ApplyStructuralModelMutationRefresh("DeleteSelection");
+			bool deleted_exists = !ids.IsEmpty() && model_.Find(ids[0]);
+			StructuralTrace("STRUCT_READBACK",
+				Format("deleted_id=%d exists=%d preview_hit=0",
+				       ids.IsEmpty() ? 0 : (int)ids[0], deleted_exists ? 1 : 0));
+			StructuralTrace("STRUCT_END", "result=OK");
 		}
 	}
 
@@ -5276,6 +5447,7 @@ private:
 	bool refresh_deferred_ = false;
 	bool full_refresh_requested_ = false;
 	bool live_preview_refresh_pending_ = false;
+	bool inspector_selection_refresh_posted_ = false;
 	String diagnostics_text_;
 	StateMachine designer_fsm_;
 	PendingInspectorTransaction pending_inspector_txn_;
@@ -5287,6 +5459,7 @@ private:
 	bool designer_console_trace_enabled_ = false;
 	bool designer_preview_readback_trace_enabled_ = false;
 	bool designer_refresh_loop_summary_enabled_ = false;
+	bool structural_trace_enabled_ = false;
 	DesignerNodeId last_hierarchy_primary_selection_ = Designer_NULL;
 	VectorMap<String, Value> live_preview_old_values_;
 	VectorMap<String, bool> live_preview_had_old_;
