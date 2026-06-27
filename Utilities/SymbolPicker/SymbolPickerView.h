@@ -106,12 +106,11 @@ private:
 	UiBoxLayout main_box_ { UiDirection::V };
 	UiBoxLayout top_heading_layout_ { UiDirection::H };
 	UiTitleCard heading_card_;
-	UiDropdown  theme_preset_drop_;
-	SymbolPickerTintCtrl tint_ctrl_;
-	UiButton    new_collection_button_;
-	UiButton    clear_bin_button_;
-	UiButton    add_to_bin_button_;
-	UiButton    add_to_collection_button_;
+	UiLabel     version_label_;
+	UiToolButton dark_theme_tool_;
+	UiToolButton help_tool_;
+	UiToolButton setup_tool_;
+	UiButton    exit_button_;
 
 	UiPanel categories_panel_;
 	UiBoxLayout category_base_layout_ { UiDirection::V };

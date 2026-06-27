@@ -230,7 +230,7 @@ void SymbolPickerView::BuildTopHeading()
 	heading_style.card_line_gap = DPI(9);
 	heading_card_.SetCustomStyle(heading_style);
 	heading_card_.SetTitle("Symbols Picker")
-		.SetSubTitle("Designer layout reconciliation shell")
+		.SetSubTitle("")
 		.SetContentInset(DPI(4))
 		.SetMediaGap(DPI(9))
 		.SetMediaReserve(DPI(0))
@@ -238,60 +238,59 @@ void SymbolPickerView::BuildTopHeading()
 		.SetMediaAutoFit(false)
 		.SetMediaSide(UiAlign::LEFT)
 		.SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER);
+	heading_card_.SetMedia(ICON_BRAND_NEWLOGO_V5_48(), Size(DPI(18), DPI(18)));
+	heading_card_.ShowCardLine(false);
+	version_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
+	version_label_.SetMinSize(Size(DPI(76), DPI(28)));
+	version_label_.SetText("v0.3.3");
+	version_label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+	version_label_.SetContentGap(DPI(5));
+	version_label_.SetIconScaleToContent(true);
 
-	theme_preset_drop_.SetSizeMin(DPI(110), 0);
-	theme_preset_drop_.UseInternalModel().Clear()
-		.Add("Minimal", (int)UiThemePreset::Minimal)
-		.Add("Pill", (int)UiThemePreset::Pill)
-		.Add("Layered", (int)UiThemePreset::Layered);
-	theme_preset_drop_.Select(0);
+	dark_theme_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+	dark_theme_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	dark_theme_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	dark_theme_tool_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16));
 
-	new_collection_button_.SetText("New Collection").SetContentInset(DPI(6)).SetContentGap(DPI(8));
-	clear_bin_button_.SetText("Clear Bin").SetContentInset(DPI(6)).SetContentGap(DPI(8));
-	add_to_bin_button_.SetText("Add To Bin").SetContentInset(DPI(6)).SetContentGap(DPI(8));
-	add_to_collection_button_.SetText("Add To Collection").SetContentInset(DPI(6)).SetContentGap(DPI(8));
+	help_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+	help_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	help_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	help_tool_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16));
 
-	top_heading_layout_.Add(heading_card_).Expand(1).MinMain(DPI(240)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Stretch);
-	top_heading_layout_.Add(theme_preset_drop_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
-	top_heading_layout_.Add(tint_ctrl_).Fixed(DPI(112)).AlignSelf(UiBoxLayout::Align::Center);
-	top_heading_layout_.Add(add_to_bin_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	top_heading_layout_.Add(add_to_collection_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	top_heading_layout_.Add(new_collection_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	top_heading_layout_.Add(clear_bin_button_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	setup_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+	setup_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	setup_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	setup_tool_.SetIcon(ICON_DESIGN_SETTINGS_48()).SetIconSize(DPI(16), DPI(16));
 
-	tint_ctrl_.WhenAction = [=] {
-		// Stub for later rendering/export workflow wiring.
+	exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+	exit_button_.SetMinSize(Size(DPI(92), DPI(1)));
+	exit_button_.SetText("Exit").SetContentInset(DPI(6)).SetContentGap(DPI(12));
+	exit_button_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+	exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(13), DPI(13)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+
+	top_heading_layout_.Add(heading_card_).Fit().MinMain(DPI(240)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
+	top_heading_layout_.Add(version_label_).Fit().MinMain(DPI(76)).MinMaxCross(DPI(28), DPI(28)).AlignSelf(UiBoxLayout::Align::Center);
+	{
+		auto spacer = top_heading_layout_.AddSpacer(1);
+		spacer.Expand(1).MinMain(DPI(10));
+		spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
+	}
+	top_heading_layout_.Add(dark_theme_tool_).Fixed(DPI(50)).AlignSelf(UiBoxLayout::Align::Center);
+	top_heading_layout_.Add(help_tool_).Fixed(DPI(50)).AlignSelf(UiBoxLayout::Align::Center);
+	top_heading_layout_.Add(setup_tool_).Fixed(DPI(50)).AlignSelf(UiBoxLayout::Align::Center);
+	top_heading_layout_.Add(exit_button_).Fixed(DPI(82)).MinMain(DPI(92)).AlignSelf(UiBoxLayout::Align::Stretch);
+
+	dark_theme_tool_.WhenAction = [=] {
+		// Stub for later theme workflow wiring.
 	};
-	theme_preset_drop_.WhenAction = [=] {
-		// Stub for later theme/settings workflow wiring.
+	help_tool_.WhenAction = [=] {
+		// Stub for later help workflow wiring.
 	};
-	new_collection_button_.WhenAction = [=] {
-		if(model_ && commands_)
-			commands_->Execute(MakeSymbolPickerCreateCollectionCommand(Format("Collection %d", model_->GetCollections().GetCount() + 1)), *model_);
+	setup_tool_.WhenAction = [=] {
+		// Stub for later setup workflow wiring.
 	};
-	clear_bin_button_.WhenAction = [=] {
-		// Bin remains a data concept for this pass; no direct clear action yet.
-	};
-	add_to_bin_button_.WhenAction = [=] {
-		if(model_ && commands_ && !selected_library_catalog_id_.IsEmpty())
-			commands_->Execute(MakeSymbolPickerAddToBinCommand(selected_library_catalog_id_), *model_);
-	};
-	add_to_collection_button_.WhenAction = [=] {
-		if(!model_ || !catalog_ || !commands_ || selected_library_catalog_id_.IsEmpty())
-			return;
-		if(model_->GetActiveCollectionIndex() < 0)
-			return;
-		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(selected_library_catalog_id_);
-		if(!entry)
-			return;
-		SymbolPickerIconRef ref;
-		ref.catalog_id = entry->catalog_id;
-		ref.source_id = entry->source_id;
-		ref.alias = MakeCollectionAlias(*entry);
-		ref.size = model_->GetExportSize();
-		ref.tint = model_->GetTintColor();
-		ref.unresolved = false;
-		commands_->Execute(MakeSymbolPickerAddIconToCollectionCommand(model_->GetActiveCollectionIndex(), ref), *model_);
+	exit_button_.WhenAction = [=] {
+		Close();
 	};
 }
 
@@ -314,13 +313,20 @@ void SymbolPickerView::BuildCategoriesPanel()
 		.SetMediaSide(UiAlign::LEFT)
 		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
 		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
+	category_card_.SetMedia(ICON_DESIGN_ACCOUNT_TREE_48(), Size(DPI(29), DPI(29)));
+	category_card_.ShowCardLine(false);
 
 	category_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
 	category_scroll_panel_.Content().Add(category_content_layout_.SizePos());
-	category_content_layout_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(8));
+	category_content_layout_.SetDirection(UiDirection::H)
+		.SetGap(DPI(4), DPI(4))
+		.SetInset(0)
+		.SetWrap(UiBoxWrap::Flow)
+		.SetWrapAutoResize(true)
+		.SetFixedColumn(DPI(220));
 
 	category_base_layout_.Add(category_header_shell_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	category_header_layout_.Add(category_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	category_header_layout_.Add(category_card_).Fit().MinMain(DPI(180)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
 	category_header_layout_.Add(categories_action_layout_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	category_base_layout_.Add(category_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 }
@@ -343,6 +349,8 @@ void SymbolPickerView::BuildLibraryPanel()
 		.SetMediaSide(UiAlign::LEFT)
 		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
 		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
+	library_card_.SetMedia(ICON_DESIGN_WIDGETS_48(), Size(DPI(29), DPI(29)));
+	library_card_.ShowCardLine(false);
 
 	library_style_selector_.SetSizeMin(DPI(110), 0);
 	library_style_selector_.UseInternalModel().Clear()
@@ -351,16 +359,24 @@ void SymbolPickerView::BuildLibraryPanel()
 		.Add("Sharp", (int)SymbolPickerIconStyle::Sharp);
 	library_style_selector_.Select(0);
 
-	library_refresh_button_.SetText("").SetIconSize(DPI(15), DPI(15)).SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	library_refresh_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+	library_refresh_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	library_refresh_button_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	library_refresh_button_.SetIcon(ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48()).SetIconSize(DPI(15), DPI(15));
 	library_filter_edit_.SetMinSize(Size(DPI(180), 0));
 	library_filter_edit_.SetPlaceholder("Filter");
 
 	library_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
 	library_scroll_panel_.Content().Add(library_content_layout_.SizePos());
-	library_content_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(DPI(8)).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetFixedColumn(DPI(260));
+	library_content_layout_.SetDirection(UiDirection::H)
+		.SetGap(DPI(4), DPI(4))
+		.SetInset(0)
+		.SetWrap(UiBoxWrap::Flow)
+		.SetWrapAutoResize(true)
+		.SetFixedColumn(DPI(260));
 
 	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	library_header_layout_.Add(library_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	library_header_layout_.Add(library_card_).Fit().MinMain(DPI(180)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
 	library_header_layout_.Add(library_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	library_action_cluster_.Add(library_style_selector_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
 	{
@@ -377,7 +393,7 @@ void SymbolPickerView::BuildLibraryPanel()
 			commands_->Execute(MakeSymbolPickerSetIconStyleCommand((SymbolPickerIconStyle)(int)~library_style_selector_), *model_);
 	};
 	library_refresh_button_.WhenAction = [=] {
-		RefreshLibrary();
+		// Stub for later library refresh/search workflow wiring.
 	};
 	library_filter_edit_.WhenAction = [=] {
 		if(model_ && commands_)
@@ -403,13 +419,24 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.SetMediaSide(UiAlign::LEFT)
 		.SetMediaAlign(UiAlign::CENTER, UiAlign::TOP)
 		.SetTextAlign(UiAlign::LEFT, UiAlign::TOP);
+	collections_card_.SetMedia(ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), Size(DPI(29), DPI(29)));
+	collections_card_.ShowCardLine(false);
 
-	new_collection_tool_.SetText("+").SetContentInset(DPI(4)).SetContentGap(DPI(4));
-	remove_collection_tool_.SetText("-").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	collections_selector_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Accent));
+	new_collection_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+	new_collection_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	new_collection_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	new_collection_tool_.SetIcon(ICON_CONTENT_OUTLINED_ADD_CIRCLE_OUTLINE_48()).SetIconSize(DPI(20), DPI(20));
+	remove_collection_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+	remove_collection_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	remove_collection_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	remove_collection_tool_.SetIcon(ICON_CONTENT_OUTLINED_REMOVE_CIRCLE_OUTLINE_48()).SetIconSize(DPI(20), DPI(20));
 
+	save_and_save_as_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 	save_and_save_as_button_.SetText("Save").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	save_and_save_as_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
 	save_and_save_as_button_.Add("Save").Add("Save As");
+	load_and_history_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 	load_and_history_button_.SetText("Load").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	load_and_history_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
 	load_and_history_button_.Add("Load").Add("Recent A").Add("Recent B");
@@ -418,36 +445,59 @@ void SymbolPickerView::BuildCollectionsPanel()
 	export_and_type_button_.Add("Export current").Add("Export all");
 
 	collections_selector_.SetSizeMin(DPI(180), 0);
+	output_pixel_size_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
 	output_pixel_size_.SetSizeMin(DPI(110), 0);
 	output_pixel_size_.UseInternalModel().Clear().Add("24 px", 24).Add("32 px", 32).Add("48 px", 48).Add("64 px", 64);
 	output_pixel_size_.SelectByData(48);
+	output_export_type_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
 	output_export_type_.SetSizeMin(DPI(130), 0);
 	output_export_type_.UseInternalModel().Clear()
 		.Add("Image Call", (int)SymbolPickerExportType::ImageCall)
 		.Add("Icon Id", (int)SymbolPickerExportType::IconId)
 		.Add("C++ Snippet", (int)SymbolPickerExportType::CppSnippet);
 	output_export_type_.Select(0);
-	copy_button_.SetText("Copy").SetContentInset(DPI(4)).SetContentGap(DPI(4));
-	collections_filter_icon_.SetText("F").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+	copy_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	copy_button_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	copy_button_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(17), DPI(17));
+	collections_filter_icon_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+	collections_filter_icon_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+	collections_filter_icon_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	collections_filter_icon_.SetIcon(ICON_DESIGN_YOUTUBE_SEARCHED_FOR_48()).SetIconSize(DPI(15), DPI(15));
 	collections_filter_edit_.SetMinSize(Size(DPI(160), 0));
 	collections_filter_edit_.SetPlaceholder("Filter");
 
 	collections_scroll_panel_.SetScrollMode(UIPANELSCROLL_AUTO);
 	collections_scroll_panel_.Content().Add(collections_content_layout_.SizePos());
-	collections_content_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
+	collections_content_layout_.SetDirection(UiDirection::H)
+		.SetGap(DPI(4), DPI(4))
+		.SetInset(0)
+		.SetWrap(UiBoxWrap::Flow)
+		.SetWrapAutoResize(true)
+		.SetFixedColumn(DPI(260));
 
 	collections_base_layout_.Add(collections_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
-	collections_header_layout_.Add(collections_card_).Expand(1).MinMain(DPI(180)).MinCross(DPI(56));
+	collections_header_layout_.Add(collections_card_).Fit().MinMain(DPI(180)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
 	collections_header_layout_.Add(collections_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(collections_selector_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(new_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(remove_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(save_and_save_as_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(load_and_history_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	{
+		auto spacer = collections_action_cluster_.AddSpacer(1);
+		spacer.Fixed(DPI(14)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
+		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
+	}
 	collections_action_cluster_.Add(export_and_type_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(output_pixel_size_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(output_export_type_).Fit().MinMain(DPI(130)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(copy_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	{
+		auto spacer = collections_action_cluster_.AddSpacer(1);
+		spacer.Fixed(DPI(14)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
+		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
+	}
 	collections_action_cluster_.Add(collections_filter_icon_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(collections_filter_edit_).Fit().MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_base_layout_.Add(collections_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
@@ -640,10 +690,8 @@ void SymbolPickerView::RefreshFromModel()
 	if(!model_)
 		return;
 
-	theme_preset_drop_ <<= (int)model_->GetThemePreset();
 	library_style_selector_ <<= (int)model_->GetIconStyle();
 	library_filter_edit_.SetTextUtf8(model_->GetFilterText());
-	tint_ctrl_.SetColor(model_->GetTintColor());
 	output_pixel_size_ <<= model_->GetExportSize();
 	output_export_type_ <<= (int)model_->GetExportType();
 
@@ -651,13 +699,6 @@ void SymbolPickerView::RefreshFromModel()
 	RefreshLibrary();
 	RefreshCollections();
 	RefreshCollectionItems();
-
-	String heading_subtitle = Format("Theme: %d | Icon style: %s | Category: %s | Bin: %d",
-		(int)model_->GetThemePreset(),
-		SymbolPickerIconStyleText(model_->GetIconStyle()),
-		model_->GetCurrentCategory(),
-		model_->GetBinIconIds().GetCount());
-	heading_card_.SetSubTitle(heading_subtitle);
 
 	const SymbolPickerCollection* active = model_->GetActiveCollection();
 	if(active)
