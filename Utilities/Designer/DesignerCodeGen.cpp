@@ -119,18 +119,6 @@ static String StyleHelperName(const VectorMap<DesignerNodeId, String>& names, co
 	return "Make" + CodeIdentifier(VarName(names, n.id)) + "Style";
 }
 
-static bool SupportsRoleSetter(const DesignerNode& n)
-{
-	return n.type_id == "UiPanel" || n.type_id == "Item" || n.type_id == "Generic" ||
-	       n.type_id == "UiScrollPanel" || n.type_id == "UiGroupPanel" ||
-	       n.type_id == "UiLabel" || n.type_id == "UiTitleCard" ||
-	       n.type_id == "UiButton" || n.type_id == "UiSplitButton" ||
-	       n.type_id == "UiToolButton" || n.type_id == "UiCheckBox" ||
-	       n.type_id == "UiToggle" || n.type_id == "UiSlider" ||
-	       n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" ||
-	       n.type_id == "UiFloatEdit" || n.type_id == "UiDropdown";
-}
-
 static bool HasThemeOverride(const DesignerNode& n, bool emit_designer_appearance)
 {
 	return emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
@@ -527,8 +515,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	if(!override) {
 		if(n.type_id == "UiAccordion")
 			return;
-		if(!custom_align && role != "Standard" && !force_style && SupportsRoleSetter(n)) {
-			out << "\t\t" << var << ".SetRole(" << role_expr << ");\n";
+		if(!custom_align && role != "Standard" && !force_style) {
+			out << "\t\t" << var << ".SetCustomStyle(" << resolve_expr << ");\n";
 			return;
 		}
 		else
