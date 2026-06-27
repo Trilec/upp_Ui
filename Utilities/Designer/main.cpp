@@ -2348,6 +2348,15 @@ private:
 		ApplyPendingInspectorPreview();
 		DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, designer_fsm_.GetCurrent());
 		ResetPendingInspectorTransaction("OK", "preview complete");
+		if(designer_fsm_.GetCurrent() == DESIGNER_STATE_PREVIEWING && !pending_inspector_txn_.active) {
+			DesignerConsoleTrace("FSM_PREVIEW_RESET",
+				"current=Previewing active=0 action=reset_to_idle", true);
+			if(designer_fsm_.Reset()) {
+				designer_fsm_.SetInitial(DESIGNER_STATE_IDLE);
+				designer_fsm_.Start();
+			}
+			DesignerTraceSetCurrentState(DESIGNER_STATE_IDLE, designer_fsm_.GetCurrent());
+		}
 		return true;
 	}
 
