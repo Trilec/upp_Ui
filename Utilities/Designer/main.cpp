@@ -242,23 +242,29 @@ static String DesignerNameFromTitle(String text)
 	text = TrimBoth(text);
 	String out;
 	bool last_us = false;
+	bool last_dot = false;
 	for(int i = 0; i < text.GetCount(); i++) {
 		int c = (byte)text[i];
 		if(IsAlpha(c) || IsDigit(c)) {
 			out.Cat(ToLower(c));
 			last_us = false;
+			last_dot = false;
 		}
-		else if(c == '.' && !out.IsEmpty()) {
+		else if(c == '.' && !out.IsEmpty() && !last_us && !last_dot) {
 			out.Cat('.');
 			last_us = false;
+			last_dot = true;
 		}
 		else if(!last_us && !out.IsEmpty()) {
 			out.Cat('_');
 			last_us = true;
+			last_dot = false;
 		}
 	}
-	while(out.EndsWith("_"))
+	while(out.EndsWith("_") || out.EndsWith("."))
 		out.Trim(out.GetCount() - 1);
+	while(out.StartsWith("_") || out.StartsWith("."))
+		out.Remove(0, 1);
 	if(out.IsEmpty())
 		out = "node";
 	if(IsDigit((byte)out[0]))
