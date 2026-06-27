@@ -94,6 +94,11 @@ private:
 		Page() : layout(UiDirection::V) {}
 	};
 
+	struct MultiSelectionSnapshot {
+		int id = 0;
+		Vector<DesignerNodeId> ids;
+	};
+
 	Value NodeProperty(const DesignerNode& n, const String& key, const Value& def) const;
 	Value SelectionProperty(const Vector<const DesignerNode *>& nodes, const DesignerApiBinding& b, bool& mixed) const;
 	Value DefaultValue(const DesignerNode& n, const DesignerType& t, const DesignerApiBinding& b) const;
@@ -143,8 +148,10 @@ private:
 	bool CanDeliverManyRowCommit(int generation, const String& property_id, const char *editor_kind) const;
 	void PostInspectorCommit(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);
 	void PostInspectorPreview(int generation, DesignerNodeId row_node, const String& property_id, const Value& value);
-	void PostInspectorManyCommit(int generation, const String& property_id, const Value& value);
-	void PostInspectorManyPreview(int generation, const String& property_id, const Value& value);
+	int StoreMultiSelectionSnapshot(const Vector<DesignerNodeId>& ids);
+	const Vector<DesignerNodeId>* FindMultiSelectionSnapshot(int snapshot_id) const;
+	void PostInspectorManyCommit(int generation, int snapshot_id, const String& property_id, const Value& value);
+	void PostInspectorManyPreview(int generation, int snapshot_id, const String& property_id, const Value& value);
 
 	UiStack stack_;
 	Array<Page> pages_;
@@ -155,6 +162,8 @@ private:
 	String binding_group_;
 	bool syncing_ = false;
 	int inspector_generation_ = 0;
+	int next_multi_selection_snapshot_id_ = 1;
+	Array<MultiSelectionSnapshot> multi_selection_snapshots_;
 	mutable VectorMap<String, Vector<DesignerApiBinding>> descriptor_cache_;
 };
 

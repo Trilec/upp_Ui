@@ -1040,6 +1040,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	Value value = SelectionProperty(nodes, b, mixed);
 	String property_id = b.property_id;
 	int generation = inspector_generation_;
+	int snapshot_id = StoreMultiSelectionSnapshot(selection_);
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -1063,7 +1064,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 			if(!self || IsNull(data))
 				return;
 			if(CanDeliverManyRowCommit(generation, property_id, "multi-choice"))
-				PostInspectorManyCommit(generation, property_id, data);
+				PostInspectorManyCommit(generation, snapshot_id, property_id, data);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1083,7 +1084,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-bool"))
-				PostInspectorManyCommit(generation, property_id, (bool)self->GetData());
+				PostInspectorManyCommit(generation, snapshot_id, property_id, (bool)self->GetData());
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1113,7 +1114,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyPreview(generation, property_id, v);
+			PostInspectorManyPreview(generation, snapshot_id, property_id, v);
 		};
 		row->WhenAction = [=] {
 			if(!self)
@@ -1122,7 +1123,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 				return;
 			int v = max(min_value, min(max_value, (int)self->GetData()));
 			self->SetValueText(AsString(v));
-			PostInspectorManyCommit(generation, property_id, v);
+			PostInspectorManyCommit(generation, snapshot_id, property_id, v);
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1142,7 +1143,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		row->Enable(DesignerBindingEditableInMultiSelect(b));
 		row->WhenAction = [=] {
 			if(self && CanDeliverManyRowCommit(generation, property_id, "multi-color"))
-				PostInspectorManyCommit(generation, property_id, self->GetColor(0));
+				PostInspectorManyCommit(generation, snapshot_id, property_id, self->GetColor(0));
 		};
 		Row& r = page.rows.Add();
 		r.property_id = property_id;
@@ -1170,7 +1171,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	row->WhenAction = [=] {
 		if(self && !(row_mixed && IsNull(self->GetData())) &&
 		   CanDeliverManyRowCommit(generation, property_id, "multi-edit"))
-			PostInspectorManyCommit(generation, property_id, self->GetData());
+			PostInspectorManyCommit(generation, snapshot_id, property_id, self->GetData());
 	};
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
@@ -1273,9 +1274,8 @@ bool DesignerInspector::CanDeliverManyRowCommit(int generation, const String& pr
 	}
 
 	if(generation != inspector_generation_) {
-		RLOG(Format("Inspector row commit blocked: generation mismatch editor=%s property=%s old=%d current=%d",
+		RLOG(Format("Inspector row commit generation changed but same multi-selection: editor=%s property=%s old=%d current=%d -- allowing",
 		            editor_kind, property_id, generation, inspector_generation_));
-		return false;
 	}
 
 	return true;
@@ -1339,7 +1339,23 @@ void DesignerInspector::PostInspectorPreview(int generation, DesignerNodeId row_
 	WhenPropertyPreview(row_node, property_id, value);
 }
 
-void DesignerInspector::PostInspectorManyCommit(int generation, const String& property_id, const Value& value)
+int DesignerInspector::StoreMultiSelectionSnapshot(const Vector<DesignerNodeId>& ids)
+{
+	MultiSelectionSnapshot& snapshot = multi_selection_snapshots_.Add();
+	snapshot.id = next_multi_selection_snapshot_id_++;
+	snapshot.ids = clone(ids);
+	return snapshot.id;
+}
+
+const Vector<DesignerNodeId>* DesignerInspector::FindMultiSelectionSnapshot(int snapshot_id) const
+{
+	for(const MultiSelectionSnapshot& snapshot : multi_selection_snapshots_)
+		if(snapshot.id == snapshot_id)
+			return &snapshot.ids;
+	return nullptr;
+}
+
+void DesignerInspector::PostInspectorManyCommit(int generation, int snapshot_id, const String& property_id, const Value& value)
 {
 	Ptr<DesignerInspector> self = this;
 	PostCallback([=] {
@@ -1357,26 +1373,36 @@ void DesignerInspector::PostInspectorManyCommit(int generation, const String& pr
 		}
 		if(generation != self->inspector_generation_) {
 #ifdef _DEBUG
-			RLOG(Format("Inspector commit dropped: generation old=%d current=%d property=%s",
+			RLOG(Format("Inspector commit generation changed but same multi-selection: old=%d current=%d property=%s -- allowing",
 			            generation, self->inspector_generation_, property_id));
 #endif
-			return;
 		}
 #ifdef _DEBUG
 		RLOG("Inspector commit requested: " << property_id << "=" << StdFormat(value));
 #endif
-		self->WhenPropertyMany(clone(self->selection_), property_id, value);
+		const Vector<DesignerNodeId>* selection_ids = self->FindMultiSelectionSnapshot(snapshot_id);
+		if(!selection_ids || selection_ids->IsEmpty()) {
+#ifdef _DEBUG
+			RLOG(Format("Inspector commit dropped: missing multi-selection snapshot property=%s snapshot_id=%d",
+			            property_id, snapshot_id));
+#endif
+			return;
+		}
+		self->WhenPropertyMany(*selection_ids, property_id, value);
 #ifdef _DEBUG
 		RLOG("Inspector commit delivered: " << property_id);
 #endif
 	});
 }
 
-void DesignerInspector::PostInspectorManyPreview(int generation, const String& property_id, const Value& value)
+void DesignerInspector::PostInspectorManyPreview(int generation, int snapshot_id, const String& property_id, const Value& value)
 {
-	if(syncing_ || generation != inspector_generation_)
+	if(syncing_)
 		return;
-	WhenPropertyManyPreview(selection_, property_id, value);
+	const Vector<DesignerNodeId>* selection_ids = FindMultiSelectionSnapshot(snapshot_id);
+	if(!selection_ids || selection_ids->IsEmpty())
+		return;
+	WhenPropertyManyPreview(*selection_ids, property_id, value);
 }
 
 void DesignerInspector::RefreshPage(Page& page, const DesignerNode& n, const DesignerType& t,

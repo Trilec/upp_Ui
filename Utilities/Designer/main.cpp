@@ -548,14 +548,14 @@ private:
 		if(key == K_CTRL_Z) {
 			if(commands_.Undo(model_)) {
 				SetDocumentDirty();
-				RequestDesignerRefresh(true, true);
+				ApplyStructuralModelMutationRefresh("Undo");
 			}
 			return true;
 		}
 		if(key == K_CTRL_Y) {
 			if(commands_.Redo(model_)) {
 				SetDocumentDirty();
-				RequestDesignerRefresh(true, true);
+				ApplyStructuralModelMutationRefresh("Redo");
 			}
 			return true;
 		}
@@ -3260,7 +3260,7 @@ private:
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", crumbs, "Select crumb"), model_);
 			commands_.EndGroup();
 			SetDocumentDirty();
-			RequestDesignerRefresh(true, true);
+			ApplyStructuralModelMutationRefresh("AddBreadcrumb");
 			return;
 		}
 		DesignerNodeId container_id = SelectedPageContainerId();
@@ -3289,7 +3289,7 @@ private:
 		commands_.EndGroup();
 		model_.SelectOne(page);
 		SetDocumentDirty();
-		RequestDesignerRefresh(true, true);
+		ApplyStructuralModelMutationRefresh("AddPageSlot");
 	}
 
 	void RemovePageSlotForSelection()
@@ -3307,7 +3307,7 @@ private:
 			commands_.Execute(MakeDesignerSetPropertyCommand(breadcrumb_id, "current", min(current, next - 1), "Select crumb"), model_);
 			commands_.EndGroup();
 			SetDocumentDirty();
-			RequestDesignerRefresh(true, true);
+			ApplyStructuralModelMutationRefresh("RemoveBreadcrumb");
 			return;
 		}
 		DesignerNodeId container_id = SelectedPageContainerId();
@@ -3328,7 +3328,7 @@ private:
 		commands_.EndGroup();
 		model_.SelectOne(next_page);
 		SetDocumentDirty();
-		RequestDesignerRefresh(true, true);
+		ApplyStructuralModelMutationRefresh("RemovePageSlot");
 	}
 
 	// Coalesce refreshes posted by property callbacks.
@@ -4397,7 +4397,7 @@ private:
 		if(!model_.Validate(error))
 			SetWarningNotes("Model validation failed after hierarchy move: " + error);
 		SetDocumentDirty();
-		RequestDesignerRefresh(true, true);
+		ApplyStructuralModelMutationRefresh("HandleHierarchyMoveRequest");
 	}
 
 	// Commit an inspector property edit through a command.
@@ -4487,6 +4487,7 @@ private:
 		if(ids.IsEmpty())
 			return;
 		BeginInspectorLiveEditing();
+		Vector<DesignerNodeId> changed_ids;
 		for(DesignerNodeId id : ids) {
 			DesignerNode* n = model_.Find(id);
 			if(!n || n->id == Designer_ROOT)
@@ -4498,9 +4499,13 @@ private:
 				live_preview_old_values_.Add(preview_key, q >= 0 ? n->properties.GetValue(q) : Value());
 				live_preview_had_old_.Add(preview_key, q >= 0);
 			}
-			model_.SetProperty(id, property_id, normalized);
+			if(model_.SetProperty(id, property_id, normalized))
+				changed_ids.Add(id);
 		}
-		ScheduleLivePreviewRefresh();
+		if(!changed_ids.IsEmpty()) {
+			DesignerProjectionRequest projection = GetProjectionForInspectorPreviewSelection(changed_ids, property_id);
+			ApplyPreviewProjectionDuringEdit(projection);
+		}
 	}
 
 	void ApplyPendingInspectorCommit()
@@ -4793,12 +4798,12 @@ private:
 			RLOG(Format("CommitPreviewInspectorPropertyValues node=%d type=%s property=%s value=%s normalized=%s",
 			            (int)id, n->type_id, property_id, StdFormat(value), StdFormat(normalized)));
 #endif
-			int q = n->properties.Find(property_id);
-			if(q >= 0 && n->properties.GetValue(q) == normalized)
-				continue;
 			String preview_key = Format("%d:%s", (int)id, property_id);
 			int preview_q = live_preview_old_values_.Find(preview_key);
 			bool has_preview_old = preview_q >= 0;
+			int q = n->properties.Find(property_id);
+			if(q >= 0 && n->properties.GetValue(q) == normalized && !has_preview_old)
+				continue;
 			Value old_value = has_preview_old ? live_preview_old_values_[preview_q] : Value();
 			bool had_old = has_preview_old ? live_preview_had_old_[preview_q] : (q >= 0);
 			if(!grouped) {
@@ -5091,6 +5096,17 @@ private:
 		r.hierarchy = true;
 		r.inspector = true;
 		r.code = true;
+		return r;
+	}
+
+	DesignerProjectionRequest GetProjectionForInspectorPreviewSelection(const Vector<DesignerNodeId>& ids,
+	                                                                   const String& property_id) const
+	{
+		DesignerProjectionRequest r = GetProjectionForInspectorCommitSelection(ids, property_id);
+		r.reason = "multi-select inspector preview";
+		r.inspector = false;
+		r.code = false;
+		r.full = false;
 		return r;
 	}
 
