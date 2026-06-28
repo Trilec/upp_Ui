@@ -575,6 +575,46 @@ private:
 	SymbolPickerIconRef backup_;
 };
 
+class MoveCollectionIconCommand final : public SymbolPickerCommand {
+public:
+	MoveCollectionIconCommand(int collection_index, int from_index, int to_index)
+		: collection_index_(collection_index), from_index_(from_index), requested_to_index_(to_index)
+	{
+	}
+
+	bool Do(SymbolPickerModel& model) override
+	{
+		if(!model.IsValidItemIndex(collection_index_, from_index_))
+			return false;
+		const int count = model.GetCollections()[collection_index_].items.GetCount();
+		if(requested_to_index_ < 0 || requested_to_index_ > count)
+			return false;
+		if(from_index_ == requested_to_index_ || from_index_ + 1 == requested_to_index_)
+			return false;
+
+		applied_to_index_ = requested_to_index_;
+		return model.MoveIconInCollection(collection_index_, from_index_, requested_to_index_);
+	}
+
+	void Undo(SymbolPickerModel& model) override
+	{
+		if(applied_to_index_ < 0 || !model.IsValidCollectionIndex(collection_index_))
+			return;
+		int moved_index = applied_to_index_;
+		if(moved_index > from_index_)
+			--moved_index;
+		model.MoveIconInCollection(collection_index_, moved_index, from_index_);
+	}
+
+	String Label() const override { return "Move collection icon"; }
+
+private:
+	int collection_index_;
+	int from_index_;
+	int requested_to_index_;
+	int applied_to_index_ = -1;
+};
+
 class ClearCollectionCommand final : public SymbolPickerCommand {
 public:
 	ClearCollectionCommand(int collection_index) : collection_index_(collection_index) {}
@@ -707,6 +747,11 @@ One<SymbolPickerCommand> MakeSymbolPickerAddIconToCollectionCommand(int collecti
 One<SymbolPickerCommand> MakeSymbolPickerRemoveIconFromCollectionCommand(int collection_index, int item_index)
 {
 	return MakeOne<RemoveIconFromCollectionCommand>(collection_index, item_index);
+}
+
+One<SymbolPickerCommand> MakeSymbolPickerMoveCollectionIconCommand(int collection_index, int from_index, int to_index)
+{
+	return MakeOne<MoveCollectionIconCommand>(collection_index, from_index, to_index);
 }
 
 One<SymbolPickerCommand> MakeSymbolPickerClearCollectionCommand(int collection_index)
@@ -864,6 +909,48 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("Second AddIconToCollection command did not add item.");
 	if(!model.GetCollections()[0].items[1].unresolved)
 		return Fail("Unresolved icon ref was not preserved.");
+
+	SymbolPickerIconRef third;
+	third.catalog_id = "action/save/sharp";
+	third.source_id = "action/save";
+	third.alias = "ICON_ACTION_SAVE_SHARP";
+	third.size = 64;
+	third.tint = Color(3, 4, 5);
+	third.unresolved = false;
+	if(!stack.Execute(MakeSymbolPickerAddIconToCollectionCommand(0, third), model))
+		return Fail("Third AddIconToCollection command did not execute.");
+	if(model.GetCollections()[0].items.GetCount() != 3)
+		return Fail("Third AddIconToCollection command did not add item.");
+
+	if(!stack.Execute(MakeSymbolPickerMoveCollectionIconCommand(0, 0, 3), model))
+		return Fail("MoveCollectionIcon command did not execute.");
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[1].catalog_id != "action/save/sharp"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/rounded")
+		return Fail("MoveCollectionIcon command did not reorder items correctly.");
+	if(model.GetCollections()[0].items[2].source_id != "action/save")
+		return Fail("MoveCollectionIcon command did not preserve source id.");
+	if(!stack.Undo(model))
+		return Fail("MoveCollectionIcon undo failed to execute.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
+		return Fail("MoveCollectionIcon undo did not restore original order.");
+	if(!stack.Redo(model))
+		return Fail("MoveCollectionIcon redo failed to execute.");
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[1].catalog_id != "action/save/sharp"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/rounded")
+		return Fail("MoveCollectionIcon redo did not restore moved order.");
+	if(model.GetCollections()[0].items[2].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[2].source_id != "action/save")
+		return Fail("MoveCollectionIcon redo did not preserve identities.");
+	if(!stack.Undo(model))
+		return Fail("MoveCollectionIcon second undo failed to execute.");
+	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
+		return Fail("MoveCollectionIcon second undo did not restore original order.");
 
 	if(!stack.Execute(MakeSymbolPickerRenameCollectionIconAliasCommand(0, 0, "RenamedGlyph"), model))
 		return Fail("RenameCollectionIconAlias command did not execute.");

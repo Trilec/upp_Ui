@@ -65,16 +65,21 @@ public:
 	SymbolPickerCollectionTile();
 
 	void SetItem(const SymbolPickerIconRef& item, int index);
+	int GetItemIndex() const { return item_index_; }
 
 	virtual void Paint(Draw& w) override;
 	virtual void Layout() override;
 	virtual Size GetMinSize() const override;
+	virtual void LeftDrag(Point p, dword keyflags) override;
+
+	Event<> WhenDragStart;
 
 private:
 	Label title_;
 	Label meta_;
 	Label ids_;
 	bool  unresolved_ = false;
+	int   item_index_ = -1;
 };
 
 class SymbolPickerDropScrollPanel : public UiScrollPanel {
@@ -92,6 +97,7 @@ public:
 
 	void SetDropState(DropVisualState state);
 	DropVisualState GetDropState() const { return drop_state_; }
+	Point GetLastDragPoint() const { return last_drag_point_; }
 
 	Event<PasteClip&> WhenDropTest;
 	Event<PasteClip&> WhenDropPerform;
@@ -103,6 +109,7 @@ public:
 
 private:
 	DropVisualState drop_state_ = DROP_NORMAL;
+	Point last_drag_point_ = Point(0, 0);
 };
 
 class SymbolPickerView : public TopWindow {
@@ -131,6 +138,7 @@ private:
 	void RebuildCollectionTiles();
 	void HandleCollectionsDropTest(PasteClip& d);
 	void HandleCollectionsDropPerform(PasteClip& d);
+	int GetCollectionDropInsertIndex(Point p) const;
 	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
 	void SelectLibraryCatalogId(const String& catalog_id);
 	void UpdateLibraryTileSelection();

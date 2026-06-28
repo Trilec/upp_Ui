@@ -50,6 +50,7 @@ One<SymbolPickerCommand> MakeSymbolPickerRenameCollectionCommand(int index, cons
 One<SymbolPickerCommand> MakeSymbolPickerSetActiveCollectionCommand(int index);
 One<SymbolPickerCommand> MakeSymbolPickerAddIconToCollectionCommand(int collection_index, const SymbolPickerIconRef& ref);
 One<SymbolPickerCommand> MakeSymbolPickerRemoveIconFromCollectionCommand(int collection_index, int item_index);
+One<SymbolPickerCommand> MakeSymbolPickerMoveCollectionIconCommand(int collection_index, int from_index, int to_index);
 One<SymbolPickerCommand> MakeSymbolPickerClearCollectionCommand(int collection_index);
 One<SymbolPickerCommand> MakeSymbolPickerRenameCollectionIconAliasCommand(int collection_index, int item_index, const String& alias);
 

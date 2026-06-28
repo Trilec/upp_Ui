@@ -207,6 +207,26 @@ bool SymbolPickerModel::RemoveIconFromCollection(int collection_index, int item_
 	return true;
 }
 
+bool SymbolPickerModel::MoveIconInCollection(int collection_index, int from_index, int to_index)
+{
+	if(!IsValidItemIndex(collection_index, from_index))
+		return false;
+	const int count = collections_[collection_index].items.GetCount();
+	if(to_index < 0 || to_index > count)
+		return false;
+	if(from_index == to_index || from_index + 1 == to_index)
+		return false;
+
+	SymbolPickerIconRef moved = CopyIconRef(collections_[collection_index].items[from_index]);
+	collections_[collection_index].items.Remove(from_index);
+	if(to_index > from_index)
+		--to_index;
+	collections_[collection_index].items.Insert(to_index, moved);
+	collections_[collection_index].dirty = true;
+	Changed();
+	return true;
+}
+
 bool SymbolPickerModel::ClearCollection(int collection_index)
 {
 	if(!IsValidCollectionIndex(collection_index) || collections_[collection_index].items.IsEmpty())

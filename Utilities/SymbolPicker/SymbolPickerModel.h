@@ -52,6 +52,7 @@ public:
 	bool SetActiveCollection(int index);
 	bool AddIconToCollection(int collection_index, const SymbolPickerIconRef& ref);
 	bool RemoveIconFromCollection(int collection_index, int item_index);
+	bool MoveIconInCollection(int collection_index, int from_index, int to_index);
 	bool ClearCollection(int collection_index);
 	bool RenameCollectionIconAlias(int collection_index, int item_index, const String& alias);
 
