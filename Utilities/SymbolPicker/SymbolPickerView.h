@@ -33,6 +33,7 @@ public:
 	SymbolPickerIconTile();
 
 	void SetEntry(const SymbolPickerIconEntry& entry);
+	const SymbolPickerIconEntry& GetEntry() const { return entry_; }
 	String GetCatalogId() const;
 	String GetSourceId() const;
 	void SetSelected(bool selected);
@@ -41,6 +42,7 @@ public:
 	Event<> WhenActivated;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
+	virtual void LeftDrag(Point p, dword keyflags) override;
 	virtual void LeftDouble(Point p, dword keyflags) override;
 	virtual void Paint(Draw& w) override;
 	virtual void Layout() override;
@@ -75,6 +77,34 @@ private:
 	bool  unresolved_ = false;
 };
 
+class SymbolPickerDropScrollPanel : public UiScrollPanel {
+public:
+	typedef SymbolPickerDropScrollPanel CLASSNAME;
+
+	enum DropVisualState {
+		DROP_NORMAL,
+		DROP_DRAG_OVER,
+		DROP_ACCEPTED,
+		DROP_REJECTED,
+	};
+
+	SymbolPickerDropScrollPanel();
+
+	void SetDropState(DropVisualState state);
+	DropVisualState GetDropState() const { return drop_state_; }
+
+	Event<PasteClip&> WhenDropTest;
+	Event<PasteClip&> WhenDropPerform;
+
+	virtual void Paint(Draw& w) override;
+	virtual void DragEnter() override;
+	virtual void DragAndDrop(Point p, PasteClip& d) override;
+	virtual void DragLeave() override;
+
+private:
+	DropVisualState drop_state_ = DROP_NORMAL;
+};
+
 class SymbolPickerView : public TopWindow {
 public:
 	typedef SymbolPickerView CLASSNAME;
@@ -99,6 +129,8 @@ private:
 	void RebuildCategoryButtons();
 	void RebuildLibraryTiles();
 	void RebuildCollectionTiles();
+	void HandleCollectionsDropTest(PasteClip& d);
+	void HandleCollectionsDropPerform(PasteClip& d);
 	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
 	void SelectLibraryCatalogId(const String& catalog_id);
 	void UpdateLibraryTileSelection();
@@ -118,6 +150,8 @@ private:
 	UiBoxLayout category_header_layout_ { UiDirection::H };
 	UiBoxLayout categories_action_layout_ { UiDirection::H };
 	UiTitleCard category_card_;
+	UiToolButton categories_filter_icon_;
+	UiLineEdit  categories_filter_edit_;
 	UiScrollPanel category_scroll_panel_;
 
 	UiPanel library_panel_;
@@ -145,11 +179,11 @@ private:
 	UiToolButton copy_button_;
 	UiToolButton collections_filter_icon_;
 	UiLineEdit  collections_filter_edit_;
-	UiScrollPanel collections_scroll_panel_;
+	SymbolPickerDropScrollPanel collections_scroll_panel_;
 
-	UiBoxLayout category_content_layout_ { UiDirection::V };
+	UiBoxLayout category_content_layout_ { UiDirection::H };
 	UiBoxLayout library_content_layout_ { UiDirection::H };
-	UiBoxLayout collections_content_layout_ { UiDirection::V };
+	UiBoxLayout collections_content_layout_ { UiDirection::H };
 	UiDropdown  collections_selector_;
 
 	Array<UiButton> category_buttons_;
