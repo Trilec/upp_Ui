@@ -961,23 +961,27 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 
 	if(!stack.Execute(MakeSymbolPickerRemoveIconFromCollectionCommand(0, 0), model))
 		return Fail("RemoveIconFromCollection command did not execute.");
-	if(model.GetCollections()[0].items.GetCount() != 1)
+	if(model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("RemoveIconFromCollection command did not remove item.");
-	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[1].catalog_id != "action/save/sharp")
 		return Fail("RemoveIconFromCollection removed wrong variant.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 3)
 		return Fail("RemoveIconFromCollection undo failed.");
 	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
-	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
 		return Fail("RemoveIconFromCollection undo did not restore both identities.");
-	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 1)
+	if(!stack.Redo(model) || model.GetCollections()[0].items.GetCount() != 2)
 		return Fail("RemoveIconFromCollection redo failed.");
-	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined")
+	if(model.GetCollections()[0].items[0].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[1].catalog_id != "action/save/sharp")
 		return Fail("RemoveIconFromCollection redo restored wrong item state.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 3)
 		return Fail("RemoveIconFromCollection second undo failed.");
 	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
-	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
 		return Fail("RemoveIconFromCollection second undo did not preserve identities.");
 
 	if(!stack.Execute(MakeSymbolPickerCreateCollectionCommand("Secondary"), model))
@@ -997,17 +1001,19 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("ClearCollection command did not execute.");
 	if(!model.GetCollections()[0].items.IsEmpty())
 		return Fail("ClearCollection command did not clear items.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 3)
 		return Fail("ClearCollection undo failed.");
 	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
-	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
 		return Fail("ClearCollection undo did not preserve identities.");
 	if(!stack.Redo(model) || !model.GetCollections()[0].items.IsEmpty())
 		return Fail("ClearCollection redo failed.");
-	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 2)
+	if(!stack.Undo(model) || model.GetCollections()[0].items.GetCount() != 3)
 		return Fail("ClearCollection second undo failed.");
 	if(model.GetCollections()[0].items[0].catalog_id != "action/save/rounded"
-	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined")
+	|| model.GetCollections()[0].items[1].catalog_id != "legacy/missing_icon/outlined"
+	|| model.GetCollections()[0].items[2].catalog_id != "action/save/sharp")
 		return Fail("ClearCollection second undo did not preserve identities.");
 
 	if(!stack.Execute(MakeSymbolPickerRemoveCollectionCommand(1), model))

@@ -854,8 +854,8 @@ void SymbolPickerView::HandleCollectionsDropPerform(PasteClip& d)
 		if(!model_->IsValidItemIndex(collection_index, from_index))
 			return;
 		const int to_index = GetCollectionDropInsertIndex(collections_scroll_panel_.GetLastDragPoint());
-		if(commands_->Execute(MakeSymbolPickerMoveCollectionIconCommand(collection_index, from_index, to_index), *model_))
-			collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
+		bool moved = commands_->Execute(MakeSymbolPickerMoveCollectionIconCommand(collection_index, from_index, to_index), *model_);
+		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
 		return;
 	}
 }

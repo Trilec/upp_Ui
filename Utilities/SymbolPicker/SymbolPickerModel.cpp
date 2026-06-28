@@ -2,7 +2,7 @@
 
 namespace Upp {
 
-static int FindStringIndex(const Vector<String>& values, const String& value)
+static int FindStringIndexModel(const Vector<String>& values, const String& value)
 {
 	for(int i = 0; i < values.GetCount(); i++)
 		if(values[i] == value)
@@ -10,7 +10,7 @@ static int FindStringIndex(const Vector<String>& values, const String& value)
 	return -1;
 }
 
-static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
+static SymbolPickerIconRef CopyIconRefModel(const SymbolPickerIconRef& src)
 {
 	SymbolPickerIconRef out;
 	out.catalog_id = src.catalog_id;
@@ -98,7 +98,7 @@ bool SymbolPickerModel::SetExportSize(int px)
 bool SymbolPickerModel::AddIconToBin(const String& id)
 {
 	String next = TrimBoth(id);
-	if(next.IsEmpty() || FindStringIndex(bin_icon_ids_, next) >= 0)
+	if(next.IsEmpty() || FindStringIndexModel(bin_icon_ids_, next) >= 0)
 		return false;
 	bin_icon_ids_.Add(next);
 	Changed();
@@ -107,7 +107,7 @@ bool SymbolPickerModel::AddIconToBin(const String& id)
 
 bool SymbolPickerModel::RemoveIconFromBin(const String& id)
 {
-	int q = FindStringIndex(bin_icon_ids_, id);
+	int q = FindStringIndexModel(bin_icon_ids_, id);
 	if(q < 0)
 		return false;
 	bin_icon_ids_.Remove(q);
@@ -188,7 +188,7 @@ bool SymbolPickerModel::AddIconToCollection(int collection_index, const SymbolPi
 {
 	if(!IsValidCollectionIndex(collection_index))
 		return false;
-	SymbolPickerIconRef copy = CopyIconRef(ref);
+	SymbolPickerIconRef copy = CopyIconRefModel(ref);
 	if(copy.catalog_id.IsEmpty() && !copy.source_id.IsEmpty())
 		copy.unresolved = true;
 	collections_[collection_index].items.Add(copy);
@@ -217,7 +217,7 @@ bool SymbolPickerModel::MoveIconInCollection(int collection_index, int from_inde
 	if(from_index == to_index || from_index + 1 == to_index)
 		return false;
 
-	SymbolPickerIconRef moved = CopyIconRef(collections_[collection_index].items[from_index]);
+	SymbolPickerIconRef moved = CopyIconRefModel(collections_[collection_index].items[from_index]);
 	collections_[collection_index].items.Remove(from_index);
 	if(to_index > from_index)
 		--to_index;
@@ -257,7 +257,7 @@ const SymbolPickerCollection* SymbolPickerModel::GetActiveCollection() const
 
 int SymbolPickerModel::FindBinIconIndex(const String& id) const
 {
-	return FindStringIndex(bin_icon_ids_, id);
+	return FindStringIndexModel(bin_icon_ids_, id);
 }
 
 bool SymbolPickerModel::IsValidCollectionIndex(int index) const
