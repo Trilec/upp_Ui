@@ -72,10 +72,8 @@ SymbolPickerIconTile::SymbolPickerIconTile()
 {
 	title_.SetFont(StdFont().Bold());
 	meta_.SetFont(StdFont());
-	ids_.SetFont(StdFont());
 	Add(title_);
 	Add(meta_);
-	Add(ids_);
 }
 
 void SymbolPickerIconTile::SetEntry(const SymbolPickerIconEntry& entry)
@@ -99,6 +97,12 @@ void SymbolPickerIconTile::SetSelected(bool selected)
 	if(selected_ == selected)
 		return;
 	selected_ = selected;
+	Refresh();
+}
+
+void SymbolPickerIconTile::SetPreviewImage(const Image& image)
+{
+	preview_ = image;
 	Refresh();
 }
 
@@ -130,30 +134,39 @@ void SymbolPickerIconTile::Paint(Draw& w)
 	w.DrawRect(r.left, r.bottom - 1, r.GetWidth(), 1, frame);
 	w.DrawRect(r.left, r.top, 1, r.GetHeight(), frame);
 	w.DrawRect(r.right - 1, r.top, 1, r.GetHeight(), frame);
+
+	Rect preview_box = RectC(DPI(12), DPI(10), max(0, GetSize().cx - DPI(24)), DPI(64));
+	if(!preview_.IsEmpty()) {
+		Size isz = preview_.GetSize();
+		int draw_w = min(preview_box.GetWidth(), isz.cx);
+		int draw_h = min(preview_box.GetHeight(), isz.cy);
+		int draw_x = preview_box.left + (preview_box.GetWidth() - draw_w) / 2;
+		int draw_y = preview_box.top + (preview_box.GetHeight() - draw_h) / 2;
+		w.DrawImage(draw_x, draw_y, draw_w, draw_h, preview_);
+	}
 }
 
 void SymbolPickerIconTile::Layout()
 {
 	int x = DPI(10);
-	int y = DPI(8);
+	int y = DPI(80);
 	int w = max(0, GetSize().cx - DPI(20));
 	title_.SetRect(x, y, w, title_.GetMinSize().cy);
 	y += title_.GetMinSize().cy + DPI(4);
 	meta_.SetRect(x, y, w, meta_.GetMinSize().cy);
-	y += meta_.GetMinSize().cy + DPI(4);
-	ids_.SetRect(x, y, w, ids_.GetMinSize().cy);
 }
 
 Size SymbolPickerIconTile::GetMinSize() const
 {
-	return Size(DPI(220), DPI(72));
+	return Size(DPI(112), DPI(124));
 }
 
 void SymbolPickerIconTile::SyncLabels()
 {
 	title_.SetLabel(entry_.display_name);
-	meta_.SetLabel(Format("Category: %s | Style: %s", entry_.category, SymbolPickerIconStyleText(entry_.style)));
-	ids_.SetLabel(Format("catalog_id: %s | source_id: %s", entry_.catalog_id, entry_.source_id));
+	meta_.SetLabel(SymbolPickerIconStyleText(entry_.style));
+	Tip(Format("%s\ncatalog_id: %s\nsource_id: %s\ncategory: %s",
+		entry_.display_name, entry_.catalog_id, entry_.source_id, entry_.category));
 	RefreshLayout();
 	Refresh();
 }
@@ -490,7 +503,7 @@ void SymbolPickerView::BuildLibraryPanel()
 		.SetInset(0)
 		.SetWrap(UiBoxWrap::Flow)
 		.SetWrapAutoResize(true)
-		.SetFixedColumn(DPI(260));
+		.SetFixedColumn(DPI(120));
 
 	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	library_header_layout_.Add(library_card_).Fit().MinMain(DPI(180)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
@@ -757,6 +770,7 @@ void SymbolPickerView::RebuildLibraryTiles()
 		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
 		SymbolPickerIconTile& tile = library_tiles_.Add(new SymbolPickerIconTile());
 		tile.SetEntry(entry);
+		tile.SetPreviewImage(image_cache_.GetImage(entry, DPI(48), model_->GetTintColor()));
 		library_content_layout_.Add(tile).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 
 		String catalog_id = entry.catalog_id;

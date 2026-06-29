@@ -4,6 +4,7 @@
 #include "SymbolPickerModel.h"
 #include "SymbolPickerCatalog.h"
 #include "SymbolPickerCommands.h"
+#include "SymbolPickerIconImageCache.h"
 
 #include <Ui/Ui.h>
 
@@ -33,6 +34,7 @@ public:
 	SymbolPickerIconTile();
 
 	void SetEntry(const SymbolPickerIconEntry& entry);
+	void SetPreviewImage(const Image& image);
 	const SymbolPickerIconEntry& GetEntry() const { return entry_; }
 	String GetCatalogId() const;
 	String GetSourceId() const;
@@ -54,7 +56,7 @@ private:
 	SymbolPickerIconEntry entry_;
 	Label title_;
 	Label meta_;
-	Label ids_;
+	Image preview_;
 	bool  selected_ = false;
 };
 
@@ -202,6 +204,7 @@ private:
 	SymbolPickerModel* model_ = nullptr;
 	const SymbolPickerCatalog* catalog_ = nullptr;
 	SymbolPickerCommandStack* commands_ = nullptr;
+	SymbolPickerIconImageCache image_cache_;
 };
 
 }

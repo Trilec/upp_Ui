@@ -10,7 +10,10 @@ bool SymbolPickerApp::Init(String& error)
 		return false;
 	if(!RunSymbolPickerCatalogSmokeTests(error))
 		return false;
-	if(LoadGeneratedSymbolPickerCatalog(catalog_) <= 0)
+	if(!RunSymbolPickerGeneratedCatalogSmokeTests(error))
+		return false;
+	used_seed_fallback_ = LoadGeneratedSymbolPickerCatalog(catalog_) <= 0;
+	if(used_seed_fallback_)
 		SeedSymbolPickerCatalog(catalog_);
 	Wire();
 	if(kEnableLocalDemoData)

@@ -11,6 +11,7 @@ class SymbolPickerApp {
 public:
 	bool Init(String& error);
 	void Run();
+	bool IsSeedFallbackUsed() const { return used_seed_fallback_; }
 
 	SymbolPickerModel& GetModel() { return model_; }
 	SymbolPickerCatalog& GetCatalog() { return catalog_; }
@@ -25,6 +26,7 @@ private:
 	SymbolPickerCatalog catalog_;
 	SymbolPickerCommandStack commands_;
 	SymbolPickerView view_;
+	bool used_seed_fallback_ = false;
 };
 
 }

@@ -1,4 +1,5 @@
 #include "SymbolPickerGeneratedCatalog.h"
+#include "SymbolPickerCatalogSeed.h"
 
 #include "OLD_CODE/icons_action.h"
 #include "OLD_CODE/icons_activitie.h"
@@ -40,6 +41,15 @@ static SymbolPickerIconStyle ToPickerStyleGenerated(int style)
 	}
 }
 
+static String StyleSuffixGenerated(SymbolPickerIconStyle style)
+{
+	switch(style) {
+	case SymbolPickerIconStyle::Rounded: return "rounded";
+	case SymbolPickerIconStyle::Sharp:   return "sharp";
+	default:                             return "outlined";
+	}
+}
+
 static String MakeDisplayNameGenerated(const char* raw_name)
 {
 	String out;
@@ -58,6 +68,13 @@ static String MakeDisplayNameGenerated(const char* raw_name)
 }
 
 template <class T>
+static String MakeCatalogIdGenerated(const T& row)
+{
+	String source_id = String(row.category) + "/" + row.name;
+	return source_id + "/" + StyleSuffixGenerated(ToPickerStyleGenerated((int)row.style));
+}
+
+template <class T>
 static int AddGeneratedRows(SymbolPickerCatalog& catalog, const T* rows, int count)
 {
 	int added = 0;
@@ -68,17 +85,7 @@ static int AddGeneratedRows(SymbolPickerCatalog& catalog, const T* rows, int cou
 		e.display_name = MakeDisplayNameGenerated(row.name);
 		e.source_id = String(row.category) + "/" + row.name;
 		e.style = ToPickerStyleGenerated((int)row.style);
-		switch(e.style) {
-		case SymbolPickerIconStyle::Rounded:
-			e.catalog_id = e.source_id + "/rounded";
-			break;
-		case SymbolPickerIconStyle::Sharp:
-			e.catalog_id = e.source_id + "/sharp";
-			break;
-		default:
-			e.catalog_id = e.source_id + "/outlined";
-			break;
-		}
+		e.catalog_id = MakeCatalogIdGenerated(row);
 		e.source_symbol = row.source ? String(row.source) : String();
 		e.available = row.b64zIcon && *row.b64zIcon;
 		catalog.Add(e);
@@ -87,41 +94,133 @@ static int AddGeneratedRows(SymbolPickerCatalog& catalog, const T* rows, int cou
 	return added;
 }
 
+template <class T>
+static bool DecodeGeneratedRowSvg(const T* rows, int count, const String& catalog_id, String& svg_xml)
+{
+	for(int i = 0; i < count; ++i) {
+		const T& row = rows[i];
+		if(MakeCatalogIdGenerated(row) != catalog_id)
+			continue;
+		if(!row.b64zIcon || !*row.b64zIcon)
+			return false;
+		String packed = Base64Decode(String(row.b64zIcon));
+		if(packed.IsEmpty())
+			return false;
+		svg_xml = ZDecompress(packed);
+		return !svg_xml.IsEmpty();
+	}
+	return false;
+}
+
+#define SYMBOLPICKER_GENERATED_ICON_TABLES(OP) \
+	OP(action) \
+	OP(activitie) \
+	OP(alert) \
+	OP(android) \
+	OP(audio_video) \
+	OP(busines) \
+	OP(communicate) \
+	OP(communication) \
+	OP(content) \
+	OP(device) \
+	OP(editor) \
+	OP(file) \
+	OP(hardware) \
+	OP(home) \
+	OP(household) \
+	OP(image) \
+	OP(map) \
+	OP(navigation) \
+	OP(notification) \
+	OP(place) \
+	OP(privacy) \
+	OP(search) \
+	OP(social) \
+	OP(text) \
+	OP(toggle) \
+	OP(transit) \
+	OP(travel) \
+	OP(ui_action)
+
 int LoadGeneratedSymbolPickerCatalog(SymbolPickerCatalog& catalog)
 {
 	catalog.Clear();
 
 	int added = 0;
-	added += AddGeneratedRows(catalog, action::kIcons, action::kIconCount);
-	added += AddGeneratedRows(catalog, activitie::kIcons, activitie::kIconCount);
-	added += AddGeneratedRows(catalog, alert::kIcons, alert::kIconCount);
-	added += AddGeneratedRows(catalog, android::kIcons, android::kIconCount);
-	added += AddGeneratedRows(catalog, audio_video::kIcons, audio_video::kIconCount);
-	added += AddGeneratedRows(catalog, busines::kIcons, busines::kIconCount);
-	added += AddGeneratedRows(catalog, communicate::kIcons, communicate::kIconCount);
-	added += AddGeneratedRows(catalog, communication::kIcons, communication::kIconCount);
-	added += AddGeneratedRows(catalog, content::kIcons, content::kIconCount);
-	added += AddGeneratedRows(catalog, device::kIcons, device::kIconCount);
-	added += AddGeneratedRows(catalog, editor::kIcons, editor::kIconCount);
-	added += AddGeneratedRows(catalog, file::kIcons, file::kIconCount);
-	added += AddGeneratedRows(catalog, hardware::kIcons, hardware::kIconCount);
-	added += AddGeneratedRows(catalog, home::kIcons, home::kIconCount);
-	added += AddGeneratedRows(catalog, household::kIcons, household::kIconCount);
-	added += AddGeneratedRows(catalog, image::kIcons, image::kIconCount);
-	added += AddGeneratedRows(catalog, map::kIcons, map::kIconCount);
-	added += AddGeneratedRows(catalog, navigation::kIcons, navigation::kIconCount);
-	added += AddGeneratedRows(catalog, notification::kIcons, notification::kIconCount);
-	added += AddGeneratedRows(catalog, place::kIcons, place::kIconCount);
-	added += AddGeneratedRows(catalog, privacy::kIcons, privacy::kIconCount);
-	added += AddGeneratedRows(catalog, search::kIcons, search::kIconCount);
-	added += AddGeneratedRows(catalog, social::kIcons, social::kIconCount);
-	added += AddGeneratedRows(catalog, text::kIcons, text::kIconCount);
-	added += AddGeneratedRows(catalog, toggle::kIcons, toggle::kIconCount);
-	added += AddGeneratedRows(catalog, transit::kIcons, transit::kIconCount);
-	added += AddGeneratedRows(catalog, travel::kIcons, travel::kIconCount);
-	added += AddGeneratedRows(catalog, ui_action::kIcons, ui_action::kIconCount);
-
+#define ADD_TABLE(ns) added += AddGeneratedRows(catalog, ns::kIcons, ns::kIconCount);
+	SYMBOLPICKER_GENERATED_ICON_TABLES(ADD_TABLE)
+#undef ADD_TABLE
 	return added;
+}
+
+bool DecodeGeneratedSymbolPickerSvg(const String& catalog_id, String& svg_xml)
+{
+	svg_xml.Clear();
+#define FIND_TABLE(ns) if(DecodeGeneratedRowSvg(ns::kIcons, ns::kIconCount, catalog_id, svg_xml)) return true;
+	SYMBOLPICKER_GENERATED_ICON_TABLES(FIND_TABLE)
+#undef FIND_TABLE
+	return false;
+}
+
+bool RunSymbolPickerGeneratedCatalogSmokeTests(String& error)
+{
+	auto Fail = [&](const String& msg) {
+		error = msg;
+		return false;
+	};
+
+	SymbolPickerCatalog generated;
+	int count = LoadGeneratedSymbolPickerCatalog(generated);
+	if(count <= 0)
+		return Fail("Generated catalog loader returned no rows.");
+	if(generated.GetIcons().IsEmpty())
+		return Fail("Generated catalog is empty.");
+
+	Index<String> catalog_ids;
+	bool has_outlined = false;
+	bool has_rounded = false;
+	bool has_sharp = false;
+	bool has_action = false;
+	bool has_navigation = false;
+	bool has_content = false;
+	String sample_catalog_id;
+
+	for(const auto& icon : generated.GetIcons()) {
+		if(icon.catalog_id.IsEmpty())
+			return Fail("Generated catalog produced an empty catalog_id.");
+		if(icon.source_id.IsEmpty())
+			return Fail("Generated catalog produced an empty source_id.");
+		if(catalog_ids.FindAdd(icon.catalog_id) != catalog_ids.GetCount() - 1)
+			return Fail("Generated catalog ids are not unique.");
+		if(!icon.available)
+			return Fail("Generated catalog row was unexpectedly marked unavailable.");
+		has_outlined |= icon.style == SymbolPickerIconStyle::Outlined;
+		has_rounded |= icon.style == SymbolPickerIconStyle::Rounded;
+		has_sharp |= icon.style == SymbolPickerIconStyle::Sharp;
+		has_action |= icon.category == "action";
+		has_navigation |= icon.category == "navigation";
+		has_content |= icon.category == "content";
+		if(sample_catalog_id.IsEmpty())
+			sample_catalog_id = icon.catalog_id;
+	}
+
+	if(!has_outlined || !has_rounded || !has_sharp)
+		return Fail("Generated catalog is missing one or more style variants.");
+	if(!has_action || !has_navigation || !has_content)
+		return Fail("Generated catalog is missing expected categories.");
+
+	String svg_xml;
+	if(sample_catalog_id.IsEmpty() || !DecodeGeneratedSymbolPickerSvg(sample_catalog_id, svg_xml) || svg_xml.IsEmpty())
+		return Fail("Generated catalog could not decode a sample SVG payload.");
+	if(!IsSVG(svg_xml))
+		return Fail("Generated catalog sample payload did not decode to SVG.");
+
+	SymbolPickerCatalog fallback;
+	SeedSymbolPickerCatalog(fallback);
+	if(count > 0 && generated.GetIcons().GetCount() == fallback.GetIcons().GetCount())
+		return Fail("Generated catalog smoke test looks like seeded fallback data.");
+
+	return true;
 }
 
 }
