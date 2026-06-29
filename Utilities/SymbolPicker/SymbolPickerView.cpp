@@ -2,6 +2,9 @@
 
 namespace Upp {
 
+static constexpr int kLibraryTilePreviewPx = 28;
+static constexpr int kLibraryAllInitialLimit = 240;
+
 static const char* SymbolPickerIconStyleText(SymbolPickerIconStyle style)
 {
 	switch(style) {
@@ -135,7 +138,7 @@ void SymbolPickerIconTile::Paint(Draw& w)
 	w.DrawRect(r.left, r.top, 1, r.GetHeight(), frame);
 	w.DrawRect(r.right - 1, r.top, 1, r.GetHeight(), frame);
 
-	Rect preview_box = RectC(DPI(12), DPI(10), max(0, GetSize().cx - DPI(24)), DPI(64));
+	Rect preview_box = RectC(DPI(8), DPI(6), max(0, GetSize().cx - DPI(16)), DPI(34));
 	if(!preview_.IsEmpty()) {
 		Size isz = preview_.GetSize();
 		int draw_w = min(preview_box.GetWidth(), isz.cx);
@@ -148,25 +151,25 @@ void SymbolPickerIconTile::Paint(Draw& w)
 
 void SymbolPickerIconTile::Layout()
 {
-	int x = DPI(10);
-	int y = DPI(80);
-	int w = max(0, GetSize().cx - DPI(20));
+	int x = DPI(6);
+	int y = DPI(40);
+	int w = max(0, GetSize().cx - DPI(12));
 	title_.SetRect(x, y, w, title_.GetMinSize().cy);
-	y += title_.GetMinSize().cy + DPI(4);
+	y += title_.GetMinSize().cy + DPI(2);
 	meta_.SetRect(x, y, w, meta_.GetMinSize().cy);
 }
 
 Size SymbolPickerIconTile::GetMinSize() const
 {
-	return Size(DPI(112), DPI(124));
+	return Size(DPI(56), DPI(64));
 }
 
 void SymbolPickerIconTile::SyncLabels()
 {
 	title_.SetLabel(entry_.display_name);
-	meta_.SetLabel(SymbolPickerIconStyleText(entry_.style));
-	Tip(Format("%s\ncatalog_id: %s\nsource_id: %s\ncategory: %s",
-		entry_.display_name, entry_.catalog_id, entry_.source_id, entry_.category));
+	meta_.SetLabel(String(AsString(SymbolPickerIconStyleText(entry_.style)[0])));
+	Tip(Format("%s\ncatalog_id: %s\nsource_id: %s\ncategory: %s\nstyle: %s",
+		entry_.display_name, entry_.catalog_id, entry_.source_id, entry_.category, SymbolPickerIconStyleText(entry_.style)));
 	RefreshLayout();
 	Refresh();
 }
@@ -503,7 +506,7 @@ void SymbolPickerView::BuildLibraryPanel()
 		.SetInset(0)
 		.SetWrap(UiBoxWrap::Flow)
 		.SetWrapAutoResize(true)
-		.SetFixedColumn(DPI(120));
+		.SetFixedColumn(DPI(64));
 
 	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	library_header_layout_.Add(library_card_).Fit().MinMain(DPI(180)).MinCross(DPI(56)).AlignSelf(UiBoxLayout::Align::Start);
@@ -687,6 +690,7 @@ void SymbolPickerView::SetModel(SymbolPickerModel* model)
 void SymbolPickerView::SetCatalog(const SymbolPickerCatalog* catalog)
 {
 	catalog_ = catalog;
+	image_cache_.Clear();
 	RefreshFromModel();
 }
 
@@ -765,12 +769,16 @@ void SymbolPickerView::RebuildLibraryTiles()
 	if(!catalog_ || !model_)
 		return;
 
+	int64 started = msecs();
 	Vector<int> rows = catalog_->Filter(model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
-	for(int row : rows) {
+	bool limited_all = model_->GetCurrentCategory() == "All" && TrimBoth(model_->GetFilterText()).IsEmpty() && rows.GetCount() > kLibraryAllInitialLimit;
+	int visible_count = limited_all ? min(rows.GetCount(), kLibraryAllInitialLimit) : rows.GetCount();
+	for(int i = 0; i < visible_count; ++i) {
+		int row = rows[i];
 		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
 		SymbolPickerIconTile& tile = library_tiles_.Add(new SymbolPickerIconTile());
 		tile.SetEntry(entry);
-		tile.SetPreviewImage(image_cache_.GetImage(entry, DPI(48), model_->GetTintColor()));
+		tile.SetPreviewImage(image_cache_.GetImage(entry, DPI(kLibraryTilePreviewPx), model_->GetTintColor()));
 		library_content_layout_.Add(tile).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 
 		String catalog_id = entry.catalog_id;
@@ -783,6 +791,11 @@ void SymbolPickerView::RebuildLibraryTiles()
 				commands_->Execute(MakeSymbolPickerAddToBinCommand(catalog_id), *model_);
 		};
 	}
+	int elapsed = (int)(msecs() - started);
+	if(limited_all)
+		library_card_.SetSubTitle(Format("Showing first %d of %d | %d ms", visible_count, rows.GetCount(), elapsed));
+	else
+		library_card_.SetSubTitle(Format("%d icons | %d ms", visible_count, elapsed));
 	UpdateLibraryTileSelection();
 }
 
@@ -878,8 +891,8 @@ void SymbolPickerView::SelectLibraryCatalogId(const String& catalog_id)
 {
 	selected_library_catalog_id_ = catalog_id;
 	UpdateLibraryTileSelection();
-	String subtitle = catalog_id.IsEmpty() ? "Browse the full icon library." : "Selected: " + catalog_id;
-	library_card_.SetSubTitle(subtitle);
+	if(!catalog_id.IsEmpty())
+		library_card_.SetSubTitle("Selected: " + catalog_id);
 }
 
 void SymbolPickerView::UpdateLibraryTileSelection()

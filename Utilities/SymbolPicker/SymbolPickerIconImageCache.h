@@ -12,6 +12,9 @@ public:
 	void SetMaxEntries(int max_entries);
 	Image GetImage(const SymbolPickerIconEntry& entry, int pixel_size, Color tint);
 	void Clear();
+	int GetMaxEntries() const { return max_entries_; }
+	int GetHitCount() const { return hit_count_; }
+	int GetMissCount() const { return miss_count_; }
 
 private:
 	struct CacheItem : Moveable<CacheItem> {
@@ -26,8 +29,11 @@ private:
 	void Trim();
 
 	Vector<CacheItem> items_;
+	VectorMap<String, int> lookup_;
 	int max_entries_ = 256;
 	int stamp_ = 0;
+	int hit_count_ = 0;
+	int miss_count_ = 0;
 };
 
 }

@@ -79,24 +79,35 @@ void SymbolPickerIconImageCache::Trim()
 		for(int i = 1; i < items_.GetCount(); ++i)
 			if(items_[i].stamp < items_[oldest].stamp)
 				oldest = i;
+		lookup_.RemoveKey(items_[oldest].key);
 		items_.Remove(oldest);
+		for(int i = oldest; i < items_.GetCount(); ++i) {
+			int q = lookup_.Find(items_[i].key);
+			if(q >= 0)
+				lookup_[q] = i;
+		}
 	}
 }
 
 Image SymbolPickerIconImageCache::GetImage(const SymbolPickerIconEntry& entry, int pixel_size, Color tint)
 {
 	String key = MakeKey(entry, pixel_size, tint);
-	for(int i = 0; i < items_.GetCount(); ++i) {
-		if(items_[i].key == key) {
+	int q = lookup_.Find(key);
+	if(q >= 0) {
+		int i = lookup_[q];
+		if(i >= 0 && i < items_.GetCount() && items_[i].key == key) {
+			++hit_count_;
 			Touch(i);
 			return items_[i].image;
 		}
 	}
 
+	++miss_count_;
 	CacheItem& item = items_.Add();
 	item.key = key;
 	item.image = RenderImage(entry, pixel_size, tint);
 	item.stamp = ++stamp_;
+	lookup_.GetAdd(key, items_.GetCount() - 1) = items_.GetCount() - 1;
 	Trim();
 	return item.image;
 }
@@ -104,7 +115,10 @@ Image SymbolPickerIconImageCache::GetImage(const SymbolPickerIconEntry& entry, i
 void SymbolPickerIconImageCache::Clear()
 {
 	items_.Clear();
+	lookup_.Clear();
 	stamp_ = 0;
+	hit_count_ = 0;
+	miss_count_ = 0;
 }
 
 }

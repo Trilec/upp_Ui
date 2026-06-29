@@ -1,34 +1,34 @@
 #include "SymbolPickerGeneratedCatalog.h"
 #include "SymbolPickerCatalogSeed.h"
 
-#include "OLD_CODE/icons_action.h"
-#include "OLD_CODE/icons_activitie.h"
-#include "OLD_CODE/icons_alert.h"
-#include "OLD_CODE/icons_android.h"
-#include "OLD_CODE/icons_audio_video.h"
-#include "OLD_CODE/icons_busines.h"
-#include "OLD_CODE/icons_communicate.h"
-#include "OLD_CODE/icons_communication.h"
-#include "OLD_CODE/icons_content.h"
-#include "OLD_CODE/icons_device.h"
-#include "OLD_CODE/icons_editor.h"
-#include "OLD_CODE/icons_file.h"
-#include "OLD_CODE/icons_hardware.h"
-#include "OLD_CODE/icons_home.h"
-#include "OLD_CODE/icons_household.h"
-#include "OLD_CODE/icons_image.h"
-#include "OLD_CODE/icons_map.h"
-#include "OLD_CODE/icons_navigation.h"
-#include "OLD_CODE/icons_notification.h"
-#include "OLD_CODE/icons_place.h"
-#include "OLD_CODE/icons_privacy.h"
-#include "OLD_CODE/icons_search.h"
-#include "OLD_CODE/icons_social.h"
-#include "OLD_CODE/icons_text.h"
-#include "OLD_CODE/icons_toggle.h"
-#include "OLD_CODE/icons_transit.h"
-#include "OLD_CODE/icons_travel.h"
-#include "OLD_CODE/icons_ui_action.h"
+#include "Generated/icons_action.h"
+#include "Generated/icons_activitie.h"
+#include "Generated/icons_alert.h"
+#include "Generated/icons_android.h"
+#include "Generated/icons_audio_video.h"
+#include "Generated/icons_busines.h"
+#include "Generated/icons_communicate.h"
+#include "Generated/icons_communication.h"
+#include "Generated/icons_content.h"
+#include "Generated/icons_device.h"
+#include "Generated/icons_editor.h"
+#include "Generated/icons_file.h"
+#include "Generated/icons_hardware.h"
+#include "Generated/icons_home.h"
+#include "Generated/icons_household.h"
+#include "Generated/icons_image.h"
+#include "Generated/icons_map.h"
+#include "Generated/icons_navigation.h"
+#include "Generated/icons_notification.h"
+#include "Generated/icons_place.h"
+#include "Generated/icons_privacy.h"
+#include "Generated/icons_search.h"
+#include "Generated/icons_social.h"
+#include "Generated/icons_text.h"
+#include "Generated/icons_toggle.h"
+#include "Generated/icons_transit.h"
+#include "Generated/icons_travel.h"
+#include "Generated/icons_ui_action.h"
 
 namespace Upp {
 
@@ -112,6 +112,15 @@ static bool DecodeGeneratedRowSvg(const T* rows, int count, const String& catalo
 	return false;
 }
 
+struct GeneratedPayloadRow : Moveable<GeneratedPayloadRow> {
+	String category;
+	String name;
+	String source;
+	String catalog_id;
+	SymbolPickerIconStyle style = SymbolPickerIconStyle::Outlined;
+	const char* b64z = nullptr;
+};
+
 #define SYMBOLPICKER_GENERATED_ICON_TABLES(OP) \
 	OP(action) \
 	OP(activitie) \
@@ -142,24 +151,83 @@ static bool DecodeGeneratedRowSvg(const T* rows, int count, const String& catalo
 	OP(travel) \
 	OP(ui_action)
 
+static Vector<GeneratedPayloadRow>& GeneratedRowsStorage()
+{
+	static Vector<GeneratedPayloadRow> rows;
+	return rows;
+}
+
+static VectorMap<String, int>& GeneratedLookupStorage()
+{
+	static VectorMap<String, int> lookup;
+	return lookup;
+}
+
+template <class T>
+static void AppendGeneratedIndexRows(const T* rows, int count)
+{
+	Vector<GeneratedPayloadRow>& out = GeneratedRowsStorage();
+	VectorMap<String, int>& lookup = GeneratedLookupStorage();
+	for(int i = 0; i < count; ++i) {
+		const T& row = rows[i];
+		GeneratedPayloadRow& item = out.Add();
+		item.category = row.category;
+		item.name = row.name;
+		item.source = row.source ? String(row.source) : String();
+		item.catalog_id = MakeCatalogIdGenerated(row);
+		item.style = ToPickerStyleGenerated((int)row.style);
+		item.b64z = row.b64zIcon;
+		lookup.Add(item.catalog_id, out.GetCount() - 1);
+	}
+}
+
+static void EnsureGeneratedLookup()
+{
+	Vector<GeneratedPayloadRow>& rows = GeneratedRowsStorage();
+	if(!rows.IsEmpty())
+		return;
+
+#define INDEX_TABLE(ns) AppendGeneratedIndexRows(ns::kIcons, ns::kIconCount);
+	SYMBOLPICKER_GENERATED_ICON_TABLES(INDEX_TABLE);
+#undef INDEX_TABLE
+}
+
 int LoadGeneratedSymbolPickerCatalog(SymbolPickerCatalog& catalog)
 {
 	catalog.Clear();
+	EnsureGeneratedLookup();
 
-	int added = 0;
-#define ADD_TABLE(ns) added += AddGeneratedRows(catalog, ns::kIcons, ns::kIconCount);
-	SYMBOLPICKER_GENERATED_ICON_TABLES(ADD_TABLE)
-#undef ADD_TABLE
-	return added;
+	const Vector<GeneratedPayloadRow>& rows = GeneratedRowsStorage();
+	for(const auto& row : rows) {
+		SymbolPickerIconEntry e;
+		e.category = row.category;
+		e.display_name = MakeDisplayNameGenerated(row.name);
+		e.source_id = row.category + "/" + row.name;
+		e.style = row.style;
+		e.catalog_id = row.catalog_id;
+		e.source_symbol = row.source;
+		e.available = row.b64z && *row.b64z;
+		catalog.Add(e);
+	}
+	return rows.GetCount();
 }
 
 bool DecodeGeneratedSymbolPickerSvg(const String& catalog_id, String& svg_xml)
 {
 	svg_xml.Clear();
-#define FIND_TABLE(ns) if(DecodeGeneratedRowSvg(ns::kIcons, ns::kIconCount, catalog_id, svg_xml)) return true;
-	SYMBOLPICKER_GENERATED_ICON_TABLES(FIND_TABLE)
-#undef FIND_TABLE
-	return false;
+	EnsureGeneratedLookup();
+	const VectorMap<String, int>& lookup = GeneratedLookupStorage();
+	int q = lookup.Find(catalog_id);
+	if(q < 0)
+		return false;
+	const GeneratedPayloadRow& row = GeneratedRowsStorage()[lookup[q]];
+	if(!row.b64z || !*row.b64z)
+		return false;
+	String packed = Base64Decode(String(row.b64z));
+	if(packed.IsEmpty())
+		return false;
+	svg_xml = ZDecompress(packed);
+	return !svg_xml.IsEmpty();
 }
 
 bool RunSymbolPickerGeneratedCatalogSmokeTests(String& error)
