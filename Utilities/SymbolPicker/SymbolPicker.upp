@@ -14,6 +14,8 @@ file
 	SymbolPickerCatalog.cpp,
 	SymbolPickerCatalogSeed.h,
 	SymbolPickerCatalogSeed.cpp,
+	SymbolPickerGeneratedCatalog.h,
+	SymbolPickerGeneratedCatalog.cpp,
 	SymbolPickerCollectionIo.h,
 	SymbolPickerCollectionIo.cpp,
 	SymbolPickerView.h,
@@ -26,4 +28,3 @@ file
 
 mainconfig
 	"" = "GUI";
-

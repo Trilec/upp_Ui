@@ -10,7 +10,8 @@ bool SymbolPickerApp::Init(String& error)
 		return false;
 	if(!RunSymbolPickerCatalogSmokeTests(error))
 		return false;
-	SeedSymbolPickerCatalog(catalog_);
+	if(LoadGeneratedSymbolPickerCatalog(catalog_) <= 0)
+		SeedSymbolPickerCatalog(catalog_);
 	Wire();
 	if(kEnableLocalDemoData)
 		SeedDemoData();
