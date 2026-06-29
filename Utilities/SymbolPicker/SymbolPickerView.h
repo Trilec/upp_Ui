@@ -67,6 +67,7 @@ public:
 	SymbolPickerCollectionTile();
 
 	void SetItem(const SymbolPickerIconRef& item, int index);
+	void SetPreviewImage(const Image& image);
 	int GetItemIndex() const { return item_index_; }
 
 	virtual void Paint(Draw& w) override;
@@ -79,7 +80,7 @@ public:
 private:
 	Label title_;
 	Label meta_;
-	Label ids_;
+	Image preview_;
 	bool  unresolved_ = false;
 	int   item_index_ = -1;
 };
