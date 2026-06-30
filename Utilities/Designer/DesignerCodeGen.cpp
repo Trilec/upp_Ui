@@ -907,6 +907,8 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiCompositeDropdown " << var << ";\n";
 	else if(n.type_id == "UiCompositeToggle")
 		out << "\tUiCompositeToggle " << var << ";\n";
+	else if(n.type_id == "UiCompositeColor")
+		out << "\tUiCompositeColor " << var << ";\n";
 	else if(n.type_id == "UiCompositeSlider")
 		out << "\tUiCompositeSlider " << var << ";\n";
 	else if(n.type_id == "UiSliderEdit")
@@ -1132,6 +1134,23 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
 		    << "\t\t" << var << ".SetData(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
 	}
+	else if(n.type_id == "UiCompositeColor") {
+		int color_count = minmax((int)CodeGenNodeProperty(n, "color_count", 4), 1, 4);
+		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
+		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
+		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 76)) << "))"
+		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "))"
+		    << ".SetColorCount(" << color_count << ");\n";
+		for(int i = 0; i < color_count; i++) {
+			String color_key = Format("color_%d", i + 1);
+			String label_key = Format("color_label_%d", i + 1);
+			out << "\t\t" << var << ".SetColor(" << i << ", " << ColorExpr(CodeGenNodeProperty(n, color_key, Color())) << ");\n";
+			out << "\t\t" << var << ".SetColorLabel(" << i << ", " << CppString(CodeGenNodeProperty(n, label_key, String())) << ");\n";
+			if(i > 0 && (bool)CodeGenNodeProperty(n, Format("separator_%d", i + 1), false))
+				out << "\t\t" << var << ".SetSeparatorBefore(" << i << ", true);\n";
+		}
+	}
 	else if(n.type_id == "UiCompositeSlider") {
 		int mn = (int)CodeGenNodeProperty(n, "min", 0);
 		int mx = (int)CodeGenNodeProperty(n, "max", 100);
@@ -1211,6 +1230,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << ";\n";
 	}	else if(n.type_id == "UiCompositeLabel" || n.type_id == "UiCompositeEdit" ||
 	        n.type_id == "UiCompositeDropdown" || n.type_id == "UiCompositeToggle" ||
+	        n.type_id == "UiCompositeColor" ||
 	        n.type_id == "UiCompositeSlider" || n.type_id == "UiSliderEdit") {
 		EmitCompositeSetup(out, var, n);
 	}

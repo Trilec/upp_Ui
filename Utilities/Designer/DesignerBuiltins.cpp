@@ -50,6 +50,8 @@ static Image MakeDesignerTypeIcon(const String& id)
 		return ICON_DESIGN_SLIDERS_48();
 	if(id == "UiToggle")
 		return ICON_DESIGN_TOGGLE_COMPOSITE_48();
+	if(id == "UiCompositeColor")
+		return ICON_DESIGN_FORMAT_PAINT_48();
 	if(id == "UiDropdown")
 		return ICON_DESIGN_LIST_ALT_48();
 	if(id == "UiCheckBox")
@@ -526,6 +528,34 @@ static DesignerType MakeCompositeType(const String& id, const String& name, Size
 		n.properties.Set("face_enabled", false);
 		n.properties.Set("frame_enabled", false);
 		n.properties.Set("radius", 0);
+		if(id == "UiCompositeColor") {
+			n.properties.Set("label", "Color");
+			n.properties.Set("value_text", "#0078D4");
+			n.properties.Set("show_value", true);
+			n.properties.Set("color_count", 4);
+			n.properties.Set("color_1", Color(0, 120, 212));
+			n.properties.Set("color_2", Color(226, 141, 0));
+			n.properties.Set("color_3", Color(52, 199, 89));
+			n.properties.Set("color_4", Color(0, 0, 0));
+			n.properties.Set("color_label_1", "Accent");
+			n.properties.Set("color_label_2", "Warning");
+			n.properties.Set("color_label_3", "Success");
+			n.properties.Set("color_label_4", "Ink");
+			n.properties.Set("separator_2", false);
+			n.properties.Set("separator_3", false);
+			n.properties.Set("separator_4", false);
+			n.properties.Set("layout_mode", "Inline");
+			n.properties.Set("label_width", 112);
+			n.properties.Set("value_width", 76);
+			n.properties.Set("field_gap", 8);
+			n.properties.Set("stack_gap", 4);
+			n.properties.Set("h_sizing", "Fit");
+			n.properties.Set("v_sizing", "Fit");
+			n.properties.Set("fixed_width", 260);
+			n.properties.Set("fixed_height", 32);
+			n.properties.Set("width", 260);
+			n.properties.Set("height", 32);
+		}
 	};
 	return t;
 }static DesignerType MakeGenericType()
@@ -806,6 +836,7 @@ void RegisterDesignerBuiltins(DesignerRegistry& registry)
 	registry.Register(MakeCompositeType("UiCompositeEdit", "Composite Edit", Size(260, 32)));
 	registry.Register(MakeCompositeType("UiCompositeDropdown", "Composite Dropdown", Size(260, 32)));
 	registry.Register(MakeCompositeType("UiCompositeToggle", "Composite Toggle", Size(240, 32)));
+	registry.Register(MakeCompositeType("UiCompositeColor", "Composite Color", Size(260, 32)));
 	registry.Register(MakeCompositeType("UiCompositeSlider", "Composite Slider", Size(280, 32)));
 	registry.Register(MakeCompositeType("UiSliderEdit", "Slider Edit", Size(280, 32)));
 	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));

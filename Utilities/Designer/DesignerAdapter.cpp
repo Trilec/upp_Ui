@@ -2669,6 +2669,7 @@ static bool DesignerIsCompositeType(const String& type_id)
 	       type_id == "UiCompositeEdit" ||
 	       type_id == "UiCompositeDropdown" ||
 	       type_id == "UiCompositeToggle" ||
+	       type_id == "UiCompositeColor" ||
 	       type_id == "UiCompositeSlider" ||
 	       type_id == "UiSliderEdit";
 }
@@ -2735,6 +2736,29 @@ void DesignerCompositeAdapter::SyncFromNode(const DesignerNode& node)
 		c->SetData((bool)AdapterNodeProperty(node, "on", true));
 		inner_.Attach(c);
 	}
+	else if(type_id_ == "UiCompositeColor") {
+		UiCompositeColor *c = new UiCompositeColor;
+		int color_count = minmax((int)AdapterNodeProperty(node, "color_count", 4), 1, 4);
+		c->SetLayoutMode(layout)
+		 .SetLabel(label)
+		 .SetValueText(value)
+		 .ShowValue((bool)AdapterNodeProperty(node, "show_value", true))
+		 .SetLabelWidth(label_w)
+		 .SetValueWidth(DPI(max(0, (int)AdapterNodeProperty(node, "value_width", 76))))
+		 .SetFieldGap(field_gap)
+		 .SetStackGap(DPI(max(0, (int)AdapterNodeProperty(node, "stack_gap", 4))))
+		 .SetColorCount(color_count);
+		for(int i = 0; i < color_count; i++) {
+			String color_key = Format("color_%d", i + 1);
+			String label_key = Format("color_label_%d", i + 1);
+			if(DesignerHasProperty(node, color_key))
+				c->SetColor(i, (Color)AdapterNodeProperty(node, color_key, Color()));
+			c->SetColorLabel(i, AdapterNodeProperty(node, label_key, String()));
+			if(i > 0)
+				c->SetSeparatorBefore(i, (bool)AdapterNodeProperty(node, Format("separator_%d", i + 1), false));
+		}
+		inner_.Attach(c);
+	}
 	else if(type_id_ == "UiCompositeSlider") {
 		UiCompositeSlider *c = new UiCompositeSlider;
 		int mn = (int)AdapterNodeProperty(node, "min", 0);
@@ -2785,7 +2809,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 		            {{"Inline", "Inline"}, {"Stacked", "Stacked"}});
 		b.AddInt("label_width", "Label width", DesignerEditorKind::Slider, "SetLabelWidth", "Fixed label column width.", 0, 320);
 	}
-	if(node.type_id == "UiCompositeLabel" || node.type_id == "UiCompositeEdit" || node.type_id == "UiCompositeToggle")
+	if(node.type_id == "UiCompositeLabel" || node.type_id == "UiCompositeEdit" || node.type_id == "UiCompositeToggle" || node.type_id == "UiCompositeColor")
 		b.Add("value_text", "Value text", DesignerEditorKind::Text, "composite value text/data", "Preview value text.");
 	if(node.type_id == "UiCompositeDropdown")
 		b.AddChoice("selected", "Selected", "UiCompositeDropdown::SelectByData", "Preview selected item.",
@@ -2794,6 +2818,25 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 		b.Add("on", "On", DesignerEditorKind::Bool, "UiCompositeToggle::SetData", "Preview toggle state.");
 		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeToggle::ShowValue", "Shows the value label.");
 		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "SetValueWidth", "Width of the value label.", 0, 180);
+	}
+	if(node.type_id == "UiCompositeColor") {
+		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeColor::ShowValue", "Shows the value label.");
+		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "UiCompositeColor::SetValueWidth", "Width of the value label.", 0, 180);
+		b.AddInt("color_count", "Color count", DesignerEditorKind::Slider, "UiCompositeColor::SetColorCount", "Number of visible swatches.", 1, 4);
+		b.Add("color_1", "Color 1", DesignerEditorKind::Color, "UiCompositeColor::SetColor", "First swatch color.");
+		b.Add("color_2", "Color 2", DesignerEditorKind::Color, "UiCompositeColor::SetColor", "Second swatch color.");
+		b.Add("color_3", "Color 3", DesignerEditorKind::Color, "UiCompositeColor::SetColor", "Third swatch color.");
+		b.Add("color_4", "Color 4", DesignerEditorKind::Color, "UiCompositeColor::SetColor", "Fourth swatch color.");
+		b.Add("color_label_1", "Color label 1", DesignerEditorKind::Text, "UiCompositeColor::SetColorLabel", "First swatch label.");
+		b.Add("color_label_2", "Color label 2", DesignerEditorKind::Text, "UiCompositeColor::SetColorLabel", "Second swatch label.");
+		b.Add("color_label_3", "Color label 3", DesignerEditorKind::Text, "UiCompositeColor::SetColorLabel", "Third swatch label.");
+		b.Add("color_label_4", "Color label 4", DesignerEditorKind::Text, "UiCompositeColor::SetColorLabel", "Fourth swatch label.");
+		b.Add("separator_2", "Separator before 2", DesignerEditorKind::Bool, "UiCompositeColor::SetSeparatorBefore", "Adds a separator before swatch 2.");
+		b.Add("separator_3", "Separator before 3", DesignerEditorKind::Bool, "UiCompositeColor::SetSeparatorBefore", "Adds a separator before swatch 3.");
+		b.Add("separator_4", "Separator before 4", DesignerEditorKind::Bool, "UiCompositeColor::SetSeparatorBefore", "Adds a separator before swatch 4.");
+		b.AddInt("stack_gap", "Stack gap", DesignerEditorKind::Slider, "UiCompositeColor::SetStackGap", "Gap used by stacked layout.", 0, 32);
+		b.AddInt("field_gap", "Field gap", DesignerEditorKind::Slider, "UiCompositeColor::SetFieldGap", "Gap between label, swatches, and value.", 0, 64);
+		return;
 	}
 	if(node.type_id == "UiCompositeSlider") {
 		b.AddInt("min", "Min", DesignerEditorKind::Slider, "UiSlider::SetRange", "Slider minimum.", 0, 500);
