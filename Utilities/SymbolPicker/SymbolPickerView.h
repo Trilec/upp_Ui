@@ -39,9 +39,12 @@ public:
 	String GetCatalogId() const;
 	String GetSourceId() const;
 	void SetSelected(bool selected);
+	void SetTooltipEnabled(bool enabled);
 
-	Event<> WhenSelected;
+	Event<dword> WhenSelected;
 	Event<> WhenActivated;
+	Event<> WhenDragStart;
+	Event<> WhenDragEnd;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
@@ -59,6 +62,8 @@ private:
 	Label title_;
 	Label meta_;
 	Image preview_;
+	String tooltip_text_;
+	bool  tooltip_enabled_ = true;
 	bool  hovered_ = false;
 	bool  selected_ = false;
 };
@@ -72,7 +77,10 @@ public:
 	void SetItem(const SymbolPickerIconRef& item, int index);
 	void SetPreviewImage(const Image& image);
 	int GetItemIndex() const { return item_index_; }
+	void SetSelected(bool selected);
+	void SetTooltipEnabled(bool enabled);
 
+	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void MouseEnter(Point p, dword keyflags) override;
 	virtual void MouseLeave() override;
 	virtual void Paint(Draw& w) override;
@@ -80,13 +88,18 @@ public:
 	virtual Size GetMinSize() const override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
 
+	Event<dword> WhenSelected;
 	Event<> WhenDragStart;
+	Event<> WhenDragEnd;
 
 private:
 	Label title_;
 	Label meta_;
 	Image preview_;
+	String tooltip_text_;
+	bool  tooltip_enabled_ = true;
 	bool  hovered_ = false;
+	bool  selected_ = false;
 	bool  unresolved_ = false;
 	int   item_index_ = -1;
 };
@@ -112,9 +125,12 @@ public:
 	Event<PasteClip&> WhenDropPerform;
 
 	virtual void Paint(Draw& w) override;
+	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void DragEnter() override;
 	virtual void DragAndDrop(Point p, PasteClip& d) override;
 	virtual void DragLeave() override;
+
+	Event<dword> WhenBackgroundLeftDown;
 
 private:
 	DropVisualState drop_state_ = DROP_NORMAL;
@@ -147,6 +163,18 @@ private:
 	void RebuildCollectionTiles();
 	void ApplyLibraryFilter();
 	void UpdateCollectionsEmptyState();
+	void SetLibrarySelectionOne(const String& catalog_id);
+	void ToggleLibrarySelection(const String& catalog_id);
+	void ClearLibrarySelection();
+	bool IsLibrarySelected(const String& catalog_id) const;
+	Vector<String> GetSelectedLibraryCatalogIdsForDrag(const String& primary_catalog_id) const;
+	void SetCollectionSelectionOne(int item_index);
+	void ToggleCollectionSelection(int item_index);
+	void ClearCollectionSelection();
+	bool IsCollectionItemSelected(int item_index) const;
+	void NormalizeCollectionSelectionAfterModelChange();
+	bool RemoveSelectedCollectionItems();
+	void SetDragInteractionActive(bool active);
 	void HandleCollectionsDropTest(PasteClip& d);
 	void HandleCollectionsDropPerform(PasteClip& d);
 	int GetCollectionDropInsertIndex(Point p) const;
@@ -197,6 +225,7 @@ private:
 	UiDropdown  output_pixel_size_;
 	UiDropdown  output_export_type_;
 	UiToolButton copy_button_;
+	UiToolButton remove_selected_collection_items_tool_;
 	UiToolButton collections_filter_icon_;
 	UiLineEdit  collections_filter_edit_;
 	SymbolPickerDropScrollPanel collections_scroll_panel_;
@@ -211,7 +240,12 @@ private:
 	Array<SymbolPickerIconTile> library_tiles_;
 	Array<SymbolPickerCollectionTile> collection_tiles_;
 	String          selected_library_catalog_id_;
+	Index<String>   selected_library_catalog_ids_;
+	Index<int>      selected_collection_item_indexes_;
 	bool            sync_view_state_ = false;
+	bool            drag_interaction_active_ = false;
+
+	virtual bool Key(dword key, int count) override;
 
 	SymbolPickerModel* model_ = nullptr;
 	const SymbolPickerCatalog* catalog_ = nullptr;
