@@ -1032,10 +1032,18 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 			       generation, inspector_generation_, syncing_ ? 1 : 0));
 		PostInspectorIntent({row_node, property_id, data, false, true, "edit-commit", generation, inspector_generation_, syncing_});
 	};
-	row->WhenAction = [=] {
-		commit_edit();
+	auto post_commit_edit = [=] {
+		Ptr<UiCompositeEdit> safe = self;
+		PostCallback([=] {
+			if(!safe)
+				return;
+			commit_edit();
+		});
 	};
-	row->WhenLoseFocus = [=] { commit_edit(); };
+	row->WhenAction = [=] {
+		post_commit_edit();
+	};
+	row->WhenLoseFocus = [=] { post_commit_edit(); };
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
 	r.editor = b.editor;
@@ -1208,10 +1216,18 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 		*last_committed = data;
 		PostInspectorManyCommit(generation, snapshot_id, property_id, data);
 	};
-	row->WhenAction = [=] {
-		commit_many_edit();
+	auto post_commit_many_edit = [=] {
+		Ptr<UiCompositeEdit> safe = self;
+		PostCallback([=] {
+			if(!safe)
+				return;
+			commit_many_edit();
+		});
 	};
-	row->WhenLoseFocus = [=] { commit_many_edit(); };
+	row->WhenAction = [=] {
+		post_commit_many_edit();
+	};
+	row->WhenLoseFocus = [=] { post_commit_many_edit(); };
 	Row& r = page.rows.Add();
 	r.property_id = property_id;
 	r.editor = b.editor;
