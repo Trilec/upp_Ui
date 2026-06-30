@@ -2,7 +2,7 @@
 
 namespace Upp {
 
-static const bool kEnableLocalDemoData = true;
+static const bool kEnableLocalDemoData = false;
 
 bool SymbolPickerApp::Init(String& error)
 {
@@ -16,6 +16,8 @@ bool SymbolPickerApp::Init(String& error)
 	if(used_seed_fallback_)
 		SeedSymbolPickerCatalog(catalog_);
 	Wire();
+	if(model_.GetCollections().IsEmpty())
+		model_.CreateCollection("Collection 1");
 	if(kEnableLocalDemoData)
 		SeedDemoData();
 	return true;

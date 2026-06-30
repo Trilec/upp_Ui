@@ -46,6 +46,8 @@ public:
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
 	virtual void LeftDouble(Point p, dword keyflags) override;
+	virtual void MouseEnter(Point p, dword keyflags) override;
+	virtual void MouseLeave() override;
 	virtual void Paint(Draw& w) override;
 	virtual void Layout() override;
 	virtual Size GetMinSize() const override;
@@ -57,6 +59,7 @@ private:
 	Label title_;
 	Label meta_;
 	Image preview_;
+	bool  hovered_ = false;
 	bool  selected_ = false;
 };
 
@@ -70,6 +73,8 @@ public:
 	void SetPreviewImage(const Image& image);
 	int GetItemIndex() const { return item_index_; }
 
+	virtual void MouseEnter(Point p, dword keyflags) override;
+	virtual void MouseLeave() override;
 	virtual void Paint(Draw& w) override;
 	virtual void Layout() override;
 	virtual Size GetMinSize() const override;
@@ -81,6 +86,7 @@ private:
 	Label title_;
 	Label meta_;
 	Image preview_;
+	bool  hovered_ = false;
 	bool  unresolved_ = false;
 	int   item_index_ = -1;
 };
@@ -139,6 +145,8 @@ private:
 	void RebuildCategoryButtons();
 	void RebuildLibraryTiles();
 	void RebuildCollectionTiles();
+	void ApplyLibraryFilter();
+	void UpdateCollectionsEmptyState();
 	void HandleCollectionsDropTest(PasteClip& d);
 	void HandleCollectionsDropPerform(PasteClip& d);
 	int GetCollectionDropInsertIndex(Point p) const;
@@ -171,6 +179,7 @@ private:
 	UiTitleCard library_card_;
 	UiBoxLayout library_action_cluster_ { UiDirection::H };
 	UiDropdown  library_style_selector_;
+	SymbolPickerTintCtrl library_tint_ctrl_;
 	UiToolButton library_refresh_button_;
 	UiLineEdit  library_filter_edit_;
 	UiScrollPanel library_scroll_panel_;
@@ -191,6 +200,7 @@ private:
 	UiToolButton collections_filter_icon_;
 	UiLineEdit  collections_filter_edit_;
 	SymbolPickerDropScrollPanel collections_scroll_panel_;
+	UiLabel     collections_empty_label_;
 
 	UiBoxLayout category_content_layout_ { UiDirection::H };
 	UiBoxLayout library_content_layout_ { UiDirection::H };
@@ -201,6 +211,7 @@ private:
 	Array<SymbolPickerIconTile> library_tiles_;
 	Array<SymbolPickerCollectionTile> collection_tiles_;
 	String          selected_library_catalog_id_;
+	bool            sync_view_state_ = false;
 
 	SymbolPickerModel* model_ = nullptr;
 	const SymbolPickerCatalog* catalog_ = nullptr;
