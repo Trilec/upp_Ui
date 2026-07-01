@@ -23,14 +23,32 @@ struct SymbolPickerIconRef : Moveable<SymbolPickerIconRef> {
 	String alias;
 	int    size = 24;
 	Color  tint = Null;
+	String comment;
+	String category_override;
+	SymbolPickerIconStyle style_override = SymbolPickerIconStyle::Outlined;
+	bool   has_style_override = false;
 	bool   unresolved = false;
 };
 
 struct SymbolPickerCollection : Moveable<SymbolPickerCollection> {
 	String                      name;
+	String                      comment;
 	String                      file_path;
 	Vector<SymbolPickerIconRef> items;
 	bool                        dirty = false;
+};
+
+struct SymbolPickerProject : Moveable<SymbolPickerProject> {
+	String                        project_name;
+	String                        comment;
+	String                        file_path;
+	String                        output_base_name;
+	String                        symbol_prefix;
+	int                           default_size = 48;
+	Color                         default_tint = Null;
+	SymbolPickerIconStyle         default_style = SymbolPickerIconStyle::Outlined;
+	Vector<SymbolPickerCollection> collections;
+	int                           active_collection_index = -1;
 };
 
 class SymbolPickerModel {
@@ -55,6 +73,14 @@ public:
 	bool MoveIconInCollection(int collection_index, int from_index, int to_index);
 	bool ClearCollection(int collection_index);
 	bool RenameCollectionIconAlias(int collection_index, int item_index, const String& alias);
+	bool SetProjectName(const String& name);
+	bool SetProjectComment(const String& comment);
+	bool SetProjectFilePath(const String& path);
+	bool SetOutputBaseName(const String& name);
+	bool SetSymbolPrefix(const String& prefix);
+	void MarkCollectionsSaved();
+	SymbolPickerProject ExportProject() const;
+	bool LoadProject(const SymbolPickerProject& project);
 
 	UiThemePreset GetThemePreset() const { return theme_preset_; }
 	SymbolPickerIconStyle GetIconStyle() const { return icon_style_; }
@@ -66,6 +92,11 @@ public:
 	const Vector<String>& GetBinIconIds() const { return bin_icon_ids_; }
 	const Vector<SymbolPickerCollection>& GetCollections() const { return collections_; }
 	int GetActiveCollectionIndex() const { return active_collection_index_; }
+	const String& GetProjectName() const { return project_name_; }
+	const String& GetProjectComment() const { return project_comment_; }
+	const String& GetProjectFilePath() const { return project_file_path_; }
+	const String& GetOutputBaseName() const { return output_base_name_; }
+	const String& GetSymbolPrefix() const { return symbol_prefix_; }
 	const SymbolPickerCollection* GetActiveCollection() const;
 	int FindBinIconIndex(const String& id) const;
 	bool IsValidCollectionIndex(int index) const;
@@ -86,6 +117,11 @@ private:
 	Vector<String> bin_icon_ids_;
 	Vector<SymbolPickerCollection> collections_;
 	int active_collection_index_ = -1;
+	String project_name_;
+	String project_comment_;
+	String project_file_path_;
+	String output_base_name_ = "symbols";
+	String symbol_prefix_ = "ICON_";
 };
 
 }

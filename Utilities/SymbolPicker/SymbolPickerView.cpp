@@ -1,4 +1,5 @@
 #include "SymbolPickerView.h"
+#include "SymbolPickerProjectIo.h"
 
 namespace Upp {
 
@@ -86,6 +87,14 @@ static String SafeAliasPart(const String& text)
 	while(!out.IsEmpty() && out[out.GetCount() - 1] == '_')
 		out.Trim(out.GetCount() - 1);
 	return out;
+}
+
+static String EnsureProjectExtension(String path)
+{
+	String lower = ToLower(path);
+	if(!lower.EndsWith(".uppicons.json"))
+		path << ".uppicons.json";
+	return path;
 }
 
 static Image MakeDragSampleFromCtrl(Ctrl& ctrl)
@@ -754,11 +763,11 @@ void SymbolPickerView::BuildCollectionsPanel()
 	save_and_save_as_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 	save_and_save_as_button_.SetText("Save").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	save_and_save_as_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
-	save_and_save_as_button_.Add("Save").Add("Save As");
+	save_and_save_as_button_.ClearItems().Add("Save", "save").Add("Save As", "save_as");
 	load_and_history_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 	load_and_history_button_.SetText("Load").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	load_and_history_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
-	load_and_history_button_.Add("Load").Add("Recent A").Add("Recent B");
+	load_and_history_button_.ClearItems().Add("Load", "load");
 	export_and_type_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
 	export_and_type_button_.SetText("Export").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	export_and_type_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
@@ -872,10 +881,20 @@ void SymbolPickerView::BuildCollectionsPanel()
 		// Stub for later export workflow wiring.
 	};
 	save_and_save_as_button_.WhenAction = [=] {
-		// Stub for later save workflow wiring.
+		SaveProject(false);
+	};
+	save_and_save_as_button_.WhenSelect = [=](int, const Value& data) {
+		String cmd = AsString(data);
+		if(cmd == "save_as")
+			SaveProject(true);
+		else
+			SaveProject(false);
 	};
 	load_and_history_button_.WhenAction = [=] {
-		// Stub for later load workflow wiring.
+		LoadProject();
+	};
+	load_and_history_button_.WhenSelect = [=](int, const Value&) {
+		LoadProject();
 	};
 	export_and_type_button_.WhenAction = [=] {
 		// Stub for later export workflow wiring.
@@ -1115,6 +1134,114 @@ void SymbolPickerView::UpdateCollectionsEmptyState()
 	const bool show_empty = active && active->items.IsEmpty();
 	collections_empty_label_.Show(show_empty);
 	remove_selected_collection_items_tool_.Enable(!selected_collection_item_indexes_.IsEmpty());
+}
+
+String SymbolPickerView::BuildProjectDialogTitle(const char* verb) const
+{
+	String label = model_ ? model_->GetProjectName() : String();
+	if(label.IsEmpty())
+		label = "SymbolPicker Project";
+	return Format("%s %s", verb, label);
+}
+
+void SymbolPickerView::ValidateLoadedProject(SymbolPickerProject& project) const
+{
+	if(project.collections.IsEmpty()) {
+		SymbolPickerCollection collection;
+		collection.name = "Collection 1";
+		collection.file_path = project.file_path;
+		project.collections.Add(pick(collection));
+		project.active_collection_index = 0;
+		return;
+	}
+
+	for(auto& collection : project.collections) {
+		collection.file_path = project.file_path;
+		collection.dirty = false;
+		for(auto& item : collection.items) {
+			const SymbolPickerIconEntry* entry = catalog_ ? catalog_->FindByCatalogId(item.catalog_id) : nullptr;
+			item.unresolved = entry == nullptr;
+		}
+	}
+
+	if(project.active_collection_index < 0 || project.active_collection_index >= project.collections.GetCount())
+		project.active_collection_index = 0;
+}
+
+bool SymbolPickerView::SaveProject(bool save_as)
+{
+	if(!model_) {
+		Exclamation("No SymbolPicker model is attached.");
+		return false;
+	}
+
+	String path = model_->GetProjectFilePath();
+	if(save_as || path.IsEmpty()) {
+		FileSel fs;
+		fs.Type("SymbolPicker project", "*.uppicons.json");
+		fs.ActiveDir(path.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(path));
+		String base_name = model_->GetProjectName();
+		if(base_name.IsEmpty())
+			base_name = "symbolpicker_project";
+		fs.PreSelect(EnsureProjectExtension(base_name));
+		if(!fs.ExecuteSaveAs(BuildProjectDialogTitle("Save")))
+			return false;
+		path = EnsureProjectExtension(~fs);
+	}
+
+	SymbolPickerProject project = model_->ExportProject();
+	if(project.project_name.IsEmpty())
+		project.project_name = GetFileTitle(path);
+	project.file_path = path;
+	for(auto& collection : project.collections)
+		collection.file_path = path;
+
+	String error;
+	if(!SaveSymbolPickerProjectJson(project, path, error)) {
+		Exclamation(error);
+		return false;
+	}
+
+	model_->SetProjectFilePath(path);
+	if(model_->GetProjectName().IsEmpty())
+		model_->SetProjectName(project.project_name);
+	model_->MarkCollectionsSaved();
+	PromptOK(Format("Saved project:\n%s", path));
+	return true;
+}
+
+bool SymbolPickerView::LoadProject()
+{
+	if(!model_ || !commands_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+
+	FileSel fs;
+	fs.Type("SymbolPicker project", "*.uppicons.json");
+	String current = model_->GetProjectFilePath();
+	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	if(!fs.ExecuteOpen(BuildProjectDialogTitle("Load")))
+		return false;
+
+	SymbolPickerProject project;
+	String error;
+	String path = ~fs;
+	if(!LoadSymbolPickerProjectJson(path, project, error)) {
+		Exclamation(error);
+		return false;
+	}
+
+	if(project.project_name.IsEmpty())
+		project.project_name = GetFileTitle(path);
+	project.file_path = path;
+	ValidateLoadedProject(project);
+	model_->LoadProject(project);
+	commands_->Clear();
+	ClearLibrarySelection();
+	ClearCollectionSelection();
+	PromptOK(Format("Loaded project:\n%s", path));
+	return true;
 }
 
 void SymbolPickerView::HandleCollectionsDropTest(PasteClip& d)

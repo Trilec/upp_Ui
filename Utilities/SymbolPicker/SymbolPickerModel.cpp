@@ -18,7 +18,23 @@ static SymbolPickerIconRef CopyIconRefModel(const SymbolPickerIconRef& src)
 	out.alias = src.alias;
 	out.size = src.size;
 	out.tint = src.tint;
+	out.comment = src.comment;
+	out.category_override = src.category_override;
+	out.style_override = src.style_override;
+	out.has_style_override = src.has_style_override;
 	out.unresolved = src.unresolved;
+	return out;
+}
+
+static SymbolPickerCollection CopyCollectionModel(const SymbolPickerCollection& src)
+{
+	SymbolPickerCollection out;
+	out.name = src.name;
+	out.comment = src.comment;
+	out.file_path = src.file_path;
+	for(const auto& item : src.items)
+		out.items.Add(CopyIconRefModel(item));
+	out.dirty = src.dirty;
 	return out;
 }
 
@@ -246,6 +262,122 @@ bool SymbolPickerModel::RenameCollectionIconAlias(int collection_index, int item
 		return false;
 	collections_[collection_index].items[item_index].alias = next;
 	collections_[collection_index].dirty = true;
+	Changed();
+	return true;
+}
+
+bool SymbolPickerModel::SetProjectName(const String& name)
+{
+	String next = TrimBoth(name);
+	if(project_name_ == next)
+		return false;
+	project_name_ = next;
+	Changed();
+	return true;
+}
+
+bool SymbolPickerModel::SetProjectComment(const String& comment)
+{
+	if(project_comment_ == comment)
+		return false;
+	project_comment_ = comment;
+	Changed();
+	return true;
+}
+
+bool SymbolPickerModel::SetProjectFilePath(const String& path)
+{
+	if(project_file_path_ == path)
+		return false;
+	project_file_path_ = path;
+	Changed();
+	return true;
+}
+
+bool SymbolPickerModel::SetOutputBaseName(const String& name)
+{
+	String next = TrimBoth(name);
+	if(next.IsEmpty())
+		next = "symbols";
+	if(output_base_name_ == next)
+		return false;
+	output_base_name_ = next;
+	Changed();
+	return true;
+}
+
+bool SymbolPickerModel::SetSymbolPrefix(const String& prefix)
+{
+	String next = TrimBoth(prefix);
+	if(next.IsEmpty())
+		next = "ICON_";
+	if(symbol_prefix_ == next)
+		return false;
+	symbol_prefix_ = next;
+	Changed();
+	return true;
+}
+
+void SymbolPickerModel::MarkCollectionsSaved()
+{
+	bool changed = false;
+	for(auto& collection : collections_)
+		if(collection.dirty) {
+			collection.dirty = false;
+			changed = true;
+		}
+	if(changed)
+		Changed();
+}
+
+SymbolPickerProject SymbolPickerModel::ExportProject() const
+{
+	SymbolPickerProject project;
+	project.project_name = project_name_;
+	project.comment = project_comment_;
+	project.file_path = project_file_path_;
+	project.output_base_name = output_base_name_;
+	project.symbol_prefix = symbol_prefix_;
+	project.default_size = export_size_;
+	project.default_tint = tint_color_;
+	project.default_style = icon_style_;
+	project.active_collection_index = active_collection_index_;
+	for(const auto& collection : collections_) {
+		SymbolPickerCollection copy = CopyCollectionModel(collection);
+		project.collections.Add(pick(copy));
+	}
+	return project;
+}
+
+bool SymbolPickerModel::LoadProject(const SymbolPickerProject& project)
+{
+	project_name_ = TrimBoth(project.project_name);
+	project_comment_ = project.comment;
+	project_file_path_ = project.file_path;
+	output_base_name_ = TrimBoth(project.output_base_name);
+	if(output_base_name_.IsEmpty())
+		output_base_name_ = "symbols";
+	symbol_prefix_ = TrimBoth(project.symbol_prefix);
+	if(symbol_prefix_.IsEmpty())
+		symbol_prefix_ = "ICON_";
+	export_size_ = max(1, project.default_size);
+	tint_color_ = project.default_tint;
+	icon_style_ = project.default_style;
+	collections_.Clear();
+	for(const auto& collection : project.collections) {
+		SymbolPickerCollection copy = CopyCollectionModel(collection);
+		copy.dirty = false;
+		collections_.Add(pick(copy));
+	}
+	if(collections_.IsEmpty())
+		active_collection_index_ = -1;
+	else if(project.active_collection_index >= 0 && project.active_collection_index < collections_.GetCount())
+		active_collection_index_ = project.active_collection_index;
+	else
+		active_collection_index_ = 0;
+	bin_icon_ids_.Clear();
+	current_category_ = "All";
+	filter_text_.Clear();
 	Changed();
 	return true;
 }

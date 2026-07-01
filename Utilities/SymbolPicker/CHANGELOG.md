@@ -1,5 +1,13 @@
 # SymbolPicker Changelog
 
+## 0.4.6
+
+- replaced the collection-only JSON stub with project-level `.uppicons.json` I/O
+- added `SymbolPickerProject` metadata and model snapshot import/export
+- wired Save / Save As / Load to real file dialogs in the runtime shell
+- added project JSON roundtrip smoke coverage at startup
+- kept export/header generation out of scope for this pass
+
 ## 0.3.3
 
 - rebuilt `SymbolPickerView` around the Designer hierarchy

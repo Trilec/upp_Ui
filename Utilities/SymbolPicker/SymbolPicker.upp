@@ -18,8 +18,8 @@ file
 	SymbolPickerGeneratedCatalog.cpp,
 	SymbolPickerIconImageCache.h,
 	SymbolPickerIconImageCache.cpp,
-	SymbolPickerCollectionIo.h,
-	SymbolPickerCollectionIo.cpp,
+	SymbolPickerProjectIo.h,
+	SymbolPickerProjectIo.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,
@@ -58,4 +58,3 @@ file
 
 mainconfig
 	"" = "GUI";
-

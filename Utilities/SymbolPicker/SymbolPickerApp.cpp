@@ -15,7 +15,10 @@ bool SymbolPickerApp::Init(String& error)
 	used_seed_fallback_ = LoadGeneratedSymbolPickerCatalog(catalog_) <= 0;
 	if(used_seed_fallback_)
 		SeedSymbolPickerCatalog(catalog_);
+	if(!RunSymbolPickerProjectIoSmokeTests(catalog_, error))
+		return false;
 	Wire();
+	model_.SetProjectName("SymbolPicker Project");
 	if(model_.GetCollections().IsEmpty())
 		model_.CreateCollection("Collection 1");
 	if(kEnableLocalDemoData)

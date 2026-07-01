@@ -163,6 +163,10 @@ private:
 	void RebuildCollectionTiles();
 	void ApplyLibraryFilter();
 	void UpdateCollectionsEmptyState();
+	bool SaveProject(bool save_as);
+	bool LoadProject();
+	String BuildProjectDialogTitle(const char* verb) const;
+	void ValidateLoadedProject(SymbolPickerProject& project) const;
 	void SetLibrarySelectionOne(const String& catalog_id);
 	void ToggleLibrarySelection(const String& catalog_id);
 	void ClearLibrarySelection();
