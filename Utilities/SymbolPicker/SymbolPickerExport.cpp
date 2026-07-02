@@ -201,6 +201,27 @@ static String MakeSafeFileComponent(const String& text)
 	return out;
 }
 
+static bool HasString(const Vector<String>& values, const String& value)
+{
+	for(const String& item : values) {
+		if(item == value)
+			return true;
+	}
+	return false;
+}
+
+static String MakeUniqueFileComponent(const String& base, const Vector<String>& used)
+{
+	String name = MakeSafeFileComponent(base);
+	if(!HasString(used, name))
+		return name;
+	for(int n = 2;; ++n) {
+		String candidate = name + "_" + AsString(n);
+		if(!HasString(used, candidate))
+			return candidate;
+	}
+}
+
 static bool EnsureDirectoryPath(const String& path)
 {
 	String p = NormalizePath(path);
@@ -512,6 +533,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	bool ok = true;
 	int written = 0;
 	int skipped = 0;
+	Vector<String> used_collection_folders;
 
 	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
 		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
@@ -519,8 +541,11 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 
 		const SymbolPickerCollection& collection = project.collections[ci];
 		String collection_dir = output_folder;
-		if(scope == SymbolPickerExportScope::AllCollections)
-			collection_dir = AppendFileName(output_folder, MakeSafeFileComponent(collection.name));
+		if(scope == SymbolPickerExportScope::AllCollections) {
+			String folder = MakeUniqueFileComponent(collection.name, used_collection_folders);
+			used_collection_folders.Add(folder);
+			collection_dir = AppendFileName(output_folder, folder);
+		}
 		if(!EnsureDirectoryPath(collection_dir)) {
 			warn.Add(Format("Could not create SVG export folder '%s'.", collection_dir));
 			ok = false;
@@ -574,6 +599,11 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 			}
 			++written;
 		}
+	}
+
+	if(written == 0) {
+		warn.Add("SVG export completed without writing any files.");
+		ok = false;
 	}
 
 	if(files_written)
@@ -755,6 +785,60 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Export smoke all-collections mode did not include more than active collection coverage.";
 		return false;
 	}
+
+	String dup_temp_dir = AppendFileName(GetTempPath(), "symbolpicker_svg_dup_smoke");
+	DeleteFolderDeep(dup_temp_dir);
+	if(!EnsureDirectoryPath(dup_temp_dir)) {
+		error = "SVG duplicate-folder smoke could not create its temp folder.";
+		return false;
+	}
+
+	SymbolPickerProject dup_project;
+	dup_project.project_name = "SVG Duplicate Folders";
+	dup_project.symbol_prefix = "ICON_MYAPP_";
+	dup_project.default_size = 32;
+	dup_project.active_collection_index = 0;
+
+	SymbolPickerCollection dup_a;
+	dup_a.name = "Toolbar";
+	SymbolPickerIconRef dup_a_item;
+	dup_a_item.catalog_id = "action/save/outlined";
+	dup_a_item.source_id = "action/save";
+	dup_a_item.alias = "Toolbar Save";
+	dup_a_item.unresolved = false;
+	dup_a.items.Add(dup_a_item);
+	dup_project.collections.Add(pick(dup_a));
+
+	SymbolPickerCollection dup_b;
+	dup_b.name = "Toolbar";
+	SymbolPickerIconRef dup_b_item;
+	dup_b_item.catalog_id = "content/content_copy/outlined";
+	dup_b_item.source_id = "content/content_copy";
+	dup_b_item.alias = "Toolbar Copy";
+	dup_b_item.unresolved = false;
+	dup_b.items.Add(dup_b_item);
+	dup_project.collections.Add(pick(dup_b));
+
+	Vector<String> dup_warnings;
+	int dup_written = 0;
+	int dup_skipped = 0;
+	if(!ExportSymbolPickerSvgFiles(dup_project, catalog, SymbolPickerExportScope::AllCollections, dup_temp_dir, &dup_warnings, &dup_written, &dup_skipped)) {
+		DeleteFolderDeep(dup_temp_dir);
+		error = "SVG duplicate-folder smoke export failed.";
+		return false;
+	}
+	if(dup_written != 2) {
+		DeleteFolderDeep(dup_temp_dir);
+		error = "SVG duplicate-folder smoke did not write both SVG files.";
+		return false;
+	}
+	if(!FileExists(AppendFileName(dup_temp_dir, "Toolbar\\ICON_MYAPP_TOOLBAR_SAVE.svg"))
+		|| !FileExists(AppendFileName(dup_temp_dir, "Toolbar_2\\ICON_MYAPP_TOOLBAR_COPY.svg"))) {
+		DeleteFolderDeep(dup_temp_dir);
+		error = "SVG duplicate-folder smoke did not create unique folders.";
+		return false;
+	}
+	DeleteFolderDeep(dup_temp_dir);
 
 	String icon_id_export = BuildIconIdExport(project, catalog, SymbolPickerExportScope::AllCollections);
 	String image_call_export = BuildImageCallExport(project, catalog, SymbolPickerExportScope::AllCollections);
