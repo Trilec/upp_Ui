@@ -45,6 +45,29 @@ struct DesignerOverlayState {
 	int radius = 0;
 };
 
+// Resolved theme surface values for controls that expose shared face/frame/
+// shadow overrides in the Designer. This is the effective style state after the
+// current role theme is applied, before any explicit model override is layered
+// on top.
+struct DesignerThemeSurfaceDefaults {
+	bool found = false;
+	Color face = SColorFace();
+	Color frame = SColorShadow();
+	int frame_width = 1;
+	int radius = 0;
+	bool face_enabled = false;
+	bool frame_enabled = false;
+	bool shadow_enabled = false;
+	int shadow_distance = 6;
+	int shadow_offset_x = 0;
+	int shadow_offset_y = 0;
+	int shadow_alpha = 90;
+	Color shadow_color = Black();
+	String shadow_curve = "Soft";
+};
+
+DesignerThemeSurfaceDefaults DesignerResolveThemeSurfaceDefaults(const DesignerNode& node);
+
 // Inspector editor kind requested by an adapter property descriptor.
 // The inspector maps these values to Ui composite rows so each adapter can expose
 // properties without constructing inspector widgets itself.

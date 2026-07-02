@@ -1551,7 +1551,7 @@
 				},
 				"icon_scale": {
 					"type": "bool",
-					"value": true
+					"value": false
 				},
 				"content_gap": {
 					"type": "int",
@@ -4777,7 +4777,7 @@
 				},
 				"line_orientation": {
 					"type": "string",
-					"value": "Auto"
+					"value": "Vertical"
 				},
 				"line_align": {
 					"type": "string",

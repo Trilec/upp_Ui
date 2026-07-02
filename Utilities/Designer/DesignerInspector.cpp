@@ -102,70 +102,11 @@ static const DesignerApiBinding* FindCommonBindingById(const Vector<DesignerApiB
 	return nullptr;
 }
 
-struct DesignerInspectorSurfaceDefault {
-	Color face = SColorFace();
-	Color frame = SColorShadow();
-	int radius = 0;
-	bool face_enabled = false;
-	bool frame_enabled = false;
-	bool shadow_enabled = false;
-	int shadow_distance = 6;
-	int shadow_offset_x = 0;
-	int shadow_offset_y = 0;
-	int shadow_alpha = 90;
-	Color shadow_color = Black();
-	String shadow_curve = "Soft";
-	bool found = false;
-};
-
-template <class Style>
-static DesignerInspectorSurfaceDefault DesignerInspectorSurfaceFromStyle(const Style& s)
-{
-	DesignerInspectorSurfaceDefault out;
-	out.face = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorFace();
-	out.frame = s.palette.frame[ST_NORMAL];
-	out.radius = s.metrics.radius;
-	out.face_enabled = s.metrics.face_enabled;
-	out.frame_enabled = s.metrics.frame_enabled;
-	out.shadow_enabled = s.metrics.shadow.enabled;
-	out.shadow_distance = s.metrics.shadow.distance;
-	out.shadow_offset_x = s.metrics.shadow.offset_x;
-	out.shadow_offset_y = s.metrics.shadow.offset_y;
-	out.shadow_alpha = s.metrics.shadow.alpha;
-	out.shadow_color = s.metrics.shadow.color;
-	out.shadow_curve = s.metrics.shadow.mode == SHADOW_HARD ? "Hard" : "Soft";
-	out.found = true;
-	return out;
-}
+using DesignerInspectorSurfaceDefault = DesignerThemeSurfaceDefaults;
 
 static DesignerInspectorSurfaceDefault DesignerInspectorThemeSurfaceDefault(const DesignerNode& n)
 {
-	int role_pos = n.properties.Find("role");
-	UiRole role = DesignerInspectorRoleChoice(role_pos >= 0 ? n.properties.GetValue(role_pos) : Value("Standard"));
-	if(n.type_id == "Window" || n.type_id == "UiPanel" ||
-	   n.type_id == "Item" || n.type_id == "Generic")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolvePanel(role));
-	if(n.type_id == "UiScrollPanel")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveScrollPanel(role));
-	if(n.type_id == "UiGroupPanel")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveGroupPanel(role));
-	if(n.type_id == "UiLabel")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveLabel(role));
-	if(n.type_id == "UiTitleCard")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveTitleCard(role));
-	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveButton(role));
-	if(n.type_id == "UiToolButton")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveToolButton(role));
-	if(n.type_id == "UiAccordion")
-		return DesignerInspectorSurfaceFromStyle(UiAccordion::StyleDefault());
-	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveEdit(role));
-	if(n.type_id == "UiDropdown")
-		return DesignerInspectorSurfaceFromStyle(UiTheme::ResolveDropdown(role));
-	if(n.type_id == "UiBreadcrumbs")
-		return DesignerInspectorSurfaceFromStyle(UiBreadcrumbs::StyleDefault());
-	return DesignerInspectorSurfaceDefault();
+	return DesignerResolveThemeSurfaceDefaults(n);
 }
 
 DesignerInspector::DesignerInspector()
@@ -447,6 +388,10 @@ Value DesignerInspector::DefaultValue(const DesignerNode& n, const DesignerType&
 		return t.default_size.cx;
 	if(b.property_id == "height" || b.property_id == "fixed_height")
 		return t.default_size.cy;
+	if(b.property_id == "frame_width") {
+		DesignerInspectorSurfaceDefault surface = DesignerInspectorThemeSurfaceDefault(n);
+		return surface.found ? surface.frame_width : 1;
+	}
 	if(b.property_id == "min_width" || b.property_id == "min_height")
 		return DESIGNER_MIN_CLAMP;
 	if(b.property_id == "radius") {

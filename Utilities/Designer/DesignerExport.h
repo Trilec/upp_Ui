@@ -28,6 +28,7 @@
 
 #include "DesignerModel.h"
 #include "DesignerRegistry.h"
+#include "DesignerCodeGen.h"
 
 namespace Upp {
 
@@ -36,7 +37,7 @@ struct DesignerProjectExportOptions {
 	String output_directory;
 	String class_name;
 	String source_design_filename;
-	bool include_designer_appearance = false;
+	DesignerAppearanceMode appearance_mode = DesignerAppearanceMode::ExactDesign;
 	bool include_design_json = true;
 	bool include_readme = true;
 	bool overwrite_existing = false;

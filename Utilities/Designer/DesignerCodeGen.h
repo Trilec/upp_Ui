@@ -38,9 +38,14 @@
 
 namespace Upp {
 
+enum class DesignerAppearanceMode {
+	ExactDesign,
+	ThemeFirst
+};
+
 struct DesignerCodeGenOptions {
 	String class_name = "GeneratedDesignerWindow";
-	bool emit_designer_appearance = false;
+	DesignerAppearanceMode appearance_mode = DesignerAppearanceMode::ThemeFirst;
 	bool emit_export_header = false;
 	String designer_version;
 	String source_design_filename;
@@ -52,13 +57,19 @@ struct DesignerCodeGenOptions {
 };
 
 // Produce a standalone GUI window class and entry point from the current model.
-// Appearance metadata is omitted by default and only emitted when explicitly
-// requested, so generated examples stay aligned with the active Ui theme.
+// ExactDesign emits explicit appearance helpers and applies them back into the
+// generated controls. ThemeFirst keeps theme helpers out of the output and
+// leaves appearance resolution to runtime theme defaults.
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
                             const DesignerCodeGenOptions& options);
 
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
                             const String& class_name = "GeneratedDesignerWindow",
-                            bool emit_designer_appearance = false);
+                            DesignerAppearanceMode appearance_mode = DesignerAppearanceMode::ThemeFirst);
+
+// Compatibility wrapper for older call sites. Prefer the explicit appearance
+// mode overload above for new code.
+String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
+                            const String& class_name, bool emit_designer_appearance);
 
 }

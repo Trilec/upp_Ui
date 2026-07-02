@@ -15,6 +15,7 @@ static Value AdapterNodeProperty(const DesignerNode& n, const String& key, const
 
 static Color GetColorProperty(const DesignerNode& n, const String& key, Color def);
 static bool DesignerHasProperty(const DesignerNode& n, const String& key);
+static UiRole DesignerRoleChoice(const Value& value);
 static void DrawRoundedFrame(Draw& w, const Rect& r, Color c, int radius, int width);
 static void DrawDashedFrame(Draw& w, const Rect& r, Color c, int radius, int width);
 static void PaintDesignerAppearanceValues(Draw& w, const Rect& r, Color face, Color frame, int radius,
@@ -23,6 +24,57 @@ static void PaintDesignerAppearance(Draw& w, const Rect& r, const DesignerNode& 
                                     Color default_face, Color default_frame);
 static Color DesignerDebugColor(const DesignerNode& n);
 static void ApplyTitleCardInkOverrides(UiTitleCard::Style& style, const DesignerNode& n);
+
+template <class Style>
+static DesignerThemeSurfaceDefaults DesignerThemeSurfaceDefaultsFromStyle(const Style& s)
+{
+	DesignerThemeSurfaceDefaults out;
+	out.face = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorFace();
+	out.frame = s.palette.frame[ST_NORMAL];
+	out.frame_width = max(1, s.metrics.frame_width);
+	out.radius = s.metrics.radius;
+	out.face_enabled = s.metrics.face_enabled;
+	out.frame_enabled = s.metrics.frame_enabled;
+	out.shadow_enabled = s.metrics.shadow.enabled;
+	out.shadow_distance = s.metrics.shadow.distance;
+	out.shadow_offset_x = s.metrics.shadow.offset_x;
+	out.shadow_offset_y = s.metrics.shadow.offset_y;
+	out.shadow_alpha = s.metrics.shadow.alpha;
+	out.shadow_color = s.metrics.shadow.color;
+	out.shadow_curve = s.metrics.shadow.mode == SHADOW_HARD ? "Hard" : "Soft";
+	out.found = true;
+	return out;
+}
+
+DesignerThemeSurfaceDefaults DesignerResolveThemeSurfaceDefaults(const DesignerNode& n)
+{
+	int role_pos = n.properties.Find("role");
+	UiRole role = DesignerRoleChoice(role_pos >= 0 ? n.properties.GetValue(role_pos) : Value("Standard"));
+	if(n.type_id == "Window" || n.type_id == "UiPanel" ||
+	   n.type_id == "Item" || n.type_id == "Generic")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolvePanel(role));
+	if(n.type_id == "UiScrollPanel")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveScrollPanel(role));
+	if(n.type_id == "UiGroupPanel")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveGroupPanel(role));
+	if(n.type_id == "UiLabel")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveLabel(role));
+	if(n.type_id == "UiTitleCard")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveTitleCard(role));
+	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveButton(role));
+	if(n.type_id == "UiToolButton")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveToolButton(role));
+	if(n.type_id == "UiAccordion")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiAccordion::StyleDefault());
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveEdit(role));
+	if(n.type_id == "UiDropdown")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiTheme::ResolveDropdown(role));
+	if(n.type_id == "UiBreadcrumbs")
+		return DesignerThemeSurfaceDefaultsFromStyle(UiBreadcrumbs::StyleDefault());
+	return DesignerThemeSurfaceDefaults();
+}
 
 static int DesignerBreadcrumbCount(const DesignerNode& n)
 {

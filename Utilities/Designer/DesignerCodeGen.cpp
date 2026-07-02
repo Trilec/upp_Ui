@@ -13,6 +13,11 @@ static String ExportPlaceholder(const String& value, const char *placeholder)
 	return text.IsEmpty() ? String("[") + placeholder + "]" : text;
 }
 
+static bool IsExactDesign(DesignerAppearanceMode mode)
+{
+	return mode == DesignerAppearanceMode::ExactDesign;
+}
+
 static Value CodeGenNodeProperty(const DesignerNode& n, const String& key, const Value& def)
 {
 	int q = n.properties.Find(key);
@@ -119,9 +124,9 @@ static String StyleHelperName(const VectorMap<DesignerNodeId, String>& names, co
 	return "Make" + CodeIdentifier(VarName(names, n.id)) + "Style";
 }
 
-static bool HasThemeOverride(const DesignerNode& n, bool emit_designer_appearance)
+static bool HasThemeOverride(const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
-	return emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+	return IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false);
 }
 
 static String DirectionExpr(const DesignerNode& n, const String& def)
@@ -480,10 +485,10 @@ static void EmitAccordionThemeStyle(String& out, const String& var, const Design
 	    << "\t\t}\n";
 }
 
-static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n, bool emit_designer_appearance)
+static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
 	if(n.type_id == "UiAccordion") {
-		if(emit_designer_appearance)
+		if(IsExactDesign(appearance_mode))
 			EmitAccordionThemeStyle(out, var, n);
 		return;
 	}
@@ -493,7 +498,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	String resolve_expr = ResolveStyleExpr(n, role_expr);
 	if(style_type.IsEmpty() || resolve_expr.IsEmpty())
 		return;
-	bool override = emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false);
+	bool override = IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false);
 	bool force_style = false;
 	if(n.type_id == "UiTitleCard") {
 		force_style = CodeGenNodeProperty(n, "card_line_side", "Bottom") != "Bottom"
@@ -523,7 +528,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			return;
 	}
 
-	if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false)) {
+	if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false)) {
 		out << "\t\t// Designer appearance override for " << (n.name.IsEmpty() ? n.type_id : n.name) << ".\n"
 		    << "\t\t// Role base: " << AsString(CodeGenNodeProperty(n, "role", "Standard")) << ".\n"
 		    << "\t\t// Remove this block to return to theme defaults.\n";
@@ -532,7 +537,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	out << "\t\t{\n"
 	    << "\t\t\t" << style_type << " s = " << resolve_expr << ";\n";
 	if(CodeGenHasProperty(n, "face_enabled")) {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Surface override.\n";
 		bool face_enabled = (bool)CodeGenNodeProperty(n, "face_enabled", false);
 		out << "\t\t\ts.metrics.face_enabled = " << (face_enabled ? "true" : "false") << ";\n";
@@ -579,21 +584,21 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 	}
 	if(n.type_id == "UiTitleCard") {
 		if(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)) {
-			if(emit_designer_appearance)
+			if(IsExactDesign(appearance_mode))
 				out << "\t\t\t// Text/icon override.\n";
 			out << "\t\t\ts.title_color = "
 			    << ColorExpr(CodeGenNodeProperty(n, "title_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).title_color))
 			    << ";\n";
 		}
 		if(CodeGenHasProperty(n, "subtitle_color_enabled") && (bool)CodeGenNodeProperty(n, "subtitle_color_enabled", false)) {
-			if(emit_designer_appearance && !(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)))
+			if(IsExactDesign(appearance_mode) && !(CodeGenHasProperty(n, "title_color_enabled") && (bool)CodeGenNodeProperty(n, "title_color_enabled", false)))
 				out << "\t\t\t// Text/icon override.\n";
 			out << "\t\t\ts.subtitle_color = "
 			    << ColorExpr(CodeGenNodeProperty(n, "subtitle_color", UiTheme::ResolveTitleCard(CodeGenRoleChoice(n)).subtitle_color))
 			    << ";\n";
 		}
 		if(CodeGenHasProperty(n, "card_line_side")) {
-			if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 				out << "\t\t\t// Layout-specific override.\n";
 			out << "\t\t\ts.card_line_side = " << AlignSideExpr(CodeGenNodeProperty(n, "card_line_side", "Bottom"), "Bottom") << ";\n";
 		}
@@ -616,7 +621,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	if(CodeGenHasProperty(n, "shadow_enabled")) {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Shadow override.\n";
 		bool shadow = (bool)CodeGenNodeProperty(n, "shadow_enabled", false);
 		out << "\t\t\ts.metrics.shadow.enabled = " << (shadow ? "true" : "false") << ";\n";
@@ -637,18 +642,18 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	if(n.type_id == "UiCheckBox") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Indicator override.\n";
 		EmitSurfaceOverrideFields(out, "s.indicator_palette", n, "indicator");
 	}
 	else if(n.type_id == "UiToggle") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Indicator override.\n";
 		EmitSurfaceOverrideFields(out, "s.track_palette", n, "track");
 		EmitSurfaceOverrideFields(out, "s.thumb_palette", n, "thumb");
 	}
 	if(n.type_id == "UiSlider") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Layout-specific override.\n";
 		out << "\t\t\ts.track_size = Size(DPI(" << max(20, (int)CodeGenNodeProperty(n, "track_width", 120))
 		    << "), DPI(" << max(1, (int)CodeGenNodeProperty(n, "track_height", 3)) << "));\n"
@@ -662,7 +667,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		    << "\t\t\ts.affordance_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "affordance_gap", 4)) << ");\n";
 	}
 	if(n.type_id == "UiLabel") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Text/icon override.\n";
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = UiTheme::ResolveLabel(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
@@ -683,7 +688,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiCheckBox") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Text/icon override.\n";
 		String visual = AsString(CodeGenNodeProperty(n, "visual", "Classic"));
 		UiCheckVisual vis = visual == "Chip" ? UICHECKVIS_CHIP :
@@ -705,7 +710,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiDropdown") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Text/icon override.\n";
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
 			Color base_ink = UiTheme::ResolveDropdown(CodeGenRoleChoice(n)).palette.ink[ST_NORMAL];
@@ -716,7 +721,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		}
 	}
 	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit") {
-		if(emit_designer_appearance && (bool)CodeGenNodeProperty(n, "theme_override", false))
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Text/icon override.\n";
 		UiBaseEdit::Style base = UiTheme::ResolveEdit(CodeGenRoleChoice(n));
 		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
@@ -740,7 +745,7 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 static String BuildThemeHelperBody(const String& var, const DesignerNode& n)
 {
 	String temp;
-	EmitThemeStyle(temp, var, n, true);
+	EmitThemeStyle(temp, var, n, DesignerAppearanceMode::ExactDesign);
 	temp.Replace("\t\t\t" + var + ".SetCustomStyle(s);\n", "\treturn s;\n");
 	temp.Replace("\t\t{\n", "");
 	temp.Replace("\t\t}\n", "");
@@ -751,7 +756,7 @@ static String BuildThemeHelperBody(const String& var, const DesignerNode& n)
 
 static void EmitThemeHelper(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
 {
-	if(!HasThemeOverride(n, true))
+	if(!HasThemeOverride(n, DesignerAppearanceMode::ExactDesign))
 		return;
 	String helper = StyleHelperName(names, n);
 	String style_type = StyleTypeExpr(n);
@@ -1195,13 +1200,13 @@ static void EmitDesignerMinSize(String& out, const String& var, const DesignerNo
 }
 
 static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& names,
-                      const DesignerNode& n, bool emit_designer_appearance)
+                      const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
 	String var = VarName(names, n.id);
 	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
 		return;
-	if(!HasThemeOverride(n, emit_designer_appearance))
-		EmitThemeStyle(out, var, n, emit_designer_appearance);
+	if(!HasThemeOverride(n, appearance_mode))
+		EmitThemeStyle(out, var, n, appearance_mode);
 	EmitDesignerMinSize(out, var, n);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
@@ -1333,8 +1338,9 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		    << ".SetMediaAutoFit(" << ((bool)CodeGenNodeProperty(n, "media_auto_fit", false) ? "true" : "false") << ")"
 		    << ".SetMediaSide(" << AlignSideExpr(CodeGenNodeProperty(n, "media_side", "Left"), "Left") << ")"
 		    << ".SetMediaAlign(" << AlignHExpr(CodeGenNodeProperty(n, "media_align_h", "Center"), "Center")
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ")";
-		if(emit_designer_appearance || text_align_v != "Center")
+		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ")"
+		    << ".ShowTitleLine(" << ((bool)CodeGenNodeProperty(n, "title_line", true) ? "true" : "false") << ")";
+		if(IsExactDesign(appearance_mode) || text_align_v != "Center")
 			out << ".SetTextAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align", "Left"), "Left")
 			    << ", " << AlignVExpr(text_align_v, "Center") << ")";
 		out << ";\n";
@@ -1803,10 +1809,10 @@ static void EmitPostAddSetup(String& out, const VectorMap<DesignerNodeId, String
 }
 
 static void EmitAppearanceApply(String& out, const VectorMap<DesignerNodeId, String>& names,
-                                const DesignerModel& model, bool emit_designer_appearance)
+                                const DesignerModel& model, DesignerAppearanceMode appearance_mode)
 {
 	for(const DesignerNode& n : model.GetNodes()) {
-		if(n.id == Designer_ROOT || !HasThemeOverride(n, emit_designer_appearance))
+		if(n.id == Designer_ROOT || !HasThemeOverride(n, appearance_mode))
 			continue;
 		out << "\t\t" << VarName(names, n.id) << ".SetCustomStyle(" << StyleHelperName(names, n) << "());\n";
 	}
@@ -1821,6 +1827,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	if(options.emit_export_header) {
 		out << "// Generated by U++ Ui Designer.\n"
 		    << "// Designer version: " << ExportPlaceholder(options.designer_version, "DESIGNER_VERSION") << "\n"
+		    << "// Appearance mode: " << (options.appearance_mode == DesignerAppearanceMode::ExactDesign ? "ExactDesign" : "ThemeFirst") << "\n"
 		    << "// Source design: " << ExportPlaceholder(options.source_design_filename, "SOURCE_DESIGN_JSON") << "\n"
 		    << "// Package: " << ExportPlaceholder(options.package_name, "PACKAGE_NAME") << "\n"
 		    << "// UMK path: " << ExportPlaceholder(options.umk_path, "PATH_TO_UPP_OR_UMK") << "\n"
@@ -1828,7 +1835,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 		    << "// Build method: " << ExportPlaceholder(options.build_method, "BUILD_METHOD") << "\n"
 		    << "// Output executable: " << ExportPlaceholder(options.output_exe_path, "PATH_TO_OUTPUT_EXE") << "\n"
 		    << "// Regenerate from design.json when the Designer model changes.\n"
-		    << "// This file is theme-first generated output.\n"
+		    << "// This file is " << (options.appearance_mode == DesignerAppearanceMode::ExactDesign ? "exact-design" : "theme-first") << " generated output.\n"
 		    << "// Explicit Designer appearance overrides are marked in code.\n\n";
 	}
 	out << "#include <CtrlLib/CtrlLib.h>\n"
@@ -1836,13 +1843,19 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	    << "using namespace Upp;\n\n"
 	    << "// -----------------------------------------------------------------------------\n"
 	    << "// Theme candidates\n"
-	    << "// -----------------------------------------------------------------------------\n"
-	    << "// These style helpers were generated from Designer appearance overrides.\n"
-	    << "// They can be copied into a shared UiTheme preset later.\n"
-	    << "// Instance-specific text, layout, data, and event wiring remain outside this section.\n\n";
-	for(const DesignerNode& n : model.GetNodes())
-		if(n.id != Designer_ROOT)
-			EmitThemeHelper(out, names, n);
+	    << "// -----------------------------------------------------------------------------\n";
+	if(IsExactDesign(options.appearance_mode)) {
+		out << "// These style helpers were generated from Designer appearance overrides.\n"
+		    << "// They can be copied into a shared UiTheme preset later.\n"
+		    << "// Instance-specific text, layout, data, and event wiring remain outside this section.\n\n";
+		for(const DesignerNode& n : model.GetNodes())
+			if(n.id != Designer_ROOT)
+				EmitThemeHelper(out, names, n);
+	}
+	else {
+		out << "// Designer appearance export omitted in theme-first mode.\n"
+		    << "// Instance-specific text, layout, data, and event wiring remain outside this section.\n\n";
+	}
 
 	out << "class " << options.class_name << " : public TopWindow {\n"
 	    << "public:\n"
@@ -1875,15 +1888,15 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitSetup(out, names, n, options.emit_designer_appearance);
+		EmitSetup(out, names, n, options.appearance_mode);
 	}
 	out << "\t}\n\n"
 	    << "\tvoid ApplyAppearanceOverrides()\n"
 	    << "\t{\n";
-	if(options.emit_designer_appearance)
-		EmitAppearanceApply(out, names, model, options.emit_designer_appearance);
+	if(IsExactDesign(options.appearance_mode))
+		EmitAppearanceApply(out, names, model, options.appearance_mode);
 	else
-		out << "\t\t// Designer appearance export disabled; role/theme-first output only.\n";
+		out << "\t\t// Designer appearance export omitted; theme-first output only.\n";
 	out << "\t}\n\n"
 	    << "\tvoid BuildLayout()\n"
 	    << "\t{\n"
@@ -1911,12 +1924,20 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 }
 
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
-                            const String& class_name, bool emit_designer_appearance)
+                            const String& class_name, DesignerAppearanceMode appearance_mode)
 {
 	DesignerCodeGenOptions options;
 	options.class_name = class_name;
-	options.emit_designer_appearance = emit_designer_appearance;
+	options.appearance_mode = appearance_mode;
 	return GenerateDesignerCode(model, registry, options);
+}
+
+String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
+                            const String& class_name, bool emit_designer_appearance)
+{
+	return GenerateDesignerCode(model, registry, class_name,
+	                            emit_designer_appearance ? DesignerAppearanceMode::ExactDesign
+	                                                      : DesignerAppearanceMode::ThemeFirst);
 }
 
 }
