@@ -183,6 +183,23 @@ static String BuildExportWarningBlock(const Vector<String>& warnings)
 	return out;
 }
 
+static String EscapeCppString(const String& text)
+{
+	String out;
+	for(int i = 0; i < text.GetCount(); ++i) {
+		const char c = text[i];
+		switch(c) {
+		case '\\': out << "\\\\"; break;
+		case '"': out << "\\\""; break;
+		case '\n': out << "\\n"; break;
+		case '\r': out << "\\r"; break;
+		case '\t': out << "\\t"; break;
+		default:   out.Cat(c); break;
+		}
+	}
+	return out;
+}
+
 static String StyleLabel(const SymbolPickerExportItem& item)
 {
 	String out = SymbolPickerIconStyleText(item.style);
@@ -315,8 +332,9 @@ String BuildCppSnippetExport(const SymbolPickerProject& project,
 		<< "};\n\n";
 	out << "static const SymbolPickerExportRow kSymbolPickerExport[] = {\n";
 	for(const auto& item : items) {
-		out << "    { \"" << item.symbol_name << "\", \"" << item.catalog_id << "\", \"" << item.source_id
-			<< "\", \"" << item.category << "\", " << item.size << ", \"" << item.comment << "\" },\n";
+		out << "    { \"" << EscapeCppString(item.symbol_name) << "\", \"" << EscapeCppString(item.catalog_id) << "\", \""
+			<< EscapeCppString(item.source_id) << "\", \"" << EscapeCppString(item.category) << "\", " << item.size
+			<< ", \"" << EscapeCppString(item.comment) << "\" },\n";
 	}
 	out << "};\n";
 	return out;
@@ -405,6 +423,17 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	d.unresolved = false;
 	secondary.items.Add(d);
 
+	SymbolPickerIconRef f;
+	f.catalog_id = "action/save/sharp";
+	f.source_id = "action/save";
+	f.alias = "Quote \"Alias\" \\ sample";
+	f.size = 128;
+	f.tint = Color(16, 17, 18);
+	f.comment = "line1\nline2\t\"tail\"\\";
+	f.category_override = "Content";
+	f.unresolved = false;
+	secondary.items.Add(f);
+
 	SymbolPickerIconRef e;
 	e.catalog_id = "legacy/missing_icon/outlined";
 	e.source_id = "legacy/missing_icon";
@@ -422,7 +451,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	Vector<SymbolPickerExportItem> all_items = BuildSymbolPickerExportItems(project, catalog, SymbolPickerExportScope::AllCollections, &all_warnings);
 	Vector<SymbolPickerExportCategory> active_categories = BuildSymbolPickerExportCategories(project, catalog, SymbolPickerExportScope::ActiveCollection, &active_warnings);
 	Vector<SymbolPickerExportCategory> all_categories = BuildSymbolPickerExportCategories(project, catalog, SymbolPickerExportScope::AllCollections, &all_warnings);
-	if(active_items.GetCount() != 3 || all_items.GetCount() != 4
+	if(active_items.GetCount() != 3 || all_items.GetCount() != 5
 		|| active_categories.GetCount() != 2 || all_categories.GetCount() != 3) {
 		error = "Export smoke did not create enough categories.";
 		return false;
@@ -448,7 +477,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 			primary_cat = i;
 	}
 	for(int i = 0; i < all_categories.GetCount(); ++i) {
-		if(all_categories[i].name == "content")
+		if(all_categories[i].name == "Content")
 			content = i;
 	}
 	if(pinned < 0 || primary_cat < 0 || content < 0) {
@@ -458,7 +487,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 
 	if(active_categories[pinned].items.GetCount() != 1
 		|| active_categories[primary_cat].items.GetCount() != 2
-		|| all_categories[content].items.GetCount() != 1) {
+		|| all_categories[content].items.GetCount() != 2) {
 		error = "Export smoke category item counts are wrong.";
 		return false;
 	}
@@ -469,7 +498,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Export smoke symbol naming failed.";
 		return false;
 	}
-	if(all_categories[content].items[0].symbol_name != "ICON_MYAPP_COPY_NOW") {
+	if(all_categories[content].items[0].symbol_name != "ICON_MYAPP_COPY_NOW"
+		|| all_categories[content].items[1].symbol_name != "ICON_MYAPP_QUOTE_ALIAS_SAMPLE") {
 		error = "Export smoke derived symbol naming failed.";
 		return false;
 	}
@@ -514,6 +544,11 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		|| category_list_export.Find("Primary:") < 0
 		|| category_list_export.Find("Content:") < 0)
 		return Fail("Export smoke text builders did not format the expected structure.");
+	if(cpp_snippet_export.Find("\\\"Alias\\\"") < 0
+		|| cpp_snippet_export.Find("\\\\ sample") < 0
+		|| cpp_snippet_export.Find("\\nline2") < 0
+		|| cpp_snippet_export.Find("\\t\\\"tail\\\"\\\\") < 0)
+		return Fail("Export smoke C++ escaping failed.");
 	if(icon_id_export.Find("ICON_MYAPP_ICON_MYAPP") >= 0
 		|| image_call_export.Find("ICON_MYAPP_ICON_MYAPP") >= 0
 		|| cpp_snippet_export.Find("ICON_MYAPP_ICON_MYAPP") >= 0) {
