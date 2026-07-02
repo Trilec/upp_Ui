@@ -806,7 +806,8 @@ void SymbolPickerView::BuildCollectionsPanel()
 	output_export_type_.UseInternalModel().Clear()
 		.Add("Image Call", (int)SymbolPickerExportType::ImageCall)
 		.Add("Icon Id", (int)SymbolPickerExportType::IconId)
-		.Add("C++ Snippet", (int)SymbolPickerExportType::CppSnippet);
+		.Add("C++ Snippet", (int)SymbolPickerExportType::CppSnippet)
+		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles);
 	output_export_type_.Select(0);
 	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
 	copy_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
@@ -1229,6 +1230,10 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
+	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles) {
+		PromptOK("SVG file export uses Export.");
+		return false;
+	}
 	const SymbolPickerCollection* collection = model_->GetActiveCollection();
 	if(!collection || collection->items.IsEmpty()) {
 		PromptOK("No items in the active collection.");
@@ -1251,6 +1256,8 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
+	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles)
+		return ExportCurrentSvgFiles(scope);
 
 	String text = BuildExportText(scope);
 	if(text.IsEmpty()) {
@@ -1278,6 +1285,41 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 		return false;
 	}
 	PromptOK(Format("Exported text:\n%s", path));
+	return true;
+}
+
+bool SymbolPickerView::ExportCurrentSvgFiles(SymbolPickerExportScope scope)
+{
+	if(!model_ || !catalog_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+
+	FileSel fs;
+	fs.Type("Folder", ".*");
+	String current = model_->GetProjectFilePath();
+	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	if(!fs.ExecuteSelectDir(BuildProjectDialogTitle(scope == SymbolPickerExportScope::AllCollections ? "Export All SVG" : "Export SVG")))
+		return false;
+
+	String output_folder = ~fs;
+	Vector<String> warnings;
+	int written = 0;
+	int skipped = 0;
+	SymbolPickerProject project = model_->ExportProject();
+	project.default_size = model_->GetExportSize();
+	if(!ExportSymbolPickerSvgFiles(project, *catalog_, scope, output_folder, &warnings, &written, &skipped)) {
+		String message = Format("SVG export finished with issues.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder);
+		if(!warnings.IsEmpty()) {
+			message << "\nWarnings: " << warnings.GetCount();
+			Exclamation(message);
+		}
+		else
+			Exclamation(message);
+		return false;
+	}
+
+	PromptOK(Format("SVG export finished.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder));
 	return true;
 }
 

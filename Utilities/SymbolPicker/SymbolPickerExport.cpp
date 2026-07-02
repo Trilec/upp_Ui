@@ -1,4 +1,5 @@
 #include "SymbolPickerExport.h"
+#include "SymbolPickerGeneratedCatalog.h"
 
 namespace Upp {
 
@@ -183,6 +184,100 @@ static String BuildExportWarningBlock(const Vector<String>& warnings)
 	return out;
 }
 
+static String MakeSafeFileComponent(const String& text)
+{
+	String out;
+	for(int i = 0; i < text.GetCount(); ++i) {
+		const char c = text[i];
+		if(IsAlNum((byte)c) || c == '_' || c == '-' || c == '.')
+			out.Cat(c);
+		else if(out.IsEmpty() || out[out.GetCount() - 1] != '_')
+			out.Cat('_');
+	}
+	while(!out.IsEmpty() && (out[out.GetCount() - 1] == '_' || out[out.GetCount() - 1] == '.'))
+		out.Trim(out.GetCount() - 1);
+	if(out.IsEmpty())
+		out = "export";
+	return out;
+}
+
+static bool EnsureDirectoryPath(const String& path)
+{
+	String p = NormalizePath(path);
+	if(p.IsEmpty())
+		return false;
+	if(DirectoryExists(p))
+		return true;
+	String parent = GetFileFolder(p);
+	if(!parent.IsEmpty() && parent != p && !DirectoryExists(parent) && !EnsureDirectoryPath(parent))
+		return false;
+	return DirectoryCreate(p) || DirectoryExists(p);
+}
+
+static String SvgHexColor(Color c)
+{
+	return Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB());
+}
+
+static void ReplaceAttribute(String& text, const String& attr, const String& value)
+{
+	String pattern1 = attr + "=\"";
+	int q = text.Find(pattern1);
+	if(q >= 0) {
+		int start = q + pattern1.GetCount();
+		int end = text.Find('"', start);
+		if(end >= 0)
+			text = text.Left(start) + value + text.Mid(end);
+		return;
+	}
+
+	String pattern2 = attr + "='";
+	q = text.Find(pattern2);
+	if(q >= 0) {
+		int start = q + pattern2.GetCount();
+		int end = text.Find('\'', start);
+		if(end >= 0)
+			text = text.Left(start) + value + text.Mid(end);
+		return;
+	}
+
+	int svg = text.Find("<svg");
+	if(svg < 0)
+		return;
+	int gt = text.Find('>', svg);
+	if(gt < 0)
+		return;
+	text.Insert(gt, Format(" %s=\"%s\"", attr, value));
+}
+
+static String NormalizeSvgRoot(String svg_xml, int size, Color tint)
+{
+	String out = svg_xml;
+	int svg = out.Find("<svg");
+	if(svg < 0)
+		return out;
+
+	int gt = out.Find('>', svg);
+	if(gt < 0)
+		return out;
+
+	String root = out.Mid(svg, gt - svg + 1);
+	ReplaceAttribute(root, "width", AsString(size));
+	ReplaceAttribute(root, "height", AsString(size));
+
+	if(!IsNull(tint)) {
+		String hex = SvgHexColor(tint);
+		ReplaceAttribute(root, "color", hex);
+		if(root.Find("fill=") < 0)
+			ReplaceAttribute(root, "fill", hex);
+		out.Replace("currentColor", hex);
+	}
+
+	out.Remove(svg, gt - svg + 1);
+	out.Insert(svg, root);
+	return out;
+}
+
 static String EscapeCppString(const String& text)
 {
 	String out;
@@ -206,6 +301,42 @@ static String StyleLabel(const SymbolPickerExportItem& item)
 	if(item.unresolved)
 		out << " (unresolved)";
 	return out;
+}
+
+String BuildSymbolPickerSvgFileName(const SymbolPickerExportItem& item)
+{
+	String name = TrimBoth(item.symbol_name);
+	if(name.IsEmpty())
+		name = "icon";
+	return MakeSafeFileComponent(name) + ".svg";
+}
+
+String BuildSymbolPickerSvgText(const SymbolPickerExportItem& item, const String& svg_xml)
+{
+	String out = NormalizeSvgRoot(svg_xml, item.size > 0 ? item.size : 48, item.tint);
+	if(!IsNull(item.tint)) {
+		String hex = SvgHexColor(item.tint);
+		if(out.Find("currentColor") < 0 && out.Find("fill=") < 0) {
+			int svg = out.Find("<svg");
+			if(svg >= 0) {
+				int gt = out.Find('>', svg);
+				if(gt >= 0)
+					out.Insert(gt, Format(" fill=\"%s\"", hex));
+			}
+		}
+	}
+	return out;
+}
+
+static bool WriteSvgWarningsFile(const String& folder, const Vector<String>& warnings)
+{
+	if(warnings.IsEmpty())
+		return true;
+	String path = AppendFileName(folder, "_export_warnings.txt");
+	String out;
+	for(const String& warning : warnings)
+		out << warning << '\n';
+	return SaveFile(path, out);
 }
 
 Vector<SymbolPickerExportItem> BuildSymbolPickerExportItems(const SymbolPickerProject& project,
@@ -356,6 +487,103 @@ String BuildCategoryListExport(const SymbolPickerProject& project,
 		out << '\n';
 	}
 	return out;
+}
+
+bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
+	const SymbolPickerCatalog& catalog,
+	SymbolPickerExportScope scope,
+	const String& output_folder,
+	Vector<String>* warnings,
+	int* files_written,
+	int* files_skipped)
+{
+	if(files_written)
+		*files_written = 0;
+	if(files_skipped)
+		*files_skipped = 0;
+
+	Vector<String> local_warnings;
+	Vector<String>& warn = warnings ? *warnings : local_warnings;
+	if(!EnsureDirectoryPath(output_folder)) {
+		warn.Add(Format("Could not create output folder '%s'.", output_folder));
+		return false;
+	}
+
+	bool ok = true;
+	int written = 0;
+	int skipped = 0;
+
+	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
+		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
+			continue;
+
+		const SymbolPickerCollection& collection = project.collections[ci];
+		String collection_dir = output_folder;
+		if(scope == SymbolPickerExportScope::AllCollections)
+			collection_dir = AppendFileName(output_folder, MakeSafeFileComponent(collection.name));
+		if(!EnsureDirectoryPath(collection_dir)) {
+			warn.Add(Format("Could not create SVG export folder '%s'.", collection_dir));
+			ok = false;
+			continue;
+		}
+
+		Index<String> used_names;
+		for(const auto& item : collection.items) {
+			const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
+			if(!entry && !item.source_id.IsEmpty())
+				entry = catalog.FindBySourceId(item.source_id);
+			if(!entry || item.unresolved) {
+				warn.Add(Format("Skipped unresolved icon %s%s%s in collection '%s'.",
+					(item.catalog_id.IsEmpty() ? String("(missing catalog_id)") : item.catalog_id),
+					(item.source_id.IsEmpty() ? String() : " / "),
+					(item.source_id.IsEmpty() ? String() : item.source_id),
+					collection.name));
+				++skipped;
+				continue;
+			}
+
+			SymbolPickerExportItem ex;
+			ex.category = ResolveExportCategory(project, collection, item, entry);
+			ex.symbol_name = MakeSymbolPickerExportSymbolName(project, collection, item, entry, used_names);
+			ex.display_name = MakeSymbolPickerExportDisplayName(project, collection, item, entry);
+			ex.catalog_id = item.catalog_id;
+			ex.source_id = item.source_id;
+			ex.alias = item.alias;
+			ex.comment = item.comment;
+			ex.size = item.size > 0 ? item.size : project.default_size;
+			ex.tint = item.tint;
+			ex.style = item.has_style_override ? item.style_override : entry->style;
+			ex.unresolved = false;
+
+			String svg_xml;
+			if(!DecodeGeneratedSymbolPickerSvg(ex.catalog_id, svg_xml) || svg_xml.IsEmpty()) {
+				warn.Add(Format("Could not decode SVG for %s.", ex.catalog_id));
+				++skipped;
+				ok = false;
+				continue;
+			}
+
+			String file_name = BuildSymbolPickerSvgFileName(ex);
+			String path = AppendFileName(collection_dir, file_name);
+			String svg_text = BuildSymbolPickerSvgText(ex, svg_xml);
+			if(!SaveFile(path, svg_text)) {
+				warn.Add(Format("Could not write SVG file '%s'.", path));
+				++skipped;
+				ok = false;
+				continue;
+			}
+			++written;
+		}
+	}
+
+	if(files_written)
+		*files_written = written;
+	if(files_skipped)
+		*files_skipped = skipped;
+
+	if(!WriteSvgWarningsFile(output_folder, warn))
+		ok = false;
+	return ok;
 }
 
 bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String& error)
@@ -563,7 +791,88 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		return false;
 	}
 
+	String svg_temp_dir = AppendFileName(GetTempPath(), "symbolpicker_svg_smoke");
+	DeleteFolderDeep(svg_temp_dir);
+	if(!EnsureDirectoryPath(svg_temp_dir)) {
+		error = "SVG smoke could not create its temp folder.";
+		return false;
+	}
+
+	SymbolPickerProject svg_project;
+	svg_project.project_name = "SVG Smoke";
+	svg_project.symbol_prefix = "ICON_MYAPP_";
+	svg_project.default_size = 32;
+	svg_project.active_collection_index = 0;
+
+	SymbolPickerCollection svg_collection;
+	svg_collection.name = "SVG Collection";
+
+	SymbolPickerIconRef svga;
+	svga.catalog_id = "action/save/outlined";
+	svga.source_id = "action/save";
+	svga.alias = "Svg One";
+	svga.size = 16;
+	svga.tint = Null;
+	svg_collection.items.Add(svga);
+
+	SymbolPickerIconRef svgb;
+	svgb.catalog_id = "content/content_copy/outlined";
+	svgb.source_id = "content/content_copy";
+	svgb.alias = "Tinted Svg";
+	svgb.size = 48;
+	svgb.tint = Color(255, 0, 0);
+	svg_collection.items.Add(svgb);
+
+	SymbolPickerIconRef svgc;
+	svgc.catalog_id = "legacy/missing_icon/outlined";
+	svgc.source_id = "legacy/missing_icon";
+	svgc.alias = "Broken";
+	svgc.unresolved = true;
+	svg_collection.items.Add(svgc);
+
+	svg_project.collections.Add(pick(svg_collection));
+
+	Vector<String> svg_warnings;
+	int written = 0;
+	int skipped = 0;
+	if(!ExportSymbolPickerSvgFiles(svg_project, catalog, SymbolPickerExportScope::ActiveCollection, svg_temp_dir, &svg_warnings, &written, &skipped)) {
+		DeleteFolderDeep(svg_temp_dir);
+		error = "SVG smoke export failed.";
+		return false;
+	}
+	String svg_one = AppendFileName(svg_temp_dir, "ICON_MYAPP_SVG_ONE.svg");
+	String svg_two = AppendFileName(svg_temp_dir, "ICON_MYAPP_TINTED_SVG.svg");
+	if(written != 2 || skipped == 0 || !FileExists(svg_one) || !FileExists(svg_two)) {
+		DeleteFolderDeep(svg_temp_dir);
+		error = "SVG smoke did not write the expected files.";
+		return false;
+	}
+	String svg_one_text = LoadFile(svg_one);
+	String svg_two_text = LoadFile(svg_two);
+	if(svg_one_text.Find("<svg") < 0 || svg_one_text.Find("width=\"16\"") < 0 || svg_one_text.Find("height=\"16\"") < 0) {
+		DeleteFolderDeep(svg_temp_dir);
+		error = "SVG smoke did not normalize SVG size.";
+		return false;
+	}
+	if(svg_two_text.Find("<svg") < 0 || svg_two_text.Find("#FF0000") < 0) {
+		DeleteFolderDeep(svg_temp_dir);
+		error = "SVG smoke did not apply tint.";
+		return false;
+	}
+	if(svg_warnings.IsEmpty() || !FileExists(AppendFileName(svg_temp_dir, "_export_warnings.txt"))) {
+		DeleteFolderDeep(svg_temp_dir);
+		error = "SVG smoke did not emit warnings.";
+		return false;
+	}
+
+	DeleteFolderDeep(svg_temp_dir);
+
 	return true;
+}
+
+bool RunSymbolPickerSvgExportSmokeTests(const SymbolPickerCatalog& catalog, String& error)
+{
+	return RunSymbolPickerExportSmokeTests(catalog, error);
 }
 
 }
