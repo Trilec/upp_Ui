@@ -6,6 +6,20 @@ Reference:
 This note captures the shell direction from the generated mockup so the live
 Designer can be updated without copying the generated source directly.
 
+## 0. Adopted Into The Live Shell
+
+The following mockup elements were carried into `Utilities/Designer/main.cpp`:
+- cleaner top header row with title card, save/load split buttons, version badge,
+  theme controls, and exit action
+- left tool strip with category buttons and a scroll-hosted inner info area
+- center aspect helper strip above the preview surface
+- right tool strip with pane controls and a scroll-hosted inner info area
+- wider right panel treatment for hierarchy/inspector/code content
+- lower warning/status row kept as the quiet bottom feedback area
+- role-first panel styling with compact mono-tint tool buttons
+
+## 1. Top Bar
+
 ## 1. Top Bar
 
 Observed top bar controls in the mockup:
@@ -39,6 +53,7 @@ Observed layout direction:
 - A short top strip for category switching
 - A scrollable information/tool area beneath the strip
 - Lightweight vertical spacing and narrow icon-first controls
+- A dedicated panel toggle affordance belongs at the far left when implemented
 
 ## 3. Center Strip
 
@@ -52,6 +67,8 @@ Observed layout direction:
 - Helper strip sits above the preview area
 - The preview area is the main central surface
 - Aspect helpers are visually lightweight and should not dominate the shell
+- The live shell uses a compact fit/portrait/landscape/square helper strip instead
+  of copying the mockup verbatim
 
 ## 4. Right Tool Strip
 
@@ -67,6 +84,8 @@ Observed layout direction:
 - Top strip for shell navigation and pane affordances
 - Scrollable information area below the strip
 - Wider panel than the left tool strip because the hierarchy needs more room
+- The live shell keeps the right panel wider than the left, but does not copy the
+  mockup's generated helper blocks directly
 
 ## 5. Lower Status / Help Area
 
@@ -103,6 +122,27 @@ No missing icon symbols were found for the mockup references:
 - `ICON_EDITOR_FORMAT_INDENT_INCREASE_48`
 - `ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48`
 
+Icons used in the live shell implementation:
+- `ICON_ACTION_LIGHT_MODE_48`
+- `ICON_ACTION_OUTLINED_VISIBILITY_48`
+- `ICON_DESIGN_ASPECT_RATIO_48`
+- `ICON_DESIGN_DASHBOARD_EDIT_48`
+- `ICON_DESIGN_HELP_48`
+- `ICON_DESIGN_LAYOUTS_CATEGORY_48`
+- `ICON_DESIGN_RIGHT_PANEL_CLOSE_48`
+- `ICON_DESIGN_RIGHT_PANEL_OPEN_48`
+- `ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48`
+- `ICON_DESIGN_SPLITSCREEN_PORTRAIT_48`
+- `ICON_DESIGN_TAB_GROUP_48`
+- `ICON_DESIGN_WIDGETS_48`
+- `ICON_NAVIGATION_EXIT_TO_APP_48`
+- `ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48`
+
+Missing or renamed icons:
+- none missing from the current catalog for the adopted shell set
+- the mockup's left/right panel toggle labels were kept as shell affordances,
+  not hard-coded generated names
+
 ## 7. Cleanup Notes Before Shell Implementation
 
 Suggested naming cleanup for the live Designer shell:
@@ -116,3 +156,20 @@ Suggested implementation rule:
 - Keep the Designer model and inspector flow unchanged.
 - Only reshape the shell chrome and the container hierarchy.
 - Use the mockup as the visual guide, not as generated source.
+
+## 8. Intentionally Not Copied
+
+The following mockup-generated helper/styling blocks were intentionally not copied
+into the live shell:
+- generated style helper functions or large style factory blocks
+- generated mockup layout scaffolding that would bypass the live Designer model
+- any direct generated source structure that would mix shell chrome and model logic
+- mockup-only placeholder controls that do not exist in the current Designer shell
+
+## 9. Placeholders Left For Later
+
+The live shell still leaves these for a later pass:
+- explicit left panel collapse/expand behavior if it is added as a real feature
+- any deeper code-view/status-bar expansion beyond the current warning/status row
+- further spacing polish once the right-side content pages are tuned in practice
+- any icon catalog cleanup that turns up during the next control-module audit
