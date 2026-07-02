@@ -97,6 +97,21 @@ static String EnsureProjectExtension(String path)
 	return path;
 }
 
+static String MakeExportScopeName(const SymbolPickerProject& project, SymbolPickerExportScope scope)
+{
+	String base = TrimBoth(project.output_base_name);
+	if(base.IsEmpty())
+		base = TrimBoth(project.project_name);
+	if(base.IsEmpty())
+		base = "symbolpicker_export";
+	base = MakeSymbolPickerSafeCppIdentifierSegment(base);
+	if(scope == SymbolPickerExportScope::AllCollections)
+		base << "_all";
+	else
+		base << "_current";
+	return ToLower(base);
+}
+
 static Image MakeDragSampleFromCtrl(Ctrl& ctrl)
 {
 	Size sz = ctrl.GetSize();
@@ -771,12 +786,20 @@ void SymbolPickerView::BuildCollectionsPanel()
 	export_and_type_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
 	export_and_type_button_.SetText("Export").SetContentInset(DPI(6)).SetContentGap(DPI(4));
 	export_and_type_button_.SetSplitWidth(DPI(30)).SetSplitContentGap(DPI(4)).SetSplitIconSize(DPI(16)).SetPopupMinWidth(DPI(220));
-	export_and_type_button_.Add("Export current").Add("Export all");
+	export_and_type_button_.ClearItems().Add("Export current", "current").Add("Export all", "all");
 
 	collections_selector_.SetSizeMin(DPI(180), 0);
 	output_pixel_size_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
 	output_pixel_size_.SetSizeMin(DPI(110), 0);
-	output_pixel_size_.UseInternalModel().Clear().Add("24 px", 24).Add("32 px", 32).Add("48 px", 48).Add("64 px", 64);
+	output_pixel_size_.UseInternalModel().Clear()
+		.Add("16 px", 16)
+		.Add("24 px", 24)
+		.Add("32 px", 32)
+		.Add("48 px", 48)
+		.Add("64 px", 64)
+		.Add("128 px", 128)
+		.Add("256 px", 256)
+		.Add("512 px", 512);
 	output_pixel_size_.SelectByData(48);
 	output_export_type_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
 	output_export_type_.SetSizeMin(DPI(130), 0);
@@ -874,11 +897,21 @@ void SymbolPickerView::BuildCollectionsPanel()
 	remove_collection_tool_.WhenAction = [=] {
 		// Stub for later collection-management workflow wiring.
 	};
+	output_pixel_size_.WhenSelectData = [=](const Value& value) {
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetExportSizeCommand(IsNumber(value) ? (int)value : 0), *model_);
+	};
 	output_pixel_size_.WhenAction = [=] {
-		// Stub for later export workflow wiring.
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetExportSizeCommand(IsNumber(~output_pixel_size_) ? (int)~output_pixel_size_ : 0), *model_);
+	};
+	output_export_type_.WhenSelectData = [=](const Value& value) {
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetExportTypeCommand((SymbolPickerExportType)(IsNumber(value) ? (int)value : (int)SymbolPickerExportType::ImageCall)), *model_);
 	};
 	output_export_type_.WhenAction = [=] {
-		// Stub for later export workflow wiring.
+		if(model_ && commands_)
+			commands_->Execute(MakeSymbolPickerSetExportTypeCommand((SymbolPickerExportType)(IsNumber(~output_export_type_) ? (int)~output_export_type_ : (int)SymbolPickerExportType::ImageCall)), *model_);
 	};
 	save_and_save_as_button_.WhenAction = [=] {
 		SaveProject(false);
@@ -897,10 +930,17 @@ void SymbolPickerView::BuildCollectionsPanel()
 		LoadProject();
 	};
 	export_and_type_button_.WhenAction = [=] {
-		// Stub for later export workflow wiring.
+		ExportCurrentText(SymbolPickerExportScope::ActiveCollection);
+	};
+	export_and_type_button_.WhenSelect = [=](int, const Value& data) {
+		String cmd = AsString(data);
+		if(cmd == "all")
+			ExportCurrentText(SymbolPickerExportScope::AllCollections);
+		else
+			ExportCurrentText(SymbolPickerExportScope::ActiveCollection);
 	};
 	copy_button_.WhenAction = [=] {
-		// Stub for later copy/export workflow wiring.
+		CopyCurrentExportToClipboard();
 	};
 	remove_selected_collection_items_tool_.WhenAction = [=] {
 		RemoveSelectedCollectionItems();
@@ -1142,6 +1182,103 @@ String SymbolPickerView::BuildProjectDialogTitle(const char* verb) const
 	if(label.IsEmpty())
 		label = "SymbolPicker Project";
 	return Format("%s %s", verb, label);
+}
+
+String SymbolPickerView::MakeExportDefaultExtension() const
+{
+	if(!model_)
+		return ".txt";
+	switch(model_->GetExportType()) {
+	case SymbolPickerExportType::CppSnippet: return ".cpp";
+	case SymbolPickerExportType::IconId:
+	case SymbolPickerExportType::ImageCall:
+	default:
+		return ".txt";
+	}
+}
+
+String SymbolPickerView::MakeExportDefaultName(SymbolPickerExportScope scope) const
+{
+	if(!model_)
+		return "symbolpicker_export";
+	return MakeExportScopeName(model_->ExportProject(), scope);
+}
+
+String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope) const
+{
+	if(!model_ || !catalog_)
+		return String();
+
+	SymbolPickerProject project = model_->ExportProject();
+	project.default_size = model_->GetExportSize();
+
+	switch(model_->GetExportType()) {
+	case SymbolPickerExportType::IconId:
+		return BuildIconIdExport(project, *catalog_, scope);
+	case SymbolPickerExportType::CppSnippet:
+		return BuildCppSnippetExport(project, *catalog_, scope);
+	case SymbolPickerExportType::ImageCall:
+	default:
+		return BuildImageCallExport(project, *catalog_, scope);
+	}
+}
+
+bool SymbolPickerView::CopyCurrentExportToClipboard()
+{
+	if(!model_ || !catalog_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+	const SymbolPickerCollection* collection = model_->GetActiveCollection();
+	if(!collection || collection->items.IsEmpty()) {
+		PromptOK("No items in the active collection.");
+		return false;
+	}
+
+	String text = BuildExportText(SymbolPickerExportScope::ActiveCollection);
+	if(text.IsEmpty()) {
+		PromptOK("Nothing exportable in the active collection.");
+		return false;
+	}
+	WriteClipboardText(text);
+	PromptOK("Export text copied to clipboard.");
+	return true;
+}
+
+bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
+{
+	if(!model_ || !catalog_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+
+	String text = BuildExportText(scope);
+	if(text.IsEmpty()) {
+		PromptOK(scope == SymbolPickerExportScope::AllCollections
+			? "No exportable items in all collections."
+			: "No exportable items in the active collection.");
+		return false;
+	}
+
+	FileSel fs;
+	String ext = MakeExportDefaultExtension();
+	String type_label = model_->GetExportType() == SymbolPickerExportType::CppSnippet ? "*.cpp" : "*.txt";
+	fs.Type("Export text", type_label);
+	String current = model_->GetProjectFilePath();
+	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	fs.PreSelect(MakeExportDefaultName(scope) + ext);
+	if(!fs.ExecuteSaveAs(BuildProjectDialogTitle("Export")))
+		return false;
+
+	String path = ~fs;
+	if(!ToLower(path).EndsWith(ext))
+		path << ext;
+	if(!SaveFile(path, text)) {
+		Exclamation(Format("Could not write export file:\n%s", path));
+		return false;
+	}
+	PromptOK(Format("Exported text:\n%s", path));
+	return true;
 }
 
 void SymbolPickerView::ValidateLoadedProject(SymbolPickerProject& project) const

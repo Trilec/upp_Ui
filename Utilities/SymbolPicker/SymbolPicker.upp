@@ -20,6 +20,8 @@ file
 	SymbolPickerIconImageCache.cpp,
 	SymbolPickerProjectIo.h,
 	SymbolPickerProjectIo.cpp,
+	SymbolPickerExport.h,
+	SymbolPickerExport.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,

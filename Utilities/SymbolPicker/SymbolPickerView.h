@@ -4,6 +4,7 @@
 #include "SymbolPickerModel.h"
 #include "SymbolPickerCatalog.h"
 #include "SymbolPickerCommands.h"
+#include "SymbolPickerExport.h"
 #include "SymbolPickerIconImageCache.h"
 
 #include <Ui/Ui.h>
@@ -165,6 +166,11 @@ private:
 	void UpdateCollectionsEmptyState();
 	bool SaveProject(bool save_as);
 	bool LoadProject();
+	String BuildExportText(SymbolPickerExportScope scope) const;
+	String MakeExportDefaultName(SymbolPickerExportScope scope) const;
+	String MakeExportDefaultExtension() const;
+	bool CopyCurrentExportToClipboard();
+	bool ExportCurrentText(SymbolPickerExportScope scope);
 	String BuildProjectDialogTitle(const char* verb) const;
 	void ValidateLoadedProject(SymbolPickerProject& project) const;
 	void SetLibrarySelectionOne(const String& catalog_id);

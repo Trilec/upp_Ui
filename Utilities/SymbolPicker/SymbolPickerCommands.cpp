@@ -18,6 +18,10 @@ static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
 	out.alias = src.alias;
 	out.size = src.size;
 	out.tint = src.tint;
+	out.comment = src.comment;
+	out.category_override = src.category_override;
+	out.style_override = src.style_override;
+	out.has_style_override = src.has_style_override;
 	out.unresolved = src.unresolved;
 	return out;
 }
@@ -52,6 +56,7 @@ static SymbolPickerCollection CopyCollection(const SymbolPickerCollection& src)
 {
 	SymbolPickerCollection out;
 	out.name = src.name;
+	out.comment = src.comment;
 	out.file_path = src.file_path;
 	out.items = CopyIconRefVector(src.items);
 	out.dirty = src.dirty;

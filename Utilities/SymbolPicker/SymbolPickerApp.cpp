@@ -17,6 +17,8 @@ bool SymbolPickerApp::Init(String& error)
 		SeedSymbolPickerCatalog(catalog_);
 	if(!RunSymbolPickerProjectIoSmokeTests(catalog_, error))
 		return false;
+	if(!RunSymbolPickerExportSmokeTests(catalog_, error))
+		return false;
 	Wire();
 	model_.SetProjectName("SymbolPicker Project");
 	if(model_.GetCollections().IsEmpty())

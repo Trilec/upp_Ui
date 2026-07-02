@@ -136,6 +136,13 @@ enum DesignerRightMode {
 	RIGHT_DIAGNOSTICS
 };
 
+enum DesignerPreviewAspectMode {
+	PREVIEW_ASPECT_FIT = 0,
+	PREVIEW_ASPECT_PORTRAIT,
+	PREVIEW_ASPECT_LANDSCAPE,
+	PREVIEW_ASPECT_SQUARE
+};
+
 class DesignerModeButton : public UiButton {
 public:
 	typedef DesignerModeButton CLASSNAME;
@@ -435,27 +442,36 @@ public:
 		int preset_w = DPI(170);
 		int theme_w = DPI(96);
 		int exit_w = DPI(94);
-		int controls_w = save_w + save_status_w + load_w + overlay_w + preset_w + theme_w + exit_w + version_w + gap * 8;
+		int controls_w = save_w + save_status_w + load_w + version_w + overlay_w + preset_w + theme_w + exit_w + gap * 8;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
 		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
 		save_status_label_.SetRect(save_button_.GetRect().right + gap, control_y + DPI(8), save_status_w, DPI(18));
 		load_button_.SetRect(save_status_label_.GetRect().right + gap, control_y, load_w, DPI(34));
-		overlay_button_.SetRect(load_button_.GetRect().right + gap, control_y, overlay_w, DPI(34));
+		version_badge_.SetRect(load_button_.GetRect().right + gap, control_y, version_w, DPI(34));
+		overlay_button_.SetRect(version_badge_.GetRect().right + gap, control_y, overlay_w, DPI(34));
 		theme_preset_row_.SetRect(overlay_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
 		theme_shell_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, theme_w, DPI(34));
 		theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
 		theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
 		exit_button_.SetRect(theme_shell_.GetRect().right + gap, control_y, exit_w, DPI(34));
-		version_badge_.SetRect(exit_button_.GetRect().right + gap, control_y, version_w, DPI(34));
 
 		int warning_h = warning_visible_ ? DPI(30) : 0;
 		int body_y = top_y + header_h + gap;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
 		int left_w = DPI(190);
-		int right_w = right_collapsed_ ? DPI(48) : DPI(365);
-		toolbox_panel_.SetRect(gap, body_y, left_w, body_h);
-		preview_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
-		                  max(0, r.Width() - left_w - right_w - gap * 4), body_h);
+		int right_w = right_collapsed_ ? DPI(48) : DPI(370);
+		int left_strip_h = DPI(63);
+		int help_h = DPI(86);
+		int help_gap = DPI(8);
+		toolbox_panel_.SetRect(gap, body_y, left_w, left_strip_h);
+		Rect toolbox_scroll_rect = RectC(gap, body_y + left_strip_h + gap, left_w, max(0, body_h - left_strip_h - gap));
+		toolbox_scroll_.SetRect(toolbox_scroll_rect);
+		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
+		int left_content_h = max(toolbox_scroll_rect.GetHeight(), tree_h + help_h + help_gap);
+		left_info_box_.SetRect(0, 0, left_w, left_content_h);
+		left_info_box_.RefreshLayout();
+		center_panel_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
+		                      max(0, r.Width() - left_w - right_w - gap * 4), body_h);
 		if(drag_status_visible_) {
 			Size status_sz = GetTextSize(drag_status_text_, SansSerifZ(11).Bold()) + Size(DPI(24), DPI(12));
 			Point p = drag_status_screen_ - GetScreenRect().TopLeft() + Point(DPI(14), DPI(14));
@@ -482,8 +498,6 @@ public:
 		}
 
 		Rect toolbox_rect = toolbox_panel_.GetSize();
-		int help_h = DPI(76);
-		int help_gap = DPI(8);
 		int tabs_h = DPI(33);
 		int tab_gap = DPI(4);
 		int tab_w = tabs_h;
@@ -497,36 +511,18 @@ public:
 		toolbox_composites_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
 		tab_x += tab_w + tab_gap;
 		toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
-		Rect toolbox_body = toolbox_rect;
-		toolbox_body.top += tabs_h + DPI(4);
-		int tree_h = max(0, toolbox_tree_.GetContentSize().cy + DPI(10));
-		if(toolbox_body.GetHeight() < DPI(220)) {
-			toolbox_scroll_.SetRect(toolbox_body);
-			toolbox_tree_.SetRect(0, 0, max(0, toolbox_body.GetWidth()), max(toolbox_body.GetHeight(), tree_h));
-			toolbox_help_panel_.Hide();
-			toolbox_help_icon_.Hide();
-			toolbox_help_title_.Hide();
-			toolbox_help_text_.Hide();
-		}
-		else {
-			toolbox_help_panel_.Show();
-			toolbox_help_icon_.Show();
-			toolbox_help_title_.Show();
-			toolbox_help_text_.Show();
-			Rect scroll_r = RectC(toolbox_body.left, toolbox_body.top,
-			                      toolbox_body.GetWidth(), max(0, toolbox_body.GetHeight() - help_h - help_gap));
-			toolbox_scroll_.SetRect(scroll_r);
-			toolbox_tree_.SetRect(0, 0, max(0, scroll_r.GetWidth()), max(scroll_r.GetHeight(), tree_h));
-			Rect hp = RectC(toolbox_body.left, toolbox_body.bottom - help_h,
-			                max(0, toolbox_body.GetWidth()), help_h);
-			toolbox_help_panel_.SetRect(hp);
-			toolbox_help_icon_.SetRect(DPI(10), DPI(10), DPI(18), DPI(18));
-			toolbox_help_title_.SetRect(DPI(34), DPI(8), max(0, hp.GetWidth() - DPI(44)), DPI(18));
-			toolbox_help_text_.SetRect(DPI(14), DPI(30), max(0, hp.GetWidth() - DPI(28)), max(0, hp.GetHeight() - DPI(38)));
-			RefreshToolboxHelpText();
-		}
+		toolbox_scroll_.RefreshLayout();
+		RefreshToolboxHelpText();
+		Rect center_rect = center_panel_.GetSize();
+		int aspect_h = DPI(63);
+		aspect_panel_.SetRect(0, 0, center_rect.GetWidth(), aspect_h);
+		Rect preview_r = RectC(0, aspect_h + DPI(8), center_rect.GetWidth(), max(0, center_rect.GetHeight() - aspect_h - DPI(8)));
+		preview_.SetRect(FitPreviewAspect(preview_r));
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
+		left_info_box_.RefreshLayout();
+		center_panel_.RefreshLayout();
+		toolbox_scroll_.RefreshLayout();
 	}
 
 private:
@@ -709,7 +705,8 @@ private:
 		Add(theme_toggle_);
 		Add(exit_button_);
 		Add(toolbox_panel_);
-		Add(preview_);
+		Add(toolbox_scroll_);
+		Add(center_panel_);
 		Add(drag_status_);
 		Add(warning_panel_);
 		Add(warning_icon_);
@@ -720,15 +717,18 @@ private:
 		toolbox_panel_.Add(toolbox_controls_button_);
 		toolbox_panel_.Add(toolbox_composites_button_);
 		toolbox_panel_.Add(toolbox_presets_button_);
-		toolbox_panel_.Add(toolbox_scroll_);
-		toolbox_scroll_.Content().Add(toolbox_tree_);
-		toolbox_panel_.Add(toolbox_help_panel_);
+		toolbox_scroll_.Content().Add(left_info_box_.SizePos());
+		left_info_box_.SetDirection(UiDirection::V).SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
+		left_info_box_.Add(toolbox_tree_).Expand(1);
+		left_info_box_.Add(toolbox_help_panel_).Fit();
 		toolbox_help_panel_.Add(toolbox_help_icon_);
 		toolbox_help_panel_.Add(toolbox_help_title_);
 		toolbox_help_panel_.Add(toolbox_help_text_);
 		side_.SetScrollMode(UIPANELSCROLL_VERTICAL);
+		side_.Content().Add(right_info_box_.SizePos());
+		right_info_box_.SetDirection(UiDirection::V).SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
 		header_.SetTitle("Designer - Box/Grid Layout Builder")
-		       .SetSubTitle("Model-first designer skeleton with registered Ui types.")
+		       .SetSubTitle("")
 		       .SetMedia(DesignerAssetsImg::DESIGNER_LOGO_V5())
 		       .SetMediaSide(UiAlign::LEFT)
 		       .SetMediaReserve(DPI(42))
@@ -819,6 +819,38 @@ private:
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
 		exit_button_.WhenAction = [=] { Close(); };
 
+		center_panel_.Add(aspect_panel_);
+		center_panel_.Add(preview_);
+		aspect_panel_.Add(aspect_layout_.SizePos());
+		aspect_layout_.SetDirection(UiDirection::H).SetGap(DPI(8), DPI(8)).SetInset(DPI(19)).SetWrap(UiBoxWrap::None);
+		aspect_layout_.Add(portrait_aspect_).Fit();
+		aspect_layout_.Add(landscape_aspect_).Fit();
+		aspect_layout_.Add(square_aspect_).Fit();
+		aspect_layout_.Add(aspect_preset_).Fit();
+		aspect_preset_.ClearItems();
+		aspect_preset_.Add("Fit", "fit");
+		aspect_preset_.Add("Portrait", "portrait");
+		aspect_preset_.Add("Landscape", "landscape");
+		aspect_preset_.Add("Square", "square");
+		aspect_preset_.SetData("fit");
+		portrait_aspect_.WhenAction = [=] { SetPreviewAspectMode(PREVIEW_ASPECT_PORTRAIT); };
+		landscape_aspect_.WhenAction = [=] { SetPreviewAspectMode(PREVIEW_ASPECT_LANDSCAPE); };
+		square_aspect_.WhenAction = [=] { SetPreviewAspectMode(PREVIEW_ASPECT_SQUARE); };
+		aspect_preset_.WhenAction = [=] { SetPreviewAspectMode(PREVIEW_ASPECT_FIT); };
+		aspect_preset_.WhenSelect = [=](int, const Value& v) {
+			if(IsNull(v))
+				return;
+			String id = AsString(v);
+			if(id == "fit")
+				SetPreviewAspectMode(PREVIEW_ASPECT_FIT);
+			else if(id == "portrait")
+				SetPreviewAspectMode(PREVIEW_ASPECT_PORTRAIT);
+			else if(id == "landscape")
+				SetPreviewAspectMode(PREVIEW_ASPECT_LANDSCAPE);
+			else if(id == "square")
+				SetPreviewAspectMode(PREVIEW_ASPECT_SQUARE);
+		};
+
 		preview_.Set(&model_, &registry_);
 		preview_.WhenSelect = [=](DesignerNodeId id, dword keyflags) {
 			DesignerNodeId old_primary = model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0];
@@ -891,7 +923,7 @@ private:
 		SetupToolboxCategoryButton(toolbox_containers_button_, ICON_DESIGN_TAB_GROUP_48(), 1);
 		SetupToolboxCategoryButton(toolbox_controls_button_, ICON_DESIGN_WIDGETS_48(), 2);
 		SetupToolboxCategoryButton(toolbox_composites_button_, ICON_DESIGN_DYNAMIC_FORM_48(), 3);
-		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_CUSTOMIZE_48(), 4);
+		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_EDIT_48(), 4);
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_MULTI);
@@ -1103,7 +1135,7 @@ private:
 		diagnostics_page_.Add(diagnostics_heading_).Fit();
 		diagnostics_page_.Add(diagnostics_scroll_).Expand(1);
 
-		side_.Content().Add(right_stack_.SizePos());
+		right_info_box_.Add(right_stack_).Expand(1);
 		right_stack_.AddPage(hierarchy_page_, "hierarchy");
 		right_stack_.AddPage(inspector_page_, "inspector");
 		right_stack_.AddPage(overrides_page_, "overrides");
@@ -3474,6 +3506,7 @@ private:
 	{
 		LayoutRightPanel();
 		right_box_.RefreshLayout();
+		right_info_box_.RefreshLayout();
 		side_.RefreshLayout();
 		side_.Refresh();
 	}
@@ -3518,7 +3551,8 @@ private:
 			right_content_card_.SetRect(pad, pad + button_h + DPI(8), content_w, content_h);
 			side_.SetRect(0, 0, content_w, content_h);
 			int stack_h = right_mode_ == RIGHT_HIERARCHY ? content_h : max(content_h, right_stack_.GetContentSize().cy);
-			right_stack_.SetRect(0, 0, content_w, stack_h);
+			right_info_box_.SetRect(0, 0, content_w, stack_h);
+			right_info_box_.RefreshLayout();
 			side_.Layout();
 		}
 		RefreshCollapseButton();
@@ -3568,9 +3602,69 @@ private:
 		collapse_button_.SetCustomStyle(s);
 		collapse_button_.SetIconRenderMode(UiIconRenderMode::MonoTint);
 		collapse_button_.SetIconSize(DPI(18), DPI(18));
-		collapse_button_.SetIcon(right_collapsed_ ? ICON_NAVIGATION_OUTLINED_ARROW_RIGHT_48()
-		                                          : ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48());
+		collapse_button_.SetIcon(right_collapsed_ ? ICON_DESIGN_RIGHT_PANEL_OPEN_48()
+		                                          : ICON_DESIGN_RIGHT_PANEL_CLOSE_48());
 		collapse_button_.Tip(right_collapsed_ ? "Expand right panel" : "Collapse right panel");
+	}
+
+	String PreviewAspectLabel(DesignerPreviewAspectMode mode) const
+	{
+		switch(mode) {
+		case PREVIEW_ASPECT_PORTRAIT: return "1:2 Aspect";
+		case PREVIEW_ASPECT_LANDSCAPE: return "16:9 Aspect";
+		case PREVIEW_ASPECT_SQUARE: return "Square";
+		default: return "Fit";
+		}
+	}
+
+	String PreviewAspectId(DesignerPreviewAspectMode mode) const
+	{
+		switch(mode) {
+		case PREVIEW_ASPECT_PORTRAIT: return "portrait";
+		case PREVIEW_ASPECT_LANDSCAPE: return "landscape";
+		case PREVIEW_ASPECT_SQUARE: return "square";
+		default: return "fit";
+		}
+	}
+
+	void SetPreviewAspectMode(DesignerPreviewAspectMode mode)
+	{
+		if(preview_aspect_mode_ == mode)
+			return;
+		preview_aspect_mode_ = mode;
+		aspect_preset_.SetText(PreviewAspectLabel(mode));
+		aspect_preset_.SetData(PreviewAspectId(mode));
+		RelayoutDesignerShell();
+	}
+
+	Rect FitPreviewAspect(Rect area) const
+	{
+		if(area.IsEmpty() || preview_aspect_mode_ == PREVIEW_ASPECT_FIT)
+			return area;
+
+		double target = 1.0;
+		switch(preview_aspect_mode_) {
+		case PREVIEW_ASPECT_PORTRAIT: target = 0.5; break;
+		case PREVIEW_ASPECT_LANDSCAPE: target = 16.0 / 9.0; break;
+		case PREVIEW_ASPECT_SQUARE: target = 1.0; break;
+		default: break;
+		}
+
+		int w = area.GetWidth();
+		int h = area.GetHeight();
+		if(w <= 0 || h <= 0)
+			return area;
+
+		double current = double(w) / double(h);
+		Size fitted = area.GetSize();
+		if(current > target)
+			fitted.cx = max(1, int(h * target));
+		else
+			fitted.cy = max(1, int(w / target));
+
+		Point top_left = area.TopLeft() + Point(max(0, (area.GetWidth() - fitted.cx) / 2),
+		                                         max(0, (area.GetHeight() - fitted.cy) / 2));
+		return RectC(top_left.x, top_left.y, fitted.cx, fitted.cy);
 	}
 
 	void StoreHierarchyExpandedState()
@@ -5299,6 +5393,19 @@ private:
 		return control_icon_;
 	}
 
+	void SetupShellToolButton(UiToolButton& button, const Image& icon, const char *tip, UiRole role = UiRole::Subtle,
+	                          Size icon_size = Size(DPI(16), DPI(16)))
+	{
+		button.SetCustomStyle(UiTheme::ResolveToolButton(role));
+		button.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		button.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		button.SetIconSide(UiAlign::LEFT);
+		button.SetIcon(icon).SetIconSize(icon_size);
+		button.SetIconRenderMode(UiIconRenderMode::MonoTint);
+		button.NoWantFocus();
+		button.Tip(tip);
+	}
+
 	// Apply the selected theme preset and light/dark mode to the shell and child Ui controls.
 	// Demos and utilities should stay theme-first; local styling here is limited
 	// to layout shell surfaces and status affordances.
@@ -5338,6 +5445,7 @@ private:
 		theme_toggle_.SetOn(mode == UiThemeMode::Dark);
 		exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
 		toolbox_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+		toolbox_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
 		toolbox_help_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
 		UiLabel::Style help_icon_style = UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body);
 		help_icon_style.font = SansSerifZ(11).Bold();
@@ -5375,7 +5483,23 @@ private:
 		UiPanel::Style shell_style = UiPanel::StyleDefault();
 		shell_style.transparent = true;
 		right_box_.SetCustomStyle(shell_style);
+		side_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
 		right_content_card_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		center_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+		aspect_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+		aspect_preset_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+		SetupShellToolButton(portrait_aspect_, ICON_DESIGN_SPLITSCREEN_PORTRAIT_48(), "Portrait aspect");
+		SetupShellToolButton(landscape_aspect_, ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48(), "Landscape aspect");
+		SetupShellToolButton(square_aspect_, ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48(), "Square aspect");
+		aspect_preset_.SetText("Fit").SetContentInset(DPI(6)).SetContentGap(DPI(4));
+		aspect_preset_.SetSplitWidth(DPI(30));
+		aspect_preset_.SetSplitContentGap(DPI(4));
+		aspect_preset_.SetSplitIconSize(DPI(16));
+		aspect_preset_.SetPopupMinWidth(DPI(220));
+		aspect_preset_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		aspect_preset_.SetIconSide(UiAlign::LEFT);
+		aspect_preset_.SetIcon(ICON_DESIGN_ASPECT_RATIO_48()).SetIconSize(DPI(16), DPI(16)).SetIconRenderMode(UiIconRenderMode::MonoTint);
+		aspect_preset_.Tip("Preset aspect ratio");
 		UiScrollPanel::Style code_scroll_style = UiScrollPanel::StyleDefault();
 		for(int i = 0; i < 4; i++) {
 			code_scroll_style.palette.face[i] = UiFill::Solid(Color(20, 20, 20));
@@ -5423,6 +5547,7 @@ private:
 	DesignerToolboxCategoryButton toolbox_composites_button_;
 	DesignerToolboxCategoryButton toolbox_presets_button_;
 	UiScrollPanel toolbox_scroll_;
+	UiBoxLayout left_info_box_ { UiDirection::V };
 	DesignerToolboxTree toolbox_tree_;
 	UiTreeModel toolbox_model_;
 	UiPanel toolbox_help_panel_;
@@ -5431,12 +5556,20 @@ private:
 	UiLabel toolbox_help_text_;
 	String toolbox_help_raw_;
 	DesignerPreview preview_;
+	UiPanel center_panel_;
+	UiPanel aspect_panel_;
+	UiBoxLayout aspect_layout_ { UiDirection::H };
+	UiToolButton portrait_aspect_;
+	UiToolButton landscape_aspect_;
+	UiToolButton square_aspect_;
+	UiSplitButton aspect_preset_;
 	bool show_design_overlays_ = true;
 	UiLabel drag_status_;
 	UiPanel warning_panel_;
 	UiLabel warning_icon_;
 	UiLabel warning_text_;
 	UiScrollPanel side_;
+	UiBoxLayout right_info_box_ { UiDirection::V };
 	UiPanel right_box_;
 	UiPanel right_content_card_;
 	UiBoxLayout right_root_ { UiDirection::V };
@@ -5519,6 +5652,7 @@ private:
 	bool syncing_theme_ = false;
 	bool syncing_recent_ = false;
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
+	DesignerPreviewAspectMode preview_aspect_mode_ = PREVIEW_ASPECT_FIT;
 	int active_toolbox_category_ = 0;
 	DesignerRightMode right_mode_ = RIGHT_HIERARCHY;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;

@@ -4,6 +4,7 @@
 #include "SymbolPickerGeneratedCatalog.h"
 #include "SymbolPickerCatalogSeed.h"
 #include "SymbolPickerProjectIo.h"
+#include "SymbolPickerExport.h"
 #include "SymbolPickerView.h"
 
 namespace Upp {

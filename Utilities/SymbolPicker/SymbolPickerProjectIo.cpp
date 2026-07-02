@@ -292,11 +292,17 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	}
 
 	if(loaded.project_name != project.project_name
+		|| loaded.comment != project.comment
 		|| loaded.output_base_name != project.output_base_name
 		|| loaded.symbol_prefix != project.symbol_prefix
 		|| loaded.default_size != project.default_size
+		|| loaded.default_tint != project.default_tint
 		|| loaded.default_style != project.default_style) {
 		error = "Loaded project settings do not match saved settings.";
+		return false;
+	}
+	if(loaded.active_collection_index != project.active_collection_index) {
+		error = "Loaded active collection index is wrong.";
 		return false;
 	}
 	if(loaded.collections.GetCount() != 2) {

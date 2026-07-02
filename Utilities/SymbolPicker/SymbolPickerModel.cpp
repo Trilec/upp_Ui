@@ -369,8 +369,13 @@ bool SymbolPickerModel::LoadProject(const SymbolPickerProject& project)
 		copy.dirty = false;
 		collections_.Add(pick(copy));
 	}
-	if(collections_.IsEmpty())
-		active_collection_index_ = -1;
+	if(collections_.IsEmpty()) {
+		SymbolPickerCollection& collection = collections_.Add();
+		collection.name = "Collection 1";
+		collection.file_path = project.file_path;
+		collection.dirty = false;
+		active_collection_index_ = 0;
+	}
 	else if(project.active_collection_index >= 0 && project.active_collection_index < collections_.GetCount())
 		active_collection_index_ = project.active_collection_index;
 	else
