@@ -10,15 +10,15 @@ Designer can be updated without copying the generated source directly.
 
 The following mockup elements were carried into `Utilities/Designer/main.cpp`:
 - cleaner top header row with title card, save/load split buttons, version badge,
-  theme controls, and exit action
-- left tool strip with category buttons and a scroll-hosted inner info area
+  theme dropdown, dark/help tools, and exit action
+- left tool strip with category buttons, a scroll-hosted inner info area, and the
+  panel toggle at the end of the strip
 - center aspect helper strip above the preview surface
-- right tool strip with pane controls and a scroll-hosted inner info area
+- right tool strip with pane controls, expand/contract affordances, and a
+  scroll-hosted inner info area
 - wider right panel treatment for hierarchy/inspector/code content
-- lower warning/status row kept as the quiet bottom feedback area
+- lower status/help row kept as the quiet bottom feedback area
 - role-first panel styling with compact mono-tint tool buttons
-
-## 1. Top Bar
 
 ## 1. Top Bar
 
@@ -38,6 +38,13 @@ Observed styling direction:
 - Small icon buttons with mono-tint rendering
 - Subtle panel surfaces rather than saturated demo blocks
 
+Live shell mapping:
+- `header_` is the title card shell
+- `save_button_` and `load_button_` are the split buttons
+- `version_badge_` uses `ICON_DESIGN_ADJUST_48`
+- `theme_preset_row_` is the live theme selector control
+- `dark_theme_tool_`, `help_tool_`, and `exit_button_` implement the right-side actions
+
 ## 2. Left Tool Strip
 
 Mockup left-side controls:
@@ -55,6 +62,15 @@ Observed layout direction:
 - Lightweight vertical spacing and narrow icon-first controls
 - A dedicated panel toggle affordance belongs at the far left when implemented
 
+Live shell mapping:
+- `toolbox_layouts_button_`
+- `toolbox_containers_button_`
+- `toolbox_controls_button_`
+- `toolbox_composites_button_`
+- `toolbox_presets_button_`
+- `left_panel_toggle_`
+- `toolbox_scroll_` and `left_info_box_` form the scroll-hosted info area
+
 ## 3. Center Strip
 
 Mockup center helper controls:
@@ -69,6 +85,15 @@ Observed layout direction:
 - Aspect helpers are visually lightweight and should not dominate the shell
 - The live shell uses a compact fit/portrait/landscape/square helper strip instead
   of copying the mockup verbatim
+
+Live shell mapping:
+- `aspect_panel_`
+- `aspect_layout_`
+- `portrait_aspect_`
+- `landscape_aspect_`
+- `square_aspect_`
+- `aspect_preset_`
+- `preview_`
 
 ## 4. Right Tool Strip
 
@@ -86,6 +111,17 @@ Observed layout direction:
 - Wider panel than the left tool strip because the hierarchy needs more room
 - The live shell keeps the right panel wider than the left, but does not copy the
   mockup's generated helper blocks directly
+
+Live shell mapping:
+- `collapse_button_`
+- `right_panel_expand_`
+- `right_panel_contract_`
+- `hierarchy_mode_button_`
+- `inspector_mode_button_`
+- `overrides_mode_button_`
+- `code_mode_button_`
+- `diagnostics_mode_button_`
+- `side_` and `right_info_box_` form the scroll-hosted info area
 
 ## 5. Lower Status / Help Area
 
@@ -127,8 +163,11 @@ Icons used in the live shell implementation:
 - `ICON_ACTION_OUTLINED_VISIBILITY_48`
 - `ICON_DESIGN_ASPECT_RATIO_48`
 - `ICON_DESIGN_DASHBOARD_EDIT_48`
+- `ICON_DESIGN_ADJUST_48`
 - `ICON_DESIGN_HELP_48`
 - `ICON_DESIGN_LAYOUTS_CATEGORY_48`
+- `ICON_DESIGN_LEFT_PANEL_CLOSE_48`
+- `ICON_DESIGN_LEFT_PANEL_OPEN_48`
 - `ICON_DESIGN_RIGHT_PANEL_CLOSE_48`
 - `ICON_DESIGN_RIGHT_PANEL_OPEN_48`
 - `ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48`
@@ -173,3 +212,12 @@ The live shell still leaves these for a later pass:
 - any deeper code-view/status-bar expansion beyond the current warning/status row
 - further spacing polish once the right-side content pages are tuned in practice
 - any icon catalog cleanup that turns up during the next control-module audit
+
+## 10. Current Status
+
+The live shell is now close to the mockup, but it is still a hand-authored shell
+rather than generated source:
+- the theme selector is implemented with the existing composite dropdown path
+- the shell uses live Designer widgets and callbacks instead of mockup-only helpers
+- the layout matches the mockup structure closely enough for this pass, but the
+  generated reference still remains the source of truth for spacing polish

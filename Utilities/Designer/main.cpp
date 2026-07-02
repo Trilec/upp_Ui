@@ -434,32 +434,31 @@ public:
 		int header_h = DPI(58);
 		int top_y = gap;
 		int control_y = top_y + DPI(12);
-		int version_w = DPI(82);
+		int version_w = DPI(76);
 		int save_status_w = DPI(96);
-		int save_w = DPI(92);
-		int load_w = DPI(92);
-		int overlay_w = DPI(42);
-		int preset_w = DPI(170);
-		int theme_w = DPI(96);
-		int exit_w = DPI(94);
-		int controls_w = save_w + save_status_w + load_w + version_w + overlay_w + preset_w + theme_w + exit_w + gap * 8;
+		int save_w = DPI(84);
+		int load_w = DPI(84);
+		int tool_w = DPI(60);
+		int preset_w = DPI(84);
+		int theme_w = DPI(84);
+		int exit_w = DPI(60);
+		int controls_w = save_w + save_status_w + load_w + version_w + tool_w * 3 + preset_w + theme_w + exit_w + gap * 8;
 		header_.SetRect(gap, top_y, max(0, r.Width() - controls_w - gap * 2), header_h);
 		save_button_.SetRect(r.right - controls_w, control_y, save_w, DPI(34));
 		save_status_label_.SetRect(save_button_.GetRect().right + gap, control_y + DPI(8), save_status_w, DPI(18));
 		load_button_.SetRect(save_status_label_.GetRect().right + gap, control_y, load_w, DPI(34));
 		version_badge_.SetRect(load_button_.GetRect().right + gap, control_y, version_w, DPI(34));
-		overlay_button_.SetRect(version_badge_.GetRect().right + gap, control_y, overlay_w, DPI(34));
-		theme_preset_row_.SetRect(overlay_button_.GetRect().right + gap, control_y, preset_w, DPI(34));
-		theme_shell_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, theme_w, DPI(34));
-		theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
-		theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
-		exit_button_.SetRect(theme_shell_.GetRect().right + gap, control_y, exit_w, DPI(34));
+		theme_preset_row_.SetRect(version_badge_.GetRect().right + gap, control_y, preset_w, DPI(34));
+		dark_theme_tool_.SetRect(theme_preset_row_.GetRect().right + gap, control_y, tool_w, DPI(34));
+		help_tool_.SetRect(dark_theme_tool_.GetRect().right + gap, control_y, tool_w, DPI(34));
+		exit_button_.SetRect(help_tool_.GetRect().right + gap, control_y, exit_w, DPI(34));
 
 		int warning_h = warning_visible_ ? DPI(30) : 0;
+		int lower_h = DPI(24);
 		int body_y = top_y + header_h + gap;
-		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
-		int left_w = DPI(190);
-		int right_w = right_collapsed_ ? DPI(48) : DPI(370);
+		int body_h = max(0, r.Height() - body_y - gap - warning_h - lower_h - (warning_visible_ ? gap : 0));
+		int left_w = left_collapsed_ ? DPI(48) : DPI(232);
+		int right_w = right_collapsed_ ? DPI(48) : right_panel_width_;
 		int left_strip_h = DPI(63);
 		int help_h = DPI(86);
 		int help_gap = DPI(8);
@@ -470,6 +469,8 @@ public:
 		int left_content_h = max(toolbox_scroll_rect.GetHeight(), tree_h + help_h + help_gap);
 		left_info_box_.SetRect(0, 0, left_w, left_content_h);
 		left_info_box_.RefreshLayout();
+		left_info_box_.Show(!left_collapsed_);
+		toolbox_scroll_.Show(!left_collapsed_);
 		center_panel_.SetRect(toolbox_panel_.GetRect().right + gap, body_y,
 		                      max(0, r.Width() - left_w - right_w - gap * 4), body_h);
 		if(drag_status_visible_) {
@@ -497,20 +498,39 @@ public:
 			warning_text_.Hide();
 		}
 
+		lower_layout_.SetRect(gap, r.bottom - gap - warning_h - lower_h, max(0, r.GetWidth() - gap * 2), lower_h);
+
 		Rect toolbox_rect = toolbox_panel_.GetSize();
 		int tabs_h = DPI(33);
 		int tab_gap = DPI(4);
 		int tab_w = tabs_h;
 		int tab_x = toolbox_rect.left;
-		toolbox_layouts_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
-		tab_x += tab_w + tab_gap;
-		toolbox_containers_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
-		tab_x += tab_w + tab_gap;
-		toolbox_controls_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
-		tab_x += tab_w + tab_gap;
-		toolbox_composites_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
-		tab_x += tab_w + tab_gap;
-		toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
+		if(!left_collapsed_) {
+			toolbox_layouts_button_.Show();
+			toolbox_containers_button_.Show();
+			toolbox_controls_button_.Show();
+			toolbox_composites_button_.Show();
+			toolbox_presets_button_.Show();
+			toolbox_layouts_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+			tab_x += tab_w + tab_gap;
+			toolbox_containers_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+			tab_x += tab_w + tab_gap;
+			toolbox_controls_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+			tab_x += tab_w + tab_gap;
+			toolbox_composites_button_.SetRect(tab_x, toolbox_rect.top, tab_w, tabs_h);
+			tab_x += tab_w + tab_gap;
+			toolbox_presets_button_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
+			tab_x += tab_w + tab_gap;
+			left_panel_toggle_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
+		}
+		else {
+			toolbox_layouts_button_.Hide();
+			toolbox_containers_button_.Hide();
+			toolbox_controls_button_.Hide();
+			toolbox_composites_button_.Hide();
+			toolbox_presets_button_.Hide();
+			left_panel_toggle_.SetRect(tab_x, toolbox_rect.top, tabs_h, tabs_h);
+		}
 		toolbox_scroll_.RefreshLayout();
 		RefreshToolboxHelpText();
 		Rect center_rect = center_panel_.GetSize();
@@ -698,15 +718,14 @@ private:
 		Add(save_button_);
 		Add(save_status_label_);
 		Add(load_button_);
-		Add(overlay_button_);
 		Add(theme_preset_row_);
-		Add(theme_shell_);
-		Add(theme_icon_);
-		Add(theme_toggle_);
+		Add(dark_theme_tool_);
+		Add(help_tool_);
 		Add(exit_button_);
 		Add(toolbox_panel_);
 		Add(toolbox_scroll_);
 		Add(center_panel_);
+		Add(lower_layout_);
 		Add(drag_status_);
 		Add(warning_panel_);
 		Add(warning_icon_);
@@ -717,6 +736,7 @@ private:
 		toolbox_panel_.Add(toolbox_controls_button_);
 		toolbox_panel_.Add(toolbox_composites_button_);
 		toolbox_panel_.Add(toolbox_presets_button_);
+		toolbox_panel_.Add(left_panel_toggle_);
 		toolbox_scroll_.Content().Add(left_info_box_.SizePos());
 		left_info_box_.SetDirection(UiDirection::V).SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
 		left_info_box_.Add(toolbox_tree_).Expand(1);
@@ -724,15 +744,20 @@ private:
 		toolbox_help_panel_.Add(toolbox_help_icon_);
 		toolbox_help_panel_.Add(toolbox_help_title_);
 		toolbox_help_panel_.Add(toolbox_help_text_);
+		lower_layout_.SetDirection(UiDirection::H).SetGap(DPI(6), DPI(6)).SetInset(Rect(DPI(6), DPI(2), DPI(6), DPI(2)));
+		lower_layout_.Add(lower_label_).Expand(1);
 		side_.SetScrollMode(UIPANELSCROLL_VERTICAL);
 		side_.Content().Add(right_info_box_.SizePos());
 		right_info_box_.SetDirection(UiDirection::V).SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
-		header_.SetTitle("Designer - Box/Grid Layout Builder")
+		header_.SetTitle("Designer")
 		       .SetSubTitle("")
 		       .SetMedia(DesignerAssetsImg::DESIGNER_LOGO_V5())
 		       .SetMediaSide(UiAlign::LEFT)
-		       .SetMediaReserve(DPI(42))
-		       .SetMediaAutoFit(true)
+		       .SetMediaReserve(DPI(0))
+		       .SetMediaMin(DPI(15))
+		       .SetMediaAutoFit(false)
+		       .SetMediaGap(DPI(9))
+		       .SetContentInset(DPI(4))
 		       .SetSelectable(false)
 		       .EnableHover(false);
 		drag_status_.NoWantFocus().IgnoreMouse();
@@ -741,17 +766,30 @@ private:
 		warning_panel_.NoWantFocus().IgnoreMouse();
 		warning_icon_.SetText("!").NoWantFocus().IgnoreMouse();
 		warning_text_.NoWantFocus().IgnoreMouse();
+		lower_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body));
+		lower_label_.SetText("Ready").NoWantFocus().IgnoreMouse();
 		warning_panel_.Hide();
 		warning_icon_.Hide();
 		warning_text_.Hide();
-		version_badge_.SetText(DESIGNER_VERSION).NoWantFocus();
+		version_badge_.SetMinSize(Size(DPI(76), DPI(28)));
+		version_badge_.SetText(DESIGNER_VERSION)
+		             .SetIcon(ICON_DESIGN_ADJUST_48())
+		             .SetIconSize(DPI(10), DPI(10))
+		             .SetIconSide(UiAlign::LEFT)
+		             .SetContentGap(DPI(5))
+		             .NoWantFocus();
 		save_status_label_.NoWantFocus().IgnoreMouse();
 		save_status_label_.SetText("");
+		save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 		save_button_.SetIcon(CtrlImg::save())
 		            .SetText("Save")
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint)
 		            .Tip("Save current design");
+		save_button_.SetMinSize(Size(DPI(74), DPI(24)));
+		save_button_.SetSplitWidth(DPI(31));
+		save_button_.SetSplitIconSize(DPI(10));
+		save_button_.SetSplitContentGap(DPI(4));
 		save_button_.WhenAction = [=] {
 			if(!current_design_path_.IsEmpty())
 				SaveDesignToPath(current_design_path_);
@@ -759,6 +797,7 @@ private:
 				SaveDesignAs();
 		};
 		SetupRecentSplitButton(save_button_, "Save As or choose recent save path");
+		load_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
 		save_button_.WhenSelect = [=](int, const Value& v) {
 			if(syncing_recent_ || IsNull(v))
 				return;
@@ -772,6 +811,10 @@ private:
 		            .SetText("Load")
 		            .SetIconSize(DPI(15), DPI(15))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
+		load_button_.SetMinSize(Size(DPI(74), DPI(24)));
+		load_button_.SetSplitWidth(DPI(30));
+		load_button_.SetSplitIconSize(DPI(10));
+		load_button_.SetSplitContentGap(DPI(4));
 		load_button_.WhenAction = [=] { LoadDesignFromFile(); };
 		SetupRecentSplitButton(load_button_, "Open or choose recent load path");
 		load_button_.WhenSelect = [=](int, const Value& v) {
@@ -786,16 +829,11 @@ private:
 			else
 				LoadDesignPath(cmd);
 		};
-		overlay_button_.SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48())
-		               .SetText("")
-		               .SetIconSize(DPI(18), DPI(18))
-		               .SetIconRenderMode(UiIconRenderMode::MonoTint)
-		               .Tip("Hide designer overlays");
-		overlay_button_.WhenAction = [=] { ToggleDesignOverlays(); };
-		theme_preset_row_.SetLabel("Theme").SetLabelWidth(DPI(48)).SetFieldGap(DPI(6));
+		theme_preset_row_.SetLabel("").SetLabelWidth(DPI(0)).SetFieldGap(DPI(0));
+		theme_preset_row_.Clear();
 		theme_preset_row_.Add("Minimal", "Minimal");
 		theme_preset_row_.Add("Pill", "Pill");
-		theme_preset_row_.SetData(DesignerThemePresetId(theme_preset_));
+		theme_preset_row_.SelectByData(DesignerThemePresetId(theme_preset_));
 		theme_preset_row_.WhenSelectData = [=](const Value& id) {
 			if(syncing_theme_)
 				return;
@@ -809,13 +847,31 @@ private:
 				return;
 			ApplyTheme(DesignerThemePresetFromId(theme_preset_row_.GetData()), theme_mode_);
 		};
-		theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
-		theme_toggle_.WhenAction = [=] {
-			ApplyTheme(theme_preset_, (bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
+		dark_theme_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		dark_theme_tool_.SetMinSize(Size(DPI(60), DPI(0)));
+		dark_theme_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		dark_theme_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		dark_theme_tool_.SetIconSide(UiAlign::LEFT);
+		dark_theme_tool_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16));
+		dark_theme_tool_.Tip("Toggle dark mode");
+		dark_theme_tool_.WhenAction = [=] {
+			ApplyTheme(theme_preset_, theme_mode_ == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark);
 		};
-		exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48())
-		            .SetText("Exit")
-		            .SetIconSize(DPI(15), DPI(15))
+		help_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		help_tool_.SetMinSize(Size(DPI(60), DPI(0)));
+		help_tool_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		help_tool_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		help_tool_.SetIconSide(UiAlign::LEFT);
+		help_tool_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16));
+		help_tool_.Tip("Help");
+		help_tool_.WhenAction = [=] {
+			SetWarningNotes("Help: Designer shell mockup layout is active.");
+		};
+		exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+		exit_button_.SetMinSize(Size(DPI(60), DPI(0)));
+		exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48())
+		            .SetText("")
+		            .SetIconSize(DPI(16), DPI(16))
 		            .SetIconRenderMode(UiIconRenderMode::MonoTint);
 		exit_button_.WhenAction = [=] { Close(); };
 
@@ -924,6 +980,18 @@ private:
 		SetupToolboxCategoryButton(toolbox_controls_button_, ICON_DESIGN_WIDGETS_48(), 2);
 		SetupToolboxCategoryButton(toolbox_composites_button_, ICON_DESIGN_DYNAMIC_FORM_48(), 3);
 		SetupToolboxCategoryButton(toolbox_presets_button_, ICON_DESIGN_DASHBOARD_EDIT_48(), 4);
+		left_panel_toggle_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		left_panel_toggle_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		left_panel_toggle_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		left_panel_toggle_.SetIconSide(UiAlign::LEFT);
+		left_panel_toggle_.SetIcon(ICON_DESIGN_LEFT_PANEL_CLOSE_48()).SetIconSize(DPI(16), DPI(16));
+		left_panel_toggle_.Tip("Collapse left panel");
+		left_panel_toggle_.WhenAction = [=] {
+			left_collapsed_ = !left_collapsed_;
+			RefreshLeftPanelButton();
+			RelayoutDesignerShell();
+		};
+		RefreshLeftPanelButton();
 		hierarchy_.SetModel(hierarchy_model_);
 		hierarchy_.SetRootVisible(true);
 		hierarchy_.SetSelectionMode(UITREESEL_MULTI);
@@ -1063,6 +1131,28 @@ private:
 			RelayoutDesignerShell();
 		};
 		right_mode_bar_.Add(collapse_button_).Fixed(DPI(34));
+		right_panel_expand_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		right_panel_expand_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		right_panel_expand_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		right_panel_expand_.SetIconSide(UiAlign::LEFT);
+		right_panel_expand_.SetIcon(ICON_EDITOR_FORMAT_INDENT_DECREASE_48()).SetIconSize(DPI(16), DPI(16));
+		right_panel_expand_.Tip("Expand right panel");
+		right_panel_expand_.WhenAction = [=] {
+			right_panel_width_ = DPI(420);
+			RelayoutDesignerShell();
+		};
+		right_mode_bar_.Add(right_panel_expand_).Fixed(DPI(34));
+		right_panel_contract_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		right_panel_contract_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
+		right_panel_contract_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+		right_panel_contract_.SetIconSide(UiAlign::LEFT);
+		right_panel_contract_.SetIcon(ICON_EDITOR_FORMAT_INDENT_INCREASE_48()).SetIconSize(DPI(16), DPI(16));
+		right_panel_contract_.Tip("Contract right panel");
+		right_panel_contract_.WhenAction = [=] {
+			right_panel_width_ = DPI(346);
+			RelayoutDesignerShell();
+		};
+		right_mode_bar_.Add(right_panel_contract_).Fixed(DPI(34));
 		auto setup_mode_button = [&](DesignerModeButton& button, const Image& icon, const char *tip, DesignerRightMode mode) {
 			button.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 			button.SetModeIcon(icon);
@@ -1075,6 +1165,7 @@ private:
 		setup_mode_button(overrides_mode_button_, ICON_DESIGN_SETTINGS_48(), "Show theme overrides", RIGHT_OVERRIDES);
 		setup_mode_button(code_mode_button_, ICON_DESIGN_EDIT_TEXT_48(), "Show generated code", RIGHT_CODE);
 		setup_mode_button(diagnostics_mode_button_, ICON_DESIGN_INFO_48(), "Show inspector diagnostics", RIGHT_DIAGNOSTICS);
+		RefreshCollapseButton();
 		right_box_.Add(right_mode_bar_);
 		right_box_.Add(right_content_card_);
 		right_content_card_.Add(side_);
@@ -3520,7 +3611,7 @@ private:
 		int body_y = top_y + header_h + gap;
 		int warning_h = warning_visible_ ? DPI(30) : 0;
 		int body_h = max(0, r.Height() - body_y - gap - warning_h - (warning_visible_ ? gap : 0));
-		int right_w = right_collapsed_ ? DPI(48) : DPI(370);
+		int right_w = right_collapsed_ ? DPI(48) : right_panel_width_;
 		right_box_.SetRect(r.right - right_w - gap, body_y, right_w, body_h);
 		Rect shell = right_box_.GetSize();
 		int pad = DPI(8);
@@ -3605,6 +3696,13 @@ private:
 		collapse_button_.SetIcon(right_collapsed_ ? ICON_DESIGN_RIGHT_PANEL_OPEN_48()
 		                                          : ICON_DESIGN_RIGHT_PANEL_CLOSE_48());
 		collapse_button_.Tip(right_collapsed_ ? "Expand right panel" : "Collapse right panel");
+	}
+
+	void RefreshLeftPanelButton()
+	{
+		left_panel_toggle_.SetIcon(left_collapsed_ ? ICON_DESIGN_LEFT_PANEL_OPEN_48()
+		                                           : ICON_DESIGN_LEFT_PANEL_CLOSE_48());
+		left_panel_toggle_.Tip(left_collapsed_ ? "Expand left panel" : "Collapse left panel");
 	}
 
 	String PreviewAspectLabel(DesignerPreviewAspectMode mode) const
@@ -5539,6 +5637,8 @@ private:
 	UiPanel theme_shell_;
 	UiLabel theme_icon_;
 	UiToggle theme_toggle_;
+	UiToolButton dark_theme_tool_;
+	UiToolButton help_tool_;
 	UiButton exit_button_;
 	UiPanel toolbox_panel_;
 	DesignerToolboxCategoryButton toolbox_layouts_button_;
@@ -5546,6 +5646,7 @@ private:
 	DesignerToolboxCategoryButton toolbox_controls_button_;
 	DesignerToolboxCategoryButton toolbox_composites_button_;
 	DesignerToolboxCategoryButton toolbox_presets_button_;
+	UiToolButton left_panel_toggle_;
 	UiScrollPanel toolbox_scroll_;
 	UiBoxLayout left_info_box_ { UiDirection::V };
 	DesignerToolboxTree toolbox_tree_;
@@ -5570,6 +5671,8 @@ private:
 	UiLabel warning_text_;
 	UiScrollPanel side_;
 	UiBoxLayout right_info_box_ { UiDirection::V };
+	UiBoxLayout lower_layout_ { UiDirection::H };
+	UiLabel lower_label_;
 	UiPanel right_box_;
 	UiPanel right_content_card_;
 	UiBoxLayout right_root_ { UiDirection::V };
@@ -5592,6 +5695,8 @@ private:
 	DesignerModeButton code_mode_button_;
 	DesignerModeButton diagnostics_mode_button_;
 	UiButton collapse_button_;
+	UiToolButton right_panel_expand_;
+	UiToolButton right_panel_contract_;
 	UiButton code_setup_button_;
 	UiButton code_build_run_button_;
 	DesignerHierarchyTree hierarchy_;
@@ -5599,6 +5704,8 @@ private:
 	VectorMap<DesignerNodeId, UiTreeNodeRef> hierarchy_refs_;
 	bool syncing_hierarchy_ = false;
 	bool right_collapsed_ = false;
+	bool left_collapsed_ = false;
+	int right_panel_width_ = DPI(346);
 	UiBoxLayout container_actions_ { UiDirection::H };
 	UiLabel container_action_label_;
 	UiButton container_add_button_;
