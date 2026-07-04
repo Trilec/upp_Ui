@@ -6,7 +6,7 @@
 		"cy": 824
 	},
 	"selection": [
-		59
+		12
 	],
 	"nodes": [
 		{
@@ -42,8 +42,8 @@
 			"last_rect": {
 				"left": 30,
 				"top": 30,
-				"right": 532,
-				"bottom": 487
+				"right": 682,
+				"bottom": 617
 			},
 			"properties": {
 				"direction": {
@@ -137,7 +137,7 @@
 			"last_rect": {
 				"left": 30,
 				"top": 30,
-				"right": 532,
+				"right": 682,
 				"bottom": 71
 			},
 			"properties": {
@@ -225,8 +225,8 @@
 			"last_rect": {
 				"left": 30,
 				"top": 79,
-				"right": 532,
-				"bottom": 452
+				"right": 682,
+				"bottom": 582
 			},
 			"properties": {
 				"direction": {
@@ -310,9 +310,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 30,
-				"top": 460,
-				"right": 532,
-				"bottom": 487
+				"top": 590,
+				"right": 682,
+				"bottom": 617
 			},
 			"properties": {
 				"direction": {
@@ -528,6 +528,10 @@
 				"cell_align_h": {
 					"type": "string",
 					"value": "Left"
+				},
+				"card_line": {
+					"type": "bool",
+					"value": false
 				}
 			}
 		},
@@ -969,7 +973,7 @@
 			"last_rect": {
 				"left": 441,
 				"top": 36,
-				"right": 526,
+				"right": 516,
 				"bottom": 65
 			},
 			"properties": {
@@ -1093,10 +1097,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 36,
-				"top": 73,
-				"right": 120,
-				"bottom": 98
+				"left": 524,
+				"top": 36,
+				"right": 608,
+				"bottom": 65
 			},
 			"properties": {
 				"text": {
@@ -1219,9 +1223,9 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 196,
+				"left": 36,
 				"top": 73,
-				"right": 256,
+				"right": 96,
 				"bottom": 97
 			},
 			"properties": {
@@ -1342,9 +1346,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 30,
-				"top": 460,
+				"top": 590,
 				"right": 73,
-				"bottom": 487
+				"bottom": 617
 			},
 			"properties": {
 				"text": {
@@ -1551,7 +1555,7 @@
 				},
 				"icon_scale": {
 					"type": "bool",
-					"value": false
+					"value": true
 				},
 				"content_gap": {
 					"type": "int",
@@ -1585,10 +1589,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 128,
-				"top": 73,
-				"right": 188,
-				"bottom": 97
+				"left": 616,
+				"top": 38,
+				"right": 676,
+				"bottom": 62
 			},
 			"properties": {
 				"text": {
@@ -1711,7 +1715,7 @@
 				"left": 31,
 				"top": 80,
 				"right": 313,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"direction": {
@@ -1814,7 +1818,7 @@
 				"left": 591,
 				"top": 80,
 				"right": 937,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"direction": {
@@ -2714,7 +2718,7 @@
 				"left": 31,
 				"top": 151,
 				"right": 313,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"text": {
@@ -3857,7 +3861,7 @@
 				"left": 591,
 				"top": 151,
 				"right": 937,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"text": {
@@ -3932,9 +3936,9 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 264,
+				"left": 104,
 				"top": 73,
-				"right": 324,
+				"right": 164,
 				"bottom": 97
 			},
 			"properties": {
@@ -4057,7 +4061,7 @@
 				"left": 313,
 				"top": 80,
 				"right": 591,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"text": {
@@ -4136,7 +4140,7 @@
 				"left": 313,
 				"top": 80,
 				"right": 591,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"direction": {
@@ -4328,7 +4332,7 @@
 				"left": 313,
 				"top": 151,
 				"right": 591,
-				"bottom": 451
+				"bottom": 581
 			},
 			"properties": {
 				"text": {
@@ -4777,7 +4781,7 @@
 				},
 				"line_orientation": {
 					"type": "string",
-					"value": "Vertical"
+					"value": "Auto"
 				},
 				"line_align": {
 					"type": "string",
