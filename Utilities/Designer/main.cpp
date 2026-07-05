@@ -279,42 +279,26 @@ static String DesignerNameFromTitle(String text)
 	return out;
 }
 
-static String DesignerDefaultBaseName(const String& type_id)
+static String DesignerDefaultBaseName(const DesignerRegistry& registry, const String& type_id)
 {
-	if(type_id == "BoxLayout") return "boxLayout";
-	if(type_id == "GridLayout") return "gridLayout";
-	if(type_id == "Spacer") return "spacer";
-	if(type_id == "UiSplitter") return "splitter";
-	if(type_id == "UiQuadSplitter") return "quadSplitter";
-	if(type_id == "UiPanel") return "panel";
-	if(type_id == "UiScrollPanel") return "scrollPanel";
-	if(type_id == "UiTab") return "tab";
-	if(type_id == "UiStack") return "stack";
-	if(type_id == "UiLabel") return "label";
-	if(type_id == "UiTitleCard") return "titleCard";
-	if(type_id == "UiButton") return "button";
-	if(type_id == "UiToolButton") return "toolButton";
-	if(type_id == "UiAccordion") return "accordion";
-	if(type_id == "AccordionSectionSlot") return "section";
-	if(type_id == "UiLineEdit") return "lineEdit";
-	if(type_id == "UiIntEdit") return "intEdit";
-	if(type_id == "UiFloatEdit") return "floatEdit";
-	if(type_id == "UiSlider") return "slider";
-	if(type_id == "UiCompositeSlider") return "compositeSlider";
-	if(type_id == "UiSliderEdit") return "sliderEdit";
-	if(type_id == "UiToggle") return "toggle";
-	if(type_id == "UiCompositeToggle") return "compositeToggle";
-	if(type_id == "UiDropdown") return "dropdown";
-	if(type_id == "UiCompositeDropdown") return "compositeDropdown";
-	if(type_id == "UiCompositeLabel") return "compositeLabel";
-	if(type_id == "UiCompositeEdit") return "compositeEdit";
-	if(type_id == "UiCheckBox") return "checkBox";
-	if(type_id == "UiBreadcrumbs") return "breadcrumbs";
-	if(type_id == "UiTable") return "table";
-	if(type_id == "UiTree") return "tree";
-	if(type_id == "PaneSlot") return "pane";
-	if(type_id == "PageSlot") return "page";
+	if(const DesignerType *t = registry.Find(type_id))
+		if(!t->default_base_name.IsEmpty())
+			return t->default_base_name;
 	return DesignerNameFromTitle(type_id);
+}
+
+static String DesignerExportNameFromPath(const String& path)
+{
+	String normalized = NormalizePath(TrimBoth(path));
+	if(normalized.IsEmpty())
+		return String();
+	String file = ToLower(GetFileName(normalized));
+	String base = GetFileTitle(normalized);
+	if(file == "design.json")
+		base = GetFileName(GetFileFolder(normalized));
+	else if(file.EndsWith(".design.json"))
+		base = GetFileTitle(GetFileTitle(normalized));
+	return SanitizeDesignerPackageName(base, "ExportedDesignerProject");
 }
 
 static String WrapDesignerHelpText(const String& text, int width, Font font)
@@ -657,33 +641,39 @@ private:
 		if(id != Designer_NULL) {
 			InitNode(id);
 			if(DesignerNode* n = model_.Find(id))
-				n->name = UniqueDesignerName(DesignerDefaultBaseName(type_id), id);
+				n->name = UniqueDesignerName(DesignerDefaultBaseName(registry_, type_id), id);
 		}
 		return id;
 	}
 
-	void AddDefaultSplitterPanes(DesignerNodeId id)
+	void AddDefaultChildSlots(DesignerNodeId id)
 	{
 		DesignerNode* n = model_.Find(id);
 		if(!n)
 			return;
-		if(n->type_id == "UiSplitter") {
+		const DesignerType* t = registry_.Find(n->type_id);
+		if(!t || !t->RequiresDefaultChildSlots())
+			return;
+		switch(t->default_child_slots) {
+		case DesignerDefaultChildSlotSet::SplitterTwoPanes: {
 			DesignerNodeId a = AddInitializedNode("PaneSlot", id, 0);
 			DesignerNodeId b = AddInitializedNode("PaneSlot", id, 1);
 			if(DesignerNode* p = model_.Find(a))
 				p->name = "leftPane";
 			if(DesignerNode* p = model_.Find(b))
 				p->name = "rightPane";
+			break;
 		}
-		else if(n->type_id == "UiQuadSplitter") {
+		case DesignerDefaultChildSlotSet::QuadSplitterFourPanes: {
 			static const char *name[] = { "topLeftPane", "topRightPane", "bottomLeftPane", "bottomRightPane" };
 			for(int i = 0; i < 4; i++) {
 				DesignerNodeId pane = AddInitializedNode("PaneSlot", id, i);
 				if(DesignerNode* p = model_.Find(pane))
 					p->name = name[i];
 			}
+			break;
 		}
-		else if(n->type_id == "UiTab" || n->type_id == "UiStack") {
+		case DesignerDefaultChildSlotSet::PageContainerThreePages: {
 			static const char *name[] = { "pageA", "pageB", "pageC" };
 			static const char *title[] = { "Page A", "Page B", "Page C" };
 			for(int i = 0; i < 3; i++) {
@@ -693,8 +683,9 @@ private:
 					p->properties.Set("page_title", title[i]);
 				}
 			}
+			break;
 		}
-		else if(n->type_id == "UiAccordion") {
+		case DesignerDefaultChildSlotSet::AccordionThreeSections: {
 			static const char *name[] = { "sectionA", "sectionB", "sectionC" };
 			static const char *title[] = { "Section A", "Section B", "Section C" };
 			for(int i = 0; i < 3; i++) {
@@ -705,6 +696,11 @@ private:
 					p->properties.Set("open", i == 0);
 				}
 			}
+			break;
+		}
+		case DesignerDefaultChildSlotSet::None:
+		default:
+			break;
 		}
 	}
 
@@ -1304,6 +1300,26 @@ private:
 		ShowSaveSuccess("Saved");
 	}
 
+	bool SaveCurrentDesignAsSourcePath(const String& path)
+	{
+		if(path.IsEmpty())
+			return false;
+		if(!SaveFile(path, StoreDesignerModelJson(model_))) {
+			ShowSaveError("Unable to save designer document.");
+			Exclamation("Unable to save designer document.");
+			return false;
+		}
+		String normalized = NormalizePath(path);
+		current_design_path_ = normalized;
+		AddRecentPath(recent_saves_, normalized);
+		AddRecentPath(recent_loads_, normalized);
+		StoreRecentFiles();
+		SyncRecentDropdowns();
+		SetDocumentDirty(false);
+		ShowSaveSuccess("Saved");
+		return true;
+	}
+
 	void LoadDesignFromFile()
 	{
 		FileSel fs;
@@ -1513,6 +1529,7 @@ private:
 				Value export_design_json = ConfigValue(cfg, "export_include_design_json");
 				Value export_readme = ConfigValue(cfg, "export_include_readme");
 				Value export_theme_first = ConfigValue(cfg, "export_theme_first_output");
+				Value export_source_mode = ConfigValue(cfg, "export_source_mode");
 				Value export_appearance = ConfigValue(cfg, "export_include_appearance");
 				if(!IsNull(export_design_json))
 					export_include_design_json_ = (bool)export_design_json;
@@ -1520,6 +1537,8 @@ private:
 					export_include_readme_ = (bool)export_readme;
 				if(!IsNull(export_theme_first))
 					export_theme_first_output_ = (bool)export_theme_first;
+				if(!IsNull(export_source_mode))
+					export_source_mode_ = (DesignerExportSourceMode)(int)export_source_mode;
 				if(!IsNull(export_appearance))
 					export_theme_first_output_ = !(bool)export_appearance;
 				if(umk_path_.IsEmpty() && !u_root_.IsEmpty())
@@ -1546,6 +1565,7 @@ private:
 		cfg.Set("export_include_design_json", export_include_design_json_);
 		cfg.Set("export_include_readme", export_include_readme_);
 		cfg.Set("export_theme_first_output", export_theme_first_output_);
+		cfg.Set("export_source_mode", (int)export_source_mode_);
 		SaveFile(ConfigFile("DesignerConfig.json"), AsJSON(cfg, true));
 	}
 
@@ -1582,7 +1602,7 @@ private:
 				SetRect(0, 0, DPI(560), DPI(190));
 				SetMinSize(Size(DPI(500), DPI(180)));
 
-				Add(box_);
+				Add(box_.SizePos());
 				box_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(Rect(DPI(12), DPI(12), DPI(12), DPI(12)));
 				box_.Add(info_).Fit();
 				box_.Add(umk_row_).Fit();
@@ -1682,46 +1702,62 @@ private:
 				SetRect(0, 0, DPI(720), DPI(420));
 				SetMinSize(Size(DPI(680), DPI(380)));
 
-				Add(box_);
+				Add(box_.SizePos());
 				box_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(Rect(DPI(12), DPI(12), DPI(12), DPI(12)));
 				box_.Add(info_).Fit();
-				box_.Add(project_row_).Fit();
-				box_.Add(destination_row_).Fit();
-				box_.Add(final_path_row_).Fit();
+				box_.Add(folder_row_).Fit();
+				box_.Add(name_row_).Fit();
+				box_.Add(final_output_box_).Fixed(DPI(120));
 				box_.Add(include_row_).Fit();
+				box_.Add(source_row_).Fit();
 				box_.Add(appearance_row_).Fit();
 				box_.Add(build_row_).Fit();
 				box_.Add(button_row_).Fit();
 
-				info_.SetText("Export a ready-to-open U++ package with main.cpp and .upp. design.json and README are optional.")
+				info_.SetText("Export a ready-to-open U++ package. The exact output folder and files are shown below before export runs.")
 				     .SetAlign(UiAlign::LEFT, UiAlign::TOP)
 				     .NoWantFocus();
 
-				project_label_.SetText("Project/package").NoWantFocus();
-				project_edit_.SetText(owner_.SuggestedExportProjectName().ToWString());
-				project_edit_.WhenLiveChange = [=] { UpdateExportState(); };
-				project_row_.Add(project_label_).Fixed(DPI(130));
-				project_row_.Add(project_edit_).Expand(1);
+				folder_label_.SetText("Export folder").NoWantFocus();
+				folder_edit_.SetText(owner_.SuggestedExportFolder().ToWString());
+				folder_edit_.WhenLiveChange = [=] { UpdateExportState(); };
+				folder_browse_.SetText("").SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(14), DPI(14));
+				folder_browse_.WhenAction = [=] { PickExportFolder(); };
+				folder_row_.Add(folder_label_).Fixed(DPI(130));
+				folder_row_.Add(folder_edit_).Expand(1);
+				folder_row_.Add(folder_browse_).Fixed(DPI(34));
 
-				destination_label_.SetText("Destination root").NoWantFocus();
-				destination_edit_.SetText(owner_.SuggestedExportDestinationRoot().ToWString());
-				destination_edit_.WhenLiveChange = [=] { UpdateExportState(); };
-				destination_browse_.SetText("Browse").SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(14), DPI(14));
-				destination_browse_.WhenAction = [=] { PickDestinationRoot(); };
-				destination_row_.Add(destination_label_).Fixed(DPI(130));
-				destination_row_.Add(destination_edit_).Expand(1);
-				destination_row_.Add(destination_browse_).Fixed(DPI(78));
+				name_label_.SetText("Export name").NoWantFocus();
+				name_edit_.SetText(owner_.SuggestedExportProjectName().ToWString());
+				name_edit_.WhenLiveChange = [=] { UpdateExportState(); };
+				name_pick_.SetText("").SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48()).SetIconSize(DPI(14), DPI(14));
+				name_pick_.WhenAction = [=] { PickExportName(); };
+				name_row_.Add(name_label_).Fixed(DPI(130));
+				name_row_.Add(name_edit_).Expand(1);
+				name_row_.Add(name_pick_).Fixed(DPI(34));
 
-				final_path_label_.SetText("Final package path").NoWantFocus();
-				final_path_value_.NoWantFocus().IgnoreMouse();
-				final_path_value_.SetText("").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-				final_path_row_.Add(final_path_label_).Fixed(DPI(130));
-				final_path_row_.Add(final_path_value_).Expand(1);
+				final_output_label_.SetText("Final output").NoWantFocus();
+				final_output_value_.NoWantFocus().IgnoreMouse();
+				final_output_value_.SetAlign(UiAlign::LEFT, UiAlign::TOP).SetText("");
+				final_output_box_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(DPI(8), DPI(8), DPI(8), DPI(8)));
+				final_output_box_.Add(final_output_label_).Fit();
+				final_output_box_.Add(final_output_value_).Expand(1);
 
-				include_design_json_.SetText("Include design.json").SetData(owner_.export_include_design_json_);
+				include_design_json_.SetText("Include source design").SetData(owner_.export_include_design_json_);
 				include_readme_.SetText("Include README.md").SetData(owner_.export_include_readme_);
+				include_design_json_.WhenAction = [=] { UpdateExportState(); };
+				include_readme_.WhenAction = [=] { UpdateExportState(); };
 				include_row_.Add(include_design_json_).Fit();
 				include_row_.Add(include_readme_).Fit();
+
+				source_label_.SetText("Source structure").NoWantFocus();
+				source_mode_.Clear();
+				source_mode_.Add("Single main.cpp", (int)DesignerExportSourceMode::SingleMainCpp);
+				source_mode_.Add("Split header/source", (int)DesignerExportSourceMode::SplitHeaderSource);
+				source_mode_.SelectByData((int)owner_.export_source_mode_);
+				source_mode_.WhenSelectData = [=](const Value&) { UpdateExportState(); };
+				source_row_.Add(source_label_).Fixed(DPI(130));
+				source_row_.Add(source_mode_).Fixed(DPI(220));
 
 				appearance_label_.SetText("Appearance mode").NoWantFocus();
 				appearance_mode_.Clear();
@@ -1748,6 +1784,8 @@ private:
 				export_button_.SetText("Export").SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48()).SetIconSize(DPI(14), DPI(14));
 				export_build_button_.SetText("Export and Build").SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(14), DPI(14));
 				cancel_button_.SetText("Cancel").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48()).SetIconSize(DPI(14), DPI(14));
+				export_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+				cancel_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 				export_button_.WhenAction = [=] { RequestAction(EXPORT_ONLY); };
 				export_build_button_.WhenAction = [=] { RequestAction(EXPORT_AND_BUILD); };
 				cancel_button_.WhenAction = [=] { RequestAction(CANCELLED); };
@@ -1759,8 +1797,13 @@ private:
 				UpdateExportState();
 			}
 
-			String GetProjectName() const { return TrimBoth(project_edit_.GetText().ToString()); }
-			String GetDestinationRoot() const { return TrimBoth(destination_edit_.GetText().ToString()); }
+			String GetProjectName() const { return TrimBoth(name_edit_.GetText().ToString()); }
+			String GetPackageDirectory() const { return TrimBoth(folder_edit_.GetText().ToString()); }
+			DesignerExportSourceMode GetSourceMode() const
+			{
+				Value v = source_mode_.GetData();
+				return IsNull(v) ? DesignerExportSourceMode::SingleMainCpp : (DesignerExportSourceMode)(int)v;
+			}
 			DesignerAppearanceMode GetAppearanceMode() const
 			{
 				Value v = appearance_mode_.GetData();
@@ -1797,38 +1840,63 @@ private:
 				}
 			};
 
-			void PickDestinationRoot()
+			void PickExportFolder()
 			{
 				FileSel fs;
-				if(fs.ExecuteSelectDir("Select destination root"))
-					destination_edit_.SetText((~fs).ToWString());
+				if(fs.ExecuteSelectDir("Select export folder"))
+					folder_edit_.SetText((~fs).ToWString());
 				UpdateExportState();
 			}
 
-			String FinalPackagePath() const
+			void PickExportName()
 			{
-				String root = GetDestinationRoot();
-				if(root.IsEmpty())
-					return String();
-				String project_name = SanitizeDesignerPackageName(GetProjectName());
-				if(project_name.IsEmpty())
-					return String();
-				return AppendFileName(root, project_name);
+				FileSel fs;
+				String folder = GetPackageDirectory();
+				if(!folder.IsEmpty())
+					fs.ActiveDir(folder);
+				fs.AllFilesType().DefaultExt("upp").DefaultName(GetProjectName().IsEmpty() ? String("ExportedDesignerProject") : GetProjectName());
+				if(!fs.ExecuteSaveAs("Select export name"))
+					return;
+				String path = ~fs;
+				if(path.IsEmpty())
+					return;
+				String dir = GetFileFolder(path);
+				String base = GetFileTitle(path);
+				if(!dir.IsEmpty())
+					folder_edit_.SetText(dir.ToWString());
+				name_edit_.SetText(base.ToWString());
+				UpdateExportState();
 			}
 
-			bool IsDestinationRootValid() const
+			bool IsPackageDirectoryValid() const
 			{
-				String root = GetDestinationRoot();
-				return !root.IsEmpty() && DirectoryExists(root);
+				String folder = GetPackageDirectory();
+				String project_name = SanitizeDesignerPackageName(GetProjectName());
+				return !folder.IsEmpty() && !project_name.IsEmpty();
 			}
 
 			void UpdateExportState()
 			{
-				String pkg = FinalPackagePath();
-				final_path_value_.SetText(pkg.IsEmpty()
-					? String("Select a valid destination root to preview the package folder.")
-					: pkg);
-				bool can_export = !GetProjectName().IsEmpty() && IsDestinationRootValid();
+				String folder = GetPackageDirectory();
+				String project_name = SanitizeDesignerPackageName(GetProjectName());
+				String text;
+				if(folder.IsEmpty() || project_name.IsEmpty()) {
+					text = "Select an export folder and export name to preview the output files.";
+				}
+				else {
+					text << "Folder\n" << folder << "\n\nFiles\n";
+					if(GetSourceMode() == DesignerExportSourceMode::SplitHeaderSource)
+						text << "main.cpp\n" << project_name << ".h\n" << project_name << ".cpp\n";
+					else
+						text << "main.cpp\n";
+					text << project_name << ".upp";
+					if(IncludeDesignJson())
+						text << "\n" << project_name << ".design.json";
+					if(IncludeReadme())
+						text << "\nREADME.md";
+				}
+				final_output_value_.SetText(text);
+				bool can_export = !GetProjectName().IsEmpty() && IsPackageDirectoryValid();
 				export_button_.Enable(can_export);
 				export_build_button_.Enable(can_export);
 			}
@@ -1838,31 +1906,35 @@ private:
 				action_ = action;
 				if(action == CANCELLED)
 					Break(IDCANCEL);
-				else if(!GetProjectName().IsEmpty() && IsDestinationRootValid())
+				else if(!GetProjectName().IsEmpty() && IsPackageDirectoryValid())
 					Break(IDOK);
 				else
-					Exclamation("Project/package name and a valid destination root are required.");
+					Exclamation("Export folder and export name are required.");
 			}
 
 			DesignerWindow& owner_;
 			UiBoxLayout box_ { UiDirection::V };
 			UiLabel info_;
-			UiBoxLayout project_row_ { UiDirection::H };
-			UiBoxLayout destination_row_ { UiDirection::H };
-			UiBoxLayout final_path_row_ { UiDirection::H };
+			UiBoxLayout folder_row_ { UiDirection::H };
+			UiBoxLayout name_row_ { UiDirection::H };
+			UiBoxLayout final_output_box_ { UiDirection::V };
 			UiBoxLayout include_row_ { UiDirection::H };
+			UiBoxLayout source_row_ { UiDirection::H };
 			UiBoxLayout appearance_row_ { UiDirection::H };
 			UiBoxLayout build_row_ { UiDirection::H };
 			UiBoxLayout button_row_ { UiDirection::H };
-			UiLabel project_label_;
-			LiveEditLineEdit project_edit_;
-			UiLabel destination_label_;
-			LiveEditLineEdit destination_edit_;
-			UiButton destination_browse_;
-			UiLabel final_path_label_;
-			UiLabel final_path_value_;
+			UiLabel folder_label_;
+			LiveEditLineEdit folder_edit_;
+			UiButton folder_browse_;
+			UiLabel name_label_;
+			LiveEditLineEdit name_edit_;
+			UiButton name_pick_;
+			UiLabel final_output_label_;
+			UiLabel final_output_value_;
 			UiCheckBox include_design_json_;
 			UiCheckBox include_readme_;
+			UiLabel source_label_;
+			UiDropdown source_mode_;
 			UiLabel appearance_label_;
 			UiDropdown appearance_mode_;
 			UiLabel build_label_;
@@ -1880,16 +1952,32 @@ private:
 			return;
 
 		export_project_name_ = dlg.GetProjectName();
-		String destination_root = dlg.GetDestinationRoot();
+		String package_directory = dlg.GetPackageDirectory();
 		export_class_name_ = SanitizeDesignerClassName(export_project_name_ + "Window");
+		export_source_mode_ = dlg.GetSourceMode();
 		export_include_design_json_ = dlg.IncludeDesignJson();
 		export_include_readme_ = dlg.IncludeReadme();
 		export_theme_first_output_ = dlg.ThemeFirstOutput();
 
+		String export_design_path;
+		if(export_include_design_json_)
+			export_design_path = AppendFileName(package_directory, SanitizeDesignerPackageName(export_project_name_) + ".design.json");
+
+		if(export_include_design_json_ && TrimBoth(current_design_path_).IsEmpty()) {
+			int decision = PromptYesNoCancel(
+				Format("This design has not been saved yet.\n\nSave the source design here before export?\n\n%s",
+				       export_design_path));
+			if(decision < 0)
+				return;
+			if(decision > 0 && !SaveCurrentDesignAsSourcePath(export_design_path))
+				return;
+		}
+
 		DesignerProjectExportOptions options;
 		options.project_name = export_project_name_;
-		options.output_directory = destination_root;
+		options.package_directory = package_directory;
 		options.class_name = export_class_name_;
+		options.source_mode = export_source_mode_;
 		options.appearance_mode = dlg.GetAppearanceMode();
 		options.include_design_json = export_include_design_json_;
 		options.include_readme = export_include_readme_;
@@ -1897,20 +1985,19 @@ private:
 		options.umk_path = umk_path_;
 		options.build_method = export_build_method_;
 		options.output_exe_path = export_output_exe_path_;
-		options.source_design_filename = current_design_path_.IsEmpty() ? String("design.json") : GetFileName(current_design_path_);
+		options.source_design_filename = current_design_path_.IsEmpty() ? GetFileName(export_design_path) : GetFileName(current_design_path_);
 
-		String project_name = SanitizeDesignerPackageName(options.project_name);
-		String package_dir = AppendFileName(options.output_directory, project_name);
+		String package_dir = options.package_directory;
 		bool package_is_dir = DirectoryExists(package_dir);
 		bool package_is_file = FileExists(package_dir);
 		bool should_overwrite = false;
 		if(package_is_file) {
-			if(!PromptYesNo(Format("The following package folder already exists:\n\n%s\n\nReplace this package folder?", package_dir)))
+			if(!PromptYesNo(Format("The following export folder already exists:\n\n%s\n\nReplace this folder and its generated files?", package_dir)))
 				return;
 			should_overwrite = true;
 		}
 		else if(package_is_dir && DirectoryHasFiles(package_dir)) {
-			if(!PromptYesNo(Format("The following package folder already exists:\n\n%s\n\nReplace this package folder?", package_dir)))
+			if(!PromptYesNo(Format("The following export folder already exists:\n\n%s\n\nReplace this folder and its generated files?", package_dir)))
 				return;
 			should_overwrite = true;
 		}
@@ -1921,16 +2008,23 @@ private:
 			Exclamation(result.error.IsEmpty() ? "Export failed." : result.error);
 			return;
 		}
-		export_output_dir_ = destination_root;
+		export_output_dir_ = package_directory;
+		export_destination_root_stored_ = true;
 		StoreRecentFiles();
 		String notes;
-		notes << "Exported U++ project to " << result.package_dir << "\n"
-		      << "main.cpp: " << result.main_cpp_path;
+		notes << "Exported U++ project to " << result.package_dir;
+		if(options.source_mode == DesignerExportSourceMode::SplitHeaderSource)
+			notes << "\n" << "main.cpp: " << result.main_cpp_path
+			      << "\n" << result.header_path
+			      << "\n" << result.source_cpp_path;
+		else
+			notes << "\n" << "main.cpp: " << result.main_cpp_path;
 		if(options.include_design_json)
-			notes << "\n" << "design.json: " << result.design_json_path;
+			notes << "\n" << "design: " << result.design_json_path;
 		if(options.include_readme)
 			notes << "\n" << "README.md: " << result.readme_path;
 		SetWarningNotes(notes);
+		String build_result;
 
 		if(dlg.GetAction() == ExportProjectDialog::EXPORT_AND_BUILD) {
 			String effective_umk = TrimBoth(umk_path_);
@@ -1939,24 +2033,33 @@ private:
 			String build_method = TrimBoth(export_build_method_);
 			String output_exe = TrimBoth(export_output_exe_path_);
 			if(effective_umk.IsEmpty() || build_method.IsEmpty() || output_exe.IsEmpty()) {
+				build_result = "Build skipped: UMK path, build method, or executable path is missing.";
 				SetWarningNotes("Export completed. Build skipped because UMK path, build method, or executable path is missing.");
-				return;
 			}
-			BuildExportedProject(result, effective_umk, build_method, output_exe);
+			else {
+				build_result = BuildExportedProject(result, effective_umk, build_method, output_exe);
+				SetWarningNotes(notes + "\n" + build_result);
+			}
 		}
+		ShowExportCompletionDialog(result, options.source_mode, options.include_design_json, options.include_readme, build_result);
 	}
 
 	String SuggestedExportProjectName() const
 	{
+		String from_design = DesignerExportNameFromPath(current_design_path_);
+		if(!from_design.IsEmpty())
+			return from_design;
 		if(!TrimBoth(export_project_name_).IsEmpty())
 			return export_project_name_;
-		String base = model_.GetNodes().GetCount() > 1 ? "DesignerWorkbenchExport" : "ExportedDesignerProject";
-		return SanitizeDesignerPackageName(base);
+		return "ExportedDesignerProject";
 	}
 
-	String SuggestedExportDestinationRoot() const
+	String SuggestedExportFolder() const
 	{
-		if(!TrimBoth(export_output_dir_).IsEmpty())
+		if(!TrimBoth(current_design_path_).IsEmpty())
+			return GetFileFolder(NormalizePath(current_design_path_));
+		if(export_destination_root_stored_ && !TrimBoth(export_output_dir_).IsEmpty() &&
+		   (DirectoryExists(export_output_dir_) || FileExists(export_output_dir_)))
 			return export_output_dir_;
 		return String();
 	}
@@ -1984,9 +2087,19 @@ private:
 		return Format("UMK: %s    Method: %s    Exe: %s", umk, method, exe);
 	}
 
-	void BuildExportedProject(const DesignerProjectExportResult& result,
-	                          const String& umk_path, const String& build_method,
-	                          const String& output_exe)
+	void OpenExportFolder(const String& path)
+	{
+		if(path.IsEmpty())
+			return;
+		Vector<String> args;
+		args.Add(path);
+		LocalProcess process;
+		process.Start("explorer.exe", args, NULL, GetFileFolder(path));
+	}
+
+	String BuildExportedProject(const DesignerProjectExportResult& result,
+	                            const String& umk_path, const String& build_method,
+	                            const String& output_exe)
 	{
 		String package_root = GetFileFolder(result.package_dir);
 		Vector<String> args;
@@ -1999,24 +2112,88 @@ private:
 
 		LocalProcess process;
 		String output;
-		String exported_paths = Format("Exported U++ project to %s; main.cpp: %s",
-		                               result.package_dir, result.main_cpp_path);
-		if(!result.design_json_path.IsEmpty())
-			exported_paths << "; design.json: " << result.design_json_path;
-		if(!result.readme_path.IsEmpty())
-			exported_paths << "; README.md: " << result.readme_path;
-		if(!process.Start(umk_path, args, NULL, package_root)) {
-			SetWarningNotes(exported_paths + "; build failed: unable to start UMK.");
-			return;
-		}
+		if(!process.Start(umk_path, args, NULL, package_root))
+			return "Build failed: unable to start UMK.";
 		int exit_code = process.Finish(output);
-		if(exit_code == 0) {
-			SetWarningNotes(exported_paths + "; build succeeded: " + output_exe);
-			return;
-		}
+		if(exit_code == 0)
+			return "Build succeeded: " + output_exe;
 		output.Replace("\r", "");
 		output = TrimBoth(output);
-		SetWarningNotes(exported_paths + Format("; build failed (%d): %s", exit_code, output.IsEmpty() ? "no output" : output));
+		return Format("Build failed (%d): %s", exit_code, output.IsEmpty() ? "no output" : output);
+	}
+
+	void ShowExportCompletionDialog(const DesignerProjectExportResult& result,
+	                                DesignerExportSourceMode source_mode,
+	                                bool include_design_json,
+	                                bool include_readme,
+	                                const String& build_result)
+	{
+		class ExportResultDialog : public TopWindow {
+		public:
+			typedef ExportResultDialog CLASSNAME;
+
+			ExportResultDialog(DesignerWindow& owner, const DesignerProjectExportResult& result,
+			                   DesignerExportSourceMode source_mode, bool include_design_json,
+			                   bool include_readme, const String& build_result)
+				: owner_(owner)
+			{
+				Title("Export complete");
+				Sizeable().Zoomable();
+				Add(box_.SizePos());
+				box_.SetGap(DPI(10)).SetInset(DPI(14));
+
+				info_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::Body))
+				    .SetText("Export completed successfully.")
+				    .SetAlign(UiAlign::LEFT, UiAlign::TOP)
+				    .NoWantFocus();
+				box_.Add(info_).Fit();
+
+				String summary;
+				summary << "Package folder\n" << result.package_dir
+				        << "\n\nPackage file\n" << result.upp_path;
+				if(source_mode == DesignerExportSourceMode::SplitHeaderSource)
+					summary << "\n\nGenerated sources\n" << result.main_cpp_path << "\n" << result.header_path << "\n" << result.source_cpp_path;
+				else
+					summary << "\n\nGenerated source\n" << result.main_cpp_path;
+				if(include_design_json && !result.design_json_path.IsEmpty())
+					summary << "\n\nSource design\n" << result.design_json_path;
+				if(include_readme && !result.readme_path.IsEmpty())
+					summary << "\n\nREADME\n" << result.readme_path;
+				if(!build_result.IsEmpty())
+					summary << "\n\nBuild result\n" << build_result;
+				details_.SetText(summary)
+				        .SetAlign(UiAlign::LEFT, UiAlign::TOP)
+				        .NoWantFocus();
+				details_.SetMinSize(Size(0, DPI(260)));
+				box_.Add(details_).Expand(1);
+
+				button_row_.SetGap(DPI(8));
+				open_folder_button_.SetText("Open Folder")
+				    .SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+				open_folder_button_.WhenAction = [=] { owner_.OpenExportFolder(result.package_dir); };
+				close_button_.SetText("Close")
+				    .SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+				close_button_.WhenAction = [=] { Break(IDOK); };
+				button_row_.Add(open_folder_button_).Fit();
+				button_row_.Add(spacer_).Expand();
+				button_row_.Add(close_button_).Fit();
+				box_.Add(button_row_).Fit();
+
+				SetRect(0, 0, DPI(640), DPI(430));
+			}
+
+			DesignerWindow& owner_;
+			UiBoxLayout box_ { UiDirection::V };
+			UiLabel info_;
+			UiLabel details_;
+			UiBoxLayout button_row_ { UiDirection::H };
+			UiButton open_folder_button_;
+			UiLabel spacer_;
+			UiButton close_button_;
+		};
+
+		ExportResultDialog dlg(*this, result, source_mode, include_design_json, include_readme, build_result);
+		dlg.Run();
 	}
 
 	String SuggestedExportBuildMethod() const
@@ -2399,7 +2576,7 @@ private:
 			Vector<DesignerApiBinding> bindings;
 			DesignerAdapter *adapter = nullptr;
 			One<Ctrl> ctrl;
-			ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
+			ctrl.Attach(CreateDesignerAdapterCtrl(registry_, *n, &adapter));
 			if(adapter)
 				adapter->DescribeApi(bindings, *n);
 		const DesignerApiBinding* binding = FindApiBinding(bindings, pending_inspector_txn_.property_id);
@@ -4160,7 +4337,7 @@ private:
 			commands_.EndGroup();
 			return;
 		}
-		AddDefaultSplitterPanes(id);
+		AddDefaultChildSlots(id);
 		ApplyGridCellForNode(id, index);
 		AdjustGridCellForNode(id);
 		commands_.EndGroup();
@@ -4905,7 +5082,7 @@ private:
 		Vector<DesignerApiBinding> bindings;
 		DesignerAdapter *adapter = nullptr;
 		One<Ctrl> ctrl;
-		ctrl.Attach(CreateDesignerAdapterCtrl(*n, &adapter));
+			ctrl.Attach(CreateDesignerAdapterCtrl(registry_, *n, &adapter));
 		if(adapter)
 			adapter->DescribeApi(bindings, *n);
 		const DesignerApiBinding* binding = FindApiBinding(bindings, property_id);
@@ -5392,7 +5569,7 @@ private:
 		{
 			DesignerAdapter *adapter = nullptr;
 			One<Ctrl> ctrl;
-			ctrl.Attach(CreateDesignerAdapterCtrl(node, &adapter));
+			ctrl.Attach(CreateDesignerAdapterCtrl(registry_, node, &adapter));
 			if(adapter) {
 				Vector<DesignerApiBinding> bindings;
 				adapter->DescribeApi(bindings, node);
@@ -5572,17 +5749,17 @@ private:
 
 	bool IsLayoutType(const DesignerType* t) const
 	{
-		return t && (t->toolbox_group == "Layouts" || t->id == "Window");
+		return t && t->IsLayout();
 	}
 
 	bool IsPanelType(const DesignerType* t) const
 	{
-		return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "AccordionSectionSlot");
+		return t && (t->IsContainer() || t->IsSlotNode()) && !t->IsLayout();
 	}
 
 	bool IsLayoutOwnerType(const DesignerType* t) const
 	{
-		return t && t->can_have_children && (t->toolbox_group == "Layouts" || t->id == "Window");
+		return t && t->SupportsChildren() && t->IsLayout();
 	}
 
 	DesignerNodeId FindNearestLayoutOwner(DesignerNodeId node_id) const
@@ -5708,8 +5885,9 @@ private:
 		layout_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(245, 158, 66) : Color(217, 119, 6));
 		panel_icon_ = MakeTypeIcon(true, mode == UiThemeMode::Dark ? Color(74, 222, 128) : Color(34, 150, 91));
 		control_icon_ = MakeTypeIcon(false, mode == UiThemeMode::Dark ? Color(96, 165, 250) : Color(54, 116, 210));
+		// Keep the shell header free of TitleCard separator chrome.
 		header_.SetCustomStyle(UiTheme::ResolveTitleCard());
-		header_.ShowTitleLine(false);
+		header_.ShowTitleLine(false).ShowCardLine(false);
 		version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
 		UiLabel::Style save_status_style = UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::Body);
 		save_status_style.font = SansSerifZ(9).Bold();
@@ -5962,6 +6140,7 @@ private:
 	String export_class_name_;
 	String export_build_method_;
 	String export_output_exe_path_;
+	DesignerExportSourceMode export_source_mode_ = DesignerExportSourceMode::SingleMainCpp;
 	bool export_include_design_json_ = true;
 	bool export_include_readme_ = true;
 	bool export_theme_first_output_ = false;

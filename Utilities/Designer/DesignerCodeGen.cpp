@@ -871,8 +871,25 @@ static String LineStyleExpr(const String& style)
 	return "SOLID";
 }
 
-static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
+static const DesignerControlSpec* CodeGenSpec(const DesignerRegistry& registry, const DesignerNode& n)
 {
+	return registry.FindSpec(n.type_id);
+}
+
+static bool CodeGenIsHeadlessNode(const DesignerRegistry& registry, const DesignerNode& n)
+{
+	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
+	return spec && spec->IsHeadlessNode();
+}
+
+static void EmitDeclaration(String& out, const DesignerRegistry& registry,
+                            const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
+{
+	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
+	if(spec && spec->codegen.emit_declaration) {
+		spec->codegen.emit_declaration(out, n);
+		return;
+	}
 	String var = VarName(names, n.id);
 	if(n.type_id == "BoxLayout")
 		out << "\tUiBoxLayout " << var << ";\n";
@@ -936,7 +953,7 @@ static void EmitDeclaration(String& out, const VectorMap<DesignerNodeId, String>
 		out << "\tUiTree " << var << ";\n";
 	else if(n.type_id == "UiScrollPanel")
 		out << "\tUiScrollPanel " << var << ";\n";
-	else if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
+	else if(CodeGenIsHeadlessNode(registry, n))
 		out << "\tParentCtrl " << var << ";\n";
 	else if(n.type_id == "Spacer") {
 		if((bool)CodeGenNodeProperty(n, "line_enabled", false))
@@ -1185,10 +1202,9 @@ static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 	       CodeGenMinMetric(n, "min_height") > 0;
 }
 
-static void EmitDesignerMinSize(String& out, const String& var, const DesignerNode& n)
+static void EmitDesignerMinSize(String& out, const DesignerRegistry& registry, const String& var, const DesignerNode& n)
 {
-	if(n.type_id == "Spacer" || n.type_id == "PaneSlot" || n.type_id == "UiPanel" ||
-	   n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot")
+	if(n.type_id == "Spacer" || n.type_id == "UiPanel" || CodeGenIsHeadlessNode(registry, n))
 		return;
 	if(!HasDesignerMinSizeOverride(n))
 		return;
@@ -1199,15 +1215,20 @@ static void EmitDesignerMinSize(String& out, const String& var, const DesignerNo
 	    << ")));\n";
 }
 
-static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& names,
+static void EmitSetup(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
                       const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
+	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
+	if(spec && spec->codegen.emit_setup) {
+		spec->codegen.emit_setup(out, n);
+		return;
+	}
 	String var = VarName(names, n.id);
-	if(n.type_id == "PaneSlot" || n.type_id == "PageSlot" || n.type_id == "AccordionSectionSlot" || n.type_id == "Spacer")
+	if(CodeGenIsHeadlessNode(registry, n) || n.type_id == "Spacer")
 		return;
 	if(!HasThemeOverride(n, appearance_mode))
 		EmitThemeStyle(out, var, n, appearance_mode);
-	EmitDesignerMinSize(out, var, n);
+	EmitDesignerMinSize(out, registry, var, n);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
 		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"
@@ -1340,6 +1361,7 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		    << ".SetMediaAlign(" << AlignHExpr(CodeGenNodeProperty(n, "media_align_h", "Center"), "Center")
 		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ")"
 		    << ".ShowTitleLine(" << ((bool)CodeGenNodeProperty(n, "title_line", true) ? "true" : "false") << ")";
+		out << ".ShowCardLine(" << ((bool)CodeGenNodeProperty(n, "card_line", false) ? "true" : "false") << ")";
 		if(IsExactDesign(appearance_mode) || text_align_v != "Center")
 			out << ".SetTextAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align", "Left"), "Left")
 			    << ", " << AlignVExpr(text_align_v, "Center") << ")";
@@ -1549,11 +1571,14 @@ static void EmitSetup(String& out, const VectorMap<DesignerNodeId, String>& name
 		out << "\t\t" << var << ".Tip(" << CppString(tooltip) << ");\n";
 }
 
-static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& names,
+static void EmitAddChild(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
                          const DesignerNode& parent, const DesignerNode& child, int index)
 {
 	String p = VarName(names, parent.id);
 	String c = VarName(names, child.id);
+	const DesignerControlSpec* parent_spec = CodeGenSpec(registry, parent);
+	DesignerLayoutChildEmissionStrategy emission = parent_spec ? parent_spec->child_emission
+	                                                           : DesignerLayoutChildEmissionStrategy::DirectChild;
 	if(child.type_id == "Spacer" && parent.id == Designer_ROOT)
 		return;
 	if(child.type_id == "Spacer") {
@@ -1694,9 +1719,9 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		out << "\t\tAdd(" << c << ");\n";
 		EmitDirectChildLayout(out, c, child);
 	}
-	else if(parent.type_id == "BoxLayout")
+	else if(emission == DesignerLayoutChildEmissionStrategy::BoxLayoutItem)
 		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << BoxMinCall(parent, child) << ";\n";
-	else if(parent.type_id == "GridLayout") {
+	else if(emission == DesignerLayoutChildEmissionStrategy::GridItem) {
 		int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
 		int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
 		int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
@@ -1723,7 +1748,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 			out << "\t\t}\n";
 		}
 	}
-	else if(parent.type_id == "UiSplitter") {
+	else if(emission == DesignerLayoutChildEmissionStrategy::SplitterPane && parent.type_id == "UiSplitter") {
 		out << "\t\t" << p << ".Add(" << c << ");\n";
 		if(index == 0) {
 			out << "\t\t" << p << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(parent, "min_a", 80) << "));\n";
@@ -1731,7 +1756,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		}
 		out << "\t\t" << p << ".SetSplitPercent(" << (int)CodeGenNodeProperty(parent, "split_percent", 50) << ");\n";
 	}
-	else if(parent.type_id == "UiQuadSplitter") {
+	else if(emission == DesignerLayoutChildEmissionStrategy::SplitterPane && parent.type_id == "UiQuadSplitter") {
 		out << "\t\t" << p << ".Add(" << c << ");\n";
 		if(index == 0) {
 			out << "\t\t" << p << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(parent, "min_a", 60) << "));\n";
@@ -1743,7 +1768,7 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		    << (int)CodeGenNodeProperty(parent, "column_percent", 50) << ", "
 		    << (int)CodeGenNodeProperty(parent, "row_percent", 50) << ");\n";
 	}
-	else if(parent.type_id == "UiTab") {
+	else if(emission == DesignerLayoutChildEmissionStrategy::PageContainerPage && parent.type_id == "UiTab") {
 		String title = (bool)CodeGenNodeProperty(child, "show_title", true)
 		             ? AsString(CodeGenNodeProperty(child, "page_title", child.name))
 		             : String();
@@ -1753,9 +1778,9 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 			out << ", " << icon;
 		out << ");\n";
 	}
-	else if(parent.type_id == "UiStack")
+	else if(emission == DesignerLayoutChildEmissionStrategy::PageContainerPage && parent.type_id == "UiStack")
 		out << "\t\t" << p << ".AddPage(" << c << ", " << CppString(CodeGenNodeProperty(child, "page_title", child.name)) << ");\n";
-	else if(parent.type_id == "UiAccordion") {
+	else if(emission == DesignerLayoutChildEmissionStrategy::AccordionSection) {
         String title = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_title", child.name)) : child.name;
         String subtitle = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_subtitle", "")) : String();
 
@@ -1774,17 +1799,17 @@ static void EmitAddChild(String& out, const VectorMap<DesignerNodeId, String>& n
 		out << "\t\t\t" << p << ".GetSectionContent(section).Add(" << c << ".SizePos());\n";
 		out << "\t\t}\n";
 	}
-	else if(parent.type_id == "UiScrollPanel")
+	else if(emission == DesignerLayoutChildEmissionStrategy::ScrollContent)
 		out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
-	else if(parent.type_id == "UiGroupPanel")
+	else if(emission == DesignerLayoutChildEmissionStrategy::GroupPanelContent)
 		out << "\t\t" << p << ".SetContent(" << c << ");\n";
-	else if(parent.type_id == "UiPanel")
+	else if(emission == DesignerLayoutChildEmissionStrategy::PanelContent)
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
-	else if(parent.type_id == "PaneSlot" || parent.type_id == "PageSlot" || parent.type_id == "AccordionSectionSlot")
+	else if(emission == DesignerLayoutChildEmissionStrategy::SlotPassthrough)
 		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
 }
 
-static void EmitAdds(String& out, const VectorMap<DesignerNodeId, String>& names,
+static void EmitAdds(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
                      const DesignerModel& model, const DesignerNode& parent)
 {
 	for(int i = 0; i < parent.children.GetCount(); i++) {
@@ -1792,8 +1817,8 @@ static void EmitAdds(String& out, const VectorMap<DesignerNodeId, String>& names
 		const DesignerNode* child = model.Find(child_id);
 		if(!child)
 			continue;
-		EmitAddChild(out, names, parent, *child, i);
-		EmitAdds(out, names, model, *child);
+		EmitAddChild(out, registry, names, parent, *child, i);
+		EmitAdds(out, registry, names, model, *child);
 	}
 }
 
@@ -1821,7 +1846,6 @@ static void EmitAppearanceApply(String& out, const VectorMap<DesignerNodeId, Str
 String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& registry,
                             const DesignerCodeGenOptions& options)
 {
-	(void)registry;
 	VectorMap<DesignerNodeId, String> names = BuildCodeNames(model);
 	String out;
 	if(options.emit_export_header) {
@@ -1888,7 +1912,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitSetup(out, names, n, options.appearance_mode);
+		EmitSetup(out, registry, names, n, options.appearance_mode);
 	}
 	out << "\t}\n\n"
 	    << "\tvoid ApplyAppearanceOverrides()\n"
@@ -1903,7 +1927,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	    << "\t\t// Parent-child layout tree only.\n";
 	const DesignerNode* root = model.Find(Designer_ROOT);
 	if(root)
-		EmitAdds(out, names, model, *root);
+		EmitAdds(out, registry, names, model, *root);
 	out << "\t}\n\n"
 	    << "\tvoid PostBuild()\n"
 	    << "\t{\n"
@@ -1913,7 +1937,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitDeclaration(out, names, n);
+		EmitDeclaration(out, registry, names, n);
 	}
 	out << "};\n\n"
 	    << "GUI_APP_MAIN\n"

@@ -14,20 +14,30 @@ static int FindString(const Vector<String>& v, const String& s)
 	return -1;
 }
 
-void DesignerRegistry::Register(const DesignerType& type)
+void DesignerRegistry::Register(const DesignerControlSpec& type)
 {
-	types_.GetAdd(type.id) = clone(type);
+	DesignerControlSpec spec = clone(type);
+	if(spec.default_base_name.IsEmpty())
+		spec.default_base_name = spec.display_name;
+	if(spec.runtime_cpp_type.IsEmpty())
+		spec.runtime_cpp_type = spec.id;
+	spec.capabilities.is_container = spec.capabilities.is_container || spec.is_container;
+	spec.capabilities.can_have_children = spec.capabilities.can_have_children || spec.can_have_children;
+	spec.capabilities.supports_children = spec.capabilities.supports_children || spec.capabilities.can_have_children;
+	spec.is_container = spec.capabilities.is_container;
+	spec.can_have_children = spec.capabilities.can_have_children;
+	types_.GetAdd(type.id) = pick(spec);
 }
 
-const DesignerType* DesignerRegistry::Find(const String& type_id) const
+const DesignerControlSpec* DesignerRegistry::FindSpec(const String& type_id) const
 {
 	int q = types_.Find(type_id);
 	return q >= 0 ? &types_[q] : nullptr;
 }
 
-Vector<const DesignerType*> DesignerRegistry::GetTypes() const
+Vector<const DesignerControlSpec*> DesignerRegistry::GetSpecs() const
 {
-	Vector<const DesignerType*> out;
+	Vector<const DesignerControlSpec*> out;
 	for(int i = 0; i < types_.GetCount(); i++)
 		out.Add(&types_[i]);
 	return out;
@@ -44,9 +54,9 @@ Vector<String> DesignerRegistry::GetToolboxGroups() const
 	return groups;
 }
 
-Vector<const DesignerType*> DesignerRegistry::GetToolboxTypes(const String& group) const
+Vector<const DesignerControlSpec*> DesignerRegistry::GetToolboxSpecs(const String& group) const
 {
-	Vector<const DesignerType*> out;
+	Vector<const DesignerControlSpec*> out;
 	for(int i = 0; i < types_.GetCount(); i++)
 		if(types_[i].toolbox_group == group)
 			out.Add(&types_[i]);
@@ -55,11 +65,11 @@ Vector<const DesignerType*> DesignerRegistry::GetToolboxTypes(const String& grou
 
 bool DesignerRegistry::CanDrop(const DesignerNode& parent, const DesignerNode& child) const
 {
-	const DesignerType* parent_type = Find(parent.type_id);
-	const DesignerType* child_type = Find(child.type_id);
+	const DesignerControlSpec* parent_type = FindSpec(parent.type_id);
+	const DesignerControlSpec* child_type = FindSpec(child.type_id);
 	if(!parent_type || !child_type)
 		return false;
-	if(!parent_type->can_have_children)
+	if(!parent_type->CanHaveChildren())
 		return false;
 	if(parent_type->can_drop)
 		return parent_type->can_drop(parent, child);

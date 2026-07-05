@@ -93,6 +93,7 @@ struct DesignerApiBinding : Moveable<DesignerApiBinding> {
 	String api_call;
 	String codegen_hint;
 	String group;
+	DesignerPropertyDomain domain = DesignerPropertyDomain::DesignerOnly;
 	Value default_value;
 	Value min_value;
 	Value max_value;
@@ -115,6 +116,7 @@ public:
 	                                const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
 	DesignerApiBinding& AddInt(const String& id, const String& label, DesignerEditorKind editor,
 	                             const String& api_call, const String& help, int min_value, int max_value);
+	DesignerApiBuilder& SetDomain(const String& id, DesignerPropertyDomain domain);
 	void Disable(const String& id, const String& reason);
 	void Hide(const String& id);
 	DesignerApiBinding* Find(const String& id);
@@ -742,7 +744,8 @@ private:
 
 // Factory used by preview, inspector probing, and tests.
 // Returns a real Ui control with its adapter interface attached when supported.
-Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adapter = nullptr);
+Ctrl* CreateDesignerAdapterCtrl(const DesignerRegistry& registry, const DesignerNode& node,
+                                DesignerAdapter **adapter = nullptr);
 DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl);
 const DesignerAdapter* AsDesignerAdapter(const Ctrl& ctrl);
 String DesignerAdapterHelp(const String& type_id);

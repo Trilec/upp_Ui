@@ -1,0 +1,159 @@
+# Designer control architecture
+
+## Purpose
+
+This note defines the control-level architecture for the Ui Designer.
+
+The short version:
+
+- the model is still the truth
+- commands are still the write path
+- control specifications own integration
+- preview/codegen/export rebuild from model state instead of accumulating one-off type rules
+
+## Core rules
+
+### Model-first
+
+`DesignerModel` remains authoritative for:
+
+- node ids
+- type ids
+- property maps
+- parent/child relationships
+- selection
+- virtual preview size
+
+If preview and inspector disagree, the model wins. Full stop.
+
+### Commands-only edits
+
+User edits continue through commands.
+
+Inspector controls emit intent. They do not directly mutate runtime preview controls and call that saved state.
+
+Expected flow:
+
+```text
+Editor callback
+-> posted Designer intent
+-> command stack mutation
+-> scheduled refresh
+-> preview / hierarchy / inspector / codegen rebuilt from model
+```
+
+### Preview is projection state
+
+Preview controls are rebuilt from:
+
+- current model
+- registered control specifications
+- theme context
+
+Preview adapters should never become a second hidden model.
+
+### Generated code reads model + registered spec
+
+Code generation should read:
+
+- model data
+- registered control specification metadata/hooks
+
+It should not depend on incidental shell state or inspector-only behavior.
+
+## DesignerControlSpec
+
+The registry now has a central `DesignerControlSpec` shape.
+
+Responsibilities bundled into the spec:
+
+- stable type id
+- display name
+- default base name
+- toolbox group
+- runtime C++ type
+- toolbox icon
+- declared capabilities
+- theme capability declaration
+- default/min size
+- default initializer
+- drop policy
+- adapter creation hook
+- codegen hooks
+- theme schema
+
+That does **not** mean every subsystem is migrated in one patch. It means the registry now owns the target contract and the rest of the Designer can move toward it without inventing another side channel.
+
+## Control-family modules
+
+Built-in registrations are now split by family under `Utilities/Designer/controls/`.
+
+Current shape:
+
+- `DesignerLayoutControls.cpp`
+- `DesignerContainerControls.cpp`
+- `DesignerDisplayControls.cpp`
+- `DesignerButtonControls.cpp`
+- `DesignerEditControls.cpp`
+- `DesignerCompositeControls.cpp`
+- `DesignerDataControls.cpp`
+
+`DesignerBuiltins.cpp` remains the single orchestration entrypoint. It does not host a second registry or a second layer of partial metadata; it just calls the family registrars in a stable order.
+
+## Capabilities
+
+`DesignerControlCapabilities` exists to declare what a control family supports instead of inferring it from scattered string checks.
+
+Examples:
+
+- container or not
+- child-hosting or not
+- preview participation
+- inspector participation
+- codegen participation
+
+Some old callers still read `is_container` / `can_have_children` directly. Those mirrors remain temporarily so the architecture can move without turning this step into a repo-wide churn bomb.
+
+## Theme capability
+
+`DesignerThemeCapability` describes how a control participates in theme override work:
+
+- `None`
+- `RoleOnly`
+- `CommonSurface`
+- `PartAware`
+
+The goal is to stop guessing whether a control “probably” has common overrides by reading five unrelated files.
+
+## Codegen hooks
+
+`DesignerCodeGenHooks` is the landing zone for control-specific emission hooks.
+
+This does not replace the current code generator overnight. It gives code generation a proper place to move toward, one control family at a time.
+
+## Theme schema
+
+`DesignerThemeSchema` is the matching landing zone for declared theme fields and part fields.
+
+That lets Inspector and codegen eventually consume the same declaration instead of maintaining separate lists that drift apart every few weeks.
+
+## What does not change in this phase
+
+- command stack semantics
+- model serialization architecture
+- refresh scheduler model
+- posted inspector commit lifecycle
+- preview rebuild ownership
+
+This step is about putting the control contract in one place, not inventing a new synchronous transaction system.
+
+## Migration guidance
+
+When adding or cleaning up a control type:
+
+1. Register or update its `DesignerControlSpec`.
+2. Keep defaults in the spec initializer.
+3. Declare capabilities/theme participation there.
+4. Move adapter/codegen/theme special cases toward spec hooks instead of adding fresh string switches.
+
+If a new control requires touching Builtins, Adapter, Preview, Inspector, and CodeGen manually with no shared spec update, the architecture is drifting again.

@@ -83,6 +83,7 @@ static DesignerApiBinding DesignerCloneBinding(const DesignerApiBinding& src)
 	out.api_call = src.api_call;
 	out.codegen_hint = src.codegen_hint;
 	out.group = src.group;
+	out.domain = src.domain;
 	out.default_value = src.default_value;
 	out.min_value = src.min_value;
 	out.max_value = src.max_value;
@@ -501,7 +502,7 @@ void DesignerInspector::Describe(Vector<DesignerApiBinding>& bindings, const Des
 	}
 	DesignerAdapter *adapter = nullptr;
 	One<Ctrl> ctrl;
-	ctrl.Attach(CreateDesignerAdapterCtrl(n, &adapter));
+	ctrl.Attach(CreateDesignerAdapterCtrl(*registry_, n, &adapter));
 	if(adapter) {
 		Vector<DesignerApiBinding> all;
 		adapter->DescribeApi(all, n);

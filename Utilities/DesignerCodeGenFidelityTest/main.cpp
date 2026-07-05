@@ -7,9 +7,19 @@
 #include "../Designer/DesignerSerialization.h"
 #include "../Designer/DesignerCodeGen.h"
 
+#include "../Designer/controls/DesignerControlFamilyShared.cpp"
+#include "../Designer/controls/DesignerLayoutControls.cpp"
+#include "../Designer/controls/DesignerContainerControls.cpp"
+#include "../Designer/controls/DesignerButtonControls.cpp"
+#include "../Designer/controls/DesignerEditControls.cpp"
+#include "../Designer/controls/DesignerDisplayControls.cpp"
+#include "../Designer/controls/DesignerCompositeControls.cpp"
+#include "../Designer/controls/DesignerDataControls.cpp"
+
 #include "../Designer/DesignerModel.cpp"
 #include "../Designer/DesignerRegistry.cpp"
 #include "../Designer/DesignerBuiltins.cpp"
+#include "../Designer/DesignerAdapter.cpp"
 #include "../Designer/DesignerSerialization.cpp"
 #include "../Designer/DesignerCodeGen.cpp"
 
@@ -105,6 +115,7 @@ CONSOLE_APP_MAIN
 	CheckContains(t, exact_code, "right_tool_button_panel.SetCustomStyle(Makeright_tool_button_panelStyle());", "exact code applies right tool panel style helper");
 	CheckContains(t, exact_code, "header_title_card.SetTitle(\"Designer\").SetSubTitle(\"\").SetContentInset(DPI(4)).SetMediaGap(DPI(9)).SetMediaReserve(", "exact code emits header title card chain");
 	CheckContains(t, exact_code, ".ShowTitleLine(false)", "exact code explicitly disables the header title line");
+	CheckContains(t, exact_code, ".ShowCardLine(false)", "exact code explicitly disables the header card line");
 	CheckContains(t, exact_code, "version_label.SetIconScaleToContent(false);", "exact code keeps the version badge from auto-scaling");
 	CheckContains(t, exact_code, "UiTheme::ResolvePanel(UiRole::Subtle)", "exact code keeps role-aware panel styling");
 	CheckContains(t, exact_code, "s.metrics.face_enabled = true;", "exact code emits explicit fill enable");

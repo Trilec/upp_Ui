@@ -1555,7 +1555,7 @@
 				},
 				"icon_scale": {
 					"type": "bool",
-					"value": true
+					"value": false
 				},
 				"content_gap": {
 					"type": "int",

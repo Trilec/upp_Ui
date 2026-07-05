@@ -128,22 +128,23 @@ static Color DesignerPreviewBackground(UiThemeMode mode)
 
 static bool DesignerPreviewIsLayoutType(const DesignerType *t)
 {
-	return t && (t->toolbox_group == "Layouts" || t->id == "Window");
+	return t && t->IsLayout();
 }
 
 static bool DesignerPreviewIsPanelType(const DesignerType *t)
 {
-	return t && (t->toolbox_group == "Containers" || t->id == "PaneSlot" || t->id == "PageSlot" || t->id == "AccordionSectionSlot");
+	return t && (t->IsContainer() || t->IsSlotNode()) && !t->IsLayout();
 }
 
-static bool DesignerPreviewIsPageContainer(const DesignerNode& n)
+static bool DesignerPreviewIsPageContainer(const DesignerRegistry* registry, const DesignerNode& n)
 {
-	return n.type_id == "UiTab" || n.type_id == "UiStack";
+	const DesignerType* t = registry ? registry->Find(n.type_id) : nullptr;
+	return t && t->IsPageContainer();
 }
 
 static DesignerNodeId DesignerPreviewActivePageSlot(const DesignerNode& n)
 {
-	if(!DesignerPreviewIsPageContainer(n) || n.children.IsEmpty())
+	if(n.children.IsEmpty())
 		return Designer_NULL;
 	int active = clamp((int)DesignerPreviewNodeProperty(n, "active", 0), 0, n.children.GetCount() - 1);
 	return n.children[active];
@@ -1097,12 +1098,12 @@ DesignerNodeId DesignerPreview::ResolveDropTarget(DesignerNodeId hit) const
 				const DesignerNode* n = model_->Find(id);
 				const DesignerType* t = n ? registry_->Find(n->type_id) : nullptr;
 				const DesignerNode* parent = n ? model_->Find(n->parent) : nullptr;
-				if(parent && DesignerPreviewIsPageContainer(*parent)) {
+				if(parent && DesignerPreviewIsPageContainer(registry_, *parent)) {
 					DesignerNodeId page = DesignerPreviewActivePageSlot(*parent);
 					if(page != Designer_NULL && page != drag_candidate_)
 						return page;
 				}
-				if(n && DesignerPreviewIsPageContainer(*n)) {
+				if(n && DesignerPreviewIsPageContainer(registry_, *n)) {
 					DesignerNodeId page = DesignerPreviewActivePageSlot(*n);
 					if(page != Designer_NULL && page != drag_candidate_)
 						return page;
@@ -1214,7 +1215,7 @@ Ctrl* DesignerPreview::BuildRealNode(DesignerNodeId id)
 				return nullptr;
 			DesignerPreviewLogReadback(*n, Null, n->parent);
 			DesignerAdapter *adapter = nullptr;
-			Ctrl *raw = CreateDesignerAdapterCtrl(*n, &adapter);
+			Ctrl *raw = CreateDesignerAdapterCtrl(*registry_, *n, &adapter);
 			if(!raw || !adapter)
 				return nullptr;
 			raw->IgnoreMouse().NoWantFocus();

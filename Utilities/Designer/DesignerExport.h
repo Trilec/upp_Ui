@@ -32,12 +32,18 @@
 
 namespace Upp {
 
+enum class DesignerExportSourceMode {
+	SingleMainCpp,
+	SplitHeaderSource
+};
+
 struct DesignerProjectExportOptions {
 	String project_name;
-	String output_directory;
+	String package_directory;
 	String class_name;
 	String source_design_filename;
 	DesignerAppearanceMode appearance_mode = DesignerAppearanceMode::ExactDesign;
+	DesignerExportSourceMode source_mode = DesignerExportSourceMode::SingleMainCpp;
 	bool include_design_json = true;
 	bool include_readme = true;
 	bool overwrite_existing = false;
@@ -54,6 +60,8 @@ struct DesignerProjectExportResult {
 	String package_dir;
 	String upp_path;
 	String main_cpp_path;
+	String header_path;
+	String source_cpp_path;
 	String design_json_path;
 	String readme_path;
 	String error;

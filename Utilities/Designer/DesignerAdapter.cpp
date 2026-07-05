@@ -858,6 +858,8 @@ String DesignerAdapterHelp(const String& type_id)
 	return "Select a toolbox item to see how it should be used in the designer.";
 }
 
+static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id);
+
 DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& label,
                                                 DesignerEditorKind editor, const String& api_call,
                                                 const String& help)
@@ -869,6 +871,7 @@ DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& labe
 	b.api_call = api_call;
 	b.help = help;
 	b.codegen_hint = api_call;
+	b.domain = DesignerGuessPropertyDomain(id);
 	return b;
 }
 
@@ -890,6 +893,13 @@ DesignerApiBinding& DesignerApiBuilder::AddInt(const String& id, const String& l
 	b.min_value = min_value;
 	b.max_value = max_value;
 	return b;
+}
+
+DesignerApiBuilder& DesignerApiBuilder::SetDomain(const String& id, DesignerPropertyDomain domain)
+{
+	if(DesignerApiBinding *b = Find(id))
+		b->domain = domain;
+	return *this;
 }
 
 DesignerApiBinding* DesignerApiBuilder::Find(const String& id)
@@ -961,6 +971,56 @@ static void SetBindingDefault(DesignerApiBuilder& b, const String& id, const Val
 {
 	if(DesignerApiBinding *binding = b.Find(id))
 		binding->default_value = def;
+}
+
+static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id);
+static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id)
+{
+	if(id == "name" || id == "tooltip")
+		return DesignerPropertyDomain::DesignerOnly;
+	if(id == "role" || id == "theme_override" || id == "face" || id == "face_mode" || id == "face_quad" ||
+	   id == "frame" || id == "frame_style" || id == "frame_width" || id == "radius" ||
+	   id == "face_enabled" || id == "frame_enabled" || id == "shadow_enabled" ||
+	   id == "shadow_distance" || id == "shadow_offset_x" || id == "shadow_offset_y" ||
+	   id == "shadow_alpha" || id == "shadow_color" || id == "shadow_curve" ||
+	   id == "ink_enabled" || id == "ink" || id == "icon_ink_enabled" || id == "icon_ink" ||
+	   id == "title_color_enabled" || id == "title_color" || id == "subtitle_color_enabled" || id == "subtitle_color" ||
+	   id == "card_line_color_enabled" || id == "card_line_color" ||
+	   id == "indicator_face_enabled" || id == "indicator_face" ||
+	   id == "indicator_frame_enabled" || id == "indicator_frame" ||
+	   id == "indicator_ink_enabled" || id == "indicator_ink" ||
+	   id == "track_face_enabled" || id == "track_face" ||
+	   id == "track_frame_enabled" || id == "track_frame" ||
+	   id == "thumb_face_enabled" || id == "thumb_face" ||
+	   id == "thumb_frame_enabled" || id == "thumb_frame" ||
+	   id == "header_face_enabled" || id == "header_face" ||
+	   id == "header_frame_enabled" || id == "header_frame" ||
+	   id == "body_face_enabled" || id == "body_face" ||
+	   id == "body_frame_enabled" || id == "body_frame")
+		return DesignerPropertyDomain::ThemeStyle;
+	if(id == "h_sizing" || id == "v_sizing" || id == "cell_align_h" || id == "cell_align_v" ||
+	   id == "fixed_width" || id == "fixed_height" || id == "min_width" || id == "min_height" ||
+	   id == "max_width" || id == "max_height" || id == "content_inset" || id == "content_gap" ||
+	   id == "inset" || id == "header_inset" || id == "line_thickness" || id == "card_line_thickness" ||
+	   id == "card_line_gap" || id == "field_gap" || id == "stack_gap" || id == "label_width" ||
+	   id == "value_width" || id == "track_width" || id == "track_height" || id == "thumb_width" ||
+	   id == "thumb_height" || id == "track_radius" || id == "thumb_radius" || id == "body_min_height" ||
+	   id == "header_radius" || id == "body_radius" || id == "divider_gap" || id == "item_gap")
+		return DesignerPropertyDomain::Layout;
+	if(id == "open" || id == "show_title" || id == "expand_tabs" || id == "close_buttons" ||
+	   id == "drag_handles" || id == "animation" || id == "single_open" || id == "enforce_one" ||
+	   id == "show_chevron" || id == "trim" || id == "selected" || id == "on" || id == "state" ||
+	   id == "tri_state" || id == "layout_break" || id == "debug" || id == "debug_auto_color" ||
+	   id == "debug_color" || id == "root_visible" || id == "connectors" || id == "metadata" ||
+	   id == "row_headers" || id == "column_headers" || id == "show_value" || id == "media_auto_fit")
+		return DesignerPropertyDomain::Behaviour;
+	return DesignerPropertyDomain::Content;
+}
+
+static void SetBindingDomain(DesignerApiBuilder& b, DesignerPropertyDomain domain, std::initializer_list<const char*> ids)
+{
+	for(const char *id : ids)
+		b.SetDomain(id, domain);
 }
 
 static void SetButtonThemeInkDefaults(DesignerApiBuilder& b, const String& text_enabled_id, const String& text_color_id,
@@ -1149,6 +1209,15 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	      "Explicit shadow color.").group = theme_group;
 	b.AddChoice("shadow_curve", "Shadow curve", "StyledShadow::curve",
 	            "Explicit shadow falloff curve.", {{"Soft", "Soft"}, {"Linear", "Linear"}, {"Tight", "Tight"}, {"Hard", "Hard"}}).group = theme_group;
+
+	SetBindingDomain(b, DesignerPropertyDomain::DesignerOnly, {"name", "tooltip"});
+	SetBindingDomain(b, DesignerPropertyDomain::ThemeStyle,
+		{"role", "theme_override", "face", "face_mode", "face_quad", "frame", "frame_style", "frame_width", "radius",
+		 "face_enabled", "frame_enabled", "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
+		 "shadow_alpha", "shadow_color", "shadow_curve"});
+	SetBindingDomain(b, DesignerPropertyDomain::Layout,
+		{"h_sizing", "v_sizing", "cell_align_h", "cell_align_v", "fixed_width", "fixed_height",
+		 "min_width", "min_height", "max_width", "max_height"});
 	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
 	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
 }
@@ -3323,135 +3392,14 @@ static void ApplyDesignerControlMinSize(Ctrl& ctrl, const DesignerNode& node)
 	ctrl.SetMinSize(Size(DPI(min_w), DPI(min_h)));
 }
 
-Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adapter)
+Ctrl* CreateDesignerAdapterCtrl(const DesignerRegistry& registry, const DesignerNode& node, DesignerAdapter **adapter)
 {
+	const DesignerControlSpec *spec = registry.FindSpec(node.type_id);
 	Ctrl *ctrl = nullptr;
 	DesignerAdapter *a = nullptr;
-	if(node.type_id == "BoxLayout") {
-		DesignerBoxLayoutAdapter *p = new DesignerBoxLayoutAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "GridLayout") {
-		DesignerGridLayoutAdapter *p = new DesignerGridLayoutAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiSplitter") {
-		DesignerSplitterAdapter *p = new DesignerSplitterAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiQuadSplitter") {
-		DesignerQuadSplitterAdapter *p = new DesignerQuadSplitterAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiAccordion") {
-		DesignerAccordionAdapter *p = new DesignerAccordionAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiLabel") {
-		DesignerLabelAdapter *p = new DesignerLabelAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiTitleCard") {
-		DesignerTitleCardAdapter *p = new DesignerTitleCardAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiGroupPanel") {
-		DesignerGroupPanelAdapter *p = new DesignerGroupPanelAdapter;
-		ctrl = p;
-		a = p;
-	}	else if(DesignerIsCompositeType(node.type_id)) {
-		DesignerCompositeAdapter *p = new DesignerCompositeAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiSlider") {
-		DesignerSliderAdapter *p = new DesignerSliderAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiButton") {
-		DesignerButtonAdapter *p = new DesignerButtonAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiSplitButton") {
-		DesignerSplitButtonAdapter *p = new DesignerSplitButtonAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiToolButton") {
-		DesignerToolButtonAdapter *p = new DesignerToolButtonAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiLineEdit") {
-		DesignerLineEditAdapter *p = new DesignerLineEditAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiIntEdit") {
-		DesignerIntEditAdapter *p = new DesignerIntEditAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiFloatEdit") {
-		DesignerFloatEditAdapter *p = new DesignerFloatEditAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiToggle") {
-		DesignerToggleAdapter *p = new DesignerToggleAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiDropdown") {
-		DesignerDropdownAdapter *p = new DesignerDropdownAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiCheckBox") {
-		DesignerCheckBoxAdapter *p = new DesignerCheckBoxAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiBreadcrumbs") {
-		DesignerBreadcrumbsAdapter *p = new DesignerBreadcrumbsAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiTab") {
-		DesignerTabAdapter *p = new DesignerTabAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiStack") {
-		DesignerStackAdapter *p = new DesignerStackAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiTable") {
-		DesignerTableAdapter *p = new DesignerTableAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiTree") {
-		DesignerTreeAdapter *p = new DesignerTreeAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else if(node.type_id == "UiScrollPanel") {
-		DesignerScrollPanelAdapter *p = new DesignerScrollPanelAdapter;
-		ctrl = p;
-		a = p;
-	}
-	else {
+	if(spec && spec->create_adapter)
+		ctrl = spec->create_adapter(node, &a);
+	if(!ctrl) {
 		DesignerPanelAdapter *p = new DesignerPanelAdapter;
 		ctrl = p;
 		a = p;
@@ -3469,33 +3417,7 @@ Ctrl* CreateDesignerAdapterCtrl(const DesignerNode& node, DesignerAdapter **adap
 
 DesignerAdapter* AsDesignerAdapter(Ctrl& ctrl)
 {
-	if(DesignerPanelAdapter *p = dynamic_cast<DesignerPanelAdapter *>(&ctrl)) return p;
-	if(DesignerGroupPanelAdapter *p = dynamic_cast<DesignerGroupPanelAdapter *>(&ctrl)) return p;
-	if(DesignerLabelAdapter *p = dynamic_cast<DesignerLabelAdapter *>(&ctrl)) return p;
-	if(DesignerTitleCardAdapter *p = dynamic_cast<DesignerTitleCardAdapter *>(&ctrl)) return p;	if(DesignerCompositeAdapter *p = dynamic_cast<DesignerCompositeAdapter *>(&ctrl)) return p;
-
-	if(DesignerSliderAdapter *p = dynamic_cast<DesignerSliderAdapter *>(&ctrl)) return p;
-	if(DesignerButtonAdapter *p = dynamic_cast<DesignerButtonAdapter *>(&ctrl)) return p;
-	if(DesignerSplitButtonAdapter *p = dynamic_cast<DesignerSplitButtonAdapter *>(&ctrl)) return p;
-	if(DesignerToolButtonAdapter *p = dynamic_cast<DesignerToolButtonAdapter *>(&ctrl)) return p;
-	if(DesignerLineEditAdapter *p = dynamic_cast<DesignerLineEditAdapter *>(&ctrl)) return p;
-	if(DesignerIntEditAdapter *p = dynamic_cast<DesignerIntEditAdapter *>(&ctrl)) return p;
-	if(DesignerFloatEditAdapter *p = dynamic_cast<DesignerFloatEditAdapter *>(&ctrl)) return p;
-	if(DesignerToggleAdapter *p = dynamic_cast<DesignerToggleAdapter *>(&ctrl)) return p;
-	if(DesignerDropdownAdapter *p = dynamic_cast<DesignerDropdownAdapter *>(&ctrl)) return p;
-	if(DesignerCheckBoxAdapter *p = dynamic_cast<DesignerCheckBoxAdapter *>(&ctrl)) return p;
-	if(DesignerBreadcrumbsAdapter *p = dynamic_cast<DesignerBreadcrumbsAdapter *>(&ctrl)) return p;
-	if(DesignerTabAdapter *p = dynamic_cast<DesignerTabAdapter *>(&ctrl)) return p;
-	if(DesignerStackAdapter *p = dynamic_cast<DesignerStackAdapter *>(&ctrl)) return p;
-	if(DesignerTableAdapter *p = dynamic_cast<DesignerTableAdapter *>(&ctrl)) return p;
-	if(DesignerTreeAdapter *p = dynamic_cast<DesignerTreeAdapter *>(&ctrl)) return p;
-	if(DesignerAccordionAdapter *p = dynamic_cast<DesignerAccordionAdapter *>(&ctrl)) return p;
-	if(DesignerScrollPanelAdapter *p = dynamic_cast<DesignerScrollPanelAdapter *>(&ctrl)) return p;
-	if(DesignerBoxLayoutAdapter *p = dynamic_cast<DesignerBoxLayoutAdapter *>(&ctrl)) return p;
-	if(DesignerGridLayoutAdapter *p = dynamic_cast<DesignerGridLayoutAdapter *>(&ctrl)) return p;
-	if(DesignerSplitterAdapter *p = dynamic_cast<DesignerSplitterAdapter *>(&ctrl)) return p;
-	if(DesignerQuadSplitterAdapter *p = dynamic_cast<DesignerQuadSplitterAdapter *>(&ctrl)) return p;
-	return nullptr;
+	return dynamic_cast<DesignerAdapter*>(&ctrl);
 }
 
 const DesignerAdapter* AsDesignerAdapter(const Ctrl& ctrl)
