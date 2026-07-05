@@ -1,6 +1,7 @@
 #include "SymbolPickerExport.h"
 #include "SymbolPickerGeneratedCatalog.h"
 #include "SymbolPickerImageRender.h"
+#include "SymbolPickerUppExport.h"
 
 #include <plugin/png/png.h>
 
@@ -939,6 +940,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 
 	SymbolPickerProject project;
 	project.project_name = "Export Smoke";
+	project.output_base_name = "export_smoke";
 	project.symbol_prefix = "ICON_MYAPP_";
 	project.default_size = 48;
 	project.active_collection_index = 0;
@@ -973,10 +975,20 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	c.source_id = "action/save";
 	c.alias = "ICON_MYAPP Save action!";
 	c.size = 32;
-	c.tint = Color(7, 8, 9);
+	c.tint = Null;
 	c.comment = "third";
 	c.unresolved = false;
 	primary.items.Add(c);
+
+	SymbolPickerIconRef u;
+	u.catalog_id = "legacy/missing_icon/outlined";
+	u.source_id = "legacy/missing_icon";
+	u.alias = "Missing active";
+	u.size = 24;
+	u.tint = Color(9, 10, 11);
+	u.comment = "unresolved active";
+	u.unresolved = true;
+	primary.items.Add(u);
 	project.collections.Add(pick(primary));
 
 	SymbolPickerCollection secondary;
@@ -1090,7 +1102,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Export smoke category naming failed.";
 		return false;
 	}
-	if(active_warnings.GetCount() != 0 || all_warnings.IsEmpty()) {
+	if(active_warnings.IsEmpty() || all_warnings.IsEmpty()) {
 		error = "Export smoke did not report unresolved skips.";
 		return false;
 	}
@@ -1098,6 +1110,42 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Export smoke all-collections mode did not include more than active collection coverage.";
 		return false;
 	}
+
+	Vector<String> raw_warnings;
+	Vector<String> rle_warnings;
+	String raw_header_smoke = BuildSymbolPickerUppRawHeader(project, catalog, SymbolPickerExportScope::ActiveCollection, &raw_warnings);
+	String rle_header_smoke = BuildSymbolPickerUppRleHeader(project, catalog, SymbolPickerExportScope::AllCollections, &rle_warnings);
+	if(raw_header_smoke.IsEmpty() || rle_header_smoke.IsEmpty() || raw_warnings.IsEmpty() || rle_warnings.IsEmpty()) {
+		error = "Upp header smoke did not produce expected output and warnings.";
+		return false;
+	}
+	if(raw_header_smoke.Find("#ifndef EXPORT_SMOKE_UPP_RAW_HEADER_H") < 0
+		|| rle_header_smoke.Find("#ifndef EXPORT_SMOKE_UPP_RLE_HEADER_H") < 0
+		|| raw_header_smoke.Find("UiMakeIcon RAW") < 0
+		|| rle_header_smoke.Find("UiMakeIcon RLE") < 0
+		|| raw_header_smoke.Find("ICON_ICON_MYAPP") >= 0
+		|| rle_header_smoke.Find("ICON_ICON_MYAPP") >= 0
+		|| raw_header_smoke.Find("ICON_MYAPP_MISSING_ACTIVE") >= 0
+		|| rle_header_smoke.Find("ICON_MYAPP_MISSING_ACTIVE") >= 0) {
+		error = "Upp header smoke naming or guard assertions failed.";
+		return false;
+	}
+	if(raw_header_smoke.Find("return Upp::UiMakeIcon(DATA_ICON_MYAPP_SAVE_ACTION);") < 0
+		|| raw_header_smoke.Find("ICON_MYAPP_SAVE_ACTION_2") < 0
+		|| raw_header_smoke.Find("ICON_MYAPP_SAVE_ACTION_3") < 0
+		|| rle_header_smoke.Find("ICON_MYAPP_COPY_NOW") < 0
+		|| rle_header_smoke.Find("ICON_MYAPP_QUOTE_ALIAS_SAMPLE") < 0) {
+		error = "Upp header smoke symbol assertions failed.";
+		return false;
+	}
+	if(raw_header_smoke.Find("// Export warnings:") < 0
+		|| rle_header_smoke.Find("// Export warnings:") < 0) {
+		error = "Upp header smoke did not include warnings comments.";
+		return false;
+	}
+
+	if(!RunSymbolPickerUppExportSmokeTests(error))
+		return false;
 
 	String dup_temp_dir = AppendFileName(GetTempPath(), "symbolpicker_svg_dup_smoke");
 	DeleteFolderDeep(dup_temp_dir);
@@ -1185,6 +1233,19 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	String current_active_text = BuildIconIdExport(project, catalog, SymbolPickerExportScope::ActiveCollection);
 	if(current_all_text.IsEmpty() || current_active_text.IsEmpty()) {
 		error = "Export smoke all/active text builders returned empty text.";
+		return false;
+	}
+
+	String raw_header = BuildSymbolPickerUppRawHeader(project, catalog, SymbolPickerExportScope::AllCollections);
+	String rle_header = BuildSymbolPickerUppRleHeader(project, catalog, SymbolPickerExportScope::AllCollections);
+	if(raw_header.IsEmpty() || rle_header.IsEmpty()) {
+		error = "Export smoke UiMakeIcon headers returned empty text.";
+		return false;
+	}
+	if(raw_header.Find("UiMakeIcon RAW") < 0
+		|| raw_header.Find("return Upp::UiMakeIcon(") < 0
+		|| rle_header.Find("UiMakeIcon RLE") < 0) {
+		error = "Export smoke UiMakeIcon headers did not format correctly.";
 		return false;
 	}
 

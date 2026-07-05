@@ -166,7 +166,7 @@ private:
 	void UpdateCollectionsEmptyState();
 	bool SaveProject(bool save_as);
 	bool LoadProject();
-	String BuildExportText(SymbolPickerExportScope scope) const;
+	String BuildExportText(SymbolPickerExportScope scope, Vector<String>* warnings = nullptr) const;
 	String MakeExportDefaultName(SymbolPickerExportScope scope) const;
 	String MakeExportDefaultExtension() const;
 	bool CopyCurrentExportToClipboard();

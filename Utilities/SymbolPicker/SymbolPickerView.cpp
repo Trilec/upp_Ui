@@ -1,5 +1,6 @@
 #include "SymbolPickerView.h"
 #include "SymbolPickerProjectIo.h"
+#include "SymbolPickerUppExport.h"
 
 namespace Upp {
 
@@ -110,6 +111,21 @@ static String MakeExportScopeName(const SymbolPickerProject& project, SymbolPick
 	else
 		base << "_current";
 	return ToLower(base);
+}
+
+static String MakeExportTypeName(SymbolPickerExportType type)
+{
+	switch(type) {
+	case SymbolPickerExportType::CppSnippet: return "cpp";
+	case SymbolPickerExportType::UppRawHeader: return "raw";
+	case SymbolPickerExportType::UppRleHeader: return "rle";
+	case SymbolPickerExportType::PngFiles: return "png";
+	case SymbolPickerExportType::SvgFiles: return "svg";
+	case SymbolPickerExportType::IconId: return "icon_id";
+	case SymbolPickerExportType::ImageCall:
+	default:
+		return "image_call";
+	}
 }
 
 static Image MakeDragSampleFromCtrl(Ctrl& ctrl)
@@ -808,7 +824,9 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.Add("Icon Id", (int)SymbolPickerExportType::IconId)
 		.Add("C++ Snippet", (int)SymbolPickerExportType::CppSnippet)
 		.Add("PNG Files", (int)SymbolPickerExportType::PngFiles)
-		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles);
+		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles)
+		.Add("U++ RAW Header", (int)SymbolPickerExportType::UppRawHeader)
+		.Add("U++ RLE Header", (int)SymbolPickerExportType::UppRleHeader);
 	output_export_type_.Select(0);
 	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
 	copy_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
@@ -1192,6 +1210,9 @@ String SymbolPickerView::MakeExportDefaultExtension() const
 		return ".txt";
 	switch(model_->GetExportType()) {
 	case SymbolPickerExportType::CppSnippet: return ".cpp";
+	case SymbolPickerExportType::UppRawHeader:
+	case SymbolPickerExportType::UppRleHeader:
+		return ".h";
 	case SymbolPickerExportType::PngFiles:
 	case SymbolPickerExportType::SvgFiles:
 		return ".txt";
@@ -1206,10 +1227,22 @@ String SymbolPickerView::MakeExportDefaultName(SymbolPickerExportScope scope) co
 {
 	if(!model_)
 		return "symbolpicker_export";
-	return MakeExportScopeName(model_->ExportProject(), scope);
+	String base = MakeExportScopeName(model_->ExportProject(), scope);
+	switch(model_->GetExportType()) {
+	case SymbolPickerExportType::UppRawHeader:
+		base << "_raw";
+		break;
+	case SymbolPickerExportType::UppRleHeader:
+		base << "_rle";
+		break;
+	default:
+		base << '_' << MakeExportTypeName(model_->GetExportType());
+		break;
+	}
+	return base;
 }
 
-String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope) const
+String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope, Vector<String>* warnings) const
 {
 	if(!model_ || !catalog_)
 		return String();
@@ -1217,18 +1250,35 @@ String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope) const
 	SymbolPickerProject project = model_->ExportProject();
 	project.default_size = model_->GetExportSize();
 
+	Vector<String> local_warnings;
+	Vector<String>& warn = warnings ? *warnings : local_warnings;
+	String text;
+
 	switch(model_->GetExportType()) {
 	case SymbolPickerExportType::IconId:
-		return BuildIconIdExport(project, *catalog_, scope);
+		text = BuildIconIdExport(project, *catalog_, scope, &warn);
+		break;
 	case SymbolPickerExportType::CppSnippet:
-		return BuildCppSnippetExport(project, *catalog_, scope);
+		text = BuildCppSnippetExport(project, *catalog_, scope, &warn);
+		break;
+	case SymbolPickerExportType::UppRawHeader:
+		text = BuildSymbolPickerUppRawHeader(project, *catalog_, scope, &warn);
+		break;
+	case SymbolPickerExportType::UppRleHeader:
+		text = BuildSymbolPickerUppRleHeader(project, *catalog_, scope, &warn);
+		break;
 	case SymbolPickerExportType::PngFiles:
 	case SymbolPickerExportType::SvgFiles:
 		return String();
 	case SymbolPickerExportType::ImageCall:
 	default:
-		return BuildImageCallExport(project, *catalog_, scope);
+		text = BuildImageCallExport(project, *catalog_, scope, &warn);
+		break;
 	}
+
+	if(text.IsEmpty())
+		return String();
+	return text;
 }
 
 bool SymbolPickerView::CopyCurrentExportToClipboard()
@@ -1251,7 +1301,8 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 		return false;
 	}
 
-	String text = BuildExportText(SymbolPickerExportScope::ActiveCollection);
+	Vector<String> warnings;
+	String text = BuildExportText(SymbolPickerExportScope::ActiveCollection, &warnings);
 	if(text.IsEmpty()) {
 		PromptOK("Nothing exportable in the active collection.");
 		return false;
@@ -1272,7 +1323,8 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 	if(model_->GetExportType() == SymbolPickerExportType::PngFiles)
 		return ExportCurrentPngFiles(scope);
 
-	String text = BuildExportText(scope);
+	Vector<String> warnings;
+	String text = BuildExportText(scope, &warnings);
 	if(text.IsEmpty()) {
 		PromptOK(scope == SymbolPickerExportScope::AllCollections
 			? "No exportable items in all collections."
@@ -1282,7 +1334,8 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 
 	FileSel fs;
 	String ext = MakeExportDefaultExtension();
-	String type_label = model_->GetExportType() == SymbolPickerExportType::CppSnippet ? "*.cpp" : "*.txt";
+	String type_label = model_->GetExportType() == SymbolPickerExportType::CppSnippet ? "*.cpp" :
+		((model_->GetExportType() == SymbolPickerExportType::UppRawHeader || model_->GetExportType() == SymbolPickerExportType::UppRleHeader) ? "*.h" : "*.txt");
 	fs.Type("Export text", type_label);
 	String current = model_->GetProjectFilePath();
 	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
@@ -1296,6 +1349,14 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 	if(!SaveFile(path, text)) {
 		Exclamation(Format("Could not write export file:\n%s", path));
 		return false;
+	}
+	if(!warnings.IsEmpty()) {
+		String warnings_path = AppendFileName(GetFileFolder(path), "_export_warnings.txt");
+		String warning_text;
+		for(const String& warning : warnings)
+			warning_text << warning << '\n';
+		if(!SaveFile(warnings_path, warning_text))
+			Exclamation(Format("Could not write warnings file:\n%s", warnings_path));
 	}
 	PromptOK(Format("Exported text:\n%s", path));
 	return true;

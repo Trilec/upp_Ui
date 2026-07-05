@@ -11,6 +11,8 @@ enum class SymbolPickerExportType : byte {
 	CppSnippet,
 	PngFiles,
 	SvgFiles,
+	UppRawHeader,
+	UppRleHeader,
 };
 
 enum class SymbolPickerIconStyle : byte {

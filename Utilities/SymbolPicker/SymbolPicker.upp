@@ -25,6 +25,8 @@ file
 	SymbolPickerProjectIo.cpp,
 	SymbolPickerExport.h,
 	SymbolPickerExport.cpp,
+	SymbolPickerUppExport.h,
+	SymbolPickerUppExport.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,
