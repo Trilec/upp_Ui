@@ -1123,6 +1123,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		|| rle_header_smoke.Find("#ifndef EXPORT_SMOKE_UPP_RLE_HEADER_H") < 0
 		|| raw_header_smoke.Find("UiMakeIcon RAW") < 0
 		|| rle_header_smoke.Find("UiMakeIcon RLE") < 0
+		|| raw_header_smoke.Find("RAW encoding: row-major premultiplied RGBA bytes.") < 0
+		|| rle_header_smoke.Find("RLE encoding: uint16 little-endian run length followed by premultiplied RGBA.") < 0
 		|| raw_header_smoke.Find("ICON_ICON_MYAPP") >= 0
 		|| rle_header_smoke.Find("ICON_ICON_MYAPP") >= 0
 		|| raw_header_smoke.Find("ICON_MYAPP_MISSING_ACTIVE") >= 0
@@ -1141,6 +1143,29 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	if(raw_header_smoke.Find("// Export warnings:") < 0
 		|| rle_header_smoke.Find("// Export warnings:") < 0) {
 		error = "Upp header smoke did not include warnings comments.";
+		return false;
+	}
+
+	SymbolPickerProject empty_project;
+	empty_project.project_name = "Export Smoke Empty";
+	empty_project.output_base_name = "export_smoke_empty";
+	empty_project.symbol_prefix = "ICON_MYAPP_";
+	empty_project.default_size = 48;
+	empty_project.active_collection_index = 0;
+	SymbolPickerCollection empty_collection;
+	empty_collection.name = "Empty";
+	SymbolPickerIconRef empty_item;
+	empty_item.catalog_id = "legacy/missing_icon/outlined";
+	empty_item.source_id = "legacy/missing_icon";
+	empty_item.alias = "Broken";
+	empty_item.unresolved = true;
+	empty_collection.items.Add(empty_item);
+	empty_project.collections.Add(pick(empty_collection));
+	Vector<String> empty_warnings;
+	String empty_raw = BuildSymbolPickerUppRawHeader(empty_project, catalog, SymbolPickerExportScope::AllCollections, &empty_warnings);
+	String empty_rle = BuildSymbolPickerUppRleHeader(empty_project, catalog, SymbolPickerExportScope::AllCollections, &empty_warnings);
+	if(!empty_raw.IsEmpty() || !empty_rle.IsEmpty() || empty_warnings.IsEmpty()) {
+		error = "Upp header smoke zero-output rejection failed.";
 		return false;
 	}
 

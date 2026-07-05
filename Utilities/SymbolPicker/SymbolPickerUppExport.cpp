@@ -42,6 +42,7 @@ static String MakeWarningCommentBlock(const Vector<String>& warnings)
 	if(warnings.IsEmpty())
 		return String();
 	String out;
+	out << "// Export warnings:\n";
 	for(const String& warning : warnings)
 		out << "// " << warning << "\n";
 	out << "\n";
@@ -152,7 +153,6 @@ static bool BuildEncodedUppPayload(const Image& img, bool use_rle, Vector<byte>&
 	int y = 0;
 	RGBA prev = img[0][0];
 	unsigned int run = 1;
-	bool emitted = false;
 
 	for(int idx = 1; idx < total_px; ++idx) {
 		++x;
@@ -172,7 +172,6 @@ static bool BuildEncodedUppPayload(const Image& img, bool use_rle, Vector<byte>&
 				AppendPayloadByte(out, prev.g);
 				AppendPayloadByte(out, prev.b);
 				AppendPayloadByte(out, prev.a);
-				emitted = true;
 				run = 1;
 			}
 			else
@@ -185,7 +184,6 @@ static bool BuildEncodedUppPayload(const Image& img, bool use_rle, Vector<byte>&
 			AppendPayloadByte(out, prev.g);
 			AppendPayloadByte(out, prev.b);
 			AppendPayloadByte(out, prev.a);
-			emitted = true;
 			prev = p;
 			run = 1;
 		}
@@ -203,7 +201,7 @@ static bool BuildEncodedUppPayload(const Image& img, bool use_rle, Vector<byte>&
 	return true;
 }
 
-static void EmitItemBlock(String& out,
+static bool EmitItemBlock(String& out,
 	const SymbolPickerProject& project,
 	const SymbolPickerCollection& collection,
 	int collection_index,
@@ -219,7 +217,7 @@ static void EmitItemBlock(String& out,
 			(item.source_id.IsEmpty() ? String() : " / "),
 			(item.source_id.IsEmpty() ? String() : item.source_id),
 			collection.name.IsEmpty() ? GetCollectionLabel(collection, collection_index) : collection.name));
-		return;
+		return false;
 	}
 
 	int px = ResolveExportSize(project, item);
@@ -229,7 +227,7 @@ static void EmitItemBlock(String& out,
 		warnings.Add(error.IsEmpty()
 			? Format("Could not render %s.", item.catalog_id)
 			: error);
-		return;
+		return false;
 	}
 
 	String symbol_name = MakeSymbolPickerExportSymbolName(project, collection, item, entry, used_names);
@@ -254,7 +252,7 @@ static void EmitItemBlock(String& out,
 	Vector<byte> payload;
 	if(!BuildEncodedUppPayload(img, use_rle, payload)) {
 		warnings.Add(Format("Could not encode %s for U++ header export.", item.catalog_id));
-		return;
+		return false;
 	}
 	out << FormatHeaderBytes(payload);
 
@@ -263,6 +261,7 @@ static void EmitItemBlock(String& out,
 	out << "{\n";
 	out << "    return Upp::UiMakeIcon(" << data_sym << ");\n";
 	out << "}\n\n";
+	return true;
 }
 
 static String BuildSymbolPickerUppHeader(const SymbolPickerProject& project,
@@ -294,8 +293,7 @@ static String BuildSymbolPickerUppHeader(const SymbolPickerProject& project,
 				continue;
 			}
 
-			EmitItemBlock(body, project, collection, ci, item, entry, use_rle, used_names, warn);
-			wrote_any = true;
+			wrote_any |= EmitItemBlock(body, project, collection, ci, item, entry, use_rle, used_names, warn);
 		}
 	}
 
@@ -313,7 +311,10 @@ static String BuildSymbolPickerUppHeader(const SymbolPickerProject& project,
 	if(!project.comment.IsEmpty())
 		out << "// Project comment: " << project.comment << "\n";
 	out << "// Export format: UiMakeIcon " << (use_rle ? "RLE" : "RAW") << "\n";
-	out << "// RAW encoding: row-major RGBA bytes from the rendered Image.\n";
+	if(use_rle)
+		out << "// RLE encoding: uint16 little-endian run length followed by premultiplied RGBA.\n";
+	else
+		out << "// RAW encoding: row-major premultiplied RGBA bytes.\n";
 	out << "// Deterministic export; no timestamps.\n\n";
 	out << "#ifndef " << guard << "\n";
 	out << "#define " << guard << "\n\n";

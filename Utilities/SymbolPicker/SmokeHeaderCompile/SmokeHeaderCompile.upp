@@ -7,6 +7,12 @@ uses
 
 file
 	main.cpp,
+	../SymbolPickerCatalog.cpp,
+	../SymbolPickerCatalogSeed.cpp,
+	../SymbolPickerGeneratedCatalog.cpp,
+	../SymbolPickerExport.cpp,
+	../SymbolPickerUppExport.cpp,
+	../SymbolPickerImageRender.cpp,
 	GeneratedRawHeader.h,
 	GeneratedRleHeader.h;
 
