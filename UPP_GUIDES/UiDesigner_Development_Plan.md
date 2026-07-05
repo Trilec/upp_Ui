@@ -9,6 +9,23 @@ The Designer stays model-first.
 - Preview, inspector, hierarchy, codegen, and export are projections rebuilt from model state.
 - Runtime controls emit intent; Designer decides when to commit and when to refresh.
 
+## Completed architecture
+
+The control contract is now centralized in `DesignerControlSpec` and the family
+registrations under `Utilities/Designer/controls/`.
+
+Completed pieces:
+
+- registry-owned control identity and defaults
+- explicit capability declarations
+- explicit theme schema records
+- explicit property-domain declarations
+- adapter creation registered through control specs
+- spec-driven codegen and preview routing for migrated families
+- canonical fidelity and export regeneration checks
+
+These are current architecture, not future landing zones.
+
 ## Why this plan exists
 
 The old Designer integration drifted into a fragmented shape:
@@ -64,6 +81,18 @@ That spec is the convergence point for:
 - codegen hooks
 
 The rest of the Designer should ask the spec what a type is, instead of rebuilding that answer from string switches.
+
+### 3a. Deliberately retained exceptions
+
+Some compatibility mirrors remain while the last callers are migrated:
+
+- `DesignerType = DesignerControlSpec`
+- `Find(...)`, `GetTypes(...)`, `GetToolboxTypes(...)`
+- `is_container` / `can_have_children`
+- a few central type switches in generator and adapter glue where the last
+  legacy branches still need to be removed
+
+These are transitional compatibility layers, not architectural goals.
 
 ### 4. Inspector emits intents only
 
@@ -124,6 +153,7 @@ This phase should:
 - move codegen routing into spec hooks
 - move theme surface declarations into spec theme schema
 - split descriptor shape from descriptor state once caching can be trusted again
+- keep Theme Export as a later, explicit feature boundary
 
 ## Non-goals for this step
 
@@ -133,3 +163,9 @@ This phase should:
 - no new hidden state machine
 
 The point is to reduce fragmentation without making the Designer clever in new ways.
+
+## Theme Export boundary
+
+Theme Export is intentionally not enabled yet. The current work makes the
+exportable theme surface explicit and auditable, but the user-facing Theme Export
+workflow remains a later step.

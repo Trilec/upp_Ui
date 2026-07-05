@@ -70,6 +70,7 @@ enum class DesignerThemeCapability {
 };
 
 enum class DesignerPropertyDomain {
+	Unclassified,
 	DesignerOnly,
 	Content,
 	Layout,
@@ -107,6 +108,17 @@ struct DesignerCodeGenHooks : Moveable<DesignerCodeGenHooks> {
 };
 
 struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {
+	struct DesignerThemeFieldSpec : Moveable<DesignerThemeFieldSpec> {
+		String property_id;
+		String style_target;
+		bool preview_supported = false;
+		bool exact_codegen_supported = false;
+		bool theme_export_supported = false;
+		String unsupported_reason;
+		DesignerPropertyDomain domain = DesignerPropertyDomain::Unclassified;
+	};
+
+	Vector<DesignerThemeFieldSpec> fields;
 	Vector<String> common_fields;
 	Vector<String> part_fields;
 	VectorMap<String, String> unsupported_fields;
@@ -114,6 +126,7 @@ struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {
 	DesignerThemeSchema() = default;
 	DesignerThemeSchema(const DesignerThemeSchema& s, int)
 	{
+		fields <<= s.fields;
 		common_fields <<= s.common_fields;
 		part_fields <<= s.part_fields;
 		unsupported_fields.Clear();
@@ -122,6 +135,7 @@ struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {
 	}
 	DesignerThemeSchema(const DesignerThemeSchema& s)
 	{
+		fields <<= s.fields;
 		common_fields <<= s.common_fields;
 		part_fields <<= s.part_fields;
 		unsupported_fields.Clear();
@@ -130,6 +144,7 @@ struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {
 	}
 	void operator=(const DesignerThemeSchema& s)
 	{
+		fields <<= s.fields;
 		common_fields <<= s.common_fields;
 		part_fields <<= s.part_fields;
 		unsupported_fields.Clear();

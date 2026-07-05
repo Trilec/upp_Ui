@@ -871,7 +871,111 @@ DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& labe
 	b.api_call = api_call;
 	b.help = help;
 	b.codegen_hint = api_call;
-	b.domain = DesignerGuessPropertyDomain(id);
+	b.domain = DesignerPropertyDomain::Unclassified;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const String& label, DesignerEditorKind editor,
+                                                   const String& api_call, const String& help)
+{
+	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
+	b.domain = DesignerPropertyDomain::Content;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const String& label, const String& api_call,
+                                                   const String& help, std::initializer_list<std::pair<const char *, const char *>> choices)
+{
+	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
+	b.domain = DesignerPropertyDomain::Content;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const String& label, DesignerEditorKind editor,
+                                                   const String& api_call, const String& help, int min_value, int max_value)
+{
+	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
+	b.domain = DesignerPropertyDomain::Content;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String& label, DesignerEditorKind editor,
+                                                  const String& api_call, const String& help)
+{
+	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
+	b.domain = DesignerPropertyDomain::Layout;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String& label, const String& api_call,
+                                                  const String& help, std::initializer_list<std::pair<const char *, const char *>> choices)
+{
+	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
+	b.domain = DesignerPropertyDomain::Layout;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String& label, DesignerEditorKind editor,
+                                                  const String& api_call, const String& help, int min_value, int max_value)
+{
+	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
+	b.domain = DesignerPropertyDomain::Layout;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const String& label, DesignerEditorKind editor,
+                                                     const String& api_call, const String& help)
+{
+	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
+	b.domain = DesignerPropertyDomain::Behaviour;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const String& label, const String& api_call,
+                                                     const String& help, std::initializer_list<std::pair<const char *, const char *>> choices)
+{
+	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
+	b.domain = DesignerPropertyDomain::Behaviour;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const String& label, DesignerEditorKind editor,
+                                                     const String& api_call, const String& help, int min_value, int max_value)
+{
+	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
+	b.domain = DesignerPropertyDomain::Behaviour;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String& label, DesignerEditorKind editor,
+                                                 const String& api_call, const String& help)
+{
+	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
+	b.domain = DesignerPropertyDomain::ThemeStyle;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String& label, const String& api_call,
+                                                 const String& help, std::initializer_list<std::pair<const char *, const char *>> choices)
+{
+	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
+	b.domain = DesignerPropertyDomain::ThemeStyle;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String& label, DesignerEditorKind editor,
+                                                 const String& api_call, const String& help, int min_value, int max_value)
+{
+	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
+	b.domain = DesignerPropertyDomain::ThemeStyle;
+	return b;
+}
+
+DesignerApiBinding& DesignerApiBuilder::AddDesignerOnly(const String& id, const String& label, DesignerEditorKind editor,
+                                                        const String& api_call, const String& help)
+{
+	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
+	b.domain = DesignerPropertyDomain::DesignerOnly;
 	return b;
 }
 
@@ -971,50 +1075,6 @@ static void SetBindingDefault(DesignerApiBuilder& b, const String& id, const Val
 {
 	if(DesignerApiBinding *binding = b.Find(id))
 		binding->default_value = def;
-}
-
-static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id);
-static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id)
-{
-	if(id == "name" || id == "tooltip")
-		return DesignerPropertyDomain::DesignerOnly;
-	if(id == "role" || id == "theme_override" || id == "face" || id == "face_mode" || id == "face_quad" ||
-	   id == "frame" || id == "frame_style" || id == "frame_width" || id == "radius" ||
-	   id == "face_enabled" || id == "frame_enabled" || id == "shadow_enabled" ||
-	   id == "shadow_distance" || id == "shadow_offset_x" || id == "shadow_offset_y" ||
-	   id == "shadow_alpha" || id == "shadow_color" || id == "shadow_curve" ||
-	   id == "ink_enabled" || id == "ink" || id == "icon_ink_enabled" || id == "icon_ink" ||
-	   id == "title_color_enabled" || id == "title_color" || id == "subtitle_color_enabled" || id == "subtitle_color" ||
-	   id == "card_line_color_enabled" || id == "card_line_color" ||
-	   id == "indicator_face_enabled" || id == "indicator_face" ||
-	   id == "indicator_frame_enabled" || id == "indicator_frame" ||
-	   id == "indicator_ink_enabled" || id == "indicator_ink" ||
-	   id == "track_face_enabled" || id == "track_face" ||
-	   id == "track_frame_enabled" || id == "track_frame" ||
-	   id == "thumb_face_enabled" || id == "thumb_face" ||
-	   id == "thumb_frame_enabled" || id == "thumb_frame" ||
-	   id == "header_face_enabled" || id == "header_face" ||
-	   id == "header_frame_enabled" || id == "header_frame" ||
-	   id == "body_face_enabled" || id == "body_face" ||
-	   id == "body_frame_enabled" || id == "body_frame")
-		return DesignerPropertyDomain::ThemeStyle;
-	if(id == "h_sizing" || id == "v_sizing" || id == "cell_align_h" || id == "cell_align_v" ||
-	   id == "fixed_width" || id == "fixed_height" || id == "min_width" || id == "min_height" ||
-	   id == "max_width" || id == "max_height" || id == "content_inset" || id == "content_gap" ||
-	   id == "inset" || id == "header_inset" || id == "line_thickness" || id == "card_line_thickness" ||
-	   id == "card_line_gap" || id == "field_gap" || id == "stack_gap" || id == "label_width" ||
-	   id == "value_width" || id == "track_width" || id == "track_height" || id == "thumb_width" ||
-	   id == "thumb_height" || id == "track_radius" || id == "thumb_radius" || id == "body_min_height" ||
-	   id == "header_radius" || id == "body_radius" || id == "divider_gap" || id == "item_gap")
-		return DesignerPropertyDomain::Layout;
-	if(id == "open" || id == "show_title" || id == "expand_tabs" || id == "close_buttons" ||
-	   id == "drag_handles" || id == "animation" || id == "single_open" || id == "enforce_one" ||
-	   id == "show_chevron" || id == "trim" || id == "selected" || id == "on" || id == "state" ||
-	   id == "tri_state" || id == "layout_break" || id == "debug" || id == "debug_auto_color" ||
-	   id == "debug_color" || id == "root_visible" || id == "connectors" || id == "metadata" ||
-	   id == "row_headers" || id == "column_headers" || id == "show_value" || id == "media_auto_fit")
-		return DesignerPropertyDomain::Behaviour;
-	return DesignerPropertyDomain::Content;
 }
 
 static void SetBindingDomain(DesignerApiBuilder& b, DesignerPropertyDomain domain, std::initializer_list<const char*> ids)
@@ -1138,11 +1198,11 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 {
 	static const char *theme_group = "Theme Overrides";
 	DesignerApiBuilder b(out);
-	b.Add("name", "Name", DesignerEditorKind::Text, "designer model name",
+	b.AddDesignerOnly("name", "Name", DesignerEditorKind::Text, "designer model name",
 	      "Designer-only identifier used by hierarchy and generated variable naming.");
-	b.Add("tooltip", "Tooltip", DesignerEditorKind::Text, "Ctrl::Tip",
+	b.AddDesignerOnly("tooltip", "Tooltip", DesignerEditorKind::Text, "Ctrl::Tip",
 	      "Shown on hover for visible controls. Leave empty to omit Tip(...) in generated code.");
-	b.AddChoice("role", "Role", "UiTheme role resolver",
+	b.AddBehaviour("role", "Role", "UiTheme role resolver",
 	            "Semantic theme role used by role-aware controls.",
 	            {{"Standard", "Standard"}, {"Subtle", "Subtle"}, {"Accent", "Accent"}, {"Alert", "Alert"}});
 	// V1 sizing vocabulary:
@@ -1150,74 +1210,65 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	// - Fixed uses the exact fixed width/height on that axis.
 	// - Expand consumes parent-distributed extra space, subject to min/max caps.
 	// - Cell align places the item inside the allocated rect; it is not stretch or weight.
-	b.AddChoice("h_sizing", "Width mode", "parent layout horizontal item sizing",
+	b.AddLayout("h_sizing", "Width mode", "parent layout horizontal item sizing",
 	            "Fit uses natural width, Fixed uses exact fixed width, Expand consumes parent-distributed extra width.",
 	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
-	b.AddChoice("v_sizing", "Height mode", "parent layout vertical item sizing",
+	b.AddLayout("v_sizing", "Height mode", "parent layout vertical item sizing",
 	            "Fit uses natural height, Fixed uses exact fixed height, Expand consumes parent-distributed extra height.",
 	            {{"Fit", "Fit"}, {"Fixed", "Fixed"}, {"Expand", "Expand"}});
-	b.AddChoice("cell_align_h", "Cell align X", "UiGridLayout::SetItemAlign horizontal",
+	b.AddLayout("cell_align_h", "Cell align X", "UiGridLayout::SetItemAlign horizontal",
 	            "Places a non-stretched item horizontally inside its allocated rect.", {{"Auto", "Auto"}, {"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
-	b.AddChoice("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
+	b.AddLayout("cell_align_v", "Cell align Y", "UiGridLayout::SetItemAlign vertical",
 	            "Places a non-stretched item vertically inside its allocated rect.", {{"Auto", "Auto"}, {"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
-	b.AddInt("fixed_width", "Fixed width", DesignerEditorKind::Slider,
+	b.AddLayout("fixed_width", "Fixed width", DesignerEditorKind::Slider,
 	         "fixed parent layout width",
 	         "Used only when Width mode is Fixed.", 1, 1600);
-	b.AddInt("fixed_height", "Fixed height", DesignerEditorKind::Slider,
+	b.AddLayout("fixed_height", "Fixed height", DesignerEditorKind::Slider,
 	         "fixed parent layout height",
 	         "Used only when Height mode is Fixed.", 1, 900);
-	b.AddInt("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
+	b.AddLayout("min_width", "Min width", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
 	         "Lower bound used by Fit and Expand width. Use 0 for no explicit lower bound.", 0, 1600);
-	b.AddInt("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
+	b.AddLayout("min_height", "Min height", DesignerEditorKind::Slider, "Ctrl::SetMinSize",
 	         "Lower bound used by Fit and Expand height. Use 0 for no explicit lower bound.", 0, 900);
-	b.AddInt("max_width", "Max width", DesignerEditorKind::Slider, "parent layout width cap",
+	b.AddLayout("max_width", "Max width", DesignerEditorKind::Slider, "parent layout width cap",
 	         "Expand width cap. Use 0 for unlimited.", 0, 1600);
-	b.AddInt("max_height", "Max height", DesignerEditorKind::Slider, "parent layout height cap",
+	b.AddLayout("max_height", "Max height", DesignerEditorKind::Slider, "parent layout height cap",
 	         "Expand height cap. Use 0 for unlimited.", 0, 900);
-	b.Add("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
+	b.AddBehaviour("theme_override", "Activate overrides", DesignerEditorKind::Bool, "designer explicit appearance override",
 	      "When enabled, explicit face, frame, and radius values override the selected theme role.").group = theme_group;
-	b.Add("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
+	b.AddTheme("face", "Face color", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Fill color used when Fill is on.").group = theme_group;
-	b.AddChoice("face_mode", "Face mode", "StyledPalette::face",
+	b.AddTheme("face_mode", "Face mode", "StyledPalette::face",
 	            "Solid fill or four-corner gradient fill.", {{"Solid", "Solid"}, {"Quad", "Quad"}}).group = theme_group;
-	b.Add("face_quad", "Quad face", DesignerEditorKind::QuadColor, "SetFaceQuadGradient",
+	b.AddTheme("face_quad", "Quad face", DesignerEditorKind::QuadColor, "SetFaceQuadGradient",
 	      "Four-corner gradient colors used when Face mode is Quad.").group = theme_group;
-	b.Add("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
+	b.AddTheme("frame", "Frame color", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Frame color used when Frame is on.").group = theme_group;
-	b.AddInt("frame_width", "Frame thickness", DesignerEditorKind::Slider, "StyledMetrics::frame_width",
+	b.AddTheme("frame_width", "Frame thickness", DesignerEditorKind::Slider, "StyledMetrics::frame_width",
 	         "Frame thickness used when Frame is on and overrides are active.", 0, 16).group = theme_group;
-	b.AddChoice("frame_style", "Frame style", "StyledMetrics::dashed",
+	b.AddTheme("frame_style", "Frame style", "StyledMetrics::dashed",
 	            "Frame line style used when Frame is on and overrides are active.",
 	            {{"Solid", "Solid"}, {"Dashed", "Dashed"}, {"Dotted", "Dotted"}}).group = theme_group;
-	b.AddInt("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
+	b.AddTheme("radius", "Radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit corner radius used when theme overrides are enabled.", 0, 64).group = theme_group;
-	b.Add("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
+	b.AddTheme("face_enabled", "Fill", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
 	      "When overrides are active, turns the surface fill on or off.").group = theme_group;
-	b.Add("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
+	b.AddTheme("frame_enabled", "Frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
 	      "When overrides are active, turns the surface frame on or off.").group = theme_group;
-	b.Add("shadow_enabled", "Shadow", DesignerEditorKind::Bool, "StyledMetrics::shadow.enabled",
+	b.AddTheme("shadow_enabled", "Shadow", DesignerEditorKind::Bool, "StyledMetrics::shadow.enabled",
 	      "Uses explicit shadow settings when theme overrides are active.").group = theme_group;
-	b.AddInt("shadow_distance", "Shadow size", DesignerEditorKind::Slider, "StyledShadow::distance",
+	b.AddTheme("shadow_distance", "Shadow size", DesignerEditorKind::Slider, "StyledShadow::distance",
 	         "Explicit shadow distance in pixels before DPI scaling.", 0, 64).group = theme_group;
-	b.AddInt("shadow_offset_x", "Shadow X", DesignerEditorKind::Slider, "StyledShadow::offset_x",
+	b.AddTheme("shadow_offset_x", "Shadow X", DesignerEditorKind::Slider, "StyledShadow::offset_x",
 	         "Explicit horizontal shadow offset in pixels before DPI scaling.", -32, 32).group = theme_group;
-	b.AddInt("shadow_offset_y", "Shadow Y", DesignerEditorKind::Slider, "StyledShadow::offset_y",
+	b.AddTheme("shadow_offset_y", "Shadow Y", DesignerEditorKind::Slider, "StyledShadow::offset_y",
 	         "Explicit vertical shadow offset in pixels before DPI scaling.", -32, 32).group = theme_group;
-	b.AddInt("shadow_alpha", "Shadow alpha", DesignerEditorKind::Slider, "StyledShadow::alpha",
+	b.AddTheme("shadow_alpha", "Shadow alpha", DesignerEditorKind::Slider, "StyledShadow::alpha",
 	         "Explicit shadow opacity.", 0, 255).group = theme_group;
-	b.Add("shadow_color", "Shadow color", DesignerEditorKind::Color, "StyledShadow::color",
+	b.AddTheme("shadow_color", "Shadow color", DesignerEditorKind::Color, "StyledShadow::color",
 	      "Explicit shadow color.").group = theme_group;
-	b.AddChoice("shadow_curve", "Shadow curve", "StyledShadow::curve",
+	b.AddTheme("shadow_curve", "Shadow curve", "StyledShadow::curve",
 	            "Explicit shadow falloff curve.", {{"Soft", "Soft"}, {"Linear", "Linear"}, {"Tight", "Tight"}, {"Hard", "Hard"}}).group = theme_group;
-
-	SetBindingDomain(b, DesignerPropertyDomain::DesignerOnly, {"name", "tooltip"});
-	SetBindingDomain(b, DesignerPropertyDomain::ThemeStyle,
-		{"role", "theme_override", "face", "face_mode", "face_quad", "frame", "frame_style", "frame_width", "radius",
-		 "face_enabled", "frame_enabled", "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
-		 "shadow_alpha", "shadow_color", "shadow_curve"});
-	SetBindingDomain(b, DesignerPropertyDomain::Layout,
-		{"h_sizing", "v_sizing", "cell_align_h", "cell_align_v", "fixed_width", "fixed_height",
-		 "min_width", "min_height", "max_width", "max_height"});
 	String h_sizing = AdapterNodeProperty(n, "h_sizing", "Fit");
 	String v_sizing = AdapterNodeProperty(n, "v_sizing", "Fit");
 }
@@ -1725,29 +1776,29 @@ void DesignerSliderAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	b.Hide("shadow_alpha");
 	b.Hide("shadow_color");
 	b.Hide("shadow_curve");
-	b.Add("face_enabled", "Track face", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
+	b.AddTheme("face_enabled", "Track face", DesignerEditorKind::Bool, "StyledMetrics::face_enabled",
 	      "Uses Track face as an explicit track fill override.").group = "Theme Overrides";
-	b.Add("face", "Track face", DesignerEditorKind::Color, "explicit designer appearance",
+	b.AddTheme("face", "Track face", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Explicit track fill color used when theme overrides are enabled.").group = "Theme Overrides";
-	b.Add("frame_enabled", "Track frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
+	b.AddTheme("frame_enabled", "Track frame", DesignerEditorKind::Bool, "StyledMetrics::frame_enabled",
 	      "Uses Track frame as an explicit track frame override. The thumb preview still derives from this color in the current slider runtime path.").group = "Theme Overrides";
-	b.Add("frame", "Track frame", DesignerEditorKind::Color, "explicit designer appearance",
+	b.AddTheme("frame", "Track frame", DesignerEditorKind::Color, "explicit designer appearance",
 	      "Explicit track frame color used when theme overrides are enabled. The thumb preview still derives from this color in the current slider runtime path.").group = "Theme Overrides";
-	b.AddInt("radius", "Track radius", DesignerEditorKind::Slider, "explicit designer appearance",
+	b.AddTheme("radius", "Track radius", DesignerEditorKind::Slider, "explicit designer appearance",
 	         "Explicit track corner radius used when theme overrides are enabled.", 0, 64).group = "Theme Overrides";
-	b.AddInt("track_width", "Track width", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
+	b.AddLayout("track_width", "Track width", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
 	         "Track length used by the slider preview style.", 20, 400).group = "Theme Overrides";
-	b.AddInt("track_height", "Track height", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
+	b.AddLayout("track_height", "Track height", DesignerEditorKind::Slider, "UiSlider::SetTrackSize",
 	         "Track thickness used by the slider preview style.", 1, 24).group = "Theme Overrides";
-	b.AddInt("thumb_width", "Thumb width", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
+	b.AddLayout("thumb_width", "Thumb width", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
 	         "Thumb width used by the slider preview style.", 6, 80).group = "Theme Overrides";
-	b.AddInt("thumb_height", "Thumb height", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
+	b.AddLayout("thumb_height", "Thumb height", DesignerEditorKind::Slider, "UiSlider::SetThumbSize",
 	         "Thumb height used by the slider preview style.", 6, 80).group = "Theme Overrides";
-	b.AddInt("track_radius", "Track radius", DesignerEditorKind::Slider, "UiSlider::Style::track_metrics.radius",
+	b.AddTheme("track_radius", "Track radius", DesignerEditorKind::Slider, "UiSlider::Style::track_metrics.radius",
 	         "Track corner radius for the slider preview style.", 0, 64).group = "Theme Overrides";
-	b.AddInt("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSlider::Style::thumb_metrics.radius",
+	b.AddTheme("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSlider::Style::thumb_metrics.radius",
 	         "Thumb corner radius for the slider preview style.", 0, 64).group = "Theme Overrides";
-	b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiSlider::SetValue",
+	b.AddBehaviour("value", "Value", DesignerEditorKind::Slider, "UiSlider::SetValue",
 	         "Sets the preview slider value. Full slider API is intentionally not exposed yet.", 0, 100);
 }
 
@@ -1784,29 +1835,29 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
-	b.Add("text", "Text", DesignerEditorKind::Text, "UiButton::SetText",
+	b.AddContent("text", "Text", DesignerEditorKind::Text, "UiButton::SetText",
 	      "Sets the button caption.");
 	AddIconBinding(b);
-	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiButton::SetIconScaleToContent",
+	b.AddBehaviour("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiButton::SetIconScaleToContent",
 	      "When enabled, the icon scales to the button content box and overrides Icon size.");
-	b.AddChoice("icon_side", "Icon side", "UiButton::SetIconSide",
+	b.AddLayout("icon_side", "Icon side", "UiButton::SetIconSide",
 	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
-	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiButton::SetContentInset",
+	b.AddLayout("content_inset", "Content inset", DesignerEditorKind::Slider, "UiButton::SetContentInset",
 	         "Padding inside the button surface.", 0, 32);
-	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiButton::SetContentGap",
+	b.AddLayout("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiButton::SetContentGap",
 	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
-	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	b.AddTheme("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	      "UiButton::SetInkColor",
 	      "Enables an explicit text ink override.").group = "Theme Overrides";
-	b.Add("ink", "Text color", DesignerEditorKind::Color,
+	b.AddTheme("ink", "Text color", DesignerEditorKind::Color,
 	      "UiButton::SetInkColor",
 	      "Explicit text ink color used when theme overrides are active.").group = "Theme Overrides";
-	b.Add("icon_ink_enabled", "Use icon color", DesignerEditorKind::Bool,
+	b.AddTheme("icon_ink_enabled", "Use icon color", DesignerEditorKind::Bool,
 	      "UiButton::SetIconColor",
 	      "Enables an explicit icon ink override.").group = "Theme Overrides";
-	b.Add("icon_ink", "Icon color", DesignerEditorKind::Color,
+	b.AddTheme("icon_ink", "Icon color", DesignerEditorKind::Color,
 	      "UiButton::SetIconColor",
 	      "Explicit icon ink color used when theme overrides are active.").group = "Theme Overrides";
 	SetButtonThemeInkDefaults(b, "ink_enabled", "ink", "icon_ink_enabled", "icon_ink", node, false);

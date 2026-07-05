@@ -84,6 +84,22 @@ Responsibilities bundled into the spec:
 
 That does **not** mean every subsystem is migrated in one patch. It means the registry now owns the target contract and the rest of the Designer can move toward it without inventing another side channel.
 
+## Completed architecture
+
+The following are now owned by the control-spec model rather than free-floating
+type checks:
+
+- toolbox identity
+- default base names
+- runtime type names
+- adapter factory registration
+- explicit capability declarations
+- explicit theme schema records
+- explicit property-domain declarations
+- spec-driven codegen hooks for migrated families
+
+These are current behavior. They are no longer future landing zones.
+
 ## Control-family modules
 
 Built-in registrations are now split by family under `Utilities/Designer/controls/`.
@@ -99,6 +115,17 @@ Current shape:
 - `DesignerDataControls.cpp`
 
 `DesignerBuiltins.cpp` remains the single orchestration entrypoint. It does not host a second registry or a second layer of partial metadata; it just calls the family registrars in a stable order.
+
+### Deliberately retained exceptions
+
+Some compatibility paths remain while the last callers are migrated:
+
+- `DesignerType = DesignerControlSpec`
+- `Find(...)`, `GetTypes(...)`, `GetToolboxTypes(...)`
+- `is_container` / `can_have_children`
+- a few central type-switch branches in generator, adapter and preview glue
+
+These are transitional compatibility layers, not the end state.
 
 ## Capabilities
 
@@ -137,6 +164,10 @@ This does not replace the current code generator overnight. It gives code genera
 
 That lets Inspector and codegen eventually consume the same declaration instead of maintaining separate lists that drift apart every few weeks.
 
+Theme schema is now the authoritative contract for theme-style fields where a
+family has been migrated. The remaining work is finishing the last unmigrated
+families and removing compatibility mirrors only after the callers are gone.
+
 ## What does not change in this phase
 
 - command stack semantics
@@ -146,6 +177,12 @@ That lets Inspector and codegen eventually consume the same declaration instead 
 - preview rebuild ownership
 
 This step is about putting the control contract in one place, not inventing a new synchronous transaction system.
+
+## Theme Export boundary
+
+Theme Export is still future work. The schema and parity checks are the
+foundation; the user-facing exporter stays out of this phase until the final
+callers are migrated and the remaining compatibility branches are gone.
 
 ## Migration guidance
 

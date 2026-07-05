@@ -112,6 +112,32 @@ public:
 
 	DesignerApiBinding& Add(const String& id, const String& label, DesignerEditorKind editor,
 	                          const String& api_call, const String& help);
+	DesignerApiBinding& AddContent(const String& id, const String& label, DesignerEditorKind editor,
+	                               const String& api_call, const String& help);
+	DesignerApiBinding& AddContent(const String& id, const String& label, const String& api_call,
+	                               const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
+	DesignerApiBinding& AddContent(const String& id, const String& label, DesignerEditorKind editor,
+	                               const String& api_call, const String& help, int min_value, int max_value);
+	DesignerApiBinding& AddLayout(const String& id, const String& label, DesignerEditorKind editor,
+	                              const String& api_call, const String& help);
+	DesignerApiBinding& AddLayout(const String& id, const String& label, const String& api_call,
+	                              const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
+	DesignerApiBinding& AddLayout(const String& id, const String& label, DesignerEditorKind editor,
+	                              const String& api_call, const String& help, int min_value, int max_value);
+	DesignerApiBinding& AddBehaviour(const String& id, const String& label, DesignerEditorKind editor,
+	                                 const String& api_call, const String& help);
+	DesignerApiBinding& AddBehaviour(const String& id, const String& label, const String& api_call,
+	                                 const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
+	DesignerApiBinding& AddBehaviour(const String& id, const String& label, DesignerEditorKind editor,
+	                                 const String& api_call, const String& help, int min_value, int max_value);
+	DesignerApiBinding& AddTheme(const String& id, const String& label, DesignerEditorKind editor,
+	                            const String& api_call, const String& help);
+	DesignerApiBinding& AddTheme(const String& id, const String& label, const String& api_call,
+	                            const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
+	DesignerApiBinding& AddTheme(const String& id, const String& label, DesignerEditorKind editor,
+	                            const String& api_call, const String& help, int min_value, int max_value);
+	DesignerApiBinding& AddDesignerOnly(const String& id, const String& label, DesignerEditorKind editor,
+	                                    const String& api_call, const String& help);
 	DesignerApiBinding& AddChoice(const String& id, const String& label, const String& api_call,
 	                                const String& help, std::initializer_list<std::pair<const char *, const char *>> choices);
 	DesignerApiBinding& AddInt(const String& id, const String& label, DesignerEditorKind editor,
