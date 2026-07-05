@@ -204,15 +204,23 @@ static String MakeSafeFileComponent(const String& text)
 	return out;
 }
 
-static String MakeUniqueFolderComponent(const String& base, VectorMap<String, int>& counts)
+static bool HasFolderComponentCaseInsensitive(const Vector<String>& used, const String& candidate)
+{
+	for(const String& item : used) {
+		if(ToLower(item) == ToLower(candidate))
+			return true;
+	}
+	return false;
+}
+
+static String MakeUniqueFolderComponent(const String& base, Vector<String>& used)
 {
 	String name = MakeSafeFileComponent(base);
-	String key = ToLower(name);
-	int& count = counts.GetAdd(key, 0);
-	++count;
-	if(count == 1)
-		return name;
-	return name + "_" + AsString(count);
+	String candidate = name;
+	for(int suffix = 1; HasFolderComponentCaseInsensitive(used, candidate); ++suffix)
+		candidate = name + "_" + AsString(suffix + 1);
+	used.Add(candidate);
+	return candidate;
 }
 
 static bool EnsureDirectoryPath(const String& path)
@@ -534,7 +542,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	bool ok = true;
 	int written = 0;
 	int skipped = 0;
-	VectorMap<String, int> used_collection_folders;
+	Vector<String> used_collection_folders;
 
 	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
 		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
@@ -641,7 +649,7 @@ bool ExportSymbolPickerPngFiles(const SymbolPickerProject& project,
 	bool ok = true;
 	int written = 0;
 	int skipped = 0;
-	VectorMap<String, int> used_collection_folders;
+	Vector<String> used_collection_folders;
 
 	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
 		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
@@ -868,6 +876,56 @@ file_tinted_done:
 	}
 
 	DeleteFolderDeep(temp_dir);
+
+	String all_temp_dir = AppendFileName(GetTempPath(), "symbolpicker_png_all_smoke");
+	DeleteFolderDeep(all_temp_dir);
+	if(!EnsureDirectoryPath(all_temp_dir))
+		return Fail("PNG all-collections smoke could not create its temp folder.");
+
+	SymbolPickerProject all_project;
+	all_project.project_name = "PNG All Smoke";
+	all_project.symbol_prefix = "ICON_MYAPP_";
+	all_project.default_size = 32;
+	all_project.active_collection_index = 0;
+
+	const char* all_names[] = { "Toolbar", "toolbar", "Toolbar_2" };
+	const char* all_catalog_ids[] = {
+		"action/save/outlined",
+		"content/content_copy/outlined",
+		"action/save/sharp",
+	};
+	const char* all_aliases[] = { "Save", "Copy", "Sharp" };
+	for(int i = 0; i < 3; ++i) {
+		SymbolPickerCollection col;
+		col.name = all_names[i];
+		SymbolPickerIconRef ref;
+		ref.catalog_id = all_catalog_ids[i];
+		ref.source_id = all_catalog_ids[i];
+		ref.alias = all_aliases[i];
+		ref.size = 16 + i * 8;
+		ref.unresolved = false;
+		col.items.Add(ref);
+		all_project.collections.Add(pick(col));
+	}
+
+	Vector<String> all_warnings;
+	int all_written = 0;
+	int all_skipped = 0;
+	if(!ExportSymbolPickerPngFiles(all_project, catalog, SymbolPickerExportScope::AllCollections, all_temp_dir, &all_warnings, &all_written, &all_skipped)) {
+		DeleteFolderDeep(all_temp_dir);
+		return Fail("PNG all-collections smoke export failed.");
+	}
+	if(all_written != 3 || all_skipped != 0) {
+		DeleteFolderDeep(all_temp_dir);
+		return Fail("PNG all-collections smoke wrote the wrong number of files.");
+	}
+	if(!FileExists(AppendFileName(AppendFileName(all_temp_dir, "Toolbar"), "ICON_MYAPP_SAVE.png"))
+		|| !FileExists(AppendFileName(AppendFileName(all_temp_dir, "toolbar_2"), "ICON_MYAPP_COPY.png"))
+		|| !FileExists(AppendFileName(AppendFileName(all_temp_dir, "Toolbar_2_2"), "ICON_MYAPP_SHARP.png"))) {
+		DeleteFolderDeep(all_temp_dir);
+		return Fail("PNG all-collections smoke did not create the expected folders/files.");
+	}
+	DeleteFolderDeep(all_temp_dir);
 	return true;
 }
 
