@@ -172,6 +172,7 @@ private:
 	bool CopyCurrentExportToClipboard();
 	bool ExportCurrentText(SymbolPickerExportScope scope);
 	bool ExportCurrentSvgFiles(SymbolPickerExportScope scope);
+	bool ExportCurrentPngFiles(SymbolPickerExportScope scope);
 	String BuildProjectDialogTitle(const char* verb) const;
 	void ValidateLoadedProject(SymbolPickerProject& project) const;
 	void SetLibrarySelectionOne(const String& catalog_id);

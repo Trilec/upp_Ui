@@ -3,6 +3,7 @@ uses
 	Draw,
 	CtrlCore,
 	CtrlLib,
+	plugin/png,
 	Ui;
 
 file
@@ -16,6 +17,8 @@ file
 	SymbolPickerCatalogSeed.cpp,
 	SymbolPickerGeneratedCatalog.h,
 	SymbolPickerGeneratedCatalog.cpp,
+	SymbolPickerImageRender.h,
+	SymbolPickerImageRender.cpp,
 	SymbolPickerIconImageCache.h,
 	SymbolPickerIconImageCache.cpp,
 	SymbolPickerProjectIo.h,

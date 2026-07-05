@@ -9,6 +9,7 @@ enum class SymbolPickerExportType : byte {
 	ImageCall,
 	IconId,
 	CppSnippet,
+	PngFiles,
 	SvgFiles,
 };
 

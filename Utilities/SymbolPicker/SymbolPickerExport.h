@@ -70,6 +70,14 @@ String BuildCategoryListExport(const SymbolPickerProject& project,
 	Vector<String>* warnings = nullptr);
 String BuildSymbolPickerSvgFileName(const SymbolPickerExportItem& item);
 String BuildSymbolPickerSvgText(const SymbolPickerExportItem& item, const String& svg_xml);
+String BuildSymbolPickerPngFileName(const SymbolPickerExportItem& item);
+bool ExportSymbolPickerPngFiles(const SymbolPickerProject& project,
+	const SymbolPickerCatalog& catalog,
+	SymbolPickerExportScope scope,
+	const String& output_folder,
+	Vector<String>* warnings = nullptr,
+	int* files_written = nullptr,
+	int* files_skipped = nullptr);
 bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	const SymbolPickerCatalog& catalog,
 	SymbolPickerExportScope scope,
@@ -79,6 +87,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	int* files_skipped = nullptr);
 bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String& error);
 bool RunSymbolPickerSvgExportSmokeTests(const SymbolPickerCatalog& catalog, String& error);
+bool RunSymbolPickerPngExportSmokeTests(const SymbolPickerCatalog& catalog, String& error);
 
 }
 

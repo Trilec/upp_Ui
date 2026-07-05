@@ -807,6 +807,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.Add("Image Call", (int)SymbolPickerExportType::ImageCall)
 		.Add("Icon Id", (int)SymbolPickerExportType::IconId)
 		.Add("C++ Snippet", (int)SymbolPickerExportType::CppSnippet)
+		.Add("PNG Files", (int)SymbolPickerExportType::PngFiles)
 		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles);
 	output_export_type_.Select(0);
 	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
@@ -1191,6 +1192,9 @@ String SymbolPickerView::MakeExportDefaultExtension() const
 		return ".txt";
 	switch(model_->GetExportType()) {
 	case SymbolPickerExportType::CppSnippet: return ".cpp";
+	case SymbolPickerExportType::PngFiles:
+	case SymbolPickerExportType::SvgFiles:
+		return ".txt";
 	case SymbolPickerExportType::IconId:
 	case SymbolPickerExportType::ImageCall:
 	default:
@@ -1218,6 +1222,9 @@ String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope) const
 		return BuildIconIdExport(project, *catalog_, scope);
 	case SymbolPickerExportType::CppSnippet:
 		return BuildCppSnippetExport(project, *catalog_, scope);
+	case SymbolPickerExportType::PngFiles:
+	case SymbolPickerExportType::SvgFiles:
+		return String();
 	case SymbolPickerExportType::ImageCall:
 	default:
 		return BuildImageCallExport(project, *catalog_, scope);
@@ -1232,6 +1239,10 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 	}
 	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles) {
 		PromptOK("SVG file export uses Export.");
+		return false;
+	}
+	if(model_->GetExportType() == SymbolPickerExportType::PngFiles) {
+		PromptOK("PNG file export uses Export.");
 		return false;
 	}
 	const SymbolPickerCollection* collection = model_->GetActiveCollection();
@@ -1258,6 +1269,8 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 	}
 	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles)
 		return ExportCurrentSvgFiles(scope);
+	if(model_->GetExportType() == SymbolPickerExportType::PngFiles)
+		return ExportCurrentPngFiles(scope);
 
 	String text = BuildExportText(scope);
 	if(text.IsEmpty()) {
@@ -1320,6 +1333,41 @@ bool SymbolPickerView::ExportCurrentSvgFiles(SymbolPickerExportScope scope)
 	}
 
 	PromptOK(Format("SVG export finished.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder));
+	return true;
+}
+
+bool SymbolPickerView::ExportCurrentPngFiles(SymbolPickerExportScope scope)
+{
+	if(!model_ || !catalog_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+
+	FileSel fs;
+	fs.Type("Folder", ".*");
+	String current = model_->GetProjectFilePath();
+	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	if(!fs.ExecuteSelectDir(BuildProjectDialogTitle(scope == SymbolPickerExportScope::AllCollections ? "Export All PNG" : "Export PNG")))
+		return false;
+
+	String output_folder = ~fs;
+	Vector<String> warnings;
+	int written = 0;
+	int skipped = 0;
+	SymbolPickerProject project = model_->ExportProject();
+	project.default_size = model_->GetExportSize();
+	if(!ExportSymbolPickerPngFiles(project, *catalog_, scope, output_folder, &warnings, &written, &skipped)) {
+		String message = Format("PNG export finished with issues.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder);
+		if(!warnings.IsEmpty()) {
+			message << "\nWarnings: " << warnings.GetCount();
+			Exclamation(message);
+		}
+		else
+			Exclamation(message);
+		return false;
+	}
+
+	PromptOK(Format("PNG export finished.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder));
 	return true;
 }
 

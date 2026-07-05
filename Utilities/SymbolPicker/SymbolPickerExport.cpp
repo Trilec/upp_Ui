@@ -1,5 +1,8 @@
 #include "SymbolPickerExport.h"
 #include "SymbolPickerGeneratedCatalog.h"
+#include "SymbolPickerImageRender.h"
+
+#include <plugin/png/png.h>
 
 namespace Upp {
 
@@ -201,25 +204,15 @@ static String MakeSafeFileComponent(const String& text)
 	return out;
 }
 
-static bool HasString(const Vector<String>& values, const String& value)
-{
-	for(const String& item : values) {
-		if(item == value)
-			return true;
-	}
-	return false;
-}
-
-static String MakeUniqueFileComponent(const String& base, const Vector<String>& used)
+static String MakeUniqueFolderComponent(const String& base, VectorMap<String, int>& counts)
 {
 	String name = MakeSafeFileComponent(base);
-	if(!HasString(used, name))
+	String key = ToLower(name);
+	int& count = counts.GetAdd(key, 0);
+	++count;
+	if(count == 1)
 		return name;
-	for(int n = 2;; ++n) {
-		String candidate = name + "_" + AsString(n);
-		if(!HasString(used, candidate))
-			return candidate;
-	}
+	return name + "_" + AsString(count);
 }
 
 static bool EnsureDirectoryPath(const String& path)
@@ -349,7 +342,15 @@ String BuildSymbolPickerSvgText(const SymbolPickerExportItem& item, const String
 	return out;
 }
 
-static bool WriteSvgWarningsFile(const String& folder, const Vector<String>& warnings)
+String BuildSymbolPickerPngFileName(const SymbolPickerExportItem& item)
+{
+	String name = TrimBoth(item.symbol_name);
+	if(name.IsEmpty())
+		name = "icon";
+	return MakeSafeFileComponent(name) + ".png";
+}
+
+static bool WriteWarningsFile(const String& folder, const Vector<String>& warnings)
 {
 	if(warnings.IsEmpty())
 		return true;
@@ -533,7 +534,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	bool ok = true;
 	int written = 0;
 	int skipped = 0;
-	Vector<String> used_collection_folders;
+	VectorMap<String, int> used_collection_folders;
 
 	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
 		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
@@ -542,8 +543,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 		const SymbolPickerCollection& collection = project.collections[ci];
 		String collection_dir = output_folder;
 		if(scope == SymbolPickerExportScope::AllCollections) {
-			String folder = MakeUniqueFileComponent(collection.name, used_collection_folders);
-			used_collection_folders.Add(folder);
+			String folder = MakeUniqueFolderComponent(collection.name, used_collection_folders);
 			collection_dir = AppendFileName(output_folder, folder);
 		}
 		if(!EnsureDirectoryPath(collection_dir)) {
@@ -611,9 +611,264 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 	if(files_skipped)
 		*files_skipped = skipped;
 
-	if(!WriteSvgWarningsFile(output_folder, warn))
+	if(!WriteWarningsFile(output_folder, warn))
+		ok = false;
+	if(written == 0)
 		ok = false;
 	return ok;
+}
+
+bool ExportSymbolPickerPngFiles(const SymbolPickerProject& project,
+	const SymbolPickerCatalog& catalog,
+	SymbolPickerExportScope scope,
+	const String& output_folder,
+	Vector<String>* warnings,
+	int* files_written,
+	int* files_skipped)
+{
+	if(files_written)
+		*files_written = 0;
+	if(files_skipped)
+		*files_skipped = 0;
+
+	Vector<String> local_warnings;
+	Vector<String>& warn = warnings ? *warnings : local_warnings;
+	if(!EnsureDirectoryPath(output_folder)) {
+		warn.Add(Format("Could not create output folder '%s'.", output_folder));
+		return false;
+	}
+
+	bool ok = true;
+	int written = 0;
+	int skipped = 0;
+	VectorMap<String, int> used_collection_folders;
+
+	for(int ci = 0; ci < project.collections.GetCount(); ++ci) {
+		if(scope == SymbolPickerExportScope::ActiveCollection && ci != project.active_collection_index)
+			continue;
+
+		const SymbolPickerCollection& collection = project.collections[ci];
+		String collection_dir = output_folder;
+		if(scope == SymbolPickerExportScope::AllCollections) {
+			String folder = MakeUniqueFolderComponent(collection.name, used_collection_folders);
+			collection_dir = AppendFileName(output_folder, folder);
+		}
+		if(!EnsureDirectoryPath(collection_dir)) {
+			warn.Add(Format("Could not create PNG export folder '%s'.", collection_dir));
+			ok = false;
+			continue;
+		}
+
+		Index<String> used_names;
+		for(const auto& item : collection.items) {
+			const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
+			if(!entry && !item.source_id.IsEmpty())
+				entry = catalog.FindBySourceId(item.source_id);
+			if(!entry || item.unresolved) {
+				warn.Add(Format("Skipped unresolved icon %s%s%s in collection '%s'.",
+					(item.catalog_id.IsEmpty() ? String("(missing catalog_id)") : item.catalog_id),
+					(item.source_id.IsEmpty() ? String() : " / "),
+					(item.source_id.IsEmpty() ? String() : item.source_id),
+					collection.name));
+				++skipped;
+				continue;
+			}
+
+			SymbolPickerExportItem ex;
+			ex.category = ResolveExportCategory(project, collection, item, entry);
+			ex.symbol_name = MakeSymbolPickerExportSymbolName(project, collection, item, entry, used_names);
+			ex.display_name = MakeSymbolPickerExportDisplayName(project, collection, item, entry);
+			ex.catalog_id = item.catalog_id;
+			ex.source_id = item.source_id;
+			ex.alias = item.alias;
+			ex.comment = item.comment;
+			ex.size = item.size > 0 ? item.size : project.default_size;
+			ex.tint = item.tint;
+			ex.style = item.has_style_override ? item.style_override : entry->style;
+			ex.unresolved = false;
+
+			String error;
+			Image img = RenderSymbolPickerIconImage(*entry, ex.size, ex.tint, &error);
+			if(img.IsEmpty()) {
+				warn.Add(error.IsEmpty()
+					? Format("Could not render PNG for %s.", ex.catalog_id)
+					: error);
+				++skipped;
+				ok = false;
+				continue;
+			}
+
+			String file_name = BuildSymbolPickerPngFileName(ex);
+			String path = AppendFileName(collection_dir, file_name);
+			if(!PNGEncoder().SaveFile(path, img)) {
+				warn.Add(Format("Could not write PNG file '%s'.", path));
+				++skipped;
+				ok = false;
+				continue;
+			}
+			++written;
+		}
+	}
+
+	if(written == 0) {
+		warn.Add("PNG export completed without writing any files.");
+		ok = false;
+	}
+
+	if(files_written)
+		*files_written = written;
+	if(files_skipped)
+		*files_skipped = skipped;
+
+	if(!WriteWarningsFile(output_folder, warn))
+		ok = false;
+	return ok;
+}
+
+static bool RunSymbolPickerPngExportSmokeTestsImpl(const SymbolPickerCatalog& catalog, String& error)
+{
+	error.Clear();
+	auto Fail = [&](const String& msg) {
+		error = msg;
+		return false;
+	};
+
+	const SymbolPickerIconEntry* save_entry = catalog.FindByCatalogId("action/save/outlined");
+	const SymbolPickerIconEntry* copy_entry = catalog.FindByCatalogId("content/content_copy/outlined");
+	if(!save_entry || !copy_entry)
+		return Fail("PNG smoke could not resolve expected catalog ids.");
+
+	Image save_direct = RenderSymbolPickerIconImage(*save_entry, 16, Null, &error);
+	if(save_direct.IsEmpty())
+		return Fail(error.IsEmpty() ? "PNG smoke could not render the 16px icon." : error);
+	if(save_direct.GetSize() != Size(16, 16))
+		return Fail("PNG smoke renderer did not return 16x16.");
+	if(save_direct[0][0].a != 0)
+		return Fail("PNG smoke renderer did not preserve transparency.");
+
+	Image tinted_direct = RenderSymbolPickerIconImage(*copy_entry, 48, Color(255, 0, 0), &error);
+	if(tinted_direct.IsEmpty())
+		return Fail(error.IsEmpty() ? "PNG smoke could not render the tinted icon." : error);
+	if(tinted_direct.GetSize() != Size(48, 48))
+		return Fail("PNG smoke renderer did not return 48x48.");
+	if(tinted_direct[0][0].a != 0)
+		return Fail("PNG smoke tinted renderer did not preserve transparency.");
+
+	bool found_tinted_pixel = false;
+	for(int y = 0; y < tinted_direct.GetSize().cy; ++y) {
+		const RGBA* row = tinted_direct[y];
+		for(int x = 0; x < tinted_direct.GetSize().cx; ++x) {
+			if(row[x].a == 0)
+				continue;
+			found_tinted_pixel = true;
+			if(row[x].r < row[x].g || row[x].r < row[x].b)
+				return Fail("PNG smoke tinted pixels do not look red.");
+			goto tinted_done;
+		}
+	}
+tinted_done:
+	if(!found_tinted_pixel)
+		return Fail("PNG smoke did not find any visible tinted pixels.");
+
+	String temp_dir = AppendFileName(GetTempPath(), "symbolpicker_png_smoke");
+	DeleteFolderDeep(temp_dir);
+	if(!EnsureDirectoryPath(temp_dir))
+		return Fail("PNG smoke could not create its temp folder.");
+
+	SymbolPickerProject project;
+	project.project_name = "PNG Smoke";
+	project.symbol_prefix = "ICON_MYAPP_";
+	project.default_size = 32;
+	project.active_collection_index = 0;
+
+	SymbolPickerCollection collection;
+	collection.name = "PNG";
+
+	SymbolPickerIconRef a;
+	a.catalog_id = "action/save/outlined";
+	a.source_id = "action/save";
+	a.alias = "Save icon";
+	a.size = 16;
+	a.unresolved = false;
+	collection.items.Add(a);
+
+	SymbolPickerIconRef b;
+	b.catalog_id = "content/content_copy/outlined";
+	b.source_id = "content/content_copy";
+	b.alias = "Tinted icon";
+	b.size = 48;
+	b.tint = Color(0, 128, 255);
+	b.unresolved = false;
+	collection.items.Add(b);
+
+	SymbolPickerIconRef c;
+	c.catalog_id = "legacy/missing_icon/outlined";
+	c.source_id = "legacy/missing_icon";
+	c.alias = "Broken";
+	c.unresolved = true;
+	collection.items.Add(c);
+
+	project.collections.Add(pick(collection));
+
+	Vector<String> warnings;
+	int written = 0;
+	int skipped = 0;
+	if(!ExportSymbolPickerPngFiles(project, catalog, SymbolPickerExportScope::ActiveCollection, temp_dir, &warnings, &written, &skipped)) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke export failed.");
+	}
+	if(written != 2 || skipped == 0) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke did not write the expected files.");
+	}
+
+	String png_one = AppendFileName(temp_dir, "ICON_MYAPP_SAVE_ICON.png");
+	String png_two = AppendFileName(temp_dir, "ICON_MYAPP_TINTED_ICON.png");
+	if(!FileExists(png_one) || !FileExists(png_two)) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke files are missing.");
+	}
+
+	Image file_one = StreamRaster::LoadFileAny(png_one);
+	Image file_two = StreamRaster::LoadFileAny(png_two);
+	if(file_one.IsEmpty() || file_two.IsEmpty()) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke could not read the exported files.");
+	}
+	if(file_one.GetSize() != Size(16, 16) || file_two.GetSize() != Size(48, 48)) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke exported the wrong image dimensions.");
+	}
+	if(file_one[0][0].a != 0 || file_two[0][0].a != 0) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke exported a non-transparent corner.");
+	}
+
+	bool found_file_tint = false;
+	for(int y = 0; y < file_two.GetSize().cy; ++y) {
+		const RGBA* row = file_two[y];
+		for(int x = 0; x < file_two.GetSize().cx; ++x) {
+			if(row[x].a == 0)
+				continue;
+			found_file_tint = true;
+			if(row[x].b > row[x].r || row[x].g > row[x].r)
+				return Fail("PNG smoke file tint does not look blue.");
+			goto file_tinted_done;
+		}
+	}
+file_tinted_done:
+	if(!found_file_tint) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke did not find any visible tinted pixels in the file.");
+	}
+
+	if(warnings.IsEmpty() || !FileExists(AppendFileName(temp_dir, "_export_warnings.txt"))) {
+		DeleteFolderDeep(temp_dir);
+		return Fail("PNG smoke did not emit warnings.");
+	}
+
+	DeleteFolderDeep(temp_dir);
+	return true;
 }
 
 bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String& error)
@@ -832,8 +1087,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "SVG duplicate-folder smoke did not write both SVG files.";
 		return false;
 	}
-	if(!FileExists(AppendFileName(dup_temp_dir, "Toolbar\\ICON_MYAPP_TOOLBAR_SAVE.svg"))
-		|| !FileExists(AppendFileName(dup_temp_dir, "Toolbar_2\\ICON_MYAPP_TOOLBAR_COPY.svg"))) {
+	if(!FileExists(AppendFileName(AppendFileName(dup_temp_dir, "Toolbar"), "ICON_MYAPP_TOOLBAR_SAVE.svg"))
+		|| !FileExists(AppendFileName(AppendFileName(dup_temp_dir, "Toolbar_2"), "ICON_MYAPP_TOOLBAR_COPY.svg"))) {
 		DeleteFolderDeep(dup_temp_dir);
 		error = "SVG duplicate-folder smoke did not create unique folders.";
 		return false;
@@ -951,12 +1206,20 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 
 	DeleteFolderDeep(svg_temp_dir);
 
+	if(!RunSymbolPickerPngExportSmokeTestsImpl(catalog, error))
+		return false;
+
 	return true;
 }
 
 bool RunSymbolPickerSvgExportSmokeTests(const SymbolPickerCatalog& catalog, String& error)
 {
 	return RunSymbolPickerExportSmokeTests(catalog, error);
+}
+
+bool RunSymbolPickerPngExportSmokeTests(const SymbolPickerCatalog& catalog, String& error)
+{
+	return RunSymbolPickerPngExportSmokeTestsImpl(catalog, error);
 }
 
 }
