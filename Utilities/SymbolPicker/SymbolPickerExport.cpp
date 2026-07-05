@@ -859,7 +859,7 @@ tinted_done:
 			if(row[x].a == 0)
 				continue;
 			found_file_tint = true;
-			if(row[x].b > row[x].r || row[x].g > row[x].r)
+			if(row[x].b < row[x].r || row[x].b < row[x].g)
 				return Fail("PNG smoke file tint does not look blue.");
 			goto file_tinted_done;
 		}
