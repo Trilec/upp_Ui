@@ -100,6 +100,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	registry.Register(MakeAccordionSectionSlotType());
 	DesignerType panel = MakePanelControlType("UiPanel", "Panel", Size(240, 140));
 	panel.icon = ICON_DESIGN_PANEL_48();
+	SetDesignerAdapterFactory<DesignerPanelAdapter>(panel);
 	{
 		auto common_init = panel.init_defaults;
 		panel.init_defaults = [=](DesignerNode& n) {
@@ -123,6 +124,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	registry.Register(MakeGroupPanelType());
 	DesignerType scroll = MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160));
 	scroll.icon = ICON_DESIGN_EXPANSION_PANELS_48();
+	SetDesignerAdapterFactory<DesignerScrollPanelAdapter>(scroll);
 	{
 		auto common_init = scroll.init_defaults;
 		scroll.init_defaults = [=](DesignerNode& n) {
@@ -142,6 +144,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	registry.Register(MakeAccordionType());
 	DesignerType tab = MakePageContainerType("UiTab", "Tab", Size(300, 180));
 	tab.icon = ICON_DESIGN_TAB_48();
+	SetDesignerAdapterFactory<DesignerTabAdapter>(tab);
 	SetDesignerThemeSchema(tab,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
@@ -173,6 +176,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	registry.Register(tab);
 	DesignerType stack = MakePageContainerType("UiStack", "Stack", Size(300, 180));
 	stack.icon = ICON_DESIGN_STACK_48();
+	SetDesignerAdapterFactory<DesignerStackAdapter>(stack);
 	SetDesignerThemeSchema(stack,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",

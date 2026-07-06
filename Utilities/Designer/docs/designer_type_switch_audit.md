@@ -7,17 +7,19 @@ without breaking the control-family-local code that still owns real behavior.
 
 ## Summary
 
-- Raw type-switch sites found: 237
+- Original baseline type-switch sites found: 237
 - Registered control specs: 38
 - Explicit theme field records: 91
 - Unsupported theme fields with written reasons: 2
+- Current type-switch sites after this pass: 233
 - Removed in this pass:
   - central icon switch in `MakeDesignerTypeIcon(...)`
   - type-specific branches from shared `MakeControlType(...)`
   - shared special-case defaults for `UiCompositeColor`, `UiTab`, `UiStack`,
     and `UiScrollPanel`
 - Remaining shared-helper branches:
-  - 2
+  - `id == "Item"` compatibility in central preview/codegen paths
+  - `id == "UiCompositeSlider"` placeholder default in shared composite setup
 
 ## Categories
 
@@ -38,7 +40,6 @@ Keep removing these when they still duplicate `DesignerControlSpec`:
 Representative sites:
 
 - `Utilities/Designer/DesignerAdapter.cpp`
-  - `CreateDesignerAdapterCtrl(...)`
   - central binding setup and adapter type dispatch
 - `Utilities/Designer/DesignerCodeGen.cpp`
   - declaration emission

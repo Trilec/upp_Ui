@@ -43,7 +43,6 @@ DesignerType MakeControlType(const String& id, const String& name, Size size)
 	t.default_size = size;
 	t.min_size = DesignerMinSize();
 	t.init_defaults = [=](DesignerNode& n) {
-		bool placeholder = id == "Item";
 		n.properties.Set("text", name);
 		n.properties.Set("role", "Standard");
 		n.properties.Set("h_sizing", "Fit");
@@ -55,8 +54,8 @@ DesignerType MakeControlType(const String& id, const String& name, Size size)
 		n.properties.Set("face", DesignerControlFace());
 		n.properties.Set("frame", DesignerControlFrame());
 		n.properties.Set("radius", 0);
-		n.properties.Set("face_enabled", placeholder);
-		n.properties.Set("frame_enabled", placeholder);
+		n.properties.Set("face_enabled", false);
+		n.properties.Set("frame_enabled", false);
 		n.properties.Set("font", "Sans");
 		n.properties.Set("font_size", 11);
 		n.properties.Set("align", "Left");
@@ -88,7 +87,7 @@ DesignerType MakeCompositeType(const String& id, const String& name, Size size)
 		n.properties.Set("maxf", 100.0);
 		n.properties.Set("valuef", 42.0);
 		n.properties.Set("stepf", 1.0);
-		n.properties.Set("show_value", id == "UiCompositeSlider");
+		n.properties.Set("show_value", false);
 		n.properties.Set("layout_mode", "Inline");
 		n.properties.Set("label_width", 112);
 		n.properties.Set("value_width", 48);
@@ -149,10 +148,6 @@ DesignerType MakePageContainerType(const String& id, const String& name, Size si
 	t.capabilities.requires_default_child_slots = true;
 	t.default_child_slots = DesignerDefaultChildSlotSet::PageContainerThreePages;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::PageContainerPage;
-	if(id == "UiTab")
-		SetDesignerAdapterFactory<DesignerTabAdapter>(t);
-	else
-		SetDesignerAdapterFactory<DesignerStackAdapter>(t);
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
@@ -175,17 +170,12 @@ DesignerType MakePanelControlType(const String& id, const String& name, Size siz
 	t.toolbox_group = "Containers";
 	t.is_container = true;
 	t.can_have_children = true;
-	t.icon = id == "UiScrollPanel" ? ICON_DESIGN_EXPANSION_PANELS_48() : ICON_DESIGN_PANEL_48();
 	t.capabilities.is_container = true;
 	t.capabilities.can_have_children = true;
 	t.capabilities.supports_children = true;
 	t.child_emission = id == "UiScrollPanel"
 	    ? DesignerLayoutChildEmissionStrategy::ScrollContent
 	    : DesignerLayoutChildEmissionStrategy::PanelContent;
-	if(id == "UiScrollPanel")
-		SetDesignerAdapterFactory<DesignerScrollPanelAdapter>(t);
-	else
-		SetDesignerAdapterFactory<DesignerPanelAdapter>(t);
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
