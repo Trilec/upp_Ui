@@ -11,6 +11,13 @@ without breaking the control-family-local code that still owns real behavior.
 - Registered control specs: 38
 - Explicit theme field records: 91
 - Unsupported theme fields with written reasons: 2
+- Removed in this pass:
+  - central icon switch in `MakeDesignerTypeIcon(...)`
+  - type-specific branches from shared `MakeControlType(...)`
+  - shared special-case defaults for `UiCompositeColor`, `UiTab`, `UiStack`,
+    and `UiScrollPanel`
+- Remaining shared-helper branches:
+  - 2
 
 ## Categories
 
@@ -32,7 +39,6 @@ Representative sites:
 
 - `Utilities/Designer/DesignerAdapter.cpp`
   - `CreateDesignerAdapterCtrl(...)`
-  - `MakeDesignerTypeIcon(...)`
   - central binding setup and adapter type dispatch
 - `Utilities/Designer/DesignerCodeGen.cpp`
   - declaration emission
@@ -46,6 +52,10 @@ Representative sites:
   - shell-level control registration and toolbox assembly
 
 Decision: remove where the logic is still a general registry concern.
+
+Current status: the shared icon switch is gone. The remaining central work is
+down to the last compatibility branches in the shared family helpers and the
+older registry aliases that are still kept for migration.
 
 ### B. Structural model protocol
 

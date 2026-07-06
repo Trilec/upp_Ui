@@ -13,8 +13,6 @@ Color DesignerPanelFrame();
 Color DesignerControlFace();
 Color DesignerControlFrame();
 
-Image MakeDesignerTypeIcon(const String& id);
-
 template <class T>
 inline Ctrl* MakeDesignerAdapterCtrl(DesignerAdapter **adapter)
 {

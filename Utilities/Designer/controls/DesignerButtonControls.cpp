@@ -8,6 +8,20 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType button = MakeControlType("UiButton", "Button", DesignerDefaultSize());
 	button.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerButtonAdapter>(button);
+	{
+		auto common_init = button.init_defaults;
+		button.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("align", "Center");
+			n.properties.Set("align_h", "Center");
+			n.properties.Set("align_v", "Center");
+			n.properties.Set("content_inset", 6);
+			n.properties.Set("content_gap", 4);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
+		};
+	}
 	SetDesignerThemeSchema(button,
 		{
 			ThemeField("theme_override", "UiTheme role surface", true, true, true),
@@ -39,6 +53,29 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType split = MakeControlType("UiSplitButton", "Split Button", Size(112, 34));
 	split.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerSplitButtonAdapter>(split);
+	{
+		auto common_init = split.init_defaults;
+		split.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("align", "Center");
+			n.properties.Set("align_h", "Center");
+			n.properties.Set("align_v", "Center");
+			n.properties.Set("text", "Save");
+			n.properties.Set("icon_size", 16);
+			n.properties.Set("content_inset", 6);
+			n.properties.Set("content_gap", 4);
+			n.properties.Set("split_width", 30);
+			n.properties.Set("split_content_gap", 4);
+			n.properties.Set("split_icon_size", 16);
+			n.properties.Set("popup_min_width", 220);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
+			n.properties.Set("choice_a", "Recent A");
+			n.properties.Set("choice_b", "Recent B");
+			n.properties.Set("choice_c", "Recent C");
+		};
+	}
 	SetDesignerThemeSchema(split,
 		{
 			ThemeField("theme_override", "UiTheme role surface"),
@@ -70,6 +107,20 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType tool = MakeControlType("UiToolButton", "Tool Button", Size(40, 34));
 	tool.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerToolButtonAdapter>(tool);
+	{
+		auto common_init = tool.init_defaults;
+		tool.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("text", "");
+			n.properties.Set("icon", "Settings");
+			n.properties.Set("icon_size", 20);
+			n.properties.Set("content_inset", 4);
+			n.properties.Set("content_gap", 4);
+			n.properties.Set("ink_enabled", false);
+			n.properties.Set("icon_ink_enabled", false);
+		};
+	}
 	SetDesignerThemeSchema(tool,
 		{
 			ThemeField("theme_override", "UiTheme role surface"),
@@ -98,6 +149,18 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType toggle = MakeControlType("UiToggle", "Toggle", Size(54, 28));
 	toggle.icon = ICON_DESIGN_TOGGLE_COMPOSITE_48();
 	SetDesignerAdapterFactory<DesignerToggleAdapter>(toggle);
+	{
+		auto common_init = toggle.init_defaults;
+		toggle.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("on", true);
+			n.properties.Set("track_width", 54);
+			n.properties.Set("track_height", 28);
+			n.properties.Set("thumb_width", 20);
+			n.properties.Set("thumb_height", 20);
+		};
+	}
 	SetDesignerThemeSchema(toggle,
 		{
 			ThemeField("theme_override", "UiTheme role surface"),
@@ -120,6 +183,16 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType checkbox = MakeControlType("UiCheckBox", "Checkbox", Size(150, 28));
 	checkbox.icon = ICON_DESIGN_CHECK_SMALL_48();
 	SetDesignerAdapterFactory<DesignerCheckBoxAdapter>(checkbox);
+	{
+		auto common_init = checkbox.init_defaults;
+		checkbox.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("state", "Checked");
+			n.properties.Set("tri_state", false);
+			n.properties.Set("visual", "Classic");
+		};
+	}
 	SetDesignerThemeSchema(checkbox,
 		{
 			ThemeField("theme_override", "UiTheme role surface"),

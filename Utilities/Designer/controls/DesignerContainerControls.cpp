@@ -98,12 +98,89 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 {
 	registry.Register(MakePageSlotType());
 	registry.Register(MakeAccordionSectionSlotType());
-	registry.Register(MakePanelControlType("UiPanel", "Panel", Size(240, 140)));
+	DesignerType panel = MakePanelControlType("UiPanel", "Panel", Size(240, 140));
+	panel.icon = ICON_DESIGN_PANEL_48();
+	{
+		auto common_init = panel.init_defaults;
+		panel.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("face", DesignerPanelFace());
+			n.properties.Set("frame", DesignerPanelFrame());
+			n.properties.Set("radius", 8);
+			n.properties.Set("face_enabled", false);
+			n.properties.Set("frame_enabled", false);
+		};
+	}
+	SetDesignerThemeSchema(panel,
+		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
+		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
+		 "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
+		 "shadow_alpha", "shadow_color", "shadow_curve"},
+		{},
+		{{"panel content is model content, not theme export state", "UiPanel theme export stays on the surface chrome contract."}});
+	registry.Register(panel);
 	registry.Register(MakeGroupPanelType());
-	registry.Register(MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160)));
+	DesignerType scroll = MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160));
+	scroll.icon = ICON_DESIGN_EXPANSION_PANELS_48();
+	{
+		auto common_init = scroll.init_defaults;
+		scroll.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("scroll_mode", "Auto");
+		};
+	}
+	SetDesignerThemeSchema(scroll,
+		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
+		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
+		 "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
+		 "shadow_alpha", "shadow_color", "shadow_curve"},
+		{},
+		{{"scroll mode is behavior, not theme", "UiScrollPanel::SetScrollMode is runtime behavior."}});
+	registry.Register(scroll);
 	registry.Register(MakeAccordionType());
-	registry.Register(MakePageContainerType("UiTab", "Tab", Size(300, 180)));
-	registry.Register(MakePageContainerType("UiStack", "Stack", Size(300, 180)));
+	DesignerType tab = MakePageContainerType("UiTab", "Tab", Size(300, 180));
+	tab.icon = ICON_DESIGN_TAB_48();
+	SetDesignerThemeSchema(tab,
+		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
+		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
+		 "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
+		 "shadow_alpha", "shadow_color", "shadow_curve",
+		 "visual", "placement", "expand_tabs", "close_buttons", "drag_handles",
+		 "tab_font", "tab_font_size", "tab_icon_size", "tab_icon_side",
+		 "content_gap", "affordance_gap"},
+		{},
+		{{"style helpers are emitted from theme/state, not as a separate instance-only schema", "The page container already owns the tab strip styling contract."}});
+	{
+		auto common_init = tab.init_defaults;
+		tab.init_defaults = [=](DesignerNode& n) {
+			if(common_init)
+				common_init(n);
+			n.properties.Set("visual", "Underline");
+			n.properties.Set("placement", "Top");
+			n.properties.Set("expand_tabs", false);
+			n.properties.Set("close_buttons", false);
+			n.properties.Set("drag_handles", false);
+			n.properties.Set("tab_font", "Sans");
+			n.properties.Set("tab_font_size", 11);
+			n.properties.Set("tab_icon_size", 16);
+			n.properties.Set("tab_icon_side", "Left");
+			n.properties.Set("content_gap", 6);
+			n.properties.Set("affordance_gap", 4);
+		};
+	}
+	registry.Register(tab);
+	DesignerType stack = MakePageContainerType("UiStack", "Stack", Size(300, 180));
+	stack.icon = ICON_DESIGN_STACK_48();
+	SetDesignerThemeSchema(stack,
+		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
+		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
+		 "shadow_enabled", "shadow_distance", "shadow_offset_x", "shadow_offset_y",
+		 "shadow_alpha", "shadow_color", "shadow_curve"},
+		{},
+		{{"tab-specific fields are not relevant to UiStack", "UiStack only exports page activation and page chrome styling."}});
+	registry.Register(stack);
 }
 
 }
