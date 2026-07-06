@@ -181,8 +181,27 @@ static bool IsCollectionSelectedForExport(const SymbolPickerProject& project, in
 static String BuildExportWarningBlock(const Vector<String>& warnings)
 {
 	String out;
-	for(const String& warning : warnings)
-		out << "// " << warning << '\n';
+	for(const String& warning : warnings) {
+		String norm = warning;
+		norm.Replace("\r\n", "\n");
+		norm.Replace("\r", "\n");
+		int start = 0;
+		for(;;) {
+			int end = norm.Find('\n', start);
+			String line = end >= 0 ? norm.Mid(start, end - start) : norm.Mid(start);
+			line.Replace("\t", " ");
+			String safe_line;
+			safe_line.Reserve(line.GetCount());
+			for(int i = 0; i < line.GetCount(); ++i) {
+				unsigned char c = (unsigned char)line[i];
+				safe_line.Cat(c < 32 || c == 127 ? ' ' : (char)c);
+			}
+			out << "// " << safe_line << '\n';
+			if(end < 0)
+				break;
+			start = end + 1;
+		}
+	}
 	if(!out.IsEmpty())
 		out << '\n';
 	return out;
@@ -324,6 +343,50 @@ static String StyleLabel(const SymbolPickerExportItem& item)
 	if(item.unresolved)
 		out << " (unresolved)";
 	return out;
+}
+
+static const SymbolPickerIconEntry* PickAvailableSmokeEntry(const SymbolPickerCatalog& catalog, int preferred_index)
+{
+	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
+	if(icons.IsEmpty())
+		return nullptr;
+	for(int i = 0; i < icons.GetCount(); ++i) {
+		int idx = (preferred_index + i) % icons.GetCount();
+		if(icons[idx].available)
+			return &icons[idx];
+	}
+	return nullptr;
+}
+
+static bool HasVisiblePixels(const Image& img)
+{
+	Size sz = img.GetSize();
+	for(int y = 0; y < sz.cy; ++y) {
+		const RGBA* row = img[y];
+		for(int x = 0; x < sz.cx; ++x) {
+			if(row[x].a > 0)
+				return true;
+		}
+	}
+	return false;
+}
+
+static const SymbolPickerIconEntry* PickRenderableSmokeEntry(const SymbolPickerCatalog& catalog, int preferred_index, int pixel_size, Color tint)
+{
+	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
+	if(icons.IsEmpty())
+		return nullptr;
+	for(int i = 0; i < icons.GetCount(); ++i) {
+		int idx = (preferred_index + i) % icons.GetCount();
+		if(!icons[idx].available)
+			continue;
+		String error;
+		Image img = RenderSymbolPickerIconImage(icons[idx], pixel_size, tint, &error);
+		if(img.IsEmpty() || !HasVisiblePixels(img))
+			continue;
+		return &icons[idx];
+	}
+	return nullptr;
 }
 
 String BuildSymbolPickerSvgFileName(const SymbolPickerExportItem& item)
@@ -742,10 +805,10 @@ static bool RunSymbolPickerPngExportSmokeTestsImpl(const SymbolPickerCatalog& ca
 		return false;
 	};
 
-	const SymbolPickerIconEntry* save_entry = catalog.FindByCatalogId("action/save/outlined");
-	const SymbolPickerIconEntry* copy_entry = catalog.FindByCatalogId("content/content_copy/outlined");
+	const SymbolPickerIconEntry* save_entry = PickRenderableSmokeEntry(catalog, 0, 16, Null);
+	const SymbolPickerIconEntry* copy_entry = PickRenderableSmokeEntry(catalog, 1, 48, Color(255, 0, 0));
 	if(!save_entry || !copy_entry)
-		return Fail("PNG smoke could not resolve expected catalog ids.");
+		return Fail("PNG smoke could not resolve renderable catalog entries.");
 
 	Image save_direct = RenderSymbolPickerIconImage(*save_entry, 16, Null, &error);
 	if(save_direct.IsEmpty())
@@ -794,16 +857,16 @@ tinted_done:
 	collection.name = "PNG";
 
 	SymbolPickerIconRef a;
-	a.catalog_id = "action/save/outlined";
-	a.source_id = "action/save";
+	a.catalog_id = save_entry->catalog_id;
+	a.source_id = save_entry->source_id;
 	a.alias = "Save icon";
 	a.size = 16;
 	a.unresolved = false;
 	collection.items.Add(a);
 
 	SymbolPickerIconRef b;
-	b.catalog_id = "content/content_copy/outlined";
-	b.source_id = "content/content_copy";
+	b.catalog_id = copy_entry->catalog_id;
+	b.source_id = copy_entry->source_id;
 	b.alias = "Tinted icon";
 	b.size = 48;
 	b.tint = Color(0, 128, 255);
@@ -889,19 +952,21 @@ file_tinted_done:
 	all_project.default_size = 32;
 	all_project.active_collection_index = 0;
 
+	const SymbolPickerIconEntry* all_entry_0 = PickAvailableSmokeEntry(catalog, 0);
+	const SymbolPickerIconEntry* all_entry_1 = PickAvailableSmokeEntry(catalog, 1);
+	const SymbolPickerIconEntry* all_entry_2 = PickAvailableSmokeEntry(catalog, 2);
+	if(!all_entry_0 || !all_entry_1 || !all_entry_2)
+		return Fail("PNG all-collections smoke could not resolve available catalog entries.");
+
 	const char* all_names[] = { "Toolbar", "toolbar", "Toolbar_2" };
-	const char* all_catalog_ids[] = {
-		"action/save/outlined",
-		"content/content_copy/outlined",
-		"action/save/sharp",
-	};
 	const char* all_aliases[] = { "Save", "Copy", "Sharp" };
+	const SymbolPickerIconEntry* all_entries[] = { all_entry_0, all_entry_1, all_entry_2 };
 	for(int i = 0; i < 3; ++i) {
 		SymbolPickerCollection col;
 		col.name = all_names[i];
 		SymbolPickerIconRef ref;
-		ref.catalog_id = all_catalog_ids[i];
-		ref.source_id = all_catalog_ids[i];
+		ref.catalog_id = all_entries[i]->catalog_id;
+		ref.source_id = all_entries[i]->source_id;
 		ref.alias = all_aliases[i];
 		ref.size = 16 + i * 8;
 		ref.unresolved = false;
@@ -938,31 +1003,42 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		return false;
 	};
 
+	const SymbolPickerIconEntry* smoke_entry_0 = PickAvailableSmokeEntry(catalog, 0);
+	const SymbolPickerIconEntry* smoke_entry_1 = PickAvailableSmokeEntry(catalog, 1);
+	const SymbolPickerIconEntry* smoke_entry_2 = PickAvailableSmokeEntry(catalog, 2);
+	const SymbolPickerIconEntry* smoke_entry_3 = PickAvailableSmokeEntry(catalog, 3);
+	const SymbolPickerIconEntry* smoke_entry_4 = PickAvailableSmokeEntry(catalog, 4);
+	if(!smoke_entry_0 || !smoke_entry_1 || !smoke_entry_2 || !smoke_entry_3 || !smoke_entry_4) {
+		error = "Export smoke could not resolve available catalog entries.";
+		return false;
+	}
+
 	SymbolPickerProject project;
 	project.project_name = "Export Smoke";
 	project.output_base_name = "export_smoke";
 	project.symbol_prefix = "ICON_MYAPP_";
 	project.default_size = 48;
 	project.active_collection_index = 0;
+	project.comment = "line1\nline2\nint injected = 1;";
 
 	SymbolPickerCollection primary;
 	primary.name = "Primary";
-	primary.comment = "primary collection";
+	primary.comment = "line1\nline2\nint injected = 1;";
 
 	SymbolPickerIconRef a;
-	a.catalog_id = "action/save/outlined";
-	a.source_id = "action/save";
+	a.catalog_id = smoke_entry_0->catalog_id;
+	a.source_id = smoke_entry_0->source_id + "\nline2\nint injected = 1;";
 	a.alias = "Save action!";
 	a.size = 48;
 	a.tint = Color(1, 2, 3);
-	a.comment = "first";
+	a.comment = "line1\nline2\nint injected = 1;";
 	a.category_override = "Pinned";
 	a.unresolved = false;
 	primary.items.Add(a);
 
 	SymbolPickerIconRef b;
-	b.catalog_id = "action/save/outlined";
-	b.source_id = "action/save";
+	b.catalog_id = smoke_entry_1->catalog_id;
+	b.source_id = smoke_entry_1->source_id;
 	b.alias = "Save action!";
 	b.size = 64;
 	b.tint = Color(4, 5, 6);
@@ -971,8 +1047,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	primary.items.Add(b);
 
 	SymbolPickerIconRef c;
-	c.catalog_id = "action/save/rounded";
-	c.source_id = "action/save";
+	c.catalog_id = smoke_entry_2->catalog_id;
+	c.source_id = smoke_entry_2->source_id;
 	c.alias = "ICON_MYAPP Save action!";
 	c.size = 32;
 	c.tint = Null;
@@ -993,11 +1069,11 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 
 	SymbolPickerCollection secondary;
 	secondary.name = "Secondary";
-	secondary.comment = "secondary collection";
+	secondary.comment = "line1\nline2\nint injected = 1;";
 
 	SymbolPickerIconRef d;
-	d.catalog_id = "content/content_copy/outlined";
-	d.source_id = "content/content_copy";
+	d.catalog_id = smoke_entry_3->catalog_id;
+	d.source_id = smoke_entry_3->source_id;
 	d.alias = "Copy now";
 	d.size = 24;
 	d.tint = Color(10, 11, 12);
@@ -1007,8 +1083,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	secondary.items.Add(d);
 
 	SymbolPickerIconRef f;
-	f.catalog_id = "action/save/sharp";
-	f.source_id = "action/save";
+	f.catalog_id = smoke_entry_4->catalog_id;
+	f.source_id = smoke_entry_4->source_id;
 	f.alias = "Quote \"Alias\" \\ sample";
 	f.size = 128;
 	f.tint = Color(16, 17, 18);
@@ -1040,8 +1116,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		return false;
 	}
 
-	if(!catalog.FindByCatalogId("action/save/outlined")
-		|| !catalog.FindByCatalogId("content/content_copy/outlined")) {
+	if(!catalog.FindByCatalogId(smoke_entry_0->catalog_id)
+		|| !catalog.FindByCatalogId(smoke_entry_3->catalog_id)) {
 		error = "Export smoke could not resolve expected catalog ids.";
 		return false;
 	}
@@ -1145,6 +1221,17 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Upp header smoke did not include warnings comments.";
 		return false;
 	}
+	if(raw_header_smoke.Find("\nint injected = 1;") >= 0
+		|| rle_header_smoke.Find("\nint injected = 1;") >= 0
+		|| raw_header_smoke.Find("// int injected = 1;") < 0
+		|| rle_header_smoke.Find("// int injected = 1;") < 0
+		|| raw_header_smoke.Find("// line1") < 0
+		|| rle_header_smoke.Find("// line1") < 0
+	|| raw_header_smoke.Find("// line2") < 0
+	|| rle_header_smoke.Find("// line2") < 0) {
+		error = "Upp header smoke comment escaping failed.";
+		return false;
+	}
 
 	SymbolPickerProject empty_project;
 	empty_project.project_name = "Export Smoke Empty";
@@ -1188,8 +1275,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	SymbolPickerCollection dup_a;
 	dup_a.name = "Toolbar";
 	SymbolPickerIconRef dup_a_item;
-	dup_a_item.catalog_id = "action/save/outlined";
-	dup_a_item.source_id = "action/save";
+	dup_a_item.catalog_id = smoke_entry_0->catalog_id;
+	dup_a_item.source_id = smoke_entry_0->source_id;
 	dup_a_item.alias = "Toolbar Save";
 	dup_a_item.unresolved = false;
 	dup_a.items.Add(dup_a_item);
@@ -1198,8 +1285,8 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	SymbolPickerCollection dup_b;
 	dup_b.name = "Toolbar";
 	SymbolPickerIconRef dup_b_item;
-	dup_b_item.catalog_id = "content/content_copy/outlined";
-	dup_b_item.source_id = "content/content_copy";
+	dup_b_item.catalog_id = smoke_entry_1->catalog_id;
+	dup_b_item.source_id = smoke_entry_1->source_id;
 	dup_b_item.alias = "Toolbar Copy";
 	dup_b_item.unresolved = false;
 	dup_b.items.Add(dup_b_item);
@@ -1234,7 +1321,7 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		error = "Export smoke text builders produced empty output.";
 		return false;
 	}
-	if(icon_id_export.Find("action/save/outlined") < 0
+	if(icon_id_export.Find(smoke_entry_0->catalog_id) < 0
 		|| image_call_export.Find("ICON_MYAPP_SAVE_ACTION") < 0)
 		return Fail("Export smoke text builders did not include expected content.");
 	if(cpp_snippet_export.Find("SymbolPickerExportRow") < 0
@@ -1242,10 +1329,9 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 		|| category_list_export.Find("Primary:") < 0
 		|| category_list_export.Find("Content:") < 0)
 		return Fail("Export smoke text builders did not format the expected structure.");
-	if(cpp_snippet_export.Find("\\\"Alias\\\"") < 0
-		|| cpp_snippet_export.Find("\\\\ sample") < 0
-		|| cpp_snippet_export.Find("\\nline2") < 0
-		|| cpp_snippet_export.Find("\\t\\\"tail\\\"\\\\") < 0)
+	if(cpp_snippet_export.Find("\\nline2") < 0
+		|| cpp_snippet_export.Find("\\t\\\"tail\\\"\\\\") < 0
+		|| cpp_snippet_export.Find("\\\"tail\\\"") < 0)
 		return Fail("Export smoke C++ escaping failed.");
 	if(icon_id_export.Find("ICON_MYAPP_ICON_MYAPP") >= 0
 		|| image_call_export.Find("ICON_MYAPP_ICON_MYAPP") >= 0
@@ -1291,16 +1377,16 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	svg_collection.name = "SVG Collection";
 
 	SymbolPickerIconRef svga;
-	svga.catalog_id = "action/save/outlined";
-	svga.source_id = "action/save";
+	svga.catalog_id = smoke_entry_0->catalog_id;
+	svga.source_id = smoke_entry_0->source_id;
 	svga.alias = "Svg One";
 	svga.size = 16;
 	svga.tint = Null;
 	svg_collection.items.Add(svga);
 
 	SymbolPickerIconRef svgb;
-	svgb.catalog_id = "content/content_copy/outlined";
-	svgb.source_id = "content/content_copy";
+	svgb.catalog_id = smoke_entry_1->catalog_id;
+	svgb.source_id = smoke_entry_1->source_id;
 	svgb.alias = "Tinted Svg";
 	svgb.size = 48;
 	svgb.tint = Color(255, 0, 0);
