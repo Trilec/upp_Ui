@@ -3,9 +3,9 @@
 #include "../SymbolPickerModel.h"
 #include "../SymbolPickerCatalog.h"
 #include "../SymbolPickerGeneratedCatalog.h"
-#include "../SymbolPickerApp.h"
 #include "../SymbolPickerExport.h"
 #include "../SymbolPickerUppExport.h"
+#include "../SymbolPickerImageRender.h"
 
 using namespace Upp;
 
@@ -19,22 +19,40 @@ static String MakeProjectHeaderPath(const String& folder, const char* name)
 	return AppendFileName(folder, name);
 }
 
-static const SymbolPickerIconEntry* PickAvailableIcon(const SymbolPickerCatalog& catalog, int preferred_index)
+static bool HasVisiblePixels(const Image& img)
+{
+	Size sz = img.GetSize();
+	for(int y = 0; y < sz.cy; ++y) {
+		const RGBA* row = img[y];
+		for(int x = 0; x < sz.cx; ++x) {
+			if(row[x].a > 0)
+				return true;
+		}
+	}
+	return false;
+}
+
+static const SymbolPickerIconEntry* PickRenderableIcon(const SymbolPickerCatalog& catalog, int preferred_index, int pixel_size, Color tint)
 {
 	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
 	if(icons.IsEmpty())
 		return nullptr;
 	for(int i = 0; i < icons.GetCount(); ++i) {
 		int idx = (preferred_index + i) % icons.GetCount();
-		if(icons[idx].available)
-			return &icons[idx];
+		if(!icons[idx].available)
+			continue;
+		String error;
+		Image img = RenderSymbolPickerIconImage(icons[idx], pixel_size, tint, &error);
+		if(img.IsEmpty() || !HasVisiblePixels(img))
+			continue;
+		return &icons[idx];
 	}
 	return nullptr;
 }
 
 static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
 {
-	const SymbolPickerIconEntry* entry = PickAvailableIcon(catalog, 0);
+	const SymbolPickerIconEntry* entry = PickRenderableIcon(catalog, 0, 24, Null);
 	if(!entry)
 		return SymbolPickerProject();
 
@@ -46,9 +64,11 @@ static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
 	project.default_tint = Null;
 	project.default_style = SymbolPickerIconStyle::Outlined;
 	project.active_collection_index = 0;
+	project.comment = "line1\nline2\nint injected = 1;\\";
 
 	SymbolPickerCollection collection;
-	collection.name = "Raw";
+	collection.name = "Raw\nline2\tint injected = 1;\\";
+	collection.comment = "collection line1\ncollection line2\\";
 
 	SymbolPickerIconRef item;
 	item.catalog_id = entry->catalog_id;
@@ -56,6 +76,7 @@ static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
 	item.alias = "Save";
 	item.size = 24;
 	item.tint = Null;
+	item.comment = "item line1\nitem line2\tint injected = 1;\\";
 	item.unresolved = false;
 	collection.items.Add(item);
 
@@ -65,9 +86,9 @@ static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
 
 static SymbolPickerProject MakeRleProject(const SymbolPickerCatalog& catalog)
 {
-	const SymbolPickerIconEntry* entry = PickAvailableIcon(catalog, 1);
+	const SymbolPickerIconEntry* entry = PickRenderableIcon(catalog, 1, 24, Color(32, 64, 128));
 	if(!entry)
-		entry = PickAvailableIcon(catalog, 0);
+		entry = PickRenderableIcon(catalog, 0, 24, Color(32, 64, 128));
 	if(!entry)
 		return SymbolPickerProject();
 
@@ -79,9 +100,11 @@ static SymbolPickerProject MakeRleProject(const SymbolPickerCatalog& catalog)
 	project.default_tint = Null;
 	project.default_style = SymbolPickerIconStyle::Outlined;
 	project.active_collection_index = 0;
+	project.comment = "line1\nline2\nint injected = 1;\\";
 
 	SymbolPickerCollection collection;
-	collection.name = "Rle";
+	collection.name = "Rle\nline2\tint injected = 1;\\";
+	collection.comment = "collection line1\ncollection line2\\";
 
 	SymbolPickerIconRef item;
 	item.catalog_id = entry->catalog_id;
@@ -89,6 +112,7 @@ static SymbolPickerProject MakeRleProject(const SymbolPickerCatalog& catalog)
 	item.alias = "Copy";
 	item.size = 24;
 	item.tint = Color(32, 64, 128);
+	item.comment = "item line1\nitem line2\tint injected = 1;\\";
 	item.unresolved = false;
 	collection.items.Add(item);
 
@@ -179,7 +203,6 @@ CONSOLE_APP_MAIN
 	String output_folder;
 	bool verify = false;
 	bool smoke = false;
-	bool app_smoke = false;
 	for(const String& arg : CommandLine()) {
 		String t = TrimBoth(arg);
 		if(t.IsEmpty())
@@ -192,26 +215,10 @@ CONSOLE_APP_MAIN
 			smoke = true;
 			continue;
 		}
-		if(IsFlag(t, "--app-smoke")) {
-			app_smoke = true;
-			continue;
-		}
 		if(output_folder.IsEmpty()) {
 			output_folder = t;
 			continue;
 		}
-	}
-
-	if(app_smoke) {
-		SymbolPickerApp app;
-		String error;
-		if(!app.Init(error)) {
-			Cout() << error << '\n';
-			SetExitCode(1);
-			return;
-		}
-		Cout() << "App smoke OK\n";
-		return;
 	}
 
 	SymbolPickerCatalog catalog;

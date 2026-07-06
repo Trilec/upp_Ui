@@ -25,6 +25,10 @@ static String SanitizeGeneratedCommentLine(String line)
 		unsigned char c = (unsigned char)line[i];
 		out.Cat(c < 32 || c == 127 ? ' ' : (char)c);
 	}
+	if(!out.IsEmpty() && out[out.GetCount() - 1] == '\\') {
+		out.Trim(out.GetCount() - 1);
+		out << " [backslash]";
+	}
 	return out;
 }
 

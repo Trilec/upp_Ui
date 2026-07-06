@@ -196,6 +196,10 @@ static String BuildExportWarningBlock(const Vector<String>& warnings)
 				unsigned char c = (unsigned char)line[i];
 				safe_line.Cat(c < 32 || c == 127 ? ' ' : (char)c);
 			}
+			if(!safe_line.IsEmpty() && safe_line[safe_line.GetCount() - 1] == '\\') {
+				safe_line.Trim(safe_line.GetCount() - 1);
+				safe_line << " [backslash]";
+			}
 			out << "// " << safe_line << '\n';
 			if(end < 0)
 				break;
@@ -367,6 +371,24 @@ static bool HasVisiblePixels(const Image& img)
 			if(row[x].a > 0)
 				return true;
 		}
+	}
+	return false;
+}
+
+static bool HasCommentLineEndingWithBackslash(const String& text)
+{
+	String norm = text;
+	norm.Replace("\r\n", "\n");
+	norm.Replace("\r", "\n");
+	int start = 0;
+	for(;;) {
+		int end = norm.Find('\n', start);
+		String line = end >= 0 ? norm.Mid(start, end - start) : norm.Mid(start);
+		if(!line.IsEmpty() && line[line.GetCount() - 1] == '\\')
+			return true;
+		if(end < 0)
+			break;
+		start = end + 1;
 	}
 	return false;
 }
@@ -1219,6 +1241,18 @@ bool RunSymbolPickerExportSmokeTests(const SymbolPickerCatalog& catalog, String&
 	if(raw_header_smoke.Find("// Export warnings:") < 0
 		|| rle_header_smoke.Find("// Export warnings:") < 0) {
 		error = "Upp header smoke did not include warnings comments.";
+		return false;
+	}
+	if(HasCommentLineEndingWithBackslash(raw_header_smoke)
+		|| HasCommentLineEndingWithBackslash(rle_header_smoke)) {
+		error = "Upp header smoke comment sanitization left a trailing backslash.";
+		return false;
+	}
+	if(raw_header_smoke.Find("static const unsigned char DATA_") < 0
+		|| raw_header_smoke.Find("inline Upp::Image ") < 0
+		|| rle_header_smoke.Find("static const unsigned char DATA_") < 0
+		|| rle_header_smoke.Find("inline Upp::Image ") < 0) {
+		error = "Upp header smoke lost its item declarations.";
 		return false;
 	}
 	if(raw_header_smoke.Find("\nint injected = 1;") >= 0
