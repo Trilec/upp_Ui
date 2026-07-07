@@ -1,5 +1,6 @@
 #include "DesignerControlFamilies.h"
 #include "DesignerControlFamilyShared.h"
+#include "../DesignerCodeGen.h"
 
 namespace Upp {
 
@@ -102,6 +103,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	panel.icon = ICON_DESIGN_PANEL_48();
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(panel);
 	panel.child_emission = DesignerLayoutChildEmissionStrategy::PanelContent;
+	panel.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	{
 		auto common_init = panel.init_defaults;
 		panel.init_defaults = [=](DesignerNode& n) {
@@ -127,6 +129,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	scroll.icon = ICON_DESIGN_EXPANSION_PANELS_48();
 	SetDesignerAdapterFactory<DesignerScrollPanelAdapter>(scroll);
 	scroll.child_emission = DesignerLayoutChildEmissionStrategy::ScrollContent;
+	scroll.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	{
 		auto common_init = scroll.init_defaults;
 		scroll.init_defaults = [=](DesignerNode& n) {
@@ -147,6 +150,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	DesignerType tab = MakePageContainerType("UiTab", "Tab", Size(300, 180));
 	tab.icon = ICON_DESIGN_TAB_48();
 	SetDesignerAdapterFactory<DesignerTabAdapter>(tab);
+	tab.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerThemeSchema(tab,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
@@ -179,6 +183,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	DesignerType stack = MakePageContainerType("UiStack", "Stack", Size(300, 180));
 	stack.icon = ICON_DESIGN_STACK_48();
 	SetDesignerAdapterFactory<DesignerStackAdapter>(stack);
+	stack.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerThemeSchema(stack,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",

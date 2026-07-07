@@ -43,6 +43,7 @@ namespace Upp {
 
 class Ctrl;
 class DesignerAdapter;
+class DesignerCodeGenContext;
 
 struct DesignerControlCapabilities : Moveable<DesignerControlCapabilities> {
 	bool is_layout = false;
@@ -100,11 +101,21 @@ enum class DesignerLayoutChildEmissionStrategy {
 	SlotPassthrough
 };
 
+enum class DesignerCodeGenRoute {
+	Unspecified,
+	OrdinaryHook,
+	LayoutCentral,
+	StructuralCentral,
+	Headless,
+	NoRuntimeOutput
+};
+
 struct DesignerCodeGenHooks : Moveable<DesignerCodeGenHooks> {
-	Function<void(String& out, const DesignerNode& node)> emit_declaration;
-	Function<void(String& out, const DesignerNode& node)> emit_setup;
-	Function<void(String& out, const DesignerNode& node)> emit_layout;
-	Function<void(String& out, const DesignerNode& node)> emit_post_build;
+	DesignerCodeGenRoute route = DesignerCodeGenRoute::Unspecified;
+	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_declaration;
+	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_setup;
+	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_layout;
+	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_post_build;
 };
 
 struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {
@@ -265,6 +276,7 @@ struct DesignerControlSpec : DeepCopyOption<DesignerControlSpec> {
 	bool SupportsAppearanceOverrides() const { return capabilities.supports_appearance_overrides; }
 	bool SupportsThemeExport() const { return capabilities.supports_theme_export; }
 	bool RequiresDefaultChildSlots() const { return capabilities.requires_default_child_slots; }
+	bool HasCodeGenRoute() const { return codegen.route != DesignerCodeGenRoute::Unspecified; }
 };
 
 using DesignerType = DesignerControlSpec;

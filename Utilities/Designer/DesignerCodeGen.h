@@ -43,6 +43,35 @@ enum class DesignerAppearanceMode {
 	ThemeFirst
 };
 
+class DesignerCodeGenContext {
+public:
+	DesignerCodeGenContext(String& out, const DesignerRegistry& registry, const DesignerModel& model,
+	                       const VectorMap<DesignerNodeId, String>& names, DesignerAppearanceMode appearance_mode)
+	    : out_(out), registry_(registry), model_(model), names_(names), appearance_mode_(appearance_mode) {}
+
+	String& Out() { return out_; }
+	const String& Out() const { return out_; }
+	String Var(const DesignerNode& node) const;
+	Value Property(const DesignerNode& node, const String& property, const Value& fallback) const;
+	bool HasProperty(const DesignerNode& node, const String& property) const;
+	String CppString(const Value& value) const;
+	String ColorExpr(const Value& value) const;
+	String IconExpr(const Value& value) const;
+	String AlignHExpr(const Value& value, const String& fallback = "Left") const;
+	String AlignVExpr(const Value& value, const String& fallback = "Center") const;
+	String AlignSideExpr(const Value& value, const String& fallback = "Left") const;
+	DesignerAppearanceMode AppearanceMode() const { return appearance_mode_; }
+	const DesignerRegistry& Registry() const { return registry_; }
+	const DesignerModel& Model() const { return model_; }
+
+private:
+	String& out_;
+	const DesignerRegistry& registry_;
+	const DesignerModel& model_;
+	const VectorMap<DesignerNodeId, String>& names_;
+	DesignerAppearanceMode appearance_mode_;
+};
+
 struct DesignerCodeGenOptions {
 	String class_name = "GeneratedDesignerWindow";
 	DesignerAppearanceMode appearance_mode = DesignerAppearanceMode::ThemeFirst;

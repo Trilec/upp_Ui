@@ -1,13 +1,80 @@
 #include "DesignerControlFamilies.h"
 #include "DesignerControlFamilyShared.h"
+#include "../DesignerCodeGen.h"
 
 namespace Upp {
+
+static void EmitDesignerButtonSetup(DesignerCodeGenContext& ctx, const DesignerNode& n)
+{
+	String& out = ctx.Out();
+	String var = ctx.Var(n);
+	if(n.type_id == "UiButton") {
+		out << "\t\t" << var << ".SetText(" << ctx.CppString(ctx.Property(n, "text", n.name)) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)ctx.Property(n, "content_inset", 6)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)ctx.Property(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << ctx.AlignHExpr(ctx.Property(n, "align_h", ctx.Property(n, "align", "Center")))
+		    << ", " << ctx.AlignVExpr(ctx.Property(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << ctx.AlignSideExpr(ctx.Property(n, "icon_side", "Left"), "Left") << ");\n";
+		String icon = ctx.IconExpr(ctx.Property(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
+			    << (int)ctx.Property(n, "icon_size", 16) << "), DPI("
+			    << (int)ctx.Property(n, "icon_size", 16) << "));\n";
+	}
+	else if(n.type_id == "UiSplitButton") {
+		out << "\t\t" << var << ".SetText(" << ctx.CppString(ctx.Property(n, "text", n.name)) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)ctx.Property(n, "content_inset", 6)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)ctx.Property(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetSplitWidth(DPI(" << (int)ctx.Property(n, "split_width", 30) << "));\n";
+		out << "\t\t" << var << ".SetSplitContentGap(DPI(" << max(0, (int)ctx.Property(n, "split_content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetSplitIconSize(DPI(" << max(8, (int)ctx.Property(n, "split_icon_size", 16)) << "));\n";
+		out << "\t\t" << var << ".SetPopupMinWidth(DPI(" << (int)ctx.Property(n, "popup_min_width", 220) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << ctx.AlignHExpr(ctx.Property(n, "align_h", ctx.Property(n, "align", "Center")))
+		    << ", " << ctx.AlignVExpr(ctx.Property(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << ctx.AlignSideExpr(ctx.Property(n, "icon_side", "Left"), "Left") << ");\n";
+		String icon = ctx.IconExpr(ctx.Property(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
+			    << (int)ctx.Property(n, "icon_size", 16) << "), DPI("
+			    << (int)ctx.Property(n, "icon_size", 16) << "));\n";
+		out << "\t\t" << var << ".Add(" << ctx.CppString(ctx.Property(n, "choice_a", "Recent A")) << ", \"a\")"
+		    << ".Add(" << ctx.CppString(ctx.Property(n, "choice_b", "Recent B")) << ", \"b\")"
+		    << ".Add(" << ctx.CppString(ctx.Property(n, "choice_c", "Recent C")) << ", \"c\");\n";
+	}
+	else if(n.type_id == "UiToolButton") {
+		out << "\t\t" << var << ".SetText(" << ctx.CppString(ctx.Property(n, "text", "")) << ")"
+		    << ".SetContentInset(DPI(" << max(0, (int)ctx.Property(n, "content_inset", 4)) << "))"
+		    << ".SetContentGap(DPI(" << max(0, (int)ctx.Property(n, "content_gap", 4)) << "));\n";
+		out << "\t\t" << var << ".SetAlign(" << ctx.AlignHExpr(ctx.Property(n, "align_h", ctx.Property(n, "align", "Center")))
+		    << ", " << ctx.AlignVExpr(ctx.Property(n, "align_v", "Center")) << ");\n";
+		out << "\t\t" << var << ".SetIconSide(" << ctx.AlignSideExpr(ctx.Property(n, "icon_side", "Center"), "Center") << ");\n";
+		String icon = ctx.IconExpr(ctx.Property(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
+			    << (int)ctx.Property(n, "icon_size", 20) << "), DPI("
+			    << (int)ctx.Property(n, "icon_size", 20) << "));\n";
+	}
+	else if(n.type_id == "UiToggle") {
+		out << "\t\t" << var << ".SetOn(" << ((bool)ctx.Property(n, "on", true) ? "true" : "false") << ");\n";
+	}
+	else if(n.type_id == "UiCheckBox") {
+		out << "\t\t" << var << ".SetText(" << ctx.CppString(ctx.Property(n, "text", n.name)) << ")"
+		    << ".SetTriState(" << ((bool)ctx.Property(n, "tri_state", false) ? "true" : "false") << ");\n";
+		String visual = AsString(ctx.Property(n, "visual", "Classic"));
+		out << "\t\t" << var << ".SetVisual(" << (visual == "Chip" ? "UICHECKVIS_CHIP" : visual == "List" ? "UICHECKVIS_LIST" : "UICHECKVIS_CLASSIC") << ");\n";
+		String state = AsString(ctx.Property(n, "state", "Checked"));
+		out << "\t\t" << var << ".SetState(" << (state == "Indeterminate" ? "UICHECK_INDETERMINATE" :
+		                                       state == "Unchecked" ? "UICHECK_UNCHECKED" : "UICHECK_CHECKED") << ");\n";
+	}
+}
 
 void RegisterDesignerButtonControls(DesignerRegistry& registry)
 {
 	DesignerType button = MakeControlType("UiButton", "Button", DesignerDefaultSize());
 	button.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerButtonAdapter>(button);
+	button.codegen.route = DesignerCodeGenRoute::OrdinaryHook;
+	button.codegen.emit_setup = EmitDesignerButtonSetup;
 	{
 		auto common_init = button.init_defaults;
 		button.init_defaults = [=](DesignerNode& n) {
@@ -53,6 +120,8 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType split = MakeControlType("UiSplitButton", "Split Button", Size(112, 34));
 	split.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerSplitButtonAdapter>(split);
+	split.codegen.route = DesignerCodeGenRoute::OrdinaryHook;
+	split.codegen.emit_setup = EmitDesignerButtonSetup;
 	{
 		auto common_init = split.init_defaults;
 		split.init_defaults = [=](DesignerNode& n) {
@@ -107,6 +176,8 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType tool = MakeControlType("UiToolButton", "Tool Button", Size(40, 34));
 	tool.icon = ICON_DESIGN_BUTTON_48();
 	SetDesignerAdapterFactory<DesignerToolButtonAdapter>(tool);
+	tool.codegen.route = DesignerCodeGenRoute::OrdinaryHook;
+	tool.codegen.emit_setup = EmitDesignerButtonSetup;
 	{
 		auto common_init = tool.init_defaults;
 		tool.init_defaults = [=](DesignerNode& n) {
@@ -149,6 +220,8 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType toggle = MakeControlType("UiToggle", "Toggle", Size(54, 28));
 	toggle.icon = ICON_DESIGN_TOGGLE_COMPOSITE_48();
 	SetDesignerAdapterFactory<DesignerToggleAdapter>(toggle);
+	toggle.codegen.route = DesignerCodeGenRoute::OrdinaryHook;
+	toggle.codegen.emit_setup = EmitDesignerButtonSetup;
 	{
 		auto common_init = toggle.init_defaults;
 		toggle.init_defaults = [=](DesignerNode& n) {
@@ -183,6 +256,8 @@ void RegisterDesignerButtonControls(DesignerRegistry& registry)
 	DesignerType checkbox = MakeControlType("UiCheckBox", "Checkbox", Size(150, 28));
 	checkbox.icon = ICON_DESIGN_CHECK_SMALL_48();
 	SetDesignerAdapterFactory<DesignerCheckBoxAdapter>(checkbox);
+	checkbox.codegen.route = DesignerCodeGenRoute::OrdinaryHook;
+	checkbox.codegen.emit_setup = EmitDesignerButtonSetup;
 	{
 		auto common_init = checkbox.init_defaults;
 		checkbox.init_defaults = [=](DesignerNode& n) {

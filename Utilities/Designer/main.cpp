@@ -306,14 +306,6 @@ static bool IsBuildProfileLikeExportName(const String& name)
 	String s = TrimBoth(name);
 	if(s.IsEmpty())
 		return false;
-	String norm;
-	for(int i = 0; i < s.GetCount(); i++) {
-		int c = s[i];
-		if(IsAlNum((byte)c))
-			norm.Cat((char)ToLower(c));
-	}
-	if(norm.IsEmpty())
-		return false;
 	Vector<String> tokens;
 	String cur;
 	for(int i = 0; i < s.GetCount(); i++) {
@@ -330,7 +322,8 @@ static bool IsBuildProfileLikeExportName(const String& name)
 	if(tokens.IsEmpty())
 		return false;
 	static const char *profiles[] = { "clang", "clangx64", "gcc", "gccx64", "msc", "mscx64", "debug", "release",
-	                                  "full", "optimal", "blitz", "shared", "gui", "console" };
+	                                  "full", "optimal", "blitz", "shared", "gui", "console",
+	                                  "x64", "x86", "x86_64", "arm", "arm64", "win32", "win64" };
 	for(const String& token : tokens) {
 		bool known = false;
 		for(const char *p : profiles)

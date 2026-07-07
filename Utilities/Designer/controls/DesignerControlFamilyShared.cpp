@@ -1,4 +1,5 @@
 #include "DesignerControlFamilyShared.h"
+#include "../DesignerCodeGen.h"
 
 namespace Upp {
 
@@ -147,6 +148,7 @@ DesignerType MakePageContainerType(const String& id, const String& name, Size si
 	t.capabilities.requires_default_child_slots = true;
 	t.default_child_slots = DesignerDefaultChildSlotSet::PageContainerThreePages;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::PageContainerPage;
+	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
@@ -200,6 +202,7 @@ DesignerType MakeGroupPanelType()
 	t.capabilities.can_have_children = true;
 	t.capabilities.supports_children = true;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::GroupPanelContent;
+	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerAdapterFactory<DesignerGroupPanelAdapter>(t);
 	SetDesignerThemeSchema(t,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
@@ -252,6 +255,7 @@ DesignerType MakeAccordionType()
 	t.capabilities.requires_default_child_slots = true;
 	t.default_child_slots = DesignerDefaultChildSlotSet::AccordionThreeSections;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::AccordionSection;
+	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerAdapterFactory<DesignerAccordionAdapter>(t);
 	SetDesignerThemeSchema(t,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",

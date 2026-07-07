@@ -1,5 +1,6 @@
 #include "DesignerControlFamilies.h"
 #include "DesignerControlFamilyShared.h"
+#include "../DesignerCodeGen.h"
 
 namespace Upp {
 
@@ -21,6 +22,7 @@ static DesignerType MakeBoxLayoutType()
 	t.capabilities.supports_children = true;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::BoxLayoutItem;
+	t.codegen.route = DesignerCodeGenRoute::LayoutCentral;
 	SetDesignerAdapterFactory<DesignerBoxLayoutAdapter>(t);
 	t.default_size = Size(260, 160);
 	t.min_size = Size(80, 50);
@@ -64,6 +66,7 @@ static DesignerType MakeGridLayoutType()
 	t.capabilities.supports_children = true;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::GridItem;
+	t.codegen.route = DesignerCodeGenRoute::LayoutCentral;
 	SetDesignerAdapterFactory<DesignerGridLayoutAdapter>(t);
 	t.default_size = Size(280, 180);
 	t.min_size = Size(DESIGNER_GRID_MIN_WIDTH, DESIGNER_GRID_MIN_HEIGHT);
@@ -98,6 +101,7 @@ static DesignerType MakeSpacerType()
 	t.capabilities.is_layout = true;
 	t.capabilities.is_visible_control = false;
 	t.capabilities.supports_theme_export = false;
+	t.codegen.route = DesignerCodeGenRoute::NoRuntimeOutput;
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(t);
 	t.default_size = Size(32, 32);
 	t.min_size = Size(1, 1);
@@ -150,6 +154,7 @@ static DesignerType MakeSplitterType()
 	t.capabilities.supports_theme_export = false;
 	t.default_child_slots = DesignerDefaultChildSlotSet::SplitterTwoPanes;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::SplitterPane;
+	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerAdapterFactory<DesignerSplitterAdapter>(t);
 	t.default_size = Size(320, 180);
 	t.min_size = Size(100, 60);
@@ -204,6 +209,7 @@ static DesignerType MakeQuadSplitterType()
 	t.capabilities.supports_theme_export = false;
 	t.default_child_slots = DesignerDefaultChildSlotSet::QuadSplitterFourPanes;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::SplitterPane;
+	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	SetDesignerAdapterFactory<DesignerQuadSplitterAdapter>(t);
 	t.default_size = Size(360, 220);
 	t.min_size = Size(160, 120);
@@ -243,6 +249,7 @@ static DesignerType MakePaneSlotType()
 	t.capabilities.supports_appearance_overrides = false;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::SlotPassthrough;
+	t.codegen.route = DesignerCodeGenRoute::Headless;
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(t);
 	t.default_size = Size(180, 120);
 	t.min_size = Size(40, 30);
@@ -276,6 +283,7 @@ static DesignerType MakeWindowType()
 	t.capabilities.supports_children = true;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::DirectChild;
+	t.codegen.route = DesignerCodeGenRoute::NoRuntimeOutput;
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(t);
 	t.default_size = DesignerWindowSize();
 	t.min_size = DesignerWindowMinSize();

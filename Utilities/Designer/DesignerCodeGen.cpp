@@ -29,6 +29,59 @@ static bool CodeGenHasProperty(const DesignerNode& n, const String& key)
 	return n.properties.Find(key) >= 0;
 }
 
+static String VarName(const VectorMap<DesignerNodeId, String>& names, DesignerNodeId id);
+static String CppString(const String& s);
+static String ColorExpr(Color c);
+static String IconExpr(const String& icon);
+static String AlignHExpr(const String& align, const String& def);
+static String AlignVExpr(const String& align, const String& def);
+static String AlignSideExpr(const String& side, const String& def);
+
+String DesignerCodeGenContext::Var(const DesignerNode& node) const
+{
+	return VarName(names_, node.id);
+}
+
+Value DesignerCodeGenContext::Property(const DesignerNode& node, const String& property, const Value& fallback) const
+{
+	return CodeGenNodeProperty(node, property, fallback);
+}
+
+bool DesignerCodeGenContext::HasProperty(const DesignerNode& node, const String& property) const
+{
+	return CodeGenHasProperty(node, property);
+}
+
+String DesignerCodeGenContext::CppString(const Value& value) const
+{
+	return ::Upp::CppString(AsString(value));
+}
+
+String DesignerCodeGenContext::ColorExpr(const Value& value) const
+{
+	return ::Upp::ColorExpr((Color)value);
+}
+
+String DesignerCodeGenContext::IconExpr(const Value& value) const
+{
+	return ::Upp::IconExpr(AsString(value));
+}
+
+String DesignerCodeGenContext::AlignHExpr(const Value& value, const String& fallback) const
+{
+	return ::Upp::AlignHExpr(AsString(value), fallback);
+}
+
+String DesignerCodeGenContext::AlignVExpr(const Value& value, const String& fallback) const
+{
+	return ::Upp::AlignVExpr(AsString(value), fallback);
+}
+
+String DesignerCodeGenContext::AlignSideExpr(const Value& value, const String& fallback) const
+{
+	return ::Upp::AlignSideExpr(AsString(value), fallback);
+}
+
 static String CppString(const String& s)
 {
 	String out = "\"";
@@ -882,14 +935,15 @@ static bool CodeGenIsHeadlessNode(const DesignerRegistry& registry, const Design
 	return spec && spec->IsHeadlessNode();
 }
 
-static void EmitDeclaration(String& out, const DesignerRegistry& registry,
+static void EmitDeclaration(DesignerCodeGenContext& ctx, const DesignerRegistry& registry,
                             const VectorMap<DesignerNodeId, String>& names, const DesignerNode& n)
 {
 	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
 	if(spec && spec->codegen.emit_declaration) {
-		spec->codegen.emit_declaration(out, n);
+		spec->codegen.emit_declaration(ctx, n);
 		return;
 	}
+	String& out = ctx.Out();
 	String var = VarName(names, n.id);
 	if(n.type_id == "BoxLayout")
 		out << "\tUiBoxLayout " << var << ";\n";
@@ -1111,12 +1165,12 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	}
 }
 
-static String CompositeLayoutExpr(const String& mode)
+static String CodeGenCompositeLayoutExpr(const String& mode)
 {
 	return mode == "Stacked" ? "UICOMPOSITE_STACKED" : "UICOMPOSITE_INLINE";
 }
 
-static String FieldAlignExpr(const String& side)
+static String CodeGenFieldAlignExpr(const String& side)
 {
 	if(side == "Left") return "UiAlign::LEFT";
 	if(side == "Top") return "UiAlign::TOP";
@@ -1136,20 +1190,20 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 		    << ".SetLabelWidth(DPI(" << label_w << ")).SetFieldGap(DPI(" << field_gap << "));\n";
 	}
 	else if(n.type_id == "UiCompositeEdit") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
 		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
 		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
 		    << "\t\t" << var << ".SetData(" << CppString(value) << ");\n";
 	}
 	else if(n.type_id == "UiCompositeDropdown") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
 		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
 		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
 		    << "\t\t" << var << ".Clear().Add(\"First\", \"First\").Add(\"Second\", \"Second\").Add(\"Third\", \"Third\");\n"
 		    << "\t\t" << var << ".SelectByData(" << CppString(CodeGenNodeProperty(n, "selected", "First")) << ");\n";
 	}
 	else if(n.type_id == "UiCompositeToggle") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
 		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
 		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", false) ? "true" : "false") << ")"
 		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 42)) << "))"
@@ -1158,7 +1212,7 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 	}
 	else if(n.type_id == "UiCompositeColor") {
 		int color_count = minmax((int)CodeGenNodeProperty(n, "color_count", 4), 1, 4);
-		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
 		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
 		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
 		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 76)) << "))"
@@ -1177,7 +1231,7 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 		int mn = (int)CodeGenNodeProperty(n, "min", 0);
 		int mx = (int)CodeGenNodeProperty(n, "max", 100);
 		int val = minmax((int)CodeGenNodeProperty(n, "value", 42), mn, mx);
-		out << "\t\t" << var << ".SetLayoutMode(" << CompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
+		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
 		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(AsString(val)) << ")"
 		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
 		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 48)) << "))"
@@ -1190,7 +1244,7 @@ static void EmitCompositeSetup(String& out, const String& var, const DesignerNod
 		    << (double)CodeGenNodeProperty(n, "maxf", 100.0) << ")"
 		    << ".SetStep(" << (double)CodeGenNodeProperty(n, "stepf", 1.0) << ")"
 		    << ".SetValue(" << (double)CodeGenNodeProperty(n, "valuef", 42.0) << ")"
-		    << ".SetFieldAlign(" << FieldAlignExpr(CodeGenNodeProperty(n, "field_align", "Right")) << ")"
+		    << ".SetFieldAlign(" << CodeGenFieldAlignExpr(CodeGenNodeProperty(n, "field_align", "Right")) << ")"
 		    << ".SetFieldWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "field_width", 72)) << "))"
 		    << ".SetGap(DPI(" << field_gap << "));\n";
 	}
@@ -1215,20 +1269,27 @@ static void EmitDesignerMinSize(String& out, const DesignerRegistry& registry, c
 	    << ")));\n";
 }
 
-static void EmitSetup(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
+static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
                       const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
 	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
-	if(spec && spec->codegen.emit_setup) {
-		spec->codegen.emit_setup(out, n);
-		return;
-	}
+	String& out = ctx.Out();
 	String var = VarName(names, n.id);
 	if(CodeGenIsHeadlessNode(registry, n) || n.type_id == "Spacer")
 		return;
 	if(!HasThemeOverride(n, appearance_mode))
 		EmitThemeStyle(out, var, n, appearance_mode);
 	EmitDesignerMinSize(out, registry, var, n);
+	if(spec && spec->codegen.route == DesignerCodeGenRoute::OrdinaryHook) {
+		if(spec->codegen.emit_setup)
+			spec->codegen.emit_setup(ctx, n);
+		else
+			RLOG("Designer codegen contract error: missing setup hook for " << n.type_id);
+		String tooltip = CodeGenNodeProperty(n, "tooltip", String());
+		if(!tooltip.IsEmpty())
+			out << "\t\t" << var << ".Tip(" << CppString(AsString(tooltip)) << ");\n";
+		return;
+	}
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
 		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"
@@ -1848,6 +1909,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 {
 	VectorMap<DesignerNodeId, String> names = BuildCodeNames(model);
 	String out;
+	DesignerCodeGenContext ctx(out, registry, model, names, options.appearance_mode);
 	if(options.emit_export_header) {
 		out << "// Generated by U++ Ui Designer.\n"
 		    << "// Designer version: " << ExportPlaceholder(options.designer_version, "DESIGNER_VERSION") << "\n"
@@ -1912,7 +1974,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitSetup(out, registry, names, n, options.appearance_mode);
+		EmitSetup(ctx, registry, names, n, options.appearance_mode);
 	}
 	out << "\t}\n\n"
 	    << "\tvoid ApplyAppearanceOverrides()\n"
@@ -1937,7 +1999,7 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
 			continue;
-		EmitDeclaration(out, registry, names, n);
+		EmitDeclaration(ctx, registry, names, n);
 	}
 	out << "};\n\n"
 	    << "GUI_APP_MAIN\n"
