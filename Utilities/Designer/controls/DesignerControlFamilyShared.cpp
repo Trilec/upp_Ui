@@ -140,7 +140,6 @@ DesignerType MakePageContainerType(const String& id, const String& name, Size si
 	t.toolbox_group = "Containers";
 	t.is_container = true;
 	t.can_have_children = true;
-	t.icon = id == "UiTab" ? ICON_DESIGN_TAB_48() : ICON_DESIGN_STACK_48();
 	t.capabilities.is_container = true;
 	t.capabilities.is_page_container = true;
 	t.capabilities.can_have_children = true;
@@ -173,9 +172,6 @@ DesignerType MakePanelControlType(const String& id, const String& name, Size siz
 	t.capabilities.is_container = true;
 	t.capabilities.can_have_children = true;
 	t.capabilities.supports_children = true;
-	t.child_emission = id == "UiScrollPanel"
-	    ? DesignerLayoutChildEmissionStrategy::ScrollContent
-	    : DesignerLayoutChildEmissionStrategy::PanelContent;
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");

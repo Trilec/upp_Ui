@@ -101,6 +101,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	DesignerType panel = MakePanelControlType("UiPanel", "Panel", Size(240, 140));
 	panel.icon = ICON_DESIGN_PANEL_48();
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(panel);
+	panel.child_emission = DesignerLayoutChildEmissionStrategy::PanelContent;
 	{
 		auto common_init = panel.init_defaults;
 		panel.init_defaults = [=](DesignerNode& n) {
@@ -125,6 +126,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	DesignerType scroll = MakePanelControlType("UiScrollPanel", "Scroll Panel", Size(260, 160));
 	scroll.icon = ICON_DESIGN_EXPANSION_PANELS_48();
 	SetDesignerAdapterFactory<DesignerScrollPanelAdapter>(scroll);
+	scroll.child_emission = DesignerLayoutChildEmissionStrategy::ScrollContent;
 	{
 		auto common_init = scroll.init_defaults;
 		scroll.init_defaults = [=](DesignerNode& n) {

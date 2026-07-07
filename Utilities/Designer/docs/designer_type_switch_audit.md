@@ -11,15 +11,17 @@ without breaking the control-family-local code that still owns real behavior.
 - Registered control specs: 38
 - Explicit theme field records: 91
 - Unsupported theme fields with written reasons: 2
-- Current type-switch sites after this pass: 233
+- Current type-switch sites after this pass: 141
 - Removed in this pass:
   - central icon switch in `MakeDesignerTypeIcon(...)`
   - type-specific branches from shared `MakeControlType(...)`
   - shared special-case defaults for `UiCompositeColor`, `UiTab`, `UiStack`,
     and `UiScrollPanel`
+  - shared `UiTab` icon selection in `DesignerControlFamilyShared.cpp`
+  - shared `UiScrollPanel` child-emission selection in `DesignerControlFamilyShared.cpp`
 - Remaining shared-helper branches:
-  - `id == "Item"` compatibility in central preview/codegen paths
-  - `id == "UiCompositeSlider"` placeholder default in shared composite setup
+  - none in the shared family helper layer; remaining `type_id` checks are in
+    adapter family code, preview routing, codegen routing, and shell workflow
 
 ## Categories
 
@@ -54,9 +56,9 @@ Representative sites:
 
 Decision: remove where the logic is still a general registry concern.
 
-Current status: the shared icon switch is gone. The remaining central work is
-down to the last compatibility branches in the shared family helpers and the
-older registry aliases that are still kept for migration.
+Current status: the shared icon/child-emission helper branches are gone. The
+remaining central work is mostly adapter-family routing and the older registry
+aliases that are still kept for migration.
 
 ### B. Structural model protocol
 

@@ -301,6 +301,49 @@ static String DesignerExportNameFromPath(const String& path)
 	return SanitizeDesignerPackageName(base, "Designer_Export");
 }
 
+static bool IsBuildProfileLikeExportName(const String& name)
+{
+	String s = TrimBoth(name);
+	if(s.IsEmpty())
+		return false;
+	String norm;
+	for(int i = 0; i < s.GetCount(); i++) {
+		int c = s[i];
+		if(IsAlNum((byte)c))
+			norm.Cat((char)ToLower(c));
+	}
+	if(norm.IsEmpty())
+		return false;
+	Vector<String> tokens;
+	String cur;
+	for(int i = 0; i < s.GetCount(); i++) {
+		int c = s[i];
+		if(IsAlNum((byte)c))
+			cur.Cat((char)ToLower(c));
+		else if(!cur.IsEmpty()) {
+			tokens.Add(cur);
+			cur.Clear();
+		}
+	}
+	if(!cur.IsEmpty())
+		tokens.Add(cur);
+	if(tokens.IsEmpty())
+		return false;
+	static const char *profiles[] = { "clang", "clangx64", "gcc", "gccx64", "msc", "mscx64", "debug", "release",
+	                                  "full", "optimal", "blitz", "shared", "gui", "console" };
+	for(const String& token : tokens) {
+		bool known = false;
+		for(const char *p : profiles)
+			if(token == p) {
+				known = true;
+				break;
+			}
+		if(!known)
+			return false;
+	}
+	return true;
+}
+
 static String WrapDesignerHelpText(const String& text, int width, Font font)
 {
 	if(width <= DPI(24) || text.IsEmpty())
@@ -1785,7 +1828,7 @@ private:
 				box_.Add(include_row_).Fit();
 				box_.Add(source_row_).Fit();
 				box_.Add(appearance_row_).Fit();
-				box_.Add(build_row_).Fit();
+				box_.Add(build_section_).Fit();
 				box_.Add(button_row_).Fit();
 
 				info_.SetText("Choose the folder and package name for the generated U++ project.\nThe exact files that will be created are shown in Details.")
@@ -1845,17 +1888,18 @@ private:
 				appearance_row_.Add(appearance_label_).Fixed(DPI(130));
 				appearance_row_.Add(appearance_mode_).Fixed(DPI(220));
 
-				build_label_.SetText("Build settings").NoWantFocus();
-				build_summary_.NoWantFocus().IgnoreMouse();
-				build_summary_.SetText(owner_.ExportBuildSettingsSummary());
+				build_heading_.SetText("Build settings").NoWantFocus();
 				build_settings_button_.SetText("Configure...").SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(14), DPI(14));
 				build_settings_button_.WhenAction = [=] {
 					owner_.ShowBuildSettingsDialog();
-					build_summary_.SetText(owner_.ExportBuildSettingsSummary());
+					UpdateBuildSummary();
 				};
-				build_row_.Add(build_label_).Fixed(DPI(130));
-				build_row_.Add(build_summary_).Expand(1);
-				build_row_.Add(build_settings_button_).Fixed(DPI(116));
+				build_heading_row_.Add(build_heading_).Expand(1);
+				build_heading_row_.Add(build_settings_button_).Fixed(DPI(116));
+				build_section_.SetDirection(UiDirection::V).SetGap(DPI(4)).SetInset(Rect(0, 0, 0, 0));
+				build_section_.Add(build_heading_row_).Fit();
+				build_section_.Add(build_summary_).Fit();
+				UpdateBuildSummary();
 				export_button_.SetText("Export").SetIcon(ICON_DESIGN_ARROWS_OUTPUT_48()).SetIconSize(DPI(14), DPI(14));
 				export_build_button_.SetText("Export and Build").SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(14), DPI(14));
 				cancel_button_.SetText("Cancel").SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48()).SetIconSize(DPI(14), DPI(14));
@@ -1870,6 +1914,11 @@ private:
 				button_row_.Add(cancel_button_).Fixed(DPI(92));
 
 				UpdateExportState();
+			}
+
+			void UpdateBuildSummary()
+			{
+				build_summary_.SetText(owner_.ExportBuildSettingsSummary());
 			}
 
 			String GetProjectName() const { return TrimBoth(name_edit_.GetText().ToString()); }
@@ -1996,7 +2045,8 @@ private:
 			UiBoxLayout include_row_ { UiDirection::H };
 			UiBoxLayout source_row_ { UiDirection::H };
 			UiBoxLayout appearance_row_ { UiDirection::H };
-			UiBoxLayout build_row_ { UiDirection::H };
+			UiBoxLayout build_section_ { UiDirection::V };
+			UiBoxLayout build_heading_row_ { UiDirection::H };
 			UiBoxLayout button_row_ { UiDirection::H };
 			UiLabel folder_label_;
 			LiveEditLineEdit folder_edit_;
@@ -2012,7 +2062,7 @@ private:
 			UiDropdown source_mode_;
 			UiLabel appearance_label_;
 			UiDropdown appearance_mode_;
-			UiLabel build_label_;
+			UiLabel build_heading_;
 			UiLabel build_summary_;
 			UiButton build_settings_button_;
 			UiLabel spacer_;
@@ -2125,8 +2175,7 @@ private:
 		if(!from_design.IsEmpty())
 			return from_design;
 		String saved = TrimBoth(export_project_name_);
-		String build = TrimBoth(export_build_method_);
-		if(!saved.IsEmpty() && saved != build)
+		if(!saved.IsEmpty() && !IsBuildProfileLikeExportName(saved))
 			return SanitizeDesignerPackageName(saved, "Designer_Export");
 		return "Designer_Export";
 	}
@@ -2161,11 +2210,20 @@ private:
 		if(method.IsEmpty())
 			method = "CLANGx64";
 		String exe = TrimBoth(export_output_exe_path_);
+		String def_folder = TrimBoth(default_export_folder_);
+		if(def_folder.IsEmpty())
+			def_folder = startup_working_directory_;
 		if(umk.IsEmpty())
 			umk = "[PATH_TO_UPP_OR_UMK]";
 		if(exe.IsEmpty())
 			exe = "[PATH_TO_OUTPUT_EXE]";
-		return Format("UMK: %s    Method: %s    Exe: %s", umk, method, exe);
+		String out;
+		out << "UMK:            " << umk << '\n'
+		    << "U++ root:       " << (u_root_.IsEmpty() ? "[not set]" : u_root_) << '\n'
+		    << "Method:         " << method << '\n'
+		    << "Output EXE:     " << exe << '\n'
+		    << "Default folder: " << def_folder;
+		return out;
 	}
 
 	void OpenExportFolder(const String& path)
