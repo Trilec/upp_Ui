@@ -42,7 +42,7 @@ The `Ui` package currently covers:
 
 - Theme and style infrastructure
   - `UiStyle`, `UiTheme`, `UiDraw`, `UiIcons`
-  - Shared palette/metrics/skin driven styling and helper paint routines
+  - shared palette/metrics/skin styling, icon catalog, and paint helpers
 
 - Layout and composition
   - `UiBoxLayout` - lightweight row/column layout with fit, fixed, and expand semantics
@@ -51,6 +51,7 @@ The `Ui` package currently covers:
   - `UiQuadSplitter` - four-pane splitter layout for editor-style workspaces
   - `UiStack` - page stack/container for switching between hosted child pages
   - `UiLayoutCursor` - small incremental placement helper for readable manual layout code
+  - `UiMeasureLayout` - helper for asking a control how much space it actually wants, which is annoyingly useful
 
 - Text and display controls
   - `UiLabel` - styled text display with selection, alignment, icon/media, and richer presentation options
@@ -64,6 +65,8 @@ The `Ui` package currently covers:
   - `UiCheckBox` - themed boolean box control
   - `UiRadioButton` - themed single-choice option control
   - `UiToggle` - themed switch/toggle control
+  - `UiSplitButton` - action button with a secondary popup lane, because one click was too simple
+  - `UiMenu` - themed popup action surface
 
 - Panels, containers, and scrolling
   - `UiPanel` - general styled surface with frame, fill, radius, and shadow support
@@ -73,6 +76,7 @@ The `Ui` package currently covers:
   - `UiScrollBar` - standalone themed scrollbar
   - `UiTab` - tabbed navigation surface
   - `UiStack` - stacked page container for multi-view surfaces
+  - `UiSliderEdit` - a slider paired with a text field, for when precision refuses to be optional
 
 - Edit and text-entry controls
   - `UiBaseEdit` - shared base for edit controls
@@ -82,19 +86,17 @@ The `Ui` package currently covers:
   - `UiMultiEdit` - multi-line text editing
   - `UiIntEdit` - integer entry
   - `UiFloatEdit` - floating-point entry
+  - `UiColorPicker` - reusable color picker with numeric channels and swatch workflow
 
 - Selection, data, and navigation controls
   - `UiDropdown` - themed selection dropdown
   - `UiList` - styled flat list with selection and metadata support
   - `UiTree` - styled hierarchical item browser
   - `UiTable` - themed tabular presentation/edit surface
-  - `UiMenu` - themed menu and action surface
   - `UiDataModels` - reusable data/model helpers used across list, tree, dropdown, and table controls
 
 - Slider, picker, and curve utilities
   - `UiSlider` - themed scalar slider
-  - `UiSliderEdit` - slider + edit composition surface
-  - `UiColorPicker` - reusable technical color picker with slot previews, editable numeric channels, and swatch-library workflow
   - `UiBezierCurveEditor` - interactive curve editor for four-point bezier curves
   - `UiBezierCurveField` - composite field around the curve editor for direct use in apps and demos
 
