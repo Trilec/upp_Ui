@@ -2712,6 +2712,13 @@ static void TestRecentDocumentHelper(TestCtx& t)
 	t.Expect(merged.Get().GetCount() == 2, "legacy merge dedupes and keeps both sources");
 	t.Expect(merged.Get()[0].EndsWith("legacy_load.json") || merged.Get()[0].EndsWith("legacy_save.json"),
 	         "legacy merge remains deterministic");
+	t.Expect(authoritative.Get().GetCount() == 2, "authoritative recent_documents key is still intact after legacy merge test");
+
+	DesignerRecentDocuments missing;
+	missing.AddRecentDesignerDocument("E:/tmp/missing_a.design.json");
+	missing.AddRecentDesignerDocument("E:/tmp/missing_b.design.json");
+	missing.RemoveMissingDesignerDocuments();
+	t.Expect(missing.Get().IsEmpty(), "missing recent documents can be pruned");
 
 	UiSplitButton save_button, load_button;
 	RefreshRecentDocumentMenus(save_button, load_button, restored);
@@ -2720,6 +2727,10 @@ static void TestRecentDocumentHelper(TestCtx& t)
 	t.Expect(save_button.GetItem(save_button.GetCount() - 2).group_header &&
 	         load_button.GetItem(load_button.GetCount() - 2).group_header,
 	         "shared recent menu uses the same header row in both menus");
+	t.Expect(save_button.GetItem(save_button.GetCount() - 1).text == "No recent documents" ||
+	         save_button.GetItem(save_button.GetCount() - 1).text.Find("(missing)") >= 0 ||
+	         save_button.GetItem(save_button.GetCount() - 1).text.Find("recent_") >= 0,
+	         "recent menu wording stays unified");
 }
 
 static DesignerModel MakeSampleModel(DesignerRegistry& r)

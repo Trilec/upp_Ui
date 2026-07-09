@@ -14,6 +14,8 @@ public:
 	void AddRecentDesignerDocument(const String& path);
 	void LoadRecentDesignerDocuments(const Value& value);
 	Value StoreRecentDesignerDocuments() const;
+	void RemoveMissingDesignerDocuments();
+	bool HasMissingDesignerDocuments() const;
 
 	const Vector<String>& Get() const { return recent_; }
 	void Clear() { recent_.Clear(); }

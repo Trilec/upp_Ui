@@ -34,6 +34,21 @@ Value DesignerRecentDocuments::StoreRecentDesignerDocuments() const
 	return out;
 }
 
+void DesignerRecentDocuments::RemoveMissingDesignerDocuments()
+{
+	for(int i = recent_.GetCount() - 1; i >= 0; i--)
+		if(!FileExists(recent_[i]))
+			recent_.Remove(i);
+}
+
+bool DesignerRecentDocuments::HasMissingDesignerDocuments() const
+{
+	for(const String& path : recent_)
+		if(!FileExists(path))
+			return true;
+	return false;
+}
+
 void RefreshRecentDocumentMenus(UiSplitButton& save_button, UiSplitButton& load_button,
 	                           const DesignerRecentDocuments& recents)
 {
@@ -56,6 +71,10 @@ void RefreshRecentDocumentMenus(UiSplitButton& save_button, UiSplitButton& load_
 				button.SetItemDescription(button.GetCount() - 1, path);
 				button.SetItemEnabled(button.GetCount() - 1, ok);
 			}
+		}
+		if(recents.HasMissingDesignerDocuments()) {
+			button.AddSeparator();
+			button.Add("Remove missing documents", "cmd:prune_missing");
 		}
 	};
 	fill(save_button, true);

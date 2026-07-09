@@ -645,10 +645,8 @@ void UiSplitButton::PopupWindow::Deactivate()
         return;
 
     Ptr<UiSplitButton> self = owner;
-    PostCallback([self] {
-        if(self && self->IsPopupOpen())
-            self->ClosePopup();
-    });
+    if(self && self->IsPopupOpen())
+        self->ClosePopup();
 }
 
 } // namespace Upp

@@ -855,6 +855,15 @@ private:
 			String cmd = AsString(v);
 			if(cmd == "cmd:save_as")
 				SaveDesignAs();
+			else if(cmd == "cmd:open_folder") {
+				if(!current_design_path_.IsEmpty())
+					OpenExportFolder(GetFileFolder(current_design_path_));
+			}
+			else if(cmd == "cmd:prune_missing") {
+				recent_documents_.RemoveMissingDesignerDocuments();
+				StoreRecentFiles();
+				SyncRecentDropdowns();
+			}
 			else
 				SaveDesignToPath(cmd);
 		};
@@ -877,6 +886,15 @@ private:
 #endif
 			if(cmd == "cmd:open")
 				LoadDesignFromFile();
+			else if(cmd == "cmd:prune_missing") {
+				recent_documents_.RemoveMissingDesignerDocuments();
+				StoreRecentFiles();
+				SyncRecentDropdowns();
+			}
+			else if(cmd == "cmd:open_folder") {
+				if(!current_design_path_.IsEmpty())
+					OpenExportFolder(GetFileFolder(current_design_path_));
+			}
 			else
 				LoadDesignPath(cmd);
 		};
@@ -1398,6 +1416,7 @@ private:
 		current_design_path_ = NormalizePath(path);
 		recent_documents_.AddRecentDesignerDocument(path);
 		StoreRecentFiles();
+		SyncRecentDropdowns();
 		SetDocumentDirty(false);
 		ForceDesignerProjectionRefresh("load");
 		DesignerConsoleTrace("LOAD_DONE",
