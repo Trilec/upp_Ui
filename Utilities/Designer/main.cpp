@@ -1520,9 +1520,13 @@ private:
 			Value parsed = ParseJSON(text);
 			if(parsed.Is<ValueMap>()) {
 				ValueMap cfg = parsed;
-				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_documents"));
-				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_saves"));
-				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_loads"));
+				Value recent_documents = ConfigValue(cfg, "recent_documents");
+				if(!IsNull(recent_documents) && recent_documents.Is<ValueArray>() && recent_documents.GetCount() > 0)
+					recent_documents_.LoadRecentDesignerDocuments(recent_documents);
+				else {
+					recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_saves"));
+					recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_loads"));
+				}
 				umk_path_ = AsString(ConfigValue(cfg, "umk_path"));
 				u_root_ = AsString(ConfigValue(cfg, "u_root"));
 				Value export_destination_root_saved = ConfigValue(cfg, "export_destination_root_saved");

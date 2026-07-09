@@ -2680,9 +2680,38 @@ static void TestRecentDocumentHelper(TestCtx& t)
 	Value stored = recents.StoreRecentDesignerDocuments();
 	DesignerRecentDocuments restored;
 	restored.LoadRecentDesignerDocuments(stored);
-	t.Expect(restored.Get().GetCount() == 2, "recent document store/load round-trips");
-	t.Expect(restored.Get()[0].EndsWith("a.design.json") && restored.Get()[1].EndsWith("b.design.json"),
-	         "recent document store/load preserves order");
+	t.Expect(restored.Get().GetCount() == DesignerRecentDocuments::MAX_RECENT,
+	         "recent document store/load preserves the cap");
+	t.Expect(restored.Get()[0].EndsWith("recent_11.design.json"),
+	         "recent document store/load preserves newest-first order");
+	t.Expect(restored.Get()[restored.Get().GetCount() - 1].EndsWith("recent_02.design.json"),
+	         "recent document store/load drops overflow items");
+
+	DesignerRecentDocuments legacy;
+	ValueArray legacy_values;
+	legacy_values.Add(String("E:/tmp/s1.json"));
+	legacy_values.Add(String("E:/tmp/s2.json"));
+	legacy.LoadRecentDesignerDocuments(legacy_values);
+	ValueMap cfg;
+	cfg.Set("recent_documents", legacy.StoreRecentDesignerDocuments());
+	ValueArray legacy_saves;
+	legacy_saves.Add(String("E:/tmp/legacy_save.json"));
+	ValueArray legacy_loads;
+	legacy_loads.Add(String("E:/tmp/legacy_load.json"));
+	cfg.Set("recent_saves", legacy_saves);
+	cfg.Set("recent_loads", legacy_loads);
+	DesignerRecentDocuments authoritative;
+	authoritative.LoadRecentDesignerDocuments(cfg.GetValue(cfg.Find("recent_documents")));
+	t.Expect(authoritative.Get().GetCount() == 2, "authoritative recent_documents key wins over legacy keys");
+	t.Expect(authoritative.Get()[0].EndsWith("s1.json") && authoritative.Get()[1].EndsWith("s2.json"),
+	         "authoritative recent_documents order is preserved");
+
+	DesignerRecentDocuments merged;
+	merged.LoadRecentDesignerDocuments(cfg.GetValue(cfg.Find("recent_saves")));
+	merged.LoadRecentDesignerDocuments(cfg.GetValue(cfg.Find("recent_loads")));
+	t.Expect(merged.Get().GetCount() == 2, "legacy merge dedupes and keeps both sources");
+	t.Expect(merged.Get()[0].EndsWith("legacy_load.json") || merged.Get()[0].EndsWith("legacy_save.json"),
+	         "legacy merge remains deterministic");
 
 	UiSplitButton save_button, load_button;
 	RefreshRecentDocumentMenus(save_button, load_button, restored);

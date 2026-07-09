@@ -21,7 +21,7 @@ void DesignerRecentDocuments::LoadRecentDesignerDocuments(const Value& value)
 	if(!value.Is<ValueArray>())
 		return;
 	ValueArray items = value;
-	for(int i = 0; i < items.GetCount(); i++)
+	for(int i = items.GetCount() - 1; i >= 0; i--)
 		if(!IsNull(items[i]))
 			AddRecentDesignerDocument(AsString(items[i]));
 }
@@ -45,7 +45,7 @@ void RefreshRecentDocumentMenus(UiSplitButton& save_button, UiSplitButton& load_
 			button.Add("Open containing folder", "cmd:open_folder", false);
 		button.AddGroupHeader("Recent documents");
 		if(recents.Get().IsEmpty())
-			button.Add(is_save ? "No recent saves" : "No recent loads", Value(), false);
+			button.Add("No recent documents", Value(), false);
 		else {
 			for(const String& path : recents.Get()) {
 				bool ok = FileExists(path);
