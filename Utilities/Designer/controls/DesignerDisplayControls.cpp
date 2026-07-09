@@ -46,7 +46,7 @@ static void EmitDesignerDisplaySetup(DesignerCodeGenContext& ctx, const Designer
 	else if(n.type_id == "UiBreadcrumbs") {
 		int count = max(1, min(24, (int)ctx.Property(n, "crumb_count", 3)));
 		for(int i = 0; i < count; i++)
-			out << "\t\t" << var << ".AddCrumb(" << ctx.CppString(AsString(ctx.Property(n, i == 0 ? "crumb_a" : i == 1 ? "crumb_b" : "crumb_c", i == 0 ? "Home" : i == 1 ? "Library" : "Current"))) << ", "
+			out << "\t\t" << var << ".AddCrumb(" << ctx.CppString(AsString(ctx.Property(n, Format("crumb_%d", i + 1), Format("Crumb %d", i + 1)))) << ", "
 			    << ctx.CppString(AsString(i)) << ");\n";
 		out << "\t\t" << var << ".SetCurrentIndex(" << clamp((int)ctx.Property(n, "current", min(2, count - 1)), 0, count - 1) << ");\n";
 		out << "\t\t" << var << ".SetTrimOnSelect(" << ((bool)ctx.Property(n, "trim", false) ? "true" : "false")
@@ -135,9 +135,10 @@ void RegisterDesignerDisplayControls(DesignerRegistry& registry)
 		crumbs.init_defaults = [=](DesignerNode& n) {
 			if(common_init)
 				common_init(n);
-			n.properties.Set("crumb_a", "Home");
-			n.properties.Set("crumb_b", "Library");
-			n.properties.Set("crumb_c", "Current");
+			n.properties.Set("crumb_count", 3);
+			n.properties.Set("crumb_1", "Home");
+			n.properties.Set("crumb_2", "Library");
+			n.properties.Set("crumb_3", "Current");
 			n.properties.Set("current", 2);
 			n.properties.Set("trim", false);
 			n.properties.Set("divider", "/");

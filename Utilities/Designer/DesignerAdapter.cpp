@@ -91,12 +91,6 @@ static String DesignerBreadcrumbCrumbText(const DesignerNode& n, int i)
 	String key = DesignerBreadcrumbCrumbKey(i);
 	if(DesignerHasProperty(n, key))
 		return AdapterNodeProperty(n, key, Format("Crumb %d", i + 1));
-	if(i == 0)
-		return AdapterNodeProperty(n, "crumb_a", "Home");
-	if(i == 1)
-		return AdapterNodeProperty(n, "crumb_b", "Library");
-	if(i == 2)
-		return AdapterNodeProperty(n, "crumb_c", "Current");
 	return Format("Crumb %d", i + 1);
 }
 

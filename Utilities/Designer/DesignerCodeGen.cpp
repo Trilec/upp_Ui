@@ -1,4 +1,4 @@
-﻿#include "DesignerCodeGen.h"
+#include "DesignerCodeGen.h"
 #include "DesignerDefaults.h"
 
 // DesignerCodeGen.cpp - converts the model tree into standalone U++ code.
@@ -292,12 +292,6 @@ static String CodeGenBreadcrumbCrumbText(const DesignerNode& n, int i)
 	String key = CodeGenBreadcrumbCrumbKey(i);
 	if(CodeGenHasProperty(n, key))
 		return CodeGenNodeProperty(n, key, Format("Crumb %d", i + 1));
-	if(i == 0)
-		return CodeGenNodeProperty(n, "crumb_a", "Home");
-	if(i == 1)
-		return CodeGenNodeProperty(n, "crumb_b", "Library");
-	if(i == 2)
-		return CodeGenNodeProperty(n, "crumb_c", "Current");
 	return Format("Crumb %d", i + 1);
 }
 
@@ -1165,91 +1159,6 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	}
 }
 
-static String CodeGenCompositeLayoutExpr(const String& mode)
-{
-	return mode == "Stacked" ? "UICOMPOSITE_STACKED" : "UICOMPOSITE_INLINE";
-}
-
-static String CodeGenFieldAlignExpr(const String& side)
-{
-	if(side == "Left") return "UiAlign::LEFT";
-	if(side == "Top") return "UiAlign::TOP";
-	if(side == "Bottom") return "UiAlign::BOTTOM";
-	return "UiAlign::RIGHT";
-}
-
-static void EmitCompositeSetup(String& out, const String& var, const DesignerNode& n)
-{
-	String label = CodeGenNodeProperty(n, "label", n.name);
-	String value = CodeGenNodeProperty(n, "value_text", "Value");
-	int label_w = DesignerClampMin((int)CodeGenNodeProperty(n, "label_width", 112));
-	int field_gap = max(0, (int)CodeGenNodeProperty(n, "field_gap", 8));
-	int stack_gap = max(0, (int)CodeGenNodeProperty(n, "stack_gap", 4));
-	if(n.type_id == "UiCompositeLabel") {
-		out << "\t\t" << var << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
-		    << ".SetLabelWidth(DPI(" << label_w << ")).SetFieldGap(DPI(" << field_gap << "));\n";
-	}
-	else if(n.type_id == "UiCompositeEdit") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
-		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
-		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
-		    << "\t\t" << var << ".SetData(" << CppString(value) << ");\n";
-	}
-	else if(n.type_id == "UiCompositeDropdown") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
-		    << ".SetLabel(" << CppString(label) << ").SetLabelWidth(DPI(" << label_w << "))"
-		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
-		    << "\t\t" << var << ".Clear().Add(\"First\", \"First\").Add(\"Second\", \"Second\").Add(\"Third\", \"Third\");\n"
-		    << "\t\t" << var << ".SelectByData(" << CppString(CodeGenNodeProperty(n, "selected", "First")) << ");\n";
-	}
-	else if(n.type_id == "UiCompositeToggle") {
-		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
-		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
-		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", false) ? "true" : "false") << ")"
-		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 42)) << "))"
-		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
-		    << "\t\t" << var << ".SetData(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
-	}
-	else if(n.type_id == "UiCompositeColor") {
-		int color_count = minmax((int)CodeGenNodeProperty(n, "color_count", 4), 1, 4);
-		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
-		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(value) << ")"
-		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
-		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 76)) << "))"
-		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "))"
-		    << ".SetColorCount(" << color_count << ");\n";
-		for(int i = 0; i < color_count; i++) {
-			String color_key = Format("color_%d", i + 1);
-			String label_key = Format("color_label_%d", i + 1);
-			out << "\t\t" << var << ".SetColor(" << i << ", " << ColorExpr(CodeGenNodeProperty(n, color_key, Color())) << ");\n";
-			out << "\t\t" << var << ".SetColorLabel(" << i << ", " << CppString(CodeGenNodeProperty(n, label_key, String())) << ");\n";
-			if(i > 0 && (bool)CodeGenNodeProperty(n, Format("separator_%d", i + 1), false))
-				out << "\t\t" << var << ".SetSeparatorBefore(" << i << ", true);\n";
-		}
-	}
-	else if(n.type_id == "UiCompositeSlider") {
-		int mn = (int)CodeGenNodeProperty(n, "min", 0);
-		int mx = (int)CodeGenNodeProperty(n, "max", 100);
-		int val = minmax((int)CodeGenNodeProperty(n, "value", 42), mn, mx);
-		out << "\t\t" << var << ".SetLayoutMode(" << CodeGenCompositeLayoutExpr(CodeGenNodeProperty(n, "layout_mode", "Inline")) << ")"
-		    << ".SetLabel(" << CppString(label) << ").SetValueText(" << CppString(AsString(val)) << ")"
-		    << ".ShowValue(" << ((bool)CodeGenNodeProperty(n, "show_value", true) ? "true" : "false") << ")"
-		    << ".SetLabelWidth(DPI(" << label_w << ")).SetValueWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "value_width", 48)) << "))"
-		    << ".SetFieldGap(DPI(" << field_gap << ")).SetStackGap(DPI(" << stack_gap << "));\n"
-		    << "\t\t" << var << ".Slider().SetRange(" << mn << ", " << mx << ");\n"
-		    << "\t\t" << var << ".SetData(" << val << ");\n";
-	}
-	else if(n.type_id == "UiSliderEdit") {
-		out << "\t\t" << var << ".SetRange(" << (double)CodeGenNodeProperty(n, "minf", 0.0) << ", "
-		    << (double)CodeGenNodeProperty(n, "maxf", 100.0) << ")"
-		    << ".SetStep(" << (double)CodeGenNodeProperty(n, "stepf", 1.0) << ")"
-		    << ".SetValue(" << (double)CodeGenNodeProperty(n, "valuef", 42.0) << ")"
-		    << ".SetFieldAlign(" << CodeGenFieldAlignExpr(CodeGenNodeProperty(n, "field_align", "Right")) << ")"
-		    << ".SetFieldWidth(DPI(" << max(0, (int)CodeGenNodeProperty(n, "field_width", 72)) << "))"
-		    << ".SetGap(DPI(" << field_gap << "));\n";
-	}
-}
-
 static bool HasDesignerMinSizeOverride(const DesignerNode& n)
 {
 	return CodeGenMinMetric(n, "min_width") > 0 ||
@@ -1315,11 +1224,6 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		if(wrap != "None")
 			out << ".SetWrapAutoResize(true)";
 		out << ";\n";
-	}	else if(n.type_id == "UiCompositeLabel" || n.type_id == "UiCompositeEdit" ||
-	        n.type_id == "UiCompositeDropdown" || n.type_id == "UiCompositeToggle" ||
-	        n.type_id == "UiCompositeColor" ||
-	        n.type_id == "UiCompositeSlider" || n.type_id == "UiSliderEdit") {
-		EmitCompositeSetup(out, var, n);
 	}
 	else if(n.type_id == "GridLayout") {
 		out << "\t\t" << var << ".SetGridSize("
@@ -1395,44 +1299,6 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		    << ".SetMinPixels(2, DPI(" << (int)CodeGenNodeProperty(n, "min_c", 60) << "))"
 		    << ".SetMinPixels(3, DPI(" << (int)CodeGenNodeProperty(n, "min_d", 60) << "));\n";
 	}
-	else if(n.type_id == "UiLabel") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
-		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Left")), "Left")
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center"), "Center") << ");\n";
-		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
-		out << "\t\t" << var << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 6)) << "));\n";
-		out << "\t\t" << var << ".SetIconScaleToContent(" << ((bool)CodeGenNodeProperty(n, "icon_scale", false) ? "true" : "false") << ");\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetIcon(" << icon << ", UiIconRenderMode::MonoTint)"
-			    << ".SetIconSize(DPI(" << (int)CodeGenNodeProperty(n, "icon_size", 18) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 18) << "));\n";
-	}
-	else if(n.type_id == "UiTitleCard")
-	{
-		String text_align_v = CodeGenNodeProperty(n, "text_align_v", "Center");
-		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
-		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 8)) << "))"
-		    << ".SetMediaGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "media_gap", 10)) << "))"
-		    << ".SetMediaReserve(DPI(" << max(0, (int)CodeGenNodeProperty(n, "media_reserve", 24)) << "))"
-		    << ".SetMediaMin(DPI(" << max(0, (int)CodeGenNodeProperty(n, "media_min", 16)) << "))"
-		    << ".SetMediaAutoFit(" << ((bool)CodeGenNodeProperty(n, "media_auto_fit", false) ? "true" : "false") << ")"
-		    << ".SetMediaSide(" << AlignSideExpr(CodeGenNodeProperty(n, "media_side", "Left"), "Left") << ")"
-		    << ".SetMediaAlign(" << AlignHExpr(CodeGenNodeProperty(n, "media_align_h", "Center"), "Center")
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "media_align_v", "Center"), "Center") << ")"
-		    << ".ShowTitleLine(" << ((bool)CodeGenNodeProperty(n, "title_line", true) ? "true" : "false") << ")";
-		out << ".ShowCardLine(" << ((bool)CodeGenNodeProperty(n, "card_line", false) ? "true" : "false") << ")";
-		if(IsExactDesign(appearance_mode) || text_align_v != "Center")
-			out << ".SetTextAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align", "Left"), "Left")
-			    << ", " << AlignVExpr(text_align_v, "Center") << ")";
-		out << ";\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetMedia(" << icon << ", Size(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 24) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 24) << ")));\n";
-	}
 	else if(n.type_id == "UiGroupPanel") {
 		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
@@ -1454,126 +1320,6 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
-	}
-	else if(n.type_id == "UiButton") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
-		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
-		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
-		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
-	}
-	else if(n.type_id == "UiSplitButton") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 6)) << "))"
-		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
-		out << "\t\t" << var << ".SetSplitWidth(DPI(" << (int)CodeGenNodeProperty(n, "split_width", 30) << "));\n"
-		    << "\t\t" << var << ".SetSplitContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "split_content_gap", 4)) << "));\n"
-		    << "\t\t" << var << ".SetSplitIconSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "split_icon_size", 16)) << "));\n"
-		    << "\t\t" << var << ".SetPopupMinWidth(DPI(" << (int)CodeGenNodeProperty(n, "popup_min_width", 220) << "));\n";
-		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
-		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Left"), "Left") << ");\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
-		out << "\t\t" << var << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_a", "Recent A")) << ", \"a\")"
-		    << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_b", "Recent B")) << ", \"b\")"
-		    << ".Add(" << CppString(CodeGenNodeProperty(n, "choice_c", "Recent C")) << ", \"c\");\n";
-	}
-	else if(n.type_id == "UiToolButton") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", "")) << ")"
-		    << ".SetContentInset(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_inset", 4)) << "))"
-		    << ".SetContentGap(DPI(" << max(0, (int)CodeGenNodeProperty(n, "content_gap", 4)) << "));\n";
-		out << "\t\t" << var << ".SetAlign(" << AlignHExpr(CodeGenNodeProperty(n, "align_h", CodeGenNodeProperty(n, "align", "Center")))
-		    << ", " << AlignVExpr(CodeGenNodeProperty(n, "align_v", "Center")) << ");\n";
-		out << "\t\t" << var << ".SetIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "icon_side", "Center"), "Center") << ");\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 20) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 20) << "));\n";
-	}
-	else if(n.type_id == "UiLineEdit") {
-		out << "\t\t" << var << ".SetTextUtf8(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ");\n";
-		if(CodeGenHasProperty(n, "placeholder"))
-			out << "\t\t" << var << ".SetPlaceholder(" << CppString(AsString(CodeGenNodeProperty(n, "placeholder", ""))) << ");\n";
-	}
-	else if(n.type_id == "UiIntEdit") {
-		out << "\t\t" << var << ".MinMax(" << (int)CodeGenNodeProperty(n, "min", 0)
-		    << ", " << (int)CodeGenNodeProperty(n, "max", 100) << ")"
-		    << ".Step(" << (int)CodeGenNodeProperty(n, "step", 1) << ")"
-		    << ".ShowSpin(" << ((bool)CodeGenNodeProperty(n, "spin", true) ? "true" : "false") << ");\n";
-		out << "\t\t" << var << ".SetValue(" << (int)CodeGenNodeProperty(n, "value", 42) << ");\n";
-	}
-	else if(n.type_id == "UiFloatEdit") {
-		out << "\t\t" << var << ".MinMax(" << (double)CodeGenNodeProperty(n, "minf", 0.0)
-		    << ", " << (double)CodeGenNodeProperty(n, "maxf", 100.0) << ")"
-		    << ".Step(" << (double)CodeGenNodeProperty(n, "stepf", 0.1) << ")"
-		    << ".Precision(" << (int)CodeGenNodeProperty(n, "precision", 2) << ")"
-		    << ".ShowSpin(" << ((bool)CodeGenNodeProperty(n, "spin", true) ? "true" : "false") << ");\n";
-		out << "\t\t" << var << ".SetValue(" << (double)CodeGenNodeProperty(n, "valuef", 3.14) << ");\n";
-	}
-	else if(n.type_id == "UiSlider")
-		out << "\t\t" << var << ".SetRange(0, 100).SetValue(50);\n";
-	else if(n.type_id == "UiToggle")
-		out << "\t\t" << var << ".SetOn(" << ((bool)CodeGenNodeProperty(n, "on", true) ? "true" : "false") << ");\n";
-	else if(n.type_id == "UiDropdown") {
-		String item_text = CodeGenNodeProperty(n, "item_text", "First");
-		out << "\t\t" << var << ".UseInternalModel().Clear().Add(" << CppString(item_text) << ", " << CppString(item_text) << ");\n";
-		out << "\t\t" << var << ".Select(0);\n";
-		out << "\t\t" << var << ".SetIndicatorSide(" << AlignSideExpr(CodeGenNodeProperty(n, "indicator_side", "Right"), "Right") << ");\n";
-		out << "\t\t" << var << ".SetIndicatorSize(DPI(" << max(8, (int)CodeGenNodeProperty(n, "indicator_size", 14)) << "));\n";
-		String closed_icon = IconExpr(CodeGenNodeProperty(n, "indicator_closed_icon", "None"));
-		String opened_icon = IconExpr(CodeGenNodeProperty(n, "indicator_opened_icon", "None"));
-		if(!closed_icon.IsEmpty() || !opened_icon.IsEmpty()) {
-			if(closed_icon.IsEmpty())
-				closed_icon = "ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48()";
-			if(opened_icon.IsEmpty())
-				opened_icon = "ICON_NAVIGATION_OUTLINED_ARROW_DROP_UP_48()";
-			out << "\t\t" << var << ".SetIndicatorGlyphs(" << closed_icon << ", " << opened_icon << ");\n";
-		}
-	}
-	else if(n.type_id == "UiCheckBox") {
-		out << "\t\t" << var << ".SetText(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetTriState(" << ((bool)CodeGenNodeProperty(n, "tri_state", false) ? "true" : "false") << ");\n";
-		String visual = CodeGenNodeProperty(n, "visual", "Classic");
-		if(visual == "Chip")
-			out << "\t\t" << var << ".SetVisual(UICHECKVIS_CHIP);\n";
-		else if(visual == "List")
-			out << "\t\t" << var << ".SetVisual(UICHECKVIS_LIST);\n";
-		else
-			out << "\t\t" << var << ".SetVisual(UICHECKVIS_CLASSIC);\n";
-		String state = CodeGenNodeProperty(n, "state", "Checked");
-		out << "\t\t" << var << ".SetState(" << (state == "Indeterminate" ? "UICHECK_INDETERMINATE" :
-		                                       state == "Unchecked" ? "UICHECK_UNCHECKED" : "UICHECK_CHECKED") << ");\n";
-	}
-	else if(n.type_id == "UiBreadcrumbs") {
-		int count = CodeGenBreadcrumbCount(n);
-		for(int i = 0; i < count; i++)
-			out << "\t\t" << var << ".AddCrumb(" << CppString(CodeGenBreadcrumbCrumbText(n, i)) << ", "
-			    << CppString(AsString(i)) << ");\n";
-		out << "\t\t" << var << ".SetCurrentIndex("
-		    << clamp((int)CodeGenNodeProperty(n, "current", min(2, count - 1)), 0, count - 1) << ");\n";
-		out << "\t\t" << var << ".SetTrimOnSelect(" << ((bool)CodeGenNodeProperty(n, "trim", false) ? "true" : "false")
-		    << ").SetDivider(" << CppString(CodeGenNodeProperty(n, "divider", "/")) << ");\n";
-		String divider_icon = IconExpr(CodeGenNodeProperty(n, "divider_icon", "None"));
-		if(!divider_icon.IsEmpty())
-			out << "\t\t" << var << ".SetDividerIcon(" << divider_icon << ", Size(DPI("
-			    << (int)CodeGenNodeProperty(n, "divider_icon_size", 14) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "divider_icon_size", 14) << ")));\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetPathIcon(" << icon << ", UiAlign::LEFT, Size(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "), DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << ")));\n";
 	}
 	else if(n.type_id == "UiAccordion") {
 		out << "\t\t" << var << ".SetSingleOpen(" << ((bool)CodeGenNodeProperty(n, "single_open", false) ? "true" : "false") << ")"
@@ -1601,15 +1347,6 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 	else if(n.type_id == "UiStack") {
 		// Headless page container: pages and active index are emitted after children.
 	}
-	else if(n.type_id == "UiTable") {
-		out << "\t\t" << var << ".UseInternalModel();\n"
-		    << "\t\t" << var << ".GetInternalModel().SetSize(" << (int)CodeGenNodeProperty(n, "rows_count", 4)
-		    << ", " << (int)CodeGenNodeProperty(n, "cols_count", 3) << ");\n";
-	}
-	else if(n.type_id == "UiTree") {
-		out << "\t\t" << var << ".GetInternalModel().AddChild(" << var << ".GetInternalModel().Root(), UiModelItem(\"Workspace\", \"workspace\"));\n";
-		out << "\t\t" << var << ".ShowConnectorLines(" << ((bool)CodeGenNodeProperty(n, "connectors", true) ? "true" : "false") << ");\n";
-	}
 	else if(n.type_id == "UiScrollPanel") {
 		String mode = CodeGenNodeProperty(n, "scroll_mode", "Auto");
 		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
@@ -1623,9 +1360,6 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		    << "), DPI("
 		    << CodeGenMinMetric(n, "min_height")
 		    << "));\n";
-	}
-	else {
-		out << "\t\t" << var << ".SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));\n";
 	}
 	String tooltip = CodeGenNodeProperty(n, "tooltip", String());
 	if(!tooltip.IsEmpty() && n.type_id != "Spacer")
