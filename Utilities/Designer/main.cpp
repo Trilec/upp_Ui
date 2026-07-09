@@ -3,6 +3,7 @@
 #include "DesignerCommands.h"
 #include "DesignerPreview.h"
 #include "DesignerTemplates.h"
+#include "DesignerRecentDocuments.h"
 #include "DesignerCodeGen.h"
 #include "DesignerExport.h"
 #include "DesignerSerialization.h"
@@ -41,7 +42,7 @@ static bool designer_trace_summary_pending = false;
 static constexpr int TOOL_DRAG_TIMER_ID = 101;
 static constexpr int SAVE_STATUS_TIMER_ID = 102;
 static constexpr int LIVE_PREVIEW_TIMER_ID = 103;
-static constexpr int DESIGNER_RECENT_LIMIT = 10;
+static constexpr int DESIGNER_RECENT_LIMIT = DesignerRecentDocuments::MAX_RECENT;
 static const char *DESIGNER_STATE_IDLE = "Idle";
 static const char *DESIGNER_STATE_PREVIEWING = "Previewing";
 static const char *DESIGNER_STATE_COMMITTING = "Committing";
@@ -1335,7 +1336,7 @@ private:
 			Exclamation("Unable to save designer document.");
 			return;
 		}
-		AddRecentPath(recent_saves_, path);
+		recent_documents_.AddRecentDesignerDocument(path);
 		current_design_path_ = NormalizePath(path);
 		StoreRecentFiles();
 		SyncRecentDropdowns();
@@ -1354,8 +1355,7 @@ private:
 		}
 		String normalized = NormalizePath(path);
 		current_design_path_ = normalized;
-		AddRecentPath(recent_saves_, normalized);
-		AddRecentPath(recent_loads_, normalized);
+		recent_documents_.AddRecentDesignerDocument(normalized);
 		StoreRecentFiles();
 		SyncRecentDropdowns();
 		SetDocumentDirty(false);
@@ -1396,7 +1396,7 @@ private:
 		}
 		commands_.Clear();
 		current_design_path_ = NormalizePath(path);
-		AddRecentPath(recent_loads_, path);
+		recent_documents_.AddRecentDesignerDocument(path);
 		StoreRecentFiles();
 		SetDocumentDirty(false);
 		ForceDesignerProjectionRefresh("load");
@@ -1505,59 +1505,24 @@ private:
 		button.SetPopupMaxItems(DESIGNER_RECENT_LIMIT);
 	}
 
-	void AddRecentPath(Vector<String>& list, const String& path)
-	{
-		String p = NormalizePath(path);
-		if(p.IsEmpty())
-			return;
-		for(int i = list.GetCount() - 1; i >= 0; i--)
-			if(NormalizePath(list[i]) == p)
-				list.Remove(i);
-		list.Insert(0, p);
-		if(list.GetCount() > DESIGNER_RECENT_LIMIT)
-			list.SetCount(DESIGNER_RECENT_LIMIT);
-	}
-
-	void SyncRecentSplitButton(UiSplitButton& button, const Vector<String>& list, const String& empty)
-	{
-		button.ClearItems();
-		const bool is_save = &button == &save_button_;
-		if(is_save)
-			button.Add("Save As...", "cmd:save_as");
-		else
-			button.Add("Open...", "cmd:open");
-		if(list.IsEmpty()) {
-			button.AddSeparator();
-			button.Add(empty, Value(), false);
-		}
-		else {
-			button.AddGroupHeader(is_save ? "Recent saves" : "Recent loads");
-			for(const String& path : list) {
-				button.Add(GetFileName(path), path);
-				button.SetItemDescription(button.GetCount() - 1, path);
-			}
-		}
-	}
-
 	void SyncRecentDropdowns()
 	{
 		syncing_recent_ = true;
-		SyncRecentSplitButton(save_button_, recent_saves_, "No recent saves");
-		SyncRecentSplitButton(load_button_, recent_loads_, "No recent loads");
+		RefreshRecentDocumentMenus(save_button_, load_button_, recent_documents_);
 		syncing_recent_ = false;
 	}
 
 	void LoadRecentFiles()
 	{
-		recent_saves_.Clear();
-		recent_loads_.Clear();
+		recent_documents_.Clear();
 		String text = LoadFile(ConfigFile("DesignerConfig.json"));
 		if(!text.IsVoid() && !TrimBoth(text).IsEmpty()) {
 			Value parsed = ParseJSON(text);
 			if(parsed.Is<ValueMap>()) {
 				ValueMap cfg = parsed;
-				LoadRecentList(ConfigValue(cfg, "recent_saves"), recent_saves_);
-				LoadRecentList(ConfigValue(cfg, "recent_loads"), recent_loads_);
+				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_documents"));
+				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_saves"));
+				recent_documents_.LoadRecentDesignerDocuments(ConfigValue(cfg, "recent_loads"));
 				umk_path_ = AsString(ConfigValue(cfg, "umk_path"));
 				u_root_ = AsString(ConfigValue(cfg, "u_root"));
 				Value export_destination_root_saved = ConfigValue(cfg, "export_destination_root_saved");
@@ -1600,8 +1565,7 @@ private:
 	{
 		ValueMap cfg;
 		cfg.Set("schema", 1);
-		cfg.Set("recent_saves", StoreRecentList(recent_saves_));
-		cfg.Set("recent_loads", StoreRecentList(recent_loads_));
+		cfg.Set("recent_documents", recent_documents_.StoreRecentDesignerDocuments());
 		cfg.Set("umk_path", umk_path_);
 		cfg.Set("u_root", u_root_);
 		cfg.Set("export_output_dir", export_output_dir_);
@@ -1616,12 +1580,6 @@ private:
 		cfg.Set("export_source_mode", (int)export_source_mode_);
 		cfg.Set("default_export_folder", default_export_folder_);
 		SaveFile(ConfigFile("DesignerConfig.json"), AsJSON(cfg, true));
-	}
-
-	bool DirectoryHasFiles(const String& path) const
-	{
-		FindFile ff(AppendFileName(path, "*"));
-		return ff;
 	}
 
 	String InferUmkPath(const String& root) const
@@ -2335,28 +2293,16 @@ private:
 		return "CLANGx64";
 	}
 
+	bool DirectoryHasFiles(const String& path) const
+	{
+		FindFile ff(AppendFileName(path, "*"));
+		return ff;
+	}
+
 	Value ConfigValue(const ValueMap& cfg, const String& key) const
 	{
 		int q = cfg.Find(key);
 		return q >= 0 ? cfg.GetValue(q) : Value();
-	}
-
-	ValueArray StoreRecentList(const Vector<String>& list) const
-	{
-		ValueArray out;
-		for(const String& path : list)
-			out.Add(path);
-		return out;
-	}
-
-	void LoadRecentList(const Value& value, Vector<String>& list)
-	{
-		if(!value.Is<ValueArray>())
-			return;
-		ValueArray items = value;
-		for(int i = 0; i < items.GetCount(); i++)
-			if(!IsNull(items[i]))
-				AddRecentPath(list, AsString(items[i]));
 	}
 
 	// Full rebuild after structural edits or template changes.
@@ -6261,8 +6207,7 @@ private:
 	int active_toolbox_category_ = 0;
 	DesignerRightMode right_mode_ = RIGHT_HIERARCHY;
 	UiThemeMode theme_mode_ = UiThemeMode::Light;
-	Vector<String> recent_saves_;
-	Vector<String> recent_loads_;
+	DesignerRecentDocuments recent_documents_;
 	String umk_path_;
 	String u_root_;
 	String startup_working_directory_;

@@ -34,6 +34,8 @@ file
 	DesignerPreview.cpp,
 	DesignerTemplates.h,
 	DesignerTemplates.cpp,
+	DesignerRecentDocuments.h,
+	DesignerRecentDocuments.cpp,
 	DesignerCodeGen.h,
 	DesignerCodeGen.cpp,
 	DesignerExport.h,

@@ -13,6 +13,7 @@
 #include "../Designer/DesignerPreview.h"
 #include "../Designer/DesignerSerialization.h"
 #include "../Designer/DesignerTemplates.h"
+#include "../Designer/DesignerRecentDocuments.h"
 
 #include "../Designer/controls/DesignerControlFamilyShared.cpp"
 #include "../Designer/controls/DesignerLayoutControls.cpp"
@@ -29,6 +30,7 @@
 #include "../Designer/DesignerCommands.cpp"
 #include "../Designer/DesignerDragController.cpp"
 #include "../Designer/DesignerTemplates.cpp"
+#include "../Designer/DesignerRecentDocuments.cpp"
 #include "../Designer/DesignerCodeGen.cpp"
 #include "../Designer/DesignerExport.cpp"
 #include "../Designer/DesignerInspector.cpp"
@@ -2660,6 +2662,37 @@ static void TestSplitButtonPopupMetadata(TestCtx& t)
 	         "split button popup posts select before close after teardown");
 }
 
+static void TestRecentDocumentHelper(TestCtx& t)
+{
+	t.Section("Designer recent documents");
+
+	DesignerRecentDocuments recents;
+	recents.AddRecentDesignerDocument("E:/tmp/a.design.json");
+	recents.AddRecentDesignerDocument("E:/tmp/b.design.json");
+	recents.AddRecentDesignerDocument("E:/tmp/a.design.json");
+	t.Expect(recents.Get().GetCount() == 2, "duplicate recent path is not duplicated");
+	t.Expect(recents.Get().GetCount() > 0 && recents.Get()[0].EndsWith("a.design.json"),
+	         "most recent document moves to the top");
+	for(int i = 0; i < 12; i++)
+		recents.AddRecentDesignerDocument(Format("E:/tmp/recent_%02d.design.json", i));
+	t.Expect(recents.Get().GetCount() == DesignerRecentDocuments::MAX_RECENT,
+	         "recent document list is capped at ten");
+	Value stored = recents.StoreRecentDesignerDocuments();
+	DesignerRecentDocuments restored;
+	restored.LoadRecentDesignerDocuments(stored);
+	t.Expect(restored.Get().GetCount() == 2, "recent document store/load round-trips");
+	t.Expect(restored.Get()[0].EndsWith("a.design.json") && restored.Get()[1].EndsWith("b.design.json"),
+	         "recent document store/load preserves order");
+
+	UiSplitButton save_button, load_button;
+	RefreshRecentDocumentMenus(save_button, load_button, restored);
+	t.Expect(save_button.GetCount() == load_button.GetCount(), "Save and Load share the same recent menu model");
+	t.Expect(save_button.GetCount() >= 4, "shared recent menu includes command, separator, header, and recent items");
+	t.Expect(save_button.GetItem(save_button.GetCount() - 2).group_header &&
+	         load_button.GetItem(load_button.GetCount() - 2).group_header,
+	         "shared recent menu uses the same header row in both menus");
+}
+
 static DesignerModel MakeSampleModel(DesignerRegistry& r)
 {
 	DesignerModel m;
@@ -3193,6 +3226,7 @@ CONSOLE_APP_MAIN
 	TestDesignerChoiceCommitPath(t);
 	TestDesignerChoiceBindingAudit(t);
 	TestSplitButtonPopupMetadata(t);
+	TestRecentDocumentHelper(t);
 	TestGeneratedCodeText(t);
 	TestDesignerSerialization(t);
 	TestDesignerProjectExport(t);
