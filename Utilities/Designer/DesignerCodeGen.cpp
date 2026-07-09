@@ -1178,27 +1178,17 @@ static void EmitDesignerMinSize(String& out, const DesignerRegistry& registry, c
 	    << ")));\n";
 }
 
-static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
-                      const DesignerNode& n, DesignerAppearanceMode appearance_mode)
+static void ReportCodeGenContractError(String& out, const DesignerNode& n, const String& reason)
 {
-	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
+	String message = Format("DESIGNER CODEGEN CONTRACT ERROR: %s %s", n.type_id, reason);
+	RLOG(message);
+	out << "\t\t// " << message << "\n";
+}
+
+static bool EmitCentralLayoutSetup(DesignerCodeGenContext& ctx, const DesignerNode& n)
+{
 	String& out = ctx.Out();
-	String var = VarName(names, n.id);
-	if(CodeGenIsHeadlessNode(registry, n) || n.type_id == "Spacer")
-		return;
-	if(!HasThemeOverride(n, appearance_mode))
-		EmitThemeStyle(out, var, n, appearance_mode);
-	EmitDesignerMinSize(out, registry, var, n);
-	if(spec && spec->codegen.route == DesignerCodeGenRoute::OrdinaryHook) {
-		if(spec->codegen.emit_setup)
-			spec->codegen.emit_setup(ctx, n);
-		else
-			RLOG("Designer codegen contract error: missing setup hook for " << n.type_id);
-		String tooltip = CodeGenNodeProperty(n, "tooltip", String());
-		if(!tooltip.IsEmpty())
-			out << "\t\t" << var << ".Tip(" << CppString(AsString(tooltip)) << ");\n";
-		return;
-	}
+	String var = ctx.Var(n);
 	if(n.type_id == "BoxLayout") {
 		String wrap = CodeGenNodeProperty(n, "wrap", "None");
 		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"
@@ -1224,8 +1214,9 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		if(wrap != "None")
 			out << ".SetWrapAutoResize(true)";
 		out << ";\n";
+		return true;
 	}
-	else if(n.type_id == "GridLayout") {
+	if(n.type_id == "GridLayout") {
 		out << "\t\t" << var << ".SetGridSize("
 		    << max(1, (int)CodeGenNodeProperty(n, "columns", 2)) << ", "
 		    << max(1, (int)CodeGenNodeProperty(n, "rows", 2)) << ")"
@@ -1236,8 +1227,9 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		if((bool)CodeGenNodeProperty(n, "debug", false))
 			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
 		out << ";\n";
+		return true;
 	}
-	else if(n.type_id == "UiSplitter") {
+	if(n.type_id == "UiSplitter") {
 		String dir = CodeGenNodeProperty(n, "direction", "H");
 		String role_expr = RoleExpr(AsString(CodeGenNodeProperty(n, "role", "Standard")));
 		out << "\t\t" << var << "." << (dir == "V" ? "Vert" : "Horz") << "();\n";
@@ -1289,8 +1281,9 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		out << "\t\t\ts.thumb_metrics.radius = DPI(" << (int)CodeGenNodeProperty(n, "thumb_radius", 8) << ");\n"
 		    << "\t\t\t" << var << ".SetCustomStyle(s);\n"
 		    << "\t\t}\n";
+		return true;
 	}
-	else if(n.type_id == "UiQuadSplitter") {
+	if(n.type_id == "UiQuadSplitter") {
 		out << "\t\t" << var << ".SetSplitPercent("
 		    << (int)CodeGenNodeProperty(n, "column_percent", 50) << ", "
 		    << (int)CodeGenNodeProperty(n, "row_percent", 50) << ")"
@@ -1298,8 +1291,16 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 60) << "))"
 		    << ".SetMinPixels(2, DPI(" << (int)CodeGenNodeProperty(n, "min_c", 60) << "))"
 		    << ".SetMinPixels(3, DPI(" << (int)CodeGenNodeProperty(n, "min_d", 60) << "));\n";
+		return true;
 	}
-	else if(n.type_id == "UiGroupPanel") {
+	return false;
+}
+
+static bool EmitCentralStructuralSetup(DesignerCodeGenContext& ctx, const DesignerNode& n)
+{
+	String& out = ctx.Out();
+	String var = ctx.Var(n);
+	if(n.type_id == "UiGroupPanel") {
 		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
 		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
 		    << ".SetSideTitle(" << CppString(CodeGenNodeProperty(n, "side_title", "")) << ")"
@@ -1320,8 +1321,9 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		if(!icon.IsEmpty())
 			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
 			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
+		return true;
 	}
-	else if(n.type_id == "UiAccordion") {
+	if(n.type_id == "UiAccordion") {
 		out << "\t\t" << var << ".SetSingleOpen(" << ((bool)CodeGenNodeProperty(n, "single_open", false) ? "true" : "false") << ")"
 		    << ".SetEnforceOne(" << ((bool)CodeGenNodeProperty(n, "enforce_one", false) ? "true" : "false") << ")"
 		    << ".ShowChevron(" << ((bool)CodeGenNodeProperty(n, "show_chevron", true) ? "true" : "false") << ")"
@@ -1331,8 +1333,9 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		    << (int)CodeGenNodeProperty(n, "close_ms", 0) << ")"
 		    << ".ShowDragHandle(" << ((bool)CodeGenNodeProperty(n, "show_drag_handle", false) ? "true" : "false") << ")"
 		    << ".EnableDragReorder(" << ((bool)CodeGenNodeProperty(n, "drag_reorder", false) ? "true" : "false") << ");\n";
+		return true;
 	}
-	else if(n.type_id == "UiTab") {
+	if(n.type_id == "UiTab") {
 		String visual = CodeGenNodeProperty(n, "visual", "Underline");
 		out << "\t\t" << var << ".SetVisual(" << TabVisualExpr(visual) << ")"
 		    << ".SetPlacement(" << AlignSideExpr(CodeGenNodeProperty(n, "placement", "Top"), "Top") << ")"
@@ -1343,23 +1346,71 @@ static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& regis
 		    << FontExpr(CodeGenNodeProperty(n, "tab_font", "Sans"), (int)CodeGenNodeProperty(n, "tab_font_size", 11))
 		    << ").SetTabIconSize(DPI(" << (int)CodeGenNodeProperty(n, "tab_icon_size", 16) << "))"
 		    << ".SetTabIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "tab_icon_side", "Left")) << ");\n";
+		return true;
 	}
-	else if(n.type_id == "UiStack") {
+	if(n.type_id == "UiStack") {
 		// Headless page container: pages and active index are emitted after children.
+		return true;
 	}
-	else if(n.type_id == "UiScrollPanel") {
+	if(n.type_id == "UiScrollPanel") {
 		String mode = CodeGenNodeProperty(n, "scroll_mode", "Auto");
 		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
 		              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
 		              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
 		out << "\t\t" << var << ".SetScrollMode(" << expr << ");\n";
+		return true;
 	}
-	else if(n.type_id == "UiPanel") {
+	if(n.type_id == "UiPanel") {
 		out << "\t\t" << var << ".SetSizeMin(DPI("
 		    << CodeGenMinMetric(n, "min_width")
 		    << "), DPI("
 		    << CodeGenMinMetric(n, "min_height")
 		    << "));\n";
+		return true;
+	}
+	return false;
+}
+
+static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
+                      const DesignerNode& n, DesignerAppearanceMode appearance_mode)
+{
+	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
+	String& out = ctx.Out();
+	String var = VarName(names, n.id);
+	if(CodeGenIsHeadlessNode(registry, n) || n.type_id == "Spacer")
+		return;
+	if(!HasThemeOverride(n, appearance_mode))
+		EmitThemeStyle(out, var, n, appearance_mode);
+	EmitDesignerMinSize(out, registry, var, n);
+	if(spec && spec->codegen.route == DesignerCodeGenRoute::OrdinaryHook) {
+		if(spec->codegen.emit_setup)
+			spec->codegen.emit_setup(ctx, n);
+		else
+			ReportCodeGenContractError(out, n, "missing ordinary setup hook");
+		String tooltip = CodeGenNodeProperty(n, "tooltip", String());
+		if(!tooltip.IsEmpty())
+			out << "\t\t" << var << ".Tip(" << CppString(AsString(tooltip)) << ");\n";
+		return;
+	}
+	if(spec && spec->codegen.route == DesignerCodeGenRoute::LayoutCentral) {
+		if(!EmitCentralLayoutSetup(ctx, n)) {
+			ReportCodeGenContractError(out, n, "unhandled layout-central node");
+			return;
+		}
+	}
+	else if(spec && spec->codegen.route == DesignerCodeGenRoute::StructuralCentral) {
+		if(!EmitCentralStructuralSetup(ctx, n)) {
+			ReportCodeGenContractError(out, n, "unhandled structural-central node");
+			return;
+		}
+	}
+	else if((spec && spec->codegen.route == DesignerCodeGenRoute::NoRuntimeOutput) ||
+	        (spec && spec->codegen.route == DesignerCodeGenRoute::Headless)) {
+		return;
+	}
+	else {
+		ReportCodeGenContractError(out, n, "missing route handling");
+		return;
 	}
 	String tooltip = CodeGenNodeProperty(n, "tooltip", String());
 	if(!tooltip.IsEmpty() && n.type_id != "Spacer")

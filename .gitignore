@@ -9,6 +9,8 @@ run_uidoc_regression.cmd
 /examples/OLD
 /out
 /Utilities/DesignerRunTests
+!/Utilities/DesignerRunTests/
+!/Utilities/DesignerRunTests/**
 /Utilities/UiGeneratedCodeSmoke
 /examples/UiChoiceRunTests
 *CHECKLIST*
