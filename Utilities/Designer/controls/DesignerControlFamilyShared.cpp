@@ -149,6 +149,38 @@ DesignerType MakePageContainerType(const String& id, const String& name, Size si
 	t.default_child_slots = DesignerDefaultChildSlotSet::PageContainerThreePages;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::PageContainerPage;
 	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	t.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		if(n.type_id != "UiTab")
+			return;
+		String visual = AsString(ctx.Property(n, "visual", "Underline"));
+		String& out = ctx.Out();
+		String var = ctx.Var(n);
+		out << "\t\t" << var << ".SetVisual(" << (visual == "Segmented" ? "UITAB_SEGMENTED" : visual == "Rail" ? "UITAB_RAIL" : visual == "Document" ? "UITAB_DOCUMENT" : visual == "Underline" ? "UITAB_UNDERLINE" : "UITAB_CLASSIC") << ")"
+		    << ".SetPlacement(" << ctx.AlignSideExpr(ctx.Property(n, "placement", "Top"), "Top") << ")"
+		    << ".SetExpandTabs(" << ((bool)ctx.Property(n, "expand_tabs", false) ? "true" : "false") << ")"
+		    << ".EnableCloseButtons(" << ((bool)ctx.Property(n, "close_buttons", false) ? "true" : "false") << ")"
+		    << ".EnableDragHandles(" << ((bool)ctx.Property(n, "drag_handles", false) ? "true" : "false") << ");\n";
+		String font_family = AsString(ctx.Property(n, "tab_font", "Sans"));
+		int font_size = max(7, (int)ctx.Property(n, "tab_font_size", 11));
+		String font_expr = font_family == "Mono" ? Format("MonospaceZ(%d)", font_size)
+		                   : font_family == "Serif" ? Format("SerifZ(%d)", font_size)
+		                   : (font_family == "Segoe UI" || font_family == "Arial" || font_family == "Verdana" ||
+		                      font_family == "Tahoma" || font_family == "Consolas")
+		                         ? Format("Font().FaceName(%s).Height(%d)", ctx.CppString(font_family), font_size)
+		                         : Format("SansSerifZ(%d)", font_size);
+		out << "\t\t" << var << ".SetTabFont(" << font_expr
+		    << ").SetTabIconSize(DPI(" << (int)ctx.Property(n, "tab_icon_size", 16) << "))"
+		    << ".SetTabIconSide(" << ctx.AlignSideExpr(ctx.Property(n, "tab_icon_side", "Left"), "Left") << ");\n";
+		out << "\t\t" << var << ".SetContentGap(DPI(" << max(0, (int)ctx.Property(n, "content_gap", 6)) << "))"
+		    << ".SetAffordanceGap(DPI(" << max(0, (int)ctx.Property(n, "affordance_gap", 4)) << "));\n";
+	};
+	t.codegen.emit_child = EmitDesignerLayoutChild;
+	t.codegen.emit_post_build = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		if(n.type_id == "UiTab")
+			ctx.Out() << "\t\t" << ctx.Var(n) << ".SetActiveTab(" << (int)ctx.Property(n, "active", 0) << ");\n";
+		else if(n.type_id == "UiStack")
+			ctx.Out() << "\t\t" << ctx.Var(n) << ".SetActivePage(" << (int)ctx.Property(n, "active", 0) << ");\n";
+	};
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
@@ -174,6 +206,20 @@ DesignerType MakePanelControlType(const String& id, const String& name, Size siz
 	t.capabilities.is_container = true;
 	t.capabilities.can_have_children = true;
 	t.capabilities.supports_children = true;
+	t.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		String& out = ctx.Out();
+		if(n.type_id == "UiPanel")
+			out << "\t\t" << ctx.Var(n) << ".SetSizeMin(DPI(" << (int)ctx.Property(n, "min_width", 0)
+			    << "), DPI(" << (int)ctx.Property(n, "min_height", 0) << "));\n";
+		else if(n.type_id == "UiScrollPanel") {
+			String mode = AsString(ctx.Property(n, "scroll_mode", "Auto"));
+			String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
+			              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
+			              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
+			out << "\t\t" << ctx.Var(n) << ".SetScrollMode(" << expr << ");\n";
+		}
+	};
+	t.codegen.emit_child = EmitDesignerLayoutChild;
 	t.init_defaults = [=](DesignerNode& n) {
 		n.properties.Set("text", name);
 		n.properties.Set("h_sizing", "Expand");
@@ -203,6 +249,27 @@ DesignerType MakeGroupPanelType()
 	t.capabilities.supports_children = true;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::GroupPanelContent;
 	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	t.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		String& out = ctx.Out();
+		String var = ctx.Var(n);
+		String header_mode = AsString(ctx.Property(n, "header_mode", "Inside"));
+		String header_expr = header_mode == "Outside" ? "UiGroupPanel::Outside" :
+		                     header_mode == "Center" ? "UiGroupPanel::Center" : "UiGroupPanel::Inside";
+		out << "\t\t" << var << ".SetTitle(" << ctx.CppString(ctx.Property(n, "text", n.name)) << ")"
+		    << ".SetSubTitle(" << ctx.CppString(ctx.Property(n, "subtitle", "")) << ")"
+		    << ".SetSideTitle(" << ctx.CppString(ctx.Property(n, "side_title", "")) << ")"
+		    << ".SetHeaderMode(" << header_expr << ")"
+		    << ".SetHeaderPlacement(" << ctx.AlignSideExpr(ctx.Property(n, "placement", "Top"), "Top") << ")"
+		    << ".SetLine(" << ((bool)ctx.Property(n, "line", false) ? "true" : "false") << ")"
+		    << ".SetHeaderBand(" << ((bool)ctx.Property(n, "header_band", false) ? "true" : "false") << ")"
+		    << ".SetLineThickness(DPI(" << (int)ctx.Property(n, "line_thickness", 1) << "))"
+		    << ".SetInset(Rect(DPI(" << (int)ctx.Property(n, "inset", 8) << "), DPI(" << (int)ctx.Property(n, "inset", 8) << "), DPI(" << (int)ctx.Property(n, "inset", 8) << "), DPI(" << (int)ctx.Property(n, "inset", 8) << ")))"
+		    << ".SetHeaderInset(Rect(DPI(" << (int)ctx.Property(n, "header_inset", 6) << "), DPI(" << (int)ctx.Property(n, "header_inset", 6) << "), DPI(" << (int)ctx.Property(n, "header_inset", 6) << "), DPI(" << (int)ctx.Property(n, "header_inset", 6) << ")))";
+		String icon = ctx.IconExpr(ctx.Property(n, "icon", "None"));
+		if(!icon.IsEmpty())
+			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI(" << (int)ctx.Property(n, "icon_size", 16) << "));\n";
+	};
+	t.codegen.emit_child = EmitDesignerLayoutChild;
 	SetDesignerAdapterFactory<DesignerGroupPanelAdapter>(t);
 	SetDesignerThemeSchema(t,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
@@ -256,6 +323,18 @@ DesignerType MakeAccordionType()
 	t.default_child_slots = DesignerDefaultChildSlotSet::AccordionThreeSections;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::AccordionSection;
 	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	t.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetSingleOpen(" << ((bool)ctx.Property(n, "single_open", false) ? "true" : "false")
+		          << ").SetEnforceOne(" << ((bool)ctx.Property(n, "enforce_one", false) ? "true" : "false")
+		          << ").ShowChevron(" << ((bool)ctx.Property(n, "show_chevron", true) ? "true" : "false")
+		          << ").SetChevronSide(" << ctx.AlignSideExpr(ctx.Property(n, "chevron_side", "Right"), "Right") << ")"
+		          << ".SetAnimation(" << ((bool)ctx.Property(n, "animation", true) ? "true" : "false") << ", "
+		          << (int)ctx.Property(n, "open_ms", 120) << ", "
+		          << (int)ctx.Property(n, "close_ms", 0) << ")"
+		          << ".ShowDragHandle(" << ((bool)ctx.Property(n, "show_drag_handle", false) ? "true" : "false")
+		          << ").EnableDragReorder(" << ((bool)ctx.Property(n, "drag_reorder", false) ? "true" : "false") << ");\n";
+	};
+	t.codegen.emit_child = EmitDesignerLayoutChild;
 	SetDesignerAdapterFactory<DesignerAccordionAdapter>(t);
 	SetDesignerThemeSchema(t,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",

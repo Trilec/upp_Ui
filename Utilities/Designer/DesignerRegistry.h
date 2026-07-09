@@ -116,6 +116,7 @@ struct DesignerCodeGenHooks : Moveable<DesignerCodeGenHooks> {
 	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_setup;
 	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_layout;
 	Function<void(DesignerCodeGenContext&, const DesignerNode& node)> emit_post_build;
+	Function<void(DesignerCodeGenContext&, const DesignerNode& parent, const DesignerNode& child, int child_index)> emit_child;
 };
 
 struct DesignerThemeSchema : DeepCopyOption<DesignerThemeSchema> {

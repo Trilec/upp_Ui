@@ -5,6 +5,17 @@
 
 namespace Upp {
 
+inline Value DesignerNodeProperty(const DesignerNode& n, const String& key, const Value& def)
+{
+	int q = n.properties.Find(key);
+	return q >= 0 ? n.properties.GetValue(q) : def;
+}
+
+inline bool DesignerNodeHasProperty(const DesignerNode& n, const String& key)
+{
+	return n.properties.Find(key) >= 0;
+}
+
 Color DesignerLayoutFace();
 Color DesignerLayoutFrame();
 Color DesignerDebugRed();
@@ -12,6 +23,7 @@ Color DesignerPanelFace();
 Color DesignerPanelFrame();
 Color DesignerControlFace();
 Color DesignerControlFrame();
+void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& parent, const DesignerNode& child, int child_index);
 
 template <class T>
 inline Ctrl* MakeDesignerAdapterCtrl(DesignerAdapter **adapter)

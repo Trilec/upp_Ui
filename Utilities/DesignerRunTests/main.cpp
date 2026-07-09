@@ -124,10 +124,10 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	         "field align helper is removed from central codegen");
 	t.Expect(!SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle))"),
 	         "generic fallback panel style is removed from central codegen");
-	t.Expect(SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "static bool EmitCentralLayoutSetup("),
-	         "layout-central helper exists");
-	t.Expect(SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "static bool EmitCentralStructuralSetup("),
-	         "structural-central helper exists");
+	t.Expect(!SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "static bool EmitCentralLayoutSetup("),
+	         "layout-central helper is removed from central codegen");
+	t.Expect(!SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "static bool EmitCentralStructuralSetup("),
+	         "structural-central helper is removed from central codegen");
 	t.Expect(SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "static void ReportCodeGenContractError("),
 	         "codegen contract error reporter exists");
 	String emit_setup = SourceRegion("Utilities/Designer/DesignerCodeGen.cpp", "static void EmitSetup", "static void EmitAddChild");
@@ -143,8 +143,20 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	         "central EmitSetup no longer contains ordinary-control branches");
 	t.Expect(emit_setup.Find("SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle))") < 0,
 	         "central EmitSetup no longer has a generic panel fallback");
-	t.Expect(emit_setup.Find("EmitCentralLayoutSetup(") >= 0 && emit_setup.Find("EmitCentralStructuralSetup(") >= 0,
-	         "central EmitSetup calls the explicit route helpers");
+	t.Expect(emit_setup.Find("EmitCentralLayoutSetup(") < 0 && emit_setup.Find("EmitCentralStructuralSetup(") < 0,
+	         "central EmitSetup no longer calls removed route helpers");
+	String emit_add_child = SourceRegion("Utilities/Designer/DesignerCodeGen.cpp", "static void EmitAddChild", "static void EmitAdds");
+	t.Expect(!emit_add_child.IsEmpty(), "EmitAddChild source region is found");
+	t.Expect(emit_add_child.Find("UiPanel") < 0 && emit_add_child.Find("UiScrollPanel") < 0 &&
+	         emit_add_child.Find("UiGroupPanel") < 0 && emit_add_child.Find("UiTab") < 0 &&
+	         emit_add_child.Find("UiStack") < 0 && emit_add_child.Find("UiAccordion") < 0 &&
+	         emit_add_child.Find("UiSplitter") < 0 && emit_add_child.Find("UiQuadSplitter") < 0 &&
+	         emit_add_child.Find("BoxLayout") < 0 && emit_add_child.Find("GridLayout") < 0,
+	         "central EmitAddChild now delegates structural routing to parent hooks");
+	String emit_post = SourceRegion("Utilities/Designer/DesignerCodeGen.cpp", "static void EmitPostAddSetup", "static void EmitAppearanceApply");
+	t.Expect(!emit_post.IsEmpty(), "EmitPostAddSetup source region is found");
+	t.Expect(emit_post.Find("UiTab") < 0 && emit_post.Find("UiStack") < 0,
+	         "central EmitPostAddSetup no longer switches on page containers");
 	t.Expect(!SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "crumb_a") &&
 	         !SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "crumb_b") &&
 	         !SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "crumb_c"),
@@ -187,6 +199,7 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	t.Expect(route_structural > 0, "structural routes are registered");
 	t.Expect(route_headless > 0, "headless routes are registered");
 	t.Expect(route_no_output > 0, "no-runtime-output routes are registered");
+	t.Expect(specs.GetCount() == 38, "registry still exposes the expected 38 control specs");
 }
 
 static const DesignerNode* FindNodeByName(const DesignerModel& model, const String& name)
@@ -2775,11 +2788,19 @@ static void TestGeneratedCodeText(TestCtx& t)
 	t.Expect(code.Find("UiTree") >= 0 && code.Find(".ShowConnectorLines(") >= 0, "generated code emits tree control");
 	t.Expect(code.Find("UiPanel panelHost") >= 0 && code.Find("panelHost.Add(panelLabel") >= 0, "generated code emits panel container");
 	t.Expect(code.Find("UiScrollPanel") >= 0 && code.Find(".Content().Add(") >= 0, "generated code emits scroll panel content");
+	t.Expect(code.Find("UiGroupPanel") >= 0 && code.Find(".SetContent(") >= 0, "generated code emits group panel content");
+	t.Expect(code.Find("UiAccordion") >= 0 && code.Find(".AddSection(") >= 0, "generated code emits accordion sections");
 	t.Expect(code.Find("UiTheme::ResolveScrollPanel(UiRole::Accent)") >= 0, "generated code emits role-aware scroll panel style");
 	t.Expect(code.Find(".SetTextAlign(") >= 0, "generated code emits title card vertical text alignment");
 	t.Expect(code.Find(".card_line_side = UiAlign::LEFT") >= 0, "generated code emits title card card line side");
 	t.Expect(code.Find("UiSplitter") >= 0 && code.Find(".SetSplitPercent(") >= 0, "generated code emits splitter control");
 	t.Expect(code.Find("UiQuadSplitter") >= 0 && code.Find(".SetSplitPercent(") >= 0, "generated code emits quad splitter control");
+	t.Expect(code.Find("UiCompositeColor") >= 0 && code.Find(".SetColorCount(") >= 0 && code.Find(".SetColor(") >= 0,
+	         "generated code emits composite color control");
+	t.Expect(code.Find("UiSlider") >= 0 && code.Find(".SetRange(") >= 0 && code.Find(".SetThumbSize(") >= 0,
+	         "generated code emits slider setup");
+	t.Expect(code.Find("UiSplitButton") >= 0 && code.Find(".SetSplitWidth(") >= 0,
+	         "generated code emits split button split lane setup");
 	t.Expect(code.Find("crumb_a") < 0 && code.Find("crumb_b") < 0 && code.Find("crumb_c") < 0,
 	         "generated code omits legacy breadcrumb aliases");
 	String grid_code = GenerateDesignerCode(m, r, "GeneratedDesignerGridSmoke");

@@ -22,6 +22,7 @@ static DesignerType MakeAccordionSectionSlotType()
 	t.capabilities.supports_appearance_overrides = false;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::SlotPassthrough;
+	t.codegen.emit_child = EmitDesignerLayoutChild;
 	t.default_size = Size(240, 120);
 	t.min_size = Size(40, 30);
 	SetDesignerThemeSchema(t,
@@ -68,6 +69,7 @@ static DesignerType MakePageSlotType()
 	t.capabilities.supports_appearance_overrides = false;
 	t.capabilities.supports_theme_export = false;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::SlotPassthrough;
+	t.codegen.emit_child = EmitDesignerLayoutChild;
 	t.default_size = Size(220, 140);
 	t.min_size = Size(40, 30);
 	SetDesignerThemeSchema(t,
@@ -104,6 +106,12 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	SetDesignerAdapterFactory<DesignerPanelAdapter>(panel);
 	panel.child_emission = DesignerLayoutChildEmissionStrategy::PanelContent;
 	panel.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	panel.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		String& out = ctx.Out();
+		out << "\t\t" << ctx.Var(n) << ".SetSizeMin(DPI(" << (int)ctx.Property(n, "min_width", 0)
+		    << "), DPI(" << (int)ctx.Property(n, "min_height", 0) << "));\n";
+	};
+	panel.codegen.emit_child = EmitDesignerLayoutChild;
 	{
 		auto common_init = panel.init_defaults;
 		panel.init_defaults = [=](DesignerNode& n) {
@@ -130,6 +138,14 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	SetDesignerAdapterFactory<DesignerScrollPanelAdapter>(scroll);
 	scroll.child_emission = DesignerLayoutChildEmissionStrategy::ScrollContent;
 	scroll.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	scroll.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		String mode = AsString(ctx.Property(n, "scroll_mode", "Auto"));
+		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
+		              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
+		              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
+		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetScrollMode(" << expr << ");\n";
+	};
+	scroll.codegen.emit_child = EmitDesignerLayoutChild;
 	{
 		auto common_init = scroll.init_defaults;
 		scroll.init_defaults = [=](DesignerNode& n) {
@@ -151,6 +167,10 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	tab.icon = ICON_DESIGN_TAB_48();
 	SetDesignerAdapterFactory<DesignerTabAdapter>(tab);
 	tab.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	tab.codegen.emit_post_build = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetActiveTab(" << (int)ctx.Property(n, "active", 0) << ");\n";
+	};
+	tab.codegen.emit_child = EmitDesignerLayoutChild;
 	SetDesignerThemeSchema(tab,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",
@@ -184,6 +204,10 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 	stack.icon = ICON_DESIGN_STACK_48();
 	SetDesignerAdapterFactory<DesignerStackAdapter>(stack);
 	stack.codegen.route = DesignerCodeGenRoute::StructuralCentral;
+	stack.codegen.emit_post_build = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
+		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetActivePage(" << (int)ctx.Property(n, "active", 0) << ");\n";
+	};
+	stack.codegen.emit_child = EmitDesignerLayoutChild;
 	SetDesignerThemeSchema(stack,
 		{"theme_override", "face_enabled", "face", "face_mode", "face_quad",
 		 "frame_enabled", "frame", "frame_style", "frame_width", "radius",

@@ -36,6 +36,7 @@ static String IconExpr(const String& icon);
 static String AlignHExpr(const String& align, const String& def);
 static String AlignVExpr(const String& align, const String& def);
 static String AlignSideExpr(const String& side, const String& def);
+static void ReportCodeGenContractError(String& out, const DesignerNode& n, const String& reason);
 
 String DesignerCodeGenContext::Var(const DesignerNode& node) const
 {
@@ -939,78 +940,17 @@ static void EmitDeclaration(DesignerCodeGenContext& ctx, const DesignerRegistry&
 	}
 	String& out = ctx.Out();
 	String var = VarName(names, n.id);
-	if(n.type_id == "BoxLayout")
-		out << "\tUiBoxLayout " << var << ";\n";
-	else if(n.type_id == "GridLayout")
-		out << "\tUiGridLayout " << var << ";\n";
-	else if(n.type_id == "UiSplitter")
-		out << "\tUiSplitter " << var << ";\n";
-	else if(n.type_id == "UiQuadSplitter")
-		out << "\tUiQuadSplitter " << var << ";\n";
-	else if(n.type_id == "UiLabel")
-		out << "\tUiLabel " << var << ";\n";
-	else if(n.type_id == "UiTitleCard")
-		out << "\tUiTitleCard " << var << ";\n";
-	else if(n.type_id == "UiGroupPanel")
-		out << "\tUiGroupPanel " << var << ";\n";
-	else if(n.type_id == "UiButton")
-		out << "\tUiButton " << var << ";\n";
-	else if(n.type_id == "UiSplitButton")
-		out << "\tUiSplitButton " << var << ";\n";
-	else if(n.type_id == "UiToolButton")
-		out << "\tUiToolButton " << var << ";\n";
-	else if(n.type_id == "UiAccordion")
-		out << "\tUiAccordion " << var << ";\n";
-	else if(n.type_id == "UiLineEdit")
-		out << "\tUiLineEdit " << var << ";\n";
-	else if(n.type_id == "UiIntEdit")
-		out << "\tUiIntEdit " << var << ";\n";
-	else if(n.type_id == "UiFloatEdit")
-		out << "\tUiFloatEdit " << var << ";\n";
-	else if(n.type_id == "UiSlider")
-		out << "\tUiSlider " << var << ";\n";
-	else if(n.type_id == "UiCompositeLabel")
-		out << "\tUiCompositeLabel " << var << ";\n";
-	else if(n.type_id == "UiCompositeEdit")
-		out << "\tUiCompositeEdit " << var << ";\n";
-	else if(n.type_id == "UiCompositeDropdown")
-		out << "\tUiCompositeDropdown " << var << ";\n";
-	else if(n.type_id == "UiCompositeToggle")
-		out << "\tUiCompositeToggle " << var << ";\n";
-	else if(n.type_id == "UiCompositeColor")
-		out << "\tUiCompositeColor " << var << ";\n";
-	else if(n.type_id == "UiCompositeSlider")
-		out << "\tUiCompositeSlider " << var << ";\n";
-	else if(n.type_id == "UiSliderEdit")
-		out << "\tUiSliderEdit " << var << ";\n";
-	else if(n.type_id == "UiToggle")
-		out << "\tUiToggle " << var << ";\n";
-	else if(n.type_id == "UiDropdown")
-		out << "\tUiDropdown " << var << ";\n";
-	else if(n.type_id == "UiCheckBox")
-		out << "\tUiCheckBox " << var << ";\n";
-	else if(n.type_id == "UiBreadcrumbs")
-		out << "\tUiBreadcrumbs " << var << ";\n";
-	else if(n.type_id == "UiTab")
-		out << "\tUiTab " << var << ";\n";
-	else if(n.type_id == "UiStack")
-		out << "\tUiStack " << var << ";\n";
-	else if(n.type_id == "UiTable")
-		out << "\tUiTable " << var << ";\n";
-	else if(n.type_id == "UiTree")
-		out << "\tUiTree " << var << ";\n";
-	else if(n.type_id == "UiScrollPanel")
-		out << "\tUiScrollPanel " << var << ";\n";
-	else if(CodeGenIsHeadlessNode(registry, n))
-		out << "\tParentCtrl " << var << ";\n";
-	else if(n.type_id == "Spacer") {
-		if((bool)CodeGenNodeProperty(n, "line_enabled", false))
-			out << "\tUiPanel " << var << ";\n";
-		else
-			return;
+	if(!spec) {
+		ReportCodeGenContractError(out, n, "missing control spec");
+		return;
 	}
-	else
-		out << "\tUiPanel " << var << ";\n";
+	if(spec->codegen.route == DesignerCodeGenRoute::NoRuntimeOutput)
+		return;
+	if(spec->runtime_cpp_type.IsEmpty()) {
+		ReportCodeGenContractError(out, n, "missing runtime type for declaration");
+		return;
+	}
+	out << "\t" << spec->runtime_cpp_type << " " << var << ";\n";
 }
 
 static String AxisSizing(const DesignerNode& n, const String& axis_key)
@@ -1185,497 +1125,62 @@ static void ReportCodeGenContractError(String& out, const DesignerNode& n, const
 	out << "\t\t// " << message << "\n";
 }
 
-static bool EmitCentralLayoutSetup(DesignerCodeGenContext& ctx, const DesignerNode& n)
-{
-	String& out = ctx.Out();
-	String var = ctx.Var(n);
-	if(n.type_id == "BoxLayout") {
-		String wrap = CodeGenNodeProperty(n, "wrap", "None");
-		out << "\t\t" << var << ".SetDirection(" << DirectionExpr(n, "V") << ")"
-		    << ".SetGap(DPI(" << (int)CodeGenNodeProperty(n, "gap_x", (int)CodeGenNodeProperty(n, "gap", 8)) << "), "
-		    << "DPI(" << (int)CodeGenNodeProperty(n, "gap_y", (int)CodeGenNodeProperty(n, "gap", 8)) << "))"
-		    << ".SetInset(DPI(" << (int)CodeGenNodeProperty(n, "inset", 8) << "))"
-		    << ".SetWrap(" << (wrap == "Snap" ? "UiBoxWrap::Snap" : wrap == "Flow" ? "UiBoxWrap::Flow" : "UiBoxWrap::None") << ")";
-		if(wrap == "Snap") {
-			out << ".SetWrapSnapCount(" << max(0, (int)CodeGenNodeProperty(n, "snap_count", 0)) << ")";
-			int a = max(0, (int)CodeGenNodeProperty(n, "snap_size_a", 80));
-			int b = max(0, (int)CodeGenNodeProperty(n, "snap_size_b", 0));
-			if(a > 0 || b > 0) {
-				out << ".SetWrapSnapSizes(Vector<int>()";
-				if(a > 0)
-					out << " << DPI(" << a << ")";
-				if(b > 0)
-					out << " << DPI(" << b << ")";
-				out << ")";
-			}
-		}
-		if((bool)CodeGenNodeProperty(n, "debug", false))
-			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
-		if(wrap != "None")
-			out << ".SetWrapAutoResize(true)";
-		out << ";\n";
-		return true;
-	}
-	if(n.type_id == "GridLayout") {
-		out << "\t\t" << var << ".SetGridSize("
-		    << max(1, (int)CodeGenNodeProperty(n, "columns", 2)) << ", "
-		    << max(1, (int)CodeGenNodeProperty(n, "rows", 2)) << ")"
-		    << ".SetMinCellSize(Size(DPI(" << DesignerClampMin((int)CodeGenNodeProperty(n, "cell_width", DESIGNER_GRID_CELL_WIDTH))
-		    << "), DPI(" << DesignerClampMin((int)CodeGenNodeProperty(n, "cell_height", DESIGNER_GRID_CELL_HEIGHT)) << ")))"
-		    << ".SetGap(DPI(" << (int)CodeGenNodeProperty(n, "gap", 8) << "))"
-		    << ".SetInset(DPI(" << (int)CodeGenNodeProperty(n, "inset", 8) << "))";
-		if((bool)CodeGenNodeProperty(n, "debug", false))
-			out << ".SetDebugColor(" << ColorExpr(CodeGenDebugColor(n)) << ").SetDebug(true)";
-		out << ";\n";
-		return true;
-	}
-	if(n.type_id == "UiSplitter") {
-		String dir = CodeGenNodeProperty(n, "direction", "H");
-		String role_expr = RoleExpr(AsString(CodeGenNodeProperty(n, "role", "Standard")));
-		out << "\t\t" << var << "." << (dir == "V" ? "Vert" : "Horz") << "();\n";
-		out << "\t\t" << var << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(n, "min_a", 80) << "))"
-		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 80) << "))"
-		    << ".SetSplitPercent(" << (int)CodeGenNodeProperty(n, "split_percent", 50) << ");\n";
-		out << "\t\t{\n"
-		    << "\t\t\tUiSplitter::Style s = UiTheme::ResolveSplitter(" << role_expr << ");\n"
-		    << "\t\t\ts.hit_width = DPI(" << (int)CodeGenNodeProperty(n, "hit_width", 14) << ");\n"
-		    << "\t\t\ts.track_thickness = DPI(" << (int)CodeGenNodeProperty(n, "track_thickness", 2) << ");\n"
-		    << "\t\t\tint track_inset = DPI(" << (int)CodeGenNodeProperty(n, "track_inset", 0) << ");\n"
-		    << "\t\t\ts.track_inset = Rect(track_inset, track_inset, track_inset, track_inset);\n";
-		int thumb_w = (int)CodeGenNodeProperty(n, "thumb_width", 14);
-		int thumb_h = (int)CodeGenNodeProperty(n, "thumb_height", 64);
-		if(dir == "V") {
-			out << "\t\t\ts.thumb_main = DPI(" << thumb_w << ");\n"
-			    << "\t\t\ts.thumb_cross = DPI(" << thumb_h << ");\n";
-		}
-		else {
-			out << "\t\t\ts.thumb_main = DPI(" << thumb_h << ");\n"
-			    << "\t\t\ts.thumb_cross = DPI(" << thumb_w << ");\n";
-		}
-		String grip_visual = CodeGenNodeProperty(n, "grip_visual", "");
-		if(grip_visual.IsEmpty()) {
-			if(CodeGenHasProperty(n, "show_grip") && !(bool)CodeGenNodeProperty(n, "show_grip", true))
-				grip_visual = "None";
-			else if(!IconExpr(CodeGenNodeProperty(n, "thumb_icon", "None")).IsEmpty())
-				grip_visual = "Icon";
-			else
-				grip_visual = "Lines";
-		}
-		out << "\t\t\ts.grip_visual = " << (grip_visual == "None" ? "UISPLITTER_GRIP_NONE"
-		                                    : grip_visual == "Dots" ? "UISPLITTER_GRIP_DOTS"
-		                                    : grip_visual == "Icon" ? "UISPLITTER_GRIP_ICON"
-		                                    : "UISPLITTER_GRIP_LINES") << ";\n"
-		    << "\t\t\ts.grip_count = " << max(1, (int)CodeGenNodeProperty(n, "grip_count", 2)) << ";\n"
-		    << "\t\t\ts.grip_size = DPI(" << max(1, (int)CodeGenNodeProperty(n, "grip_size", 2)) << ");\n"
-		    << "\t\t\ts.grip_gap = DPI(" << max(0, (int)CodeGenNodeProperty(n, "grip_gap", 3)) << ");\n";
-		if(CodeGenHasProperty(n, "grip_color_enabled") && (bool)CodeGenNodeProperty(n, "grip_color_enabled", false))
-			out << "\t\t\ts.grip_color = " << ColorExpr(CodeGenNodeProperty(n, "grip_color", Null)) << ";\n";
-		else
-			out << "\t\t\ts.grip_color = Null;\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "thumb_icon", "None"));
-		if(!icon.IsEmpty()) {
-			out << "\t\t\ts.thumb_icon = " << icon << ";\n"
-			    << "\t\t\ts.grip_visual = UISPLITTER_GRIP_ICON;\n";
-		}
-		out << "\t\t\ts.thumb_icon_size = DPI(" << max(1, (int)CodeGenNodeProperty(n, "thumb_icon_size", 14)) << ");\n";
-		out << "\t\t\ts.thumb_metrics.radius = DPI(" << (int)CodeGenNodeProperty(n, "thumb_radius", 8) << ");\n"
-		    << "\t\t\t" << var << ".SetCustomStyle(s);\n"
-		    << "\t\t}\n";
-		return true;
-	}
-	if(n.type_id == "UiQuadSplitter") {
-		out << "\t\t" << var << ".SetSplitPercent("
-		    << (int)CodeGenNodeProperty(n, "column_percent", 50) << ", "
-		    << (int)CodeGenNodeProperty(n, "row_percent", 50) << ")"
-		    << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(n, "min_a", 60) << "))"
-		    << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(n, "min_b", 60) << "))"
-		    << ".SetMinPixels(2, DPI(" << (int)CodeGenNodeProperty(n, "min_c", 60) << "))"
-		    << ".SetMinPixels(3, DPI(" << (int)CodeGenNodeProperty(n, "min_d", 60) << "));\n";
-		return true;
-	}
-	return false;
-}
-
-static bool EmitCentralStructuralSetup(DesignerCodeGenContext& ctx, const DesignerNode& n)
-{
-	String& out = ctx.Out();
-	String var = ctx.Var(n);
-	if(n.type_id == "UiGroupPanel") {
-		out << "\t\t" << var << ".SetTitle(" << CppString(CodeGenNodeProperty(n, "text", n.name)) << ")"
-		    << ".SetSubTitle(" << CppString(CodeGenNodeProperty(n, "subtitle", "")) << ")"
-		    << ".SetSideTitle(" << CppString(CodeGenNodeProperty(n, "side_title", "")) << ")"
-		    << ".SetHeaderMode(" << GroupHeaderModeExpr(CodeGenNodeProperty(n, "header_mode", "Inside")) << ")"
-		    << ".SetHeaderPlacement(" << AlignSideExpr(CodeGenNodeProperty(n, "placement", "Top"), "Top") << ")"
-		    << ".SetLine(" << ((bool)CodeGenNodeProperty(n, "line", false) ? "true" : "false") << ")"
-		    << ".SetHeaderBand(" << ((bool)CodeGenNodeProperty(n, "header_band", false) ? "true" : "false") << ")"
-		    << ".SetLineThickness(DPI(" << (int)CodeGenNodeProperty(n, "line_thickness", 1) << "))"
-		    << ".SetInset(Rect(DPI(" << (int)CodeGenNodeProperty(n, "inset", 8) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "inset", 8) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "inset", 8) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "inset", 8) << ")))"
-		    << ".SetHeaderInset(Rect(DPI(" << (int)CodeGenNodeProperty(n, "header_inset", 6) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "header_inset", 6) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "header_inset", 6) << "), DPI("
-		    << (int)CodeGenNodeProperty(n, "header_inset", 6) << ")));\n";
-		String icon = IconExpr(CodeGenNodeProperty(n, "icon", "None"));
-		if(!icon.IsEmpty())
-			out << "\t\t" << var << ".SetIcon(" << icon << ").SetIconSize(DPI("
-			    << (int)CodeGenNodeProperty(n, "icon_size", 16) << "));\n";
-		return true;
-	}
-	if(n.type_id == "UiAccordion") {
-		out << "\t\t" << var << ".SetSingleOpen(" << ((bool)CodeGenNodeProperty(n, "single_open", false) ? "true" : "false") << ")"
-		    << ".SetEnforceOne(" << ((bool)CodeGenNodeProperty(n, "enforce_one", false) ? "true" : "false") << ")"
-		    << ".ShowChevron(" << ((bool)CodeGenNodeProperty(n, "show_chevron", true) ? "true" : "false") << ")"
-		    << ".SetChevronSide(" << AlignSideExpr(CodeGenNodeProperty(n, "chevron_side", "Right"), "Right") << ")"
-		    << ".SetAnimation(" << ((bool)CodeGenNodeProperty(n, "animation", true) ? "true" : "false") << ", "
-		    << (int)CodeGenNodeProperty(n, "open_ms", 120) << ", "
-		    << (int)CodeGenNodeProperty(n, "close_ms", 0) << ")"
-		    << ".ShowDragHandle(" << ((bool)CodeGenNodeProperty(n, "show_drag_handle", false) ? "true" : "false") << ")"
-		    << ".EnableDragReorder(" << ((bool)CodeGenNodeProperty(n, "drag_reorder", false) ? "true" : "false") << ");\n";
-		return true;
-	}
-	if(n.type_id == "UiTab") {
-		String visual = CodeGenNodeProperty(n, "visual", "Underline");
-		out << "\t\t" << var << ".SetVisual(" << TabVisualExpr(visual) << ")"
-		    << ".SetPlacement(" << AlignSideExpr(CodeGenNodeProperty(n, "placement", "Top"), "Top") << ")"
-		    << ".SetExpandTabs(" << ((bool)CodeGenNodeProperty(n, "expand_tabs", false) ? "true" : "false") << ")"
-		    << ".EnableCloseButtons(" << ((bool)CodeGenNodeProperty(n, "close_buttons", false) ? "true" : "false") << ")"
-		    << ".EnableDragHandles(" << ((bool)CodeGenNodeProperty(n, "drag_handles", false) ? "true" : "false") << ");\n";
-		out << "\t\t" << var << ".SetTabFont("
-		    << FontExpr(CodeGenNodeProperty(n, "tab_font", "Sans"), (int)CodeGenNodeProperty(n, "tab_font_size", 11))
-		    << ").SetTabIconSize(DPI(" << (int)CodeGenNodeProperty(n, "tab_icon_size", 16) << "))"
-		    << ".SetTabIconSide(" << AlignSideExpr(CodeGenNodeProperty(n, "tab_icon_side", "Left")) << ");\n";
-		return true;
-	}
-	if(n.type_id == "UiStack") {
-		// Headless page container: pages and active index are emitted after children.
-		return true;
-	}
-	if(n.type_id == "UiScrollPanel") {
-		String mode = CodeGenNodeProperty(n, "scroll_mode", "Auto");
-		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
-		              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
-		              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
-		out << "\t\t" << var << ".SetScrollMode(" << expr << ");\n";
-		return true;
-	}
-	if(n.type_id == "UiPanel") {
-		out << "\t\t" << var << ".SetSizeMin(DPI("
-		    << CodeGenMinMetric(n, "min_width")
-		    << "), DPI("
-		    << CodeGenMinMetric(n, "min_height")
-		    << "));\n";
-		return true;
-	}
-	return false;
-}
-
 static void EmitSetup(DesignerCodeGenContext& ctx, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
                       const DesignerNode& n, DesignerAppearanceMode appearance_mode)
 {
 	const DesignerControlSpec* spec = CodeGenSpec(registry, n);
 	String& out = ctx.Out();
 	String var = VarName(names, n.id);
-	if(CodeGenIsHeadlessNode(registry, n) || n.type_id == "Spacer")
+	if(!spec) {
+		ReportCodeGenContractError(out, n, "missing control spec");
+		return;
+	}
+	if(spec->codegen.route == DesignerCodeGenRoute::NoRuntimeOutput || spec->codegen.route == DesignerCodeGenRoute::Headless)
 		return;
 	if(!HasThemeOverride(n, appearance_mode))
 		EmitThemeStyle(out, var, n, appearance_mode);
 	EmitDesignerMinSize(out, registry, var, n);
-	if(spec && spec->codegen.route == DesignerCodeGenRoute::OrdinaryHook) {
-		if(spec->codegen.emit_setup)
-			spec->codegen.emit_setup(ctx, n);
-		else
-			ReportCodeGenContractError(out, n, "missing ordinary setup hook");
-		String tooltip = CodeGenNodeProperty(n, "tooltip", String());
-		if(!tooltip.IsEmpty())
-			out << "\t\t" << var << ".Tip(" << CppString(AsString(tooltip)) << ");\n";
-		return;
+	if(spec->codegen.emit_setup) {
+		spec->codegen.emit_setup(ctx, n);
 	}
-	if(spec && spec->codegen.route == DesignerCodeGenRoute::LayoutCentral) {
-		if(!EmitCentralLayoutSetup(ctx, n)) {
-			ReportCodeGenContractError(out, n, "unhandled layout-central node");
-			return;
-		}
-	}
-	else if(spec && spec->codegen.route == DesignerCodeGenRoute::StructuralCentral) {
-		if(!EmitCentralStructuralSetup(ctx, n)) {
-			ReportCodeGenContractError(out, n, "unhandled structural-central node");
-			return;
-		}
-	}
-	else if((spec && spec->codegen.route == DesignerCodeGenRoute::NoRuntimeOutput) ||
-	        (spec && spec->codegen.route == DesignerCodeGenRoute::Headless)) {
-		return;
-	}
-	else {
-		ReportCodeGenContractError(out, n, "missing route handling");
-		return;
-	}
+	else if(spec->codegen.route != DesignerCodeGenRoute::NoRuntimeOutput &&
+	        spec->codegen.route != DesignerCodeGenRoute::Headless)
+		ReportCodeGenContractError(out, n, "missing setup hook");
 	String tooltip = CodeGenNodeProperty(n, "tooltip", String());
 	if(!tooltip.IsEmpty() && n.type_id != "Spacer")
 		out << "\t\t" << var << ".Tip(" << CppString(tooltip) << ");\n";
 }
 
-static void EmitAddChild(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
-                         const DesignerNode& parent, const DesignerNode& child, int index)
+static void EmitAddChild(DesignerCodeGenContext& ctx, const DesignerNode& parent, const DesignerNode& child, int index)
 {
-	String p = VarName(names, parent.id);
-	String c = VarName(names, child.id);
-	const DesignerControlSpec* parent_spec = CodeGenSpec(registry, parent);
-	DesignerLayoutChildEmissionStrategy emission = parent_spec ? parent_spec->child_emission
-	                                                           : DesignerLayoutChildEmissionStrategy::DirectChild;
-	if(child.type_id == "Spacer" && parent.id == Designer_ROOT)
-		return;
-	if(child.type_id == "Spacer") {
-		int weight = max(1, (int)CodeGenNodeProperty(child, "weight", 1));
-		int line_min = (bool)CodeGenNodeProperty(child, "line_enabled", false) ? SpacerLineThickness(child) : 0;
-		bool layout_break = (bool)CodeGenNodeProperty(child, "layout_break", false);
-		if(parent.type_id == "BoxLayout") {
-			if(layout_break)
-				out << "\t\t" << p << ".AddBreak(" << weight << ");\n";
-			else {
-				bool parent_horizontal = CodeGenNodeProperty(parent, "direction", "V") == "H";
-				String main_sizing = parent_horizontal ? AxisSizing(child, "h_sizing") : AxisSizing(child, "v_sizing");
-				String cross_sizing = parent_horizontal ? AxisSizing(child, "v_sizing") : AxisSizing(child, "h_sizing");
-				int min_w = SpacerAxisMin(child, true);
-				int min_h = SpacerAxisMin(child, false);
-				int max_w = SpacerAxisMax(child, true);
-				int max_h = SpacerAxisMax(child, false);
-				int fixed_w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
-				int fixed_h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
-				String orientation = AsString(CodeGenNodeProperty(child, "line_orientation", "Auto"));
-				if(orientation == "Vertical")
-					min_w = max(min_w, line_min);
-				else if(orientation == "Horizontal")
-					min_h = max(min_h, line_min);
-				int min_main = parent_horizontal ? min_w : min_h;
-				int max_main = parent_horizontal ? max_w : max_h;
-				int fixed_main = parent_horizontal ? fixed_w : fixed_h;
-				int min_cross = parent_horizontal ? min_h : min_w;
-				int max_cross = parent_horizontal ? max_h : max_w;
-				int fixed_cross = parent_horizontal ? fixed_h : fixed_w;
-				String cross_align = BoxCrossAlignExpr(child, parent_horizontal);
-				out << "\t\t{\n";
-				out << "\t\t\tauto spacer = " << p << ".AddSpacer(" << weight << ");\n";
-				if(main_sizing == "Fixed")
-					out << "\t\t\tspacer.Fixed(DPI(" << fixed_main << "));\n";
-				else if(main_sizing == "Expand")
-					out << "\t\t\tspacer.Expand(" << weight << ").MinMain(DPI(" << min_main << "));\n";
-				else
-					out << "\t\t\tspacer.Fit().MinMain(DPI(" << min_main << "));\n";
-				if(max_main > 0)
-					out << "\t\t\tspacer.MaxMain(DPI(" << max(max_main, min_main) << "));\n";
-				if(cross_sizing == "Fixed")
-					out << "\t\t\tspacer.MinMaxCross(DPI(" << fixed_cross << "), DPI(" << fixed_cross << ")).AlignSelf(" << cross_align << ");\n";
-				else if(cross_sizing == "Expand") {
-					if(max_cross > 0)
-						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(UiBoxLayout::Align::Stretch);\n";
-					else
-						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(UiBoxLayout::Align::Stretch);\n";
-				}
-				else {
-					if(max_cross > 0)
-						out << "\t\t\tspacer.MinMaxCross(DPI(" << min_cross << "), DPI(" << max(max_cross, min_cross) << ")).AlignSelf(" << cross_align << ");\n";
-					else
-						out << "\t\t\tspacer.MinCross(DPI(" << min_cross << ")).AlignSelf(" << cross_align << ");\n";
-				}
-				if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
-					out << "\t\t\tspacer.LineEnabled(true)"
-					    << ".LineOrientation(" << SpacerLineOrientationExpr(child) << ")"
-					    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
-					    << ".LineThickness(DPI(" << SpacerLineThickness(child) << "))"
-					    << ".LineDash(" << SpacerLineDashExpr(child) << ")"
-					    << ".LineInset(DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << "))";
-					if(CodeGenHasProperty(child, "line_color_enabled") &&
-					   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))
-						out << ".LineColorEnabled(true).LineColor(" << SpacerLineColorExpr(child) << ")";
-					out << ";\n";
-				}
-				out << "\t\t}\n";
-			}
-			return;
-		}
-		if(parent.type_id == "GridLayout") {
-			int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
-			int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
-			int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
-			int col = clamp((int)CodeGenNodeProperty(child, "grid_col", index % columns), 0, columns - 1);
-			int min_w = SpacerAxisMin(child, true);
-			int min_h = SpacerAxisMin(child, false);
-			int max_w = SpacerAxisMax(child, true);
-			int max_h = SpacerAxisMax(child, false);
-			int fixed_w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
-			int fixed_h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
-			String hs = AxisSizing(child, "h_sizing");
-			String vs = AxisSizing(child, "v_sizing");
-			String orientation = AsString(CodeGenNodeProperty(child, "line_orientation", "Auto"));
-			if(orientation == "Vertical")
-				min_w = max(min_w, line_min);
-			else if(orientation == "Horizontal")
-				min_h = max(min_h, line_min);
-			else {
-				min_w = max(min_w, line_min);
-				min_h = max(min_h, line_min);
-			}
-			if(layout_break)
-				return;
-			out << "\t\t{\n";
-			out << "\t\t\tauto blank = " << p << ".AddBlank(" << row << ", " << col << ");\n";
-			if(hs == "Expand")
-				out << "\t\t\tblank.ExpandX(true);\n";
-			if(vs == "Expand")
-				out << "\t\t\tblank.ExpandY(true);\n";
-			if(hs == "Fixed")
-				out << "\t\t\tblank.FixedWidth(DPI(" << fixed_w << "));\n";
-			else {
-				out << "\t\t\tblank.MinWidth(DPI(" << min_w << "));\n";
-				if(max_w > 0)
-					out << "\t\t\tblank.MaxWidth(DPI(" << max(max_w, min_w) << "));\n";
-			}
-			if(vs == "Fixed")
-				out << "\t\t\tblank.FixedHeight(DPI(" << fixed_h << "));\n";
-			else {
-				out << "\t\t\tblank.MinHeight(DPI(" << min_h << "));\n";
-				if(max_h > 0)
-					out << "\t\t\tblank.MaxHeight(DPI(" << max(max_h, min_h) << "));\n";
-			}
-			out << "\t\t\tblank.Align("
-			    << (hs == "Expand" ? "UiGridLayout::Align::Stretch" : "UiGridLayout::Align::Start") << ", "
-			    << (vs == "Expand" ? "UiGridLayout::Align::Stretch" : "UiGridLayout::Align::Start") << ");\n";
-			if((bool)CodeGenNodeProperty(child, "line_enabled", false)) {
-				out << "\t\t\tblank.LineEnabled(true)"
-				    << ".LineAlign(" << SpacerLineAlignExpr(child) << ")"
-				    << ".LineOrientation(" << SpacerLineOrientationExpr(child) << ")"
-				    << ".LineThickness(DPI(" << SpacerLineThickness(child)
-				    << "))"
-				    << ".LineDash(" << SpacerLineDashExpr(child) << ")"
-				    << ".LineInset(DPI(" << max(0, (int)CodeGenNodeProperty(child, "line_inset", 0)) << "))";
-				if(CodeGenHasProperty(child, "line_color_enabled") &&
-				   (bool)CodeGenNodeProperty(child, "line_color_enabled", false))
-					out << ".LineColorEnabled(true).LineColor(" << SpacerLineColorExpr(child) << ")";
-				out << ";\n";
-			}
-			out << "\t\t}\n";
-			return;
-		}
-		return;
-	}
-	if(parent.id == Designer_ROOT) {
-		out << "\t\tAdd(" << c << ");\n";
-		EmitDirectChildLayout(out, c, child);
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::BoxLayoutItem)
-		out << "\t\t" << p << ".Add(" << c << ")" << BoxSizingCall(parent, child) << BoxMinCall(parent, child) << ";\n";
-	else if(emission == DesignerLayoutChildEmissionStrategy::GridItem) {
-		int columns = max(1, (int)CodeGenNodeProperty(parent, "columns", 2));
-		int rows = max(1, (int)CodeGenNodeProperty(parent, "rows", 2));
-		int row = clamp((int)CodeGenNodeProperty(child, "grid_row", index / columns), 0, rows - 1);
-		int col = clamp((int)CodeGenNodeProperty(child, "grid_col", index % columns), 0, columns - 1);
-		String hs = AxisSizing(child, "h_sizing");
-		String vs = AxisSizing(child, "v_sizing");
-		if(hs == "Fixed" || vs == "Fixed") {
-			int w = DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
-			int h = DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
-			out << "\t\t{\n";
-			out << "\t\t\tint item = " << p << ".Add(" << c << ", " << row << ", " << col
-			    << ", " << (hs == "Expand" ? "true" : "false")
-			    << ", " << (vs == "Expand" ? "true" : "false")
-			    << ", Size(DPI(" << w << "), DPI(" << h << ")));\n";
-			out << "\t\t\t" << p << ".SetItemAlign(item, " << GridItemAlignHExpr(child) << ", " << GridItemAlignVExpr(child) << ");\n";
-			out << "\t\t}\n";
-		}
-		else {
-			out << "\t\t{\n";
-			out << "\t\t\tint item = " << p << ".Add(" << c << ", " << row << ", " << col
-			    << ", " << (hs == "Expand" ? "true" : "false")
-			    << ", " << (vs == "Expand" ? "true" : "false") << ");\n";
-			out << "\t\t\t" << p << ".SetItemAlign(item, " << GridItemAlignHExpr(child) << ", " << GridItemAlignVExpr(child) << ");\n";
-			out << "\t\t}\n";
-		}
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::SplitterPane && parent.type_id == "UiSplitter") {
-		out << "\t\t" << p << ".Add(" << c << ");\n";
-		if(index == 0) {
-			out << "\t\t" << p << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(parent, "min_a", 80) << "));\n";
-			out << "\t\t" << p << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(parent, "min_b", 80) << "));\n";
-		}
-		out << "\t\t" << p << ".SetSplitPercent(" << (int)CodeGenNodeProperty(parent, "split_percent", 50) << ");\n";
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::SplitterPane && parent.type_id == "UiQuadSplitter") {
-		out << "\t\t" << p << ".Add(" << c << ");\n";
-		if(index == 0) {
-			out << "\t\t" << p << ".SetMinPixels(0, DPI(" << (int)CodeGenNodeProperty(parent, "min_a", 60) << "));\n";
-			out << "\t\t" << p << ".SetMinPixels(1, DPI(" << (int)CodeGenNodeProperty(parent, "min_b", 60) << "));\n";
-			out << "\t\t" << p << ".SetMinPixels(2, DPI(" << (int)CodeGenNodeProperty(parent, "min_c", 60) << "));\n";
-			out << "\t\t" << p << ".SetMinPixels(3, DPI(" << (int)CodeGenNodeProperty(parent, "min_d", 60) << "));\n";
-		}
-		out << "\t\t" << p << ".SetSplitPercent("
-		    << (int)CodeGenNodeProperty(parent, "column_percent", 50) << ", "
-		    << (int)CodeGenNodeProperty(parent, "row_percent", 50) << ");\n";
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::PageContainerPage && parent.type_id == "UiTab") {
-		String title = (bool)CodeGenNodeProperty(child, "show_title", true)
-		             ? AsString(CodeGenNodeProperty(child, "page_title", child.name))
-		             : String();
-		String icon = IconExpr(CodeGenNodeProperty(child, "icon", "None"));
-		out << "\t\t" << p << ".Add(" << c << ", " << CppString(title);
-		if(!icon.IsEmpty())
-			out << ", " << icon;
-		out << ");\n";
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::PageContainerPage && parent.type_id == "UiStack")
-		out << "\t\t" << p << ".AddPage(" << c << ", " << CppString(CodeGenNodeProperty(child, "page_title", child.name)) << ");\n";
-	else if(emission == DesignerLayoutChildEmissionStrategy::AccordionSection) {
-        String title = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_title", child.name)) : child.name;
-        String subtitle = child.type_id == "AccordionSectionSlot" ? AsString(CodeGenNodeProperty(child, "section_subtitle", "")) : String();
-
-		bool open = child.type_id == "AccordionSectionSlot" ? (bool)CodeGenNodeProperty(child, "open", true) : true;
-		out << "\t\t{\n";
-		out << "\t\t\tint section = " << p << ".AddSection(" << CppString(title) << ", "
-		    << CppString(subtitle) << ", String(), " << (open ? "true" : "false") << ");\n";
-		if(child.type_id == "AccordionSectionSlot") {
-			String lock = CodeGenNodeProperty(child, "lock", "None");
-			if(lock != "None")
-				out << "\t\t\t" << p << ".SetLockMode(section, UiAccordion::Lock::" << lock << ");\n";
-			int body_height = (int)CodeGenNodeProperty(child, "body_height", -1);
-			if(body_height > 0)
-				out << "\t\t\t" << p << ".SetSectionBodyHeight(section, DPI(" << body_height << "));\n";
-		}
-		out << "\t\t\t" << p << ".GetSectionContent(section).Add(" << c << ".SizePos());\n";
-		out << "\t\t}\n";
-	}
-	else if(emission == DesignerLayoutChildEmissionStrategy::ScrollContent)
-		out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
-	else if(emission == DesignerLayoutChildEmissionStrategy::GroupPanelContent)
-		out << "\t\t" << p << ".SetContent(" << c << ");\n";
-	else if(emission == DesignerLayoutChildEmissionStrategy::PanelContent)
-		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
-	else if(emission == DesignerLayoutChildEmissionStrategy::SlotPassthrough)
-		out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
+	String& out = ctx.Out();
+	const DesignerControlSpec* parent_spec = CodeGenSpec(ctx.Registry(), parent);
+	if(parent.id == Designer_ROOT)
+		out << "\t\tAdd(" << ctx.Var(child) << ");\n";
+	else if(parent_spec && parent_spec->codegen.emit_child)
+		parent_spec->codegen.emit_child(ctx, parent, child, index);
+	else
+		ReportCodeGenContractError(out, parent, "missing child emitter");
 }
 
-static void EmitAdds(String& out, const DesignerRegistry& registry, const VectorMap<DesignerNodeId, String>& names,
-                     const DesignerModel& model, const DesignerNode& parent)
+static void EmitAdds(DesignerCodeGenContext& ctx, const DesignerModel& model, const DesignerNode& parent)
 {
 	for(int i = 0; i < parent.children.GetCount(); i++) {
 		DesignerNodeId child_id = parent.children[i];
 		const DesignerNode* child = model.Find(child_id);
 		if(!child)
 			continue;
-		EmitAddChild(out, registry, names, parent, *child, i);
-		EmitAdds(out, registry, names, model, *child);
+		EmitAddChild(ctx, parent, *child, i);
+		EmitAdds(ctx, model, *child);
 	}
 }
 
-static void EmitPostAddSetup(String& out, const VectorMap<DesignerNodeId, String>& names, const DesignerModel& model)
+static void EmitPostAddSetup(DesignerCodeGenContext& ctx, const DesignerModel& model)
 {
 	for(const DesignerNode& n : model.GetNodes()) {
-		String var = VarName(names, n.id);
-		if(n.type_id == "UiTab")
-			out << "\t\t" << var << ".SetActiveTab(" << (int)CodeGenNodeProperty(n, "active", 0) << ");\n";
-		else if(n.type_id == "UiStack")
-			out << "\t\t" << var << ".SetActivePage(" << (int)CodeGenNodeProperty(n, "active", 0) << ");\n";
+		const DesignerControlSpec* spec = CodeGenSpec(ctx.Registry(), n);
+		if(spec && spec->codegen.emit_post_build)
+			spec->codegen.emit_post_build(ctx, n);
 	}
 }
 
@@ -1774,12 +1279,12 @@ String GenerateDesignerCode(const DesignerModel& model, const DesignerRegistry& 
 	    << "\t\t// Parent-child layout tree only.\n";
 	const DesignerNode* root = model.Find(Designer_ROOT);
 	if(root)
-		EmitAdds(out, registry, names, model, *root);
+		EmitAdds(ctx, model, *root);
 	out << "\t}\n\n"
 	    << "\tvoid PostBuild()\n"
 	    << "\t{\n"
 	    << "\t\t// Active tabs/pages and late setup.\n";
-	EmitPostAddSetup(out, names, model);
+	EmitPostAddSetup(ctx, model);
 	out << "\t}\n\n";
 	for(const DesignerNode& n : model.GetNodes()) {
 		if(n.id == Designer_ROOT)
