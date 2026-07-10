@@ -427,6 +427,71 @@ void DesignerPreview::DrawDropIndicator(Draw& w, const Rect& root)
 			w.DrawText(tag.left + DPI(6), tag.top + DPI(4), label, tag_font, Black());
 		}
 
+DesignerPreview::GridDropCell DesignerPreview::ResolveGridDropCell(const DesignerNode& parent, Point p, const Rect& root) const
+{
+			GridDropCell out;
+			if(parent.type_id != "GridLayout")
+				return out;
+			int columns = max(1, (int)DesignerPreviewNodeProperty(parent, "columns", 2));
+			int rows = max(1, (int)DesignerPreviewNodeProperty(parent, "rows", 2));
+			int q = real_adapters_.Find(parent.id);
+			if(q >= 0) {
+				if(const DesignerGridLayoutAdapter* grid = dynamic_cast<const DesignerGridLayoutAdapter *>(real_adapters_[q])) {
+					Rect best;
+					int best_distance = INT_MAX;
+					for(int row = 0; row < rows; row++) {
+						for(int col = 0; col < columns; col++) {
+							Rect cell = grid->GetCellRect(row, col) + parent.last_rect.TopLeft();
+							if(cell.IsEmpty())
+								continue;
+							if(cell.Contains(p)) {
+								out.row = row;
+								out.column = col;
+								out.index = row * columns + col;
+								out.highlight = cell;
+								out.valid = true;
+								return out;
+							}
+							int dx = p.x < cell.left ? cell.left - p.x : p.x >= cell.right ? p.x - cell.right + 1 : 0;
+							int dy = p.y < cell.top ? cell.top - p.y : p.y >= cell.bottom ? p.y - cell.bottom + 1 : 0;
+							int distance = dx * dx + dy * dy;
+							if(distance < best_distance) {
+								best_distance = distance;
+								best = cell;
+								out.row = row;
+								out.column = col;
+							}
+						}
+					}
+					if(!best.IsEmpty()) {
+						out.index = out.row * columns + out.column;
+						out.highlight = best;
+						out.valid = true;
+						return out;
+					}
+				}
+			}
+
+			Rect pr = GetContainerContentRect(parent, root);
+			int inset = (int)DesignerPreviewNodeProperty(parent, "inset", 0);
+			Rect grid = pr.Deflated(inset);
+			if(grid.IsEmpty())
+				return out;
+			int gap = (int)DesignerPreviewNodeProperty(parent, "gap", DPI(8));
+			int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (grid.GetWidth() - gap * (columns - 1)) / columns);
+			int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (grid.GetHeight() - gap * (rows - 1)) / rows);
+			int step_x = max(1, cw + gap);
+			int step_y = max(1, ch + gap);
+			int local_x = clamp(p.x, grid.left, grid.right - 1) - grid.left;
+			int local_y = clamp(p.y, grid.top, grid.bottom - 1) - grid.top;
+			out.column = clamp(local_x / step_x, 0, columns - 1);
+			out.row = clamp(local_y / step_y, 0, rows - 1);
+			out.index = out.row * columns + out.column;
+			out.highlight = RectC(grid.left + out.column * step_x, grid.top + out.row * step_y, cw, ch);
+			out.valid = true;
+			return out;
+		}
+
 Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect& root) const
 {
 			if(parent.type_id == "UiSplitter" || parent.type_id == "UiQuadSplitter")
@@ -448,16 +513,14 @@ Rect DesignerPreview::GetInsertMarkerRect(const DesignerNode& parent, const Rect
 							return cell + parent.last_rect.TopLeft();
 					}
 				}
-				int gap = (int)DesignerPreviewNodeProperty(parent, "gap", DPI(8));
 				int inset = (int)DesignerPreviewNodeProperty(parent, "inset", 0);
 				Rect grid = pr.Deflated(inset);
 				if(grid.IsEmpty())
 					return Rect(0, 0, 0, 0);
+				int gap = (int)DesignerPreviewNodeProperty(parent, "gap", DPI(8));
 				int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (grid.GetWidth() - gap * (columns - 1)) / columns);
 				int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (grid.GetHeight() - gap * (rows - 1)) / rows);
-				int y = grid.top + row * (ch + gap);
-				int x = grid.left + col * (cw + gap);
-				return RectC(x, y, cw, ch);
+				return RectC(grid.left + col * (cw + gap), grid.top + row * (ch + gap), cw, ch);
 			}
 			int count = parent.children.GetCount();
 			if(count <= 0)
@@ -1143,35 +1206,9 @@ void DesignerPreview::UpdateDropSlot(Point p)
 				drop_index_ = clamp(GetSplitterPaneIndex(*parent, p), 0, panes - 1);
 			}
 			else if(parent && parent->type_id == "GridLayout") {
-				int columns = max(1, (int)DesignerPreviewNodeProperty(*parent, "columns", 2));
-				int rows = max(1, (int)DesignerPreviewNodeProperty(*parent, "rows", 2));
-				int q = real_adapters_.Find(parent->id);
-				bool resolved = false;
-				if(q >= 0) {
-					if(const DesignerGridLayoutAdapter* grid = dynamic_cast<const DesignerGridLayoutAdapter *>(real_adapters_[q])) {
-						for(int row = 0; row < rows && !resolved; row++) {
-							for(int col = 0; col < columns; col++) {
-								Rect cell = grid->GetCellRect(row, col) + parent->last_rect.TopLeft();
-								if(cell.Contains(p)) {
-									drop_index_ = row * columns + col;
-									resolved = true;
-									break;
-								}
-							}
-						}
-					}
-				}
-				if(!resolved) {
-					Rect pr = GetContainerContentRect(*parent, GetVirtualWindowRect());
-					int inset = (int)DesignerPreviewNodeProperty(*parent, "inset", 0);
-					Rect grid = pr.Deflated(inset);
-					int gap = (int)DesignerPreviewNodeProperty(*parent, "gap", DPI(8));
-					int cw = max(DPI(DESIGNER_GRID_CELL_WIDTH), (grid.GetWidth() - gap * (columns - 1)) / columns);
-					int ch = max(DPI(DESIGNER_GRID_CELL_HEIGHT), (grid.GetHeight() - gap * (rows - 1)) / rows);
-					int col = clamp((p.x - grid.left) / max(1, cw + gap), 0, columns - 1);
-					int row = clamp((p.y - grid.top) / max(1, ch + gap), 0, rows - 1);
-					drop_index_ = row * columns + col;
-				}
+				GridDropCell cell = ResolveGridDropCell(*parent, p, GetVirtualWindowRect());
+				if(cell.valid)
+					drop_index_ = cell.index;
 			}
 			else if(parent && hit_node && hit_node->parent == parent->id) {
 				int q = FindChildIndex(*parent, hit_node->id);

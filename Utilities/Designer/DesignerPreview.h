@@ -40,6 +40,14 @@ namespace Upp {
 // rectangles for hit testing, and emits events for selection, resize, and moves.
 class DesignerPreview : public Ctrl {
 public:
+		struct GridDropCell : Moveable<GridDropCell> {
+			int row = 0;
+			int column = 0;
+			int index = -1;
+			Rect highlight;
+			bool valid = false;
+		};
+
 		Event<DesignerNodeId, dword> WhenSelect;
 		Event<> WhenChanged;
 		Event<DesignerNodeId, DesignerNodeId, int> WhenMoveNode;
@@ -66,6 +74,7 @@ private:
 		Rect GetResizeHandle(const Rect& root) const;
 		void DrawResizeHandle(Draw& w, const Rect& root);
 		void DrawDropIndicator(Draw& w, const Rect& root);
+		GridDropCell ResolveGridDropCell(const DesignerNode& parent, Point p, const Rect& root) const;
 		Rect GetInsertMarkerRect(const DesignerNode& parent, const Rect& root) const;
 		Rect GetDropTagRect(const DesignerNode& target, const Rect& root, const Rect& marker, const String& label) const;
 		Rect GetContainerContentRect(const DesignerNode& parent, const Rect& root) const;

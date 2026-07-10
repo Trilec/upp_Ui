@@ -531,6 +531,39 @@ static void TestDesignerDragController(TestCtx& t)
 	t.Expect(m.Validate(), "drag-mutated model validates");
 }
 
+static void TestUiQuadSplitterConstruction(TestCtx& t)
+{
+	t.Section("UiQuadSplitter construction");
+
+	for(int i = 0; i < 16; i++) {
+		UiQuadSplitter quad;
+		t.Expect(quad.RootSplitter().GetParent() == &quad, "quad root splitter is owned by UiQuadSplitter");
+		t.Expect(quad.TopSplitter().GetParent() == &quad.RootSplitter(), "quad top splitter is owned by root splitter");
+		t.Expect(quad.BottomSplitter().GetParent() == &quad.RootSplitter(), "quad bottom splitter is owned by root splitter");
+	}
+
+	DesignerRegistry registry;
+	RegisterDesignerBuiltins(registry);
+	DesignerNode node;
+	node.id = 1;
+	node.type_id = "UiQuadSplitter";
+	node.name = "quad";
+	if(const DesignerType* type = registry.Find(node.type_id))
+		if(type->init_defaults)
+			type->init_defaults(node);
+	DesignerAdapter* adapter = nullptr;
+	One<Ctrl> ctrl;
+	ctrl.Attach(CreateDesignerAdapterCtrl(registry, node, &adapter));
+	t.Expect(ctrl && adapter, "UiQuadSplitter adapter factory constructs safely");
+	if(UiQuadSplitter* quad = dynamic_cast<UiQuadSplitter*>(ctrl.Get())) {
+		t.Expect(quad->RootSplitter().GetParent() == quad, "factory quad root splitter is owned by adapter");
+		t.Expect(quad->TopSplitter().GetParent() == &quad->RootSplitter(), "factory quad top splitter is owned by root");
+		t.Expect(quad->BottomSplitter().GetParent() == &quad->RootSplitter(), "factory quad bottom splitter is owned by root");
+	}
+	else
+		t.Expect(false, "UiQuadSplitter adapter is a UiQuadSplitter");
+}
+
 static void TestRegistryAndBuiltins(TestCtx& t)
 {
 	t.Section("DesignerRegistry built-ins");
@@ -1213,13 +1246,6 @@ static void TestDesignerApiCoverageAudit(TestCtx& t)
 		if(!spec) {
 			Cout() << Format("%-20s %-4s %-4s %-4s %-4s %-8s %-8s\n",
 			                 type->id, "FAIL", "FAIL", "FAIL", "FAIL", "FAIL", "FAIL");
-			continue;
-		}
-
-		if(type->id == "UiQuadSplitter") {
-			Cout() << "  skip: standalone adapter construction crashes on a bare UiQuadSplitter node\n";
-			Cout() << Format("%-20s %-4s %-4s %-4s %-4s %-8s %-8s\n",
-			                 type->id, "SKIP", "SKIP", "SKIP", "SKIP", "SKIP", "SKIP");
 			continue;
 		}
 
@@ -3252,6 +3278,7 @@ CONSOLE_APP_MAIN
 	TestExplicitEmptyTextValues(t);
 	TestDesignerArchitectureGuard(t);
 	TestDesignerDragController(t);
+	TestUiQuadSplitterConstruction(t);
 	TestRegistryAndBuiltins(t);
 	TestDesignerAdapters(t);
 	TestDesignerApiCoverageAudit(t);

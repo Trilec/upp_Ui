@@ -28,14 +28,27 @@ void DesignerDragController::BeginToolDrag(const String& type_id)
 	kind_ = type_id.IsEmpty() ? DesignerDragKind::None : DesignerDragKind::Tool;
 	tool_type_ = type_id;
 	node_id_ = Designer_NULL;
+	node_ids_.Clear();
 	target_ = DesignerDropTarget();
 }
 
 void DesignerDragController::BeginNodeDrag(DesignerNodeId id)
 {
-	kind_ = id == Designer_NULL || id == Designer_ROOT ? DesignerDragKind::None : DesignerDragKind::Node;
+	Vector<DesignerNodeId> ids;
+	if(id != Designer_NULL && id != Designer_ROOT)
+		ids.Add(id);
+	BeginNodeDrag(ids);
+}
+
+void DesignerDragController::BeginNodeDrag(const Vector<DesignerNodeId>& ids)
+{
+	node_ids_.Clear();
+	for(DesignerNodeId id : ids)
+		if(id != Designer_NULL && id != Designer_ROOT)
+			node_ids_.Add(id);
+	kind_ = node_ids_.IsEmpty() ? DesignerDragKind::None : DesignerDragKind::Node;
 	tool_type_.Clear();
-	node_id_ = id;
+	node_id_ = node_ids_.IsEmpty() ? Designer_NULL : node_ids_[0];
 	target_ = DesignerDropTarget();
 }
 
@@ -44,6 +57,7 @@ void DesignerDragController::Cancel()
 	kind_ = DesignerDragKind::None;
 	tool_type_.Clear();
 	node_id_ = Designer_NULL;
+	node_ids_.Clear();
 	target_ = DesignerDropTarget();
 }
 
@@ -104,29 +118,38 @@ DesignerDropTarget DesignerDragController::Validate(const DesignerModel& model, 
 			return out;
 		}
 		child.type_id = tool_type_;
+		if(!registry.CanDrop(*parent, child)) {
+			out.message = "Container rejects this type";
+			return out;
+		}
 	}
 	else {
-		const DesignerNode* existing = model.Find(node_id_);
-		if(!existing) {
-			out.message = "Missing dragged node";
+		if(node_ids_.IsEmpty()) {
+			out.message = "Missing dragged nodes";
 			return out;
 		}
-		if(existing->id == parent_id) {
-			out.message = "Cannot drop a node into itself";
-			return out;
-		}
-		for(const DesignerNode* p = parent; p; p = model.Find(p->parent)) {
-			if(p->id == existing->id) {
-				out.message = "Cannot drop a node into its descendant";
+		for(DesignerNodeId id : node_ids_) {
+			const DesignerNode* existing = model.Find(id);
+			if(!existing) {
+				out.message = "Missing dragged node";
+				return out;
+			}
+			if(existing->id == parent_id) {
+				out.message = "Cannot drop a node into itself";
+				return out;
+			}
+			for(const DesignerNode* p = parent; p; p = model.Find(p->parent)) {
+				if(p->id == existing->id) {
+					out.message = "Cannot drop a node into its descendant";
+					return out;
+				}
+			}
+			child.type_id = existing->type_id;
+			if(!registry.CanDrop(*parent, child)) {
+				out.message = "Container rejects this type";
 				return out;
 			}
 		}
-		child.type_id = existing->type_id;
-	}
-
-	if(!registry.CanDrop(*parent, child)) {
-		out.message = "Container rejects this type";
-		return out;
 	}
 
 	out.parent = parent_id;
@@ -145,8 +168,20 @@ bool DesignerDragController::Drop(DesignerModel& model, DesignerCommandStack& co
 	bool ok = false;
 	if(kind_ == DesignerDragKind::Tool)
 		ok = commands.AddNode(model, tool_type_, target_.parent, target_.insert_index) != Designer_NULL;
-	else
+	else if(node_ids_.GetCount() == 1)
 		ok = commands.Execute(MakeDesignerMoveNodeCommand(node_id_, target_.parent, target_.insert_index), model);
+	else {
+		commands.BeginGroup("Move selection");
+		int at = target_.insert_index;
+		for(DesignerNodeId id : node_ids_) {
+			if(commands.Execute(MakeDesignerMoveNodeCommand(id, target_.parent, at), model)) {
+				ok = true;
+				if(at >= 0)
+					at++;
+			}
+		}
+		commands.EndGroup();
+	}
 	Cancel();
 	return ok;
 }

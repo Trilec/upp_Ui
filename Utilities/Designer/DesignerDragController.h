@@ -72,6 +72,7 @@ class DesignerDragController {
 public:
 	void BeginToolDrag(const String& type_id);
 	void BeginNodeDrag(DesignerNodeId id);
+	void BeginNodeDrag(const Vector<DesignerNodeId>& ids);
 	void UpdateTarget(const DesignerModel& model, const DesignerRegistry& registry,
 	                  const DesignerDropTarget& target);
 	void Cancel();
@@ -81,6 +82,7 @@ public:
 	const DesignerDropTarget& GetTarget() const { return target_; }
 	String GetToolType() const { return tool_type_; }
 	DesignerNodeId GetNodeId() const { return node_id_; }
+	const Vector<DesignerNodeId>& GetNodeIds() const { return node_ids_; }
 
 	bool Drop(DesignerModel& model, DesignerCommandStack& commands);
 
@@ -91,6 +93,7 @@ private:
 	DesignerDragKind kind_ = DesignerDragKind::None;
 	String tool_type_;
 	DesignerNodeId node_id_ = Designer_NULL;
+	Vector<DesignerNodeId> node_ids_;
 	DesignerDropTarget target_;
 };
 

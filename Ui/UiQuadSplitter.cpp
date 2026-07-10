@@ -4,7 +4,7 @@ namespace Upp {
 
 UiQuadSplitter::UiQuadSplitter()
 {
-    Add(root_.SizePos());
+    Ctrl::Add(root_.SizePos());
     root_.Vert(top_, bottom_);
     top_.Horz();
     bottom_.Horz();

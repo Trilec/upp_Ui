@@ -590,6 +590,12 @@ private:
 		SAVE_STATUS_SAVED
 	};
 
+	bool IsDesignerClipboardShortcutReservedForEditor() const
+	{
+		Ctrl *focus = Ctrl::GetFocusCtrl();
+		return dynamic_cast<UiBaseEdit *>(focus) != nullptr;
+	}
+
 	void Paint(Draw& w) override
 	{
 		w.DrawRect(GetSize(), DesignerShellBackground(theme_mode_));
@@ -597,12 +603,19 @@ private:
 
 	bool Key(dword key, int count) override
 	{
+		if(IsDesignerClipboardShortcutReservedForEditor() &&
+		   (key == K_CTRL_C || key == K_CTRL_X || key == K_CTRL_V || key == K_DELETE))
+			return TopWindow::Key(key, count);
 		if(key == K_DELETE) {
 			DeleteSelection();
 			return true;
 		}
 		if(key == K_CTRL_C) {
 			CopySelection();
+			return true;
+		}
+		if(key == K_CTRL_X) {
+			CutSelection();
 			return true;
 		}
 		if(key == K_CTRL_V) {
@@ -4323,8 +4336,9 @@ private:
 	{
 		if(id == Designer_NULL || id == Designer_ROOT)
 			return;
+		Vector<DesignerNodeId> drag_roots = BuildSelectedDragRoots(id);
 		if(!drag_.IsActive() || drag_.GetKind() != DesignerDragKind::Node || drag_.GetNodeId() != id)
-			drag_.BeginNodeDrag(id);
+			drag_.BeginNodeDrag(drag_roots);
 		preview_.SetPlacementType(String());
 		Rect pr = preview_.GetScreenRect();
 		Rect hr = hierarchy_.GetScreenRect();
@@ -4350,7 +4364,7 @@ private:
 	void FinishNodeDrag(DesignerNodeId id, UiTreeNodeRef fallback_target)
 	{
 		if(drag_.GetKind() != DesignerDragKind::Node || drag_.GetNodeId() != id) {
-			drag_.BeginNodeDrag(id);
+			drag_.BeginNodeDrag(BuildSelectedDragRoots(id));
 			UiTree::DropInfo info = hierarchy_.GetDropInfo();
 			if(!info.valid && fallback_target.IsValid()) {
 				DesignerNodeId target = GetHierarchyNodeId(fallback_target);
@@ -4369,7 +4383,7 @@ private:
 		HideDragStatus();
 		drag_.Cancel();
 		if(target.valid) {
-			MovePreviewNode(id, target.parent, target.insert_index);
+			MovePreviewNodes(BuildSelectedDragRoots(id), target.parent, target.insert_index);
 			preview_.ClearDropState();
 			hierarchy_.ClearTrackedDropTarget();
 			preview_.Refresh();
@@ -4560,16 +4574,87 @@ private:
 		return false;
 	}
 
+	bool SelectionContainsAncestor(DesignerNodeId id, const Vector<DesignerNodeId>& selection) const
+	{
+		const DesignerNode* n = model_.Find(id);
+		while(n && n->parent) {
+			if(FindNodeId(selection, n->parent) >= 0)
+				return true;
+			n = model_.Find(n->parent);
+		}
+		return false;
+	}
+
+	void AppendSelectedRootsInModelOrder(Vector<DesignerNodeId>& out, DesignerNodeId id,
+	                                     const Vector<DesignerNodeId>& selection) const
+	{
+		const DesignerNode* n = model_.Find(id);
+		if(!n)
+			return;
+		if(id != Designer_ROOT && id != Designer_NULL && FindNodeId(selection, id) >= 0 &&
+		   !SelectionContainsAncestor(id, selection)) {
+			out.Add(id);
+			return;
+		}
+		for(DesignerNodeId child : n->children)
+			AppendSelectedRootsInModelOrder(out, child, selection);
+	}
+
+	Vector<DesignerNodeId> BuildSelectedRootIds() const
+	{
+		Vector<DesignerNodeId> roots;
+		Vector<DesignerNodeId> selection = clone(model_.GetSelection());
+		AppendSelectedRootsInModelOrder(roots, Designer_ROOT, selection);
+		return roots;
+	}
+
+	Vector<DesignerNodeId> BuildSelectedDragRoots(DesignerNodeId dragged_id) const
+	{
+		Vector<DesignerNodeId> selection = clone(model_.GetSelection());
+		if(dragged_id == Designer_NULL || dragged_id == Designer_ROOT)
+			return Vector<DesignerNodeId>();
+		if(FindNodeId(selection, dragged_id) < 0) {
+			Vector<DesignerNodeId> single;
+			single.Add(dragged_id);
+			return single;
+		}
+		return BuildSelectedRootIds();
+	}
+
 	void CopySelection()
 	{
 		designer_clipboard_.Clear();
-		Vector<DesignerNodeId> selected = clone(model_.GetSelection());
+		Vector<DesignerNodeId> selected = BuildSelectedRootIds();
 		for(DesignerNodeId id : selected) {
-			if(id == Designer_ROOT || id == Designer_NULL)
-				continue;
-			if(ClipboardContainsAncestor(id, selected))
-				continue;
 			model_.CaptureSubtree(id, designer_clipboard_);
+		}
+	}
+
+	void CutSelection()
+	{
+		Vector<DesignerNodeId> roots = BuildSelectedRootIds();
+		if(roots.IsEmpty())
+			return;
+		Vector<DesignerNodeState> captured;
+		for(DesignerNodeId id : roots)
+			model_.CaptureSubtree(id, captured);
+		int before_nodes = StructuralNodeCount();
+		StructuralTrace("STRUCT_BEGIN",
+			Format("action=CutSelection ids=%s", AsString(roots)));
+		commands_.BeginGroup("Cut");
+		bool changed = false;
+		for(DesignerNodeId id : roots)
+			changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
+		bool grouped = commands_.EndGroup();
+		if(changed || grouped) {
+			designer_clipboard_ = pick(captured);
+			SetDocumentDirty();
+			StructuralTrace("STRUCT_MODEL",
+				Format("before_nodes=%d after_nodes=%d selected=%d",
+				       before_nodes, StructuralNodeCount(),
+				       model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0]));
+			ApplyStructuralModelMutationRefresh("CutSelection");
+			StructuralTrace("STRUCT_END", "result=OK");
 		}
 	}
 
@@ -4641,14 +4726,19 @@ private:
 			candidate.type_id = state.type_id;
 			if(!registry_.CanDrop(*parent, candidate))
 				continue;
-			DesignerNodeId id = PasteStateSubtree(designer_clipboard_, state.id, parent_id, insert_index);
+			int placement_index = insert_index;
+			if(parent->type_id == "GridLayout" && !FindNextFreeGridCell(*parent, placement_index)) {
+				SetWarningNotes("Grid does not have enough free cells for paste.");
+				break;
+			}
+			DesignerNodeId id = PasteStateSubtree(designer_clipboard_, state.id, parent_id, placement_index);
 			if(id == Designer_NULL)
 				continue;
 			pasted.Add(id);
 			if(parent->type_id == "GridLayout")
-				ApplyGridCellForNode(id, insert_index);
+				ApplyGridCellForNode(id, placement_index);
 			if(insert_index >= 0)
-				insert_index++;
+				insert_index = placement_index + 1;
 		}
 		bool changed = commands_.EndGroup();
 		if(changed && !pasted.IsEmpty()) {
@@ -4661,6 +4751,36 @@ private:
 			ApplyStructuralModelMutationRefresh("PasteClipboard");
 			StructuralTrace("STRUCT_END", "result=OK");
 		}
+	}
+
+	bool IsGridCellOccupied(const DesignerNode& grid, int index, DesignerNodeId except = Designer_NULL) const
+	{
+		int columns = max(1, (int)DesignerNodePropertyOr(grid, "columns", 2));
+		for(int i = 0; i < grid.children.GetCount(); i++) {
+			const DesignerNode* child = model_.Find(grid.children[i]);
+			if(!child || child->id == except)
+				continue;
+			int col = clamp((int)DesignerNodePropertyOr(*child, "grid_col", i % columns), 0, columns - 1);
+			int row = max(0, (int)DesignerNodePropertyOr(*child, "grid_row", i / columns));
+			if(row * columns + col == index)
+				return true;
+		}
+		return false;
+	}
+
+	bool FindNextFreeGridCell(const DesignerNode& grid, int& index) const
+	{
+		int columns = max(1, (int)DesignerNodePropertyOr(grid, "columns", 2));
+		int rows = max(1, (int)DesignerNodePropertyOr(grid, "rows", 2));
+		int cells = columns * rows;
+		int start = clamp(index, 0, max(0, cells - 1));
+		for(int i = start; i < cells; i++) {
+			if(!IsGridCellOccupied(grid, i)) {
+				index = i;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// Persist stable grid coordinates on a child node after grid placement.
@@ -4732,34 +4852,59 @@ private:
 	// Move an existing node through the drag command path.
 	// Never rewires children directly here; the drag controller and command stack
 	// keep validation, undo, and refresh behavior consistent.
-	void MovePreviewNode(DesignerNodeId id, DesignerNodeId target, int index)
+	void MovePreviewNodes(const Vector<DesignerNodeId>& ids, DesignerNodeId target, int index)
 	{
 		StructuralTrace("STRUCT_BEGIN",
-			Format("action=MovePreviewNode id=%d target=%d index=%d", (int)id, (int)target, index));
-		if(id == Designer_ROOT || id == Designer_NULL || id == target)
+			Format("action=MovePreviewNodes ids=%s target=%d index=%d", AsString(ids), (int)target, index));
+		if(ids.IsEmpty() || target == Designer_NULL)
 			return;
-		if(!model_.Find(id) || !model_.Find(target))
+		if(!model_.Find(target))
 			return;
-		drag_.BeginNodeDrag(id);
+		drag_.BeginNodeDrag(ids);
 		drag_.UpdateTarget(model_, registry_, DesignerMakeIntoTarget(target, index));
-		bool moved = drag_.Drop(model_, commands_);
+		DesignerDropTarget validated = drag_.GetTarget();
+		if(!validated.valid) {
+			drag_.Cancel();
+			return;
+		}
+		commands_.BeginGroup("Move selection");
+		bool moved = false;
+		Vector<DesignerNodeId> moved_ids;
+		int at = validated.insert_index;
+		for(DesignerNodeId id : ids) {
+			if(id == Designer_ROOT || id == Designer_NULL || id == validated.parent)
+				continue;
+			if(!model_.Find(id))
+				continue;
+			if(commands_.Execute(MakeDesignerMoveNodeCommand(id, validated.parent, at), model_)) {
+				moved = true;
+				moved_ids.Add(id);
+				ApplyGridCellForNode(id, at);
+				AdjustGridCellForNode(id);
+				if(at >= 0)
+					at++;
+			}
+		}
+		commands_.EndGroup();
+		drag_.Cancel();
 		if(moved) {
-			ApplyGridCellForNode(id, index);
-			AdjustGridCellForNode(id);
-			if(model_.Find(id))
-				model_.SelectOne(id);
+			model_.SetSelection(moved_ids);
 			String error;
 			if(!model_.Validate(error))
 				SetWarningNotes("Model validation failed after move: " + error);
 			SetDocumentDirty();
-			ApplyStructuralModelMutationRefresh("MovePreviewNode");
-			const DesignerNode* moved_node = model_.Find(id);
+			ApplyStructuralModelMutationRefresh("MovePreviewNodes");
 			StructuralTrace("STRUCT_READBACK",
-				Format("selected=%d exists=%d parent=%d visible_rect=%s",
-				       (int)id, moved_node ? 1 : 0, moved_node ? (int)moved_node->parent : 0,
-				       moved_node ? AsString(moved_node->last_rect) : String("<missing>")));
+				Format("selected=%s count=%d", AsString(moved_ids), moved_ids.GetCount()));
 			StructuralTrace("STRUCT_END", "result=OK");
 		}
+	}
+
+	void MovePreviewNode(DesignerNodeId id, DesignerNodeId target, int index)
+	{
+		Vector<DesignerNodeId> ids;
+		ids.Add(id);
+		MovePreviewNodes(ids, target, index);
 	}
 
 	void SetWarningNotes(const String& notes)
@@ -5798,14 +5943,13 @@ private:
 
 	void DeleteSelection()
 	{
-		Vector<DesignerNodeId> ids = clone(model_.GetSelection());
+		Vector<DesignerNodeId> ids = BuildSelectedRootIds();
 		int before_nodes = StructuralNodeCount();
 		StructuralTrace("STRUCT_BEGIN",
 			Format("action=DeleteSelection ids=%s", AsString(ids)));
 		bool changed = false;
 		for(DesignerNodeId id : ids)
-			if(id != Designer_ROOT)
-				changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
+			changed = commands_.Execute(MakeDesignerRemoveNodeCommand(id), model_) || changed;
 		if(changed) {
 			SetDocumentDirty();
 			StructuralTrace("STRUCT_MODEL",
