@@ -231,6 +231,7 @@ DesignerType MakePanelControlType(const String& id, const String& name, Size siz
 		n.properties.Set("face", DesignerPanelFace());
 		n.properties.Set("frame", DesignerPanelFrame());
 		n.properties.Set("radius", 8);
+		n.properties.Set("inset", 0);
 		n.properties.Set("face_enabled", false);
 		n.properties.Set("frame_enabled", false);
 	};

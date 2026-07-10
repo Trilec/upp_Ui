@@ -245,11 +245,19 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 			return;
 		}
 		if(parent.type_id == "UiPanel") {
-			out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
+			int inset = max(0, (int)ctx.Property(parent, "inset", 0));
+			if(inset > 0)
+				out << "\t\t" << p << ".Add(" << c << ".SizePosZ(DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << ")));\n";
+			else
+				out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
 			return;
 		}
 		if(parent.type_id == "UiScrollPanel") {
-			out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
+			int inset = max(0, (int)ctx.Property(parent, "inset", 0));
+			if(inset > 0)
+				out << "\t\t" << p << ".Content().Add(" << c << ".SizePosZ(DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << ")));\n";
+			else
+				out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
 			return;
 		}
 		if(parent.type_id == "UiGroupPanel") {
@@ -581,11 +589,19 @@ static DesignerType MakeBoxLayoutType()
 			return;
 		}
 		if(parent.type_id == "UiPanel") {
-			out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
+			int inset = max(0, (int)ctx.Property(parent, "inset", 0));
+			if(inset > 0)
+				out << "\t\t" << p << ".Add(" << c << ".SizePosZ(DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << ")));\n";
+			else
+				out << "\t\t" << p << ".Add(" << c << ".SizePos());\n";
 			return;
 		}
 		if(parent.type_id == "UiScrollPanel") {
-			out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
+			int inset = max(0, (int)ctx.Property(parent, "inset", 0));
+			if(inset > 0)
+				out << "\t\t" << p << ".Content().Add(" << c << ".SizePosZ(DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << "), DPI(" << inset << ")));\n";
+			else
+				out << "\t\t" << p << ".Content().Add(" << c << ".SizePos());\n";
 			return;
 		}
 		if(parent.type_id == "UiGroupPanel") {

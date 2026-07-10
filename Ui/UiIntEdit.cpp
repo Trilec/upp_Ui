@@ -7,6 +7,13 @@ namespace Upp {
 
 UiIntEdit::UiIntEdit()
 {
+    SetAcceptsNewlines(false);
+    SetAcceptsTabs(false);
+    sb_.ShowX(false);
+    sb_.ShowY(false);
+    sb_.AutoHide();
+    RemoveFrame(sb_);
+
     auto SetupSpin = [&](UiButton& b, bool up) {
         b.SetText("");
         b.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));

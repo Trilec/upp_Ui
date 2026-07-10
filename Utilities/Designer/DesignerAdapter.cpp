@@ -1410,6 +1410,10 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		}
 		return;
 	}
+	if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic") {
+		b.AddLayout("inset", "Inset", DesignerEditorKind::Slider, "UiPanel child layout",
+		            "Inset applied when sizing direct child content inside the panel.", 0, 64);
+	}
 	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
 	      "Designer placeholder text used until this node becomes a real control.");
 }
@@ -2817,6 +2821,8 @@ void DesignerScrollPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.AddLayout("inset", "Inset", DesignerEditorKind::Slider, "UiScrollPanel child layout",
+	            "Inset applied when sizing direct child content inside the scroll panel.", 0, 64);
 	b.AddChoice("scroll_mode", "Scroll mode", "UiScrollPanel::SetScrollMode",
 	            "Controls which scroll directions are available.",
 	            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}, {"None", "None"}});
