@@ -646,6 +646,8 @@ static void ApplyAccordionPartOverrides(UiAccordion::Style& s, const DesignerNod
 static void ApplyPanelAppearance(UiPanel& panel, const DesignerNode& n)
 {
 	UiPanel::Style s = UiTheme::ResolvePanel(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
+	int inset = max(0, (int)AdapterNodeProperty(n, "inset", 0));
+	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	bool pane_slot = n.type_id == "PaneSlot" || n.type_id == "PageSlot" || (bool)AdapterNodeProperty(n, "pane_slot", false);
 	if(pane_slot) {
 		s.metrics.face_enabled = false;
@@ -2803,6 +2805,8 @@ void DesignerScrollPanelAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
 	UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Standard")));
+	int inset = max(0, (int)AdapterNodeProperty(node, "inset", 0));
+	s.metrics.content_margin = Rect(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
 	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, node);
 	SetCustomStyle(s);
 	String mode = AdapterNodeProperty(node, "scroll_mode", "Auto");

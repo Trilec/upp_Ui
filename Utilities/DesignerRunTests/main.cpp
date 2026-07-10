@@ -1534,6 +1534,62 @@ static void TestDesignerAdapters(TestCtx& t)
 	t.Expect(FindBinding(bindings, "page_title") && FindBinding(bindings, "show_title") &&
 	         FindBinding(bindings, "icon"),
 	         "page slot adapter exposes tab title, title visibility, and icon controls");
+
+	auto ExpectPanelInset = [&](const char *type, int inset, const String& label) {
+		DesignerNode n;
+		n.id = 80 + inset;
+		n.type_id = type;
+		n.name = label;
+		r.Find(type)->init_defaults(n);
+		n.properties.Set("inset", inset);
+		DesignerAdapter* local_adapter = nullptr;
+		One<Ctrl> local_ctrl;
+		local_ctrl.Attach(CreateDesignerAdapterCtrl(r, n, &local_adapter));
+		Rect expected(DPI(inset), DPI(inset), DPI(inset), DPI(inset));
+		if(String(type) == "UiPanel") {
+			UiPanel* panel = dynamic_cast<UiPanel*>(local_ctrl.Get());
+			t.Expect(panel && panel->GetStyle().metrics.content_margin == expected,
+			         label + " applies inset to panel content margin");
+		}
+		else {
+			UiScrollPanel* scroll = dynamic_cast<UiScrollPanel*>(local_ctrl.Get());
+			t.Expect(scroll && scroll->GetStyle().metrics.content_margin == expected,
+			         label + " applies inset to scroll panel content margin");
+		}
+	};
+	ExpectPanelInset("UiPanel", 0, "panel inset zero");
+	ExpectPanelInset("UiPanel", 12, "panel inset twelve");
+	ExpectPanelInset("UiScrollPanel", 0, "scroll panel inset zero");
+	ExpectPanelInset("UiScrollPanel", 12, "scroll panel inset twelve");
+
+	DesignerModel inset_model;
+	DesignerNodeId root = inset_model.AddNode("BoxLayout", Designer_ROOT);
+	r.Find("BoxLayout")->init_defaults(*inset_model.Find(root));
+	DesignerNodeId panel_zero = inset_model.AddNode("UiPanel", root);
+	r.Find("UiPanel")->init_defaults(*inset_model.Find(panel_zero));
+	inset_model.Find(panel_zero)->name = "panelZero";
+	inset_model.Find(panel_zero)->properties.Set("inset", 0);
+	DesignerNodeId panel_twelve = inset_model.AddNode("UiPanel", root);
+	r.Find("UiPanel")->init_defaults(*inset_model.Find(panel_twelve));
+	inset_model.Find(panel_twelve)->name = "panelTwelve";
+	inset_model.Find(panel_twelve)->properties.Set("inset", 12);
+	DesignerNodeId scroll_zero = inset_model.AddNode("UiScrollPanel", root);
+	r.Find("UiScrollPanel")->init_defaults(*inset_model.Find(scroll_zero));
+	inset_model.Find(scroll_zero)->name = "scrollZero";
+	inset_model.Find(scroll_zero)->properties.Set("inset", 0);
+	DesignerNodeId scroll_twelve = inset_model.AddNode("UiScrollPanel", root);
+	r.Find("UiScrollPanel")->init_defaults(*inset_model.Find(scroll_twelve));
+	inset_model.Find(scroll_twelve)->name = "scrollTwelve";
+	inset_model.Find(scroll_twelve)->properties.Set("inset", 12);
+	String inset_code = GenerateDesignerCode(inset_model, r, "GeneratedPanelInsetAudit");
+	t.Expect(inset_code.Find("panelZero.SetInset(DPI(0));") >= 0,
+	         "generated code emits explicit zero inset for panel");
+	t.Expect(inset_code.Find("panelTwelve.SetInset(DPI(12));") >= 0,
+	         "generated code emits non-zero inset for panel");
+	t.Expect(inset_code.Find("scrollZero.SetInset(DPI(0));") >= 0,
+	         "generated code emits explicit zero inset for scroll panel");
+	t.Expect(inset_code.Find("scrollTwelve.SetInset(DPI(12));") >= 0,
+	         "generated code emits non-zero inset for scroll panel");
 }
 
 static void TestDesignerCodeGenPages(TestCtx& t)

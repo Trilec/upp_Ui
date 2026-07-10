@@ -110,6 +110,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 		String& out = ctx.Out();
 		out << "\t\t" << ctx.Var(n) << ".SetSizeMin(DPI(" << (int)ctx.Property(n, "min_width", 0)
 		    << "), DPI(" << (int)ctx.Property(n, "min_height", 0) << "));\n";
+		out << "\t\t" << ctx.Var(n) << ".SetInset(DPI(" << max(0, (int)ctx.Property(n, "inset", 0)) << "));\n";
 	};
 	panel.codegen.emit_child = EmitDesignerLayoutChild;
 	{
@@ -143,6 +144,7 @@ void RegisterDesignerContainerControls(DesignerRegistry& registry)
 		String expr = mode == "Vertical" ? "UIPANELSCROLL_VERTICAL" :
 		              mode == "Horizontal" ? "UIPANELSCROLL_HORIZONTAL" :
 		              mode == "None" ? "UIPANELSCROLL_NONE" : "UIPANELSCROLL_AUTO";
+		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetInset(DPI(" << max(0, (int)ctx.Property(n, "inset", 0)) << "));\n";
 		ctx.Out() << "\t\t" << ctx.Var(n) << ".SetScrollMode(" << expr << ");\n";
 	};
 	scroll.codegen.emit_child = EmitDesignerLayoutChild;
