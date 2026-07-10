@@ -8,7 +8,7 @@ This repository is building a cohesive `Ui*` layer that sits alongside CtrlLib a
 - practical reusable controls, layouts, and drawing helpers
 - demos that are useful in a WYSIWYG sense, not just showcase windows
 
-The library is still evolving, but it is now far enough along that the main direction is stable: clean themed controls, predictable layout behavior, and demo applications that help both users and AI agents understand how to apply the library in real code.
+The library is moving toward a Version 1 release. The main direction is stable: clean themed controls, predictable layout behavior, clear ownership, and demo/Designer applications that help users and coding agents understand how to apply the library in real code.
 
 ![UiButton demo screenshot](Snapshot_Button.jpg)
 
@@ -27,7 +27,10 @@ The library is still evolving, but it is now far enough along that the main dire
 ## Quick links
 
 - `GETTING_STARTED.md` - fast ramp-up
-- `UPP_GUIDES/README.md` - engineering guides, architecture notes, and active roadmaps
+- `UPP_GUIDES/00_Ui_V1_Engineering_Contract.md` - current Version 1 API, style, geometry, lifetime, and Designer authority
+- `UPP_GUIDES/Ui_V1_Control_Audit.md` - release-readiness audit and remediation workstreams
+- `UPP_GUIDES/Ui_V1_Documentation_Cleanup.md` - documentation retention, cleanup, consolidation, and archive plan
+- `UPP_GUIDES/README.md` - guide reading order and documentation authority
 - `CHANGELOG.md`
 
 ## Repo layout
@@ -35,8 +38,11 @@ The library is still evolving, but it is now far enough along that the main dire
 - `Ui/` - the `Ui` package: controls, theme/style infrastructure, layout helpers, icons, and draw utilities
 - `examples/` - demos and small test apps; these also act as a manual regression suite
 - `Utilities/Designer/` - visual layout/control designer for building and saving UI designs, inspecting generated code, and testing layout behavior
+- `UPP_GUIDES/` - current engineering contracts, detailed guides, feature references, audits, and archived design history
 
 ## What the repository provides
+
+The runtime source of truth is `Ui/Ui.upp` together with the public umbrella header `Ui/Ui.h`. Documentation and Designer coverage are expected to follow that inventory.
 
 The `Ui` package currently covers:
 
@@ -51,7 +57,7 @@ The `Ui` package currently covers:
   - `UiQuadSplitter` - four-pane splitter layout for editor-style workspaces
   - `UiStack` - page stack/container for switching between hosted child pages
   - `UiLayoutCursor` - small incremental placement helper for readable manual layout code
-  - `UiMeasureLayout` - helper for asking a control how much space it actually wants, which is annoyingly useful
+  - `UiMeasureLayout` - helper for asking a control how much space it wants
 
 - Text and display controls
   - `UiLabel` - styled text display with selection, alignment, icon/media, and richer presentation options
@@ -65,23 +71,23 @@ The `Ui` package currently covers:
   - `UiCheckBox` - themed boolean box control
   - `UiRadioButton` - themed single-choice option control
   - `UiToggle` - themed switch/toggle control
-  - `UiSplitButton` - action button with a secondary popup lane, because one click was too simple
+  - `UiSplitButton` - action button with a secondary popup lane
   - `UiMenu` - themed popup action surface
 
 - Panels, containers, and scrolling
-  - `UiPanel` - general styled surface with frame, fill, radius, and shadow support
-  - `UiGroupPanel` - titled group container with icon/subtitle/side-title header chrome and a single hosted body slot
+  - `UiPanel` - general styled host surface with frame, fill, radius, and shadow support
+  - `UiGroupPanel` - titled single-content container with icon/subtitle/side-title header chrome
   - `UiAccordion` - collapsible section container with themed headers and bodies
   - `UiScrollPanel` - themed scrollable content host
   - `UiScrollBar` - standalone themed scrollbar
   - `UiTab` - tabbed navigation surface
   - `UiStack` - stacked page container for multi-view surfaces
-  - `UiSliderEdit` - a slider paired with a text field, for when precision refuses to be optional
+  - `UiSliderEdit` - a slider paired with a text field
 
 - Edit and text-entry controls
   - `UiBaseEdit` - shared base for edit controls
   - `UiLineEdit` - single-line text entry
-  - `UiPasswordEdit` - masked password entry
+  - `UiPasswordEdit` - masked password entry with optional visibility control
   - `UiMaskEdit` - masked formatted text entry
   - `UiMultiEdit` - multi-line text editing
   - `UiIntEdit` - integer entry
@@ -112,41 +118,47 @@ The `Ui` package currently covers:
   - `UiIndicatorBase`, `UiIndicatorSupport` - shared indicator helpers used by several controls
   - `Ui.h` - package umbrella include
 
+Controls still being added or closed out for Version 1 should be described as in progress until their runtime implementation, tests, demo, documentation, and Designer integration have all been accepted.
+
 ## Designer
 
 `Utilities/Designer` is the visual designer for this library. It lets you build a model using layouts, containers, controls, composites, and presets; inspect the hierarchy and sizing modes; save/load designs as JSON; and view generated U++ code while testing layout behavior in the preview.
 
-The Designer currently supports the same core layout concepts used by the controls: fit, fixed, and expand sizing; box/grid placement; box wrapping and snap flow; spacers; splitters; panel, group-panel, and scroll-panel hosting; tab/stack containers; theme roles; and reusable layout presets.
+The Designer uses the same fit, fixed, and expand sizing concepts as the runtime controls, together with box/grid placement, spacers, splitters, panel-style hosting, page containers, theme roles, and reusable presets.
+
+Designer coverage is a Version 1 parity gate rather than a separate control inventory:
+
+- adapters should construct real runtime controls;
+- inspector properties should map to real runtime APIs or style fields;
+- inapplicable properties should not remain silently editable;
+- preview, save/reload, and generated code should agree.
 
 ![Designer screenshot](Snapshot_Designer.jpg)
 
 ## Intended role of the demos
 
-The demos are meant to be practical reference tools, not only visual showcases.
+The demos are practical reference and manual regression tools, not only visual showcases.
 
 Examples:
 
-- `UiPanelDemo` acts like a small panel builder that lets a user tune properties and copy the generated code
-- `UiFontSelectorDemo` is a useful font helper that previews installed fonts and shows the exact font-construction call
+- `UiPanelDemo` acts like a small panel builder that lets a user tune properties and copy generated code
+- `UiFontSelectorDemo` previews installed fonts and shows the corresponding font-construction call
 - `UiDemoBase` is the shell/template reference for how demo windows are structured and styled
 
-The current demo direction is to make each demo useful on its own while still exposing the implementation patterns behind the control. The active builder demos share one shell contract: header/title/subtitle/logo, version pill, theme toggle, red exit pill, dotted preview canvas, and Usage -> State -> Properties inspectors with live code output.
-
-Recent rewrites on that path include UiMultiEditDemo, UiRadioButtonDemo, UiMenuDemo, and UiTabDemo, each updated to surface the full control-specific behavior/layout/color seams rather than only a narrow showcase subset.
+The active builder demos share a common shell contract: header/title/subtitle/logo, version pill, theme toggle, exit control, dotted preview canvas, and Usage -> State -> Properties inspectors with live code output.
 
 ## Example/demo inventory
 
-The `examples/` directory currently includes:
+The `examples/` directory includes focused demos and shared demo infrastructure, including:
 
-- `UiDemoBase` - shared demo shell/template reference
-- `UiAccordionDemo`, `UiPanelDemo`, `UiFontSelectorDemo`, `UiThemeDemo`
-- `UiButtonDemo`, `UiToolButton` behavior is represented in the button-oriented demos
-- `UiLabelDemo`, `UiTitleCardDemo`, `UiBreadcrumbsDemo`
-- `UiBoxLayoutDemo`, `UiGridLayoutDemo`, `UiSplitterDemo`, `UiScrollPanelDemo`, `UiScrollBarDemo`
-- `UiBaseEditDemo`, `UiLineEditDemo`, `UiPasswordEditDemo`, `UiMaskEditDemo`, `UiMultiEditDemo`, `UiIntFloatDemo`
-- `UiDropdownDemo`, `UiListDemo`, `UiTreeDemo`, `UiTableDemo`, `UiMenuDemo`, `UiTabDemo`
-- `UiCheckBoxDemo`, `UiRadioButtonDemo`, `UiToggleDemo`
-- `UiColorPickerDemo`, `UiDocDemo`, `UiOsFileDialogDemo`
+- `UiDemoBase`
+- panel, accordion, theme, label, title-card, breadcrumb, button, and toggle demos
+- box/grid/splitter/scroll demos
+- base, line, password, mask, multi-line, integer, and floating-point edit demos
+- dropdown, list, tree, table, menu, and tab demos
+- color picker, document, and OS file-dialog examples
+
+The checked-in package list is the source of truth. Retired prototype demos should remain outside the active build sweep or under the documented archive/OLD location.
 
 ## Build and run
 
@@ -159,77 +171,64 @@ Important:
 ### TheIDE
 
 1. Open the repository in TheIDE.
-2. Ensure your assembly/nests can see both:
-   - this repo, for `Ui` and `examples`
-   - U++ `uppsrc`, for `Core`, `Draw`, `CtrlLib`, and related packages
-3. Set a demo package as the main package and run that package, for example `examples/UiPanelDemo`, `examples/UiFontSelectorDemo`, or `examples/UiButtonDemo`.
+2. Ensure the selected assembly can see:
+   - this repository;
+   - the external `Animation` package used by `Ui/Ui.upp`;
+   - U++ `uppsrc`.
+3. Select a demo package or `Utilities/Designer` as the main package.
 
-Dependencies used by `Ui/Ui.upp` include `Painter` and `Animation`.
+For this repository, prefer the checked-in `GitHubOut.var` assembly for local development. It contains the project nest configuration and keeps intermediates and runnable outputs under the repository `out/` directory rather than the global U++ output tree.
 
-Note: `Animation` should resolve from the external `E:\apps\github\upp_AnimationEasing` nest, not from a local package inside this repository.
-
-### CLI with `umk`
-
-Example on Windows:
-
-```bat
-"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui\examples,E:\apps\github\upp_Ui,E:\apps\github\upp_AnimationEasing,E:\upp-18468\uppsrc" UiButtonDemo CLANGx64 --out-dir "E:\apps\github\upp_Ui\out" -br "E:\apps\github\upp_Ui\out\UiButtonDemo.exe"
-```
-
-For this repository, prefer the checked-in `GitHubOut.var` assembly when doing
-local development. It includes the `E:\apps\github\upp_AnimationEasing` nest
-required by `Ui/Ui.upp` and writes intermediates to
-`E:\apps\github\upp_Ui\out`, avoiding locked/shared objects under
-`E:\upp-18468\out`.
-
-Keep ad-hoc CLI build artifacts in the repository `out` root
-(`E:\apps\github\upp_Ui\out`). Do not place current demo/designer outputs in
-`build` or `bin`.
+Do not place current demo or Designer outputs in `build/` or `bin/`.
 
 ## Public API direction
 
-This is a new codebase with no backward-compat naming shim layer. Public names are being kept explicit and direct, and docs/demos are updated with the code.
+This is a new codebase with no backward-compatibility naming shim layer. Experimental names may be corrected before Version 1.
 
-Spacing conventions used across item-oriented controls:
+The canonical project rules are in `UPP_GUIDES/00_Ui_V1_Engineering_Contract.md`.
 
-- `item_spacing` means spacing between repeated owned items
-- `content_gap` means primary spacing inside one control/item surface
-- semantic secondary gaps stay explicit, for example `right_gap`, `metadata_gap`, `drag_gap`, `chevron_gap`
-- `content_margin` is the outer inset around painted content
-Current conventions used across the controls and demos:
+Current conventions include:
 
-- interactive selection controls expose `SetData()` / `GetData()`
-- selection notifications use `WhenSelection`
-- `UiTab` uses `SetActiveTab()` / `GetActiveTab()`
-- `UiDropdown` uses explicit model binding via `SetModel(UiListModel&)`, `UseInternalModel()`, and `GetInternalModel()`
-- numeric edits keep one vocabulary: `Min`, `Max`, `MinMax`, `Step`, `Precision`, `NotNull`
-- `UiAccordion` section accessors are `GetSectionContent()`, `GetSectionHeader()`, and `GetSectionBody()`
-- custom-painted primitive parts use dedicated hooks rather than outer overpaint:
-  - `UiSlider`: `WhenPaintTrack`, `WhenPaintActiveTrack`, `WhenPaintThumb`
-  - `UiScrollBar`: `WhenPaintTrack`, `WhenPaintThumb`, `WhenPaintArrow`
-  - `UiToggle`: `WhenPaintTrack`, `WhenPaintThumb`
+- public control methods use normal U++-style PascalCase names such as `SetText`, `GetData`, and `SetCustomStyle`;
+- callbacks use `WhenX`;
+- interactive selection controls expose `SetData()` / `GetData()` where data binding is natural;
+- selection notifications use the accepted family callback, normally `WhenSelection`;
+- `UiTab` uses `SetActiveTab()` / `GetActiveTab()`;
+- `UiDropdown` uses explicit model binding through `SetModel(UiListModel&)`, `UseInternalModel()`, and `GetInternalModel()`;
+- numeric edits use `Min`, `Max`, `MinMax`, `Step`, `Precision`, and `NotNull`;
+- `UiAccordion` section accessors are `GetSectionContent()`, `GetSectionHeader()`, and `GetSectionBody()`;
+- custom-painted primitive parts use dedicated hooks rather than outer overpaint.
+
+Spacing vocabulary:
+
+- `item_spacing` - spacing between repeated owned items;
+- `content_gap` - primary spacing inside one item/control surface;
+- semantic secondary gaps use explicit names such as `right_gap`, `metadata_gap`, `drag_gap`, `chevron_gap`, or `accessory_gap`;
+- `content_margin` - margin inside a styled surface around painted content;
+- container/layout inset remains a distinct host-placement concept.
 
 Minimal button usage:
 
 ```cpp
-UiButton b;
-b.SetText("Run")
- .SetIcon(CtrlImg::go_forward())
- .SetIconSide(UiAlign::LEFT)
- .SetStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
+UiButton button;
+button.SetText("Run")
+      .SetIcon(CtrlImg::go_forward())
+      .SetIconSide(UiAlign::LEFT)
+      .SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Accent));
 ```
 
 ## Current status
 
-The project is still under active refinement, especially around:
+The project is in Version 1 hardening:
 
-- demo quality and usefulness
-- final polish of default styles
-- ensuring new controls stay clean, documented, and low-bloat in usage
+- runtime API and style unification;
+- container/layout stability;
+- complete Designer coverage and parity;
+- focused tests and demos;
+- documentation and release cleanup.
 
-The overall direction is no longer just exploratory. The controls, helpers, and demos are being shaped into a usable styled UI layer for real Ultimate++ applications.
+The goal is a solid styled UI layer for real Ultimate++ applications, without preserving accidental experimental APIs or hidden behavior.
 
 ## License
 
 Intended to live alongside Ultimate++.
-
