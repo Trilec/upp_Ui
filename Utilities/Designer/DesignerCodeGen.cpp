@@ -330,12 +330,17 @@ static String StyleTypeExpr(const DesignerNode& n)
 		return "UiCheckBox::Style";
 	if(n.type_id == "UiToggle")
 		return "UiToggle::Style";
+	if(n.type_id == "UiProgressBar")
+		return "UiProgressBar::Style";
 	if(n.type_id == "UiSlider")
 		return "UiSlider::Style";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::Style";
-	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit" ||
+	   n.type_id == "UiMaskEdit" || n.type_id == "UiPasswordEdit")
 		return "UiBaseEdit::Style";
+	if(n.type_id == "UiDoc")
+		return "UiDoc::Style";
 	if(n.type_id == "UiDropdown")
 		return "UiDropdown::Style";
 	if(n.type_id == "UiBreadcrumbs")
@@ -366,12 +371,17 @@ static String ResolveStyleExpr(const DesignerNode& n, const String& role_expr)
 		       CheckVisualExpr(AsString(CodeGenNodeProperty(n, "visual", "Classic"))) + ")";
 	if(n.type_id == "UiToggle")
 		return "UiTheme::ResolveToggle(" + role_expr + ")";
+	if(n.type_id == "UiProgressBar")
+		return "UiTheme::ResolveProgressBar(" + role_expr + ")";
 	if(n.type_id == "UiSlider")
 		return "UiTheme::ResolveSlider(" + RoleExpr(AsString(CodeGenNodeProperty(n, "role", "Standard"))) + ")";
 	if(n.type_id == "UiAccordion")
 		return "UiAccordion::StyleDefault()";
-	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit")
+	if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit" ||
+	   n.type_id == "UiMaskEdit" || n.type_id == "UiPasswordEdit")
 		return "UiTheme::ResolveEdit(" + role_expr + ")";
+	if(n.type_id == "UiDoc")
+		return "UiDoc::StyleDefault()";
 	if(n.type_id == "UiDropdown")
 		return "UiTheme::ResolveDropdown(" + role_expr + ")";
 	if(n.type_id == "UiBreadcrumbs")
@@ -481,6 +491,40 @@ static void EmitSurfaceOverrideFields(String& out, const String& target, const D
 	EmitFrameStyleOverrideFields(out, target + ".metrics", frame_style_key, n);
 	if(CodeGenHasProperty(n, radius_key))
 		out << "\t\t\t" << target << ".metrics.radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, radius_key, 0)) << ");\n";
+}
+
+static void EmitProgressSurfaceOverrideFields(String& out, const String& palette_target,
+                                              const String& metrics_target, const String& prefix,
+                                              const DesignerNode& n)
+{
+	String face_enabled_key = prefix + "_face_enabled";
+	String face_key = prefix + "_face";
+	String frame_enabled_key = prefix + "_frame_enabled";
+	String frame_key = prefix + "_frame";
+	String radius_key = prefix + "_radius";
+	if(CodeGenHasProperty(n, face_enabled_key)) {
+		bool face_enabled = (bool)CodeGenNodeProperty(n, face_enabled_key, false);
+		out << "\t\t\t" << metrics_target << ".face_enabled = " << (face_enabled ? "true" : "false") << ";\n";
+		if(face_enabled) {
+			Color face = CodeGenNodeProperty(n, face_key, SColorFace());
+			out << "\t\t\tColor " << prefix << "_face = " << ColorExpr(face) << ";\n"
+			    << "\t\t\t" << palette_target << ".face[ST_NORMAL] = UiFill::Solid(" << prefix << "_face);\n"
+			    << "\t\t\t" << palette_target << ".face[ST_HOT] = UiFill::Solid(Blend(" << prefix << "_face, White(), 24));\n"
+			    << "\t\t\t" << palette_target << ".face[ST_PRESSED] = UiFill::Solid(Blend(" << prefix << "_face, Black(), 16));\n"
+			    << "\t\t\t" << palette_target << ".face[ST_DISABLED] = UiFill::Solid(Blend(" << prefix << "_face, SColorFace(), 90));\n";
+		}
+	}
+	if(CodeGenHasProperty(n, frame_enabled_key)) {
+		bool frame_enabled = (bool)CodeGenNodeProperty(n, frame_enabled_key, false);
+		out << "\t\t\t" << metrics_target << ".frame_enabled = " << (frame_enabled ? "true" : "false") << ";\n";
+		if(frame_enabled) {
+			Color frame = CodeGenNodeProperty(n, frame_key, SColorShadow());
+			out << "\t\t\tfor(int i = 0; i < 4; i++)\n"
+			    << "\t\t\t\t" << palette_target << ".frame[i] = " << ColorExpr(frame) << ";\n";
+		}
+	}
+	if(CodeGenHasProperty(n, radius_key))
+		out << "\t\t\t" << metrics_target << ".radius = DPI(" << max(0, (int)CodeGenNodeProperty(n, radius_key, 0)) << ");\n";
 }
 
 static void EmitAccordionThemeStyle(String& out, const String& var, const DesignerNode& n)
@@ -700,6 +744,16 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		EmitSurfaceOverrideFields(out, "s.track_palette", n, "track");
 		EmitSurfaceOverrideFields(out, "s.thumb_palette", n, "thumb");
 	}
+	if(n.type_id == "UiProgressBar") {
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Progress part override.\n";
+		EmitProgressSurfaceOverrideFields(out, "s.track_palette", "s.track_metrics", "track", n);
+		EmitProgressSurfaceOverrideFields(out, "s.fill_palette", "s.fill_metrics", "progress", n);
+		if(CodeGenHasProperty(n, "filled_text_enabled") && (bool)CodeGenNodeProperty(n, "filled_text_enabled", false))
+			out << "\t\t\ts.filled_text = " << ColorExpr(CodeGenNodeProperty(n, "filled_text", UiTheme::ResolveProgressBar(CodeGenRoleChoice(n)).filled_text)) << ";\n";
+		if(CodeGenHasProperty(n, "empty_text_enabled") && (bool)CodeGenNodeProperty(n, "empty_text_enabled", false))
+			out << "\t\t\ts.empty_text = " << ColorExpr(CodeGenNodeProperty(n, "empty_text", UiTheme::ResolveProgressBar(CodeGenRoleChoice(n)).empty_text)) << ";\n";
+	}
 	if(n.type_id == "UiSlider") {
 		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Layout-specific override.\n";
@@ -768,7 +822,8 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
 		}
 	}
-	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit") {
+	else if(n.type_id == "UiLineEdit" || n.type_id == "UiIntEdit" || n.type_id == "UiFloatEdit" ||
+	        n.type_id == "UiMaskEdit" || n.type_id == "UiPasswordEdit") {
 		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
 			out << "\t\t\t// Text/icon override.\n";
 		UiBaseEdit::Style base = UiTheme::ResolveEdit(CodeGenRoleChoice(n));
@@ -780,6 +835,16 @@ static void EmitThemeStyle(String& out, const String& var, const DesignerNode& n
 		if(CodeGenHasProperty(n, "placeholder_ink_enabled") && (bool)CodeGenNodeProperty(n, "placeholder_ink_enabled", false)) {
 			Color placeholder = CodeGenNodeProperty(n, "placeholder_ink", base.placeholder_ink);
 			out << "\t\t\ts.placeholder_ink = " << ColorExpr(placeholder) << ";\n";
+		}
+	}
+	else if(n.type_id == "UiDoc") {
+		if(IsExactDesign(appearance_mode) && (bool)CodeGenNodeProperty(n, "theme_override", false))
+			out << "\t\t\t// Text/icon override.\n";
+		UiDoc::Style base = UiDoc::StyleDefault();
+		if(CodeGenHasProperty(n, "ink_enabled") && (bool)CodeGenNodeProperty(n, "ink_enabled", false)) {
+			Color base_ink = IsNull(base.palette.ink[ST_NORMAL]) ? SColorText() : base.palette.ink[ST_NORMAL];
+			Color ink = CodeGenNodeProperty(n, "ink", base_ink);
+			EmitPaletteColorOverrideFields(out, "s.palette", "ink", ink);
 		}
 	}
 	if(n.type_id == "UiButton" || n.type_id == "UiSplitButton")
@@ -951,6 +1016,9 @@ static void EmitDeclaration(DesignerCodeGenContext& ctx, const DesignerRegistry&
 		return;
 	}
 	out << "\t" << spec->runtime_cpp_type << " " << var << ";\n";
+	const DesignerNode* parent = ctx.Model().Find(n.parent);
+	if(parent && parent->type_id == "UiGroupPanel")
+		out << "\tUiDirectContentHost " << var << "_host;\n";
 }
 
 static String AxisSizing(const DesignerNode& n, const String& axis_key)

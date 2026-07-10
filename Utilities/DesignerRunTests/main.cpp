@@ -137,6 +137,8 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	t.Expect(emit_setup.Find("UiButton") < 0 && emit_setup.Find("UiSplitButton") < 0 &&
 	         emit_setup.Find("UiToolButton") < 0 && emit_setup.Find("UiLineEdit") < 0 &&
 	         emit_setup.Find("UiIntEdit") < 0 && emit_setup.Find("UiFloatEdit") < 0 &&
+	         emit_setup.Find("UiMaskEdit") < 0 && emit_setup.Find("UiPasswordEdit") < 0 &&
+	         emit_setup.Find("UiDoc") < 0 && emit_setup.Find("UiProgressBar") < 0 &&
 	         emit_setup.Find("UiSlider") < 0 && emit_setup.Find("UiToggle") < 0 &&
 	         emit_setup.Find("UiDropdown") < 0 && emit_setup.Find("UiCheckBox") < 0 &&
 	         emit_setup.Find("UiBreadcrumbs") < 0 && emit_setup.Find("UiLabel") < 0 &&
@@ -201,7 +203,7 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	t.Expect(route_structural > 0, "structural routes are registered");
 	t.Expect(route_headless > 0, "headless routes are registered");
 	t.Expect(route_no_output > 0, "no-runtime-output routes are registered");
-	t.Expect(specs.GetCount() == 38, "registry still exposes the expected 38 control specs");
+	t.Expect(specs.GetCount() == 42, "registry exposes the expected 42 control specs");
 }
 
 static const DesignerNode* FindNodeByName(const DesignerModel& model, const String& name)
@@ -495,6 +497,177 @@ static void TestExplicitEmptyTextValues(TestCtx& t)
 	t.Expect(button_adapter.GetText().IsEmpty(), "button preview preserves explicit empty text");
 }
 
+static void TestDesignerNewEditControls(TestCtx& t)
+{
+	t.Section("Designer Mask/Password/Doc/Progress controls");
+
+	DesignerRegistry r;
+	RegisterDesignerBuiltins(r);
+
+	DesignerModel m;
+	DesignerNodeId box = m.AddNode("BoxLayout", Designer_ROOT);
+	r.Find("BoxLayout")->init_defaults(*m.Find(box));
+
+	DesignerNodeId mask = m.AddNode("UiMaskEdit", box);
+	r.Find("UiMaskEdit")->init_defaults(*m.Find(mask));
+	m.Find(mask)->name = "dateMask";
+	m.Find(mask)->properties.Set("mask", "##/##/####");
+	m.Find(mask)->properties.Set("prompt_char", "_");
+	m.Find(mask)->properties.Set("text", "07042026");
+	m.Find(mask)->properties.Set("placeholder", "Date");
+	m.Find(mask)->properties.Set("show_error", true);
+	m.Find(mask)->properties.Set("error_color_enabled", true);
+	m.Find(mask)->properties.Set("error_color", Color(220, 38, 38));
+
+	DesignerNodeId password = m.AddNode("UiPasswordEdit", box);
+	r.Find("UiPasswordEdit")->init_defaults(*m.Find(password));
+	m.Find(password)->name = "passwordEdit";
+	m.Find(password)->properties.Set("sample_text", "secret");
+	m.Find(password)->properties.Set("placeholder", "Password");
+	m.Find(password)->properties.Set("plain_visible", false);
+	m.Find(password)->properties.Set("visibility_icon", true);
+
+	DesignerNodeId doc = m.AddNode("UiDoc", box);
+	r.Find("UiDoc")->init_defaults(*m.Find(doc));
+	m.Find(doc)->name = "documentEditor";
+	m.Find(doc)->properties.Set("sample_text", "Document sample\nSecond line");
+
+	DesignerNodeId progress = m.AddNode("UiProgressBar", box);
+	r.Find("UiProgressBar")->init_defaults(*m.Find(progress));
+	m.Find(progress)->name = "assetProgress";
+	m.Find(progress)->properties.Set("actual", 75);
+	m.Find(progress)->properties.Set("total", 100);
+	m.Find(progress)->properties.Set("show_percentage", true);
+	m.Find(progress)->properties.Set("indeterminate", false);
+	m.Find(progress)->properties.Set("orientation", "Horizontal");
+	m.Find(progress)->properties.Set("custom_text", "Loading assets");
+	m.Find(progress)->properties.Set("role", "Accent");
+	m.Find(progress)->properties.Set("theme_override", true);
+	m.Find(progress)->properties.Set("track_face_enabled", true);
+	m.Find(progress)->properties.Set("track_face", Color(226, 232, 240));
+	m.Find(progress)->properties.Set("progress_face_enabled", true);
+	m.Find(progress)->properties.Set("progress_face", Color(37, 99, 235));
+	m.Find(progress)->properties.Set("progress_radius", 12);
+	m.Find(progress)->properties.Set("filled_text_enabled", true);
+	m.Find(progress)->properties.Set("filled_text", White());
+	m.Find(progress)->properties.Set("empty_text_enabled", true);
+	m.Find(progress)->properties.Set("empty_text", Color(51, 65, 85));
+
+	auto HasBinding = [](const Vector<DesignerApiBinding>& bindings, const String& id) {
+		for(const DesignerApiBinding& b : bindings)
+			if(b.property_id == id)
+				return true;
+		return false;
+	};
+	for(DesignerNodeId id : { mask, password, doc, progress }) {
+		DesignerAdapter* adapter = nullptr;
+		One<Ctrl> ctrl(CreateDesignerAdapterCtrl(r, *m.Find(id), &adapter));
+		t.Expect(adapter != nullptr, m.Find(id)->type_id + " adapter constructs");
+		Vector<DesignerApiBinding> bindings;
+		if(adapter)
+			adapter->DescribeApi(bindings, *m.Find(id));
+		t.Expect(HasBinding(bindings, "h_sizing") && HasBinding(bindings, "v_sizing"),
+		         m.Find(id)->type_id + " preserves common sizing bindings");
+	}
+
+	DesignerAdapter* progress_adapter = nullptr;
+	One<Ctrl> progress_ctrl(CreateDesignerAdapterCtrl(r, *m.Find(progress), &progress_adapter));
+	t.Expect(progress_adapter && progress_adapter->GetTypeId() == "UiProgressBar",
+	         "progress bar adapter factory constructs");
+	if(progress_adapter) {
+		progress_adapter->SyncFromNode(*m.Find(progress));
+		UiProgressBar* bar = dynamic_cast<UiProgressBar*>(progress_ctrl.Get());
+		t.Expect(bar && bar->Get() == 75 && bar->GetTotal() == 100,
+		         "progress bar adapter projects determinate value");
+		t.Expect(bar && bar->IsPercentShown(), "progress bar adapter projects percentage flag");
+		t.Expect(bar && bar->GetOrientation() == UiProgressBar::Orientation::Horizontal,
+		         "progress bar adapter projects horizontal orientation");
+		t.Expect(bar && bar->GetText() == "Loading assets",
+		         "progress bar adapter projects custom text");
+		t.Expect(bar && bar->GetStyle().fill_metrics.radius == DPI(12),
+		         "progress bar adapter projects explicit progress radius");
+		t.Expect(bar && bar->GetStyle().fill_palette.face[ST_NORMAL].IsSolid() &&
+		         bar->GetStyle().fill_palette.face[ST_NORMAL].color == Color(37, 99, 235),
+		         "progress bar adapter projects explicit progress fill");
+	}
+
+	DesignerNode indeterminate_node;
+	indeterminate_node.id = 9001;
+	indeterminate_node.type_id = "UiProgressBar";
+	indeterminate_node.name = "busyProgress";
+	r.Find("UiProgressBar")->init_defaults(indeterminate_node);
+	indeterminate_node.properties.Set("indeterminate", true);
+	indeterminate_node.properties.Set("total", 100);
+	indeterminate_node.properties.Set("orientation", "Vertical");
+	DesignerProgressBarAdapter indeterminate_adapter;
+	indeterminate_adapter.SyncFromNode(indeterminate_node);
+	t.Expect(indeterminate_adapter.IsIndeterminate(),
+	         "progress bar indeterminate projection ignores positive total after SetIndeterminate");
+	t.Expect(indeterminate_adapter.GetOrientation() == UiProgressBar::Orientation::Vertical,
+	         "progress bar adapter projects vertical orientation");
+	{
+		DesignerProgressBarAdapter live;
+		live.SyncFromNode(indeterminate_node);
+		t.Expect(live.IsIndeterminate(), "animating progress bar can be constructed before destruction");
+	}
+
+	String json = StoreDesignerModelJson(m);
+	DesignerModel loaded;
+	String error;
+	t.Expect(LoadDesignerModelJson(loaded, r, json, error, nullptr),
+	         "new edit controls reload from designer JSON");
+	const DesignerNode* loaded_mask = FindNodeByName(loaded, "dateMask");
+	const DesignerNode* loaded_password = FindNodeByName(loaded, "passwordEdit");
+	const DesignerNode* loaded_doc = FindNodeByName(loaded, "documentEditor");
+	const DesignerNode* loaded_progress = FindNodeByName(loaded, "assetProgress");
+	t.Expect(loaded_mask && TestNodePropertyOr(*loaded_mask, "mask", "") == "##/##/####" &&
+	         TestNodePropertyOr(*loaded_mask, "text", "") == "07042026",
+	         "mask edit properties survive save/reload");
+	t.Expect(loaded_password && TestNodePropertyOr(*loaded_password, "sample_text", "") == "secret" &&
+	         TestNodePropertyOr(*loaded_password, "visibility_icon", false) == true,
+	         "password edit properties survive save/reload");
+	t.Expect(loaded_doc && AsString(TestNodePropertyOr(*loaded_doc, "sample_text", "")).Find("Second line") >= 0,
+	         "doc sample text survives save/reload");
+	t.Expect(loaded_progress && TestNodePropertyOr(*loaded_progress, "actual", 0) == 75 &&
+	         TestNodePropertyOr(*loaded_progress, "orientation", "") == "Horizontal" &&
+	         TestNodePropertyOr(*loaded_progress, "custom_text", "") == "Loading assets",
+	         "progress bar properties survive save/reload");
+
+	String code = GenerateDesignerCode(m, r, "GeneratedNewEditControls", true);
+	t.Expect(code.Find("UiMaskEdit dateMask;") >= 0 && code.Find("dateMask.SetMask(\"##/##/####\"") >= 0 &&
+	         code.Find("dateMask.SetData(\"07042026\")") >= 0 && code.Find("dateMask.SetErrorColor(") >= 0,
+	         "mask edit generated code includes runtime setup");
+	t.Expect(code.Find("UiPasswordEdit passwordEdit;") >= 0 && code.Find("passwordEdit.SetTextUtf8(\"secret\")") >= 0 &&
+	         code.Find("passwordEdit.SetPlainTextVisible(false)") >= 0 &&
+	         code.Find("passwordEdit.EnableVisibilityIcon(true)") >= 0,
+	         "password edit generated code includes runtime setup");
+	t.Expect(code.Find("UiDoc documentEditor;") >= 0 &&
+	         code.Find("documentEditor.SetText(\"Document sample\\nSecond line\")") >= 0,
+	         "doc generated code includes runtime setup");
+	t.Expect(code.Find("UiProgressBar assetProgress;") >= 0 &&
+	         code.Find("assetProgress.Percent(true).SetOrientation(UiProgressBar::Orientation::Horizontal)") >= 0 &&
+	         code.Find("assetProgress.SetText(\"Loading assets\")") >= 0 &&
+	         code.Find("assetProgress.Set(75, 100)") >= 0,
+	         "progress bar generated code includes determinate runtime setup");
+	t.Expect(code.Find("UiProgressBar::Style") >= 0 &&
+	         code.Find("s.fill_palette.face[ST_NORMAL] = UiFill::Solid(progress_face)") >= 0 &&
+	         code.Find("s.empty_text = Color(51, 65, 85)") >= 0,
+	         "progress bar generated code includes explicit style overrides");
+
+	DesignerModel indeterminate_model;
+	DesignerNodeId indeterminate_box = indeterminate_model.AddNode("BoxLayout", Designer_ROOT);
+	r.Find("BoxLayout")->init_defaults(*indeterminate_model.Find(indeterminate_box));
+	DesignerNodeId indeterminate_progress = indeterminate_model.AddNode("UiProgressBar", indeterminate_box);
+	r.Find("UiProgressBar")->init_defaults(*indeterminate_model.Find(indeterminate_progress));
+	indeterminate_model.Find(indeterminate_progress)->name = "busyProgress";
+	indeterminate_model.Find(indeterminate_progress)->properties.Set("indeterminate", true);
+	indeterminate_model.Find(indeterminate_progress)->properties.Set("total", 100);
+	String indeterminate_code = GenerateDesignerCode(indeterminate_model, r, "GeneratedIndeterminateProgress", true);
+	t.Expect(indeterminate_code.Find("busyProgress.SetIndeterminate(true)") >= 0 &&
+	         indeterminate_code.Find("busyProgress.Set(60, 100)") < 0,
+	         "indeterminate progress generated code does not cancel indeterminate mode");
+}
+
 static void TestDesignerDragController(TestCtx& t)
 {
 	t.Section("Designer drag controller");
@@ -614,8 +787,16 @@ static void TestRegistryAndBuiltins(TestCtx& t)
 	t.Expect(r.Find("UiLineEdit") && !r.Find("UiLineEdit")->icon.IsEmpty(), "edit control has toolbox icon");
 	t.Expect(r.Find("UiToggle") && !r.Find("UiToggle")->icon.IsEmpty(), "toggle control has toolbox icon");
 	t.Expect(r.Find("UiDropdown") && !r.Find("UiDropdown")->icon.IsEmpty(), "dropdown control has toolbox icon");
-	for(const char *type : { "UiCheckBox", "UiBreadcrumbs", "UiTab", "UiStack", "UiTable", "UiTree" })
+	for(const char *type : { "UiMaskEdit", "UiPasswordEdit", "UiDoc", "UiProgressBar", "UiCheckBox", "UiBreadcrumbs", "UiTab", "UiStack", "UiTable", "UiTree" })
 		t.Expect(r.Find(type) && !r.Find(type)->icon.IsEmpty(), String(type) + " is registered with toolbox icon");
+	auto ToolboxHas = [&](const String& id) {
+		for(const DesignerType* type : r.GetToolboxTypes("Controls"))
+			if(type && type->id == id)
+				return true;
+		return false;
+	};
+	t.Expect(ToolboxHas("UiMaskEdit") && ToolboxHas("UiPasswordEdit") && ToolboxHas("UiDoc") && ToolboxHas("UiProgressBar"),
+	         "mask, password, doc, and progress controls appear in the Controls toolbox");
 
 	DesignerNode parent;
 	parent.type_id = "UiLabel";
@@ -985,6 +1166,96 @@ static VectorMap<String, DesignerApiAuditSpec> BuildDesignerApiAuditSpecs()
 	auto& float_edit = AddAuditSpec(specs, "UiFloatEdit");
 	float_edit = line;
 	float_edit.icon_ink_visible = false;
+
+	auto& mask_edit = AddAuditSpec(specs, "UiMaskEdit");
+	mask_edit = line;
+	mask_edit.part_overrides = {"mask", "prompt_char", "show_error", "error_color_enabled",
+	                            "error_color", "success_color_enabled", "success_color"};
+	mask_edit.setup = [](DesignerNode& n) {
+		n.properties.Set("role", "Accent");
+		n.properties.Set("theme_override", true);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("face", Color(240, 240, 255));
+		n.properties.Set("frame_enabled", true);
+		n.properties.Set("frame", Color(226, 226, 226));
+		n.properties.Set("radius", 8);
+		n.properties.Set("ink_enabled", true);
+		n.properties.Set("ink", Color(10, 90, 200));
+		n.properties.Set("placeholder_ink_enabled", true);
+		n.properties.Set("placeholder_ink", Color(120, 130, 140));
+		n.properties.Set("mask", "##/##/####");
+		n.properties.Set("prompt_char", "_");
+		n.properties.Set("show_error", true);
+	};
+
+	auto& password_edit = AddAuditSpec(specs, "UiPasswordEdit");
+	password_edit = line;
+	password_edit.part_overrides = {"sample_text", "password_char", "plain_visible", "visibility_icon"};
+	password_edit.setup = [](DesignerNode& n) {
+		n.properties.Set("role", "Accent");
+		n.properties.Set("theme_override", true);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("face", Color(240, 240, 255));
+		n.properties.Set("frame_enabled", true);
+		n.properties.Set("frame", Color(226, 226, 226));
+		n.properties.Set("radius", 8);
+		n.properties.Set("ink_enabled", true);
+		n.properties.Set("ink", Color(10, 90, 200));
+		n.properties.Set("placeholder_ink_enabled", true);
+		n.properties.Set("placeholder_ink", Color(120, 130, 140));
+		n.properties.Set("sample_text", "secret");
+		n.properties.Set("plain_visible", false);
+		n.properties.Set("visibility_icon", true);
+	};
+
+	auto& doc = AddAuditSpec(specs, "UiDoc");
+	doc.role_visible = true;
+	doc.theme_visible = true;
+	doc.surface_visible = true;
+	doc.quad_visible = true;
+	doc.ink_visible = true;
+	doc.icon_ink_visible = false;
+	doc.part_overrides = {"sample_text"};
+	AddStrings(doc.codegen_markers, {"UiDoc::StyleDefault()", "s.palette.ink[ST_NORMAL]"});
+	doc.setup = [](DesignerNode& n) {
+		n.properties.Set("role", "Accent");
+		n.properties.Set("theme_override", true);
+		n.properties.Set("face_enabled", true);
+		n.properties.Set("face", Color(240, 240, 255));
+		n.properties.Set("frame_enabled", true);
+		n.properties.Set("frame", Color(226, 226, 226));
+		n.properties.Set("radius", 8);
+		n.properties.Set("ink_enabled", true);
+		n.properties.Set("ink", Color(10, 90, 200));
+		n.properties.Set("sample_text", "Document sample");
+	};
+
+	auto& progress = AddAuditSpec(specs, "UiProgressBar");
+	progress.role_visible = true;
+	progress.theme_visible = true;
+	progress.part_overrides = {"track_face_enabled", "track_face", "track_frame_enabled", "track_frame",
+	                           "track_radius", "progress_face_enabled", "progress_face",
+	                           "progress_frame_enabled", "progress_frame", "progress_radius",
+	                           "filled_text_enabled", "filled_text", "empty_text_enabled", "empty_text",
+	                           "actual", "total", "show_percentage", "indeterminate", "orientation", "custom_text"};
+	AddStrings(progress.hidden_common, {"face", "face_mode", "face_quad", "frame", "frame_style", "radius",
+	                                   "face_enabled", "frame_enabled", "shadow_enabled", "shadow_distance",
+	                                   "shadow_offset_x", "shadow_offset_y", "shadow_alpha", "shadow_color", "shadow_curve"});
+	AddStrings(progress.codegen_markers, {"UiTheme::ResolveProgressBar(UiRole::Accent)", "s.fill_palette.face[ST_NORMAL]", ".Set(75, 100)"});
+	progress.setup = [](DesignerNode& n) {
+		n.properties.Set("role", "Accent");
+		n.properties.Set("theme_override", true);
+		n.properties.Set("track_face_enabled", true);
+		n.properties.Set("track_face", Color(226, 232, 240));
+		n.properties.Set("progress_face_enabled", true);
+		n.properties.Set("progress_face", Color(37, 99, 235));
+		n.properties.Set("progress_radius", 12);
+		n.properties.Set("actual", 75);
+		n.properties.Set("total", 100);
+		n.properties.Set("show_percentage", true);
+		n.properties.Set("orientation", "Horizontal");
+		n.properties.Set("custom_text", "Loading assets");
+	};
 
 	auto& dropdown = AddAuditSpec(specs, "UiDropdown");
 	dropdown.role_visible = true;
@@ -1472,7 +1743,7 @@ static void TestDesignerAdapters(TestCtx& t)
 	t.Expect(text && text->editor == DesignerEditorKind::Text, "label adapter exposes text editor");
 	t.Expect(text && text->api_call == "UiLabel::SetText", "label text binding names real API");
 
-	for(const char *type : { "Spacer", "UiButton", "UiLineEdit", "UiToggle", "UiDropdown",
+	for(const char *type : { "Spacer", "UiButton", "UiLineEdit", "UiMaskEdit", "UiPasswordEdit", "UiDoc", "UiProgressBar", "UiToggle", "UiDropdown",
 	                         "UiCheckBox", "UiBreadcrumbs", "UiTab", "UiStack", "UiTable", "UiTree" }) {
 		DesignerNode n;
 		n.id = 50;
@@ -1496,6 +1767,23 @@ static void TestDesignerAdapters(TestCtx& t)
 		else if(String(type) == "UiDropdown")
 			t.Expect(FindBinding(bindings, "item_text") && FindBinding(bindings, "indicator_side"),
 			         "dropdown adapter exposes item text and chevron controls");
+		else if(String(type) == "UiMaskEdit")
+			t.Expect(FindBinding(bindings, "mask") && FindBinding(bindings, "prompt_char") &&
+			         FindBinding(bindings, "show_error") && FindBinding(bindings, "error_color"),
+			         "mask edit adapter exposes mask, prompt, and feedback controls");
+		else if(String(type) == "UiPasswordEdit")
+			t.Expect(FindBinding(bindings, "sample_text") && FindBinding(bindings, "password_char") &&
+			         FindBinding(bindings, "plain_visible") && FindBinding(bindings, "visibility_icon"),
+			         "password edit adapter exposes masking and visibility controls");
+		else if(String(type) == "UiDoc")
+			t.Expect(FindBinding(bindings, "sample_text") && !FindBinding(bindings, "read_only") &&
+			         !FindBinding(bindings, "word_wrap"),
+			         "doc adapter exposes minimal V1 sample text without invented editor APIs");
+		else if(String(type) == "UiProgressBar")
+			t.Expect(FindBinding(bindings, "actual") && FindBinding(bindings, "total") &&
+			         FindBinding(bindings, "indeterminate") && FindBinding(bindings, "orientation") &&
+			         FindBinding(bindings, "progress_face") && FindBinding(bindings, "track_face"),
+			         "progress bar adapter exposes value, mode, orientation, and part styling controls");
 		else if(String(type) == "UiCheckBox")
 			t.Expect(FindBinding(bindings, "state") && FindBinding(bindings, "state")->editor == DesignerEditorKind::Choice,
 			         "checkbox adapter exposes check state");
@@ -1562,6 +1850,88 @@ static void TestDesignerAdapters(TestCtx& t)
 	ExpectPanelInset("UiScrollPanel", 0, "scroll panel inset zero");
 	ExpectPanelInset("UiScrollPanel", 12, "scroll panel inset twelve");
 
+	auto PreviewDirectChildRect = [&](const char *parent_type, int inset) {
+		DesignerModel pm;
+		DesignerNodeId parent = pm.AddNode(parent_type, Designer_ROOT);
+		r.Find(parent_type)->init_defaults(*pm.Find(parent));
+		pm.Find(parent)->properties.Set("inset", inset);
+		pm.Find(parent)->properties.Set("h_sizing", "Expand");
+		pm.Find(parent)->properties.Set("v_sizing", "Expand");
+		DesignerNodeId child = pm.AddNode("UiButton", parent);
+		r.Find("UiButton")->init_defaults(*pm.Find(child));
+		pm.Find(child)->properties.Set("h_sizing", "Fixed");
+		pm.Find(child)->properties.Set("v_sizing", "Fixed");
+		pm.Find(child)->properties.Set("fixed_width", 80);
+		pm.Find(child)->properties.Set("fixed_height", 28);
+		DesignerPreview preview;
+		preview.Set(&pm, &r);
+		preview.SetRect(0, 0, 640, 360);
+		preview.SyncRealPreview();
+		preview.Layout();
+		return pm.Find(child)->last_rect;
+	};
+	Rect panel_child_0 = PreviewDirectChildRect("UiPanel", 0);
+	Rect panel_child_12 = PreviewDirectChildRect("UiPanel", 12);
+	t.Expect(panel_child_12.left == panel_child_0.left + DPI(12) &&
+	         panel_child_12.top == panel_child_0.top + DPI(12),
+	         "panel preview direct child rect follows inset");
+	Rect scroll_child_0 = PreviewDirectChildRect("UiScrollPanel", 0);
+	Rect scroll_child_12 = PreviewDirectChildRect("UiScrollPanel", 12);
+	t.Expect(scroll_child_12.left == scroll_child_0.left + DPI(12) &&
+	         scroll_child_12.top == scroll_child_0.top + DPI(12),
+	         "scroll panel preview direct child rect follows inset");
+
+	UiDirectContentHost host;
+	UiButton hosted_button;
+	host.SetContent(hosted_button)
+	    .SetSizing(UIDIRECT_FIT, UIDIRECT_FIT)
+	    .SetFixedSize(Size(DPI(80), DPI(28)))
+	    .SetMinimumSize(Size(DPI(40), DPI(20)))
+	    .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+	host.SetRect(0, 0, DPI(220), DPI(100));
+	host.Layout();
+	t.Expect(hosted_button.GetRect().GetWidth() < host.GetSize().cx &&
+	         hosted_button.GetRect().left > 0 &&
+	         hosted_button.GetRect().top > 0,
+	         "direct content host centers fit content without filling");
+	host.SetSizing(UIDIRECT_EXPAND, UIDIRECT_FIT);
+	host.Layout();
+	t.Expect(hosted_button.GetRect().GetWidth() == host.GetSize().cx &&
+	         hosted_button.GetRect().GetHeight() < host.GetSize().cy,
+	         "direct content host expands only requested axis");
+
+	DesignerNode group_parent;
+	group_parent.type_id = "UiGroupPanel";
+	r.Find("UiGroupPanel")->init_defaults(group_parent);
+	DesignerNode group_child;
+	group_child.type_id = "UiButton";
+	r.Find("UiButton")->init_defaults(group_child);
+	t.Expect(r.CanDrop(group_parent, group_child), "empty group panel accepts one direct content root");
+	group_parent.children.Add(101);
+	t.Expect(!r.CanDrop(group_parent, group_child), "group panel rejects a second direct content root");
+
+	DesignerModel group_preview_model;
+	DesignerNodeId group = group_preview_model.AddNode("UiGroupPanel", Designer_ROOT);
+	r.Find("UiGroupPanel")->init_defaults(*group_preview_model.Find(group));
+	DesignerNodeId group_button = group_preview_model.AddNode("UiButton", group);
+	r.Find("UiButton")->init_defaults(*group_preview_model.Find(group_button));
+	group_preview_model.Find(group_button)->properties.Set("h_sizing", "Fit");
+	group_preview_model.Find(group_button)->properties.Set("v_sizing", "Fit");
+	group_preview_model.Find(group_button)->properties.Set("cell_align_h", "Center");
+	group_preview_model.Find(group_button)->properties.Set("cell_align_v", "Center");
+	DesignerPreview group_preview;
+	group_preview.Set(&group_preview_model, &r);
+	group_preview.SetRect(0, 0, 640, 360);
+	group_preview.SyncRealPreview();
+	group_preview.Layout();
+	Rect group_rect = group_preview_model.Find(group)->last_rect;
+	Rect button_rect = group_preview_model.Find(group_button)->last_rect;
+	t.Expect(button_rect.GetWidth() < group_rect.GetWidth() &&
+	         button_rect.GetHeight() < group_rect.GetHeight() &&
+	         button_rect.left > group_rect.left &&
+	         button_rect.top > group_rect.top,
+	         "group panel preview uses hosted fit content placement");
+
 	DesignerModel inset_model;
 	DesignerNodeId root = inset_model.AddNode("BoxLayout", Designer_ROOT);
 	r.Find("BoxLayout")->init_defaults(*inset_model.Find(root));
@@ -1590,6 +1960,26 @@ static void TestDesignerAdapters(TestCtx& t)
 	         "generated code emits explicit zero inset for scroll panel");
 	t.Expect(inset_code.Find("scrollTwelve.SetInset(DPI(12));") >= 0,
 	         "generated code emits non-zero inset for scroll panel");
+
+	DesignerModel group_codegen_model;
+	DesignerNodeId code_group = group_codegen_model.AddNode("UiGroupPanel", Designer_ROOT);
+	r.Find("UiGroupPanel")->init_defaults(*group_codegen_model.Find(code_group));
+	group_codegen_model.Find(code_group)->name = "settingsGroup";
+	DesignerNodeId code_button = group_codegen_model.AddNode("UiToolButton", code_group);
+	r.Find("UiToolButton")->init_defaults(*group_codegen_model.Find(code_button));
+	group_codegen_model.Find(code_button)->name = "settingsTool";
+	group_codegen_model.Find(code_button)->properties.Set("h_sizing", "Fit");
+	group_codegen_model.Find(code_button)->properties.Set("v_sizing", "Fit");
+	group_codegen_model.Find(code_button)->properties.Set("cell_align_h", "Center");
+	group_codegen_model.Find(code_button)->properties.Set("cell_align_v", "Center");
+	String group_code = GenerateDesignerCode(group_codegen_model, r, "GeneratedGroupDirectContentAudit");
+	t.Expect(group_code.Find("UiDirectContentHost settingsTool_host;") >= 0,
+	         "generated code declares direct content host for group child");
+	t.Expect(group_code.Find("settingsTool_host.SetContent(settingsTool);") >= 0 &&
+	         group_code.Find("settingsGroup.SetContent(settingsTool_host);") >= 0,
+	         "generated code routes group child through direct content host");
+	t.Expect(group_code.Find("settingsTool_host.SetAlign(UiAlign::CENTER, UiAlign::CENTER);") >= 0,
+	         "generated code emits direct content alignment");
 }
 
 static void TestDesignerCodeGenPages(TestCtx& t)
@@ -2886,10 +3276,22 @@ static DesignerModel MakeSampleModel(DesignerRegistry& r)
 		r.Find("PaneSlot")->init_defaults(*m.Find(pane));
 		m.Find(pane)->name = "quadPane" + AsString(i + 1);
 	}
-	for(const char *type : { "UiCheckBox", "UiBreadcrumbs", "UiTab", "UiStack", "UiTable", "UiTree" }) {
+	for(const char *type : { "UiMaskEdit", "UiPasswordEdit", "UiDoc", "UiCheckBox", "UiBreadcrumbs", "UiTab", "UiStack", "UiTable", "UiTree" }) {
 		DesignerNodeId id = m.AddNode(type, grid);
 		r.Find(type)->init_defaults(*m.Find(id));
 		m.Find(id)->name = type;
+		if(String(type) == "UiMaskEdit") {
+			m.Find(id)->properties.Set("mask", "##/##/####");
+			m.Find(id)->properties.Set("text", "12312026");
+			m.Find(id)->properties.Set("show_error", true);
+		}
+		else if(String(type) == "UiPasswordEdit") {
+			m.Find(id)->properties.Set("sample_text", "secret");
+			m.Find(id)->properties.Set("plain_visible", false);
+			m.Find(id)->properties.Set("visibility_icon", true);
+		}
+		else if(String(type) == "UiDoc")
+			m.Find(id)->properties.Set("sample_text", "UiDoc sample text");
 		if(String(type) == "UiBreadcrumbs") {
 			m.Find(id)->properties.Set("crumb_count", 5);
 			m.Find(id)->properties.Set("crumb_1", "Home");
@@ -2927,6 +3329,14 @@ static void TestGeneratedCodeText(TestCtx& t)
 	t.Expect(code.Find("UiGridLayout contentGrid") >= 0, "generated code declares grid layout member from model name");
 	t.Expect(code.Find("UiButton") >= 0 && code.Find(".SetText(\"Button\")") >= 0, "generated code emits button control");
 	t.Expect(code.Find("UiLineEdit") >= 0 && code.Find(".SetTextUtf8(\"Edit\")") >= 0, "generated code emits line edit control");
+	t.Expect(code.Find("UiMaskEdit") >= 0 && code.Find(".SetMask(\"##/##/####\"") >= 0 &&
+	         code.Find(".SetData(\"12312026\")") >= 0 && code.Find(".ShowError(true)") >= 0,
+	         "generated code emits mask edit setup");
+	t.Expect(code.Find("UiPasswordEdit") >= 0 && code.Find(".SetPasswordChar(") >= 0 &&
+	         code.Find(".EnableVisibilityIcon(true)") >= 0,
+	         "generated code emits password edit setup");
+	t.Expect(code.Find("UiDoc") >= 0 && code.Find(".SetText(\"UiDoc sample text\")") >= 0,
+	         "generated code emits doc setup");
 	t.Expect(code.Find("UiToggle") >= 0 && code.Find(".SetOn(true)") >= 0, "generated code emits toggle control");
 	t.Expect(code.Find("UiDropdown") >= 0 && code.Find(".UseInternalModel().Clear().Add(\"First\"") >= 0, "generated code emits dropdown control");
 	t.Expect(code.Find("UiCheckBox") >= 0 && code.Find(".SetState(") >= 0, "generated code emits checkbox control");
@@ -3332,6 +3742,7 @@ CONSOLE_APP_MAIN
 	TestDesignerAddTarget(t);
 	TestDesignerCommands(t);
 	TestExplicitEmptyTextValues(t);
+	TestDesignerNewEditControls(t);
 	TestDesignerArchitectureGuard(t);
 	TestDesignerDragController(t);
 	TestUiQuadSplitterConstruction(t);

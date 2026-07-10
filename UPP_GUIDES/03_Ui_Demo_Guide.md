@@ -725,6 +725,7 @@ Status key:
 - [ ] `UiGridLayoutDemo`
 - [ ] `UiIntFloatDemo`
 - [ ] `UiMaskEditDemo`
+- [ ] `UiProgressBarDemo`
 - [ ] `UiScrollBarDemo`
 - [ ] `UiScrollPanelDemo`
 - [ ] `UiTabCapDemo`

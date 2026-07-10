@@ -25,6 +25,16 @@ static void PaintDesignerAppearance(Draw& w, const Rect& r, const DesignerNode& 
 static Color DesignerDebugColor(const DesignerNode& n);
 static void ApplyTitleCardInkOverrides(UiTitleCard::Style& style, const DesignerNode& n);
 
+static UiProgressBar::Orientation DesignerProgressOrientationChoice(const Value& value)
+{
+	String s = AsString(value);
+	if(s == "Horizontal")
+		return UiProgressBar::Orientation::Horizontal;
+	if(s == "Vertical")
+		return UiProgressBar::Orientation::Vertical;
+	return UiProgressBar::Orientation::Auto;
+}
+
 template <class Style>
 static DesignerThemeSurfaceDefaults DesignerThemeSurfaceDefaultsFromStyle(const Style& s)
 {
@@ -773,6 +783,15 @@ static void ApplyEditAppearance(UiBaseEdit& edit, const DesignerNode& n)
 	edit.SetCustomStyle(s);
 }
 
+static void ApplyDocAppearance(UiDoc& doc, const DesignerNode& n)
+{
+	UiDoc::Style s = UiDoc::StyleDefault();
+	ApplyExplicitSurfaceOverrides(s.palette, s.metrics, n);
+	ApplyExplicitInkOverrides(s.palette, n);
+	s.font = DesignerFontChoice(n, "font", max(7, (int)AdapterNodeProperty(n, "font_size", 11)));
+	doc.SetCustomStyle(s);
+}
+
 static void ApplyDropdownAppearance(UiDropdown& drop, const DesignerNode& n)
 {
 	UiDropdown::Style s = UiTheme::ResolveDropdown(DesignerRoleChoice(AdapterNodeProperty(n, "role", "Standard")));
@@ -827,6 +846,12 @@ String DesignerAdapterHelp(const String& type_id)
 		return "Integer field with numeric editing behavior. Useful for compact property or settings forms.";
 	if(type_id == "UiFloatEdit")
 		return "Floating-point field with precision and step settings. Useful for numeric inspector-style input.";
+	if(type_id == "UiMaskEdit")
+		return "Masked text field for dates, codes, and other structured input. Keeps callbacks out of Designer, mercifully.";
+	if(type_id == "UiPasswordEdit")
+		return "Password field with masking and optional reveal icon. Useful for login mockups without pretending security is decoration.";
+	if(type_id == "UiDoc")
+		return "Rich document editor surface. Designer exposes sample text only; the serious editor API stays in runtime code.";
 	if(type_id == "UiSlider")
 		return "Continuous/ranged value control. Use fixed height plus expanding width to test common toolbar and settings layouts.";
 	if(type_id == "UiToggle")
@@ -1809,6 +1834,138 @@ void DesignerSliderAdapter::Paint(Draw& w)
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 
+void DesignerProgressBarAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	UiProgressBar::Style s = UiTheme::ResolveProgressBar(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Accent")));
+	ApplyPrefixedSurfaceOverrides(s.track_palette, s.track_metrics, node, "track");
+	ApplyPrefixedSurfaceOverrides(s.fill_palette, s.fill_metrics, node, "progress");
+	if(DesignerBoolProperty(node, "theme_override", false)) {
+		if(DesignerBoolProperty(node, "filled_text_enabled", false))
+			s.filled_text = GetColorProperty(node, "filled_text", s.filled_text);
+		if(DesignerBoolProperty(node, "empty_text_enabled", false))
+			s.empty_text = GetColorProperty(node, "empty_text", s.empty_text);
+	}
+	SetCustomStyle(s);
+	SetOrientation(DesignerProgressOrientationChoice(AdapterNodeProperty(node, "orientation", "Auto")));
+	Percent(DesignerBoolProperty(node, "show_percentage", true));
+	String custom_text = AsString(AdapterNodeProperty(node, "custom_text", ""));
+	if(custom_text.IsEmpty())
+		ClearText();
+	else
+		SetText(custom_text);
+	if(DesignerBoolProperty(node, "indeterminate", false))
+		SetIndeterminate(true);
+	else
+		Set((int)AdapterNodeProperty(node, "actual", 60), (int)AdapterNodeProperty(node, "total", 100));
+	NoWantFocus();
+}
+
+void DesignerProgressBarAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerProgressBarAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Hide("face_mode");
+	b.Hide("face_quad");
+	b.Hide("face_enabled");
+	b.Hide("face");
+	b.Hide("frame_enabled");
+	b.Hide("frame");
+	b.Hide("frame_style");
+	b.Hide("radius");
+	b.Hide("shadow_enabled");
+	b.Hide("shadow_distance");
+	b.Hide("shadow_offset_x");
+	b.Hide("shadow_offset_y");
+	b.Hide("shadow_alpha");
+	b.Hide("shadow_color");
+	b.Hide("shadow_curve");
+	b.AddBehaviour("actual", "Actual", DesignerEditorKind::Slider, "UiProgressBar::Set",
+	               "Current progress value used when Indeterminate is off.", 0, 1000);
+	b.AddBehaviour("total", "Total", DesignerEditorKind::Slider, "UiProgressBar::Set",
+	               "Total progress value. Zero or negative runtime total means indeterminate; use the Indeterminate switch for clarity.", 0, 1000);
+	b.AddBehaviour("show_percentage", "Show percentage", DesignerEditorKind::Bool, "UiProgressBar::Percent",
+	               "Shows centered percentage text for determinate progress.");
+	b.AddBehaviour("indeterminate", "Indeterminate", DesignerEditorKind::Bool, "UiProgressBar::SetIndeterminate",
+	               "Shows the animated unknown-total state.");
+	b.AddBehaviour("orientation", "Orientation", "UiProgressBar::SetOrientation",
+	               "Auto follows aspect ratio; explicit modes force horizontal or vertical layout.",
+	               {{"Auto", "Auto"}, {"Horizontal", "Horizontal"}, {"Vertical", "Vertical"}});
+	b.AddContent("custom_text", "Custom text", DesignerEditorKind::Text, "UiProgressBar::SetText",
+	             "Optional text drawn instead of percentage text.");
+
+	b.AddTheme("track_face_enabled", "Track fill enabled", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::track_metrics.face_enabled",
+	           "Enables an explicit progress track fill.").group = "Theme Overrides";
+	b.AddTheme("track_face", "Track fill", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::track_palette.face",
+	           "Explicit progress track fill color.").group = "Theme Overrides";
+	b.AddTheme("track_frame_enabled", "Track frame enabled", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::track_metrics.frame_enabled",
+	           "Enables an explicit progress track frame.").group = "Theme Overrides";
+	b.AddTheme("track_frame", "Track frame", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::track_palette.frame",
+	           "Explicit progress track frame color.").group = "Theme Overrides";
+	b.AddTheme("track_radius", "Track radius", DesignerEditorKind::Slider,
+	           "UiProgressBar::Style::track_metrics.radius",
+	           "Track corner radius.", 0, 64).group = "Theme Overrides";
+	b.AddTheme("progress_face_enabled", "Progress fill enabled", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::fill_metrics.face_enabled",
+	           "Enables an explicit filled progress color.").group = "Theme Overrides";
+	b.AddTheme("progress_face", "Progress fill", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::fill_palette.face",
+	           "Explicit filled progress color.").group = "Theme Overrides";
+	b.AddTheme("progress_frame_enabled", "Progress frame enabled", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::fill_metrics.frame_enabled",
+	           "Enables an explicit frame around the filled progress segment.").group = "Theme Overrides";
+	b.AddTheme("progress_frame", "Progress frame", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::fill_palette.frame",
+	           "Explicit filled progress frame color.").group = "Theme Overrides";
+	b.AddTheme("progress_radius", "Progress radius", DesignerEditorKind::Slider,
+	           "UiProgressBar::Style::fill_metrics.radius",
+	           "Filled progress segment corner radius.", 0, 64).group = "Theme Overrides";
+	b.AddTheme("filled_text_enabled", "Use filled text color", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::filled_text",
+	           "Enables an explicit text color over the filled segment.").group = "Theme Overrides";
+	b.AddTheme("filled_text", "Filled text color", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::filled_text",
+	           "Text color used over the filled segment.").group = "Theme Overrides";
+	b.AddTheme("empty_text_enabled", "Use empty text color", DesignerEditorKind::Bool,
+	           "UiProgressBar::Style::empty_text",
+	           "Enables an explicit text color over the unfilled track.").group = "Theme Overrides";
+	b.AddTheme("empty_text", "Empty text color", DesignerEditorKind::Color,
+	           "UiProgressBar::Style::empty_text",
+	           "Text color used over the unfilled track.").group = "Theme Overrides";
+
+	UiProgressBar::Style s = UiTheme::ResolveProgressBar(DesignerRoleChoice(AdapterNodeProperty(node, "role", "Accent")));
+	SetBindingDefault(b, "track_face_enabled", false);
+	SetBindingDefault(b, "track_face", s.track_palette.face[ST_NORMAL].IsSolid() ? s.track_palette.face[ST_NORMAL].color : Null);
+	SetBindingDefault(b, "track_frame_enabled", false);
+	SetBindingDefault(b, "track_frame", s.track_palette.frame[ST_NORMAL]);
+	SetBindingDefault(b, "track_radius", s.track_metrics.radius / max(1, DPI(1)));
+	SetBindingDefault(b, "progress_face_enabled", false);
+	SetBindingDefault(b, "progress_face", s.fill_palette.face[ST_NORMAL].IsSolid() ? s.fill_palette.face[ST_NORMAL].color : Null);
+	SetBindingDefault(b, "progress_frame_enabled", false);
+	SetBindingDefault(b, "progress_frame", s.fill_palette.frame[ST_NORMAL]);
+	SetBindingDefault(b, "progress_radius", s.fill_metrics.radius / max(1, DPI(1)));
+	SetBindingDefault(b, "filled_text_enabled", false);
+	SetBindingDefault(b, "filled_text", s.filled_text);
+	SetBindingDefault(b, "empty_text_enabled", false);
+	SetBindingDefault(b, "empty_text", s.empty_text);
+}
+
+void DesignerProgressBarAdapter::Paint(Draw& w)
+{
+	UiProgressBar::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
 void DesignerButtonAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
@@ -2180,6 +2337,194 @@ void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 void DesignerFloatEditAdapter::Paint(Draw& w)
 {
 	UiFloatEdit::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+static char DesignerPromptCharChoice(const DesignerNode& node)
+{
+	String s = AsString(AdapterNodeProperty(node, "prompt_char", "_"));
+	return s.IsEmpty() ? '_' : s[0];
+}
+
+static wchar DesignerPasswordCharChoice(const DesignerNode& node)
+{
+	String s = AsString(AdapterNodeProperty(node, "password_char", String()));
+	WString ws = s.ToWString();
+	return ws.IsEmpty() ? (wchar)0x2022 : ws[0];
+}
+
+void DesignerMaskEditAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyEditAppearance(*this, node);
+	SetPlaceholder(AdapterNodeProperty(node, "placeholder", "Masked value"));
+	SetMask(AdapterNodeProperty(node, "mask", "##/##/####"), DesignerPromptCharChoice(node));
+	String sample = AsString(AdapterNodeProperty(node, "text", ""));
+	if(!sample.IsEmpty())
+		SetData(sample);
+	ShowError((bool)AdapterNodeProperty(node, "show_error", false));
+	if((bool)AdapterNodeProperty(node, "error_color_enabled", false))
+		SetErrorColor(AdapterNodeProperty(node, "error_color", Color(220, 38, 38)));
+	if((bool)AdapterNodeProperty(node, "success_color_enabled", false))
+		SetSuccessColor(AdapterNodeProperty(node, "success_color", Color(52, 199, 89)));
+	NoWantFocus();
+}
+
+void DesignerMaskEditAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerMaskEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("text", "Text", DesignerEditorKind::Text, "UiMaskEdit::SetData",
+	      "Sample raw value placed into the mask. Empty keeps the prompt visible.");
+	b.Add("placeholder", "Placeholder", DesignerEditorKind::Text, "UiMaskEdit::SetPlaceholder",
+	      "Placeholder shown when the mask is not carrying input.");
+	b.Add("mask", "Mask", DesignerEditorKind::Text, "UiMaskEdit::SetMask",
+	      "Mask pattern, for example ##/##/####.");
+	b.Add("prompt_char", "Prompt character", DesignerEditorKind::Text, "UiMaskEdit::SetMask",
+	      "Single prompt character used for empty mask slots.");
+	b.Add("show_error", "Show error", DesignerEditorKind::Bool, "UiMaskEdit::ShowError",
+	      "Shows the runtime error tint in preview.");
+	b.Add("error_color_enabled", "Use error color", DesignerEditorKind::Bool, "UiMaskEdit::SetErrorColor",
+	      "Enables explicit error feedback color in generated code.");
+	b.Add("error_color", "Error color", DesignerEditorKind::Color, "UiMaskEdit::SetErrorColor",
+	      "Explicit error feedback color.");
+	b.Add("success_color_enabled", "Use success color", DesignerEditorKind::Bool, "UiMaskEdit::SetSuccessColor",
+	      "Enables explicit success feedback color in generated code.");
+	b.Add("success_color", "Success color", DesignerEditorKind::Color, "UiMaskEdit::SetSuccessColor",
+	      "Explicit success feedback color.");
+	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
+	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
+	            "Preview edit font family.",
+	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
+	         "Preview edit font size.", 7, 32);
+	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	      "UiBaseEdit::Style::palette.ink",
+	      "Enables an explicit edit text color override.").group = "Theme Overrides";
+	b.Add("ink", "Text color", DesignerEditorKind::Color,
+	      "UiBaseEdit::Style::palette.ink",
+	      "Explicit edit text color used when theme overrides are active.").group = "Theme Overrides";
+	b.Add("placeholder_ink_enabled", "Use placeholder color", DesignerEditorKind::Bool,
+	      "UiBaseEdit::Style::placeholder_ink",
+	      "Enables an explicit placeholder text color override.").group = "Theme Overrides";
+	b.Add("placeholder_ink", "Placeholder color", DesignerEditorKind::Color,
+	      "UiBaseEdit::Style::placeholder_ink",
+	      "Explicit placeholder text color used when theme overrides are active.").group = "Theme Overrides";
+	SetEditThemeInkDefaults(b, "ink_enabled", "ink", "placeholder_ink_enabled", "placeholder_ink", node);
+}
+
+void DesignerMaskEditAdapter::Paint(Draw& w)
+{
+	UiMaskEdit::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerPasswordEditAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyEditAppearance(*this, node);
+	SetTextUtf8(AdapterNodeProperty(node, "sample_text", "Password"));
+	SetPlaceholder(AdapterNodeProperty(node, "placeholder", "Password"));
+	SetPasswordChar(DesignerPasswordCharChoice(node));
+	SetPlainTextVisible((bool)AdapterNodeProperty(node, "plain_visible", false));
+	EnableVisibilityIcon((bool)AdapterNodeProperty(node, "visibility_icon", true));
+	NoWantFocus();
+}
+
+void DesignerPasswordEditAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerPasswordEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("sample_text", "Sample text", DesignerEditorKind::Text, "UiPasswordEdit::SetTextUtf8",
+	      "Sample password text used by the Designer preview.");
+	b.Add("placeholder", "Placeholder", DesignerEditorKind::Text, "UiPasswordEdit::SetPlaceholder",
+	      "Placeholder shown when the password field is empty.");
+	b.Add("password_char", "Password character", DesignerEditorKind::Text, "UiPasswordEdit::SetPasswordChar",
+	      "Single character used to mask the password text.");
+	b.Add("plain_visible", "Plain text visible", DesignerEditorKind::Bool, "UiPasswordEdit::SetPlainTextVisible",
+	      "Shows the sample text unmasked in preview.");
+	b.Add("visibility_icon", "Visibility icon", DesignerEditorKind::Bool, "UiPasswordEdit::EnableVisibilityIcon",
+	      "Shows the built-in eye toggle icon.");
+	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
+	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
+	            "Preview edit font family.",
+	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiBaseEdit::Style::font",
+	         "Preview edit font size.", 7, 32);
+	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	      "UiBaseEdit::Style::palette.ink",
+	      "Enables an explicit edit text color override.").group = "Theme Overrides";
+	b.Add("ink", "Text color", DesignerEditorKind::Color,
+	      "UiBaseEdit::Style::palette.ink",
+	      "Explicit edit text color used when theme overrides are active.").group = "Theme Overrides";
+	b.Add("placeholder_ink_enabled", "Use placeholder color", DesignerEditorKind::Bool,
+	      "UiBaseEdit::Style::placeholder_ink",
+	      "Enables an explicit placeholder text color override.").group = "Theme Overrides";
+	b.Add("placeholder_ink", "Placeholder color", DesignerEditorKind::Color,
+	      "UiBaseEdit::Style::placeholder_ink",
+	      "Explicit placeholder text color used when theme overrides are active.").group = "Theme Overrides";
+	SetEditThemeInkDefaults(b, "ink_enabled", "ink", "placeholder_ink_enabled", "placeholder_ink", node);
+}
+
+void DesignerPasswordEditAdapter::Paint(Draw& w)
+{
+	UiPasswordEdit::Paint(w);
+	DrawDesignerOverlay(w, GetSize(), overlay_);
+}
+
+void DesignerDocAdapter::SyncFromNode(const DesignerNode& node)
+{
+	node_id_ = node.id;
+	ApplyDocAppearance(*this, node);
+	SetText(AdapterNodeProperty(node, "sample_text", "UiDoc sample\n\nEdit rich text at runtime."));
+	NoWantFocus();
+}
+
+void DesignerDocAdapter::SetOverlayState(const DesignerOverlayState& state)
+{
+	overlay_ = state;
+	Refresh();
+}
+
+void DesignerDocAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const
+{
+	AddCommonBindings(out, node);
+	DesignerApiBuilder b(out);
+	b.Add("sample_text", "Sample text", DesignerEditorKind::Text, "UiDoc::SetText",
+	      "Representative document text. Advanced transactions and annotations stay in runtime code.");
+	b.AddChoice("font", "Font", "UiDoc::Style::font",
+	            "Preview document font family.",
+	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
+	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
+	b.AddInt("font_size", "Font size", DesignerEditorKind::Slider, "UiDoc::Style::font",
+	         "Preview document font size.", 7, 32);
+	b.AddTheme("ink_enabled", "Use text color", DesignerEditorKind::Bool,
+	           "UiDoc::Style::palette.ink",
+	           "Enables an explicit document text color override.").group = "Theme Overrides";
+	b.AddTheme("ink", "Text color", DesignerEditorKind::Color,
+	           "UiDoc::Style::palette.ink",
+	           "Explicit document text color used when theme overrides are active.").group = "Theme Overrides";
+}
+
+void DesignerDocAdapter::Paint(Draw& w)
+{
+	UiDoc::Paint(w);
 	DrawDesignerOverlay(w, GetSize(), overlay_);
 }
 

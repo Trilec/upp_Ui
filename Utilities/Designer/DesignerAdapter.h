@@ -283,6 +283,28 @@ private:
 	DesignerOverlayState overlay_;
 };
 
+// Designer wrapper for UiProgressBar.
+// Uses the real runtime progress bar and only maps model properties into the
+// public value/theme API.
+class DesignerProgressBarAdapter : public UiProgressBar, public DesignerAdapter {
+public:
+	typedef DesignerProgressBarAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiProgressBar"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
 
 // Designer wrapper for stable Ui composite controls.
 // The wrapper owns the real composite as a child so design-time overlay behavior
@@ -436,6 +458,69 @@ public:
 	const Ctrl& GetCtrl() const override { return *this; }
 	DesignerNodeId GetNodeId() const override { return node_id_; }
 	String GetTypeId() const override { return "UiFloatEdit"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+// Designer wrapper for UiMaskEdit.
+// Keeps mask configuration previewable without exposing validator callbacks.
+class DesignerMaskEditAdapter : public UiMaskEdit, public DesignerAdapter {
+public:
+	typedef DesignerMaskEditAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiMaskEdit"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+// Designer wrapper for UiPasswordEdit.
+// Exposes password-specific preview knobs while reusing the edit style contract.
+class DesignerPasswordEditAdapter : public UiPasswordEdit, public DesignerAdapter {
+public:
+	typedef DesignerPasswordEditAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiPasswordEdit"; }
+	void SyncFromNode(const DesignerNode& node) override;
+	void SetOverlayState(const DesignerOverlayState& state) override;
+	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }
+	void DescribeApi(Vector<DesignerApiBinding>& out, const DesignerNode& node) const override;
+	void Paint(Draw& w) override;
+
+private:
+	DesignerNodeId node_id_ = Designer_NULL;
+	DesignerOverlayState overlay_;
+};
+
+// Designer wrapper for UiDoc.
+// V1 exposes representative document text only; advanced editor APIs stay runtime-owned.
+class DesignerDocAdapter : public UiDoc, public DesignerAdapter {
+public:
+	typedef DesignerDocAdapter CLASSNAME;
+
+	Ctrl& GetCtrl() override { return *this; }
+	const Ctrl& GetCtrl() const override { return *this; }
+	DesignerNodeId GetNodeId() const override { return node_id_; }
+	String GetTypeId() const override { return "UiDoc"; }
 	void SyncFromNode(const DesignerNode& node) override;
 	void SetOverlayState(const DesignerOverlayState& state) override;
 	const DesignerOverlayState& GetOverlayState() const override { return overlay_; }

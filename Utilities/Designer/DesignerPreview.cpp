@@ -100,25 +100,70 @@ static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const S
 	return max(natural, user_min);
 }
 
-static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n)
+static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n, int inset = 0)
 {
 	String hs = DesignerPreviewAxisSizing(n, "h_sizing");
 	String vs = DesignerPreviewAxisSizing(n, "v_sizing");
+	inset = DPI(max(0, inset));
 
 	if(hs == "Expand" && vs == "Expand") {
-		child.SizePos();
+		child.HSizePosZ(inset, inset);
+		child.VSizePosZ(inset, inset);
 		return;
 	}
 
 	if(hs == "Expand")
-		child.HSizePosZ(0, 0);
+		child.HSizePosZ(inset, inset);
 	else
-		child.LeftPosZ(0, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+		child.LeftPosZ(inset, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
 
 	if(vs == "Expand")
-		child.VSizePosZ(0, 0);
+		child.VSizePosZ(inset, inset);
 	else
-		child.TopPosZ(0, DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+		child.TopPosZ(inset, DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+}
+
+static UiDirectSizeMode DesignerPreviewDirectSizeMode(const DesignerNode& n, const String& axis)
+{
+	String sizing = DesignerPreviewAxisSizing(n, axis);
+	if(sizing == "Expand")
+		return UIDIRECT_EXPAND;
+	if(sizing == "Fixed")
+		return UIDIRECT_FIXED;
+	return UIDIRECT_FIT;
+}
+
+static UiAlign DesignerPreviewDirectAlignH(const DesignerNode& n)
+{
+	String align = DesignerPreviewNodeProperty(n, "cell_align_h", "Left");
+	if(align == "Center")
+		return UiAlign::CENTER;
+	if(align == "Right")
+		return UiAlign::RIGHT;
+	return UiAlign::LEFT;
+}
+
+static UiAlign DesignerPreviewDirectAlignV(const DesignerNode& n)
+{
+	String align = DesignerPreviewNodeProperty(n, "cell_align_v", "Top");
+	if(align == "Center")
+		return UiAlign::CENTER;
+	if(align == "Bottom")
+		return UiAlign::BOTTOM;
+	return UiAlign::TOP;
+}
+
+static void DesignerPreviewConfigureDirectHost(UiDirectContentHost& host, Ctrl& child, const DesignerNode& n)
+{
+	int fixed_w = DesignerClampMin((int)DesignerPreviewFixedMetric(n, "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+	int fixed_h = DesignerClampMin((int)DesignerPreviewFixedMetric(n, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+	int min_w = max(0, (int)DesignerPreviewNodeProperty(n, "min_width", 0));
+	int min_h = max(0, (int)DesignerPreviewNodeProperty(n, "min_height", 0));
+	host.SetContent(child)
+	    .SetSizing(DesignerPreviewDirectSizeMode(n, "h_sizing"), DesignerPreviewDirectSizeMode(n, "v_sizing"))
+	    .SetFixedSize(Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h))))
+	    .SetMinimumSize(Size(DPI(min_w), DPI(min_h)))
+	    .SetAlign(DesignerPreviewDirectAlignH(n), DesignerPreviewDirectAlignV(n));
 }
 
 static Color DesignerPreviewBackground(UiThemeMode mode)
@@ -1528,16 +1573,22 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			}
 			else if(DesignerScrollPanelAdapter *scroll = dynamic_cast<DesignerScrollPanelAdapter *>(&parent)) {
 				scroll->Content().Add(child);
-				DesignerPreviewApplyDirectChildLayout(child, child_node);
+				DesignerPreviewApplyDirectChildLayout(child, child_node,
+					(int)DesignerPreviewNodeProperty(parent_node, "inset", 0));
 			}
 			else if(DesignerGroupPanelAdapter *group = dynamic_cast<DesignerGroupPanelAdapter *>(&parent)) {
-				if(!group->GetContent())
-					group->SetContent(child);
-				DesignerPreviewApplyDirectChildLayout(child, child_node);
+				if(!group->GetContent()) {
+					UiDirectContentHost& host = direct_hosts_.Add();
+					group->SetContent(host);
+					DesignerPreviewConfigureDirectHost(host, child, child_node);
+				}
 			}
 			else {
 				parent_ctrl.Add(child);
-				DesignerPreviewApplyDirectChildLayout(child, child_node);
+				int inset = parent_node.type_id == "UiPanel"
+				          ? (int)DesignerPreviewNodeProperty(parent_node, "inset", 0)
+				          : 0;
+				DesignerPreviewApplyDirectChildLayout(child, child_node, inset);
 			}
 		}
 
@@ -1586,6 +1637,7 @@ void DesignerPreview::RebuildRealPreview()
 			for(int i = 0; i < real_controls_.GetCount(); i++)
 				real_controls_[i].Remove();
 			real_adapters_.Clear();
+			direct_hosts_.Clear();
 			real_controls_.Clear();
 			if(!model_ || !registry_) {
 				rebuilding_real_ = false;

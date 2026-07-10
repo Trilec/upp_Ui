@@ -33,6 +33,8 @@ file
 	UiToggle.cpp,
 	UiPanel.h,
 	UiPanel.cpp,
+	UiDirectContentHost.h,
+	UiDirectContentHost.cpp,
 	UiGroupPanel.h,
 	UiGroupPanel.cpp,
 	UiStack.h,
@@ -69,6 +71,8 @@ file
 	UiMultiEdit.cpp,
 	UiMaskEdit.h,
 	UiMaskEdit.cpp,
+	UiProgressBar.h,
+	UiProgressBar.cpp,
 	UiSlider.h,
 	UiSlider.cpp,
 	Composites/UiCompositeSlider.h,
@@ -113,4 +117,3 @@ file
 	UiColorPicker.cpp,
 	src.tpp,
 	srcdoc.tpp;
-

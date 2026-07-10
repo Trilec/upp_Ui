@@ -77,6 +77,41 @@ static String DesignerLayoutBoxCrossAlignExpr(const DesignerNode& n, bool horizo
 	return "UiBoxLayout::Align::Start";
 }
 
+static String DesignerDirectSizeModeExpr(const DesignerNode& n, const String& key)
+{
+	String sizing = AsString(DesignerNodeProperty(n, key, "Fit"));
+	if(sizing == "Expand")
+		return "UIDIRECT_EXPAND";
+	if(sizing == "Fixed")
+		return "UIDIRECT_FIXED";
+	return "UIDIRECT_FIT";
+}
+
+static String DesignerDirectAlignHExpr(const DesignerNode& n)
+{
+	String align = AsString(DesignerNodeProperty(n, "cell_align_h", "Left"));
+	if(align == "Center")
+		return "UiAlign::CENTER";
+	if(align == "Right")
+		return "UiAlign::RIGHT";
+	return "UiAlign::LEFT";
+}
+
+static String DesignerDirectAlignVExpr(const DesignerNode& n)
+{
+	String align = AsString(DesignerNodeProperty(n, "cell_align_v", "Top"));
+	if(align == "Center")
+		return "UiAlign::CENTER";
+	if(align == "Bottom")
+		return "UiAlign::BOTTOM";
+	return "UiAlign::TOP";
+}
+
+static String DesignerDirectHostVar(DesignerCodeGenContext& ctx, const DesignerNode& child)
+{
+	return ctx.Var(child) + "_host";
+}
+
 void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& parent, const DesignerNode& child, int index)
 {
 	String& out = ctx.Out();
@@ -261,7 +296,21 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 			return;
 		}
 		if(parent.type_id == "UiGroupPanel") {
-			out << "\t\t" << p << ".SetContent(" << c << ");\n";
+			String host = DesignerDirectHostVar(ctx, child);
+			int fixed_w = max(DesignerClampMin((int)ctx.Property(child, "fixed_width", DESIGNER_FIXED_FALLBACK_WIDTH)),
+			                  max(0, (int)ctx.Property(child, "min_width", 0)));
+			int fixed_h = max(DesignerClampMin((int)ctx.Property(child, "fixed_height", DESIGNER_FIXED_FALLBACK_HEIGHT)),
+			                  max(0, (int)ctx.Property(child, "min_height", 0)));
+			int min_w = max(0, (int)ctx.Property(child, "min_width", 0));
+			int min_h = max(0, (int)ctx.Property(child, "min_height", 0));
+			out << "\t\t" << host << ".SetContent(" << c << ");\n";
+			out << "\t\t" << host << ".SetSizing(" << DesignerDirectSizeModeExpr(child, "h_sizing")
+			    << ", " << DesignerDirectSizeModeExpr(child, "v_sizing") << ");\n";
+			out << "\t\t" << host << ".SetFixedSize(Size(DPI(" << fixed_w << "), DPI(" << fixed_h << ")));\n";
+			out << "\t\t" << host << ".SetMinimumSize(Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+			out << "\t\t" << host << ".SetAlign(" << DesignerDirectAlignHExpr(child) << ", "
+			    << DesignerDirectAlignVExpr(child) << ");\n";
+			out << "\t\t" << p << ".SetContent(" << host << ");\n";
 			return;
 		}
 		if(parent.type_id == "UiTab") {

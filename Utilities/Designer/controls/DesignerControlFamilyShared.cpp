@@ -249,6 +249,9 @@ DesignerType MakeGroupPanelType()
 	t.capabilities.can_have_children = true;
 	t.capabilities.supports_children = true;
 	t.child_emission = DesignerLayoutChildEmissionStrategy::GroupPanelContent;
+	t.can_drop = [](const DesignerNode& parent, const DesignerNode&) {
+		return parent.children.GetCount() == 0;
+	};
 	t.codegen.route = DesignerCodeGenRoute::StructuralCentral;
 	t.codegen.emit_setup = [](DesignerCodeGenContext& ctx, const DesignerNode& n) {
 		String& out = ctx.Out();

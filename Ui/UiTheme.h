@@ -48,6 +48,7 @@
 #include <Ui/UiCheckBox.h>
 #include <Ui/UiToggle.h>
 #include <Ui/UiRadioButton.h>
+#include <Ui/UiProgressBar.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiScrollPanel.h>
 #include <Ui/UiScrollBar.h>
@@ -1073,6 +1074,85 @@ inline UiRadioButton::Style ApplyRadioButtonVisual(UiRadioButton::Style s, UiRad
     }
     return s;
 }
+
+inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
+{
+    UiProgressBar::Style s = UiProgressBar::StyleDefault();
+    switch(preset) {
+    case UiThemePreset::Minimal:
+        return s;
+    case UiThemePreset::Pill:
+        s.track_metrics.radius = DPI(999);
+        s.fill_metrics.radius = DPI(999);
+        return s;
+    case UiThemePreset::Linear:
+        s.track_metrics.radius = 0;
+        s.fill_metrics.radius = 0;
+        s.track_metrics.frame_enabled = false;
+        return s;
+    case UiThemePreset::Solid:
+        s.track_metrics.radius = DPI(6);
+        s.fill_metrics.radius = DPI(6);
+        SetFace(s.track_palette, Color(203, 213, 225), Color(203, 213, 225), Color(203, 213, 225), Color(226, 232, 240));
+        return s;
+    case UiThemePreset::Outline:
+        s.track_metrics.face_enabled = false;
+        s.track_metrics.frame_enabled = true;
+        s.track_metrics.frame_width = DPI(1);
+        s.fill_metrics.frame_enabled = false;
+        s.track_metrics.radius = 0;
+        s.fill_metrics.radius = 0;
+        return s;
+    case UiThemePreset::Compact:
+        s.font = StdFontZ(10);
+        s.content_inset = Rect(0, 0, 0, 0);
+        s.indeterminate_span = DPI(30);
+        return s;
+    case UiThemePreset::Layered:
+        s.track_metrics.radius = DPI(999);
+        s.fill_metrics.radius = DPI(999);
+        s.track_metrics.shadow.enabled = true;
+        s.track_metrics.shadow.curve = ShadowSoft();
+        s.track_metrics.shadow.distance = DPI(3);
+        s.track_metrics.shadow.alpha = 36;
+        s.track_metrics.shadow.color = Color(148, 163, 184);
+        return s;
+    }
+    return s;
+}
+
+inline void TuneProgressBarRole(UiProgressBar::Style& s, UiThemeMode mode, UiRole role)
+{
+    bool dark = ResolveEffectiveMode(mode) == UiThemeMode::Dark;
+    Color fill;
+    Color track = dark ? Color(51, 65, 85) : Color(226, 232, 240);
+    Color frame = dark ? Color(71, 85, 105) : Color(203, 213, 225);
+
+    switch(role) {
+    case UiRole::Subtle:
+        fill = dark ? Color(100, 116, 139) : Color(148, 163, 184);
+        break;
+    case UiRole::Accent:
+        fill = dark ? Color(96, 165, 250) : Color(37, 99, 235);
+        break;
+    case UiRole::Alert:
+        fill = dark ? Color(248, 113, 113) : Color(220, 38, 38);
+        break;
+    case UiRole::Standard:
+    default:
+        fill = dark ? Color(125, 211, 252) : Color(14, 165, 233);
+        break;
+    }
+
+    SetFace(s.track_palette, track, track, track, dark ? Color(30, 41, 59) : Color(241, 245, 249));
+    SetFrame(s.track_palette, frame, frame, frame, dark ? Color(51, 65, 85) : Color(226, 232, 240));
+    SetFace(s.fill_palette, fill, LtColor(fill, 8), DkColor(fill, 12), Blend(fill, track, 160));
+    SetFrame(s.fill_palette, fill, LtColor(fill, 8), DkColor(fill, 12), Blend(fill, track, 160));
+    SetInk(s.fill_palette, White(), White(), White(), dark ? Color(203, 213, 225) : Color(100, 116, 139));
+    s.empty_text = dark ? Color(203, 213, 225) : Color(51, 65, 85);
+    s.filled_text = White();
+}
+
 inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
 {
     UiSlider::Style s = UiSlider::StyleDefault();
@@ -2486,6 +2566,8 @@ public:
     static UiToggle::Style ResolveToggle() { return ResolveToggle(GetContext()); }
     static UiRadioButton::Style ResolveRadioButton(UiRole role, UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return ResolveRadioButton(GetContext(), role, visual); }
     static UiRadioButton::Style ResolveRadioButton(UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return ResolveRadioButton(GetContext(), visual); }
+    static UiProgressBar::Style ResolveProgressBar(UiRole role) { return ResolveProgressBar(GetContext(), role); }
+    static UiProgressBar::Style ResolveProgressBar() { return ResolveProgressBar(GetContext(), UiRole::Standard); }
     static UiSlider::Style ResolveSlider(UiRole role) { return ResolveSlider(GetContext(), role); }
     static UiSlider::Style ResolveSlider() { return ResolveSlider(GetContext(), UiRole::Standard); }
     static UiScrollBar::Style ResolveScrollBar() { return ResolveScrollBar(GetContext()); }
@@ -2671,6 +2753,19 @@ public:
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.indicator_palette, normalized.mode);
+        return s;
+    }
+
+    static UiProgressBar::Style ResolveProgressBar(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
+    {
+        UiThemeContext normalized = NormalizeContext(ctx);
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        UiProgressBar::Style s = UiThemeDetail::ResolveProgressBarBase(normalized.preset);
+        UiThemeDetail::TuneProgressBarRole(s, normalized.mode, role);
+        if(UiThemeDetail::IsPillPreset(normalized.preset)) {
+            s.track_metrics.radius = DPI(999);
+            s.fill_metrics.radius = DPI(999);
+        }
         return s;
     }
 
@@ -3402,6 +3497,11 @@ public:
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveRadioButton(ctx, role, visual);
     }
 
+    static UiProgressBar::Style ResolveProgressBar(UiThemePreset preset, UiThemeMode mode, UiRole role = UiRole::Standard)
+    {
+        UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveProgressBar(ctx, role);
+    }
+
     static UiSlider::Style ResolveSlider(UiThemePreset preset, UiThemeMode mode)
     {
         UiThemeContext ctx; ctx.preset = preset; ctx.mode = mode; return ResolveSlider(ctx);
@@ -3466,6 +3566,7 @@ inline UiBaseEdit::Style MakeEdit(UiThemePreset preset, UiThemeMode mode, UiEdit
 inline UiCheckBox::Style MakeCheckBox(UiThemePreset preset, UiThemeMode mode, UiCheckVisual visual = UICHECKVIS_CLASSIC) { return UiTheme::ResolveCheckBox(preset, mode, visual); }
 inline UiToggle::Style MakeToggle(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveToggle(preset, mode); }
 inline UiRadioButton::Style MakeRadioButton(UiThemePreset preset, UiThemeMode mode, UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return UiTheme::ResolveRadioButton(preset, mode, visual); }
+inline UiProgressBar::Style MakeProgressBar(UiThemePreset preset, UiThemeMode mode, UiRole role = UiRole::Standard) { return UiTheme::ResolveProgressBar(preset, mode, role); }
 inline UiSlider::Style MakeSlider(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveSlider(preset, mode); }
 inline UiScrollBar::Style MakeScrollBar(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveScrollBar(preset, mode); }
 inline UiSplitter::Style MakeSplitter(UiThemePreset preset, UiThemeMode mode) { return UiTheme::ResolveSplitter(preset, mode); }

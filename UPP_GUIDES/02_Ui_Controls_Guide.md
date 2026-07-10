@@ -33,7 +33,7 @@ Primary controls:
 - UiLabel, UiButton, UiCheckBox, UiToggle, UiRadioButton
 - UiPanel, UiGroupPanel, UiAccordion, UiScrollPanel, UiStack, UiTitleCard
 - UiBaseEdit, UiLineEdit, UiPasswordEdit, UiMaskEdit, UiMultiEdit
-- UiIntEdit, UiFloatEdit, UiSlider, UiSliderEdit, UiScrollBar, UiSplitter
+- UiIntEdit, UiFloatEdit, UiProgressBar, UiSlider, UiSliderEdit, UiScrollBar, UiSplitter
 - UiColorPicker, UiDropdown, UiMenu, UiTab, UiBreadcrumbs
 - UiList, UiTree, UiTable
 - UiGridLayout, UiBoxLayout, UiDoc

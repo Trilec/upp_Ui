@@ -109,6 +109,7 @@ private:
 		DesignerModel* model_ = nullptr;
 		DesignerRegistry* registry_ = nullptr;
 		Array<Ctrl> real_controls_;
+		Array<UiDirectContentHost> direct_hosts_;
 		VectorMap<DesignerNodeId, DesignerAdapter*> real_adapters_;
 		bool real_dirty_ = true;
 		bool rebuilding_real_ = false;

@@ -1,0 +1,13 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "";
+

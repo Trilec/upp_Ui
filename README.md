@@ -96,6 +96,7 @@ The `Ui` package currently covers:
   - `UiDataModels` - reusable data/model helpers used across list, tree, dropdown, and table controls
 
 - Slider, picker, and curve utilities
+  - `UiProgressBar` - determinate/indeterminate progress bar; it moves, because users worry when it does not
   - `UiSlider` - themed scalar slider
   - `UiBezierCurveEditor` - interactive curve editor for four-point bezier curves
   - `UiBezierCurveField` - composite field around the curve editor for direct use in apps and demos
@@ -146,7 +147,7 @@ The `examples/` directory currently includes:
 - `UiBaseEditDemo`, `UiLineEditDemo`, `UiPasswordEditDemo`, `UiMaskEditDemo`, `UiMultiEditDemo`, `UiIntFloatDemo`
 - `UiDropdownDemo`, `UiListDemo`, `UiTreeDemo`, `UiTableDemo`, `UiMenuDemo`, `UiTabDemo`
 - `UiCheckBoxDemo`, `UiRadioButtonDemo`, `UiToggleDemo`
-- `UiColorPickerDemo`, `UiDocDemo`, `UiOsFileDialogDemo`
+- `UiColorPickerDemo`, `UiProgressBarDemo`, `UiDocDemo`, `UiOsFileDialogDemo`
 
 ## Build and run
 

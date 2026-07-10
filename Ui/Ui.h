@@ -50,6 +50,7 @@
 #include <Ui/UiRadioButton.h>
 #include <Ui/UiToggle.h>
 #include <Ui/UiPanel.h>
+#include <Ui/UiDirectContentHost.h>
 #include <Ui/UiGroupPanel.h>
 #include <Ui/UiStack.h>
 #include <Ui/UiAccordion.h>
@@ -68,6 +69,7 @@
 #include <Ui/UiPasswordEdit.h>
 #include <Ui/UiMultiEdit.h>
 #include <Ui/UiMaskEdit.h>
+#include <Ui/UiProgressBar.h>
 #include <Ui/UiSlider.h>
 #include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/Composites/UiCompositeToggle.h>
