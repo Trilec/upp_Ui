@@ -165,6 +165,16 @@ static void TestDesignerArchitectureGuard(TestCtx& t)
 	         !SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "crumb_b") &&
 	         !SourceContains("Utilities/Designer/DesignerCodeGen.cpp", "crumb_c"),
 	         "breadcrumb legacy aliases are removed from codegen");
+	String selection_refresh = SourceRegion("Utilities/Designer/main.cpp", "void RefreshSelectionUi()", "void RefreshInspectorPreview()");
+	t.Expect(!selection_refresh.IsEmpty(), "selection refresh source region is found");
+	t.Expect(selection_refresh.Find("ApplySelectionProjection();") >= 0,
+	         "selection refresh applies projection immediately");
+	t.Expect(selection_refresh.Find("PostInspectorSelectionRefresh();") < 0,
+	         "selection refresh no longer posts inspector sync as the primary path");
+	String inspector_preview_refresh = SourceRegion("Utilities/Designer/main.cpp", "void RefreshInspectorPreview()", "Image NodeIcon");
+	t.Expect(!inspector_preview_refresh.IsEmpty(), "inspector preview refresh source region is found");
+	t.Expect(inspector_preview_refresh.Find("ApplySelectionProjection();") >= 0,
+	         "inspector preview refresh applies selection projection");
 
 	DesignerRegistry registry;
 	RegisterDesignerBuiltins(registry);

@@ -3302,12 +3302,7 @@ private:
 	{
 		int total_start = msecs();
 		DesignerTraceSetSelection(model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0]);
-		int sync_start = msecs();
-		SyncHierarchySelectionLight();
-		int sync_ms = msecs(sync_start);
-		int preview_start = msecs();
-		preview_.Refresh();
-		int preview_ms = msecs(preview_start);
+		ApplySelectionProjection();
 		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
 		                        model_.GetSelection().GetCount(),
 		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
@@ -3317,19 +3312,12 @@ private:
 			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
-			PostInspectorSelectionRefresh();
 			return;
 		}
-		int inspector_refresh_start = msecs();
-		if(IsInspectorPanelVisibleForSelection())
-			RefreshInspectorForActiveRightPanelOnly();
-		else
-			PostInspectorSelectionRefresh();
-		int inspector_refresh_ms = msecs(inspector_refresh_start);
 		if(DesignerDiagnosticsEnabled()) {
 			DesignerConsoleTrace("SELECT_PROFILE",
 				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms InspectorSelection=%dms visible=%d",
-				       msecs(total_start), sync_ms, preview_ms, inspector_refresh_ms,
+				       msecs(total_start), 0, 0, 0,
 				       IsInspectorPanelVisibleForSelection() ? 1 : 0),
 				false);
 		}
@@ -3339,15 +3327,15 @@ private:
 
 	void RefreshInspectorPreview()
 	{
+		ApplySelectionProjection();
 		if(IsDesignerRefreshBlocked()) {
 			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
-			PostInspectorSelectionRefresh();
 			return;
 		}
-		ApplySelectionProjection();
 		refresh_posted_ = false;
+		DesignerTraceSetRefreshPosted(false);
 	}
 
 	Image NodeIcon(const DesignerType* t) const
@@ -6492,9 +6480,9 @@ GUI_APP_MAIN
 			repro_fixture = args[++i];
 	}
 #ifdef _DEBUG
-	String designer_log_path = DesignerDebugLogPath();
-	StdLogSetup(LOG_COUT | LOG_FILE, designer_log_path);
-	InstallCrashDump("Designer");
+	Upp::String designer_log_path = Upp::DesignerDebugLogPath();
+	Upp::StdLogSetup(Upp::LOG_COUT | Upp::LOG_FILE, designer_log_path);
+	Upp::InstallCrashDump("Designer");
 	RLOG("Designer debug log: " << designer_log_path);
 #endif
 	if(repro) {
