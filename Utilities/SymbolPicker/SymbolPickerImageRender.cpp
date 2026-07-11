@@ -58,8 +58,9 @@ static Image RenderTransparentSvg(Size sz, const String& svg_xml)
 	double scale = min(fitted.cx / bounds.GetWidth(), fitted.cy / bounds.GetHeight());
 	double ox = (sz.cx - fitted.cx) * 0.5;
 	double oy = (sz.cy - fitted.cy) * 0.5;
+	sw.Translate(ox, oy);
 	sw.Scale(scale);
-	sw.Translate(ox - bounds.left * scale, oy - bounds.top * scale);
+	sw.Translate(-bounds.left, -bounds.top);
 	RenderSVG(sw, svg_xml, Black());
 	return Image(ib);
 }

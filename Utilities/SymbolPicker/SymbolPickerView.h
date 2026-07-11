@@ -257,6 +257,7 @@ private:
 	bool            sync_view_state_ = false;
 	bool            drag_interaction_active_ = false;
 	bool            pending_model_refresh_ = false;
+	bool            suppress_model_refresh_ = false;
 
 	virtual bool Key(dword key, int count) override;
 

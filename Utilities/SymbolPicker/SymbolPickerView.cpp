@@ -174,6 +174,11 @@ SymbolPickerIconTile::SymbolPickerIconTile()
 {
 	title_.SetFont(StdFont().Height(DPI(7)));
 	meta_.SetFont(StdFont().Height(DPI(6)));
+	title_.IgnoreMouse();
+	title_.NoWantFocus();
+	meta_.IgnoreMouse();
+	meta_.NoWantFocus();
+	tooltip_enabled_ = false;
 	Add(title_);
 	Add(meta_);
 }
@@ -305,6 +310,11 @@ SymbolPickerCollectionTile::SymbolPickerCollectionTile()
 {
 	title_.SetFont(StdFont().Height(DPI(7)));
 	meta_.SetFont(StdFont().Height(DPI(6)));
+	title_.IgnoreMouse();
+	title_.NoWantFocus();
+	meta_.IgnoreMouse();
+	meta_.NoWantFocus();
+	tooltip_enabled_ = false;
 	Add(title_);
 	Add(meta_);
 }
@@ -1590,6 +1600,7 @@ void SymbolPickerView::HandleCollectionsDropPerform(PasteClip& d)
 		if(drag_ids.GetCount() > 1)
 			commands_->BeginGroup("Add icons to collection");
 
+		suppress_model_refresh_ = true;
 		for(const String& catalog_id : drag_ids) {
 			const SymbolPickerIconEntry* entry = catalog_ ? catalog_->FindByCatalogId(catalog_id) : nullptr;
 			if(!entry)
@@ -1607,6 +1618,9 @@ void SymbolPickerView::HandleCollectionsDropPerform(PasteClip& d)
 
 		if(drag_ids.GetCount() > 1)
 			commands_->EndGroup();
+		suppress_model_refresh_ = false;
+		RefreshCollections();
+		RefreshCollectionItems();
 		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
 		return;
 	}
@@ -1618,9 +1632,13 @@ void SymbolPickerView::HandleCollectionsDropPerform(PasteClip& d)
 		if(!model_->IsValidItemIndex(collection_index, from_index))
 			return;
 		const int to_index = GetCollectionDropInsertIndex(collections_scroll_panel_.GetLastDragPoint());
+		suppress_model_refresh_ = true;
 		bool moved = commands_->Execute(MakeSymbolPickerMoveCollectionIconCommand(collection_index, from_index, to_index), *model_);
+		suppress_model_refresh_ = false;
 		if(moved)
 			ClearCollectionSelection();
+		if(moved)
+			RefreshCollectionItems();
 		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
 		return;
 	}
@@ -1792,6 +1810,8 @@ String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry)
 void SymbolPickerView::RefreshFromModel()
 {
 	if(!model_)
+		return;
+	if(suppress_model_refresh_)
 		return;
 	if(drag_interaction_active_) {
 		pending_model_refresh_ = true;
