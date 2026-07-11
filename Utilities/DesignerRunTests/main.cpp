@@ -261,6 +261,39 @@ static UiCompositeDropdown* FindCompositeDropdownByLabel(Ctrl& root, const Strin
 	return nullptr;
 }
 
+static UiCompositeEdit* FindCompositeEditByLabel(Ctrl& root, const String& label_text)
+{
+	if(UiCompositeEdit* row = dynamic_cast<UiCompositeEdit*>(&root))
+		if(row->LabelCtrl().GetText() == label_text)
+			return row;
+	for(Ctrl* child = root.GetFirstChild(); child; child = child->GetNext())
+		if(UiCompositeEdit* found = FindCompositeEditByLabel(*child, label_text))
+			return found;
+	return nullptr;
+}
+
+static UiCompositeToggle* FindCompositeToggleByLabel(Ctrl& root, const String& label_text)
+{
+	if(UiCompositeToggle* row = dynamic_cast<UiCompositeToggle*>(&root))
+		if(row->LabelCtrl().GetText() == label_text)
+			return row;
+	for(Ctrl* child = root.GetFirstChild(); child; child = child->GetNext())
+		if(UiCompositeToggle* found = FindCompositeToggleByLabel(*child, label_text))
+			return found;
+	return nullptr;
+}
+
+static UiCompositeSlider* FindCompositeSliderByLabel(Ctrl& root, const String& label_text)
+{
+	if(UiCompositeSlider* row = dynamic_cast<UiCompositeSlider*>(&root))
+		if(row->LabelCtrl().GetText() == label_text)
+			return row;
+	for(Ctrl* child = root.GetFirstChild(); child; child = child->GetNext())
+		if(UiCompositeSlider* found = FindCompositeSliderByLabel(*child, label_text))
+			return found;
+	return nullptr;
+}
+
 static void TestModelTreeEdits(TestCtx& t)
 {
 	t.Section("DesignerModel tree edits");
@@ -2194,6 +2227,144 @@ static void TestPropertyEditStability(TestCtx& t)
 	ExerciseFloatEditContainer("UiGroupPanel", "float edit group panel");
 }
 
+static void TestInspectorLiveSelectionTransition(TestCtx& t)
+{
+	t.Section("Designer inspector live selection transition");
+
+	DesignerRegistry r;
+	RegisterDesignerBuiltins(r);
+
+	DesignerModel m;
+	DesignerNodeId outer = m.AddNode("GridLayout", Designer_ROOT);
+	r.Find("GridLayout")->init_defaults(*m.Find(outer));
+	m.Find(outer)->properties.Set("columns", 2);
+	m.Find(outer)->properties.Set("rows", 2);
+	DesignerNodeId inner = m.AddNode("GridLayout", outer);
+	r.Find("GridLayout")->init_defaults(*m.Find(inner));
+	m.Find(inner)->properties.Set("columns", 2);
+	m.Find(inner)->properties.Set("rows", 2);
+
+	auto add_leaf = [&](const char *type, const String& name) -> DesignerNodeId {
+		DesignerNodeId id = m.AddNode(type, inner);
+		r.Find(type)->init_defaults(*m.Find(id));
+		m.Find(id)->name = name;
+		return id;
+	};
+	DesignerNodeId mask = add_leaf("UiMaskEdit", "maskEdit");
+	m.Find(mask)->properties.Set("mask", "##/##/####");
+	m.Find(mask)->properties.Set("text", "12312026");
+	DesignerNodeId integer = add_leaf("UiIntEdit", "intEdit");
+	m.Find(integer)->properties.Set("value", 17);
+	DesignerNodeId password = add_leaf("UiPasswordEdit", "passwordEdit");
+	m.Find(password)->properties.Set("sample_text", "secret");
+	m.Find(password)->properties.Set("placeholder", "Password");
+	m.Find(password)->properties.Set("plain_visible", false);
+	m.Find(password)->properties.Set("visibility_icon", true);
+	DesignerNodeId line = add_leaf("UiLineEdit", "lineEdit");
+	m.Find(line)->properties.Set("text", "alpha");
+	DesignerNodeId float_edit = add_leaf("UiFloatEdit", "floatEdit");
+	m.Find(float_edit)->properties.Set("minf", 0.5);
+	m.Find(float_edit)->properties.Set("maxf", 99.5);
+	m.Find(float_edit)->properties.Set("stepf", 0.25);
+	m.Find(float_edit)->properties.Set("precision", 3);
+	m.Find(float_edit)->properties.Set("valuef", 1.5);
+
+	DesignerInspector inspector;
+	DesignerPreview preview;
+	inspector.Set(&m, &r);
+	preview.Set(&m, &r);
+	TopWindow host;
+	UiBoxLayout shell(UiDirection::V);
+	shell.Add(inspector).Expand(1);
+	shell.Add(preview).Expand(1);
+	host.Add(shell.SizePos());
+	host.SetRect(0, 0, 960, 760);
+	host.Open();
+	Ctrl::ProcessEvents();
+	preview.SetRect(0, 0, 960, 360);
+	preview.SyncRealPreview();
+	preview.Layout();
+	Ctrl::ProcessEvents();
+
+	inspector.WhenProperty = [&](DesignerNodeId id, String property, Value value) {
+		m.SetProperty(id, property, value);
+	};
+	inspector.WhenPropertyPreview = [&](DesignerNodeId id, String property, Value value) {
+		m.SetProperty(id, property, value);
+	};
+	inspector.WhenPropertyMany = [&](const Vector<DesignerNodeId>& ids, String property, Value value) {
+		for(DesignerNodeId id : ids)
+			m.SetProperty(id, property, value);
+	};
+	inspector.WhenPropertyManyPreview = [&](const Vector<DesignerNodeId>& ids, String property, Value value) {
+		for(DesignerNodeId id : ids)
+			m.SetProperty(id, property, value);
+	};
+
+	auto pump = [&] {
+		Ctrl::ProcessEvents();
+		preview.SyncRealPreview();
+		preview.Layout();
+		Ctrl::ProcessEvents();
+		t.Expect(m.Validate(), "live inspector transition keeps model valid");
+	};
+	auto select = [&](DesignerNodeId id) {
+		Vector<DesignerNodeId> sel;
+		sel.Add(id);
+		inspector.SetSelection(sel);
+		inspector.Layout();
+		pump();
+	};
+	auto edit_text = [&](const String& label, const String& text) {
+		UiCompositeEdit* row = FindCompositeEditByLabel(inspector, label);
+		t.Expect(row != nullptr, "live selection transition finds " + label + " text row");
+		if(!row)
+			return;
+		row->Edit().SetTextUtf8(text);
+		row->Edit().WhenAction();
+		pump();
+	};
+	auto toggle = [&](const String& label) {
+		UiCompositeToggle* row = FindCompositeToggleByLabel(inspector, label);
+		t.Expect(row != nullptr, "live selection transition finds " + label + " toggle row");
+		if(!row)
+			return;
+		row->SetData(!(bool)row->GetData());
+		row->WhenAction();
+		pump();
+	};
+	auto slide = [&](const String& label, int value) {
+		UiCompositeSlider* row = FindCompositeSliderByLabel(inspector, label);
+		t.Expect(row != nullptr, "live selection transition finds " + label + " slider row");
+		if(!row)
+			return;
+		row->SetData(value);
+		row->WhenAction();
+		pump();
+	};
+
+	for(int i = 0; i < 20; i++) {
+		select(mask);
+		edit_text("Text", Format("1231%02d26", i));
+		select(integer);
+		slide("Value", 20 + i);
+		select(password);
+		edit_text("Sample text", Format("secret %d", i));
+		toggle("Plain text visible");
+		select(float_edit);
+		edit_text("Value", Format("1.%02d", i));
+		slide("Precision", 2 + (i % 3));
+		toggle("Spin buttons");
+		select(line);
+		edit_text("Text", Format("line %d", i));
+		select(float_edit);
+		edit_text("Min", "0.5");
+		edit_text("Step", "0.25");
+	}
+
+	host.Close();
+}
+
 class FixedMinCtrl : public Ctrl {
 	Size min_size_;
 public:
@@ -3825,6 +3996,7 @@ CONSOLE_APP_MAIN
 	TestAncestorRelayoutContract(t);
 	TestDesignerInspectorContextAndThemeRows(t);
 	TestDesignerInspectorMultiSelectSizing(t);
+	TestInspectorLiveSelectionTransition(t);
 	TestDesignerChoiceCommitPath(t);
 	TestDesignerChoiceBindingAudit(t);
 	TestSplitButtonPopupMetadata(t);

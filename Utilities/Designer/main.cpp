@@ -108,6 +108,11 @@ static UiThemePreset DesignerThemePresetFromId(const Value& id)
 	return UiThemePreset::Minimal;
 }
 
+static String DesignerDebugLogPath()
+{
+	return AppendFileName(GetFileDirectory(GetExeFilePath()), "Designer-debug.log");
+}
+
 static Color DesignerShellBackground(UiThemeMode mode)
 {
 	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
@@ -3235,17 +3240,24 @@ private:
 		int preview_start = msecs();
 		preview_.Refresh();
 		int preview_ms = msecs(preview_start);
+		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
+		                        model_.GetSelection().GetCount(),
+		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
+		                        IsDesignerRefreshBlocked() ? 1 : 0,
+		                        DesignerRefreshBlockReason()));
+		if(IsDesignerRefreshBlocked()) {
+			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
+			refresh_deferred_ = true;
+			pending_inspector_refresh_ = true;
+			PostInspectorSelectionRefresh();
+			return;
+		}
 		int inspector_refresh_start = msecs();
 		if(IsInspectorPanelVisibleForSelection())
 			RefreshInspectorForActiveRightPanelOnly();
 		else
 			PostInspectorSelectionRefresh();
 		int inspector_refresh_ms = msecs(inspector_refresh_start);
-		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
-		                        model_.GetSelection().GetCount(),
-		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
-		                        IsDesignerRefreshBlocked() ? 1 : 0,
-		                        DesignerRefreshBlockReason()));
 		if(DesignerDiagnosticsEnabled()) {
 			DesignerConsoleTrace("SELECT_PROFILE",
 				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms InspectorSelection=%dms visible=%d",
@@ -3253,25 +3265,20 @@ private:
 				       IsInspectorPanelVisibleForSelection() ? 1 : 0),
 				false);
 		}
-		if(IsDesignerRefreshBlocked()) {
-			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
-			refresh_deferred_ = true;
-			pending_inspector_refresh_ = true;
-			return;
-		}
 		refresh_posted_ = false;
 		DesignerTraceSetRefreshPosted(false);
 	}
 
 	void RefreshInspectorPreview()
 	{
-		ApplySelectionProjection();
 		if(IsDesignerRefreshBlocked()) {
 			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
+			PostInspectorSelectionRefresh();
 			return;
 		}
+		ApplySelectionProjection();
 		refresh_posted_ = false;
 	}
 
@@ -5320,6 +5327,7 @@ private:
 			return;
 		if(!ValidatePendingInspectorIntent("commit", true))
 			return;
+		BeginInspectorLiveEditing();
 		DesignerNodeId node_id = pending_inspector_txn_.node_id;
 		const String property_id = pending_inspector_txn_.property_id;
 		const Value value = pending_inspector_txn_.value;
@@ -5328,7 +5336,6 @@ private:
 		pending_inspector_txn_.failure_reason.Clear();
 		pending_inspector_txn_.projection = DesignerProjectionRequest();
 		pending_inspector_txn_.inspector_refresh_requested = false;
-		SetInspectorLiveEditing(false);
 		DesignerNode* n = model_.Find(node_id);
 		if(!n)
 			return;
@@ -5595,7 +5602,7 @@ private:
 
 	void CommitPreviewInspectorPropertyValues(const Vector<DesignerNodeId>& ids, const String& property_id, const Value& value)
 	{
-		SetInspectorLiveEditing(false);
+		BeginInspectorLiveEditing();
 		if(ids.IsEmpty())
 			return;
 		Vector<DesignerNodeId> changed_ids;
@@ -6405,5 +6412,11 @@ private:
 
 GUI_APP_MAIN
 {
+#ifdef _DEBUG
+	String designer_log_path = DesignerDebugLogPath();
+	StdLogSetup(LOG_COUT | LOG_FILE, designer_log_path);
+	InstallCrashDump("Designer");
+	RLOG("Designer debug log: " << designer_log_path);
+#endif
 	Upp::DesignerWindow().Run();
 }
