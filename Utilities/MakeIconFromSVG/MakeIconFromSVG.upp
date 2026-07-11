@@ -1,5 +1,6 @@
 uses
 	Core,
+	Utilities/IconExportCore,
 	Draw,
 	plugin/png,
 	Painter;

@@ -32,27 +32,27 @@ static bool HasVisiblePixels(const Image& img)
 	return false;
 }
 
-static const SymbolPickerIconEntry* PickRenderableIcon(const SymbolPickerCatalog& catalog, int preferred_index, int pixel_size, Color tint)
+static const SymbolPickerIconEntry* PickRenderableIcon(const SymbolPickerCatalog& catalog, int pixel_size, Color tint, const String& exclude_catalog_id = String())
 {
 	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
 	if(icons.IsEmpty())
 		return nullptr;
-	for(int i = 0; i < icons.GetCount(); ++i) {
-		int idx = (preferred_index + i) % icons.GetCount();
-		if(!icons[idx].available)
+	for(const SymbolPickerIconEntry& entry : icons) {
+		if(!entry.available)
+			continue;
+		if(!exclude_catalog_id.IsEmpty() && entry.catalog_id == exclude_catalog_id)
 			continue;
 		String error;
-		Image img = RenderSymbolPickerIconImage(icons[idx], pixel_size, tint, &error);
+		Image img = RenderSymbolPickerIconImage(entry, pixel_size, tint, &error);
 		if(img.IsEmpty() || !HasVisiblePixels(img))
 			continue;
-		return &icons[idx];
+		return &entry;
 	}
 	return nullptr;
 }
 
-static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
+static SymbolPickerProject MakeRawProject(const SymbolPickerIconEntry* entry)
 {
-	const SymbolPickerIconEntry* entry = PickRenderableIcon(catalog, 0, 24, Null);
 	if(!entry)
 		return SymbolPickerProject();
 
@@ -84,11 +84,8 @@ static SymbolPickerProject MakeRawProject(const SymbolPickerCatalog& catalog)
 	return project;
 }
 
-static SymbolPickerProject MakeRleProject(const SymbolPickerCatalog& catalog)
+static SymbolPickerProject MakeRleProject(const SymbolPickerIconEntry* entry)
 {
-	const SymbolPickerIconEntry* entry = PickRenderableIcon(catalog, 1, 24, Color(32, 64, 128));
-	if(!entry)
-		entry = PickRenderableIcon(catalog, 0, 24, Color(32, 64, 128));
 	if(!entry)
 		return SymbolPickerProject();
 
@@ -142,8 +139,20 @@ static bool BuildFixtures(const String& output_folder, bool verify, String& erro
 		return false;
 	}
 
-	SymbolPickerProject raw_project = MakeRawProject(catalog);
-	SymbolPickerProject rle_project = MakeRleProject(catalog);
+	const SymbolPickerIconEntry* raw_entry = PickRenderableIcon(catalog, 24, Null);
+	if(!raw_entry) {
+		error = "Could not select a visible RAW fixture entry.";
+		return false;
+	}
+	const SymbolPickerIconEntry* rle_entry = PickRenderableIcon(catalog, 24, Color(32, 64, 128), raw_entry->catalog_id);
+	if(!rle_entry)
+		rle_entry = raw_entry;
+
+	Cout() << "RAW catalog_id: " << raw_entry->catalog_id << '\n';
+	Cout() << "RLE catalog_id: " << rle_entry->catalog_id << '\n';
+
+	SymbolPickerProject raw_project = MakeRawProject(raw_entry);
+	SymbolPickerProject rle_project = MakeRleProject(rle_entry);
 	if(raw_project.collections.IsEmpty() || rle_project.collections.IsEmpty()) {
 		error = "Could not select valid fixture catalog entries.";
 		return false;
@@ -202,7 +211,6 @@ CONSOLE_APP_MAIN
 {
 	String output_folder;
 	bool verify = false;
-	bool smoke = false;
 	for(const String& arg : CommandLine()) {
 		String t = TrimBoth(arg);
 		if(t.IsEmpty())
@@ -211,32 +219,10 @@ CONSOLE_APP_MAIN
 			verify = true;
 			continue;
 		}
-		if(IsFlag(t, "--smoke")) {
-			smoke = true;
-			continue;
-		}
 		if(output_folder.IsEmpty()) {
 			output_folder = t;
 			continue;
 		}
-	}
-
-	SymbolPickerCatalog catalog;
-	if(!LoadGeneratedSymbolPickerCatalog(catalog)) {
-		Cout() << "Could not load generated catalog.\n";
-		SetExitCode(1);
-		return;
-	}
-
-	if(smoke) {
-		String error;
-		if(!RunSymbolPickerExportSmokeTests(catalog, error)) {
-			Cout() << error << '\n';
-			SetExitCode(1);
-			return;
-		}
-		Cout() << "Smoke OK\n";
-		return;
 	}
 
 	if(output_folder.IsEmpty()) {

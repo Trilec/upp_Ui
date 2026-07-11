@@ -1,0 +1,7 @@
+uses
+	Core,
+	Draw;
+
+file
+	IconExportCore.h,
+	IconExportCore.cpp;

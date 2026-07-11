@@ -1,0 +1,10 @@
+uses
+	Core,
+	Draw,
+	Utilities/IconExportCore;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "CONSOLE";

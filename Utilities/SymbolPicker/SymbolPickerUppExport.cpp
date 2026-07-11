@@ -6,7 +6,7 @@ namespace Upp {
 
 static const char* kUppRawInclude = "#include <CtrlLib/CtrlLib.h>\n#include <Ui/UiDraw.h>\n";
 
-static const char* SymbolPickerIconStyleText(SymbolPickerIconStyle style)
+static const char* SymbolPickerUppIconStyleText(SymbolPickerIconStyle style)
 {
 	switch(style) {
 	case SymbolPickerIconStyle::Outlined: return "outlined";
@@ -282,7 +282,7 @@ static bool EmitItemBlock(String& out,
 	String collection_name = GetCollectionLabel(collection, collection_index);
 	String category = GetItemCategoryLabel(project, collection, item, entry);
 	String display_name = MakeSymbolPickerExportDisplayName(project, collection, item, entry);
-	String style_text = SymbolPickerIconStyleText(item.has_style_override ? item.style_override : entry->style);
+	String style_text = SymbolPickerUppIconStyleText(item.has_style_override ? item.style_override : entry->style);
 
 	String item_out;
 	AppendGeneratedCommentField(item_out, "Collection", collection_name);

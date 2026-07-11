@@ -65,7 +65,7 @@ static void PaintSymbolPickerCard(Draw& w, const Rect& r, Color face, Color fram
 	w.DrawImage(r.left, r.top, UiGetCachedAARoundedRectImage(r.GetSize(), radius, face, frame, 1));
 }
 
-static const char* SymbolPickerIconStyleText(SymbolPickerIconStyle style)
+static const char* SymbolPickerViewIconStyleText(SymbolPickerIconStyle style)
 {
 	switch(style) {
 	case SymbolPickerIconStyle::Outlined: return "Outlined";
@@ -292,9 +292,9 @@ Size SymbolPickerIconTile::GetMinSize() const
 void SymbolPickerIconTile::SyncLabels()
 {
 	title_.SetLabel(entry_.display_name);
-	meta_.SetLabel(String(AsString(SymbolPickerIconStyleText(entry_.style)[0])));
+	meta_.SetLabel(String(AsString(SymbolPickerViewIconStyleText(entry_.style)[0])));
 	tooltip_text_ = Format("%s\ncatalog_id: %s\nsource_id: %s\ncategory: %s\nstyle: %s",
-		entry_.display_name, entry_.catalog_id, entry_.source_id, entry_.category, SymbolPickerIconStyleText(entry_.style));
+		entry_.display_name, entry_.catalog_id, entry_.source_id, entry_.category, SymbolPickerViewIconStyleText(entry_.style));
 	Tip(tooltip_enabled_ ? tooltip_text_ : String());
 	RefreshLayout();
 	Refresh();
@@ -1764,7 +1764,7 @@ void SymbolPickerView::SetDragInteractionActive(bool active)
 
 String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
 {
-	String alias = "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(SymbolPickerIconStyleText(entry.style));
+	String alias = "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(SymbolPickerViewIconStyleText(entry.style));
 	return alias;
 }
 
