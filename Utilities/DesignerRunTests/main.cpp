@@ -889,6 +889,27 @@ struct DesignerApiAuditSpec : Moveable<DesignerApiAuditSpec> {
 };
 
 static String g_test_only;
+static String g_fixture_path;
+
+static String ResolveDesignerFixture(const String& requested)
+{
+	if(!requested.IsEmpty())
+		return NormalizePath(requested);
+	Vector<String> starts = {GetCurrentDirectory(), GetFileFolder(GetExeFilePath())};
+	for(const String& start : starts) {
+		String dir = start;
+		for(int i = 0; i < 8 && !dir.IsEmpty(); i++) {
+			String candidate = AppendFileName(dir, "designs/design_themestudio.json");
+			if(FileExists(candidate))
+				return NormalizePath(candidate);
+			String parent = GetFileFolder(dir);
+			if(parent == dir)
+				break;
+			dir = parent;
+		}
+	}
+	return String();
+}
 
 static void TraceTestStep(const String& tag)
 {
@@ -2277,49 +2298,22 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 	bool loaded_fixture = false;
 	String fixture_error;
 	Vector<String> fixture_notes;
-	String fixture_json = LoadFile("E:/apps/github/upp_Ui/designs/design_themestudio.json");
+	String fixture_path = ResolveDesignerFixture(g_fixture_path);
+	Cout() << "fixture requested: " << (g_fixture_path.IsEmpty() ? "<repository-relative>" : g_fixture_path) << "\n";
+	Cout() << "fixture resolved: " << (fixture_path.IsEmpty() ? "<not found>" : fixture_path) << "\n";
+	String fixture_json = fixture_path.IsEmpty() ? String() : LoadFile(fixture_path);
 	if(!fixture_json.IsEmpty())
 		loaded_fixture = LoadDesignerModelJson(m, r, fixture_json, fixture_error, &fixture_notes);
+	Cout() << "fixture loaded: " << (loaded_fixture ? "yes" : "no") << "\n";
+	Cout() << "fixture error: " << (fixture_error.IsEmpty() ? "<none>" : fixture_error) << "\n";
+	Cout() << "fallback used: no\n";
 	if(!loaded_fixture) {
-		TraceTestStep("LIVE_TRANSITION 005: fallback synthetic model");
-		DesignerNodeId outer = m.AddNode("GridLayout", Designer_ROOT);
-		r.Find("GridLayout")->init_defaults(*m.Find(outer));
-		m.Find(outer)->properties.Set("columns", 2);
-		m.Find(outer)->properties.Set("rows", 2);
-		DesignerNodeId inner = m.AddNode("GridLayout", outer);
-		r.Find("GridLayout")->init_defaults(*m.Find(inner));
-		m.Find(inner)->properties.Set("columns", 2);
-		m.Find(inner)->properties.Set("rows", 2);
-
-		auto add_leaf = [&](const char *type, const String& name) -> DesignerNodeId {
-			DesignerNodeId id = m.AddNode(type, inner);
-			r.Find(type)->init_defaults(*m.Find(id));
-			m.Find(id)->name = name;
-			return id;
-		};
-		DesignerNodeId mask = add_leaf("UiMaskEdit", "maskEdit");
-		m.Find(mask)->properties.Set("mask", "##/##/####");
-		m.Find(mask)->properties.Set("text", "12312026");
-		DesignerNodeId integer = add_leaf("UiIntEdit", "intEdit");
-		m.Find(integer)->properties.Set("value", 17);
-		DesignerNodeId password = add_leaf("UiPasswordEdit", "passwordEdit");
-		m.Find(password)->properties.Set("sample_text", "secret");
-		m.Find(password)->properties.Set("placeholder", "Password");
-		m.Find(password)->properties.Set("plain_visible", false);
-		m.Find(password)->properties.Set("visibility_icon", true);
-		DesignerNodeId line = add_leaf("UiLineEdit", "lineEdit");
-		m.Find(line)->properties.Set("text", "alpha");
-		DesignerNodeId float_edit = add_leaf("UiFloatEdit", "floatEdit");
-		m.Find(float_edit)->properties.Set("minf", 0.5);
-		m.Find(float_edit)->properties.Set("maxf", 99.5);
-		m.Find(float_edit)->properties.Set("stepf", 0.25);
-		m.Find(float_edit)->properties.Set("precision", 3);
-		m.Find(float_edit)->properties.Set("valuef", 1.5);
-	} else {
-		TraceTestStep("LIVE_TRANSITION 005: loaded design_themestudio.json");
-		if(!fixture_notes.IsEmpty())
-			TraceTestStep("LIVE_TRANSITION 006: fixture notes " + Join(fixture_notes, " | "));
+		t.Expect(false, "live selection transition fixture is loaded");
+		return;
 	}
+	TraceTestStep("LIVE_TRANSITION 005: loaded design_themestudio.json");
+	if(!fixture_notes.IsEmpty())
+		TraceTestStep("LIVE_TRANSITION 006: fixture notes " + Join(fixture_notes, " | "));
 
 	DesignerNodeId mask = FindFirstNodeByType(m, Designer_ROOT, "UiMaskEdit");
 	DesignerNodeId integer = FindFirstNodeByType(m, Designer_ROOT, "UiIntEdit");
@@ -4058,12 +4052,17 @@ CONSOLE_APP_MAIN
 		const String& arg = args[i];
 		if(arg == "--only" && i + 1 < args.GetCount()) {
 			g_test_only = args[i + 1];
-			break;
+			++i;
+			continue;
 		}
 		if(arg.StartsWith("--only=")) {
 			g_test_only = arg.Mid(7);
-			break;
+			continue;
 		}
+		if(arg.StartsWith("--fixture="))
+			g_fixture_path = arg.Mid(10);
+		else if(arg == "--fixture" && i + 1 < args.GetCount())
+			g_fixture_path = args[++i];
 	}
 	if(ShouldRunTest("model-tree-edits")) TestModelTreeEdits(t);
 	if(ShouldRunTest("designer-add-target")) TestDesignerAddTarget(t);

@@ -113,6 +113,26 @@ static String DesignerDebugLogPath()
 	return AppendFileName(GetFileDirectory(GetExeFilePath()), "Designer-debug.log");
 }
 
+static String DesignerResolveFixture(const String& requested)
+{
+	if(!requested.IsEmpty())
+		return NormalizePath(requested);
+	Vector<String> starts = {GetCurrentDirectory(), GetFileFolder(GetExeFilePath())};
+	for(const String& start : starts) {
+		String dir = start;
+		for(int i = 0; i < 8 && !dir.IsEmpty(); i++) {
+			String candidate = AppendFileName(dir, "designs/design_themestudio.json");
+			if(FileExists(candidate))
+				return NormalizePath(candidate);
+			String parent = GetFileFolder(dir);
+			if(parent == dir)
+				break;
+			dir = parent;
+		}
+	}
+	return String();
+}
+
 static Color DesignerShellBackground(UiThemeMode mode)
 {
 	return mode == UiThemeMode::Dark ? Color(32, 32, 32) : Color(246, 248, 251);
@@ -586,6 +606,54 @@ public:
 		left_info_box_.RefreshLayout();
 		center_panel_.RefreshLayout();
 		toolbox_scroll_.RefreshLayout();
+	}
+
+	// Debug-only scripted path for the live Password -> Float inspector transition.
+	// It deliberately uses the application model selection and projection coordinator.
+	int RunFloatInspectorRepro(const String& fixture_path)
+	{
+		auto trace = [&](const String& line) {
+			RLOG(line);
+			FileAppend out(DesignerDebugLogPath());
+			out << line << "\n";
+		};
+		trace("FLOAT_REPRO fixture path=" + fixture_path);
+		LoadDesignPath(fixture_path);
+		if(current_design_path_.IsEmpty() || model_.GetNodes().GetCount() <= 1) {
+			trace("FLOAT_REPRO normal completion=no reason=fixture not loaded");
+			return 2;
+		}
+		Vector<DesignerNodeId> password_ids;
+		Vector<DesignerNodeId> float_ids;
+		for(const DesignerNode& n : model_.GetNodes()) {
+			if(n.type_id == "UiPasswordEdit")
+				password_ids.Add(n.id);
+			if(n.type_id == "UiFloatEdit")
+				float_ids.Add(n.id);
+		}
+		if(password_ids.IsEmpty() || float_ids.IsEmpty()) {
+			trace("FLOAT_REPRO normal completion=no reason=required controls missing");
+			return 3;
+		}
+		Open();
+		for(int cycle = 1; cycle <= 100; cycle++) {
+			trace(Format("FLOAT_REPRO cycle=%d selection=Password", cycle));
+			model_.SelectOne(password_ids[0]);
+			RefreshSelectionUi();
+			Ctrl::ProcessEvents();
+			trace(Format("FLOAT_REPRO cycle=%d selection=Float", cycle));
+			model_.SelectOne(float_ids[0]);
+			RefreshSelectionUi();
+			Ctrl::ProcessEvents();
+			if(!model_.Validate()) {
+				trace(Format("FLOAT_REPRO normal completion=no reason=model validation failed cycle=%d", cycle));
+				Close();
+				return 4;
+			}
+		}
+		trace("FLOAT_REPRO normal completion=yes cycles=100");
+		Close();
+		return 0;
 	}
 
 private:
@@ -6412,11 +6480,33 @@ private:
 
 GUI_APP_MAIN
 {
+	Upp::String repro_fixture;
+	bool repro = false;
+	const Upp::Vector<Upp::String>& args = Upp::CommandLine();
+	for(int i = 0; i < args.GetCount(); i++) {
+		if(args[i] == "--repro-float-inspector")
+			repro = true;
+		else if(args[i].StartsWith("--fixture="))
+			repro_fixture = args[i].Mid(10);
+		else if(args[i] == "--fixture" && i + 1 < args.GetCount())
+			repro_fixture = args[++i];
+	}
 #ifdef _DEBUG
 	String designer_log_path = DesignerDebugLogPath();
 	StdLogSetup(LOG_COUT | LOG_FILE, designer_log_path);
 	InstallCrashDump("Designer");
 	RLOG("Designer debug log: " << designer_log_path);
 #endif
+	if(repro) {
+		Upp::String designer_log_path = Upp::DesignerDebugLogPath();
+		Upp::StdLogSetup(Upp::LOG_COUT | Upp::LOG_FILE, designer_log_path);
+		Upp::InstallCrashDump("Designer");
+		RLOG("Designer repro log: " << designer_log_path);
+		repro_fixture = DesignerResolveFixture(repro_fixture);
+		RLOG("FLOAT_REPRO fixture resolved=" << repro_fixture);
+		Upp::DesignerWindow window;
+		Upp::SetExitCode(window.RunFloatInspectorRepro(repro_fixture));
+		return;
+	}
 	Upp::DesignerWindow().Run();
 }
