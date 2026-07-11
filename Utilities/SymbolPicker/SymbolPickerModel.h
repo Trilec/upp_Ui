@@ -13,6 +13,7 @@ enum class SymbolPickerExportType : byte {
 	SvgFiles,
 	UppRawHeader,
 	UppRleHeader,
+	UppIml,
 };
 
 enum class SymbolPickerIconStyle : byte {

@@ -215,6 +215,15 @@ bool LoadSymbolPickerProjectJson(const String& path, SymbolPickerProject& out, S
 bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, String& error)
 {
 	error.Clear();
+	Vector<const SymbolPickerIconEntry*> valid;
+	for(const SymbolPickerIconEntry& icon : catalog.GetIcons()) {
+		if(icon.available && valid.GetCount() < 3)
+			valid.Add(&icon);
+	}
+	if(valid.GetCount() < 3) {
+		error = "Project IO smoke could not find three valid active-catalog entries.";
+		return false;
+	}
 
 	SymbolPickerProject project;
 	project.project_name = "Smoke Project";
@@ -230,8 +239,8 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	first.name = "Primary";
 	first.comment = "first collection";
 	SymbolPickerIconRef first_a;
-	first_a.catalog_id = "action/save/rounded";
-	first_a.source_id = "action/save";
+	first_a.catalog_id = valid[0]->catalog_id;
+	first_a.source_id = valid[0]->source_id;
 	first_a.alias = "Save";
 	first_a.size = 32;
 	first_a.tint = Color(80, 90, 100);
@@ -243,8 +252,8 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	first.items.Add(first_a);
 
 	SymbolPickerIconRef first_b;
-	first_b.catalog_id = "navigation/menu/sharp";
-	first_b.source_id = "navigation/menu";
+	first_b.catalog_id = valid[1]->catalog_id;
+	first_b.source_id = valid[1]->source_id;
 	first_b.alias = "Menu";
 	first_b.size = 24;
 	first_b.tint = Color(10, 20, 30);
@@ -267,8 +276,8 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	second.items.Add(second_a);
 
 	SymbolPickerIconRef second_b;
-	second_b.catalog_id = "content/copy/outlined";
-	second_b.source_id = "content/copy";
+	second_b.catalog_id = valid[2]->catalog_id;
+	second_b.source_id = valid[2]->source_id;
 	second_b.alias = "Copy";
 	second_b.size = 64;
 	second_b.tint = Color(1, 2, 3);
@@ -317,8 +326,8 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 		error = "Loaded collection comments are wrong.";
 		return false;
 	}
-	if(loaded.collections[0].items[0].catalog_id != "action/save/rounded"
-		|| loaded.collections[0].items[0].source_id != "action/save"
+	if(loaded.collections[0].items[0].catalog_id != valid[0]->catalog_id
+		|| loaded.collections[0].items[0].source_id != valid[0]->source_id
 		|| loaded.collections[0].items[0].alias != "Save"
 		|| loaded.collections[0].items[1].alias != "Menu"
 		|| loaded.collections[1].items[0].alias != "Missing"
@@ -349,9 +358,9 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 		error = "Loaded project item tints are wrong.";
 		return false;
 	}
-	if(!catalog.FindByCatalogId("action/save/rounded")
-		|| !catalog.FindByCatalogId("navigation/menu/sharp")
-		|| !catalog.FindByCatalogId("content/copy/outlined")) {
+	if(!catalog.FindByCatalogId(valid[0]->catalog_id)
+		|| !catalog.FindByCatalogId(valid[1]->catalog_id)
+		|| !catalog.FindByCatalogId(valid[2]->catalog_id)) {
 		error = "Smoke test valid ids are not present in the active catalog.";
 		return false;
 	}

@@ -4,6 +4,7 @@ uses
 	CtrlCore,
 	CtrlLib,
 	plugin/png,
+	Utilities/IconExportCore,
 	Ui;
 
 file
@@ -27,6 +28,8 @@ file
 	SymbolPickerExport.cpp,
 	SymbolPickerUppExport.h,
 	SymbolPickerUppExport.cpp,
+	SymbolPickerImlExport.h,
+	SymbolPickerImlExport.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,
@@ -65,3 +68,4 @@ file
 
 mainconfig
 	"" = "GUI";
+

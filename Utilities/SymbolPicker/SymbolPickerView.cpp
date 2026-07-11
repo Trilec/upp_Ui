@@ -1,6 +1,7 @@
 #include "SymbolPickerView.h"
 #include "SymbolPickerProjectIo.h"
 #include "SymbolPickerUppExport.h"
+#include "SymbolPickerImlExport.h"
 
 namespace Upp {
 
@@ -826,7 +827,8 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.Add("PNG Files", (int)SymbolPickerExportType::PngFiles)
 		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles)
 		.Add("U++ RAW Header", (int)SymbolPickerExportType::UppRawHeader)
-		.Add("U++ RLE Header", (int)SymbolPickerExportType::UppRleHeader);
+		.Add("U++ RLE Header", (int)SymbolPickerExportType::UppRleHeader)
+		.Add("U++ IML", (int)SymbolPickerExportType::UppIml);
 	output_export_type_.Select(0);
 	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
 	copy_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
@@ -1213,6 +1215,8 @@ String SymbolPickerView::MakeExportDefaultExtension() const
 	case SymbolPickerExportType::UppRawHeader:
 	case SymbolPickerExportType::UppRleHeader:
 		return ".h";
+	case SymbolPickerExportType::UppIml:
+		return ".iml";
 	case SymbolPickerExportType::PngFiles:
 	case SymbolPickerExportType::SvgFiles:
 		return ".txt";
@@ -1234,6 +1238,9 @@ String SymbolPickerView::MakeExportDefaultName(SymbolPickerExportScope scope) co
 		break;
 	case SymbolPickerExportType::UppRleHeader:
 		base << "_rle";
+		break;
+	case SymbolPickerExportType::UppIml:
+		base << "_iml";
 		break;
 	default:
 		base << '_' << MakeExportTypeName(model_->GetExportType());
@@ -1266,6 +1273,9 @@ String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope, Vector<S
 		break;
 	case SymbolPickerExportType::UppRleHeader:
 		text = BuildSymbolPickerUppRleHeader(project, *catalog_, scope, &warn);
+		break;
+	case SymbolPickerExportType::UppIml:
+		text = BuildSymbolPickerUppIml(project, *catalog_, scope, &warn);
 		break;
 	case SymbolPickerExportType::PngFiles:
 	case SymbolPickerExportType::SvgFiles:
@@ -1335,7 +1345,8 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 	FileSel fs;
 	String ext = MakeExportDefaultExtension();
 	String type_label = model_->GetExportType() == SymbolPickerExportType::CppSnippet ? "*.cpp" :
-		((model_->GetExportType() == SymbolPickerExportType::UppRawHeader || model_->GetExportType() == SymbolPickerExportType::UppRleHeader) ? "*.h" : "*.txt");
+		((model_->GetExportType() == SymbolPickerExportType::UppRawHeader || model_->GetExportType() == SymbolPickerExportType::UppRleHeader) ? "*.h" :
+		(model_->GetExportType() == SymbolPickerExportType::UppIml ? "*.iml" : "*.txt"));
 	fs.Type("Export text", type_label);
 	String current = model_->GetProjectFilePath();
 	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));

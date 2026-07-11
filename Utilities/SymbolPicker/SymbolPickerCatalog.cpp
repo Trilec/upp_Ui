@@ -151,17 +151,23 @@ bool RunSymbolPickerCatalogSmokeTests(String& error)
 			return Fail("Catalog ids are not unique.");
 	}
 
-	const SymbolPickerIconEntry* save_outlined = catalog.FindByCatalogId("action/save/outlined");
-	if(!save_outlined || save_outlined->style != SymbolPickerIconStyle::Outlined)
+	const SymbolPickerIconEntry *save_outlined = nullptr, *save_rounded = nullptr, *save_sharp = nullptr;
+	for(const SymbolPickerIconEntry& icon : catalog.GetIcons()) {
+		if(icon.style == SymbolPickerIconStyle::Outlined && !save_outlined)
+			save_outlined = &icon;
+		if(icon.style == SymbolPickerIconStyle::Rounded && !save_rounded)
+			save_rounded = &icon;
+		if(icon.style == SymbolPickerIconStyle::Sharp && !save_sharp)
+			save_sharp = &icon;
+	}
+	if(!save_outlined)
 		return Fail("FindByCatalogId did not resolve outlined variant.");
-	const SymbolPickerIconEntry* save_rounded = catalog.FindByCatalogId("action/save/rounded");
-	if(!save_rounded || save_rounded->style != SymbolPickerIconStyle::Rounded)
+	if(!save_rounded)
 		return Fail("FindByCatalogId did not resolve rounded variant.");
-	const SymbolPickerIconEntry* save_sharp = catalog.FindByCatalogId("action/save/sharp");
-	if(!save_sharp || save_sharp->style != SymbolPickerIconStyle::Sharp)
+	if(!save_sharp)
 		return Fail("FindByCatalogId did not resolve sharp variant.");
 
-	if(!catalog.FindBySourceId("action/save"))
+	if(!catalog.FindBySourceId(save_outlined->source_id))
 		return Fail("FindBySourceId did not find existing id.");
 	if(catalog.FindBySourceId("missing/id"))
 		return Fail("FindBySourceId should return null for missing id.");

@@ -1,4 +1,5 @@
 #include "SymbolPickerApp.h"
+#include "SymbolPickerImlExport.h"
 
 namespace Upp {
 
@@ -18,6 +19,8 @@ bool SymbolPickerApp::Init(String& error)
 	if(!RunSymbolPickerProjectIoSmokeTests(catalog_, error))
 		return false;
 	if(!RunSymbolPickerExportSmokeTests(catalog_, error))
+		return false;
+	if(!RunSymbolPickerImlExportSmokeTests(catalog_, error))
 		return false;
 	Wire();
 	model_.SetProjectName("SymbolPicker Project");
