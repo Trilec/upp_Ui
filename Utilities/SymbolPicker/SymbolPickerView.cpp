@@ -1113,6 +1113,7 @@ void SymbolPickerView::RebuildLibraryTiles()
 		};
 		tile.WhenDragStart = [=] {
 			SetDragInteractionActive(true);
+			collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_DRAG_OVER);
 		};
 		tile.WhenDragEnd = [=] {
 			SetDragInteractionActive(false);
@@ -1769,8 +1770,17 @@ void SymbolPickerView::SetDragInteractionActive(bool active)
 		library_tiles_[i].SetTooltipEnabled(!active);
 	for(int i = 0; i < collection_tiles_.GetCount(); ++i)
 		collection_tiles_[i].SetTooltipEnabled(!active);
-	if(!active)
+	if(!active) {
 		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
+		if(pending_model_refresh_) {
+			PostCallback([=] {
+				if(drag_interaction_active_)
+					return;
+				pending_model_refresh_ = false;
+				RefreshFromModel();
+			});
+		}
+	}
 }
 
 String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
@@ -1783,6 +1793,10 @@ void SymbolPickerView::RefreshFromModel()
 {
 	if(!model_)
 		return;
+	if(drag_interaction_active_) {
+		pending_model_refresh_ = true;
+		return;
+	}
 
 	sync_view_state_ = true;
 	library_style_selector_ <<= (int)model_->GetIconStyle();

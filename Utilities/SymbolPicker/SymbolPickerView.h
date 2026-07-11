@@ -256,6 +256,7 @@ private:
 	Index<int>      selected_collection_item_indexes_;
 	bool            sync_view_state_ = false;
 	bool            drag_interaction_active_ = false;
+	bool            pending_model_refresh_ = false;
 
 	virtual bool Key(dword key, int count) override;
 
