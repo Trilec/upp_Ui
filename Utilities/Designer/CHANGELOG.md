@@ -5,7 +5,7 @@ This Doc is ment for short but specific notes for: recording behavior changes, a
 
 ## 2026-06-26
 
-- Bumped Designer to `v1.0.3 Alpha`.
+- Bumped Designer to `v1.0.0-rc1`.
 - Added a runtime diagnostics channel for inspector transactions so supervisor testing can see raw intent, DSM admission, validation, command, projection, and readback outside `_DEBUG`.
 - Continued moving single-node inspector ownership under the Designer state machine, including clearer preview vs final-commit intent handling.
 

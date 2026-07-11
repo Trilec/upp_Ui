@@ -888,6 +888,35 @@ struct DesignerApiAuditSpec : Moveable<DesignerApiAuditSpec> {
 	}
 };
 
+static String g_test_only;
+
+static void TraceTestStep(const String& tag)
+{
+	RLOG(tag);
+	Cout() << tag << "\n";
+	Cout().Flush();
+}
+
+static bool ShouldRunTest(const char *name)
+{
+	return g_test_only.IsEmpty() || g_test_only == name;
+}
+
+static DesignerNodeId FindFirstNodeByType(const DesignerModel& model, DesignerNodeId root, const String& type_id)
+{
+	const DesignerNode* n = model.Find(root);
+	if(!n)
+		return Designer_NULL;
+	if(n->type_id == type_id)
+		return root;
+	for(DesignerNodeId child : n->children) {
+		DesignerNodeId found = FindFirstNodeByType(model, child, type_id);
+		if(found != Designer_NULL)
+			return found;
+	}
+	return Designer_NULL;
+}
+
 static bool BindingVisible(const Vector<DesignerApiBinding>& bindings, const String& id)
 {
 	const DesignerApiBinding* b = FindBinding(bindings, id);
@@ -2064,6 +2093,7 @@ static void TestDesignerCodeGenPages(TestCtx& t)
 static void TestPropertyEditStability(TestCtx& t)
 {
 	t.Section("Designer property edit stability");
+	TraceTestStep("PROPERTY_STABILITY 010: begin");
 
 	DesignerRegistry r;
 	RegisterDesignerBuiltins(r);
@@ -2072,6 +2102,7 @@ static void TestPropertyEditStability(TestCtx& t)
 	DesignerNodeId grid = 4;
 	DesignerNodeId label = 5;
 	DesignerNodeId slider = 6;
+	TraceTestStep("PROPERTY_STABILITY 020: basic property edits");
 
 	for(int i = 0; i < 40; i++) {
 		stack.Execute(MakeDesignerSetPropertyCommand(grid, "columns", 1 + (i % 4)), m);
@@ -2094,6 +2125,7 @@ static void TestPropertyEditStability(TestCtx& t)
 		t.Expect(stack.Redo(m), "property redo remains stable");
 	t.Expect(m.Validate(), "model validates after repeated property redo");
 
+	TraceTestStep("PROPERTY_STABILITY 030: live preview transaction setup");
 	DesignerNodeId scroll_host = m.AddNode("BoxLayout", Designer_ROOT);
 	r.Find("BoxLayout")->init_defaults(*m.Find(scroll_host));
 	DesignerNodeId scroll = m.AddNode("UiScrollPanel", scroll_host);
@@ -2109,6 +2141,7 @@ static void TestPropertyEditStability(TestCtx& t)
 	t.Expect(TestNodePropertyOr(*m.Find(scroll), "v_sizing", Value()) == Value("Fixed"),
 	         "scroll panel fixed height edit preserves Fixed mode");
 
+	TraceTestStep("PROPERTY_STABILITY 040: spacer fixed sizing");
 	DesignerNodeId spacer_host = m.AddNode("BoxLayout", Designer_ROOT);
 	r.Find("BoxLayout")->init_defaults(*m.Find(spacer_host));
 	m.Find(spacer_host)->properties.Set("direction", "H");
@@ -2125,10 +2158,12 @@ static void TestPropertyEditStability(TestCtx& t)
 	DesignerPreview preview;
 	preview.Set(&m, &r);
 	preview.SetRect(0, 0, 640, 360);
+	TraceTestStep("PROPERTY_STABILITY 050: before preview sync");
 	preview.SyncRealPreview();
 	preview.Layout();
 	t.Expect(m.Validate(), "preview relayout after spacer fixed sizing remains stable");
 
+	TraceTestStep("PROPERTY_STABILITY 060: float edit containers");
 	DesignerModel live_preview_model;
 	DesignerNodeId host = live_preview_model.AddNode("UiPanel", Designer_ROOT);
 	r.Find("UiPanel")->init_defaults(*live_preview_model.Find(host));
@@ -2158,7 +2193,9 @@ static void TestPropertyEditStability(TestCtx& t)
 	t.Expect(TestNodePropertyOr(*live_preview_model.Find(title), "fixed_width", Value()) == old_w,
 	         "undo restores pre-preview fixed_width");
 
+	TraceTestStep("PROPERTY_STABILITY 070: float edit grids and containers");
 	auto ExerciseFloatEditContainer = [&](const char *parent_type, const String& label) {
+		TraceTestStep("PROPERTY_STABILITY 071: before " + String(label));
 		DesignerModel local;
 		DesignerNodeId parent = local.AddNode(parent_type, Designer_ROOT);
 		r.Find(parent_type)->init_defaults(*local.Find(parent));
@@ -2220,11 +2257,13 @@ static void TestPropertyEditStability(TestCtx& t)
 		preview.SyncRealPreview();
 		preview.Layout();
 		t.Expect(local.Validate(), label + " preview rebuild stays stable after float edit changes");
+		TraceTestStep("PROPERTY_STABILITY 072: after " + String(label));
 	};
 	ExerciseFloatEditContainer("GridLayout", "float edit grid");
 	ExerciseFloatEditContainer("BoxLayout", "float edit box");
 	ExerciseFloatEditContainer("UiPanel", "float edit panel");
 	ExerciseFloatEditContainer("UiGroupPanel", "float edit group panel");
+	TraceTestStep("PROPERTY_STABILITY 080: teardown");
 }
 
 static void TestInspectorLiveSelectionTransition(TestCtx& t)
@@ -2235,39 +2274,65 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 	RegisterDesignerBuiltins(r);
 
 	DesignerModel m;
-	DesignerNodeId outer = m.AddNode("GridLayout", Designer_ROOT);
-	r.Find("GridLayout")->init_defaults(*m.Find(outer));
-	m.Find(outer)->properties.Set("columns", 2);
-	m.Find(outer)->properties.Set("rows", 2);
-	DesignerNodeId inner = m.AddNode("GridLayout", outer);
-	r.Find("GridLayout")->init_defaults(*m.Find(inner));
-	m.Find(inner)->properties.Set("columns", 2);
-	m.Find(inner)->properties.Set("rows", 2);
+	bool loaded_fixture = false;
+	String fixture_error;
+	Vector<String> fixture_notes;
+	String fixture_json = LoadFile("E:/apps/github/upp_Ui/designs/design_themestudio.json");
+	if(!fixture_json.IsEmpty())
+		loaded_fixture = LoadDesignerModelJson(m, r, fixture_json, fixture_error, &fixture_notes);
+	if(!loaded_fixture) {
+		TraceTestStep("LIVE_TRANSITION 005: fallback synthetic model");
+		DesignerNodeId outer = m.AddNode("GridLayout", Designer_ROOT);
+		r.Find("GridLayout")->init_defaults(*m.Find(outer));
+		m.Find(outer)->properties.Set("columns", 2);
+		m.Find(outer)->properties.Set("rows", 2);
+		DesignerNodeId inner = m.AddNode("GridLayout", outer);
+		r.Find("GridLayout")->init_defaults(*m.Find(inner));
+		m.Find(inner)->properties.Set("columns", 2);
+		m.Find(inner)->properties.Set("rows", 2);
 
-	auto add_leaf = [&](const char *type, const String& name) -> DesignerNodeId {
-		DesignerNodeId id = m.AddNode(type, inner);
-		r.Find(type)->init_defaults(*m.Find(id));
-		m.Find(id)->name = name;
-		return id;
-	};
-	DesignerNodeId mask = add_leaf("UiMaskEdit", "maskEdit");
-	m.Find(mask)->properties.Set("mask", "##/##/####");
-	m.Find(mask)->properties.Set("text", "12312026");
-	DesignerNodeId integer = add_leaf("UiIntEdit", "intEdit");
-	m.Find(integer)->properties.Set("value", 17);
-	DesignerNodeId password = add_leaf("UiPasswordEdit", "passwordEdit");
-	m.Find(password)->properties.Set("sample_text", "secret");
-	m.Find(password)->properties.Set("placeholder", "Password");
-	m.Find(password)->properties.Set("plain_visible", false);
-	m.Find(password)->properties.Set("visibility_icon", true);
-	DesignerNodeId line = add_leaf("UiLineEdit", "lineEdit");
-	m.Find(line)->properties.Set("text", "alpha");
-	DesignerNodeId float_edit = add_leaf("UiFloatEdit", "floatEdit");
-	m.Find(float_edit)->properties.Set("minf", 0.5);
-	m.Find(float_edit)->properties.Set("maxf", 99.5);
-	m.Find(float_edit)->properties.Set("stepf", 0.25);
-	m.Find(float_edit)->properties.Set("precision", 3);
-	m.Find(float_edit)->properties.Set("valuef", 1.5);
+		auto add_leaf = [&](const char *type, const String& name) -> DesignerNodeId {
+			DesignerNodeId id = m.AddNode(type, inner);
+			r.Find(type)->init_defaults(*m.Find(id));
+			m.Find(id)->name = name;
+			return id;
+		};
+		DesignerNodeId mask = add_leaf("UiMaskEdit", "maskEdit");
+		m.Find(mask)->properties.Set("mask", "##/##/####");
+		m.Find(mask)->properties.Set("text", "12312026");
+		DesignerNodeId integer = add_leaf("UiIntEdit", "intEdit");
+		m.Find(integer)->properties.Set("value", 17);
+		DesignerNodeId password = add_leaf("UiPasswordEdit", "passwordEdit");
+		m.Find(password)->properties.Set("sample_text", "secret");
+		m.Find(password)->properties.Set("placeholder", "Password");
+		m.Find(password)->properties.Set("plain_visible", false);
+		m.Find(password)->properties.Set("visibility_icon", true);
+		DesignerNodeId line = add_leaf("UiLineEdit", "lineEdit");
+		m.Find(line)->properties.Set("text", "alpha");
+		DesignerNodeId float_edit = add_leaf("UiFloatEdit", "floatEdit");
+		m.Find(float_edit)->properties.Set("minf", 0.5);
+		m.Find(float_edit)->properties.Set("maxf", 99.5);
+		m.Find(float_edit)->properties.Set("stepf", 0.25);
+		m.Find(float_edit)->properties.Set("precision", 3);
+		m.Find(float_edit)->properties.Set("valuef", 1.5);
+	} else {
+		TraceTestStep("LIVE_TRANSITION 005: loaded design_themestudio.json");
+		if(!fixture_notes.IsEmpty())
+			TraceTestStep("LIVE_TRANSITION 006: fixture notes " + Join(fixture_notes, " | "));
+	}
+
+	DesignerNodeId mask = FindFirstNodeByType(m, Designer_ROOT, "UiMaskEdit");
+	DesignerNodeId integer = FindFirstNodeByType(m, Designer_ROOT, "UiIntEdit");
+	DesignerNodeId password = FindFirstNodeByType(m, Designer_ROOT, "UiPasswordEdit");
+	DesignerNodeId line = FindFirstNodeByType(m, Designer_ROOT, "UiLineEdit");
+	DesignerNodeId float_edit = FindFirstNodeByType(m, Designer_ROOT, "UiFloatEdit");
+	t.Expect(mask != Designer_NULL, "live selection transition has a mask edit");
+	t.Expect(integer != Designer_NULL, "live selection transition has an int edit");
+	t.Expect(password != Designer_NULL, "live selection transition has a password edit");
+	t.Expect(line != Designer_NULL, "live selection transition has a line edit");
+	t.Expect(float_edit != Designer_NULL, "live selection transition has a float edit");
+	if(mask == Designer_NULL || integer == Designer_NULL || password == Designer_NULL || line == Designer_NULL || float_edit == Designer_NULL)
+		return;
 
 	DesignerInspector inspector;
 	DesignerPreview preview;
@@ -2344,23 +2409,34 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 	};
 
 	for(int i = 0; i < 20; i++) {
+		if(i == 0)
+			TraceTestStep("LIVE_TRANSITION 010: begin cycle");
 		select(mask);
 		edit_text("Text", Format("1231%02d26", i));
+		if(i == 0)
+			TraceTestStep("LIVE_TRANSITION 020: after mask edit");
 		select(integer);
 		slide("Value", 20 + i);
+		if(i == 0)
+			TraceTestStep("LIVE_TRANSITION 030: after integer slide");
 		select(password);
 		edit_text("Sample text", Format("secret %d", i));
 		toggle("Plain text visible");
+		if(i == 0)
+			TraceTestStep("LIVE_TRANSITION 040: after password toggle");
 		select(float_edit);
 		edit_text("Value", Format("1.%02d", i));
 		slide("Precision", 2 + (i % 3));
 		toggle("Spin buttons");
+		if(i == 0)
+			TraceTestStep("LIVE_TRANSITION 050: after float edits");
 		select(line);
 		edit_text("Text", Format("line %d", i));
 		select(float_edit);
 		edit_text("Min", "0.5");
 		edit_text("Step", "0.25");
 	}
+	TraceTestStep("LIVE_TRANSITION 060: teardown");
 
 	host.Close();
 }
@@ -3977,33 +4053,45 @@ static void TestDesignerProjectExport(TestCtx& t)
 CONSOLE_APP_MAIN
 {
 	TestCtx t;
-	TestModelTreeEdits(t);
-	TestDesignerAddTarget(t);
-	TestDesignerCommands(t);
-	TestExplicitEmptyTextValues(t);
-	TestDesignerNewEditControls(t);
-	TestDesignerArchitectureGuard(t);
-	TestDesignerDragController(t);
-	TestUiQuadSplitterConstruction(t);
-	TestRegistryAndBuiltins(t);
-	TestDesignerAdapters(t);
-	TestDesignerApiCoverageAudit(t);
-	TestDesignerThemeSchemaParity(t);
-	TestDesignerCodeGenPages(t);
-	TestPropertyEditStability(t);
-	TestLayoutSizingPrimitives(t);
-	TestWidthAwareLayoutMeasure(t);
-	TestAncestorRelayoutContract(t);
-	TestDesignerInspectorContextAndThemeRows(t);
-	TestDesignerInspectorMultiSelectSizing(t);
-	TestInspectorLiveSelectionTransition(t);
-	TestDesignerChoiceCommitPath(t);
-	TestDesignerChoiceBindingAudit(t);
-	TestSplitButtonPopupMetadata(t);
-	TestRecentDocumentHelper(t);
-	TestGeneratedCodeText(t);
-	TestDesignerSerialization(t);
-	TestDesignerProjectExport(t);
+	const Vector<String>& args = CommandLine();
+	for(int i = 0; i < args.GetCount(); i++) {
+		const String& arg = args[i];
+		if(arg == "--only" && i + 1 < args.GetCount()) {
+			g_test_only = args[i + 1];
+			break;
+		}
+		if(arg.StartsWith("--only=")) {
+			g_test_only = arg.Mid(7);
+			break;
+		}
+	}
+	if(ShouldRunTest("model-tree-edits")) TestModelTreeEdits(t);
+	if(ShouldRunTest("designer-add-target")) TestDesignerAddTarget(t);
+	if(ShouldRunTest("designer-commands")) TestDesignerCommands(t);
+	if(ShouldRunTest("explicit-empty-text")) TestExplicitEmptyTextValues(t);
+	if(ShouldRunTest("designer-new-edit-controls")) TestDesignerNewEditControls(t);
+	if(ShouldRunTest("designer-architecture-guard")) TestDesignerArchitectureGuard(t);
+	if(ShouldRunTest("designer-drag-controller")) TestDesignerDragController(t);
+	if(ShouldRunTest("ui-quad-splitter-construction")) TestUiQuadSplitterConstruction(t);
+	if(ShouldRunTest("registry-and-builtins")) TestRegistryAndBuiltins(t);
+	if(ShouldRunTest("designer-adapters")) TestDesignerAdapters(t);
+	if(ShouldRunTest("designer-api-coverage-audit")) TestDesignerApiCoverageAudit(t);
+	if(ShouldRunTest("designer-theme-schema-parity")) TestDesignerThemeSchemaParity(t);
+	if(ShouldRunTest("designer-code-gen-pages")) TestDesignerCodeGenPages(t);
+	if(ShouldRunTest("property-edit-stability")) TestPropertyEditStability(t);
+	if(ShouldRunTest("layout-sizing-primitives")) TestLayoutSizingPrimitives(t);
+	if(ShouldRunTest("width-aware-layout-measure")) TestWidthAwareLayoutMeasure(t);
+	if(ShouldRunTest("ancestor-relayout-contract")) TestAncestorRelayoutContract(t);
+	if(ShouldRunTest("designer-inspector-context-and-theme-rows")) TestDesignerInspectorContextAndThemeRows(t);
+	if(ShouldRunTest("designer-inspector-multiselect-sizing")) TestDesignerInspectorMultiSelectSizing(t);
+	if(ShouldRunTest("inspector-live-transition")) TestInspectorLiveSelectionTransition(t);
+	if(ShouldRunTest("designer-choice-commit-path")) TestDesignerChoiceCommitPath(t);
+	if(ShouldRunTest("designer-choice-binding-audit")) TestDesignerChoiceBindingAudit(t);
+	if(ShouldRunTest("split-button-popup-metadata")) TestSplitButtonPopupMetadata(t);
+	if(ShouldRunTest("recent-document-helper")) TestRecentDocumentHelper(t);
+	if(ShouldRunTest("generated-code-text")) TestGeneratedCodeText(t);
+	if(ShouldRunTest("designer-serialization")) TestDesignerSerialization(t);
+	if(ShouldRunTest("designer-project-export")) TestDesignerProjectExport(t);
 
 	Cout() << "\nChecks: " << t.checks << ", fails: " << t.fails << "\n";
 	SetExitCode(t.fails ? 1 : 0);
