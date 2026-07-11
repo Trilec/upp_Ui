@@ -159,7 +159,7 @@ NOTES FOR AI CONSUMERS
 - Indicate required decoders or external DLLs explicitly.
 
 REPO-SPECIFIC UI NOTES
-- For this repo's Ui* control layer, load UPP_GUIDES/u_new_controls_checklist.md first. It now acts as the practical UI controls guide.
+- For this repo's Ui* control layer, start with `00_Ui_V1_Engineering_Contract.md`, then `02_Ui_Controls_Guide.md`, then `Ui_V1_Control_Audit.md`.
 - New controls and demos should be commented in groups: constructor/setup, layout, theme application, and reactive event wiring.
 - Prefer control/theme defaults over local demo overrides. If a slider, button, or label baseline is correct in the control layer, demos should use it directly.
 - Plain semantic label roles should stay geometry-neutral. If a value field or compact inspector row needs spacing/container treatment, that should come from the parent layout or an explicitly decorative role, not hidden label-role margins.

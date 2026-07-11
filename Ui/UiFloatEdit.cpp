@@ -128,6 +128,9 @@ void UiFloatEdit::OnSpinDown()
 
 void UiFloatEdit::SetData(const Value& v)
 {
+#ifdef _DEBUG
+    RLOG(Format("UiFloatEdit::SetData type=%s value=%s", v.GetTypeName(), StdFormat(v)));
+#endif
     if(v.Is<double>()) SetValue(v);
     else if(v.Is<int>()) SetValue((double)(int)v);
     else if(!IsNull(v)) SetValue(ScanDouble(v.ToString()));

@@ -2124,6 +2124,74 @@ static void TestPropertyEditStability(TestCtx& t)
 	         "live-previewed fixed_width commit is undoable");
 	t.Expect(TestNodePropertyOr(*live_preview_model.Find(title), "fixed_width", Value()) == old_w,
 	         "undo restores pre-preview fixed_width");
+
+	auto ExerciseFloatEditContainer = [&](const char *parent_type, const String& label) {
+		DesignerModel local;
+		DesignerNodeId parent = local.AddNode(parent_type, Designer_ROOT);
+		r.Find(parent_type)->init_defaults(*local.Find(parent));
+		if(String(parent_type) == "GridLayout") {
+			local.Find(parent)->properties.Set("columns", 2);
+			local.Find(parent)->properties.Set("rows", 2);
+		}
+		DesignerNodeId edit = local.AddNode("UiFloatEdit", parent);
+		r.Find("UiFloatEdit")->init_defaults(*local.Find(edit));
+		local.Find(edit)->properties.Set("h_sizing", "Fixed");
+		local.Find(edit)->properties.Set("v_sizing", "Fixed");
+		local.Find(edit)->properties.Set("fixed_width", 120);
+		local.Find(edit)->properties.Set("fixed_height", 32);
+		local.Find(edit)->properties.Set("minf", 0.5);
+		local.Find(edit)->properties.Set("maxf", 99.5);
+		local.Find(edit)->properties.Set("stepf", 0.25);
+		local.Find(edit)->properties.Set("precision", 3);
+		local.Find(edit)->properties.Set("valuef", 1.5);
+
+		DesignerInspector inspector;
+		inspector.Set(&local, &r);
+		Vector<DesignerNodeId> selection;
+		selection.Add(edit);
+		inspector.SetSelection(selection);
+		t.Expect(inspector.HasRow("valuef"), label + " inspector exposes float value");
+		t.Expect(inspector.HasRow("precision"), label + " inspector exposes precision");
+
+		DesignerPreview preview;
+		preview.Set(&local, &r);
+		preview.SetRect(0, 0, 480, 240);
+		preview.SyncRealPreview();
+		preview.Layout();
+		t.Expect(local.Validate(), label + " preview validates before edits");
+
+		DesignerCommandStack local_stack;
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "h_sizing", "Expand"), local),
+		         label + " accepts expand width");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "v_sizing", "Expand"), local),
+		         label + " accepts expand height");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "minf", String("0.75")), local),
+		         label + " accepts float minimum");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "maxf", String("42.5")), local),
+		         label + " accepts float maximum");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "stepf", String("0.5")), local),
+		         label + " accepts float step");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "precision", 4), local),
+		         label + " accepts precision");
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "valuef", String("12.25")), local),
+		         label + " accepts float value");
+		t.Expect(IsNumber(TestNodePropertyOr(*local.Find(edit), "minf", Value())),
+		         label + " stores float minimum as numeric model data");
+		t.Expect(IsNumber(TestNodePropertyOr(*local.Find(edit), "valuef", Value())),
+		         label + " stores float value as numeric model data");
+
+		if(String(parent_type) == "GridLayout") {
+			local.Find(edit)->properties.Set("grid_row", 1);
+			local.Find(edit)->properties.Set("grid_col", 1);
+		}
+		preview.SyncRealPreview();
+		preview.Layout();
+		t.Expect(local.Validate(), label + " preview rebuild stays stable after float edit changes");
+	};
+	ExerciseFloatEditContainer("GridLayout", "float edit grid");
+	ExerciseFloatEditContainer("BoxLayout", "float edit box");
+	ExerciseFloatEditContainer("UiPanel", "float edit panel");
+	ExerciseFloatEditContainer("UiGroupPanel", "float edit group panel");
 }
 
 class FixedMinCtrl : public Ctrl {

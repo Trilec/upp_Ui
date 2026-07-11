@@ -2604,7 +2604,7 @@ https://github.com/ultimatepp/ultimatepp/blob/master/uppsrc/Core/Ptr.h
 -------------------------------------------------------------------------------
 20) REPO-SPECIFIC UI CONTROL NOTES
 -------------------------------------------------------------------------------
-- Load UPP_GUIDES/u_new_controls_checklist.md when working on this repo's Ui* controls; it is the practical control guide, not just a merge checklist.
+- For this repo's Ui* control layer, start with `00_Ui_V1_Engineering_Contract.md`, then `02_Ui_Controls_Guide.md`, then `Ui_V1_Control_Audit.md`; those are the practical control authorities.
 - Use UiLayoutCursor for lightweight shell/manual placement. Do not invent ad-hoc coordinate helpers per demo.
 - For accordions inside scroll panels, make section-body sizes explicit and ensure the owning layout triggers scroll extent recomputation on toggle.
 - Prefer baseline control/theme defaults in demos. Demo-local style helpers should only remain when they intentionally show a variant.

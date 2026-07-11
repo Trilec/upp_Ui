@@ -2287,6 +2287,16 @@ void DesignerIntEditAdapter::Paint(Draw& w)
 void DesignerFloatEditAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
+#ifdef _DEBUG
+	RLOG(Format("FloatEdit SyncFromNode node=%d minf=%s maxf=%s stepf=%s precision=%d spin=%d valuef=%s",
+	            (int)node.id,
+	            StdFormat(AdapterNodeProperty(node, "minf", 0.0)),
+	            StdFormat(AdapterNodeProperty(node, "maxf", 100.0)),
+	            StdFormat(AdapterNodeProperty(node, "stepf", 0.1)),
+	            (int)AdapterNodeProperty(node, "precision", 2),
+	            (bool)AdapterNodeProperty(node, "spin", true) ? 1 : 0,
+	            StdFormat(AdapterNodeProperty(node, "valuef", 3.14))));
+#endif
 	ApplyEditAppearance(*this, node);
 	MinMax((double)AdapterNodeProperty(node, "minf", 0.0), (double)AdapterNodeProperty(node, "maxf", 100.0));
 	Step((double)AdapterNodeProperty(node, "stepf", 0.1));

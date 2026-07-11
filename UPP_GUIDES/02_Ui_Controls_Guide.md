@@ -77,7 +77,7 @@ Support controls:
 
 ## Sizing And Content Measurement
 
-The authoritative detailed document is [UiSizing_Contract.md](E:\apps\github\upp_Ui\UPP_GUIDES\UiSizing_Contract.md). This guide carries the short version because every new control and demo needs it during review.
+The authoritative detailed document is [UiSizing_Contract.md](UiSizing_Contract.md). This guide carries the short version because every new control and demo needs it during review.
 
 Use these meanings consistently:
 
@@ -212,8 +212,8 @@ Retired prototype demos live under `examples/OLD` and are intentionally excluded
 - Default output mode: `iml`.
 - Input: vector (`.svg`) and raster (`.png`, other `StreamRaster` formats).
 - Shared icon workflow output:
-  - `<base>.iml.append` for [UiIcons.iml](E:\apps\github\upp_Ui\Ui\UiIcons.iml)
-  - `<base>.icons_h.append` for [UiIcons.h](E:\apps\github\upp_Ui\Ui\UiIcons.h)
+  - `<base>.iml.append` for [UiIcons.iml](../Ui/UiIcons.iml)
+  - `<base>.icons_h.append` for [UiIcons.h](../Ui/UiIcons.h)
 - Legacy/local output mode: `uimakeicon`.
 - Typical usage:
 
@@ -1603,7 +1603,7 @@ For any control with paintable sub-parts:
 ## Proposed Slider API
 
 Add a small paint context struct in
-[E:\apps\github\upp_Ui\Ui\UiSlider.h](E:\apps\github\upp_Ui\Ui\UiSlider.h):
+[Ui/UiSlider.h](../Ui/UiSlider.h):
 
 ```cpp
 struct UiSliderPaintContext {
@@ -1808,16 +1808,16 @@ slider.WhenPaintThumb = [&](Draw& w, const UiSliderPaintContext& ctx, bool& hand
 Completed:
 
 1. Added `UiSliderPaintContext` to
-   [E:\apps\github\upp_Ui\Ui\UiSlider.h](E:\apps\github\upp_Ui\Ui\UiSlider.h)
+   [Ui/UiSlider.h](../Ui/UiSlider.h)
 2. Added `WhenPaintTrack`, `WhenPaintActiveTrack`, and `WhenPaintThumb`
 3. Updated `UiSlider::Paint()` in
-   [E:\apps\github\upp_Ui\Ui\UiSlider.cpp](E:\apps\github\upp_Ui\Ui\UiSlider.cpp)
+   [Ui/UiSlider.cpp](../Ui/UiSlider.cpp)
 4. Preserved existing background/foreground hooks unchanged
 5. Normalized the same contract onto:
-   - [E:\apps\github\upp_Ui\Ui\UiScrollBar.h](E:\apps\github\upp_Ui\Ui\UiScrollBar.h)
-   - [E:\apps\github\upp_Ui\Ui\UiToggle.h](E:\apps\github\upp_Ui\Ui\UiToggle.h)
+   - [Ui/UiScrollBar.h](../Ui/UiScrollBar.h)
+   - [Ui/UiToggle.h](../Ui/UiToggle.h)
 6. Used the contract in:
-   - [E:\apps\github\upp_Ui\Ui\UiColorPicker.cpp](E:\apps\github\upp_Ui\Ui\UiColorPicker.cpp)
+   - [Ui/UiColorPicker.cpp](../Ui/UiColorPicker.cpp)
    for hue/gain/alpha track rendering
 
 Next:

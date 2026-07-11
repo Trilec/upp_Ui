@@ -378,10 +378,13 @@ private:
 		open_close_lift_panel.SetIconSide(UiAlign::LEFT);
 		open_close_lift_panel.SetIcon(ICON_DESIGN_LEFT_PANEL_CLOSE_48()).SetIconSize(DPI(16), DPI(16));
 		left_info_panel.SetMinSize(Size(DPI(0), DPI(1)));
+		left_info_panel.SetInset(DPI(0));
 		left_info_panel.SetScrollMode(UIPANELSCROLL_AUTO);
 		left_tool_button_panel.SetSizeMin(DPI(0), DPI(0));
+		left_tool_button_panel.SetInset(DPI(0));
 		left_tools_layout.SetDirection(UiDirection::H).SetGap(DPI(8), DPI(8)).SetInset(DPI(20)).SetWrap(UiBoxWrap::None);
 		right_tool_button_panel.SetSizeMin(DPI(0), DPI(0));
+		right_tool_button_panel.SetInset(DPI(0));
 		right_tools_layout.SetDirection(UiDirection::H).SetGap(DPI(8), DPI(8)).SetInset(DPI(19)).SetWrap(UiBoxWrap::None);
 		code_tool.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
 		code_tool.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
@@ -413,6 +416,7 @@ private:
 		open_close_right_panel.SetIconSide(UiAlign::LEFT);
 		open_close_right_panel.SetIcon(ICON_DESIGN_RIGHT_PANEL_CLOSE_48()).SetIconSize(DPI(16), DPI(16));
 		right_info_panel.SetMinSize(Size(DPI(0), DPI(1)));
+		right_info_panel.SetInset(DPI(0));
 		right_info_panel.SetScrollMode(UIPANELSCROLL_AUTO);
 		exit_tool.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
 		exit_tool.SetMinSize(Size(DPI(60), DPI(0)));
@@ -421,9 +425,12 @@ private:
 		exit_tool.SetIconSide(UiAlign::LEFT);
 		exit_tool.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16));
 		center_panel.SetSizeMin(DPI(0), DPI(0));
+		center_panel.SetInset(DPI(0));
 		center_box_layout.SetDirection(UiDirection::V).SetGap(DPI(0), DPI(8)).SetInset(DPI(0)).SetWrap(UiBoxWrap::None);
 		zoom_aspect_panel.SetSizeMin(DPI(0), DPI(0));
+		zoom_aspect_panel.SetInset(DPI(0));
 		zoom_aspect_panel.Tip("Set size or aspect ratio");
+		preview_panel.SetInset(DPI(0));
 		preview_panel.SetScrollMode(UIPANELSCROLL_AUTO);
 		zoom_aspect_layout.SetDirection(UiDirection::H).SetGap(DPI(8), DPI(8)).SetInset(DPI(19)).SetWrap(UiBoxWrap::None);
 		portrait_aspect.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
@@ -484,80 +491,74 @@ private:
 	{
 		// Parent-child layout tree only.
 		Add(main_window_layout);
-		main_window_layout.HSizePosZ(0, 0);
-		main_window_layout.VSizePosZ(0, 0);
-		main_window_layout.Add(top_layout).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		top_layout.Add(header_title_card).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
+		main_window_layout.Add(top_layout).Fit().MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		top_layout.Add(header_title_card).Fit().MinCross(DPI(0));
 		{
 			auto spacer = top_layout.AddSpacer(1);
 			spacer.Fit().MinMain(DPI(10));
 			spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
 			spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Start).LineThickness(DPI(2)).LineDash(SOLID).LineInset(DPI(2));
 		}
-		top_layout.Add(save_split_button).Fixed(DPI(84)).MinMain(DPI(74)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
-		top_layout.Add(load_split_button).Fixed(DPI(84)).MinMain(DPI(74)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
-		top_layout.Add(version_label).Fit().MinMain(DPI(76)).MinMaxCross(DPI(28), DPI(28)).AlignSelf(UiBoxLayout::Align::Center);
+		top_layout.Add(save_split_button).Fixed(DPI(84)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
+		top_layout.Add(load_split_button).Fixed(DPI(84)).MinCross(DPI(24)).AlignSelf(UiBoxLayout::Align::Stretch);
+		top_layout.Add(version_label).Fit().MinMaxCross(DPI(28), DPI(28));
 		{
 			auto spacer = top_layout.AddSpacer(1);
 			spacer.Expand(1).MinMain(DPI(10));
 			spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
 			spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::End).LineThickness(DPI(2)).LineDash(SOLID).LineInset(DPI(2));
 		}
-		top_layout.Add(theme_selection_drop_down).Fixed(DPI(84)).MinMain(DPI(74)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		top_layout.Add(dark_theme_tool).Fit().MinMain(DPI(60)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		top_layout.Add(help_tool).Fit().MinMain(DPI(60)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		top_layout.Add(exit_tool).Fit().MinMain(DPI(60)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		main_window_layout.Add(center_layout).Expand(1).MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		center_layout.Add(leftlayout).Fit().MinMain(DPI(56)).MinCross(DPI(1)).AlignSelf(UiBoxLayout::Align::Stretch);
-		leftlayout.Add(left_tool_button_panel).Fixed(DPI(63)).MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		left_tool_button_panel.Add(left_tools_layout.SizePos());
-		left_tools_layout.Add(layouts_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		left_tools_layout.Add(containers_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		left_tools_layout.Add(controls_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		left_tools_layout.Add(composites_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		left_tools_layout.Add(presets_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
+		top_layout.Add(theme_selection_drop_down).Fixed(DPI(84)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		top_layout.Add(dark_theme_tool).Fit().MinCross(DPI(0));
+		top_layout.Add(help_tool).Fit().MinCross(DPI(0));
+		top_layout.Add(exit_tool).Fit().MinCross(DPI(0));
+		main_window_layout.Add(center_layout).Expand(1).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		center_layout.Add(leftlayout).Fit().MinCross(DPI(1)).AlignSelf(UiBoxLayout::Align::Stretch);
+		leftlayout.Add(left_tool_button_panel).Fixed(DPI(63)).MinCross(DPI(0));
+		left_tools_layout.Add(layouts_tool).Fit().MinCross(DPI(0));
+		left_tools_layout.Add(containers_tool).Fit().MinCross(DPI(0));
+		left_tools_layout.Add(controls_tool).Fit().MinCross(DPI(0));
+		left_tools_layout.Add(composites_tool).Fit().MinCross(DPI(0));
+		left_tools_layout.Add(presets_tool).Fit().MinCross(DPI(0));
 		{
 			auto spacer = left_tools_layout.AddSpacer(1);
 			spacer.Expand(1).MinMain(DPI(28));
 			spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
 			spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Start).LineThickness(DPI(2)).LineDash(SOLID).LineInset(DPI(0));
 		}
-		left_tools_layout.Add(open_close_lift_panel).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		leftlayout.Add(left_info_panel).Expand(1).MinMain(DPI(1)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		center_layout.Add(center_panel).Expand(1).MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		center_panel.Add(center_box_layout.SizePos());
-		center_box_layout.Add(zoom_aspect_panel).Fixed(DPI(63)).MinMain(DPI(0)).MinMaxCross(DPI(278), DPI(278)).AlignSelf(UiBoxLayout::Align::Center);
-		zoom_aspect_panel.Add(zoom_aspect_layout.SizePos());
-		zoom_aspect_layout.Add(portrait_aspect).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		zoom_aspect_layout.Add(landscape_aspect).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		zoom_aspect_layout.Add(square_aspect).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
+		left_tools_layout.Add(open_close_lift_panel).Fit().MinCross(DPI(0));
+		leftlayout.Add(left_info_panel).Expand(1).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		center_layout.Add(center_panel).Expand(1).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		center_box_layout.Add(zoom_aspect_panel).Fixed(DPI(63)).MinMaxCross(DPI(278), DPI(278));
+		zoom_aspect_layout.Add(portrait_aspect).Fit().MinCross(DPI(0));
+		zoom_aspect_layout.Add(landscape_aspect).Fit().MinCross(DPI(0));
+		zoom_aspect_layout.Add(square_aspect).Fit().MinCross(DPI(0));
 		{
 			auto spacer = zoom_aspect_layout.AddSpacer(1);
 			spacer.Expand(1).MinMain(DPI(10));
 			spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
 			spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Auto).LineAlign(UiCrossAlign::Start).LineThickness(DPI(2)).LineDash(SOLID).LineInset(DPI(0));
 		}
-		zoom_aspect_layout.Add(preset_saspect).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Center);
-		center_box_layout.Add(preview_panel).Expand(1).MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		center_layout.Add(rightlayout).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		rightlayout.Add(right_tool_button_panel).Fixed(DPI(63)).MinMain(DPI(0)).MinMaxCross(DPI(346), DPI(346)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tool_button_panel.Add(right_tools_layout.SizePos());
-		right_tools_layout.Add(open_close_right_panel).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tools_layout.Add(open_close_right_panel_02).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tools_layout.Add(open_close_right_panel_03).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
+		zoom_aspect_layout.Add(preset_saspect).Fit().MinCross(DPI(0));
+		center_box_layout.Add(preview_panel).Expand(1).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		center_layout.Add(rightlayout).Fit().MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		rightlayout.Add(right_tool_button_panel).Fixed(DPI(63)).MinMaxCross(DPI(346), DPI(346));
+		right_tools_layout.Add(open_close_right_panel).Fit().MinCross(DPI(0));
+		right_tools_layout.Add(open_close_right_panel_02).Fit().MinCross(DPI(0));
+		right_tools_layout.Add(open_close_right_panel_03).Fit().MinCross(DPI(0));
 		{
 			auto spacer = right_tools_layout.AddSpacer(1);
 			spacer.Expand(1).MinMain(DPI(75));
 			spacer.MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
 			spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::End).LineThickness(DPI(2)).LineDash(SOLID).LineInset(DPI(0));
 		}
-		right_tools_layout.Add(hierarchy_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tools_layout.Add(inspector_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tools_layout.Add(overrides_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		right_tools_layout.Add(code_tool).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
-		rightlayout.Add(right_info_panel).Expand(1).MinMain(DPI(1)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		main_window_layout.Add(lower_layout).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
-		lower_layout.Add(lower__label).Fit().MinMain(DPI(0)).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Start);
+		right_tools_layout.Add(hierarchy_tool).Fit().MinCross(DPI(0));
+		right_tools_layout.Add(inspector_tool).Fit().MinCross(DPI(0));
+		right_tools_layout.Add(overrides_tool).Fit().MinCross(DPI(0));
+		right_tools_layout.Add(code_tool).Fit().MinCross(DPI(0));
+		rightlayout.Add(right_info_panel).Expand(1).MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		main_window_layout.Add(lower_layout).Fit().MinCross(DPI(0)).AlignSelf(UiBoxLayout::Align::Stretch);
+		lower_layout.Add(lower__label).Fit().MinCross(DPI(0));
 	}
 
 	void PostBuild()
@@ -572,8 +573,6 @@ private:
 	UiTitleCard header_title_card;
 	UiSplitButton save_split_button;
 	UiSplitButton load_split_button;
-	UiPanel header_spacer;
-	UiPanel spacer_03;
 	UiDropdown theme_selection_drop_down;
 	UiToolButton help_tool;
 	UiLabel lower__label;
@@ -586,7 +585,6 @@ private:
 	UiToolButton controls_tool;
 	UiToolButton composites_tool;
 	UiToolButton presets_tool;
-	UiPanel spacer_02;
 	UiToolButton open_close_lift_panel;
 	UiScrollPanel left_info_panel;
 	UiPanel left_tool_button_panel;
@@ -597,7 +595,6 @@ private:
 	UiToolButton overrides_tool;
 	UiToolButton inspector_tool;
 	UiToolButton hierarchy_tool;
-	UiPanel spacer_02_02;
 	UiToolButton open_close_right_panel;
 	UiScrollPanel right_info_panel;
 	UiToolButton exit_tool;
@@ -608,7 +605,6 @@ private:
 	UiBoxLayout zoom_aspect_layout;
 	UiToolButton portrait_aspect;
 	UiToolButton landscape_aspect;
-	UiPanel spacer_04;
 	UiSplitButton preset_saspect;
 	UiToolButton square_aspect;
 	UiToolButton open_close_right_panel_02;

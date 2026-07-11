@@ -2849,6 +2849,13 @@ private:
 	{
 		DESIGNER_DBG_LOG(Format("PreviewProjectionDuringEdit: reason=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
 		                        r.reason, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, 0, r.code ? 1 : 0, 0));
+		if(IsDesignerRefreshBlocked()) {
+			DESIGNER_DBG_LOG("Preview projection deferred: " << DesignerRefreshBlockReason());
+			refresh_deferred_ = true;
+			pending_inspector_refresh_ = pending_inspector_refresh_ || r.inspector;
+			full_refresh_requested_ = full_refresh_requested_ || r.full;
+			return;
+		}
 		if(r.hierarchy)
 			RefreshHierarchy();
 		if(r.code)
@@ -5772,6 +5779,8 @@ private:
 			return normalize_text(value);
 		if(property_id == "rows" || property_id == "columns")
 			return max(1, IsNumber(value) ? (int)value : 1);
+		if(property_id == "minf" || property_id == "maxf" || property_id == "stepf" || property_id == "valuef")
+			return IsNumber(value) ? (double)value : ScanDouble(AsString(value));
 		if(property_id == "gap" || property_id == "inset" || property_id == "radius")
 			return max(0, IsNumber(value) ? (int)value : 0);
 		if(property_id == "active")

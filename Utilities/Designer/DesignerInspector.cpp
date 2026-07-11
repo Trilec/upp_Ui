@@ -777,6 +777,13 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	String property_id = b.property_id;
 	DesignerNodeId row_node = n.id;
 	int generation = inspector_generation_;
+#ifdef _DEBUG
+	if(property_id == "valuef" || property_id == "minf" || property_id == "maxf" ||
+	   property_id == "stepf" || property_id == "precision" || property_id == "spin") {
+		RLOG(Format("Inspector binding create node=%d type=%s property=%s editor=%d value=%s generation=%d",
+		            (int)row_node, n.type_id, property_id, (int)b.editor, StdFormat(value), generation));
+	}
+#endif
 
 	if(b.editor == DesignerEditorKind::Choice) {
 		One<Ctrl> ctrl;
@@ -1455,6 +1462,13 @@ void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t
                                       const DesignerApiBinding& b, Row& row)
 {
 	Value value = PropertyValue(n, t, b);
+#ifdef _DEBUG
+	if(b.property_id == "valuef" || b.property_id == "minf" || b.property_id == "maxf" ||
+	   b.property_id == "stepf" || b.property_id == "precision" || b.property_id == "spin") {
+		RLOG(Format("Inspector readback node=%d type=%s property=%s value=%s editor=%d",
+		            (int)n.id, n.type_id, b.property_id, StdFormat(value), (int)b.editor));
+	}
+#endif
 	if(row.ctrl)
 		row.ctrl->Enable(b.enabled);
 	if(UiCompositeDropdown *c = dynamic_cast<UiCompositeDropdown *>(row.ctrl))
@@ -1487,6 +1501,12 @@ void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, c
 {
 	bool mixed = false;
 	Value value = SelectionProperty(nodes, b, mixed);
+#ifdef _DEBUG
+	if(b.property_id == "valuef" || b.property_id == "minf" || b.property_id == "maxf" ||
+	   b.property_id == "stepf" || b.property_id == "precision" || b.property_id == "spin") {
+		RLOG(Format("Inspector multi readback property=%s value=%s mixed=%d", b.property_id, StdFormat(value), mixed ? 1 : 0));
+	}
+#endif
 	if(row.ctrl)
 		row.ctrl->Enable(DesignerBindingEditableInMultiSelect(b));
 	if(UiCompositeDropdown *c = dynamic_cast<UiCompositeDropdown *>(row.ctrl))
