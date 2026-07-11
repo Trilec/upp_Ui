@@ -2263,20 +2263,46 @@ static void TestPropertyEditStability(TestCtx& t)
 		         label + " accepts expand width");
 		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "v_sizing", "Expand"), local),
 		         label + " accepts expand height");
-		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "minf", String("0.75")), local),
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "minf", 0.75), local),
 		         label + " accepts float minimum");
-		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "maxf", String("42.5")), local),
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "maxf", 42.5), local),
 		         label + " accepts float maximum");
-		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "stepf", String("0.5")), local),
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "stepf", 0.5), local),
 		         label + " accepts float step");
 		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "precision", 4), local),
 		         label + " accepts precision");
-		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "valuef", String("12.25")), local),
+		t.Expect(local_stack.Execute(MakeDesignerSetPropertyCommand(edit, "valuef", 12.25), local),
 		         label + " accepts float value");
-		t.Expect(!IsNull(TestNodePropertyOr(*local.Find(edit), "minf", Value())),
-		         label + " stores float minimum model data");
-		t.Expect(!IsNull(TestNodePropertyOr(*local.Find(edit), "valuef", Value())),
-		         label + " stores float value model data");
+		const DesignerNode& edited = *local.Find(edit);
+		auto expect_double = [&](const char *property, double expected) {
+			Value v = TestNodePropertyOr(edited, property, Value());
+			t.Expect(IsNumber(v), label + " stores numeric " + property);
+			if(IsNumber(v))
+				t.Expect(fabs((double)v - expected) < 1e-9,
+				         label + " stores expected numeric " + property);
+		};
+		expect_double("minf", 0.75);
+		expect_double("maxf", 42.5);
+		expect_double("stepf", 0.5);
+		expect_double("valuef", 12.25);
+		String saved = StoreDesignerModelJson(local);
+		DesignerModel reloaded;
+		String reload_error;
+		t.Expect(LoadDesignerModelJson(reloaded, r, saved, reload_error, nullptr),
+		         label + " FloatEdit JSON reloads");
+		const DesignerNode *reloaded_edit = reloaded.Find(edit);
+		t.Expect(reloaded_edit != nullptr, label + " reloaded FloatEdit exists");
+		if(reloaded_edit) {
+			t.Expect(IsNumber(TestNodePropertyOr(*reloaded_edit, "minf", Value())) &&
+			         IsNumber(TestNodePropertyOr(*reloaded_edit, "maxf", Value())) &&
+			         IsNumber(TestNodePropertyOr(*reloaded_edit, "stepf", Value())) &&
+			         IsNumber(TestNodePropertyOr(*reloaded_edit, "valuef", Value())),
+			         label + " FloatEdit numeric properties survive JSON reload");
+		}
+		String generated = GenerateDesignerCode(local, r, "Generated" + String(label));
+		t.Expect(generated.Find("0.75") >= 0 && generated.Find("42.5") >= 0 &&
+		         generated.Find("0.5") >= 0 && generated.Find("12.25") >= 0,
+		         label + " generated code emits FloatEdit numeric literals");
 
 		if(String(parent_type) == "GridLayout") {
 			local.Find(edit)->properties.Set("grid_row", 1);
