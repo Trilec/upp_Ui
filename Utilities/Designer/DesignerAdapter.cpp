@@ -2287,6 +2287,18 @@ void DesignerIntEditAdapter::Paint(Draw& w)
 void DesignerFloatEditAdapter::SyncFromNode(const DesignerNode& node)
 {
 	node_id_ = node.id;
+	auto numeric = [&](const char *key, double fallback) {
+		Value v = AdapterNodeProperty(node, key, fallback);
+		if(v.Is<double>())
+			return (double)v;
+		if(v.Is<int>())
+			return (double)(int)v;
+		if(v.Is<int64>())
+			return (double)(int64)v;
+		if(IsNull(v))
+			return fallback;
+		return ScanDouble(AsString(v));
+	};
 #ifdef _DEBUG
 	RLOG(Format("FloatEdit SyncFromNode node=%d minf=%s maxf=%s stepf=%s precision=%d spin=%d valuef=%s",
 	            (int)node.id,
@@ -2298,11 +2310,11 @@ void DesignerFloatEditAdapter::SyncFromNode(const DesignerNode& node)
 	            StdFormat(AdapterNodeProperty(node, "valuef", 3.14))));
 #endif
 	ApplyEditAppearance(*this, node);
-	MinMax((double)AdapterNodeProperty(node, "minf", 0.0), (double)AdapterNodeProperty(node, "maxf", 100.0));
-	Step((double)AdapterNodeProperty(node, "stepf", 0.1));
+	MinMax(numeric("minf", 0.0), numeric("maxf", 100.0));
+	Step(numeric("stepf", 0.1));
 	Precision((int)AdapterNodeProperty(node, "precision", 2));
 	ShowSpin((bool)AdapterNodeProperty(node, "spin", true));
-	SetValue((double)AdapterNodeProperty(node, "valuef", 3.14));
+	SetValue(numeric("valuef", 3.14));
 	NoWantFocus();
 }
 

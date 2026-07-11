@@ -959,9 +959,10 @@ void DesignerInspector::AddBindingRow(Page& page, const DesignerNode& n, const D
 	UiCompositeEdit *row = new UiCompositeEdit;
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
-	std::shared_ptr<Value> last_committed = std::make_shared<Value>(value);
+	String edit_value = IsNull(value) ? String() : AsString(value);
+	std::shared_ptr<Value> last_committed = std::make_shared<Value>(edit_value);
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
-	row->SetData(value);
+	row->SetData(edit_value);
 	row->Enable(b.enabled);
 	row->WhenChange = [=] {
 		if(!self)
@@ -1141,7 +1142,8 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	ctrl.Attach(row);
 	Ptr<UiCompositeEdit> self = row;
 	bool row_mixed = mixed;
-	std::shared_ptr<Value> last_committed = std::make_shared<Value>(mixed ? Value() : value);
+	String edit_value = IsNull(value) ? String() : AsString(value);
+	std::shared_ptr<Value> last_committed = std::make_shared<Value>(mixed ? Value() : Value(edit_value));
 	row->SetLabel(b.label).SetLabelWidth(label_w).SetFieldGap(gap).SetEditRole(UiRole::Accent);
 	if(mixed) {
 		row->SetData(Value());
@@ -1149,7 +1151,7 @@ void DesignerInspector::AddBindingRow(Page& page, const Vector<const DesignerNod
 	}
 	else {
 		row->Edit().SetPlaceholder("");
-		row->SetData(value);
+		row->SetData(edit_value);
 	}
 	row->Enable(DesignerBindingEditableInMultiSelect(b));
 	row->WhenChange = [=] {
@@ -1493,7 +1495,7 @@ void DesignerInspector::SetRowValue(const DesignerNode& n, const DesignerType& t
 			c->SetColor(0, IsNull(value) ? Color(214, 231, 255) : (Color)value);
 	}
 	else if(UiCompositeEdit *c = dynamic_cast<UiCompositeEdit *>(row.ctrl))
-		c->SetData(value);
+		c->SetData(IsNull(value) ? String() : AsString(value));
 }
 
 void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, const Vector<const DesignerType *>&,
@@ -1528,7 +1530,7 @@ void DesignerInspector::SetRowValue(const Vector<const DesignerNode *>& nodes, c
 		}
 		else {
 			c->Edit().SetPlaceholder("");
-			c->SetData(value);
+			c->SetData(IsNull(value) ? String() : AsString(value));
 		}
 	}
 }
