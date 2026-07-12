@@ -254,22 +254,21 @@ void SymbolPickerIconTile::LeftUp(Point, dword)
 	if(!pressed_)
 		return;
 	pressed_ = false;
-	ReleaseCapture();
-	if(dragging_ && WhenDragRelease)
-		WhenDragRelease();
-	if(dragging_ && WhenDragEnd)
-		WhenDragEnd();
+	bool completed_drag = dragging_;
 	dragging_ = false;
+	if(HasCapture())
+		ReleaseCapture();
+	if(WhenDragFinished)
+		WhenDragFinished(completed_drag);
 }
 
 void SymbolPickerIconTile::CancelMode()
 {
 	pressed_ = false;
 	dragging_ = false;
-	ReleaseCapture();
-	if(WhenDragEnd)
-		WhenDragEnd();
 	ParentCtrl::CancelMode();
+	if(WhenDragFinished)
+		WhenDragFinished(false);
 }
 
 void SymbolPickerIconTile::LeftDouble(Point, dword)
@@ -484,22 +483,21 @@ void SymbolPickerCollectionTile::LeftUp(Point, dword)
 	if(!pressed_)
 		return;
 	pressed_ = false;
-	ReleaseCapture();
-	if(dragging_ && WhenDragRelease)
-		WhenDragRelease();
-	if(dragging_ && WhenDragEnd)
-		WhenDragEnd();
+	bool completed_drag = dragging_;
 	dragging_ = false;
+	if(HasCapture())
+		ReleaseCapture();
+	if(WhenDragFinished)
+		WhenDragFinished(completed_drag);
 }
 
 void SymbolPickerCollectionTile::CancelMode()
 {
 	pressed_ = false;
 	dragging_ = false;
-	ReleaseCapture();
-	if(WhenDragEnd)
-		WhenDragEnd();
 	ParentCtrl::CancelMode();
+	if(WhenDragFinished)
+		WhenDragFinished(false);
 }
 
 SymbolPickerDropScrollPanel::SymbolPickerDropScrollPanel()
@@ -553,33 +551,6 @@ void SymbolPickerDropScrollPanel::LeftDown(Point, dword keyflags)
 	if(WhenBackgroundLeftDown)
 		WhenBackgroundLeftDown(keyflags);
 	SetFocus();
-}
-
-void SymbolPickerDropScrollPanel::DragEnter()
-{
-	SetDropState(DROP_DRAG_OVER);
-}
-
-void SymbolPickerDropScrollPanel::DragAndDrop(Point p, PasteClip& d)
-{
-	last_drag_point_ = p;
-	if(WhenDropTest)
-		WhenDropTest(d);
-	if(d.IsAccepted()) {
-		SetDropState(DROP_DRAG_OVER);
-		if(d.IsPaste()) {
-			if(WhenDropPerform)
-				WhenDropPerform(d);
-			SetDropState(DROP_ACCEPTED);
-		}
-	}
-	else
-		SetDropState(DROP_REJECTED);
-}
-
-void SymbolPickerDropScrollPanel::DragLeave()
-{
-	SetDropState(DROP_NORMAL);
 }
 
 SymbolPickerView::SymbolPickerView()
@@ -968,12 +939,6 @@ void SymbolPickerView::BuildCollectionsPanel()
 	collections_action_cluster_.Add(collections_filter_icon_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(collections_filter_edit_).Fit().MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_base_layout_.Add(collections_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
-	collections_scroll_panel_.WhenDropTest = [=](PasteClip& d) {
-		HandleCollectionsDropTest(d);
-	};
-	collections_scroll_panel_.WhenDropPerform = [=](PasteClip& d) {
-		HandleCollectionsDropPerform(d);
-	};
 	collections_scroll_panel_.WhenBackgroundLeftDown = [=](dword) {
 		ClearCollectionSelection();
 	};
@@ -1199,8 +1164,9 @@ void SymbolPickerView::RebuildLibraryTiles()
 			collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_DRAG_OVER);
 		};
 		tile.WhenDragMove = [=](Point p) { HandleLibraryGestureMove(p); };
-		tile.WhenDragRelease = [=] { HandleLibraryGestureRelease(); };
-		tile.WhenDragEnd = [=] {
+		tile.WhenDragFinished = [=](bool completed) {
+			if(completed)
+				HandleLibraryGestureRelease();
 			active_library_drag_id_.Clear();
 			SetDragInteractionActive(false);
 		};
@@ -1265,8 +1231,9 @@ void SymbolPickerView::RebuildCollectionTiles()
 			collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_DRAG_OVER);
 		};
 		row.WhenDragMove = [=](Point p) { HandleCollectionGestureMove(p); };
-		row.WhenDragRelease = [=] { HandleCollectionGestureRelease(); };
-		row.WhenDragEnd = [=] {
+		row.WhenDragFinished = [=](bool completed) {
+			if(completed)
+				HandleCollectionGestureRelease();
 			active_collection_drag_index_ = -1;
 			SetDragInteractionActive(false);
 		};
@@ -1634,24 +1601,6 @@ bool SymbolPickerView::LoadProject()
 	return true;
 }
 
-void SymbolPickerView::HandleCollectionsDropTest(PasteClip& d)
-{
-	bool accepted = false;
-	if(model_ && commands_ && model_->GetActiveCollectionIndex() >= 0) {
-		if(catalog_)
-			accepted = AcceptInternal<SymbolPickerIconTile>(d, "symbolpicker-library-tile");
-		if(!accepted)
-			accepted = AcceptInternal<SymbolPickerCollectionTile>(d, "symbolpicker-collection-tile");
-	}
-	if(accepted) {
-		if(AcceptInternal<SymbolPickerCollectionTile>(d, "symbolpicker-collection-tile"))
-			d.SetAction(DND_MOVE);
-		else
-			d.SetAction(DND_COPY);
-		d.Accept();
-	}
-}
-
 int SymbolPickerView::GetCollectionDropInsertIndex(Point p) const
 {
 	Point content_point = p + collections_scroll_panel_.GetScrollPos();
@@ -1664,64 +1613,6 @@ int SymbolPickerView::GetCollectionDropInsertIndex(Point p) const
 		}
 	}
 	return collection_tiles_.GetCount();
-}
-
-void SymbolPickerView::HandleCollectionsDropPerform(PasteClip& d)
-{
-	if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0)
-		return;
-
-	if(catalog_ && AcceptInternal<SymbolPickerIconTile>(d, "symbolpicker-library-tile")) {
-		const SymbolPickerIconTile& src = GetInternal<SymbolPickerIconTile>(d);
-		Vector<String> drag_ids = GetSelectedLibraryCatalogIdsForDrag(src.GetCatalogId());
-		if(drag_ids.IsEmpty())
-			drag_ids.Add(src.GetCatalogId());
-
-		if(drag_ids.GetCount() > 1)
-			commands_->BeginGroup("Add icons to collection");
-
-		suppress_model_refresh_ = true;
-		for(const String& catalog_id : drag_ids) {
-			const SymbolPickerIconEntry* entry = catalog_ ? catalog_->FindByCatalogId(catalog_id) : nullptr;
-			if(!entry)
-				continue;
-
-			SymbolPickerIconRef ref;
-			ref.catalog_id = entry->catalog_id;
-			ref.source_id = entry->source_id;
-			ref.alias = MakeCollectionAlias(*entry);
-			ref.size = model_->GetExportSize();
-			ref.tint = model_->GetTintColor();
-			ref.unresolved = false;
-			commands_->Execute(MakeSymbolPickerAddIconToCollectionCommand(model_->GetActiveCollectionIndex(), ref), *model_);
-		}
-
-		if(drag_ids.GetCount() > 1)
-			commands_->EndGroup();
-		suppress_model_refresh_ = false;
-		RefreshCollections();
-		RefreshCollectionItems();
-		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
-		return;
-	}
-
-	if(AcceptInternal<SymbolPickerCollectionTile>(d, "symbolpicker-collection-tile")) {
-		const SymbolPickerCollectionTile& src = GetInternal<SymbolPickerCollectionTile>(d);
-		const int from_index = src.GetItemIndex();
-		const int collection_index = model_->GetActiveCollectionIndex();
-		if(!model_->IsValidItemIndex(collection_index, from_index))
-			return;
-		const int to_index = GetCollectionDropInsertIndex(collections_scroll_panel_.GetLastDragPoint());
-		suppress_model_refresh_ = true;
-		bool moved = commands_->Execute(MakeSymbolPickerMoveCollectionIconCommand(collection_index, from_index, to_index), *model_);
-		suppress_model_refresh_ = false;
-		if(moved)
-			ClearCollectionSelection();
-		if(moved)
-			RefreshCollectionItems();
-		collections_scroll_panel_.SetDropState(SymbolPickerDropScrollPanel::DROP_NORMAL);
-		return;
-	}
 }
 
 void SymbolPickerView::HandleLibraryGestureMove(Point screen)

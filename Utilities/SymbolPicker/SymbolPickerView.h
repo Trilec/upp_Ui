@@ -46,8 +46,7 @@ public:
 	Event<> WhenActivated;
 	Event<> WhenDragStart;
 	Event<Point> WhenDragMove;
-	Event<> WhenDragRelease;
-	Event<> WhenDragEnd;
+	Event<bool> WhenDragFinished;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
@@ -103,8 +102,7 @@ public:
 	Event<dword> WhenSelected;
 	Event<> WhenDragStart;
 	Event<Point> WhenDragMove;
-	Event<> WhenDragRelease;
-	Event<> WhenDragEnd;
+	Event<bool> WhenDragFinished;
 
 private:
 	Label title_;
@@ -136,22 +134,14 @@ public:
 
 	void SetDropState(DropVisualState state);
 	DropVisualState GetDropState() const { return drop_state_; }
-	Point GetLastDragPoint() const { return last_drag_point_; }
-
-	Event<PasteClip&> WhenDropTest;
-	Event<PasteClip&> WhenDropPerform;
 
 	virtual void Paint(Draw& w) override;
 	virtual void LeftDown(Point p, dword keyflags) override;
-	virtual void DragEnter() override;
-	virtual void DragAndDrop(Point p, PasteClip& d) override;
-	virtual void DragLeave() override;
 
 	Event<dword> WhenBackgroundLeftDown;
 
 private:
 	DropVisualState drop_state_ = DROP_NORMAL;
-	Point last_drag_point_ = Point(0, 0);
 };
 
 class SymbolPickerView : public TopWindow {
@@ -207,8 +197,6 @@ private:
 	void HandleLibraryGestureRelease();
 	void HandleCollectionGestureMove(Point screen);
 	void HandleCollectionGestureRelease();
-	void HandleCollectionsDropTest(PasteClip& d);
-	void HandleCollectionsDropPerform(PasteClip& d);
 	int GetCollectionDropInsertIndex(Point p) const;
 	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
 	void SelectLibraryCatalogId(const String& catalog_id);
