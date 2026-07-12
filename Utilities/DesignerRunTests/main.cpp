@@ -2372,9 +2372,9 @@ static void TestFloatGridPreviewMinimal(TestCtx& t)
 
 static void TestInspectorLiveSelectionTransition(TestCtx& t)
 {
-	t.Section("Designer inspector live selection transition");
+	t.Section("Designer inspector direct selection and edit lifecycle");
 	String trace_path = AppendFileName(GetFileDirectory(GetExeFilePath()), "DesignerRunTests-inspector-live-transition.log");
-	FileAppend trace_out(trace_path);
+	FileOut trace_out(trace_path);
 	auto trace = [&](const String& s) {
 		Cout() << s << "\n";
 		Cout().Flush();

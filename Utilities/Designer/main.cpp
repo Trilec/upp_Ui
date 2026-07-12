@@ -612,47 +612,104 @@ public:
 	// It deliberately uses the application model selection and projection coordinator.
 	int RunFloatInspectorRepro(const String& fixture_path)
 	{
+		String trace_path = AppendFileName(GetFileDirectory(GetExeFilePath()), "DesignerFloatRepro.log");
+		FileOut trace_out(trace_path);
+		int repro_checks = 0;
+		int repro_fails = 0;
 		auto trace = [&](const String& line) {
-			RLOG(line);
-			FileAppend out(DesignerDebugLogPath());
-			out << line << "\n";
+			trace_out << line << "\n";
+			trace_out.Flush();
+			Cout() << line << "\n";
+			Cout().Flush();
 		};
-		trace("FLOAT_REPRO fixture path=" + fixture_path);
+		auto expect = [&](bool cond, const String& msg) {
+			++repro_checks;
+			if(!cond) {
+				++repro_fails;
+				trace("FAIL " + msg);
+			}
+		};
+		trace("run start timestamp=" + AsString(GetSysTime()));
+		trace("executable path=" + GetExeFilePath());
+		trace("fixture path=" + fixture_path);
+		trace("version=" + String(DESIGNER_VERSION));
+		trace("process id=" + AsString((int)GetCurrentProcessId()));
+		trace("log path=" + trace_path);
+		Open();
+		trace("WINDOW opened");
+		trace("before SetRightMode");
+		SetRightMode(RIGHT_INSPECTOR);
+		trace("after SetRightMode");
+		trace("before load");
 		LoadDesignPath(fixture_path);
+		trace("after load");
+		trace("fixture loaded=" + String(current_design_path_.IsEmpty() ? "no" : "yes"));
 		if(current_design_path_.IsEmpty() || model_.GetNodes().GetCount() <= 1) {
 			trace("FLOAT_REPRO normal completion=no reason=fixture not loaded");
+			trace("LIVE_TRANSITION FINAL cycles=0 checks=" + AsString(repro_checks) + " fails=" + AsString(repro_fails) + " exit=2");
 			return 2;
 		}
 		Vector<DesignerNodeId> password_ids;
 		Vector<DesignerNodeId> float_ids;
+		Vector<DesignerNodeId> mask_ids;
+		Vector<DesignerNodeId> integer_ids;
 		for(const DesignerNode& n : model_.GetNodes()) {
 			if(n.type_id == "UiPasswordEdit")
 				password_ids.Add(n.id);
 			if(n.type_id == "UiFloatEdit")
 				float_ids.Add(n.id);
+			if(n.type_id == "UiMaskEdit")
+				mask_ids.Add(n.id);
+			if(n.type_id == "UiIntEdit")
+				integer_ids.Add(n.id);
 		}
 		if(password_ids.IsEmpty() || float_ids.IsEmpty()) {
 			trace("FLOAT_REPRO normal completion=no reason=required controls missing");
+			trace("LIVE_TRANSITION FINAL cycles=0 checks=" + AsString(repro_checks) + " fails=" + AsString(repro_fails) + " exit=3");
 			return 3;
 		}
-		Open();
+		trace("cycles begin");
+		int cycles_completed = 0;
+		auto select = [&](DesignerNodeId id) {
+			model_.SelectOne(id);
+			RefreshSelectionUi();
+			expect(model_.GetSelection().GetCount() == 1 && model_.GetSelection()[0] == id,
+			       Format("model primary selection matches %d", (int)id));
+			expect(inspector_.GetNode() == id,
+			       Format("inspector selected node matches %d", (int)id));
+		};
 		for(int cycle = 1; cycle <= 100; cycle++) {
-			trace(Format("FLOAT_REPRO cycle=%d selection=Password", cycle));
-			model_.SelectOne(password_ids[0]);
-			RefreshSelectionUi();
-			Ctrl::ProcessEvents();
-			trace(Format("FLOAT_REPRO cycle=%d selection=Float", cycle));
-			model_.SelectOne(float_ids[0]);
-			RefreshSelectionUi();
-			Ctrl::ProcessEvents();
+			trace(Format("cycle %d begin", cycle));
+			select(password_ids[0]);
+			select(float_ids[0]);
+			if(!mask_ids.IsEmpty()) {
+				select(mask_ids[0]);
+				select(float_ids[0]);
+			}
+			if(!integer_ids.IsEmpty()) {
+				select(integer_ids[0]);
+				select(float_ids[0]);
+			}
 			if(!model_.Validate()) {
 				trace(Format("FLOAT_REPRO normal completion=no reason=model validation failed cycle=%d", cycle));
+				trace("LIVE_TRANSITION FINAL cycles=" + AsString(cycle - 1) + " checks=" + AsString(repro_checks) + " fails=" + AsString(repro_fails) + " exit=4");
+				trace("WINDOW 070: close requested");
 				Close();
+				trace("WINDOW 080: closed");
+				trace("WINDOW 090: objects destroyed");
 				return 4;
 			}
+			cycles_completed = cycle;
+			if(cycle == 1 || cycle == 25 || cycle == 50 || cycle == 75 || cycle == 100)
+				trace(Format("cycle %d complete", cycle));
 		}
-		trace("FLOAT_REPRO normal completion=yes cycles=100");
+		trace("callbacks drained");
+		trace("WINDOW 070: close requested");
 		Close();
+		trace("WINDOW 080: closed");
+		trace("FLOAT_REPRO normal completion=yes cycles=100");
+		trace("LIVE_TRANSITION FINAL cycles=" + AsString(cycles_completed) + " checks=" + AsString(repro_checks) + " fails=" + AsString(repro_fails) + " exit=0");
+		trace("WINDOW 090: objects destroyed");
 		return 0;
 	}
 
