@@ -1188,7 +1188,7 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
 Size UiAccordion::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    int w = DPI(200);
+    int w = 0;
     int h = 0;
 
     for(int i = 0; i < sections_.GetCount(); i++) {

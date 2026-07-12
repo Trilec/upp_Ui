@@ -30,6 +30,7 @@ public:
     UiDirectContentHost& SetSizing(UiDirectSizeMode h, UiDirectSizeMode v);
     UiDirectContentHost& SetFixedSize(Size sz);
     UiDirectContentHost& SetMinimumSize(Size sz);
+    UiDirectContentHost& SetMaximumSize(Size sz);
     UiDirectContentHost& SetAlign(UiAlign h, UiAlign v);
 
     Ctrl* GetContent() const { return content_; }
@@ -42,6 +43,7 @@ private:
     UiDirectSizeMode v_mode_ = UIDIRECT_FIT;
     Size fixed_ = Size(0, 0);
     Size min_ = Size(0, 0);
+    Size max_ = Size(0, 0); // zero means unbounded
     UiAlign align_h_ = UiAlign::LEFT;
     UiAlign align_v_ = UiAlign::TOP;
 };

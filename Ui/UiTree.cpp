@@ -1394,8 +1394,8 @@ Size UiTree::GetMinSize() const
 {
     const_cast<UiTree *>(this)->SyncModel();
     const Style& style = GetEffectiveStyle();
-    int sample_rows = max(3, min(8, visible_rows_.GetCount()));
-    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 3 + DPI(220);
+    int sample_rows = max(1, min(2, visible_rows_.GetCount()));
+    int width = style.metrics.content_margin.left + style.metrics.content_margin.right + style.h_padding * 2 + style.indent_px * 1 + DPI(120);
     int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom + sample_rows * max(DPI(18), style.row_height);
     return UiStyledOuterSizeFromContent(Size(width, height), style.metrics, style.skin);
 }

@@ -1133,6 +1133,8 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	String vs = AxisSizing(child, "v_sizing");
 	int min_w = CodeGenMinMetric(child, "min_width");
 	int min_h = CodeGenMinMetric(child, "min_height");
+	int max_w = max(0, (int)CodeGenNodeProperty(child, "max_width", 0));
+	int max_h = max(0, (int)CodeGenNodeProperty(child, "max_height", 0));
 	String width_expr;
 
 	if(hs == "Expand")
@@ -1142,28 +1144,39 @@ static void EmitDirectChildLayout(String& out, const String& var, const Designer
 	}
 	else if(hs == "Fixed") {
 		int w = max(DesignerClampMin((int)CodeGenFixedMetric(child, "width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w);
+		if(max_w > 0)
+			w = min(w, max_w);
 		out << "\t\t" << var << ".LeftPosZ(0, DPI(" << w << "));\n";
 		width_expr = "DPI(" + AsString(w) + ")";
 	}
 	else {
-		out << "\t\t" << var << ".LeftPosZ(0, max(" << var << ".GetMinSize().cx, DPI(" << min_w << ")));\n";
-		width_expr = "max(" + var + ".GetMinSize().cx, DPI(" + AsString(min_w) + "))";
+		String w_expr = "max(" + var + ".GetMinSize().cx, DPI(" + AsString(min_w) + "))";
+		if(max_w > 0)
+			w_expr = "min(" + w_expr + ", DPI(" + AsString(max_w) + "))";
+		out << "\t\t" << var << ".LeftPosZ(0, " << w_expr << ");\n";
+		width_expr = w_expr;
 	}
 
 	if(vs == "Expand")
 		out << "\t\t" << var << ".VSizePosZ(0, 0);\n";
 	else if(vs == "Fixed") {
 		int h = max(DesignerClampMin((int)CodeGenFixedMetric(child, "height", DESIGNER_FIXED_FALLBACK_HEIGHT)), min_h);
+		if(max_h > 0)
+			h = min(h, max_h);
 		out << "\t\t" << var << ".TopPosZ(0, DPI(" << h << "));\n";
 	}
 	else {
 		bool wrapped_horizontal_box = child.type_id == "BoxLayout" &&
 		                              CodeGenNodeProperty(child, "direction", "V") == "H" &&
 		                              CodeGenNodeProperty(child, "wrap", "None") != "None";
+		String h_expr = "max(" + var + ".GetMinSize().cy, DPI(" + AsString(min_h) + "))";
+		if(max_h > 0)
+			h_expr = "min(" + h_expr + ", DPI(" + AsString(max_h) + "))";
 		if(wrapped_horizontal_box)
-			out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".MeasureHeightForWidth(" << width_expr << "), DPI(" << min_h << ")));\n";
+			out << "\t\t" << var << ".TopPosZ(0, min(max(" << var << ".MeasureHeightForWidth(" << width_expr << "), DPI(" << min_h << ")), "
+			    << (max_h > 0 ? "DPI(" + AsString(max_h) + ")" : h_expr) << ");\n";
 		else
-			out << "\t\t" << var << ".TopPosZ(0, max(" << var << ".GetMinSize().cy, DPI(" << min_h << ")));\n";
+			out << "\t\t" << var << ".TopPosZ(0, " << h_expr << ");\n";
 	}
 }
 

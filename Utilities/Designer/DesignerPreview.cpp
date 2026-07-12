@@ -92,11 +92,19 @@ static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const S
 {
 	String sizing = DesignerPreviewAxisSizing(n, axis);
 	int user_min = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "min_width" : "min_height", 0)));
+	int user_max = DPI(max(0, (int)DesignerPreviewNodeProperty(n, value_key == "width" ? "max_width" : "max_height", 0)));
 	if(sizing == "Fixed")
-		return max(DPI(DesignerClampMin((int)DesignerPreviewFixedMetric(n, value_key, fallback))), user_min);
+	{
+		int value = DPI(DesignerClampMin((int)DesignerPreviewFixedMetric(n, value_key, fallback)));
+		if(user_max > 0)
+			value = min(value, user_max);
+		return max(value, user_min);
+	}
 
 	Size minsz = child.GetMinSize();
 	int natural = value_key == "width" ? minsz.cx : minsz.cy;
+	if(user_max > 0)
+		natural = min(natural, user_max);
 	return max(natural, user_min);
 }
 
@@ -159,10 +167,13 @@ static void DesignerPreviewConfigureDirectHost(UiDirectContentHost& host, Ctrl& 
 	int fixed_h = DesignerClampMin((int)DesignerPreviewFixedMetric(n, "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
 	int min_w = max(0, (int)DesignerPreviewNodeProperty(n, "min_width", 0));
 	int min_h = max(0, (int)DesignerPreviewNodeProperty(n, "min_height", 0));
+	int max_w = max(0, (int)DesignerPreviewNodeProperty(n, "max_width", 0));
+	int max_h = max(0, (int)DesignerPreviewNodeProperty(n, "max_height", 0));
 	host.SetContent(child)
 	    .SetSizing(DesignerPreviewDirectSizeMode(n, "h_sizing"), DesignerPreviewDirectSizeMode(n, "v_sizing"))
 	    .SetFixedSize(Size(DPI(max(fixed_w, min_w)), DPI(max(fixed_h, min_h))))
 	    .SetMinimumSize(Size(DPI(min_w), DPI(min_h)))
+	    .SetMaximumSize(Size(DPI(max_w), DPI(max_h)))
 	    .SetAlign(DesignerPreviewDirectAlignH(n), DesignerPreviewDirectAlignV(n));
 }
 

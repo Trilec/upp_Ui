@@ -42,6 +42,21 @@ UiDirectContentHost& UiDirectContentHost::SetFixedSize(Size sz)
 UiDirectContentHost& UiDirectContentHost::SetMinimumSize(Size sz)
 {
     min_ = Size(max(0, sz.cx), max(0, sz.cy));
+    if(max_.cx > 0 && min_.cx > max_.cx)
+        max_.cx = min_.cx;
+    if(max_.cy > 0 && min_.cy > max_.cy)
+        max_.cy = min_.cy;
+    RefreshLayout();
+    return *this;
+}
+
+UiDirectContentHost& UiDirectContentHost::SetMaximumSize(Size sz)
+{
+    max_ = Size(max(0, sz.cx), max(0, sz.cy));
+    if(max_.cx > 0 && max_.cx < min_.cx)
+        max_.cx = min_.cx;
+    if(max_.cy > 0 && max_.cy < min_.cy)
+        max_.cy = min_.cy;
     RefreshLayout();
     return *this;
 }
@@ -61,6 +76,10 @@ Size UiDirectContentHost::GetMinSize() const
     Size natural = content_->GetMinSize();
     int cx = h_mode_ == UIDIRECT_FIXED ? fixed_.cx : natural.cx;
     int cy = v_mode_ == UIDIRECT_FIXED ? fixed_.cy : natural.cy;
+    if(max_.cx > 0)
+        cx = min(cx, max_.cx);
+    if(max_.cy > 0)
+        cy = min(cy, max_.cy);
     return Size(max(cx, min_.cx), max(cy, min_.cy));
 }
 
@@ -87,6 +106,10 @@ void UiDirectContentHost::Layout()
           : natural.cy;
     w = min(max(w, min_.cx), r.GetWidth());
     h = min(max(h, min_.cy), r.GetHeight());
+    if(max_.cx > 0)
+        w = min(w, max_.cx);
+    if(max_.cy > 0)
+        h = min(h, max_.cy);
     int x = UiDirectAlignedPos(r.left, r.GetWidth(), w, align_h_);
     int y = UiDirectAlignedPos(r.top, r.GetHeight(), h, align_v_);
     content_->SetRect(RectC(x, y, w, h));

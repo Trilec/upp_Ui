@@ -993,9 +993,9 @@ Size UiTable::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
     int width = style.metrics.content_margin.left + style.metrics.content_margin.right
-              + (style.show_row_headers ? style.row_header_width : 0) + style.default_column_width * 3;
+              + (style.show_row_headers ? style.row_header_width : 0) + style.default_column_width;
     int height = style.metrics.content_margin.top + style.metrics.content_margin.bottom
-               + (style.show_column_headers ? style.header_height : 0) + style.row_height * 6;
+               + (style.show_column_headers ? style.header_height : 0) + style.row_height;
     return UiStyledOuterSizeFromContent(Size(width, height), style.metrics, style.skin);
 }
 

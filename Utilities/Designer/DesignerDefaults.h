@@ -83,6 +83,52 @@ inline int DesignerClampMin(int value, int minimum = DESIGNER_MIN_CLAMP)
 	return value < minimum ? minimum : value;
 }
 
+struct DesignerResolvedAxis {
+	String sizing_mode;
+	int minimum = 0;
+	int maximum = 0; // 0 means unbounded.
+	int preferred = 0;
+	int fixed = 0;
+	int available = 0;
+	bool expand = false;
+	bool fixed_mode = false;
+	bool fit_mode = true;
+
+	int Resolve() const
+	{
+		int value = fixed_mode ? fixed : expand ? available : preferred;
+		if(maximum > 0)
+			value = min(value, maximum);
+		value = max(value, minimum);
+		return max(0, value);
+	}
+};
+
+inline DesignerResolvedAxis ResolveDesignerAxis(const String& sizing_mode, int fixed_value,
+                                                int explicit_min, int explicit_max,
+                                                int preferred_value, int available_value)
+{
+	DesignerResolvedAxis axis;
+	axis.sizing_mode = sizing_mode;
+	axis.minimum = max(0, explicit_min);
+	axis.maximum = max(0, explicit_max);
+	if(axis.maximum > 0 && axis.minimum > axis.maximum)
+		Swap(axis.minimum, axis.maximum);
+	axis.preferred = max(axis.minimum, preferred_value);
+	if(axis.maximum > 0)
+		axis.preferred = min(axis.preferred, axis.maximum);
+	axis.fixed = max(axis.minimum, fixed_value);
+	if(axis.maximum > 0)
+		axis.fixed = min(axis.fixed, axis.maximum);
+	axis.available = max(axis.minimum, available_value);
+	if(axis.maximum > 0)
+		axis.available = min(axis.available, axis.maximum);
+	axis.fixed_mode = sizing_mode == "Fixed";
+	axis.expand = sizing_mode == "Expand";
+	axis.fit_mode = !axis.fixed_mode && !axis.expand;
+	return axis;
+}
+
 }
 
 #endif

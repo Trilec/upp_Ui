@@ -2662,6 +2662,41 @@ static void TestLayoutSizingPrimitives(TestCtx& t)
 	t.Expect(axis_child.GetRect().GetWidth() >= 300, "stable grid can expand child width only");
 	t.Expect(axis_child.GetRect().GetHeight() <= 50, "stable grid keeps non-expanded child height natural");
 
+	UiDirectContentHost direct_host;
+	FixedMinCtrl host_child(Size(120, 40));
+	direct_host.SetContent(host_child)
+	           .SetSizing(UIDIRECT_FIXED, UIDIRECT_FIXED)
+	           .SetFixedSize(Size(240, 96))
+	           .SetMinimumSize(Size(40, 20))
+	           .SetMaximumSize(Size(160, 70));
+	direct_host.SetRect(0, 0, 320, 180);
+	direct_host.Layout();
+	t.Expect(host_child.GetRect().GetWidth() == 160,
+	         Format("direct content host clamps fixed width to max (got %d)", host_child.GetRect().GetWidth()));
+	t.Expect(host_child.GetRect().GetHeight() == 70,
+	         Format("direct content host clamps fixed height to max (got %d)", host_child.GetRect().GetHeight()));
+
+	DesignerResolvedAxis fixed_axis = ResolveDesignerAxis("Fixed", 240, 60, 160, 80, 300);
+	t.Expect(fixed_axis.Resolve() == 160, Format("shared axis resolver clamps fixed value to explicit max (got %d)", fixed_axis.Resolve()));
+	DesignerResolvedAxis fit_axis = ResolveDesignerAxis("Fit", 0, 20, 0, 90, 200);
+	t.Expect(fit_axis.Resolve() == 90, Format("shared axis resolver keeps fit value within bounds (got %d)", fit_axis.Resolve()));
+
+	UiAccordion accordion;
+	accordion.AddSection("Compact accordion", true);
+	Size accordion_min = accordion.GetMinSize();
+	t.Expect(accordion_min.cx <= DPI(180), Format("accordion min width stays compact (got %d)", accordion_min.cx));
+	t.Expect(accordion_min.cy <= DPI(180), Format("accordion min height stays compact (got %d)", accordion_min.cy));
+
+	UiTable table;
+	Size table_min = table.GetMinSize();
+	t.Expect(table_min.cx <= DPI(220), Format("table min width stays compact (got %d)", table_min.cx));
+	t.Expect(table_min.cy <= DPI(120), Format("table min height stays compact (got %d)", table_min.cy));
+
+	UiTree tree;
+	Size tree_min = tree.GetMinSize();
+	t.Expect(tree_min.cx <= DPI(200), Format("tree min width stays compact (got %d)", tree_min.cx));
+	t.Expect(tree_min.cy <= DPI(120), Format("tree min height stays compact (got %d)", tree_min.cy));
+
 	DesignerRegistry registry;
 	RegisterDesignerBuiltins(registry);
 	DesignerModel preview_model;

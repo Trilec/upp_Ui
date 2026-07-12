@@ -303,11 +303,14 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 			                  max(0, (int)ctx.Property(child, "min_height", 0)));
 			int min_w = max(0, (int)ctx.Property(child, "min_width", 0));
 			int min_h = max(0, (int)ctx.Property(child, "min_height", 0));
+			int max_w = max(0, (int)ctx.Property(child, "max_width", 0));
+			int max_h = max(0, (int)ctx.Property(child, "max_height", 0));
 			out << "\t\t" << host << ".SetContent(" << c << ");\n";
 			out << "\t\t" << host << ".SetSizing(" << DesignerDirectSizeModeExpr(child, "h_sizing")
 			    << ", " << DesignerDirectSizeModeExpr(child, "v_sizing") << ");\n";
 			out << "\t\t" << host << ".SetFixedSize(Size(DPI(" << fixed_w << "), DPI(" << fixed_h << ")));\n";
 			out << "\t\t" << host << ".SetMinimumSize(Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+			out << "\t\t" << host << ".SetMaximumSize(Size(DPI(" << max_w << "), DPI(" << max_h << ")));\n";
 			out << "\t\t" << host << ".SetAlign(" << DesignerDirectAlignHExpr(child) << ", "
 			    << DesignerDirectAlignVExpr(child) << ");\n";
 			out << "\t\t" << p << ".SetContent(" << host << ");\n";
