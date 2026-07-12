@@ -45,11 +45,16 @@ public:
 	Event<dword> WhenSelected;
 	Event<> WhenActivated;
 	Event<> WhenDragStart;
+	Event<Point> WhenDragMove;
+	Event<> WhenDragRelease;
 	Event<> WhenDragEnd;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
 	virtual void LeftDouble(Point p, dword keyflags) override;
+	virtual void MouseMove(Point p, dword keyflags) override;
+	virtual void LeftUp(Point p, dword keyflags) override;
+	virtual void CancelMode() override;
 	virtual void MouseEnter(Point p, dword keyflags) override;
 	virtual void MouseLeave() override;
 	virtual void Paint(Draw& w) override;
@@ -67,6 +72,9 @@ private:
 	bool  tooltip_enabled_ = true;
 	bool  hovered_ = false;
 	bool  selected_ = false;
+	bool  pressed_ = false;
+	bool  dragging_ = false;
+	Point press_point_;
 };
 
 class SymbolPickerCollectionTile : public ParentCtrl {
@@ -88,9 +96,14 @@ public:
 	virtual void Layout() override;
 	virtual Size GetMinSize() const override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
+	virtual void MouseMove(Point p, dword keyflags) override;
+	virtual void LeftUp(Point p, dword keyflags) override;
+	virtual void CancelMode() override;
 
 	Event<dword> WhenSelected;
 	Event<> WhenDragStart;
+	Event<Point> WhenDragMove;
+	Event<> WhenDragRelease;
 	Event<> WhenDragEnd;
 
 private:
@@ -101,6 +114,9 @@ private:
 	bool  tooltip_enabled_ = true;
 	bool  hovered_ = false;
 	bool  selected_ = false;
+	bool  pressed_ = false;
+	bool  dragging_ = false;
+	Point press_point_;
 	bool  unresolved_ = false;
 	int   item_index_ = -1;
 };
@@ -187,6 +203,10 @@ private:
 	void NormalizeCollectionSelectionAfterModelChange();
 	bool RemoveSelectedCollectionItems();
 	void SetDragInteractionActive(bool active);
+	void HandleLibraryGestureMove(Point screen);
+	void HandleLibraryGestureRelease();
+	void HandleCollectionGestureMove(Point screen);
+	void HandleCollectionGestureRelease();
 	void HandleCollectionsDropTest(PasteClip& d);
 	void HandleCollectionsDropPerform(PasteClip& d);
 	int GetCollectionDropInsertIndex(Point p) const;
@@ -258,6 +278,8 @@ private:
 	bool            drag_interaction_active_ = false;
 	bool            pending_model_refresh_ = false;
 	bool            suppress_model_refresh_ = false;
+	String          active_library_drag_id_;
+	int             active_collection_drag_index_ = -1;
 
 	virtual bool Key(dword key, int count) override;
 
