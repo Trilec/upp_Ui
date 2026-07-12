@@ -1297,7 +1297,8 @@ Ctrl* DesignerPreview::BuildRealNode(DesignerNodeId id)
 				return nullptr;
 #ifdef _DEBUG
 			if(n->type_id == "UiFloatEdit")
-				RLOG(Format("BuildRealNode float edit node=%d parent=%d", (int)n->id, (int)n->parent));
+				if(DesignerDiagnosticsEnabled())
+					RLOG(Format("BuildRealNode float edit node=%d parent=%d", (int)n->id, (int)n->parent));
 #endif
 			DesignerPreviewLogReadback(*n, Null, n->parent);
 			DesignerAdapter *adapter = nullptr;
@@ -1513,14 +1514,16 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 				int row = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_row", index / columns), 0, rows - 1);
 				int col = clamp((int)DesignerPreviewNodeProperty(child_node, "grid_col", index % columns), 0, columns - 1);
 #ifdef _DEBUG
-				RLOG(Format("GridAdd child=%s index=%d row=%d col=%d hs=%s vs=%s fixed_w=%d fixed_h=%d",
-				            child_node.type_id, index, row, col, hs, vs, fixed.cx, fixed.cy));
+				if(DesignerDiagnosticsEnabled())
+					RLOG(Format("GridAdd child=%s index=%d row=%d col=%d hs=%s vs=%s fixed_w=%d fixed_h=%d",
+					            child_node.type_id, index, row, col, hs, vs, fixed.cx, fixed.cy));
 #endif
 				int item = grid->Add(child, row, col, hs == "Expand", vs == "Expand", fixed);
 #ifdef _DEBUG
-				RLOG(Format("GridAdd child=%s item=%d align_h=%d align_v=%d",
-				            child_node.type_id, item,
-				            (int)DesignerPreviewGridAlignH(child_node), (int)DesignerPreviewGridAlignV(child_node)));
+				if(DesignerDiagnosticsEnabled())
+					RLOG(Format("GridAdd child=%s item=%d align_h=%d align_v=%d",
+					            child_node.type_id, item,
+					            (int)DesignerPreviewGridAlignH(child_node), (int)DesignerPreviewGridAlignV(child_node)));
 #endif
 				grid->SetItemAlign(item, DesignerPreviewGridAlignH(child_node), DesignerPreviewGridAlignV(child_node));
 			}
@@ -1646,7 +1649,8 @@ void DesignerPreview::RebuildRealPreview()
 			if(rebuilding_real_)
 				return;
 #ifdef _DEBUG
-			RLOG("RebuildRealPreview begin");
+			if(DesignerDiagnosticsEnabled())
+				RLOG("RebuildRealPreview begin");
 #endif
 			rebuilding_real_ = true;
 			real_dirty_ = false;
@@ -1663,7 +1667,8 @@ void DesignerPreview::RebuildRealPreview()
 			if(!root) {
 				rebuilding_real_ = false;
 #ifdef _DEBUG
-				RLOG("RebuildRealPreview abort: missing root");
+				if(DesignerDiagnosticsEnabled())
+					RLOG("RebuildRealPreview abort: missing root");
 #endif
 				return;
 			}
@@ -1674,7 +1679,8 @@ void DesignerPreview::RebuildRealPreview()
 			}
 			rebuilding_real_ = false;
 #ifdef _DEBUG
-			RLOG("RebuildRealPreview end");
+			if(DesignerDiagnosticsEnabled())
+				RLOG("RebuildRealPreview end");
 #endif
 }
 

@@ -3302,7 +3302,9 @@ private:
 	{
 		int total_start = msecs();
 		DesignerTraceSetSelection(model_.GetSelection().IsEmpty() ? Designer_NULL : model_.GetSelection()[0]);
+		int projection_start = msecs();
 		ApplySelectionProjection();
+		int projection_ms = msecs(projection_start);
 		DESIGNER_DBG_LOG(Format("RefreshSelectionUi selection_count=%d primary=%d blocked=%d reason=%s",
 		                        model_.GetSelection().GetCount(),
 		                        model_.GetSelection().IsEmpty() ? 0 : (int)model_.GetSelection()[0],
@@ -3316,8 +3318,9 @@ private:
 		}
 		if(DesignerDiagnosticsEnabled()) {
 			DesignerConsoleTrace("SELECT_PROFILE",
-				Format("total=%dms SyncHierarchySelection=%dms preview.Refresh=%dms InspectorSelection=%dms visible=%d",
-				       msecs(total_start), 0, 0, 0,
+				Format("total=%dms selectionProjection=%dms deferred=%d visible=%d",
+				       msecs(total_start), projection_ms,
+				       IsDesignerRefreshBlocked() ? 1 : 0,
 				       IsInspectorPanelVisibleForSelection() ? 1 : 0),
 				false);
 		}
@@ -3327,12 +3330,22 @@ private:
 
 	void RefreshInspectorPreview()
 	{
+		int projection_start = msecs();
 		ApplySelectionProjection();
+		int projection_ms = msecs(projection_start);
 		if(IsDesignerRefreshBlocked()) {
 			DESIGNER_DBG_LOG("Projection refresh deferred after selection: " << DesignerRefreshBlockReason());
 			refresh_deferred_ = true;
 			pending_inspector_refresh_ = true;
 			return;
+		}
+		if(DesignerDiagnosticsEnabled()) {
+			DesignerConsoleTrace("SELECT_PROFILE",
+				Format("selectionProjection=%dms deferred=%d visible=%d",
+				       projection_ms,
+				       IsDesignerRefreshBlocked() ? 1 : 0,
+				       IsInspectorPanelVisibleForSelection() ? 1 : 0),
+				false);
 		}
 		refresh_posted_ = false;
 		DesignerTraceSetRefreshPosted(false);

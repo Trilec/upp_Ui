@@ -1,5 +1,6 @@
 ﻿#include "DesignerAdapter.h"
 #include "DesignerDefaults.h"
+#include "DesignerTrace.h"
 
 // DesignerAdapter.cpp - real Ui control wrappers for the visual designer.
 // Each adapter keeps the runtime control behavior intact, then adds only
@@ -2300,14 +2301,15 @@ void DesignerFloatEditAdapter::SyncFromNode(const DesignerNode& node)
 		return ScanDouble(AsString(v));
 	};
 #ifdef _DEBUG
-	RLOG(Format("FloatEdit SyncFromNode node=%d minf=%s maxf=%s stepf=%s precision=%d spin=%d valuef=%s",
-	            (int)node.id,
-	            StdFormat(AdapterNodeProperty(node, "minf", 0.0)),
-	            StdFormat(AdapterNodeProperty(node, "maxf", 100.0)),
-	            StdFormat(AdapterNodeProperty(node, "stepf", 0.1)),
-	            (int)AdapterNodeProperty(node, "precision", 2),
-	            (bool)AdapterNodeProperty(node, "spin", true) ? 1 : 0,
-	            StdFormat(AdapterNodeProperty(node, "valuef", 3.14))));
+	if(DesignerDiagnosticsEnabled())
+		RLOG(Format("FloatEdit SyncFromNode node=%d minf=%s maxf=%s stepf=%s precision=%d spin=%d valuef=%s",
+		            (int)node.id,
+		            StdFormat(AdapterNodeProperty(node, "minf", 0.0)),
+		            StdFormat(AdapterNodeProperty(node, "maxf", 100.0)),
+		            StdFormat(AdapterNodeProperty(node, "stepf", 0.1)),
+		            (int)AdapterNodeProperty(node, "precision", 2),
+		            (bool)AdapterNodeProperty(node, "spin", true) ? 1 : 0,
+		            StdFormat(AdapterNodeProperty(node, "valuef", 3.14))));
 #endif
 	ApplyEditAppearance(*this, node);
 	MinMax(numeric("minf", 0.0), numeric("maxf", 100.0));

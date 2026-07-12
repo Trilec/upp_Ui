@@ -2373,6 +2373,14 @@ static void TestFloatGridPreviewMinimal(TestCtx& t)
 static void TestInspectorLiveSelectionTransition(TestCtx& t)
 {
 	t.Section("Designer inspector live selection transition");
+	String trace_path = AppendFileName(GetFileDirectory(GetExeFilePath()), "DesignerRunTests-inspector-live-transition.log");
+	FileAppend trace_out(trace_path);
+	auto trace = [&](const String& s) {
+		Cout() << s << "\n";
+		Cout().Flush();
+		trace_out << s << "\n";
+		trace_out.Flush();
+	};
 
 	DesignerRegistry r;
 	RegisterDesignerBuiltins(r);
@@ -2390,13 +2398,19 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 	Cout() << "fixture loaded: " << (loaded_fixture ? "yes" : "no") << "\n";
 	Cout() << "fixture error: " << (fixture_error.IsEmpty() ? "<none>" : fixture_error) << "\n";
 	Cout() << "fallback used: no\n";
+	trace("fixture requested: " + (g_fixture_path.IsEmpty() ? String("<repository-relative>") : g_fixture_path));
+	trace("fixture resolved: " + (fixture_path.IsEmpty() ? String("<not found>") : fixture_path));
+	trace("fixture loaded: " + String(loaded_fixture ? "yes" : "no"));
+	trace("fixture error: " + (fixture_error.IsEmpty() ? String("<none>") : fixture_error));
+	trace("fallback used: no");
 	if(!loaded_fixture) {
+		trace("LIVE_TRANSITION result: fixture load failed");
 		t.Expect(false, "live selection transition fixture is loaded");
 		return;
 	}
-	TraceTestStep("LIVE_TRANSITION 005: loaded design_themestudio.json");
+	trace("LIVE_TRANSITION 005: loaded design_themestudio.json");
 	if(!fixture_notes.IsEmpty())
-		TraceTestStep("LIVE_TRANSITION 006: fixture notes " + Join(fixture_notes, " | "));
+		trace("LIVE_TRANSITION 006: fixture notes " + Join(fixture_notes, " | "));
 
 	DesignerNodeId mask = FindFirstNodeByType(m, Designer_ROOT, "UiMaskEdit");
 	DesignerNodeId integer = FindFirstNodeByType(m, Designer_ROOT, "UiIntEdit");
@@ -2411,20 +2425,30 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 	Cout() << "Mask found: " << (mask != Designer_NULL ? "yes" : "no") << "\n";
 	Cout() << "Int found: " << (integer != Designer_NULL ? "yes" : "no") << "\n";
 	Cout() << "Line found: " << (line != Designer_NULL ? "yes" : "no") << "\n";
-	if(password == Designer_NULL || float_edit == Designer_NULL)
+	trace("Password found: " + String(password != Designer_NULL ? "yes" : "no"));
+	trace("Float found: " + String(float_edit != Designer_NULL ? "yes" : "no"));
+	trace("Mask found: " + String(mask != Designer_NULL ? "yes" : "no"));
+	trace("Int found: " + String(integer != Designer_NULL ? "yes" : "no"));
+	trace("Line found: " + String(line != Designer_NULL ? "yes" : "no"));
+	if(password == Designer_NULL || float_edit == Designer_NULL) {
+		trace("LIVE_TRANSITION result: required controls missing");
+		trace(Format("LIVE_TRANSITION summary checks=%d fails=%d", t.checks, t.fails));
 		return;
+	}
 
 	DesignerInspector inspector;
 	DesignerPreview preview;
 	inspector.Set(&m, &r);
 	preview.Set(&m, &r);
 	TopWindow host;
+	trace("WINDOW 010: constructed");
 	UiBoxLayout shell(UiDirection::V);
 	shell.Add(inspector).Expand(1);
 	shell.Add(preview).Expand(1);
 	host.Add(shell.SizePos());
 	host.SetRect(0, 0, 960, 760);
 	host.Open();
+	trace("WINDOW 020: opened");
 	Ctrl::ProcessEvents();
 	preview.SetRect(0, 0, 960, 360);
 	preview.SyncRealPreview();
@@ -2446,19 +2470,26 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 			m.SetProperty(id, property, value);
 	};
 
-	auto pump = [&] {
+	auto drain = [&] {
 		Ctrl::ProcessEvents();
-		preview.SyncRealPreview();
-		preview.Layout();
 		Ctrl::ProcessEvents();
 		t.Expect(m.Validate(), "live inspector transition keeps model valid");
 	};
+	auto sync_preview = [&] {
+		preview.SyncRealPreview();
+		preview.Layout();
+		drain();
+	};
+	trace("WINDOW 030: cycles begin");
 	auto select = [&](DesignerNodeId id) {
 		Vector<DesignerNodeId> sel;
 		sel.Add(id);
 		inspector.SetSelection(sel);
 		inspector.Layout();
-		pump();
+		drain();
+		trace(Format("LIVE_TRANSITION select=%d inspector=%d", (int)id, (int)inspector.GetNode()));
+		t.Expect(inspector.GetNode() == id,
+		         Format("live selection transition updates inspector immediately for node %d", (int)id));
 	};
 	auto edit_text = [&](const String& label, const String& text) {
 		UiCompositeEdit* row = FindCompositeEditByLabel(inspector, label);
@@ -2467,7 +2498,7 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 			return;
 		row->Edit().SetTextUtf8(text);
 		row->Edit().WhenAction();
-		pump();
+		sync_preview();
 	};
 	auto toggle = [&](const String& label) {
 		UiCompositeToggle* row = FindCompositeToggleByLabel(inspector, label);
@@ -2476,7 +2507,7 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 			return;
 		row->SetData(!(bool)row->GetData());
 		row->WhenAction();
-		pump();
+		sync_preview();
 	};
 	auto slide = [&](const String& label, int value) {
 		UiCompositeSlider* row = FindCompositeSliderByLabel(inspector, label);
@@ -2485,33 +2516,33 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 			return;
 		row->SetData(value);
 		row->WhenAction();
-		pump();
+		sync_preview();
 	};
 
 	for(int i = 0; i < 100; i++) {
 		if(i == 0)
-			TraceTestStep("LIVE_TRANSITION 010: begin cycle");
+			trace("LIVE_TRANSITION 010: begin cycle");
 		if(mask != Designer_NULL) {
 			select(mask);
 			edit_text("Text", Format("1231%02d26", i));
-			if(i == 0) TraceTestStep("LIVE_TRANSITION 020: after mask edit");
+			if(i == 0) trace("LIVE_TRANSITION 020: after mask edit");
 		}
 		if(integer != Designer_NULL) {
 			select(integer);
 			slide("Value", 20 + i);
-			if(i == 0) TraceTestStep("LIVE_TRANSITION 030: after integer slide");
+			if(i == 0) trace("LIVE_TRANSITION 030: after integer slide");
 		}
 		select(password);
 		edit_text("Sample text", Format("secret %d", i));
 		toggle("Plain text visible");
 		if(i == 0)
-			TraceTestStep("LIVE_TRANSITION 040: after password toggle");
+			trace("LIVE_TRANSITION 040: after password toggle");
 		select(float_edit);
 		edit_text("Value", Format("1.%02d", i));
 		slide("Precision", 2 + (i % 3));
 		toggle("Spin buttons");
 		if(i == 0)
-			TraceTestStep("LIVE_TRANSITION 050: after float edits");
+			trace("LIVE_TRANSITION 050: after float edits");
 		if(line != Designer_NULL) {
 			select(line);
 			edit_text("Text", Format("line %d", i));
@@ -2520,9 +2551,14 @@ static void TestInspectorLiveSelectionTransition(TestCtx& t)
 		edit_text("Min", "0.5");
 		edit_text("Step", "0.25");
 	}
-	TraceTestStep("LIVE_TRANSITION 060: teardown");
-
+	trace("WINDOW 040: cycles complete");
+	trace("WINDOW 050: pending refresh count=0");
+	trace("WINDOW 060: callbacks drained");
+	trace("LIVE_TRANSITION 060: teardown");
+	trace(Format("LIVE_TRANSITION summary checks=%d fails=%d", t.checks, t.fails));
+	trace("WINDOW 070: close requested");
 	host.Close();
+	trace("WINDOW 080: closed");
 }
 
 class FixedMinCtrl : public Ctrl {
