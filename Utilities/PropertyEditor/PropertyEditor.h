@@ -1,6 +1,7 @@
 #ifndef _Utilities_PropertyEditor_PropertyEditor_h_
 #define _Utilities_PropertyEditor_PropertyEditor_h_
 
+#include <Utilities/PropertyEditorCore/PropertyEditorCore.h>
 #include "PropertyValueEditors.h"
 
 namespace Upp {

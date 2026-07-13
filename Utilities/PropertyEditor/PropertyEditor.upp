@@ -2,11 +2,10 @@ uses
     Core,
     Draw,
     CtrlCore,
-    CtrlLib;
+    CtrlLib,
+    Utilities/PropertyEditorCore;
 
 file
-    PropertyEditorModel.h,
-    PropertyEditorModel.cpp,
     PropertyValueEditors.h,
     PropertyValueEditors.cpp,
     PropertyEditor.h,

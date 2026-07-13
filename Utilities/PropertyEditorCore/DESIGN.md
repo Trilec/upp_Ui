@@ -1,4 +1,4 @@
-# PropertyEditor design
+# PropertyEditorCore design
 
 ## Why it is a separate utility
 

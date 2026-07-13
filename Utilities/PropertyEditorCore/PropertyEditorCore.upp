@@ -1,0 +1,10 @@
+uses
+    Core,
+    Draw;
+
+file
+    PropertyEditorModel.h,
+    PropertyEditorModel.cpp,
+    README.md,
+    DESIGN.md,
+    CHANGELOG.md;

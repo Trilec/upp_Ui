@@ -1,0 +1,6 @@
+#ifndef _Utilities_PropertyEditorCore_PropertyEditorCore_h_
+#define _Utilities_PropertyEditorCore_PropertyEditorCore_h_
+
+#include "PropertyEditorModel.h"
+
+#endif
