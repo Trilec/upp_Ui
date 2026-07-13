@@ -1,4 +1,5 @@
 #include <Ui/UiDirectContentHost.h>
+#include <Ui/UiAxis.h>
 
 namespace Upp {
 
@@ -69,18 +70,18 @@ UiDirectContentHost& UiDirectContentHost::SetAlign(UiAlign h, UiAlign v)
     return *this;
 }
 
+static UiAxisMode UiDirectAxisMode(UiDirectSizeMode mode);
+static UiResolvedAxis UiDirectResolveAxis(UiDirectSizeMode mode, int minimum, int maximum,
+                                          int fixed, int preferred, int available);
+
 Size UiDirectContentHost::GetMinSize() const
 {
-    if(!content_)
-        return min_;
-    Size natural = content_->GetMinSize();
-    int cx = h_mode_ == UIDIRECT_FIXED ? fixed_.cx : natural.cx;
-    int cy = v_mode_ == UIDIRECT_FIXED ? fixed_.cy : natural.cy;
-    if(max_.cx > 0)
-        cx = min(cx, max_.cx);
-    if(max_.cy > 0)
-        cy = min(cy, max_.cy);
-    return Size(max(cx, min_.cx), max(cy, min_.cy));
+    Size natural = content_ ? content_->GetMinSize() : Size(0, 0);
+    UiResolvedAxis hw = UiDirectResolveAxis(h_mode_, min_.cx, max_.cx, fixed_.cx,
+                                            natural.cx, h_mode_ == UIDIRECT_EXPAND ? min_.cx : natural.cx);
+    UiResolvedAxis hv = UiDirectResolveAxis(v_mode_, min_.cy, max_.cy, fixed_.cy,
+                                            natural.cy, v_mode_ == UIDIRECT_EXPAND ? min_.cy : natural.cy);
+    return Size(hw.final_size, hv.final_size);
 }
 
 static int UiDirectAlignedPos(int start, int available, int size, UiAlign align)
@@ -92,24 +93,38 @@ static int UiDirectAlignedPos(int start, int available, int size, UiAlign align)
     return start;
 }
 
+static UiAxisMode UiDirectAxisMode(UiDirectSizeMode mode)
+{
+	switch(mode) {
+	case UIDIRECT_FIXED:  return UiAxisMode::Fixed;
+	case UIDIRECT_EXPAND: return UiAxisMode::Expand;
+	default:              return UiAxisMode::Fit;
+	}
+}
+
+static UiResolvedAxis UiDirectResolveAxis(UiDirectSizeMode mode, int minimum, int maximum,
+                                          int fixed, int preferred, int available)
+{
+	UiAxisConstraints c;
+	c.mode = UiDirectAxisMode(mode);
+	c.minimum = minimum;
+	c.maximum = maximum;
+	c.fixed = fixed;
+	c.preferred = preferred;
+	c.available = available;
+	return UiResolveAxis(c);
+}
+
 void UiDirectContentHost::Layout()
 {
     if(!content_)
         return;
     Rect r = GetSize();
     Size natural = content_->GetMinSize();
-    int w = h_mode_ == UIDIRECT_EXPAND ? r.GetWidth()
-          : h_mode_ == UIDIRECT_FIXED ? fixed_.cx
-          : natural.cx;
-    int h = v_mode_ == UIDIRECT_EXPAND ? r.GetHeight()
-          : v_mode_ == UIDIRECT_FIXED ? fixed_.cy
-          : natural.cy;
-    w = min(max(w, min_.cx), r.GetWidth());
-    h = min(max(h, min_.cy), r.GetHeight());
-    if(max_.cx > 0)
-        w = min(w, max_.cx);
-    if(max_.cy > 0)
-        h = min(h, max_.cy);
+    UiResolvedAxis hw = UiDirectResolveAxis(h_mode_, min_.cx, max_.cx, fixed_.cx, natural.cx, r.GetWidth());
+    UiResolvedAxis hv = UiDirectResolveAxis(v_mode_, min_.cy, max_.cy, fixed_.cy, natural.cy, r.GetHeight());
+    int w = hw.final_size;
+    int h = hv.final_size;
     int x = UiDirectAlignedPos(r.left, r.GetWidth(), w, align_h_);
     int y = UiDirectAlignedPos(r.top, r.GetHeight(), h, align_v_);
     content_->SetRect(RectC(x, y, w, h));

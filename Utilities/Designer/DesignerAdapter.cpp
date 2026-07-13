@@ -400,6 +400,7 @@ static void AddHorizontalAlignmentBinding(DesignerApiBuilder& b, const String& p
 {
 	b.AddChoice(property_id, label, api,
 	            "Horizontal content alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.SetDomain(property_id, DesignerPropertyDomain::Layout);
 }
 
 static void AddVerticalAlignmentBinding(DesignerApiBuilder& b, const String& property_id = "align_v",
@@ -408,6 +409,7 @@ static void AddVerticalAlignmentBinding(DesignerApiBuilder& b, const String& pro
 {
 	b.AddChoice(property_id, label, api,
 	            "Vertical content alignment.", {{"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
+	b.SetDomain(property_id, DesignerPropertyDomain::Layout);
 }
 
 static void AddIconChoiceBinding(DesignerApiBuilder& b, const String& id = "icon", const String& label = "Icon",
@@ -415,6 +417,7 @@ static void AddIconChoiceBinding(DesignerApiBuilder& b, const String& id = "icon
                                  const String& help = "Optional preview icon from the Ui icon catalog.")
 {
 	DesignerApiBinding& icon = b.Add(id, label, DesignerEditorKind::Choice, api, help);
+	icon.domain = DesignerPropertyDomain::Content;
 	icon.choices.Add("None", "None");
 	const Vector<UiIconCatalogEntry>& catalog = UiIconCatalog();
 	for(int i = 0; i < catalog.GetCount(); i++)
@@ -426,7 +429,7 @@ static void AddIconBinding(DesignerApiBuilder& b)
 	AddIconChoiceBinding(b);
 	b.AddInt("icon_size", "Icon size", DesignerEditorKind::Slider,
 	         "SetIconSize / SetMedia preferred size",
-	         "Preview icon size for icon-capable controls.", 8, 64);
+	         "Preview icon size for icon-capable controls.", 8, 64).domain = DesignerPropertyDomain::Content;
 }
 
 static Image DesignerIconChoice(const DesignerNode& n, const String& key)
@@ -880,8 +883,6 @@ String DesignerAdapterHelp(const String& type_id)
 	return "Select a toolbox item to see how it should be used in the designer.";
 }
 
-static DesignerPropertyDomain DesignerGuessPropertyDomain(const String& id);
-
 DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& label,
                                                 DesignerEditorKind editor, const String& api_call,
                                                 const String& help)
@@ -893,7 +894,12 @@ DesignerApiBinding& DesignerApiBuilder::Add(const String& id, const String& labe
 	b.api_call = api_call;
 	b.help = help;
 	b.codegen_hint = api_call;
-	b.domain = DesignerPropertyDomain::Unclassified;
+	b.domain = default_domain_;
+	b.projection.preview = true;
+	b.projection.hierarchy = false;
+	b.projection.inspector = false;
+	b.projection.code = true;
+	b.projection.full = false;
 	return b;
 }
 
@@ -902,6 +908,7 @@ DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const Strin
 {
 	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
 	b.domain = DesignerPropertyDomain::Content;
+	b.projection.inspector = false;
 	return b;
 }
 
@@ -910,6 +917,7 @@ DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const Strin
 {
 	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
 	b.domain = DesignerPropertyDomain::Content;
+	b.projection.inspector = false;
 	return b;
 }
 
@@ -918,6 +926,7 @@ DesignerApiBinding& DesignerApiBuilder::AddContent(const String& id, const Strin
 {
 	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
 	b.domain = DesignerPropertyDomain::Content;
+	b.projection.inspector = false;
 	return b;
 }
 
@@ -926,6 +935,8 @@ DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String
 {
 	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
 	b.domain = DesignerPropertyDomain::Layout;
+	b.projection.hierarchy = true;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -934,6 +945,8 @@ DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String
 {
 	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
 	b.domain = DesignerPropertyDomain::Layout;
+	b.projection.hierarchy = true;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -942,6 +955,8 @@ DesignerApiBinding& DesignerApiBuilder::AddLayout(const String& id, const String
 {
 	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
 	b.domain = DesignerPropertyDomain::Layout;
+	b.projection.hierarchy = true;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -950,6 +965,7 @@ DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const Str
 {
 	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
 	b.domain = DesignerPropertyDomain::Behaviour;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -958,6 +974,7 @@ DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const Str
 {
 	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
 	b.domain = DesignerPropertyDomain::Behaviour;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -966,6 +983,7 @@ DesignerApiBinding& DesignerApiBuilder::AddBehaviour(const String& id, const Str
 {
 	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
 	b.domain = DesignerPropertyDomain::Behaviour;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -974,6 +992,7 @@ DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String&
 {
 	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
 	b.domain = DesignerPropertyDomain::ThemeStyle;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -982,6 +1001,7 @@ DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String&
 {
 	DesignerApiBinding& b = AddChoice(id, label, api_call, help, choices);
 	b.domain = DesignerPropertyDomain::ThemeStyle;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -990,6 +1010,7 @@ DesignerApiBinding& DesignerApiBuilder::AddTheme(const String& id, const String&
 {
 	DesignerApiBinding& b = AddInt(id, label, editor, api_call, help, min_value, max_value);
 	b.domain = DesignerPropertyDomain::ThemeStyle;
+	b.projection.inspector = true;
 	return b;
 }
 
@@ -998,7 +1019,15 @@ DesignerApiBinding& DesignerApiBuilder::AddDesignerOnly(const String& id, const 
 {
 	DesignerApiBinding& b = Add(id, label, editor, api_call, help);
 	b.domain = DesignerPropertyDomain::DesignerOnly;
+	b.projection.inspector = true;
 	return b;
+}
+
+DesignerApiBuilder& DesignerApiBuilder::SetProjection(const String& id, const DesignerApiBinding::DesignerPropertyProjection& projection)
+{
+	if(DesignerApiBinding *b = Find(id))
+		b->projection = projection;
+	return *this;
 }
 
 DesignerApiBinding& DesignerApiBuilder::AddChoice(const String& id, const String& label,
@@ -1025,6 +1054,12 @@ DesignerApiBuilder& DesignerApiBuilder::SetDomain(const String& id, DesignerProp
 {
 	if(DesignerApiBinding *b = Find(id))
 		b->domain = domain;
+	return *this;
+}
+
+DesignerApiBuilder& DesignerApiBuilder::SetDefaultDomain(DesignerPropertyDomain domain)
+{
+	default_domain_ = domain;
 	return *this;
 }
 
@@ -1222,6 +1257,15 @@ static void AddCommonBindings(Vector<DesignerApiBinding>& out, const DesignerNod
 	DesignerApiBuilder b(out);
 	b.AddDesignerOnly("name", "Name", DesignerEditorKind::Text, "designer model name",
 	      "Designer-only identifier used by hierarchy and generated variable naming.");
+	{
+		DesignerApiBinding::DesignerPropertyProjection projection;
+		projection.preview = false;
+		projection.hierarchy = true;
+		projection.inspector = false;
+		projection.code = true;
+		projection.full = false;
+		b.SetProjection("name", projection);
+	}
 	b.AddDesignerOnly("tooltip", "Tooltip", DesignerEditorKind::Text, "Ctrl::Tip",
 	      "Shown on hover for visible controls. Leave empty to omit Tip(...) in generated code.");
 	b.AddBehaviour("role", "Role", "UiTheme role resolver",
@@ -1341,6 +1385,7 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	if(node.type_id == "Spacer") {
 		b.Hide("text");
 		b.Hide("role");
@@ -1354,9 +1399,11 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Hide("radius");
 		b.Hide("face_enabled");
 		b.Hide("frame_enabled");
+		b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 		b.Add("line_enabled", "Line enabled", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
 		      "Draws a separator line instead of a blank spacer.");
+		b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 		b.AddChoice("line_orientation", "Line orientation", "UiBoxLayout::ItemRef",
 		            "Controls whether the separator is vertical, horizontal, or chosen automatically from the spacer shape.",
 		            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}});
@@ -1370,14 +1417,17 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		            {{"Solid", "Solid"}, {"Dashed", "Dashed"}});
 		b.AddInt("line_inset", "Line inset", DesignerEditorKind::Slider, "UiBoxLayout::ItemRef",
 		         "Inset applied along the separator's long axis.", 0, 64);
+		b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 		b.Add("line_color_enabled", "Use line color", DesignerEditorKind::Bool,
 		      "UiBoxLayout::ItemRef",
 		      "Enables an explicit separator color override.");
 		b.Add("line_color", "Line color", DesignerEditorKind::Color,
 		      "UiBoxLayout::ItemRef",
 		      "Explicit separator color used when custom line color is enabled.");
+		b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 		b.Add("layout_break", "Layout break", DesignerEditorKind::Bool, "UiBoxLayout::AddBreak",
 		      "Acts as a flow break marker instead of a visible spacer rectangle.");
+		b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 		b.AddInt("weight", "Weight", DesignerEditorKind::Slider, "AddSpacer / AddExpand weight",
 		         "How much remaining space this expander receives relative to other expanders.", 1, 12);
 		if((bool)AdapterNodeProperty(node, "layout_break", false)) {
@@ -1418,20 +1468,25 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		b.Disable("min_width", "Slot minimum width is owned by the " + owner + ".");
 		b.Disable("min_height", "Slot minimum height is owned by the " + owner + ".");
 		if(node.type_id == "AccordionSectionSlot") {
+			b.SetDefaultDomain(DesignerPropertyDomain::Content);
 			b.Add("section_title", "Section title", DesignerEditorKind::Text, "UiAccordion::AddSection",
 			      "Title shown in the accordion header.");
 			b.Add("section_subtitle", "Subtitle", DesignerEditorKind::Text, "UiAccordion::SetSectionText",
 			      "Optional secondary header text.");
+			b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 			b.Add("open", "Open", DesignerEditorKind::Bool, "UiAccordion::Open",
 			      "Initial open state for this section.");
 			b.AddChoice("lock", "Lock", "UiAccordion::SetLockMode",
 			            "Optional section open/closed lock.", {{"None", "None"}, {"Open", "Open"}, {"Closed", "Closed"}});
+			b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 			b.AddInt("body_height", "Body height", DesignerEditorKind::Slider, "UiAccordion::SetSectionBodyHeight",
 			         "Explicit body height. Use 0 to clear the explicit height.", 0, 500);
 		}
 		if(node.type_id == "PageSlot") {
+			b.SetDefaultDomain(DesignerPropertyDomain::Content);
 			b.Add("page_title", "Page title", DesignerEditorKind::Text, "UiTab::Add / UiStack::AddPage key",
 			      "Title/key used by the owning tab or stack page.");
+			b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 			b.Add("show_title", "Show title", DesignerEditorKind::Bool, "UiTab::SetTabText",
 			      "When off, the tab can be shown as icon-only while keeping the page title for the model.");
 			AddIconChoiceBinding(b);
@@ -1439,9 +1494,11 @@ void DesignerPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 		return;
 	}
 	if(node.type_id == "UiPanel" || node.type_id == "Item" || node.type_id == "Generic") {
+		b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 		b.AddLayout("inset", "Inset", DesignerEditorKind::Slider, "UiPanel child layout",
 		            "Inset applied when sizing direct child content inside the panel.", 0, 64);
 	}
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "placeholder label",
 	      "Designer placeholder text used until this node becomes a real control.");
 }
@@ -1488,12 +1545,14 @@ void DesignerGroupPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Title", DesignerEditorKind::Text, "UiGroupPanel::SetTitle",
 	      "Header title text.");
 	b.Add("subtitle", "Subtitle", DesignerEditorKind::Text, "UiGroupPanel::SetSubTitle",
 	      "Optional secondary text under the title.");
 	b.Add("side_title", "Side title", DesignerEditorKind::Text, "UiGroupPanel::SetSideTitle",
 	      "Optional informational text on the opposite side of the header.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddChoice("header_mode", "Header", "UiGroupPanel::SetHeaderMode",
 	            "Controls whether the frame starts outside, through, or around the header.",
 	            {{"Outside", "Outside"}, {"Center", "Center"}, {"Inside", "Inside"}});
@@ -1501,6 +1560,7 @@ void DesignerGroupPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 	      "Draws a separator line at the header edge independent of the frame.");
 	b.Add("header_band", "Header band", DesignerEditorKind::Bool, "UiGroupPanel::SetHeaderBand",
 	      "Draws a filled header band independent of the frame.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("placement", "Header side", "UiGroupPanel::SetHeaderPlacement",
 	            "Side where the group header is placed.",
 	            {{"Top", "Top"}, {"Bottom", "Bottom"}, {"Left", "Left"}, {"Right", "Right"}});
@@ -1559,13 +1619,17 @@ void DesignerLabelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiLabel::SetText",
 	      "Sets the label text shown by the real UiLabel control.");
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiLabel::SetIconScaleToContent",
 	      "When enabled, the icon scales to the label content box and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("icon_side", "Icon side", "UiLabel::SetIconSide",
 	            "Where the icon sits relative to label text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	      "UiLabel::SetInkColor",
 	      "Enables an explicit label text color override.").group = "Theme Overrides";
@@ -1579,12 +1643,14 @@ void DesignerLabelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	      "UiLabel::SetIconColor",
 	      "Explicit label icon color used when theme overrides are active.").group = "Theme Overrides";
 	SetLabelThemeInkDefaults(b, "ink_enabled", "ink", "icon_ink_enabled", "icon_ink", node);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("content_gap", "Icon gap", DesignerEditorKind::Slider, "UiLabel::SetContentGap",
 	         "Gap between the label icon and text.", 0, 64);
 	b.AddInt("inset", "Inset", DesignerEditorKind::Slider, "UiLabel::SetMargin",
 	         "Content inset used by text and scaled icon layout.", 0, 64);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiLabel::Style::font",
 	            "Preview label font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -1659,11 +1725,13 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Title", DesignerEditorKind::Text, "UiTitleCard::SetTitle",
 	      "Sets the title shown by the real UiTitleCard control.");
 	b.Add("subtitle", "Subtitle", DesignerEditorKind::Text, "UiTitleCard::SetSubTitle",
 	      "Sets the subtitle shown by the title card.");
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiTitleCard::SetContentInset",
 	         "Padding between the title card frame and its content.", 0, 32);
 	b.AddInt("media_gap", "Media gap", DesignerEditorKind::Slider, "UiTitleCard::SetMediaGap",
@@ -1672,6 +1740,7 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	         "Reserved media column or row size before DPI scaling.", 0, 160);
 	b.AddInt("media_min", "Media min", DesignerEditorKind::Slider, "UiTitleCard::Style::media_min",
 	         "Minimum media size before DPI scaling.", 0, 96);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("media_auto_fit", "Media auto fit", DesignerEditorKind::Bool, "UiTitleCard::SetMediaAutoFit",
 	      "Automatically size the media area from the text block and image aspect.");
 	b.AddChoice("media_side", "Media side", "UiTitleCard::SetMediaSide",
@@ -1687,6 +1756,7 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	            "Horizontal title/subtitle justification.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
 	b.AddChoice("text_align_v", "Text align Y", "UiTitleCard::Style::text_align_v",
 	            "Vertical title/subtitle block alignment.", {{"Top", "Top"}, {"Center", "Center"}, {"Bottom", "Bottom"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("title_line", "Title line", DesignerEditorKind::Bool, "UiTitleCard::ShowTitleLine",
 	      "Shows the title underline rule.");
 	b.Add("card_line", "Card line", DesignerEditorKind::Bool, "UiTitleCard::ShowCardLine",
@@ -1704,6 +1774,7 @@ void DesignerTitleCardAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	         "UiTitleCard::Style::card_line_thickness", "Thickness of the card separator line.", 1, 12);
 	b.AddInt("card_line_gap", "Card line gap", DesignerEditorKind::Slider,
 	         "UiTitleCard::Style::card_line_gap", "Gap between the card line and the content area.", 0, 64);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("card_line_color_enabled", "Use card line color", DesignerEditorKind::Bool,
 	      "UiTitleCard::Style::card_line_color",
 	      "Enables an explicit card separator color override when theme overrides are active.").group = "Theme Overrides";
@@ -1887,6 +1958,7 @@ void DesignerProgressBarAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	b.Hide("shadow_alpha");
 	b.Hide("shadow_color");
 	b.Hide("shadow_curve");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddBehaviour("actual", "Actual", DesignerEditorKind::Slider, "UiProgressBar::Set",
 	               "Current progress value used when Indeterminate is off.", 0, 1000);
 	b.AddBehaviour("total", "Total", DesignerEditorKind::Slider, "UiProgressBar::Set",
@@ -1898,9 +1970,11 @@ void DesignerProgressBarAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	b.AddBehaviour("orientation", "Orientation", "UiProgressBar::SetOrientation",
 	               "Auto follows aspect ratio; explicit modes force horizontal or vertical layout.",
 	               {{"Auto", "Auto"}, {"Horizontal", "Horizontal"}, {"Vertical", "Vertical"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.AddContent("custom_text", "Custom text", DesignerEditorKind::Text, "UiProgressBar::SetText",
 	             "Optional text drawn instead of percentage text.");
 
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddTheme("track_face_enabled", "Track fill enabled", DesignerEditorKind::Bool,
 	           "UiProgressBar::Style::track_metrics.face_enabled",
 	           "Enables an explicit progress track fill.").group = "Theme Overrides";
@@ -1993,11 +2067,14 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.AddContent("text", "Text", DesignerEditorKind::Text, "UiButton::SetText",
 	      "Sets the button caption.");
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddBehaviour("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiButton::SetIconScaleToContent",
 	      "When enabled, the icon scales to the button content box and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddLayout("icon_side", "Icon side", "UiButton::SetIconSide",
 	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
 	b.AddLayout("content_inset", "Content inset", DesignerEditorKind::Slider, "UiButton::SetContentInset",
@@ -2006,6 +2083,7 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	         "Gap between icon and text.", 0, 32);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddTheme("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	      "UiButton::SetInkColor",
 	      "Enables an explicit text ink override.").group = "Theme Overrides";
@@ -2019,6 +2097,7 @@ void DesignerButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	      "UiButton::SetIconColor",
 	      "Explicit icon ink color used when theme overrides are active.").group = "Theme Overrides";
 	SetButtonThemeInkDefaults(b, "ink_enabled", "ink", "icon_ink_enabled", "icon_ink", node, false);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiButton::Style::font",
 	            "Preview button font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2070,11 +2149,14 @@ void DesignerSplitButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiSplitButton::SetText",
 	      "Sets the primary command caption.");
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiSplitButton::SetIconScaleToContent",
 	      "When enabled, the icon scales to the button content box and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("icon_side", "Icon side", "UiSplitButton::SetIconSide",
 	            "Where the icon sits relative to button text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
 	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiSplitButton::SetContentInset",
@@ -2091,6 +2173,7 @@ void DesignerSplitButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	         "Chevron size inside the split lane.", 8, 32);
 	b.AddInt("popup_min_width", "Popup width", DesignerEditorKind::Slider, "UiSplitButton::SetPopupMinWidth",
 	         "Minimum width of the opened selection popup.", 120, 520);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	      "UiSplitButton::SetInkColor",
 	      "Enables an explicit text ink override.").group = "Theme Overrides";
@@ -2144,11 +2227,14 @@ void DesignerToolButtonAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiToolButton::SetText",
 	      "Optional caption for the tool button.");
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiToolButton::SetIconScaleToContent",
 	      "When enabled, the icon scales to the tool button content box and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("icon_side", "Icon side", "UiToolButton::SetIconSide",
 	            "Where the icon sits relative to optional text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}, {"Center", "Center"}});
 	b.AddInt("content_inset", "Content inset", DesignerEditorKind::Slider, "UiToolButton::SetContentInset",
@@ -2197,12 +2283,19 @@ void DesignerLineEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiLineEdit::SetTextUtf8",
 	      "Sets the edit field text.");
 	b.Add("placeholder", "Placeholder", DesignerEditorKind::Text, "UiLineEdit::SetPlaceholder",
 	      "Sets the placeholder shown when the edit field is empty.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
 	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
+	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiLineEdit::SetIconScaleToContent",
+	      "When enabled, the icon scales to the edit box content area and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
 	            "Preview edit font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2252,13 +2345,19 @@ void DesignerIntEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const 
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiIntEdit::SetValue", "Preview integer value.", -1000, 1000);
 	b.AddInt("min", "Min", DesignerEditorKind::Slider, "UiIntEdit::Min", "Minimum accepted integer.", -1000, 1000);
 	b.AddInt("max", "Max", DesignerEditorKind::Slider, "UiIntEdit::Max", "Maximum accepted integer.", -1000, 1000);
 	b.AddInt("step", "Step", DesignerEditorKind::Slider, "UiIntEdit::Step", "Step used by spin buttons and wheel.", 1, 100);
 	b.Add("spin", "Spin buttons", DesignerEditorKind::Bool, "UiIntEdit::ShowSpin", "Shows the numeric spin buttons.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
 	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
+	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiIntEdit::SetIconScaleToContent",
+	      "When enabled, the icon scales to the edit box content area and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
 	            "Preview edit font family.", {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
@@ -2330,14 +2429,20 @@ void DesignerFloatEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("valuef", "Value", DesignerEditorKind::Text, "UiFloatEdit::SetValue", "Preview floating-point value.");
 	b.Add("minf", "Min", DesignerEditorKind::Text, "UiFloatEdit::Min", "Minimum accepted value.");
 	b.Add("maxf", "Max", DesignerEditorKind::Text, "UiFloatEdit::Max", "Maximum accepted value.");
 	b.Add("stepf", "Step", DesignerEditorKind::Text, "UiFloatEdit::Step", "Step used by spin buttons and wheel.");
 	b.AddInt("precision", "Precision", DesignerEditorKind::Slider, "UiFloatEdit::Precision", "Decimal precision.", 0, 8);
 	b.Add("spin", "Spin buttons", DesignerEditorKind::Bool, "UiFloatEdit::ShowSpin", "Shows the numeric spin buttons.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
 	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
+	b.Add("icon_scale", "Scale icon", DesignerEditorKind::Bool, "UiFloatEdit::SetIconScaleToContent",
+	      "When enabled, the icon scales to the edit box content area and overrides Icon size.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
 	            "Preview edit font family.", {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
 	             {"Arial", "Arial"}, {"Verdana", "Verdana"}, {"Tahoma", "Tahoma"}, {"Consolas", "Consolas"}});
@@ -2404,6 +2509,7 @@ void DesignerMaskEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiMaskEdit::SetData",
 	      "Sample raw value placed into the mask. Empty keeps the prompt visible.");
 	b.Add("placeholder", "Placeholder", DesignerEditorKind::Text, "UiMaskEdit::SetPlaceholder",
@@ -2412,8 +2518,10 @@ void DesignerMaskEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	      "Mask pattern, for example ##/##/####.");
 	b.Add("prompt_char", "Prompt character", DesignerEditorKind::Text, "UiMaskEdit::SetMask",
 	      "Single prompt character used for empty mask slots.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("show_error", "Show error", DesignerEditorKind::Bool, "UiMaskEdit::ShowError",
 	      "Shows the runtime error tint in preview.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("error_color_enabled", "Use error color", DesignerEditorKind::Bool, "UiMaskEdit::SetErrorColor",
 	      "Enables explicit error feedback color in generated code.");
 	b.Add("error_color", "Error color", DesignerEditorKind::Color, "UiMaskEdit::SetErrorColor",
@@ -2473,18 +2581,24 @@ void DesignerPasswordEditAdapter::DescribeApi(Vector<DesignerApiBinding>& out, c
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("sample_text", "Sample text", DesignerEditorKind::Text, "UiPasswordEdit::SetTextUtf8",
 	      "Sample password text used by the Designer preview.");
 	b.Add("placeholder", "Placeholder", DesignerEditorKind::Text, "UiPasswordEdit::SetPlaceholder",
 	      "Placeholder shown when the password field is empty.");
 	b.Add("password_char", "Password character", DesignerEditorKind::Text, "UiPasswordEdit::SetPasswordChar",
 	      "Single character used to mask the password text.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("plain_visible", "Plain text visible", DesignerEditorKind::Bool, "UiPasswordEdit::SetPlainTextVisible",
 	      "Shows the sample text unmasked in preview.");
 	b.Add("visibility_icon", "Visibility icon", DesignerEditorKind::Bool, "UiPasswordEdit::EnableVisibilityIcon",
 	      "Shows the built-in eye toggle icon.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("align", "Justify", "UiBaseEdit::SetTextAlign",
 	            "Horizontal text alignment.", {{"Left", "Left"}, {"Center", "Center"}, {"Right", "Right"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiBaseEdit::Style::font",
 	            "Preview edit font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2530,8 +2644,10 @@ void DesignerDocAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("sample_text", "Sample text", DesignerEditorKind::Text, "UiDoc::SetText",
 	      "Representative document text. Advanced transactions and annotations stay in runtime code.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiDoc::Style::font",
 	            "Preview document font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2578,6 +2694,7 @@ void DesignerToggleAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	b.Hide("text");
 	HideQuadFaceBindings(b);
 	HideSurfaceOverrideBindings(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("on", "On", DesignerEditorKind::Bool, "UiToggle::SetOn",
 	      "Sets the preview toggle state.");
 	b.Add("track_face_enabled", "Track face", DesignerEditorKind::Bool,
@@ -2609,6 +2726,7 @@ void DesignerToggleAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const D
 	                       "thumb_face_enabled", "thumb_face",
 	                       "thumb_frame_enabled", "thumb_frame",
 	                       node);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 }
@@ -2648,8 +2766,10 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("item_text", "Item text", DesignerEditorKind::Text, "UiDropdown::SetItemText",
 	      "Visible text of the default dropdown item.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("indicator_side", "Chevron side", "UiDropdown::SetIndicatorSide",
 	            "Side used by the collapsed dropdown chevron.", {{"Left", "Left"}, {"Right", "Right"}});
 	AddIconChoiceBinding(b, "indicator_closed_icon", "Closed chevron",
@@ -2663,6 +2783,7 @@ void DesignerDropdownAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	         "Preview size of the collapsed dropdown chevron.", 8, 48);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiDropdown::Style::font",
 	            "Preview dropdown font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2719,6 +2840,7 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	DesignerApiBuilder b(out);
 	HideQuadFaceBindings(b);
 	HideSurfaceOverrideBindings(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.Add("text", "Text", DesignerEditorKind::Text, "UiCheckBox::SetText",
 	      "Sets the checkbox label.");
 	b.AddChoice("state", "State", "UiCheckBox::SetState",
@@ -2727,6 +2849,7 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	      "Allows the indeterminate state.");
 	b.AddChoice("visual", "Visual", "UiCheckBox::SetVisual",
 	            "Checkbox visual style.", {{"Classic", "Classic"}, {"Chip", "Chip"}, {"List", "List"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("ink_enabled", "Use text color", DesignerEditorKind::Bool,
 	      "UiCheckBox::SetInkColor",
 	      "Enables an explicit checkbox text color override.").group = "Theme Overrides";
@@ -2756,6 +2879,7 @@ void DesignerCheckBoxAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	                         "indicator_frame_enabled", "indicator_frame",
 	                         "indicator_ink_enabled", "indicator_ink",
 	                         node);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	AddHorizontalAlignmentBinding(b);
 	AddVerticalAlignmentBinding(b);
 }
@@ -2818,6 +2942,7 @@ void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	HideThemeOverrideBindings(b);
 	b.Hide("role");
 	int count = DesignerBreadcrumbCount(node);
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	b.AddInt("crumb_count", "Crumbs", DesignerEditorKind::Slider, "UiBreadcrumbs::AddCrumb count",
 	         "Number of path segments.", 1, 24);
 	for(int i = 0; i < count; i++)
@@ -2831,6 +2956,7 @@ void DesignerBreadcrumbsAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 	b.AddInt("divider_icon_size", "Divider icon size", DesignerEditorKind::Slider,
 	         "UiBreadcrumbs::SetDividerIcon size", "Divider icon size.", 8, 64);
 	AddIconBinding(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("font", "Font", "UiBreadcrumbs::Style::font",
 	            "Breadcrumb font family.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2903,6 +3029,7 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddChoice("visual", "Visual", "UiTab::SetVisual",
 	            "Tab drawing style.", {{"Document", "Document"}, {"Classic", "Classic"}, {"Underline", "Underline"}, {"Segmented", "Segmented"}, {"Rail", "Rail"}});
 	b.AddChoice("placement", "Placement", "UiTab::SetPlacement",
@@ -2910,6 +3037,7 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	b.Add("expand_tabs", "Expand tabs", DesignerEditorKind::Bool, "UiTab::SetExpandTabs", "Tabs share available strip space.");
 	b.Add("close_buttons", "Close buttons", DesignerEditorKind::Bool, "UiTab::EnableCloseButtons", "Shows close affordances.");
 	b.Add("drag_handles", "Drag handles", DesignerEditorKind::Bool, "UiTab::EnableDragHandles", "Shows tab drag handles.");
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.AddChoice("tab_font", "Tab font", "UiTab::SetTabFont",
 	            "Font family used by tab labels.",
 	            {{"Sans", "Sans"}, {"Serif", "Serif"}, {"Mono", "Mono"}, {"Segoe UI", "Segoe UI"},
@@ -2918,12 +3046,14 @@ void DesignerTabAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Desi
 	         "Font size used by tab labels.", 7, 32);
 	b.AddInt("tab_icon_size", "Tab icon size", DesignerEditorKind::Slider, "UiTab::SetTabIconSize",
 	         "Shared icon size used by tab page icons and tab affordances.", 8, 64);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("tab_icon_side", "Icon side", "UiTab::SetTabIconSide",
 	            "Where page icons sit relative to tab text.", {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
 	b.AddInt("content_gap", "Page icon gap", DesignerEditorKind::Slider, "UiTab::Style::content_gap",
 	         "Gap between a PageSlot icon and the tab title. Only visible when the page has an icon.", 0, 32);
 	b.AddInt("affordance_gap", "Action icon gap", DesignerEditorKind::Slider, "UiTab::Style::affordance_gap",
 	         "Gap before and between built-in tab action icons such as drag and close.", 0, 32);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiTab::SetActiveTab",
 	                                   "Visible tab page. Rename individual Page Slot children to change tab labels.");
 	int pages = max(1, node.children.GetCount());
@@ -2962,6 +3092,7 @@ void DesignerStackAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	DesignerApiBinding& active = b.Add("active", "Active page", DesignerEditorKind::Choice, "UiStack::SetActivePage",
 	                                   "Visible stack page. Rename individual Page Slot children to change page keys.");
 	int pages = max(1, node.children.GetCount());
@@ -3021,10 +3152,12 @@ void DesignerTableAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const De
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddInt("rows_count", "Rows", DesignerEditorKind::Slider, "UiTableModel::SetSize", "Preview row count.", 1, 20);
 	b.AddInt("cols_count", "Columns", DesignerEditorKind::Slider, "UiTableModel::SetSize", "Preview column count.", 1, 8);
 	b.Add("row_headers", "Row headers", DesignerEditorKind::Bool, "UiTable::ShowRowHeaders", "Shows row headers.");
 	b.Add("column_headers", "Column headers", DesignerEditorKind::Bool, "UiTable::ShowColumnHeaders", "Shows column headers.");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("row_height", "Row height", DesignerEditorKind::Slider, "UiTable::SetRowHeight", "Table row height.", 18, 64);
 	b.AddInt("header_height", "Header height", DesignerEditorKind::Slider, "UiTable::SetHeaderHeight", "Table header height.", 18, 72);
 	b.AddInt("column_width", "Column width", DesignerEditorKind::Slider, "UiTable::SetDefaultColumnWidth", "Default column width.", 60, 360);
@@ -3074,6 +3207,7 @@ void DesignerTreeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const Des
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("root_visible", "Root visible", DesignerEditorKind::Bool, "UiTree::SetRootVisible", "Shows the model root row.");
 	b.Add("connectors", "Connectors", DesignerEditorKind::Bool, "UiTree::ShowConnectorLines", "Shows parent/child connector lines.");
 	b.Add("metadata", "Metadata", DesignerEditorKind::Bool, "UiTree::ShowMetadataMarker", "Shows metadata markers on sample rows.");
@@ -3113,6 +3247,7 @@ void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
 	HideQuadFaceBindings(b);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("single_open", "Single open", DesignerEditorKind::Bool, "UiAccordion::SetSingleOpen",
 	      "Only one section can be open at a time.");
 	b.Add("enforce_one", "Keep one open", DesignerEditorKind::Bool, "UiAccordion::SetEnforceOne",
@@ -3127,6 +3262,7 @@ void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	         "Open animation duration.", 0, 600);
 	b.AddInt("close_ms", "Close ms", DesignerEditorKind::Slider, "UiAccordion::SetAnimation",
 	         "Close animation duration.", 0, 600);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("item_spacing", "Item gap", DesignerEditorKind::Slider, "UiAccordion::Style::item_spacing",
 	         "Spacing between sections.", 0, 48);
 	b.AddInt("header_body_gap", "Header/body gap", DesignerEditorKind::Slider, "UiAccordion::Style::header_body_gap",
@@ -3138,6 +3274,7 @@ void DesignerAccordionAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	b.Add("drag_reorder", "Drag reorder", DesignerEditorKind::Bool, "UiAccordion::EnableDragReorder",
 	      "Allows users to reorder sections at runtime.");
 	static const char *theme_group = "Theme Overrides";
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	b.Add("header_face_enabled", "Header fill", DesignerEditorKind::Bool, "UiAccordion::Style::header_style.metrics.face_enabled",
 	      "Uses an explicit fill for section headers.").group = theme_group;
 	b.Add("header_face", "Header face", DesignerEditorKind::Color, "UiAccordion::Style::header_style.palette.face",
@@ -3194,8 +3331,10 @@ void DesignerScrollPanelAdapter::DescribeApi(Vector<DesignerApiBinding>& out, co
 {
 	AddCommonBindings(out, node);
 	DesignerApiBuilder b(out);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddLayout("inset", "Inset", DesignerEditorKind::Slider, "UiScrollPanel child layout",
 	            "Inset applied when sizing direct child content inside the scroll panel.", 0, 64);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.AddChoice("scroll_mode", "Scroll mode", "UiScrollPanel::SetScrollMode",
 	            "Controls which scroll directions are available.",
 	            {{"Auto", "Auto"}, {"Vertical", "Vertical"}, {"Horizontal", "Horizontal"}, {"None", "None"}});
@@ -3348,6 +3487,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	HideThemeOverrideBindings(b);
 	b.Hide("role");
 
+	b.SetDefaultDomain(DesignerPropertyDomain::Content);
 	if(node.type_id != "UiSliderEdit") {
 		b.Add("label", "Label", DesignerEditorKind::Text, "composite SetLabel", "Label text shown on the left or above.");
 		b.AddChoice("layout_mode", "Layout", "UiComposite::SetLayoutMode", "Inline or stacked composite layout.",
@@ -3359,11 +3499,13 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	if(node.type_id == "UiCompositeDropdown")
 		b.AddChoice("selected", "Selected", "UiCompositeDropdown::SelectByData", "Preview selected item.",
 		            {{"First", "First"}, {"Second", "Second"}, {"Third", "Third"}});
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	if(node.type_id == "UiCompositeToggle") {
 		b.Add("on", "On", DesignerEditorKind::Bool, "UiCompositeToggle::SetData", "Preview toggle state.");
 		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeToggle::ShowValue", "Shows the value label.");
 		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "SetValueWidth", "Width of the value label.", 0, 180);
 	}
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	if(node.type_id == "UiCompositeColor") {
 		b.Add("show_value", "Show value", DesignerEditorKind::Bool, "UiCompositeColor::ShowValue", "Shows the value label.");
 		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "UiCompositeColor::SetValueWidth", "Width of the value label.", 0, 180);
@@ -3384,6 +3526,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 		return;
 	}
 	if(node.type_id == "UiCompositeSlider") {
+		b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 		b.AddInt("min", "Min", DesignerEditorKind::Slider, "UiSlider::SetRange", "Slider minimum.", 0, 500);
 		b.AddInt("max", "Max", DesignerEditorKind::Slider, "UiSlider::SetRange", "Slider maximum.", 1, 1000);
 		b.AddInt("value", "Value", DesignerEditorKind::Slider, "UiCompositeSlider::SetData", "Preview slider value.", 0, 1000);
@@ -3391,6 +3534,7 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 		b.AddInt("value_width", "Value width", DesignerEditorKind::Slider, "SetValueWidth", "Width of the value label.", 0, 180);
 	}
 	if(node.type_id == "UiSliderEdit") {
+		b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 		b.AddChoice("field_align", "Field side", "UiSliderEdit::SetFieldAlign", "Side used by the numeric edit field.",
 		            {{"Left", "Left"}, {"Right", "Right"}, {"Top", "Top"}, {"Bottom", "Bottom"}});
 		b.AddInt("field_width", "Field width", DesignerEditorKind::Slider, "UiSliderEdit::SetFieldWidth", "Numeric field width.", 36, 180);
@@ -3399,8 +3543,10 @@ void DesignerCompositeAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 		b.AddInt("valuef", "Value", DesignerEditorKind::Slider, "UiSliderEdit::SetValue", "Preview value.", 0, 1000);
 		b.AddInt("stepf", "Step", DesignerEditorKind::Slider, "UiSliderEdit::SetStep", "Edit increment.", 1, 100);
 	}
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	if(node.type_id != "UiCompositeLabel")
 		b.AddInt("stack_gap", "Stack gap", DesignerEditorKind::Slider, "SetStackGap", "Gap used by stacked layout.", 0, 32);
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("field_gap", "Field gap", DesignerEditorKind::Slider, "SetFieldGap / SetGap", "Gap between label/field/value parts.", 0, 64);
 }
 
@@ -3474,6 +3620,7 @@ void DesignerBoxLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, cons
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("direction", "Direction", "UiBoxLayout::SetDirection",
 	            "Controls whether children are arranged horizontally or vertically.",
 	            {{"V", "Vertical"}, {"H", "Horizontal"}});
@@ -3549,6 +3696,7 @@ void DesignerGridLayoutAdapter::DescribeApi(Vector<DesignerApiBinding>& out, con
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("columns", "Columns", DesignerEditorKind::Slider, "UiGridLayout::SetGridSize",
 	         "Stable column count for addressable grid cells.", 1, 12);
 	b.AddInt("rows", "Rows", DesignerEditorKind::Slider, "UiGridLayout::SetGridSize",
@@ -3680,6 +3828,7 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	b.Hide("radius");
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddChoice("direction", "Orientation", "UiSplitter::Horz / UiSplitter::Vert",
 	            "Controls whether panes split left/right or top/bottom.",
 	            {{"H", "Left / Right"}, {"V", "Top / Bottom"}});
@@ -3703,6 +3852,7 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	         "Optional pressed track thickness; zero uses the hit band width.", 0, 40);
 	b.AddInt("track_inset", "Track inset", DesignerEditorKind::Slider, "UiSplitter::Style::track_inset",
 	         "Inset applied to the visible track.", 0, 32);
+	b.SetDefaultDomain(DesignerPropertyDomain::ThemeStyle);
 	if(!(bool)AdapterNodeProperty(node, "expand_track_on_hot", true))
 		b.Disable("hot_track_thickness", "Hot track thickness is only used when the hot band is expanded.");
 	if(!(bool)AdapterNodeProperty(node, "expand_track_on_pressed", true))
@@ -3741,6 +3891,7 @@ void DesignerSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, const
 	         "Icon size used when Grip visual is Icon.", 8, 64);
 	b.AddInt("thumb_radius", "Thumb radius", DesignerEditorKind::Slider, "UiSplitter::Style::thumb_metrics.radius",
 	         "Corner radius for the splitter thumb.", 0, 32);
+	b.SetDefaultDomain(DesignerPropertyDomain::Behaviour);
 	b.Add("debug", "Debug", DesignerEditorKind::Bool, "designer overlay",
 	      "Shows the splitter layout bounds in the designer.");
 }
@@ -3784,6 +3935,7 @@ void DesignerQuadSplitterAdapter::DescribeApi(Vector<DesignerApiBinding>& out, c
 	b.Hide("face_enabled");
 	b.Hide("frame_enabled");
 	b.Hide("role");
+	b.SetDefaultDomain(DesignerPropertyDomain::Layout);
 	b.AddInt("column_percent", "Column split", DesignerEditorKind::Slider, "UiQuadSplitter::SetColumnSplitPercent",
 	         "Left/right split percentage shared by the top and bottom rows.", 5, 95);
 	b.AddInt("row_percent", "Row split", DesignerEditorKind::Slider, "UiQuadSplitter::SetRowSplitPercent",

@@ -35,6 +35,7 @@
 
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiAxis.h>
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>

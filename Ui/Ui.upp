@@ -11,6 +11,8 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiAxis.h,
+	UiAxis.cpp,
 	UiIndicatorBase.h,
 	UiIndicatorBase.cpp,
 	UiIndicatorSupport.h,

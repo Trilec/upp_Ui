@@ -5390,10 +5390,7 @@ private:
 		}
 #endif
 		model_.SetProperty(node_id, property_id, normalized);
-		DesignerProjectionRequest preview_projection;
-		preview_projection.preview = true;
-		preview_projection.hierarchy = property_id == "direction" || property_id == "wrap" ||
-		                               property_id == "name" || property_id == "page_title";
+		DesignerProjectionRequest preview_projection = GetProjectionForInspectorCommit(*n, property_id);
 		preview_projection.inspector = false;
 		preview_projection.code = false;
 		preview_projection.full = false;
@@ -5933,27 +5930,14 @@ private:
 		DesignerProjectionRequest r;
 		r.reason = "inspector commit";
 
-		bool needs_inspector = property_id == "theme_override" || property_id == "h_sizing" ||
-		                      property_id == "v_sizing" || property_id == "crumb_count";
-		bool needs_hierarchy = needs_inspector || property_id == "direction" || property_id == "wrap" ||
-		                      property_id == "name" || property_id == "page_title";
 		bool layout_affecting = IsLayoutAffectingProperty(node, property_id);
-		bool safe_sizing = property_id == "h_sizing" || property_id == "v_sizing" ||
-		                   property_id == "fixed_width" || property_id == "fixed_height" ||
-		                   property_id == "min_width" || property_id == "min_height" ||
-		                   property_id == "max_width" || property_id == "max_height" ||
-		                   property_id == "cell_align_h" || property_id == "cell_align_v";
-		bool theme_or_display = property_id == "theme_override" ||
-		                        property_id == "face_enabled" || property_id == "face" ||
-		                        property_id == "face_mode" || property_id == "face_quad" ||
-		                        property_id == "frame_enabled" || property_id == "frame" ||
-		                        property_id == "frame_width" || property_id == "radius" ||
-		                        property_id == "shadow_enabled" || property_id == "shadow_distance" ||
-		                        property_id == "shadow_offset_x" || property_id == "shadow_offset_y" ||
-		                        property_id == "shadow_alpha" || property_id == "shadow_color" ||
-		                        property_id == "shadow_curve" || property_id == "icon" ||
-		                        property_id == "role";
 		bool controlled_property = false;
+		bool binding_found = false;
+		bool binding_layout = false;
+		bool binding_inspector = false;
+		bool binding_preview = true;
+		bool binding_code = true;
+		bool binding_full = false;
 		{
 			DesignerAdapter *adapter = nullptr;
 			One<Ctrl> ctrl;
@@ -5961,22 +5945,36 @@ private:
 			if(adapter) {
 				Vector<DesignerApiBinding> bindings;
 				adapter->DescribeApi(bindings, node);
-				controlled_property = IsSingleNodeInspectorStateControlledProperty(node, bindings, property_id);
+				if(const DesignerApiBinding *binding = FindApiBinding(bindings, property_id)) {
+					binding_found = true;
+					controlled_property = IsSingleNodeInspectorStateControlledProperty(node, bindings, property_id);
+					binding_layout = binding->projection.hierarchy;
+					binding_inspector = binding->projection.inspector;
+					binding_preview = binding->projection.preview;
+					binding_code = binding->projection.code;
+					binding_full = binding->projection.full;
+					r.reason = binding->label.IsEmpty() ? binding->property_id : binding->label;
+				}
 			}
 		}
 
 #ifdef _DEBUG
-		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d safe_sizing=%d controlled=%d",
-		            (int)node.id, node.type_id, property_id, layout_affecting ? 1 : 0, safe_sizing ? 1 : 0, controlled_property ? 1 : 0));
+		RLOG(Format("GetProjectionForInspectorCommit node=%d type=%s property=%s layout_affecting=%d binding=%d controlled=%d",
+		            (int)node.id, node.type_id, property_id, layout_affecting ? 1 : 0, binding_found ? 1 : 0, controlled_property ? 1 : 0));
 #endif
 
-		if(controlled_property) {
-			r.preview = true;
-			r.hierarchy = true;
-			r.inspector = true;
-			r.code = true;
-			r.full = safe_sizing || layout_affecting;
-			r.reason = safe_sizing ? "controlled sizing inspector commit" : "controlled inspector commit";
+		if(binding_found) {
+			r.preview = binding_preview;
+			r.hierarchy = binding_layout;
+			r.inspector = binding_inspector;
+			r.code = binding_code;
+			r.full = binding_full || layout_affecting;
+			r.reason = binding_layout ? "binding layout projection" : "binding projection";
+			if(property_id == "name") {
+				r.hierarchy = true;
+				r.code = true;
+				r.preview = false;
+			}
 #ifdef _DEBUG
 			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
 			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
@@ -5995,35 +5993,7 @@ private:
 #endif
 			return r;
 		}
-		if(safe_sizing) {
-			r.inspector = true;
-			r.reason = "sizing inspector commit";
-#ifdef _DEBUG
-			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
-			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
-#endif
-			return r;
-		}
-		if(theme_or_display) {
-			r.inspector = true;
-			r.reason = "theme/display inspector commit";
-#ifdef _DEBUG
-			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
-			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
-#endif
-			return r;
-		}
-		if(needs_hierarchy) {
-			r.preview = false;
-			r.hierarchy = true;
-			r.inspector = true;
-			r.reason = "hierarchy-visible inspector commit";
-#ifdef _DEBUG
-			RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",
-			            property_id, r.preview ? 1 : 0, r.hierarchy ? 1 : 0, r.inspector ? 1 : 0, r.code ? 1 : 0, r.full ? 1 : 0));
-#endif
-			return r;
-		}
+
 		r.reason = "visual inspector commit";
 #ifdef _DEBUG
 		RLOG(Format("GetProjectionForInspectorCommit result property=%s preview=%d hierarchy=%d inspector=%d code=%d full=%d",

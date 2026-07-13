@@ -1630,6 +1630,20 @@ static void TestDesignerApiCoverageAudit(TestCtx& t)
 		Vector<DesignerApiBinding> bindings;
 		if(adapter)
 			adapter->DescribeApi(bindings, node);
+		int visible_count = 0;
+		int classified_count = 0;
+		for(const DesignerApiBinding& binding : bindings) {
+			if(!binding.visible)
+				continue;
+			visible_count++;
+			t.Expect(binding.domain != DesignerPropertyDomain::Unclassified,
+			         type->id + " visible binding has an explicit property domain: " + binding.property_id);
+			if(binding.domain != DesignerPropertyDomain::Unclassified)
+				classified_count++;
+			t.Expect(binding.projection.preview || binding.projection.hierarchy || binding.projection.inspector ||
+			         binding.projection.code || binding.projection.full,
+			         type->id + " visible binding has an explicit live-update projection: " + binding.property_id);
+		}
 
 		bool role_ok = spec->role_visible ? BindingVisible(bindings, "role") : BindingHidden(bindings, "role");
 		bool theme_ok = spec->theme_visible ? BindingVisible(bindings, "theme_override") : BindingHidden(bindings, "theme_override");
@@ -1693,6 +1707,7 @@ static void TestDesignerApiCoverageAudit(TestCtx& t)
 		                 AuditResultText(ink_ok && icon_ink_ok),
 		                 AuditResultText(parts_ok && hidden_ok),
 		                 codegen_status);
+		Cout() << Format("  visible=%d classified=%d\n", visible_count, classified_count);
 	}
 }
 
@@ -2676,10 +2691,39 @@ static void TestLayoutSizingPrimitives(TestCtx& t)
 	t.Expect(host_child.GetRect().GetHeight() == 70,
 	         Format("direct content host clamps fixed height to max (got %d)", host_child.GetRect().GetHeight()));
 
-	DesignerResolvedAxis fixed_axis = ResolveDesignerAxis("Fixed", 240, 60, 160, 80, 300);
-	t.Expect(fixed_axis.Resolve() == 160, Format("shared axis resolver clamps fixed value to explicit max (got %d)", fixed_axis.Resolve()));
-	DesignerResolvedAxis fit_axis = ResolveDesignerAxis("Fit", 0, 20, 0, 90, 200);
-	t.Expect(fit_axis.Resolve() == 90, Format("shared axis resolver keeps fit value within bounds (got %d)", fit_axis.Resolve()));
+	UiAxisConstraints fixed_axis_input;
+	fixed_axis_input.mode = UiAxisMode::Fixed;
+	fixed_axis_input.minimum = 60;
+	fixed_axis_input.maximum = 160;
+	fixed_axis_input.fixed = 240;
+	fixed_axis_input.preferred = 80;
+	fixed_axis_input.available = 300;
+	UiResolvedAxis fixed_axis = UiResolveAxis(fixed_axis_input);
+	t.Expect(fixed_axis.final_size == 160, Format("shared axis resolver clamps fixed value to explicit max (got %d)", fixed_axis.final_size));
+	UiAxisConstraints fit_axis_input;
+	fit_axis_input.mode = UiAxisMode::Fit;
+	fit_axis_input.minimum = 20;
+	fit_axis_input.maximum = 0;
+	fit_axis_input.preferred = 90;
+	fit_axis_input.available = 200;
+	UiResolvedAxis fit_axis = UiResolveAxis(fit_axis_input);
+	t.Expect(fit_axis.final_size == 90, Format("shared axis resolver keeps fit value within bounds (got %d)", fit_axis.final_size));
+	UiAxisConstraints expand_axis_input;
+	expand_axis_input.mode = UiAxisMode::Expand;
+	expand_axis_input.minimum = 25;
+	expand_axis_input.maximum = 80;
+	expand_axis_input.available = 300;
+	UiResolvedAxis expand_axis = UiResolveAxis(expand_axis_input);
+	t.Expect(expand_axis.final_size == 80, Format("shared axis resolver clamps expand value to explicit max (got %d)", expand_axis.final_size));
+	UiAxisConstraints order_axis_input;
+	order_axis_input.mode = UiAxisMode::Fixed;
+	order_axis_input.minimum = 120;
+	order_axis_input.maximum = 60;
+	order_axis_input.fixed = 48;
+	UiResolvedAxis order_axis = UiResolveAxis(order_axis_input);
+	t.Expect(order_axis.minimum == 120 && order_axis.maximum == 120 && order_axis.final_size == 120,
+	         Format("shared axis resolver normalizes minimum/maximum order (got min=%d max=%d final=%d)",
+	                order_axis.minimum, order_axis.maximum, order_axis.final_size));
 
 	UiAccordion accordion;
 	accordion.AddSection("Compact accordion", true);

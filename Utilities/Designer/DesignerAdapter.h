@@ -101,6 +101,13 @@ struct DesignerApiBinding : Moveable<DesignerApiBinding> {
 	bool visible = true;
 	bool enabled = true;
 	String disabled_reason;
+	struct DesignerPropertyProjection : Moveable<DesignerPropertyProjection> {
+		bool preview = true;
+		bool hierarchy = false;
+		bool inspector = false;
+		bool code = true;
+		bool full = false;
+	} projection;
 };
 
 // Small helper used inside adapters to build consistent property descriptors.
@@ -143,12 +150,15 @@ public:
 	DesignerApiBinding& AddInt(const String& id, const String& label, DesignerEditorKind editor,
 	                             const String& api_call, const String& help, int min_value, int max_value);
 	DesignerApiBuilder& SetDomain(const String& id, DesignerPropertyDomain domain);
+	DesignerApiBuilder& SetDefaultDomain(DesignerPropertyDomain domain);
+	DesignerApiBuilder& SetProjection(const String& id, const DesignerApiBinding::DesignerPropertyProjection& projection);
 	void Disable(const String& id, const String& reason);
 	void Hide(const String& id);
 	DesignerApiBinding* Find(const String& id);
 
 private:
 	Vector<DesignerApiBinding>& out;
+	DesignerPropertyDomain default_domain_ = DesignerPropertyDomain::Unclassified;
 };
 
 // Common interface implemented by every designer-wrapped real control.
