@@ -1,0 +1,16 @@
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib;
+
+file
+    PropertyEditorModel.h,
+    PropertyEditorModel.cpp,
+    PropertyValueEditors.h,
+    PropertyValueEditors.cpp,
+    PropertyEditor.h,
+    PropertyEditor.cpp,
+    README.md,
+    DESIGN.md,
+    CHANGELOG.md;
