@@ -1,15 +1,17 @@
 #ifndef _Utilities_PropertyEditor_PropertyEditor_h_
 #define _Utilities_PropertyEditor_PropertyEditor_h_
 
+#include <Ui/Ui.h>
 #include <Utilities/PropertyEditorCore/PropertyEditorCore.h>
 #include "PropertyValueEditors.h"
 
 namespace Upp {
 
 enum class PropertyEditorPaletteMode : byte {
-    System = 0,
+    FollowUiTheme = 0,
     Light,
     Dark,
+    System = FollowUiTheme,
 };
 
 struct PropertyEditorStyle {
@@ -151,13 +153,13 @@ private:
     PropertyEditorFactory *factory_ = nullptr;
 
     PropertyEditorStyle style_;
-    PropertyEditorPaletteMode palette_mode_ = PropertyEditorPaletteMode::System;
+    PropertyEditorPaletteMode palette_mode_ = PropertyEditorPaletteMode::FollowUiTheme;
 
     Array<DisplayRow> rows_;
     VectorMap<String, bool> group_open_;
 
-    EditString filter_;
-    VScrollBar scroll_;
+    UiLineEdit filter_;
+    UiScrollBar scroll_ { UiDirection::V };
 
     One<PropertyValueEditor> active_editor_;
     int active_display_row_ = -1;

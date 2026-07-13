@@ -48,15 +48,27 @@ static String PeFormatMultilineSummary(const Value& value)
     return first;
 }
 
+static Color PeFillColor(const UiFill& fill, Color fallback)
+{
+    return fill.IsSolid() ? fill.color : fallback;
+}
+
 PropertyEditorStyle PropertyEditorStyle::System()
 {
+    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Subtle);
+    UiLabel::Style label = UiTheme::ResolveLabel(UiRole::Standard);
+    UiLabel::Style subtle = UiTheme::ResolveLabel(UiRole::Subtle);
+
     return PeMakeStyle(
-        SColorPaper(),
-        Blend(SColorPaper(), SColorFace(), 42),
-        Blend(SColorPaper(), SColorFace(), 72),
-        Blend(SColorFace(), SColorPaper(), 48),
-        SColorText(),
-        SColorDisabled());
+        PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
+        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
+              PeFillColor(panel.palette.face[ST_HOT], SColorFace()), 42),
+        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
+              PeFillColor(panel.palette.face[ST_PRESSED], SColorFace()), 72),
+        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
+              PeFillColor(panel.palette.face[ST_DISABLED], SColorFace()), 48),
+        label.palette.ink[ST_NORMAL],
+        subtle.palette.ink[ST_DISABLED]);
 }
 
 PropertyEditorStyle PropertyEditorStyle::Light()
@@ -90,13 +102,12 @@ PropertyEditor::PropertyEditor()
     Add(filter_);
     Add(scroll_);
 
-    filter_.NullText("Filter properties...");
+    filter_.SetPlaceholder("Filter properties...");
     filter_.WhenAction = [=] {
         RebuildRows();
     };
 
-    scroll_.AutoHide();
-    scroll_.SetLine(style_.row_height);
+    scroll_.EnableAutoHide();
     scroll_.WhenScroll = [=] {
         LayoutActiveEditor();
         Refresh();
@@ -149,7 +160,6 @@ PropertyEditorFactory& PropertyEditor::GetFactory() const
 void PropertyEditor::SetStyle(const PropertyEditorStyle& style)
 {
     style_ = style;
-    scroll_.SetLine(max(1, style_.row_height));
     RebuildRows();
 }
 
@@ -319,7 +329,7 @@ void PropertyEditor::Layout()
     }
     else {
         scroll_.Hide();
-        scroll_.Set(0);
+        scroll_.SetPos(0);
         viewport_ = r;
     }
 
@@ -339,7 +349,7 @@ void PropertyEditor::Paint(Draw& w)
     if(viewport_.IsEmpty())
         return;
 
-    int top = viewport_.top - scroll_.Get();
+    int top = viewport_.top - scroll_.GetPos();
 
     for(int i = 0; i < rows_.GetCount(); i++) {
         const DisplayRow& row = rows_[i];
@@ -369,7 +379,7 @@ Rect PropertyEditor::GetRowRect(int display_index) const
         return Rect(0, 0, 0, 0);
 
     const DisplayRow& row = rows_[display_index];
-    int top = viewport_.top - scroll_.Get();
+    int top = viewport_.top - scroll_.GetPos();
     return Rect(viewport_.left, top + row.y,
                 viewport_.right, top + row.y + row.cy);
 }
@@ -411,7 +421,7 @@ int PropertyEditor::FindDisplayRow(Point p) const
     if(!viewport_.Contains(p))
         return -1;
 
-    int y = p.y - viewport_.top + scroll_.Get();
+    int y = p.y - viewport_.top + scroll_.GetPos();
     for(int i = 0; i < rows_.GetCount(); i++)
         if(rows_[i].y <= y && y < rows_[i].y + rows_[i].cy)
             return i;
@@ -522,9 +532,10 @@ void PropertyEditor::RebuildRows()
 
 void PropertyEditor::SyncScrollBar()
 {
-    int page = max(0, viewport_.GetHeight());
+    int page = max(1, viewport_.GetHeight());
     int total = max(page, content_height_);
-    scroll_.Set(scroll_.Get(), page, total);
+    int pos = scroll_.GetPos();
+    scroll_.SetRange(0, total, page).SetPos(pos);
 }
 
 void PropertyEditor::LayoutActiveEditor()
@@ -554,7 +565,15 @@ void PropertyEditor::EnsureSelectedVisible()
     if(selected_display_row_ < 0 || selected_display_row_ >= rows_.GetCount())
         return;
     const DisplayRow& row = rows_[selected_display_row_];
-    scroll_.ScrollInto(row.y, row.cy);
+    int page = max(1, viewport_.GetHeight());
+    int pos = scroll_.GetPos();
+    int min_pos = row.y;
+    int max_pos = max(0, row.y + row.cy - page);
+    if(pos < min_pos)
+        pos = min_pos;
+    if(pos > max_pos)
+        pos = max_pos;
+    scroll_.SetPos(pos);
     LayoutActiveEditor();
     Refresh();
 }
@@ -741,7 +760,9 @@ void PropertyEditor::MouseLeave()
 void PropertyEditor::MouseWheel(Point p, int zdelta, dword)
 {
     if(viewport_.Contains(p)) {
-        scroll_.Wheel(zdelta);
+        int step = max(1, style_.row_height);
+        int pos = scroll_.GetPos() + (zdelta > 0 ? -step : step);
+        scroll_.SetPos(pos);
         LayoutActiveEditor();
         Refresh();
     }

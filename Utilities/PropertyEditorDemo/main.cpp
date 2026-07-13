@@ -19,10 +19,7 @@ public:
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
+        edit_.Enable(item.enabled && !item.read_only);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
@@ -44,7 +41,7 @@ public:
     }
 
 private:
-    EditString edit_;
+    UiLineEdit edit_;
     bool syncing_ = false;
 };
 
@@ -118,13 +115,19 @@ public:
         editor_.SetModel(&model_);
         preview_.SetModel(&model_);
 
-        system_.SetLabel("System");
-        light_.SetLabel("Light");
-        dark_.SetLabel("Dark");
-        expand_.SetLabel("Expand all");
-        collapse_.SetLabel("Collapse all");
+        system_.SetText("Ui theme");
+        light_.SetText("Light");
+        dark_.SetText("Dark");
+        expand_.SetText("Expand all");
+        collapse_.SetText("Collapse all");
+        status_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        system_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        light_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        dark_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        expand_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+        collapse_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 
-        system_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::System); };
+        system_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::FollowUiTheme); };
         light_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::Light); };
         dark_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::Dark); };
         expand_.WhenAction = [=] { editor_.ExpandAll(); };
@@ -132,22 +135,22 @@ public:
 
         model_.WhenPreview = [=](String id, Value value) {
             preview_.Refresh();
-            status_.SetLabel("Preview  " + id + " = " + AsString(value));
+            status_.SetText("Preview  " + id + " = " + AsString(value));
         };
         model_.WhenCommit = [=](String id, Value value) {
             preview_.Refresh();
-            status_.SetLabel("Committed  " + id + " = " + AsString(value));
+            status_.SetText("Committed  " + id + " = " + AsString(value));
         };
         model_.WhenReset = [=](String id) {
             preview_.Refresh();
-            status_.SetLabel("Reset  " + id);
+            status_.SetText("Reset  " + id);
         };
         editor_.WhenHelp = [=](String text) {
             if(!text.IsEmpty())
-                status_.SetLabel(text);
+                status_.SetText(text);
         };
 
-        status_.SetLabel("Select a property. Continuous controls preview while editing and commit when finished.");
+        status_.SetText("Select a property. Continuous controls preview while editing and commit when finished.");
     }
 
     virtual void Layout() override
@@ -273,12 +276,12 @@ private:
     PropertyEditor editor_;
     PropertyEditorDemoPreview preview_;
 
-    Label status_;
-    Button system_;
-    Button light_;
-    Button dark_;
-    Button expand_;
-    Button collapse_;
+    UiLabel status_;
+    UiButton system_;
+    UiButton light_;
+    UiButton dark_;
+    UiButton expand_;
+    UiButton collapse_;
 };
 
 GUI_APP_MAIN

@@ -1,14 +1,14 @@
 # PropertyEditor
 
-`Utilities/PropertyEditor` is a reusable U++ property-browser package. It is not tied to the Ui Designer.
+`Utilities/PropertyEditor` is a reusable Ui-backed property-browser package. It is not tied to the Ui Designer.
 
 Version: **1.0.0-rc1**
 
 ## Package layout
 
-- `Utilities/PropertyEditor` — reusable library package
-- `Utilities/PropertyEditorDemo` — interactive demonstration
-- `Utilities/PropertyEditorTests` — headless model tests
+- `Utilities/PropertyEditor` - reusable Ui-backed library package
+- `Utilities/PropertyEditorDemo` - interactive demonstration
+- `Utilities/PropertyEditorTests` - headless model tests
 
 ## Design goals
 
@@ -16,10 +16,11 @@ Version: **1.0.0-rc1**
 - collapsible categories;
 - filter/search;
 - alternate row shading;
-- System, Light and Dark row palettes;
+- Follow Ui theme, System, Light and Dark row palettes;
 - one active value editor at a time rather than one permanent control per row;
 - preview and final-commit events;
 - custom editor registration;
+- Ui-backed value delegates for live preview and commit;
 - mixed and inherited values;
 - validation and reset support;
 - no dependency on the Designer model or window.

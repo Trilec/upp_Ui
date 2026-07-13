@@ -24,10 +24,7 @@ public:
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
+        edit_.Enable(item.enabled && !item.read_only);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
@@ -49,7 +46,7 @@ public:
     }
 
 private:
-    EditString edit_;
+    UiLineEdit edit_;
     bool syncing_ = false;
 };
 
@@ -113,6 +110,24 @@ CONSOLE_APP_MAIN
           "custom editor registered");
     Check(PropertyEditorFactory::Global().Create(*model.Find("custom")),
           "custom editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("title")),
+          "text editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("notes")),
+          "multiline editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("enabled")),
+          "boolean editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("count")),
+          "integer editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("ratio")),
+          "double editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("mode")),
+          "choice editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("steps")),
+          "slider editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("position")),
+          "vector editor created");
+    Check(PropertyEditorFactory::Global().Create(*model.Find("curve")),
+          "curve editor created");
 
     String error;
     Check(model.Preview("count", "8", &error), "integer string preview");

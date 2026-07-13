@@ -1,9 +1,8 @@
 uses
     Core,
     Draw,
-    CtrlCore,
-    CtrlLib,
-    Utilities/PropertyEditorCore;
+    Utilities/PropertyEditorCore,
+    Ui;
 
 file
     PropertyValueEditors.h,

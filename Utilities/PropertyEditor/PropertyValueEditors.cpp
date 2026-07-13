@@ -1,6 +1,9 @@
 #include "PropertyValueEditors.h"
 
 #include <cmath>
+#include <Ui/UiColorPicker.h>
+#include <Ui/UiSliderEdit.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -9,18 +12,19 @@ void PropertyValueEditor::FocusEditor()
     SetFocus();
 }
 
-class PropertyCommitEdit : public EditString {
+template <class T>
+class PropertyCommitEditCtrl : public T {
 public:
-    typedef PropertyCommitEdit CLASSNAME;
+    typedef PropertyCommitEditCtrl CLASSNAME;
 
-    PropertyCommitEdit()
+    PropertyCommitEditCtrl()
     {
-        WhenEnter = [=] { EmitCommit(); };
+        T::WhenAction = [=] { EmitCommit(); };
     }
 
     virtual void LostFocus() override
     {
-        EditString::LostFocus();
+        T::LostFocus();
         EmitCommit();
     }
 
@@ -29,7 +33,7 @@ public:
 private:
     void EmitCommit()
     {
-        Value v = GetData();
+        Value v = T::GetData();
         if(!has_last_commit_ || v != last_commit_) {
             last_commit_ = v;
             has_last_commit_ = true;
@@ -41,12 +45,17 @@ private:
     bool has_last_commit_ = false;
 };
 
+using PropertyCommitEdit = PropertyCommitEditCtrl<UiLineEdit>;
+using PropertyCommitMultiEdit = PropertyCommitEditCtrl<UiMultiEdit>;
+using PropertyCommitIntEdit = PropertyCommitEditCtrl<UiIntEdit>;
+using PropertyCommitFloatEdit = PropertyCommitEditCtrl<UiFloatEdit>;
+
 class PropertyTextValueEditor : public PropertyValueEditor {
 public:
     PropertyTextValueEditor()
     {
         Add(edit_.SizePos());
-        edit_.WhenAction = [=] {
+        edit_.WhenChange = [=] {
             if(!syncing_)
                 WhenPreview(edit_.GetData());
         };
@@ -58,12 +67,9 @@ public:
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
-        edit_.NullText(item.mixed ? "<multiple values>" :
-                       item.inherited ? "<inherited>" : "");
+        edit_.Enable(item.enabled && !item.read_only);
+        edit_.SetPlaceholder(item.mixed ? "<multiple values>" :
+                             item.inherited ? "<inherited>" : "");
         Enable(item.enabled && !item.read_only);
     }
 
@@ -90,60 +96,16 @@ private:
     bool syncing_ = false;
 };
 
-class PropertyMultilineEdit : public TextCtrl {
-public:
-    typedef PropertyMultilineEdit CLASSNAME;
-
-    PropertyMultilineEdit()
-    {
-        WhenState = [=] {
-            EmitPreview();
-        };
-    }
-
-    Event<> WhenFinalCommit;
-
-    virtual void LostFocus() override
-    {
-        TextCtrl::LostFocus();
-        EmitCommit();
-    }
-
-private:
-    void EmitPreview()
-    {
-        WhenPreview(GetData());
-    }
-
-    void EmitCommit()
-    {
-        Value v = GetData();
-        if(!has_last_commit_ || v != last_commit_) {
-            last_commit_ = v;
-            has_last_commit_ = true;
-            WhenFinalCommit();
-        }
-    }
-
-    Value last_commit_;
-    bool has_last_commit_ = false;
-
-public:
-    Event<Value> WhenPreview;
-};
-
 class PropertyMultilineValueEditor : public PropertyValueEditor {
 public:
     PropertyMultilineValueEditor()
     {
         Add(edit_.SizePos());
-        edit_.NoProcessTab();
-        edit_.NoProcessEnter();
-        edit_.WhenPreview = [=](Value v) {
+        edit_.WhenChange = [=] {
             if(!syncing_)
-                WhenPreview(v);
+                WhenPreview(edit_.GetData());
         };
-        edit_.WhenFinalCommit = [=] {
+        edit_.WhenCommit = [=] {
             if(!syncing_)
                 WhenCommit(edit_.GetData());
         };
@@ -151,12 +113,8 @@ public:
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
+        edit_.Enable(item.enabled && !item.read_only);
         Enable(item.enabled && !item.read_only);
-        edit_.SetFrame(EditFieldFrame());
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
@@ -177,36 +135,35 @@ public:
     }
 
 private:
-    PropertyMultilineEdit edit_;
+    PropertyCommitMultiEdit edit_;
     bool syncing_ = false;
 };
 
-class PropertyNumberValueEditor : public PropertyValueEditor {
+class PropertyIntegerValueEditor : public PropertyValueEditor {
 public:
-    explicit PropertyNumberValueEditor(bool integer)
-        : integer_(integer)
+    PropertyIntegerValueEditor()
     {
         Add(edit_.SizePos());
-        edit_.AlignRight();
-        edit_.WhenAction = [=] {
+        edit_.SetTextAlign(UiAlign::RIGHT);
+        edit_.WhenChange = [=] {
             if(!syncing_)
-                WhenPreview(GetEditorValue());
+                WhenPreview(edit_.GetData());
         };
         edit_.WhenCommit = [=] {
             if(!syncing_)
-                WhenCommit(GetEditorValue());
+                WhenCommit(edit_.GetData());
         };
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        decimals_ = max(0, item.decimals);
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
-        edit_.NullText(item.mixed ? "<mixed>" :
-                       item.inherited ? "<inherited>" : "");
+        edit_.Enable(item.enabled && !item.read_only);
+        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
+                             item.inherited ? "<inherited>" : "");
+        edit_.Min(IsNumber(item.minimum) ? (int)item.minimum : INT_MIN);
+        edit_.Max(IsNumber(item.maximum) ? (int)item.maximum : INT_MAX);
+        if(IsNumber(item.step))
+            edit_.Step(max(1, (int)item.step));
         Enable(item.enabled && !item.read_only);
     }
 
@@ -215,10 +172,8 @@ public:
         syncing_ = true;
         if(mixed || IsNull(value))
             edit_.SetData(String());
-        else if(integer_)
-            edit_.SetData(AsString((int)value));
         else
-            edit_.SetData(Format("%.*f", decimals_, (double)value));
+            edit_.SetValue((int)value);
         syncing_ = false;
     }
 
@@ -234,8 +189,63 @@ public:
     }
 
 private:
-    PropertyCommitEdit edit_;
-    bool integer_ = false;
+    PropertyCommitIntEdit edit_;
+    bool syncing_ = false;
+};
+
+class PropertyDoubleValueEditor : public PropertyValueEditor {
+public:
+    PropertyDoubleValueEditor()
+    {
+        Add(edit_.SizePos());
+        edit_.SetTextAlign(UiAlign::RIGHT);
+        edit_.WhenChange = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
+        };
+        edit_.WhenCommit = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        decimals_ = max(0, item.decimals);
+        edit_.Enable(item.enabled && !item.read_only);
+        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
+                             item.inherited ? "<inherited>" : "");
+        edit_.Min(IsNumber(item.minimum) ? (double)item.minimum : -DBL_MAX);
+        edit_.Max(IsNumber(item.maximum) ? (double)item.maximum : DBL_MAX);
+        if(IsNumber(item.step))
+            edit_.Step(max(0.0, (double)item.step));
+        edit_.Precision(decimals_);
+        Enable(item.enabled && !item.read_only);
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        syncing_ = true;
+        if(mixed || IsNull(value))
+            edit_.SetData(String());
+        else
+            edit_.SetValue((double)value);
+        syncing_ = false;
+    }
+
+    virtual Value GetEditorValue() const override
+    {
+        return edit_.GetData();
+    }
+
+    virtual void FocusEditor() override
+    {
+        edit_.SetFocus();
+        edit_.SetSelection();
+    }
+
+private:
+    PropertyCommitFloatEdit edit_;
     bool syncing_ = false;
     int decimals_ = 3;
 };
@@ -245,7 +255,8 @@ public:
     PropertyBooleanValueEditor()
     {
         Add(option_.SizePos());
-        option_.ShowLabel(false);
+        option_.SetText(String());
+        option_.SetCustomStyle(UiTheme::ResolveCheckBox(UICHECKVIS_CLASSIC));
         option_.WhenAction = [=] {
             if(syncing_)
                 return;
@@ -257,21 +268,29 @@ public:
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        option_.ThreeState(item.mixed);
+        mixed_ = item.mixed;
+        option_.SetTriState(item.mixed);
         option_.Enable(item.enabled && !item.read_only);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         syncing_ = true;
-        option_.ThreeState(mixed);
-        option_.SetData(mixed ? Value(Null) : value);
+        mixed_ = mixed;
+        option_.SetTriState(mixed);
+        if(mixed)
+            option_.SetState(UICHECK_INDETERMINATE);
+        else
+            option_.SetData(value);
         syncing_ = false;
     }
 
     virtual Value GetEditorValue() const override
     {
-        return option_.GetData();
+        int state = (int)option_.GetData();
+        if(mixed_ && state == UICHECK_INDETERMINATE)
+            return Value(Null);
+        return state == UICHECK_CHECKED;
     }
 
     virtual void FocusEditor() override
@@ -280,8 +299,9 @@ public:
     }
 
 private:
-    Option option_;
+    UiCheckBox option_;
     bool syncing_ = false;
+    bool mixed_ = false;
 };
 
 class PropertyChoiceValueEditor : public PropertyValueEditor {
@@ -289,10 +309,10 @@ public:
     PropertyChoiceValueEditor()
     {
         Add(drop_.SizePos());
-        drop_.WhenAction = [=] {
+        drop_.SetCustomStyle(UiTheme::ResolveDropdown());
+        drop_.WhenSelectData = [=](const Value& v) {
             if(syncing_)
                 return;
-            Value v = drop_.GetData();
             WhenPreview(v);
             WhenCommit(v);
         };
@@ -301,9 +321,14 @@ public:
     virtual void Configure(const PropertyEditorItem& item) override
     {
         syncing_ = true;
-        drop_.ClearList();
-        for(const PropertyEditorChoice& choice : item.choices)
-            drop_.Add(choice.value, choice.label);
+        drop_.Clear();
+        for(const PropertyEditorChoice& choice : item.choices) {
+            UiDropdown::Item it(choice.label, choice.value, true);
+            it.icon = choice.icon;
+            drop_.Add(it);
+        }
+        drop_.SetPlaceholderText(item.mixed ? "<multiple values>" :
+                                 item.inherited ? "<inherited>" : "");
         drop_.Enable(item.enabled && !item.read_only);
         syncing_ = false;
     }
@@ -311,13 +336,16 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         syncing_ = true;
-        drop_.SetData(mixed ? Value(Null) : value);
+        if(mixed)
+            drop_.ClearSelection();
+        else
+            drop_.SetDataSilently(value);
         syncing_ = false;
     }
 
     virtual Value GetEditorValue() const override
     {
-        return drop_.GetData();
+        return drop_.GetSelectedData();
     }
 
     virtual void FocusEditor() override
@@ -326,7 +354,7 @@ public:
     }
 
 private:
-    DropList drop_;
+    UiDropdown drop_;
     bool syncing_ = false;
 };
 
@@ -334,99 +362,153 @@ class PropertyColorValueEditor : public PropertyValueEditor {
 public:
     PropertyColorValueEditor()
     {
-        Add(color_.SizePos());
-        color_.WithText().WithHex().Track();
-        color_.WhenAction = [=] {
-            if(syncing_)
-                return;
-            Value v = color_.GetData();
-            WhenPreview(v);
-            WhenCommit(v);
-        };
+        Add(button_.SizePos());
+        button_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        button_.WhenAction = [=] { OpenColorDialog(); };
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        color_.Enable(item.enabled && !item.read_only);
+        button_.Enable(item.enabled && !item.read_only);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
-        syncing_ = true;
-        color_.SetData(mixed ? Value(Null) : value);
-        syncing_ = false;
+        value_ = mixed || IsNull(value) ? Null : value;
+        UpdateButton();
     }
 
     virtual Value GetEditorValue() const override
     {
-        return color_.GetData();
+        return value_;
     }
 
     virtual void FocusEditor() override
     {
-        color_.SetFocus();
+        button_.SetFocus();
     }
 
 private:
-    ColorPusher color_;
-    bool syncing_ = false;
+    static Image MakeSwatch(Color c)
+    {
+        ImageBuffer ib(Size(DPI(14), DPI(14)));
+        for(int y = 0; y < ib.GetSize().cy; y++) {
+            RGBA *line = ib[y];
+            for(int x = 0; x < ib.GetSize().cx; x++)
+                line[x] = RGBA(c);
+        }
+        return ib;
+    }
+
+    void UpdateButton()
+    {
+        if(IsNull(value_)) {
+            button_.SetText("<multiple values>");
+            button_.SetIcon(Image());
+        }
+        else {
+            Color c = value_;
+            button_.SetText(Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB()));
+            button_.SetIcon(MakeSwatch(c));
+        }
+    }
+
+    void OpenColorDialog()
+    {
+        Color original = IsNull(value_) ? Black() : Color(value_);
+        Color chosen = original;
+        bool accepted = false;
+
+        class ColorDialog : public TopWindow {
+        public:
+            UiColorPicker picker;
+            ColorDialog()
+            {
+                Title("Color");
+                Sizeable().Zoomable();
+                SetRect(0, 0, DPI(720), DPI(520));
+                Add(picker.SizePos());
+            }
+        } dlg;
+
+        dlg.picker.SetColor(original);
+        dlg.picker.WhenChanging = [&] {
+            chosen = dlg.picker.GetColor();
+            WhenPreview(chosen);
+        };
+        dlg.picker.WhenAccept = [&] {
+            chosen = dlg.picker.GetColor();
+            accepted = true;
+            dlg.AcceptBreak(IDOK);
+        };
+        dlg.picker.WhenCancel = [&] {
+            accepted = false;
+            dlg.RejectBreak(IDCANCEL);
+        };
+
+        dlg.CenterOwner();
+        if(dlg.Run() == IDOK && accepted) {
+            value_ = chosen;
+            UpdateButton();
+            WhenCommit(value_);
+        }
+        else {
+            WhenPreview(original);
+        }
+    }
+
+    UiButton button_;
+    Value value_;
 };
 
-class PropertySliderValueEditor : public PropertyValueEditor {
+class PropertySliderIntValueEditor : public PropertyValueEditor {
 public:
-    explicit PropertySliderValueEditor(bool integer)
-        : integer_(integer)
+    PropertySliderIntValueEditor()
     {
         Add(slider_);
         Add(edit_);
-        slider_.WhenAction = [=] {
+        slider_.SetCustomStyle(UiTheme::ResolveSlider());
+        slider_.WhenChanging = [=] {
             if(syncing_)
                 return;
             syncing_ = true;
-            double value = SliderToValue((int)slider_.GetData());
-            edit_.SetData(integer_ ? Value(AsString((int)floor(value + 0.5))) :
-                                     Value(Format("%.*f", decimals_, value)));
+            int value = (int)slider_.GetValue();
+            edit_.SetValue(value);
             syncing_ = false;
-            WhenPreview(integer_ ? Value((int)floor(value + 0.5)) : Value(value));
+            WhenPreview(Value(value));
         };
-        slider_.WhenSlideFinish = [=] {
+        slider_.WhenAction = [=] {
             if(syncing_)
                 return;
-            double value = SliderToValue((int)slider_.GetData());
-            WhenCommit(integer_ ? Value((int)floor(value + 0.5)) : Value(value));
+            int value = (int)slider_.GetValue();
+            edit_.SetValue(value);
+            WhenCommit(Value(value));
         };
-        edit_.WhenAction = [=] {
-            if(syncing_)
-                return;
-            Value v = edit_.GetData();
-            WhenPreview(v);
+        edit_.WhenChange = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
         };
         edit_.WhenCommit = [=] {
-            if(syncing_)
-                return;
-            Value v = edit_.GetData();
-            WhenCommit(v);
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
         };
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        decimals_ = max(0, item.decimals);
-        step_ = IsNumber(item.step) ? max(0.0, (double)item.step) : 0.0;
-        minimum_ = IsNumber(item.minimum) ? (double)item.minimum : 0.0;
-        maximum_ = IsNumber(item.maximum) ? (double)item.maximum : 100.0;
+        minimum_ = IsNumber(item.minimum) ? (int)item.minimum : 0;
+        maximum_ = IsNumber(item.maximum) ? (int)item.maximum : 100;
+        step_ = IsNumber(item.step) ? max(1, (int)item.step) : 1;
         if(maximum_ <= minimum_)
-            maximum_ = minimum_ + 1.0;
-
-        slider_.MinMax(0, slider_resolution_);
+            maximum_ = minimum_ + 1;
+        slider_.SetRange(minimum_, maximum_);
+        slider_.SetStep(step_);
         slider_.Enable(item.enabled && !item.read_only);
         edit_.Enable(item.enabled && !item.read_only);
-        if(item.read_only || !item.enabled)
-            edit_.SetReadOnly();
-        else
-            edit_.SetEditable(true);
-        edit_.AlignRight();
-        edit_.NullText(item.mixed ? "<mixed>" : "");
+        edit_.MinMax(minimum_, maximum_);
+        edit_.Step(step_);
+        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
+                             item.inherited ? "<inherited>" : "");
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
@@ -434,13 +516,12 @@ public:
         syncing_ = true;
         if(mixed || IsNull(value)) {
             edit_.SetData(String());
-            slider_.SetData(0);
+            slider_.SetValue(minimum_);
         }
         else {
-            double v = (double)value;
-            slider_.SetData(ValueToSlider(v));
-            edit_.SetData(integer_ ? Value(AsString((int)floor(v + 0.5))) :
-                                     Value(Format("%.*f", decimals_, v)));
+            int v = (int)value;
+            edit_.SetValue(v);
+            slider_.SetValue(v);
         }
         syncing_ = false;
     }
@@ -460,35 +541,78 @@ public:
 
     virtual void FocusEditor() override
     {
-        slider_.SetFocus();
+        edit_.SetFocus();
+        edit_.SetSelection();
     }
 
 private:
-    int ValueToSlider(double value) const
-    {
-        double t = (value - minimum_) / (maximum_ - minimum_);
-        t = minmax(t, 0.0, 1.0);
-        return (int)floor(t * slider_resolution_ + 0.5);
-    }
-
-    double SliderToValue(int slider_value) const
-    {
-        double t = (double)slider_value / (double)slider_resolution_;
-        double v = minimum_ + (maximum_ - minimum_) * t;
-        if(step_ > 0)
-            v = minimum_ + floor((v - minimum_) / step_ + 0.5) * step_;
-        return minmax(v, minimum_, maximum_);
-    }
-
-    SliderCtrl slider_;
-    PropertyCommitEdit edit_;
-    bool integer_ = false;
+    UiSlider slider_;
+    PropertyCommitIntEdit edit_;
     bool syncing_ = false;
-    double minimum_ = 0;
-    double maximum_ = 100;
-    double step_ = 0;
+    int minimum_ = 0;
+    int maximum_ = 100;
+    int step_ = 1;
+};
+
+class PropertySliderDoubleValueEditor : public PropertyValueEditor {
+public:
+    PropertySliderDoubleValueEditor()
+    {
+        Add(edit_.SizePos());
+        edit_.Slider().SetCustomStyle(UiTheme::ResolveSlider());
+        edit_.WhenChanging = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
+        };
+        edit_.WhenAction = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        minimum_ = IsNumber(item.minimum) ? (double)item.minimum : 0.0;
+        maximum_ = IsNumber(item.maximum) ? (double)item.maximum : 100.0;
+        step_ = IsNumber(item.step) ? max(0.0, (double)item.step) : 0.0;
+        decimals_ = max(0, item.decimals);
+        if(maximum_ <= minimum_)
+            maximum_ = minimum_ + 1.0;
+        edit_.SetRange(minimum_, maximum_);
+        if(step_ > 0)
+            edit_.SetStep(step_);
+        edit_.Field().Precision(decimals_);
+        edit_.Enable(item.enabled && !item.read_only);
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        syncing_ = true;
+        if(mixed || IsNull(value))
+            edit_.SetData(String());
+        else
+            edit_.SetValue((double)value);
+        syncing_ = false;
+    }
+
+    virtual Value GetEditorValue() const override
+    {
+        return edit_.GetData();
+    }
+
+    virtual void FocusEditor() override
+    {
+        edit_.Field().SetFocus();
+        edit_.Field().SetSelection();
+    }
+
+private:
+    UiSliderEdit edit_;
+    bool syncing_ = false;
+    double minimum_ = 0.0;
+    double maximum_ = 100.0;
+    double step_ = 0.0;
     int decimals_ = 3;
-    int slider_resolution_ = 10000;
 };
 
 class PropertyVectorValueEditor : public PropertyValueEditor {
@@ -497,14 +621,15 @@ public:
         : count_(count)
     {
         for(int i = 0; i < count_; i++) {
-            PropertyCommitEdit& edit = edits_.Add();
-            Label& label = labels_.Add();
+            PropertyCommitFloatEdit& edit = edits_.Add();
+            UiLabel& label = labels_.Add();
             Add(edit);
             Add(label);
-            label.SetAlign(ALIGN_CENTER);
-            label.SetLabel(i == 0 ? "X" : i == 1 ? "Y" : "Z");
-            edit.AlignRight();
-            edit.WhenAction = [=] {
+            label.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+            label.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+            label.SetText(i == 0 ? "X" : i == 1 ? "Y" : "Z");
+            edit.SetTextAlign(UiAlign::RIGHT);
+            edit.WhenChange = [=] {
                 if(!syncing_)
                     WhenPreview(GetEditorValue());
             };
@@ -518,15 +643,12 @@ public:
     virtual void Configure(const PropertyEditorItem& item) override
     {
         decimals_ = max(0, item.decimals);
-        for(Label& label : labels_)
+        for(UiLabel& label : labels_)
             label.Show();
-        for(PropertyCommitEdit& edit : edits_) {
+        for(PropertyCommitFloatEdit& edit : edits_) {
             edit.Enable(item.enabled && !item.read_only);
-            if(item.read_only || !item.enabled)
-                edit.SetReadOnly();
-            else
-                edit.SetEditable(true);
-            edit.NullText(item.mixed ? "<mixed>" : "");
+            edit.SetPlaceholder(item.mixed ? "<mixed>" : item.inherited ? "<inherited>" : "");
+            edit.Precision(decimals_);
         }
     }
 
@@ -535,15 +657,14 @@ public:
         syncing_ = true;
         Vector<double> v = PropertyEditorReadVector(value, count_);
         for(int i = 0; i < edits_.GetCount(); i++)
-            edits_[i].SetData(mixed ? Value(String()) :
-                              Value(Format("%.*f", decimals_, v[i])));
+            edits_[i].SetData(mixed ? Value(String()) : Value(v[i]));
         syncing_ = false;
     }
 
     virtual Value GetEditorValue() const override
     {
         ValueArray value;
-        for(const PropertyCommitEdit& edit : edits_)
+        for(const PropertyCommitFloatEdit& edit : edits_)
             value.Add(edit.GetData());
         return value;
     }
@@ -572,8 +693,8 @@ public:
     }
 
 private:
-    Array<PropertyCommitEdit> edits_;
-    Array<Label> labels_;
+    Array<PropertyCommitFloatEdit> edits_;
+    Array<UiLabel> labels_;
     int count_ = 2;
     int decimals_ = 3;
     bool syncing_ = false;
@@ -584,7 +705,8 @@ public:
     PropertyReadOnlyValueEditor()
     {
         Add(label_.SizePos());
-        label_.SetAlign(ALIGN_LEFT);
+        label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
     }
 
     virtual void Configure(const PropertyEditorItem&) override
@@ -594,7 +716,7 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         value_ = value;
-        label_.SetLabel(mixed ? "<multiple values>" : AsString(value));
+        label_.SetText(mixed ? "<multiple values>" : AsString(value));
     }
 
     virtual Value GetEditorValue() const override
@@ -603,7 +725,7 @@ public:
     }
 
 private:
-    Label label_;
+    UiLabel label_;
     Value value_;
 };
 
@@ -624,13 +746,16 @@ public:
         Add(ok_);
         Add(cancel_);
 
-        help_.SetLabel("Click empty space to add a point. Drag points to move them. Delete removes the selected point.");
-        reset_.SetLabel("Linear");
-        remove_.SetLabel("Remove");
-        ok_.SetLabel("OK");
-        ok_.Ok();
-        cancel_.SetLabel("Cancel");
-        cancel_.Cancel();
+        help_.SetText("Click empty space to add a point. Drag points to move them. Delete removes the selected point.");
+        help_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        reset_.SetText("Linear");
+        remove_.SetText("Remove");
+        ok_.SetText("OK");
+        cancel_.SetText("Cancel");
+        reset_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        remove_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+        ok_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+        cancel_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 
         reset_.WhenAction = [=] { canvas_.ResetLinear(); };
         remove_.WhenAction = [=] { canvas_.DeleteSelected(); };
@@ -674,11 +799,11 @@ public:
 
 private:
     PropertyCurveCanvas canvas_;
-    Label help_;
-    Button reset_;
-    Button remove_;
-    Button ok_;
-    Button cancel_;
+    UiLabel help_;
+    UiButton reset_;
+    UiButton remove_;
+    UiButton ok_;
+    UiButton cancel_;
 };
 
 class PropertyCurveValueEditor : public PropertyValueEditor {
@@ -687,13 +812,15 @@ public:
     {
         Add(summary_);
         Add(button_);
-        summary_.SetAlign(ALIGN_LEFT);
-        button_.SetLabel("Edit...");
+        summary_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        summary_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        button_.SetText("Edit...");
+        button_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         button_.WhenAction = [=] {
             Value edited = value_;
             if(EditPropertyCurve(edited, this)) {
                 value_ = edited;
-                summary_.SetLabel(PropertyEditorFormatCurve(value_));
+                summary_.SetText(PropertyEditorFormatCurve(value_));
                 WhenPreview(value_);
                 WhenCommit(value_);
             }
@@ -708,7 +835,7 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         value_ = PropertyEditorNormalizeCurve(value);
-        summary_.SetLabel(mixed ? "<multiple curves>" : PropertyEditorFormatCurve(value_));
+        summary_.SetText(mixed ? "<multiple curves>" : PropertyEditorFormatCurve(value_));
     }
 
     virtual Value GetEditorValue() const override
@@ -730,8 +857,8 @@ public:
     }
 
 private:
-    Label summary_;
-    Button button_;
+    UiLabel summary_;
+    UiButton button_;
     Value value_;
 };
 
@@ -756,9 +883,9 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
     case PropertyEditorKind::Multiline:
         return One<PropertyValueEditor>(new PropertyMultilineValueEditor);
     case PropertyEditorKind::Integer:
-        return One<PropertyValueEditor>(new PropertyNumberValueEditor(true));
+        return One<PropertyValueEditor>(new PropertyIntegerValueEditor);
     case PropertyEditorKind::Double:
-        return One<PropertyValueEditor>(new PropertyNumberValueEditor(false));
+        return One<PropertyValueEditor>(new PropertyDoubleValueEditor);
     case PropertyEditorKind::Boolean:
         return One<PropertyValueEditor>(new PropertyBooleanValueEditor);
     case PropertyEditorKind::Choice:
@@ -766,9 +893,9 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
     case PropertyEditorKind::Color:
         return One<PropertyValueEditor>(new PropertyColorValueEditor);
     case PropertyEditorKind::SliderInt:
-        return One<PropertyValueEditor>(new PropertySliderValueEditor(true));
+        return One<PropertyValueEditor>(new PropertySliderIntValueEditor);
     case PropertyEditorKind::SliderDouble:
-        return One<PropertyValueEditor>(new PropertySliderValueEditor(false));
+        return One<PropertyValueEditor>(new PropertySliderDoubleValueEditor);
     case PropertyEditorKind::Vector2:
         return One<PropertyValueEditor>(new PropertyVectorValueEditor(2));
     case PropertyEditorKind::Vector3:
@@ -1008,12 +1135,12 @@ Size PropertyCurveCanvas::GetMinSize() const
 
 bool EditPropertyCurve(Value& value, Ctrl *owner)
 {
-    PropertyCurveDialog dlg;
-    dlg.SetCurve(value);
-    if(owner)
-        dlg.CenterOwner();
-    if(dlg.Run() != IDOK)
-        return false;
+        PropertyCurveDialog dlg;
+        dlg.SetCurve(value);
+        if(owner)
+            dlg.CenterOwner();
+        if(dlg.Run() != IDOK)
+            return false;
     value = PropertyEditorNormalizeCurve(dlg.GetCurve());
     return true;
 }

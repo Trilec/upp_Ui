@@ -1,0 +1,10 @@
+uses
+    Core,
+    Draw,
+    Utilities/PropertyEditorCore;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "CONSOLE";
