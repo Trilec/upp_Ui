@@ -164,3 +164,6 @@ Supported theme fields are no longer inferred from string lists.
 The remaining switches are now categorized. The next removals should target
 category A first, then the structural protocol sites in category B where a
 spec capability can cover the behavior cleanly.
+
+The application-shell extraction work is tracked separately. This audit remains
+focused on control/type routing, not the `DesignerWindow` composition split.

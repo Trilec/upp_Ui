@@ -34,7 +34,6 @@ static void DesignerMultiSelectCommandLog(const String& text)
 	return;
 }
 
-static class DesignerWindow *designer_window_current = nullptr;
 static int designer_refresh_summary_last_msecs = 0;
 static String designer_trace_summary_text;
 static bool designer_trace_summary_pending = false;
@@ -460,7 +459,6 @@ public:
 
 	DesignerWindow()
 	{
-		designer_window_current = this;
 		DesignerBeginTrace(TRACE_LOAD, Designer_ROOT, Designer_NULL, String(), "app-start");
 		DesignerConsoleTrace("APP", "Designer " + String(DESIGNER_VERSION) + " start");
 		DesignerEndTrace();
@@ -486,8 +484,6 @@ public:
 	    KillTimeCallback(TOOL_DRAG_TIMER_ID);
 	    KillTimeCallback(SAVE_STATUS_TIMER_ID);
 	    KillTimeCallback(LIVE_PREVIEW_TIMER_ID);
-		if(designer_window_current == this)
-			designer_window_current = nullptr;
 	}
 
 	void Layout() override

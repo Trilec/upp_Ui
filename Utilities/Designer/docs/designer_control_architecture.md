@@ -4,6 +4,9 @@
 
 This note defines the control-level architecture for the Ui Designer.
 
+The application-shell split lives in
+`Utilities/Designer/docs/designer_application_architecture.md`.
+
 The short version:
 
 - the model is still the truth
@@ -178,6 +181,16 @@ families and removing compatibility mirrors only after the callers are gone.
 
 This step is about putting the control contract in one place, not inventing a new synchronous transaction system.
 
+## Ownership tiers
+
+- subsystem owner: a family module or focused Designer subsystem that owns the
+  behavior
+- composition root: the shell or bootstrap code that wires owners together
+- physical implementation module: the `.cpp` file that actually implements the
+  behavior
+
+The point is to stop pretending every layer is allowed to know everything.
+
 ## Theme Export boundary
 
 Theme Export is still future work. The schema and parity checks are the
@@ -194,3 +207,10 @@ When adding or cleaning up a control type:
 4. Move adapter/codegen/theme special cases toward spec hooks instead of adding fresh string switches.
 
 If a new control requires touching Builtins, Adapter, Preview, Inspector, and CodeGen manually with no shared spec update, the architecture is drifting again.
+
+## Application architecture boundary
+
+`main.cpp` still contains shell workflow and routing in the current codebase,
+but that is a migration staging area, not the end state. Session state, edit
+coordination, selection projection, and document/export ownership belong in the
+application architecture extraction, not in the control architecture doc.

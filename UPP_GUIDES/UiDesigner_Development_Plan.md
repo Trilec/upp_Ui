@@ -24,6 +24,27 @@ Completed pieces:
 - spec-driven codegen and preview routing for migrated families
 - canonical fidelity and export regeneration checks
 
+## Application architecture extraction
+
+The next boundary is the application shell itself. `Utilities/Designer/main.cpp`
+is still the composition root, but it should no longer be the place where the
+Designer keeps transaction state, selection routing, document workflow, or
+projection policy.
+
+Target split:
+
+- `DesignerWindow` composes the shell
+- `DesignerSession` owns document/model/session state
+- `DesignerEditCoordinator` owns edit lifecycle
+- `DesignerProjectionEngine` owns projection scheduling
+- `DesignerSelectionCoordinator` owns selection sync
+- `DesignerDocumentController` owns save/load/recent documents
+- `DesignerExportController` owns export/build workflow
+
+This extraction is about ownership boundaries, not a visual redesign. The
+window should keep looking like the window it already is, just with less
+everything stuffed inside it.
+
 These are current architecture, not future landing zones.
 
 ## Why this plan exists
@@ -147,6 +168,17 @@ This phase should:
 - split built-in registration into control-family modules under `Utilities/Designer/controls/`
 - keep `DesignerBuiltins.cpp` as the single orchestration entrypoint rather than creating a second registry path
 
+### Phase C
+
+Extract the application architecture from `main.cpp` into focused modules.
+
+This phase should:
+
+- move session state out of the shell
+- move edit/projection/selection responsibilities out of `DesignerWindow`
+- move document and export workflows into dedicated controllers
+- leave `main.cpp` as a startup/composition file
+
 ### Later phases
 
 - move adapter creation into spec records
@@ -154,6 +186,8 @@ This phase should:
 - move theme surface declarations into spec theme schema
 - split descriptor shape from descriptor state once caching can be trusted again
 - keep Theme Export as a later, explicit feature boundary
+- keep application shell extraction separate from control-spec migration so the
+  two refactors do not trip over each other
 
 ## Non-goals for this step
 

@@ -35,6 +35,10 @@ appearance when the model explicitly enables fill/frame/radius overrides.
 
 Near-term cleanup should happen in this package, not in `examples/UiDesignerDemo`.
 
+The next architecture step is to pull application workflow out of `main.cpp`
+into focused modules. The window should keep composing the app; it should not
+keep every moving part in its coat pocket.
+
 See `CHANGELOG.md` for the current development trail and decisions that still need follow-up.
 
 ## Build
