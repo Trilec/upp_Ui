@@ -1,0 +1,14 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp,
+	design_themestudio.design.json,
+	README.md;
+
+mainconfig
+	"" = "GUI";

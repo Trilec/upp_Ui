@@ -1,0 +1,9924 @@
+{
+	"format": "upp-ui-designer",
+	"schema": 1,
+	"virtual_size": {
+		"cx": 1374,
+		"cy": 858
+	},
+	"selection": [
+		244
+	],
+	"nodes": [
+		{
+			"id": 1,
+			"parent": 0,
+			"type": "Window",
+			"name": "Window",
+			"children": [
+				2
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 0,
+				"top": 0,
+				"right": 0,
+				"bottom": 0
+			},
+			"properties": {
+
+			}
+		},
+		{
+			"id": 2,
+			"parent": 1,
+			"type": "BoxLayout",
+			"name": "main_window_layout",
+			"children": [
+				7,
+				8,
+				10
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 30,
+				"right": 1272,
+				"bottom": 876
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "V"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 0
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 7,
+			"parent": 2,
+			"type": "BoxLayout",
+			"name": "top_layout",
+			"children": [
+				12,
+				15,
+				13,
+				82,
+				22,
+				17,
+				23,
+				19,
+				58
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 30,
+				"right": 1272,
+				"bottom": 71
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "H"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "Flow"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 8
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 8
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 6
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 8,
+			"parent": 2,
+			"type": "BoxLayout",
+			"name": "center_layout",
+			"children": [
+				59,
+				30
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 71,
+				"right": 1272,
+				"bottom": 849
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "H"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 0
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 10,
+			"parent": 2,
+			"type": "BoxLayout",
+			"name": "lower_layout",
+			"children": [
+				20
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 849,
+				"right": 1272,
+				"bottom": 876
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "V"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 8
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 8
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 12,
+			"parent": 7,
+			"type": "UiTitleCard",
+			"name": "header_title_card",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 36,
+				"top": 36,
+				"right": 190,
+				"bottom": 65
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Theme Studio"
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 220
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 72
+				},
+				"width": {
+					"type": "int",
+					"value": 220
+				},
+				"height": {
+					"type": "int",
+					"value": 72
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_BRAND_NEWLOGO_V5_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"media_gap": {
+					"type": "int",
+					"value": 9
+				},
+				"media_reserve": {
+					"type": "int",
+					"value": 0
+				},
+				"media_min": {
+					"type": "int",
+					"value": 15
+				},
+				"media_auto_fit": {
+					"type": "bool",
+					"value": false
+				},
+				"media_side": {
+					"type": "string",
+					"value": "Left"
+				},
+				"media_align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"media_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"title_font": {
+					"type": "string",
+					"value": "Arial"
+				},
+				"title_size": {
+					"type": "int",
+					"value": 16
+				},
+				"title_line": {
+					"type": "bool",
+					"value": false
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"card_line": {
+					"type": "bool",
+					"value": false
+				}
+			}
+		},
+		{
+			"id": 13,
+			"parent": 7,
+			"type": "UiSplitButton",
+			"name": "save_split_btn",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 216,
+				"top": 36,
+				"right": 300,
+				"bottom": 65
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Save"
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 84
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 30
+				},
+				"width": {
+					"type": "int",
+					"value": 112
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 6
+				},
+				"split_width": {
+					"type": "int",
+					"value": 31
+				},
+				"split_content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"split_icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"popup_min_width": {
+					"type": "int",
+					"value": 220
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"choice_a": {
+					"type": "string",
+					"value": "Recent A"
+				},
+				"choice_b": {
+					"type": "string",
+					"value": "Recent B"
+				},
+				"choice_c": {
+					"type": "string",
+					"value": "Recent C"
+				},
+				"min_height": {
+					"type": "int",
+					"value": 24
+				},
+				"min_width": {
+					"type": "int",
+					"value": 74
+				}
+			}
+		},
+		{
+			"id": 15,
+			"parent": 7,
+			"type": "Spacer",
+			"name": "hidder_spacer_1",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 198,
+				"top": 36,
+				"right": 208,
+				"bottom": 65
+			},
+			"properties": {
+				"weight": {
+					"type": "int",
+					"value": 1
+				},
+				"layout_break": {
+					"type": "bool",
+					"value": false
+				},
+				"line_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"line_orientation": {
+					"type": "string",
+					"value": "Vertical"
+				},
+				"line_align": {
+					"type": "string",
+					"value": "Start"
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 2
+				},
+				"line_dash": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"line_inset": {
+					"type": "int",
+					"value": 2
+				},
+				"line_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"line_color": {
+					"type": "null",
+					"value": null
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"width": {
+					"type": "int",
+					"value": 24
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 10
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 10
+				},
+				"min_width": {
+					"type": "int",
+					"value": 10
+				},
+				"min_height": {
+					"type": "int",
+					"value": 10
+				},
+				"max_width": {
+					"type": "int",
+					"value": 0
+				},
+				"max_height": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"spacer_kind": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"space": {
+					"type": "int",
+					"value": 13
+				},
+				"max_space": {
+					"type": "int",
+					"value": 0
+				},
+				"line_style": {
+					"type": "string",
+					"value": "Accent"
+				}
+			}
+		},
+		{
+			"id": 17,
+			"parent": 7,
+			"type": "Spacer",
+			"name": "header_spacer_2",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 484,
+				"top": 36,
+				"right": 1062,
+				"bottom": 65
+			},
+			"properties": {
+				"weight": {
+					"type": "int",
+					"value": 1
+				},
+				"layout_break": {
+					"type": "bool",
+					"value": false
+				},
+				"line_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"line_orientation": {
+					"type": "string",
+					"value": "Vertical"
+				},
+				"line_align": {
+					"type": "string",
+					"value": "End"
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 2
+				},
+				"line_dash": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"line_inset": {
+					"type": "int",
+					"value": 2
+				},
+				"line_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"line_color": {
+					"type": "null",
+					"value": null
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"width": {
+					"type": "int",
+					"value": 24
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 10
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 10
+				},
+				"min_width": {
+					"type": "int",
+					"value": 10
+				},
+				"min_height": {
+					"type": "int",
+					"value": 10
+				},
+				"max_width": {
+					"type": "int",
+					"value": 0
+				},
+				"max_height": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"spacer_kind": {
+					"type": "string",
+					"value": "Expander"
+				},
+				"space": {
+					"type": "int",
+					"value": 8
+				},
+				"max_space": {
+					"type": "int",
+					"value": 0
+				},
+				"line_style": {
+					"type": "string",
+					"value": "Accent"
+				}
+			}
+		},
+		{
+			"id": 18,
+			"parent": 63,
+			"type": "UiDropdown",
+			"name": "theme_selection_drop_down",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 425,
+				"top": 90,
+				"right": 549,
+				"bottom": 119
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Dropdown"
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 84
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 180
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#f0f0f0"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#e2e8f0"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"item_text": {
+					"type": "string",
+					"value": "Theme"
+				},
+				"selected_item": {
+					"type": "string",
+					"value": "First"
+				},
+				"indicator_side": {
+					"type": "string",
+					"value": "Right"
+				},
+				"indicator_closed_icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"indicator_opened_icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"indicator_size": {
+					"type": "int",
+					"value": 14
+				},
+				"min_width": {
+					"type": "int",
+					"value": 124
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 1
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 6
+				},
+				"shadow_offset_x": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_offset_y": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 90
+				},
+				"shadow_color": {
+					"type": "color",
+					"value": "#000000"
+				},
+				"shadow_curve": {
+					"type": "string",
+					"value": "Soft"
+				}
+			}
+		},
+		{
+			"id": 19,
+			"parent": 7,
+			"type": "UiToolButton",
+			"name": "help_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1138,
+				"top": 38,
+				"right": 1198,
+				"bottom": 62
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 50
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_HELP_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 60
+				}
+			}
+		},
+		{
+			"id": 20,
+			"parent": 10,
+			"type": "UiLabel",
+			"name": "lower._label",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 849,
+				"right": 73,
+				"bottom": 876
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Label"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 120
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				}
+			}
+		},
+		{
+			"id": 22,
+			"parent": 7,
+			"type": "UiLabel",
+			"name": "version_label",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 400,
+				"top": 36,
+				"right": 476,
+				"bottom": 64
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "v2.3.1"
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 52
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 18
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"face": {
+					"type": "color",
+					"value": "#e8efff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 12
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"font": {
+					"type": "string",
+					"value": "Arial"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 10
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_ADJUST_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"min_height": {
+					"type": "int",
+					"value": 28
+				},
+				"min_width": {
+					"type": "int",
+					"value": 76
+				},
+				"inset": {
+					"type": "int",
+					"value": 3
+				},
+				"icon_scale": {
+					"type": "bool",
+					"value": false
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 5
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 41
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 6
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				}
+			}
+		},
+		{
+			"id": 23,
+			"parent": 7,
+			"type": "UiToolButton",
+			"name": "dark_theme_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1070,
+				"top": 38,
+				"right": 1130,
+				"bottom": 62
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 50
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_ACTION_DARK_MODE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 60
+				}
+			}
+		},
+		{
+			"id": 30,
+			"parent": 8,
+			"type": "BoxLayout",
+			"name": "right_layout",
+			"children": [
+				48,
+				57
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 964,
+				"top": 71,
+				"right": 1272,
+				"bottom": 849
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "V"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "Flow"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 0
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 33,
+			"parent": 63,
+			"type": "UiToolButton",
+			"name": "controls_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 49,
+				"top": 90,
+				"right": 73,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_WIDGETS_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Controls"
+				}
+			}
+		},
+		{
+			"id": 34,
+			"parent": 63,
+			"type": "UiToolButton",
+			"name": "composites_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 81,
+				"top": 90,
+				"right": 105,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_DYNAMIC_FORM_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Composites"
+				}
+			}
+		},
+		{
+			"id": 48,
+			"parent": 30,
+			"type": "UiPanel",
+			"name": "right_tools_panel",
+			"children": [
+				49
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 964,
+				"top": 71,
+				"right": 1272,
+				"bottom": 134
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 308
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 63
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face": {
+					"type": "color",
+					"value": "#f3f3f2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#dbdbdb"
+				},
+				"radius": {
+					"type": "int",
+					"value": 27
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 1
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 10
+				},
+				"frame_style": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 28
+				}
+			}
+		},
+		{
+			"id": 49,
+			"parent": 48,
+			"type": "BoxLayout",
+			"name": "right_tools_layout",
+			"children": [
+				56,
+				78,
+				55,
+				54,
+				53,
+				52,
+				51
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 964,
+				"top": 71,
+				"right": 1272,
+				"bottom": 134
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "H"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 8
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 8
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 19
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 51,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "code_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1229,
+				"top": 90,
+				"right": 1253,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_CODE_BLOCKS_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Code"
+				}
+			}
+		},
+		{
+			"id": 52,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "overrides_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1197,
+				"top": 90,
+				"right": 1221,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_FORMAT_PAINT_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Theme Overrides "
+				}
+			}
+		},
+		{
+			"id": 53,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "inspector_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1165,
+				"top": 90,
+				"right": 1189,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_TUNE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Inspector "
+				}
+			}
+		},
+		{
+			"id": 54,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "hierarchy_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1133,
+				"top": 90,
+				"right": 1157,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_ACCOUNT_TREE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Hierarchy tree"
+				}
+			}
+		},
+		{
+			"id": 55,
+			"parent": 49,
+			"type": "Spacer",
+			"name": "right_tool_button_spacer",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1047,
+				"top": 90,
+				"right": 1125,
+				"bottom": 115
+			},
+			"properties": {
+				"weight": {
+					"type": "int",
+					"value": 1
+				},
+				"layout_break": {
+					"type": "bool",
+					"value": false
+				},
+				"line_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"line_orientation": {
+					"type": "string",
+					"value": "Vertical"
+				},
+				"line_align": {
+					"type": "string",
+					"value": "End"
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 2
+				},
+				"line_dash": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"line_inset": {
+					"type": "int",
+					"value": 0
+				},
+				"line_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"line_color": {
+					"type": "null",
+					"value": null
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"width": {
+					"type": "int",
+					"value": 24
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"min_width": {
+					"type": "int",
+					"value": 75
+				},
+				"min_height": {
+					"type": "int",
+					"value": 10
+				},
+				"max_width": {
+					"type": "int",
+					"value": 0
+				},
+				"max_height": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 56,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "right_open_close_btn",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 983,
+				"top": 90,
+				"right": 1007,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_RIGHT_PANEL_CLOSE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				}
+			}
+		},
+		{
+			"id": 57,
+			"parent": 30,
+			"type": "UiScrollPanel",
+			"name": "right_info_panel",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 964,
+				"top": 134,
+				"right": 1272,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Scroll Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 1
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 1
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#f7f7f7"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d9d9d9"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"scroll_mode": {
+					"type": "string",
+					"value": "Auto"
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"min_height": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 59,
+			"parent": 8,
+			"type": "UiPanel",
+			"name": "center_panel",
+			"children": [
+				60
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 71,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 60,
+			"parent": 59,
+			"type": "BoxLayout",
+			"name": "center_layout_02",
+			"children": [
+				61,
+				62
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 71,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "V"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 0
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 61,
+			"parent": 60,
+			"type": "UiPanel",
+			"name": "center_tools_panel",
+			"children": [
+				63
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 71,
+				"right": 964,
+				"bottom": 134
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 340
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 63
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face": {
+					"type": "color",
+					"value": "#f3f3f3"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d8d8d8"
+				},
+				"radius": {
+					"type": "int",
+					"value": 19
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"frame_style": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 1
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 10
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 38
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Set size or aspect ratio"
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				}
+			}
+		},
+		{
+			"id": 62,
+			"parent": 60,
+			"type": "UiScrollPanel",
+			"name": "center_preview_panel",
+			"children": [
+				155
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 134,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Scroll Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"scroll_mode": {
+					"type": "string",
+					"value": "Auto"
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_style": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 0
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Auto"
+				}
+			}
+		},
+		{
+			"id": 63,
+			"parent": 61,
+			"type": "BoxLayout",
+			"name": "center_tools_layout",
+			"children": [
+				33,
+				34,
+				92,
+				18,
+				147,
+				148,
+				149,
+				150
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 71,
+				"right": 964,
+				"bottom": 134
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "H"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 8
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 8
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 19
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				}
+			}
+		},
+		{
+			"id": 78,
+			"parent": 49,
+			"type": "UiToolButton",
+			"name": "right_expand_toggle_btn",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1015,
+				"top": 90,
+				"right": 1039,
+				"bottom": 114
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_UNFOLD_MORE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Expand toggle"
+				}
+			}
+		},
+		{
+			"id": 82,
+			"parent": 7,
+			"type": "UiSplitButton",
+			"name": "export_split_btn",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 308,
+				"top": 36,
+				"right": 392,
+				"bottom": 65
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Export"
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 84
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 30
+				},
+				"width": {
+					"type": "int",
+					"value": 112
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 6
+				},
+				"split_width": {
+					"type": "int",
+					"value": 31
+				},
+				"split_content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"split_icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"popup_min_width": {
+					"type": "int",
+					"value": 220
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"choice_a": {
+					"type": "string",
+					"value": "Header/Cpp"
+				},
+				"choice_b": {
+					"type": "string",
+					"value": "Cpp (Main)"
+				},
+				"choice_c": {
+					"type": "string",
+					"value": "Theam (only)"
+				},
+				"min_height": {
+					"type": "int",
+					"value": 24
+				},
+				"min_width": {
+					"type": "int",
+					"value": 74
+				}
+			}
+		},
+		{
+			"id": 58,
+			"parent": 7,
+			"type": "UiToolButton",
+			"name": "exit_tool",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 1206,
+				"top": 38,
+				"right": 1266,
+				"bottom": 62
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Alert"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 50
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_CANCEL_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"min_width": {
+					"type": "int",
+					"value": 60
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Close theme studio"
+				}
+			}
+		},
+		{
+			"id": 92,
+			"parent": 63,
+			"type": "Spacer",
+			"name": "right_tool_button_spacer_02",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 113,
+				"top": 90,
+				"right": 417,
+				"bottom": 119
+			},
+			"properties": {
+				"weight": {
+					"type": "int",
+					"value": 1
+				},
+				"layout_break": {
+					"type": "bool",
+					"value": false
+				},
+				"line_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"line_orientation": {
+					"type": "string",
+					"value": "Vertical"
+				},
+				"line_align": {
+					"type": "string",
+					"value": "End"
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 2
+				},
+				"line_dash": {
+					"type": "string",
+					"value": "Solid"
+				},
+				"line_inset": {
+					"type": "int",
+					"value": 0
+				},
+				"line_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"line_color": {
+					"type": "null",
+					"value": null
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"width": {
+					"type": "int",
+					"value": 24
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 24
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"min_width": {
+					"type": "int",
+					"value": 75
+				},
+				"min_height": {
+					"type": "int",
+					"value": 10
+				},
+				"max_width": {
+					"type": "int",
+					"value": 0
+				},
+				"max_height": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 147,
+			"parent": 63,
+			"type": "UiButton",
+			"name": "button",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 557,
+				"top": 90,
+				"right": 648,
+				"bottom": 119
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Normal"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 175
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Normal role"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 91
+				}
+			}
+		},
+		{
+			"id": 148,
+			"parent": 63,
+			"type": "UiButton",
+			"name": "button_02",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 656,
+				"top": 90,
+				"right": 747,
+				"bottom": 119
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Subtle"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 175
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Subtle Role"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 91
+				}
+			}
+		},
+		{
+			"id": 149,
+			"parent": 63,
+			"type": "UiButton",
+			"name": "button_03",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 755,
+				"top": 90,
+				"right": 846,
+				"bottom": 119
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 175
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Accent Role"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 91
+				}
+			}
+		},
+		{
+			"id": 150,
+			"parent": 63,
+			"type": "UiButton",
+			"name": "button_04",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 854,
+				"top": 90,
+				"right": 945,
+				"bottom": 119
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Alert"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 175
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Alert Role"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 91
+				}
+			}
+		},
+		{
+			"id": 155,
+			"parent": 62,
+			"type": "BoxLayout",
+			"name": "boxlayout",
+			"children": [
+				160,
+				157
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 134,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"direction": {
+					"type": "string",
+					"value": "V"
+				},
+				"wrap": {
+					"type": "string",
+					"value": "None"
+				},
+				"gap_x": {
+					"type": "int",
+					"value": 8
+				},
+				"gap_y": {
+					"type": "int",
+					"value": 8
+				},
+				"snap_count": {
+					"type": "int",
+					"value": 0
+				},
+				"snap_size_a": {
+					"type": "int",
+					"value": 80
+				},
+				"snap_size_b": {
+					"type": "int",
+					"value": 0
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 157,
+			"parent": 155,
+			"type": "GridLayout",
+			"name": "lower_grid",
+			"children": [
+				173,
+				227,
+				222,
+				234,
+				236,
+				242
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 218,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 2
+				},
+				"columns": {
+					"type": "int",
+					"value": 3
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 160,
+			"parent": 155,
+			"type": "UiPanel",
+			"name": "panel",
+			"children": [
+				161
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 134,
+				"right": 964,
+				"bottom": 210
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Panel"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				}
+			}
+		},
+		{
+			"id": 161,
+			"parent": 160,
+			"type": "GridLayout",
+			"name": "gridlayout",
+			"children": [
+				162,
+				163
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 134,
+				"right": 964,
+				"bottom": 210
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 1
+				},
+				"columns": {
+					"type": "int",
+					"value": 2
+				},
+				"gap": {
+					"type": "int",
+					"value": 10
+				},
+				"inset": {
+					"type": "int",
+					"value": 1
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 162,
+			"parent": 161,
+			"type": "UiTitleCard",
+			"name": "titlecard",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 135,
+				"right": 745,
+				"bottom": 209
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Main Title Card Theme"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 220
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 72
+				},
+				"width": {
+					"type": "int",
+					"value": 220
+				},
+				"height": {
+					"type": "int",
+					"value": 72
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_BRAND_NEWLOGO_V5_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 29
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 7
+				},
+				"media_gap": {
+					"type": "int",
+					"value": 10
+				},
+				"media_reserve": {
+					"type": "int",
+					"value": 24
+				},
+				"media_min": {
+					"type": "int",
+					"value": 16
+				},
+				"media_auto_fit": {
+					"type": "bool",
+					"value": false
+				},
+				"media_side": {
+					"type": "string",
+					"value": "Left"
+				},
+				"media_align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"media_align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				},
+				"subtitle": {
+					"type": "string",
+					"value": "Subtitle theme represented here"
+				},
+				"title_size": {
+					"type": "int",
+					"value": 15
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Top"
+				}
+			}
+		},
+		{
+			"id": 163,
+			"parent": 161,
+			"type": "UiPanel",
+			"name": "panel_02",
+			"children": [
+				164
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 755,
+				"top": 135,
+				"right": 963,
+				"bottom": 209
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 164,
+			"parent": 163,
+			"type": "GridLayout",
+			"name": "gridlayout_02",
+			"children": [
+				169,
+				170,
+				165,
+				171
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 755,
+				"top": 135,
+				"right": 963,
+				"bottom": 209
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 2
+				},
+				"columns": {
+					"type": "int",
+					"value": 2
+				},
+				"gap": {
+					"type": "int",
+					"value": 0
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 165,
+			"parent": 164,
+			"type": "UiLabel",
+			"name": "label",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 763,
+				"top": 173,
+				"right": 913,
+				"bottom": 200
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": " Second toggle theme"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 120
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_CIRCLE_CIRCLE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 12
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				}
+			}
+		},
+		{
+			"id": 169,
+			"parent": 164,
+			"type": "UiLabel",
+			"name": "label_02",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 763,
+				"top": 144,
+				"right": 898,
+				"bottom": 171
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": " First toggle theme "
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 120
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_CIRCLE_CIRCLE_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 12
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Left"
+				}
+			}
+		},
+		{
+			"id": 170,
+			"parent": 164,
+			"type": "UiToggle",
+			"name": "toggle",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 914,
+				"top": 145,
+				"right": 954,
+				"bottom": 170
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Toggle"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 54
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 28
+				},
+				"width": {
+					"type": "int",
+					"value": 54
+				},
+				"height": {
+					"type": "int",
+					"value": 28
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"on": {
+					"type": "bool",
+					"value": true
+				},
+				"track_width": {
+					"type": "int",
+					"value": 54
+				},
+				"track_height": {
+					"type": "int",
+					"value": 28
+				},
+				"thumb_width": {
+					"type": "int",
+					"value": 20
+				},
+				"thumb_height": {
+					"type": "int",
+					"value": 20
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 171,
+			"parent": 164,
+			"type": "UiToggle",
+			"name": "toggle_02",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 914,
+				"top": 174,
+				"right": 954,
+				"bottom": 199
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Toggle"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 54
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 28
+				},
+				"width": {
+					"type": "int",
+					"value": 54
+				},
+				"height": {
+					"type": "int",
+					"value": 28
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"on": {
+					"type": "bool",
+					"value": true
+				},
+				"track_width": {
+					"type": "int",
+					"value": 54
+				},
+				"track_height": {
+					"type": "int",
+					"value": 28
+				},
+				"thumb_width": {
+					"type": "int",
+					"value": 20
+				},
+				"thumb_height": {
+					"type": "int",
+					"value": 20
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 173,
+			"parent": 157,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_02",
+			"children": [
+				177
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 218,
+				"right": 365,
+				"bottom": 499
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "BUTTON THEMES"
+				},
+				"subtitle": {
+					"type": "string",
+					"value": " Various buttons for theming. "
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 8
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 177,
+			"parent": 173,
+			"type": "GridLayout",
+			"name": "gridlayout_03",
+			"children": [
+				190,
+				188,
+				189
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 260,
+				"right": 364,
+				"bottom": 498
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 3
+				},
+				"columns": {
+					"type": "int",
+					"value": 1
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 178,
+			"parent": 229,
+			"type": "GridLayout",
+			"name": "gridlayout_04",
+			"children": [
+				179,
+				202,
+				187
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 308,
+				"right": 715,
+				"bottom": 643
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 3
+				},
+				"columns": {
+					"type": "int",
+					"value": 1
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 179,
+			"parent": 178,
+			"type": "GridLayout",
+			"name": "gridlayout_05",
+			"children": [
+				182,
+				183
+			],
+			"expanded": false,
+			"last_rect": {
+				"left": 380,
+				"top": 308,
+				"right": 715,
+				"bottom": 379
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 1
+				},
+				"columns": {
+					"type": "int",
+					"value": 2
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 182,
+			"parent": 179,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_03",
+			"children": [
+				198
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 308,
+				"right": 555,
+				"bottom": 379
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "INTERGER"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 183,
+			"parent": 179,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_04",
+			"children": [
+				199
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 563,
+				"top": 308,
+				"right": 715,
+				"bottom": 379
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Group"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 187,
+			"parent": 178,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_06",
+			"children": [
+				209
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 488,
+				"right": 715,
+				"bottom": 643
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "DOCUMENT"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 2
+				}
+			}
+		},
+		{
+			"id": 188,
+			"parent": 177,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_07",
+			"children": [
+				195
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 343,
+				"right": 364,
+				"bottom": 418
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": " Split Button "
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 189,
+			"parent": 177,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_08",
+			"children": [
+				196
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 426,
+				"right": 364,
+				"bottom": 498
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": " Bread-Crumbs "
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 2
+				}
+			}
+		},
+		{
+			"id": 190,
+			"parent": 177,
+			"type": "GridLayout",
+			"name": "gridlayout_06",
+			"children": [
+				191,
+				192
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 260,
+				"right": 364,
+				"bottom": 335
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 1
+				},
+				"columns": {
+					"type": "int",
+					"value": 2
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 191,
+			"parent": 190,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_09",
+			"children": [
+				193
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 31,
+				"top": 260,
+				"right": 226,
+				"bottom": 335
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Standard Button"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 192,
+			"parent": 190,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_10",
+			"children": [
+				194
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 234,
+				"top": 260,
+				"right": 364,
+				"bottom": 335
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Tool Button"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Auto"
+				}
+			}
+		},
+		{
+			"id": 193,
+			"parent": 191,
+			"type": "UiButton",
+			"name": "button_05",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 66,
+				"top": 297,
+				"right": 190,
+				"bottom": 326
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Button"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 184
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"max_width": {
+					"type": "int",
+					"value": 168
+				},
+				"min_width": {
+					"type": "int",
+					"value": 124
+				}
+			}
+		},
+		{
+			"id": 194,
+			"parent": 192,
+			"type": "UiToolButton",
+			"name": "toolbutton",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 285,
+				"top": 297,
+				"right": 313,
+				"bottom": 325
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 40
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 40
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "Settings"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 20
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 4
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"cell_align_v": {
+					"type": "string",
+					"value": "Center"
+				}
+			}
+		},
+		{
+			"id": 195,
+			"parent": 188,
+			"type": "UiSplitButton",
+			"name": "splitbutton",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 40,
+				"top": 380,
+				"right": 355,
+				"bottom": 409
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Save"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 112
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 34
+				},
+				"width": {
+					"type": "int",
+					"value": 112
+				},
+				"height": {
+					"type": "int",
+					"value": 34
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"split_width": {
+					"type": "int",
+					"value": 30
+				},
+				"split_content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"split_icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"popup_min_width": {
+					"type": "int",
+					"value": 220
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"choice_a": {
+					"type": "string",
+					"value": "Recent A"
+				},
+				"choice_b": {
+					"type": "string",
+					"value": "Recent B"
+				},
+				"choice_c": {
+					"type": "string",
+					"value": "Recent C"
+				}
+			}
+		},
+		{
+			"id": 196,
+			"parent": 189,
+			"type": "UiBreadcrumbs",
+			"name": "breadcrumbs",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 40,
+				"top": 463,
+				"right": 355,
+				"bottom": 489
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Breadcrumbs"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "ICON_DESIGN_HOME_48"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"crumb_count": {
+					"type": "int",
+					"value": 3
+				},
+				"crumb_1": {
+					"type": "string",
+					"value": "Home"
+				},
+				"crumb_2": {
+					"type": "string",
+					"value": "Library"
+				},
+				"crumb_3": {
+					"type": "string",
+					"value": "Current"
+				},
+				"current": {
+					"type": "int",
+					"value": 2
+				},
+				"trim": {
+					"type": "bool",
+					"value": false
+				},
+				"divider": {
+					"type": "string",
+					"value": "/"
+				}
+			}
+		},
+		{
+			"id": 198,
+			"parent": 182,
+			"type": "UiIntEdit",
+			"name": "intedit",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 389,
+				"top": 345,
+				"right": 546,
+				"bottom": 370
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Integer Edit"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 140
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 140
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"placeholder": {
+					"type": "string",
+					"value": "0"
+				}
+			}
+		},
+		{
+			"id": 199,
+			"parent": 183,
+			"type": "UiFloatEdit",
+			"name": "floatedit",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 572,
+				"top": 345,
+				"right": 706,
+				"bottom": 370
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Float Edit"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 140
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 140
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"placeholder": {
+					"type": "string",
+					"value": "0.0"
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Center"
+				}
+			}
+		},
+		{
+			"id": 202,
+			"parent": 178,
+			"type": "GridLayout",
+			"name": "gridlayout_07",
+			"children": [
+				203,
+				205
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 387,
+				"right": 715,
+				"bottom": 480
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 1
+				},
+				"columns": {
+					"type": "int",
+					"value": 2
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"debug": {
+					"type": "bool",
+					"value": false
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 203,
+			"parent": 202,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_03_02",
+			"children": [
+				207
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 387,
+				"right": 526,
+				"bottom": 480
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "MASK"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 205,
+			"parent": 202,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_03_03",
+			"children": [
+				208
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 534,
+				"top": 387,
+				"right": 715,
+				"bottom": 480
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "PASSWORD"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 207,
+			"parent": 203,
+			"type": "UiMaskEdit",
+			"name": "maskedit",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 389,
+				"top": 424,
+				"right": 517,
+				"bottom": 449
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 180
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 180
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"placeholder": {
+					"type": "string",
+					"value": "Masked value"
+				},
+				"mask": {
+					"type": "string",
+					"value": "##/##/####"
+				},
+				"prompt_char": {
+					"type": "string",
+					"value": "_"
+				},
+				"show_error": {
+					"type": "bool",
+					"value": false
+				},
+				"error_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"success_color_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"error_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"success_color": {
+					"type": "color",
+					"value": "#34c759"
+				}
+			}
+		},
+		{
+			"id": 208,
+			"parent": 205,
+			"type": "UiPasswordEdit",
+			"name": "passwordedit",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 543,
+				"top": 424,
+				"right": 706,
+				"bottom": 449
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 180
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 32
+				},
+				"width": {
+					"type": "int",
+					"value": 180
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"sample_text": {
+					"type": "string",
+					"value": "Password"
+				},
+				"placeholder": {
+					"type": "string",
+					"value": "Password"
+				},
+				"password_char": {
+					"type": "null",
+					"value": null
+				},
+				"plain_visible": {
+					"type": "bool",
+					"value": false
+				},
+				"visibility_icon": {
+					"type": "bool",
+					"value": true
+				}
+			}
+		},
+		{
+			"id": 209,
+			"parent": 187,
+			"type": "UiDoc",
+			"name": "doc",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 389,
+				"top": 525,
+				"right": 706,
+				"bottom": 612
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 360
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 87
+				},
+				"width": {
+					"type": "int",
+					"value": 360
+				},
+				"height": {
+					"type": "int",
+					"value": 240
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"sample_text": {
+					"type": "string",
+					"value": "UiDoc sample"
+				}
+			}
+		},
+		{
+			"id": 222,
+			"parent": 157,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_11",
+			"children": [
+				237
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 730,
+				"top": 218,
+				"right": 964,
+				"bottom": 627
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "ACCORDION"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 2
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 227,
+			"parent": 157,
+			"type": "UiGroupPanel",
+			"name": "grouppanel_12",
+			"children": [
+				228
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 373,
+				"top": 218,
+				"right": 722,
+				"bottom": 627
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "TAB"
+				},
+				"subtitle": {
+					"type": "string",
+					"value": "Tab containing editable fields"
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 228,
+			"parent": 227,
+			"type": "UiTab",
+			"name": "tab_02",
+			"children": [
+				229,
+				230,
+				231
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 374,
+				"top": 258,
+				"right": 721,
+				"bottom": 626
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Tab"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 300
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 180
+				},
+				"width": {
+					"type": "int",
+					"value": 300
+				},
+				"height": {
+					"type": "int",
+					"value": 180
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"active": {
+					"type": "int",
+					"value": 0
+				},
+				"visual": {
+					"type": "string",
+					"value": "Underline"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"expand_tabs": {
+					"type": "bool",
+					"value": false
+				},
+				"close_buttons": {
+					"type": "bool",
+					"value": false
+				},
+				"drag_handles": {
+					"type": "bool",
+					"value": false
+				},
+				"tab_font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"tab_font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"tab_icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"tab_icon_side": {
+					"type": "string",
+					"value": "Left"
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 5
+				},
+				"affordance_gap": {
+					"type": "int",
+					"value": 4
+				}
+			}
+		},
+		{
+			"id": 229,
+			"parent": 228,
+			"type": "PageSlot",
+			"name": "pageA",
+			"children": [
+				178
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 380,
+				"top": 308,
+				"right": 715,
+				"bottom": 620
+			},
+			"properties": {
+				"page_title": {
+					"type": "string",
+					"value": "Edit Fields"
+				},
+				"show_title": {
+					"type": "bool",
+					"value": true
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 220
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 220
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 230,
+			"parent": 228,
+			"type": "PageSlot",
+			"name": "pageB",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 0,
+				"top": 0,
+				"right": 0,
+				"bottom": 0
+			},
+			"properties": {
+				"page_title": {
+					"type": "string",
+					"value": "Page B"
+				},
+				"show_title": {
+					"type": "bool",
+					"value": true
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 220
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 220
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 231,
+			"parent": 228,
+			"type": "PageSlot",
+			"name": "pageC",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 0,
+				"top": 0,
+				"right": 0,
+				"bottom": 0
+			},
+			"properties": {
+				"page_title": {
+					"type": "string",
+					"value": "Page C"
+				},
+				"show_title": {
+					"type": "bool",
+					"value": true
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 220
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 140
+				},
+				"width": {
+					"type": "int",
+					"value": 220
+				},
+				"height": {
+					"type": "int",
+					"value": 140
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 234,
+			"parent": 157,
+			"type": "UiTree",
+			"name": "tree",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 30,
+				"top": 635,
+				"right": 365,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Tree"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 198
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 180
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 180
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"root_visible": {
+					"type": "bool",
+					"value": false
+				},
+				"connectors": {
+					"type": "bool",
+					"value": true
+				},
+				"metadata": {
+					"type": "bool",
+					"value": false
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 236,
+			"parent": 157,
+			"type": "UiTable",
+			"name": "table",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 373,
+				"top": 635,
+				"right": 722,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Table"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 320
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 180
+				},
+				"width": {
+					"type": "int",
+					"value": 320
+				},
+				"height": {
+					"type": "int",
+					"value": 180
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"rows_count": {
+					"type": "int",
+					"value": 4
+				},
+				"cols_count": {
+					"type": "int",
+					"value": 2
+				},
+				"row_headers": {
+					"type": "bool",
+					"value": true
+				},
+				"column_headers": {
+					"type": "bool",
+					"value": true
+				},
+				"row_height": {
+					"type": "int",
+					"value": 28
+				},
+				"header_height": {
+					"type": "int",
+					"value": 30
+				},
+				"column_width": {
+					"type": "int",
+					"value": 120
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 1
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 237,
+			"parent": 222,
+			"type": "GridLayout",
+			"name": "gridlayout_09",
+			"children": [
+				238
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 731,
+				"top": 247,
+				"right": 963,
+				"bottom": 626
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 2
+				},
+				"columns": {
+					"type": "int",
+					"value": 1
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 238,
+			"parent": 237,
+			"type": "UiAccordion",
+			"name": "accordion",
+			"children": [
+				239,
+				240,
+				241
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 739,
+				"top": 255,
+				"right": 955,
+				"bottom": 585
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Accordion"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 300
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 220
+				},
+				"width": {
+					"type": "int",
+					"value": 300
+				},
+				"height": {
+					"type": "int",
+					"value": 220
+				},
+				"single_open": {
+					"type": "bool",
+					"value": false
+				},
+				"enforce_one": {
+					"type": "bool",
+					"value": false
+				},
+				"show_chevron": {
+					"type": "bool",
+					"value": true
+				},
+				"chevron_side": {
+					"type": "string",
+					"value": "Right"
+				},
+				"animation": {
+					"type": "bool",
+					"value": true
+				},
+				"open_ms": {
+					"type": "int",
+					"value": 120
+				},
+				"close_ms": {
+					"type": "int",
+					"value": 0
+				},
+				"item_spacing": {
+					"type": "int",
+					"value": 8
+				},
+				"header_body_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"body_min_height": {
+					"type": "int",
+					"value": 88
+				},
+				"show_drag_handle": {
+					"type": "bool",
+					"value": false
+				},
+				"drag_reorder": {
+					"type": "bool",
+					"value": false
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"header_face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"header_frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"header_radius": {
+					"type": "int",
+					"value": 8
+				},
+				"header_face": {
+					"type": "color",
+					"value": "#f8fafc"
+				},
+				"header_frame": {
+					"type": "color",
+					"value": "#cbd5e1"
+				},
+				"header_title": {
+					"type": "color",
+					"value": "#0078d4"
+				},
+				"header_subtitle": {
+					"type": "color",
+					"value": "#64748b"
+				},
+				"body_face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"body_frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"body_radius": {
+					"type": "int",
+					"value": 0
+				},
+				"body_face": {
+					"type": "color",
+					"value": "#ffffff"
+				},
+				"body_frame": {
+					"type": "color",
+					"value": "#e2e8f0"
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 239,
+			"parent": 238,
+			"type": "AccordionSectionSlot",
+			"name": "sectionA",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 751,
+				"top": 308,
+				"right": 943,
+				"bottom": 396
+			},
+			"properties": {
+				"section_title": {
+					"type": "string",
+					"value": "Section A"
+				},
+				"section_subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"open": {
+					"type": "bool",
+					"value": true
+				},
+				"lock": {
+					"type": "string",
+					"value": "None"
+				},
+				"body_height": {
+					"type": "int",
+					"value": -1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 120
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 120
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 240,
+			"parent": 238,
+			"type": "AccordionSectionSlot",
+			"name": "sectionB",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 0,
+				"top": 0,
+				"right": 192,
+				"bottom": 0
+			},
+			"properties": {
+				"section_title": {
+					"type": "string",
+					"value": "Section B"
+				},
+				"section_subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"open": {
+					"type": "bool",
+					"value": false
+				},
+				"lock": {
+					"type": "string",
+					"value": "None"
+				},
+				"body_height": {
+					"type": "int",
+					"value": -1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 120
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 120
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 241,
+			"parent": 238,
+			"type": "AccordionSectionSlot",
+			"name": "sectionC",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 0,
+				"top": 0,
+				"right": 192,
+				"bottom": 0
+			},
+			"properties": {
+				"section_title": {
+					"type": "string",
+					"value": "Section C"
+				},
+				"section_subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"open": {
+					"type": "bool",
+					"value": false
+				},
+				"lock": {
+					"type": "string",
+					"value": "None"
+				},
+				"body_height": {
+					"type": "int",
+					"value": -1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 240
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 120
+				},
+				"width": {
+					"type": "int",
+					"value": 240
+				},
+				"height": {
+					"type": "int",
+					"value": 120
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				}
+			}
+		},
+		{
+			"id": 242,
+			"parent": 157,
+			"type": "UiGroupPanel",
+			"name": "grouppanel",
+			"children": [
+				243
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 730,
+				"top": 635,
+				"right": 964,
+				"bottom": 849
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "SLIDERS"
+				},
+				"subtitle": {
+					"type": "null",
+					"value": null
+				},
+				"side_title": {
+					"type": "null",
+					"value": null
+				},
+				"header_mode": {
+					"type": "string",
+					"value": "Inside"
+				},
+				"line": {
+					"type": "bool",
+					"value": false
+				},
+				"header_band": {
+					"type": "bool",
+					"value": false
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"placement": {
+					"type": "string",
+					"value": "Top"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 16
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"header_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"line_thickness": {
+					"type": "int",
+					"value": 1
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 260
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 160
+				},
+				"width": {
+					"type": "int",
+					"value": 260
+				},
+				"height": {
+					"type": "int",
+					"value": 160
+				},
+				"face": {
+					"type": "color",
+					"value": "#bbe8cb"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#22965b"
+				},
+				"radius": {
+					"type": "int",
+					"value": 8
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": true
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 2
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 243,
+			"parent": 242,
+			"type": "GridLayout",
+			"name": "gridlayout_08",
+			"children": [
+				245,
+				244
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 739,
+				"top": 672,
+				"right": 955,
+				"bottom": 840
+			},
+			"properties": {
+				"cell_width": {
+					"type": "int",
+					"value": 25
+				},
+				"cell_height": {
+					"type": "int",
+					"value": 25
+				},
+				"rows": {
+					"type": "int",
+					"value": 2
+				},
+				"columns": {
+					"type": "int",
+					"value": 1
+				},
+				"gap": {
+					"type": "int",
+					"value": 8
+				},
+				"inset": {
+					"type": "int",
+					"value": 8
+				},
+				"debug": {
+					"type": "bool",
+					"value": true
+				},
+				"debug_color": {
+					"type": "color",
+					"value": "#dc2626"
+				},
+				"debug_auto_color": {
+					"type": "bool",
+					"value": true
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"face": {
+					"type": "color",
+					"value": "#ffe0b2"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#d97706"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 2
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				}
+			}
+		},
+		{
+			"id": 244,
+			"parent": 243,
+			"type": "UiProgressBar",
+			"name": "progressbar",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 798,
+				"top": 785,
+				"right": 896,
+				"bottom": 810
+			},
+			"properties": {
+				"text": {
+					"type": "null",
+					"value": null
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 180
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 24
+				},
+				"width": {
+					"type": "int",
+					"value": 180
+				},
+				"height": {
+					"type": "int",
+					"value": 24
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"actual": {
+					"type": "int",
+					"value": 60
+				},
+				"total": {
+					"type": "int",
+					"value": 100
+				},
+				"show_percentage": {
+					"type": "bool",
+					"value": true
+				},
+				"indeterminate": {
+					"type": "bool",
+					"value": false
+				},
+				"orientation": {
+					"type": "string",
+					"value": "Auto"
+				},
+				"custom_text": {
+					"type": "null",
+					"value": null
+				},
+				"track_face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"track_frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"progress_face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"progress_frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"filled_text_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"empty_text_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"track_radius": {
+					"type": "int",
+					"value": 999
+				},
+				"progress_radius": {
+					"type": "int",
+					"value": 999
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 1
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Center"
+				}
+			}
+		},
+		{
+			"id": 245,
+			"parent": 243,
+			"type": "UiSlider",
+			"name": "slider",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 771,
+				"top": 702,
+				"right": 923,
+				"bottom": 732
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Slider"
+				},
+				"role": {
+					"type": "string",
+					"value": "Standard"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Fit"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 100
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 25
+				},
+				"width": {
+					"type": "int",
+					"value": 100
+				},
+				"height": {
+					"type": "int",
+					"value": 25
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Left"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"track_width": {
+					"type": "int",
+					"value": 120
+				},
+				"track_height": {
+					"type": "int",
+					"value": 3
+				},
+				"thumb_width": {
+					"type": "int",
+					"value": 20
+				},
+				"thumb_height": {
+					"type": "int",
+					"value": 20
+				},
+				"track_radius": {
+					"type": "int",
+					"value": 8
+				},
+				"thumb_radius": {
+					"type": "int",
+					"value": 8
+				},
+				"value": {
+					"type": "int",
+					"value": 50
+				},
+				"grid_col": {
+					"type": "int",
+					"value": 0
+				},
+				"grid_row": {
+					"type": "int",
+					"value": 0
+				},
+				"cell_align_h": {
+					"type": "string",
+					"value": "Center"
+				}
+			}
+		}
+	]
+}
