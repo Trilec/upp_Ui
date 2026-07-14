@@ -10,34 +10,34 @@ namespace Upp {
 
 enum UiDesignerPaneWidth { PANE_CLOSED, PANE_NORMAL, PANE_MEDIUM, PANE_WIDE };
 
-class UiDesignerIconStrip : public UiPanel {
+class UiDesignerPillBar : public UiPanel {
 public:
-    typedef UiDesignerIconStrip CLASSNAME;
+    typedef UiDesignerPillBar CLASSNAME;
 
-    UiDesignerIconStrip();
-    UiDesignerIconStrip& AddSection(const String& tip, const Image& icon);
-    UiDesignerIconStrip& RightStrip(bool b = true) { right_ = b; return *this; }
-    int GetSelected() const { return selected_; }
+    UiDesignerPillBar();
+    UiDesignerPillBar& SetInset(int inset);
+    UiDesignerPillBar& AddSection(const String& tip, const Image& icon);
+    UiDesignerPillBar& AddControl(Ctrl& ctrl, int width);
     Event<int> WhenSelect;
-    Event<> WhenCycle;
-    Event<> WhenClose;
     virtual void Layout() override;
 
 private:
-    Array<UiToolButton> sections_;
-    UiToolButton close_;
-    UiToolButton expand_;
-    int selected_ = 0;
-    bool right_ = false;
+    struct Item : Moveable<Item> {
+        Ptr<Ctrl> ctrl;
+        int width = 0;
+    };
+    Vector<Item> items_;
+    Array<UiToolButton> owned_buttons_;
+    int inset_ = DPI(20);
 };
 
-class UiDesignerPane : public ParentCtrl {
+class UiDesignerSideColumn : public ParentCtrl {
 public:
-    typedef UiDesignerPane CLASSNAME;
+    typedef UiDesignerSideColumn CLASSNAME;
 
-    UiDesignerPane();
-    UiDesignerPane& RightPane(bool b = true);
-    UiDesignerPane& AddSection(const String& tip, const Image& icon, Ctrl& content);
+    UiDesignerSideColumn();
+    UiDesignerSideColumn& RightColumn(bool b = true);
+    UiDesignerSideColumn& AddSection(const String& tip, const Image& icon, Ctrl& content);
     void SetPaneWidth(UiDesignerPaneWidth width);
     int GetDesiredWidth() const;
     Event<> WhenWidthChanged;
@@ -46,7 +46,11 @@ public:
 private:
     void Select(int i);
     void Cycle();
-    UiDesignerIconStrip strip_;
+    void Close();
+
+    UiDesignerPillBar tools_;
+    UiToolButton close_;
+    UiToolButton expand_;
     UiPanel content_surface_;
     UiStack pages_;
     UiDesignerPaneWidth width_ = PANE_NORMAL;
@@ -65,11 +69,13 @@ private:
     void BuildTheme();
     void ShowDesigner();
     void ShowTheme();
+    void PopulateThemeGallery();
 
     UiPanel header_surface_;
     UiTitleCard brand_;
     UiSplitButton save_;
     UiSplitButton load_;
+    UiSplitButton export_;
     UiDropdown theme_select_;
     UiToolButton dark_;
     UiToolButton help_;
@@ -80,30 +86,41 @@ private:
     ParentCtrl designer_page_;
     ParentCtrl theme_page_;
 
-    UiDesignerPane designer_left_;
-    UiDesignerPane designer_right_;
+    UiDesignerSideColumn designer_left_;
     UiPanel designer_center_;
-    UiPanel designer_toolbar_pill_;
-    UiDropdown aspect_;
-    UiDropdown zoom_;
-    UiToolButton fit_;
-    UiToolButton guides_;
-    UiPanel canvas_;
+    UiDesignerPillBar aspect_pill_;
+    UiToolButton portrait_;
+    UiToolButton landscape_;
+    UiSplitButton aspect_preset_;
+    UiToolButton square_;
+    UiScrollPanel preview_scroll_;
+    UiPanel preview_surface_;
+    UiDesignerSideColumn designer_right_;
 
-    UiDesignerPane theme_left_;
-    UiDesignerPane theme_right_;
-    UiPanel theme_center_;
-    UiPanel theme_toolbar_pill_;
-    UiLabel theme_title_;
-    UiDropdown gallery_mode_;
+    UiPanel theme_gallery_column_;
+    UiDesignerPillBar theme_gallery_pill_;
+    UiToolButton theme_all_;
+    UiToolButton theme_inputs_;
+    UiToolButton theme_containers_;
     UiScrollPanel gallery_scroll_;
-    UiPanel gallery_;
+    UiPanel gallery_surface_;
+    UiDesignerSideColumn theme_right_;
 
     UiScrollPanel presets_, layouts_, containers_, controls_, composites_, upp_controls_;
     UiScrollPanel hierarchy_, overrides_, code_;
     PropertyEditor inspector_;
-    UiScrollPanel tokens_, roles_, theme_controls_, theme_code_;
     PropertyEditor theme_inspector_;
+    UiScrollPanel theme_code_;
+
+    UiLabel gallery_heading_;
+    UiButton gallery_button_;
+    UiLineEdit gallery_line_edit_;
+    UiCheckBox gallery_check_;
+    UiDropdown gallery_dropdown_;
+    UiSlider gallery_slider_;
+    UiProgressBar gallery_progress_;
+    UiColorPicker gallery_color_;
+    UiGroupPanel gallery_group_;
 
     UiPanel footer_surface_;
     UiLabel footer_;
