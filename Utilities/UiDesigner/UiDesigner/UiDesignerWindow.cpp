@@ -8,77 +8,100 @@ static void Put(Ctrl& c, int x, int y, int cx, int cy)
     c.SetRect(x, y, max(0, cx), max(0, cy));
 }
 
-UiDesignerIconStrip::UiDesignerIconStrip()
+UiDesignerPillBar::UiDesignerPillBar()
 {
     SetCustomStyle(UiDesignerPillStyle());
-    close_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
-    expand_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
-    close_.SetIcon(ICON_DESIGN_LEFT_PANEL_CLOSE_48()).SetIconSize(DPI(16), DPI(16));
-    expand_.SetIcon(ICON_DESIGN_UNFOLD_MORE_48()).SetIconSize(DPI(16), DPI(16));
-    close_.Tip("Collapse panel");
-    expand_.Tip("Cycle panel width");
-    close_.WhenAction = [=] { WhenClose(); };
-    expand_.WhenAction = [=] { WhenCycle(); };
-    Add(close_);
-    Add(expand_);
 }
 
-UiDesignerIconStrip& UiDesignerIconStrip::AddSection(const String& tip, const Image& icon)
+UiDesignerPillBar& UiDesignerPillBar::SetInset(int inset)
 {
-    const int index = sections_.GetCount();
-    UiToolButton& button = sections_.Add();
+    inset_ = max(0, inset);
+    Layout();
+    return *this;
+}
+
+UiDesignerPillBar& UiDesignerPillBar::AddSection(const String& tip, const Image& icon)
+{
+    const int index = owned_buttons_.GetCount();
+    UiToolButton& button = owned_buttons_.Add();
     button.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
     button.SetIcon(icon).SetIconSize(DPI(16), DPI(16));
     button.Tip(tip);
-    button.WhenAction = [=] { selected_ = index; WhenSelect(index); Refresh(); };
+    button.WhenAction = [=] { WhenSelect(index); };
     Add(button);
+    Item& item = items_.Add();
+    item.ctrl = &button;
+    item.width = DPI(32);
     return *this;
 }
 
-void UiDesignerIconStrip::Layout()
+UiDesignerPillBar& UiDesignerPillBar::AddControl(Ctrl& ctrl, int width)
 {
-    const int w = GetSize().cx;
-    const int h = GetSize().cy;
-    const int inset = right_ ? UiDesignerStyleMetrics::RightPillInset()
-                             : UiDesignerStyleMetrics::LeftPillInset();
-    const int button = DPI(32);
-    int y = inset;
-    for(UiToolButton& b : sections_) {
-        Put(b, (w - button) / 2, y, button, button);
-        y += button + DPI(4);
-    }
-    Put(close_, (w - button) / 2, max(y, h - inset - button * 2 - DPI(4)), button, button);
-    Put(expand_, (w - button) / 2, h - inset - button, button, button);
+    Add(ctrl);
+    Item& item = items_.Add();
+    item.ctrl = &ctrl;
+    item.width = max(DPI(24), width);
+    return *this;
 }
 
-UiDesignerPane::UiDesignerPane()
+void UiDesignerPillBar::Layout()
 {
-    Add(strip_);
+    int x = inset_;
+    const int h = GetSize().cy;
+    const int control_h = max(DPI(24), h - DPI(10));
+    for(const Item& item : items_) {
+        if(item.ctrl)
+            Put(*item.ctrl, x, (h - control_h) / 2, item.width, control_h);
+        x += item.width + DPI(6);
+    }
+}
+
+UiDesignerSideColumn::UiDesignerSideColumn()
+{
+    tools_.SetInset(UiDesignerStyleMetrics::LeftPillInset());
     content_surface_.SetCustomStyle(UiDesignerSurfaceStyle());
     content_surface_.Add(pages_.SizePos());
+
+    close_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    close_.SetIcon(ICON_DESIGN_LEFT_PANEL_CLOSE_48()).SetIconSize(DPI(16), DPI(16));
+    close_.Tip("Collapse panel");
+    close_.WhenAction = [=] { Close(); };
+
+    expand_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    expand_.SetIcon(ICON_DESIGN_UNFOLD_MORE_48()).SetIconSize(DPI(16), DPI(16));
+    expand_.Tip("Cycle panel width");
+    expand_.WhenAction = [=] { Cycle(); };
+
+    tools_.AddControl(close_, DPI(32));
+    tools_.AddControl(expand_, DPI(32));
+    tools_.WhenSelect = [=](int i) { Select(i); };
+
+    Add(tools_);
     Add(content_surface_);
-    strip_.WhenSelect = [=](int i) { Select(i); };
-    strip_.WhenCycle = [=] { Cycle(); };
-    strip_.WhenClose = [=] { SetPaneWidth(PANE_CLOSED); };
 }
 
-UiDesignerPane& UiDesignerPane::RightPane(bool b)
+UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool b)
 {
     right_ = b;
-    strip_.RightStrip(b);
+    tools_.SetInset(b ? UiDesignerStyleMetrics::RightPillInset()
+                      : UiDesignerStyleMetrics::LeftPillInset());
+    close_.SetIcon(b ? ICON_DESIGN_RIGHT_PANEL_CLOSE_48()
+                     : ICON_DESIGN_LEFT_PANEL_CLOSE_48());
     return *this;
 }
 
-UiDesignerPane& UiDesignerPane::AddSection(const String& tip, const Image& icon, Ctrl& content)
+UiDesignerSideColumn& UiDesignerSideColumn::AddSection(const String& tip, const Image& icon, Ctrl& content)
 {
-    strip_.AddSection(tip, icon);
+    const int section_index = pages_.GetCount();
+    UiDesignerPillBar temp;
+    tools_.AddSection(tip, icon);
     pages_.Add(content, tip);
-    if(pages_.GetCount() == 1)
+    if(section_index == 0)
         pages_.SetActivePage(0);
     return *this;
 }
 
-void UiDesignerPane::SetPaneWidth(UiDesignerPaneWidth width)
+void UiDesignerSideColumn::SetPaneWidth(UiDesignerPaneWidth width)
 {
     if(width_ == width)
         return;
@@ -87,19 +110,19 @@ void UiDesignerPane::SetPaneWidth(UiDesignerPaneWidth width)
     WhenWidthChanged();
 }
 
-int UiDesignerPane::GetDesiredWidth() const
+int UiDesignerSideColumn::GetDesiredWidth() const
 {
-    const int rail = UiDesignerStyleMetrics::RailWidth();
+    if(width_ == PANE_CLOSED)
+        return UiDesignerStyleMetrics::RailWidth();
     switch(width_) {
-    case PANE_CLOSED: return rail;
-    case PANE_NORMAL: return rail + UiDesignerStyleMetrics::PanelNormalWidth();
-    case PANE_MEDIUM: return rail + UiDesignerStyleMetrics::PanelMediumWidth();
-    case PANE_WIDE:   return rail + UiDesignerStyleMetrics::PanelWideWidth();
+    case PANE_NORMAL: return UiDesignerStyleMetrics::PanelNormalWidth();
+    case PANE_MEDIUM: return UiDesignerStyleMetrics::PanelMediumWidth();
+    case PANE_WIDE:   return UiDesignerStyleMetrics::PanelWideWidth();
+    default:          return UiDesignerStyleMetrics::PanelNormalWidth();
     }
-    return rail;
 }
 
-void UiDesignerPane::Select(int i)
+void UiDesignerSideColumn::Select(int i)
 {
     pages_.SetActivePage(i);
     if(width_ == PANE_CLOSED)
@@ -108,7 +131,7 @@ void UiDesignerPane::Select(int i)
     WhenWidthChanged();
 }
 
-void UiDesignerPane::Cycle()
+void UiDesignerSideColumn::Cycle()
 {
     switch(width_) {
     case PANE_CLOSED: width_ = PANE_NORMAL; break;
@@ -120,19 +143,21 @@ void UiDesignerPane::Cycle()
     WhenWidthChanged();
 }
 
-void UiDesignerPane::Layout()
+void UiDesignerSideColumn::Close()
 {
-    const int rail = UiDesignerStyleMetrics::RailWidth();
+    width_ = PANE_CLOSED;
+    Layout();
+    WhenWidthChanged();
+}
+
+void UiDesignerSideColumn::Layout()
+{
     const int w = GetSize().cx;
     const int h = GetSize().cy;
-    if(right_) {
-        Put(content_surface_, 0, 0, max(0, w - rail), h);
-        Put(strip_, max(0, w - rail), 0, rail, h);
-    }
-    else {
-        Put(strip_, 0, 0, rail, h);
-        Put(content_surface_, rail, 0, max(0, w - rail), h);
-    }
+    const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
+    Put(tools_, 0, 0, w, pill_h);
+    Put(content_surface_, 0, pill_h + UiDesignerStyleMetrics::Gap(), w,
+        max(0, h - pill_h - UiDesignerStyleMetrics::Gap()));
     content_surface_.Show(width_ != PANE_CLOSED);
 }
 
@@ -156,7 +181,6 @@ UiDesignerWindow::UiDesignerWindow()
 
     designer_left_.WhenWidthChanged = [=] { Layout(); };
     designer_right_.WhenWidthChanged = [=] { Layout(); };
-    theme_left_.WhenWidthChanged = [=] { Layout(); };
     theme_right_.WhenWidthChanged = [=] { Layout(); };
 }
 
@@ -175,9 +199,12 @@ void UiDesignerWindow::BuildHeader()
     load_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     load_.SetText("Load").SetSplitWidth(DPI(30));
     load_.Add("Open", "open").Add("Recent", "recent");
+    export_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+    export_.SetText("Export").SetSplitWidth(DPI(31));
+    export_.Add("C++", "cpp").Add("JSON", "json");
 
     designer_mode_.SetText("Designer");
-    theme_mode_.SetText("Theme");
+    theme_mode_.SetText("Theme Studio");
     designer_mode_.WhenAction = [=] { ShowDesigner(); };
     theme_mode_.WhenAction = [=] { ShowTheme(); };
 
@@ -189,6 +216,7 @@ void UiDesignerWindow::BuildHeader()
     header_surface_.Add(brand_);
     header_surface_.Add(save_);
     header_surface_.Add(load_);
+    header_surface_.Add(export_);
     header_surface_.Add(designer_mode_);
     header_surface_.Add(theme_mode_);
     header_surface_.Add(theme_select_);
@@ -202,63 +230,96 @@ void UiDesignerWindow::BuildDesigner()
     designer_page_.Add(designer_center_);
     designer_page_.Add(designer_right_);
 
-    designer_left_.AddSection("Presets", ICON_DESIGN_DASHBOARD_EDIT_48(), presets_)
-                  .AddSection("Layouts", ICON_DESIGN_LAYOUTS_CATEGORY_48(), layouts_)
+    designer_left_.AddSection("Layouts", ICON_DESIGN_LAYOUTS_CATEGORY_48(), layouts_)
                   .AddSection("Containers", ICON_DESIGN_TAB_GROUP_48(), containers_)
                   .AddSection("Controls", ICON_DESIGN_WIDGETS_48(), controls_)
                   .AddSection("Composites", ICON_DESIGN_DYNAMIC_FORM_48(), composites_)
+                  .AddSection("Presets", ICON_DESIGN_DASHBOARD_EDIT_48(), presets_)
                   .AddSection("U++ Controls", ICON_DESIGN_WIDGETS_48(), upp_controls_);
 
-    designer_right_.RightPane()
+    designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
 
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle());
-    designer_toolbar_pill_.SetCustomStyle(UiDesignerPillStyle());
-    aspect_.UseInternalModel().Clear().Add("16:9", "16:9").Add("4:3", "4:3").Add("Free", "Free");
-    aspect_.Select(0);
-    zoom_.UseInternalModel().Clear().Add("50%", 50).Add("75%", 75).Add("100%", 100).Add("Fit", -1);
-    zoom_.Select(2);
-    fit_.SetIcon(ICON_DESIGN_ASPECT_RATIO_48()).SetIconSize(DPI(16), DPI(16));
-    guides_.SetIcon(ICON_DESIGN_GRID_ON_48()).SetIconSize(DPI(16), DPI(16));
-    canvas_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
+    aspect_pill_.SetInset(UiDesignerStyleMetrics::RightPillInset());
+    portrait_.SetIcon(ICON_DESIGN_SPLITSCREEN_PORTRAIT_48()).SetIconSize(DPI(20), DPI(20));
+    portrait_.Tip("Portrait");
+    landscape_.SetIcon(ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48()).SetIconSize(DPI(20), DPI(20));
+    landscape_.Tip("Landscape");
+    aspect_preset_.SetText("2:1").SetSplitWidth(DPI(30));
+    aspect_preset_.Add("Portrait 1:2", "1:2").Add("Landscape 2:1", "2:1").Add("Square 1:1", "1:1");
+    square_.SetIcon(ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48()).SetIconSize(DPI(17), DPI(17));
+    square_.Tip("Square");
+    aspect_pill_.AddControl(portrait_, DPI(32))
+                .AddControl(landscape_, DPI(32))
+                .AddControl(aspect_preset_, DPI(92))
+                .AddControl(square_, DPI(32));
 
-    designer_toolbar_pill_.Add(aspect_);
-    designer_toolbar_pill_.Add(zoom_);
-    designer_toolbar_pill_.Add(fit_);
-    designer_toolbar_pill_.Add(guides_);
-    designer_center_.Add(designer_toolbar_pill_);
-    designer_center_.Add(canvas_);
+    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
+    preview_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
+    preview_scroll_.SetInset(DPI(0));
+    preview_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
+    preview_scroll_.Add(preview_surface_.SizePos());
+
+    designer_center_.Add(aspect_pill_);
+    designer_center_.Add(preview_scroll_);
 }
 
 void UiDesignerWindow::BuildTheme()
 {
-    theme_page_.Add(theme_left_);
-    theme_page_.Add(theme_center_);
+    theme_page_.Add(theme_gallery_column_);
     theme_page_.Add(theme_right_);
 
-    theme_left_.AddSection("Tokens", ICON_DESIGN_FORMAT_PAINT_48(), tokens_)
-               .AddSection("Roles", ICON_DESIGN_TUNE_48(), roles_)
-               .AddSection("Controls", ICON_DESIGN_WIDGETS_48(), theme_controls_);
-    theme_right_.RightPane()
+    theme_gallery_column_.SetCustomStyle(UiDesignerSurfaceStyle());
+    theme_gallery_pill_.SetInset(UiDesignerStyleMetrics::LeftPillInset());
+    theme_all_.SetIcon(ICON_DESIGN_WIDGETS_48()).SetIconSize(DPI(16), DPI(16));
+    theme_all_.Tip("All controls");
+    theme_inputs_.SetIcon(ICON_DESIGN_DYNAMIC_FORM_48()).SetIconSize(DPI(16), DPI(16));
+    theme_inputs_.Tip("Inputs");
+    theme_containers_.SetIcon(ICON_DESIGN_TAB_GROUP_48()).SetIconSize(DPI(16), DPI(16));
+    theme_containers_.Tip("Containers");
+    theme_gallery_pill_.AddControl(theme_all_, DPI(32))
+                       .AddControl(theme_inputs_, DPI(32))
+                       .AddControl(theme_containers_, DPI(32));
+
+    gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
+    gallery_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
+    gallery_scroll_.SetInset(DPI(0));
+    gallery_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
+    gallery_scroll_.Add(gallery_surface_.SizePos());
+    theme_gallery_column_.Add(theme_gallery_pill_);
+    theme_gallery_column_.Add(gallery_scroll_);
+
+    theme_right_.RightColumn()
                 .AddSection("Inspector", ICON_DESIGN_TUNE_48(), theme_inspector_)
                 .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), theme_code_);
 
-    theme_center_.SetCustomStyle(UiDesignerSurfaceStyle());
-    theme_toolbar_pill_.SetCustomStyle(UiDesignerPillStyle());
-    theme_title_.SetText("Control gallery").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-    gallery_mode_.UseInternalModel().Clear().Add("All controls", "all").Add("Inputs", "inputs").Add("Containers", "containers");
-    gallery_mode_.Select(0);
-    gallery_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
-    gallery_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
-    gallery_scroll_.Add(gallery_.SizePos());
+    PopulateThemeGallery();
+}
 
-    theme_toolbar_pill_.Add(theme_title_);
-    theme_toolbar_pill_.Add(gallery_mode_);
-    theme_center_.Add(theme_toolbar_pill_);
-    theme_center_.Add(gallery_scroll_);
+void UiDesignerWindow::PopulateThemeGallery()
+{
+    gallery_heading_.SetText("Theme control gallery").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+    gallery_button_.SetText("Button");
+    gallery_line_edit_.SetData("Line edit");
+    gallery_check_.SetText("Check box");
+    gallery_dropdown_.UseInternalModel().Clear().Add("First", 1).Add("Second", 2).Add("Third", 3);
+    gallery_dropdown_.Select(0);
+    gallery_progress_.Set(62, 100).Percent();
+    gallery_group_.SetTitle("Container preview");
+
+    gallery_surface_.Add(gallery_heading_);
+    gallery_surface_.Add(gallery_button_);
+    gallery_surface_.Add(gallery_line_edit_);
+    gallery_surface_.Add(gallery_check_);
+    gallery_surface_.Add(gallery_dropdown_);
+    gallery_surface_.Add(gallery_slider_);
+    gallery_surface_.Add(gallery_progress_);
+    gallery_surface_.Add(gallery_color_);
+    gallery_surface_.Add(gallery_group_);
 }
 
 void UiDesignerWindow::ShowDesigner()
@@ -286,46 +347,57 @@ void UiDesignerWindow::Layout()
     int x = UiDesignerStyleMetrics::HeaderInset();
     const int y = UiDesignerStyleMetrics::HeaderInset();
     const int h = header_h - y * 2;
-    Put(brand_, x, y, DPI(150), h); x += DPI(158);
-    Put(save_, x, y, DPI(78), h); x += DPI(86);
-    Put(load_, x, y, DPI(78), h); x += DPI(86);
-    Put(designer_mode_, x, y, DPI(82), h); x += DPI(90);
-    Put(theme_mode_, x, y, DPI(72), h);
+    Put(brand_, x, y, DPI(145), h); x += DPI(153);
+    Put(save_, x, y, DPI(74), h); x += DPI(82);
+    Put(load_, x, y, DPI(74), h); x += DPI(82);
+    Put(export_, x, y, DPI(74), h); x += DPI(82);
+    Put(designer_mode_, x, y, DPI(78), h); x += DPI(86);
+    Put(theme_mode_, x, y, DPI(98), h);
     Put(help_, sz.cx - y - DPI(34), y, DPI(34), h);
     Put(dark_, sz.cx - y - DPI(76), y, DPI(34), h);
     Put(theme_select_, sz.cx - y - DPI(186), y, DPI(102), h);
 
-    Put(workspaces_, 0, header_h, sz.cx, max(0, sz.cy - header_h - footer_h));
+    const int body_h = max(0, sz.cy - header_h - footer_h);
+    Put(workspaces_, 0, header_h, sz.cx, body_h);
     Put(footer_surface_, 0, sz.cy - footer_h, sz.cx, footer_h);
 
-    ParentCtrl* page = workspaces_.GetActiveKey() == "theme" ? &theme_page_ : &designer_page_;
-    UiDesignerPane* left = workspaces_.GetActiveKey() == "theme" ? &theme_left_ : &designer_left_;
-    UiDesignerPane* right = workspaces_.GetActiveKey() == "theme" ? &theme_right_ : &designer_right_;
-    Ctrl* center = workspaces_.GetActiveKey() == "theme" ? (Ctrl*)&theme_center_ : (Ctrl*)&designer_center_;
+    const bool theme = workspaces_.GetActiveKey() == "theme";
+    if(!theme) {
+        const int left_w = min(designer_left_.GetDesiredWidth(), max(DPI(56), sz.cx / 3));
+        const int right_w = min(designer_right_.GetDesiredWidth(), max(DPI(56), sz.cx / 3));
+        Put(designer_page_, 0, 0, sz.cx, body_h);
+        Put(designer_left_, 0, 0, left_w, body_h);
+        Put(designer_right_, max(0, sz.cx - right_w), 0, right_w, body_h);
+        Put(designer_center_, left_w + gap, 0, max(0, sz.cx - left_w - right_w - gap * 2), body_h);
 
-    const int content_h = max(0, sz.cy - header_h - footer_h);
-    const int left_w = min(left->GetDesiredWidth(), max(0, sz.cx / 3));
-    const int right_w = min(right->GetDesiredWidth(), max(0, sz.cx / 3));
-    Put(*left, 0, 0, left_w, content_h);
-    Put(*right, max(0, sz.cx - right_w), 0, right_w, content_h);
-    Put(*center, left_w + gap, 0, max(0, sz.cx - left_w - right_w - gap * 2), content_h);
-    page->SetRect(0, 0, sz.cx, content_h);
-
-    if(center == &designer_center_) {
-        const int toolbar_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
-        Put(designer_toolbar_pill_, gap, gap, max(0, designer_center_.GetSize().cx - gap * 2), toolbar_h);
-        Put(aspect_, UiDesignerStyleMetrics::LeftPillInset(), DPI(5), DPI(92), toolbar_h - DPI(10));
-        Put(zoom_, DPI(120), DPI(5), DPI(86), toolbar_h - DPI(10));
-        Put(fit_, DPI(214), DPI(5), DPI(32), toolbar_h - DPI(10));
-        Put(guides_, DPI(252), DPI(5), DPI(32), toolbar_h - DPI(10));
-        Put(canvas_, gap, toolbar_h + gap * 2, max(0, designer_center_.GetSize().cx - gap * 2), max(0, content_h - toolbar_h - gap * 3));
+        const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
+        Put(aspect_pill_, 0, 0, designer_center_.GetSize().cx, pill_h);
+        Put(preview_scroll_, 0, pill_h + gap, designer_center_.GetSize().cx,
+            max(0, body_h - pill_h - gap));
     }
     else {
-        const int toolbar_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
-        Put(theme_toolbar_pill_, gap, gap, max(0, theme_center_.GetSize().cx - gap * 2), toolbar_h);
-        Put(theme_title_, UiDesignerStyleMetrics::LeftPillInset(), DPI(5), DPI(180), toolbar_h - DPI(10));
-        Put(gallery_mode_, max(DPI(210), theme_center_.GetSize().cx - DPI(180)), DPI(5), DPI(150), toolbar_h - DPI(10));
-        Put(gallery_scroll_, gap, toolbar_h + gap * 2, max(0, theme_center_.GetSize().cx - gap * 2), max(0, content_h - toolbar_h - gap * 3));
+        const int right_w = min(theme_right_.GetDesiredWidth(), max(DPI(56), sz.cx / 3));
+        Put(theme_page_, 0, 0, sz.cx, body_h);
+        Put(theme_right_, max(0, sz.cx - right_w), 0, right_w, body_h);
+        Put(theme_gallery_column_, 0, 0, max(0, sz.cx - right_w - gap), body_h);
+
+        const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
+        Put(theme_gallery_pill_, 0, 0, theme_gallery_column_.GetSize().cx, pill_h);
+        Put(gallery_scroll_, 0, pill_h + gap, theme_gallery_column_.GetSize().cx,
+            max(0, body_h - pill_h - gap));
+
+        const int inset = DPI(20);
+        const int row_h = DPI(34);
+        int gy = inset;
+        Put(gallery_heading_, inset, gy, DPI(260), row_h); gy += row_h + gap;
+        Put(gallery_button_, inset, gy, DPI(130), row_h);
+        Put(gallery_line_edit_, DPI(170), gy, DPI(220), row_h); gy += row_h + gap;
+        Put(gallery_check_, inset, gy, DPI(150), row_h);
+        Put(gallery_dropdown_, DPI(170), gy, DPI(220), row_h); gy += row_h + gap;
+        Put(gallery_slider_, inset, gy, DPI(370), row_h); gy += row_h + gap;
+        Put(gallery_progress_, inset, gy, DPI(370), row_h); gy += row_h + gap;
+        Put(gallery_color_, inset, gy, DPI(180), row_h); gy += row_h + gap;
+        Put(gallery_group_, inset, gy, max(DPI(370), gallery_surface_.GetSize().cx - inset * 2), DPI(150));
     }
 }
 
