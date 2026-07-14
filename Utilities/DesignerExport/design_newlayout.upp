@@ -7,9 +7,8 @@ uses
 
 file
 	main.cpp,
-	design.json,
+	design_newlayout.design.json,
 	README.md;
 
 mainconfig
 	"" = "GUI";
-

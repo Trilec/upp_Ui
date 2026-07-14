@@ -2,11 +2,11 @@
 	"format": "upp-ui-designer",
 	"schema": 1,
 	"virtual_size": {
-		"cx": 1133,
-		"cy": 824
+		"cx": 1020,
+		"cy": 668
 	},
 	"selection": [
-		12
+		20
 	],
 	"nodes": [
 		{
@@ -42,8 +42,8 @@
 			"last_rect": {
 				"left": 30,
 				"top": 30,
-				"right": 682,
-				"bottom": 617
+				"right": 1050,
+				"bottom": 698
 			},
 			"properties": {
 				"direction": {
@@ -60,7 +60,7 @@
 				},
 				"gap_y": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"snap_count": {
 					"type": "int",
@@ -125,19 +125,20 @@
 				12,
 				15,
 				13,
+				82,
 				14,
 				22,
 				17,
-				18,
+				81,
 				23,
 				19,
 				58
 			],
-			"expanded": false,
+			"expanded": true,
 			"last_rect": {
 				"left": 30,
 				"top": 30,
-				"right": 682,
+				"right": 1050,
 				"bottom": 71
 			},
 			"properties": {
@@ -224,9 +225,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 30,
-				"top": 79,
-				"right": 682,
-				"bottom": 582
+				"top": 71,
+				"right": 1050,
+				"bottom": 671
 			},
 			"properties": {
 				"direction": {
@@ -310,9 +311,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 30,
-				"top": 590,
-				"right": 682,
-				"bottom": 617
+				"top": 671,
+				"right": 1050,
+				"bottom": 698
 			},
 			"properties": {
 				"direction": {
@@ -539,7 +540,7 @@
 			"id": 13,
 			"parent": 7,
 			"type": "UiSplitButton",
-			"name": "save_split_button",
+			"name": "save_split_btn",
 			"children": [
 
 			],
@@ -689,15 +690,15 @@
 			"id": 14,
 			"parent": 7,
 			"type": "UiSplitButton",
-			"name": "load_split_button",
+			"name": "load_split_btn",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 265,
+				"left": 357,
 				"top": 36,
-				"right": 349,
+				"right": 441,
 				"bottom": 65
 			},
 			"properties": {
@@ -839,7 +840,7 @@
 			"id": 15,
 			"parent": 7,
 			"type": "Spacer",
-			"name": "header_spacer",
+			"name": "hidder_spacer_1",
 			"children": [
 
 			],
@@ -965,15 +966,15 @@
 			"id": 17,
 			"parent": 7,
 			"type": "Spacer",
-			"name": "spacer_03",
+			"name": "header_spacer_2",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 441,
+				"left": 533,
 				"top": 36,
-				"right": 516,
+				"right": 741,
 				"bottom": 65
 			},
 			"properties": {
@@ -1089,7 +1090,7 @@
 		},
 		{
 			"id": 18,
-			"parent": 7,
+			"parent": 63,
 			"type": "UiDropdown",
 			"name": "theme_selection_drop_down",
 			"children": [
@@ -1097,10 +1098,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 524,
-				"top": 36,
-				"right": 608,
-				"bottom": 65
+				"left": 560,
+				"top": 91,
+				"right": 644,
+				"bottom": 120
 			},
 			"properties": {
 				"text": {
@@ -1109,7 +1110,7 @@
 				},
 				"role": {
 					"type": "string",
-					"value": "Accent"
+					"value": "Subtle"
 				},
 				"h_sizing": {
 					"type": "string",
@@ -1137,15 +1138,15 @@
 				},
 				"face": {
 					"type": "color",
-					"value": "#cbe0ff"
+					"value": "#f0f0f0"
 				},
 				"frame": {
 					"type": "color",
-					"value": "#3674d2"
+					"value": "#e2e8f0"
 				},
 				"radius": {
 					"type": "int",
-					"value": 0
+					"value": 8
 				},
 				"face_enabled": {
 					"type": "bool",
@@ -1153,7 +1154,7 @@
 				},
 				"frame_enabled": {
 					"type": "bool",
-					"value": false
+					"value": true
 				},
 				"font": {
 					"type": "string",
@@ -1210,6 +1211,42 @@
 				"min_width": {
 					"type": "int",
 					"value": 74
+				},
+				"theme_override": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 1
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 6
+				},
+				"shadow_offset_x": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_offset_y": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 90
+				},
+				"shadow_color": {
+					"type": "color",
+					"value": "#000000"
+				},
+				"shadow_curve": {
+					"type": "string",
+					"value": "Soft"
 				}
 			}
 		},
@@ -1223,10 +1260,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 36,
-				"top": 73,
-				"right": 96,
-				"bottom": 97
+				"left": 916,
+				"top": 38,
+				"right": 976,
+				"bottom": 62
 			},
 			"properties": {
 				"text": {
@@ -1346,9 +1383,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 30,
-				"top": 590,
+				"top": 671,
 				"right": 73,
-				"bottom": 617
+				"bottom": 698
 			},
 			"properties": {
 				"text": {
@@ -1443,9 +1480,9 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 357,
+				"left": 449,
 				"top": 36,
-				"right": 433,
+				"right": 525,
 				"bottom": 64
 			},
 			"properties": {
@@ -1589,9 +1626,9 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 616,
+				"left": 848,
 				"top": 38,
-				"right": 676,
+				"right": 908,
 				"bottom": 62
 			},
 			"properties": {
@@ -1713,9 +1750,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 31,
-				"top": 80,
+				"top": 72,
 				"right": 313,
-				"bottom": 581
+				"bottom": 670
 			},
 			"properties": {
 				"direction": {
@@ -1728,11 +1765,11 @@
 				},
 				"gap_x": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"gap_y": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"snap_count": {
 					"type": "int",
@@ -1815,10 +1852,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 591,
-				"top": 80,
-				"right": 937,
-				"bottom": 581
+				"left": 703,
+				"top": 72,
+				"right": 1049,
+				"bottom": 670
 			},
 			"properties": {
 				"direction": {
@@ -1831,11 +1868,11 @@
 				},
 				"gap_x": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"gap_y": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"snap_count": {
 					"type": "int",
@@ -1902,9 +1939,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 51,
-				"top": 100,
+				"top": 92,
 				"right": 75,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2020,9 +2057,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 83,
-				"top": 100,
+				"top": 92,
 				"right": 107,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2138,9 +2175,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 115,
-				"top": 100,
+				"top": 92,
 				"right": 139,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2256,9 +2293,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 147,
-				"top": 100,
+				"top": 92,
 				"right": 171,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2374,9 +2411,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 179,
-				"top": 100,
+				"top": 92,
 				"right": 203,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2492,9 +2529,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 211,
-				"top": 100,
+				"top": 92,
 				"right": 261,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"weight": {
@@ -2602,9 +2639,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 269,
-				"top": 100,
+				"top": 92,
 				"right": 293,
-				"bottom": 124
+				"bottom": 116
 			},
 			"properties": {
 				"text": {
@@ -2716,9 +2753,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 31,
-				"top": 151,
+				"top": 135,
 				"right": 313,
-				"bottom": 581
+				"bottom": 670
 			},
 			"properties": {
 				"text": {
@@ -2761,6 +2798,10 @@
 					"type": "int",
 					"value": 0
 				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
 				"face_enabled": {
 					"type": "bool",
 					"value": true
@@ -2787,16 +2828,16 @@
 			"id": 46,
 			"parent": 28,
 			"type": "UiPanel",
-			"name": "left_tool_button_panel",
+			"name": "left_tools_panel",
 			"children": [
 				47
 			],
 			"expanded": true,
 			"last_rect": {
 				"left": 31,
-				"top": 80,
+				"top": 72,
 				"right": 313,
-				"bottom": 143
+				"bottom": 135
 			},
 			"properties": {
 				"text": {
@@ -2838,6 +2879,10 @@
 				"radius": {
 					"type": "int",
 					"value": 25
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
 				},
 				"face_enabled": {
 					"type": "bool",
@@ -2890,9 +2935,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 31,
-				"top": 80,
+				"top": 72,
 				"right": 313,
-				"bottom": 143
+				"bottom": 135
 			},
 			"properties": {
 				"direction": {
@@ -2969,16 +3014,16 @@
 			"id": 48,
 			"parent": 30,
 			"type": "UiPanel",
-			"name": "right_tool_button_panel",
+			"name": "right_tools_panel",
 			"children": [
 				49
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 591,
-				"top": 80,
-				"right": 937,
-				"bottom": 143
+				"left": 703,
+				"top": 72,
+				"right": 1049,
+				"bottom": 135
 			},
 			"properties": {
 				"text": {
@@ -3020,6 +3065,10 @@
 				"radius": {
 					"type": "int",
 					"value": 27
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
 				},
 				"face_enabled": {
 					"type": "bool",
@@ -3067,7 +3116,6 @@
 			"children": [
 				56,
 				78,
-				79,
 				55,
 				54,
 				53,
@@ -3076,10 +3124,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 591,
-				"top": 80,
-				"right": 937,
-				"bottom": 143
+				"left": 703,
+				"top": 72,
+				"right": 1049,
+				"bottom": 135
 			},
 			"properties": {
 				"direction": {
@@ -3162,10 +3210,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 894,
-				"top": 99,
-				"right": 918,
-				"bottom": 123
+				"left": 1006,
+				"top": 91,
+				"right": 1030,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -3280,10 +3328,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 862,
-				"top": 99,
-				"right": 886,
-				"bottom": 123
+				"left": 974,
+				"top": 91,
+				"right": 998,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -3398,10 +3446,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 830,
-				"top": 99,
-				"right": 854,
-				"bottom": 123
+				"left": 942,
+				"top": 91,
+				"right": 966,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -3516,10 +3564,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 798,
-				"top": 99,
-				"right": 822,
-				"bottom": 123
+				"left": 910,
+				"top": 91,
+				"right": 934,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -3628,16 +3676,16 @@
 			"id": 55,
 			"parent": 49,
 			"type": "Spacer",
-			"name": "spacer_02_02",
+			"name": "right_tool_button_spacer",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 706,
-				"top": 99,
-				"right": 790,
-				"bottom": 124
+				"left": 786,
+				"top": 91,
+				"right": 902,
+				"bottom": 116
 			},
 			"properties": {
 				"weight": {
@@ -3738,16 +3786,16 @@
 			"id": 56,
 			"parent": 49,
 			"type": "UiToolButton",
-			"name": "open_close_right_panel",
+			"name": "right_open_close_btn",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 610,
-				"top": 99,
-				"right": 634,
-				"bottom": 123
+				"left": 722,
+				"top": 91,
+				"right": 746,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -3858,10 +3906,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 591,
-				"top": 151,
-				"right": 937,
-				"bottom": 581
+				"left": 703,
+				"top": 135,
+				"right": 1049,
+				"bottom": 670
 			},
 			"properties": {
 				"text": {
@@ -3904,6 +3952,10 @@
 					"type": "int",
 					"value": 0
 				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
 				"face_enabled": {
 					"type": "bool",
 					"value": true
@@ -3936,10 +3988,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 104,
-				"top": 73,
-				"right": 164,
-				"bottom": 97
+				"left": 984,
+				"top": 38,
+				"right": 1044,
+				"bottom": 62
 			},
 			"properties": {
 				"text": {
@@ -4059,9 +4111,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 313,
-				"top": 80,
-				"right": 591,
-				"bottom": 581
+				"top": 72,
+				"right": 703,
+				"bottom": 670
 			},
 			"properties": {
 				"text": {
@@ -4104,6 +4156,10 @@
 					"type": "int",
 					"value": 8
 				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
 				"face_enabled": {
 					"type": "bool",
 					"value": false
@@ -4138,9 +4194,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 313,
-				"top": 80,
-				"right": 591,
-				"bottom": 581
+				"top": 72,
+				"right": 703,
+				"bottom": 670
 			},
 			"properties": {
 				"direction": {
@@ -4157,7 +4213,7 @@
 				},
 				"gap_y": {
 					"type": "int",
-					"value": 8
+					"value": 0
 				},
 				"snap_count": {
 					"type": "int",
@@ -4223,10 +4279,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 313,
-				"top": 80,
-				"right": 591,
-				"bottom": 143
+				"left": 338,
+				"top": 72,
+				"right": 678,
+				"bottom": 135
 			},
 			"properties": {
 				"text": {
@@ -4243,7 +4299,7 @@
 				},
 				"fixed_width": {
 					"type": "int",
-					"value": 278
+					"value": 340
 				},
 				"fixed_height": {
 					"type": "int",
@@ -4268,6 +4324,10 @@
 				"radius": {
 					"type": "int",
 					"value": 19
+				},
+				"inset": {
+					"type": "int",
+					"value": 0
 				},
 				"face_enabled": {
 					"type": "bool",
@@ -4330,9 +4390,9 @@
 			"expanded": true,
 			"last_rect": {
 				"left": 313,
-				"top": 151,
-				"right": 591,
-				"bottom": 581
+				"top": 135,
+				"right": 703,
+				"bottom": 670
 			},
 			"properties": {
 				"text": {
@@ -4375,6 +4435,10 @@
 					"type": "int",
 					"value": 0
 				},
+				"inset": {
+					"type": "int",
+					"value": 0
+				},
 				"face_enabled": {
 					"type": "bool",
 					"value": false
@@ -4414,15 +4478,15 @@
 				66,
 				67,
 				77,
-				76,
-				70
+				70,
+				18
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 313,
-				"top": 80,
-				"right": 591,
-				"bottom": 143
+				"left": 338,
+				"top": 72,
+				"right": 678,
+				"bottom": 135
 			},
 			"properties": {
 				"direction": {
@@ -4513,10 +4577,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 332,
-				"top": 99,
-				"right": 360,
-				"bottom": 127
+				"left": 357,
+				"top": 91,
+				"right": 385,
+				"bottom": 119
 			},
 			"properties": {
 				"text": {
@@ -4635,10 +4699,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 368,
-				"top": 99,
-				"right": 396,
-				"bottom": 127
+				"left": 393,
+				"top": 91,
+				"right": 421,
+				"bottom": 119
 			},
 			"properties": {
 				"text": {
@@ -4752,116 +4816,6 @@
 			}
 		},
 		{
-			"id": 76,
-			"parent": 63,
-			"type": "Spacer",
-			"name": "spacer_04",
-			"children": [
-
-			],
-			"expanded": true,
-			"last_rect": {
-				"left": 437,
-				"top": 99,
-				"right": 465,
-				"bottom": 127
-			},
-			"properties": {
-				"weight": {
-					"type": "int",
-					"value": 1
-				},
-				"layout_break": {
-					"type": "bool",
-					"value": false
-				},
-				"line_enabled": {
-					"type": "bool",
-					"value": true
-				},
-				"line_orientation": {
-					"type": "string",
-					"value": "Auto"
-				},
-				"line_align": {
-					"type": "string",
-					"value": "Start"
-				},
-				"line_thickness": {
-					"type": "int",
-					"value": 2
-				},
-				"line_dash": {
-					"type": "string",
-					"value": "Solid"
-				},
-				"line_inset": {
-					"type": "int",
-					"value": 0
-				},
-				"line_color_enabled": {
-					"type": "bool",
-					"value": false
-				},
-				"line_color": {
-					"type": "null",
-					"value": null
-				},
-				"h_sizing": {
-					"type": "string",
-					"value": "Expand"
-				},
-				"v_sizing": {
-					"type": "string",
-					"value": "Expand"
-				},
-				"width": {
-					"type": "int",
-					"value": 24
-				},
-				"height": {
-					"type": "int",
-					"value": 24
-				},
-				"fixed_width": {
-					"type": "int",
-					"value": 24
-				},
-				"fixed_height": {
-					"type": "int",
-					"value": 24
-				},
-				"min_width": {
-					"type": "int",
-					"value": 10
-				},
-				"min_height": {
-					"type": "int",
-					"value": 10
-				},
-				"max_width": {
-					"type": "int",
-					"value": 0
-				},
-				"max_height": {
-					"type": "int",
-					"value": 0
-				},
-				"face_enabled": {
-					"type": "bool",
-					"value": false
-				},
-				"frame_enabled": {
-					"type": "bool",
-					"value": false
-				},
-				"radius": {
-					"type": "int",
-					"value": 0
-				}
-			}
-		},
-		{
 			"id": 70,
 			"parent": 63,
 			"type": "UiSplitButton",
@@ -4871,15 +4825,15 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 473,
-				"top": 99,
-				"right": 572,
-				"bottom": 126
+				"left": 462,
+				"top": 91,
+				"right": 552,
+				"bottom": 120
 			},
 			"properties": {
 				"text": {
 					"type": "string",
-					"value": "1:2 Aspect"
+					"value": "2:1"
 				},
 				"role": {
 					"type": "string",
@@ -4911,23 +4865,23 @@
 				},
 				"face": {
 					"type": "color",
-					"value": "#cbe0ff"
+					"value": "#f7f8fa"
 				},
 				"frame": {
 					"type": "color",
-					"value": "#3674d2"
+					"value": "#cbd5e1"
 				},
 				"radius": {
 					"type": "int",
-					"value": 12
+					"value": 8
 				},
 				"face_enabled": {
 					"type": "bool",
-					"value": false
+					"value": true
 				},
 				"frame_enabled": {
 					"type": "bool",
-					"value": false
+					"value": true
 				},
 				"font": {
 					"type": "string",
@@ -4991,15 +4945,15 @@
 				},
 				"choice_a": {
 					"type": "string",
-					"value": "Recent A"
+					"value": "Portrait 1:2 "
 				},
 				"choice_b": {
 					"type": "string",
-					"value": "Recent B"
+					"value": " Landscape 2:1"
 				},
 				"choice_c": {
 					"type": "string",
-					"value": "Recent C"
+					"value": " Square 1:1"
 				},
 				"tooltip": {
 					"type": "string",
@@ -5007,11 +4961,47 @@
 				},
 				"theme_override": {
 					"type": "bool",
-					"value": true
+					"value": false
 				},
 				"cell_align_v": {
 					"type": "string",
 					"value": "Center"
+				},
+				"min_width": {
+					"type": "int",
+					"value": 60
+				},
+				"frame_width": {
+					"type": "int",
+					"value": 1
+				},
+				"shadow_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"shadow_distance": {
+					"type": "int",
+					"value": 6
+				},
+				"shadow_offset_x": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_offset_y": {
+					"type": "int",
+					"value": 0
+				},
+				"shadow_alpha": {
+					"type": "int",
+					"value": 90
+				},
+				"shadow_color": {
+					"type": "color",
+					"value": "#000000"
+				},
+				"shadow_curve": {
+					"type": "string",
+					"value": "Soft"
 				}
 			}
 		},
@@ -5025,10 +5015,10 @@
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 404,
-				"top": 100,
-				"right": 429,
-				"bottom": 125
+				"left": 429,
+				"top": 93,
+				"right": 454,
+				"bottom": 118
 			},
 			"properties": {
 				"text": {
@@ -5145,16 +5135,16 @@
 			"id": 78,
 			"parent": 49,
 			"type": "UiToolButton",
-			"name": "open_close_right_panel_02",
+			"name": "right_expand_toggle_btn",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 642,
-				"top": 99,
-				"right": 666,
-				"bottom": 123
+				"left": 754,
+				"top": 91,
+				"right": 778,
+				"bottom": 115
 			},
 			"properties": {
 				"text": {
@@ -5231,7 +5221,7 @@
 				},
 				"icon": {
 					"type": "string",
-					"value": "ICON_EDITOR_FORMAT_INDENT_DECREASE_48"
+					"value": "ICON_DESIGN_UNFOLD_MORE_48"
 				},
 				"icon_size": {
 					"type": "int",
@@ -5255,33 +5245,33 @@
 				},
 				"tooltip": {
 					"type": "string",
-					"value": "Expand"
+					"value": "Expand toggle"
 				}
 			}
 		},
 		{
-			"id": 79,
-			"parent": 49,
-			"type": "UiToolButton",
-			"name": "open_close_right_panel_03",
+			"id": 81,
+			"parent": 7,
+			"type": "UiButton",
+			"name": "theme_studio_button",
 			"children": [
 
 			],
 			"expanded": true,
 			"last_rect": {
-				"left": 674,
-				"top": 99,
-				"right": 698,
-				"bottom": 123
+				"left": 749,
+				"top": 36,
+				"right": 840,
+				"bottom": 65
 			},
 			"properties": {
 				"text": {
-					"type": "null",
-					"value": null
+					"type": "string",
+					"value": "Theme Studio"
 				},
 				"role": {
 					"type": "string",
-					"value": "Subtle"
+					"value": "Alert"
 				},
 				"h_sizing": {
 					"type": "string",
@@ -5293,15 +5283,133 @@
 				},
 				"fixed_width": {
 					"type": "int",
-					"value": 40
+					"value": 120
 				},
 				"fixed_height": {
 					"type": "int",
-					"value": 34
+					"value": 32
 				},
 				"width": {
 					"type": "int",
-					"value": 40
+					"value": 120
+				},
+				"height": {
+					"type": "int",
+					"value": 32
+				},
+				"face": {
+					"type": "color",
+					"value": "#cbe0ff"
+				},
+				"frame": {
+					"type": "color",
+					"value": "#3674d2"
+				},
+				"radius": {
+					"type": "int",
+					"value": 0
+				},
+				"face_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"frame_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"font": {
+					"type": "string",
+					"value": "Sans"
+				},
+				"font_size": {
+					"type": "int",
+					"value": 11
+				},
+				"align": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_h": {
+					"type": "string",
+					"value": "Center"
+				},
+				"align_v": {
+					"type": "string",
+					"value": "Center"
+				},
+				"icon": {
+					"type": "string",
+					"value": "None"
+				},
+				"icon_size": {
+					"type": "int",
+					"value": 18
+				},
+				"content_inset": {
+					"type": "int",
+					"value": 6
+				},
+				"content_gap": {
+					"type": "int",
+					"value": 4
+				},
+				"ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"icon_ink_enabled": {
+					"type": "bool",
+					"value": false
+				},
+				"tooltip": {
+					"type": "string",
+					"value": "Theme Studio"
+				}
+			}
+		},
+		{
+			"id": 82,
+			"parent": 7,
+			"type": "UiSplitButton",
+			"name": "export_split_btn",
+			"children": [
+
+			],
+			"expanded": true,
+			"last_rect": {
+				"left": 265,
+				"top": 36,
+				"right": 349,
+				"bottom": 65
+			},
+			"properties": {
+				"text": {
+					"type": "string",
+					"value": "Export"
+				},
+				"role": {
+					"type": "string",
+					"value": "Accent"
+				},
+				"h_sizing": {
+					"type": "string",
+					"value": "Fixed"
+				},
+				"v_sizing": {
+					"type": "string",
+					"value": "Expand"
+				},
+				"fixed_width": {
+					"type": "int",
+					"value": 84
+				},
+				"fixed_height": {
+					"type": "int",
+					"value": 30
+				},
+				"width": {
+					"type": "int",
+					"value": 112
 				},
 				"height": {
 					"type": "int",
@@ -5349,19 +5457,35 @@
 				},
 				"icon": {
 					"type": "string",
-					"value": "ICON_EDITOR_FORMAT_INDENT_INCREASE_48"
+					"value": "None"
 				},
 				"icon_size": {
 					"type": "int",
-					"value": 16
+					"value": 10
 				},
 				"content_inset": {
 					"type": "int",
-					"value": 4
+					"value": 6
 				},
 				"content_gap": {
 					"type": "int",
+					"value": 6
+				},
+				"split_width": {
+					"type": "int",
+					"value": 31
+				},
+				"split_content_gap": {
+					"type": "int",
 					"value": 4
+				},
+				"split_icon_size": {
+					"type": "int",
+					"value": 10
+				},
+				"popup_min_width": {
+					"type": "int",
+					"value": 220
 				},
 				"ink_enabled": {
 					"type": "bool",
@@ -5371,9 +5495,25 @@
 					"type": "bool",
 					"value": false
 				},
-				"tooltip": {
+				"choice_a": {
 					"type": "string",
-					"value": "Contract"
+					"value": "Header/Cpp"
+				},
+				"choice_b": {
+					"type": "string",
+					"value": "Cpp (Main)"
+				},
+				"choice_c": {
+					"type": "string",
+					"value": "Theam (only)"
+				},
+				"min_height": {
+					"type": "int",
+					"value": 24
+				},
+				"min_width": {
+					"type": "int",
+					"value": 74
 				}
 			}
 		}
