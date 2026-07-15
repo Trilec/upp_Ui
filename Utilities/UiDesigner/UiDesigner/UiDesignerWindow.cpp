@@ -258,7 +258,7 @@ void UiDesignerWindow::BuildDesigner()
                 .AddControl(aspect_preset_, DPI(92))
                 .AddControl(square_, DPI(32));
 
-    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
+    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard));
     preview_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
     preview_scroll_.SetInset(DPI(0));
     preview_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
@@ -285,7 +285,7 @@ void UiDesignerWindow::BuildTheme()
                        .AddControl(theme_inputs_, DPI(32))
                        .AddControl(theme_containers_, DPI(32));
 
-    gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Default));
+    gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard));
     gallery_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
     gallery_scroll_.SetInset(DPI(0));
     gallery_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);

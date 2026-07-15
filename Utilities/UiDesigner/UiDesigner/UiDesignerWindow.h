@@ -3,6 +3,7 @@
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
+#include <Ui/UiColorPicker.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include "UiDesignerStyle.h"
 
@@ -46,7 +47,7 @@ public:
 private:
     void Select(int i);
     void Cycle();
-    void Close();
+    void Close() override;
 
     UiDesignerPillBar tools_;
     UiToolButton close_;
