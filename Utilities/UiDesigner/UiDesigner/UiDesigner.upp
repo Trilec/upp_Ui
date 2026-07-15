@@ -1,15 +1,19 @@
-description "Greenfield Ui Designer application shell";
+description "Greenfield UiDesigner application";
 
 uses
     CtrlLib,
     Ui,
-    Utilities/PropertyEditor;
+    Utilities/PropertyEditor,
+    Utilities/UiDesigner/Services,
+    Utilities/UiDesigner/Theme;
 
 file
     UiDesignerStyle.h,
+    UiDesignerWidgets.h,
+    UiDesignerWidgets.cpp,
     UiDesignerWindow.h,
     UiDesignerWindow.cpp,
-    main.cpp;
-
-mainconfig
-    "GUI" = "GUI";
+    UiDesignerApplication.h,
+    UiDesignerApplication.cpp,
+    main.cpp,
+    README.md;

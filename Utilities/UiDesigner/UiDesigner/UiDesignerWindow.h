@@ -5,83 +5,58 @@
 #include <Ui/Ui.h>
 #include <Ui/UiColorPicker.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
-#include "UiDesignerStyle.h"
+#include <Utilities/UiDesigner/Services/UiDesignerServices.h>
+#include <Utilities/UiDesigner/Theme/UiDesignerThemeGallery.h>
+#include "UiDesignerWidgets.h"
 
 namespace Upp {
-
-enum UiDesignerPaneWidth { PANE_CLOSED, PANE_NORMAL, PANE_MEDIUM, PANE_WIDE };
-
-class UiDesignerPillBar : public UiPanel {
-public:
-    typedef UiDesignerPillBar CLASSNAME;
-
-    UiDesignerPillBar();
-    UiDesignerPillBar& SetInset(int inset);
-    UiDesignerPillBar& AddSection(const String& tip, const Image& icon);
-    UiDesignerPillBar& AddControl(Ctrl& ctrl, int width);
-    Event<int> WhenSelect;
-    virtual void Layout() override;
-
-private:
-    struct Item : Moveable<Item> {
-        Ptr<Ctrl> ctrl;
-        int width = 0;
-    };
-    Vector<Item> items_;
-    Array<UiToolButton> owned_buttons_;
-    int inset_ = DPI(20);
-};
-
-class UiDesignerSideColumn : public ParentCtrl {
-public:
-    typedef UiDesignerSideColumn CLASSNAME;
-
-    UiDesignerSideColumn();
-    UiDesignerSideColumn& RightColumn(bool b = true);
-    UiDesignerSideColumn& AddSection(const String& tip, const Image& icon, Ctrl& content);
-    void SetPaneWidth(UiDesignerPaneWidth width);
-    int GetDesiredWidth() const;
-    Event<> WhenWidthChanged;
-    virtual void Layout() override;
-
-private:
-    void Select(int i);
-    void Cycle();
-    void Close() override;
-
-    UiDesignerPillBar tools_;
-    UiToolButton close_;
-    UiToolButton expand_;
-    UiPanel content_surface_;
-    UiStack pages_;
-    UiDesignerPaneWidth width_ = PANE_NORMAL;
-    bool right_ = false;
-};
 
 class UiDesignerWindow : public TopWindow {
 public:
     typedef UiDesignerWindow CLASSNAME;
+
     UiDesignerWindow();
+
+    UiDesignerSession& Session() { return session_; }
+
     virtual void Layout() override;
+    virtual bool Key(dword key, int count) override;
+    virtual void Close() override;
 
 private:
     void BuildHeader();
     void BuildDesigner();
     void BuildTheme();
+    void ConnectServices();
+
     void ShowDesigner();
     void ShowTheme();
-    void PopulateThemeGallery();
+    void RefreshHierarchy();
+    void RefreshInspector();
+    void RefreshThemeInspector();
+    void RefreshCode();
+    void RefreshStatus(const String& text = String());
+
+    void ActivateToolbox(const String& id);
+    void SaveDocument(bool save_as);
+    void LoadDocument();
+    void ExportProject();
+    void ToggleDarkMode();
+    void ApplyThemeToShell();
+
+    UiDesignerSession session_;
 
     UiPanel header_surface_;
     UiTitleCard brand_;
     UiSplitButton save_;
     UiSplitButton load_;
     UiSplitButton export_;
+    UiLabel version_;
+    UiButton designer_mode_;
+    UiButton theme_mode_;
     UiDropdown theme_select_;
     UiToolButton dark_;
     UiToolButton help_;
-    UiButton designer_mode_;
-    UiButton theme_mode_;
 
     UiStack workspaces_;
     ParentCtrl designer_page_;
@@ -96,7 +71,21 @@ private:
     UiToolButton square_;
     UiScrollPanel preview_scroll_;
     UiPanel preview_surface_;
+    UiDesignerPreviewCanvas preview_canvas_;
     UiDesignerSideColumn designer_right_;
+
+    UiDesignerCatalogList presets_list_;
+    UiDesignerCatalogList layouts_list_;
+    UiDesignerCatalogList containers_list_;
+    UiDesignerCatalogList controls_list_;
+    UiDesignerCatalogList composites_list_;
+    UiDesignerCatalogList upp_controls_list_;
+
+    UiDesignerHierarchyView hierarchy_;
+    PropertyEditor inspector_;
+    PropertyEditor overrides_;
+    PropertyEditorModel overrides_model_;
+    UiDesignerCodeView code_;
 
     UiPanel theme_gallery_column_;
     UiDesignerPillBar theme_gallery_pill_;
@@ -105,28 +94,19 @@ private:
     UiToolButton theme_containers_;
     UiScrollPanel gallery_scroll_;
     UiPanel gallery_surface_;
+    UiDesignerThemeGallery theme_gallery_;
     UiDesignerSideColumn theme_right_;
 
-    UiScrollPanel presets_, layouts_, containers_, controls_, composites_, upp_controls_;
-    UiScrollPanel hierarchy_, overrides_, code_;
-    PropertyEditor inspector_;
     PropertyEditor theme_inspector_;
-    UiScrollPanel theme_code_;
-
-    UiLabel gallery_heading_;
-    UiButton gallery_button_;
-    UiLineEdit gallery_line_edit_;
-    UiCheckBox gallery_check_;
-    UiDropdown gallery_dropdown_;
-    UiSlider gallery_slider_;
-    UiProgressBar gallery_progress_;
-    UiColorPicker gallery_color_;
-    UiGroupPanel gallery_group_;
+    PropertyEditorModel theme_model_;
+    UiDesignerCodeView theme_code_;
 
     UiPanel footer_surface_;
     UiLabel footer_;
+
+    String current_path_;
 };
 
-} // namespace Upp
+}
 
 #endif

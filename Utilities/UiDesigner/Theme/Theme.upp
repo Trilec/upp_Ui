@@ -1,0 +1,13 @@
+description "UiDesigner complete Ui control theme gallery";
+
+uses
+    Ui,
+    CtrlLib,
+    Utilities/UiDesigner/Catalog,
+    Utilities/UiDesigner/Preview,
+    Utilities/UiDesigner/ThemeCore;
+
+file
+    UiDesignerThemeGallery.h,
+    UiDesignerThemeGallery.cpp,
+    README.md;

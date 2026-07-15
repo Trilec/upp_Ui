@@ -1,0 +1,13 @@
+description "UiDesigner in-process preview and overlays";
+
+uses
+    Ui,
+    CtrlLib,
+    Utilities/UiDesigner/Core,
+    Utilities/UiDesigner/Catalog,
+    Utilities/UiDesigner/Services;
+
+file
+    UiDesignerPreview.h,
+    UiDesignerPreview.cpp,
+    README.md;

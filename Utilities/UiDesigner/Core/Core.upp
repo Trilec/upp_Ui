@@ -1,0 +1,16 @@
+description "UiDesigner headless document core";
+
+uses
+    Core,
+    Draw;
+
+file
+    UiDesignerCore.h,
+    UiDesignerTypes.h,
+    UiDesignerDocument.h,
+    UiDesignerDocument.cpp,
+    UiDesignerOverlay.h,
+    UiDesignerOverlay.cpp,
+    UiDesignerSerialization.h,
+    UiDesignerSerialization.cpp,
+    README.md;

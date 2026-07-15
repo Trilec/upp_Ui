@@ -1,0 +1,18 @@
+description "UiDesigner session, edit, projection and automation services";
+
+uses
+    Utilities/PropertyEditorCore,
+    Utilities/UiDesigner/Core,
+    Utilities/UiDesigner/Commands,
+    Utilities/UiDesigner/Catalog,
+    Utilities/UiDesigner/CodeGen,
+    Utilities/UiDesigner/ThemeCore;
+
+file
+    UiDesignerServices.h,
+    UiDesignerProjection.h,
+    UiDesignerSession.h,
+    UiDesignerSession.cpp,
+    UiDesignerAutomation.h,
+    UiDesignerAutomation.cpp,
+    README.md;

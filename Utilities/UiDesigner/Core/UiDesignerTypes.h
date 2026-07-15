@@ -1,0 +1,222 @@
+#ifndef _Utilities_UiDesigner_Core_UiDesignerTypes_h_
+#define _Utilities_UiDesigner_Core_UiDesignerTypes_h_
+
+#include <Core/Core.h>
+#include <Draw/Draw.h>
+
+namespace Upp {
+
+inline Value UiDesignerMapValue(const ValueMap& map, const char *key,
+                                const Value& fallback = Value())
+{
+    const int q = map.Find(key);
+    return q >= 0 ? map.GetValue(q) : fallback;
+}
+
+using UiDesignerNodeId = int64;
+
+enum UiDesignerNodeFlags : dword {
+    UiDesignerNodeNone       = 0,
+    UiDesignerNodeContainer  = 1 << 0,
+    UiDesignerNodeLayout     = 1 << 1,
+    UiDesignerNodeStockUpp   = 1 << 2,
+    UiDesignerNodeStructural = 1 << 3,
+};
+
+enum UiDesignerChangeImpact : dword {
+    UiDesignerImpactNone             = 0,
+    UiDesignerImpactPaint            = 1 << 0,
+    UiDesignerImpactControlState     = 1 << 1,
+    UiDesignerImpactLocalLayout      = 1 << 2,
+    UiDesignerImpactAncestorLayout   = 1 << 3,
+    UiDesignerImpactSubtree          = 1 << 4,
+    UiDesignerImpactStructure        = 1 << 5,
+    UiDesignerImpactHierarchy        = 1 << 6,
+    UiDesignerImpactInspectorSchema  = 1 << 7,
+    UiDesignerImpactCode             = 1 << 8,
+    UiDesignerImpactThemeGlobal      = 1 << 9,
+    UiDesignerImpactFullPreview      = 1 << 10,
+};
+
+inline UiDesignerChangeImpact operator|(UiDesignerChangeImpact a, UiDesignerChangeImpact b)
+{
+    return (UiDesignerChangeImpact)((dword)a | (dword)b);
+}
+
+inline UiDesignerChangeImpact& operator|=(UiDesignerChangeImpact& a, UiDesignerChangeImpact b)
+{
+    a = a | b;
+    return a;
+}
+
+inline bool HasUiDesignerImpact(UiDesignerChangeImpact value, UiDesignerChangeImpact flag)
+{
+    return (((dword)value) & ((dword)flag)) != 0;
+}
+
+struct UiDesignerPropertyChange : Moveable<UiDesignerPropertyChange> {
+    UiDesignerNodeId node = 0;
+    String property;
+    Value old_value;
+    Value new_value;
+    UiDesignerChangeImpact impact = UiDesignerImpactNone;
+};
+
+enum class UiDesignerStructureChangeKind : byte {
+    Created = 0,
+    Removed,
+    Reparented,
+    Reordered,
+    Replaced,
+};
+
+struct UiDesignerStructureChange : Moveable<UiDesignerStructureChange> {
+    UiDesignerStructureChangeKind kind = UiDesignerStructureChangeKind::Created;
+    UiDesignerNodeId node = 0;
+    UiDesignerNodeId old_parent = 0;
+    UiDesignerNodeId new_parent = 0;
+    int old_index = -1;
+    int new_index = -1;
+};
+
+struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
+    uint64 transaction_id = 0;
+    uint64 document_revision = 0;
+    String reason;
+
+    Vector<UiDesignerPropertyChange> properties;
+    Vector<UiDesignerStructureChange> structure;
+
+    bool virtual_size_changed = false;
+    bool resources_changed = false;
+    bool schema_changed = false;
+
+    UiDesignerChangeSet() {}
+    UiDesignerChangeSet(const UiDesignerChangeSet& other)
+        : transaction_id(other.transaction_id),
+          document_revision(other.document_revision), reason(other.reason),
+          virtual_size_changed(other.virtual_size_changed),
+          resources_changed(other.resources_changed),
+          schema_changed(other.schema_changed)
+    {
+        properties.Append(clone(other.properties));
+        structure.Append(clone(other.structure));
+    }
+
+    UiDesignerChangeSet& operator=(const UiDesignerChangeSet& other)
+    {
+        if(this == &other)
+            return *this;
+        transaction_id = other.transaction_id;
+        document_revision = other.document_revision;
+        reason = other.reason;
+        properties.Clear();
+        structure.Clear();
+        properties.Append(clone(other.properties));
+        structure.Append(clone(other.structure));
+        virtual_size_changed = other.virtual_size_changed;
+        resources_changed = other.resources_changed;
+        schema_changed = other.schema_changed;
+        return *this;
+    }
+
+    UiDesignerChangeSet& operator=(UiDesignerChangeSet&& other)
+    {
+        if(this == &other)
+            return *this;
+        transaction_id = other.transaction_id;
+        document_revision = other.document_revision;
+        reason = pick(other.reason);
+        properties = pick(other.properties);
+        structure = pick(other.structure);
+        virtual_size_changed = other.virtual_size_changed;
+        resources_changed = other.resources_changed;
+        schema_changed = other.schema_changed;
+        return *this;
+    }
+
+    bool IsEmpty() const
+    {
+        return properties.IsEmpty() && structure.IsEmpty() &&
+               !virtual_size_changed && !resources_changed && !schema_changed;
+    }
+
+    UiDesignerChangeImpact CombinedImpact() const
+    {
+        UiDesignerChangeImpact result = UiDesignerImpactNone;
+        for(const auto& change : properties)
+            result |= change.impact;
+        if(!structure.IsEmpty())
+            result |= UiDesignerImpactStructure | UiDesignerImpactHierarchy |
+                      UiDesignerImpactCode | UiDesignerImpactSubtree;
+        if(schema_changed)
+            result |= UiDesignerImpactInspectorSchema;
+        if(resources_changed)
+            result |= UiDesignerImpactCode;
+        return result;
+    }
+
+    void Append(const UiDesignerChangeSet& other)
+    {
+        properties.Append(clone(other.properties));
+        structure.Append(clone(other.structure));
+        virtual_size_changed |= other.virtual_size_changed;
+        resources_changed |= other.resources_changed;
+        schema_changed |= other.schema_changed;
+        if(reason.IsEmpty())
+            reason = other.reason;
+    }
+};
+
+struct UiDesignerSelection {
+    Vector<UiDesignerNodeId> nodes;
+    UiDesignerNodeId primary = 0;
+    uint64 revision = 0;
+
+    bool Contains(UiDesignerNodeId id) const
+    {
+        return FindIndex(nodes, id) >= 0;
+    }
+
+    void Clear()
+    {
+        nodes.Clear();
+        primary = 0;
+        revision++;
+    }
+
+    void Set(UiDesignerNodeId id)
+    {
+        nodes.Clear();
+        if(id)
+            nodes.Add(id);
+        primary = id;
+        revision++;
+    }
+
+    void Toggle(UiDesignerNodeId id)
+    {
+        const int q = FindIndex(nodes, id);
+        if(q >= 0)
+            nodes.Remove(q);
+        else if(id)
+            nodes.Add(id);
+        primary = nodes.IsEmpty() ? 0 : id;
+        revision++;
+    }
+};
+
+struct UiDesignerSessionState {
+    UiDesignerSelection selection;
+    UiDesignerNodeId hovered = 0;
+    UiDesignerNodeId active_container = 0;
+    double canvas_zoom = 1.0;
+    Point canvas_scroll;
+    String active_workspace = "designer";
+    String active_left_section = "Layouts";
+    String active_right_section = "Inspector";
+};
+
+}
+
+#endif
