@@ -1,0 +1,20 @@
+{
+  "archive": "UiDesignerIntegratedSource.zip",
+  "archive_size": 78260,
+  "archive_sha256": "a01b813c0a238da99066c105102971304e0aae5d8e42f79ffbae4caeea9d27d6",
+  "base64_length": 104348,
+  "file_count": 69,
+  "parts": [
+    { "name": "part00.b64", "length": 10000, "sha256": "3e9aa488e83904fb1c60c517d9ee274ffb4aa593c4244c3611ac85453099a06c" },
+    { "name": "part01.b64", "length": 10000, "sha256": "67ce9195e49d607e276273b9fcd9048c726b1abbe828ff3fbdf89ab495d9d65a" },
+    { "name": "part02.b64", "length": 10000, "sha256": "bacc30ee0a78d17725e7902cb030f02be0265f61fc6633ec4ab0c6c023ee634b" },
+    { "name": "part03.b64", "length": 10000, "sha256": "7ab37cf753230789032b3fc80b54035698e8371b9d12bd7cbf1beea8d7e1b4c6" },
+    { "name": "part04.b64", "length": 10000, "sha256": "0e0ef9b14cbc11352522c30f4cfc83fc6575469d2243d76ac1e5d7063714188e" },
+    { "name": "part05.b64", "length": 10000, "sha256": "2fe8766e186a7bc9ed8f580da821ca833dd541fbe1598455637320610d335035" },
+    { "name": "part06.b64", "length": 10000, "sha256": "a9b0c749885a0ccad8091329f8eca574231a24bc8b2d3b9c715bfc12b7a61385" },
+    { "name": "part07.b64", "length": 10000, "sha256": "eac6ffeaf62a546809c62d14e1d4440b3f8445bed38e95a2afb3341822dd657b" },
+    { "name": "part08.b64", "length": 10000, "sha256": "f8569020cf153951040a7eb5b1708f956904df905a50392bfc3ad59393e4a929" },
+    { "name": "part09.b64", "length": 10000, "sha256": "dcb0896d379e8d1d057ee8bd3b73fd57801aebfcc7d5d209341df08d13b9ebf3" },
+    { "name": "part10.b64", "length": 4348, "sha256": "e33ee132453fbb8b930a3855ab1741c5a1fe0209d1ae2ce46dd6e804f0329403" }
+  ]
+}
