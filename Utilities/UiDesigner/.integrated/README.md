@@ -10,6 +10,8 @@ The archive contains 69 normal source/documentation files under `Utilities/UiDes
 - the integrated three-pill Designer / two-region Theme application
 - tests, architecture guards and build documentation
 
+The delivery is split into exactly 11 Base64 files, `part00.b64` through `part10.b64`. `manifest.json` records the required filename, length and SHA-256 of every part, as well as the decoded archive size, checksum and ZIP entry count.
+
 From the repository root run:
 
 ```powershell
@@ -22,6 +24,6 @@ Expected archive SHA-256:
 a01b813c0a238da99066c105102971304e0aae5d8e42f79ffbae4caeea9d27d6
 ```
 
-The installer validates the checksum before replacing the current shell files and creating the remaining packages. It does not commit or push.
+The installer refuses missing, extra, truncated or altered parts. It verifies every part before Base64 decoding, then verifies the decoded archive size, archive checksum and 69-entry ZIP inventory before extraction. It does not commit or push.
 
 After Gary's compile/runtime audit, the extracted ordinary source tree should be committed and this temporary `.integrated` delivery removed.
