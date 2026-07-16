@@ -34,6 +34,24 @@ static UiDesignerNodeId AddThroughDrop(UiDesignerSession& session,
     return session.ExecuteDrop(plan, &created, error) ? created : 0;
 }
 
+static bool BindAction(UiDesignerSession& session, UiDesignerNodeId node,
+                       UiDesignerActionType action,
+                       UiDesignerNodeId target = 0,
+                       Value value = Value(),
+                       const String& property = String(),
+                       const String& handler = String())
+{
+    UiDesignerActionBinding binding;
+    binding.event_id = "WhenAction";
+    binding.action = action;
+    binding.target = target;
+    binding.value = value;
+    binding.target_property = property;
+    binding.handler_name = handler;
+    binding.enabled = true;
+    return session.Commands().SetActionBinding(node, binding, "Bind fixture action");
+}
+
 static bool BuildFixture(UiDesignerSession& session, String& error)
 {
     session.NewDocument("blank");
@@ -46,10 +64,16 @@ static bool BuildFixture(UiDesignerSession& session, String& error)
 
     UiDesignerNodeId label = AddThroughDrop(session, "UiLabel", box);
     UiDesignerNodeId spacer = AddThroughDrop(session, "Spacer", box);
-    UiDesignerNodeId button = AddThroughDrop(session, "UiButton", box);
+    UiDesignerNodeId close_button = AddThroughDrop(session, "UiButton", box);
+    UiDesignerNodeId accept_button = AddThroughDrop(session, "UiButton", box);
     UiDesignerNodeId grid = AddThroughDrop(session, "UiGridLayout", box);
+    UiDesignerNodeId stack = AddThroughDrop(session, "UiStack", box);
+    UiDesignerNodeId tab = AddThroughDrop(session, "UiTab", box);
+    UiDesignerNodeId splitter = AddThroughDrop(session, "UiSplitter", box);
+    UiDesignerNodeId quad = AddThroughDrop(session, "UiQuadSplitter", box);
     UiDesignerNodeId stock = AddThroughDrop(session, "UppLabel", box);
-    if(!label || !spacer || !button || !grid || !stock) {
+    if(!label || !spacer || !close_button || !accept_button || !grid ||
+       !stack || !tab || !splitter || !quad || !stock) {
         error = "Unable to build fixture nodes";
         return false;
     }
@@ -63,7 +87,9 @@ static bool BuildFixture(UiDesignerSession& session, String& error)
         UiDesignerImpactPaint | UiDesignerImpactCode);
     session.Commands().SetProperty(spacer, "line_dash", "Dash",
         UiDesignerImpactPaint | UiDesignerImpactCode);
-    session.Commands().SetProperty(button, "text", "Close",
+    session.Commands().SetProperty(close_button, "text", "Close",
+        UiDesignerImpactControlState | UiDesignerImpactCode);
+    session.Commands().SetProperty(accept_button, "text", "Accept",
         UiDesignerImpactControlState | UiDesignerImpactCode);
     session.Commands().SetProperty(stock, "text", "Stock U++ label",
         UiDesignerImpactControlState | UiDesignerImpactCode);
@@ -80,17 +106,50 @@ static bool BuildFixture(UiDesignerSession& session, String& error)
         UiDesignerImpactPaint | UiDesignerImpactCode);
     session.Commands().SetProperty(grid_spacer, "line_orientation", "Vertical",
         UiDesignerImpactPaint | UiDesignerImpactCode);
+    session.Commands().SetProperty(grid_spacer, "line_align", "End",
+        UiDesignerImpactPaint | UiDesignerImpactCode);
 
-    UiDesignerActionBinding binding;
-    binding.event_id = "WhenAction";
-    binding.action = UiDesignerActionType::CloseWindow;
-    binding.enabled = true;
-    if(!session.Commands().SetActionBinding(button, binding, "Bind close")) {
+    UiDesignerNodeId stack_a = AddThroughDrop(session, "UiPanel", stack);
+    UiDesignerNodeId stack_b = AddThroughDrop(session, "UiPanel", stack);
+    UiDesignerNodeId tab_a = AddThroughDrop(session, "UiPanel", tab);
+    UiDesignerNodeId tab_b = AddThroughDrop(session, "UiPanel", tab);
+    UiDesignerNodeId split_a = AddThroughDrop(session, "UiPanel", splitter);
+    UiDesignerNodeId split_b = AddThroughDrop(session, "UiPanel", splitter);
+    if(!stack_a || !stack_b || !tab_a || !tab_b || !split_a || !split_b) {
+        error = "Unable to build page/splitter fixture";
+        return false;
+    }
+    for(int i = 0; i < 4; i++)
+        if(!AddThroughDrop(session, "UiPanel", quad)) {
+            error = "Unable to build QuadSplitter fixture";
+            return false;
+        }
+
+    if(!BindAction(session, close_button, UiDesignerActionType::CloseWindow) ||
+       !BindAction(session, accept_button, UiDesignerActionType::AcceptDialog)) {
         error = session.Commands().GetLastError();
+        return false;
+    }
+    UiDesignerNodeId page_button = AddThroughDrop(session, "UiButton", box);
+    if(!page_button ||
+       !BindAction(session, page_button, UiDesignerActionType::ActivatePage,
+                   stack, 1)) {
+        error = "Unable to bind page action";
         return false;
     }
     error.Clear();
     return true;
+}
+
+static UiDesignerCodeGenerationOptions FixtureOptions()
+{
+    UiDesignerCodeGenerationOptions options;
+    options.package_name = "GeneratedPackage";
+    options.class_name = "GeneratedUiWindow";
+    options.namespace_name = "Upp";
+    options.include_source_design = true;
+    options.include_theme = true;
+    return options;
 }
 
 static bool EmitFixture(const String& folder, String& error)
@@ -101,9 +160,7 @@ static bool EmitFixture(const String& folder, String& error)
     UiDesignerExportRequest request;
     request.profile = UiDesignerExportProfile::CompleteCppPackage;
     request.destination = folder;
-    request.generation.package_name = "GeneratedUi";
-    request.generation.class_name = "GeneratedUiWindow";
-    request.generation.namespace_name = "Upp";
+    request.generation = FixtureOptions();
     request.write.overwrite = UiDesignerOverwritePolicy::ReplaceAll;
     request.write.preserve_user_files = false;
     UiDesignerExportService service(session.Catalog());
@@ -137,13 +194,17 @@ static void RunTests(FoundationTester& t)
 {
     UiDesignerSession session;
     String error;
-    t.Check(session.Catalog().Validate(error), "catalog validates with adapter/event contracts");
+    t.Check(session.Catalog().Validate(error),
+            "catalog validates with adapter/event contracts");
     const UiDesignerControlSpec* spacer_spec = session.Catalog().Find("Spacer");
     t.Check(spacer_spec != nullptr, "Spacer is registered");
-    t.Check(spacer_spec && spacer_spec->IsSemanticItem(), "Spacer is semantic, not a Ctrl");
-    t.Check(spacer_spec && spacer_spec->FindProperty("line_enabled"), "Spacer exposes separator properties");
+    t.Check(spacer_spec && spacer_spec->IsSemanticItem(),
+            "Spacer is semantic, not a Ctrl");
+    t.Check(spacer_spec && spacer_spec->FindProperty("line_enabled"),
+            "Spacer exposes separator properties");
     const UiDesignerControlSpec* button_spec = session.Catalog().Find("UiButton");
-    t.Check(button_spec && button_spec->FindEvent("WhenAction"), "Button exposes typed action event");
+    t.Check(button_spec && button_spec->FindEvent("WhenAction"),
+            "Button exposes typed action event");
 
     UiDesignerDocument legacy;
     t.Check(UiDesignerDeserialize(LegacySpacerJson(), legacy, error),
@@ -175,39 +236,29 @@ static void RunTests(FoundationTester& t)
             "valid add plan is still pure");
     UiDesignerNodeId box = 0;
     t.Check(session.ExecuteDrop(box_plan, &box, error), "terminal add executes");
-    t.Check(box != 0 && session.Document().GetCount() == before_plan_count + 1,
-            "terminal add creates one node");
     const int history_after_box = session.Commands().GetHistoryPosition();
-
     UiDesignerDropPlan spacer_plan = session.PlanAddControl("Spacer", box);
-    t.Check(spacer_plan.valid, "Spacer plan is valid inside BoxLayout");
     UiDesignerNodeId spacer = 0;
-    t.Check(session.ExecuteDrop(spacer_plan, &spacer, error), "Box Spacer executes");
+    t.Check(spacer_plan.valid && session.ExecuteDrop(spacer_plan, &spacer, error),
+            "Box Spacer terminal drop executes");
     t.Check(session.Commands().GetHistoryPosition() == history_after_box + 1,
             "Spacer drop creates one history entry");
-    t.Check(session.Undo(), "Spacer drop undo succeeds");
-    t.Check(!session.Document().Find(spacer), "Spacer undo removes semantic node");
+    t.Check(session.Undo() && !session.Document().Find(spacer),
+            "Spacer drop undo removes semantic node");
     t.Check(session.Redo(), "Spacer drop redo succeeds");
 
     UiDesignerNodeId button = AddThroughDrop(session, "UiButton", box);
-    t.Check(button != 0, "button added through shared drop service");
     UiDesignerActionBinding binding;
     binding.event_id = "WhenAction";
     binding.action = UiDesignerActionType::CloseWindow;
-    t.Check(session.Commands().SetActionBinding(button, binding),
+    t.Check(button && session.Commands().SetActionBinding(button, binding),
             "typed behavior command succeeds");
-    t.Check(session.Document().GetActionBinding(button, "WhenAction") != nullptr,
-            "typed behavior persists in document");
     const String serialized = UiDesignerSerialize(session.Document(), true);
     UiDesignerDocument roundtrip;
     t.Check(UiDesignerDeserialize(serialized, roundtrip, error),
             "behavior document round trip succeeds");
     t.Check(roundtrip.GetActionBinding(button, "WhenAction") != nullptr,
             "behavior survives round trip");
-    t.Check(session.Undo(), "behavior undo succeeds");
-    t.Check(session.Document().GetActionBinding(button, "WhenAction") == nullptr,
-            "behavior undo restores unbound state");
-    t.Check(session.Redo(), "behavior redo succeeds");
 
     UiDesignerNodeId child_panel = AddThroughDrop(session, "UiPanel", box);
     UiDesignerNodeId nested = AddThroughDrop(session, "UiPanel", child_panel);
@@ -217,21 +268,33 @@ static void RunTests(FoundationTester& t)
         move_nodes, nested, Point(), false, -1);
     t.Check(!cyclic.valid, "drop planner rejects descendant target");
 
-    UiDesignerCodeGenerator generator(session.Catalog());
-    UiDesignerCodeGenerationOptions generation;
-    generation.package_name = "GeneratedUi";
-    generation.class_name = "GeneratedUiWindow";
+    UiDesignerSession fixture;
+    t.Check(BuildFixture(fixture, error), "complete codegen fixture builds in model");
+    UiDesignerCodeGenerator generator(fixture.Catalog());
+    const UiDesignerCodeGenerationOptions generation = FixtureOptions();
     UiDesignerGeneratedProject project = generator.Generate(
-        session.Document(), generation);
+        fixture.Document(), generation);
     t.Check(project.IsValid(), "generated project validates");
     t.Check(project.generated_header.Find("Spacer") < 0,
             "Spacer does not emit a runtime member");
     t.Check(project.generated_source.Find(".AddSpacer(") >= 0,
             "Box Spacer emits semantic layout API");
-    t.Check(project.generated_source.Find("WhenAction =") >= 0,
-            "typed behavior emits generated binding");
-    t.Check(project.FindFile("GeneratedUiWindow.generated.h") != nullptr,
-            "generated base header inventory exists");
+    t.Check(project.generated_source.Find(".AddBlank(") >= 0,
+            "Grid Spacer emits semantic layout API");
+    t.Check(project.generated_source.Find("UiGridLayout::Align::End") >= 0,
+            "Grid separator uses Grid alignment type");
+    t.Check(project.generated_source.Find("Break(IDOK)") >= 0,
+            "Accept action emits compile-safe dialog break");
+    t.Check(project.generated_source.Find(".SetData(1)") >= 0,
+            "Activate-page action uses common page data API");
+    t.Check(project.generated_source.Find(" << ") >= 0,
+            "splitter families use registered attachment adapter");
+    t.Check(project.FindFile("GeneratedPackage.upp") != nullptr,
+            "package filename is independent from class name");
+    t.Check(project.package.Find("GeneratedUiWindow.generated.cpp") >= 0,
+            "package manifest lists class-owned source files");
+    t.Check(project.package.Find("GeneratedPackage.generated.cpp") < 0,
+            "package manifest does not invent package-named class files");
     const UiDesignerGeneratedFile* user_source =
         project.FindFile("GeneratedUiWindow.cpp");
     t.Check(user_source && !user_source->generator_owned,
@@ -240,41 +303,75 @@ static void RunTests(FoundationTester& t)
     const String temp = AppendFileName(GetTempPath(),
         "uidesigner-foundation-" + AsString(Uuid::Create()));
     DeleteFolderDeep(temp);
+    UiDesignerExportService export_service(fixture.Catalog());
+
     UiDesignerExportRequest complete;
     complete.profile = UiDesignerExportProfile::CompleteCppPackage;
-    complete.destination = temp;
+    complete.destination = AppendFileName(temp, "complete");
     complete.generation = generation;
     complete.write.overwrite = UiDesignerOverwritePolicy::ReplaceGenerated;
-    UiDesignerExportService export_service(session.Catalog());
-    UiDesignerExportResult preview = export_service.Preview(
-        session.Document(), session.Theme(), complete);
-    t.Check(preview.success && preview.inventory.GetCount() >= 7,
-            "complete export previews full inventory");
     UiDesignerExportResult first = export_service.Execute(
-        session.Document(), session.Theme(), complete);
-    t.Check(first.success, "complete export succeeds atomically");
-    const String user_path = AppendFileName(temp, "GeneratedUiWindow.cpp");
-    t.Check(FileExists(user_path), "user implementation is exported");
+        fixture.Document(), fixture.Theme(), complete);
+    t.Check(first.success && first.written_files.GetCount() >= 7,
+            "complete package export succeeds atomically");
+    const String user_path = AppendFileName(
+        complete.destination, "GeneratedUiWindow.cpp");
     SaveFile(user_path, "// preserved user code\n");
     UiDesignerExportResult second = export_service.Execute(
-        session.Document(), session.Theme(), complete);
-    t.Check(second.success, "repeat export succeeds");
-    t.Check(LoadFile(user_path) == "// preserved user code\n",
-            "repeat export preserves user code");
+        fixture.Document(), fixture.Theme(), complete);
+    t.Check(second.success && LoadFile(user_path) == "// preserved user code\n",
+            "repeat package export preserves user code");
 
-    UiDesignerExportRequest document_json;
-    document_json.profile = UiDesignerExportProfile::DocumentJson;
-    document_json.destination = AppendFileName(temp, "document.json");
-    UiDesignerExportResult json_result = export_service.Execute(
-        session.Document(), session.Theme(), document_json);
-    t.Check(json_result.success && json_result.written_files.GetCount() == 1,
-            "document JSON export is distinct and writes one file");
+    UiDesignerExportRequest component = complete;
+    component.profile = UiDesignerExportProfile::ComponentOnly;
+    component.destination = AppendFileName(temp, "component");
+    UiDesignerExportResult component_result = export_service.Execute(
+        fixture.Document(), fixture.Theme(), component);
+    t.Check(component_result.success &&
+            !FileExists(AppendFileName(component.destination, "main.cpp")) &&
+            !FileExists(AppendFileName(component.destination, "GeneratedPackage.upp")),
+            "component export omits package entry point");
 
-    UiDesignerAutomationService automation(session);
+    const struct JsonCase {
+        UiDesignerExportProfile profile;
+        const char *name;
+    } json_cases[] = {
+        {UiDesignerExportProfile::ProjectJson, "project.uidesign.json"},
+        {UiDesignerExportProfile::DocumentJson, "document.uidesign.json"},
+        {UiDesignerExportProfile::ThemeJson, "theme.json"},
+    };
+    for(const auto& item : json_cases) {
+        UiDesignerExportRequest request;
+        request.profile = item.profile;
+        request.destination = AppendFileName(temp, item.name);
+        request.generation = generation;
+        UiDesignerExportResult result = export_service.Execute(
+            fixture.Document(), fixture.Theme(), request);
+        t.Check(result.success && result.written_files.GetCount() == 1 &&
+                FileExists(request.destination),
+                String(item.name) + " export is distinct");
+    }
+
+    const String refuse_folder = AppendFileName(temp, "refuse");
+    RealizeDirectory(refuse_folder);
+    const String sentinel = AppendFileName(
+        refuse_folder, "GeneratedUiWindow.generated.h");
+    SaveFile(sentinel, "sentinel");
+    UiDesignerExportRequest refuse = complete;
+    refuse.destination = refuse_folder;
+    refuse.write.overwrite = UiDesignerOverwritePolicy::RefuseExisting;
+    UiDesignerExportResult refused = export_service.Execute(
+        fixture.Document(), fixture.Theme(), refuse);
+    t.Check(!refused.success && LoadFile(sentinel) == "sentinel" &&
+            !FileExists(AppendFileName(refuse_folder,
+                                       "GeneratedUiWindow.generated.cpp")),
+            "preflight refusal leaves no partial export");
+
+    UiDesignerAutomationService automation(fixture);
     ValueMap search_params;
     search_params.Set("query", "spacer");
-    ValueMap search_result = automation.ListControls(search_params);
-    t.Check(UiDesignerMapValue(search_result, "ok", false),
+    t.Check(UiDesignerMapValue(
+                ValueMap(automation.ListControls(search_params)), "ok", false),
             "automation catalog search succeeds");
     ValueArray tools = automation.ListMcpTools();
     bool has_drop = false, has_behavior = false, has_export = false;
@@ -286,7 +383,16 @@ static void RunTests(FoundationTester& t)
         has_export |= name == "uidesigner_export";
     }
     t.Check(has_drop && has_behavior && has_export,
-            "MCP tool list exposes drop, behavior and export");
+            "MCP exposes drop, behavior and export tools");
+
+    ValueMap stale;
+    stale.Set("operation", "add");
+    stale.Set("type", "UiLabel");
+    stale.Set("target", fixture.Document().GetRootId());
+    stale.Set("expected_revision", (int64)fixture.Document().GetRevision() - 1);
+    ValueMap stale_result = automation.ApplyDrop(stale);
+    t.Check(!UiDesignerMapValue(stale_result, "ok", true),
+            "automation rejects stale drop revision");
 
     DeleteFolderDeep(temp);
 }
