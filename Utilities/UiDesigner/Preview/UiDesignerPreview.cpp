@@ -13,9 +13,35 @@ static UiRole ParseRole(const Value& value)
     return UiRole::Standard;
 }
 
-One<Ctrl> UiDesignerPreviewFactory::Create(const UiDesignerControlSpec& spec)
+static UiCrossAlign ParseCrossAlign(const Value& value)
 {
-    switch(spec.runtime_kind) {
+    const String align = value;
+    if(align == "Start") return UiCrossAlign::Start;
+    if(align == "End") return UiCrossAlign::End;
+    if(align == "Stretch" || align == "Fill") return UiCrossAlign::Stretch;
+    if(align == "Center") return UiCrossAlign::Center;
+    return UiCrossAlign::Auto;
+}
+
+static UiSpacerLineOrientation ParseLineOrientation(const Value& value)
+{
+    const String orientation = value;
+    if(orientation == "Vertical") return UiSpacerLineOrientation::Vertical;
+    if(orientation == "Horizontal") return UiSpacerLineOrientation::Horizontal;
+    return UiSpacerLineOrientation::Auto;
+}
+
+static UiLineStyle ParseLineDash(const Value& value)
+{
+    const String dash = value;
+    if(dash == "Dash") return DASHED;
+    if(dash == "Dot") return DOTTED;
+    return SOLID;
+}
+
+static One<Ctrl> CreateRuntime(UiDesignerRuntimeKind kind)
+{
+    switch(kind) {
     case UiDesignerRuntimeKind::UiLabel: return MakeOne<UiLabel>();
     case UiDesignerRuntimeKind::UiCheckBox: return MakeOne<UiCheckBox>();
     case UiDesignerRuntimeKind::UiRadioButton: return MakeOne<UiRadioButton>();
@@ -61,7 +87,6 @@ One<Ctrl> UiDesignerPreviewFactory::Create(const UiDesignerControlSpec& spec)
     case UiDesignerRuntimeKind::UiCompositeDropdown: return MakeOne<UiCompositeDropdown>();
     case UiDesignerRuntimeKind::UiCompositeLabel: return MakeOne<UiCompositeLabel>();
     case UiDesignerRuntimeKind::UiCompositeEdit: return MakeOne<UiCompositeEdit>();
-
     case UiDesignerRuntimeKind::UppLabel: return MakeOne<Label>();
     case UiDesignerRuntimeKind::UppButton: return MakeOne<Button>();
     case UiDesignerRuntimeKind::UppOption: return MakeOne<Option>();
@@ -81,73 +106,54 @@ One<Ctrl> UiDesignerPreviewFactory::Create(const UiDesignerControlSpec& spec)
     case UiDesignerRuntimeKind::UppSplitter: return MakeOne<Splitter>();
     case UiDesignerRuntimeKind::UppHScrollBar: return MakeOne<HScrollBar>();
     case UiDesignerRuntimeKind::UppVScrollBar: return MakeOne<VScrollBar>();
-    default: {
-        One<UiGroupPanel> placeholder = MakeOne<UiGroupPanel>();
-        placeholder->SetTitle(spec.display_name);
-        return pick(placeholder);
-    }
+    case UiDesignerRuntimeKind::SemanticSpacer: return One<Ctrl>();
+    default: return MakeOne<UiPanel>();
     }
 }
 
-void UiDesignerPreviewFactory::Initialize(Ctrl& ctrl,
-                                          const UiDesignerControlSpec& spec)
+static void InitializeRuntime(Ctrl& ctrl, const UiDesignerControlSpec& spec)
 {
     ctrl.Tip(spec.help.IsEmpty() ? spec.display_name : spec.help);
-    if(auto *button = dynamic_cast<UiButton *>(&ctrl))
-        button->SetText(spec.display_name);
-    if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
-        label->SetText(spec.display_name);
-    if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl))
-        group->SetTitle(spec.display_name);
-    if(auto *title = dynamic_cast<UiTitleCard *>(&ctrl))
-        title->SetTitle(spec.display_name);
-    if(auto *check = dynamic_cast<UiCheckBox *>(&ctrl))
-        check->SetText(spec.display_name);
-    if(auto *radio = dynamic_cast<UiRadioButton *>(&ctrl))
-        radio->SetText(spec.display_name);
+    if(auto *button = dynamic_cast<UiButton *>(&ctrl)) button->SetText(spec.display_name);
+    if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) label->SetText(spec.display_name);
+    if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl)) group->SetTitle(spec.display_name);
+    if(auto *title = dynamic_cast<UiTitleCard *>(&ctrl)) title->SetTitle(spec.display_name);
+    if(auto *check = dynamic_cast<UiCheckBox *>(&ctrl)) check->SetText(spec.display_name);
+    if(auto *radio = dynamic_cast<UiRadioButton *>(&ctrl)) radio->SetText(spec.display_name);
     if(auto *split = dynamic_cast<UiSplitButton *>(&ctrl))
         split->SetText(spec.display_name).Add("First", 1).Add("Second", 2);
     if(auto *drop = dynamic_cast<UiDropdown *>(&ctrl)) {
-        drop->UseInternalModel().Clear()
-            .Add("First", 1).Add("Second", 2).Add("Third", 3);
+        drop->UseInternalModel().Clear().Add("First", 1).Add("Second", 2).Add("Third", 3);
         drop->Select(0);
     }
-    if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl))
-        progress->Percent(true).Set(50, 100);
-    if(auto *slider = dynamic_cast<UiSlider *>(&ctrl))
-        slider->SetRange(0, 100).SetValue(50);
+    if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl)) progress->Percent(true).Set(50, 100);
+    if(auto *slider = dynamic_cast<UiSlider *>(&ctrl)) slider->SetRange(0, 100).SetValue(50);
     if(auto *breadcrumbs = dynamic_cast<UiBreadcrumbs *>(&ctrl)) {
         breadcrumbs->AddCrumb("Home", "0");
         breadcrumbs->AddCrumb("Current", "1");
         breadcrumbs->SetCurrentIndex(1);
     }
     if(auto *tree = dynamic_cast<UiTree *>(&ctrl)) {
-        tree->GetInternalModel().AddChild(
-            tree->GetInternalModel().Root(),
-            UiModelItem("Workspace", "workspace"));
+        tree->GetInternalModel().AddChild(tree->GetInternalModel().Root(),
+                                          UiModelItem("Workspace", "workspace"));
         tree->ShowConnectorLines(true);
     }
     if(auto *table = dynamic_cast<UiTable *>(&ctrl)) {
         table->UseInternalModel();
         table->GetInternalModel().SetSize(3, 3);
     }
-    if(auto *doc = dynamic_cast<UiDoc *>(&ctrl))
-        doc->SetText("UiDoc sample");
-    if(auto *menu = dynamic_cast<UiMenu *>(&ctrl))
-        menu->SetMenuBarMode(true);
+    if(auto *doc = dynamic_cast<UiDoc *>(&ctrl)) doc->SetText("UiDoc sample");
+    if(auto *menu = dynamic_cast<UiMenu *>(&ctrl)) menu->SetMenuBarMode(true);
     if(auto *composite = dynamic_cast<UiCompositeSlider *>(&ctrl)) {
         composite->SetLabel(spec.display_name);
         composite->SetData(50);
     }
-    if(auto *label = dynamic_cast<Label *>(&ctrl))
-        label->SetLabel(spec.display_name);
-    if(auto *button = dynamic_cast<Button *>(&ctrl))
-        button->SetLabel(spec.display_name);
-    if(auto *option = dynamic_cast<Option *>(&ctrl))
-        option->SetLabel(spec.display_name);
+    if(auto *label = dynamic_cast<Label *>(&ctrl)) label->SetLabel(spec.display_name);
+    if(auto *button = dynamic_cast<Button *>(&ctrl)) button->SetLabel(spec.display_name);
+    if(auto *option = dynamic_cast<Option *>(&ctrl)) option->SetLabel(spec.display_name);
 }
 
-UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
+static UiDesignerApplyResult ApplyRuntime(
     Ctrl& ctrl, const UiDesignerControlSpec& spec,
     const String& property, const Value& value)
 {
@@ -161,14 +167,10 @@ UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
     }
     if(property == "role") {
         const UiRole role = ParseRole(value);
-        if(auto *panel = dynamic_cast<UiPanel *>(&ctrl))
-            panel->SetCustomStyle(UiTheme::ResolvePanel(role));
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
-            button->SetCustomStyle(UiTheme::ResolveButton(role));
-        if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
-            label->SetCustomStyle(UiTheme::ResolveLabel(role));
-        if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl))
-            group->SetCustomStyle(UiTheme::ResolveGroupPanel(role));
+        if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) panel->SetCustomStyle(UiTheme::ResolvePanel(role));
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) button->SetCustomStyle(UiTheme::ResolveButton(role));
+        if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) label->SetCustomStyle(UiTheme::ResolveLabel(role));
+        if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl)) group->SetCustomStyle(UiTheme::ResolveGroupPanel(role));
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
@@ -202,20 +204,12 @@ UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
     }
     if(property == "value") {
         const double number = value;
-        if(auto *slider = dynamic_cast<UiSlider *>(&ctrl))
-            slider->SetValue(number);
-        else if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl))
-            progress->Set((int)number, 100);
-        else if(auto *intedit = dynamic_cast<UiIntEdit *>(&ctrl))
-            intedit->SetValue((int)number);
-        else if(auto *floatedit = dynamic_cast<UiFloatEdit *>(&ctrl))
-            floatedit->SetValue(number);
-        else
-            ctrl.SetData(value);
+        if(auto *slider = dynamic_cast<UiSlider *>(&ctrl)) slider->SetValue(number);
+        else if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl)) progress->Set((int)number, 100);
+        else if(auto *intedit = dynamic_cast<UiIntEdit *>(&ctrl)) intedit->SetValue((int)number);
+        else if(auto *floatedit = dynamic_cast<UiFloatEdit *>(&ctrl)) floatedit->SetValue(number);
+        else ctrl.SetData(value);
         ctrl.Refresh();
-        return UiDesignerApplyResult::AppliedControlState;
-    }
-    if(property == "minimum" || property == "maximum") {
         return UiDesignerApplyResult::AppliedControlState;
     }
     if(property == "color") {
@@ -223,17 +217,137 @@ UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
-    if(property == "rows" || property == "columns" ||
-       property == "direction")
+    if(property == "rows" || property == "columns" || property == "direction")
         return UiDesignerApplyResult::RequiresSubtreeRebuild;
-    if(property == "x" || property == "y" ||
-       property == "width" || property == "height" ||
-       property.StartsWith("minimum_") ||
-       property.StartsWith("maximum_"))
+    if(property == "x" || property == "y" || property == "width" || property == "height" ||
+       property.StartsWith("minimum_") || property.StartsWith("maximum_") ||
+       property == "grid_row" || property == "grid_column")
         return UiDesignerApplyResult::AppliedAncestorLayout;
-    if(property == "name")
+    if(property == "minimum" || property == "maximum" || property == "name")
         return UiDesignerApplyResult::AppliedControlState;
     return UiDesignerApplyResult::Rejected;
+}
+
+UiDesignerPreviewAdapterRegistry& UiDesignerPreviewAdapterRegistry::Global()
+{
+    static UiDesignerPreviewAdapterRegistry registry;
+    return registry;
+}
+
+void UiDesignerPreviewAdapterRegistry::Register(UiDesignerPreviewAdapter adapter)
+{
+    for(int i = 0; i < adapters_.GetCount(); i++)
+        if(adapters_[i].id == adapter.id) {
+            adapters_[i] = pick(adapter);
+            return;
+        }
+    adapters_.Add(pick(adapter));
+}
+
+const UiDesignerPreviewAdapter* UiDesignerPreviewAdapterRegistry::Find(const String& id) const
+{
+    for(const UiDesignerPreviewAdapter& adapter : adapters_)
+        if(adapter.id == id)
+            return &adapter;
+    return nullptr;
+}
+
+void UiDesignerPreviewAdapterRegistry::EnsureBuiltins()
+{
+    if(builtins_registered_)
+        return;
+    builtins_registered_ = true;
+    UiDesignerPreviewAdapter spacer;
+    spacer.id = "spacer";
+    spacer.semantic = true;
+    Register(pick(spacer));
+}
+
+const UiDesignerPreviewAdapter* UiDesignerPreviewFactory::Adapter(
+    const UiDesignerControlSpec& spec)
+{
+    UiDesignerPreviewAdapterRegistry& registry =
+        UiDesignerPreviewAdapterRegistry::Global();
+    registry.EnsureBuiltins();
+    if(const UiDesignerPreviewAdapter* existing =
+           registry.Find(spec.preview_adapter_id))
+        return existing;
+
+    UiDesignerPreviewAdapter adapter;
+    adapter.id = spec.preview_adapter_id;
+    adapter.semantic = spec.IsSemanticItem();
+    if(!adapter.semantic) {
+        const UiDesignerRuntimeKind kind = spec.runtime_kind;
+        adapter.create = [=] { return CreateRuntime(kind); };
+        adapter.initialize = InitializeRuntime;
+        adapter.apply = ApplyRuntime;
+    }
+    registry.Register(pick(adapter));
+    return registry.Find(spec.preview_adapter_id);
+}
+
+One<Ctrl> UiDesignerPreviewFactory::Create(const UiDesignerControlSpec& spec)
+{
+    const UiDesignerPreviewAdapter* adapter = Adapter(spec);
+    return adapter && adapter->create ? adapter->create() : One<Ctrl>();
+}
+
+void UiDesignerPreviewFactory::Initialize(Ctrl& ctrl,
+                                          const UiDesignerControlSpec& spec)
+{
+    const UiDesignerPreviewAdapter* adapter = Adapter(spec);
+    if(adapter && adapter->initialize)
+        adapter->initialize(ctrl, spec);
+}
+
+UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
+    Ctrl& ctrl, const UiDesignerControlSpec& spec,
+    const String& property, const Value& value)
+{
+    const UiDesignerPreviewAdapter* adapter = Adapter(spec);
+    return adapter && adapter->apply
+        ? adapter->apply(ctrl, spec, property, value)
+        : UiDesignerApplyResult::Rejected;
+}
+
+String UiDesignerCatalogDragText(const String& type_id)
+{
+    return "uidesigner/catalog/v1:" + type_id;
+}
+
+String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes)
+{
+    String out = "uidesigner/nodes/v1:";
+    for(int i = 0; i < nodes.GetCount(); i++) {
+        if(i) out << ',';
+        out << nodes[i];
+    }
+    return out;
+}
+
+bool UiDesignerParseCatalogDragText(const String& text, String& type_id)
+{
+    const String prefix = "uidesigner/catalog/v1:";
+    if(!text.StartsWith(prefix))
+        return false;
+    type_id = text.Mid(prefix.GetCount());
+    return !type_id.IsEmpty();
+}
+
+bool UiDesignerParseNodesDragText(const String& text,
+                                  Vector<UiDesignerNodeId>& nodes)
+{
+    const String prefix = "uidesigner/nodes/v1:";
+    if(!text.StartsWith(prefix))
+        return false;
+    nodes.Clear();
+    for(const String& item : Split(text.Mid(prefix.GetCount()), ',')) {
+        const int64 id = ScanInt64(item);
+        if(id <= 0)
+            return false;
+        nodes.Add(id);
+    }
+    return !nodes.IsEmpty();
 }
 
 UiDesignerPreviewCanvas::UiDesignerPreviewCanvas()
@@ -252,21 +366,9 @@ void UiDesignerPreviewCanvas::Bind(
     selection_ = selection;
 }
 
-void UiDesignerPreviewCanvas::SetCatalog(const UiDesignerCatalog *catalog)
-{
-    catalog_ = catalog;
-}
-
-void UiDesignerPreviewCanvas::SetDocument(const UiDesignerDocument *document)
-{
-    document_ = document;
-}
-
-void UiDesignerPreviewCanvas::SetOverlay(const UiDesignerTransientOverlay *overlay)
-{
-    overlay_ = overlay;
-}
-
+void UiDesignerPreviewCanvas::SetCatalog(const UiDesignerCatalog *catalog) { catalog_ = catalog; }
+void UiDesignerPreviewCanvas::SetDocument(const UiDesignerDocument *document) { document_ = document; }
+void UiDesignerPreviewCanvas::SetOverlay(const UiDesignerTransientOverlay *overlay) { overlay_ = overlay; }
 void UiDesignerPreviewCanvas::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
@@ -305,6 +407,14 @@ Rect UiDesignerPreviewCanvas::GetNodeRect(UiDesignerNodeId node) const
     return q >= 0 ? rects_[q] : Rect(0, 0, 0, 0);
 }
 
+UiDesignerNodeId UiDesignerPreviewCanvas::HitNode(Point p) const
+{
+    for(int i = rects_.GetCount() - 1; i >= 0; i--)
+        if(rects_[i].Contains(p))
+            return rects_.GetKey(i);
+    return 0;
+}
+
 void UiDesignerPreviewCanvas::DestroyInstances()
 {
     for(UiDesignerPreviewInstance& instance : instances_)
@@ -328,58 +438,181 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
     const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node.type) : nullptr;
     if(!spec || !instance.control)
         return;
-    for(const UiDesignerPropertySpec& property : spec->properties) {
-        Value value = Effective(node, property.id, property.default_value);
+    for(const UiDesignerPropertySpec& property : spec->properties)
         UiDesignerPreviewFactory::Apply(*instance.control, *spec,
-                                        property.id, value);
+            property.id, Effective(node, property.id, property.default_value));
+}
+
+static void ConfigureBoxSpacer(UiBoxLayout::ItemRef item,
+                               const UiDesignerNode& node)
+{
+    if(node.GetProperty("layout_break", false))
+        ;
+    else {
+        const int fixed = max((int)node.GetProperty("fixed_width", 0),
+                              (int)node.GetProperty("fixed_height", 0));
+        if((String)node.GetProperty("h_sizing", "Auto") == "Fixed" ||
+           (String)node.GetProperty("v_sizing", "Auto") == "Fixed")
+            item.Fixed(max(0, fixed));
+        else
+            item.Expand(max(1, (int)(double)node.GetProperty("weight", 1.0)));
+        item.MinMaxWidth((int)node.GetProperty("min_width", 0),
+                         max((int)node.GetProperty("min_width", 0),
+                             (int)node.GetProperty("max_width", INT_MAX)));
+        item.MinMaxHeight((int)node.GetProperty("min_height", 0),
+                          max((int)node.GetProperty("min_height", 0),
+                              (int)node.GetProperty("max_height", INT_MAX)));
+    }
+    item.LineEnabled(node.GetProperty("line_enabled", false))
+        .LineOrientation(ParseLineOrientation(node.GetProperty("line_orientation", "Horizontal")))
+        .LineAlign(ParseCrossAlign(node.GetProperty("line_align", "Center")))
+        .LineThickness((int)node.GetProperty("line_thickness", 1))
+        .LineDash(ParseLineDash(node.GetProperty("line_dash", "Solid")))
+        .LineInset((int)node.GetProperty("line_inset", 0))
+        .LineColorEnabled(node.GetProperty("line_color_enabled", false))
+        .LineColor(node.GetProperty("line_color", Color(128, 128, 128)));
+}
+
+static void ConfigureGridSpacer(UiGridLayout::BlankRef item,
+                                const UiDesignerNode& node)
+{
+    if((String)node.GetProperty("h_sizing", "Auto") == "Fill") item.ExpandX();
+    if((String)node.GetProperty("v_sizing", "Auto") == "Fill") item.ExpandY();
+    const int fw = node.GetProperty("fixed_width", 0);
+    const int fh = node.GetProperty("fixed_height", 0);
+    if(fw) item.FixedWidth(fw);
+    if(fh) item.FixedHeight(fh);
+    const int minw = node.GetProperty("min_width", 0);
+    const int minh = node.GetProperty("min_height", 0);
+    const int maxw = node.GetProperty("max_width", 0);
+    const int maxh = node.GetProperty("max_height", 0);
+    if(minw) item.MinWidth(minw);
+    if(minh) item.MinHeight(minh);
+    if(maxw) item.MaxWidth(maxw);
+    if(maxh) item.MaxHeight(maxh);
+    item.LineEnabled(node.GetProperty("line_enabled", false))
+        .LineOrientation(ParseLineOrientation(node.GetProperty("line_orientation", "Horizontal")))
+        .LineAlign(ParseCrossAlign(node.GetProperty("line_align", "Center")))
+        .LineThickness((int)node.GetProperty("line_thickness", 1))
+        .LineDash(ParseLineDash(node.GetProperty("line_dash", "Solid")))
+        .LineInset((int)node.GetProperty("line_inset", 0))
+        .LineColorEnabled(node.GetProperty("line_color_enabled", false))
+        .LineColor(node.GetProperty("line_color", Color(128, 128, 128)));
+}
+
+void UiDesignerPreviewCanvas::AttachSemanticItem(
+    UiDesignerPreviewInstance& instance, const UiDesignerNode& node,
+    UiDesignerPreviewInstance& parent_instance)
+{
+    instance.semantic = true;
+    instance.runtime_parent = parent_instance.node;
+    if(auto *box = dynamic_cast<UiBoxLayout *>(parent_instance.control.Get())) {
+        instance.layout_item_index = box->GetItemCount();
+        UiBoxLayout::ItemRef item = node.GetProperty("layout_break", false)
+            ? box->AddBreak(max(1, (int)(double)node.GetProperty("weight", 1.0)))
+            : box->AddSpacer(max(1, (int)(double)node.GetProperty("weight", 1.0)));
+        ConfigureBoxSpacer(item, node);
+    }
+    else if(auto *grid = dynamic_cast<UiGridLayout *>(parent_instance.control.Get())) {
+        instance.layout_item_index = grid->GetItemCount();
+        UiGridLayout::BlankRef item = grid->AddBlank(
+            node.GetProperty("grid_row", 0), node.GetProperty("grid_column", 0));
+        ConfigureGridSpacer(item, node);
     }
 }
 
-void UiDesignerPreviewCanvas::BuildNode(UiDesignerNodeId node_id,
-                                        ParentCtrl& parent, int depth,
-                                        UiDesignerNodeId runtime_parent)
+static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
+                               const UiDesignerNode& node,
+                               int& layout_item_index)
+{
+    if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
+        layout_item_index = box->GetItemCount();
+        box->Add(child).Fit();
+    }
+    else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
+        layout_item_index = grid->GetItemCount();
+        grid->Add(child, node.GetProperty("grid_row", 0),
+                   node.GetProperty("grid_column", 0), true);
+    }
+    else if(auto *tab = dynamic_cast<UiTab *>(&parent))
+        tab->Add(child, node.GetProperty("title", node.name));
+    else if(auto *stack = dynamic_cast<UiStack *>(&parent))
+        stack->Add(child, node.name);
+    else if(auto *accordion = dynamic_cast<UiAccordion *>(&parent)) {
+        const int section = accordion->AddSection(
+            node.GetProperty("title", node.name), true);
+        accordion->GetSectionContent(section).Add(child.SizePos());
+    }
+    else if(auto *split = dynamic_cast<Splitter *>(&parent))
+        *split << child;
+    else
+        parent.Add(child);
+}
+
+void UiDesignerPreviewCanvas::BuildNode(
+    UiDesignerNodeId node_id, ParentCtrl& fallback_parent, int depth,
+    UiDesignerNodeId runtime_parent)
 {
     if(!document_ || !catalog_)
         return;
     const UiDesignerNode* node = document_->Find(node_id);
     if(!node)
         return;
-
-    if(node_id != document_->GetRootId()) {
-        const UiDesignerControlSpec* spec = catalog_->Find(node->type);
-        if(!spec)
-            return;
-
-        UiDesignerPreviewInstance& instance = instances_.Add();
-        instance.node = node_id;
-        instance.runtime_parent = runtime_parent;
-        instance.type = node->type;
-        instance.control = UiDesignerPreviewFactory::Create(*spec);
-        instance.generation = ++generation_sequence_;
-        UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
-        parent.Add(*instance.control);
-        ApplyAllProperties(instance, *node);
-
-        ParentCtrl* child_parent = dynamic_cast<ParentCtrl *>(instance.control.Get());
-        const UiDesignerNodeId child_runtime_parent = child_parent
-            ? node_id : runtime_parent;
-        if(!child_parent)
-            child_parent = &parent;
+    if(node_id == document_->GetRootId()) {
         for(UiDesignerNodeId child : node->children)
-            BuildNode(child, *child_parent, depth + 1,
-                      child_runtime_parent);
+            BuildNode(child, fallback_parent, depth + 1, 0);
+        return;
     }
-    else {
-        for(UiDesignerNodeId child : node->children)
-            BuildNode(child, parent, depth + 1, 0);
+
+    const UiDesignerControlSpec* spec = catalog_->Find(node->type);
+    if(!spec)
+        return;
+    UiDesignerPreviewInstance& instance = instances_.Add();
+    instance.node = node_id;
+    instance.runtime_parent = runtime_parent;
+    instance.type = node->type;
+    instance.adapter_id = spec->preview_adapter_id;
+    instance.semantic = spec->IsSemanticItem();
+    instance.generation = ++generation_sequence_;
+
+    UiDesignerPreviewInstance* parent_instance = nullptr;
+    if(runtime_parent) {
+        const int p = FindInstance(runtime_parent);
+        if(p >= 0)
+            parent_instance = &instances_[p];
     }
+
+    if(instance.semantic) {
+        if(parent_instance && parent_instance->control)
+            AttachSemanticItem(instance, *node, *parent_instance);
+        return;
+    }
+
+    instance.control = UiDesignerPreviewFactory::Create(*spec);
+    if(!instance.control)
+        return;
+    UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
+    if(parent_instance && parent_instance->control)
+        AttachRuntimeChild(*parent_instance->control, *instance.control,
+                           *node, instance.layout_item_index);
+    else
+        fallback_parent.Add(*instance.control);
+    ApplyAllProperties(instance, *node);
+
+    ParentCtrl* child_fallback = dynamic_cast<ParentCtrl *>(instance.control.Get());
+    if(!child_fallback)
+        child_fallback = &fallback_parent;
+    const UiDesignerNodeId next_runtime_parent =
+        (spec->node_flags & UiDesignerNodeContainer) ? node_id : runtime_parent;
+    for(UiDesignerNodeId child : node->children)
+        BuildNode(child, *child_fallback, depth + 1, next_runtime_parent);
 }
 
 void UiDesignerPreviewCanvas::RebuildDocument()
 {
     DestroyInstances();
     if(document_ && catalog_)
-        BuildNode(document_->GetRootId(), *this, 0);
+        BuildNode(document_->GetRootId(), *this, 0, 0);
     stats_.full_rebuilds++;
     Layout();
     Refresh();
@@ -405,8 +638,7 @@ void UiDesignerPreviewCanvas::RemoveInstanceTree(
 {
     for(int i = instances_.GetCount() - 1; i >= 0; i--) {
         const UiDesignerNodeId candidate = instances_[i].node;
-        if((include_root && candidate == node) ||
-           IsRuntimeDescendant(candidate, node)) {
+        if((include_root && candidate == node) || IsRuntimeDescendant(candidate, node)) {
             if(instances_[i].control)
                 instances_[i].control->Remove();
             rects_.RemoveKey(candidate);
@@ -422,36 +654,22 @@ bool UiDesignerPreviewCanvas::RebuildSubtree(UiDesignerNodeId root)
     const UiDesignerNode* node = document_->Find(root);
     if(!node)
         return false;
-
     if(root == document_->GetRootId()) {
-        RemoveInstanceTree(root, false);
-        for(UiDesignerNodeId child : node->children)
-            BuildNode(child, *this, 0, 0);
+        RebuildDocument();
+        return true;
     }
-    else {
-        const int q = FindInstance(root);
-        if(q < 0)
-            return false;
-        ParentCtrl* root_parent = dynamic_cast<ParentCtrl *>(instances_[q].control.Get());
-        if(root_parent) {
-            RemoveInstanceTree(root, false);
-            ApplyAllProperties(instances_[q], *node);
-            for(UiDesignerNodeId child : node->children)
-                BuildNode(child, *root_parent, 1, root);
-        }
-        else {
-            const UiDesignerNodeId runtime_parent = instances_[q].runtime_parent;
-            ParentCtrl* parent = this;
-            if(runtime_parent) {
-                Ctrl* parent_ctrl = FindRuntime(runtime_parent);
-                ParentCtrl* candidate = dynamic_cast<ParentCtrl *>(parent_ctrl);
-                if(candidate)
-                    parent = candidate;
-            }
-            RemoveInstanceTree(root, true);
-            BuildNode(root, *parent, 0, runtime_parent);
-        }
+
+    const int q = FindInstance(root);
+    if(q < 0)
+        return false;
+    const UiDesignerNodeId runtime_parent = instances_[q].runtime_parent;
+    ParentCtrl* fallback = this;
+    if(runtime_parent) {
+        if(ParentCtrl* candidate = dynamic_cast<ParentCtrl *>(FindRuntime(runtime_parent)))
+            fallback = candidate;
     }
+    RemoveInstanceTree(root, true);
+    BuildNode(root, *fallback, 0, runtime_parent);
     stats_.subtree_rebuilds++;
     Layout();
     Refresh();
@@ -463,64 +681,58 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
 {
     const int q = FindInstance(node_id);
     const UiDesignerNode* node = document_ ? document_->Find(node_id) : nullptr;
-    const UiDesignerControlSpec* spec =
-        node && catalog_ ? catalog_->Find(node->type) : nullptr;
-    if(q < 0 || !spec || !instances_[q].control) {
+    const UiDesignerControlSpec* spec = node && catalog_ ? catalog_->Find(node->type) : nullptr;
+    if(q < 0 || !spec) {
         stats_.rejected++;
         return UiDesignerApplyResult::Rejected;
     }
 
-    UiDesignerApplyResult result = UiDesignerPreviewFactory::Apply(
-        *instances_[q].control, *spec, property, value);
-    stats_.live_applies++;
-
-    switch(result) {
-    case UiDesignerApplyResult::AppliedPaint:
-        stats_.paint_updates++;
-        break;
-    case UiDesignerApplyResult::AppliedLocalLayout:
-        stats_.local_layouts++;
-        Layout();
-        break;
-    case UiDesignerApplyResult::AppliedAncestorLayout:
-        stats_.ancestor_layouts++;
-        Layout();
-        break;
-    case UiDesignerApplyResult::RequiresSubtreeRebuild:
-        RebuildSubtree(node_id);
-        break;
-    case UiDesignerApplyResult::RequiresFullRebuild:
-        RebuildDocument();
-        break;
-    case UiDesignerApplyResult::Rejected:
-        stats_.rejected++;
-        break;
-    default:
-        break;
+    UiDesignerApplyResult result;
+    if(instances_[q].semantic) {
+        result = UiDesignerApplyResult::RequiresSubtreeRebuild;
+        const UiDesignerNodeId parent = node->parent;
+        if(!RebuildSubtree(parent))
+            RebuildDocument();
     }
+    else if(instances_[q].control) {
+        result = UiDesignerPreviewFactory::Apply(*instances_[q].control,
+                                                  *spec, property, value);
+        switch(result) {
+        case UiDesignerApplyResult::AppliedPaint: stats_.paint_updates++; break;
+        case UiDesignerApplyResult::AppliedLocalLayout:
+            stats_.local_layouts++; Layout(); break;
+        case UiDesignerApplyResult::AppliedAncestorLayout:
+            stats_.ancestor_layouts++; Layout(); break;
+        case UiDesignerApplyResult::RequiresSubtreeRebuild:
+            RebuildSubtree(node_id); break;
+        case UiDesignerApplyResult::RequiresFullRebuild:
+            RebuildDocument(); break;
+        case UiDesignerApplyResult::Rejected: stats_.rejected++; break;
+        default: break;
+        }
+    }
+    else {
+        result = UiDesignerApplyResult::Rejected;
+        stats_.rejected++;
+    }
+    stats_.live_applies++;
     Refresh();
     return result;
 }
 
-void UiDesignerPreviewCanvas::ApplyChangeSet(
-    const UiDesignerChangeSet& changes)
+void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
 {
-    if(HasUiDesignerImpact(changes.CombinedImpact(),
-                           UiDesignerImpactFullPreview) ||
+    if(HasUiDesignerImpact(changes.CombinedImpact(), UiDesignerImpactFullPreview) ||
        changes.schema_changed) {
         RebuildDocument();
         return;
     }
-
     if(!changes.structure.IsEmpty()) {
         Index<UiDesignerNodeId> affected;
         for(const UiDesignerStructureChange& change : changes.structure) {
-            UiDesignerNodeId root = change.new_parent
-                ? change.new_parent : change.old_parent;
-            if(!root)
-                root = document_ ? document_->GetRootId() : 0;
-            if(root && affected.Find(root) < 0)
-                affected.Add(root);
+            UiDesignerNodeId root = change.new_parent ? change.new_parent : change.old_parent;
+            if(!root) root = document_ ? document_->GetRootId() : 0;
+            if(root && affected.Find(root) < 0) affected.Add(root);
         }
         for(int i = 0; i < affected.GetCount(); i++)
             if(!RebuildSubtree(affected[i])) {
@@ -529,37 +741,70 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(
             }
         return;
     }
-
     if(changes.virtual_size_changed) {
         Layout();
         Refresh();
     }
     for(const UiDesignerPropertyChange& change : changes.properties)
         ApplyProperty(change.node, change.property, change.new_value);
+    if(!changes.behaviors.IsEmpty())
+        Refresh();
 }
 
-void UiDesignerPreviewCanvas::LayoutNode(UiDesignerNodeId node_id,
-                                         int ordinal, int depth)
+void UiDesignerPreviewCanvas::UpdateSemanticRect(
+    UiDesignerPreviewInstance& instance, const UiDesignerNode& node)
+{
+    Rect local;
+    if(Ctrl* parent = FindRuntime(instance.runtime_parent)) {
+        if(auto *box = dynamic_cast<UiBoxLayout *>(parent))
+            local = box->GetItemRect(instance.layout_item_index);
+        else if(auto *grid = dynamic_cast<UiGridLayout *>(parent))
+            local = grid->GetItemRect(instance.layout_item_index);
+    }
+    Rect parent_rect = GetNodeRect(instance.runtime_parent);
+    rects_.GetAdd(node.id) = local.Offseted(parent_rect.TopLeft());
+}
+
+void UiDesignerPreviewCanvas::LayoutNode(
+    UiDesignerNodeId node_id, int ordinal, int depth)
 {
     const int q = FindInstance(node_id);
     const UiDesignerNode* node = document_ ? document_->Find(node_id) : nullptr;
     if(q < 0 || !node)
         return;
-
-    const int x = (int)Effective(*node, "x", 20 + depth * 18);
-    const int y = (int)Effective(*node, "y", 20 + ordinal * 44);
-    const int cx = max(20, (int)Effective(*node, "width", 160));
-    const int cy = max(20, (int)Effective(*node, "height", 32));
-
-    instances_[q].control->SetRect(x, y, cx, cy);
-    Point origin(0, 0);
-    const UiDesignerNodeId runtime_parent = instances_[q].runtime_parent;
-    if(runtime_parent) {
-        const int parent_rect = rects_.Find(runtime_parent);
-        if(parent_rect >= 0)
-            origin = rects_[parent_rect].TopLeft();
+    UiDesignerPreviewInstance& instance = instances_[q];
+    if(instance.semantic) {
+        UpdateSemanticRect(instance, *node);
+        return;
     }
-    rects_.GetAdd(node_id) = RectC(origin.x + x, origin.y + y, cx, cy);
+    if(!instance.control)
+        return;
+
+    const UiDesignerNode* parent_node = document_->Find(node->parent);
+    const UiDesignerControlSpec* parent_spec = parent_node && catalog_
+        ? catalog_->Find(parent_node->type) : nullptr;
+    const String adapter = parent_spec ? parent_spec->child_adapter_id : "root";
+    const bool managed = adapter == "box" || adapter == "grid" ||
+                         adapter == "tab" || adapter == "stack" ||
+                         adapter == "accordion" || adapter == "splitter" ||
+                         adapter == "quad" || adapter == "single" ||
+                         adapter == "upp_tab" || adapter == "upp_splitter";
+    if(!managed) {
+        const int x = (int)Effective(*node, "x", 20 + depth * 18);
+        const int y = (int)Effective(*node, "y", 20 + ordinal * 44);
+        const int cx = max(20, (int)Effective(*node, "width", 160));
+        const int cy = max(20, (int)Effective(*node, "height", 32));
+        instance.control->SetRect(x, y, cx, cy);
+    }
+
+    Point origin(0, 0);
+    if(instance.runtime_parent) {
+        const int p = rects_.Find(instance.runtime_parent);
+        if(p >= 0)
+            origin = rects_[p].TopLeft();
+    }
+    const Rect local = instance.control->GetRect();
+    rects_.GetAdd(node_id) = local.Offseted(origin);
 
     int child_ordinal = 0;
     for(UiDesignerNodeId child : node->children)
@@ -574,9 +819,43 @@ void UiDesignerPreviewCanvas::Layout()
     if(!root)
         return;
     rects_.Clear();
+    for(UiDesignerPreviewInstance& instance : instances_)
+        if(instance.control)
+            instance.control->Layout();
     int ordinal = 0;
     for(UiDesignerNodeId child : root->children)
         LayoutNode(child, ordinal++, 0);
+}
+
+void UiDesignerPreviewCanvas::PaintSemantic(
+    Draw& w, const UiDesignerPreviewInstance& instance,
+    const UiDesignerNode& node) const
+{
+    Rect r = GetNodeRect(node.id);
+    if(r.IsEmpty())
+        return;
+    const bool selected = selection_ && selection_->Contains(node.id);
+    const Color frame = selected ? accent_ : Blend(SColorText(), SColorPaper(), 150);
+    w.DrawRect(r, Blend(SColorPaper(), frame, 235));
+    w.DrawRect(r.left, r.top, r.Width(), 1, frame);
+    w.DrawRect(r.left, r.bottom - 1, r.Width(), 1, frame);
+    w.DrawRect(r.left, r.top, 1, r.Height(), frame);
+    w.DrawRect(r.right - 1, r.top, 1, r.Height(), frame);
+    const String label = node.GetProperty("layout_break", false) ? "Break" : "Spacer";
+    w.DrawText(r.left + DPI(5), r.top + DPI(3), label, StdFont().Height(DPI(11)), frame);
+    if(node.GetProperty("line_enabled", false)) {
+        const Color line = node.GetProperty("line_color_enabled", false)
+            ? (Color)node.GetProperty("line_color", frame) : frame;
+        const int thickness = max(1, (int)node.GetProperty("line_thickness", 1));
+        const int inset = max(0, (int)node.GetProperty("line_inset", 0));
+        const String orientation = node.GetProperty("line_orientation", "Horizontal");
+        if(orientation == "Vertical")
+            w.DrawRect(r.CenterPoint().x, r.top + inset, thickness,
+                       max(0, r.Height() - inset * 2), line);
+        else
+            w.DrawRect(r.left + inset, r.CenterPoint().y,
+                       max(0, r.Width() - inset * 2), thickness, line);
+    }
 }
 
 void UiDesignerPreviewCanvas::Paint(Draw& w)
@@ -586,33 +865,124 @@ void UiDesignerPreviewCanvas::Paint(Draw& w)
     w.DrawRect(0, 0, min(doc_size.cx, GetSize().cx),
                min(doc_size.cy, GetSize().cy),
                Blend(SColorPaper(), SColorFace(), 180));
+    if(document_)
+        for(const UiDesignerPreviewInstance& instance : instances_)
+            if(instance.semantic)
+                if(const UiDesignerNode* node = document_->Find(instance.node))
+                    PaintSemantic(w, instance, *node);
 
     if(selection_) {
         for(UiDesignerNodeId id : selection_->nodes) {
             Rect r = GetNodeRect(id);
-            if(!r.IsEmpty()) {
-                Color color = id == selection_->primary
-                                  ? accent_
-                                  : Blend(accent_, White(), 115);
-                w.DrawRect(r.left, r.top, r.Width(), 2, color);
-                w.DrawRect(r.left, r.bottom - 2, r.Width(), 2, color);
-                w.DrawRect(r.left, r.top, 2, r.Height(), color);
-                w.DrawRect(r.right - 2, r.top, 2, r.Height(), color);
-            }
+            if(r.IsEmpty()) continue;
+            Color color = id == selection_->primary ? accent_
+                : Blend(accent_, White(), 115);
+            w.DrawRect(r.left, r.top, r.Width(), 2, color);
+            w.DrawRect(r.left, r.bottom - 2, r.Width(), 2, color);
+            w.DrawRect(r.left, r.top, 2, r.Height(), color);
+            w.DrawRect(r.right - 2, r.top, 2, r.Height(), color);
         }
+    }
+    if(!drop_indicator_.IsEmpty()) {
+        const Color color = drop_plan_.valid ? Color(34, 197, 94) : Color(220, 38, 38);
+        w.DrawRect(drop_indicator_.left, drop_indicator_.top,
+                   drop_indicator_.Width(), 2, color);
+        w.DrawRect(drop_indicator_.left, drop_indicator_.bottom - 2,
+                   drop_indicator_.Width(), 2, color);
+        w.DrawRect(drop_indicator_.left, drop_indicator_.top,
+                   2, drop_indicator_.Height(), color);
+        w.DrawRect(drop_indicator_.right - 2, drop_indicator_.top,
+                   2, drop_indicator_.Height(), color);
     }
 }
 
 void UiDesignerPreviewCanvas::LeftDown(Point p, dword keyflags)
 {
-    UiDesignerNodeId hit = 0;
-    for(int i = rects_.GetCount() - 1; i >= 0; i--)
-        if(rects_[i].Contains(p)) {
-            hit = rects_.GetKey(i);
-            break;
-        }
-    WhenSelectNode(hit, (keyflags & K_CTRL) != 0);
+    WhenSelectNode(HitNode(p), (keyflags & K_CTRL) != 0);
     SetFocus();
+}
+
+void UiDesignerPreviewCanvas::ClearDropPlan()
+{
+    drop_plan_ = UiDesignerDropPlan();
+    drop_indicator_ = Rect(0, 0, 0, 0);
+    drop_payload_.Clear();
+    Refresh();
+}
+
+void UiDesignerPreviewCanvas::UpdateDropPlan(Point p, const String& payload)
+{
+    if(!document_)
+        return;
+    UiDesignerNodeId target = HitNode(p);
+    if(!target)
+        target = document_->GetRootId();
+    UiDesignerNodeId placement_parent = target;
+    const UiDesignerNode* target_node = document_->Find(target);
+    if(target_node && !(target_node->flags & UiDesignerNodeContainer))
+        placement_parent = target_node->parent;
+    Rect parent_rect = GetNodeRect(placement_parent);
+    Point local = parent_rect.IsEmpty() ? p : p - parent_rect.TopLeft();
+
+    String type;
+    Vector<UiDesignerNodeId> nodes;
+    if(UiDesignerParseCatalogDragText(payload, type) && PlanCatalogDrop)
+        drop_plan_ = PlanCatalogDrop(type, target, local);
+    else if(UiDesignerParseNodesDragText(payload, nodes) && PlanNodeDrop)
+        drop_plan_ = PlanNodeDrop(nodes, target, local);
+    else {
+        ClearDropPlan();
+        return;
+    }
+    drop_payload_ = payload;
+    if(drop_plan_.parent == document_->GetRootId())
+        drop_indicator_ = RectC(local.x, local.y, DPI(160), DPI(36));
+    else {
+        Rect target_rect = GetNodeRect(drop_plan_.parent);
+        drop_indicator_ = target_rect.IsEmpty()
+            ? RectC(p.x - DPI(40), p.y - DPI(12), DPI(80), DPI(24))
+            : target_rect.Deflated(DPI(3));
+    }
+    if(WhenDropStatus)
+        WhenDropStatus(drop_plan_.valid ? drop_plan_.label : drop_plan_.reason);
+    Refresh();
+}
+
+void UiDesignerPreviewCanvas::DragEnter()
+{
+    Refresh();
+}
+
+void UiDesignerPreviewCanvas::DragAndDrop(Point p, PasteClip& d)
+{
+    if(!AcceptText(d)) {
+        ClearDropPlan();
+        return;
+    }
+    const String payload = GetString(d);
+    UpdateDropPlan(p, payload);
+    if(!drop_plan_.valid)
+        return;
+    d.SetAction(UiDesignerParseCatalogDragText(payload, drop_payload_)
+                    ? DND_COPY : DND_MOVE);
+    if(d.IsPaste()) {
+        String error;
+        const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
+        if(WhenDropStatus)
+            WhenDropStatus(ok ? "Drop completed" : error);
+        ClearDropPlan();
+    }
+}
+
+void UiDesignerPreviewCanvas::DragRepeat(Point p)
+{
+    if(!drop_payload_.IsEmpty())
+        UpdateDropPlan(p, drop_payload_);
+}
+
+void UiDesignerPreviewCanvas::DragLeave()
+{
+    ClearDropPlan();
 }
 
 }
