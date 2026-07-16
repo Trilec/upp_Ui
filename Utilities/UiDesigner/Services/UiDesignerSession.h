@@ -51,7 +51,10 @@ public:
     const PropertyEditorModel& InspectorModel() const { return inspector_model_; }
     PropertyEditorModel& BehaviorModel() { return behavior_model_; }
     const PropertyEditorModel& BehaviorModel() const { return behavior_model_; }
-    PropertyEditorModel& ThemeModel() { return theme_model_; }
+    PropertyEditorModel& ThemeModel() {
+        theme_.BuildPropertyModel(theme_model_);
+        return theme_model_;
+    }
     const PropertyEditorModel& ThemeModel() const { return theme_model_; }
 
     void AttachProjection(UiDesignerProjectionSink *projection);
