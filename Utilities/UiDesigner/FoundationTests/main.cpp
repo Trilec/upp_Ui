@@ -19,6 +19,15 @@ struct FoundationTester {
     }
 };
 
+static bool IsSuccessfulJsonRpcResponse(const String& response)
+{
+    Value parsed = ParseJSON(response);
+    if(IsError(parsed) || !parsed.Is<ValueMap>())
+        return false;
+    ValueMap object = parsed;
+    return object.Find("result") >= 0 && object.Find("error") < 0;
+}
+
 static UiDesignerNodeId AddThroughDrop(UiDesignerSession& session,
                                        const String& type,
                                        UiDesignerNodeId parent,
@@ -384,6 +393,22 @@ static void RunTests(FoundationTester& t)
     }
     t.Check(has_drop && has_behavior && has_export,
             "MCP exposes drop, behavior and export tools");
+
+    UiDesignerMcpEndpoint endpoint(automation);
+    const String resource_response = endpoint.HandleJsonLine(
+        R"JSON({"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"uidesigner://document"}})JSON");
+    t.Check(IsSuccessfulJsonRpcResponse(resource_response),
+            "MCP endpoint reads the document resource through its service");
+
+    const String tools_response = endpoint.HandleJsonLine(
+        R"JSON({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}})JSON");
+    t.Check(IsSuccessfulJsonRpcResponse(tools_response),
+            "MCP endpoint lists tools through its service");
+
+    const String call_response = endpoint.HandleJsonLine(
+        R"JSON({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"uidesigner_get_document","arguments":{}}})JSON");
+    t.Check(IsSuccessfulJsonRpcResponse(call_response),
+            "MCP endpoint dispatches tool calls through its service");
 
     ValueMap stale;
     stale.Set("operation", "add");
