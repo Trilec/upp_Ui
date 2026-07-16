@@ -13,6 +13,7 @@ struct UiDesignerNode {
     dword flags = UiDesignerNodeNone;
     Vector<UiDesignerNodeId> children;
     ValueMap properties;
+    Vector<UiDesignerActionBinding> actions;
 
     UiDesignerNode() {}
     UiDesignerNode(const UiDesignerNode& other)
@@ -20,10 +21,17 @@ struct UiDesignerNode {
           flags(other.flags), properties(other.properties)
     {
         children.Append(clone(other.children));
+        actions.Append(clone(other.actions));
     }
 
     Value GetProperty(const String& id, const Value& fallback = Value()) const;
     void SetProperty(const String& id, const Value& value);
+
+    int FindAction(const String& event_id) const;
+    const UiDesignerActionBinding* GetAction(const String& event_id) const;
+    UiDesignerActionBinding* GetAction(const String& event_id);
+    void SetAction(UiDesignerActionBinding binding);
+    bool RemoveAction(const String& event_id);
 };
 
 class UiDesignerDocument {
@@ -60,6 +68,11 @@ public:
     Value GetProperty(UiDesignerNodeId id, const String& property,
                       const Value& fallback = Value()) const;
 
+    bool SetActionBinding(UiDesignerNodeId id, UiDesignerActionBinding binding);
+    bool RemoveActionBinding(UiDesignerNodeId id, const String& event_id);
+    const UiDesignerActionBinding* GetActionBinding(UiDesignerNodeId id,
+                                                    const String& event_id) const;
+
     void BeginBatch(const String& reason);
     void CommitBatch();
     void CancelBatch();
@@ -73,6 +86,8 @@ public:
 private:
     int FindIndexById(UiDesignerNodeId id) const;
     void RemoveNodeRecursive(UiDesignerNodeId id, UiDesignerChangeSet& changes);
+    void RemoveBindingsTargeting(const Index<UiDesignerNodeId>& removed,
+                                 UiDesignerChangeSet& changes);
     void QueueChange(const UiDesignerChangeSet& changes);
     void EmitChange(UiDesignerChangeSet changes);
 
