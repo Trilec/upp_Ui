@@ -1,0 +1,20 @@
+description "UiDesigner Spacer, drop, behavior and export regression tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui,
+    Utilities/PropertyEditorCore,
+    Utilities/UiDesigner/Core,
+    Utilities/UiDesigner/Commands,
+    Utilities/UiDesigner/Catalog,
+    Utilities/UiDesigner/CodeGen,
+    Utilities/UiDesigner/ThemeCore,
+    Utilities/UiDesigner/Services;
+
+mainconfig
+    "GUI" = "1";
+
+file
+    main.cpp,
+    README.md;
