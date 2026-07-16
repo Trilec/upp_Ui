@@ -84,13 +84,17 @@ void UiDesignerDocument::Clear()
     batch_depth_ = 0;
 }
 
-void UiDesignerDocument::NewDocument(Size virtual_size)
+void UiDesignerDocument::NewDocument(Size virtual_size,
+                                     UiDesignerNodeId root_id)
 {
     Clear();
     virtual_size_ = virtual_size;
+    if(root_id <= 0)
+        root_id = 1;
     UiDesignerNode& root = nodes_.Add();
-    root.id = next_id_++;
+    root.id = root_id;
     root_id_ = root.id;
+    next_id_ = root_id + 1;
     root.type = "Window";
     root.name = "Window";
     root.flags = UiDesignerNodeContainer | UiDesignerNodeStructural;
@@ -134,16 +138,25 @@ UiDesignerNodeId UiDesignerDocument::AddNode(const String& type,
                                              UiDesignerNodeId parent,
                                              dword flags, int index)
 {
+    return AddNodeWithId(next_id_, type, name, parent, flags, index);
+}
+
+UiDesignerNodeId UiDesignerDocument::AddNodeWithId(
+    UiDesignerNodeId id, const String& type, const String& name,
+    UiDesignerNodeId parent, dword flags, int index)
+{
     UiDesignerNode* p = Find(parent);
-    if(!p)
+    if(id <= 0 || !p || Find(id))
         return 0;
 
     UiDesignerNode& node = nodes_.Add();
-    node.id = next_id_++;
+    node.id = id;
     node.parent = parent;
     node.type = type;
     node.name = name;
     node.flags = flags;
+    if(next_id_ <= id)
+        next_id_ = id + 1;
 
     if(index < 0 || index > p->children.GetCount())
         p->children.Add(node.id);
