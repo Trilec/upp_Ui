@@ -75,6 +75,8 @@ bool UiDesignerSession::ExecuteDrop(const UiDesignerDropPlan& plan,
     else {
         RebuildInspector();
         RebuildBehaviorModel();
+        WhenInspectorChanged();
+        WhenBehaviorChanged();
     }
     return true;
 }
@@ -139,7 +141,7 @@ void UiDesignerSession::RebuildBehaviorModel()
     if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
        spec->events.IsEmpty()) {
         active_behavior_event_.Clear();
-        WhenBehaviorChanged();
+        behavior_model_.StructureChanged();
         return;
     }
 
@@ -197,7 +199,6 @@ void UiDesignerSession::RebuildBehaviorModel()
             ? "Bound and persisted" : "Not yet bound; editing creates the binding",
         "Binding");
     behavior_model_.StructureChanged();
-    WhenBehaviorChanged();
 }
 
 bool UiDesignerSession::CommitBehaviorField(
@@ -258,6 +259,7 @@ bool UiDesignerSession::CommitBehaviorField(
         return false;
     }
     RebuildBehaviorModel();
+    WhenBehaviorChanged();
     WhenCodeChanged();
     error.Clear();
     return true;
@@ -277,6 +279,7 @@ bool UiDesignerSession::RemoveActiveBehavior(String& error)
         return false;
     }
     RebuildBehaviorModel();
+    WhenBehaviorChanged();
     WhenCodeChanged();
     error.Clear();
     return true;
