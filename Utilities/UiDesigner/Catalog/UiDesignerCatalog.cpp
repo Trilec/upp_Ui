@@ -87,6 +87,15 @@ const UiDesignerPropertySpec* UiDesignerControlSpec::FindProperty(
     return nullptr;
 }
 
+const UiDesignerEventSpec* UiDesignerControlSpec::FindEvent(
+    const String& id) const
+{
+    for(const UiDesignerEventSpec& event : events)
+        if(event.id == id)
+            return &event;
+    return nullptr;
+}
+
 void UiDesignerCatalog::Register(UiDesignerControlSpec spec)
 {
     if(Find(spec.type_id))
@@ -119,6 +128,26 @@ Vector<int> UiDesignerCatalog::FindCategory(const String& category) const
     return result;
 }
 
+Vector<int> UiDesignerCatalog::Search(const String& query,
+                                      const String& category) const
+{
+    Vector<int> result;
+    const String needle = ToLower(TrimBoth(query));
+    for(int i = 0; i < controls_.GetCount(); i++) {
+        const UiDesignerControlSpec& spec = controls_[i];
+        if(category != "All" && !category.IsEmpty() &&
+           spec.category != category)
+            continue;
+        if(needle.IsEmpty() ||
+           ToLower(spec.display_name).Find(needle) >= 0 ||
+           ToLower(spec.type_id).Find(needle) >= 0 ||
+           ToLower(spec.help).Find(needle) >= 0 ||
+           ToLower(spec.category).Find(needle) >= 0)
+            result.Add(i);
+    }
+    return result;
+}
+
 Vector<String> UiDesignerCatalog::GetCategories() const
 {
     Index<String> categories;
@@ -139,6 +168,157 @@ const UiDesignerPreset* UiDesignerCatalog::FindPreset(const String& id) const
     return nullptr;
 }
 
+bool UiDesignerCatalog::CanParent(const String& child_type,
+                                  const String& parent_type,
+                                  String& reason) const
+{
+    const UiDesignerControlSpec* child = Find(child_type);
+    if(!child) {
+        reason = "Unknown child type: " + child_type;
+        return false;
+    }
+
+    if(parent_type == "Window") {
+        if(child->IsSemanticItem()) {
+            reason = child->display_name + " must be inside a compatible layout";
+            return false;
+        }
+        reason.Clear();
+        return true;
+    }
+
+    const UiDesignerControlSpec* parent = Find(parent_type);
+    if(!parent) {
+        reason = "Unknown parent type: " + parent_type;
+        return false;
+    }
+    if(!HasUiDesignerCapability(parent->capabilities,
+                                UiDesignerCapabilityContainer)) {
+        reason = parent->display_name + " cannot contain children";
+        return false;
+    }
+    if(child->IsSemanticItem() &&
+       !HasUiDesignerCapability(parent->capabilities,
+                                UiDesignerCapabilityAcceptSpacer)) {
+        reason = child->display_name + " is only valid in Box or Grid layouts";
+        return false;
+    }
+    reason.Clear();
+    return true;
+}
+
+bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
+                                  const String& child_type,
+                                  UiDesignerNodeId parent_id, int index,
+                                  String& reason) const
+{
+    const UiDesignerNode* parent = document.Find(parent_id);
+    if(!parent) {
+        reason = "Drop target does not exist";
+        return false;
+    }
+    if(index < -1 || index > parent->children.GetCount()) {
+        reason = "Insertion index is outside the target";
+        return false;
+    }
+    if(!CanParent(child_type, parent->type, reason))
+        return false;
+
+    if(parent->type == "UiSplitter" && parent->children.GetCount() >= 2) {
+        reason = "Splitter already has two panes";
+        return false;
+    }
+    if(parent->type == "UiQuadSplitter" && parent->children.GetCount() >= 4) {
+        reason = "Quad Splitter already has four panes";
+        return false;
+    }
+    if((parent->type == "UiScrollPanel" ||
+        parent->type == "UiDirectContentHost") &&
+       parent->children.GetCount() >= 1) {
+        reason = parent->type + " accepts one direct content child";
+        return false;
+    }
+    reason.Clear();
+    return true;
+}
+
+bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
+                                         String& error) const
+{
+    Index<UiDesignerNodeId> ids;
+    Index<String> names;
+    for(const UiDesignerNode& node : document.GetNodes()) {
+        if(!node.id || ids.Find(node.id) >= 0) {
+            error = "Document contains a duplicate or zero node id";
+            return false;
+        }
+        ids.Add(node.id);
+        if(node.id == document.GetRootId())
+            continue;
+
+        const UiDesignerControlSpec* spec = Find(node.type);
+        if(!spec) {
+            error = "Unregistered control type: " + node.type;
+            return false;
+        }
+        const UiDesignerNode* parent = document.Find(node.parent);
+        if(!parent) {
+            error = node.name + " has a missing parent";
+            return false;
+        }
+        String reason;
+        if(!CanParent(node.type, parent->type, reason)) {
+            error = node.name + ": " + reason;
+            return false;
+        }
+        if(names.Find(node.name) >= 0) {
+            error = "Duplicate generated member name: " + node.name;
+            return false;
+        }
+        names.Add(node.name);
+
+        for(const UiDesignerActionBinding& binding : node.actions) {
+            if(!spec->FindEvent(binding.event_id)) {
+                error = spec->display_name + " does not expose event " +
+                        binding.event_id;
+                return false;
+            }
+            if(!binding.IsValid(&error))
+                return false;
+            if(binding.target && !document.Find(binding.target)) {
+                error = "Action target is missing for " + node.name;
+                return false;
+            }
+        }
+    }
+
+    for(const UiDesignerNode& parent : document.GetNodes()) {
+        Index<UiDesignerNodeId> children;
+        for(UiDesignerNodeId child_id : parent.children) {
+            if(children.Find(child_id) >= 0) {
+                error = parent.name + " contains a duplicate child";
+                return false;
+            }
+            children.Add(child_id);
+            const UiDesignerNode* child = document.Find(child_id);
+            if(!child || child->parent != parent.id) {
+                error = parent.name + " has an inconsistent child reference";
+                return false;
+            }
+        }
+        if(parent.type == "UiSplitter" && parent.children.GetCount() > 2) {
+            error = parent.name + " has more than two splitter panes";
+            return false;
+        }
+        if(parent.type == "UiQuadSplitter" && parent.children.GetCount() > 4) {
+            error = parent.name + " has more than four quad panes";
+            return false;
+        }
+    }
+    error.Clear();
+    return true;
+}
+
 bool UiDesignerCatalog::Validate(String& error) const
 {
     Index<String> ids;
@@ -153,6 +333,14 @@ bool UiDesignerCatalog::Validate(String& error) const
             return false;
         }
         ids.Add(spec.type_id);
+        if(spec.preview_adapter_id.IsEmpty()) {
+            error = spec.type_id + " has no preview adapter id";
+            return false;
+        }
+        if(spec.codegen && spec.codegen_adapter_id.IsEmpty()) {
+            error = spec.type_id + " has no code-generation adapter id";
+            return false;
+        }
         Index<String> property_ids;
         for(const UiDesignerPropertySpec& property : spec.properties) {
             if(property.id.IsEmpty()) {
@@ -169,6 +357,14 @@ bool UiDesignerCatalog::Validate(String& error) const
                         " has no declared impact";
                 return false;
             }
+        }
+        Index<String> event_ids;
+        for(const UiDesignerEventSpec& event : spec.events) {
+            if(event.id.IsEmpty() || event_ids.Find(event.id) >= 0) {
+                error = spec.type_id + " has an invalid/duplicate event id";
+                return false;
+            }
+            event_ids.Add(event.id);
         }
     }
     error.Clear();
