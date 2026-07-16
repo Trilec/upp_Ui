@@ -2,8 +2,6 @@ description "UiDesigner Spacer, drop, behavior and export regression tests";
 
 uses
     Core,
-    CtrlLib,
-    Ui,
     Utilities/PropertyEditorCore,
     Utilities/UiDesigner/Core,
     Utilities/UiDesigner/Commands,
