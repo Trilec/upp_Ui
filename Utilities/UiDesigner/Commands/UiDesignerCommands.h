@@ -30,6 +30,10 @@ public:
                              UiDesignerNodeId parent, dword flags,
                              const ValueMap& defaults = ValueMap(),
                              const String& label = String());
+    UiDesignerNodeId AddNodeAt(const String& type, const String& name,
+                               UiDesignerNodeId parent, int index, dword flags,
+                               const ValueMap& defaults = ValueMap(),
+                               const String& label = String());
     bool RemoveNode(UiDesignerNodeId node, const String& label = String());
     bool RemoveNodes(const Vector<UiDesignerNodeId>& nodes,
                      const String& label = "Delete selection");
@@ -40,6 +44,12 @@ public:
                    const String& label = "Move selection");
     bool RenameNode(UiDesignerNodeId node, const String& name,
                     const String& label = String());
+
+    bool SetActionBinding(UiDesignerNodeId node,
+                          const UiDesignerActionBinding& binding,
+                          const String& label = String());
+    bool RemoveActionBinding(UiDesignerNodeId node, const String& event_id,
+                             const String& label = String());
 
     bool ReplaceDocument(const UiDesignerDocument& document,
                          const String& label = "Replace document");
