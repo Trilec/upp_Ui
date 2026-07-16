@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$designer = Join-Path $root 'Utilities\UiDesigner'
 
 function Fail([string]$message) { throw "UiDesigner architecture guard: $message" }
 function Require-Path([string]$relative) {
@@ -68,8 +67,8 @@ foreach($headless in @(
     'Utilities\UiDesigner\CLI',
     'Utilities\UiDesigner\MCP'
 )) {
-    Forbid-InTree $headless '#include\s+<Ui/'
-    Forbid-InTree $headless '#include\s+<CtrlLib/'
+    Forbid-InTree $headless '^\s*#include\s+<Ui/'
+    Forbid-InTree $headless '^\s*#include\s+<CtrlLib/'
     Forbid-InTree $headless 'Utilities/Designer/'
 }
 
