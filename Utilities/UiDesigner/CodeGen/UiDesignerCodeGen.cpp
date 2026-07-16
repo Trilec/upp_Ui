@@ -58,13 +58,22 @@ static String NamespaceClose(const String& ns)
     return ns.IsEmpty() ? String() : "\n} // namespace " + ns + "\n";
 }
 
-static String CrossAlignExpr(const String& value)
+static String BoxAlignExpr(const String& value)
 {
     if(value == "Stretch" || value == "Fill") return "UiCrossAlign::Stretch";
     if(value == "Start") return "UiCrossAlign::Start";
     if(value == "End") return "UiCrossAlign::End";
     if(value == "Center") return "UiCrossAlign::Center";
     return "UiCrossAlign::Auto";
+}
+
+static String GridAlignExpr(const String& value)
+{
+    if(value == "Stretch" || value == "Fill") return "UiGridLayout::Align::Stretch";
+    if(value == "Start") return "UiGridLayout::Align::Start";
+    if(value == "End") return "UiGridLayout::Align::End";
+    if(value == "Center") return "UiGridLayout::Align::Center";
+    return "UiGridLayout::Align::Auto";
 }
 
 static String LineOrientationExpr(const String& value)
@@ -168,6 +177,13 @@ String UiDesignerCodeGenerator::QualifiedClass(
         : options.namespace_name + "::" + options.class_name + suffix;
 }
 
+static bool UsesLabelSetter(UiDesignerRuntimeKind kind)
+{
+    return kind == UiDesignerRuntimeKind::UppLabel ||
+           kind == UiDesignerRuntimeKind::UppButton ||
+           kind == UiDesignerRuntimeKind::UppOption;
+}
+
 void UiDesignerCodeGenerator::EmitSetup(
     String& out, const UiDesignerNode& node,
     const UiDesignerControlSpec& spec) const
@@ -189,7 +205,7 @@ void UiDesignerCodeGenerator::EmitSetup(
     if(const UiDesignerPropertySpec* text = spec.FindProperty("text")) {
         const Value value = node.GetProperty("text", text->default_value);
         if(!IsNull(value)) {
-            if(spec.stock_upp)
+            if(UsesLabelSetter(spec.runtime_kind))
                 out << "\t" << member << ".SetLabel(" << EmitValue(value) << ");\n";
             else
                 out << "\t" << member << ".SetText(" << EmitValue(value) << ");\n";
@@ -242,32 +258,51 @@ void UiDesignerCodeGenerator::EmitSpacer(
     const String p = MemberName(parent);
     const bool is_break = spacer.GetProperty("layout_break", false);
     String chain;
+    bool grid = false;
+
     if(parent.type == "UiBoxLayout") {
         chain = p + (is_break ? ".AddBreak()" : ".AddSpacer()");
         if(!is_break) {
-            const String direction = parent.GetProperty("direction", "V");
+            const bool horizontal = (String)parent.GetProperty("direction", "V") == "H";
             const String main_mode = spacer.GetProperty(
-                direction == "H" ? "h_sizing" : "v_sizing", "Auto");
-            const int fixed = spacer.GetProperty(
-                direction == "H" ? "fixed_width" : "fixed_height", 0);
+                horizontal ? "h_sizing" : "v_sizing", "Auto");
+            const String cross_mode = spacer.GetProperty(
+                horizontal ? "v_sizing" : "h_sizing", "Auto");
+            const int fixed_main = spacer.GetProperty(
+                horizontal ? "fixed_width" : "fixed_height", 0);
+            const int fixed_cross = spacer.GetProperty(
+                horizontal ? "fixed_height" : "fixed_width", 0);
+            const int min_main = spacer.GetProperty(
+                horizontal ? "min_width" : "min_height", 0);
+            const int max_main = spacer.GetProperty(
+                horizontal ? "max_width" : "max_height", 0);
+            const int min_cross = spacer.GetProperty(
+                horizontal ? "min_height" : "min_width", 0);
+            const int max_cross = spacer.GetProperty(
+                horizontal ? "max_height" : "max_width", 0);
             const int weight = max(1, (int)(double)spacer.GetProperty("weight", 1.0));
-            if(main_mode == "Fixed" && fixed > 0)
-                chain << ".Fixed(DPI(" << fixed << "))";
+
+            if(main_mode == "Fixed" && fixed_main > 0)
+                chain << ".Fixed(DPI(" << fixed_main << "))";
             else
                 chain << ".Expand(" << weight << ")";
+            if(min_main || max_main)
+                chain << ".MinMaxMain(DPI(" << min_main << "), "
+                      << (max_main ? "DPI(" + AsString(max_main) + ")" : "INT_MAX")
+                      << ")";
+            if(cross_mode == "Fixed" && fixed_cross > 0)
+                chain << ".MinMaxCross(DPI(" << fixed_cross << "), DPI("
+                      << fixed_cross << "))";
+            else if(min_cross || max_cross)
+                chain << ".MinMaxCross(DPI(" << min_cross << "), "
+                      << (max_cross ? "DPI(" + AsString(max_cross) + ")" : "INT_MAX")
+                      << ")";
+            if(cross_mode == "Fill")
+                chain << ".AlignSelf(UiCrossAlign::Stretch)";
         }
-        const int minw = spacer.GetProperty("min_width", 0);
-        const int maxw = spacer.GetProperty("max_width", 0);
-        const int minh = spacer.GetProperty("min_height", 0);
-        const int maxh = spacer.GetProperty("max_height", 0);
-        if(minw || maxw)
-            chain << ".MinMaxWidth(DPI(" << minw << "), "
-                  << (maxw ? "DPI(" + AsString(maxw) + ")" : "INT_MAX") << ")";
-        if(minh || maxh)
-            chain << ".MinMaxHeight(DPI(" << minh << "), "
-                  << (maxh ? "DPI(" + AsString(maxh) + ")" : "INT_MAX") << ")";
     }
     else if(parent.type == "UiGridLayout") {
+        grid = true;
         const int row = spacer.GetProperty("grid_row", 0);
         const int column = spacer.GetProperty("grid_column", 0);
         chain = p + ".AddBlank(" + AsString(row) + ", " + AsString(column) + ")";
@@ -294,12 +329,12 @@ void UiDesignerCodeGenerator::EmitSpacer(
     }
 
     if(spacer.GetProperty("line_enabled", false)) {
+        const String align = spacer.GetProperty("line_align", "Center");
         chain << ".LineEnabled()"
               << ".LineOrientation("
               << LineOrientationExpr(spacer.GetProperty("line_orientation", "Horizontal"))
               << ")"
-              << ".LineAlign("
-              << CrossAlignExpr(spacer.GetProperty("line_align", "Center")) << ")"
+              << ".LineAlign(" << (grid ? GridAlignExpr(align) : BoxAlignExpr(align)) << ")"
               << ".LineThickness(DPI("
               << (int)spacer.GetProperty("line_thickness", 1) << "))"
               << ".LineDash("
@@ -314,14 +349,101 @@ void UiDesignerCodeGenerator::EmitSpacer(
     out << "\t" << chain << ";\n";
 }
 
+struct UiDesignerChildAttachContext {
+    String& out;
+    const String& parent;
+    const String& member;
+    const UiDesignerNode& child;
+    const String& title;
+};
+
+typedef void (*UiDesignerChildAttachFn)(UiDesignerChildAttachContext&);
+
+static void AttachRoot(UiDesignerChildAttachContext& c)
+{
+    c.out << "\tAdd(" << c.member << ");\n";
+}
+
+static void AttachAdd(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member << ");\n";
+}
+
+static void AttachBox(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member << ").Fit();\n";
+}
+
+static void AttachGrid(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member << ", "
+          << (int)c.child.GetProperty("grid_row", 0) << ", "
+          << (int)c.child.GetProperty("grid_column", 0) << ", true);\n";
+}
+
+static void AttachTab(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member << ", "
+          << CppString(c.title) << ");\n";
+}
+
+static void AttachStack(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member << ", "
+          << CppString(c.child.name) << ");\n";
+}
+
+static void AttachAccordion(UiDesignerChildAttachContext& c)
+{
+    const String section = "section_" + AsString(c.child.id);
+    c.out << "\tconst int " << section << " = " << c.parent
+          << ".AddSection(" << CppString(c.title) << ", true);\n"
+          << "\t" << c.parent << ".GetSectionContent(" << section
+          << ").Add(" << c.member << ".SizePos());\n";
+}
+
+static void AttachSplitter(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << " << " << c.member << ";\n";
+}
+
+struct UiDesignerChildAdapterEntry {
+    const char *id;
+    UiDesignerChildAttachFn emit;
+};
+
+static const UiDesignerChildAdapterEntry *FindChildAdapter(const String& id)
+{
+    static const UiDesignerChildAdapterEntry adapters[] = {
+        {"root", AttachRoot},
+        {"add", AttachAdd},
+        {"single", AttachAdd},
+        {"box", AttachBox},
+        {"grid", AttachGrid},
+        {"tab", AttachTab},
+        {"upp_tab", AttachTab},
+        {"stack", AttachStack},
+        {"accordion", AttachAccordion},
+        {"splitter", AttachSplitter},
+        {"quad", AttachSplitter},
+        {"upp_splitter", AttachSplitter},
+    };
+    for(const auto& adapter : adapters)
+        if(id == adapter.id)
+            return &adapter;
+    return nullptr;
+}
+
 void UiDesignerCodeGenerator::EmitChildren(
     String& out, const UiDesignerDocument& document,
     const UiDesignerNode& node) const
 {
     const String parent = node.id == document.GetRootId()
-                              ? String() : MemberName(node);
+        ? String() : MemberName(node);
     const UiDesignerControlSpec* parent_spec =
         node.id == document.GetRootId() ? nullptr : catalog_.Find(node.type);
+    const String adapter_id = parent_spec ? parent_spec->child_adapter_id : "root";
+    const UiDesignerChildAdapterEntry *adapter = FindChildAdapter(adapter_id);
 
     for(UiDesignerNodeId child_id : node.children) {
         const UiDesignerNode* child = document.Find(child_id);
@@ -338,34 +460,13 @@ void UiDesignerCodeGenerator::EmitChildren(
         const String member = MemberName(*child);
         const String title = child->GetProperty(
             "title", child->GetProperty("text", child->name));
-        const String adapter = parent_spec ? parent_spec->child_adapter_id : "root";
-
-        if(adapter == "root" || parent.IsEmpty())
-            out << "\tAdd(" << member << ");\n";
-        else if(adapter == "box")
-            out << "\t" << parent << ".Add(" << member << ").Fit();\n";
-        else if(adapter == "grid")
-            out << "\t" << parent << ".Add(" << member << ", "
-                << (int)child->GetProperty("grid_row", 0) << ", "
-                << (int)child->GetProperty("grid_column", 0)
-                << ", true);\n";
-        else if(adapter == "tab" || adapter == "upp_tab")
-            out << "\t" << parent << ".Add(" << member << ", "
-                << EmitValue(title) << ");\n";
-        else if(adapter == "stack")
-            out << "\t" << parent << ".Add(" << member << ", "
-                << EmitValue(child->name) << ");\n";
-        else if(adapter == "accordion") {
-            const String section = "section_" + AsString(child->id);
-            out << "\tconst int " << section << " = " << parent
-                << ".AddSection(" << EmitValue(title) << ", true);\n"
-                << "\t" << parent << ".GetSectionContent(" << section
-                << ").Add(" << member << ".SizePos());\n";
+        if(adapter) {
+            UiDesignerChildAttachContext context{out, parent, member, *child, title};
+            adapter->emit(context);
         }
-        else if(adapter == "upp_splitter")
-            out << "\t" << parent << " << " << member << ";\n";
         else
-            out << "\t" << parent << ".Add(" << member << ");\n";
+            out << "\t#error Unsupported UiDesigner child adapter "
+                << CppString(adapter_id) << "\n";
         EmitChildren(out, document, *child);
     }
 }
@@ -374,6 +475,14 @@ static String EventLambdaPrefix(const String& event_id)
 {
     if(event_id == "WhenSelect")
         return "[=](int, const Value&)";
+    if(event_id == "WhenPageChanged" || event_id == "WhenPageMoved" ||
+       event_id == "WhenReordered")
+        return "[=](int, int)";
+    if(event_id == "WhenSectionToggled")
+        return "[=](int, bool)";
+    if(event_id == "WhenClose" || event_id == "WhenRemoved" ||
+       event_id == "WhenAdded" || event_id == "WhenPageRemoved")
+        return "[=](int)";
     return "[=]";
 }
 
@@ -403,10 +512,10 @@ void UiDesignerCodeGenerator::EmitBinding(
         body = "Close();";
         break;
     case UiDesignerActionType::AcceptDialog:
-        body = "AcceptBreak(IDOK);";
+        body = "Break(IDOK);";
         break;
     case UiDesignerActionType::CancelDialog:
-        body = "RejectBreak(IDCANCEL);";
+        body = "Break(IDCANCEL);";
         break;
     case UiDesignerActionType::SetProperty:
         if(!target)
@@ -415,7 +524,8 @@ void UiDesignerCodeGenerator::EmitBinding(
             body = target_member + ".Show(" + EmitValue(binding.value) + ");";
         else if(binding.target_property == "enabled")
             body = target_member + ".Enable(" + EmitValue(binding.value) + ");";
-        else if(binding.target_property == "text" && target_spec && target_spec->stock_upp)
+        else if(binding.target_property == "text" && target_spec &&
+                UsesLabelSetter(target_spec->runtime_kind))
             body = target_member + ".SetLabel(" + EmitValue(binding.value) + ");";
         else if(binding.target_property == "text")
             body = target_member + ".SetText(" + EmitValue(binding.value) + ");";
@@ -440,7 +550,7 @@ void UiDesignerCodeGenerator::EmitBinding(
         break;
     case UiDesignerActionType::ActivatePage:
         body = target
-            ? target_member + ".SetActivePage((int)" + EmitValue(binding.value) + ");"
+            ? target_member + ".SetData(" + EmitValue(binding.value) + ");"
             : "/* Missing ActivatePage target */";
         break;
     case UiDesignerActionType::CallNamedHandler:
@@ -448,8 +558,14 @@ void UiDesignerCodeGenerator::EmitBinding(
         break;
     }
 
-    out << "\t" << member << "." << binding.event_id << " = "
-        << EventLambdaPrefix(binding.event_id) << " { " << body << " };\n";
+    String event = binding.event_id;
+    if(node.type == "UiStack" && event == "WhenAction")
+        event = "WhenPageChanged";
+    else if(node.type == "UiAccordion" && event == "WhenAction")
+        event = "WhenSectionToggled";
+
+    out << "\t" << member << "." << event << " = "
+        << EventLambdaPrefix(event) << " { " << body << " };\n";
 }
 
 Vector<String> UiDesignerCodeGenerator::CollectHandlers(
@@ -474,8 +590,7 @@ String UiDesignerCodeGenerator::GenerateHeader(
     UiDesignerCodeGenerationOptions options;
     options.package_name = class_name;
     options.class_name = class_name;
-    UiDesignerGeneratedProject project = Generate(document, options);
-    return project.generated_header;
+    return Generate(document, options).generated_header;
 }
 
 String UiDesignerCodeGenerator::GenerateSource(
@@ -484,17 +599,17 @@ String UiDesignerCodeGenerator::GenerateSource(
     UiDesignerCodeGenerationOptions options;
     options.package_name = class_name;
     options.class_name = class_name;
-    UiDesignerGeneratedProject project = Generate(document, options);
-    return project.generated_source;
+    return Generate(document, options).generated_source;
 }
 
-String UiDesignerCodeGenerator::GeneratePackage(const String& package_name) const
+String UiDesignerCodeGenerator::GeneratePackage(const String& class_name) const
 {
     return "description \"Generated UiDesigner application\";\n\n"
            "uses\n\tCtrlLib,\n\tUi;\n\n"
-           "file\n\t" + package_name + ".generated.h,\n\t" +
-           package_name + ".generated.cpp,\n\t" + package_name + ".h,\n\t" +
-           package_name + ".cpp,\n\tmain.cpp;\n";
+           "mainconfig\n\t\"GUI\" = \"1\";\n\n"
+           "file\n\t" + class_name + ".generated.h,\n\t" +
+           class_name + ".generated.cpp,\n\t" + class_name + ".h,\n\t" +
+           class_name + ".cpp,\n\tmain.cpp;\n";
 }
 
 UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
@@ -519,6 +634,25 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
     if(!catalog_.ValidateDocument(document, error)) {
         result.diagnostics.Add(error);
         return result;
+    }
+    for(const UiDesignerNode& node : document.GetNodes()) {
+        if(node.id == document.GetRootId())
+            continue;
+        const UiDesignerControlSpec* spec = catalog_.Find(node.type);
+        if(!spec)
+            continue;
+        if(spec->codegen_adapter_id != "control" &&
+           spec->codegen_adapter_id != "spacer") {
+            result.diagnostics.Add("Unsupported code-generation adapter: " +
+                                   spec->codegen_adapter_id);
+            return result;
+        }
+        if((spec->node_flags & UiDesignerNodeContainer) &&
+           !FindChildAdapter(spec->child_adapter_id)) {
+            result.diagnostics.Add("Unsupported child adapter: " +
+                                   spec->child_adapter_id);
+            return result;
+        }
     }
 
     const String base = options.class_name + "Generated";
@@ -547,8 +681,7 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
             continue;
         gh << "\t" << spec->runtime_cpp_type << " " << MemberName(node) << ";\n";
     }
-    gh << "};\n" << NamespaceClose(options.namespace_name)
-       << "\n#endif\n";
+    gh << "};\n" << NamespaceClose(options.namespace_name) << "\n#endif\n";
 
     String gs;
     gs << "#include \"" << options.class_name << ".generated.h\"\n\n"
@@ -586,8 +719,7 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
        << "protected:\n\tvoid BindActions() override;\n";
     for(const String& handler : handlers)
         uh << "\tvoid " << handler << "() override;\n";
-    uh << "};\n" << NamespaceClose(options.namespace_name)
-       << "\n#endif\n";
+    uh << "};\n" << NamespaceClose(options.namespace_name) << "\n#endif\n";
 
     String us;
     us << "#include \"" << options.class_name << ".h\"\n\n"
@@ -617,11 +749,10 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
     result.main_source = main_cpp;
     result.header = gh;
     result.source = gs;
-    result.package = GeneratePackage(options.package_name);
+    result.package = GeneratePackage(options.class_name);
     result.json = UiDesignerSerialize(document, true);
 
-    auto AddFile = [&](const String& path, const String& content,
-                       bool generated) {
+    auto AddFile = [&](const String& path, const String& content, bool generated) {
         UiDesignerGeneratedFile& file = result.files.Add();
         file.relative_path = path;
         file.content = content;
@@ -640,9 +771,39 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
 
 static bool RemoveTree(const String& path)
 {
-    if(!DirectoryExists(path))
-        return true;
-    return DeleteFolderDeep(path);
+    return !DirectoryExists(path) || DeleteFolderDeep(path);
+}
+
+struct UiDesignerPublishEntry : Moveable<UiDesignerPublishEntry> {
+    String staged;
+    String destination;
+    String backup;
+    String temporary;
+    bool existed = false;
+    bool touched = false;
+};
+
+static bool RestorePublished(Vector<UiDesignerPublishEntry>& entries,
+                             String& diagnostic)
+{
+    bool ok = true;
+    for(int i = entries.GetCount() - 1; i >= 0; i--) {
+        UiDesignerPublishEntry& entry = entries[i];
+        if(!entry.touched)
+            continue;
+        if(FileExists(entry.destination) && !FileDelete(entry.destination))
+            ok = false;
+        if(entry.existed && FileExists(entry.backup)) {
+            RealizeDirectory(GetFileFolder(entry.destination));
+            if(!FileCopy(entry.backup, entry.destination))
+                ok = false;
+        }
+        if(FileExists(entry.temporary))
+            FileDelete(entry.temporary);
+    }
+    if(!ok)
+        diagnostic << "\nRollback was incomplete; inspect the export destination.";
+    return ok;
 }
 
 bool UiDesignerWriteGeneratedProject(
@@ -674,6 +835,11 @@ bool UiDesignerWriteGeneratedProject(
         }
     }
 
+    const bool folder_existed = DirectoryExists(folder);
+    if(!RealizeDirectory(folder)) {
+        error = "Unable to create export folder: " + folder;
+        return false;
+    }
     const String stage = AppendFileName(
         folder, ".uidesigner-stage-" + AsString(Uuid::Create()));
     if(!RealizeDirectory(stage)) {
@@ -681,52 +847,71 @@ bool UiDesignerWriteGeneratedProject(
         return false;
     }
 
+    Vector<UiDesignerPublishEntry> entries;
     bool ok = true;
-    for(const UiDesignerGeneratedFile& file : project.files) {
-        const String path = AppendFileName(stage, file.relative_path);
-        RealizeDirectory(GetFileFolder(path));
-        if(!SaveFile(path, file.content)) {
+    for(int i = 0; i < project.files.GetCount(); i++) {
+        const UiDesignerGeneratedFile& file = project.files[i];
+        const String destination = AppendFileName(folder, file.relative_path);
+        if(FileExists(destination) && !file.generator_owned &&
+           options.preserve_user_files)
+            continue;
+
+        UiDesignerPublishEntry& entry = entries.Add();
+        entry.staged = AppendFileName(stage, "new/" + file.relative_path);
+        entry.destination = destination;
+        entry.backup = AppendFileName(stage, "backup/" + AsString(i));
+        entry.temporary = destination + ".uidesigner-tmp-" + AsString(Uuid::Create());
+        entry.existed = FileExists(destination);
+
+        RealizeDirectory(GetFileFolder(entry.staged));
+        if(!SaveFile(entry.staged, file.content)) {
             error = "Unable to stage " + file.relative_path;
             ok = false;
             break;
         }
-    }
-
-    if(ok) {
-        RealizeDirectory(folder);
-        for(const UiDesignerGeneratedFile& file : project.files) {
-            const String destination = AppendFileName(folder, file.relative_path);
-            if(FileExists(destination) && !file.generator_owned &&
-               options.preserve_user_files)
-                continue;
-            const String staged = AppendFileName(stage, file.relative_path);
-            const String temporary = destination + ".uidesigner-tmp-" +
-                                     AsString(Uuid::Create());
-            RealizeDirectory(GetFileFolder(destination));
-            if(!FileCopy(staged, temporary)) {
-                error = "Unable to prepare " + destination;
+        if(entry.existed) {
+            RealizeDirectory(GetFileFolder(entry.backup));
+            if(!FileCopy(entry.destination, entry.backup)) {
+                error = "Unable to back up " + entry.destination;
                 ok = false;
                 break;
             }
-            if(FileExists(destination) && !DeleteFile(destination)) {
-                DeleteFile(temporary);
-                error = "Unable to replace " + destination;
-                ok = false;
-                break;
-            }
-            if(!FileMove(temporary, destination)) {
-                DeleteFile(temporary);
-                error = "Unable to publish " + destination;
-                ok = false;
-                break;
-            }
-            written_files.Add(destination);
         }
     }
 
+    if(ok) {
+        for(UiDesignerPublishEntry& entry : entries) {
+            RealizeDirectory(GetFileFolder(entry.destination));
+            if(!FileCopy(entry.staged, entry.temporary)) {
+                error = "Unable to prepare " + entry.destination;
+                ok = false;
+                break;
+            }
+            entry.touched = true;
+            if(entry.existed && !FileDelete(entry.destination)) {
+                error = "Unable to replace " + entry.destination;
+                ok = false;
+                break;
+            }
+            if(!FileMove(entry.temporary, entry.destination)) {
+                error = "Unable to publish " + entry.destination;
+                ok = false;
+                break;
+            }
+            written_files.Add(entry.destination);
+        }
+    }
+
+    if(!ok) {
+        RestorePublished(entries, error);
+        written_files.Clear();
+    }
     RemoveTree(stage);
-    if(!ok)
+    if(!ok) {
+        if(!folder_existed && DirectoryExists(folder))
+            DeleteFolderDeep(folder);
         return false;
+    }
     error.Clear();
     return true;
 }
@@ -735,6 +920,7 @@ bool UiDesignerWriteGeneratedProject(
     const String& folder, const String& package_name,
     const UiDesignerGeneratedProject& project, String& error)
 {
+    (void)package_name;
     UiDesignerExportWriteOptions options;
     options.overwrite = UiDesignerOverwritePolicy::ReplaceGenerated;
     Vector<String> written;
