@@ -42,6 +42,11 @@ public:
     bool MoveNodes(const Vector<UiDesignerNodeId>& nodes,
                    UiDesignerNodeId parent, int index = -1,
                    const String& label = "Move selection");
+    bool MoveNodesConfigured(
+        const Vector<UiDesignerNodeId>& nodes,
+        UiDesignerNodeId parent, int index,
+        const VectorMap<UiDesignerNodeId, ValueMap>& property_updates,
+        const String& label = "Move selection");
     bool RenameNode(UiDesignerNodeId node, const String& name,
                     const String& label = String());
 
