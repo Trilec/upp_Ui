@@ -8,6 +8,7 @@ namespace Upp {
 
 enum class UiDesignerRuntimeKind : word {
     Placeholder = 0,
+    SemanticSpacer,
     UiLabel,
     UiCheckBox,
     UiRadioButton,
@@ -75,6 +76,31 @@ enum class UiDesignerRuntimeKind : word {
     UppVScrollBar,
 };
 
+enum UiDesignerControlCapability : dword {
+    UiDesignerCapabilityNone          = 0,
+    UiDesignerCapabilityRuntimeCtrl   = 1 << 0,
+    UiDesignerCapabilityContainer     = 1 << 1,
+    UiDesignerCapabilityFreeform      = 1 << 2,
+    UiDesignerCapabilityOrdered       = 1 << 3,
+    UiDesignerCapabilityGrid          = 1 << 4,
+    UiDesignerCapabilityPages         = 1 << 5,
+    UiDesignerCapabilitySemanticItem  = 1 << 6,
+    UiDesignerCapabilityAcceptSpacer  = 1 << 7,
+    UiDesignerCapabilityAcceptActions = 1 << 8,
+};
+
+inline bool HasUiDesignerCapability(dword value,
+                                    UiDesignerControlCapability capability)
+{
+    return (value & (dword)capability) != 0;
+}
+
+struct UiDesignerEventSpec : Moveable<UiDesignerEventSpec> {
+    String id;
+    String label;
+    String help;
+};
+
 struct UiDesignerPropertySpec : Moveable<UiDesignerPropertySpec> {
     String id;
     String label;
@@ -134,10 +160,16 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
 
     UiDesignerRuntimeKind runtime_kind = UiDesignerRuntimeKind::Placeholder;
     dword node_flags = UiDesignerNodeNone;
+    dword capabilities = UiDesignerCapabilityRuntimeCtrl;
     Size default_size = Size(160, 32);
 
     Vector<UiDesignerPropertySpec> properties;
+    Vector<UiDesignerEventSpec> events;
     ValueMap defaults;
+
+    String preview_adapter_id;
+    String codegen_adapter_id;
+    String child_adapter_id;
 
     bool preview = true;
     bool inspector = true;
@@ -146,6 +178,11 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     bool stock_upp = false;
 
     const UiDesignerPropertySpec* FindProperty(const String& id) const;
+    const UiDesignerEventSpec* FindEvent(const String& id) const;
+    bool IsSemanticItem() const {
+        return HasUiDesignerCapability(capabilities,
+                                       UiDesignerCapabilitySemanticItem);
+    }
 };
 
 struct UiDesignerPreset {
@@ -168,11 +205,20 @@ public:
 
     const UiDesignerControlSpec* Find(const String& type_id) const;
     Vector<int> FindCategory(const String& category) const;
+    Vector<int> Search(const String& query,
+                       const String& category = "All") const;
     Vector<String> GetCategories() const;
 
     const Array<UiDesignerPreset>& GetPresets() const { return presets_; }
     const UiDesignerPreset* FindPreset(const String& id) const;
 
+    bool CanParent(const String& child_type, const String& parent_type,
+                   String& reason) const;
+    bool CanInsert(const UiDesignerDocument& document,
+                   const String& child_type, UiDesignerNodeId parent,
+                   int index, String& reason) const;
+    bool ValidateDocument(const UiDesignerDocument& document,
+                          String& error) const;
     bool Validate(String& error) const;
 
 private:
