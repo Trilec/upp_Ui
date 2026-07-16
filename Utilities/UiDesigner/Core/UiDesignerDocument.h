@@ -41,7 +41,8 @@ public:
     UiDesignerDocument();
 
     void Clear();
-    void NewDocument(Size virtual_size = Size(1020, 668));
+    void NewDocument(Size virtual_size = Size(1020, 668),
+                     UiDesignerNodeId root_id = 1);
 
     int GetCount() const { return nodes_.GetCount(); }
     const Array<UiDesignerNode>& GetNodes() const { return nodes_; }
@@ -60,6 +61,10 @@ public:
     UiDesignerNodeId AddNode(const String& type, const String& name,
                              UiDesignerNodeId parent, dword flags,
                              int index = -1);
+    UiDesignerNodeId AddNodeWithId(UiDesignerNodeId id,
+                                   const String& type, const String& name,
+                                   UiDesignerNodeId parent, dword flags,
+                                   int index = -1);
     bool RemoveNode(UiDesignerNodeId id);
     bool MoveNode(UiDesignerNodeId id, UiDesignerNodeId new_parent, int new_index = -1);
     bool RenameNode(UiDesignerNodeId id, const String& name);
