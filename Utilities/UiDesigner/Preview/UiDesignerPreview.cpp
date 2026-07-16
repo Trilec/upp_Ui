@@ -963,7 +963,8 @@ void UiDesignerPreviewCanvas::DragAndDrop(Point p, PasteClip& d)
     UpdateDropPlan(p, payload);
     if(!drop_plan_.valid)
         return;
-    d.SetAction(UiDesignerParseCatalogDragText(payload, drop_payload_)
+    String catalog_type;
+    d.SetAction(UiDesignerParseCatalogDragText(payload, catalog_type)
                     ? DND_COPY : DND_MOVE);
     if(d.IsPaste()) {
         String error;
