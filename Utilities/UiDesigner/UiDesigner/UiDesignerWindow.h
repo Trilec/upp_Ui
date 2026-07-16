@@ -5,9 +5,11 @@
 #include <Ui/Ui.h>
 #include <Ui/UiColorPicker.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
+#include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeGallery.h>
 #include "UiDesignerWidgets.h"
+#include "UiDesignerExportDialog.h"
 
 namespace Upp {
 
@@ -18,9 +20,9 @@ public:
     UiDesignerWindow();
 
     UiDesignerSession& Session() { return session_; }
+    const UiDesignerSession& Session() const { return session_; }
 
     virtual void Layout() override;
-    virtual bool Key(dword key, int count) override;
     virtual void Close() override;
 
 private:
@@ -28,21 +30,23 @@ private:
     void BuildDesigner();
     void BuildTheme();
     void ConnectServices();
+    void ApplyThemeToShell();
 
     void ShowDesigner();
     void ShowTheme();
+    void ToggleDarkMode();
+    void ActivateToolbox(const String& id);
+    void SaveDocument(bool save_as = false);
+    void LoadDocument();
+    void ExportProject(UiDesignerExportProfile profile);
+
     void RefreshHierarchy();
     void RefreshInspector();
+    void RefreshBehavior();
     void RefreshThemeInspector();
     void RefreshCode();
-    void RefreshStatus(const String& text = String());
-
-    void ActivateToolbox(const String& id);
-    void SaveDocument(bool save_as);
-    void LoadDocument();
-    void ExportProject();
-    void ToggleDarkMode();
-    void ApplyThemeToShell();
+    void RefreshStatus(const String& status);
+    void WriteLaunchDiagnostic();
 
     UiDesignerSession session_;
 
@@ -52,18 +56,27 @@ private:
     UiSplitButton load_;
     UiSplitButton export_;
     UiLabel version_;
-    UiButton designer_mode_;
-    UiButton theme_mode_;
+    UiRadioButton designer_mode_;
+    UiRadioButton theme_mode_;
     UiDropdown theme_select_;
     UiToolButton dark_;
     UiToolButton help_;
 
     UiStack workspaces_;
-    ParentCtrl designer_page_;
-    ParentCtrl theme_page_;
+    UiPanel designer_page_;
+    UiPanel theme_page_;
 
     UiDesignerSideColumn designer_left_;
     UiPanel designer_center_;
+    UiDesignerSideColumn designer_right_;
+
+    UiDesignerCatalogList layouts_list_;
+    UiDesignerCatalogList containers_list_;
+    UiDesignerCatalogList controls_list_;
+    UiDesignerCatalogList composites_list_;
+    UiDesignerCatalogList presets_list_;
+    UiDesignerCatalogList upp_controls_list_;
+
     UiDesignerPillBar aspect_pill_;
     UiToolButton portrait_;
     UiToolButton landscape_;
@@ -72,19 +85,11 @@ private:
     UiScrollPanel preview_scroll_;
     UiPanel preview_surface_;
     UiDesignerPreviewCanvas preview_canvas_;
-    UiDesignerSideColumn designer_right_;
-
-    UiDesignerCatalogList presets_list_;
-    UiDesignerCatalogList layouts_list_;
-    UiDesignerCatalogList containers_list_;
-    UiDesignerCatalogList controls_list_;
-    UiDesignerCatalogList composites_list_;
-    UiDesignerCatalogList upp_controls_list_;
 
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;
+    PropertyEditor behaviors_;
     PropertyEditor overrides_;
-    PropertyEditorModel overrides_model_;
     UiDesignerCodeView code_;
 
     UiPanel theme_gallery_column_;
@@ -96,15 +101,15 @@ private:
     UiPanel gallery_surface_;
     UiDesignerThemeGallery theme_gallery_;
     UiDesignerSideColumn theme_right_;
-
     PropertyEditor theme_inspector_;
-    PropertyEditorModel theme_model_;
     UiDesignerCodeView theme_code_;
 
     UiPanel footer_surface_;
     UiLabel footer_;
 
-    String current_path_;
+    String current_file_;
+    UiDesignerExportProfile last_export_profile_ =
+        UiDesignerExportProfile::CompleteCppPackage;
 };
 
 }
