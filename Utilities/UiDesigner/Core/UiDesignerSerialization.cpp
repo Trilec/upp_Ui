@@ -258,6 +258,10 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
                         "legacy_root_layout", loaded.GetRootId(),
                         UiDesignerNodeContainer | UiDesignerNodeLayout);
                     UiDesignerNode* layout = loaded.Find(legacy_root_layout);
+                    if(!layout) {
+                        error = "Unable to create legacy root layout";
+                        return false;
+                    }
                     layout->properties.Set("direction", "V");
                     layout->properties.Set("x", 20);
                     layout->properties.Set("y", 20);
@@ -315,6 +319,10 @@ bool UiDesignerDocumentFromValue(const Value& value, UiDesignerDocument& documen
     }
 
     ValueArray nodes = UiDesignerMapValue(root, "nodes", ValueArray());
+    if(nodes.IsEmpty() || !nodes[0].Is<ValueMap>()) {
+        error = "Document has no valid root node";
+        return false;
+    }
     ValueMap size = UiDesignerMapValue(root, "virtual_size", ValueMap());
     const Size virtual_size((int)UiDesignerMapValue(size, "cx", 1020),
                             (int)UiDesignerMapValue(size, "cy", 668));
