@@ -249,13 +249,22 @@ bool UiDesignerCommandService::MoveNodesConfigured(
                     last_error_ = "Invalid node in selection";
                     return false;
                 }
+                const UiDesignerNodeId old_parent = old->parent;
+                const UiDesignerNode* old_parent_node = document_.Find(old_parent);
+                const int old_index = old_parent_node
+                    ? FindIndex(old_parent_node->children, node) : -1;
+                if(old_parent == parent && insertion >= 0 &&
+                   old_index >= 0 && old_index < insertion)
+                    insertion--;
+
                 UiDesignerStructureChange& change = aggregate.structure.Add();
-                change.kind = old->parent == parent
+                change.kind = old_parent == parent
                                 ? UiDesignerStructureChangeKind::Reordered
                                 : UiDesignerStructureChangeKind::Reparented;
                 change.node = node;
-                change.old_parent = old->parent;
+                change.old_parent = old_parent;
                 change.new_parent = parent;
+                change.old_index = old_index;
                 change.new_index = insertion;
                 if(!document_.MoveNode(node, parent, insertion)) {
                     last_error_ = "Unable to move selected node";
