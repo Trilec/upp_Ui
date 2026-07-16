@@ -1,6 +1,10 @@
 #include "UiDesignerWindow.h"
 #include <Ui/UiIcons.h>
 
+#ifdef PLATFORM_WIN32
+#include <windows.h>
+#endif
+
 namespace Upp {
 
 static void Put(Ctrl& c, int x, int y, int cx, int cy)
@@ -32,8 +36,10 @@ UiDesignerWindow::UiDesignerWindow()
     ApplyThemeToShell();
     RefreshHierarchy();
     RefreshInspector();
+    RefreshBehavior();
     RefreshThemeInspector();
     RefreshCode();
+    PostCallback(THISBACK(WriteLaunchDiagnostic));
 }
 
 void UiDesignerWindow::BuildHeader()
@@ -43,8 +49,7 @@ void UiDesignerWindow::BuildHeader()
 
     brand_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
     brand_.SetTitle("Designer").ShowTitleLine(false).ShowCardLine(false);
-    brand_.SetMedia(ICON_BRAND_NEWLOGO_V5_48(),
-                    Size(DPI(18), DPI(18)));
+    brand_.SetMedia(ICON_BRAND_NEWLOGO_V5_48(), Size(DPI(18), DPI(18)));
 
     save_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     save_.SetText("Save").SetSplitWidth(DPI(31));
@@ -62,26 +67,28 @@ void UiDesignerWindow::BuildHeader()
     load_.WhenAction = [=] { LoadDocument(); };
     load_.WhenSelect = [=](int, const Value& value) {
         const String action = value;
-        if(action == "open")
-            LoadDocument();
-        else if(action == "blank")
-            session_.NewDocument("blank");
-        else if(action == "settings")
-            session_.NewDocument("settings");
-        else
-            session_.NewDocument("three_pane");
+        if(action == "open") LoadDocument();
+        else if(action == "blank") session_.NewDocument("blank");
+        else if(action == "settings") session_.NewDocument("settings");
+        else session_.NewDocument("three_pane");
     };
 
     export_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     export_.SetText("Export").SetSplitWidth(DPI(31));
-    export_.Add("C++ project", "cpp").Add("JSON", "json");
-    export_.WhenAction = [=] { ExportProject(); };
-    export_.WhenSelect = [=](int, const Value&) { ExportProject(); };
+    export_.Add("Complete C++ package", (int)UiDesignerExportProfile::CompleteCppPackage)
+           .Add("C++ component / class", (int)UiDesignerExportProfile::ComponentOnly)
+           .Add("UiDesigner project JSON", (int)UiDesignerExportProfile::ProjectJson)
+           .Add("Document JSON", (int)UiDesignerExportProfile::DocumentJson)
+           .Add("Theme JSON", (int)UiDesignerExportProfile::ThemeJson);
+    export_.WhenAction = [=] { ExportProject(last_export_profile_); };
+    export_.WhenSelect = [=](int, const Value& value) {
+        last_export_profile_ = (UiDesignerExportProfile)(int)value;
+        ExportProject(last_export_profile_);
+    };
 
     version_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
     version_.SetText("v1.0.0-rc1")
-            .SetIcon(ICON_DESIGN_ADJUST_48(),
-                     UiIconRenderMode::MonoTint)
+            .SetIcon(ICON_DESIGN_ADJUST_48(), UiIconRenderMode::MonoTint)
             .SetIconSize(DPI(10), DPI(10));
 
     designer_mode_.SetText("Designer");
@@ -114,8 +121,9 @@ void UiDesignerWindow::BuildHeader()
     help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16));
     help_.WhenAction = [=] {
         PromptOK("UiDesigner greenfield architecture\n"
-                 "Core, commands, catalog, preview, theme, code generation "
-                 "and MCP share one property pipeline.");
+                 "Core, commands, catalog, semantic layout items, preview, "
+                 "theme, behavior bindings, code generation, CLI and MCP "
+                 "share one command/property pipeline.");
     };
 
     header_surface_.Add(brand_);
@@ -137,45 +145,29 @@ void UiDesignerWindow::BuildDesigner()
     designer_page_.Add(designer_right_);
 
     const UiDesignerCatalog& catalog = session_.Catalog();
-    presets_list_.SetCatalog(&catalog);
-    presets_list_.SetPresets();
-    layouts_list_.SetCatalog(&catalog);
-    layouts_list_.SetCategory("Layouts");
-    containers_list_.SetCatalog(&catalog);
-    containers_list_.SetCategory("Containers");
-    controls_list_.SetCatalog(&catalog);
-    controls_list_.SetCategory("Ui Controls");
-    composites_list_.SetCatalog(&catalog);
-    composites_list_.SetCategory("Composites");
-    upp_controls_list_.SetCatalog(&catalog);
-    upp_controls_list_.SetCategory("U++ Controls");
+    presets_list_.SetCatalog(&catalog); presets_list_.SetPresets();
+    layouts_list_.SetCatalog(&catalog); layouts_list_.SetCategory("Layouts");
+    containers_list_.SetCatalog(&catalog); containers_list_.SetCategory("Containers");
+    controls_list_.SetCatalog(&catalog); controls_list_.SetCategory("Ui Controls");
+    composites_list_.SetCatalog(&catalog); composites_list_.SetCategory("Composites");
+    upp_controls_list_.SetCatalog(&catalog); upp_controls_list_.SetCategory("U++ Controls");
 
-    designer_left_.AddSection("Layouts",
-                              ICON_DESIGN_LAYOUTS_CATEGORY_48(), layouts_list_)
-                  .AddSection("Containers",
-                              ICON_DESIGN_TAB_GROUP_48(), containers_list_)
-                  .AddSection("Controls",
-                              ICON_DESIGN_WIDGETS_48(), controls_list_)
-                  .AddSection("Composites",
-                              ICON_DESIGN_DYNAMIC_FORM_48(), composites_list_)
-                  .AddSection("Presets",
-                              ICON_DESIGN_DASHBOARD_EDIT_48(), presets_list_)
-                  .AddSection("U++ Controls",
-                              ICON_DESIGN_WIDGETS_48(), upp_controls_list_);
+    designer_left_.AddSection("Layouts", ICON_DESIGN_LAYOUTS_CATEGORY_48(), layouts_list_)
+                  .AddSection("Containers", ICON_DESIGN_TAB_GROUP_48(), containers_list_)
+                  .AddSection("Controls", ICON_DESIGN_WIDGETS_48(), controls_list_)
+                  .AddSection("Composites", ICON_DESIGN_DYNAMIC_FORM_48(), composites_list_)
+                  .AddSection("Presets", ICON_DESIGN_DASHBOARD_EDIT_48(), presets_list_)
+                  .AddSection("U++ Controls", ICON_DESIGN_WIDGETS_48(), upp_controls_list_);
 
     designer_right_.RightColumn()
-                   .AddSection("Hierarchy",
-                               ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
-                   .AddSection("Inspector",
-                               ICON_DESIGN_TUNE_48(), inspector_)
-                   .AddSection("Theme Overrides",
-                               ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
-                   .AddSection("Code",
-                               ICON_DESIGN_CODE_BLOCKS_48(), code_);
+                   .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
+                   .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
+                   .AddSection("Behaviors", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
+                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
+                   .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
     designer_right_.SetActiveSection(1);
 
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle());
-
     aspect_pill_.SetInset(UiDesignerStyleMetrics::RightPillInset());
     portrait_.SetIcon(ICON_DESIGN_SPLITSCREEN_PORTRAIT_48())
              .SetIconSize(DPI(20), DPI(20)).Tip("Portrait");
@@ -188,25 +180,15 @@ void UiDesignerWindow::BuildDesigner()
     square_.SetIcon(ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48())
            .SetIconSize(DPI(17), DPI(17)).Tip("Square");
 
-    portrait_.WhenAction = [=] {
-        session_.SetVirtualSize(Size(668, 1020));
-    };
-    landscape_.WhenAction = [=] {
-        session_.SetVirtualSize(Size(1020, 668));
-    };
-    square_.WhenAction = [=] {
-        session_.SetVirtualSize(Size(800, 800));
-    };
+    portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(668, 1020)); };
+    landscape_.WhenAction = [=] { session_.SetVirtualSize(Size(1020, 668)); };
+    square_.WhenAction = [=] { session_.SetVirtualSize(Size(800, 800)); };
     aspect_preset_.WhenSelect = [=](int, const Value& value) {
         const String ratio = value;
-        if(ratio == "1:2")
-            session_.SetVirtualSize(Size(500, 1000));
-        else if(ratio == "1:1")
-            session_.SetVirtualSize(Size(800, 800));
-        else
-            session_.SetVirtualSize(Size(1000, 500));
+        if(ratio == "1:2") session_.SetVirtualSize(Size(500, 1000));
+        else if(ratio == "1:1") session_.SetVirtualSize(Size(800, 800));
+        else session_.SetVirtualSize(Size(1000, 500));
     };
-
     aspect_pill_.AddControl(portrait_, DPI(32))
                 .AddControl(landscape_, DPI(32))
                 .AddControl(aspect_preset_, DPI(92))
@@ -218,63 +200,49 @@ void UiDesignerWindow::BuildDesigner()
     preview_scroll_.SetInset(DPI(0));
     preview_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
     preview_scroll_.Add(preview_surface_.SizePos());
-
     designer_center_.Add(aspect_pill_);
     designer_center_.Add(preview_scroll_);
 
     auto wire_list = [=](UiDesignerCatalogList& list) {
         list.WhenActivate = [=](const String& id) { ActivateToolbox(id); };
+        list.WhenFilter = [=](const String& query) {
+            session_.State().toolbox_filter = query;
+        };
     };
-    wire_list(presets_list_);
-    wire_list(layouts_list_);
-    wire_list(containers_list_);
-    wire_list(controls_list_);
-    wire_list(composites_list_);
-    wire_list(upp_controls_list_);
+    wire_list(presets_list_); wire_list(layouts_list_);
+    wire_list(containers_list_); wire_list(controls_list_);
+    wire_list(composites_list_); wire_list(upp_controls_list_);
 }
 
 void UiDesignerWindow::BuildTheme()
 {
     theme_page_.Add(theme_gallery_column_);
     theme_page_.Add(theme_right_);
-
     theme_gallery_column_.SetCustomStyle(UiDesignerSurfaceStyle());
     theme_gallery_pill_.SetInset(UiDesignerStyleMetrics::LeftPillInset());
 
-    theme_all_.SetIcon(ICON_DESIGN_WIDGETS_48())
-              .SetIconSize(DPI(16), DPI(16)).Tip("All controls");
-    theme_inputs_.SetIcon(ICON_DESIGN_DYNAMIC_FORM_48())
-                 .SetIconSize(DPI(16), DPI(16)).Tip("Inputs");
-    theme_containers_.SetIcon(ICON_DESIGN_TAB_GROUP_48())
-                     .SetIconSize(DPI(16), DPI(16)).Tip("Containers");
-
+    theme_all_.SetIcon(ICON_DESIGN_WIDGETS_48()).SetIconSize(DPI(16), DPI(16)).Tip("All controls");
+    theme_inputs_.SetIcon(ICON_DESIGN_DYNAMIC_FORM_48()).SetIconSize(DPI(16), DPI(16)).Tip("Inputs");
+    theme_containers_.SetIcon(ICON_DESIGN_TAB_GROUP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Containers");
     theme_all_.WhenAction = [=] { theme_gallery_.SetFilter("all"); };
     theme_inputs_.WhenAction = [=] { theme_gallery_.SetFilter("inputs"); };
-    theme_containers_.WhenAction = [=] {
-        theme_gallery_.SetFilter("containers");
-    };
-
+    theme_containers_.WhenAction = [=] { theme_gallery_.SetFilter("containers"); };
     theme_gallery_pill_.AddControl(theme_all_, DPI(32))
                        .AddControl(theme_inputs_, DPI(32))
                        .AddControl(theme_containers_, DPI(32));
 
     gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard));
     gallery_surface_.Add(theme_gallery_);
-    gallery_scroll_.SetCustomStyle(
-        UiTheme::ResolveScrollPanel(UiRole::Subtle));
+    gallery_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
     gallery_scroll_.SetInset(DPI(0));
     gallery_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
     gallery_scroll_.Add(gallery_surface_.SizePos());
-
     theme_gallery_column_.Add(theme_gallery_pill_);
     theme_gallery_column_.Add(gallery_scroll_);
 
     theme_right_.RightColumn()
-                .AddSection("Inspector",
-                            ICON_DESIGN_TUNE_48(), theme_inspector_)
-                .AddSection("Code",
-                            ICON_DESIGN_CODE_BLOCKS_48(), theme_code_);
-
+                .AddSection("Inspector", ICON_DESIGN_TUNE_48(), theme_inspector_)
+                .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), theme_code_);
     theme_gallery_.SetCatalog(&session_.Catalog());
     theme_gallery_.SetThemeDocument(&session_.Theme());
 }
@@ -286,82 +254,196 @@ void UiDesignerWindow::ConnectServices()
     hierarchy_.WhenSelectNode = [=](UiDesignerNodeId id, bool toggle) {
         session_.Select(id, toggle);
     };
+    hierarchy_.PlanDrop = [=](const Vector<UiDesignerNodeId>& nodes,
+                              UiDesignerNodeId parent, int index) {
+        return session_.Drops().PlanMove(nodes, parent, Point(), false, index);
+    };
+    hierarchy_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
+        return session_.ExecuteDrop(plan, nullptr, error);
+    };
+    hierarchy_.WhenDropStatus = [=](const String& status) { RefreshStatus(status); };
+
+    preview_canvas_.PlanCatalogDrop = [=](const String& type,
+                                          UiDesignerNodeId target, Point local) {
+        return session_.PlanAddControl(type, target, local, true);
+    };
+    preview_canvas_.PlanNodeDrop = [=](const Vector<UiDesignerNodeId>& nodes,
+                                       UiDesignerNodeId target, Point local) {
+        return session_.Drops().PlanMove(nodes, target, local, true);
+    };
+    preview_canvas_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
+        return session_.ExecuteDrop(plan, nullptr, error);
+    };
+    preview_canvas_.WhenSelectNode = [=](UiDesignerNodeId id, bool toggle) {
+        session_.Select(id, toggle);
+    };
+    preview_canvas_.WhenDropStatus = [=](const String& status) { RefreshStatus(status); };
 
     inspector_.SetModel(&session_.InspectorModel());
     inspector_.WhenPreview = [=](const String& id, const Value& value) {
         String error;
-        if(!session_.PreviewProperty(id, value, error))
-            RefreshStatus(error);
+        if(!session_.PreviewProperty(id, value, error)) RefreshStatus(error);
     };
     inspector_.WhenCommit = [=](const String& id, const Value& value) {
         String error;
-        if(!session_.CommitProperty(id, value, error))
-            RefreshStatus(error);
+        if(!session_.CommitProperty(id, value, error)) RefreshStatus(error);
     };
+    inspector_.WhenCancel = [=](const String&) { session_.CancelPreview(); };
     inspector_.WhenReset = [=](const String& id) {
         String error;
-        if(!session_.ResetProperty(id, error))
-            RefreshStatus(error);
+        if(!session_.ResetProperty(id, error)) RefreshStatus(error);
     };
 
-    theme_inspector_.SetModel(&theme_model_);
+    behaviors_.SetModel(&session_.BehaviorModel());
+    behaviors_.WhenCommit = [=](const String& id, const Value& value) {
+        String error;
+        if(!session_.CommitBehaviorField(id, value, error)) RefreshStatus(error);
+        else RefreshBehavior();
+    };
+    behaviors_.WhenReset = [=](const String&) {
+        String error;
+        if(!session_.RemoveActiveBehavior(error)) RefreshStatus(error);
+        else RefreshBehavior();
+    };
+
+    theme_inspector_.SetModel(&session_.ThemeModel());
     theme_inspector_.WhenPreview = [=](const String& id, const Value& value) {
         String error;
-        if(!session_.Theme().Preview(id, value, error))
-            RefreshStatus(error);
+        if(!session_.Theme().Preview(id, value, error)) RefreshStatus(error);
         ApplyThemeToShell();
-        theme_gallery_.SetThemeDocument(&session_.Theme());
     };
     theme_inspector_.WhenCommit = [=](const String& id, const Value& value) {
         String error;
-        if(!session_.Theme().Commit(id, value, "Set theme " + id, error))
-            RefreshStatus(error);
+        if(!session_.Theme().Commit(id, value, "Set theme " + id, error)) RefreshStatus(error);
         ApplyThemeToShell();
         RefreshThemeInspector();
-        theme_gallery_.SetThemeDocument(&session_.Theme());
+    };
+    theme_inspector_.WhenCancel = [=](const String&) {
+        session_.Theme().CancelPreview();
+        ApplyThemeToShell();
     };
     theme_inspector_.WhenReset = [=](const String& id) {
         String error;
-        if(!session_.Theme().Reset(id, error))
-            RefreshStatus(error);
+        if(!session_.Theme().Reset(id, error)) RefreshStatus(error);
         ApplyThemeToShell();
         RefreshThemeInspector();
-        theme_gallery_.SetThemeDocument(&session_.Theme());
     };
 
     session_.WhenSelectionChanged = [=] {
-        RefreshHierarchy();
-        RefreshInspector();
+        RefreshHierarchy(); RefreshInspector(); RefreshBehavior(); RefreshCode();
     };
-    session_.WhenInspectorChanged = [=] {
-        RefreshInspector();
-        RefreshThemeInspector();
-    };
+    session_.WhenInspectorChanged = [=] { RefreshInspector(); };
+    session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
     session_.WhenCodeChanged = [=] { RefreshCode(); };
     session_.WhenStatus = [=](const String& text) { RefreshStatus(text); };
+
+    session_.Document().WhenChanged = [=](const UiDesignerChangeSet& changes) {
+        preview_canvas_.ApplyChangeSet(changes);
+        RefreshHierarchy(); RefreshCode(); RefreshBehavior();
+    };
+    session_.Theme().WhenChanged = [=] {
+        ApplyThemeToShell(); RefreshThemeInspector(); RefreshCode();
+    };
+    session_.Theme().WhenPreviewChanged = [=] { ApplyThemeToShell(); };
 
     designer_left_.WhenWidthChanged = [=] { Layout(); };
     designer_right_.WhenWidthChanged = [=] { Layout(); };
     theme_right_.WhenWidthChanged = [=] { Layout(); };
 }
 
+void UiDesignerWindow::ApplyThemeToShell()
+{
+    const UiDesignerThemeSnapshot& theme = session_.Theme().GetEffective();
+    UiTheme::SetPresetByName(theme.preset);
+    UiTheme::SetMode(theme.mode == "Dark" ? UiThemeMode::Dark : UiThemeMode::Light);
+    header_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
+    footer_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Subtle, theme));
+    designer_left_.ApplyTheme(theme);
+    designer_right_.ApplyTheme(theme);
+    theme_right_.ApplyTheme(theme);
+    designer_center_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
+    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
+    theme_gallery_column_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
+    gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
+    aspect_pill_.ApplyTheme(theme);
+    theme_gallery_pill_.ApplyTheme(theme);
+    preview_canvas_.SetAccent(theme.accent);
+    theme_gallery_.RefreshTheme();
+    RefreshLayout(); Refresh();
+}
+
 void UiDesignerWindow::ShowDesigner()
 {
-    session_.Theme().CancelPreview();
     workspaces_.SetActiveKey("designer");
     session_.State().active_workspace = "designer";
-    brand_.SetTitle("Designer");
-    Layout();
+    designer_mode_.SetData(true); theme_mode_.SetData(false);
+    RefreshStatus("Designer workspace");
 }
 
 void UiDesignerWindow::ShowTheme()
 {
-    session_.CancelPreview();
     workspaces_.SetActiveKey("theme");
     session_.State().active_workspace = "theme";
-    brand_.SetTitle("Theme Studio");
+    designer_mode_.SetData(false); theme_mode_.SetData(true);
     RefreshThemeInspector();
-    Layout();
+    RefreshStatus("Theme Studio workspace");
+}
+
+void UiDesignerWindow::ToggleDarkMode()
+{
+    const String next = session_.Theme().GetEffective().mode == "Dark" ? "Light" : "Dark";
+    String error;
+    session_.Theme().Commit("mode", next, "Toggle dark mode", error);
+    ApplyThemeToShell();
+    RefreshThemeInspector();
+}
+
+void UiDesignerWindow::ActivateToolbox(const String& id)
+{
+    if(id.StartsWith("preset:")) {
+        session_.NewDocument(id.Mid(7));
+        return;
+    }
+    UiDesignerDropPlan plan = session_.PlanAddControl(id);
+    String error;
+    UiDesignerNodeId created = 0;
+    if(!plan.valid || !session_.ExecuteDrop(plan, &created, error))
+        RefreshStatus(plan.valid ? error : plan.reason);
+}
+
+void UiDesignerWindow::SaveDocument(bool save_as)
+{
+    if(current_file_.IsEmpty() || save_as) {
+        FileSel fs;
+        fs.Type("UiDesigner project", "*.uidesign.json");
+        if(!fs.ExecuteSaveAs("Save UiDesigner project")) return;
+        current_file_ = ~fs;
+    }
+    String error;
+    if(!session_.Save(current_file_, error)) Exclamation(error);
+    else RefreshStatus("Saved " + current_file_);
+}
+
+void UiDesignerWindow::LoadDocument()
+{
+    FileSel fs;
+    fs.Type("UiDesigner project", "*.uidesign.json");
+    fs.Type("Legacy Designer JSON", "*.json");
+    if(!fs.ExecuteOpen("Load UiDesigner project")) return;
+    String error;
+    if(!session_.Load(~fs, error)) { Exclamation(error); return; }
+    current_file_ = ~fs;
+    RefreshHierarchy(); RefreshInspector(); RefreshBehavior(); RefreshCode();
+    RefreshStatus("Loaded " + current_file_);
+}
+
+void UiDesignerWindow::ExportProject(UiDesignerExportProfile profile)
+{
+    UiDesignerExportDialog dialog(session_, profile);
+    if(dialog.Execute()) {
+        last_export_profile_ = profile;
+        RefreshStatus(dialog.GetResult().diagnostic);
+    }
 }
 
 void UiDesignerWindow::RefreshHierarchy()
@@ -373,285 +455,117 @@ void UiDesignerWindow::RefreshHierarchy()
 void UiDesignerWindow::RefreshInspector()
 {
     inspector_.SetModel(&session_.InspectorModel());
-    inspector_.RefreshModel();
+    inspector_.Refresh();
+}
 
-    overrides_model_.Clear();
-    if(session_.State().selection.primary) {
-        overrides_model_.AddReadOnly(
-            "theme.note", "Theme overrides",
-            "Control-specific overrides use the same property descriptors.",
-            "Theme");
-    }
-    overrides_.SetModel(&overrides_model_);
-    overrides_.RefreshModel();
+void UiDesignerWindow::RefreshBehavior()
+{
+    session_.RebuildBehaviorModel();
+    behaviors_.SetModel(&session_.BehaviorModel());
+    behaviors_.Refresh();
 }
 
 void UiDesignerWindow::RefreshThemeInspector()
 {
-    session_.Theme().BuildPropertyModel(theme_model_);
-    theme_inspector_.SetModel(&theme_model_);
-    theme_inspector_.RefreshModel();
-    theme_gallery_.SetThemeDocument(&session_.Theme());
+    theme_inspector_.SetModel(&session_.ThemeModel());
+    theme_inspector_.Refresh();
     theme_code_.SetCode(session_.Theme().Serialize(true));
-    ApplyThemeToShell();
 }
 
 void UiDesignerWindow::RefreshCode()
 {
-    code_.SetCode(session_.GenerateCode("GeneratedUiWindow"));
-    theme_code_.SetCode(session_.Theme().Serialize(true));
+    code_.SetCode(session_.GenerateHeader("GeneratedUiWindow") + "\n" +
+                  session_.GenerateCode("GeneratedUiWindow"));
 }
 
-void UiDesignerWindow::RefreshStatus(const String& text)
+void UiDesignerWindow::RefreshStatus(const String& status)
 {
-    String status = text;
-    if(status.IsEmpty())
-        status = (session_.Commands().IsDirty() || session_.Theme().IsDirty())
-                     ? "Modified" : "Ready";
-    {
-        const UiDesignerPreviewStats& stats = preview_canvas_.GetStats();
-        status << "  |  live " << stats.live_applies
-               << "  layout " << stats.local_layouts + stats.ancestor_layouts
-               << "  subtree " << stats.subtree_rebuilds
-               << "  full " << stats.full_rebuilds;
-    }
-    footer_.SetText(status);
+    footer_.SetText(status.IsEmpty() ? "Ready" : status);
 }
 
-void UiDesignerWindow::ActivateToolbox(const String& id)
+void UiDesignerWindow::WriteLaunchDiagnostic()
 {
-    if(id.StartsWith("preset:")) {
-        session_.NewDocument(id.Mid(7));
-        return;
-    }
-    if(!session_.AddControl(id))
-        RefreshStatus("Unable to add " + id);
-}
-
-void UiDesignerWindow::SaveDocument(bool save_as)
-{
-    String path = current_path_;
-    if(save_as || path.IsEmpty()) {
-        FileSel file;
-        file.Type("UiDesigner document", "*.uidesign.json");
-        if(!file.ExecuteSaveAs("Save UiDesigner document"))
-            return;
-        path = ~file;
-    }
-    String error;
-    if(session_.Save(path, error))
-        current_path_ = path;
-    else
-        Exclamation(error);
-}
-
-void UiDesignerWindow::LoadDocument()
-{
-    FileSel file;
-    file.Type("UiDesigner document", "*.uidesign.json");
-    if(!file.ExecuteOpen("Open UiDesigner document"))
-        return;
-    String error;
-    if(session_.Load(~file, error))
-        current_path_ = ~file;
-    else
-        Exclamation(error);
-}
-
-void UiDesignerWindow::ExportProject()
-{
-    FileSel folder;
-    if(!folder.ExecuteSelectDir("Export generated project"))
-        return;
-    String error;
-    if(!session_.Export(~folder, "GeneratedUiWindow", error))
-        Exclamation(error);
-}
-
-void UiDesignerWindow::ToggleDarkMode()
-{
-    String error;
-    const String next =
-        session_.Theme().Get().mode == "Dark" ? "Light" : "Dark";
-    session_.Theme().Commit("mode", next, "Toggle dark mode", error);
-    RefreshThemeInspector();
-    theme_gallery_.Refresh();
-    RefreshStatus("Theme mode: " + next);
-}
-
-void UiDesignerWindow::ApplyThemeToShell()
-{
-    const UiDesignerThemeSnapshot theme = session_.Theme().GetEffective();
-    UiDesignerApplyGlobalTheme(theme);
-
-    header_surface_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Subtle, theme));
-    footer_surface_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Subtle, theme));
-    designer_center_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Subtle, theme));
-    preview_surface_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Standard, theme));
-    theme_gallery_column_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Subtle, theme));
-    gallery_surface_.SetCustomStyle(
-        UiDesignerSurfaceStyle(UiRole::Standard, theme));
-
-    aspect_pill_.ApplyTheme(theme);
-    theme_gallery_pill_.ApplyTheme(theme);
-    designer_left_.ApplyTheme(theme);
-    designer_right_.ApplyTheme(theme);
-    theme_right_.ApplyTheme(theme);
-
-    preview_scroll_.SetCustomStyle(
-        UiTheme::ResolveScrollPanel(UiRole::Subtle));
-    gallery_scroll_.SetCustomStyle(
-        UiTheme::ResolveScrollPanel(UiRole::Subtle));
-    preview_canvas_.SetAccent(theme.accent);
-
-    brand_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
-    save_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-    load_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-    export_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-    version_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
-    dark_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
-    help_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
-
-    theme_gallery_.SetThemeDocument(&session_.Theme());
-    RefreshLayout();
-    Refresh();
-}
-
-void UiDesignerWindow::Close()
-{
-    session_.CancelPreview();
-    session_.Theme().CancelPreview();
-    if((session_.Commands().IsDirty() || session_.Theme().IsDirty()) &&
-       !PromptYesNo("Discard unsaved UiDesigner changes?"))
-        return;
-    TopWindow::Close();
-}
-
-bool UiDesignerWindow::Key(dword key, int count)
-{
-    if(key == K_CTRL_Z) {
-        if(workspaces_.GetActiveKey() == "theme")
-            session_.Theme().Undo();
-        else
-            session_.Undo();
-        RefreshThemeInspector();
-        ApplyThemeToShell();
-        return true;
-    }
-    if(key == K_CTRL_Y) {
-        if(workspaces_.GetActiveKey() == "theme")
-            session_.Theme().Redo();
-        else
-            session_.Redo();
-        RefreshThemeInspector();
-        ApplyThemeToShell();
-        return true;
-    }
-    if(key == K_DELETE) {
-        session_.RemoveSelection();
-        return true;
-    }
-    if(key == K_CTRL_S) {
-        SaveDocument(false);
-        return true;
-    }
-    return TopWindow::Key(key, count);
+    ValueMap diagnostic;
+    diagnostic.Set("title", GetTitle());
+    Rect r = GetRect();
+    ValueMap rect;
+    rect.Set("left", r.left); rect.Set("top", r.top);
+    rect.Set("right", r.right); rect.Set("bottom", r.bottom);
+    diagnostic.Set("rect", rect);
+    diagnostic.Set("open", IsOpen());
+#ifdef PLATFORM_WIN32
+    diagnostic.Set("process_id", (int64)::GetCurrentProcessId());
+    diagnostic.Set("native_handle", (int64)(uintptr_t)GetHWND());
+#else
+    diagnostic.Set("native_handle", (int64)0);
+#endif
+    SaveFile(AppendFileName(GetTempPath(), "uidesigner-launch.json"),
+             AsJSON(diagnostic, true));
 }
 
 void UiDesignerWindow::Layout()
 {
-    const Size sz = GetSize();
+    const int margin = UiDesignerStyleMetrics::Margin();
     const int gap = UiDesignerStyleMetrics::Gap();
     const int header_h = UiDesignerStyleMetrics::HeaderHeight();
     const int footer_h = UiDesignerStyleMetrics::FooterHeight();
+    const Size size = GetSize();
 
-    Put(header_surface_, 0, 0, sz.cx, header_h);
-    int x = UiDesignerStyleMetrics::HeaderInset();
-    const int y = UiDesignerStyleMetrics::HeaderInset();
-    const int h = header_h - y * 2;
+    Put(header_surface_, margin, margin, max(0, size.cx - margin * 2), header_h);
+    Put(brand_, DPI(14), DPI(10), DPI(130), DPI(42));
+    Put(save_, DPI(160), DPI(13), DPI(92), DPI(36));
+    Put(load_, DPI(260), DPI(13), DPI(92), DPI(36));
+    Put(export_, DPI(360), DPI(13), DPI(105), DPI(36));
+    Put(version_, DPI(474), DPI(13), DPI(106), DPI(36));
+    Put(designer_mode_, DPI(596), DPI(13), DPI(92), DPI(36));
+    Put(theme_mode_, DPI(692), DPI(13), DPI(120), DPI(36));
+    Put(theme_select_, max(DPI(820), header_surface_.GetSize().cx - DPI(354)), DPI(13), DPI(150), DPI(36));
+    Put(dark_, header_surface_.GetSize().cx - DPI(92), DPI(13), DPI(36), DPI(36));
+    Put(help_, header_surface_.GetSize().cx - DPI(48), DPI(13), DPI(36), DPI(36));
 
-    Put(brand_, x, y, DPI(145), h); x += DPI(153);
-    Put(save_, x, y, DPI(74), h); x += DPI(82);
-    Put(load_, x, y, DPI(74), h); x += DPI(82);
-    Put(export_, x, y, DPI(74), h); x += DPI(82);
-    Put(version_, x, y, DPI(90), h); x += DPI(98);
-    Put(designer_mode_, x, y, DPI(78), h); x += DPI(86);
-    Put(theme_mode_, x, y, DPI(98), h);
+    const int content_y = margin + header_h + gap;
+    const int content_h = max(0, size.cy - content_y - footer_h - gap - margin);
+    Put(workspaces_, margin, content_y, max(0, size.cx - margin * 2), content_h);
+    Put(footer_surface_, margin, content_y + content_h + gap,
+        max(0, size.cx - margin * 2), footer_h);
 
-    Put(help_, sz.cx - y - DPI(34), y, DPI(34), h);
-    Put(dark_, sz.cx - y - DPI(76), y, DPI(34), h);
-    Put(theme_select_, sz.cx - y - DPI(186), y, DPI(102), h);
+    const int left_w = designer_left_.GetDesiredWidth();
+    const int right_w = designer_right_.GetDesiredWidth();
+    const int inner_h = designer_page_.GetSize().cy;
+    const int center_w = max(DPI(260), designer_page_.GetSize().cx - left_w - right_w - gap * 2);
+    Put(designer_left_, 0, 0, left_w, inner_h);
+    Put(designer_center_, left_w + gap, 0, center_w, inner_h);
+    Put(designer_right_, left_w + gap + center_w + gap, 0, right_w, inner_h);
 
-    const int body_h = max(0, sz.cy - header_h - footer_h);
-    Put(workspaces_, 0, header_h, sz.cx, body_h);
-    Put(footer_surface_, 0, sz.cy - footer_h, sz.cx, footer_h);
+    const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
+    Put(aspect_pill_, 0, 0, designer_center_.GetSize().cx, pill_h);
+    Put(preview_scroll_, 0, pill_h + gap, designer_center_.GetSize().cx,
+        max(0, designer_center_.GetSize().cy - pill_h - gap));
+    preview_surface_.SetRect(0, 0,
+        max(preview_scroll_.GetSize().cx, session_.Document().GetVirtualSize().cx + DPI(40)),
+        max(preview_scroll_.GetSize().cy, session_.Document().GetVirtualSize().cy + DPI(40)));
 
-    const bool theme = workspaces_.GetActiveKey() == "theme";
-    if(!theme) {
-        const int left_w = min(designer_left_.GetDesiredWidth(),
-                               max(DPI(56), sz.cx / 3));
-        const int right_w = min(designer_right_.GetDesiredWidth(),
-                                max(DPI(56), sz.cx / 3));
+    const int theme_right_w = theme_right_.GetDesiredWidth();
+    const int theme_gallery_w = max(DPI(320), theme_page_.GetSize().cx - theme_right_w - gap);
+    Put(theme_gallery_column_, 0, 0, theme_gallery_w, theme_page_.GetSize().cy);
+    Put(theme_right_, theme_gallery_w + gap, 0, theme_right_w, theme_page_.GetSize().cy);
+    Put(theme_gallery_pill_, 0, 0, theme_gallery_column_.GetSize().cx, pill_h);
+    Put(gallery_scroll_, 0, pill_h + gap, theme_gallery_column_.GetSize().cx,
+        max(0, theme_gallery_column_.GetSize().cy - pill_h - gap));
+    const Size gallery_size = theme_gallery_.GetPreferredSize(gallery_scroll_.GetSize().cx);
+    gallery_surface_.SetRect(0, 0, max(gallery_scroll_.GetSize().cx, gallery_size.cx),
+                            max(gallery_scroll_.GetSize().cy, gallery_size.cy));
+    theme_gallery_.SetRect(DPI(8), DPI(8),
+                           max(0, gallery_surface_.GetSize().cx - DPI(16)),
+                           max(0, gallery_surface_.GetSize().cy - DPI(16)));
+}
 
-        Put(designer_page_, 0, 0, sz.cx, body_h);
-        Put(designer_left_, 0, 0, left_w, body_h);
-        Put(designer_right_, max(0, sz.cx - right_w), 0,
-            right_w, body_h);
-        Put(designer_center_, left_w + gap, 0,
-            max(0, sz.cx - left_w - right_w - gap * 2), body_h);
-
-        const int pill_h =
-            UiDesignerStyleMetrics::DesignerToolbarHeight();
-        Put(aspect_pill_, 0, 0,
-            designer_center_.GetSize().cx, pill_h);
-        Put(preview_scroll_, 0, pill_h + gap,
-            designer_center_.GetSize().cx,
-            max(0, body_h - pill_h - gap));
-
-        preview_surface_.SetRect(
-            0, 0,
-            max(preview_scroll_.GetSize().cx,
-                session_.Document().GetVirtualSize().cx + DPI(40)),
-            max(preview_scroll_.GetSize().cy,
-                session_.Document().GetVirtualSize().cy + DPI(40)));
-        preview_canvas_.SetRect(
-            DPI(20), DPI(20),
-            session_.Document().GetVirtualSize().cx,
-            session_.Document().GetVirtualSize().cy);
-    }
-    else {
-        const int right_w = min(theme_right_.GetDesiredWidth(),
-                                max(DPI(56), sz.cx / 3));
-
-        Put(theme_page_, 0, 0, sz.cx, body_h);
-        Put(theme_right_, max(0, sz.cx - right_w), 0,
-            right_w, body_h);
-        Put(theme_gallery_column_, 0, 0,
-            max(0, sz.cx - right_w - gap), body_h);
-
-        const int pill_h =
-            UiDesignerStyleMetrics::DesignerToolbarHeight();
-        Put(theme_gallery_pill_, 0, 0,
-            theme_gallery_column_.GetSize().cx, pill_h);
-        Put(gallery_scroll_, 0, pill_h + gap,
-            theme_gallery_column_.GetSize().cx,
-            max(0, body_h - pill_h - gap));
-
-        const int gallery_w =
-            max(DPI(820), gallery_scroll_.GetSize().cx);
-        theme_gallery_.SetRect(0, 0, gallery_w,
-                               max(DPI(1200),
-                                   theme_gallery_.GetContentHeight()));
-        gallery_surface_.SetRect(
-            0, 0, gallery_w,
-            max(gallery_scroll_.GetSize().cy,
-                theme_gallery_.GetContentHeight()));
-    }
+void UiDesignerWindow::Close()
+{
+    if(session_.Commands().IsDirty() &&
+       !PromptYesNo("The UiDesigner document has unsaved changes. Close anyway?"))
+        return;
+    TopWindow::Close();
 }
 
 }
