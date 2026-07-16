@@ -806,13 +806,13 @@ String UiDesignerMcpEndpoint::HandleJsonLine(const String& line)
             UiDesignerMapValue(request, "params", ValueMap()), "uri", "");
         Value content_value;
         if(uri == "uidesigner://document")
-            content_value = GetDocument();
+            content_value = service_.GetDocument();
         else if(uri == "uidesigner://theme")
-            content_value = GetTheme();
+            content_value = service_.GetTheme();
         else if(uri == "uidesigner://catalog")
-            content_value = ListControls();
+            content_value = service_.ListControls();
         else if(uri == "uidesigner://behaviors")
-            content_value = GetBehaviors();
+            content_value = service_.GetBehaviors();
         else {
             ValueMap detail;
             detail.Set("code", -32002);
@@ -834,7 +834,7 @@ String UiDesignerMcpEndpoint::HandleJsonLine(const String& line)
 
     if(method == "tools/list") {
         ValueMap result;
-        result.Set("tools", ListMcpTools());
+        result.Set("tools", service_.ListMcpTools());
         response.Set("result", result);
         return notification ? String() : AsJSON(response);
     }
@@ -848,10 +848,10 @@ String UiDesignerMcpEndpoint::HandleJsonLine(const String& line)
         ValueMap direct;
         direct.Set("method", name);
         direct.Set("params", UiDesignerMapValue(params, "arguments", ValueMap()));
-        service_result = Handle(direct);
+        service_result = service_.Handle(direct);
     }
     else
-        service_result = Handle(request);
+        service_result = service_.Handle(request);
 
     ValueMap service_map = service_result;
     const bool ok = UiDesignerMapValue(service_map, "ok", false);
