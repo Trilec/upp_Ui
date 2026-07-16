@@ -6,6 +6,7 @@
 #include <Utilities/UiDesigner/CodeGen/UiDesignerCodeGen.h>
 #include <Utilities/UiDesigner/ThemeCore/UiDesignerTheme.h>
 #include "UiDesignerProjection.h"
+#include "UiDesignerDrop.h"
 
 namespace Upp {
 
@@ -33,6 +34,7 @@ public:
     UiDesignerCommandService& Commands() { return commands_; }
     UiDesignerCatalog& Catalog() { return catalog_; }
     const UiDesignerCatalog& Catalog() const { return catalog_; }
+    UiDesignerDropService& Drops() { return drops_; }
 
     UiDesignerSessionState& State() { return state_; }
     const UiDesignerSessionState& State() const { return state_; }
@@ -44,6 +46,8 @@ public:
 
     PropertyEditorModel& InspectorModel() { return inspector_model_; }
     const PropertyEditorModel& InspectorModel() const { return inspector_model_; }
+    PropertyEditorModel& BehaviorModel() { return behavior_model_; }
+    const PropertyEditorModel& BehaviorModel() const { return behavior_model_; }
     PropertyEditorModel& ThemeModel() { return theme_model_; }
     const PropertyEditorModel& ThemeModel() const { return theme_model_; }
 
@@ -55,6 +59,17 @@ public:
     bool Save(const String& path, String& error);
     bool Export(const String& folder, const String& class_name, String& error);
 
+    UiDesignerDropPlan PlanAddControl(
+        const String& type_id, UiDesignerNodeId target = 0,
+        Point canvas_position = Point(0, 0),
+        bool has_canvas_position = false, int index = -1) const;
+    UiDesignerDropPlan PlanMoveSelection(
+        UiDesignerNodeId target,
+        Point canvas_position = Point(0, 0),
+        bool has_canvas_position = false, int index = -1) const;
+    bool ExecuteDrop(const UiDesignerDropPlan& plan,
+                     UiDesignerNodeId *created, String& error);
+
     UiDesignerNodeId AddControl(const String& type_id,
                                 UiDesignerNodeId parent = 0);
     bool RemoveSelection();
@@ -64,6 +79,7 @@ public:
     void Select(UiDesignerNodeId node, bool toggle = false);
     void ClearSelection();
     void RebuildInspector();
+    void RebuildBehaviorModel();
 
     bool PreviewProperty(const String& property, const Value& value,
                          String& error);
@@ -71,6 +87,15 @@ public:
                         String& error);
     bool ResetProperty(const String& property, String& error);
     void CancelPreview();
+
+    const String& GetActiveBehaviorEvent() const {
+        return active_behavior_event_;
+    }
+    void SetActiveBehaviorEvent(const String& event_id);
+    bool CommitBehaviorField(const String& field, const Value& value,
+                             String& error);
+    bool RemoveActiveBehavior(String& error);
+    const UiDesignerActionBinding* GetActiveBehavior() const;
 
     bool Undo();
     bool Redo();
@@ -80,6 +105,7 @@ public:
 
     Event<> WhenSelectionChanged;
     Event<> WhenInspectorChanged;
+    Event<> WhenBehaviorChanged;
     Event<> WhenCodeChanged;
     Event<String> WhenStatus;
 
@@ -93,20 +119,26 @@ private:
                                const UiDesignerPropertySpec& property) const;
     bool SelectionSupports(const String& property,
                            const UiDesignerPropertySpec **primary_spec = nullptr) const;
+    UiDesignerActionBinding MakeEditableBehavior() const;
+    String DefaultHandlerName(const UiDesignerNode& node,
+                              const String& event_id) const;
 
     UiDesignerDocument document_;
     UiDesignerCommandService commands_;
     UiDesignerCatalog catalog_;
+    UiDesignerDropService drops_;
     UiDesignerSessionState state_;
     UiDesignerTransientOverlay overlay_;
     UiDesignerProjectionSink *projection_ = nullptr;
 
     PropertyEditorModel inspector_model_;
+    PropertyEditorModel behavior_model_;
     UiDesignerThemeDocument theme_;
     PropertyEditorModel theme_model_;
 
     String current_path_;
     uint64 editor_generation_ = 0;
+    String active_behavior_event_;
 };
 
 }
