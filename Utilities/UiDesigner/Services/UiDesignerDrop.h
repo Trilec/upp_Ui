@@ -28,10 +28,23 @@ struct UiDesignerDropPlan : Moveable<UiDesignerDropPlan> {
 
 class UiDesignerDropService {
 public:
+    UiDesignerDropService() {}
     UiDesignerDropService(UiDesignerDocument& document,
                           const UiDesignerCatalog& catalog,
                           UiDesignerCommandService& commands)
-        : document_(document), catalog_(catalog), commands_(commands) {}
+    {
+        Bind(document, catalog, commands);
+    }
+
+    void Bind(UiDesignerDocument& document,
+              const UiDesignerCatalog& catalog,
+              UiDesignerCommandService& commands)
+    {
+        document_ = &document;
+        catalog_ = &catalog;
+        commands_ = &commands;
+    }
+    bool IsBound() const { return document_ && catalog_ && commands_; }
 
     UiDesignerDropPlan PlanAdd(const String& type_id,
                                UiDesignerNodeId target,
@@ -58,9 +71,9 @@ private:
                         UiDesignerNodeId ancestor) const;
     String MakeUniqueName(const UiDesignerControlSpec& spec) const;
 
-    UiDesignerDocument& document_;
-    const UiDesignerCatalog& catalog_;
-    UiDesignerCommandService& commands_;
+    UiDesignerDocument *document_ = nullptr;
+    const UiDesignerCatalog *catalog_ = nullptr;
+    UiDesignerCommandService *commands_ = nullptr;
 };
 
 }
