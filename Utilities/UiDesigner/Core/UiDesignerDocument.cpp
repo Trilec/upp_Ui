@@ -2,6 +2,21 @@
 
 namespace Upp {
 
+static Value ActionBindingToValue(const UiDesignerActionBinding& binding)
+{
+    ValueMap out;
+    out.Set("id", binding.id);
+    out.Set("event", binding.event_id);
+    out.Set("action", UiDesignerActionTypeName(binding.action));
+    out.Set("target", binding.target);
+    out.Set("property", binding.target_property);
+    out.Set("value", binding.value);
+    out.Set("delta", binding.delta);
+    out.Set("handler", binding.handler_name);
+    out.Set("enabled", binding.enabled);
+    return out;
+}
+
 Value UiDesignerNode::GetProperty(const String& id, const Value& fallback) const
 {
     const int q = properties.Find(id);
@@ -11,6 +26,45 @@ Value UiDesignerNode::GetProperty(const String& id, const Value& fallback) const
 void UiDesignerNode::SetProperty(const String& id, const Value& value)
 {
     properties.Set(id, value);
+}
+
+int UiDesignerNode::FindAction(const String& event_id) const
+{
+    for(int i = 0; i < actions.GetCount(); i++)
+        if(actions[i].event_id == event_id)
+            return i;
+    return -1;
+}
+
+const UiDesignerActionBinding* UiDesignerNode::GetAction(
+    const String& event_id) const
+{
+    const int q = FindAction(event_id);
+    return q >= 0 ? &actions[q] : nullptr;
+}
+
+UiDesignerActionBinding* UiDesignerNode::GetAction(const String& event_id)
+{
+    const int q = FindAction(event_id);
+    return q >= 0 ? &actions[q] : nullptr;
+}
+
+void UiDesignerNode::SetAction(UiDesignerActionBinding binding)
+{
+    const int q = FindAction(binding.event_id);
+    if(q >= 0)
+        actions[q] = pick(binding);
+    else
+        actions.Add(pick(binding));
+}
+
+bool UiDesignerNode::RemoveAction(const String& event_id)
+{
+    const int q = FindAction(event_id);
+    if(q < 0)
+        return false;
+    actions.Remove(q);
+    return true;
 }
 
 UiDesignerDocument::UiDesignerDocument()
@@ -75,9 +129,10 @@ void UiDesignerDocument::SetVirtualSize(Size size)
     QueueChange(changes);
 }
 
-UiDesignerNodeId UiDesignerDocument::AddNode(const String& type, const String& name,
-                                             UiDesignerNodeId parent, dword flags,
-                                             int index)
+UiDesignerNodeId UiDesignerDocument::AddNode(const String& type,
+                                             const String& name,
+                                             UiDesignerNodeId parent,
+                                             dword flags, int index)
 {
     UiDesignerNode* p = Find(parent);
     if(!p)
@@ -128,6 +183,24 @@ void UiDesignerDocument::RemoveNodeRecursive(UiDesignerNodeId id,
         nodes_.Remove(q);
 }
 
+void UiDesignerDocument::RemoveBindingsTargeting(
+    const Index<UiDesignerNodeId>& removed, UiDesignerChangeSet& changes)
+{
+    for(UiDesignerNode& node : nodes_) {
+        for(int i = node.actions.GetCount() - 1; i >= 0; i--) {
+            const UiDesignerActionBinding& binding = node.actions[i];
+            if(binding.target && removed.Find(binding.target) >= 0) {
+                UiDesignerBehaviorChange& change = changes.behaviors.Add();
+                change.kind = UiDesignerBehaviorChangeKind::Removed;
+                change.node = node.id;
+                change.event_id = binding.event_id;
+                change.old_binding = ActionBindingToValue(binding);
+                node.actions.Remove(i);
+            }
+        }
+    }
+}
+
 bool UiDesignerDocument::RemoveNode(UiDesignerNodeId id)
 {
     if(!id || id == root_id_)
@@ -135,6 +208,19 @@ bool UiDesignerDocument::RemoveNode(UiDesignerNodeId id)
     UiDesignerNode* node = Find(id);
     if(!node)
         return false;
+
+    Index<UiDesignerNodeId> removed;
+    removed.Add(id);
+    bool changed = true;
+    while(changed) {
+        changed = false;
+        for(const UiDesignerNode& candidate : nodes_)
+            if(removed.Find(candidate.id) < 0 &&
+               removed.Find(candidate.parent) >= 0) {
+                removed.Add(candidate.id);
+                changed = true;
+            }
+    }
 
     UiDesignerNode* parent = Find(node->parent);
     if(parent) {
@@ -146,11 +232,13 @@ bool UiDesignerDocument::RemoveNode(UiDesignerNodeId id)
     UiDesignerChangeSet changes;
     changes.reason = "Remove node";
     RemoveNodeRecursive(id, changes);
+    RemoveBindingsTargeting(removed, changes);
     QueueChange(changes);
     return true;
 }
 
-bool UiDesignerDocument::MoveNode(UiDesignerNodeId id, UiDesignerNodeId new_parent,
+bool UiDesignerDocument::MoveNode(UiDesignerNodeId id,
+                                  UiDesignerNodeId new_parent,
                                   int new_index)
 {
     UiDesignerNode* node = Find(id);
@@ -158,7 +246,6 @@ bool UiDesignerDocument::MoveNode(UiDesignerNodeId id, UiDesignerNodeId new_pare
     if(!node || !target || id == root_id_ || id == new_parent)
         return false;
 
-    // A node cannot be reparented beneath one of its own descendants.
     for(const UiDesignerNode* p = target; p && p->parent; p = Find(p->parent))
         if(p->id == id)
             return false;
@@ -183,7 +270,9 @@ bool UiDesignerDocument::MoveNode(UiDesignerNodeId id, UiDesignerNodeId new_pare
     UiDesignerChangeSet changes;
     changes.reason = "Move node";
     UiDesignerStructureChange& change = changes.structure.Add();
-    change.kind = UiDesignerStructureChangeKind::Reparented;
+    change.kind = old_parent_id == new_parent
+                    ? UiDesignerStructureChangeKind::Reordered
+                    : UiDesignerStructureChangeKind::Reparented;
     change.node = id;
     change.old_parent = old_parent_id;
     change.new_parent = new_parent;
@@ -213,7 +302,8 @@ bool UiDesignerDocument::RenameNode(UiDesignerNodeId id, const String& name)
     return true;
 }
 
-bool UiDesignerDocument::SetProperty(UiDesignerNodeId id, const String& property,
+bool UiDesignerDocument::SetProperty(UiDesignerNodeId id,
+                                     const String& property,
                                      const Value& value,
                                      UiDesignerChangeImpact impact)
 {
@@ -237,11 +327,67 @@ bool UiDesignerDocument::SetProperty(UiDesignerNodeId id, const String& property
     return true;
 }
 
-Value UiDesignerDocument::GetProperty(UiDesignerNodeId id, const String& property,
+Value UiDesignerDocument::GetProperty(UiDesignerNodeId id,
+                                      const String& property,
                                       const Value& fallback) const
 {
     const UiDesignerNode* node = Find(id);
     return node ? node->GetProperty(property, fallback) : fallback;
+}
+
+bool UiDesignerDocument::SetActionBinding(UiDesignerNodeId id,
+                                          UiDesignerActionBinding binding)
+{
+    UiDesignerNode* node = Find(id);
+    String error;
+    if(!node || !binding.IsValid(&error))
+        return false;
+    if(binding.id.IsEmpty())
+        binding.id = AsString(Uuid::Create());
+
+    const UiDesignerActionBinding* existing = node->GetAction(binding.event_id);
+    UiDesignerChangeSet changes;
+    changes.reason = "Bind " + binding.event_id;
+    UiDesignerBehaviorChange& change = changes.behaviors.Add();
+    change.kind = existing ? UiDesignerBehaviorChangeKind::Updated
+                           : UiDesignerBehaviorChangeKind::Added;
+    change.node = id;
+    change.event_id = binding.event_id;
+    if(existing)
+        change.old_binding = ActionBindingToValue(*existing);
+    change.new_binding = ActionBindingToValue(binding);
+    node->SetAction(pick(binding));
+    QueueChange(changes);
+    return true;
+}
+
+bool UiDesignerDocument::RemoveActionBinding(UiDesignerNodeId id,
+                                             const String& event_id)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node)
+        return false;
+    const UiDesignerActionBinding* existing = node->GetAction(event_id);
+    if(!existing)
+        return false;
+
+    UiDesignerChangeSet changes;
+    changes.reason = "Unbind " + event_id;
+    UiDesignerBehaviorChange& change = changes.behaviors.Add();
+    change.kind = UiDesignerBehaviorChangeKind::Removed;
+    change.node = id;
+    change.event_id = event_id;
+    change.old_binding = ActionBindingToValue(*existing);
+    node->RemoveAction(event_id);
+    QueueChange(changes);
+    return true;
+}
+
+const UiDesignerActionBinding* UiDesignerDocument::GetActionBinding(
+    UiDesignerNodeId id, const String& event_id) const
+{
+    const UiDesignerNode* node = Find(id);
+    return node ? node->GetAction(event_id) : nullptr;
 }
 
 void UiDesignerDocument::BeginBatch(const String& reason)
