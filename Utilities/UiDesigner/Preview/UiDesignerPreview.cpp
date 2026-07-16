@@ -266,11 +266,9 @@ void UiDesignerPreviewAdapterRegistry::EnsureBuiltins()
 const UiDesignerPreviewAdapter* UiDesignerPreviewFactory::Adapter(
     const UiDesignerControlSpec& spec)
 {
-    UiDesignerPreviewAdapterRegistry& registry =
-        UiDesignerPreviewAdapterRegistry::Global();
+    UiDesignerPreviewAdapterRegistry& registry = UiDesignerPreviewAdapterRegistry::Global();
     registry.EnsureBuiltins();
-    if(const UiDesignerPreviewAdapter* existing =
-           registry.Find(spec.preview_adapter_id))
+    if(const UiDesignerPreviewAdapter* existing = registry.Find(spec.preview_adapter_id))
         return existing;
 
     UiDesignerPreviewAdapter adapter;
@@ -443,25 +441,41 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
             property.id, Effective(node, property.id, property.default_value));
 }
 
-static void ConfigureBoxSpacer(UiBoxLayout::ItemRef item,
+static void ConfigureBoxSpacer(UiBoxLayout& box,
+                               UiBoxLayout::ItemRef item,
                                const UiDesignerNode& node)
 {
-    if(node.GetProperty("layout_break", false))
-        ;
-    else {
-        const int fixed = max((int)node.GetProperty("fixed_width", 0),
-                              (int)node.GetProperty("fixed_height", 0));
-        if((String)node.GetProperty("h_sizing", "Auto") == "Fixed" ||
-           (String)node.GetProperty("v_sizing", "Auto") == "Fixed")
-            item.Fixed(max(0, fixed));
+    if(!node.GetProperty("layout_break", false)) {
+        const bool horizontal = box.GetDirection() == UiDirection::H;
+        const String main_mode = node.GetProperty(
+            horizontal ? "h_sizing" : "v_sizing", "Auto");
+        const String cross_mode = node.GetProperty(
+            horizontal ? "v_sizing" : "h_sizing", "Auto");
+        const int fixed_main = node.GetProperty(
+            horizontal ? "fixed_width" : "fixed_height", 0);
+        const int fixed_cross = node.GetProperty(
+            horizontal ? "fixed_height" : "fixed_width", 0);
+        const int min_main = node.GetProperty(
+            horizontal ? "min_width" : "min_height", 0);
+        const int max_main = node.GetProperty(
+            horizontal ? "max_width" : "max_height", 0);
+        const int min_cross = node.GetProperty(
+            horizontal ? "min_height" : "min_width", 0);
+        const int max_cross = node.GetProperty(
+            horizontal ? "max_height" : "max_width", 0);
+
+        if(main_mode == "Fixed" && fixed_main > 0)
+            item.Fixed(fixed_main);
         else
             item.Expand(max(1, (int)(double)node.GetProperty("weight", 1.0)));
-        item.MinMaxWidth((int)node.GetProperty("min_width", 0),
-                         max((int)node.GetProperty("min_width", 0),
-                             (int)node.GetProperty("max_width", INT_MAX)));
-        item.MinMaxHeight((int)node.GetProperty("min_height", 0),
-                          max((int)node.GetProperty("min_height", 0),
-                              (int)node.GetProperty("max_height", INT_MAX)));
+        if(min_main || max_main)
+            item.MinMaxMain(min_main, max_main ? max_main : INT_MAX);
+        if(cross_mode == "Fixed" && fixed_cross > 0)
+            item.MinMaxCross(fixed_cross, fixed_cross);
+        else if(min_cross || max_cross)
+            item.MinMaxCross(min_cross, max_cross ? max_cross : INT_MAX);
+        if(cross_mode == "Fill")
+            item.AlignSelf(UiCrossAlign::Stretch);
     }
     item.LineEnabled(node.GetProperty("line_enabled", false))
         .LineOrientation(ParseLineOrientation(node.GetProperty("line_orientation", "Horizontal")))
@@ -511,7 +525,7 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
         UiBoxLayout::ItemRef item = node.GetProperty("layout_break", false)
             ? box->AddBreak(max(1, (int)(double)node.GetProperty("weight", 1.0)))
             : box->AddSpacer(max(1, (int)(double)node.GetProperty("weight", 1.0)));
-        ConfigureBoxSpacer(item, node);
+        ConfigureBoxSpacer(*box, item, node);
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(parent_instance.control.Get())) {
         instance.layout_item_index = grid->GetItemCount();
@@ -523,8 +537,13 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
 
 static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
                                const UiDesignerNode& node,
+                               const String& adapter,
                                int& layout_item_index)
 {
+    if(adapter == "single") {
+        parent.Add(child.SizePos());
+        return;
+    }
     if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
         layout_item_index = box->GetItemCount();
         box->Add(child).Fit();
@@ -532,9 +551,11 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
         grid->Add(child, node.GetProperty("grid_row", 0),
-                   node.GetProperty("grid_column", 0), true);
+                  node.GetProperty("grid_column", 0), true);
     }
     else if(auto *tab = dynamic_cast<UiTab *>(&parent))
+        tab->Add(child, node.GetProperty("title", node.name));
+    else if(auto *tab = dynamic_cast<TabCtrl *>(&parent))
         tab->Add(child, node.GetProperty("title", node.name));
     else if(auto *stack = dynamic_cast<UiStack *>(&parent))
         stack->Add(child, node.name);
@@ -543,6 +564,10 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
             node.GetProperty("title", node.name), true);
         accordion->GetSectionContent(section).Add(child.SizePos());
     }
+    else if(auto *split = dynamic_cast<UiSplitter *>(&parent))
+        *split << child;
+    else if(auto *quad = dynamic_cast<UiQuadSplitter *>(&parent))
+        *quad << child;
     else if(auto *split = dynamic_cast<Splitter *>(&parent))
         *split << child;
     else
@@ -576,10 +601,13 @@ void UiDesignerPreviewCanvas::BuildNode(
     instance.generation = ++generation_sequence_;
 
     UiDesignerPreviewInstance* parent_instance = nullptr;
+    const UiDesignerControlSpec* parent_spec = nullptr;
     if(runtime_parent) {
         const int p = FindInstance(runtime_parent);
-        if(p >= 0)
+        if(p >= 0) {
             parent_instance = &instances_[p];
+            parent_spec = catalog_->Find(parent_instance->type);
+        }
     }
 
     if(instance.semantic) {
@@ -594,7 +622,9 @@ void UiDesignerPreviewCanvas::BuildNode(
     UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
     if(parent_instance && parent_instance->control)
         AttachRuntimeChild(*parent_instance->control, *instance.control,
-                           *node, instance.layout_item_index);
+                           *node,
+                           parent_spec ? parent_spec->child_adapter_id : "add",
+                           instance.layout_item_index);
     else
         fallback_parent.Add(*instance.control);
     ApplyAllProperties(instance, *node);
@@ -831,6 +861,7 @@ void UiDesignerPreviewCanvas::PaintSemantic(
     Draw& w, const UiDesignerPreviewInstance& instance,
     const UiDesignerNode& node) const
 {
+    (void)instance;
     Rect r = GetNodeRect(node.id);
     if(r.IsEmpty())
         return;
