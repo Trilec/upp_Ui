@@ -6,11 +6,21 @@ static void Usage()
 {
     Cout() <<
         "UiDesigner CLI\n"
-        "  list-controls\n"
-        "  validate <project-or-design.json>\n"
+        "  list-controls [query] [category]\n"
         "  schema <control-type>\n"
+        "  validate <project-or-design.json>\n"
         "  set <project> <node-id> <property> <json-value>\n"
         "  theme-set <project> <property> <json-value>\n"
+        "  plan-add <project> <type> <target-id> [x y] [index]\n"
+        "  add <project> <type> <target-id> [x y] [index]\n"
+        "  plan-move <project> <target-id> <node-id[,node-id...]> [index]\n"
+        "  move <project> <target-id> <node-id[,node-id...]> [index]\n"
+        "  behavior-get <project> <node-id>\n"
+        "  behavior-set <project> <node-id> <event> <action>"
+        " [target-id] [property] [json-value] [delta] [handler]\n"
+        "  behavior-remove <project> <node-id> <event>\n"
+        "  export <project> <complete|component|project_json|document_json|theme_json>"
+        " <destination> [package] [class] [namespace]\n"
         "  generate <project> <output-folder> [class-name]\n"
         "  migrate <legacy-design.json> <project.uidesign.json>\n";
 }
@@ -30,12 +40,56 @@ static bool LoadProject(UiDesignerSession& session, const String& path)
     return false;
 }
 
+static bool ResultOk(const Value& value)
+{
+    return value.Is<ValueMap>() &&
+           (bool)UiDesignerMapValue(ValueMap(value), "ok", false);
+}
+
 static int PrintResult(const Value& value)
 {
     Cout() << AsJSON(value, true) << '\n';
-    if(value.Is<ValueMap>() && !(bool)UiDesignerMapValue(ValueMap(value), "ok", false))
-        return 1;
-    return 0;
+    return ResultOk(value) ? 0 : 1;
+}
+
+static bool SaveProject(UiDesignerSession& session, const String& path)
+{
+    String error;
+    if(session.Save(path, error))
+        return true;
+    Cerr() << error << '\n';
+    return false;
+}
+
+static ValueArray ParseNodeList(const String& text)
+{
+    ValueArray result;
+    for(const String& token : Split(text, ',')) {
+        const String trimmed = TrimBoth(token);
+        if(!trimmed.IsEmpty())
+            result.Add(ScanInt64(trimmed));
+    }
+    return result;
+}
+
+static ValueMap DropParams(const Vector<String>& args, bool move)
+{
+    ValueMap request;
+    request.Set("operation", move ? "move" : "add");
+    request.Set("target", ScanInt64(args[2]));
+    if(move)
+        request.Set("nodes", ParseNodeList(args[3]));
+    else
+        request.Set("type", args[1]);
+
+    const int base = move ? 4 : 3;
+    if(args.GetCount() >= base + 2) {
+        request.Set("x", ScanInt(args[base]));
+        request.Set("y", ScanInt(args[base + 1]));
+    }
+    if(args.GetCount() >= base + 3)
+        request.Set("index", ScanInt(args[base + 2]));
+    return request;
 }
 
 CONSOLE_APP_MAIN
@@ -52,40 +106,18 @@ CONSOLE_APP_MAIN
     const String command = args[0];
 
     if(command == "list-controls") {
-        SetExitCode(PrintResult(automation.ListControls()));
+        ValueMap params;
+        if(args.GetCount() >= 2) params.Set("query", args[1]);
+        if(args.GetCount() >= 3) params.Set("category", args[2]);
+        SetExitCode(PrintResult(automation.ListControls(params)));
         return;
     }
 
     if(command == "schema") {
         if(args.GetCount() != 2) { Usage(); SetExitCode(2); return; }
-        const UiDesignerControlSpec* spec = session.Catalog().Find(args[1]);
-        if(!spec) {
-            Cerr() << "Unknown control type: " << args[1] << '\n';
-            SetExitCode(1);
-            return;
-        }
-        ValueArray properties;
-        for(const UiDesignerPropertySpec& property : spec->properties) {
-            ValueMap item;
-            item.Set("id", property.id);
-            item.Set("label", property.label);
-            item.Set("group", property.group);
-            item.Set("kind", PropertyEditorKindName(property.kind));
-            item.Set("domain", PropertyEditorDomainName(property.domain));
-            item.Set("impact", PropertyEditorImpactName(property.impact));
-            item.Set("default", property.default_value);
-            item.Set("minimum", property.minimum);
-            item.Set("maximum", property.maximum);
-            item.Set("step", property.step);
-            item.Set("help", property.help);
-            properties.Add(item);
-        }
-        ValueMap result;
-        result.Set("type", spec->type_id);
-        result.Set("cpp_type", spec->runtime_cpp_type);
-        result.Set("category", spec->category);
-        result.Set("properties", properties);
-        Cout() << AsJSON(result, true) << '\n';
+        ValueMap params;
+        params.Set("type", args[1]);
+        SetExitCode(PrintResult(automation.GetControlSpec(params)));
         return;
     }
 
@@ -108,11 +140,8 @@ CONSOLE_APP_MAIN
         request.Set("value", ParseArgumentValue(args[4]));
         request.Set("expected_revision", (int64)session.Document().GetRevision());
         Value result = automation.CommitProperty(request);
-        if((bool)UiDesignerMapValue(ValueMap(result), "ok", false)) {
-            String error;
-            if(!session.Save(args[1], error)) {
-                Cerr() << error << '\n'; SetExitCode(1); return;
-            }
+        if(ResultOk(result) && !SaveProject(session, args[1])) {
+            SetExitCode(1); return;
         }
         SetExitCode(PrintResult(result));
         return;
@@ -126,13 +155,123 @@ CONSOLE_APP_MAIN
         request.Set("property", args[2]);
         request.Set("value", ParseArgumentValue(args[3]));
         Value result = automation.CommitThemeProperty(request);
-        if((bool)UiDesignerMapValue(ValueMap(result), "ok", false)) {
-            String error;
-            if(!session.Save(args[1], error)) {
-                Cerr() << error << '\n'; SetExitCode(1); return;
+        if(ResultOk(result) && !SaveProject(session, args[1])) {
+            SetExitCode(1); return;
+        }
+        SetExitCode(PrintResult(result));
+        return;
+    }
+
+    if(command == "plan-add" || command == "add") {
+        if(args.GetCount() < 4 || args.GetCount() > 7 ||
+           !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        Vector<String> drop_args;
+        drop_args.Add(args[2]);
+        drop_args.Add(args[2]);
+        drop_args.Add(args[3]);
+        for(int i = 4; i < args.GetCount(); i++) drop_args.Add(args[i]);
+        ValueMap request = DropParams(drop_args, false);
+        Value result;
+        if(command == "plan-add")
+            result = automation.PlanAdd(request);
+        else {
+            request.Set("expected_revision", (int64)session.Document().GetRevision());
+            result = automation.ApplyDrop(request);
+            if(ResultOk(result) && !SaveProject(session, args[1])) {
+                SetExitCode(1); return;
             }
         }
         SetExitCode(PrintResult(result));
+        return;
+    }
+
+    if(command == "plan-move" || command == "move") {
+        if(args.GetCount() < 4 || args.GetCount() > 5 ||
+           !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        ValueMap request;
+        request.Set("operation", "move");
+        request.Set("target", ScanInt64(args[2]));
+        request.Set("nodes", ParseNodeList(args[3]));
+        if(args.GetCount() == 5) request.Set("index", ScanInt(args[4]));
+        Value result;
+        if(command == "plan-move")
+            result = automation.PlanMove(request);
+        else {
+            request.Set("expected_revision", (int64)session.Document().GetRevision());
+            result = automation.ApplyDrop(request);
+            if(ResultOk(result) && !SaveProject(session, args[1])) {
+                SetExitCode(1); return;
+            }
+        }
+        SetExitCode(PrintResult(result));
+        return;
+    }
+
+    if(command == "behavior-get") {
+        if(args.GetCount() != 3 || !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        ValueMap request;
+        request.Set("node", ScanInt64(args[2]));
+        SetExitCode(PrintResult(automation.GetBehaviors(request)));
+        return;
+    }
+
+    if(command == "behavior-set") {
+        if(args.GetCount() < 6 || args.GetCount() > 11 ||
+           !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        ValueMap request;
+        request.Set("node", ScanInt64(args[2]));
+        request.Set("event", args[3]);
+        request.Set("action", args[4]);
+        request.Set("expected_revision", (int64)session.Document().GetRevision());
+        if(args.GetCount() >= 6) request.Set("target", ScanInt64(args[5]));
+        if(args.GetCount() >= 7) request.Set("property", args[6]);
+        if(args.GetCount() >= 8) request.Set("value", ParseArgumentValue(args[7]));
+        if(args.GetCount() >= 9) request.Set("delta", ScanDouble(args[8]));
+        if(args.GetCount() >= 10) request.Set("handler", args[9]);
+        Value result = automation.SetBehavior(request);
+        if(ResultOk(result) && !SaveProject(session, args[1])) {
+            SetExitCode(1); return;
+        }
+        SetExitCode(PrintResult(result));
+        return;
+    }
+
+    if(command == "behavior-remove") {
+        if(args.GetCount() != 4 || !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        ValueMap request;
+        request.Set("node", ScanInt64(args[2]));
+        request.Set("event", args[3]);
+        request.Set("expected_revision", (int64)session.Document().GetRevision());
+        Value result = automation.RemoveBehavior(request);
+        if(ResultOk(result) && !SaveProject(session, args[1])) {
+            SetExitCode(1); return;
+        }
+        SetExitCode(PrintResult(result));
+        return;
+    }
+
+    if(command == "export") {
+        if(args.GetCount() < 4 || args.GetCount() > 7 ||
+           !LoadProject(session, args[1])) {
+            Usage(); SetExitCode(2); return;
+        }
+        ValueMap request;
+        request.Set("profile", args[2]);
+        request.Set("destination", args[3]);
+        if(args.GetCount() >= 5) request.Set("package_name", args[4]);
+        if(args.GetCount() >= 6) request.Set("class_name", args[5]);
+        if(args.GetCount() >= 7) request.Set("namespace", args[6]);
+        SetExitCode(PrintResult(automation.Export(request)));
         return;
     }
 
@@ -141,13 +280,14 @@ CONSOLE_APP_MAIN
            !LoadProject(session, args[1])) {
             Usage(); SetExitCode(2); return;
         }
-        String error;
+        ValueMap request;
+        request.Set("profile", "complete");
+        request.Set("destination", args[2]);
         const String class_name = args.GetCount() == 4
-                                      ? args[3] : "GeneratedUiWindow";
-        if(!session.Export(args[2], class_name, error)) {
-            Cerr() << error << '\n'; SetExitCode(1); return;
-        }
-        Cout() << "Generated " << class_name << " in " << args[2] << '\n';
+            ? args[3] : "GeneratedUiWindow";
+        request.Set("package_name", class_name);
+        request.Set("class_name", class_name);
+        SetExitCode(PrintResult(automation.Export(request)));
         return;
     }
 
@@ -155,9 +295,8 @@ CONSOLE_APP_MAIN
         if(args.GetCount() != 3 || !LoadProject(session, args[1])) {
             Usage(); SetExitCode(2); return;
         }
-        String error;
-        if(!session.Save(args[2], error)) {
-            Cerr() << error << '\n'; SetExitCode(1); return;
+        if(!SaveProject(session, args[2])) {
+            SetExitCode(1); return;
         }
         Cout() << "Migrated to " << args[2] << '\n';
         return;
