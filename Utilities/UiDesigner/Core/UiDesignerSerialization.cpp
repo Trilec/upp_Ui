@@ -199,6 +199,16 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
 
     VectorMap<int64, int64> id_map;
     id_map.Add((int64)UiDesignerMapValue(root_node, "id", 1), loaded.GetRootId());
+    UiDesignerNodeId next_migration_id = loaded.GetRootId() + 1;
+    for(const Value& item : nodes) {
+        if(!item.Is<ValueMap>())
+            continue;
+        ValueMap encoded = item;
+        const UiDesignerNodeId id =
+            (int64)UiDesignerMapValue(encoded, "id", 0);
+        if(next_migration_id <= id)
+            next_migration_id = id + 1;
+    }
     VectorMap<UiDesignerNodeId, ValueArray> pending_actions;
     pending_actions.Add(loaded.GetRootId(),
                         UiDesignerMapValue(root_node, "actions", ValueArray()));
@@ -212,6 +222,11 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
         bool progressed = false;
         for(int p = pending.GetCount() - 1; p >= 0; p--) {
             ValueMap n = nodes[pending[p]];
+            const int64 old_id = UiDesignerMapValue(n, "id", 0);
+            if(old_id <= 0 || id_map.Find(old_id) >= 0) {
+                error = "Document contains an invalid or duplicate node ID";
+                return false;
+            }
             const int64 old_parent = UiDesignerMapValue(n, "parent", 0);
             const int parent_q = id_map.Find(old_parent);
             if(parent_q < 0)
@@ -238,8 +253,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             UiDesignerNodeId parent = id_map[parent_q];
             if(legacy && type == "Spacer" && parent == loaded.GetRootId()) {
                 if(!legacy_root_layout) {
-                    legacy_root_layout = loaded.AddNode(
-                        "UiBoxLayout", "legacy_root_layout", loaded.GetRootId(),
+                    legacy_root_layout = loaded.AddNodeWithId(
+                        next_migration_id++, "UiBoxLayout",
+                        "legacy_root_layout", loaded.GetRootId(),
                         UiDesignerNodeContainer | UiDesignerNodeLayout);
                     UiDesignerNode* layout = loaded.Find(legacy_root_layout);
                     layout->properties.Set("direction", "V");
@@ -254,11 +270,16 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             dword flags = (dword)(int64)UiDesignerMapValue(n, "flags", 0);
             if(type == "Spacer")
                 flags |= UiDesignerNodeStructural | UiDesignerNodeSemanticItem;
-            const UiDesignerNodeId new_id = loaded.AddNode(
-                type, UiDesignerMapValue(n, "name", "control"), parent, flags);
+            const UiDesignerNodeId new_id = loaded.AddNodeWithId(
+                old_id, type, UiDesignerMapValue(n, "name", "control"),
+                parent, flags);
+            if(!new_id) {
+                error = "Unable to restore node identity " + AsString(old_id);
+                return false;
+            }
             UiDesignerNode* created = loaded.Find(new_id);
             created->properties = pick(properties);
-            id_map.Add((int64)UiDesignerMapValue(n, "id", 0), new_id);
+            id_map.Add(old_id, new_id);
             pending_actions.Add(new_id,
                 UiDesignerMapValue(n, "actions", ValueArray()));
             pending.Remove(p);
@@ -298,8 +319,16 @@ bool UiDesignerDocumentFromValue(const Value& value, UiDesignerDocument& documen
     const Size virtual_size((int)UiDesignerMapValue(size, "cx", 1020),
                             (int)UiDesignerMapValue(size, "cy", 668));
 
+    ValueMap encoded_root = nodes[0];
+    const UiDesignerNodeId persisted_root_id =
+        (int64)UiDesignerMapValue(encoded_root, "id", 1);
+    if(persisted_root_id <= 0) {
+        error = "Document root has an invalid node ID";
+        return false;
+    }
+
     UiDesignerDocument loaded;
-    loaded.NewDocument(virtual_size);
+    loaded.NewDocument(virtual_size, persisted_root_id);
     if(!legacy)
         loaded.SetDocumentId(UiDesignerMapValue(root, "document_id",
                                                 AsString(Uuid::Create())));
