@@ -2,6 +2,46 @@
 
 namespace Upp {
 
+static Value ActionToValue(const UiDesignerActionBinding& binding)
+{
+    ValueMap out;
+    out.Set("id", binding.id);
+    out.Set("event", binding.event_id);
+    out.Set("action", UiDesignerActionTypeName(binding.action));
+    out.Set("target", binding.target);
+    out.Set("property", binding.target_property);
+    out.Set("value", binding.value);
+    out.Set("delta", binding.delta);
+    out.Set("handler", binding.handler_name);
+    out.Set("enabled", binding.enabled);
+    return out;
+}
+
+static bool ActionFromValue(const Value& value,
+                            UiDesignerActionBinding& binding,
+                            String& error)
+{
+    if(!value.Is<ValueMap>()) {
+        error = "Action binding must be an object";
+        return false;
+    }
+    ValueMap map = value;
+    binding.id = UiDesignerMapValue(map, "id", AsString(Uuid::Create()));
+    binding.event_id = UiDesignerMapValue(map, "event", "");
+    const String action = UiDesignerMapValue(map, "action", "CallNamedHandler");
+    if(!UiDesignerParseActionType(action, binding.action)) {
+        error = "Unknown action type: " + action;
+        return false;
+    }
+    binding.target = (int64)UiDesignerMapValue(map, "target", 0);
+    binding.target_property = UiDesignerMapValue(map, "property", "");
+    binding.value = UiDesignerMapValue(map, "value", Value());
+    binding.delta = (double)UiDesignerMapValue(map, "delta", 0.0);
+    binding.handler_name = UiDesignerMapValue(map, "handler", "");
+    binding.enabled = (bool)UiDesignerMapValue(map, "enabled", true);
+    return binding.IsValid(&error);
+}
+
 static Value NodeToValue(const UiDesignerNode& node)
 {
     ValueMap out;
@@ -15,6 +55,10 @@ static Value NodeToValue(const UiDesignerNode& node)
         children.Add(id);
     out.Set("children", children);
     out.Set("properties", node.properties);
+    ValueArray actions;
+    for(const UiDesignerActionBinding& binding : node.actions)
+        actions.Add(ActionToValue(binding));
+    out.Set("actions", actions);
     return out;
 }
 
@@ -22,7 +66,7 @@ Value UiDesignerDocumentToValue(const UiDesignerDocument& document)
 {
     ValueMap out;
     out.Set("format", "upp-ui-designer-next");
-    out.Set("schema", 2);
+    out.Set("schema", 3);
     out.Set("document_id", document.GetDocumentId());
     out.Set("revision", (int64)document.GetRevision());
 
@@ -96,7 +140,7 @@ static String NormalizeLegacyType(String type)
         "IntEdit", "FloatEdit", "PasswordEdit", "MultiEdit", "MaskEdit",
         "ProgressBar", "Slider", "Breadcrumbs", "SliderEdit", "ScrollBar",
         "Table", "Doc", "Tree", "List", "BezierCurveEditor",
-        "BezierCurveField", "Dropdown", "Menu", "ColorPicker"
+        "BezierCurveField", "Dropdown", "Menu", "ColorPicker", "Spacer"
     };
     static const char *to[] = {
         "UiBoxLayout", "UiGridLayout", "UiSplitter", "UiQuadSplitter",
@@ -106,7 +150,7 @@ static String NormalizeLegacyType(String type)
         "UiIntEdit", "UiFloatEdit", "UiPasswordEdit", "UiMultiEdit", "UiMaskEdit",
         "UiProgressBar", "UiSlider", "UiBreadcrumbs", "UiSliderEdit", "UiScrollBar",
         "UiTable", "UiDoc", "UiTree", "UiList", "UiBezierCurveEditor",
-        "UiBezierCurveField", "UiDropdown", "UiMenu", "UiColorPicker"
+        "UiBezierCurveField", "UiDropdown", "UiMenu", "UiColorPicker", "Spacer"
     };
     for(int i = 0; i < __countof(from); i++)
         if(type == from[i])
@@ -115,6 +159,28 @@ static String NormalizeLegacyType(String type)
        type == "AccordionSectionSlot")
         return "UiPanel";
     return type;
+}
+
+static bool LoadActions(UiDesignerNode& node, const ValueArray& encoded,
+                        const VectorMap<int64, int64>& id_map, String& error)
+{
+    node.actions.Clear();
+    for(const Value& item : encoded) {
+        UiDesignerActionBinding binding;
+        if(!ActionFromValue(item, binding, error))
+            return false;
+        if(binding.target) {
+            const int q = id_map.Find(binding.target);
+            if(q < 0) {
+                error = "Action binding references missing target " +
+                        AsString(binding.target);
+                return false;
+            }
+            binding.target = id_map[q];
+        }
+        node.SetAction(pick(binding));
+    }
+    return true;
 }
 
 static bool LoadNodes(const ValueArray& nodes, bool legacy,
@@ -133,10 +199,15 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
 
     VectorMap<int64, int64> id_map;
     id_map.Add((int64)UiDesignerMapValue(root_node, "id", 1), loaded.GetRootId());
+    VectorMap<UiDesignerNodeId, ValueArray> pending_actions;
+    pending_actions.Add(loaded.GetRootId(),
+                        UiDesignerMapValue(root_node, "actions", ValueArray()));
+
     Vector<int> pending;
     for(int i = 1; i < nodes.GetCount(); i++)
         pending.Add(i);
 
+    UiDesignerNodeId legacy_root_layout = 0;
     while(!pending.IsEmpty()) {
         bool progressed = false;
         for(int p = pending.GetCount() - 1; p >= 0; p--) {
@@ -164,12 +235,32 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             const String type = legacy
                 ? NormalizeLegacyType(UiDesignerMapValue(n, "type", "UiLabel"))
                 : (String)UiDesignerMapValue(n, "type", "UiLabel");
-            const dword flags = (dword)(int64)UiDesignerMapValue(n, "flags", 0);
+            UiDesignerNodeId parent = id_map[parent_q];
+            if(legacy && type == "Spacer" && parent == loaded.GetRootId()) {
+                if(!legacy_root_layout) {
+                    legacy_root_layout = loaded.AddNode(
+                        "UiBoxLayout", "legacy_root_layout", loaded.GetRootId(),
+                        UiDesignerNodeContainer | UiDesignerNodeLayout);
+                    UiDesignerNode* layout = loaded.Find(legacy_root_layout);
+                    layout->properties.Set("direction", "V");
+                    layout->properties.Set("x", 20);
+                    layout->properties.Set("y", 20);
+                    layout->properties.Set("width", loaded.GetVirtualSize().cx - 40);
+                    layout->properties.Set("height", loaded.GetVirtualSize().cy - 40);
+                }
+                parent = legacy_root_layout;
+            }
+
+            dword flags = (dword)(int64)UiDesignerMapValue(n, "flags", 0);
+            if(type == "Spacer")
+                flags |= UiDesignerNodeStructural | UiDesignerNodeSemanticItem;
             const UiDesignerNodeId new_id = loaded.AddNode(
-                type, UiDesignerMapValue(n, "name", "control"), id_map[parent_q], flags);
+                type, UiDesignerMapValue(n, "name", "control"), parent, flags);
             UiDesignerNode* created = loaded.Find(new_id);
             created->properties = pick(properties);
             id_map.Add((int64)UiDesignerMapValue(n, "id", 0), new_id);
+            pending_actions.Add(new_id,
+                UiDesignerMapValue(n, "actions", ValueArray()));
             pending.Remove(p);
             progressed = true;
         }
@@ -177,6 +268,12 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             error = "Document contains a missing or cyclic parent reference";
             return false;
         }
+    }
+
+    for(int i = 0; i < pending_actions.GetCount(); i++) {
+        UiDesignerNode* node = loaded.Find(pending_actions.GetKey(i));
+        if(node && !LoadActions(*node, pending_actions[i], id_map, error))
+            return false;
     }
     return true;
 }
@@ -204,7 +301,8 @@ bool UiDesignerDocumentFromValue(const Value& value, UiDesignerDocument& documen
     UiDesignerDocument loaded;
     loaded.NewDocument(virtual_size);
     if(!legacy)
-        loaded.SetDocumentId(UiDesignerMapValue(root, "document_id", AsString(Uuid::Create())));
+        loaded.SetDocumentId(UiDesignerMapValue(root, "document_id",
+                                                AsString(Uuid::Create())));
 
     if(!LoadNodes(nodes, legacy, loaded, error))
         return false;
