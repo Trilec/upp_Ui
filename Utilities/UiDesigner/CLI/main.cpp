@@ -72,26 +72,6 @@ static ValueArray ParseNodeList(const String& text)
     return result;
 }
 
-static ValueMap DropParams(const Vector<String>& args, bool move)
-{
-    ValueMap request;
-    request.Set("operation", move ? "move" : "add");
-    request.Set("target", ScanInt64(args[2]));
-    if(move)
-        request.Set("nodes", ParseNodeList(args[3]));
-    else
-        request.Set("type", args[1]);
-
-    const int base = move ? 4 : 3;
-    if(args.GetCount() >= base + 2) {
-        request.Set("x", ScanInt(args[base]));
-        request.Set("y", ScanInt(args[base + 1]));
-    }
-    if(args.GetCount() >= base + 3)
-        request.Set("index", ScanInt(args[base + 2]));
-    return request;
-}
-
 CONSOLE_APP_MAIN
 {
     const Vector<String>& args = CommandLine();
@@ -167,12 +147,16 @@ CONSOLE_APP_MAIN
            !LoadProject(session, args[1])) {
             Usage(); SetExitCode(2); return;
         }
-        Vector<String> drop_args;
-        drop_args.Add(args[2]);
-        drop_args.Add(args[2]);
-        drop_args.Add(args[3]);
-        for(int i = 4; i < args.GetCount(); i++) drop_args.Add(args[i]);
-        ValueMap request = DropParams(drop_args, false);
+        ValueMap request;
+        request.Set("operation", "add");
+        request.Set("type", args[2]);
+        request.Set("target", ScanInt64(args[3]));
+        if(args.GetCount() >= 6) {
+            request.Set("x", ScanInt(args[4]));
+            request.Set("y", ScanInt(args[5]));
+        }
+        if(args.GetCount() == 7)
+            request.Set("index", ScanInt(args[6]));
         Value result;
         if(command == "plan-add")
             result = automation.PlanAdd(request);
@@ -222,7 +206,7 @@ CONSOLE_APP_MAIN
     }
 
     if(command == "behavior-set") {
-        if(args.GetCount() < 6 || args.GetCount() > 11 ||
+        if(args.GetCount() < 5 || args.GetCount() > 10 ||
            !LoadProject(session, args[1])) {
             Usage(); SetExitCode(2); return;
         }
