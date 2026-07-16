@@ -4,8 +4,12 @@ uses
     Core,
     Utilities/UiDesigner/Services;
 
+mainconfig
+    "CONSOLE" = "1";
+
 file
     UiDesignerMcpServer.h,
     UiDesignerMcpServer.cpp,
     main.cpp,
-    README.md;
+    README.md,
+    Smoke.ps1;
