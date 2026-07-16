@@ -5,7 +5,7 @@ namespace Upp {
 
 Image UiDesignerResolveCatalogIcon(const String& key)
 {
-    if(key == "layouts") return ICON_DESIGN_LAYOUTS_CATEGORY_48();
+    if(key == "layouts" || key == "spacer") return ICON_DESIGN_LAYOUTS_CATEGORY_48();
     if(key == "containers") return ICON_DESIGN_TAB_GROUP_48();
     if(key == "composites") return ICON_DESIGN_DYNAMIC_FORM_48();
     if(key == "presets") return ICON_DESIGN_DASHBOARD_EDIT_48();
@@ -259,139 +259,202 @@ void UiDesignerSideColumn::Layout()
 UiDesignerCatalogList::UiDesignerCatalogList()
 {
     BackPaint();
+    Add(filter_edit_);
+    filter_edit_.SetPlaceholder("Search controls...");
+    filter_edit_.WhenChanging = [=] {
+        filter_ = AsString(filter_edit_.GetData());
+        RebuildMatches();
+        WhenFilter(filter_);
+    };
 }
 
 void UiDesignerCatalogList::SetCatalog(const UiDesignerCatalog *catalog)
 {
     catalog_ = catalog;
-    Refresh();
+    RebuildMatches();
 }
 
 void UiDesignerCatalogList::SetCategory(const String& category)
 {
     category_ = category;
     presets_ = false;
-    scroll_ = 0;
-    Refresh();
+    RebuildMatches();
 }
 
 void UiDesignerCatalogList::SetPresets(bool on)
 {
     presets_ = on;
+    RebuildMatches();
+}
+
+void UiDesignerCatalogList::SetFilter(const String& filter)
+{
+    filter_ = filter;
+    filter_edit_.SetData(filter);
+    RebuildMatches();
+}
+
+void UiDesignerCatalogList::RebuildMatches()
+{
+    matches_.Clear();
+    if(catalog_) {
+        const String needle = ToLower(TrimBoth(filter_));
+        if(presets_) {
+            for(int i = 0; i < catalog_->GetPresets().GetCount(); i++) {
+                const UiDesignerPreset& preset = catalog_->GetPresets()[i];
+                if(needle.IsEmpty() ||
+                   ToLower(preset.display_name).Find(needle) >= 0 ||
+                   ToLower(preset.help).Find(needle) >= 0)
+                    matches_.Add(i);
+            }
+        }
+        else
+            matches_ = catalog_->Search(filter_, category_.IsEmpty() ? "All" : category_);
+    }
+    hover_ = -1;
+    selected_ = matches_.IsEmpty() ? -1 : minmax(selected_, 0, matches_.GetCount() - 1);
     scroll_ = 0;
     Refresh();
 }
 
 int UiDesignerCatalogList::Count() const
 {
-    if(!catalog_)
-        return 0;
-    return presets_ ? catalog_->GetPresets().GetCount()
-                    : catalog_->FindCategory(category_).GetCount();
+    return matches_.GetCount();
 }
 
 String UiDesignerCatalogList::ItemId(int index) const
 {
-    if(!catalog_)
+    if(!catalog_ || index < 0 || index >= matches_.GetCount())
         return String();
-    if(presets_)
-        return index >= 0 && index < catalog_->GetPresets().GetCount()
-                   ? "preset:" + catalog_->GetPresets()[index].id
-                   : String();
-    Vector<int> matches = catalog_->FindCategory(category_);
-    return index >= 0 && index < matches.GetCount()
-               ? catalog_->GetControls()[matches[index]].type_id
-               : String();
+    const int source = matches_[index];
+    return presets_ ? "preset:" + catalog_->GetPresets()[source].id
+                    : catalog_->GetControls()[source].type_id;
 }
 
 String UiDesignerCatalogList::ItemLabel(int index) const
 {
-    if(!catalog_)
+    if(!catalog_ || index < 0 || index >= matches_.GetCount())
         return String();
-    if(presets_)
-        return index >= 0 && index < catalog_->GetPresets().GetCount()
-                   ? catalog_->GetPresets()[index].display_name
-                   : String();
-    Vector<int> matches = catalog_->FindCategory(category_);
-    return index >= 0 && index < matches.GetCount()
-               ? catalog_->GetControls()[matches[index]].display_name
-               : String();
+    const int source = matches_[index];
+    return presets_ ? catalog_->GetPresets()[source].display_name
+                    : catalog_->GetControls()[source].display_name;
 }
 
 String UiDesignerCatalogList::ItemHelp(int index) const
 {
-    if(!catalog_)
+    if(!catalog_ || index < 0 || index >= matches_.GetCount())
         return String();
-    if(presets_)
-        return index >= 0 && index < catalog_->GetPresets().GetCount()
-                   ? catalog_->GetPresets()[index].help
-                   : String();
-    Vector<int> matches = catalog_->FindCategory(category_);
-    return index >= 0 && index < matches.GetCount()
-               ? catalog_->GetControls()[matches[index]].help
-               : String();
+    const int source = matches_[index];
+    return presets_ ? catalog_->GetPresets()[source].help
+                    : catalog_->GetControls()[source].help;
 }
 
 Image UiDesignerCatalogList::ItemIcon(int index) const
 {
-    if(!catalog_)
+    if(!catalog_ || index < 0 || index >= matches_.GetCount())
         return Image();
-    if(presets_)
-        return index >= 0 && index < catalog_->GetPresets().GetCount()
-                   ? UiDesignerResolveCatalogIcon(catalog_->GetPresets()[index].icon_key)
-                   : Image();
-    Vector<int> matches = catalog_->FindCategory(category_);
-    return index >= 0 && index < matches.GetCount()
-               ? UiDesignerResolveCatalogIcon(catalog_->GetControls()[matches[index]].icon_key)
-               : Image();
+    const int source = matches_[index];
+    return presets_
+        ? UiDesignerResolveCatalogIcon(catalog_->GetPresets()[source].icon_key)
+        : UiDesignerResolveCatalogIcon(catalog_->GetControls()[source].icon_key);
 }
 
 Rect UiDesignerCatalogList::ItemRect(int index) const
 {
-    const int row = DPI(38);
-    return RectC(0, index * row - scroll_, GetSize().cx, row);
+    const int top = DPI(40);
+    const int row = DPI(42);
+    return RectC(0, top + index * row - scroll_, GetSize().cx, row);
+}
+
+int UiDesignerCatalogList::RowAt(Point p) const
+{
+    if(p.y < DPI(40))
+        return -1;
+    const int index = (p.y - DPI(40) + scroll_) / DPI(42);
+    return index >= 0 && index < Count() ? index : -1;
 }
 
 int UiDesignerCatalogList::GetContentHeight() const
 {
-    return Count() * DPI(38);
+    return Count() * DPI(42);
+}
+
+void UiDesignerCatalogList::Layout()
+{
+    filter_edit_.SetRect(DPI(6), DPI(5), max(0, GetSize().cx - DPI(12)), DPI(30));
 }
 
 void UiDesignerCatalogList::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), SColorPaper());
-    const int count = Count();
-    for(int i = 0; i < count; i++) {
+    for(int i = 0; i < Count(); i++) {
         Rect r = ItemRect(i);
-        if(r.bottom < 0 || r.top > GetSize().cy)
+        if(r.bottom < DPI(40) || r.top > GetSize().cy)
             continue;
-        Color face = i == hover_
-                         ? Blend(SColorHighlight(), SColorPaper(), 40)
-                         : (i & 1 ? Blend(SColorFace(), SColorPaper(), 70)
-                                  : SColorPaper());
+        const bool current = i == selected_;
+        Color face = current
+            ? Blend(SColorHighlight(), SColorPaper(), 75)
+            : i == hover_ ? Blend(SColorHighlight(), SColorPaper(), 35)
+            : (i & 1 ? Blend(SColorFace(), SColorPaper(), 70) : SColorPaper());
         w.DrawRect(r, face);
         Image icon = ItemIcon(i);
         if(!icon.IsEmpty())
-            w.DrawImage(r.left + DPI(10), r.top + DPI(10),
-                        DPI(18), DPI(18), icon);
-        w.DrawText(r.left + DPI(38), r.top + DPI(10),
-                   ItemLabel(i), SansSerifZ(11), SColorText());
-        w.DrawLine(r.left, r.bottom - 1, r.right, r.bottom - 1,
-                   1, SColorShadow());
+            w.DrawImage(r.left + DPI(10), r.top + DPI(11), DPI(18), DPI(18), icon);
+        w.DrawText(r.left + DPI(38), r.top + DPI(7), ItemLabel(i),
+                   SansSerifZ(11).Bold(current), SColorText());
+        const String help = ItemHelp(i);
+        if(!help.IsEmpty())
+            w.DrawText(r.left + DPI(38), r.top + DPI(23),
+                       help.Left(54), SansSerifZ(8), SColorDisabled());
+        w.DrawLine(r.left, r.bottom - 1, r.right, r.bottom - 1, 1, SColorShadow());
     }
+    if(Count() == 0)
+        w.DrawText(DPI(12), DPI(54), "No matching controls", SansSerifZ(10), SColorDisabled());
 }
 
-void UiDesignerCatalogList::LeftDown(Point p, dword)
+void UiDesignerCatalogList::Activate(int index)
 {
-    const int index = (p.y + scroll_) / DPI(38);
     if(index >= 0 && index < Count())
         WhenActivate(ItemId(index));
 }
 
+void UiDesignerCatalogList::LeftDown(Point p, dword)
+{
+    pressed_ = selected_ = RowAt(p);
+    dragging_ = false;
+    SetFocus();
+    Refresh();
+}
+
+void UiDesignerCatalogList::LeftUp(Point p, dword)
+{
+    const int index = RowAt(p);
+    if(!dragging_ && pressed_ >= 0 && index == pressed_)
+        Activate(index);
+    pressed_ = -1;
+    dragging_ = false;
+}
+
+void UiDesignerCatalogList::LeftDouble(Point p, dword)
+{
+    Activate(RowAt(p));
+}
+
+void UiDesignerCatalogList::LeftDrag(Point, dword)
+{
+    if(pressed_ < 0 || pressed_ >= Count() || presets_)
+        return;
+    dragging_ = true;
+    const String type = ItemId(pressed_);
+    DoDragAndDrop(TextClip(UiDesignerCatalogDragText(type)),
+                  ItemIcon(pressed_), DND_COPY);
+    pressed_ = -1;
+    dragging_ = false;
+}
+
 void UiDesignerCatalogList::MouseMove(Point p, dword)
 {
-    const int index = (p.y + scroll_) / DPI(38);
-    const int next = index >= 0 && index < Count() ? index : -1;
+    const int next = RowAt(p);
     if(next != hover_) {
         hover_ = next;
         Tip(next >= 0 ? ItemHelp(next) : String());
@@ -408,20 +471,42 @@ void UiDesignerCatalogList::MouseLeave()
 
 void UiDesignerCatalogList::MouseWheel(Point, int zdelta, dword)
 {
-    const int maximum = max(0, GetContentHeight() - GetSize().cy);
+    const int list_height = max(0, GetSize().cy - DPI(40));
+    const int maximum = max(0, GetContentHeight() - list_height);
     scroll_ = minmax(scroll_ - zdelta / 4, 0, maximum);
     Refresh();
 }
 
-void UiDesignerHierarchyView::SetDocument(
-    const UiDesignerDocument *document)
+bool UiDesignerCatalogList::Key(dword key, int)
+{
+    if(key == K_UP && Count()) {
+        selected_ = max(0, selected_ - 1);
+        Refresh();
+        return true;
+    }
+    if(key == K_DOWN && Count()) {
+        selected_ = min(Count() - 1, selected_ + 1);
+        Refresh();
+        return true;
+    }
+    if(key == K_ENTER && selected_ >= 0) {
+        Activate(selected_);
+        return true;
+    }
+    if(key == K_CTRL_F) {
+        filter_edit_.SetFocus();
+        return true;
+    }
+    return ParentCtrl::Key(key, 1);
+}
+
+void UiDesignerHierarchyView::SetDocument(const UiDesignerDocument *document)
 {
     document_ = document;
     Rebuild();
 }
 
-void UiDesignerHierarchyView::SetSelection(
-    const UiDesignerSelection *selection)
+void UiDesignerHierarchyView::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
     Refresh();
@@ -454,35 +539,73 @@ void UiDesignerHierarchyView::Rebuild()
     Refresh();
 }
 
+Rect UiDesignerHierarchyView::RowRect(int index) const
+{
+    return RectC(0, index * DPI(30) - scroll_, GetSize().cx, DPI(30));
+}
+
+int UiDesignerHierarchyView::RowAt(Point p) const
+{
+    const int index = (p.y + scroll_) / DPI(30);
+    return index >= 0 && index < rows_.GetCount() ? index : -1;
+}
+
 void UiDesignerHierarchyView::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), SColorPaper());
-    const int row_h = DPI(30);
     for(int i = 0; i < rows_.GetCount(); i++) {
-        const int y = i * row_h - scroll_;
-        if(y + row_h < 0 || y > GetSize().cy)
+        Rect r = RowRect(i);
+        if(r.bottom < 0 || r.top > GetSize().cy)
             continue;
-        const UiDesignerNode* node =
-            document_ ? document_->Find(rows_[i].node) : nullptr;
+        const UiDesignerNode* node = document_ ? document_->Find(rows_[i].node) : nullptr;
         if(!node)
             continue;
-        const bool selected =
-            selection_ && selection_->Contains(node->id);
+        const bool selected = selection_ && selection_->Contains(node->id);
         if(selected)
-            w.DrawRect(0, y, GetSize().cx, row_h,
-                       Blend(SColorHighlight(), SColorPaper(), 80));
+            w.DrawRect(r, Blend(SColorHighlight(), SColorPaper(), 80));
         const int x = DPI(8) + rows_[i].depth * DPI(16);
-        w.DrawText(x, y + DPI(7),
-                   node->name + "  [" + node->type + "]",
+        w.DrawText(x, r.top + DPI(7), node->name + "  [" + node->type + "]",
                    SansSerifZ(10), SColorText());
+    }
+    if(drop_row_ >= 0 && drop_row_ < rows_.GetCount()) {
+        Rect r = RowRect(drop_row_);
+        const Color color = drop_plan_.valid ? Color(34, 197, 94) : Color(220, 38, 38);
+        if(drop_edge_ < 0)
+            w.DrawRect(r.left, r.top, r.Width(), DPI(2), color);
+        else if(drop_edge_ > 0)
+            w.DrawRect(r.left, r.bottom - DPI(2), r.Width(), DPI(2), color);
+        else {
+            w.DrawRect(r.left, r.top, r.Width(), DPI(2), color);
+            w.DrawRect(r.left, r.bottom - DPI(2), r.Width(), DPI(2), color);
+            w.DrawRect(r.left, r.top, DPI(2), r.Height(), color);
+            w.DrawRect(r.right - DPI(2), r.top, DPI(2), r.Height(), color);
+        }
     }
 }
 
 void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
 {
-    const int index = (p.y + scroll_) / DPI(30);
-    if(index >= 0 && index < rows_.GetCount())
-        WhenSelectNode(rows_[index].node, (flags & K_CTRL) != 0);
+    pressed_ = RowAt(p);
+    if(pressed_ >= 0)
+        WhenSelectNode(rows_[pressed_].node, (flags & K_CTRL) != 0);
+    SetFocus();
+}
+
+void UiDesignerHierarchyView::LeftDrag(Point, dword)
+{
+    if(pressed_ < 0 || pressed_ >= rows_.GetCount() || !document_)
+        return;
+    const UiDesignerNodeId pressed_node = rows_[pressed_].node;
+    if(pressed_node == document_->GetRootId())
+        return;
+    Vector<UiDesignerNodeId> nodes;
+    if(selection_ && selection_->Contains(pressed_node))
+        nodes = clone(selection_->nodes);
+    else
+        nodes.Add(pressed_node);
+    DoDragAndDrop(TextClip(UiDesignerNodesDragText(nodes)),
+                  ICON_DESIGN_ACCOUNT_TREE_48(), DND_MOVE);
+    pressed_ = -1;
 }
 
 void UiDesignerHierarchyView::MouseWheel(Point, int zdelta, dword)
@@ -490,6 +613,92 @@ void UiDesignerHierarchyView::MouseWheel(Point, int zdelta, dword)
     const int maximum = max(0, rows_.GetCount() * DPI(30) - GetSize().cy);
     scroll_ = minmax(scroll_ - zdelta / 4, 0, maximum);
     Refresh();
+}
+
+void UiDesignerHierarchyView::ClearDrop()
+{
+    drop_row_ = -1;
+    drop_edge_ = 0;
+    drag_payload_.Clear();
+    drop_plan_ = UiDesignerDropPlan();
+    Refresh();
+}
+
+void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
+{
+    if(!document_ || !PlanDrop)
+        return;
+    Vector<UiDesignerNodeId> nodes;
+    if(!UiDesignerParseNodesDragText(payload, nodes)) {
+        ClearDrop();
+        return;
+    }
+    const int row = RowAt(p);
+    if(row < 0) {
+        ClearDrop();
+        return;
+    }
+    const UiDesignerNode* target = document_->Find(rows_[row].node);
+    if(!target) {
+        ClearDrop();
+        return;
+    }
+    Rect rr = RowRect(row);
+    const int third = max(1, rr.Height() / 3);
+    drop_edge_ = p.y < rr.top + third ? -1
+               : p.y >= rr.bottom - third ? 1 : 0;
+    UiDesignerNodeId parent = target->id;
+    int index = -1;
+    if(drop_edge_ != 0 || !(target->flags & UiDesignerNodeContainer)) {
+        parent = target->parent;
+        const UiDesignerNode* parent_node = document_->Find(parent);
+        index = parent_node ? FindIndex(parent_node->children, target->id) : -1;
+        if(drop_edge_ >= 0 && index >= 0)
+            index++;
+        drop_edge_ = drop_edge_ == 0 ? 1 : drop_edge_;
+    }
+    drop_plan_ = PlanDrop(nodes, parent, index);
+    drop_row_ = row;
+    drag_payload_ = payload;
+    if(WhenDropStatus)
+        WhenDropStatus(drop_plan_.valid ? drop_plan_.label : drop_plan_.reason);
+    Refresh();
+}
+
+void UiDesignerHierarchyView::DragEnter()
+{
+    Refresh();
+}
+
+void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
+{
+    if(!AcceptText(d)) {
+        ClearDrop();
+        return;
+    }
+    const String payload = GetString(d);
+    UpdateDrop(p, payload);
+    if(!drop_plan_.valid)
+        return;
+    d.SetAction(DND_MOVE);
+    if(d.IsPaste()) {
+        String error;
+        const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
+        if(WhenDropStatus)
+            WhenDropStatus(ok ? "Move completed" : error);
+        ClearDrop();
+    }
+}
+
+void UiDesignerHierarchyView::DragRepeat(Point p)
+{
+    if(!drag_payload_.IsEmpty())
+        UpdateDrop(p, drag_payload_);
+}
+
+void UiDesignerHierarchyView::DragLeave()
+{
+    ClearDrop();
 }
 
 UiDesignerCodeView::UiDesignerCodeView()
