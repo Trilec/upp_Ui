@@ -34,7 +34,10 @@ public:
     UiDesignerCommandService& Commands() { return commands_; }
     UiDesignerCatalog& Catalog() { return catalog_; }
     const UiDesignerCatalog& Catalog() const { return catalog_; }
-    UiDesignerDropService& Drops() { return drops_; }
+    UiDesignerDropService& Drops() {
+        drops_.Bind(document_, catalog_, commands_);
+        return drops_;
+    }
 
     UiDesignerSessionState& State() { return state_; }
     const UiDesignerSessionState& State() const { return state_; }
