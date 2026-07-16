@@ -60,6 +60,7 @@ public:
     bool Replace(const UiDesignerThemeSnapshot& value, bool mark_saved = true);
 
     Event<> WhenPreview;
+    Event<>& WhenPreviewChanged = WhenPreview;
     Event<> WhenChanged;
     Event<> WhenHistoryChanged;
 
