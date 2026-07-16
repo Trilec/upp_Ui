@@ -11,6 +11,8 @@ uses
 file
     UiDesignerServices.h,
     UiDesignerProjection.h,
+    UiDesignerDrop.h,
+    UiDesignerDrop.cpp,
     UiDesignerSession.h,
     UiDesignerSession.cpp,
     UiDesignerAutomation.h,
