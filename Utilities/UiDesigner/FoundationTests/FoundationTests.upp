@@ -17,4 +17,5 @@ mainconfig
 
 file
     main.cpp,
-    README.md;
+    README.md,
+    BuildGeneratedFixture.ps1;
