@@ -2,6 +2,7 @@
 #define _Utilities_UiDesigner_Services_UiDesignerServices_h_
 
 #include "UiDesignerProjection.h"
+#include "UiDesignerDrop.h"
 #include "UiDesignerSession.h"
 #include "UiDesignerAutomation.h"
 
