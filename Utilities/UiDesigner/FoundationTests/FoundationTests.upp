@@ -13,7 +13,7 @@ uses
     Utilities/UiDesigner/Services;
 
 mainconfig
-    "GUI" = "1";
+    "CONSOLE" = "1";
 
 file
     main.cpp,
