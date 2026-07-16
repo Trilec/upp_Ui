@@ -13,6 +13,8 @@ file
     UiDesignerProjection.h,
     UiDesignerDrop.h,
     UiDesignerDrop.cpp,
+    UiDesignerExport.h,
+    UiDesignerExport.cpp,
     UiDesignerSession.h,
     UiDesignerSession.cpp,
     UiDesignerSessionExtensions.cpp,
