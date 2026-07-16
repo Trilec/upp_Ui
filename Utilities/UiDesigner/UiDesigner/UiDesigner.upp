@@ -11,6 +11,8 @@ file
     UiDesignerStyle.h,
     UiDesignerWidgets.h,
     UiDesignerWidgets.cpp,
+    UiDesignerExportDialog.h,
+    UiDesignerExportDialog.cpp,
     UiDesignerWindow.h,
     UiDesignerWindow.cpp,
     UiDesignerApplication.h,
