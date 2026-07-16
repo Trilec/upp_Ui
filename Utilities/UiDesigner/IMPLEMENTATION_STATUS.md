@@ -1,26 +1,77 @@
-# Implementation status
+# UiDesigner implementation status
 
-The integrated greenfield source contains the complete intended architecture and product
-surface for the first compile-and-runtime validation pass:
+## Supervisor source status
 
-- canonical document with persistent/session separation and legacy Designer import
-- typed change sets and transient property overrides
-- atomic multi-node commands, rollback, undo/redo and saved checkpoints
-- complete native Ui, layout, container, composite, preset and stock U++ catalog
-- shared PropertyEditor schema, mixed multi-selection and preview/commit separation
-- stable preview instance mapping, localized updates and bounded subtree reconstruction
-- deterministic generated C++, package, JSON and embedded-theme export
-- separate Theme Studio document, transient preview and independent undo history
-- the authored Theme Studio arrangement plus automatic complete native Ui inventory
-- the exact shared shell concept: three Designer top pills and two Theme regions
-- 8 px broad surfaces, 25 px pills, authored insets and soft light shadow
-- normal/medium/wide panels and closed vertical icon rails
-- document save/load/export and legacy migration
-- headless validation and generation CLI
-- MCP stdio host with standard initialize/tools/list/tools/call support
-- document and Theme property tools, revision checks, validation and export
-- architecture and behavior tests
+The greenfield UiDesigner source implementation is complete on the supervisor branch and is ready for the Windows/U++ validation pass.
 
-The source is ready for the Windows U++/CLANGx64 compile and interactive audit. The
-current authoring environment cannot run that compiler, so precise API spelling or
-ownership corrections exposed by the build remain the final 1% validation work.
+Implemented systems include:
+
+- authored three-pill Designer and two-region Theme Studio shell;
+- canonical document/session separation;
+- typed command transactions, undo/redo and dirty tracking;
+- catalog-driven properties, events, capabilities and adapter identifiers;
+- semantic Spacer, layout break and separator support without a dummy runtime `Ctrl`;
+- legacy Spacer migration into an implicit compatible layout;
+- stable preview controls and semantic layout-item projection;
+- searchable flat toolbox categories;
+- catalog, hierarchy and canvas drag/drop through a pure drop planner;
+- terminal-only atomic insertion/reparenting and one undo entry per drop;
+- PropertyEditor preview/commit/reset and mixed multi-selection;
+- separate Theme document, preview and history;
+- typed behavior/action bindings and Behavior Inspector;
+- built-in Close, Accept, Cancel, Exit, property, page and named-handler actions;
+- generated/user-owned C++ separation;
+- registered child-attachment adapters for layouts, page containers and splitters;
+- deterministic semantic Spacer and behavior code generation;
+- complete package, component, project JSON, document JSON and Theme JSON exports;
+- recoverable multi-file export publication and user-code preservation;
+- CLI and MCP coverage for catalog, document, drops, behavior, Theme and export;
+- original UiDesigner tests plus focused FoundationTests;
+- generated-package build/process smoke automation;
+- architecture, drag/drop, behavior and export contracts.
+
+## Previous validated baseline
+
+Before this final feature pass, the integrated baseline had:
+
+- architecture guard passing;
+- PropertyEditor: 47 checks, 0 failures;
+- UiDesigner: 100 checks, 0 failures;
+- CLI list/schema smoke passing;
+- MCP newline and Content-Length framing passing;
+- UiDesigner, CLI and MCP compiling under CLANGx64.
+
+Those results do not prove the later supervisor branch. They are the starting baseline only.
+
+## Pending external proof
+
+The final branch still requires the real Windows host to run `RunSupervisorValidation.ps1` and an interactive desktop audit. Until that happens, the following must not be described as verified:
+
+- final CLANGx64 compilation of every changed package;
+- FoundationTests result count;
+- generated fixture compilation through `umk`;
+- final CLI/MCP smokes;
+- visible top-level window and native handle;
+- exact visual comparison with Curt's Designer and Theme exports;
+- catalog/hierarchy/canvas drag cycles;
+- Spacer visual selection and separator rendering;
+- Behavior Inspector interaction;
+- export-dialog selection, overwrite and preservation workflows;
+- lifecycle and stress results.
+
+## Design decisions
+
+- The toolbox is a searchable flat catalog; the hierarchy remains a tree.
+- Spacer is semantic layout data, not a fake control.
+- Drag hover is transient and never mutates the document.
+- Behavior bindings are declarative and transport-neutral; custom code lives in named user-owned handlers.
+- `.generated.*` files are replaceable; user `.h/.cpp` files are preserved.
+- Application version remains `v1.0.0-rc1` until the validation report is accepted.
+
+## Validation entry point
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Utilities/UiDesigner/RunSupervisorValidation.ps1
+```
+
+After that automated sequence passes, perform the interactive audit described in the supervisor handoff task.
