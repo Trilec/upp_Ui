@@ -56,7 +56,8 @@ bool UiDesignerExportService::WriteSingleFileAtomic(
         error = "Export path is empty";
         return false;
     }
-    if(FileExists(path) && overwrite == UiDesignerOverwritePolicy::RefuseExisting) {
+    const bool existed = FileExists(path);
+    if(existed && overwrite == UiDesignerOverwritePolicy::RefuseExisting) {
         error = "Export target already exists: " + path;
         return false;
     }
@@ -67,22 +68,38 @@ bool UiDesignerExportService::WriteSingleFileAtomic(
         return false;
     }
 
-    const String temporary = path + ".uidesigner-tmp-" +
-                             AsString(Uuid::Create());
+    const String suffix = AsString(Uuid::Create());
+    const String temporary = path + ".uidesigner-tmp-" + suffix;
+    const String backup = path + ".uidesigner-backup-" + suffix;
     if(!SaveFile(temporary, content)) {
         error = "Unable to write temporary export: " + temporary;
         return false;
     }
-    if(FileExists(path) && !FileDelete(path)) {
+    if(existed && !FileCopy(path, backup)) {
         FileDelete(temporary);
-        error = "Unable to replace export: " + path;
+        error = "Unable to back up export target: " + path;
         return false;
     }
-    if(!FileMove(temporary, path)) {
+
+    bool published = false;
+    if((!existed || FileDelete(path)) && FileMove(temporary, path))
+        published = true;
+
+    if(!published) {
         FileDelete(temporary);
-        error = "Unable to publish export: " + path;
+        if(FileExists(path))
+            FileDelete(path);
+        bool restored = true;
+        if(existed)
+            restored = FileExists(backup) && FileCopy(backup, path);
+        FileDelete(backup);
+        error = restored
+            ? "Unable to publish export; previous file restored: " + path
+            : "Unable to publish export and restore previous file: " + path;
         return false;
     }
+
+    FileDelete(backup);
     error.Clear();
     return true;
 }
