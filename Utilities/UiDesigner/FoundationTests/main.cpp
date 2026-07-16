@@ -266,6 +266,8 @@ static void RunTests(FoundationTester& t)
     UiDesignerDocument roundtrip;
     t.Check(UiDesignerDeserialize(serialized, roundtrip, error),
             "behavior document round trip succeeds");
+    t.Check(roundtrip.Find(button) != nullptr,
+            "stable node identity survives round trip");
     t.Check(roundtrip.GetActionBinding(button, "WhenAction") != nullptr,
             "behavior survives round trip");
 
