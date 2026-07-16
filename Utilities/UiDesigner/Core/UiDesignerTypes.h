@@ -16,11 +16,89 @@ inline Value UiDesignerMapValue(const ValueMap& map, const char *key,
 using UiDesignerNodeId = int64;
 
 enum UiDesignerNodeFlags : dword {
-    UiDesignerNodeNone       = 0,
-    UiDesignerNodeContainer  = 1 << 0,
-    UiDesignerNodeLayout     = 1 << 1,
-    UiDesignerNodeStockUpp   = 1 << 2,
-    UiDesignerNodeStructural = 1 << 3,
+    UiDesignerNodeNone          = 0,
+    UiDesignerNodeContainer     = 1 << 0,
+    UiDesignerNodeLayout        = 1 << 1,
+    UiDesignerNodeStockUpp      = 1 << 2,
+    UiDesignerNodeStructural    = 1 << 3,
+    UiDesignerNodeSemanticItem  = 1 << 4,
+};
+
+enum class UiDesignerActionType : byte {
+    CloseWindow = 0,
+    AcceptDialog,
+    CancelDialog,
+    ExitApplication,
+    SetProperty,
+    ToggleProperty,
+    AdjustValue,
+    ActivatePage,
+    CallNamedHandler,
+};
+
+inline String UiDesignerActionTypeName(UiDesignerActionType type)
+{
+    switch(type) {
+    case UiDesignerActionType::CloseWindow:      return "CloseWindow";
+    case UiDesignerActionType::AcceptDialog:     return "AcceptDialog";
+    case UiDesignerActionType::CancelDialog:     return "CancelDialog";
+    case UiDesignerActionType::ExitApplication:  return "ExitApplication";
+    case UiDesignerActionType::SetProperty:      return "SetProperty";
+    case UiDesignerActionType::ToggleProperty:   return "ToggleProperty";
+    case UiDesignerActionType::AdjustValue:      return "AdjustValue";
+    case UiDesignerActionType::ActivatePage:     return "ActivatePage";
+    case UiDesignerActionType::CallNamedHandler: return "CallNamedHandler";
+    }
+    return "CallNamedHandler";
+}
+
+inline bool UiDesignerParseActionType(const String& text,
+                                      UiDesignerActionType& type)
+{
+    for(int i = 0; i <= (int)UiDesignerActionType::CallNamedHandler; i++) {
+        UiDesignerActionType candidate = (UiDesignerActionType)i;
+        if(UiDesignerActionTypeName(candidate) == text) {
+            type = candidate;
+            return true;
+        }
+    }
+    return false;
+}
+
+struct UiDesignerActionBinding : Moveable<UiDesignerActionBinding> {
+    String id;
+    String event_id;
+    UiDesignerActionType action = UiDesignerActionType::CallNamedHandler;
+    UiDesignerNodeId target = 0;
+    String target_property;
+    Value value;
+    double delta = 0.0;
+    String handler_name;
+    bool enabled = true;
+
+    bool IsValid(String *error = nullptr) const
+    {
+        auto Fail = [&](const String& text) {
+            if(error)
+                *error = text;
+            return false;
+        };
+        if(event_id.IsEmpty())
+            return Fail("Action binding has no event");
+        if(action == UiDesignerActionType::CallNamedHandler &&
+           handler_name.IsEmpty())
+            return Fail("Named handler action has no handler name");
+        if((action == UiDesignerActionType::SetProperty ||
+            action == UiDesignerActionType::ToggleProperty ||
+            action == UiDesignerActionType::AdjustValue) &&
+           (!target || target_property.IsEmpty()))
+            return Fail("Property action has no stable target/property");
+        if(action == UiDesignerActionType::ActivatePage && !target)
+            return Fail("ActivatePage action has no target");
+        if(error)
+            error->Clear();
+        return true;
+    }
 };
 
 enum UiDesignerChangeImpact : dword {
@@ -79,6 +157,20 @@ struct UiDesignerStructureChange : Moveable<UiDesignerStructureChange> {
     int new_index = -1;
 };
 
+enum class UiDesignerBehaviorChangeKind : byte {
+    Added = 0,
+    Updated,
+    Removed,
+};
+
+struct UiDesignerBehaviorChange : Moveable<UiDesignerBehaviorChange> {
+    UiDesignerBehaviorChangeKind kind = UiDesignerBehaviorChangeKind::Added;
+    UiDesignerNodeId node = 0;
+    String event_id;
+    Value old_binding;
+    Value new_binding;
+};
+
 struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
     uint64 transaction_id = 0;
     uint64 document_revision = 0;
@@ -86,6 +178,7 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
 
     Vector<UiDesignerPropertyChange> properties;
     Vector<UiDesignerStructureChange> structure;
+    Vector<UiDesignerBehaviorChange> behaviors;
 
     bool virtual_size_changed = false;
     bool resources_changed = false;
@@ -101,6 +194,7 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
     {
         properties.Append(clone(other.properties));
         structure.Append(clone(other.structure));
+        behaviors.Append(clone(other.behaviors));
     }
 
     UiDesignerChangeSet& operator=(const UiDesignerChangeSet& other)
@@ -112,8 +206,10 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
         reason = other.reason;
         properties.Clear();
         structure.Clear();
+        behaviors.Clear();
         properties.Append(clone(other.properties));
         structure.Append(clone(other.structure));
+        behaviors.Append(clone(other.behaviors));
         virtual_size_changed = other.virtual_size_changed;
         resources_changed = other.resources_changed;
         schema_changed = other.schema_changed;
@@ -129,6 +225,7 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
         reason = pick(other.reason);
         properties = pick(other.properties);
         structure = pick(other.structure);
+        behaviors = pick(other.behaviors);
         virtual_size_changed = other.virtual_size_changed;
         resources_changed = other.resources_changed;
         schema_changed = other.schema_changed;
@@ -138,7 +235,8 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
     bool IsEmpty() const
     {
         return properties.IsEmpty() && structure.IsEmpty() &&
-               !virtual_size_changed && !resources_changed && !schema_changed;
+               behaviors.IsEmpty() && !virtual_size_changed &&
+               !resources_changed && !schema_changed;
     }
 
     UiDesignerChangeImpact CombinedImpact() const
@@ -149,6 +247,8 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
         if(!structure.IsEmpty())
             result |= UiDesignerImpactStructure | UiDesignerImpactHierarchy |
                       UiDesignerImpactCode | UiDesignerImpactSubtree;
+        if(!behaviors.IsEmpty())
+            result |= UiDesignerImpactCode | UiDesignerImpactInspectorSchema;
         if(schema_changed)
             result |= UiDesignerImpactInspectorSchema;
         if(resources_changed)
@@ -160,6 +260,7 @@ struct UiDesignerChangeSet : Moveable<UiDesignerChangeSet> {
     {
         properties.Append(clone(other.properties));
         structure.Append(clone(other.structure));
+        behaviors.Append(clone(other.behaviors));
         virtual_size_changed |= other.virtual_size_changed;
         resources_changed |= other.resources_changed;
         schema_changed |= other.schema_changed;
@@ -215,6 +316,8 @@ struct UiDesignerSessionState {
     String active_workspace = "designer";
     String active_left_section = "Layouts";
     String active_right_section = "Inspector";
+    String toolbox_filter;
+    String toolbox_category = "All";
 };
 
 }
