@@ -10,6 +10,7 @@ static UiDesignerChangeSet CopyChangeSet(const UiDesignerChangeSet& source)
     copy.reason = source.reason;
     copy.properties.Append(clone(source.properties));
     copy.structure.Append(clone(source.structure));
+    copy.behaviors.Append(clone(source.behaviors));
     copy.virtual_size_changed = source.virtual_size_changed;
     copy.resources_changed = source.resources_changed;
     copy.schema_changed = source.schema_changed;
@@ -127,10 +128,17 @@ UiDesignerNodeId UiDesignerCommandService::AddNode(
     const String& type, const String& name, UiDesignerNodeId parent,
     dword flags, const ValueMap& defaults, const String& label)
 {
+    return AddNodeAt(type, name, parent, -1, flags, defaults, label);
+}
+
+UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
+    const String& type, const String& name, UiDesignerNodeId parent,
+    int index, dword flags, const ValueMap& defaults, const String& label)
+{
     UiDesignerNodeId result = 0;
     const bool ok = ApplyAtomic(label.IsEmpty() ? "Add " + type : label,
         [&](UiDesignerChangeSet& aggregate) {
-            result = document_.AddNode(type, name, parent, flags);
+            result = document_.AddNode(type, name, parent, flags, index);
             if(!result) {
                 last_error_ = "Unable to add " + type;
                 return false;
@@ -142,6 +150,7 @@ UiDesignerNodeId UiDesignerCommandService::AddNode(
             change.kind = UiDesignerStructureChangeKind::Created;
             change.node = result;
             change.new_parent = parent;
+            change.new_index = index;
             return true;
         });
     return ok ? result : 0;
@@ -192,12 +201,18 @@ bool UiDesignerCommandService::MoveNode(UiDesignerNodeId node,
                 return false;
             }
             UiDesignerStructureChange& change = aggregate.structure.Add();
-            change.kind = UiDesignerStructureChangeKind::Reparented;
+            change.kind = old->parent == parent
+                            ? UiDesignerStructureChangeKind::Reordered
+                            : UiDesignerStructureChangeKind::Reparented;
             change.node = node;
             change.old_parent = old->parent;
             change.new_parent = parent;
             change.new_index = index;
-            return document_.MoveNode(node, parent, index);
+            if(!document_.MoveNode(node, parent, index)) {
+                last_error_ = "Unable to move control";
+                return false;
+            }
+            return true;
         });
 }
 
@@ -215,7 +230,9 @@ bool UiDesignerCommandService::MoveNodes(
                     return false;
                 }
                 UiDesignerStructureChange& change = aggregate.structure.Add();
-                change.kind = UiDesignerStructureChangeKind::Reparented;
+                change.kind = old->parent == parent
+                                ? UiDesignerStructureChangeKind::Reordered
+                                : UiDesignerStructureChangeKind::Reparented;
                 change.node = node;
                 change.old_parent = old->parent;
                 change.new_parent = parent;
@@ -249,6 +266,44 @@ bool UiDesignerCommandService::RenameNode(UiDesignerNodeId node,
             change.new_value = name;
             change.impact = UiDesignerImpactHierarchy | UiDesignerImpactCode;
             return document_.RenameNode(node, name);
+        });
+}
+
+bool UiDesignerCommandService::SetActionBinding(
+    UiDesignerNodeId node, const UiDesignerActionBinding& binding,
+    const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Bind " + binding.event_id : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const UiDesignerActionBinding* old =
+                document_.GetActionBinding(node, binding.event_id);
+            UiDesignerBehaviorChange& change = aggregate.behaviors.Add();
+            change.kind = old ? UiDesignerBehaviorChangeKind::Updated
+                              : UiDesignerBehaviorChangeKind::Added;
+            change.node = node;
+            change.event_id = binding.event_id;
+            if(!document_.SetActionBinding(node, clone(binding))) {
+                last_error_ = "Unable to bind " + binding.event_id;
+                return false;
+            }
+            return true;
+        });
+}
+
+bool UiDesignerCommandService::RemoveActionBinding(
+    UiDesignerNodeId node, const String& event_id, const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Unbind " + event_id : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            UiDesignerBehaviorChange& change = aggregate.behaviors.Add();
+            change.kind = UiDesignerBehaviorChangeKind::Removed;
+            change.node = node;
+            change.event_id = event_id;
+            if(!document_.RemoveActionBinding(node, event_id)) {
+                last_error_ = "Unable to remove binding " + event_id;
+                return false;
+            }
+            return true;
         });
 }
 
