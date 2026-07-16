@@ -17,6 +17,32 @@ static UiDesignerChangeSet CopyChangeSet(const UiDesignerChangeSet& source)
     return copy;
 }
 
+static UiDesignerActionBinding CopyBinding(const UiDesignerActionBinding& source)
+{
+    UiDesignerActionBinding copy;
+    copy.id = source.id;
+    copy.event_id = source.event_id;
+    copy.action = source.action;
+    copy.target = source.target;
+    copy.target_property = source.target_property;
+    copy.value = source.value;
+    copy.delta = source.delta;
+    copy.handler_name = source.handler_name;
+    copy.enabled = source.enabled;
+    return copy;
+}
+
+static UiDesignerChangeImpact PlacementImpact(const String& property)
+{
+    if(property == "x" || property == "y" ||
+       property == "width" || property == "height" ||
+       property == "grid_row" || property == "grid_column" ||
+       property == "weight" || property == "layout_break" ||
+       property.EndsWith("_width") || property.EndsWith("_height"))
+        return UiDesignerImpactAncestorLayout | UiDesignerImpactCode;
+    return UiDesignerImpactControlState | UiDesignerImpactCode;
+}
+
 UiDesignerCommandService::UiDesignerCommandService(UiDesignerDocument& document)
     : document_(document)
 {
@@ -193,32 +219,26 @@ bool UiDesignerCommandService::MoveNode(UiDesignerNodeId node,
                                         UiDesignerNodeId parent, int index,
                                         const String& label)
 {
-    return ApplyAtomic(label.IsEmpty() ? "Move control" : label,
-        [&](UiDesignerChangeSet& aggregate) {
-            const UiDesignerNode* old = document_.Find(node);
-            if(!old) {
-                last_error_ = "Invalid node";
-                return false;
-            }
-            UiDesignerStructureChange& change = aggregate.structure.Add();
-            change.kind = old->parent == parent
-                            ? UiDesignerStructureChangeKind::Reordered
-                            : UiDesignerStructureChangeKind::Reparented;
-            change.node = node;
-            change.old_parent = old->parent;
-            change.new_parent = parent;
-            change.new_index = index;
-            if(!document_.MoveNode(node, parent, index)) {
-                last_error_ = "Unable to move control";
-                return false;
-            }
-            return true;
-        });
+    Vector<UiDesignerNodeId> nodes;
+    nodes.Add(node);
+    VectorMap<UiDesignerNodeId, ValueMap> updates;
+    return MoveNodesConfigured(nodes, parent, index, updates,
+                               label.IsEmpty() ? "Move control" : label);
 }
 
 bool UiDesignerCommandService::MoveNodes(
     const Vector<UiDesignerNodeId>& nodes, UiDesignerNodeId parent,
     int index, const String& label)
+{
+    VectorMap<UiDesignerNodeId, ValueMap> updates;
+    return MoveNodesConfigured(nodes, parent, index, updates, label);
+}
+
+bool UiDesignerCommandService::MoveNodesConfigured(
+    const Vector<UiDesignerNodeId>& nodes, UiDesignerNodeId parent,
+    int index,
+    const VectorMap<UiDesignerNodeId, ValueMap>& property_updates,
+    const String& label)
 {
     return ApplyAtomic(label,
         [&](UiDesignerChangeSet& aggregate) {
@@ -243,6 +263,27 @@ bool UiDesignerCommandService::MoveNodes(
                 }
                 if(insertion >= 0)
                     insertion++;
+            }
+
+            for(int i = 0; i < property_updates.GetCount(); i++) {
+                const UiDesignerNodeId node = property_updates.GetKey(i);
+                const ValueMap& values = property_updates[i];
+                for(int p = 0; p < values.GetCount(); p++) {
+                    const String property = values.GetKey(p);
+                    const Value value = values.GetValue(p);
+                    const Value old = document_.GetProperty(node, property);
+                    const UiDesignerChangeImpact impact = PlacementImpact(property);
+                    if(!document_.SetProperty(node, property, value, impact)) {
+                        last_error_ = "Unable to place selected node";
+                        return false;
+                    }
+                    UiDesignerPropertyChange& change = aggregate.properties.Add();
+                    change.node = node;
+                    change.property = property;
+                    change.old_value = old;
+                    change.new_value = value;
+                    change.impact = impact;
+                }
             }
             return true;
         });
@@ -282,7 +323,8 @@ bool UiDesignerCommandService::SetActionBinding(
                               : UiDesignerBehaviorChangeKind::Added;
             change.node = node;
             change.event_id = binding.event_id;
-            if(!document_.SetActionBinding(node, clone(binding))) {
+            UiDesignerActionBinding copy = CopyBinding(binding);
+            if(!document_.SetActionBinding(node, pick(copy))) {
                 last_error_ = "Unable to bind " + binding.event_id;
                 return false;
             }
