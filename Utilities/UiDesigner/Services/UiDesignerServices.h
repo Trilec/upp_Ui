@@ -3,6 +3,7 @@
 
 #include "UiDesignerProjection.h"
 #include "UiDesignerDrop.h"
+#include "UiDesignerExport.h"
 #include "UiDesignerSession.h"
 #include "UiDesignerAutomation.h"
 
