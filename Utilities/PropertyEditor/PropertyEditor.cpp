@@ -280,7 +280,7 @@ const PropertyEditorItem* PropertyEditor::GetSelectedProperty() const
        selected_display_row_ >= rows_.GetCount())
         return nullptr;
     const DisplayRow& row = rows_[selected_display_row_];
-    if(row.group || row.model_index < 0)
+    if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return nullptr;
     return &(*model_)[row.model_index];
 }
@@ -307,6 +307,12 @@ Rect PropertyEditor::GetViewport() const
 
 void PropertyEditor::Layout()
 {
+    // UiScrollBar::SetRange refreshes layout. Avoid asking the owning stack to
+    // lay this editor out again while its current layout pass is still active.
+    if(layout_in_progress_)
+        return;
+    layout_in_progress_ = true;
+
     Rect r = GetClientArea();
 
     if(style_.show_filter) {
@@ -335,6 +341,7 @@ void PropertyEditor::Layout()
 
     SyncScrollBar();
     LayoutActiveEditor();
+    layout_in_progress_ = false;
 }
 
 void PropertyEditor::Paint(Draw& w)
@@ -976,6 +983,9 @@ void PropertyEditor::ModelStructureChanged(PropertyEditorModel *source)
 {
     if(source != model_)
         return;
+    // A model can notify immediately after Clear(). Existing display rows then
+    // still refer to the previous model indices, so never retain that selection.
+    selected_display_row_ = -1;
     RebuildRows();
 }
 

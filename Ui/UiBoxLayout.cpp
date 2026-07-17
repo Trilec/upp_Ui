@@ -406,7 +406,11 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
         if(it.is_break)
             continue;
 
-        Size ms = GetCtrlMinSize(it);
+        // A vertical stack knows its cross-axis width before assigning item
+        // heights. Feed that width into wrapped children so Fit height tracks
+        // Flow rows instead of retaining a one-line minimum.
+        UiLayoutMeasureResult measure = it.c ? UiMeasureLayout(*it.c, {inner_w}) : UiLayoutMeasureResult();
+        Size ms = it.c ? (measure.width_dependent ? measure.measured : measure.min) : Size(0, 0);
 
         int h = it.fixed >= 0 ? it.fixed : ms.cy;
         if(fixed_row > 0)

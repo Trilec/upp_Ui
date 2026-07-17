@@ -108,27 +108,61 @@ static int DesignerPreviewDirectSize(const DesignerNode& n, Ctrl& child, const S
 	return max(natural, user_min);
 }
 
-static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n, int inset = 0)
+static Rect DesignerPreviewDirectChildRect(Ctrl& child, const DesignerNode& n, const Rect& area)
 {
 	String hs = DesignerPreviewAxisSizing(n, "h_sizing");
 	String vs = DesignerPreviewAxisSizing(n, "v_sizing");
-	inset = DPI(max(0, inset));
+	int cx = hs == "Expand" ? area.GetWidth()
+	                        : min(area.GetWidth(), DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+	int cy = vs == "Expand" ? area.GetHeight()
+	                        : min(area.GetHeight(), DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+	return RectC(area.left, area.top, max(0, cx), max(0, cy));
+}
 
-	if(hs == "Expand" && vs == "Expand") {
-		child.HSizePosZ(inset, inset);
-		child.VSizePosZ(inset, inset);
+static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n, const Rect& inset)
+{
+	String hs = DesignerPreviewAxisSizing(n, "h_sizing");
+	String vs = DesignerPreviewAxisSizing(n, "v_sizing");
+	// A horizontal Flow layout has a width-dependent natural height. Giving a
+	// Fit child its one-row minimum width here prevents it from ever observing
+	// the host width, so it clips instead of creating another row on resize.
+	// Keep its vertical sizing contract, but bind its width to the live host.
+	UiLayoutMeasureResult measure = UiMeasureLayout(child);
+	bool responsive_fit_width = hs == "Fit" && measure.width_dependent;
+
+	if((hs == "Expand" || responsive_fit_width) && vs == "Expand") {
+		child.HSizePosZ(inset.left, inset.right);
+		child.VSizePosZ(inset.top, inset.bottom);
 		return;
 	}
 
-	if(hs == "Expand")
-		child.HSizePosZ(inset, inset);
+	if(hs == "Expand" || responsive_fit_width)
+		child.HSizePosZ(inset.left, inset.right);
 	else
-		child.LeftPosZ(inset, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
+		child.LeftPosZ(inset.left, DesignerPreviewDirectSize(n, child, "h_sizing", "width", DESIGNER_FIXED_FALLBACK_WIDTH));
 
-	if(vs == "Expand")
-		child.VSizePosZ(inset, inset);
+	// The containing panel/grid has already measured the Fit height from the
+	// constrained width. Fill that measured host height so a later horizontal
+	// resize cannot leave this Flow layout at its stale one-row height.
+	if(vs == "Expand" || responsive_fit_width)
+		child.VSizePosZ(inset.top, inset.bottom);
 	else
-		child.TopPosZ(inset, DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+		child.TopPosZ(inset.top, DesignerPreviewDirectSize(n, child, "v_sizing", "height", DESIGNER_FIXED_FALLBACK_HEIGHT));
+}
+
+static void DesignerPreviewApplyDirectChildLayout(Ctrl& child, const DesignerNode& n, int inset = 0)
+{
+	inset = DPI(max(0, inset));
+	DesignerPreviewApplyDirectChildLayout(child, n, Rect(inset, inset, inset, inset));
+}
+
+static Rect DesignerPreviewPanelContentInsets(const UiPanel& panel)
+{
+	const int probe_size = DPI(4096);
+	Rect outer = RectC(0, 0, probe_size, probe_size);
+	const UiPanel::Style& style = panel.GetStyle();
+	Rect inner = UiStyledInnerRect(outer, style.metrics, style.skin);
+	return Rect(inner.left, inner.top, outer.right - inner.right, outer.bottom - inner.bottom);
 }
 
 static UiDirectSizeMode DesignerPreviewDirectSizeMode(const DesignerNode& n, const String& axis)
@@ -1014,9 +1048,11 @@ Size DesignerPreview::GetNodePreviewSize(const DesignerNode& n) const
 					int columns = max(1, (int)DesignerPreviewNodeProperty(n, "columns", 2));
 					int rows = max(1, (int)DesignerPreviewNodeProperty(n, "rows", 2));
 					rows = max(rows, (n.children.GetCount() + columns - 1) / columns);
+					// Match UiGridLayout::GetMinSize: cell dimensions are live-track
+					// defaults, not an intrinsic minimum for a populated Fit grid.
 					Vector<int> col_w, row_h;
-					col_w.SetCount(columns, max(1, (int)DesignerPreviewNodeProperty(n, "cell_width", DESIGNER_GRID_CELL_WIDTH)));
-					row_h.SetCount(rows, max(1, (int)DesignerPreviewNodeProperty(n, "cell_height", DESIGNER_GRID_CELL_HEIGHT)));
+					col_w.SetCount(columns, 0);
+					row_h.SetCount(rows, 0);
 					for(int i = 0; i < n.children.GetCount(); i++) {
 						const DesignerNode* child = model_->Find(n.children[i]);
 						if(!child)
@@ -1530,6 +1566,13 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 					            child_node.type_id, index, row, col, hs, vs, fixed.cx, fixed.cy));
 #endif
 				int item = grid->Add(child, row, col, hs == "Expand", vs == "Expand", fixed);
+				int min_w = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_width", 0)));
+				int min_h = DPI(max(0, (int)DesignerPreviewNodeProperty(child_node, "min_height", 0)));
+				int max_w = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_width", 0));
+				int max_h = max(0, (int)DesignerPreviewNodeProperty(child_node, "max_height", 0));
+				grid->SetItemMinSize(item, Size(min_w, min_h));
+				grid->SetItemMaxSize(item, Size(max_w > 0 ? DPI(max_w) : 0,
+				                                     max_h > 0 ? DPI(max_h) : 0));
 #ifdef _DEBUG
 				if(DesignerDiagnosticsEnabled())
 					RLOG(Format("GridAdd child=%s item=%d align_h=%d align_v=%d",
@@ -1612,10 +1655,10 @@ void DesignerPreview::AddRealChild(DesignerAdapter& parent, Ctrl& child,
 			}
 			else {
 				parent_ctrl.Add(child);
-				int inset = parent_node.type_id == "UiPanel"
-				          ? (int)DesignerPreviewNodeProperty(parent_node, "inset", 0)
-				          : 0;
-				DesignerPreviewApplyDirectChildLayout(child, child_node, inset);
+				if(DesignerPanelAdapter *panel = dynamic_cast<DesignerPanelAdapter *>(&parent))
+					DesignerPreviewApplyDirectChildLayout(child, child_node, DesignerPreviewPanelContentInsets(*panel));
+				else
+					DesignerPreviewApplyDirectChildLayout(child, child_node);
 			}
 		}
 
@@ -1702,8 +1745,18 @@ void DesignerPreview::LayoutRealPreview()
 			if(real_dirty_)
 				RebuildRealPreview();
 			Rect root = GetVirtualWindowRect();
-			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())
+			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext()) {
+				if(DesignerAdapter *adapter = AsDesignerAdapter(*child)) {
+					if(const DesignerNode* node = model_->Find(adapter->GetNodeId())) {
+						// Root is a direct-content host too. Do not turn every root
+						// child into a full-window control before its Fit/Fixed rule
+						// gets a chance to apply.
+						child->SetRect(DesignerPreviewDirectChildRect(*child, *node, root));
+						continue;
+					}
+				}
 				child->SetRect(root);
+			}
 			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())
 				ApplyRealLayoutProperties(*child);
 			for(Ctrl *child = GetFirstChild(); child; child = child->GetNext())

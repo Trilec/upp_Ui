@@ -188,6 +188,13 @@ CONSOLE_APP_MAIN
     Check(light.row_odd != light.row_even, "light alternate rows");
     Check(dark.row_odd != dark.row_even, "dark alternate rows");
 
+    UiStack property_host;
+    PropertyEditor hosted_editor;
+    property_host.Add(hosted_editor, "properties");
+    property_host.SetRect(0, 0, 320, 240);
+    Check(property_host.GetCount() == 1 && hosted_editor.GetSize() == Size(320, 240),
+          "property editor survives stack-hosted layout");
+
     PropertyEditorItem missing_custom;
     missing_custom.kind = PropertyEditorKind::Custom;
     missing_custom.custom_editor = "missing";

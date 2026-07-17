@@ -1,4 +1,5 @@
 #include <Ui/UiGridLayout.h>
+#include <Ui/UiMeasure.h>
 
 namespace Upp {
 
@@ -257,11 +258,11 @@ UiGridLayout& UiGridLayout::SetItemAlign(int index, Align x, Align y)
 
 Size UiGridLayout::NaturalItemSize(const Item& it) const
 {
-    Size sz = min_cell_size;
-    if(it.kind == Kind::BlankGrid)
-        sz = Size(0, 0);
-    if(it.ctrl)
-        sz = max(sz, it.ctrl->GetMinSize());
+    Size sz(0, 0);
+    if(it.ctrl) {
+        UiLayoutMeasureResult measure = UiMeasureLayout(*it.ctrl);
+        sz = max(sz, measure.min);
+    }
     sz = max(sz, it.min_size);
     if(!it.fixed.IsEmpty())
         sz = max(sz, it.fixed);
@@ -272,6 +273,29 @@ Size UiGridLayout::NaturalItemSize(const Item& it) const
         if(unified_size.cy > 0) sz.cy = unified_size.cy;
     }
     return sz;
+}
+
+UiGridLayout& UiGridLayout::SetItemMinSize(int index, Size sz)
+{
+    if(index >= 0 && index < items.GetCount()) {
+        Item& it = items[index];
+        it.min_size = Size(max(0, sz.cx), max(0, sz.cy));
+        it.max_size.cx = max(it.max_size.cx, it.min_size.cx);
+        it.max_size.cy = max(it.max_size.cy, it.min_size.cy);
+        RefreshGridLayout();
+    }
+    return *this;
+}
+
+UiGridLayout& UiGridLayout::SetItemMaxSize(int index, Size sz)
+{
+    if(index >= 0 && index < items.GetCount()) {
+        Item& it = items[index];
+        it.max_size = Size(sz.cx <= 0 ? INT_MAX : max(it.min_size.cx, sz.cx),
+                           sz.cy <= 0 ? INT_MAX : max(it.min_size.cy, sz.cy));
+        RefreshGridLayout();
+    }
+    return *this;
 }
 
 static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<bool>& expand, int available, int gap)
@@ -315,6 +339,8 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
     expand_cols.SetCount(cols, false);
     expand_rows.SetCount(rows, false);
 
+    // A configured minimum cell size is a real track floor, including
+    // populated cells. Designer defaults keep that floor deliberately small.
     for(int i = 0; i < cols; i++)
         col_widths[i] = min_cell_size.cx;
     for(int i = 0; i < rows; i++)
@@ -333,9 +359,19 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
     for(const Item& it : items) {
         if(it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
             continue;
+        UiLayoutMeasureResult measure;
+        bool width_dependent = false;
+        if(it.ctrl) {
+            measure = UiMeasureLayout(*it.ctrl);
+            width_dependent = measure.width_dependent;
+        }
         Size want = NaturalItemSize(it);
-        col_widths[it.col] = max(col_widths[it.col], want.cx);
-        row_heights[it.row] = max(row_heights[it.row], want.cy);
+        int width = want.cx;
+        if(width_dependent)
+            width = available.cx > 0 ? measure.min.cx : measure.preferred.cx;
+        col_widths[it.col] = max(col_widths[it.col], width);
+        if(!width_dependent)
+            row_heights[it.row] = max(row_heights[it.row], want.cy);
         if(it.scale_x)
             expand_cols[it.col] = true;
         if(it.scale_y)
@@ -343,6 +379,16 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
     }
 
     UiDistributeGridTrackSpace(col_widths, expand_cols, available.cx, gap);
+
+    // Wrapped children determine their row height from the resolved column,
+    // not from a stale panel rectangle or their one-column minimum width.
+    for(const Item& it : items) {
+        if(!it.ctrl || it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
+            continue;
+        UiLayoutMeasureResult measure = UiMeasureLayout(*it.ctrl, {col_widths[it.col]});
+        if(measure.width_dependent)
+            row_heights[it.row] = max(row_heights[it.row], max(0, measure.measured.cy));
+    }
     UiDistributeGridTrackSpace(row_heights, expand_rows, available.cy, gap);
 }
 
@@ -398,22 +444,30 @@ void UiGridLayout::Layout()
             continue;
         Rect cell = RectC(col_pos[it.col], row_pos[it.row], col_widths[it.col], row_heights[it.row]);
         Size want = NaturalItemSize(it);
+        // Expand chooses the available cell size first. A finite maximum then
+        // caps that result instead of reverting to the control's natural size.
+        if(it.scale_x && it.max_size.cx != INT_MAX)
+            want.cx = min(cell.GetWidth(), it.max_size.cx);
+        if(it.scale_y && it.max_size.cy != INT_MAX)
+            want.cy = min(cell.GetHeight(), it.max_size.cy);
         want.cx = min(want.cx, cell.GetWidth());
         want.cy = min(want.cy, cell.GetHeight());
         Align ax = it.align_x == Align::Auto ? align_items : it.align_x;
         Align ay = it.align_y == Align::Auto ? align_items : it.align_y;
-        if(!it.scale_x && ax == Align::Stretch)
+        bool stretch_x = it.scale_x && it.max_size.cx == INT_MAX;
+        bool stretch_y = it.scale_y && it.max_size.cy == INT_MAX;
+        if(!stretch_x && ax == Align::Stretch)
             ax = Align::Start;
-        if(!it.scale_y && ay == Align::Stretch)
+        if(!stretch_y && ay == Align::Stretch)
             ay = Align::Start;
         Rect cr = cell;
-        if(!it.scale_x && ax != Align::Stretch) {
+        if(!stretch_x && ax != Align::Stretch) {
             if(ax == Align::Center) cr.left = cell.left + (cell.GetWidth() - want.cx) / 2;
             else if(ax == Align::End) cr.left = cell.right - want.cx;
             else cr.left = cell.left;
             cr.right = cr.left + want.cx;
         }
-        if(!it.scale_y && ay != Align::Stretch) {
+        if(!stretch_y && ay != Align::Stretch) {
             if(ay == Align::Center) cr.top = cell.top + (cell.GetHeight() - want.cy) / 2;
             else if(ay == Align::End) cr.top = cell.bottom - want.cy;
             else cr.top = cell.top;

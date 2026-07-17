@@ -197,6 +197,18 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.RefreshLayout();
         return UiDesignerApplyResult::AppliedLocalLayout;
     }
+    if(property == "icon") {
+        auto *card = dynamic_cast<UiTitleCard *>(&ctrl);
+        if(!card)
+            return UiDesignerApplyResult::Rejected;
+        const String icon = value;
+        if(icon == "ICON_DESIGN_DESCRIPTION_48")
+            card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
+        else
+            card->ClearMedia();
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
+    }
     if(property == "checked") {
         ctrl.SetData(value);
         ctrl.Refresh();
@@ -348,9 +360,34 @@ bool UiDesignerParseNodesDragText(const String& text,
     return !nodes.IsEmpty();
 }
 
+bool UiDesignerReadDragText(PasteClip& clip, String& text)
+{
+    text.Clear();
+    if(clip.IsAvailable("text")) {
+        text = clip.Get("text");
+        return !text.IsEmpty();
+    }
+    if(clip.IsAvailable("wtext")) {
+        const String wide = clip.Get("wtext");
+        text = ToUtf8((const char16 *)~wide,
+                      strlen16((const char16 *)~wide));
+        return !text.IsEmpty();
+    }
+    return false;
+}
+
 UiDesignerPreviewCanvas::UiDesignerPreviewCanvas()
 {
     BackPaint();
+    selection_overlay_.owner = this;
+    selection_overlay_.IgnoreMouse().NoWantFocus();
+    Add(selection_overlay_.SizePos());
+}
+
+void UiDesignerPreviewCanvas::SelectionOverlay::Paint(Draw& w)
+{
+    if(owner)
+        owner->PaintSelectionOverlay(w);
 }
 
 void UiDesignerPreviewCanvas::Bind(
@@ -370,6 +407,7 @@ void UiDesignerPreviewCanvas::SetOverlay(const UiDesignerTransientOverlay *overl
 void UiDesignerPreviewCanvas::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
+    selection_overlay_.Refresh();
     Refresh();
 }
 
@@ -546,7 +584,29 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     }
     if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
         layout_item_index = box->GetItemCount();
-        box->Add(child).Fit();
+        UiBoxLayout::ItemRef item = box->Add(child);
+        const bool horizontal = box->GetDirection() == UiDirection::H;
+        const String main_mode = node.GetProperty(
+            horizontal ? "h_sizing" : "v_sizing", "Auto");
+        const int fixed_main = node.GetProperty(
+            horizontal ? "fixed_width" : "fixed_height", 0);
+        if(main_mode == "Fill")
+            item.Expand(max(1, (int)(double)node.GetProperty("weight", 1.0)));
+        else if(main_mode == "Fixed")
+            item.Fixed(max(0, fixed_main));
+        else
+            item.Fit();
+
+        const int min_main = node.GetProperty(
+            horizontal ? "min_width" : "min_height", 0);
+        const int max_main = node.GetProperty(
+            horizontal ? "max_width" : "max_height", 0);
+        const int min_cross = node.GetProperty(
+            horizontal ? "min_height" : "min_width", 0);
+        const int max_cross = node.GetProperty(
+            horizontal ? "max_height" : "max_width", 0);
+        item.MinMaxMain(min_main, max_main > 0 ? max_main : INT_MAX);
+        item.MinMaxCross(min_cross, max_cross > 0 ? max_cross : INT_MAX);
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
@@ -556,7 +616,7 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     else if(auto *tab = dynamic_cast<UiTab *>(&parent))
         tab->Add(child, node.GetProperty("title", node.name));
     else if(auto *tab = dynamic_cast<TabCtrl *>(&parent))
-        tab->Add(child, node.GetProperty("title", node.name));
+        tab->Add(child, AsString(node.GetProperty("title", node.name)));
     else if(auto *stack = dynamic_cast<UiStack *>(&parent))
         stack->Add(child, node.name);
     else if(auto *accordion = dynamic_cast<UiAccordion *>(&parent)) {
@@ -643,6 +703,9 @@ void UiDesignerPreviewCanvas::RebuildDocument()
     DestroyInstances();
     if(document_ && catalog_)
         BuildNode(document_->GetRootId(), *this, 0, 0);
+    // Runtime controls paint first; the Designer-only frame is always on top.
+    selection_overlay_.Remove();
+    Add(selection_overlay_.SizePos());
     stats_.full_rebuilds++;
     Layout();
     Refresh();
@@ -849,6 +912,10 @@ void UiDesignerPreviewCanvas::Layout()
     if(!root)
         return;
     rects_.Clear();
+    // Window is an implicit document host, not another runtime Ctrl. Its
+    // rectangle is nevertheless real so hierarchy selection and resize
+    // handles describe the same bounded form the user sees.
+    rects_.GetAdd(root->id) = RectC(0, 0, GetSize().cx, GetSize().cy);
     for(UiDesignerPreviewInstance& instance : instances_)
         if(instance.control)
             instance.control->Layout();
@@ -893,27 +960,29 @@ void UiDesignerPreviewCanvas::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), SColorPaper());
     const Size doc_size = document_ ? document_->GetVirtualSize() : GetSize();
-    w.DrawRect(0, 0, min(doc_size.cx, GetSize().cx),
-               min(doc_size.cy, GetSize().cy),
-               Blend(SColorPaper(), SColorFace(), 180));
+    // The canvas is the document Window. Keep its edge visible even when the
+    // workspace and document use closely related theme surfaces.
+    const Rect document_rect = RectC(0, 0, min(doc_size.cx, GetSize().cx),
+                                     min(doc_size.cy, GetSize().cy));
+    const int frame_width = DPI(3);
+    const Color document_frame = Color(96, 165, 250);
+    w.DrawRect(document_rect.left, document_rect.top, document_rect.Width(), frame_width,
+               document_frame);
+    w.DrawRect(document_rect.left, document_rect.bottom - frame_width,
+               document_rect.Width(), frame_width,
+               document_frame);
+    w.DrawRect(document_rect.left, document_rect.top, frame_width,
+               document_rect.Height(),
+               document_frame);
+    w.DrawRect(document_rect.right - frame_width, document_rect.top, frame_width,
+               document_rect.Height(),
+               document_frame);
     if(document_)
         for(const UiDesignerPreviewInstance& instance : instances_)
             if(instance.semantic)
                 if(const UiDesignerNode* node = document_->Find(instance.node))
                     PaintSemantic(w, instance, *node);
 
-    if(selection_) {
-        for(UiDesignerNodeId id : selection_->nodes) {
-            Rect r = GetNodeRect(id);
-            if(r.IsEmpty()) continue;
-            Color color = id == selection_->primary ? accent_
-                : Blend(accent_, White(), 115);
-            w.DrawRect(r.left, r.top, r.Width(), 2, color);
-            w.DrawRect(r.left, r.bottom - 2, r.Width(), 2, color);
-            w.DrawRect(r.left, r.top, 2, r.Height(), color);
-            w.DrawRect(r.right - 2, r.top, 2, r.Height(), color);
-        }
-    }
     if(!drop_indicator_.IsEmpty()) {
         const Color color = drop_plan_.valid ? Color(34, 197, 94) : Color(220, 38, 38);
         w.DrawRect(drop_indicator_.left, drop_indicator_.top,
@@ -927,10 +996,122 @@ void UiDesignerPreviewCanvas::Paint(Draw& w)
     }
 }
 
+void UiDesignerPreviewCanvas::PaintSelectionOverlay(Draw& w) const
+{
+    if(!selection_)
+        return;
+
+    const int step = DPI(7);
+    const int dot = DPI(3);
+    for(UiDesignerNodeId id : selection_->nodes) {
+        Rect r = GetNodeRect(id);
+        if(document_ && id == document_->GetRootId() && document_resize_edge_)
+            r = RectC(0, 0, document_resize_pending_.cx, document_resize_pending_.cy);
+        if(r.IsEmpty())
+            continue;
+        const Color color = id == selection_->primary
+            ? Color(245, 158, 11) : Blend(Color(245, 158, 11), White(), 110);
+        const int thickness = id == selection_->primary ? DPI(2) : DPI(1);
+        for(int x = r.left; x < r.right; x += step) {
+            w.DrawRect(x, r.top, min(dot, r.right - x), thickness, color);
+            w.DrawRect(x, r.bottom - thickness,
+                       min(dot, r.right - x), thickness, color);
+        }
+        for(int y = r.top; y < r.bottom; y += step) {
+            w.DrawRect(r.left, y, thickness, min(dot, r.bottom - y), color);
+            w.DrawRect(r.right - thickness, y,
+                       thickness, min(dot, r.bottom - y), color);
+        }
+
+        if(document_ && id == document_->GetRootId() && id == selection_->primary) {
+            const int handle = DPI(12);
+            const Color fill = Blend(color, White(), 170);
+            const Point points[] = {
+                r.TopLeft(), Point(r.CenterPoint().x, r.top), Point(r.right, r.top),
+                Point(r.left, r.CenterPoint().y), Point(r.right, r.CenterPoint().y),
+                Point(r.left, r.bottom), Point(r.CenterPoint().x, r.bottom), r.BottomRight()
+            };
+            for(const Point& point : points) {
+                Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
+                w.DrawRect(grip, fill);
+                w.DrawRect(grip.left, grip.top, grip.Width(), 1, color);
+                w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, color);
+                w.DrawRect(grip.left, grip.top, 1, grip.Height(), color);
+                w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), color);
+            }
+        }
+    }
+}
+
+enum {
+    UiDesignerResizeLeft = 1,
+    UiDesignerResizeRight = 2,
+    UiDesignerResizeTop = 4,
+    UiDesignerResizeBottom = 8,
+};
+
+int UiDesignerPreviewCanvas::HitDocumentResizeEdge(Point p) const
+{
+    if(!document_ || !selection_ || selection_->primary != document_->GetRootId())
+        return 0;
+    const Rect r = GetNodeRect(document_->GetRootId());
+    const int grab = DPI(12);
+    if(!r.Inflated(grab).Contains(p))
+        return 0;
+    int edge = 0;
+    if(abs(p.x - r.left) <= grab) edge |= UiDesignerResizeLeft;
+    if(abs(p.x - r.right) <= grab) edge |= UiDesignerResizeRight;
+    if(abs(p.y - r.top) <= grab) edge |= UiDesignerResizeTop;
+    if(abs(p.y - r.bottom) <= grab) edge |= UiDesignerResizeBottom;
+    return edge;
+}
+
+Size UiDesignerPreviewCanvas::ResizeDocumentTo(Point p) const
+{
+    const Point delta = p - document_resize_start_;
+    int width = document_resize_initial_.cx;
+    int height = document_resize_initial_.cy;
+    if(document_resize_edge_ & UiDesignerResizeRight) width += delta.x;
+    if(document_resize_edge_ & UiDesignerResizeLeft) width -= delta.x;
+    if(document_resize_edge_ & UiDesignerResizeBottom) height += delta.y;
+    if(document_resize_edge_ & UiDesignerResizeTop) height -= delta.y;
+    return Size(max(DPI(160), width), max(DPI(160), height));
+}
+
 void UiDesignerPreviewCanvas::LeftDown(Point p, dword keyflags)
 {
+    const int resize_edge = HitDocumentResizeEdge(p);
+    if(resize_edge && document_) {
+        document_resize_edge_ = resize_edge;
+        document_resize_start_ = p;
+        document_resize_initial_ = document_->GetVirtualSize();
+        document_resize_pending_ = document_resize_initial_;
+        SetCapture();
+        return;
+    }
     WhenSelectNode(HitNode(p), (keyflags & K_CTRL) != 0);
     SetFocus();
+}
+
+void UiDesignerPreviewCanvas::MouseMove(Point p, dword)
+{
+    if(!document_resize_edge_)
+        return;
+    document_resize_pending_ = ResizeDocumentTo(p);
+    Refresh();
+}
+
+void UiDesignerPreviewCanvas::LeftUp(Point p, dword)
+{
+    if(!document_resize_edge_)
+        return;
+    document_resize_pending_ = ResizeDocumentTo(p);
+    const Size final_size = document_resize_pending_;
+    document_resize_edge_ = 0;
+    ReleaseCapture();
+    if(final_size != document_resize_initial_ && WhenResizeDocument)
+        WhenResizeDocument(final_size);
+    Refresh();
 }
 
 void UiDesignerPreviewCanvas::ClearDropPlan()
@@ -953,7 +1134,9 @@ void UiDesignerPreviewCanvas::UpdateDropPlan(Point p, const String& payload)
     if(target_node && !(target_node->flags & UiDesignerNodeContainer))
         placement_parent = target_node->parent;
     Rect parent_rect = GetNodeRect(placement_parent);
-    Point local = parent_rect.IsEmpty() ? p : p - parent_rect.TopLeft();
+    Point local = p;
+    if(!parent_rect.IsEmpty())
+        local -= parent_rect.TopLeft();
 
     String type;
     Vector<UiDesignerNodeId> nodes;
@@ -986,15 +1169,20 @@ void UiDesignerPreviewCanvas::DragEnter()
 
 void UiDesignerPreviewCanvas::DragAndDrop(Point p, PasteClip& d)
 {
-    if(!AcceptText(d)) {
+    String payload;
+    if(!UiDesignerReadDragText(d, payload)) {
+        d.Reject();
         ClearDropPlan();
         return;
     }
-    const String payload = GetString(d);
     UpdateDropPlan(p, payload);
-    if(!drop_plan_.valid)
+    if(!drop_plan_.valid) {
+        d.Reject();
+        ClearDropPlan();
         return;
+    }
     String catalog_type;
+    d.Accept();
     d.SetAction(UiDesignerParseCatalogDragText(payload, catalog_type)
                     ? DND_COPY : DND_MOVE);
     if(d.IsPaste()) {

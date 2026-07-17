@@ -190,10 +190,11 @@ PropertyEditorItem& PropertyEditorItem::SetDomain(PropertyEditorDomain value)
     return *this;
 }
 
-void PropertyEditorModel::Clear()
+void PropertyEditorModel::Clear(bool notify)
 {
     items_.Clear();
-    StructureChanged();
+    if(notify)
+        StructureChanged();
 }
 
 PropertyEditorItem& PropertyEditorModel::Add(const String& id,

@@ -328,6 +328,17 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.child_adapter_id = "single";
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
+        if(String(c.type) == "UiTitleCard") {
+            UiDesignerPropertySpec icon = ChoiceProperty(
+                "icon", "Icon", "Content", "None",
+                {{"None", "None"},
+                 {"ICON_DESIGN_DESCRIPTION_48", "Description"}},
+                PropertyImpactControlState | PropertyImpactLocalLayout |
+                PropertyImpactCode);
+            icon.domain = PropertyEditorDomain::Content;
+            s.properties.Add(icon);
+            s.defaults.Set("icon", "None");
+        }
         catalog.Register(pick(s));
     }
 
@@ -523,8 +534,8 @@ static void RegisterPresets(UiDesignerCatalog& catalog)
     catalog.RegisterPreset({"three_pane", "Three Pane",
                             "Toolbox, canvas and Inspector columns.",
                             "layouts"});
-    catalog.RegisterPreset({"settings", "Settings",
-                            "A labelled settings form with grouped editors.",
+    catalog.RegisterPreset({"dialog", "Dialog",
+                            "A compact dialog with heading, content and actions.",
                             "inspector"});
 }
 

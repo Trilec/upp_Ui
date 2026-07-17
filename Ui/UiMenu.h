@@ -239,7 +239,9 @@ private:
     Vector<UiMenuModel*> bound_models_;
     mutable int model_revision_ = -1;
 
-    static const int VERIFY_SESSION_CB = 8401;
+    // UiMenu has one control-relative timer. U++ timer ids are byte offsets
+    // within the Ctrl object, so the default slot is the valid stable choice.
+    static const int VERIFY_SESSION_CB = 0;
 
     bool menu_bar_mode_ = false;
     bool session_open_ = false;

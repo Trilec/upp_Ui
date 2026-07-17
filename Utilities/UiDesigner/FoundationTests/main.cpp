@@ -203,6 +203,11 @@ static void RunTests(FoundationTester& t)
 {
     UiDesignerSession session;
     String error;
+    bool default_has_splitter = false;
+    for(const UiDesignerNode& node : session.Document().GetNodes())
+        default_has_splitter = default_has_splitter || node.type == "UiSplitter";
+    t.Check(!default_has_splitter,
+            "new Designer document starts without a splitter preset");
     t.Check(session.Catalog().Validate(error),
             "catalog validates with adapter/event contracts");
     const UiDesignerControlSpec* spacer_spec = session.Catalog().Find("Spacer");

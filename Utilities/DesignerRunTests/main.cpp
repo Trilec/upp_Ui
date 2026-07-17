@@ -2677,6 +2677,204 @@ static void TestLayoutSizingPrimitives(TestCtx& t)
 	t.Expect(axis_child.GetRect().GetWidth() >= 300, "stable grid can expand child width only");
 	t.Expect(axis_child.GetRect().GetHeight() <= 50, "stable grid keeps non-expanded child height natural");
 
+	UiGridLayout fit_grid;
+	fit_grid.SetGridSize(1, 2)
+	        .SetGap(0)
+	        .SetInset(0)
+	        .SetMinCellSize(Size(80, 80));
+	FixedMinCtrl fit_child(Size(60, 24));
+	fit_grid.Add(fit_child, 0, 0, false, false);
+	Size fit_grid_min = fit_grid.GetMinSize();
+	t.Expect(fit_grid_min.cx == 80,
+	         Format("Fit grid honors populated-cell width floor (got %d)", fit_grid_min.cx));
+	t.Expect(fit_grid_min.cy == 160,
+	         Format("Fit grid honors every row's configured cell-height floor (got %d)", fit_grid_min.cy));
+	fit_grid.SetRect(0, 0, fit_grid_min.cx, fit_grid_min.cy);
+	fit_grid.Layout();
+	t.Expect(fit_child.GetRect().GetHeight() == 24,
+	         Format("Non-expanded child keeps its natural height inside the cell floor (got %d)",
+	                fit_child.GetRect().GetHeight()));
+
+	DesignerRegistry root_registry;
+	RegisterDesignerBuiltins(root_registry);
+	DesignerModel root_model;
+	DesignerNodeId root_grid = root_model.AddNode("GridLayout", Designer_ROOT);
+	root_registry.Find("GridLayout")->init_defaults(*root_model.Find(root_grid));
+	root_model.Find(root_grid)->properties.Set("v_sizing", "Fit");
+	root_model.Find(root_grid)->properties.Set("columns", 1);
+	root_model.Find(root_grid)->properties.Set("rows", 1);
+	root_model.Find(root_grid)->properties.Set("cell_height", 80);
+	DesignerNodeId root_button = root_model.AddNode("UiButton", root_grid);
+	root_registry.Find("UiButton")->init_defaults(*root_model.Find(root_button));
+	DesignerPreview root_preview;
+	root_preview.Set(&root_model, &root_registry);
+	root_preview.SetRect(0, 0, 640, 360);
+	root_preview.SyncRealPreview();
+	root_preview.Layout();
+	t.Expect(root_model.Find(root_grid)->last_rect.GetHeight() < 100,
+	         Format("root Fit grid does not stretch to the virtual window (got %d)",
+	                root_model.Find(root_grid)->last_rect.GetHeight()));
+	root_model.Find(root_grid)->properties.Set("v_sizing", "Fixed");
+	root_model.Find(root_grid)->properties.Set("fixed_height", 44);
+	root_preview.SyncRealPreview();
+	root_preview.Layout();
+	t.Expect(root_model.Find(root_grid)->last_rect.GetHeight() == 44,
+	         Format("root Fixed grid honors explicit height (got %d)",
+	                root_model.Find(root_grid)->last_rect.GetHeight()));
+
+	DesignerModel panel_grid_model;
+	DesignerNodeId panel_grid = panel_grid_model.AddNode("GridLayout", Designer_ROOT);
+	root_registry.Find("GridLayout")->init_defaults(*panel_grid_model.Find(panel_grid));
+	panel_grid_model.Find(panel_grid)->properties.Set("v_sizing", "Fit");
+	panel_grid_model.Find(panel_grid)->properties.Set("columns", 1);
+	panel_grid_model.Find(panel_grid)->properties.Set("rows", 1);
+	panel_grid_model.Find(panel_grid)->properties.Set("cell_height", 80);
+	DesignerNodeId panel_child = panel_grid_model.AddNode("UiPanel", panel_grid);
+	root_registry.Find("UiPanel")->init_defaults(*panel_grid_model.Find(panel_child));
+	DesignerPreview panel_grid_preview;
+	panel_grid_preview.Set(&panel_grid_model, &root_registry);
+	panel_grid_preview.SetRect(0, 0, 640, 360);
+	panel_grid_preview.SyncRealPreview();
+	panel_grid_preview.Layout();
+	t.Expect(panel_grid_model.Find(panel_grid)->last_rect.GetHeight() < 100,
+	         Format("Fit grid with an Expand panel child remains content-sized (got %d)",
+	                panel_grid_model.Find(panel_grid)->last_rect.GetHeight()));
+	panel_grid_model.Find(panel_child)->properties.Set("v_sizing", "Fixed");
+	panel_grid_model.Find(panel_child)->properties.Set("fixed_height", 20);
+	panel_grid_preview.SyncRealPreview();
+	panel_grid_preview.Layout();
+	t.Expect(panel_grid_model.Find(panel_grid)->last_rect.GetHeight() < 100,
+	         Format("Fit grid with a Fixed panel child remains content-sized (got %d)",
+	                panel_grid_model.Find(panel_grid)->last_rect.GetHeight()));
+
+	UiPanel flow_panel;
+	UiBoxLayout flow_layout(UiDirection::H);
+	flow_layout.SetGap(4).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
+	FixedMinCtrl flow_a(Size(28, 24)), flow_b(Size(28, 24)), flow_c(Size(28, 24));
+	FixedMinCtrl flow_d(Size(28, 24)), flow_e(Size(28, 24)), flow_f(Size(28, 24));
+	flow_layout.Add(flow_a).Fit();
+	flow_layout.Add(flow_b).Fit();
+	flow_layout.Add(flow_c).Fit();
+	flow_layout.Add(flow_d).Fit();
+	flow_layout.Add(flow_e).Fit();
+	flow_layout.Add(flow_f).Fit();
+	flow_panel.Add(flow_layout);
+	flow_layout.Show();
+	UiGridLayout flow_grid;
+	flow_grid.SetGridSize(1, 1).SetGap(0).SetInset(0).SetMinCellSize(Size(25, 25));
+	flow_grid.Add(flow_panel, 0, 0, true, true);
+	t.Expect(flow_grid.GetMinSize().cy < 80,
+	         Format("Fit grid measures a wrapped panel at its panel width (got %d)",
+	                flow_grid.GetMinSize().cy));
+	int narrow_flow_height = flow_grid.MeasureHeightForWidth(100);
+	int wide_flow_height = flow_grid.MeasureHeightForWidth(190);
+	UiLayoutMeasureResult narrow_panel_measure = UiMeasureLayout(flow_panel, {100});
+	UiLayoutMeasureResult wide_panel_measure = UiMeasureLayout(flow_panel, {190});
+	int narrow_box_height = flow_layout.MeasureHeightForWidth(100);
+	int wide_box_height = flow_layout.MeasureHeightForWidth(190);
+	t.Expect(narrow_flow_height > wide_flow_height,
+	         Format("Grid remeasures a Flow panel taller when its available width narrows (grid %d vs %d, panel %d vs %d, box %d vs %d)",
+	                narrow_flow_height, wide_flow_height,
+	                narrow_panel_measure.measured.cy, wide_panel_measure.measured.cy,
+	                narrow_box_height, wide_box_height));
+	Size flow_panel_min = flow_panel.GetMinSize();
+	flow_panel.SetRect(0, 0, 191, 400);
+	t.Expect(flow_panel.GetMinSize() == flow_panel_min,
+	         "Panel minimum measurement is independent of its previous allocated rectangle");
+
+	// The panel's reported Fit height and the Flow child's actual row break must
+	// use the same styled content width. This is the boundary that previously
+	// left one tool clipped for a couple of pixels during side-column resizing.
+	UiPanel boundary_panel;
+	UiPanel::Style boundary_style = UiPanel::StyleDefault();
+	boundary_style.metrics.content_margin = Rect(17, 17, 17, 17);
+	boundary_style.metrics.frame_width = 1;
+	boundary_style.metrics.frame_enabled = true;
+	boundary_panel.SetCustomStyle(boundary_style);
+	UiBoxLayout boundary_flow(UiDirection::H);
+	boundary_flow.SetGap(4).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
+	FixedMinCtrl boundary_a(Size(24, 24)), boundary_b(Size(24, 24)), boundary_c(Size(24, 24));
+	FixedMinCtrl boundary_d(Size(24, 24)), boundary_e(Size(24, 24)), boundary_f(Size(24, 24));
+	boundary_flow.Add(boundary_a).Fit();
+	boundary_flow.Add(boundary_b).Fit();
+	boundary_flow.Add(boundary_c).Fit();
+	boundary_flow.Add(boundary_d).Fit();
+	boundary_flow.Add(boundary_e).Fit();
+	boundary_flow.Add(boundary_f).Fit();
+	boundary_panel.Add(boundary_flow);
+	Rect boundary_outer = RectC(0, 0, 4096, 4096);
+	Rect boundary_inner = UiStyledInnerRect(boundary_outer, boundary_style.metrics, boundary_style.skin);
+	Rect boundary_inset(boundary_inner.left, boundary_inner.top,
+	                    boundary_outer.right - boundary_inner.right,
+	                    boundary_outer.bottom - boundary_inner.bottom);
+	boundary_flow.HSizePosZ(boundary_inset.left, boundary_inset.right);
+	boundary_flow.VSizePosZ(boundary_inset.top, boundary_inset.bottom);
+	int single_row_width = 6 * 24 + 5 * 4;
+	int boundary_width = boundary_inset.left + single_row_width + boundary_inset.right;
+	Size boundary_one_row = boundary_panel.MeasureSizeForWidth(boundary_width);
+	Size boundary_two_rows = boundary_panel.MeasureSizeForWidth(boundary_width - 1);
+	boundary_panel.SetRect(0, 0, boundary_width - 1, boundary_two_rows.cy);
+	boundary_panel.Layout();
+	t.Expect(boundary_two_rows.cy > boundary_one_row.cy,
+	         Format("Flow panel height grows at the first unavailable pixel (%d vs %d)",
+	                boundary_two_rows.cy, boundary_one_row.cy));
+	t.Expect(boundary_flow.GetContentSize().cy <= boundary_two_rows.cy - boundary_inset.top - boundary_inset.bottom,
+	         "Flow panel's measured Fit height contains the wrapped second row");
+	UiGridLayout boundary_grid;
+	FixedMinCtrl boundary_actions(Size(52, 24));
+	boundary_grid.SetGridSize(2, 1).SetGap(0).SetInset(0).SetMinCellSize(Size(10, 10));
+	boundary_grid.Add(boundary_panel, 0, 0, true, true);
+	boundary_grid.Add(boundary_actions, 0, 1, false, false);
+	int grid_boundary_width = single_row_width + boundary_inset.left + boundary_inset.right + 52;
+	int grid_one_row_height = boundary_grid.MeasureHeightForWidth(grid_boundary_width);
+	int grid_two_rows_height = boundary_grid.MeasureHeightForWidth(grid_boundary_width - 1);
+	boundary_grid.SetRect(0, 0, grid_boundary_width - 1, grid_two_rows_height);
+	boundary_grid.Layout();
+	t.Expect(grid_two_rows_height > grid_one_row_height,
+	         Format("Two-column Grid grows at the first Flow row break (%d vs %d)",
+	                grid_two_rows_height, grid_one_row_height));
+	t.Expect(boundary_flow.GetContentSize().cy <= boundary_panel.GetRect().GetHeight() - boundary_inset.top - boundary_inset.bottom,
+	         "Two-column Grid gives the wrapped Flow panel its measured row height");
+
+	UiGridLayout capped_grid;
+	capped_grid.SetGridSize(1, 1).SetGap(0).SetInset(0);
+	FixedMinCtrl capped_child(Size(20, 20));
+	int capped_item = capped_grid.Add(capped_child, 0, 0, true, true);
+	capped_grid.SetItemMaxSize(capped_item, Size(60, 40));
+	capped_grid.SetRect(0, 0, 240, 160);
+	capped_grid.Layout();
+	t.Expect(capped_child.GetRect().GetWidth() == 60 && capped_child.GetRect().GetHeight() == 40,
+	         Format("Expanded grid child honors explicit maximum size (%d x %d)",
+	                capped_child.GetRect().GetWidth(), capped_child.GetRect().GetHeight()));
+
+	UiPanel column_flow_panel;
+	UiBoxLayout column_flow_layout(UiDirection::H);
+	column_flow_layout.SetGap(4).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
+	FixedMinCtrl column_a(Size(28, 24)), column_b(Size(28, 24)), column_c(Size(28, 24));
+	FixedMinCtrl column_d(Size(28, 24)), column_e(Size(28, 24)), column_f(Size(28, 24));
+	column_flow_layout.Add(column_a).Fit();
+	column_flow_layout.Add(column_b).Fit();
+	column_flow_layout.Add(column_c).Fit();
+	column_flow_layout.Add(column_d).Fit();
+	column_flow_layout.Add(column_e).Fit();
+	column_flow_layout.Add(column_f).Fit();
+	column_flow_panel.Add(column_flow_layout);
+	column_flow_layout.Show();
+	UiGridLayout column_flow_grid;
+	column_flow_grid.SetGridSize(1, 1).SetGap(0).SetInset(0).SetMinCellSize(Size(10, 10));
+	column_flow_grid.Add(column_flow_panel, 0, 0, true, true);
+	UiBoxLayout column_host(UiDirection::V);
+	column_host.Add(column_flow_grid).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+	column_host.SetRect(0, 0, 190, 300);
+	column_host.Layout();
+	int wide_column_height = column_flow_grid.GetRect().GetHeight();
+	column_host.SetRect(0, 0, 100, 300);
+	column_host.Layout();
+	int narrow_column_height = column_flow_grid.GetRect().GetHeight();
+	t.Expect(narrow_column_height > wide_column_height,
+	         Format("Vertical Fit host propagates narrow Flow width into Grid height (%d vs %d)",
+	                narrow_column_height, wide_column_height));
+
 	UiDirectContentHost direct_host;
 	FixedMinCtrl host_child(Size(120, 40));
 	direct_host.SetContent(host_child)

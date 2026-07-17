@@ -28,6 +28,7 @@ public:
     UiDesignerPillBar& ApplyTheme(const UiDesignerThemeSnapshot& theme);
     UiDesignerPillBar& AddSection(const String& tip, const Image& icon);
     UiDesignerPillBar& AddControl(Ctrl& ctrl, int extent);
+    UiDesignerPillBar& AddTrailingControl(Ctrl& ctrl, int extent);
     int GetSectionCount() const;
 
     Event<int> WhenSelect;
@@ -39,6 +40,7 @@ private:
         Ptr<Ctrl> ctrl;
         int extent = 0;
         bool section = false;
+        bool trailing = false;
     };
 
     Vector<Item> items_;
@@ -74,10 +76,16 @@ private:
     void Select(int index);
     void Cycle();
     void Close() override;
+    void UpdateToolSelection();
+    int GetToolRowHeight(int width) const;
 
-    UiDesignerPillBar tools_;
+    UiGridLayout tool_grid_;
+    UiPanel tool_panel_;
+    UiBoxLayout tool_layout_;
+    UiBoxLayout action_layout_;
     UiToolButton close_;
     UiToolButton expand_;
+    Array<UiToolButton> section_buttons_;
     UiPanel content_surface_;
     UiStack pages_;
 

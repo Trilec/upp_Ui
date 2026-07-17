@@ -18,12 +18,39 @@ static bool IsThemeModeName(const String& value)
     return value == "Light" || value == "Dark" || value == "System";
 }
 
+static String ThemeColorText(Color color)
+{
+    return Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB());
+}
+
+static bool ParseThemeColor(const Value& value, Color& color)
+{
+    if(value.Is<Color>()) {
+        color = value;
+        return true;
+    }
+    String text = value;
+    if(text.GetCount() != 7 || text[0] != '#')
+        return false;
+    int digit[6];
+    for(int i = 0; i < 6; i++) {
+        int c = text[i + 1];
+        if(c >= '0' && c <= '9') digit[i] = c - '0';
+        else if(c >= 'a' && c <= 'f') digit[i] = c - 'a' + 10;
+        else if(c >= 'A' && c <= 'F') digit[i] = c - 'A' + 10;
+        else return false;
+    }
+    color = Color(digit[0] * 16 + digit[1], digit[2] * 16 + digit[3],
+                  digit[4] * 16 + digit[5]);
+    return true;
+}
+
 ValueMap UiDesignerThemeSnapshot::ToValue() const
 {
     ValueMap out;
     out.Set("preset", preset);
     out.Set("mode", mode);
-    out.Set("accent", accent);
+    out.Set("accent", ThemeColorText(accent));
     out.Set("spacing", spacing);
     out.Set("radius", radius);
     out.Set("pill_radius", pill_radius);
@@ -48,7 +75,11 @@ bool UiDesignerThemeSnapshot::FromValue(const Value& value, String& error)
         preset = "Minimal";
     if(!IsThemeModeName(mode))
         mode = "Light";
-    accent = UiDesignerMapValue(in, "accent", Color(58, 132, 255));
+    Color parsed_accent;
+    if(ParseThemeColor(UiDesignerMapValue(in, "accent", "#3A84FF"), parsed_accent))
+        accent = parsed_accent;
+    else
+        accent = Color(58, 132, 255);
     spacing = UiDesignerMapValue(in, "spacing", 8);
     radius = UiDesignerMapValue(in, "radius", 8);
     pill_radius = UiDesignerMapValue(in, "pill_radius", 25);
@@ -83,7 +114,7 @@ void UiDesignerThemeDocument::BuildPropertyModel(
     PropertyEditorModel& model) const
 {
     const UiDesignerThemeSnapshot& t = GetEffective();
-    model.Clear();
+    model.Clear(false);
 
     static const char *preset_choices[] = {
         "Minimal", "Pill", "Linear", "Solid", "Outline", "Compact", "Layered"
@@ -147,6 +178,8 @@ void UiDesignerThemeDocument::BuildPropertyModel(
         .SetDefault(24)
         .SetDomain(PropertyEditorDomain::Theme)
         .SetImpact(PropertyImpactThemeGlobal | PropertyImpactPaint);
+
+    model.StructureChanged();
 }
 
 Value UiDesignerThemeDocument::GetProperty(

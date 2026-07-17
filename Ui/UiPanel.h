@@ -81,6 +81,11 @@ public:
     void OnStyleChanged();
 
     virtual Size GetMinSize() const override;
+    // Width-aware measurement for hosts containing wrapped layout controls.
+    // This does not inspect the last allocated rectangle.
+    Size MeasureSizeForWidth(int outer_width) const;
+    Size GetMinWrapSize() const;
+    bool HasWidthDependentContent() const;
     // Logical extent of visible child controls. UiPanel remains a styled host;
     // use UiBoxLayout/UiGridLayout when children need automatic flow.
     Size GetContentSize() const;

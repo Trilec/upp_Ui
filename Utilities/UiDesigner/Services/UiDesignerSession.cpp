@@ -8,7 +8,7 @@ UiDesignerSession::UiDesignerSession()
     RegisterUiDesignerBuiltins(catalog_);
     theme_.BuildPropertyModel(theme_model_);
     WireEvents();
-    NewDocument("three_pane");
+    NewDocument("blank");
 }
 
 void UiDesignerSession::WireEvents()
@@ -46,26 +46,14 @@ void UiDesignerSession::AttachProjection(UiDesignerProjectionSink *projection)
 
 void UiDesignerSession::ApplyPresetBlank()
 {
-    document_.NewDocument();
-    const UiDesignerControlSpec* box = catalog_.Find("UiBoxLayout");
-    if(box) {
-        UiDesignerNodeId layout = commands_.AddNode(
-            box->type_id, "root_layout", document_.GetRootId(),
-            box->node_flags, box->defaults, "Create root layout");
-        commands_.SetProperty(layout, "x", 20,
-                              UiDesignerImpactLocalLayout);
-        commands_.SetProperty(layout, "y", 20,
-                              UiDesignerImpactLocalLayout);
-        commands_.SetProperty(layout, "width", 960,
-                              UiDesignerImpactLocalLayout);
-        commands_.SetProperty(layout, "height", 600,
-                              UiDesignerImpactLocalLayout);
-    }
+    // Window is the document canvas. A blank form has no competing root
+    // layout; users can drop the first layout or control directly into it.
+    document_.NewDocument(Size(500, 250));
 }
 
 void UiDesignerSession::ApplyPresetThreePane()
 {
-    ApplyPresetBlank();
+    document_.NewDocument(Size(1020, 668));
     const UiDesignerNodeId root = document_.GetRootId();
     const UiDesignerControlSpec* splitter = catalog_.Find("UiSplitter");
     const UiDesignerControlSpec* panel = catalog_.Find("UiPanel");
@@ -109,35 +97,92 @@ void UiDesignerSession::ApplyPresetThreePane()
     commands_.SetProperty(title, "width", 340, UiDesignerImpactLocalLayout);
 }
 
-void UiDesignerSession::ApplyPresetSettings()
+void UiDesignerSession::ApplyPresetDialog()
 {
-    ApplyPresetBlank();
+    document_.NewDocument(Size(500, 250));
     const UiDesignerNodeId root = document_.GetRootId();
-    const UiDesignerControlSpec* group = catalog_.Find("UiGroupPanel");
-    const UiDesignerControlSpec* line = catalog_.Find("UiLineEdit");
-    const UiDesignerControlSpec* toggle = catalog_.Find("UiToggle");
-    const UiDesignerControlSpec* slider = catalog_.Find("UiSlider");
-    if(!group || !line || !toggle || !slider)
+    const UiDesignerControlSpec* box = catalog_.Find("UiBoxLayout");
+    const UiDesignerControlSpec* title = catalog_.Find("UiTitleCard");
+    const UiDesignerControlSpec* label = catalog_.Find("UiLabel");
+    const UiDesignerControlSpec* spacer = catalog_.Find("Spacer");
+    const UiDesignerControlSpec* button = catalog_.Find("UiButton");
+    if(!box || !title || !label || !spacer || !button)
         return;
 
-    UiDesignerNodeId container = commands_.AddNode(
-        group->type_id, "settings_group", root,
-        group->node_flags, group->defaults, "Add settings group");
-    commands_.SetProperty(container, "title", "Settings",
+    auto SetLayout = [&](UiDesignerNodeId id, const char *property,
+                         const Value& value) {
+        commands_.SetProperty(id, property, value,
+                              UiDesignerImpactLocalLayout |
+                              UiDesignerImpactCode);
+    };
+    auto Add = [&](const UiDesignerControlSpec& spec, const String& name,
+                   UiDesignerNodeId parent, const String& label_text) {
+        return commands_.AddNode(spec.type_id, name, parent, spec.node_flags,
+                                 spec.defaults, label_text);
+    };
+
+    const UiDesignerNodeId column = Add(*box, "dialog_column", root,
+                                        "Add dialog layout");
+    SetLayout(column, "direction", "V");
+    SetLayout(column, "x", 16);
+    SetLayout(column, "y", 16);
+    SetLayout(column, "width", 468);
+    SetLayout(column, "height", 218);
+
+    const UiDesignerNodeId heading = Add(*title, "dialog_heading", column,
+                                         "Add dialog heading");
+    commands_.SetProperty(heading, "title", "Dialog",
                           UiDesignerImpactControlState |
                           UiDesignerImpactLocalLayout |
                           UiDesignerImpactCode);
-    commands_.SetProperty(container, "x", 120, UiDesignerImpactLocalLayout);
-    commands_.SetProperty(container, "y", 80, UiDesignerImpactLocalLayout);
-    commands_.SetProperty(container, "width", 520, UiDesignerImpactLocalLayout);
-    commands_.SetProperty(container, "height", 320, UiDesignerImpactLocalLayout);
+    commands_.SetProperty(heading, "icon", "ICON_DESIGN_DESCRIPTION_48",
+                          UiDesignerImpactControlState |
+                          UiDesignerImpactLocalLayout |
+                          UiDesignerImpactCode);
+    SetLayout(heading, "h_sizing", "Fill");
+    SetLayout(heading, "v_sizing", "Fixed");
+    SetLayout(heading, "fixed_height", 44);
 
-    commands_.AddNode(line->type_id, "name_edit", container,
-                      line->node_flags, line->defaults, "Add name field");
-    commands_.AddNode(toggle->type_id, "enabled_toggle", container,
-                      toggle->node_flags, toggle->defaults, "Add toggle");
-    commands_.AddNode(slider->type_id, "amount_slider", container,
-                      slider->node_flags, slider->defaults, "Add slider");
+    const UiDesignerNodeId placeholder = Add(*label, "dialog_content", column,
+                                             "Add dialog content placeholder");
+    commands_.SetProperty(placeholder, "text", "Add layout and controls here",
+                          UiDesignerImpactControlState |
+                          UiDesignerImpactLocalLayout |
+                          UiDesignerImpactCode);
+    SetLayout(placeholder, "h_sizing", "Fill");
+    SetLayout(placeholder, "v_sizing", "Fill");
+
+    const UiDesignerNodeId actions = Add(*box, "dialog_actions", column,
+                                         "Add dialog actions");
+    SetLayout(actions, "direction", "H");
+    SetLayout(actions, "h_sizing", "Fill");
+    SetLayout(actions, "v_sizing", "Fixed");
+    SetLayout(actions, "fixed_height", 40);
+
+    const UiDesignerNodeId action_spacer = Add(*spacer, "dialog_action_spacer",
+                                               actions, "Add action spacer");
+    SetLayout(action_spacer, "h_sizing", "Fill");
+    SetLayout(action_spacer, "v_sizing", "Fill");
+
+    const UiDesignerNodeId cancel = Add(*button, "cancel_button", actions,
+                                        "Add Cancel button");
+    commands_.SetProperty(cancel, "text", "Cancel",
+                          UiDesignerImpactControlState |
+                          UiDesignerImpactLocalLayout |
+                          UiDesignerImpactCode);
+    SetLayout(cancel, "h_sizing", "Fixed");
+    SetLayout(cancel, "fixed_width", 88);
+
+    const UiDesignerNodeId ok = Add(*button, "ok_button", actions,
+                                    "Add OK button");
+    commands_.SetProperty(ok, "text", "OK",
+                          UiDesignerImpactControlState |
+                          UiDesignerImpactLocalLayout |
+                          UiDesignerImpactCode);
+    commands_.SetProperty(ok, "role", "Accent",
+                          UiDesignerImpactPaint | UiDesignerImpactCode);
+    SetLayout(ok, "h_sizing", "Fixed");
+    SetLayout(ok, "fixed_width", 88);
 }
 
 void UiDesignerSession::NewDocument(const String& preset)
@@ -146,8 +191,8 @@ void UiDesignerSession::NewDocument(const String& preset)
     state_.selection.Clear();
     overlay_.Clear();
 
-    if(preset == "settings")
-        ApplyPresetSettings();
+    if(preset == "dialog")
+        ApplyPresetDialog();
     else if(preset == "three_pane")
         ApplyPresetThreePane();
     else
@@ -395,6 +440,22 @@ void UiDesignerSession::RebuildInspector()
     }
 
     const UiDesignerNode* primary = document_.Find(state_.selection.primary);
+    if(primary && primary->id == document_.GetRootId()) {
+        const Size size = document_.GetVirtualSize();
+        inspector_model_.AddInteger("document_width", "Width", size.cx,
+                                    "Window")
+            .SetRange(1, 8192, 1)
+            .SetHelp("Document canvas width in pixels.")
+            .SetImpact(PropertyImpactFullPreview | PropertyImpactCode);
+        inspector_model_.AddInteger("document_height", "Height", size.cy,
+                                    "Window")
+            .SetRange(1, 8192, 1)
+            .SetHelp("Document canvas height in pixels.")
+            .SetImpact(PropertyImpactFullPreview | PropertyImpactCode);
+        inspector_model_.StructureChanged();
+        WhenInspectorChanged();
+        return;
+    }
     const UiDesignerControlSpec* control =
         primary ? catalog_.Find(primary->type) : nullptr;
     if(!primary || !control) {
@@ -423,6 +484,13 @@ void UiDesignerSession::RebuildInspector()
 bool UiDesignerSession::PreviewProperty(
     const String& property, const Value& value, String& error)
 {
+    if(state_.selection.primary == document_.GetRootId() &&
+       (property == "document_width" || property == "document_height")) {
+        // Dimension edits are committed atomically below; changing the document
+        // during an active numeric editor would create an undo item per keystroke.
+        error.Clear();
+        return true;
+    }
     const UiDesignerPropertySpec* property_spec = nullptr;
     if(!SelectionSupports(property, &property_spec)) {
         error = "Selection does not support " + property;
@@ -441,6 +509,21 @@ bool UiDesignerSession::PreviewProperty(
 bool UiDesignerSession::CommitProperty(
     const String& property, const Value& value, String& error)
 {
+    if(state_.selection.primary == document_.GetRootId() &&
+       (property == "document_width" || property == "document_height")) {
+        Size size = document_.GetVirtualSize();
+        const int dimension = max(1, (int)value);
+        if(property == "document_width")
+            size.cx = dimension;
+        else
+            size.cy = dimension;
+        if(!SetVirtualSize(size)) {
+            error = commands_.GetLastError();
+            return false;
+        }
+        error.Clear();
+        return true;
+    }
     const UiDesignerPropertySpec* property_spec = nullptr;
     if(!SelectionSupports(property, &property_spec)) {
         error = "Selection does not support " + property;

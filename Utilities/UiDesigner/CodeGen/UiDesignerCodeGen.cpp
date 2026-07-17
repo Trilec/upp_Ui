@@ -215,6 +215,12 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetTitle("
             << EmitValue(node.GetProperty("title", title->default_value))
             << ");\n";
+    if(const UiDesignerPropertySpec* icon = spec.FindProperty("icon")) {
+        const String icon_name = node.GetProperty("icon", icon->default_value);
+        if(icon_name == "ICON_DESIGN_DESCRIPTION_48")
+            out << "\t" << member
+                << ".SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));\n";
+    }
     if(spec.FindProperty("checked"))
         out << "\t" << member << ".SetData("
             << EmitValue(node.GetProperty("checked", false)) << ");\n";

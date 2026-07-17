@@ -1,6 +1,8 @@
 #ifndef _Utilities_UiDesigner_UiDesigner_UiDesignerExportDialog_h_
 #define _Utilities_UiDesigner_UiDesigner_UiDesignerExportDialog_h_
 
+#include <CtrlLib/CtrlLib.h>
+#include <Ui/Ui.h>
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 
 namespace Upp {

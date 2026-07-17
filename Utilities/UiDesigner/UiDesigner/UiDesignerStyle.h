@@ -7,13 +7,15 @@
 namespace Upp {
 
 struct UiDesignerStyleMetrics {
-    static int HeaderHeight()          { return DPI(42); }
+    static int HeaderHeight()          { return DPI(63); }
     static int FooterHeight()          { return DPI(27); }
     static int RailWidth()             { return DPI(56); }
-    static int PanelNormalWidth()      { return DPI(230); }
-    static int PanelMediumWidth()      { return DPI(280); }
-    static int PanelWideWidth()        { return DPI(340); }
-    static int DesignerToolbarHeight() { return DPI(42); }
+    // The reference shell starts each side column at 250px. The width button
+    // changes this fixed column width; the center takes only the remainder.
+    static int PanelNormalWidth()      { return DPI(250); }
+    static int PanelMediumWidth()      { return DPI(300); }
+    static int PanelWideWidth()        { return DPI(346); }
+    static int DesignerToolbarHeight() { return DPI(63); }
     static int Gap()                   { return DPI(8); }
     static int HeaderInset()           { return DPI(6); }
     static int LeftPillInset()         { return DPI(20); }

@@ -4,13 +4,22 @@
 
 namespace Upp {
 
+static Rect UiPanelContentInsets(const UiPanel::Style& style)
+{
+    const int probe_size = 4096;
+    Rect outer = RectC(0, 0, probe_size, probe_size);
+    Rect inner = UiStyledInnerRect(outer, style.metrics, style.skin);
+    return Rect(inner.left, inner.top, outer.right - inner.right, outer.bottom - inner.bottom);
+}
+
 static Size UiPanelOuterSizeFromChildExtent(Size content, const StyledMetrics& m, const StyledSkin& skin)
 {
     Rect ci = UiNonNegativeThickness(skin.content_inset);
+    Rect cm = UiNonNegativeThickness(m.content_margin);
     Rect sh = UiStyledShadowMargins(m);
     int fw = UiResolvedFrameWidth(m, skin);
-    return Size(max(0, content.cx) + ci.left + ci.right + sh.left + sh.right + 2 * fw,
-                max(0, content.cy) + ci.top + ci.bottom + sh.top + sh.bottom + 2 * fw);
+    return Size(max(0, content.cx) + ci.left + ci.right + cm.left + cm.right + sh.left + sh.right + 2 * fw,
+                max(0, content.cy) + ci.top + ci.bottom + cm.top + cm.bottom + sh.top + sh.bottom + 2 * fw);
 }
 
 const UiPanel::Style& UiPanel::StyleDefault()
@@ -131,19 +140,35 @@ void UiPanel::OnStyleChanged()
     Refresh();
 }
 
-Size UiPanel::GetMinSize() const
+Size UiPanel::MeasureSizeForWidth(int outer_width) const
 {
     const Style& style = GetEffectiveStyle();
+    Rect content_inset = UiPanelContentInsets(style);
+    int chrome_w = content_inset.left + content_inset.right;
+    int content_width_hint = outer_width >= 0 ? max(0, outer_width - chrome_w) : -1;
+
+    // Layout can be measured before a parent TopWindow is shown. Direct
+    // children are still logical panel content in that state, so do not use
+    // IsShown() as a measurement filter here.
+    if(content_width_hint < 0) {
+        content_width_hint = 0;
+        for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
+            UiLayoutMeasureResult measure = UiMeasureLayout(*q);
+            Rect r = q->GetRect();
+            content_width_hint = max(content_width_hint,
+                                     max(0, r.left - content_inset.left) + max(0, measure.preferred.cx));
+        }
+    }
+
     bool any_child = false;
     Size child_content(0, 0);
     for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
-        if(!q->IsShown())
-            continue;
-        UiLayoutMeasureResult measure = UiMeasureLayout(*q);
-        Size sz = measure.min;
         Rect r = q->GetRect();
-        int right = r.IsEmpty() ? sz.cx : max(0, r.left) + sz.cx;
-        int bottom = r.IsEmpty() ? sz.cy : max(0, r.top) + sz.cy;
+        int available_width = content_width_hint;
+        UiLayoutMeasureResult measure = UiMeasureLayout(*q, {available_width > 0 ? available_width : -1});
+        Size sz = measure.width_dependent ? measure.measured : measure.min;
+        int right = r.IsEmpty() ? sz.cx : max(0, r.left - content_inset.left) + sz.cx;
+        int bottom = r.IsEmpty() ? sz.cy : max(0, r.top - content_inset.top) + sz.cy;
         child_content.cx = max(child_content.cx, max(0, right));
         child_content.cy = max(child_content.cy, max(0, bottom));
         any_child = true;
@@ -160,6 +185,35 @@ Size UiPanel::GetMinSize() const
         h = max(h, user_min_size_.cy);
 
     return Size(w, h);
+}
+
+Size UiPanel::GetMinSize() const
+{
+    // Keep intrinsic measurement independent from the previous layout pass.
+    return MeasureSizeForWidth(-1);
+}
+
+Size UiPanel::GetMinWrapSize() const
+{
+    const Style& style = GetEffectiveStyle();
+    Rect content_inset = UiPanelContentInsets(style);
+    int chrome_w = content_inset.left + content_inset.right;
+    int content_width = 0;
+    for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
+        UiLayoutMeasureResult measure = UiMeasureLayout(*q);
+        Rect r = q->GetRect();
+        content_width = max(content_width,
+                            max(0, r.left - content_inset.left) + max(0, measure.min.cx));
+    }
+    return MeasureSizeForWidth(max(user_min_size_.cx, content_width + chrome_w));
+}
+
+bool UiPanel::HasWidthDependentContent() const
+{
+    for(Ctrl* q = GetFirstChild(); q; q = q->GetNext())
+        if(UiMeasureLayout(*q).width_dependent)
+            return true;
+    return false;
 }
 
 Size UiPanel::GetContentSize() const

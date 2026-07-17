@@ -199,6 +199,8 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 			String vs = AsString(ctx.Property(child, "v_sizing", "Fit"));
 			int min_w = max(0, (int)ctx.Property(child, "min_width", 0));
 			int min_h = max(0, (int)ctx.Property(child, "min_height", 0));
+			int max_w = max(0, (int)ctx.Property(child, "max_width", 0));
+			int max_h = max(0, (int)ctx.Property(child, "max_height", 0));
 			if(horizontal) {
 				if(hs == "Fixed")
 					out << ".Fixed(DPI(" << max(DesignerClampMin((int)ctx.Property(child, "fixed_width", DESIGNER_FIXED_FALLBACK_WIDTH)), min_w) << "))";
@@ -237,6 +239,10 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 			int col = clamp((int)ctx.Property(child, "grid_col", index % columns), 0, columns - 1);
 			String hs = AsString(ctx.Property(child, "h_sizing", "Fit"));
 			String vs = AsString(ctx.Property(child, "v_sizing", "Fit"));
+			int min_w = max(0, (int)ctx.Property(child, "min_width", 0));
+			int min_h = max(0, (int)ctx.Property(child, "min_height", 0));
+			int max_w = max(0, (int)ctx.Property(child, "max_width", 0));
+			int max_h = max(0, (int)ctx.Property(child, "max_height", 0));
 			if(hs == "Fixed" || vs == "Fixed") {
 				int w = DesignerClampMin((int)ctx.Property(child, "fixed_width", DESIGNER_FIXED_FALLBACK_WIDTH));
 				int h = DesignerClampMin((int)ctx.Property(child, "fixed_height", DESIGNER_FIXED_FALLBACK_HEIGHT));
@@ -246,6 +252,8 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 				    << ", " << (vs == "Expand" ? "true" : "false")
 				    << ", Size(DPI(" << w << "), DPI(" << h << ")));\n";
 				out << "\t\t\t" << p << ".SetItemAlign(item, " << DesignerLayoutGridItemAlignHExpr(child) << ", " << DesignerLayoutGridItemAlignVExpr(child) << ");\n";
+				out << "\t\t\t" << p << ".SetItemMinSize(item, Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+				out << "\t\t\t" << p << ".SetItemMaxSize(item, Size(DPI(" << max_w << "), DPI(" << max_h << ")));\n";
 				out << "\t\t}\n";
 			}
 			else {
@@ -254,6 +262,8 @@ void EmitDesignerLayoutChild(DesignerCodeGenContext& ctx, const DesignerNode& pa
 				    << ", " << (hs == "Expand" ? "true" : "false")
 				    << ", " << (vs == "Expand" ? "true" : "false") << ");\n";
 				out << "\t\t\t" << p << ".SetItemAlign(item, " << DesignerLayoutGridItemAlignHExpr(child) << ", " << DesignerLayoutGridItemAlignVExpr(child) << ");\n";
+				out << "\t\t\t" << p << ".SetItemMinSize(item, Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+				out << "\t\t\t" << p << ".SetItemMaxSize(item, Size(DPI(" << max_w << "), DPI(" << max_h << ")));\n";
 				out << "\t\t}\n";
 			}
 			return;
@@ -598,6 +608,10 @@ static DesignerType MakeBoxLayoutType()
 			int col = clamp((int)ctx.Property(child, "grid_col", index % columns), 0, columns - 1);
 			String hs = AsString(ctx.Property(child, "h_sizing", "Fit"));
 			String vs = AsString(ctx.Property(child, "v_sizing", "Fit"));
+			int min_w = max(0, (int)ctx.Property(child, "min_width", 0));
+			int min_h = max(0, (int)ctx.Property(child, "min_height", 0));
+			int max_w = max(0, (int)ctx.Property(child, "max_width", 0));
+			int max_h = max(0, (int)ctx.Property(child, "max_height", 0));
 			if(hs == "Fixed" || vs == "Fixed") {
 				int w = DesignerClampMin((int)ctx.Property(child, "fixed_width", DESIGNER_FIXED_FALLBACK_WIDTH));
 				int h = DesignerClampMin((int)ctx.Property(child, "fixed_height", DESIGNER_FIXED_FALLBACK_HEIGHT));
@@ -607,6 +621,8 @@ static DesignerType MakeBoxLayoutType()
 				    << ", " << (vs == "Expand" ? "true" : "false")
 				    << ", Size(DPI(" << w << "), DPI(" << h << ")));\n";
 				out << "\t\t\t" << p << ".SetItemAlign(item, " << DesignerLayoutGridItemAlignHExpr(child) << ", " << DesignerLayoutGridItemAlignVExpr(child) << ");\n";
+				out << "\t\t\t" << p << ".SetItemMinSize(item, Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+				out << "\t\t\t" << p << ".SetItemMaxSize(item, Size(DPI(" << max_w << "), DPI(" << max_h << ")));\n";
 				out << "\t\t}\n";
 			}
 			else {
@@ -615,6 +631,8 @@ static DesignerType MakeBoxLayoutType()
 				    << ", " << (hs == "Expand" ? "true" : "false")
 				    << ", " << (vs == "Expand" ? "true" : "false") << ");\n";
 				out << "\t\t\t" << p << ".SetItemAlign(item, " << DesignerLayoutGridItemAlignHExpr(child) << ", " << DesignerLayoutGridItemAlignVExpr(child) << ");\n";
+				out << "\t\t\t" << p << ".SetItemMinSize(item, Size(DPI(" << min_w << "), DPI(" << min_h << ")));\n";
+				out << "\t\t\t" << p << ".SetItemMaxSize(item, Size(DPI(" << max_w << "), DPI(" << max_h << ")));\n";
 				out << "\t\t}\n";
 			}
 			return;

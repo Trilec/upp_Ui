@@ -169,6 +169,7 @@ private:
     Rect viewport_;
     int content_height_ = 0;
     bool syncing_editor_ = false;
+    bool layout_in_progress_ = false;
 };
 
 }

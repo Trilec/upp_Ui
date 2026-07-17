@@ -39,14 +39,14 @@ void UiDesignerExportDialog::BuildControls()
     profile_.WhenAction = [=] { ProfileChanged(); };
 
     destination_.SetPlaceholder("Choose a folder or JSON file...");
-    destination_.WhenChanging = [=] { RefreshPreview(); };
+    destination_.WhenChange = [=] { RefreshPreview(); };
     browse_.SetText("Browse...");
     browse_.WhenAction = [=] { Browse(); };
 
     package_.SetData("GeneratedUi");
     class_.SetData("GeneratedUiWindow");
     namespace_.SetData("Upp");
-    package_.WhenChanging = class_.WhenChanging = namespace_.WhenChanging =
+    package_.WhenChange = class_.WhenChange = namespace_.WhenChange =
         [=] { RefreshPreview(); };
 
     appearance_.UseInternalModel().Clear()

@@ -70,6 +70,9 @@ String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes);
 bool UiDesignerParseCatalogDragText(const String& text, String& type_id);
 bool UiDesignerParseNodesDragText(const String& text,
                                   Vector<UiDesignerNodeId>& nodes);
+// Read Designer-owned drag data without accepting the drop. Targets must only
+// accept once a concrete drop plan has been validated.
+bool UiDesignerReadDragText(PasteClip& clip, String& text);
 
 class UiDesignerPreviewFactory {
 public:
@@ -128,17 +131,26 @@ public:
     Function<bool(const UiDesignerDropPlan&, String&)> ExecuteDrop;
 
     Event<UiDesignerNodeId, bool> WhenSelectNode;
+    Event<Size> WhenResizeDocument;
     Event<String> WhenDropStatus;
 
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
     virtual void LeftDown(Point p, dword keyflags) override;
+    virtual void LeftUp(Point p, dword keyflags) override;
+    virtual void MouseMove(Point p, dword keyflags) override;
     virtual void DragEnter() override;
     virtual void DragAndDrop(Point p, PasteClip& d) override;
     virtual void DragRepeat(Point p) override;
     virtual void DragLeave() override;
 
 private:
+    class SelectionOverlay : public Ctrl {
+    public:
+        UiDesignerPreviewCanvas *owner = nullptr;
+        virtual void Paint(Draw& w) override;
+    };
+
     int FindInstance(UiDesignerNodeId node) const;
     void DestroyInstances();
     void BuildNode(UiDesignerNodeId node, ParentCtrl& parent, int depth,
@@ -158,6 +170,9 @@ private:
                             const UiDesignerNode& node);
     void PaintSemantic(Draw& w, const UiDesignerPreviewInstance& instance,
                        const UiDesignerNode& node) const;
+    void PaintSelectionOverlay(Draw& w) const;
+    int HitDocumentResizeEdge(Point p) const;
+    Size ResizeDocumentTo(Point p) const;
     void UpdateDropPlan(Point p, const String& payload);
     void ClearDropPlan();
 
@@ -168,6 +183,7 @@ private:
 
     Array<UiDesignerPreviewInstance> instances_;
     VectorMap<UiDesignerNodeId, Rect> rects_;
+    SelectionOverlay selection_overlay_;
     uint64 generation_sequence_ = 0;
     UiDesignerPreviewStats stats_;
     Color accent_ = Color(37, 99, 235);
@@ -175,6 +191,10 @@ private:
     UiDesignerDropPlan drop_plan_;
     Rect drop_indicator_;
     String drop_payload_;
+    int document_resize_edge_ = 0;
+    Point document_resize_start_;
+    Size document_resize_initial_;
+    Size document_resize_pending_;
 };
 
 }

@@ -1,6 +1,7 @@
 #include <Ui/UiMeasure.h>
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>
+#include <Ui/UiPanel.h>
 #include <Ui/UiTree.h>
 
 namespace Upp {
@@ -33,6 +34,15 @@ UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& 
 			out.measured = Size(measure_w, max(0, grid->MeasureHeightForWidth(measure_w)));
 			out.width_dependent = true;
 		}
+		return out;
+	}
+
+	if(const UiPanel* panel = dynamic_cast<const UiPanel*>(&c)) {
+		out.preferred = panel->GetMinSize();
+		out.min = panel->GetMinWrapSize();
+		int measure_w = spec.available_width >= 0 ? max(0, spec.available_width) : out.preferred.cx;
+		out.measured = panel->MeasureSizeForWidth(measure_w);
+		out.width_dependent = panel->HasWidthDependentContent();
 		return out;
 	}
 

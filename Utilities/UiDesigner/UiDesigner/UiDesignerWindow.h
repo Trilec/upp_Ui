@@ -21,6 +21,7 @@ public:
 
     UiDesignerSession& Session() { return session_; }
     const UiDesignerSession& Session() const { return session_; }
+    void WriteLaunchDiagnostic();
 
     virtual void Layout() override;
     virtual void Close() override;
@@ -46,21 +47,23 @@ private:
     void RefreshThemeInspector();
     void RefreshCode();
     void RefreshStatus(const String& status);
-    void WriteLaunchDiagnostic();
+    void PostSelectionDetailsRefresh();
 
     UiDesignerSession session_;
 
     UiPanel header_surface_;
+    UiBoxLayout header_layout_;
     UiTitleCard brand_;
     UiSplitButton save_;
     UiSplitButton load_;
     UiSplitButton export_;
     UiLabel version_;
-    UiRadioButton designer_mode_;
-    UiRadioButton theme_mode_;
+    UiButton designer_mode_;
+    UiButton theme_mode_;
     UiDropdown theme_select_;
     UiToolButton dark_;
     UiToolButton help_;
+    UiToolButton exit_;
 
     UiStack workspaces_;
     UiPanel designer_page_;
@@ -83,7 +86,10 @@ private:
     UiSplitButton aspect_preset_;
     UiToolButton square_;
     UiScrollPanel preview_scroll_;
-    UiPanel preview_surface_;
+    // UiScrollPanel needs one content child to define its scroll extent. This
+    // host is intentionally unpainted; the Window canvas is the only visible
+    // document surface in the center scroll viewport.
+    ParentCtrl preview_workspace_;
     UiDesignerPreviewCanvas preview_canvas_;
 
     UiDesignerHierarchyView hierarchy_;
@@ -110,6 +116,7 @@ private:
     String current_file_;
     UiDesignerExportProfile last_export_profile_ =
         UiDesignerExportProfile::CompleteCppPackage;
+    bool selection_details_refresh_posted_ = false;
 };
 
 }

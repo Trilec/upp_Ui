@@ -81,6 +81,8 @@ public:
     BlankRef AddBlank(int row, int col);
     BlankRef AddBlank();
     UiGridLayout& SetItemAlign(int index, Align x, Align y);
+    UiGridLayout& SetItemMinSize(int index, Size sz);
+    UiGridLayout& SetItemMaxSize(int index, Size sz);
 
     int AddSeparator(int px = DPI(1));
     UiGridLayout& SetItemSeparatorLine(int index, bool on = true, Align align = Align::Center,
@@ -176,6 +178,8 @@ private:
     void  NormalizeSelectionState();
     void  RefreshGridLayout();
     Rect  GetClientGridRect() const;
+    // Configured cell dimensions provide an empty-grid fallback. A populated
+    // Fit grid is measured from its actual items.
     void  ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const;
     void  PaintDebug(Draw& w) const;
 
@@ -183,7 +187,7 @@ private:
     int   gap = DPI(6);
     int   grid_cols = 2;
     int   grid_rows = 2;
-    Size  min_cell_size = Size(DPI(25), DPI(25));
+    Size  min_cell_size = Size(DPI(10), DPI(10));
     bool  unified = false;
     Size  unified_size = Size(0, 0);
     Align align_items = Align::Stretch;

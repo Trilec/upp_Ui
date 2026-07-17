@@ -68,7 +68,10 @@ UiDesignerPillBar& UiDesignerPillBar::AddSection(
     button.WhenAction = [=] { WhenSelect(section_index); };
     Add(button);
 
-    Item& item = items_.Add();
+    int insert = items_.GetCount();
+    while(insert > 0 && items_[insert - 1].trailing)
+        --insert;
+    Item& item = items_.Insert(insert);
     item.ctrl = &button;
     item.extent = DPI(32);
     item.section = true;
@@ -85,6 +88,16 @@ UiDesignerPillBar& UiDesignerPillBar::AddControl(Ctrl& ctrl, int extent)
     return *this;
 }
 
+UiDesignerPillBar& UiDesignerPillBar::AddTrailingControl(Ctrl& ctrl, int extent)
+{
+    Add(ctrl);
+    Item& item = items_.Add();
+    item.ctrl = &ctrl;
+    item.extent = max(DPI(24), extent);
+    item.trailing = true;
+    return *this;
+}
+
 int UiDesignerPillBar::GetSectionCount() const
 {
     int count = 0;
@@ -98,7 +111,34 @@ void UiDesignerPillBar::Layout()
 {
     const int cx = GetSize().cx;
     const int cy = GetSize().cy;
+    const int horizontal_h = min(DPI(28), max(DPI(24), cy - DPI(8)));
+    const int item_gap = DPI(8);
+
+    int trailing_width = 0;
+    if(!vertical_ && show_auxiliary_) {
+        for(const Item& item : items_)
+            if(item.ctrl && item.trailing)
+                trailing_width += item.extent + item_gap;
+    }
+    int trailing_start = max(inset_, cx - inset_ - trailing_width);
+    int row_count = 1;
+    if(!vertical_) {
+        int probe = inset_;
+        for(const Item& item : items_) {
+            if(!item.ctrl || item.trailing || (!item.section && !show_auxiliary_))
+                continue;
+            if(probe + item.extent > trailing_start && probe > inset_) {
+                probe = inset_;
+                row_count++;
+            }
+            probe += item.extent + item_gap;
+        }
+    }
+
     int cursor = inset_;
+    const int rows_height = row_count * horizontal_h +
+                            max(0, row_count - 1) * DPI(4);
+    int row_y = vertical_ ? inset_ : max(DPI(4), (cy - rows_height) / 2);
 
     for(const Item& item : items_) {
         if(!item.ctrl || (!item.section && !show_auxiliary_)) {
@@ -112,45 +152,89 @@ void UiDesignerPillBar::Layout()
             PutCtrl(*item.ctrl, (cx - w) / 2, cursor, w, item.extent);
             cursor += item.extent + DPI(6);
         }
+        else if(item.trailing) {
+            PutCtrl(*item.ctrl, trailing_start, (cy - horizontal_h) / 2,
+                    item.extent, horizontal_h);
+            trailing_start += item.extent + item_gap;
+        }
         else {
-            const int h = max(DPI(24), cy - DPI(10));
-            PutCtrl(*item.ctrl, cursor, (cy - h) / 2, item.extent, h);
-            cursor += item.extent + DPI(6);
+            if(cursor + item.extent > trailing_start && cursor > inset_) {
+                cursor = inset_;
+                row_y += horizontal_h + DPI(4);
+            }
+            PutCtrl(*item.ctrl, cursor, row_y, item.extent, horizontal_h);
+            cursor += item.extent + item_gap;
         }
     }
 }
 
 UiDesignerSideColumn::UiDesignerSideColumn()
 {
-    tools_.SetInset(UiDesignerStyleMetrics::LeftPillInset());
+    tool_grid_.SetGridSize(2, 1)
+              .SetMinCellSize(Size(DPI(10), DPI(10)))
+              .SetGap(DPI(0))
+              .SetInset(DPI(0));
+
+    UiPanel::Style tool_style = UiTheme::ResolvePanel(UiRole::Subtle);
+    tool_style.metrics.face_enabled = true;
+    tool_style.palette.face[ST_NORMAL] = UiFill::Solid(Color(243, 243, 243));
+    tool_style.metrics.frame_enabled = true;
+    for(int i = 0; i < 4; i++)
+        tool_style.palette.frame[i] = Color(216, 216, 216);
+    tool_style.metrics.frame_width = DPI(1);
+    tool_style.metrics.radius = DPI(15);
+    tool_style.metrics.shadow.enabled = true;
+    tool_style.metrics.shadow.distance = DPI(9);
+    tool_style.metrics.shadow.offset_x = DPI(0);
+    tool_style.metrics.shadow.offset_y = DPI(0);
+    tool_style.metrics.shadow.alpha = 40;
+    tool_style.metrics.shadow.color = Black();
+    tool_style.metrics.shadow.mode = SHADOW_CURVE;
+    tool_style.metrics.shadow.curve = ShadowSoft();
+    tool_panel_.SetCustomStyle(tool_style).SetInset(DPI(4));
+
+    tool_layout_.SetDirection(UiDirection::H)
+                .SetGap(DPI(4), DPI(4))
+                .SetInset(DPI(0))
+                .SetWrap(UiBoxWrap::Flow)
+                .SetWrapAutoResize(true);
+    action_layout_.SetDirection(UiDirection::H)
+                  .SetGap(DPI(4), DPI(4))
+                  .SetInset(DPI(0))
+                  .SetWrap(UiBoxWrap::None);
+    tool_panel_.Add(tool_layout_);
+    tool_grid_.Add(tool_panel_, 0, 0, true, true);
+    tool_grid_.Add(action_layout_, 0, 1, false, true, Size(DPI(52), DPI(0)));
+
     content_surface_.SetCustomStyle(UiDesignerSurfaceStyle());
     content_surface_.Add(pages_.SizePos());
 
     close_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
     close_.SetIcon(ICON_DESIGN_LEFT_PANEL_CLOSE_48())
-          .SetIconSize(DPI(16), DPI(16));
+          .SetIconSize(DPI(16), DPI(16))
+          .SetContentInset(DPI(4))
+          .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     close_.Tip("Collapse panel");
     close_.WhenAction = [=] { Close(); };
 
     expand_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
     expand_.SetIcon(ICON_DESIGN_UNFOLD_MORE_48())
-           .SetIconSize(DPI(16), DPI(16));
+           .SetIconSize(DPI(16), DPI(16))
+           .SetContentInset(DPI(4))
+           .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     expand_.Tip("Cycle panel width");
     expand_.WhenAction = [=] { Cycle(); };
 
-    tools_.AddControl(close_, DPI(32));
-    tools_.AddControl(expand_, DPI(32));
-    tools_.WhenSelect = [=](int i) { Select(i); };
+    action_layout_.Add(expand_).Fixed(DPI(24)).MinCross(DPI(24));
+    action_layout_.Add(close_).Fixed(DPI(24)).MinCross(DPI(24));
 
-    Add(tools_);
+    Add(tool_grid_);
     Add(content_surface_);
 }
 
 UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool on)
 {
     right_ = on;
-    tools_.SetInset(on ? UiDesignerStyleMetrics::RightPillInset()
-                       : UiDesignerStyleMetrics::LeftPillInset());
     close_.SetIcon(on ? ICON_DESIGN_RIGHT_PANEL_CLOSE_48()
                       : ICON_DESIGN_LEFT_PANEL_CLOSE_48());
     return *this;
@@ -159,17 +243,26 @@ UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool on)
 UiDesignerSideColumn& UiDesignerSideColumn::AddSection(
     const String& tip, const Image& icon, Ctrl& content)
 {
-    tools_.AddSection(tip, icon);
+    const int section_index = section_buttons_.GetCount();
+    UiToolButton& button = section_buttons_.Add();
+    button.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    button.SetIcon(icon).SetIconSize(DPI(16), DPI(16))
+          .SetContentInset(DPI(4))
+          .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+    button.SetCheckable();
+    button.Tip(tip);
+    button.WhenAction = [=] { Select(section_index); };
+    tool_layout_.Add(button).Fixed(DPI(24)).MinCross(DPI(24));
     pages_.Add(content, tip);
     if(pages_.GetCount() == 1)
         pages_.SetActivePage(0);
+    UpdateToolSelection();
     return *this;
 }
 
 UiDesignerSideColumn& UiDesignerSideColumn::ApplyTheme(
     const UiDesignerThemeSnapshot& theme)
 {
-    tools_.ApplyTheme(theme);
     content_surface_.SetCustomStyle(
         UiDesignerSurfaceStyle(UiRole::Subtle, theme));
     Refresh();
@@ -210,9 +303,28 @@ void UiDesignerSideColumn::Select(int index)
     pages_.SetActivePage(index);
     if(width_ == PANE_CLOSED)
         width_ = PANE_NORMAL;
+    UpdateToolSelection();
     Layout();
     WhenSectionChanged(index);
     WhenWidthChanged();
+}
+
+void UiDesignerSideColumn::UpdateToolSelection()
+{
+    for(int i = 0; i < section_buttons_.GetCount(); i++)
+        section_buttons_[i].SetChecked(i == active_section_);
+}
+
+int UiDesignerSideColumn::GetToolRowHeight(int width) const
+{
+    const int action_width = DPI(52);
+    const int panel_width = max(DPI(32), width - action_width);
+    // The reference panel has both its explicit four-pixel inset and the
+    // resolved panel content margin. Use the same effective 12px side inset
+    // here rather than pinning the flow against the painted frame.
+    const int content_width = max(DPI(1), panel_width - DPI(24));
+    return max(UiDesignerStyleMetrics::DesignerToolbarHeight(),
+               tool_layout_.MeasureHeightForWidth(content_width) + DPI(8));
 }
 
 void UiDesignerSideColumn::Cycle()
@@ -239,29 +351,60 @@ void UiDesignerSideColumn::Layout()
     const int w = GetSize().cx;
     const int h = GetSize().cy;
     if(width_ == PANE_CLOSED) {
-        tools_.Vertical(true).ShowAuxiliary(false).SetInset(DPI(9));
-        PutCtrl(tools_, 0, 0, w, h);
+        tool_grid_.SetRect(0, 0, w, UiDesignerStyleMetrics::DesignerToolbarHeight());
+        tool_panel_.Show();
+        action_layout_.Show();
         content_surface_.Hide();
     }
     else {
-        tools_.Vertical(false).ShowAuxiliary(true)
-              .SetInset(right_ ? UiDesignerStyleMetrics::RightPillInset()
-                               : UiDesignerStyleMetrics::LeftPillInset());
-        const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
-        PutCtrl(tools_, 0, 0, w, pill_h);
-        PutCtrl(content_surface_, 0,
-                pill_h + UiDesignerStyleMetrics::Gap(), w,
-                max(0, h - pill_h - UiDesignerStyleMetrics::Gap()));
+        const int pill_h = GetToolRowHeight(w);
+        tool_grid_.SetRect(0, 0, w, pill_h);
+        PutCtrl(content_surface_, 0, pill_h, w, max(0, h - pill_h));
         content_surface_.Show();
     }
+
+    // The reference grid mirrors its two cells on the right: expand/close is
+    // on the inner edge, while its tool panel remains against the outer edge.
+    const int toolbar_h = width_ == PANE_CLOSED
+        ? UiDesignerStyleMetrics::DesignerToolbarHeight() : GetToolRowHeight(w);
+    const int action_w = min(DPI(52), max(0, w));
+    const int panel_w = max(0, w - action_w);
+    if(right_) {
+        action_layout_.SetRect(0, 0, action_w, toolbar_h);
+        tool_panel_.SetRect(action_w, 0, panel_w, toolbar_h);
+    }
+    else {
+        tool_panel_.SetRect(0, 0, panel_w, toolbar_h);
+        action_layout_.SetRect(panel_w, 0, action_w, toolbar_h);
+    }
+
+    // UiPanel owns painting, while the flow layout owns the wrapped children.
+    // Keep its natural rows vertically centered inside the explicit inset.
+    const Size panel_size = tool_panel_.GetSize();
+    const int panel_content_inset = DPI(12);
+    const int tool_w = max(0, panel_size.cx - panel_content_inset * 2);
+    const int tool_h = min(max(0, panel_size.cy - DPI(8)),
+                           tool_layout_.MeasureHeightForWidth(max(1, tool_w)));
+    const int preferred_w = tool_layout_.GetPreferredSize().cx;
+    const int tool_x = right_ && tool_h <= DPI(28)
+        ? max(panel_content_inset,
+              panel_size.cx - panel_content_inset - min(tool_w, preferred_w))
+        : panel_content_inset;
+    tool_layout_.SetRect(tool_x, max(DPI(4), (panel_size.cy - tool_h) / 2),
+                         min(tool_w, panel_size.cx - tool_x - panel_content_inset), tool_h);
+
+    const int action_h = DPI(28);
+    action_layout_.SetRect(action_layout_.GetRect().left,
+                           max(0, (toolbar_h - action_h) / 2),
+                           action_layout_.GetSize().cx, action_h);
 }
 
 UiDesignerCatalogList::UiDesignerCatalogList()
 {
     BackPaint();
     Add(filter_edit_);
-    filter_edit_.SetPlaceholder("Search controls...");
-    filter_edit_.WhenChanging = [=] {
+    filter_edit_.SetPlaceholder("Filter controls...");
+    filter_edit_.WhenChange = [=] {
         filter_ = AsString(filter_edit_.GetData());
         RebuildMatches();
         WhenFilter(filter_);
@@ -361,16 +504,16 @@ Image UiDesignerCatalogList::ItemIcon(int index) const
 
 Rect UiDesignerCatalogList::ItemRect(int index) const
 {
-    const int top = DPI(40);
+    const int top = DPI(72);
     const int row = DPI(42);
     return RectC(0, top + index * row - scroll_, GetSize().cx, row);
 }
 
 int UiDesignerCatalogList::RowAt(Point p) const
 {
-    if(p.y < DPI(40))
+    if(p.y < DPI(72))
         return -1;
-    const int index = (p.y - DPI(40) + scroll_) / DPI(42);
+    const int index = (p.y - DPI(72) + scroll_) / DPI(42);
     return index >= 0 && index < Count() ? index : -1;
 }
 
@@ -381,7 +524,7 @@ int UiDesignerCatalogList::GetContentHeight() const
 
 void UiDesignerCatalogList::Layout()
 {
-    filter_edit_.SetRect(DPI(6), DPI(5), max(0, GetSize().cx - DPI(12)), DPI(30));
+    filter_edit_.SetRect(DPI(6), DPI(6), max(0, GetSize().cx - DPI(12)), DPI(60));
 }
 
 void UiDesignerCatalogList::Paint(Draw& w)
@@ -446,8 +589,9 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
         return;
     dragging_ = true;
     const String type = ItemId(pressed_);
-    DoDragAndDrop(TextClip(UiDesignerCatalogDragText(type)),
-                  ItemIcon(pressed_), DND_COPY);
+    VectorMap<String, ClipData> payload;
+    Append(payload, UiDesignerCatalogDragText(type));
+    DoDragAndDrop(payload, ItemIcon(pressed_), DND_COPY);
     pressed_ = -1;
     dragging_ = false;
 }
@@ -603,8 +747,9 @@ void UiDesignerHierarchyView::LeftDrag(Point, dword)
         nodes = clone(selection_->nodes);
     else
         nodes.Add(pressed_node);
-    DoDragAndDrop(TextClip(UiDesignerNodesDragText(nodes)),
-                  ICON_DESIGN_ACCOUNT_TREE_48(), DND_MOVE);
+    VectorMap<String, ClipData> payload;
+    Append(payload, UiDesignerNodesDragText(nodes));
+    DoDragAndDrop(payload, ICON_DESIGN_ACCOUNT_TREE_48(), DND_MOVE);
     pressed_ = -1;
 }
 
@@ -672,14 +817,19 @@ void UiDesignerHierarchyView::DragEnter()
 
 void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
 {
-    if(!AcceptText(d)) {
+    String payload;
+    if(!UiDesignerReadDragText(d, payload)) {
+        d.Reject();
         ClearDrop();
         return;
     }
-    const String payload = GetString(d);
     UpdateDrop(p, payload);
-    if(!drop_plan_.valid)
+    if(!drop_plan_.valid) {
+        d.Reject();
+        ClearDrop();
         return;
+    }
+    d.Accept();
     d.SetAction(DND_MOVE);
     if(d.IsPaste()) {
         String error;

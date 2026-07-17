@@ -144,7 +144,7 @@ public:
     int GetCount() const { return items_.GetCount(); }
     bool IsEmpty() const { return items_.IsEmpty(); }
 
-    void Clear();
+    void Clear(bool notify = true);
 
     PropertyEditorItem& Add(const String& id, const String& label,
                             PropertyEditorKind kind, const Value& value = Value(),

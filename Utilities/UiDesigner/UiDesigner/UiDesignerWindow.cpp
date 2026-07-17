@@ -12,6 +12,53 @@ static void Put(Ctrl& c, int x, int y, int cx, int cy)
     c.SetRect(x, y, max(0, cx), max(0, cy));
 }
 
+static UiPanel::Style UiDesignerReferencePillStyle()
+{
+    UiPanel::Style style = UiTheme::ResolvePanel(UiRole::Subtle);
+    style.metrics.face_enabled = true;
+    style.palette.face[ST_NORMAL] = UiFill::Solid(Color(243, 243, 243));
+    style.metrics.frame_enabled = true;
+    for(int i = 0; i < 4; i++)
+        style.palette.frame[i] = Color(216, 216, 216);
+    style.metrics.frame_width = DPI(1);
+    style.metrics.radius = DPI(15);
+    style.metrics.shadow.enabled = true;
+    style.metrics.shadow.distance = DPI(9);
+    style.metrics.shadow.offset_x = DPI(0);
+    style.metrics.shadow.offset_y = DPI(0);
+    style.metrics.shadow.alpha = 40;
+    style.metrics.shadow.color = Black();
+    style.metrics.shadow.mode = SHADOW_CURVE;
+    style.metrics.shadow.curve = ShadowSoft();
+    return style;
+}
+
+static UiPanel::Style UiDesignerFooterStyle(
+    const UiDesignerThemeSnapshot& theme = UiDesignerThemeSnapshot())
+{
+    UiPanel::Style style = UiDesignerSurfaceStyle(UiRole::Subtle, theme);
+    style.metrics.shadow.enabled = false;
+    return style;
+}
+
+static UiScrollPanel::Style UiDesignerPreviewStyle()
+{
+    UiScrollPanel::Style style = UiTheme::ResolveScrollPanel(UiRole::Subtle);
+    style.metrics.face_enabled = false;
+    style.metrics.frame_enabled = true;
+    style.metrics.frame_width = DPI(0);
+    style.metrics.radius = DPI(0);
+    style.metrics.shadow.enabled = false;
+    return style;
+}
+
+static PropertyEditorStyle UiDesignerInspectorStyle()
+{
+    PropertyEditorStyle style = PropertyEditorStyle::System();
+    style.filter_height = DPI(72);
+    return style;
+}
+
 UiDesignerWindow::UiDesignerWindow()
 {
     Title("Ui Designer").Sizeable().Zoomable();
@@ -26,7 +73,7 @@ UiDesignerWindow::UiDesignerWindow()
     workspaces_.SetActiveKey("designer");
     Add(workspaces_);
 
-    footer_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Subtle));
+    footer_surface_.SetCustomStyle(UiDesignerFooterStyle());
     footer_.SetText("Ready").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
     footer_surface_.Add(footer_.SizePos());
     Add(footer_surface_);
@@ -39,17 +86,26 @@ UiDesignerWindow::UiDesignerWindow()
     RefreshBehavior();
     RefreshThemeInspector();
     RefreshCode();
-    PostCallback(THISBACK(WriteLaunchDiagnostic));
 }
 
 void UiDesignerWindow::BuildHeader()
 {
     header_surface_.SetCustomStyle(UiDesignerSurfaceStyle());
     Add(header_surface_);
+    header_surface_.Add(header_layout_);
+    header_layout_.SetDirection(UiDirection::H)
+                  .SetGap(DPI(8))
+                  .SetInset(UiDesignerStyleMetrics::HeaderInset())
+                  .SetWrap(UiBoxWrap::Flow)
+                  .SetWrapAutoResize(true)
+                  .SetAlignItems(UiCrossAlign::Center);
 
     brand_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
-    brand_.SetTitle("Designer").ShowTitleLine(false).ShowCardLine(false);
-    brand_.SetMedia(ICON_BRAND_NEWLOGO_V5_48(), Size(DPI(18), DPI(18)));
+    brand_.SetTitle("Designer").ShowTitleLine(false).ShowCardLine(false)
+          .SetContentInset(DPI(4)).SetMediaGap(DPI(9))
+          .SetMediaReserve(0).SetMediaMin(DPI(15)).SetMediaAutoFit(false);
+    brand_.SetMedia(ICON_BRAND_NEWLOGO_V5_48(), Size(DPI(18), DPI(18)))
+          .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER);
 
     save_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     save_.SetText("Save").SetSplitWidth(DPI(31));
@@ -87,12 +143,12 @@ void UiDesignerWindow::BuildHeader()
     };
 
     version_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
-    version_.SetText("v1.0.0-rc1")
+    version_.SetText("v1.0.0-rc2")
             .SetIcon(ICON_DESIGN_ADJUST_48(), UiIconRenderMode::MonoTint)
             .SetIconSize(DPI(10), DPI(10));
 
-    designer_mode_.SetText("Designer");
-    theme_mode_.SetText("Theme Studio");
+    designer_mode_.SetText("Designer").SetCheckable().SetChecked(true);
+    theme_mode_.SetText("Theme Studio").SetCheckable();
     designer_mode_.WhenAction = [=] { ShowDesigner(); };
     theme_mode_.WhenAction = [=] { ShowTheme(); };
 
@@ -126,16 +182,23 @@ void UiDesignerWindow::BuildHeader()
                  "share one command/property pipeline.");
     };
 
-    header_surface_.Add(brand_);
-    header_surface_.Add(save_);
-    header_surface_.Add(load_);
-    header_surface_.Add(export_);
-    header_surface_.Add(version_);
-    header_surface_.Add(designer_mode_);
-    header_surface_.Add(theme_mode_);
-    header_surface_.Add(theme_select_);
-    header_surface_.Add(dark_);
-    header_surface_.Add(help_);
+    exit_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+    exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16));
+    exit_.Tip("Close Ui Designer");
+    exit_.WhenAction = [=] { Close(); };
+
+    header_layout_.Add(brand_).Fixed(DPI(130)).MinCross(DPI(24));
+    header_layout_.Add(save_).Fixed(DPI(92)).MinCross(DPI(24));
+    header_layout_.Add(load_).Fixed(DPI(92)).MinCross(DPI(24));
+    header_layout_.Add(export_).Fixed(DPI(100)).MinCross(DPI(24));
+    header_layout_.Add(version_).Fixed(DPI(106)).MinCross(DPI(24));
+    header_layout_.AddSpacer(1).Expand(1).MinMain(DPI(10));
+    header_layout_.Add(designer_mode_).Fixed(DPI(92)).MinCross(DPI(24));
+    header_layout_.Add(theme_mode_).Fixed(DPI(120)).MinCross(DPI(24));
+    header_layout_.Add(theme_select_).Fixed(DPI(150)).MinCross(DPI(24));
+    header_layout_.Add(dark_).Fixed(DPI(36)).MinCross(DPI(24));
+    header_layout_.Add(help_).Fixed(DPI(36)).MinCross(DPI(24));
+    header_layout_.Add(exit_).Fixed(DPI(36)).MinCross(DPI(24));
 }
 
 void UiDesignerWindow::BuildDesigner()
@@ -157,7 +220,7 @@ void UiDesignerWindow::BuildDesigner()
                   .AddSection("Controls", ICON_DESIGN_WIDGETS_48(), controls_list_)
                   .AddSection("Composites", ICON_DESIGN_DYNAMIC_FORM_48(), composites_list_)
                   .AddSection("Presets", ICON_DESIGN_DASHBOARD_EDIT_48(), presets_list_)
-                  .AddSection("U++ Controls", ICON_DESIGN_WIDGETS_48(), upp_controls_list_);
+                  .AddSection("U++ Controls", ICON_EDITOR_CLARIFY_48(), upp_controls_list_);
 
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
@@ -166,40 +229,52 @@ void UiDesignerWindow::BuildDesigner()
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
     designer_right_.SetActiveSection(1);
+    inspector_.SetStyle(UiDesignerInspectorStyle());
+    behaviors_.SetStyle(UiDesignerInspectorStyle());
+    overrides_.SetStyle(UiDesignerInspectorStyle());
 
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle());
-    aspect_pill_.SetInset(UiDesignerStyleMetrics::RightPillInset());
+    aspect_pill_.SetCustomStyle(UiDesignerReferencePillStyle()).SetInset(DPI(5));
     portrait_.SetIcon(ICON_DESIGN_SPLITSCREEN_PORTRAIT_48())
              .SetIconSize(DPI(20), DPI(20)).Tip("Portrait");
     landscape_.SetIcon(ICON_DESIGN_SPLITSCREEN_LANDSCAPE_48())
               .SetIconSize(DPI(20), DPI(20)).Tip("Landscape");
-    aspect_preset_.SetText("2:1").SetSplitWidth(DPI(30));
-    aspect_preset_.Add("Portrait 1:2", "1:2")
-                  .Add("Landscape 2:1", "2:1")
-                  .Add("Square 1:1", "1:1");
+    aspect_preset_.SetText("16:9").SetSplitWidth(DPI(30));
+    aspect_preset_.Add("Portrait 9:16", "9:16")
+                  .Add("Portrait 2:3", "2:3")
+                  .Add("Portrait 3:4", "3:4")
+                  .Add("Square 1:1", "1:1")
+                  .Add("Landscape 4:3", "4:3")
+                  .Add("Landscape 3:2", "3:2")
+                  .Add("Landscape 16:9", "16:9")
+                  .Add("Landscape 2:1", "2:1");
     square_.SetIcon(ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48())
            .SetIconSize(DPI(17), DPI(17)).Tip("Square");
 
-    portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(668, 1020)); };
-    landscape_.WhenAction = [=] { session_.SetVirtualSize(Size(1020, 668)); };
-    square_.WhenAction = [=] { session_.SetVirtualSize(Size(800, 800)); };
+    portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(576, 1024)); };
+    landscape_.WhenAction = [=] { session_.SetVirtualSize(Size(1024, 576)); };
+    square_.WhenAction = [=] { session_.SetVirtualSize(Size(720, 720)); };
     aspect_preset_.WhenSelect = [=](int, const Value& value) {
         const String ratio = value;
-        if(ratio == "1:2") session_.SetVirtualSize(Size(500, 1000));
-        else if(ratio == "1:1") session_.SetVirtualSize(Size(800, 800));
-        else session_.SetVirtualSize(Size(1000, 500));
+        if(ratio == "9:16") session_.SetVirtualSize(Size(576, 1024));
+        else if(ratio == "2:3") session_.SetVirtualSize(Size(600, 900));
+        else if(ratio == "3:4") session_.SetVirtualSize(Size(600, 800));
+        else if(ratio == "1:1") session_.SetVirtualSize(Size(720, 720));
+        else if(ratio == "4:3") session_.SetVirtualSize(Size(800, 600));
+        else if(ratio == "3:2") session_.SetVirtualSize(Size(900, 600));
+        else if(ratio == "2:1") session_.SetVirtualSize(Size(1000, 500));
+        else session_.SetVirtualSize(Size(1024, 576));
     };
     aspect_pill_.AddControl(portrait_, DPI(32))
                 .AddControl(landscape_, DPI(32))
-                .AddControl(aspect_preset_, DPI(92))
-                .AddControl(square_, DPI(32));
+                .AddControl(square_, DPI(32))
+                .AddControl(aspect_preset_, DPI(92));
 
-    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard));
-    preview_surface_.Add(preview_canvas_.SizePos());
-    preview_scroll_.SetCustomStyle(UiTheme::ResolveScrollPanel(UiRole::Subtle));
+    preview_scroll_.SetCustomStyle(UiDesignerPreviewStyle());
     preview_scroll_.SetInset(DPI(0));
     preview_scroll_.SetScrollMode(UIPANELSCROLL_AUTO);
-    preview_scroll_.Add(preview_surface_.SizePos());
+    preview_workspace_.Add(preview_canvas_);
+    preview_scroll_.Content().Add(preview_workspace_);
     designer_center_.Add(aspect_pill_);
     designer_center_.Add(preview_scroll_);
 
@@ -243,12 +318,16 @@ void UiDesignerWindow::BuildTheme()
     theme_right_.RightColumn()
                 .AddSection("Inspector", ICON_DESIGN_TUNE_48(), theme_inspector_)
                 .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), theme_code_);
+    theme_inspector_.SetStyle(UiDesignerInspectorStyle());
     theme_gallery_.SetCatalog(&session_.Catalog());
     theme_gallery_.SetThemeDocument(&session_.Theme());
 }
 
 void UiDesignerWindow::ConnectServices()
 {
+    preview_canvas_.WhenResizeDocument = [=](Size size) {
+        session_.SetVirtualSize(size);
+    };
     hierarchy_.SetDocument(&session_.Document());
     hierarchy_.SetSelection(&session_.State().selection);
     hierarchy_.WhenSelectNode = [=](UiDesignerNodeId id, bool toggle) {
@@ -288,7 +367,6 @@ void UiDesignerWindow::ConnectServices()
         String error;
         if(!session_.CommitProperty(id, value, error)) RefreshStatus(error);
     };
-    inspector_.WhenCancel = [=](const String&) { session_.CancelPreview(); };
     inspector_.WhenReset = [=](const String& id) {
         String error;
         if(!session_.ResetProperty(id, error)) RefreshStatus(error);
@@ -318,10 +396,6 @@ void UiDesignerWindow::ConnectServices()
         ApplyThemeToShell();
         RefreshThemeInspector();
     };
-    theme_inspector_.WhenCancel = [=](const String&) {
-        session_.Theme().CancelPreview();
-        ApplyThemeToShell();
-    };
     theme_inspector_.WhenReset = [=](const String& id) {
         String error;
         if(!session_.Theme().Reset(id, error)) RefreshStatus(error);
@@ -330,7 +404,11 @@ void UiDesignerWindow::ConnectServices()
     };
 
     session_.WhenSelectionChanged = [=] {
-        RefreshHierarchy(); RefreshInspector(); RefreshBehavior(); RefreshCode();
+        // Selection feedback is visible immediately. Code and behavior panes do
+        // not affect the selected control, so coalesce their heavier rebuild.
+        RefreshHierarchy();
+        RefreshInspector();
+        PostSelectionDetailsRefresh();
     };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
@@ -339,6 +417,8 @@ void UiDesignerWindow::ConnectServices()
 
     session_.Document().WhenChanged = [=](const UiDesignerChangeSet& changes) {
         preview_canvas_.ApplyChangeSet(changes);
+        if(changes.virtual_size_changed)
+            RefreshLayout();
         RefreshHierarchy(); RefreshCode(); RefreshBehavior();
     };
     session_.Theme().WhenChanged = [=] {
@@ -354,21 +434,26 @@ void UiDesignerWindow::ConnectServices()
 void UiDesignerWindow::ApplyThemeToShell()
 {
     const UiDesignerThemeSnapshot& theme = session_.Theme().GetEffective();
-    UiTheme::SetPresetByName(theme.preset);
-    UiTheme::SetMode(theme.mode == "Dark" ? UiThemeMode::Dark : UiThemeMode::Light);
+    UiDesignerApplyGlobalTheme(theme);
     header_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
-    footer_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Subtle, theme));
+    designer_mode_.SetCustomStyle(UiTheme::ResolveButton(
+        session_.State().active_workspace == "designer" ? UiRole::Accent : UiRole::Subtle));
+    theme_mode_.SetCustomStyle(UiTheme::ResolveButton(
+        session_.State().active_workspace == "theme" ? UiRole::Accent : UiRole::Subtle));
+    footer_surface_.SetCustomStyle(UiDesignerFooterStyle(theme));
     designer_left_.ApplyTheme(theme);
     designer_right_.ApplyTheme(theme);
     theme_right_.ApplyTheme(theme);
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
-    preview_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
     theme_gallery_column_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
     gallery_surface_.SetCustomStyle(UiDesignerSurfaceStyle(UiRole::Standard, theme));
-    aspect_pill_.ApplyTheme(theme);
+    // This is an intentional instance override from DesignerExportGrid, not
+    // a generic theme pill. Reapply it after global theme changes.
+    aspect_pill_.SetCustomStyle(UiDesignerReferencePillStyle());
+    preview_scroll_.SetCustomStyle(UiDesignerPreviewStyle());
     theme_gallery_pill_.ApplyTheme(theme);
     preview_canvas_.SetAccent(theme.accent);
-    theme_gallery_.RefreshTheme();
+    theme_gallery_.SetThemeDocument(&session_.Theme());
     RefreshLayout(); Refresh();
 }
 
@@ -376,7 +461,8 @@ void UiDesignerWindow::ShowDesigner()
 {
     workspaces_.SetActiveKey("designer");
     session_.State().active_workspace = "designer";
-    designer_mode_.SetData(true); theme_mode_.SetData(false);
+    designer_mode_.SetChecked(true); theme_mode_.SetChecked(false);
+    ApplyThemeToShell();
     RefreshStatus("Designer workspace");
 }
 
@@ -384,7 +470,8 @@ void UiDesignerWindow::ShowTheme()
 {
     workspaces_.SetActiveKey("theme");
     session_.State().active_workspace = "theme";
-    designer_mode_.SetData(false); theme_mode_.SetData(true);
+    designer_mode_.SetChecked(false); theme_mode_.SetChecked(true);
+    ApplyThemeToShell();
     RefreshThemeInspector();
     RefreshStatus("Theme Studio workspace");
 }
@@ -401,7 +488,15 @@ void UiDesignerWindow::ToggleDarkMode()
 void UiDesignerWindow::ActivateToolbox(const String& id)
 {
     if(id.StartsWith("preset:")) {
-        session_.NewDocument(id.Mid(7));
+        const String preset_id = id.Mid(7);
+        const UiDesignerPreset* preset = session_.Catalog().FindPreset(preset_id);
+        const bool has_document_content = session_.Document().GetCount() > 1;
+        if((session_.Commands().IsDirty() || has_document_content) &&
+           !PromptYesNo("Replace the current design with " +
+                        (preset ? preset->display_name : preset_id) + "?\n\n"
+                        "The current document will be replaced."))
+            return;
+        session_.NewDocument(preset_id);
         return;
     }
     UiDesignerDropPlan plan = session_.PlanAddControl(id);
@@ -478,6 +573,21 @@ void UiDesignerWindow::RefreshCode()
                   session_.GenerateCode("GeneratedUiWindow"));
 }
 
+void UiDesignerWindow::PostSelectionDetailsRefresh()
+{
+    if(selection_details_refresh_posted_)
+        return;
+    selection_details_refresh_posted_ = true;
+    Ptr<UiDesignerWindow> self = this;
+    PostCallback([self] {
+        if(!self)
+            return;
+        self->selection_details_refresh_posted_ = false;
+        self->RefreshBehavior();
+        self->RefreshCode();
+    });
+}
+
 void UiDesignerWindow::RefreshStatus(const String& status)
 {
     footer_.SetText(status.IsEmpty() ? "Ready" : status);
@@ -487,6 +597,9 @@ void UiDesignerWindow::WriteLaunchDiagnostic()
 {
     ValueMap diagnostic;
     diagnostic.Set("title", GetTitle());
+    const Size virtual_size = session_.Document().GetVirtualSize();
+    diagnostic.Set("document_width", virtual_size.cx);
+    diagnostic.Set("document_height", virtual_size.cy);
     Rect r = GetRect();
     ValueMap rect;
     rect.Set("left", r.left); rect.Set("top", r.top);
@@ -505,24 +618,18 @@ void UiDesignerWindow::WriteLaunchDiagnostic()
 
 void UiDesignerWindow::Layout()
 {
-    const int margin = UiDesignerStyleMetrics::Margin();
+    const int margin = UiDesignerStyleMetrics::Gap();
     const int gap = UiDesignerStyleMetrics::Gap();
-    const int header_h = UiDesignerStyleMetrics::HeaderHeight();
-    const int footer_h = UiDesignerStyleMetrics::FooterHeight();
     const Size size = GetSize();
+    const int header_w = max(0, size.cx - margin * 2);
+    const int header_h = max(UiDesignerStyleMetrics::HeaderHeight(),
+                             header_layout_.MeasureHeightForWidth(header_w));
+    const int footer_h = UiDesignerStyleMetrics::FooterHeight();
 
-    Put(header_surface_, margin, margin, max(0, size.cx - margin * 2), header_h);
-    Put(brand_, DPI(14), DPI(10), DPI(130), DPI(42));
-    Put(save_, DPI(160), DPI(13), DPI(92), DPI(36));
-    Put(load_, DPI(260), DPI(13), DPI(92), DPI(36));
-    Put(export_, DPI(360), DPI(13), DPI(105), DPI(36));
-    Put(version_, DPI(474), DPI(13), DPI(106), DPI(36));
-    Put(designer_mode_, DPI(596), DPI(13), DPI(92), DPI(36));
-    Put(theme_mode_, DPI(692), DPI(13), DPI(120), DPI(36));
-    Put(theme_select_, max(DPI(820), header_surface_.GetSize().cx - DPI(354)), DPI(13), DPI(150), DPI(36));
-    Put(dark_, header_surface_.GetSize().cx - DPI(92), DPI(13), DPI(36), DPI(36));
-    Put(help_, header_surface_.GetSize().cx - DPI(48), DPI(13), DPI(36), DPI(36));
-
+    Put(header_surface_, margin, margin, header_w, header_h);
+    const int header_content_h = header_layout_.MeasureHeightForWidth(header_w);
+    header_layout_.SetRect(0, max(0, (header_h - header_content_h) / 2),
+                           header_w, header_content_h);
     const int content_y = margin + header_h + gap;
     const int content_h = max(0, size.cy - content_y - footer_h - gap - margin);
     Put(workspaces_, margin, content_y, max(0, size.cx - margin * 2), content_h);
@@ -532,27 +639,40 @@ void UiDesignerWindow::Layout()
     const int left_w = designer_left_.GetDesiredWidth();
     const int right_w = designer_right_.GetDesiredWidth();
     const int inner_h = designer_page_.GetSize().cy;
-    const int center_w = max(DPI(260), designer_page_.GetSize().cx - left_w - right_w - gap * 2);
+    // Side columns own their fixed width. The center must use only the
+    // remaining page rectangle; inventing a minimum here previously pushed
+    // the right column beyond the page and let preview chrome overlap it.
+    const int center_w = max(0, designer_page_.GetSize().cx - left_w - right_w);
     Put(designer_left_, 0, 0, left_w, inner_h);
-    Put(designer_center_, left_w + gap, 0, center_w, inner_h);
-    Put(designer_right_, left_w + gap + center_w + gap, 0, right_w, inner_h);
+    Put(designer_center_, left_w, 0, center_w, inner_h);
+    Put(designer_right_, left_w + center_w, 0, right_w, inner_h);
 
     const int pill_h = UiDesignerStyleMetrics::DesignerToolbarHeight();
-    Put(aspect_pill_, 0, 0, designer_center_.GetSize().cx, pill_h);
-    Put(preview_scroll_, 0, pill_h + gap, designer_center_.GetSize().cx,
-        max(0, designer_center_.GetSize().cy - pill_h - gap));
-    preview_surface_.SetRect(0, 0,
-        max(preview_scroll_.GetSize().cx, session_.Document().GetVirtualSize().cx + DPI(40)),
-        max(preview_scroll_.GetSize().cy, session_.Document().GetVirtualSize().cy + DPI(40)));
-
+    const int pill_w = min(designer_center_.GetSize().cx, DPI(340));
+    Put(aspect_pill_, max(0, (designer_center_.GetSize().cx - pill_w) / 2),
+        0, pill_w, pill_h);
+    Put(preview_scroll_, 0, pill_h, designer_center_.GetSize().cx,
+        max(0, designer_center_.GetSize().cy - pill_h));
     const int theme_right_w = theme_right_.GetDesiredWidth();
-    const int theme_gallery_w = max(DPI(320), theme_page_.GetSize().cx - theme_right_w - gap);
+    const int theme_gallery_w = max(0, theme_page_.GetSize().cx - theme_right_w - gap);
     Put(theme_gallery_column_, 0, 0, theme_gallery_w, theme_page_.GetSize().cy);
     Put(theme_right_, theme_gallery_w + gap, 0, theme_right_w, theme_page_.GetSize().cy);
     Put(theme_gallery_pill_, 0, 0, theme_gallery_column_.GetSize().cx, pill_h);
     Put(gallery_scroll_, 0, pill_h + gap, theme_gallery_column_.GetSize().cx,
         max(0, theme_gallery_column_.GetSize().cy - pill_h - gap));
-    const Size gallery_size = theme_gallery_.GetPreferredSize(gallery_scroll_.GetSize().cx);
+    const Size virtual_size = session_.Document().GetVirtualSize();
+    const int preview_margin = DPI(40);
+    const Size preview_size(max(preview_scroll_.GetSize().cx,
+                                virtual_size.cx + preview_margin * 2),
+                            max(preview_scroll_.GetSize().cy,
+                                virtual_size.cy + preview_margin * 2));
+    preview_workspace_.SetRect(0, 0, preview_size.cx, preview_size.cy);
+    preview_canvas_.SetRect((preview_size.cx - virtual_size.cx) / 2,
+                            (preview_size.cy - virtual_size.cy) / 2,
+                            virtual_size.cx, virtual_size.cy);
+
+    const Size gallery_size(gallery_scroll_.GetSize().cx,
+                            theme_gallery_.GetContentHeight());
     gallery_surface_.SetRect(0, 0, max(gallery_scroll_.GetSize().cx, gallery_size.cx),
                             max(gallery_scroll_.GetSize().cy, gallery_size.cy));
     theme_gallery_.SetRect(DPI(8), DPI(8),

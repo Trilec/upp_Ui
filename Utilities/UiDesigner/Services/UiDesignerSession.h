@@ -119,7 +119,7 @@ private:
     void WireEvents();
     void ApplyPresetBlank();
     void ApplyPresetThreePane();
-    void ApplyPresetSettings();
+    void ApplyPresetDialog();
     UiDesignerNodeId ResolveInsertParent() const;
     Value ResolvePropertyValue(const UiDesignerNode& node,
                                const UiDesignerPropertySpec& property) const;
