@@ -36,7 +36,7 @@ Primary controls:
 - UiIntEdit, UiFloatEdit, UiProgressBar, UiSlider, UiSliderEdit, UiScrollBar, UiSplitter
 - UiColorPicker, UiDropdown, UiMenu, UiTab, UiBreadcrumbs
 - UiList, UiTree, UiTable
-- UiGridLayout, UiBoxLayout, UiDoc
+- UiGridLayout, UiBoxLayout, UiAbsoluteLayout, UiDoc
 - UiBezierCurveEditor, UiBezierCurveField
 - UiOsFileDialog as a native OS dialog wrapper, not a themed dialog surface
 
@@ -66,7 +66,7 @@ Support controls:
 - `UiProgressBar` is a status/control surface, not a layout primitive. Keep its determinate/indeterminate state, orientation, text, and role defaults in the control layer; demos should show the real runtime behavior first, then only minimal overrides.
 - For accordions inside scroll panels, section body heights must be explicit only when a section intentionally contains a bounded viewport. Otherwise, accordion bodies should be able to measure real content through `MeasureHeightForWidth()` / `GetContentSize()`.
 - Use UiLayoutCursor for lightweight shell/manual placement, but keep box/grid layouts for repeated stacked content.
-- `UiBoxLayout` is for ordered flow and wrapping. `UiGridLayout` is for stable cells. If a design needs an absolute/XY layout later, treat it as a separate layout engine with its own sizing contract rather than a new kind of panel.
+- `UiBoxLayout` is for ordered flow and wrapping. `UiGridLayout` is for stable cells. `UiAbsoluteLayout` owns exact local child rectangles and does not reflow them when its own size changes. It remains a transparent layout engine rather than a new kind of panel.
 - Add comments around meaningful constructor groups, layout groups, and theme groups in demos and new controls. New code should be readable without tracing every line.
 - Keep style helpers compact. If a style helper mostly repeats defaults, trim it.
 - Prefer theme defaults, roles, and presets first. Use explicit custom style overrides only where the design truly needs a local exception and the guide or demo makes that exception obvious.
@@ -94,6 +94,7 @@ Container rules:
 - `UiPanel` is a styled host. It reports visible child bounds through `GetContentSize()`, but it does not arrange children.
 - `UiGroupPanel` is a styled titled host with one content slot. It reports the title/header and body content extent, but it does not arrange multiple body children by itself.
 - `UiBoxLayout` and `UiGridLayout` are measured layout engines, but they have different contracts. `UiBoxLayout` owns wrapping/free-form sequence layout. `UiGridLayout` owns stable row/column placement; resizing may change track sizes, but it must not silently move an item to a different logical cell.
+- `UiAbsoluteLayout` reports the union of its exact child rectangles as content/minimum extent. Overlap is permitted and insertion order remains stable; runtime placement does not snap or reflow.
 - `UiScrollPanel` is a bounded viewport. Its `GetContentSize()` is the scrollable document extent, not the viewport height.
 - `UiAccordion` should measure real section content through width-aware measurement or `GetContentSize()`. Use explicit section body height only when the section intentionally contains a bounded viewport.
 
@@ -256,6 +257,7 @@ Legend:
 | UiTitleCard | yes | UiTitleCardDemo | builds (umk) | header-focused card with title/subtitle/copy/media | add image-top and image-bottom demo variants |
 | UiGridLayout | yes | UiDesigner utility / OLD prototypes | builds in Ui package | layout engine; old demos retired to `examples/OLD` | validate through designer and future generated-code tests |
 | UiBoxLayout | yes | UiDesigner utility / OLD prototypes | builds in Ui package | layout engine; old demos retired to `examples/OLD` | validate through designer and future generated-code tests |
+| UiAbsoluteLayout | yes | focused DesignerRunTests contract | awaiting Windows build | transparent exact-rectangle layout engine | integrate through UiDesigner catalog, preview, and generated code |
 | UiBaseEdit | yes | edit-family demos | builds (umk) | foundation for edit family; side API stable | keep cursor/selection behavior tested through derived controls |
 | UiLineEdit | yes | UiLineEditDemo | builds (umk) | single-line behavior and minimal edit theme | add behavioral checks for enter/tab/focus |
 | UiPasswordEdit | yes | UiPasswordEditDemo | builds (umk) | side button/show-hide usage | visual pass on eye/submit compositions |

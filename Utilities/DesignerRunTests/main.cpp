@@ -2583,6 +2583,53 @@ public:
 	Size GetMinSize() const override { return min_size_; }
 };
 
+static void TestAbsoluteLayoutContract(TestCtx& t)
+{
+	t.Section("UiAbsoluteLayout exact placement contract");
+
+	UiAbsoluteLayout layout;
+	ParentCtrl first;
+	ParentCtrl second;
+
+	t.Expect(layout.GetItemCount() == 0, "absolute layout starts empty");
+	t.Expect(layout.GetContentSize() == Size(0, 0), "empty absolute layout has no content extent");
+	t.Expect(layout.GetMinSize() == Size(0, 0), "empty absolute layout has no minimum extent");
+
+	auto first_item = layout.Add(first, 12, 18, 80, 30);
+	auto second_item = layout.Add(second, 60, 10, 90, 55);
+	layout.Layout();
+	t.Expect(first.GetRect() == RectC(12, 18, 80, 30), "first child keeps its exact local rectangle");
+	t.Expect(second.GetRect() == RectC(60, 10, 90, 55), "overlapping second child keeps its exact local rectangle");
+	t.Expect(layout.GetContentSize() == Size(150, 65), "content size is the union of child rectangles");
+	t.Expect(layout.GetMinSize() == Size(150, 65), "minimum size follows the exact content extent");
+	t.Expect(layout.GetItemCtrl(0) == &first && layout.GetItemCtrl(1) == &second,
+	         "insertion order remains stable");
+
+	first_item.SetRect(24, 26, 40, 20);
+	t.Expect(layout.GetItemRect(first_item.GetIndex()) == RectC(24, 26, 40, 20),
+	         "item reference updates the stored rectangle");
+	t.Expect(first.GetRect() == RectC(24, 26, 40, 20),
+	         "rectangle updates are applied to the child");
+
+	layout.SetRect(0, 0, 600, 400);
+	layout.Layout();
+	t.Expect(first.GetRect() == RectC(24, 26, 40, 20) &&
+	         second.GetRect() == RectC(60, 10, 90, 55),
+	         "parent resize does not silently reflow exact children");
+
+	t.Expect(layout.Remove(first), "absolute layout removes a child by identity");
+	t.Expect(layout.GetItemCount() == 1 && first.GetParent() == nullptr,
+	         "removed child is detached and item storage is compacted");
+	t.Expect(layout.GetContentSize() == Size(150, 65),
+	         "remaining child continues to define content extent");
+
+	layout.Clear();
+	t.Expect(layout.GetItemCount() == 0 && second.GetParent() == nullptr,
+	         "clear detaches all remaining children");
+	t.Expect(layout.GetContentSize() == Size(0, 0),
+	         "clear restores an empty content extent");
+}
+
 static void TestLayoutSizingPrimitives(TestCtx& t)
 {
 	t.Section("Layout sizing primitives");
@@ -4486,6 +4533,7 @@ CONSOLE_APP_MAIN
 	if(ShouldRunTest("designer-code-gen-pages")) TestDesignerCodeGenPages(t);
 	if(ShouldRunTest("property-edit-stability")) TestPropertyEditStability(t);
 	if(ShouldRunTest("float-grid-preview-minimal")) TestFloatGridPreviewMinimal(t);
+	if(ShouldRunTest("absolute-layout-contract")) TestAbsoluteLayoutContract(t);
 	if(ShouldRunTest("layout-sizing-primitives")) TestLayoutSizingPrimitives(t);
 	if(ShouldRunTest("width-aware-layout-measure")) TestWidthAwareLayoutMeasure(t);
 	if(ShouldRunTest("ancestor-relayout-contract")) TestAncestorRelayoutContract(t);

@@ -49,6 +49,8 @@ file
 	UiTab.cpp,
 	UiTitleCard.h,
 	UiTitleCard.cpp,
+	UiAbsoluteLayout.h,
+	UiAbsoluteLayout.cpp,
 	UiGridLayout.h,
 	UiGridLayout.cpp,
 	UiBoxLayout.h,

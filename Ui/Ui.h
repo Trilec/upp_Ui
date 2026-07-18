@@ -41,6 +41,7 @@
 #include <Ui/UiDataModels.h>
 #include <Ui/UiLayoutCursor.h>
 #include <Ui/UiMeasure.h>
+#include <Ui/UiAbsoluteLayout.h>
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>
 #include <Ui/UiBezierCurveEditor.h>
@@ -89,4 +90,3 @@
 #include <Ui/UiList.h>
 
 #endif
-

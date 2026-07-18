@@ -163,7 +163,7 @@ REPO-SPECIFIC UI NOTES
 - New controls and demos should be commented in groups: constructor/setup, layout, theme application, and reactive event wiring.
 - Prefer control/theme defaults over local demo overrides. If a slider, button, or label baseline is correct in the control layer, demos should use it directly.
 - When a control or host accepts a single child, keep the visible container and the child placement contract separate. The host owns chrome and available body rects; the inserted child or layout owns actual arrangement.
-- Box and grid layouts are different tools: use box for flow/wrap behavior and grid for stable cell placement. If a future absolute layout is added, document it as a separate layout engine rather than a special-case panel.
+- Box, grid, and absolute layouts are different tools: use box for flow/wrap behavior, grid for stable cell placement, and `UiAbsoluteLayout` for exact local child rectangles. Do not turn a panel into a placement system.
 - Plain semantic label roles should stay geometry-neutral. If a value field or compact inspector row needs spacing/container treatment, that should come from the parent layout or an explicitly decorative role, not hidden label-role margins.
 - Use UiLayoutCursor for manual shell placement where a full layout container would be overkill, but keep UiBoxLayout / UiGridLayout for repeated content stacks.
 - Accordion sections inside scroll panels need explicit section-body sizing and parent/scroll relayout on toggle.

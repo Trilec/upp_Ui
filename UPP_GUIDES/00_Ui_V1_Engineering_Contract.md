@@ -97,6 +97,7 @@ Current intended semantics:
 - `UiStack`, `UiTab`, and accordion section bodies: page/body hosts;
 - `UiBoxLayout`: ordered row/column flow layout;
 - `UiGridLayout`: stable logical row/column placement;
+- `UiAbsoluteLayout`: exact local child rectangles with no automatic reflow;
 - `UiSplitter` and `UiQuadSplitter`: fixed pane-count containers.
 
 Use Box or Grid layouts when several children require automatic arrangement.
@@ -105,7 +106,7 @@ Single-content containers must reject, replace, or deliberately wrap a second di
 
 When a host container accepts only one child, that child may still be centered or aligned inside the available body rect. That positioning belongs to the host/layout contract, not to ad-hoc paint math.
 
-Future absolute-positioned content should still be treated as a layout engine, not as a styled host. A panel may host an absolute layout, but the panel itself should not become the placement system.
+Absolute-positioned content uses `UiAbsoluteLayout`, which is a layout engine rather than a styled host. A panel may host an absolute layout, but the panel itself must not become the placement system.
 
 ## 6. Sizing and alignment
 
