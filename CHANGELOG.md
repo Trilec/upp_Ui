@@ -12,7 +12,7 @@ This project is experimental and iterating quickly. The goal of this file is to 
 - Documentation refresh (README + getting-started + architecture + checklist).
 - Examples updated to current naming (`SetText` / `SetIcon` / `SetIconSide`).
 - `Ui/Ui.upp` dependencies aligned with code (`Painter`) and cleaned up for UppHub packaging.
-- Removed local `Animation` package exposure from this repo and restored `Ui` to depend on the real external `Animation` nest (`E:\apps\github\upp_AnimationEasing`).
+- Removed local `Animation` package exposure from this repo and restored `Ui` to depend on the real external `Animation` nest (`E:\apps\github\upp_animation`).
 - Removed library-package `mainconfig` from `Ui/Ui.upp` so `Ui` is not treated as a main package.
 - `UiColorPicker`: updated the control and demo toward the technical picker mockup with:
   - editable numeric value fields for hue/gain/alpha and channel values

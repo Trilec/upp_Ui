@@ -103,6 +103,10 @@ Use Box or Grid layouts when several children require automatic arrangement.
 
 Single-content containers must reject, replace, or deliberately wrap a second direct content root. They must not silently overlap or discard content.
 
+When a host container accepts only one child, that child may still be centered or aligned inside the available body rect. That positioning belongs to the host/layout contract, not to ad-hoc paint math.
+
+Future absolute-positioned content should still be treated as a layout engine, not as a styled host. A panel may host an absolute layout, but the panel itself should not become the placement system.
+
 ## 6. Sizing and alignment
 
 Use one vocabulary:
@@ -118,6 +122,8 @@ Alignment is not sizing. Centering a Fit item must not silently stretch it.
 `GetMinSize()`, `GetContentSize()`, width-aware measurement, `Layout()`, Designer preview, and generated code must agree.
 
 DPI conversion must occur exactly once.
+
+Fit sizing should still respect minimum and maximum constraints. If a child or cell advertises a cap, the layout contract must honor it before settling on the final rect.
 
 ## 7. Public API naming
 

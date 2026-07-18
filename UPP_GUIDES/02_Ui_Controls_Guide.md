@@ -62,10 +62,14 @@ Support controls:
 - `GetMinSize()` is the stable floor. `GetContentSize()` is the logical child/content extent. Container controls that host children should expose content extent so callers do not hand-measure panels.
 - `UiPanel` reports visible child bounds as content size, but it is still a host surface, not a flow layout. Use `UiBoxLayout` when rows/items need wrapping or responsive sequence layout. Use `UiGridLayout` when children belong to stable row/column cells.
 - `UiGroupPanel` is the titled grouping container. It paints group chrome and hosts one child through `SetContent()`. Put a box/grid layout inside that slot when the grouped body needs arrangement; do not add group chrome to layout engines.
+- `UiScrollPanel`, `UiAccordion`, and other single-content hosts follow the same rule: the host provides chrome, scrolling, or section behavior, while the inserted child or inner layout does the real placement. If you need centering or alignment inside one of these hosts, do it through the host body contract or an internal layout host, not through paint-only offsets.
+- `UiProgressBar` is a status/control surface, not a layout primitive. Keep its determinate/indeterminate state, orientation, text, and role defaults in the control layer; demos should show the real runtime behavior first, then only minimal overrides.
 - For accordions inside scroll panels, section body heights must be explicit only when a section intentionally contains a bounded viewport. Otherwise, accordion bodies should be able to measure real content through `MeasureHeightForWidth()` / `GetContentSize()`.
 - Use UiLayoutCursor for lightweight shell/manual placement, but keep box/grid layouts for repeated stacked content.
+- `UiBoxLayout` is for ordered flow and wrapping. `UiGridLayout` is for stable cells. If a design needs an absolute/XY layout later, treat it as a separate layout engine with its own sizing contract rather than a new kind of panel.
 - Add comments around meaningful constructor groups, layout groups, and theme groups in demos and new controls. New code should be readable without tracing every line.
 - Keep style helpers compact. If a style helper mostly repeats defaults, trim it.
+- Prefer theme defaults, roles, and presets first. Use explicit custom style overrides only where the design truly needs a local exception and the guide or demo makes that exception obvious.
 - For custom-painted primitives, use the dedicated part hooks (`WhenPaintTrack`, `WhenPaintActiveTrack`, `WhenPaintThumb`, `WhenPaintArrow`) instead of demo-local overpaint or geometry guessing.
 - Track/thumb controls should use consistent vocabulary: track is the long lane/line, thumb is the draggable affordance, and optional icons/labels belong to the thumb unless the control has a separate item/content model.
 - Splitters should expose the split as a unitless percentage/proportion by default. Exact pixel values belong on pane constraints such as minimum, preferred, or fixed pane size, and must be DPI-scaled.
@@ -258,6 +262,7 @@ Legend:
 | UiMaskEdit | yes | UiMaskEditDemo | builds (umk) | masks, validators, formatters, validation feedback | add more semantic validator scenarios |
 | UiMultiEdit | yes | UiMultiEditDemo | builds (umk) | multi-line edit behavior, side items, geometry, and color surfaces | add long-text perf checks |
 | UiIntEdit / UiFloatEdit | yes | UiIntFloatDemo | builds (umk) | numeric edit spin arrows, ranges, wheel/key support | align style API with other edit controls |
+| UiProgressBar | yes | UiProgressBarDemo | builds (umk) | determinate/indeterminate status bar with role and orientation support | keep default runtime state visible; avoid demo-only styling except for intentional examples |
 | UiSlider | yes | UiSliderDemo | builds (umk) | ticks + keyboard/wheel + click-drag behavior | add label/tick text variants |
 | UiSliderEdit | yes | UiSliderDemo | builds (umk) | slider + field composition | add integer mode and format presets |
 | UiScrollBar | yes | UiScrollBarDemo | builds (umk) | styled track/thumb/arrows + hover-expand animation | add behavioral checks for drag, wheel, arrows |
@@ -311,7 +316,8 @@ Criteria:
 - Active demo cleanup:
   - Active examples are built through the `examples` directory excluding `examples/OLD`.
   - Retired prototype/test packages such as old box/grid layout demos stay under `examples/OLD`.
-  - `UiColorPickerDemo`, `UiIntFloatDemo`, `UiMaskEditDemo`, and `UiScrollPanelDemo` now use the shared builder shell.
+- `UiColorPickerDemo`, `UiIntFloatDemo`, `UiMaskEditDemo`, and `UiScrollPanelDemo` now use the shared builder shell.
+- `UiProgressBarDemo` now serves as the runtime reference for determinate/indeterminate state, orientation, and theme-role defaults.
   - Active demo source files carry a purpose/hygiene/changelog header so future agents know whether a package is a visual reference, smoke test, or specialized behavior demo.
 
 

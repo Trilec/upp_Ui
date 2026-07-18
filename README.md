@@ -167,18 +167,18 @@ Important:
 
 Dependencies used by `Ui/Ui.upp` include `Painter` and `Animation`.
 
-Note: `Animation` should resolve from the external `E:\apps\github\upp_AnimationEasing` nest, not from a local package inside this repository.
+Note: `Animation` should resolve from the external `E:\apps\github\upp_animation` nest, not from a local package inside this repository.
 
 ### CLI with `umk`
 
 Example on Windows:
 
 ```bat
-"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui\examples,E:\apps\github\upp_Ui,E:\apps\github\upp_AnimationEasing,E:\upp-18468\uppsrc" UiButtonDemo CLANGx64 --out-dir "E:\apps\github\upp_Ui\out" -br "E:\apps\github\upp_Ui\out\UiButtonDemo.exe"
+"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui\examples,E:\apps\github\upp_Ui,E:\apps\github\upp_animation,E:\upp-18468\uppsrc" UiButtonDemo CLANGx64 --out-dir "E:\apps\github\upp_Ui\out" -br "E:\apps\github\upp_Ui\out\UiButtonDemo.exe"
 ```
 
 For this repository, prefer the checked-in `GitHubOut.var` assembly when doing
-local development. It includes the `E:\apps\github\upp_AnimationEasing` nest
+local development. It includes the `E:\apps\github\upp_animation` nest
 required by `Ui/Ui.upp` and writes intermediates to
 `E:\apps\github\upp_Ui\out`, avoiding locked/shared objects under
 `E:\upp-18468\out`.
