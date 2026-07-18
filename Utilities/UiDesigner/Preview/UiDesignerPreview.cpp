@@ -326,6 +326,11 @@ String UiDesignerCatalogDragText(const String& type_id)
     return "uidesigner/catalog/v1:" + type_id;
 }
 
+const char *UiDesignerCatalogDragFormat()
+{
+    return "application/x-upp-uidesigner-catalog";
+}
+
 String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes)
 {
     String out = "uidesigner/nodes/v1:";
@@ -342,6 +347,15 @@ bool UiDesignerParseCatalogDragText(const String& text, String& type_id)
     if(!text.StartsWith(prefix))
         return false;
     type_id = text.Mid(prefix.GetCount());
+    return !type_id.IsEmpty();
+}
+
+bool UiDesignerReadCatalogDrag(PasteClip& clip, String& type_id)
+{
+    type_id.Clear();
+    if(!clip.IsAvailable(UiDesignerCatalogDragFormat()))
+        return false;
+    type_id = clip.Get(UiDesignerCatalogDragFormat());
     return !type_id.IsEmpty();
 }
 
@@ -380,9 +394,6 @@ bool UiDesignerReadDragText(PasteClip& clip, String& text)
 UiDesignerPreviewCanvas::UiDesignerPreviewCanvas()
 {
     BackPaint();
-    selection_overlay_.owner = this;
-    selection_overlay_.IgnoreMouse().NoWantFocus();
-    Add(selection_overlay_.SizePos());
 }
 
 void UiDesignerPreviewCanvas::SelectionOverlay::Paint(Draw& w)
@@ -408,7 +419,6 @@ void UiDesignerPreviewCanvas::SetOverlay(const UiDesignerTransientOverlay *overl
 void UiDesignerPreviewCanvas::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
-    selection_overlay_.Refresh();
     Refresh();
 }
 
@@ -712,9 +722,6 @@ void UiDesignerPreviewCanvas::RebuildDocument()
     DestroyInstances();
     if(document_ && catalog_)
         BuildNode(document_->GetRootId(), *this, 0, 0);
-    // Runtime controls paint first; the Designer-only frame is always on top.
-    selection_overlay_.Remove();
-    Add(selection_overlay_.SizePos());
     stats_.full_rebuilds++;
     Layout();
     Refresh();

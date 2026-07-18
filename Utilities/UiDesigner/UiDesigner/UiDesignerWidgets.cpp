@@ -590,7 +590,7 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
     dragging_ = true;
     const String type = ItemId(pressed_);
     VectorMap<String, ClipData> payload;
-    Append(payload, UiDesignerCatalogDragText(type));
+    payload.Add(UiDesignerCatalogDragFormat(), ClipData(UiDesignerCatalogDragText(type)));
     DoDragAndDrop(payload, ItemIcon(pressed_), DND_COPY);
     pressed_ = -1;
     dragging_ = false;

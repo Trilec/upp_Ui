@@ -13,6 +13,8 @@
 
 namespace Upp {
 
+class UiDesignerInteractionOverlay;
+
 class UiDesignerWindow : public TopWindow {
 public:
     typedef UiDesignerWindow CLASSNAME;
@@ -27,6 +29,7 @@ public:
     virtual void Close() override;
 
 private:
+    friend class UiDesignerInteractionOverlay;
     void BuildHeader();
     void BuildDesigner();
     void BuildTheme();
@@ -91,6 +94,7 @@ private:
     // document surface in the center scroll viewport.
     ParentCtrl preview_workspace_;
     UiDesignerPreviewCanvas preview_canvas_;
+    UiDesignerInteractionOverlay *interaction_overlay_ = nullptr;
 
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;

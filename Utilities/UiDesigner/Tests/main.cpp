@@ -30,6 +30,8 @@ CONSOLE_APP_MAIN
     Check(catalog.FindCategory("Composites").GetCount() >= 6, "composite catalog");
     Check(catalog.FindCategory("U++ Controls").GetCount() >= 18, "stock U++ catalog");
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
+    Check(String(UiDesignerCatalogDragFormat()) == "application/x-upp-uidesigner-catalog",
+          "catalog drag format is explicit");
 
     static const char *required_ui[] = {
         "UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiPanel",
@@ -66,6 +68,24 @@ CONSOLE_APP_MAIN
     Check(absolute_preview &&
               dynamic_cast<UiAbsoluteLayout *>(absolute_preview.Get()),
           "absolute layout preview creates the runtime control");
+
+    UiDesignerSession drop_session;
+    drop_session.NewDocument("blank");
+    const UiDesignerNodeId root = drop_session.Document().GetRootId();
+    UiDesignerDropPlan panel_plan =
+        drop_session.PlanAddControl("UiPanel", root, Point(64, 48), true);
+    Check(panel_plan.valid && panel_plan.parent == root,
+          "root window accepts Panel drops");
+    Check(panel_plan.has_canvas_position &&
+              panel_plan.add_defaults.Find("x") >= 0 &&
+              panel_plan.add_defaults.Find("y") >= 0,
+          "root window drop keeps free-position coordinates");
+    UiDesignerDropPlan layout_plan =
+        drop_session.PlanAddControl("UiBoxLayout", root, Point(64, 48), true);
+    Check(layout_plan.valid && layout_plan.parent == root,
+          "root window accepts BoxLayout drops");
+    Check(layout_plan.has_canvas_position,
+          "root window drop plan keeps canvas coordinates for layouts");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);
