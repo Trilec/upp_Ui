@@ -48,7 +48,7 @@ void UiDesignerSession::ApplyPresetBlank()
 {
     // Window is the document canvas. A blank form has no competing root
     // layout; users can drop the first layout or control directly into it.
-    document_.NewDocument(Size(500, 250));
+    document_.NewDocument(Size(512, 250));
 }
 
 void UiDesignerSession::ApplyPresetThreePane()
@@ -99,7 +99,7 @@ void UiDesignerSession::ApplyPresetThreePane()
 
 void UiDesignerSession::ApplyPresetDialog()
 {
-    document_.NewDocument(Size(500, 250));
+    document_.NewDocument(Size(512, 250));
     const UiDesignerNodeId root = document_.GetRootId();
     const UiDesignerControlSpec* box = catalog_.Find("UiBoxLayout");
     const UiDesignerControlSpec* title = catalog_.Find("UiTitleCard");

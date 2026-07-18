@@ -979,24 +979,6 @@ void UiDesignerPreviewCanvas::PaintSemantic(
 void UiDesignerPreviewCanvas::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), SColorPaper());
-    const Size doc_size = document_ ? document_->GetVirtualSize() : GetSize();
-    // The canvas is the document Window. Keep its edge visible even when the
-    // workspace and document use closely related theme surfaces.
-    const Rect document_rect = RectC(0, 0, min(doc_size.cx, GetSize().cx),
-                                     min(doc_size.cy, GetSize().cy));
-    const int frame_width = DPI(3);
-    const Color document_frame = Color(96, 165, 250);
-    w.DrawRect(document_rect.left, document_rect.top, document_rect.Width(), frame_width,
-               document_frame);
-    w.DrawRect(document_rect.left, document_rect.bottom - frame_width,
-               document_rect.Width(), frame_width,
-               document_frame);
-    w.DrawRect(document_rect.left, document_rect.top, frame_width,
-               document_rect.Height(),
-               document_frame);
-    w.DrawRect(document_rect.right - frame_width, document_rect.top, frame_width,
-               document_rect.Height(),
-               document_frame);
     if(document_)
         for(const UiDesignerPreviewInstance& instance : instances_)
             if(instance.semantic)
@@ -1018,48 +1000,60 @@ void UiDesignerPreviewCanvas::Paint(Draw& w)
 
 void UiDesignerPreviewCanvas::PaintSelectionOverlay(Draw& w) const
 {
-    if(!selection_)
+    if(!document_)
         return;
 
+    const UiDesignerNodeId root_id = document_->GetRootId();
     const int step = DPI(7);
     const int dot = DPI(3);
-    for(UiDesignerNodeId id : selection_->nodes) {
-        Rect r = GetNodeRect(id);
-        if(document_ && id == document_->GetRootId() && document_resize_edge_)
-            r = RectC(0, 0, document_resize_pending_.cx, document_resize_pending_.cy);
-        if(r.IsEmpty())
-            continue;
-        const Color color = id == selection_->primary
-            ? Color(245, 158, 11) : Blend(Color(245, 158, 11), White(), 110);
-        const int thickness = id == selection_->primary ? DPI(2) : DPI(1);
-        for(int x = r.left; x < r.right; x += step) {
-            w.DrawRect(x, r.top, min(dot, r.right - x), thickness, color);
-            w.DrawRect(x, r.bottom - thickness,
-                       min(dot, r.right - x), thickness, color);
-        }
-        for(int y = r.top; y < r.bottom; y += step) {
-            w.DrawRect(r.left, y, thickness, min(dot, r.bottom - y), color);
-            w.DrawRect(r.right - thickness, y,
-                       thickness, min(dot, r.bottom - y), color);
-        }
-
-        if(document_ && id == document_->GetRootId() && id == selection_->primary) {
-            const int handle = DPI(12);
-            const Color fill = Blend(color, White(), 170);
-            const Point points[] = {
-                r.TopLeft(), Point(r.CenterPoint().x, r.top), Point(r.right, r.top),
-                Point(r.left, r.CenterPoint().y), Point(r.right, r.CenterPoint().y),
-                Point(r.left, r.bottom), Point(r.CenterPoint().x, r.bottom), r.BottomRight()
-            };
-            for(const Point& point : points) {
-                Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
-                w.DrawRect(grip, fill);
-                w.DrawRect(grip.left, grip.top, grip.Width(), 1, color);
-                w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, color);
-                w.DrawRect(grip.left, grip.top, 1, grip.Height(), color);
-                w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), color);
+    if(selection_) {
+        for(UiDesignerNodeId id : selection_->nodes) {
+            Rect r = GetNodeRect(id);
+            if(id == root_id && document_resize_edge_)
+                r = RectC(0, 0, document_resize_pending_.cx, document_resize_pending_.cy);
+            if(r.IsEmpty())
+                continue;
+            const Color color = id == selection_->primary
+                ? Color(245, 158, 11) : Blend(Color(245, 158, 11), White(), 110);
+            const int thickness = id == selection_->primary ? DPI(2) : DPI(1);
+            for(int x = r.left; x < r.right; x += step) {
+                w.DrawRect(x, r.top, min(dot, r.right - x), thickness, color);
+                w.DrawRect(x, r.bottom - thickness,
+                           min(dot, r.right - x), thickness, color);
+            }
+            for(int y = r.top; y < r.bottom; y += step) {
+                w.DrawRect(r.left, y, thickness, min(dot, r.bottom - y), color);
+                w.DrawRect(r.right - thickness, y,
+                           thickness, min(dot, r.bottom - y), color);
             }
         }
+    }
+
+    Rect root = GetNodeRect(root_id);
+    if(root.IsEmpty())
+        return;
+    const Color frame = Color(103, 232, 249);
+    const int thickness = DPI(4);
+    const int half = thickness / 2;
+    w.DrawRect(root.left - half, root.top - half, root.Width() + thickness, thickness, frame);
+    w.DrawRect(root.left - half, root.bottom - half, root.Width() + thickness, thickness, frame);
+    w.DrawRect(root.left - half, root.top - half, thickness, root.Height() + thickness, frame);
+    w.DrawRect(root.right - half, root.top - half, thickness, root.Height() + thickness, frame);
+
+    const int handle = DPI(12);
+    const Color fill = Blend(frame, White(), 170);
+    const Point points[] = {
+        root.TopLeft(), Point(root.CenterPoint().x, root.top), Point(root.right, root.top),
+        Point(root.left, root.CenterPoint().y), Point(root.right, root.CenterPoint().y),
+        Point(root.left, root.bottom), Point(root.CenterPoint().x, root.bottom), root.BottomRight()
+    };
+    for(const Point& point : points) {
+        Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
+        w.DrawRect(grip, fill);
+        w.DrawRect(grip.left, grip.top, grip.Width(), 1, frame);
+        w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, frame);
+        w.DrawRect(grip.left, grip.top, 1, grip.Height(), frame);
+        w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
     }
 }
 
@@ -1072,7 +1066,7 @@ enum {
 
 int UiDesignerPreviewCanvas::HitDocumentResizeEdge(Point p) const
 {
-    if(!document_ || !selection_ || selection_->primary != document_->GetRootId())
+    if(!document_)
         return 0;
     const Rect r = GetNodeRect(document_->GetRootId());
     const int grab = DPI(12);

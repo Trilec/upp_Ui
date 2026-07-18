@@ -255,6 +255,12 @@ static void RunTests(FoundationTester& t)
             "legacy Spacer keeps semantic identity");
 
     session.NewDocument("blank");
+    t.Check(session.Document().GetVirtualSize() == Size(512, 250),
+            "blank preset starts at 512x250");
+    session.NewDocument("dialog");
+    t.Check(session.Document().GetVirtualSize() == Size(512, 250),
+            "dialog preset starts at 512x250");
+    session.NewDocument("blank");
     const UiDesignerNodeId root = session.Document().GetRootId();
     const int before_plan_count = session.Document().GetCount();
     UiDesignerDropPlan invalid_spacer = session.PlanAddControl("Spacer", root);
