@@ -257,7 +257,7 @@ Legend:
 | UiTitleCard | yes | UiTitleCardDemo | builds (umk) | header-focused card with title/subtitle/copy/media | add image-top and image-bottom demo variants |
 | UiGridLayout | yes | UiDesigner utility / OLD prototypes | builds in Ui package | layout engine; old demos retired to `examples/OLD` | validate through designer and future generated-code tests |
 | UiBoxLayout | yes | UiDesigner utility / OLD prototypes | builds in Ui package | layout engine; old demos retired to `examples/OLD` | validate through designer and future generated-code tests |
-| UiAbsoluteLayout | yes | focused DesignerRunTests contract | awaiting Windows build | transparent exact-rectangle layout engine | integrate through UiDesigner catalog, preview, and generated code |
+| UiAbsoluteLayout | yes | focused DesignerRunTests contract plus UiDesigner catalog, preview, drop, serialization, Inspector, and codegen coverage | runtime contract passed on Windows; Designer integration awaiting focused Windows validation | transparent exact-rectangle layout engine; Designer snaps drop coordinates but stores and emits explicit local rectangles | manually verify palette selection, nested drop/resize, save/reload, and generated output in UiDesigner |
 | UiBaseEdit | yes | edit-family demos | builds (umk) | foundation for edit family; side API stable | keep cursor/selection behavior tested through derived controls |
 | UiLineEdit | yes | UiLineEditDemo | builds (umk) | single-line behavior and minimal edit theme | add behavioral checks for enter/tab/focus |
 | UiPasswordEdit | yes | UiPasswordEditDemo | builds (umk) | side button/show-hide usage | visual pass on eye/submit compositions |

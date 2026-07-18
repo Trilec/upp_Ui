@@ -56,6 +56,7 @@ static One<Ctrl> CreateRuntime(UiDesignerRuntimeKind kind)
     case UiDesignerRuntimeKind::UiTitleCard: return MakeOne<UiTitleCard>();
     case UiDesignerRuntimeKind::UiGridLayout: return MakeOne<UiGridLayout>();
     case UiDesignerRuntimeKind::UiBoxLayout: return MakeOne<UiBoxLayout>();
+    case UiDesignerRuntimeKind::UiAbsoluteLayout: return MakeOne<UiAbsoluteLayout>();
     case UiDesignerRuntimeKind::UiButton: return MakeOne<UiButton>();
     case UiDesignerRuntimeKind::UiToolButton: return MakeOne<UiToolButton>();
     case UiDesignerRuntimeKind::UiSplitButton: return MakeOne<UiSplitButton>();
@@ -582,7 +583,15 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
         parent.Add(child.SizePos());
         return;
     }
-    if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
+    if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(&parent)) {
+        layout_item_index = absolute->GetItemCount();
+        absolute->Add(child,
+                      node.GetProperty("x", 20),
+                      node.GetProperty("y", 20),
+                      max(0, (int)node.GetProperty("width", 160)),
+                      max(0, (int)node.GetProperty("height", 32)));
+    }
+    else if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
         layout_item_index = box->GetItemCount();
         UiBoxLayout::ItemRef item = box->Add(child);
         const bool horizontal = box->GetDirection() == UiDirection::H;
@@ -877,11 +886,22 @@ void UiDesignerPreviewCanvas::LayoutNode(
     const UiDesignerControlSpec* parent_spec = parent_node && catalog_
         ? catalog_->Find(parent_node->type) : nullptr;
     const String adapter = parent_spec ? parent_spec->child_adapter_id : "root";
-    const bool managed = adapter == "box" || adapter == "grid" ||
+    const bool managed = adapter == "absolute" ||
+                         adapter == "box" || adapter == "grid" ||
                          adapter == "tab" || adapter == "stack" ||
                          adapter == "accordion" || adapter == "splitter" ||
                          adapter == "quad" || adapter == "single" ||
                          adapter == "upp_tab" || adapter == "upp_splitter";
+    if(adapter == "absolute" && instance.runtime_parent) {
+        Ctrl* parent = FindRuntime(instance.runtime_parent);
+        if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(parent))
+            absolute->SetItemRect(
+                instance.layout_item_index,
+                (int)Effective(*node, "x", 20),
+                (int)Effective(*node, "y", 20),
+                max(0, (int)Effective(*node, "width", 160)),
+                max(0, (int)Effective(*node, "height", 32)));
+    }
     if(!managed) {
         const int x = (int)Effective(*node, "x", 20 + depth * 18);
         const int y = (int)Effective(*node, "y", 20 + ordinal * 44);

@@ -133,7 +133,7 @@ static ValueMap LegacyProperties(const Value& encoded)
 static String NormalizeLegacyType(String type)
 {
     static const char *from[] = {
-        "BoxLayout", "GridLayout", "Splitter", "QuadSplitter",
+        "BoxLayout", "GridLayout", "AbsoluteLayout", "Splitter", "QuadSplitter",
         "Panel", "GroupPanel", "ScrollPanel", "Tab", "Stack",
         "Accordion", "TitleCard", "Label", "CheckBox", "RadioButton",
         "Toggle", "Button", "ToolButton", "SplitButton", "LineEdit",
@@ -143,7 +143,7 @@ static String NormalizeLegacyType(String type)
         "BezierCurveField", "Dropdown", "Menu", "ColorPicker", "Spacer"
     };
     static const char *to[] = {
-        "UiBoxLayout", "UiGridLayout", "UiSplitter", "UiQuadSplitter",
+        "UiBoxLayout", "UiGridLayout", "UiAbsoluteLayout", "UiSplitter", "UiQuadSplitter",
         "UiPanel", "UiGroupPanel", "UiScrollPanel", "UiTab", "UiStack",
         "UiAccordion", "UiTitleCard", "UiLabel", "UiCheckBox", "UiRadioButton",
         "UiToggle", "UiButton", "UiToolButton", "UiSplitButton", "UiLineEdit",

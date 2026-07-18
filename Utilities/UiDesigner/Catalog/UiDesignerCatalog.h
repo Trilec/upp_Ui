@@ -23,6 +23,7 @@ enum class UiDesignerRuntimeKind : word {
     UiTitleCard,
     UiGridLayout,
     UiBoxLayout,
+    UiAbsoluteLayout,
     UiButton,
     UiToolButton,
     UiSplitButton,

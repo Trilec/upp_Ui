@@ -22,7 +22,7 @@ CONSOLE_APP_MAIN
     String error;
     Check(catalog.Validate(error), "catalog validates: " + error);
     Check(catalog.GetCount() >= 50, "complete native and U++ catalog");
-    Check(catalog.FindCategory("Layouts").GetCount() >= 4, "layout catalog");
+    Check(catalog.FindCategory("Layouts").GetCount() >= 5, "layout catalog");
     Check(catalog.FindCategory("Containers").GetCount() >= 8, "container catalog");
     Check(catalog.FindCategory("Ui Controls").GetCount() >= 20, "Ui control catalog");
     Check(catalog.FindCategory("Composites").GetCount() >= 6, "composite catalog");
@@ -33,6 +33,7 @@ CONSOLE_APP_MAIN
         "UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiPanel",
         "UiDirectContentHost", "UiGroupPanel", "UiStack", "UiAccordion",
         "UiScrollPanel", "UiTab", "UiTitleCard", "UiGridLayout", "UiBoxLayout",
+        "UiAbsoluteLayout",
         "UiButton", "UiToolButton", "UiSplitButton", "UiLineEdit", "UiIntEdit",
         "UiFloatEdit", "UiPasswordEdit", "UiMultiEdit", "UiMaskEdit",
         "UiProgressBar", "UiSlider", "UiBreadcrumbs", "UiSliderEdit",
@@ -45,6 +46,24 @@ CONSOLE_APP_MAIN
     for(int i = 0; i < __countof(required_ui); i++)
         Check(catalog.Find(required_ui[i]) != nullptr,
               String("catalog includes ") + required_ui[i]);
+
+    const UiDesignerControlSpec* absolute = catalog.Find("UiAbsoluteLayout");
+    Check(absolute && absolute->child_adapter_id == "absolute",
+          "absolute layout has an exact-rect child adapter");
+    Check(absolute && HasUiDesignerCapability(
+              absolute->capabilities, UiDesignerCapabilityFreeform),
+          "absolute layout accepts freeform Designer placement");
+    Check(absolute && absolute->FindProperty("x") &&
+              absolute->FindProperty("y") &&
+              absolute->FindProperty("width") &&
+              absolute->FindProperty("height"),
+          "absolute layout exposes Inspector geometry bindings");
+    One<Ctrl> absolute_preview;
+    if(absolute)
+        absolute_preview = UiDesignerPreviewFactory::Create(*absolute);
+    Check(absolute_preview &&
+              dynamic_cast<UiAbsoluteLayout *>(absolute_preview.Get()),
+          "absolute layout preview creates the runtime control");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);

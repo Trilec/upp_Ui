@@ -275,6 +275,19 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         catalog.Register(pick(s));
     }
     {
+        auto s = MakeSpec("UiAbsoluteLayout", "Absolute Layout", "Layouts",
+                          "UiAbsoluteLayout", "absolute",
+                          UiDesignerRuntimeKind::UiAbsoluteLayout,
+                          layouts_icon,
+                          UiDesignerNodeContainer | UiDesignerNodeLayout,
+                          Size(320, 180));
+        s.capabilities |= UiDesignerCapabilityFreeform;
+        s.child_adapter_id = "absolute";
+        s.help = "Places each child at an exact local X, Y, width and height. "
+                 "Children may overlap and paint in insertion order.";
+        catalog.Register(pick(s));
+    }
+    {
         auto s = MakeSpec("UiSplitter", "Splitter", "Layouts",
                           "UiSplitter", "splitter",
                           UiDesignerRuntimeKind::UiSplitter,

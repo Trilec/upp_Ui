@@ -76,12 +76,13 @@ static bool BuildFixture(UiDesignerSession& session, String& error)
     UiDesignerNodeId close_button = AddThroughDrop(session, "UiButton", box);
     UiDesignerNodeId accept_button = AddThroughDrop(session, "UiButton", box);
     UiDesignerNodeId grid = AddThroughDrop(session, "UiGridLayout", box);
+    UiDesignerNodeId absolute = AddThroughDrop(session, "UiAbsoluteLayout", box);
     UiDesignerNodeId stack = AddThroughDrop(session, "UiStack", box);
     UiDesignerNodeId tab = AddThroughDrop(session, "UiTab", box);
     UiDesignerNodeId splitter = AddThroughDrop(session, "UiSplitter", box);
     UiDesignerNodeId quad = AddThroughDrop(session, "UiQuadSplitter", box);
     UiDesignerNodeId stock = AddThroughDrop(session, "UppLabel", box);
-    if(!label || !spacer || !close_button || !accept_button || !grid ||
+    if(!label || !spacer || !close_button || !accept_button || !grid || !absolute ||
        !stack || !tab || !splitter || !quad || !stock) {
         error = "Unable to build fixture nodes";
         return false;
@@ -109,6 +110,12 @@ static bool BuildFixture(UiDesignerSession& session, String& error)
                                            Point(200, 40), true);
     if(!grid_spacer || !edit) {
         error = "Unable to build Grid fixture";
+        return false;
+    }
+    UiDesignerNodeId absolute_button = AddThroughDrop(
+        session, "UiButton", absolute, Point(37, 29), true);
+    if(!absolute_button) {
+        error = "Unable to build AbsoluteLayout fixture";
         return false;
     }
     session.Commands().SetProperty(grid_spacer, "line_enabled", true,
@@ -219,6 +226,18 @@ static void RunTests(FoundationTester& t)
     const UiDesignerControlSpec* button_spec = session.Catalog().Find("UiButton");
     t.Check(button_spec && button_spec->FindEvent("WhenAction"),
             "Button exposes typed action event");
+    const UiDesignerControlSpec* absolute_spec =
+        session.Catalog().Find("UiAbsoluteLayout");
+    t.Check(absolute_spec && absolute_spec->child_adapter_id == "absolute",
+            "AbsoluteLayout has a registered child adapter");
+    t.Check(absolute_spec && HasUiDesignerCapability(
+                absolute_spec->capabilities, UiDesignerCapabilityFreeform),
+            "AbsoluteLayout accepts local freeform placement");
+    t.Check(absolute_spec && absolute_spec->FindProperty("x") &&
+                absolute_spec->FindProperty("y") &&
+                absolute_spec->FindProperty("width") &&
+                absolute_spec->FindProperty("height"),
+            "AbsoluteLayout geometry is Inspector-bindable");
 
     UiDesignerDocument legacy;
     t.Check(UiDesignerDeserialize(LegacySpacerJson(), legacy, error),
@@ -261,6 +280,37 @@ static void RunTests(FoundationTester& t)
             "Spacer drop undo removes semantic node");
     t.Check(session.Redo(), "Spacer drop redo succeeds");
 
+    UiDesignerNodeId absolute = AddThroughDrop(
+        session, "UiAbsoluteLayout", root, Point(24, 24), true);
+    UiDesignerDropPlan absolute_child = session.PlanAddControl(
+        "UiButton", absolute, Point(37, 29), true);
+    t.Check(absolute && absolute_child.valid,
+            "AbsoluteLayout accepts a positioned child drop");
+    t.Check((int)UiDesignerMapValue(absolute_child.add_defaults, "x", -1) == 40 &&
+                (int)UiDesignerMapValue(absolute_child.add_defaults, "y", -1) == 32,
+            "AbsoluteLayout drop stores snapped local X/Y");
+    t.Check((int)UiDesignerMapValue(absolute_child.add_defaults, "width", -1) == 190 &&
+                (int)UiDesignerMapValue(absolute_child.add_defaults, "height", -1) == 34,
+            "AbsoluteLayout drop preserves the child size");
+    UiDesignerNodeId absolute_button = 0;
+    t.Check(session.ExecuteDrop(absolute_child, &absolute_button, error),
+            "AbsoluteLayout positioned child drop executes");
+    Vector<UiDesignerNodeId> absolute_move_nodes;
+    absolute_move_nodes.Add(absolute_button);
+    UiDesignerDropPlan absolute_move = session.Drops().PlanMove(
+        absolute_move_nodes, absolute, Point(73, 55), true, -1);
+    const ValueMap* absolute_move_properties =
+        absolute_move.property_updates.GetCount()
+            ? &absolute_move.property_updates[0] : nullptr;
+    t.Check(absolute_move.valid && absolute_move_properties &&
+                (int)UiDesignerMapValue(*absolute_move_properties, "x", -1) == 72 &&
+                (int)UiDesignerMapValue(*absolute_move_properties, "y", -1) == 56,
+            "AbsoluteLayout move plans an exact local rectangle origin");
+    t.Check(absolute_move_properties &&
+                absolute_move_properties->Find("width") < 0 &&
+                absolute_move_properties->Find("height") < 0,
+            "AbsoluteLayout move preserves the existing child size");
+
     UiDesignerNodeId button = AddThroughDrop(session, "UiButton", box);
     UiDesignerActionBinding binding;
     binding.event_id = "WhenAction";
@@ -275,6 +325,14 @@ static void RunTests(FoundationTester& t)
             "stable node identity survives round trip");
     t.Check(roundtrip.GetActionBinding(button, "WhenAction") != nullptr,
             "behavior survives round trip");
+    const UiDesignerNode* roundtrip_absolute_button =
+        roundtrip.Find(absolute_button);
+    t.Check(roundtrip_absolute_button &&
+                (int)roundtrip_absolute_button->GetProperty("x", -1) == 40 &&
+                (int)roundtrip_absolute_button->GetProperty("y", -1) == 32 &&
+                (int)roundtrip_absolute_button->GetProperty("width", -1) == 190 &&
+                (int)roundtrip_absolute_button->GetProperty("height", -1) == 34,
+            "AbsoluteLayout child rectangle survives serialization");
 
     UiDesignerNodeId child_panel = AddThroughDrop(session, "UiPanel", box);
     UiDesignerNodeId nested = AddThroughDrop(session, "UiPanel", child_panel);
@@ -293,12 +351,19 @@ static void RunTests(FoundationTester& t)
     t.Check(project.IsValid(), "generated project validates");
     t.Check(project.generated_header.Find("Spacer") < 0,
             "Spacer does not emit a runtime member");
+    t.Check(project.generated_header.Find("UiAbsoluteLayout") >= 0,
+            "AbsoluteLayout emits a runtime member");
     t.Check(project.generated_source.Find(".AddSpacer(") >= 0,
             "Box Spacer emits semantic layout API");
     t.Check(project.generated_source.Find(".AddBlank(") >= 0,
             "Grid Spacer emits semantic layout API");
     t.Check(project.generated_source.Find("UiGridLayout::Align::End") >= 0,
             "Grid separator uses Grid alignment type");
+    t.Check(project.generated_source.Find(
+                ".Add(button_n", 0) >= 0 &&
+            project.generated_source.Find(
+                "DPI(40), DPI(32), DPI(190), DPI(34)") >= 0,
+            "AbsoluteLayout emits exact DPI-scaled child placement");
     t.Check(project.generated_source.Find("Break(IDOK)") >= 0,
             "Accept action emits compile-safe dialog break");
     t.Check(project.generated_source.Find(".SetData(1)") >= 0,

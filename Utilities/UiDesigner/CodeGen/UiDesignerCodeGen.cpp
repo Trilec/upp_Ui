@@ -387,6 +387,16 @@ static void AttachGrid(UiDesignerChildAttachContext& c)
           << (int)c.child.GetProperty("grid_column", 0) << ", true);\n";
 }
 
+static void AttachAbsolute(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".Add(" << c.member
+          << ", DPI(" << (int)c.child.GetProperty("x", 20)
+          << "), DPI(" << (int)c.child.GetProperty("y", 20)
+          << "), DPI(" << max(0, (int)c.child.GetProperty("width", 160))
+          << "), DPI(" << max(0, (int)c.child.GetProperty("height", 32))
+          << "));\n";
+}
+
 static void AttachTab(UiDesignerChildAttachContext& c)
 {
     c.out << "\t" << c.parent << ".Add(" << c.member << ", "
@@ -426,6 +436,7 @@ static const UiDesignerChildAdapterEntry *FindChildAdapter(const String& id)
         {"single", AttachAdd},
         {"box", AttachBox},
         {"grid", AttachGrid},
+        {"absolute", AttachAbsolute},
         {"tab", AttachTab},
         {"upp_tab", AttachTab},
         {"stack", AttachStack},
