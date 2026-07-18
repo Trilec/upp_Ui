@@ -31,7 +31,7 @@ struct TitleCardConfig {
     bool title_line = true;
     UiSpan title_line_length = MEDIUM;
     int title_line_thickness = 1;
-    bool card_line = false;
+    bool card_line = true;
     UiSpan card_line_length = LARGE;
     int card_line_thickness = 1;
     bool hover = false;
@@ -46,6 +46,22 @@ public:
         : BuilderWindowBase("UiTitleCardDemo", "U++ UiTitleCard Builder", "Inspect header card media placement, title lines, and title/copy layout from one shell.")
     {
         Preview().Add(card_);
+        Preview().Add(mirror_card_);
+
+        card_cell_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        mirror_cell_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        card_cell_.Add(card_cell_primary_).Fit();
+        card_cell_.Add(card_cell_secondary_).Fit();
+        mirror_cell_.Add(mirror_cell_primary_).Fit();
+        mirror_cell_.Add(mirror_cell_secondary_).Fit();
+
+        card_cell_primary_.SetText("Primary");
+        card_cell_secondary_.SetText("Secondary");
+        mirror_cell_primary_.SetText("Accept");
+        mirror_cell_secondary_.SetText("Cancel");
+
+        card_.SetContentCell(card_cell_);
+        mirror_card_.SetContentCell(mirror_cell_);
 
         AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
         AddStateRow(StateBox(), state_title_row_, state_title_label_, state_title_value_, "Title");
@@ -112,11 +128,12 @@ protected:
     virtual void LayoutPreviewContent() override
     {
         Rect canvas = Preview().GetCanvasRect();
-        int w = min(DPI(420), canvas.GetWidth() - DPI(30));
-        int h = min(DPI(180), canvas.GetHeight() - DPI(30));
+        int w = min(DPI(480), canvas.GetWidth() - DPI(30));
+        int h = min(DPI(150), max(DPI(110), (canvas.GetHeight() - DPI(40)) / 2));
         int x = canvas.left + (canvas.GetWidth() - w) / 2;
-        int y = canvas.top + (canvas.GetHeight() - h) / 2;
+        int y = canvas.top + DPI(18);
         card_.SetRect(x, y, w, h);
+        mirror_card_.SetRect(x, y + h + DPI(16), w, h);
     }
 
 private:
@@ -190,6 +207,24 @@ private:
              .EnableHover(cfg_.hover)
              .SetSelectable(cfg_.selectable);
 
+        UiTitleCard::Style mirror_style = style;
+        mirror_card_.SetCustomStyle(mirror_style)
+             .SetTitle(cfg_.title)
+             .SetSubTitle(cfg_.subtitle)
+             .SetCopyText(cfg_.copy)
+             .SetMedia(ICON_EDITOR_NOTES_48(), Size(cfg_.media_size, cfg_.media_size))
+             .SetMediaSide(cfg_.media_side == UiAlign::LEFT ? UiAlign::RIGHT : UiAlign::LEFT)
+             .SetMediaSharePercent(cfg_.media_share)
+             .EnableHover(false)
+             .SetSelectable(false);
+
+        card_.SetTextAlign(UiAlign::LEFT, UiAlign::CENTER);
+        card_.SetCardLineSide(UiAlign::RIGHT);
+        card_.SetContentCellGap(DPI(8));
+        mirror_card_.SetTextAlign(UiAlign::RIGHT, UiAlign::CENTER);
+        mirror_card_.SetCardLineSide(UiAlign::LEFT);
+        mirror_card_.SetContentCellGap(DPI(8));
+
         side_drop_.SelectByData((int)cfg_.media_side);
         share_row_.Slider().SetValue(cfg_.media_share);
         size_row_.Slider().SetValue(cfg_.media_size);
@@ -220,6 +255,10 @@ private:
     String BuildUsageCode() const
     {
         String code;
+        code << "UiBoxLayout card_cell(UiDirection::H);\n";
+        code << "card_cell.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);\n";
+        code << "card_cell.Add(card_primary).Fit();\n";
+        code << "card_cell.Add(card_secondary).Fit();\n";
         code << "UiTitleCard card;\n";
         code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n";
         code << "style.metrics.radius = " << cfg_.radius << ";\n";
@@ -235,12 +274,20 @@ private:
         code << "    .SetCopyText(" << QuoteCpp(cfg_.copy) << ")\n";
         code << "    .SetMedia(ICON_EDITOR_NOTES_48(), Size(" << cfg_.media_size << ", " << cfg_.media_size << "))\n";
         code << "    .SetMediaSide(UiAlign::" << (cfg_.media_side == UiAlign::RIGHT ? "RIGHT" : cfg_.media_side == UiAlign::TOP ? "TOP" : cfg_.media_side == UiAlign::BOTTOM ? "BOTTOM" : "LEFT") << ")\n";
-        code << "    .SetMediaSharePercent(" << cfg_.media_share << ");\n";
+        code << "    .SetMediaSharePercent(" << cfg_.media_share << ")\n";
+        code << "    .SetContentCell(card_cell);\n";
         return code;
     }
 
     TitleCardConfig cfg_;
     UiTitleCard card_;
+    UiTitleCard mirror_card_;
+    UiBoxLayout card_cell_ { UiBoxLayout::Direction::H };
+    UiBoxLayout mirror_cell_ { UiBoxLayout::Direction::H };
+    UiButton card_cell_primary_;
+    UiButton card_cell_secondary_;
+    UiButton mirror_cell_primary_;
+    UiButton mirror_cell_secondary_;
 
     UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_title_row_ { UiBoxLayout::Direction::H }, state_side_row_ { UiBoxLayout::Direction::H }, state_title_line_row_ { UiBoxLayout::Direction::H };
     UiLabel state_theme_label_, state_theme_value_, state_title_label_, state_title_value_, state_side_label_, state_side_value_, state_title_line_label_, state_title_line_value_;

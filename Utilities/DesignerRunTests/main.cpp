@@ -3606,6 +3606,141 @@ static void TestDesignerInspectorContextAndThemeRows(TestCtx& t)
 	}
 }
 
+static void TestTitleCardContentCell(TestCtx& t)
+{
+	t.Section("UiTitleCard content cell");
+
+	UiTitleCard::Style default_style;
+	t.Expect(default_style.content_cell_gap == DPI(8),
+	         "content cell style default gap remains 8 px");
+
+	UiTitleCard card;
+	t.Expect(card.GetContentCell() == nullptr,
+	         "default title card starts without a content cell");
+
+	UiBoxLayout cell(UiDirection::H);
+	UiButton cell_a;
+	UiButton cell_b;
+	cell.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	cell.Add(cell_a).Fit();
+	cell.Add(cell_b).Fit();
+	cell_a.SetText("Primary");
+	cell_b.SetText("Secondary");
+
+	card.SetTitle("Header");
+	card.SetSubTitle("Subheader");
+	card.SetCopyText("Copy text");
+	card.SetTextAlign(UiAlign::LEFT, UiAlign::CENTER);
+	card.SetContentCellGap(DPI(12));
+	card.SetContentCell(cell);
+	card.SetRect(0, 0, DPI(620), DPI(220));
+	card.Layout();
+
+	t.Expect(card.GetContentCell() == &cell,
+	         "setting the content cell stores the direct child");
+	t.Expect(cell.GetParent() == &card,
+	         "content cell becomes the title card child");
+	t.Expect(card.GetContentCellRect() == cell.GetRect(),
+	         "layout assigns the content cell to GetContentCellRect()");
+
+	UiBoxLayout replacement(UiDirection::H);
+	UiButton replacement_button;
+	replacement_button.SetText("Replacement");
+	replacement.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	replacement.Add(replacement_button).Fit();
+	card.SetContentCell(replacement);
+	card.Layout();
+	t.Expect(cell.GetParent() == nullptr,
+	         "replacing the content cell detaches the previous child");
+	t.Expect(card.GetContentCell() == &replacement,
+	         "replacement content cell becomes the active child");
+	t.Expect(replacement.GetParent() == &card,
+	         "replacement content cell is parented to the title card");
+
+	card.ClearContentCell();
+	t.Expect(card.GetContentCell() == nullptr,
+	         "clearing the content cell removes the child");
+	t.Expect(replacement.GetParent() == nullptr,
+	         "clearing the content cell detaches the child cleanly");
+
+	card.SetContentCell(cell);
+	card.SetRect(0, 0, DPI(620), DPI(220));
+	card.SetTextAlign(UiAlign::LEFT, UiAlign::CENTER);
+	card.ShowCardLine(false);
+	card.Layout();
+	Rect inner = UiStyledInnerRect(card.GetSize(), card.GetStyle().metrics, card.GetStyle().skin);
+	Rect left_cell = card.GetContentCellRect();
+	t.Expect(left_cell.left > inner.left && left_cell.right <= inner.right,
+	         "left heading keeps the content cell on the right");
+	t.Expect(left_cell.GetHeight() == inner.GetHeight(),
+	         "content cell fills the available inner height");
+
+	card.SetTextAlign(UiAlign::RIGHT, UiAlign::CENTER);
+	card.Layout();
+	Rect right_cell = card.GetContentCellRect();
+	t.Expect(right_cell.left == inner.left && right_cell.right < inner.right,
+	         "right heading keeps the content cell on the left");
+
+	card.SetTextAlign(UiAlign::CENTER, UiAlign::CENTER);
+	card.Layout();
+	Rect center_cell = card.GetContentCellRect();
+	t.Expect(center_cell.left > inner.left,
+	         "centered heading uses the stable right-side fallback");
+
+	card.SetCardLine(LARGE, 1, SOLID, Null);
+	card.SetCardLineSide(UiAlign::RIGHT);
+	card.ShowCardLine(true);
+	card.SetTextAlign(UiAlign::LEFT, UiAlign::CENTER);
+	card.Layout();
+	Rect right_divider_cell = card.GetContentCellRect();
+	t.Expect(right_divider_cell.left > inner.left && right_divider_cell.right == inner.right,
+	         "vertical right divider keeps the heading on the left and the cell on the right");
+
+	card.SetCardLine(LARGE, 1, SOLID, Null);
+	card.SetCardLineSide(UiAlign::LEFT);
+	card.Layout();
+	Rect left_divider_cell = card.GetContentCellRect();
+	t.Expect(left_divider_cell.left == inner.left && left_divider_cell.right < inner.right,
+	         "vertical left divider flips the heading/cell ordering");
+
+	card.SetCardLine(LARGE, 1, SOLID, Null);
+	card.SetCardLineSide(UiAlign::TOP);
+	card.Layout();
+	Rect top_line_cell = card.GetContentCellRect();
+	card.SetCardLine(LARGE, 1, SOLID, Null);
+	card.SetCardLineSide(UiAlign::BOTTOM);
+	card.Layout();
+	Rect bottom_line_cell = card.GetContentCellRect();
+	t.Expect(top_line_cell.left == bottom_line_cell.left && top_line_cell.right == bottom_line_cell.right,
+	         "top and bottom card lines keep the content cell geometry unchanged");
+
+	card.SetRect(0, 0, 1, 1);
+	card.Layout();
+	Rect tiny = card.GetContentCellRect();
+	t.Expect(tiny.GetWidth() >= 0 && tiny.GetHeight() >= 0,
+	         "tiny rectangles remain valid");
+
+	card.ShowCardLine(false);
+	card.SetTextAlign(UiAlign::LEFT, UiAlign::CENTER);
+	card.ClearContentCell();
+	Size plain_min = card.GetMinSize();
+	card.SetContentCell(cell);
+	Size no_cell_min = card.GetMinSize();
+	t.Expect(card.GetContentCell() == &cell,
+	         "re-attaching the content cell restores the direct child");
+	card.ClearContentCell();
+	no_cell_min = card.GetMinSize();
+	t.Expect(no_cell_min == plain_min,
+	         Format("no-cell minimum size remains unchanged after clearing the content cell (got %d x %d, expected %d x %d)",
+	                no_cell_min.cx, no_cell_min.cy, plain_min.cx, plain_min.cy));
+
+	UiTitleCard::Style custom = card.GetStyle();
+	custom.content_cell_gap = DPI(16);
+	card.SetCustomStyle(custom);
+	t.Expect(card.GetStyle().content_cell_gap == DPI(16),
+	         "content cell gap round-trips through custom style");
+}
+
 static void TestDesignerInspectorMultiSelectSizing(TestCtx& t)
 {
 	t.Section("Designer inspector multi-select sizing");
@@ -4538,6 +4673,7 @@ CONSOLE_APP_MAIN
 	if(ShouldRunTest("width-aware-layout-measure")) TestWidthAwareLayoutMeasure(t);
 	if(ShouldRunTest("ancestor-relayout-contract")) TestAncestorRelayoutContract(t);
 	if(ShouldRunTest("designer-inspector-context-and-theme-rows")) TestDesignerInspectorContextAndThemeRows(t);
+	if(ShouldRunTest("title-card-content-cell")) TestTitleCardContentCell(t);
 	if(ShouldRunTest("designer-inspector-multiselect-sizing")) TestDesignerInspectorMultiSelectSizing(t);
 	if(ShouldRunTest("inspector-live-transition")) TestInspectorLiveSelectionTransition(t);
 	if(ShouldRunTest("designer-choice-commit-path")) TestDesignerChoiceCommitPath(t);

@@ -1,4 +1,5 @@
 #include <Ui/UiTitleCard.h>
+#include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -35,6 +36,7 @@ const UiTitleCard::Style& UiTitleCard::StyleDefault()
         s.media_side = UiAlign::LEFT;
         s.media_reserve = DPI(48);
         s.media_gap = DPI(8);
+        s.content_cell_gap = DPI(8);
         s.card_line_color = Null;
     }
     return s;
@@ -253,6 +255,40 @@ UiTitleCard& UiTitleCard::SetMediaGap(int px)
     return *this;
 }
 
+UiTitleCard& UiTitleCard::SetContentCell(Ctrl& child)
+{
+    if(content_cell_ == &child)
+        return *this;
+    if(content_cell_)
+        content_cell_->Remove();
+    content_cell_ = &child;
+    Add(child);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiTitleCard& UiTitleCard::ClearContentCell()
+{
+    if(!content_cell_)
+        return *this;
+    Ctrl *child = content_cell_;
+    content_cell_ = nullptr;
+    if(child->GetParent() == this)
+        child->Remove();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiTitleCard& UiTitleCard::SetContentCellGap(int pixels)
+{
+    StyleEdit().content_cell_gap = max(0, pixels);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
 UiTitleCard& UiTitleCard::SetTitleLine(UiSpan ex, int thickness, UiLineStyle style, Color c)
 {
     Style& st = StyleEdit();
@@ -309,6 +345,16 @@ UiTitleCard& UiTitleCard::ShowCardLine(bool on)
     StyleEdit().card_line = on;
     Refresh();
     return *this;
+}
+
+void UiTitleCard::ChildRemoved(Ctrl *child)
+{
+    Ctrl::ChildRemoved(child);
+    if(child == content_cell_) {
+        content_cell_ = nullptr;
+        RefreshLayout();
+        Refresh();
+    }
 }
 
 UiTitleCard& UiTitleCard::EnableHover(bool on)
@@ -393,6 +439,76 @@ int UiTitleCard::GetLineWidth(UiSpan length, int title_cx, int text_cx) const
     default:
         return max(0, text_cx);
     }
+}
+
+Size UiTitleCard::GetHeadingMinSize() const
+{
+    Size text = GetTextBlockSize();
+    Size media = IsNull(media_) ? Size(0, 0)
+                                : (media_pref_.cx > 0 && media_pref_.cy > 0 ? media_pref_ : media_.GetSize());
+
+    const Style& style = GetEffectiveStyle();
+    bool media_h = !IsNull(media_) && (style.media_side == UiAlign::LEFT || style.media_side == UiAlign::RIGHT);
+    bool auto_fit = !IsNull(media_) && style.media_auto_fit && style.media_share_percent <= 0 && media_pref_.cx <= 0 && media_pref_.cy <= 0;
+
+    int media_axis = max(style.media_min, style.media_reserve);
+    if(style.media_share_percent > 0)
+        media_axis = max(media_axis, DPI(48));
+    if(auto_fit && media.cx > 0 && media.cy > 0) {
+        if(media_h) {
+            int h = max(style.media_min, text.cy);
+            media_axis = max(1, media.cx * h / max(1, media.cy));
+            media.cy = h;
+        }
+        else {
+            int w = max(style.media_min, text.cx);
+            media_axis = max(1, media.cy * w / max(1, media.cx));
+            media.cx = w;
+        }
+    }
+
+    int cw = text.cx;
+    int ch = text.cy;
+    if(!IsNull(media_)) {
+        if(media_h) {
+            cw += media_axis + style.media_gap;
+            ch = max(ch, max(style.media_min, media.cy));
+        }
+        else {
+            cw = max(cw, max(style.media_min, media.cx));
+            ch += media_axis + style.media_gap;
+        }
+    }
+    return Size(cw, ch);
+}
+
+Rect UiTitleCard::GetContentCellRect(const Rect& content) const
+{
+    if(!content_cell_ || content.IsEmpty())
+        return RectC(0, 0, 0, 0);
+
+    const Style& style = GetEffectiveStyle();
+    Size heading = GetHeadingMinSize();
+    int heading_w = max(0, min(content.GetWidth(), heading.cx));
+    int gap = max(0, style.content_cell_gap);
+    bool split = style.card_line && style.card_line_length != NONE &&
+                 (style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT);
+    int divider_gap = split ? max(0, style.card_line_gap) : 0;
+    int divider_th = split ? max(1, style.card_line_thickness) : 0;
+    int cell_gap = gap + divider_gap + divider_th;
+    bool cell_right = split ? style.card_line_side == UiAlign::RIGHT
+                            : style.text_align_h != UiAlign::RIGHT;
+    int cell_w = max(0, content.GetWidth() - heading_w - cell_gap);
+    int x = cell_right ? content.left + heading_w + cell_gap : content.left;
+    return RectC(x, content.top, cell_w, content.GetHeight());
+}
+
+Rect UiTitleCard::GetContentCellRect() const
+{
+    if(!content_cell_ || content_cell_->GetParent() != this)
+        return RectC(0, 0, 0, 0);
+    Rect content = UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    return GetContentCellRect(content);
 }
 
 Rect UiTitleCard::GetMediaRect(const Rect& content) const
@@ -481,57 +597,49 @@ Rect UiTitleCard::GetMediaRect(const Rect& content) const
 
 Size UiTitleCard::GetMinSize() const
 {
-    Size text = GetTextBlockSize();
-    Size media = IsNull(media_) ? Size(0, 0)
-                                : (media_pref_.cx > 0 && media_pref_.cy > 0 ? media_pref_ : media_.GetSize());
-
     const Style& style = GetEffectiveStyle();
-    bool media_h = !IsNull(media_) && (style.media_side == UiAlign::LEFT || style.media_side == UiAlign::RIGHT);
-    bool auto_fit = !IsNull(media_) && style.media_auto_fit && style.media_share_percent <= 0 && media_pref_.cx <= 0 && media_pref_.cy <= 0;
+    Size heading = GetHeadingMinSize();
+    bool has_cell = content_cell_ && content_cell_->GetParent() == this;
+    bool split = has_cell && style.card_line && style.card_line_length != NONE &&
+                 (style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT);
 
-    int media_axis = max(style.media_min, style.media_reserve);
-    if(style.media_share_percent > 0)
-        media_axis = max(media_axis, DPI(48));
-    if(auto_fit && media.cx > 0 && media.cy > 0) {
-        if(media_h) {
-            int h = max(style.media_min, text.cy);
-            media_axis = max(1, media.cx * h / max(1, media.cy));
-            media.cy = h;
-        }
-        else {
-            int w = max(style.media_min, text.cx);
-            media_axis = max(1, media.cy * w / max(1, media.cx));
-            media.cx = w;
-        }
+    Size content = heading;
+    if(has_cell) {
+        Size cell = UiMeasureLayout(*content_cell_).min;
+        int gap = max(0, style.content_cell_gap);
+        content.cx += cell.cx + gap;
+        content.cy = max(content.cy, cell.cy);
+        if(split)
+            content.cx += max(0, style.card_line_gap) + max(1, style.card_line_thickness);
     }
-
-    int cw = text.cx;
-    int ch = text.cy;
-    if(!IsNull(media_)) {
-        if(media_h) {
-            cw += media_axis + style.media_gap;
-            ch = max(ch, max(style.media_min, media.cy));
-        } else {
-            cw = max(cw, max(style.media_min, media.cx));
-            ch += media_axis + style.media_gap;
-        }
-    }
-
-    if(style.card_line && style.card_line_length != NONE) {
+    else if(style.card_line && style.card_line_length != NONE) {
         int th = max(1, style.card_line_thickness);
         int gap = max(0, style.card_line_gap);
         if(style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT)
-            cw += th + gap;
+            content.cx += th + gap;
         else
-            ch += th + gap;
+            content.cy += th + gap;
     }
 
-    Size out = UiStyledOuterSizeFromContent(Size(cw, ch), style.metrics, style.skin);
+    if(has_cell && style.card_line && style.card_line_length != NONE &&
+       (style.card_line_side == UiAlign::TOP || style.card_line_side == UiAlign::BOTTOM))
+        content.cy += max(1, style.card_line_thickness) + max(0, style.card_line_gap);
+
+    Size out = UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
     if(user_min_size_.cx > 0)
         out.cx = max(out.cx, user_min_size_.cx);
     if(user_min_size_.cy > 0)
         out.cy = max(out.cy, user_min_size_.cy);
     return out;
+}
+
+void UiTitleCard::Layout()
+{
+    if(!content_cell_ || content_cell_->GetParent() != this)
+        return;
+
+    Rect content = UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    content_cell_->SetRect(GetContentCellRect(content));
 }
 
 void UiTitleCard::DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style, bool vertical) const
@@ -596,6 +704,188 @@ void UiTitleCard::Paint(Draw& w)
             WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         else if(style.metrics.focus_enabled)
             UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
+        w.End();
+        return;
+    }
+
+    bool has_cell = content_cell_ && content_cell_->GetParent() == this;
+    bool split = has_cell && style.card_line && style.card_line_length != NONE &&
+                 (style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT);
+    if(has_cell) {
+        int th = split ? max(1, style.card_line_thickness) : 0;
+        int gap = split ? max(0, style.card_line_gap) : 0;
+        int cell_gap = max(0, style.content_cell_gap);
+        Size heading = GetHeadingMinSize();
+        int heading_w = max(0, min(content.GetWidth(), heading.cx));
+        bool cell_right = split ? style.card_line_side == UiAlign::RIGHT
+                                : style.text_align_h != UiAlign::RIGHT;
+        int total_gap = cell_gap + gap + th;
+        Rect cell_r;
+        Rect heading_r;
+        if(cell_right) {
+            heading_r = RectC(content.left, content.top, heading_w, content.GetHeight());
+            int cell_x = content.left + heading_w + total_gap;
+            cell_r = RectC(cell_x, content.top, max(0, content.right - cell_x), content.GetHeight());
+        }
+        else {
+            int cell_w = max(0, content.GetWidth() - heading_w - total_gap);
+            cell_r = RectC(content.left, content.top, cell_w, content.GetHeight());
+            heading_r = RectC(content.right - heading_w, content.top, heading_w, content.GetHeight());
+        }
+
+        Rect media_r = GetMediaRect(heading_r);
+        Rect text_r = heading_r;
+        if(!media_r.IsEmpty()) {
+            switch(style.media_side) {
+            case UiAlign::LEFT:
+                text_r.left = min(text_r.right, media_r.right + style.media_gap);
+                break;
+            case UiAlign::RIGHT:
+                text_r.right = max(text_r.left, media_r.left - style.media_gap);
+                break;
+            case UiAlign::TOP:
+                text_r.top = min(text_r.bottom, media_r.bottom + style.media_gap);
+                break;
+            case UiAlign::BOTTOM:
+                text_r.bottom = max(text_r.top, media_r.top - style.media_gap);
+                break;
+            default:
+                break;
+            }
+        }
+
+        if(!media_r.IsEmpty() && !IsNull(media_)) {
+            Rect draw_r = media_r;
+            if(style.preserve_media_aspect) {
+                Size isz = media_pref_.cx > 0 && media_pref_.cy > 0 ? media_pref_ : media_.GetSize();
+                if(isz.cx > 0 && isz.cy > 0) {
+                    double sx = double(media_r.GetWidth()) / double(isz.cx);
+                    double sy = double(media_r.GetHeight()) / double(isz.cy);
+                    double scale = min(sx, sy);
+                    if(media_pref_.cx > 0 && media_pref_.cy > 0)
+                        scale = min(scale, 1.0);
+                    int dw = max(1, int(isz.cx * scale));
+                    int dh = max(1, int(isz.cy * scale));
+                    int dx = media_r.left;
+                    if(style.media_align_h == UiAlign::CENTER)
+                        dx = media_r.left + (media_r.GetWidth() - dw) / 2;
+                    else if(style.media_align_h == UiAlign::RIGHT)
+                        dx = media_r.right - dw;
+
+                    int dy = media_r.top;
+                    if(style.media_align_v == UiAlign::CENTER)
+                        dy = media_r.top + (media_r.GetHeight() - dh) / 2;
+                    else if(style.media_align_v == UiAlign::BOTTOM)
+                        dy = media_r.bottom - dh;
+
+                    draw_r = RectC(dx, dy, dw, dh);
+                }
+            }
+
+            if(style.media_tint_mono) {
+                Color media_ink = UiResolveIconColor(style.palette, st);
+                UiPaintStyledIcon(w, draw_r, media_, true, true, UiIconRenderMode::MonoTint, media_ink, IsEnabled());
+            }
+            else {
+                w.DrawImage(draw_r.left, draw_r.top, draw_r.GetWidth(), draw_r.GetHeight(), media_);
+            }
+        }
+
+        Color ink = style.palette.ink[st];
+        if(IsNull(ink))
+            ink = SColorText();
+        Color title_ink = IsNull(style.title_color) ? ink : style.title_color;
+        Color subtitle_ink = IsNull(style.subtitle_color) ? Blend(ink, SColorPaper(), 40) : style.subtitle_color;
+        Color copy_ink = IsNull(style.copy_color) ? Blend(ink, SColorPaper(), 35) : style.copy_color;
+
+        int y = text_r.top;
+        if(style.text_align_v == UiAlign::CENTER)
+            y = text_r.top + max(0, (text_r.GetHeight() - text_block_size_.cy) / 2);
+        else if(style.text_align_v == UiAlign::BOTTOM)
+            y = text_r.bottom - text_block_size_.cy;
+        y = max(y, text_r.top);
+
+        if(!title_.IsEmpty()) {
+            Size ts = title_size_;
+            int tx = text_r.left;
+            if(style.text_align_h == UiAlign::CENTER)
+                tx = text_r.left + (text_r.GetWidth() - ts.cx) / 2;
+            else if(style.text_align_h == UiAlign::RIGHT)
+                tx = text_r.right - ts.cx;
+
+            w.DrawText(tx, y, title_, style.title_font, title_ink);
+            y += ts.cy;
+
+            if(style.title_line && style.title_line_length != NONE) {
+                y += style.title_line_gap_above;
+                int rcx = GetLineWidth(style.title_line_length, ts.cx, max(0, text_r.GetWidth()));
+                if(rcx > 0) {
+                    int rx = text_r.left;
+                    if(style.text_align_h == UiAlign::CENTER)
+                        rx = text_r.left + (text_r.GetWidth() - rcx) / 2;
+                    else if(style.text_align_h == UiAlign::RIGHT)
+                        rx = text_r.right - rcx;
+                    Color tc = IsNull(style.title_line_color)
+                                   ? Blend(title_ink, SColorShadow(), 55)
+                                   : style.title_line_color;
+                    DrawLine(w, rx, y, rcx, tc, style.title_line_thickness, style.title_line_style);
+                }
+                y += max(1, style.title_line_thickness) + style.title_line_gap_below;
+            }
+        }
+
+        if(!subtitle_.IsEmpty()) {
+            if(y > text_r.top && !title_.IsEmpty())
+                y += style.title_subtitle_gap;
+
+            Size ts = subtitle_size_;
+            int tx = text_r.left;
+            if(style.text_align_h == UiAlign::CENTER)
+                tx = text_r.left + (text_r.GetWidth() - ts.cx) / 2;
+            else if(style.text_align_h == UiAlign::RIGHT)
+                tx = text_r.right - ts.cx;
+
+            w.DrawText(tx, y, subtitle_, style.subtitle_font, subtitle_ink);
+            y += ts.cy;
+        }
+
+        if(!copy_.IsEmpty()) {
+            if(y > text_r.top && (!title_.IsEmpty() || !subtitle_.IsEmpty()))
+                y += style.subtitle_copy_gap;
+
+            Size ts = copy_size_;
+            int tx = text_r.left;
+            if(style.text_align_h == UiAlign::CENTER)
+                tx = text_r.left + (text_r.GetWidth() - ts.cx) / 2;
+            else if(style.text_align_h == UiAlign::RIGHT)
+                tx = text_r.right - ts.cx;
+
+            w.DrawText(tx, y, copy_, style.copy_font, copy_ink);
+        }
+
+        if(split && style.card_line && style.card_line_length != NONE) {
+            int len = max(0, content.GetHeight());
+            if(style.card_line_length == SMALL)
+                len = min(len, DPI(40));
+            else if(style.card_line_length == MEDIUM)
+                len = min(len, content.GetHeight() * 60 / 100);
+
+            if(len > 0) {
+                Color lc = style.card_line_color_enabled && !IsNull(style.card_line_color)
+                               ? style.card_line_color
+                               : Blend(ink, SColorShadow(), 80);
+                int x = cell_right ? heading_r.right + gap
+                                   : cell_r.right + gap;
+                int y = content.top + max(0, (content.GetHeight() - len) / 2);
+                DrawLine(w, x, y, len, lc, th, style.card_line_style, true);
+            }
+        }
+
+        if(WhenPaintForeground)
+            WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
+        else if(style.metrics.focus_enabled)
+            UiPaintStyledForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
+
         w.End();
         return;
     }

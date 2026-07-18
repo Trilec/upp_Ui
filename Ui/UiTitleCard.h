@@ -21,8 +21,8 @@
     - GUI thread only.
 
     Usage
-    - Use SetTitle(), SetSubTitle(), SetCopy(), and media helpers to build
-      display-only header compositions.
+    - Use SetTitle(), SetSubTitle(), SetCopy(), media helpers, and the optional
+      single-child content cell to build header compositions.
 
     Changelog
     - 2026-03: added release-standard header documentation.
@@ -83,6 +83,7 @@ public:
 
         int title_subtitle_gap = DPI(3);
         int subtitle_copy_gap  = DPI(4);
+        int content_cell_gap   = DPI(8);
 
         bool transparent = false;
         bool hover_enabled = false;
@@ -101,7 +102,7 @@ public:
               % media_reserve % media_share_percent % media_gap % media_min % media_auto_fit % preserve_media_aspect % media_tint_mono
               % title_line % rs % re % title_line_thickness % title_line_color % title_line_gap_above % title_line_gap_below
               % card_line % bls % ble % bss % card_line_thickness % card_line_gap % card_line_color_enabled % card_line_color
-              % title_subtitle_gap % subtitle_copy_gap
+              % title_subtitle_gap % subtitle_copy_gap % content_cell_gap
               % transparent % hover_enabled;
             title_line_style = (UiLineStyle)rs;
             title_line_length = (UiSpan)re;
@@ -142,6 +143,11 @@ public:
     UiTitleCard& SetContentInset(int px);
     UiTitleCard& SetContentInset(const Rect& r);
     UiTitleCard& SetMediaGap(int px);
+    UiTitleCard& SetContentCell(Ctrl& child);
+    UiTitleCard& ClearContentCell();
+    Ctrl*        GetContentCell() const { return content_cell_; }
+    Rect         GetContentCellRect() const;
+    UiTitleCard& SetContentCellGap(int pixels);
 
     UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
@@ -157,11 +163,13 @@ public:
     UiTitleCard& SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
     virtual Size GetMinSize() const override;
+    virtual void Layout() override;
     virtual void Paint(Draw& w) override;
     virtual void MouseEnter(Point, dword) override;
     virtual void MouseLeave() override;
     virtual void LeftDown(Point, dword) override;
     virtual void LeftUp(Point, dword) override;
+    virtual void ChildRemoved(Ctrl *child) override;
 
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
@@ -178,6 +186,8 @@ private:
     const Style& GetEffectiveStyle() const;
     void InvalidateTextCache();
     void RebuildTextCache();
+    Size GetHeadingMinSize() const;
+    Rect GetContentCellRect(const Rect& content) const;
 
     void DrawLine(Draw& w, int x, int y, int cx, Color c, int thickness, UiLineStyle style, bool vertical = false) const;
     int  GetLineWidth(UiSpan length, int title_cx, int text_cx) const;
@@ -195,6 +205,7 @@ private:
 
     Image media_;
     Size  media_pref_ = Size(0, 0);
+    Ctrl* content_cell_ = nullptr;
 
     bool hot_ = false;
     bool down_ = false;
