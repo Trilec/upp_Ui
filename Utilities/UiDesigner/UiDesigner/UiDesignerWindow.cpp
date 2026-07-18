@@ -67,7 +67,6 @@ public:
     explicit UiDesignerInteractionOverlay(UiDesignerWindow& owner)
         : owner_(&owner)
     {
-        Transparent();
         NoWantFocus();
     }
 
@@ -169,12 +168,17 @@ public:
             resize_start_ = p;
             resize_initial_ = owner_->session_.Document().GetVirtualSize();
             resize_pending_ = resize_initial_;
+            SetDragStatus(Format("resize root edge=%d %dx%d",
+                                 resize_edge,
+                                 resize_initial_.cx,
+                                 resize_initial_.cy));
             SetCapture();
             SetFocus();
             return;
         }
 
         const UiDesignerNodeId hit = HitNode(p);
+        SetDragStatus(Format("select node=%d", (int)hit));
         owner_->session_.Select(hit, (keyflags & K_CTRL) != 0);
         SetFocus();
     }
@@ -185,6 +189,9 @@ public:
             return;
         if(resizing_) {
             resize_pending_ = ResizeDocumentTo(p);
+            SetDragStatus(Format("resize root %dx%d",
+                                 resize_pending_.cx,
+                                 resize_pending_.cy));
             Refresh();
             return;
         }
@@ -204,6 +211,8 @@ public:
             ReleaseCapture();
             if(final_size != resize_initial_)
                 owner_->session_.SetVirtualSize(final_size);
+            SetDragStatus(Format("resize root done %dx%d",
+                                 final_size.cx, final_size.cy));
             Refresh();
         }
     }
