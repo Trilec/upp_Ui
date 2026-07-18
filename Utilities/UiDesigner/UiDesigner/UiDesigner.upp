@@ -9,10 +9,13 @@ uses
 
 file
 	UiDesignerStyle.h,
+	UiDesignerVersion.h,
 	UiDesignerWidgets.h,
 	UiDesignerWidgets.cpp,
 	UiDesignerExportDialog.h,
 	UiDesignerExportDialog.cpp,
+	UiDesignerInteractionOverlay.h,
+	UiDesignerInteractionOverlay.cpp,
 	UiDesignerWindow.h,
 	UiDesignerWindow.cpp,
 	UiDesignerApplication.h,

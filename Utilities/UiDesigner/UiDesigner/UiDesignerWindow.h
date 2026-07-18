@@ -8,12 +8,11 @@
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeGallery.h>
+#include "UiDesignerInteractionOverlay.h"
 #include "UiDesignerWidgets.h"
 #include "UiDesignerExportDialog.h"
 
 namespace Upp {
-
-class UiDesignerInteractionOverlay;
 
 class UiDesignerWindow : public TopWindow {
 public:
@@ -94,7 +93,7 @@ private:
     // document surface in the center scroll viewport.
     ParentCtrl preview_workspace_;
     UiDesignerPreviewCanvas preview_canvas_;
-    UiDesignerInteractionOverlay *interaction_overlay_ = nullptr;
+    UiDesignerInteractionOverlay interaction_overlay_;
 
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;
