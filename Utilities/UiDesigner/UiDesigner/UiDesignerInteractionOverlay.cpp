@@ -46,7 +46,9 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     const int step = DPI(7);
     const int dot = DPI(3);
     for(UiDesignerNodeId id : selection.nodes) {
-        Rect r = owner_->preview_canvas_.GetNodeRect(id);
+        const UiDesignerGeometryRecord* geometry =
+            owner_->preview_canvas_.GetGeometrySnapshot().Find(id);
+        Rect r = geometry ? geometry->rect : Rect();
         if(r.IsEmpty())
             continue;
         r.Offset(canvas_origin.x, canvas_origin.y);
@@ -72,7 +74,9 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         if(node.type != "UiBoxLayout" && node.type != "UiGridLayout" &&
            node.type != "UiAbsoluteLayout")
             continue;
-        Rect r = owner_->preview_canvas_.GetNodeRect(node.id);
+        const UiDesignerGeometryRecord* geometry =
+            owner_->preview_canvas_.GetGeometrySnapshot().Find(node.id);
+        Rect r = geometry ? geometry->rect : Rect();
         if(r.IsEmpty())
             continue;
         r.Offset(canvas_origin.x, canvas_origin.y);
@@ -89,26 +93,14 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         }
         if(node.GetProperty("debug_layout", false)) {
             const Color debug = Color(168, 85, 247);
-            const int inset = max(0, (int)node.GetProperty("inset", 0));
-            Rect body = r.Deflated(DPI(inset));
+            Rect body = geometry ? geometry->body : r;
             w.DrawRect(body, debug);
-            for(UiDesignerNodeId child_id : node.children) {
-                Rect child = owner_->preview_canvas_.GetNodeRect(child_id);
-                if(!child.IsEmpty()) {
-                    child.Offset(canvas_origin.x, canvas_origin.y);
-                    w.DrawRect(child, Blend(debug, White(), 80));
-                }
-            }
-            if(node.type == "UiGridLayout") {
-                const int rows = max(1, (int)node.GetProperty("rows", 1));
-                const int columns = max(1, (int)node.GetProperty("columns", 1));
-                for(int row = 1; row < rows; row++)
-                    w.DrawLine(body.left, body.top + body.Height() * row / rows,
-                               body.right, body.top + body.Height() * row / rows, 1, debug);
-                for(int column = 1; column < columns; column++)
-                    w.DrawLine(body.left + body.Width() * column / columns, body.top,
-                               body.left + body.Width() * column / columns, body.bottom, 1, debug);
-            }
+            if(geometry)
+                for(const Rect& item : geometry->item_rects)
+                    w.DrawRect(item.Offseted(r.TopLeft()), Blend(debug, White(), 80));
+            if(geometry)
+                for(const Rect& gap : geometry->gap_rects)
+                    w.DrawRect(gap.Offseted(r.TopLeft()), debug);
         }
     }
 
@@ -281,7 +273,7 @@ UiDesignerNodeId UiDesignerInteractionOverlay::HitNode(Point p) const
     if(!root.Contains(p))
         return 0;
     const Point local = p - owner_->preview_canvas_.GetRect().TopLeft();
-    UiDesignerNodeId node = owner_->preview_canvas_.HitNode(local);
+    UiDesignerNodeId node = owner_->preview_canvas_.GetGeometrySnapshot().Hit(local);
     if(node)
         return node;
     const UiDesignerNode* document_root =
@@ -348,7 +340,7 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
     const UiDesignerDocument& document = owner_->session_.Document();
     const Point doc_local = overlay_local - root.TopLeft();
     drop_plan_ = UiDesignerDropPlan();
-    UiDesignerNodeId target = owner_->preview_canvas_.HitNode(doc_local);
+    UiDesignerNodeId target = owner_->preview_canvas_.GetGeometrySnapshot().Hit(doc_local);
     if(!target)
         target = document.GetRootId();
     for(UiDesignerNodeId candidate = target; candidate; ) {

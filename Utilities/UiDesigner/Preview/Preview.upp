@@ -8,6 +8,8 @@ uses
     Utilities/UiDesigner/Services;
 
 file
+    UiDesignerGeometrySnapshot.h,
+    UiDesignerGeometrySnapshot.cpp,
     UiDesignerPreview.h,
     UiDesignerPreview.cpp,
     README.md;

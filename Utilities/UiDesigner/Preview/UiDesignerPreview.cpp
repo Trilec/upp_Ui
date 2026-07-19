@@ -435,10 +435,7 @@ Rect UiDesignerPreviewCanvas::GetNodeRect(UiDesignerNodeId node) const
 
 UiDesignerNodeId UiDesignerPreviewCanvas::HitNode(Point p) const
 {
-    for(int i = rects_.GetCount() - 1; i >= 0; i--)
-        if(rects_[i].Contains(p))
-            return rects_.GetKey(i);
-    return 0;
+    return geometry_.Hit(p);
 }
 
 void UiDesignerPreviewCanvas::DestroyInstances()
@@ -448,6 +445,7 @@ void UiDesignerPreviewCanvas::DestroyInstances()
             instance.control->Remove();
     instances_.Clear();
     rects_.Clear();
+    geometry_.Clear();
 }
 
 Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
@@ -985,6 +983,57 @@ void UiDesignerPreviewCanvas::Layout()
     int ordinal = 0;
     for(UiDesignerNodeId child : root->children)
         LayoutNode(child, ordinal++, 0);
+
+    geometry_.Clear();
+    UiDesignerGeometryRecord root_record;
+    root_record.node = root->id;
+    root_record.rect = rects_.Get(root->id);
+    root_record.body = root_record.rect;
+    root_record.selectable = true;
+    root_record.drop_target = true;
+    geometry_.Add(pick(root_record));
+    int order = 0;
+    for(const UiDesignerPreviewInstance& instance : instances_) {
+        const UiDesignerNode* node = document_->Find(instance.node);
+        if(!node)
+            continue;
+        UiDesignerGeometryRecord record;
+        record.node = node->id;
+        record.parent = node->parent;
+        record.rect = GetNodeRect(node->id);
+        for(UiDesignerNodeId parent = node->parent; parent; ) {
+            const UiDesignerNode* p = document_->Find(parent);
+            if(!p)
+                break;
+            record.depth++;
+            parent = p->parent;
+        }
+        record.order = order++;
+        record.selectable = true;
+        record.drop_target = node->id == document_->GetRootId() ||
+            node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
+            node->type == "UiPanel";
+        record.inset = max(0, (int)node->GetProperty("inset", 0));
+        record.gap = max(0, (int)node->GetProperty("gap", 0));
+        record.body = record.inset ? record.rect.Deflated(DPI(record.inset)) : record.rect;
+        const int q = FindInstance(node->id);
+        if(q >= 0 && instances_[q].control &&
+           (node->type == "UiBoxLayout" || node->type == "UiGridLayout")) {
+            if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get()))
+                for(int i = 0; i < box->GetItemCount(); i++)
+                    record.item_rects.Add(box->GetItemRect(i));
+            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get()))
+                for(int i = 0; i < grid->GetItemCount(); i++)
+                    record.item_rects.Add(grid->GetItemRect(i));
+            for(int i = 1; i < record.item_rects.GetCount(); i++) {
+                Rect a = record.item_rects[i - 1], b = record.item_rects[i];
+                if(a.right < b.left)
+                    record.gap_rects.Add(RectC(a.right, max(a.top, b.top),
+                        b.left - a.right, max(0, min(a.bottom, b.bottom) - max(a.top, b.top))));
+            }
+        }
+        geometry_.Add(pick(record));
+    }
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(

@@ -136,6 +136,22 @@ CONSOLE_APP_MAIN
     Check(!preview_a.IsEmpty() && preview.HitNode(preview_a.CenterPoint()) == preview_panel_a,
           Format("preview hit testing resolves the Panel over its Box: %s",
                  AsString(preview_a)));
+    const UiDesignerGeometrySnapshot& geometry = preview.GetGeometrySnapshot();
+    const UiDesignerGeometryRecord* box_geometry = geometry.Find(preview_box);
+    const UiDesignerGeometryRecord* panel_geometry = geometry.Find(preview_panel_a);
+    Check(box_geometry && panel_geometry && box_geometry->rect == preview.GetNodeRect(preview_box),
+          "geometry snapshot matches final Box rectangle");
+    Check(panel_geometry && panel_geometry->parent == preview_box &&
+              panel_geometry->depth > (box_geometry ? box_geometry->depth : -1),
+          "Panel geometry is ordered ahead of its Box parent");
+    Check(box_geometry && box_geometry->item_rects.GetCount() >= 2,
+          "Box snapshot keeps runtime item rectangles");
+    Check(box_geometry && box_geometry->gap == 8,
+          "Box snapshot keeps authoritative gap geometry");
+    Check(box_geometry && geometry.Hit(Point(1, 1)) == preview_box,
+          "exposed Box region resolves to the Box");
+    Check(geometry.Hit(preview_a.CenterPoint()) == preview_panel_a,
+          "snapshot hit testing agrees with the painted Panel target");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);

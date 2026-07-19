@@ -7,6 +7,7 @@
 #include <Utilities/UiDesigner/Catalog/UiDesignerCatalog.h>
 #include <Utilities/UiDesigner/Services/UiDesignerProjection.h>
 #include <Utilities/UiDesigner/Services/UiDesignerDrop.h>
+#include "UiDesignerGeometrySnapshot.h"
 
 namespace Upp {
 
@@ -117,6 +118,7 @@ public:
     uint64 GetInstanceGeneration(UiDesignerNodeId node) const;
     Rect GetNodeRect(UiDesignerNodeId node) const;
     UiDesignerNodeId HitNode(Point p) const;
+    const UiDesignerGeometrySnapshot& GetGeometrySnapshot() const { return geometry_; }
 
     const UiDesignerPreviewStats& GetStats() const { return stats_; }
     void ResetStats() { stats_.Clear(); }
@@ -152,6 +154,7 @@ private:
 
     Array<UiDesignerPreviewInstance> instances_;
     VectorMap<UiDesignerNodeId, Rect> rects_;
+    UiDesignerGeometrySnapshot geometry_;
     uint64 generation_sequence_ = 0;
     UiDesignerPreviewStats stats_;
     Color accent_ = Color(37, 99, 235);
