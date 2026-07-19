@@ -8,7 +8,6 @@ uses
 	Utilities/UiDesigner/Theme;
 
 file
-    ../Core/UiDesignerDragData.h,
 	UiDesignerStyle.h,
 	UiDesignerVersion.h,
 	UiDesignerWidgets.h,

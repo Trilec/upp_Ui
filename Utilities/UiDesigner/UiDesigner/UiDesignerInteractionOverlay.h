@@ -2,7 +2,6 @@
 #define _Utilities_UiDesigner_UiDesigner_UiDesignerInteractionOverlay_h_
 
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
-#include <Utilities/UiDesigner/Core/UiDesignerDragData.h>
 
 namespace Upp {
 
@@ -15,15 +14,15 @@ public:
     explicit UiDesignerInteractionOverlay(UiDesignerWindow& owner);
 
     void SetDragStatus(const String& status);
+    void TrackCatalogDrag(const String& type_id, Point screen);
+    bool FinishCatalogDrag(const String& type_id, Point screen);
+    void CancelCatalogDrag();
 
     virtual void Paint(Draw& w) override;
     virtual void LeftDown(Point p, dword keyflags) override;
     virtual void MouseMove(Point p, dword keyflags) override;
     virtual void LeftUp(Point p, dword keyflags) override;
-    virtual void DragEnter() override;
-    virtual void DragAndDrop(Point p, PasteClip& d) override;
-    virtual void DragRepeat(Point p) override;
-    virtual void DragLeave() override;
+    virtual Image CursorImage(Point p, dword keyflags) override;
 
 private:
     UiDesignerWindow *owner_ = nullptr;
@@ -41,8 +40,8 @@ private:
     UiDesignerNodeId HitNode(Point p) const;
     int HitDocumentResizeEdge(Point p) const;
     Rect ResizeDocumentTo(Point p) const;
-    void ClearDropPlan(bool clear_payload = true);
-    void UpdateDropPlan(Point p, const String& payload);
+    void ClearDropPlan();
+    void UpdateDropPlan(const String& type_id, Point screen, bool allow_invalid_feedback = true);
 };
 
 }

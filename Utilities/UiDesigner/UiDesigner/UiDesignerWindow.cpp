@@ -285,6 +285,13 @@ void UiDesignerWindow::BuildDesigner()
         list.WhenFilter = [=](const String& query) {
             session_.State().toolbox_filter = query;
         };
+        list.WhenToolDrag = [=](const String& type_id, Point screen) {
+            TrackCatalogDrag(type_id, screen);
+        };
+        list.WhenToolDrop = [=](const String& type_id, Point screen) {
+            FinishCatalogDrag(type_id, screen);
+        };
+        list.WhenToolCancel = [=] { CancelCatalogDrag(); };
     };
     wire_list(presets_list_); wire_list(layouts_list_);
     wire_list(containers_list_); wire_list(controls_list_);
@@ -490,6 +497,33 @@ void UiDesignerWindow::ActivateToolbox(const String& id)
     UiDesignerNodeId created = 0;
     if(!plan.valid || !session_.ExecuteDrop(plan, &created, error))
         RefreshStatus(plan.valid ? error : plan.reason);
+}
+
+void UiDesignerWindow::TrackCatalogDrag(const String& type_id, Point screen)
+{
+    active_catalog_drag_type_ = type_id;
+    catalog_drag_active_ = !type_id.IsEmpty();
+    if(!catalog_drag_active_) {
+        interaction_overlay_.CancelCatalogDrag();
+        return;
+    }
+    interaction_overlay_.TrackCatalogDrag(type_id, screen);
+}
+
+void UiDesignerWindow::FinishCatalogDrag(const String& type_id, Point screen)
+{
+    const String drag_type = active_catalog_drag_type_.IsEmpty() ? type_id
+                                                                 : active_catalog_drag_type_;
+    catalog_drag_active_ = false;
+    active_catalog_drag_type_.Clear();
+    interaction_overlay_.FinishCatalogDrag(drag_type, screen);
+}
+
+void UiDesignerWindow::CancelCatalogDrag()
+{
+    catalog_drag_active_ = false;
+    active_catalog_drag_type_.Clear();
+    interaction_overlay_.CancelCatalogDrag();
 }
 
 void UiDesignerWindow::SaveDocument(bool save_as)

@@ -50,6 +50,9 @@ private:
     void RefreshCode();
     void RefreshStatus(const String& status);
     void PostSelectionDetailsRefresh();
+    void TrackCatalogDrag(const String& type_id, Point screen);
+    void FinishCatalogDrag(const String& type_id, Point screen);
+    void CancelCatalogDrag();
 
     UiDesignerSession session_;
 
@@ -120,6 +123,8 @@ private:
     UiDesignerExportProfile last_export_profile_ =
         UiDesignerExportProfile::CompleteCppPackage;
     bool selection_details_refresh_posted_ = false;
+    String active_catalog_drag_type_;
+    bool catalog_drag_active_ = false;
 };
 
 }

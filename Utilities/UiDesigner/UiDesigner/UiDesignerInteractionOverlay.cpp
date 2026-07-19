@@ -135,10 +135,7 @@ void UiDesignerInteractionOverlay::MouseMove(Point p, dword)
                              resize_pending_rect_.Width(),
                              resize_pending_rect_.Height()));
         Refresh();
-        return;
     }
-    if(!drag_payload_.IsEmpty())
-        UpdateDropPlan(p, drag_payload_);
 }
 
 void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
@@ -159,46 +156,51 @@ void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
     }
 }
 
-void UiDesignerInteractionOverlay::DragEnter()
+Image UiDesignerInteractionOverlay::CursorImage(Point, dword)
 {
-    Refresh();
+    if(resizing_ || !drag_type_id_.IsEmpty())
+        return Image::SizeAll();
+    return Ctrl::CursorImage(Point(), 0);
 }
 
-void UiDesignerInteractionOverlay::DragAndDrop(Point p, PasteClip& d)
+void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point screen)
 {
-    String payload;
-    if(!d.IsAvailable(UiDesignerCatalogDragFormat())) {
-        d.Reject();
+    if(type_id.IsEmpty()) {
+        drag_type_id_.Clear();
+        SetDragStatus("drag invalid catalog payload");
         ClearDropPlan();
         return;
     }
-    payload = d.Get(UiDesignerCatalogDragFormat());
-    UpdateDropPlan(p, payload);
+    UpdateDropPlan(type_id, screen);
+}
+
+bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Point screen)
+{
+    if(type_id.IsEmpty()) {
+        CancelCatalogDrag();
+        return false;
+    }
+    UpdateDropPlan(type_id, screen, false);
     if(!drop_plan_.valid) {
-        d.Reject();
-        ClearDropPlan(false);
-        return;
+        CancelCatalogDrag();
+        return false;
     }
-    d.Accept(UiDesignerCatalogDragFormat());
-    d.SetAction(DND_COPY);
-    if(d.IsPaste()) {
-        String error;
-        const bool ok = owner_->session_.ExecuteDrop(drop_plan_, nullptr, error);
-        SetDragStatus(ok ? drop_plan_.label + " completed"
-                         : (error.IsEmpty() ? drop_plan_.reason : error));
-        ClearDropPlan();
-    }
+    String error;
+    const bool ok = owner_->session_.ExecuteDrop(drop_plan_, nullptr, error);
+    if(ok)
+        SetDragStatus(drop_plan_.label + " completed");
+    else
+        SetDragStatus(error.IsEmpty() ? drop_plan_.reason : error);
+    ClearDropPlan();
+    drag_type_id_.Clear();
+    return ok;
 }
 
-void UiDesignerInteractionOverlay::DragRepeat(Point p)
-{
-    if(!drag_payload_.IsEmpty())
-        UpdateDropPlan(p, drag_payload_);
-}
-
-void UiDesignerInteractionOverlay::DragLeave()
+void UiDesignerInteractionOverlay::CancelCatalogDrag()
 {
     ClearDropPlan();
+    drag_type_id_.Clear();
+    SetDragStatus(String());
 }
 
 Rect UiDesignerInteractionOverlay::WorkspaceRootRect() const
@@ -256,44 +258,45 @@ Rect UiDesignerInteractionOverlay::ResizeDocumentTo(Point p) const
     return rect;
 }
 
-void UiDesignerInteractionOverlay::ClearDropPlan(bool clear_payload)
+void UiDesignerInteractionOverlay::ClearDropPlan()
 {
     drop_plan_ = UiDesignerDropPlan();
     drop_indicator_ = Rect(0, 0, 0, 0);
-    if(clear_payload)
-        drag_payload_.Clear();
     Refresh();
 }
 
-void UiDesignerInteractionOverlay::UpdateDropPlan(Point p, const String& payload)
+void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point screen,
+                                                  bool allow_invalid_feedback)
 {
     if(!owner_)
         return;
-    String type;
-    if(!UiDesignerParseCatalogDragText(payload, type)) {
-        SetDragStatus("drag invalid catalog payload");
-        ClearDropPlan(false);
-        return;
-    }
 
+    const Point overlay_local = screen - GetScreenRect().TopLeft();
     const Rect root = WorkspaceRootRect();
-    if(!root.Contains(p)) {
+    drag_type_id_ = type_id;
+    if(!root.Contains(overlay_local)) {
         drop_plan_ = UiDesignerDropPlan();
         drop_indicator_ = Rect();
-        SetDragStatus(Format("drag %s -> outside Window", type));
+        SetDragStatus(Format("drag %s -> outside Window", type_id));
         Refresh();
         return;
     }
 
     const UiDesignerNodeId target = owner_->session_.Document().GetRootId();
-    const Point local = p - root.TopLeft();
-    drop_plan_ = owner_->session_.PlanAddControl(type, target, local, true);
-    drag_payload_ = payload;
+    const Point doc_local = overlay_local - root.TopLeft();
+    drop_plan_ = owner_->session_.PlanAddControl(type_id, target, doc_local, true);
     drop_indicator_ = root;
-    SetDragStatus(Format("drag %s -> Window : %s%s",
-                         type,
-                         drop_plan_.valid ? "valid" : "invalid",
-                         drop_plan_.valid ? "" : (", " + drop_plan_.reason)));
+    if(drop_plan_.valid) {
+        SetDragStatus(Format("drag %s -> Window : valid", type_id));
+    }
+    else {
+        SetDragStatus(Format("drag %s -> Window : invalid%s",
+                             type_id,
+                             drop_plan_.reason.IsEmpty() ? String()
+                                                         : ", " + drop_plan_.reason));
+        if(!allow_invalid_feedback)
+            drop_indicator_ = Rect();
+    }
     Refresh();
 }
 

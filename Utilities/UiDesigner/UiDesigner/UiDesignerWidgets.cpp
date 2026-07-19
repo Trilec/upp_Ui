@@ -564,18 +564,34 @@ void UiDesignerCatalogList::Activate(int index)
 void UiDesignerCatalogList::LeftDown(Point p, dword)
 {
     pressed_ = selected_ = RowAt(p);
+    drag_type_ = pressed_ >= 0 && !presets_ ? ItemId(pressed_) : String();
+    drag_start_ = GetMousePos();
+    drag_armed_ = pressed_ >= 0 && !presets_ && !drag_type_.IsEmpty();
     dragging_ = false;
+    if(drag_armed_ && !HasCapture())
+        SetCapture();
     SetFocus();
     Refresh();
 }
 
 void UiDesignerCatalogList::LeftUp(Point p, dword)
 {
+    const int pressed = pressed_;
+    const String type = drag_type_;
+    const bool was_dragging = dragging_;
+    const bool was_armed = drag_armed_;
+    const Point screen = GetMousePos();
     const int index = RowAt(p);
-    if(!dragging_ && pressed_ >= 0 && index == pressed_)
-        Activate(index);
     pressed_ = -1;
     dragging_ = false;
+    drag_armed_ = false;
+    drag_type_.Clear();
+    if(HasCapture())
+        ReleaseCapture();
+    if(was_dragging && was_armed && !type.IsEmpty())
+        WhenToolDrop(type, screen);
+    else if(pressed >= 0 && index == pressed)
+        Activate(index);
 }
 
 void UiDesignerCatalogList::LeftDouble(Point p, dword)
@@ -587,17 +603,25 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
 {
     if(pressed_ < 0 || pressed_ >= Count() || presets_)
         return;
-    dragging_ = true;
-    const String type = ItemId(pressed_);
-    VectorMap<String, ClipData> payload;
-    payload.Add(UiDesignerCatalogDragFormat(), ClipData(UiDesignerCatalogDragText(type)));
-    DoDragAndDrop(payload, ItemIcon(pressed_), DND_COPY);
-    pressed_ = -1;
-    dragging_ = false;
+    if(!drag_armed_ && !drag_type_.IsEmpty()) {
+        drag_armed_ = true;
+        if(!HasCapture())
+            SetCapture();
+    }
+    MouseMove(GetMousePos() - GetScreenRect().TopLeft(), K_MOUSELEFT);
 }
 
 void UiDesignerCatalogList::MouseMove(Point p, dword)
 {
+    if(drag_armed_) {
+        if(!HasCapture())
+            SetCapture();
+        if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5))
+            dragging_ = true;
+        if(dragging_ && WhenToolDrag)
+            WhenToolDrag(drag_type_, GetMousePos());
+        return;
+    }
     const int next = RowAt(p);
     if(next != hover_) {
         hover_ = next;
@@ -611,6 +635,23 @@ void UiDesignerCatalogList::MouseLeave()
     hover_ = -1;
     Tip(String());
     Refresh();
+}
+
+Image UiDesignerCatalogList::CursorImage(Point p, dword flags)
+{
+    return dragging_ ? Image::SizeAll() : ParentCtrl::CursorImage(p, flags);
+}
+
+void UiDesignerCatalogList::CancelMode()
+{
+    const bool active = drag_armed_ || dragging_;
+    pressed_ = -1;
+    dragging_ = false;
+    drag_armed_ = false;
+    drag_type_.Clear();
+    if(active && WhenToolCancel)
+        WhenToolCancel();
+    ParentCtrl::CancelMode();
 }
 
 void UiDesignerCatalogList::MouseWheel(Point, int zdelta, dword)

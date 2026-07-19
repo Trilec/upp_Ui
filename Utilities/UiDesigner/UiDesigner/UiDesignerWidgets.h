@@ -3,7 +3,6 @@
 
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
-#include <Utilities/UiDesigner/Core/UiDesignerDragData.h>
 #include "UiDesignerStyle.h"
 
 namespace Upp {
@@ -110,6 +109,9 @@ public:
 
     Event<String> WhenActivate;
     Event<String> WhenFilter;
+    Event<String, Point> WhenToolDrag;
+    Event<String, Point> WhenToolDrop;
+    Event<> WhenToolCancel;
 
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
@@ -120,6 +122,8 @@ public:
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseLeave() override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
+    virtual Image CursorImage(Point p, dword flags) override;
+    virtual void CancelMode() override;
     virtual bool Key(dword key, int count) override;
 
 private:
@@ -143,6 +147,9 @@ private:
     int selected_ = -1;
     int pressed_ = -1;
     int scroll_ = 0;
+    Point drag_start_;
+    String drag_type_;
+    bool drag_armed_ = false;
     bool dragging_ = false;
 };
 
