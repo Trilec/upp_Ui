@@ -176,14 +176,46 @@ CONSOLE_APP_MAIN
 
     PropertyEditorItem* text = session.InspectorModel().Find("text");
     Check(text != nullptr, "multi-selection common property");
+    const int inspector_structure_before = session.InspectorModel().GetStructureRevision();
     Check(session.CommitProperty("text", "Shared", error),
           "multi-selection commit: " + error);
     Check(session.Document().GetProperty(a, "text") == "Shared",
           "first target updated");
     Check(session.Document().GetProperty(b, "text") == "Shared",
           "second target updated");
+    Check(session.InspectorModel().GetStructureRevision() == inspector_structure_before,
+          "ordinary commit keeps inspector structure stable");
+    Check(session.InspectorModel().Find("text") &&
+              session.InspectorModel().Find("text")->value == "Shared",
+          "inspector model receives committed value");
+    Check(session.CommitProperty("visible", false, error),
+          "boolean commit succeeds: " + error);
+    Check(session.CommitProperty("width", 320, error),
+          "integer commit succeeds: " + error);
     Check(session.Commands().CanUndo(), "bulk edit is one history entry");
     Check(session.Undo(), "bulk edit undo");
+
+    UiDesignerNodeId c = session.AddControl("UiLabel");
+    session.Select(c, false);
+    Check(session.RemoveSelection(), "single delete command succeeds");
+    Check(!session.Document().Find(c), "single delete removes node");
+    Check(session.Undo(), "single delete undo restores node");
+    Check(session.Document().Find(c) != nullptr, "single delete undo restores selection target");
+
+    UiDesignerNodeId d = session.AddControl("UiLabel");
+    UiDesignerNodeId e = session.AddControl("UiLabel");
+    session.Select(d, false);
+    session.Select(e, true);
+    Check(session.RemoveSelection(), "multi delete command succeeds");
+    Check(!session.Document().Find(d) && !session.Document().Find(e),
+          "multi delete removes both nodes");
+    Check(session.Undo(), "multi delete undo restores nodes");
+    Check(session.Document().Find(d) != nullptr && session.Document().Find(e) != nullptr,
+          "multi delete undo restores both targets");
+
+    session.ClearSelection();
+    session.Select(session.Document().GetRootId(), false);
+    Check(!session.RemoveSelection(), "root delete is rejected");
 
     UiDesignerAutomationService automation(session);
     ValueMap initialize;

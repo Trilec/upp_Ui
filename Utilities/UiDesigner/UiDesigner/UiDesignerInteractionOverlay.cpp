@@ -6,7 +6,7 @@ namespace Upp {
 UiDesignerInteractionOverlay::UiDesignerInteractionOverlay(UiDesignerWindow& owner)
     : owner_(&owner)
 {
-    NoWantFocus();
+    WantFocus();
 }
 
 void UiDesignerInteractionOverlay::SetDragStatus(const String& status)
@@ -161,6 +161,20 @@ Image UiDesignerInteractionOverlay::CursorImage(Point, dword)
     if(resizing_ || !drag_type_id_.IsEmpty())
         return Image::SizeAll();
     return Ctrl::CursorImage(Point(), 0);
+}
+
+bool UiDesignerInteractionOverlay::Key(dword key, int)
+{
+    if(key == K_DELETE) {
+        if(owner_ && owner_->session_.RemoveSelection()) {
+            SetDragStatus("Selection deleted");
+            return true;
+        }
+        if(owner_)
+            owner_->RefreshStatus(owner_->session_.Commands().GetLastError());
+        return true;
+    }
+    return Ctrl::Key(key, 1);
 }
 
 void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point screen)

@@ -339,6 +339,12 @@ void UiDesignerWindow::ConnectServices()
     hierarchy_.WhenSelectNode = [=](UiDesignerNodeId id, bool toggle) {
         session_.Select(id, toggle);
     };
+    hierarchy_.WhenDelete = [=] {
+        if(session_.RemoveSelection())
+            RefreshStatus("Selection deleted");
+        else
+            RefreshStatus(session_.Commands().GetLastError());
+    };
     hierarchy_.PlanDrop = [=](const Vector<UiDesignerNodeId>& nodes,
                               UiDesignerNodeId parent, int index) {
         return session_.Drops().PlanMove(nodes, parent, Point(), false, index);

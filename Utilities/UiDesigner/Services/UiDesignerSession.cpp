@@ -16,7 +16,10 @@ void UiDesignerSession::WireEvents()
     document_.WhenChanged = [=](const UiDesignerChangeSet& changes) {
         if(projection_)
             projection_->ApplyChangeSet(changes);
-        RebuildInspector();
+        if(changes.schema_changed || !changes.structure.IsEmpty())
+            RebuildInspector();
+        else
+            SyncInspectorValues(changes);
         WhenCodeChanged();
     };
 
@@ -549,9 +552,49 @@ bool UiDesignerSession::CommitProperty(
 
     for(UiDesignerNodeId id : targets)
         overlay_.Remove(id, property);
-    RebuildInspector();
     error.Clear();
     return true;
+}
+
+void UiDesignerSession::SyncInspectorValues(const UiDesignerChangeSet& changes)
+{
+    if(state_.selection.nodes.IsEmpty())
+        return;
+
+    const bool root_selected = state_.selection.primary == document_.GetRootId();
+
+    for(const UiDesignerPropertyChange& change : changes.properties) {
+        if(!state_.selection.Contains(change.node))
+            continue;
+        if(PropertyEditorItem *item = inspector_model_.Find(change.property)) {
+            const bool was_mixed = item->mixed;
+            if(item->value != change.new_value || was_mixed) {
+                inspector_model_.SetValue(change.property, change.new_value);
+                if(was_mixed)
+                    inspector_model_.SetMixed(change.property, false);
+            }
+        }
+    }
+
+    if((changes.virtual_size_changed || root_selected) && root_selected) {
+        const Size size = document_.GetVirtualSize();
+        if(PropertyEditorItem *width = inspector_model_.Find("document_width")) {
+            const bool was_mixed = width->mixed;
+            if(width->value != size.cx || was_mixed) {
+                inspector_model_.SetValue("document_width", size.cx);
+                if(was_mixed)
+                    inspector_model_.SetMixed("document_width", false);
+            }
+        }
+        if(PropertyEditorItem *height = inspector_model_.Find("document_height")) {
+            const bool was_mixed = height->mixed;
+            if(height->value != size.cy || was_mixed) {
+                inspector_model_.SetValue("document_height", size.cy);
+                if(was_mixed)
+                    inspector_model_.SetMixed("document_height", false);
+            }
+        }
+    }
 }
 
 bool UiDesignerSession::ResetProperty(

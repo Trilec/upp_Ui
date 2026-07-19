@@ -125,6 +125,7 @@ private:
                                const UiDesignerPropertySpec& property) const;
     bool SelectionSupports(const String& property,
                            const UiDesignerPropertySpec **primary_spec = nullptr) const;
+    void SyncInspectorValues(const UiDesignerChangeSet& changes);
     UiDesignerActionBinding MakeEditableBehavior() const;
     String DefaultHandlerName(const UiDesignerNode& node,
                               const String& event_id) const;

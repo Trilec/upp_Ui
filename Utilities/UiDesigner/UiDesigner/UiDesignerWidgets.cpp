@@ -232,6 +232,11 @@ UiDesignerSideColumn::UiDesignerSideColumn()
     Add(content_surface_);
 }
 
+UiDesignerHierarchyView::UiDesignerHierarchyView()
+{
+    WantFocus();
+}
+
 UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool on)
 {
     right_ = on;
@@ -890,6 +895,16 @@ void UiDesignerHierarchyView::DragRepeat(Point p)
 void UiDesignerHierarchyView::DragLeave()
 {
     ClearDrop();
+}
+
+bool UiDesignerHierarchyView::Key(dword key, int)
+{
+    if(key == K_DELETE) {
+        if(WhenDelete)
+            WhenDelete();
+        return true;
+    }
+    return ParentCtrl::Key(key, 1);
 }
 
 UiDesignerCodeView::UiDesignerCodeView()

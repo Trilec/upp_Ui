@@ -23,6 +23,7 @@ public:
     virtual void MouseMove(Point p, dword keyflags) override;
     virtual void LeftUp(Point p, dword keyflags) override;
     virtual Image CursorImage(Point p, dword keyflags) override;
+    virtual bool Key(dword key, int count) override;
 
 private:
     UiDesignerWindow *owner_ = nullptr;

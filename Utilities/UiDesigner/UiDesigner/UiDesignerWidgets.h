@@ -157,6 +157,8 @@ class UiDesignerHierarchyView : public ParentCtrl {
 public:
     typedef UiDesignerHierarchyView CLASSNAME;
 
+    UiDesignerHierarchyView();
+
     void SetDocument(const UiDesignerDocument *document);
     void SetSelection(const UiDesignerSelection *selection);
     void Rebuild();
@@ -167,6 +169,7 @@ public:
 
     Event<UiDesignerNodeId, bool> WhenSelectNode;
     Event<String> WhenDropStatus;
+    Event<> WhenDelete;
 
     virtual void Paint(Draw& w) override;
     virtual void LeftDown(Point p, dword flags) override;
@@ -176,6 +179,7 @@ public:
     virtual void DragAndDrop(Point p, PasteClip& d) override;
     virtual void DragRepeat(Point p) override;
     virtual void DragLeave() override;
+    virtual bool Key(dword key, int count) override;
 
 private:
     struct Row : Moveable<Row> {
