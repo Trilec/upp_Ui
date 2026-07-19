@@ -55,6 +55,26 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         }
     }
 
+    // Layout boundaries are Designer guidance, not runtime decoration.
+    for(const UiDesignerNode& node : document.GetNodes()) {
+        if(node.type != "UiBoxLayout" && node.type != "UiGridLayout" &&
+           node.type != "UiAbsoluteLayout")
+            continue;
+        Rect r = owner_->preview_canvas_.GetNodeRect(node.id);
+        if(r.IsEmpty())
+            continue;
+        r.Offset(canvas_origin.x, canvas_origin.y);
+        const Color outline = Blend(SColorText(), SColorPaper(), 150);
+        for(int x = r.left + 1; x < r.right - 1; x += DPI(6)) {
+            w.DrawRect(x, r.top + 1, min(DPI(3), r.right - x - 1), 1, outline);
+            w.DrawRect(x, r.bottom - 2, min(DPI(3), r.right - x - 1), 1, outline);
+        }
+        for(int y = r.top + 1; y < r.bottom - 1; y += DPI(6)) {
+            w.DrawRect(r.left + 1, y, 1, min(DPI(3), r.bottom - y - 1), outline);
+            w.DrawRect(r.right - 2, y, 1, min(DPI(3), r.bottom - y - 1), outline);
+        }
+    }
+
     const Color frame = Color(103, 232, 249);
     const int thickness = DPI(4);
     const int half = thickness / 2;

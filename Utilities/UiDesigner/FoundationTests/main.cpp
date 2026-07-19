@@ -287,7 +287,7 @@ static void RunTests(FoundationTester& t)
     t.Check(session.Redo(), "Spacer drop redo succeeds");
 
     UiDesignerNodeId absolute = AddThroughDrop(
-        session, "UiAbsoluteLayout", root, Point(24, 24), true);
+        session, "UiAbsoluteLayout", box, Point(24, 24), true);
     UiDesignerDropPlan absolute_child = session.PlanAddControl(
         "UiButton", absolute, Point(37, 29), true);
     t.Check(absolute && absolute_child.valid,

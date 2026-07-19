@@ -422,6 +422,12 @@ bool UiDesignerSession::SelectionSupports(
     if(!found)
         return false;
 
+    if(property == "x" || property == "y") {
+        const UiDesignerNode* parent = document_.Find(primary->parent);
+        if(!parent || parent->type != "UiAbsoluteLayout")
+            return false;
+    }
+
     for(UiDesignerNodeId id : state_.selection.nodes) {
         const UiDesignerNode* node = document_.Find(id);
         const UiDesignerControlSpec* control =

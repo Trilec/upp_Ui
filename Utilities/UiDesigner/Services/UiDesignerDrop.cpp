@@ -68,9 +68,8 @@ void UiDesignerDropService::PopulatePlacement(
     if(!document_ || !catalog_)
         return;
     const UiDesignerControlSpec* parent_spec = catalog_->Find(parent.type);
-    const bool freeform = parent.id == document_->GetRootId() ||
-        (parent_spec && HasUiDesignerCapability(
-            parent_spec->capabilities, UiDesignerCapabilityFreeform));
+    const bool freeform = parent_spec && HasUiDesignerCapability(
+        parent_spec->capabilities, UiDesignerCapabilityFreeform);
 
     if(parent.type == "UiGridLayout") {
         const int rows = max(1, (int)parent.GetProperty("rows", 1));
@@ -99,6 +98,15 @@ void UiDesignerDropService::PopulatePlacement(
         const int y = min(SnapCoordinate(position.y), max(0, parent_height - height));
         properties.Set("x", x);
         properties.Set("y", y);
+        properties.Set("width", width);
+        properties.Set("height", height);
+    }
+    else if(parent.id == document_->GetRootId() && parent.children.IsEmpty()) {
+        properties.Set("width_mode", "Expand");
+        properties.Set("height_mode", "Expand");
+        properties.Set("cell_align_x", "Center");
+        properties.Set("cell_align_y", "Center");
+        properties.Set("inset", 0);
     }
 }
 
@@ -235,6 +243,12 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
             ValueMap placement;
             PopulatePlacement(*spec, *parent,
                               canvas_position + Point(offset, offset), placement);
+            // Moving an absolute child changes only its origin; its authored
+            // size remains part of the node contract.
+            if(placement.Find("width") >= 0)
+                placement.Remove(placement.Find("width"));
+            if(placement.Find("height") >= 0)
+                placement.Remove(placement.Find("height"));
             if(placement.GetCount())
                 plan.property_updates.Add(node_id, pick(placement));
             offset += 12;

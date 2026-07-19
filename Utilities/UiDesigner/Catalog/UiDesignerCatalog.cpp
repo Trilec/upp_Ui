@@ -217,6 +217,10 @@ bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
         reason = "Drop target does not exist";
         return false;
     }
+    if(parent_id == document.GetRootId() && parent->children.GetCount() >= 1) {
+        reason = "Window already has content. Drop into its layout/container or use an Absolute Layout.";
+        return false;
+    }
     if(index < -1 || index > parent->children.GetCount()) {
         reason = "Insertion index is outside the target";
         return false;
@@ -450,31 +454,50 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
     const struct {
         const char *id;
         const char *label;
-        int value;
-    } geometry[] = {
-        {"x", "X", 20}, {"y", "Y", 20},
-        {"width", "Width", spec.default_size.cx},
-        {"height", "Height", spec.default_size.cy},
-        {"minimum_width", "Minimum width", 0},
-        {"minimum_height", "Minimum height", 0},
-        {"maximum_width", "Maximum width", 0},
-        {"maximum_height", "Maximum height", 0},
+        const char *value;
+    } modes[] = {
+        {"width_mode", "Width mode", "Expand"},
+        {"height_mode", "Height mode", "Expand"},
+        {"cell_align_x", "Cell align X", "Auto"},
+        {"cell_align_y", "Cell align Y", "Auto"},
     };
-    for(const auto& field : geometry) {
+    for(const auto& field : modes) {
         UiDesignerPropertySpec property;
         property.id = field.id;
         property.label = field.label;
         property.group = "Layout";
-        property.kind = PropertyEditorKind::Integer;
+        property.kind = PropertyEditorKind::Choice;
         property.domain = PropertyEditorDomain::Layout;
         property.default_value = field.value;
-        property.minimum = 0;
-        property.maximum = 10000;
-        property.step = 1;
+        if(field.id[0] == 'w' || field.id[0] == 'h')
+            property.Choice("Fit", "Fit").Choice("Fixed", "Fixed")
+                     .Choice("Expand", "Expand");
+        else if(String(field.id) == "cell_align_x")
+            property.Choice("Auto", "Auto").Choice("Left", "Left")
+                     .Choice("Center", "Center").Choice("Right", "Right");
+        else
+            property.Choice("Auto", "Auto").Choice("Top", "Top")
+                     .Choice("Center", "Center").Choice("Bottom", "Bottom");
         property.impact = PropertyImpactLocalLayout |
-                          PropertyImpactAncestorLayout |
-                          PropertyImpactCode;
-        spec.properties.Add(pick(property));
+                          PropertyImpactAncestorLayout | PropertyImpactCode;
+        spec.properties.Add(property);
+        spec.defaults.Set(field.id, field.value);
+    }
+    const struct { const char *id; const char *label; } sizes[] = {
+        {"fixed_width", "Fixed width"}, {"fixed_height", "Fixed height"},
+        {"min_width", "Min width"}, {"min_height", "Min height"},
+        {"max_width", "Max width"}, {"max_height", "Max height"},
+    };
+    for(const auto& field : sizes) {
+        UiDesignerPropertySpec property = UiDesignerNumberProperty(
+            field.id, field.label, 0, 0, 10000, 1,
+            PropertyEditorKind::Integer);
+        property.group = "Layout";
+        property.domain = PropertyEditorDomain::Layout;
+        property.impact = PropertyImpactLocalLayout |
+                          PropertyImpactAncestorLayout | PropertyImpactCode;
+        spec.properties.Add(property);
+        spec.defaults.Set(field.id, 0);
     }
 
     UiDesignerPropertySpec role;

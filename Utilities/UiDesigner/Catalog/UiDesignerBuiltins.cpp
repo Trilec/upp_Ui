@@ -29,11 +29,17 @@ static UiDesignerControlSpec MakeSpec(
 
     spec.defaults.Set("visible", true);
     spec.defaults.Set("enabled", true);
-    spec.defaults.Set("x", 20);
-    spec.defaults.Set("y", 20);
-    spec.defaults.Set("width", size.cx);
-    spec.defaults.Set("height", size.cy);
     spec.defaults.Set("role", "Standard");
+    if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
+        UiDesignerPropertySpec inset = UiDesignerNumberProperty(
+            "inset", "Inset", 0, 0, 1000, 1, PropertyEditorKind::Integer);
+        inset.group = "Layout";
+        inset.domain = PropertyEditorDomain::Layout;
+        inset.impact = PropertyImpactLocalLayout |
+                       PropertyImpactAncestorLayout | PropertyImpactCode;
+        spec.properties.Add(inset);
+        spec.defaults.Set("inset", 0);
+    }
     return spec;
 }
 
@@ -283,6 +289,20 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                           Size(320, 180));
         s.capabilities |= UiDesignerCapabilityFreeform;
         s.child_adapter_id = "absolute";
+        for(const auto& field : {std::pair<const char *, const char *>("x", "X"),
+                                 {"y", "Y"}, {"width", "Width"}, {"height", "Height"}}) {
+            UiDesignerPropertySpec p = UiDesignerNumberProperty(
+                field.first, field.second,
+                field.first == String("width") ? s.default_size.cx :
+                field.first == String("height") ? s.default_size.cy : 20,
+                0, 10000, 1, PropertyEditorKind::Integer);
+            p.group = "Absolute position";
+            p.domain = PropertyEditorDomain::Layout;
+            p.impact = PropertyImpactLocalLayout |
+                       PropertyImpactAncestorLayout | PropertyImpactCode;
+            s.properties.Add(p);
+            s.defaults.Set(field.first, p.default_value);
+        }
         s.help = "Places each child at an exact local X, Y, width and height. "
                  "Children may overlap and paint in insertion order.";
         catalog.Register(pick(s));

@@ -367,7 +367,11 @@ typedef void (*UiDesignerChildAttachFn)(UiDesignerChildAttachContext&);
 
 static void AttachRoot(UiDesignerChildAttachContext& c)
 {
-    c.out << "\tAdd(" << c.member << ");\n";
+    if(c.child.GetProperty("width_mode", "Expand") == "Expand" &&
+       c.child.GetProperty("height_mode", "Expand") == "Expand")
+        c.out << "\tAdd(" << c.member << ".SizePos());\n";
+    else
+        c.out << "\tAdd(" << c.member << ");\n";
 }
 
 static void AttachAdd(UiDesignerChildAttachContext& c)

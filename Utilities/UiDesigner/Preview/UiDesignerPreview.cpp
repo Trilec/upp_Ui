@@ -876,10 +876,40 @@ void UiDesignerPreviewCanvas::LayoutNode(
                 max(0, (int)Effective(*node, "height", 32)));
     }
     if(!managed) {
-        const int x = (int)Effective(*node, "x", 20 + depth * 18);
-        const int y = (int)Effective(*node, "y", 20 + ordinal * 44);
-        const int cx = max(20, (int)Effective(*node, "width", 160));
-        const int cy = max(20, (int)Effective(*node, "height", 32));
+        Rect available = node->parent == document_->GetRootId()
+            ? rects_.Get(node->parent) : RectC(0, 0, GetSize().cx, GetSize().cy);
+        const UiDesignerNode* host = document_->Find(node->parent);
+        const int inset = host ? max(0, (int)host->GetProperty("inset", 0)) : 0;
+        available = available.Deflated(DPI(inset));
+        auto Axis = [&](const char *mode_id, const char *fixed_id,
+                        const char *min_id, const char *max_id,
+                        int natural, int extent) {
+            const String mode = Effective(*node, mode_id, "Expand");
+            int value = mode == "Expand" ? extent :
+                        mode == "Fixed" ? (int)Effective(*node, fixed_id, natural) : natural;
+            value = max(value, (int)Effective(*node, min_id, 0));
+            const int limit = (int)Effective(*node, max_id, 0);
+            if(limit > 0) value = min(value, limit);
+            return max(1, value);
+        };
+        const int cx = Axis("width_mode", "fixed_width", "min_width", "max_width",
+                            max(1, instance.control->GetMinSize().cx), available.Width());
+        const int cy = Axis("height_mode", "fixed_height", "min_height", "max_height",
+                            max(1, instance.control->GetMinSize().cy), available.Height());
+        auto Align = [](const String& align, int extent, int size) {
+            if(align == "Center") return max(0, (extent - size) / 2);
+            if(align == "Right" || align == "Bottom") return max(0, extent - size);
+            return 0;
+        };
+        const String ax = Effective(*node, "cell_align_x", "Auto");
+        const String ay = Effective(*node, "cell_align_y", "Auto");
+        const Rect root_rect = rects_.Get(node->parent);
+        const int x = node->parent == document_->GetRootId()
+            ? available.left - root_rect.left + Align(ax == "Auto" ? "Left" : ax, available.Width(), cx)
+            : (int)Effective(*node, "x", 20 + depth * 18);
+        const int y = node->parent == document_->GetRootId()
+            ? available.top - root_rect.top + Align(ay == "Auto" ? "Top" : ay, available.Height(), cy)
+            : (int)Effective(*node, "y", 20 + ordinal * 44);
         instance.control->SetRect(x, y, cx, cy);
     }
 

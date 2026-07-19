@@ -498,11 +498,7 @@ void UiDesignerWindow::ActivateToolbox(const String& id)
         session_.NewDocument(preset_id);
         return;
     }
-    UiDesignerDropPlan plan = session_.PlanAddControl(id);
-    String error;
-    UiDesignerNodeId created = 0;
-    if(!plan.valid || !session_.ExecuteDrop(plan, &created, error))
-        RefreshStatus(plan.valid ? error : plan.reason);
+    RefreshStatus("Selected " + id + ". Drag it onto the Window to add it.");
 }
 
 void UiDesignerWindow::TrackCatalogDrag(const String& type_id, Point screen)

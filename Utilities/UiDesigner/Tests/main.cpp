@@ -75,15 +75,25 @@ CONSOLE_APP_MAIN
     Check(panel_plan.valid && panel_plan.parent == root,
           "root window accepts Panel drops");
     Check(panel_plan.has_canvas_position &&
-              panel_plan.add_defaults.Find("x") >= 0 &&
-              panel_plan.add_defaults.Find("y") >= 0,
-          "root window drop keeps free-position coordinates");
+              panel_plan.add_defaults.Find("x") < 0 &&
+              panel_plan.add_defaults.Find("y") < 0 &&
+              panel_plan.add_defaults.GetValue(panel_plan.add_defaults.Find("width_mode")) == "Expand" &&
+              panel_plan.add_defaults.GetValue(panel_plan.add_defaults.Find("height_mode")) == "Expand" &&
+              panel_plan.add_defaults.GetValue(panel_plan.add_defaults.Find("cell_align_x")) == "Center" &&
+              panel_plan.add_defaults.GetValue(panel_plan.add_defaults.Find("cell_align_y")) == "Center",
+          "root window drop uses centered expand placement without x/y");
     UiDesignerDropPlan layout_plan =
         drop_session.PlanAddControl("UiBoxLayout", root, Point(64, 48), true);
     Check(layout_plan.valid && layout_plan.parent == root,
           "root window accepts BoxLayout drops");
-    Check(layout_plan.has_canvas_position,
-          "root window drop plan keeps canvas coordinates for layouts");
+    Check(layout_plan.has_canvas_position && layout_plan.add_defaults.Find("x") < 0,
+          "root window drop ignores canvas coordinates for layouts");
+    UiDesignerNodeId first_root = 0;
+    String drop_error;
+    Check(drop_session.ExecuteDrop(panel_plan, &first_root, drop_error),
+          "root drop executes: " + drop_error);
+    Check(!drop_session.PlanAddControl("UiLabel", root, Point(10, 10), true).valid,
+          "root window rejects a second direct child");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);
@@ -190,7 +200,7 @@ CONSOLE_APP_MAIN
           "inspector model receives committed value");
     Check(session.CommitProperty("visible", false, error),
           "boolean commit succeeds: " + error);
-    Check(session.CommitProperty("width", 320, error),
+    Check(session.CommitProperty("fixed_width", 320, error),
           "integer commit succeeds: " + error);
     Check(session.Commands().CanUndo(), "bulk edit is one history entry");
     Check(session.Undo(), "bulk edit undo");

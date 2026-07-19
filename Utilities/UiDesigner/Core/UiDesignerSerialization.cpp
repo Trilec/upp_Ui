@@ -183,6 +183,25 @@ static bool LoadActions(UiDesignerNode& node, const ValueArray& encoded,
     return true;
 }
 
+static void NormalizePlacementProperties(ValueMap& properties)
+{
+    const struct { const char *old_id; const char *new_id; } aliases[] = {
+        {"minimum_width", "min_width"}, {"minimum_height", "min_height"},
+        {"maximum_width", "max_width"}, {"maximum_height", "max_height"},
+    };
+    for(const auto& alias : aliases)
+        if(properties.Find(alias.old_id) >= 0 && properties.Find(alias.new_id) < 0)
+            properties.Set(alias.new_id, properties.GetValue(properties.Find(alias.old_id)));
+    if(properties.Find("width_mode") < 0 && properties.Find("width") >= 0) {
+        properties.Set("width_mode", "Fixed");
+        properties.Set("fixed_width", properties.GetValue(properties.Find("width")));
+    }
+    if(properties.Find("height_mode") < 0 && properties.Find("height") >= 0) {
+        properties.Set("height_mode", "Fixed");
+        properties.Set("fixed_height", properties.GetValue(properties.Find("height")));
+    }
+}
+
 static bool LoadNodes(const ValueArray& nodes, bool legacy,
                       UiDesignerDocument& loaded, String& error)
 {
@@ -196,6 +215,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
     window->properties = legacy
         ? LegacyProperties(UiDesignerMapValue(root_node, "properties", ValueMap()))
         : (ValueMap)UiDesignerMapValue(root_node, "properties", ValueMap());
+    NormalizePlacementProperties(window->properties);
 
     VectorMap<int64, int64> id_map;
     id_map.Add((int64)UiDesignerMapValue(root_node, "id", 1), loaded.GetRootId());
@@ -235,6 +255,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             ValueMap properties = legacy
                 ? LegacyProperties(UiDesignerMapValue(n, "properties", ValueMap()))
                 : (ValueMap)UiDesignerMapValue(n, "properties", ValueMap());
+            NormalizePlacementProperties(properties);
             if(legacy && UiDesignerMapValue(n, "last_rect", Value()).Is<ValueMap>()) {
                 ValueMap r = UiDesignerMapValue(n, "last_rect", ValueMap());
                 const int left = UiDesignerMapValue(r, "left", 0);
