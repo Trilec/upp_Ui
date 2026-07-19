@@ -32,6 +32,14 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     if(resizing_)
         root_rect = resize_pending_rect_;
 
+    const Color frame = Color(103, 232, 249);
+    const int thickness = DPI(4);
+    const int half = thickness / 2;
+    w.DrawRect(root_rect.left - half, root_rect.top - half, root_rect.Width() + thickness, thickness, frame);
+    w.DrawRect(root_rect.left - half, root_rect.bottom - half, root_rect.Width() + thickness, thickness, frame);
+    w.DrawRect(root_rect.left - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
+    w.DrawRect(root_rect.right - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
+
     const UiDesignerSelection& selection = owner_->session_.State().selection;
     const int step = DPI(7);
     const int dot = DPI(3);
@@ -40,6 +48,8 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         if(r.IsEmpty())
             continue;
         r.Offset(canvas_origin.x, canvas_origin.y);
+        if(r == root_rect)
+            r = r.Deflated(DPI(5));
         if(id == root->id && resizing_)
             r = resize_pending_rect_;
         const Color color = id == selection.primary
@@ -64,6 +74,8 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         if(r.IsEmpty())
             continue;
         r.Offset(canvas_origin.x, canvas_origin.y);
+        if(r == root_rect)
+            r = r.Deflated(DPI(5));
         const Color outline = Blend(SColorText(), SColorPaper(), 150);
         for(int x = r.left + 1; x < r.right - 1; x += DPI(6)) {
             w.DrawRect(x, r.top + 1, min(DPI(3), r.right - x - 1), 1, outline);
@@ -73,15 +85,30 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
             w.DrawRect(r.left + 1, y, 1, min(DPI(3), r.bottom - y - 1), outline);
             w.DrawRect(r.right - 2, y, 1, min(DPI(3), r.bottom - y - 1), outline);
         }
+        if(node.GetProperty("debug_layout", false)) {
+            const Color debug = Color(168, 85, 247);
+            const int inset = max(0, (int)node.GetProperty("inset", 0));
+            Rect body = r.Deflated(DPI(inset));
+            w.DrawRect(body, debug);
+            for(UiDesignerNodeId child_id : node.children) {
+                Rect child = owner_->preview_canvas_.GetNodeRect(child_id);
+                if(!child.IsEmpty()) {
+                    child.Offset(canvas_origin.x, canvas_origin.y);
+                    w.DrawRect(child, Blend(debug, White(), 80));
+                }
+            }
+            if(node.type == "UiGridLayout") {
+                const int rows = max(1, (int)node.GetProperty("rows", 1));
+                const int columns = max(1, (int)node.GetProperty("columns", 1));
+                for(int row = 1; row < rows; row++)
+                    w.DrawLine(body.left, body.top + body.Height() * row / rows,
+                               body.right, body.top + body.Height() * row / rows, 1, debug);
+                for(int column = 1; column < columns; column++)
+                    w.DrawLine(body.left + body.Width() * column / columns, body.top,
+                               body.left + body.Width() * column / columns, body.bottom, 1, debug);
+            }
+        }
     }
-
-    const Color frame = Color(103, 232, 249);
-    const int thickness = DPI(4);
-    const int half = thickness / 2;
-    w.DrawRect(root_rect.left - half, root_rect.top - half, root_rect.Width() + thickness, thickness, frame);
-    w.DrawRect(root_rect.left - half, root_rect.bottom - half, root_rect.Width() + thickness, thickness, frame);
-    w.DrawRect(root_rect.left - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
-    w.DrawRect(root_rect.right - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
 
     const int handle = DPI(12);
     const Color fill = Blend(frame, White(), 170);
@@ -316,16 +343,47 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
         return;
     }
 
-    const UiDesignerNodeId target = owner_->session_.Document().GetRootId();
+    const UiDesignerDocument& document = owner_->session_.Document();
     const Point doc_local = overlay_local - root.TopLeft();
-    drop_plan_ = owner_->session_.PlanAddControl(type_id, target, doc_local, true);
-    drop_indicator_ = root;
+    drop_plan_ = UiDesignerDropPlan();
+    UiDesignerNodeId target = owner_->preview_canvas_.HitNode(doc_local);
+    if(!target)
+        target = document.GetRootId();
+    for(UiDesignerNodeId candidate = target; candidate; ) {
+        const UiDesignerNode* node = document.Find(candidate);
+        if(!node)
+            break;
+        UiDesignerDropPlan candidate_plan = owner_->session_.PlanAddControl(
+            type_id, candidate,
+            doc_local - owner_->preview_canvas_.GetNodeRect(candidate).TopLeft(),
+            true);
+        if(candidate_plan.valid) {
+            drop_plan_ = pick(candidate_plan);
+            target = candidate;
+            break;
+        }
+        candidate = node->parent;
+    }
+    if(!drop_plan_.valid)
+        drop_plan_ = owner_->session_.PlanAddControl(type_id,
+            document.GetRootId(), doc_local, true);
+    Rect target_rect = owner_->preview_canvas_.GetNodeRect(drop_plan_.parent);
+    if(target_rect.IsEmpty())
+        target_rect = root;
+    drop_indicator_ = target_rect.Offseted(root.TopLeft());
+    const UiDesignerNode* target_node = document.Find(drop_plan_.parent);
+    const String target_name = target_node && target_node->id != document.GetRootId()
+        ? (owner_->session_.Catalog().Find(target_node->type)
+            ? owner_->session_.Catalog().Find(target_node->type)->display_name
+            : target_node->type)
+        : "Window";
     if(drop_plan_.valid) {
-        SetDragStatus(Format("drag %s -> Window : valid", type_id));
+        SetDragStatus(Format("drag %s -> %s : valid", type_id, target_name));
     }
     else {
-        SetDragStatus(Format("drag %s -> Window : invalid%s",
+        SetDragStatus(Format("drag %s -> %s : invalid%s",
                              type_id,
+                             target_name,
                              drop_plan_.reason.IsEmpty() ? String()
                                                          : ", " + drop_plan_.reason));
         if(!allow_invalid_feedback)

@@ -250,6 +250,14 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         s.capabilities |= UiDesignerCapabilityOrdered |
                           UiDesignerCapabilityAcceptSpacer;
         s.child_adapter_id = "box";
+        UiDesignerPropertySpec debug = UiDesignerBoolProperty(
+            "debug_layout", "Debug geometry", false);
+        debug.group = "Designer";
+        debug.domain = PropertyEditorDomain::DesignerOnly;
+        debug.designer_only = true;
+        debug.impact = PropertyImpactPaint;
+        s.properties.Add(debug);
+        s.defaults.Set("debug_layout", false);
         UiDesignerPropertySpec direction = ChoiceProperty(
             "direction", "Direction", "Layout", "V",
             {{"H", "Horizontal"}, {"V", "Vertical"}});
@@ -265,6 +273,14 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         s.capabilities |= UiDesignerCapabilityGrid |
                           UiDesignerCapabilityAcceptSpacer;
         s.child_adapter_id = "grid";
+        UiDesignerPropertySpec debug = UiDesignerBoolProperty(
+            "debug_layout", "Debug geometry", false);
+        debug.group = "Designer";
+        debug.domain = PropertyEditorDomain::DesignerOnly;
+        debug.designer_only = true;
+        debug.impact = PropertyImpactPaint;
+        s.properties.Add(debug);
+        s.defaults.Set("debug_layout", false);
         auto rows = UiDesignerNumberProperty("rows", "Rows", 2, 1, 64, 1,
                                              PropertyEditorKind::Integer);
         rows.group = "Structure";

@@ -166,6 +166,13 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.Enable((bool)value);
         return UiDesignerApplyResult::AppliedControlState;
     }
+    if(property == "inset") {
+        const int inset = max(0, (int)value);
+        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) box->SetInset(DPI(inset));
+        else if(auto *grid = dynamic_cast<UiGridLayout *>(&ctrl)) grid->SetInset(DPI(inset));
+        else return UiDesignerApplyResult::Rejected;
+        return UiDesignerApplyResult::AppliedAncestorLayout;
+    }
     if(property == "role") {
         const UiRole role = ParseRole(value);
         if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) panel->SetCustomStyle(UiTheme::ResolvePanel(role));
@@ -463,7 +470,8 @@ static void ConfigureBoxSpacer(UiBoxLayout& box,
     if(!node.GetProperty("layout_break", false)) {
         const bool horizontal = box.GetDirection() == UiDirection::H;
         const String main_mode = node.GetProperty(
-            horizontal ? "h_sizing" : "v_sizing", "Auto");
+            horizontal ? "width_mode" : "height_mode",
+            node.GetProperty(horizontal ? "h_sizing" : "v_sizing", "Fit"));
         const String cross_mode = node.GetProperty(
             horizontal ? "v_sizing" : "h_sizing", "Auto");
         const int fixed_main = node.GetProperty(
@@ -575,10 +583,11 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
             horizontal ? "h_sizing" : "v_sizing", "Auto");
         const int fixed_main = node.GetProperty(
             horizontal ? "fixed_width" : "fixed_height", 0);
-        if(main_mode == "Fill")
+        if(main_mode == "Expand" || main_mode == "Fill")
             item.Expand(max(1, (int)(double)node.GetProperty("weight", 1.0)));
         else if(main_mode == "Fixed")
-            item.Fixed(max(0, fixed_main));
+            item.Fixed(max(1, fixed_main > 0 ? fixed_main :
+                          (horizontal ? child.GetMinSize().cx : child.GetMinSize().cy)));
         else
             item.Fit();
 
@@ -592,6 +601,11 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
             horizontal ? "max_height" : "max_width", 0);
         item.MinMaxMain(min_main, max_main > 0 ? max_main : INT_MAX);
         item.MinMaxCross(min_cross, max_cross > 0 ? max_cross : INT_MAX);
+        const String cross = node.GetProperty(horizontal ? "cell_align_y" : "cell_align_x", "Auto");
+        item.AlignSelf(cross == "Center" ? UiCrossAlign::Center :
+                       cross == "Right" || cross == "Bottom" ? UiCrossAlign::End :
+                       cross == "Left" || cross == "Top" ? UiCrossAlign::Start :
+                       UiCrossAlign::Auto);
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
