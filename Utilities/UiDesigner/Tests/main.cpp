@@ -148,8 +148,17 @@ CONSOLE_APP_MAIN
           "Box snapshot keeps runtime item rectangles");
     Check(box_geometry && box_geometry->gap == 8,
           "Box snapshot keeps authoritative gap geometry");
+    Check(box_geometry && box_geometry->gap_rects.GetCount() > 0,
+          "Box snapshot exposes explicit gap regions");
+    Check(box_geometry && box_geometry->item_rects.GetCount() > 0 &&
+              box_geometry->item_rects[0].TopLeft() !=
+              preview.GetNodeRect(preview_box).TopLeft(),
+          "Box item rectangles use document coordinates");
     Check(box_geometry && geometry.Hit(Point(1, 1)) == preview_box,
           "exposed Box region resolves to the Box");
+    Check(panel_geometry && geometry.HitDropTarget(preview_a.CenterPoint()) == preview_panel_a,
+          Format("drop resolver starts with the foremost supported target: %d / %d",
+                 (int)geometry.HitDropTarget(preview_a.CenterPoint()), (int)preview_panel_a));
     Check(geometry.Hit(preview_a.CenterPoint()) == preview_panel_a,
           "snapshot hit testing agrees with the painted Panel target");
 
@@ -330,6 +339,8 @@ CONSOLE_APP_MAIN
           "generated property");
     Check(generated.json.Find("upp-ui-designer-next") >= 0,
           "generated JSON");
+    Check(json.Find("geometry") < 0 && generated.source.Find("GeometrySnapshot") < 0,
+          "geometry snapshot remains outside serialization and codegen");
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

@@ -7,14 +7,22 @@ struct UiDesignerGeometryRecord : Moveable<UiDesignerGeometryRecord> {
     Rect rect, body;
     int depth = 0, order = 0, inset = 0, gap = 0;
     bool selectable = false, drop_target = false;
-    Vector<Rect> item_rects, gap_rects;
+    Vector<Rect> item_rects, gap_rects, inset_rects;
 };
 class UiDesignerGeometrySnapshot {
 public:
-    void Clear() { records_.Clear(); }
-    void Add(UiDesignerGeometryRecord record) { records_.Add(pick(record)); }
+    int GetCount() const { return records_.GetCount(); }
     const UiDesignerGeometryRecord* Find(UiDesignerNodeId node) const;
     UiDesignerNodeId Hit(Point p) const;
+    UiDesignerNodeId HitDropTarget(Point p) const;
+private:
+    friend class UiDesignerGeometrySnapshotBuilder;
+    Array<UiDesignerGeometryRecord> records_;
+};
+class UiDesignerGeometrySnapshotBuilder {
+public:
+    void Add(UiDesignerGeometryRecord record) { records_.Add(pick(record)); }
+    UiDesignerGeometrySnapshot Publish() { UiDesignerGeometrySnapshot result; result.records_ = pick(records_); return result; }
 private:
     Array<UiDesignerGeometryRecord> records_;
 };

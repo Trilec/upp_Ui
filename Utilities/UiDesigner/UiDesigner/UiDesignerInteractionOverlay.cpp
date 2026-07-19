@@ -30,7 +30,9 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         return;
 
     const Point canvas_origin = owner_->preview_canvas_.GetRect().TopLeft();
-    Rect root_rect = owner_->preview_canvas_.GetNodeRect(root->id).Offseted(canvas_origin);
+    const UiDesignerGeometryRecord* root_geometry =
+        owner_->preview_canvas_.GetGeometrySnapshot().Find(root->id);
+    Rect root_rect = root_geometry ? root_geometry->rect.Offseted(canvas_origin) : Rect();
     if(resizing_)
         root_rect = resize_pending_rect_;
 
@@ -93,14 +95,17 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         }
         if(node.GetProperty("debug_layout", false)) {
             const Color debug = Color(168, 85, 247);
-            Rect body = geometry ? geometry->body : r;
+            Rect body = geometry ? geometry->body.Offseted(canvas_origin) : r;
             w.DrawRect(body, debug);
             if(geometry)
                 for(const Rect& item : geometry->item_rects)
-                    w.DrawRect(item.Offseted(r.TopLeft()), Blend(debug, White(), 80));
+                    w.DrawRect(item.Offseted(canvas_origin), debug);
             if(geometry)
                 for(const Rect& gap : geometry->gap_rects)
-                    w.DrawRect(gap.Offseted(r.TopLeft()), debug);
+                    w.DrawRect(gap.Offseted(canvas_origin), Blend(debug, White(), 160));
+            if(geometry)
+                for(const Rect& inset : geometry->inset_rects)
+                    w.DrawRect(inset.Offseted(canvas_origin), Blend(debug, White(), 180));
         }
     }
 
@@ -340,7 +345,7 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
     const UiDesignerDocument& document = owner_->session_.Document();
     const Point doc_local = overlay_local - root.TopLeft();
     drop_plan_ = UiDesignerDropPlan();
-    UiDesignerNodeId target = owner_->preview_canvas_.GetGeometrySnapshot().Hit(doc_local);
+    UiDesignerNodeId target = owner_->preview_canvas_.GetGeometrySnapshot().HitDropTarget(doc_local);
     if(!target)
         target = document.GetRootId();
     for(UiDesignerNodeId candidate = target; candidate; ) {
@@ -349,7 +354,7 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
             break;
         UiDesignerDropPlan candidate_plan = owner_->session_.PlanAddControl(
             type_id, candidate,
-            doc_local - owner_->preview_canvas_.GetNodeRect(candidate).TopLeft(),
+            doc_local - owner_->preview_canvas_.GetGeometrySnapshot().Find(candidate)->rect.TopLeft(),
             true);
         if(candidate_plan.valid) {
             drop_plan_ = pick(candidate_plan);
@@ -361,7 +366,9 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
     if(!drop_plan_.valid)
         drop_plan_ = owner_->session_.PlanAddControl(type_id,
             document.GetRootId(), doc_local, true);
-    Rect target_rect = owner_->preview_canvas_.GetNodeRect(drop_plan_.parent);
+    const UiDesignerGeometryRecord* target_geometry =
+        owner_->preview_canvas_.GetGeometrySnapshot().Find(drop_plan_.parent);
+    Rect target_rect = target_geometry ? target_geometry->rect : Rect();
     if(target_rect.IsEmpty())
         target_rect = root;
     drop_indicator_ = target_rect.Offseted(root.TopLeft());

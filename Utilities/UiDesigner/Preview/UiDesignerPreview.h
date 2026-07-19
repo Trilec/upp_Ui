@@ -119,6 +119,7 @@ public:
     Rect GetNodeRect(UiDesignerNodeId node) const;
     UiDesignerNodeId HitNode(Point p) const;
     const UiDesignerGeometrySnapshot& GetGeometrySnapshot() const { return geometry_; }
+    const UiDesignerGeometryRecord* FindGeometry(UiDesignerNodeId node) const { return geometry_.Find(node); }
 
     const UiDesignerPreviewStats& GetStats() const { return stats_; }
     void ResetStats() { stats_.Clear(); }

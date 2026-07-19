@@ -445,7 +445,7 @@ void UiDesignerPreviewCanvas::DestroyInstances()
             instance.control->Remove();
     instances_.Clear();
     rects_.Clear();
-    geometry_.Clear();
+    geometry_ = UiDesignerGeometrySnapshot();
 }
 
 Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
@@ -984,14 +984,14 @@ void UiDesignerPreviewCanvas::Layout()
     for(UiDesignerNodeId child : root->children)
         LayoutNode(child, ordinal++, 0);
 
-    geometry_.Clear();
+    UiDesignerGeometrySnapshotBuilder snapshot;
     UiDesignerGeometryRecord root_record;
     root_record.node = root->id;
     root_record.rect = rects_.Get(root->id);
     root_record.body = root_record.rect;
     root_record.selectable = true;
     root_record.drop_target = true;
-    geometry_.Add(pick(root_record));
+    snapshot.Add(pick(root_record));
     int order = 0;
     for(const UiDesignerPreviewInstance& instance : instances_) {
         const UiDesignerNode* node = document_->Find(instance.node);
@@ -1021,19 +1021,40 @@ void UiDesignerPreviewCanvas::Layout()
            (node->type == "UiBoxLayout" || node->type == "UiGridLayout")) {
             if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get()))
                 for(int i = 0; i < box->GetItemCount(); i++)
-                    record.item_rects.Add(box->GetItemRect(i));
+                    record.item_rects.Add(box->GetItemRect(i).Offseted(record.rect.TopLeft()));
             if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get()))
                 for(int i = 0; i < grid->GetItemCount(); i++)
-                    record.item_rects.Add(grid->GetItemRect(i));
+                    record.item_rects.Add(grid->GetItemRect(i).Offseted(record.rect.TopLeft()));
             for(int i = 1; i < record.item_rects.GetCount(); i++) {
                 Rect a = record.item_rects[i - 1], b = record.item_rects[i];
                 if(a.right < b.left)
                     record.gap_rects.Add(RectC(a.right, max(a.top, b.top),
                         b.left - a.right, max(0, min(a.bottom, b.bottom) - max(a.top, b.top))));
+                else if(a.bottom < b.top)
+                    record.gap_rects.Add(RectC(max(a.left, b.left), a.bottom,
+                        max(0, min(a.right, b.right) - max(a.left, b.left)), b.top - a.bottom));
+            }
+            if(record.gap_rects.IsEmpty() && record.gap > 0 && record.item_rects.GetCount() > 1) {
+                Rect a = record.item_rects[0], b = record.item_rects[1];
+                if(a.CenterPoint().x <= b.CenterPoint().x)
+                    record.gap_rects.Add(RectC((a.right + b.left) / 2, a.top, 1, max(1, a.Height())));
+                else
+                    record.gap_rects.Add(RectC(a.left, (a.bottom + b.top) / 2, max(1, a.Width()), 1));
             }
         }
-        geometry_.Add(pick(record));
+        if(record.inset > 0) {
+            record.inset_rects.Add(RectC(record.rect.left, record.rect.top,
+                                         record.rect.Width(), DPI(record.inset)));
+            record.inset_rects.Add(RectC(record.rect.left, record.body.bottom,
+                                         record.rect.Width(), DPI(record.inset)));
+            record.inset_rects.Add(RectC(record.rect.left, record.body.top,
+                                         DPI(record.inset), record.body.Height()));
+            record.inset_rects.Add(RectC(record.body.right, record.body.top,
+                                         DPI(record.inset), record.body.Height()));
+        }
+        snapshot.Add(pick(record));
     }
+    geometry_ = snapshot.Publish();
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(
