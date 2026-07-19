@@ -251,6 +251,13 @@ void UiDesignerWindow::BuildDesigner()
                   .Add("Landscape 2:1", "2:1");
     square_.SetIcon(ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48())
            .SetIconSize(DPI(17), DPI(17)).Tip("Square");
+    decorations_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(16), DPI(16))
+                .Tip("Toggle Designer decorations");
+    decorations_.WhenAction = [=] {
+        static bool visible = true;
+        visible = !visible;
+        interaction_overlay_.SetDecorationsVisible(visible);
+    };
 
     portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(576, 1024)); };
     landscape_.WhenAction = [=] { session_.SetVirtualSize(Size(1024, 576)); };
@@ -269,7 +276,8 @@ void UiDesignerWindow::BuildDesigner()
     aspect_pill_.AddControl(portrait_, DPI(32))
                 .AddControl(landscape_, DPI(32))
                 .AddControl(square_, DPI(32))
-                .AddControl(aspect_preset_, DPI(92));
+                .AddControl(aspect_preset_, DPI(92))
+                .AddControl(decorations_, DPI(32));
 
     preview_scroll_.SetCustomStyle(UiDesignerPreviewStyle());
     preview_scroll_.SetInset(DPI(0));

@@ -166,10 +166,16 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.Enable((bool)value);
         return UiDesignerApplyResult::AppliedControlState;
     }
-    if(property == "inset") {
-        const int inset = max(0, (int)value);
-        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) box->SetInset(DPI(inset));
-        else if(auto *grid = dynamic_cast<UiGridLayout *>(&ctrl)) grid->SetInset(DPI(inset));
+    if(property == "inset" || property == "gap") {
+        const int amount = max(0, (int)value);
+        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
+            if(property == "inset") box->SetInset(DPI(amount));
+            else box->SetGap(DPI(amount));
+        }
+        else if(auto *grid = dynamic_cast<UiGridLayout *>(&ctrl)) {
+            if(property == "inset") grid->SetInset(DPI(amount));
+            else grid->SetGap(DPI(amount));
+        }
         else return UiDesignerApplyResult::Rejected;
         return UiDesignerApplyResult::AppliedAncestorLayout;
     }
@@ -486,7 +492,6 @@ static void ConfigureBoxSpacer(UiBoxLayout& box,
             horizontal ? "min_height" : "min_width", 0);
         const int max_cross = node.GetProperty(
             horizontal ? "max_height" : "max_width", 0);
-
         if(main_mode == "Fixed" && fixed_main > 0)
             item.Fixed(fixed_main);
         else
@@ -561,7 +566,8 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
 static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
                                const UiDesignerNode& node,
                                const String& adapter,
-                               int& layout_item_index)
+                               int& layout_item_index,
+                               Size catalog_size = Size(160, 32))
 {
     if(adapter == "single") {
         parent.Add(child.SizePos());
@@ -580,7 +586,8 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
         UiBoxLayout::ItemRef item = box->Add(child);
         const bool horizontal = box->GetDirection() == UiDirection::H;
         const String main_mode = node.GetProperty(
-            horizontal ? "h_sizing" : "v_sizing", "Auto");
+            horizontal ? "width_mode" : "height_mode",
+            node.GetProperty(horizontal ? "h_sizing" : "v_sizing", "Fit"));
         const int fixed_main = node.GetProperty(
             horizontal ? "fixed_width" : "fixed_height", 0);
         if(main_mode == "Expand" || main_mode == "Fill")
@@ -599,13 +606,25 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
             horizontal ? "min_height" : "min_width", 0);
         const int max_cross = node.GetProperty(
             horizontal ? "max_height" : "max_width", 0);
-        item.MinMaxMain(min_main, max_main > 0 ? max_main : INT_MAX);
-        item.MinMaxCross(min_cross, max_cross > 0 ? max_cross : INT_MAX);
-        const String cross = node.GetProperty(horizontal ? "cell_align_y" : "cell_align_x", "Auto");
-        item.AlignSelf(cross == "Center" ? UiCrossAlign::Center :
-                       cross == "Right" || cross == "Bottom" ? UiCrossAlign::End :
-                       cross == "Left" || cross == "Top" ? UiCrossAlign::Start :
-                       UiCrossAlign::Auto);
+        const String cross_mode = node.GetProperty(
+            horizontal ? "height_mode" : "width_mode", "Fit");
+        const int natural_main = horizontal ? catalog_size.cx : catalog_size.cy;
+        const int natural_cross = horizontal ? catalog_size.cy : catalog_size.cx;
+        item.MinMaxMain(main_mode == "Fixed" ? min_main : max(min_main, natural_main),
+                        main_mode == "Fixed" ? (max_main > 0 ? max_main : fixed_main) :
+                        max(max_main, natural_main));
+        if(cross_mode == "Expand") {
+            item.MinMaxCross(min_cross, max_cross > 0 ? max_cross : INT_MAX)
+                .AlignSelf(UiCrossAlign::Stretch);
+        }
+        else {
+            item.MinMaxCross(max(min_cross, natural_cross),
+                             max(max_cross, natural_cross));
+            const String cross = node.GetProperty(horizontal ? "cell_align_y" : "cell_align_x", "Center");
+            item.AlignSelf(cross == "Center" ? UiCrossAlign::Center :
+                           cross == "Right" || cross == "Bottom" ? UiCrossAlign::End :
+                           UiCrossAlign::Start);
+        }
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
@@ -683,7 +702,7 @@ void UiDesignerPreviewCanvas::BuildNode(
         AttachRuntimeChild(*parent_instance->control, *instance.control,
                            *node,
                            parent_spec ? parent_spec->child_adapter_id : "add",
-                           instance.layout_item_index);
+                           instance.layout_item_index, spec->default_size);
     else
         fallback_parent.Add(*instance.control);
     ApplyAllProperties(instance, *node);
@@ -889,7 +908,7 @@ void UiDesignerPreviewCanvas::LayoutNode(
                 max(0, (int)Effective(*node, "width", 160)),
                 max(0, (int)Effective(*node, "height", 32)));
     }
-    if(!managed) {
+    if(node->parent == document_->GetRootId() || !managed) {
         Rect available = node->parent == document_->GetRootId()
             ? rects_.Get(node->parent) : RectC(0, 0, GetSize().cx, GetSize().cy);
         const UiDesignerNode* host = document_->Find(node->parent);
@@ -926,6 +945,13 @@ void UiDesignerPreviewCanvas::LayoutNode(
             : (int)Effective(*node, "y", 20 + ordinal * 44);
         instance.control->SetRect(x, y, cx, cy);
     }
+    else if(instance.runtime_parent) {
+        Ctrl* parent = FindRuntime(instance.runtime_parent);
+        if(auto *box = dynamic_cast<UiBoxLayout *>(parent))
+            instance.control->SetRect(box->GetItemRect(instance.layout_item_index));
+        else if(auto *grid = dynamic_cast<UiGridLayout *>(parent))
+            instance.control->SetRect(grid->GetItemRect(instance.layout_item_index));
+    }
 
     Point origin(0, 0);
     if(instance.runtime_parent) {
@@ -935,6 +961,9 @@ void UiDesignerPreviewCanvas::LayoutNode(
     }
     const Rect local = instance.control->GetRect();
     rects_.GetAdd(node_id) = local.Offseted(origin);
+    // Parent layout has already assigned managed children. Layout this
+    // control only after its own rectangle is authoritative, then recurse.
+    instance.control->Layout();
 
     int child_ordinal = 0;
     for(UiDesignerNodeId child : node->children)
@@ -953,9 +982,6 @@ void UiDesignerPreviewCanvas::Layout()
     // rectangle is nevertheless real so hierarchy selection and resize
     // handles describe the same bounded form the user sees.
     rects_.GetAdd(root->id) = RectC(0, 0, GetSize().cx, GetSize().cy);
-    for(UiDesignerPreviewInstance& instance : instances_)
-        if(instance.control)
-            instance.control->Layout();
     int ordinal = 0;
     for(UiDesignerNodeId child : root->children)
         LayoutNode(child, ordinal++, 0);

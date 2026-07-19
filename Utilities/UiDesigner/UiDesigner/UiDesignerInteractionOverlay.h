@@ -17,6 +17,7 @@ public:
     void TrackCatalogDrag(const String& type_id, Point screen);
     bool FinishCatalogDrag(const String& type_id, Point screen);
     void CancelCatalogDrag();
+    void SetDecorationsVisible(bool on) { decorations_visible_ = on; Refresh(); }
 
     virtual void Paint(Draw& w) override;
     virtual void LeftDown(Point p, dword keyflags) override;
@@ -36,6 +37,7 @@ private:
     UiDesignerDropPlan drop_plan_;
     Rect drop_indicator_;
     String drag_status_;
+    bool decorations_visible_ = true;
 
     Rect WorkspaceRootRect() const;
     UiDesignerNodeId HitNode(Point p) const;

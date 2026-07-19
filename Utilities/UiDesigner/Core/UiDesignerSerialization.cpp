@@ -185,6 +185,12 @@ static bool LoadActions(UiDesignerNode& node, const ValueArray& encoded,
 
 static void NormalizePlacementProperties(ValueMap& properties)
 {
+    if(properties.Find("cell_align_x") >= 0 &&
+       (String)properties.GetValue(properties.Find("cell_align_x")) == "Auto")
+        properties.Set("cell_align_x", "Center");
+    if(properties.Find("cell_align_y") >= 0 &&
+       (String)properties.GetValue(properties.Find("cell_align_y")) == "Auto")
+        properties.Set("cell_align_y", "Center");
     const struct { const char *old_id; const char *new_id; } aliases[] = {
         {"minimum_width", "min_width"}, {"minimum_height", "min_height"},
         {"maximum_width", "max_width"}, {"maximum_height", "max_height"},

@@ -90,6 +90,7 @@ private:
     UiToolButton landscape_;
     UiSplitButton aspect_preset_;
     UiToolButton square_;
+    UiToolButton decorations_;
     UiScrollPanel preview_scroll_;
     // UiScrollPanel needs one content child to define its scroll extent. This
     // host is intentionally unpainted; the Window canvas is the only visible

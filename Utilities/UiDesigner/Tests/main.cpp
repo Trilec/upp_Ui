@@ -95,6 +95,48 @@ CONSOLE_APP_MAIN
     Check(!drop_session.PlanAddControl("UiLabel", root, Point(10, 10), true).valid,
           "root window rejects a second direct child");
 
+    const UiDesignerControlSpec* box_spec = catalog.Find("UiBoxLayout");
+    Check(box_spec && box_spec->defaults.GetValue(box_spec->defaults.Find("inset")) == 8,
+          "Box default inset is 8");
+    Check(box_spec && box_spec->defaults.GetValue(box_spec->defaults.Find("gap")) == 8,
+          "Box default gap is 8");
+    Check(box_spec && box_spec->FindProperty("debug_layout"),
+          "Box exposes Designer debug geometry");
+    Check(box_spec && box_spec->FindProperty("cell_align_x") &&
+              box_spec->FindProperty("cell_align_x")->choices.GetCount() == 3,
+          "Box alignment has no Auto choice");
+
+    UiDesignerDocument preview_document;
+    UiDesignerCommandService preview_commands(preview_document);
+    UiDesignerNodeId preview_box = preview_commands.AddNode(
+        "UiBoxLayout", "preview_box", preview_document.GetRootId(),
+        box_spec ? box_spec->node_flags : 0,
+        box_spec ? box_spec->defaults : ValueMap(), "Add preview Box");
+    const UiDesignerControlSpec* panel_spec = catalog.Find("UiPanel");
+    UiDesignerNodeId preview_panel_a = preview_commands.AddNode(
+        "UiPanel", "preview_panel_a", preview_box,
+        panel_spec ? panel_spec->node_flags : 0,
+        panel_spec ? panel_spec->defaults : ValueMap(), "Add preview Panel A");
+    UiDesignerNodeId preview_panel_b = preview_commands.AddNode(
+        "UiPanel", "preview_panel_b", preview_box,
+        panel_spec ? panel_spec->node_flags : 0,
+        panel_spec ? panel_spec->defaults : ValueMap(), "Add preview Panel B");
+    UiDesignerSelection preview_selection;
+    UiDesignerPreviewCanvas preview;
+    preview.SetRect(0, 0, 512, 250);
+    preview.Bind(&preview_document, &catalog, nullptr, &preview_selection);
+    preview.RebuildDocument();
+    const Rect preview_a = preview.GetNodeRect(preview_panel_a);
+    const Rect preview_b = preview.GetNodeRect(preview_panel_b);
+    Check(preview.GetNodeRect(preview_box).Size() == Size(512, 250),
+          "preview assigns the root Box its final rectangle first");
+    Check(!preview_a.IsEmpty() && !preview_b.IsEmpty() && preview_a != preview_b,
+          Format("Box children have distinct non-empty preview rectangles: %s / %s",
+                 AsString(preview_a), AsString(preview_b)));
+    Check(!preview_a.IsEmpty() && preview.HitNode(preview_a.CenterPoint()) == preview_panel_a,
+          Format("preview hit testing resolves the Panel over its Box: %s",
+                 AsString(preview_a)));
+
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);
 

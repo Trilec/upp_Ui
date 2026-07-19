@@ -26,6 +26,8 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     const UiDesignerNode* root = document.Find(document.GetRootId());
     if(!root)
         return;
+    if(!decorations_visible_ && drag_type_id_.IsEmpty())
+        return;
 
     const Point canvas_origin = owner_->preview_canvas_.GetRect().TopLeft();
     Rect root_rect = owner_->preview_canvas_.GetNodeRect(root->id).Offseted(canvas_origin);

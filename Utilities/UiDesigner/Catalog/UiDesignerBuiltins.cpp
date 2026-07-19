@@ -250,6 +250,15 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         s.capabilities |= UiDesignerCapabilityOrdered |
                           UiDesignerCapabilityAcceptSpacer;
         s.child_adapter_id = "box";
+        UiDesignerPropertySpec gap = UiDesignerNumberProperty(
+            "gap", "Gap", 8, 0, 1000, 1, PropertyEditorKind::Integer);
+        gap.group = "Layout";
+        gap.domain = PropertyEditorDomain::Layout;
+        gap.impact = PropertyImpactLocalLayout | PropertyImpactAncestorLayout |
+                     PropertyImpactCode;
+        s.properties.Add(gap);
+        s.defaults.Set("inset", 8);
+        s.defaults.Set("gap", 8);
         UiDesignerPropertySpec debug = UiDesignerBoolProperty(
             "debug_layout", "Debug geometry", false);
         debug.group = "Designer";
@@ -273,6 +282,15 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         s.capabilities |= UiDesignerCapabilityGrid |
                           UiDesignerCapabilityAcceptSpacer;
         s.child_adapter_id = "grid";
+        UiDesignerPropertySpec gap = UiDesignerNumberProperty(
+            "gap", "Gap", 8, 0, 1000, 1, PropertyEditorKind::Integer);
+        gap.group = "Layout";
+        gap.domain = PropertyEditorDomain::Layout;
+        gap.impact = PropertyImpactLocalLayout | PropertyImpactAncestorLayout |
+                     PropertyImpactCode;
+        s.properties.Add(gap);
+        s.defaults.Set("inset", 8);
+        s.defaults.Set("gap", 8);
         UiDesignerPropertySpec debug = UiDesignerBoolProperty(
             "debug_layout", "Debug geometry", false);
         debug.group = "Designer";

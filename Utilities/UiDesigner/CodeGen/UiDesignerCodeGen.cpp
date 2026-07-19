@@ -205,6 +205,10 @@ void UiDesignerCodeGenerator::EmitSetup(
        spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetInset(DPI("
             << max(0, (int)node.GetProperty("inset", 0)) << "));\n";
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout ||
+       spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
+        out << "\t" << member << ".SetGap(DPI("
+            << max(0, (int)node.GetProperty("gap", 0)) << "));\n";
 
     if(const UiDesignerPropertySpec* text = spec.FindProperty("text")) {
         const Value value = node.GetProperty("text", text->default_value);

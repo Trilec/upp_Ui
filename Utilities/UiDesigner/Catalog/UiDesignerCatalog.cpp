@@ -458,8 +458,8 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
     } modes[] = {
         {"width_mode", "Width mode", "Expand"},
         {"height_mode", "Height mode", "Expand"},
-        {"cell_align_x", "Cell align X", "Auto"},
-        {"cell_align_y", "Cell align Y", "Auto"},
+        {"cell_align_x", "Cell align X", "Center"},
+        {"cell_align_y", "Cell align Y", "Center"},
     };
     for(const auto& field : modes) {
         UiDesignerPropertySpec property;
@@ -473,10 +473,10 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
             property.Choice("Fit", "Fit").Choice("Fixed", "Fixed")
                      .Choice("Expand", "Expand");
         else if(String(field.id) == "cell_align_x")
-            property.Choice("Auto", "Auto").Choice("Left", "Left")
+            property.Choice("Left", "Left")
                      .Choice("Center", "Center").Choice("Right", "Right");
         else
-            property.Choice("Auto", "Auto").Choice("Top", "Top")
+            property.Choice("Top", "Top")
                      .Choice("Center", "Center").Choice("Bottom", "Bottom");
         property.impact = PropertyImpactLocalLayout |
                           PropertyImpactAncestorLayout | PropertyImpactCode;
