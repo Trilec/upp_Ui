@@ -3,6 +3,7 @@
 
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
+#include <Utilities/UiDesigner/Core/UiDesignerDragData.h>
 #include "UiDesignerStyle.h"
 
 namespace Upp {

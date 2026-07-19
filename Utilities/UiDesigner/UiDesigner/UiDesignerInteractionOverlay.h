@@ -2,6 +2,7 @@
 #define _Utilities_UiDesigner_UiDesigner_UiDesignerInteractionOverlay_h_
 
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
+#include <Utilities/UiDesigner/Core/UiDesignerDragData.h>
 
 namespace Upp {
 
@@ -31,7 +32,7 @@ private:
     Point resize_start_;
     Rect resize_start_rect_;
     Rect resize_pending_rect_;
-    String drag_payload_;
+    String drag_type_id_;
     UiDesignerDropPlan drop_plan_;
     Rect drop_indicator_;
     String drag_status_;

@@ -65,10 +65,7 @@ struct UiDesignerPreviewInstance {
     uint64 generation = 0;
 };
 
-String UiDesignerCatalogDragText(const String& type_id);
-const char *UiDesignerCatalogDragFormat();
 String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes);
-bool UiDesignerParseCatalogDragText(const String& text, String& type_id);
 bool UiDesignerParseNodesDragText(const String& text,
                                   Vector<UiDesignerNodeId>& nodes);
 // Read Designer-owned drag data without accepting the drop. Targets must only

@@ -1,5 +1,6 @@
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
+#include <Utilities/UiDesigner/Core/UiDesignerDragData.h>
 #include <Ui/UiAbsoluteLayout.h>
 
 using namespace Upp;
@@ -30,8 +31,6 @@ CONSOLE_APP_MAIN
     Check(catalog.FindCategory("Composites").GetCount() >= 6, "composite catalog");
     Check(catalog.FindCategory("U++ Controls").GetCount() >= 18, "stock U++ catalog");
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
-    Check(String(UiDesignerCatalogDragFormat()) == "application/x-upp-uidesigner-catalog",
-          "catalog drag format is explicit");
 
     static const char *required_ui[] = {
         "UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiPanel",

@@ -321,16 +321,6 @@ UiDesignerApplyResult UiDesignerPreviewFactory::Apply(
         : UiDesignerApplyResult::Rejected;
 }
 
-String UiDesignerCatalogDragText(const String& type_id)
-{
-    return "uidesigner/catalog/v1:" + type_id;
-}
-
-const char *UiDesignerCatalogDragFormat()
-{
-    return "application/x-upp-uidesigner-catalog";
-}
-
 String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes)
 {
     String out = "uidesigner/nodes/v1:";
@@ -339,15 +329,6 @@ String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes)
         out << nodes[i];
     }
     return out;
-}
-
-bool UiDesignerParseCatalogDragText(const String& text, String& type_id)
-{
-    const String prefix = "uidesigner/catalog/v1:";
-    if(!text.StartsWith(prefix))
-        return false;
-    type_id = text.Mid(prefix.GetCount());
-    return !type_id.IsEmpty();
 }
 
 bool UiDesignerParseNodesDragText(const String& text,
