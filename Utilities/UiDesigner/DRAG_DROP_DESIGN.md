@@ -1,5 +1,63 @@
 # UiDesigner drag-and-drop contract
 
+## Release gate: Stage 0 nested catalog-drag stability
+
+This gate must pass before any semantic drop-region visuals are added or tuned.
+The known failure mode is a nested `Grid -> Box -> Grid` hierarchy where dragging
+another catalog layout can leave the cursor captured while selection and normal
+input stop responding. A visible cursor is not proof that the drop system is alive;
+sometimes it is just holding the mouse hostage.
+
+### Required diagnosis
+
+Reproduce the nested drag under the debugger and record the active GUI-thread stack,
+capture owner, drag type, resolved target, Preview geometry generation, document
+generation, and whether `TrackCatalogDrag`, target resolution, `Layout`, or
+`RebuildDocument` is recursively active. Distinguish capture leakage, recursive
+tracking/rebuild, stale snapshot state, and excessive synchronous work. Do not fix
+this by adding an unconditional `ReleaseCapture()` without identifying the cause.
+
+### Drag lifecycle contract
+
+Catalog dragging has one lifecycle:
+
+```text
+Idle -> Tracking -> Completing -> Idle
+Idle -> Tracking -> Cancelling -> Idle
+```
+
+The lifecycle owns capture, drag type, resolved region, plan, indicator, status, and
+the document/geometry generations used by that plan. Every terminal path clears all
+of them: successful or invalid drop, release outside the Designer, Escape, capture
+loss, `CancelMode`, source destruction, Preview/document rebuild, geometry invalidation,
+application deactivation, and guarded early return. `CancelMode()` is idempotent.
+
+Cancellation releases capture only when owned by the drag surface, restores the
+cursor, repaints once, performs no document mutation, and cannot recursively cancel
+itself. A plan retains IDs or indices, never raw pointers into a replaceable snapshot.
+Before execution, both recorded generations must still match; otherwise the plan is
+invalidated and resolved again once.
+
+### Rebuild and work bounds
+
+Drag tracking must not synchronously rebuild Preview. If geometry changes during a
+drag, invalidate the plan and resolve on the next input event or deferred update.
+One mouse move permits at most one target resolution and one semantic plan validation,
+with no document mutation, Preview rebuild, subtree rebuild, Inspector rebuild, or
+nested target-resolution call.
+
+### Release-blocking acceptance
+
+Before continuing to semantic drop-region work, test a nested Grid/Box/Grid hierarchy:
+move a catalog Grid between outer Grid, Box, and nested Grid for at least 30 seconds;
+cancel with Escape; release outside; perform invalid and valid drops; and repeat after
+Preview rebuilds. Every attempt must return to `Idle`, release owned capture, restore
+selection and Inspector input, and leave no indicator behind.
+
+Focused coverage must include capture loss, `CancelMode`, double cancellation, source
+destruction, snapshot replacement, target deletion/rebuild, valid and invalid drops,
+and proof that a tracking move does not mutate the document or recursively resolve.
+
 ## Purpose
 
 UiDesigner uses one insertion and move service for mouse drag/drop, hierarchy reordering, click-to-add, keyboard insertion, CLI and MCP. UI controls never mutate the canonical document during hover.
