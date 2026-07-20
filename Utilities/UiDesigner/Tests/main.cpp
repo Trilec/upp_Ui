@@ -281,6 +281,26 @@ CONSOLE_APP_MAIN
     Check(session.Commands().CanUndo(), "bulk edit is one history entry");
     Check(session.Undo(), "bulk edit undo");
 
+    UiDesignerSession preview_session;
+    UiDesignerPreviewCanvas preview_projection;
+    preview_projection.SetRect(0, 0, 512, 250);
+    preview_session.AttachProjection(&preview_projection);
+    UiDesignerNodeId transient_box = preview_session.AddControl("UiBoxLayout");
+    preview_session.Select(transient_box, false);
+    const int history_before_preview_cancel =
+        preview_session.Commands().GetHistoryPosition();
+    Check(preview_session.PreviewProperty("inset", 20, error),
+          "transient inset preview succeeds");
+    Check(preview_session.PreviewOverlay().Has(transient_box, "inset"),
+          "transient inset is tracked by node/property");
+    preview_session.CancelPreview();
+    Check(!preview_session.PreviewOverlay().Has(transient_box, "inset"),
+          "cancel clears only tracked transient properties");
+    Check(preview_session.Document().GetProperty(transient_box, "inset") == 8,
+          "cancel leaves canonical inset unchanged");
+    Check(preview_session.Commands().GetHistoryPosition() == history_before_preview_cancel,
+          "cancel preview creates no undo command");
+
     UiDesignerNodeId c = session.AddControl("UiLabel");
     session.Select(c, false);
     Check(session.RemoveSelection(), "single delete command succeeds");

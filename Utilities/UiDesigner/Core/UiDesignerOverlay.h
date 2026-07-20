@@ -17,6 +17,7 @@ public:
     void Remove(UiDesignerNodeId node, const String& property);
     void Clear();
     bool Has(UiDesignerNodeId node, const String& property) const;
+    const Vector<UiDesignerTransientOverride>& GetValues() const { return values_; }
     Value Resolve(UiDesignerNodeId node, const String& property,
                   const Value& canonical) const;
 

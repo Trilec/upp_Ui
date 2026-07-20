@@ -616,21 +616,35 @@ bool UiDesignerSession::ResetProperty(
 
 void UiDesignerSession::CancelPreview()
 {
-    if(!projection_ || state_.selection.nodes.IsEmpty()) {
+    if(!projection_ || overlay_.GetValues().IsEmpty()) {
         overlay_.Clear();
         return;
     }
-    Vector<UiDesignerNodeId> nodes = clone(state_.selection.nodes);
+    Vector<UiDesignerTransientOverride> pending = clone(overlay_.GetValues());
+    bool rebuild = false;
+    for(const UiDesignerTransientOverride& item : pending) {
+        const UiDesignerNode* node = document_.Find(item.node);
+        const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+        const UiDesignerPropertySpec* property = spec ? spec->FindProperty(item.property) : nullptr;
+        if(property && HasPropertyImpact(property->impact,
+                                         PropertyImpactStructure | PropertyImpactFullPreview)) {
+            rebuild = true;
+            break;
+        }
+    }
     overlay_.Clear();
-    for(UiDesignerNodeId id : nodes) {
-        const UiDesignerNode* node = document_.Find(id);
+    if(rebuild) {
+        projection_->RebuildDocument();
+        return;
+    }
+    for(const UiDesignerTransientOverride& item : pending) {
+        const UiDesignerNode* node = document_.Find(item.node);
         const UiDesignerControlSpec* spec =
             node ? catalog_.Find(node->type) : nullptr;
-        if(!node || !spec)
+        if(!node || !spec || !spec->FindProperty(item.property))
             continue;
-        for(const UiDesignerPropertySpec& property : spec->properties)
-            projection_->ApplyTransient(id, property.id,
-                                    ResolvePropertyValue(*node, property));
+        projection_->ApplyTransient(item.node, item.property,
+                                    ResolvePropertyValue(*node, *spec->FindProperty(item.property)));
     }
 }
 

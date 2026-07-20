@@ -106,7 +106,6 @@ void UiDesignerDropService::PopulatePlacement(
         properties.Set("height_mode", "Expand");
         properties.Set("cell_align_x", "Center");
         properties.Set("cell_align_y", "Center");
-        properties.Set("inset", 0);
     }
 }
 
