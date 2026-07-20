@@ -28,6 +28,8 @@ struct UiDesignerPreviewStats {
     int ancestor_layouts = 0;
     int subtree_rebuilds = 0;
     int full_rebuilds = 0;
+    int layout_count = 0;
+    int snapshot_publications = 0;
     int rejected = 0;
 
     void Clear() { *this = UiDesignerPreviewStats(); }

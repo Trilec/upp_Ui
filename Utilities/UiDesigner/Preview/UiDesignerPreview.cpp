@@ -179,6 +179,18 @@ static UiDesignerApplyResult ApplyRuntime(
         else return UiDesignerApplyResult::Rejected;
         return UiDesignerApplyResult::AppliedAncestorLayout;
     }
+    if(property == "debug_layout") {
+        const bool on = (bool)value;
+        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
+            box->SetDebug(on).SetDebugColor(Color(139, 92, 246));
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        if(auto *grid = dynamic_cast<UiGridLayout *>(&ctrl)) {
+            grid->SetDebug(on).SetDebugColor(Color(14, 165, 233));
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
     if(property == "role") {
         const UiRole role = ParseRole(value);
         if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) panel->SetCustomStyle(UiTheme::ResolvePanel(role));
@@ -834,17 +846,10 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
         return;
     }
     if(!changes.structure.IsEmpty()) {
-        Index<UiDesignerNodeId> affected;
-        for(const UiDesignerStructureChange& change : changes.structure) {
-            UiDesignerNodeId root = change.new_parent ? change.new_parent : change.old_parent;
-            if(!root) root = document_ ? document_->GetRootId() : 0;
-            if(root && affected.Find(root) < 0) affected.Add(root);
-        }
-        for(int i = 0; i < affected.GetCount(); i++)
-            if(!RebuildSubtree(affected[i])) {
-                RebuildDocument();
-                break;
-            }
+        // Managed Box/Grid controls retain internal item references. A complete
+        // rebuild is the safe structural boundary until those items have an
+        // explicit removal API; correctness beats a stale partial tree here.
+        RebuildDocument();
         return;
     }
     if(changes.virtual_size_changed) {
@@ -975,6 +980,7 @@ void UiDesignerPreviewCanvas::Layout()
     const UiDesignerNode* root = document_->Find(document_->GetRootId());
     if(!root)
         return;
+    stats_.layout_count++;
     rects_.Clear();
     // Window is an implicit document host, not another runtime Ctrl. Its
     // rectangle is nevertheless real so hierarchy selection and resize
@@ -1055,6 +1061,7 @@ void UiDesignerPreviewCanvas::Layout()
         snapshot.Add(pick(record));
     }
     geometry_ = snapshot.Publish();
+    stats_.snapshot_publications++;
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(

@@ -93,19 +93,13 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
             w.DrawRect(r.left + 1, y, 1, min(DPI(3), r.bottom - y - 1), outline);
             w.DrawRect(r.right - 2, y, 1, min(DPI(3), r.bottom - y - 1), outline);
         }
-        if(node.GetProperty("debug_layout", false)) {
+        if(node.GetProperty("debug_layout", false) && node.type == "UiPanel") {
             const Color debug = Color(168, 85, 247);
             Rect body = geometry ? geometry->body.Offseted(canvas_origin) : r;
-            w.DrawRect(body, debug);
-            if(geometry)
-                for(const Rect& item : geometry->item_rects)
-                    w.DrawRect(item.Offseted(canvas_origin), debug);
-            if(geometry)
-                for(const Rect& gap : geometry->gap_rects)
-                    w.DrawRect(gap.Offseted(canvas_origin), Blend(debug, White(), 160));
-            if(geometry)
-                for(const Rect& inset : geometry->inset_rects)
-                    w.DrawRect(inset.Offseted(canvas_origin), Blend(debug, White(), 180));
+            w.DrawRect(body.left, body.top, body.Width(), 1, debug);
+            w.DrawRect(body.left, body.bottom - 1, body.Width(), 1, debug);
+            w.DrawRect(body.left, body.top, 1, body.Height(), debug);
+            w.DrawRect(body.right - 1, body.top, 1, body.Height(), debug);
         }
     }
 

@@ -31,14 +31,17 @@ static UiDesignerControlSpec MakeSpec(
     spec.defaults.Set("enabled", true);
     spec.defaults.Set("role", "Standard");
     if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
+        const int inset_default = !strcmp(type, "UiPanel") ||
+                                  !strcmp(type, "UiBoxLayout") ||
+                                  !strcmp(type, "UiGridLayout") ? 8 : 0;
         UiDesignerPropertySpec inset = UiDesignerNumberProperty(
-            "inset", "Inset", 0, 0, 1000, 1, PropertyEditorKind::Integer);
+            "inset", "Inset", inset_default, 0, 1000, 1, PropertyEditorKind::Integer);
         inset.group = "Layout";
         inset.domain = PropertyEditorDomain::Layout;
         inset.impact = PropertyImpactLocalLayout |
                        PropertyImpactAncestorLayout | PropertyImpactCode;
         spec.properties.Add(inset);
-        spec.defaults.Set("inset", 0);
+        spec.defaults.Set("inset", inset_default);
     }
     return spec;
 }

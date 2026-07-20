@@ -169,6 +169,8 @@ private:
     Rect viewport_;
     int content_height_ = 0;
     bool syncing_editor_ = false;
+    bool tearing_down_editor_ = false;
+    String active_property_id_;
     bool layout_in_progress_ = false;
 };
 

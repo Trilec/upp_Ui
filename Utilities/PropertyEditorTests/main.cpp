@@ -195,6 +195,31 @@ CONSOLE_APP_MAIN
     Check(property_host.GetCount() == 1 && hosted_editor.GetSize() == Size(320, 240),
           "property editor survives stack-hosted layout");
 
+    // Structural replacement must invalidate the active editor before U++
+    // sends its LostFocus callback back through the old row model.
+    PropertyEditorModel live_model;
+    live_model.AddInteger("inset", "Inset", 8, "Layout");
+    live_model.AddInteger("gap", "Gap", 8, "Layout");
+    live_model.StructureChanged();
+    PropertyEditor live_editor;
+    property_host.Add(live_editor, "live-properties");
+    live_editor.SetModel(&live_model);
+    Check(live_editor.SelectProperty("inset", true),
+          "activate inset editor before model replacement");
+    live_model.Clear(false);
+    live_model.AddInteger("gap", "Gap", 8, "Layout");
+    live_model.StructureChanged();
+    Check(live_model.Find("inset") == nullptr && live_model.Find("gap") != nullptr,
+          "replacement model contains only current properties");
+    Check(live_editor.SelectProperty("gap", true),
+          "switch directly from replaced inset to gap");
+    Check(live_model.GetCount() == 1, "replacement does not retain stale rows");
+    live_model.Clear(false);
+    live_model.AddInteger("inset", "Inset", 8, "Layout");
+    live_model.StructureChanged();
+    Check(live_model.Find("inset") != nullptr,
+          "selection replacement can restore inset safely");
+
     PropertyEditorItem missing_custom;
     missing_custom.kind = PropertyEditorKind::Custom;
     missing_custom.custom_editor = "missing";

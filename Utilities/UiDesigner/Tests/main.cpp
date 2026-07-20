@@ -113,6 +113,15 @@ CONSOLE_APP_MAIN
         box_spec ? box_spec->node_flags : 0,
         box_spec ? box_spec->defaults : ValueMap(), "Add preview Box");
     const UiDesignerControlSpec* panel_spec = catalog.Find("UiPanel");
+    const UiDesignerControlSpec* grid_spec = catalog.Find("UiGridLayout");
+    Check(panel_spec && panel_spec->FindProperty("inset") &&
+              panel_spec->FindProperty("inset")->default_value == 8 &&
+              panel_spec->defaults.GetValue(panel_spec->defaults.Find("inset")) == 8,
+          "Panel inset metadata and defaults are 8");
+    Check(grid_spec && grid_spec->FindProperty("inset") &&
+              grid_spec->FindProperty("inset")->default_value == 8 &&
+              grid_spec->defaults.GetValue(grid_spec->defaults.Find("inset")) == 8,
+          "Grid inset metadata and defaults are 8");
     UiDesignerNodeId preview_panel_a = preview_commands.AddNode(
         "UiPanel", "preview_panel_a", preview_box,
         panel_spec ? panel_spec->node_flags : 0,

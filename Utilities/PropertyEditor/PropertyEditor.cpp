@@ -604,6 +604,7 @@ void PropertyEditor::ActivateRow(int display_index)
     DeactivateEditor();
     selected_display_row_ = display_index;
     active_display_row_ = display_index;
+    active_property_id_ = item.id;
 
     active_editor_ = GetFactory().Create(item);
     if(!active_editor_) {
@@ -642,9 +643,15 @@ void PropertyEditor::DeactivateEditor()
     if(!active_editor_)
         return;
 
+    // Invalidate identity and callbacks before Remove can cause LostFocus.
+    tearing_down_editor_ = true;
+    active_display_row_ = -1;
+    active_property_id_.Clear();
+    active_editor_->WhenPreview.Clear();
+    active_editor_->WhenCommit.Clear();
     active_editor_->Remove();
     active_editor_.Clear();
-    active_display_row_ = -1;
+    tearing_down_editor_ = false;
 }
 
 void PropertyEditor::CommitActiveEditor()
@@ -656,23 +663,22 @@ void PropertyEditor::CommitActiveEditor()
 
 void PropertyEditor::ApplyEditorPreview(const Value& value)
 {
-    if(syncing_editor_ || !model_ || active_display_row_ < 0 ||
-       active_display_row_ >= rows_.GetCount())
+    if(syncing_editor_ || tearing_down_editor_ || !model_ ||
+       active_property_id_.IsEmpty())
         return;
 
-    DisplayRow& row = rows_[active_display_row_];
-    if(row.group || row.model_index < 0)
+    PropertyEditorItem* item = model_->Find(active_property_id_);
+    if(!item)
         return;
 
-    PropertyEditorItem& item = (*model_)[row.model_index];
     String error;
-    if(model_->Preview(item.id, value, &error)) {
-        WhenPreview(item.id, item.value);
+    if(model_->Preview(item->id, value, &error)) {
+        WhenPreview(item->id, item->value);
         Refresh();
     }
     else {
         syncing_editor_ = true;
-        active_editor_->Configure(item);
+        active_editor_->Configure(*item);
         syncing_editor_ = false;
         Refresh();
     }
@@ -680,27 +686,26 @@ void PropertyEditor::ApplyEditorPreview(const Value& value)
 
 void PropertyEditor::ApplyEditorCommit(const Value& value)
 {
-    if(syncing_editor_ || !model_ || active_display_row_ < 0 ||
-       active_display_row_ >= rows_.GetCount())
+    if(syncing_editor_ || tearing_down_editor_ || !model_ ||
+       active_property_id_.IsEmpty())
         return;
 
-    DisplayRow& row = rows_[active_display_row_];
-    if(row.group || row.model_index < 0)
+    PropertyEditorItem* item = model_->Find(active_property_id_);
+    if(!item)
         return;
 
-    PropertyEditorItem& item = (*model_)[row.model_index];
     String error;
-    if(model_->Commit(item.id, value, &error)) {
+    if(model_->Commit(item->id, value, &error)) {
         syncing_editor_ = true;
-        active_editor_->Configure(item);
-        active_editor_->SetEditorValue(item.value, item.mixed);
+        active_editor_->Configure(*item);
+        active_editor_->SetEditorValue(item->value, item->mixed);
         syncing_editor_ = false;
-        WhenCommit(item.id, item.value);
+        WhenCommit(item->id, item->value);
         Refresh();
     }
     else {
         syncing_editor_ = true;
-        active_editor_->Configure(item);
+        active_editor_->Configure(*item);
         syncing_editor_ = false;
         Refresh();
     }
