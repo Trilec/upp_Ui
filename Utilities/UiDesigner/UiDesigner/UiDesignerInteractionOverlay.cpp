@@ -205,6 +205,10 @@ Image UiDesignerInteractionOverlay::CursorImage(Point, dword)
 
 bool UiDesignerInteractionOverlay::Key(dword key, int)
 {
+    if(key == K_ESCAPE && drag_state_ != UiDesignerCatalogDragState::Idle) {
+        CancelCatalogDrag();
+        return true;
+    }
     if(key == K_DELETE) {
         if(owner_ && owner_->session_.RemoveSelection()) {
             SetDragStatus("Selection deleted");
@@ -217,19 +221,42 @@ bool UiDesignerInteractionOverlay::Key(dword key, int)
     return Ctrl::Key(key, 1);
 }
 
+void UiDesignerInteractionOverlay::CancelMode()
+{
+    CancelCatalogDrag();
+    Ctrl::CancelMode();
+}
+
 void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point screen)
 {
-    if(type_id.IsEmpty()) {
-        drag_type_id_.Clear();
-        SetDragStatus("drag invalid catalog payload");
-        ClearDropPlan();
+    if(cleaning_drag_ || drag_state_ == UiDesignerCatalogDragState::Completing)
+        return;
+    drag_diagnostics_.tracking_calls++;
+    drag_diagnostics_.tracking_depth++;
+    drag_diagnostics_.max_tracking_depth = max(
+        drag_diagnostics_.max_tracking_depth, drag_diagnostics_.tracking_depth);
+    if(drag_diagnostics_.tracking_depth > 1) {
+        drag_diagnostics_.tracking_depth--;
+        CancelCatalogDrag();
         return;
     }
+    if(type_id.IsEmpty()) {
+        EndCatalogDrag(UiDesignerCatalogDragState::Cancelling);
+        SetDragStatus("drag invalid catalog payload");
+        drag_diagnostics_.tracking_depth--;
+        return;
+    }
+    drag_state_ = UiDesignerCatalogDragState::Tracking;
+    drag_type_id_ = type_id;
     UpdateDropPlan(type_id, screen);
+    drag_diagnostics_.tracking_depth--;
 }
 
 bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Point screen)
 {
+    if(cleaning_drag_ || drag_state_ == UiDesignerCatalogDragState::Idle)
+        return false;
+    drag_state_ = UiDesignerCatalogDragState::Completing;
     if(type_id.IsEmpty()) {
         CancelCatalogDrag();
         return false;
@@ -245,16 +272,22 @@ bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Poin
         SetDragStatus(drop_plan_.label + " completed");
     else
         SetDragStatus(error.IsEmpty() ? drop_plan_.reason : error);
-    ClearDropPlan();
-    drag_type_id_.Clear();
+    EndCatalogDrag(UiDesignerCatalogDragState::Idle);
     return ok;
 }
 
 void UiDesignerInteractionOverlay::CancelCatalogDrag()
 {
-    ClearDropPlan();
-    drag_type_id_.Clear();
-    SetDragStatus(String());
+    EndCatalogDrag(UiDesignerCatalogDragState::Cancelling);
+}
+
+void UiDesignerInteractionOverlay::InvalidateCatalogDrag()
+{
+    if(drag_state_ == UiDesignerCatalogDragState::Idle)
+        return;
+    drop_plan_ = UiDesignerDropPlan();
+    drop_indicator_ = Rect();
+    Refresh();
 }
 
 Rect UiDesignerInteractionOverlay::WorkspaceRootRect() const
@@ -319,11 +352,33 @@ void UiDesignerInteractionOverlay::ClearDropPlan()
     Refresh();
 }
 
+void UiDesignerInteractionOverlay::EndCatalogDrag(UiDesignerCatalogDragState terminal)
+{
+    if(cleaning_drag_)
+        return;
+    cleaning_drag_ = true;
+    drag_state_ = terminal;
+    if(HasCapture()) {
+        ReleaseCapture();
+        drag_diagnostics_.capture_releases++;
+    }
+    drop_plan_ = UiDesignerDropPlan();
+    drop_indicator_ = Rect();
+    drag_type_id_.Clear();
+    drag_diagnostics_.terminal_cancellations++;
+    drag_state_ = UiDesignerCatalogDragState::Idle;
+    SetDragStatus(String());
+    Refresh();
+    cleaning_drag_ = false;
+}
+
 void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point screen,
                                                   bool allow_invalid_feedback)
 {
     if(!owner_)
         return;
+
+    drag_diagnostics_.target_resolutions++;
 
     const Point overlay_local = screen - GetScreenRect().TopLeft();
     const Rect root = WorkspaceRootRect();

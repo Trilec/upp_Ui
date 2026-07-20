@@ -422,6 +422,7 @@ void UiDesignerWindow::ConnectServices()
     session_.WhenStatus = [=](const String& text) { RefreshStatus(text); };
 
     session_.Document().WhenChanged = [=](const UiDesignerChangeSet& changes) {
+        interaction_overlay_.InvalidateCatalogDrag();
         preview_canvas_.ApplyChangeSet(changes);
         if(changes.virtual_size_changed)
             RefreshLayout();
