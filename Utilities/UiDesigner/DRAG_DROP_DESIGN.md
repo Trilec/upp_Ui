@@ -31,6 +31,11 @@ the document/geometry generations used by that plan. Every terminal path clears 
 of them: successful or invalid drop, release outside the Designer, Escape, capture
 loss, `CancelMode`, source destruction, Preview/document rebuild, geometry invalidation,
 application deactivation, and guarded early return. `CancelMode()` is idempotent.
+It is a notification of capture cancellation, not a request to release capture
+again. Overlay-initiated release marks the gesture terminal and sets its release
+guard before calling U++ `ReleaseCapture()`; the synchronous `CancelMode()`
+callback then returns without releasing again. External capture loss follows the
+same logical cleanup without calling a physical release API.
 
 Cancellation releases capture only when owned by the drag surface, restores the
 cursor, repaints once, performs no document mutation, and cannot recursively cancel

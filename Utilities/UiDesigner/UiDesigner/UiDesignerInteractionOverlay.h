@@ -14,6 +14,12 @@ enum class UiDesignerCatalogDragState : byte {
     Cancelling,
 };
 
+enum class UiDesignerPointerGesture : byte {
+    None,
+    RootResize,
+    CatalogDrag,
+};
+
 struct UiDesignerCatalogDragDiagnostics {
     int tracking_calls = 0;
     int tracking_depth = 0;
@@ -51,12 +57,15 @@ private:
     UiDesignerWindow *owner_ = nullptr;
     bool resizing_ = false;
     bool capture_owned_ = false;
+    bool drag_cleanup_in_progress_ = false;
+    bool capture_release_in_progress_ = false;
     int resize_edge_ = 0;
     Point resize_start_;
     Rect resize_start_rect_;
     Rect resize_pending_rect_;
     String drag_type_id_;
     UiDesignerCatalogDragState drag_state_ = UiDesignerCatalogDragState::Idle;
+    UiDesignerPointerGesture pointer_gesture_ = UiDesignerPointerGesture::None;
     UiDesignerCatalogDragDiagnostics drag_diagnostics_;
     bool cleaning_drag_ = false;
     UiDesignerDropPlan drop_plan_;

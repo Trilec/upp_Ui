@@ -144,6 +144,7 @@ void UiDesignerInteractionOverlay::LeftDown(Point p, dword keyflags)
     const int resize_edge = HitDocumentResizeEdge(p);
     if(resize_edge) {
         resizing_ = true;
+        pointer_gesture_ = UiDesignerPointerGesture::RootResize;
         resize_edge_ = resize_edge;
         resize_start_ = p;
         resize_start_rect_ = WorkspaceRootRect();
@@ -189,12 +190,16 @@ void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
         const Size final_size = resize_pending_rect_.Size();
         resizing_ = false;
         resize_edge_ = 0;
+        pointer_gesture_ = UiDesignerPointerGesture::None;
+        Ptr<UiDesignerInteractionOverlay> keep_alive = this;
+        capture_release_in_progress_ = true;
         ReleaseOwnedCaptureSafely();
-        if(final_size != resize_start_rect_.Size())
-            owner_->session_.SetVirtualSize(final_size);
+        capture_release_in_progress_ = false;
         SetDragStatus(Format("resize root done %dx%d",
                              final_size.cx, final_size.cy));
         Refresh();
+        if(keep_alive && final_size != resize_start_rect_.Size())
+            owner_->session_.SetVirtualSize(final_size);
     }
 }
 
@@ -225,11 +230,20 @@ bool UiDesignerInteractionOverlay::Key(dword key, int)
 
 void UiDesignerInteractionOverlay::CancelMode()
 {
-    resizing_ = false;
-    resize_edge_ = 0;
-    CancelCatalogDrag();
-    ReleaseOwnedCaptureSafely();
     Ctrl::CancelMode();
+    if(capture_release_in_progress_ || drag_cleanup_in_progress_)
+        return;
+    if(pointer_gesture_ == UiDesignerPointerGesture::RootResize) {
+        resizing_ = false;
+        resize_edge_ = 0;
+        pointer_gesture_ = UiDesignerPointerGesture::None;
+        ReleaseOwnedCaptureSafely();
+        Refresh();
+        return;
+    }
+    if(pointer_gesture_ == UiDesignerPointerGesture::CatalogDrag ||
+       drag_state_ != UiDesignerCatalogDragState::Idle)
+        CancelCatalogDrag();
 }
 
 void UiDesignerInteractionOverlay::ReleaseOwnedCaptureSafely()
@@ -266,6 +280,7 @@ void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point
         return;
     }
     drag_state_ = UiDesignerCatalogDragState::Tracking;
+    pointer_gesture_ = UiDesignerPointerGesture::CatalogDrag;
     drag_type_id_ = type_id;
     UpdateDropPlan(type_id, screen);
     drag_diagnostics_.tracking_depth--;
@@ -373,19 +388,31 @@ void UiDesignerInteractionOverlay::ClearDropPlan()
 
 void UiDesignerInteractionOverlay::EndCatalogDrag(UiDesignerCatalogDragState terminal)
 {
-    if(cleaning_drag_)
+    if(drag_cleanup_in_progress_)
         return;
+    drag_cleanup_in_progress_ = true;
     cleaning_drag_ = true;
-    drag_state_ = terminal;
-    ReleaseOwnedCaptureSafely();
+    const bool release_capture = capture_owned_ && HasCapture();
+
+    // Clear logical state before U++ can synchronously call CancelMode from
+    // ReleaseCapture. The callback must observe an already terminal gesture.
+    drag_state_ = UiDesignerCatalogDragState::Idle;
+    pointer_gesture_ = UiDesignerPointerGesture::None;
+    drag_type_id_.Clear();
     drop_plan_ = UiDesignerDropPlan();
     drop_indicator_ = Rect();
-    drag_type_id_.Clear();
+    drag_diagnostics_.tracking_depth = 0;
+
+    if(release_capture) {
+        capture_release_in_progress_ = true;
+        ReleaseOwnedCaptureSafely();
+        capture_release_in_progress_ = false;
+    }
     drag_diagnostics_.terminal_cancellations++;
-    drag_state_ = UiDesignerCatalogDragState::Idle;
     SetDragStatus(String());
     Refresh();
     cleaning_drag_ = false;
+    drag_cleanup_in_progress_ = false;
 }
 
 void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point screen,
