@@ -152,7 +152,9 @@ void UiDesignerInteractionOverlay::LeftDown(Point p, dword keyflags)
                              resize_edge,
                              resize_start_rect_.Width(),
                              resize_start_rect_.Height()));
-        SetCapture();
+        capture_owned_ = SetCapture();
+        if(capture_owned_)
+            drag_diagnostics_.capture_acquisitions++;
         SetFocus();
         return;
     }
@@ -187,7 +189,7 @@ void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
         const Size final_size = resize_pending_rect_.Size();
         resizing_ = false;
         resize_edge_ = 0;
-        ReleaseCapture();
+        ReleaseOwnedCaptureSafely();
         if(final_size != resize_start_rect_.Size())
             owner_->session_.SetVirtualSize(final_size);
         SetDragStatus(Format("resize root done %dx%d",
@@ -223,8 +225,24 @@ bool UiDesignerInteractionOverlay::Key(dword key, int)
 
 void UiDesignerInteractionOverlay::CancelMode()
 {
+    resizing_ = false;
+    resize_edge_ = 0;
     CancelCatalogDrag();
+    ReleaseOwnedCaptureSafely();
     Ctrl::CancelMode();
+}
+
+void UiDesignerInteractionOverlay::ReleaseOwnedCaptureSafely()
+{
+    if(!capture_owned_)
+        return;
+    // HasCapture is the U++ ownership query; never call the instance release
+    // path merely because an old gesture flag says capture existed.
+    if(HasCapture()) {
+        ReleaseCapture();
+        drag_diagnostics_.capture_releases++;
+    }
+    capture_owned_ = false;
 }
 
 void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point screen)
@@ -235,6 +253,7 @@ void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point
     drag_diagnostics_.tracking_depth++;
     drag_diagnostics_.max_tracking_depth = max(
         drag_diagnostics_.max_tracking_depth, drag_diagnostics_.tracking_depth);
+    ASSERT(drag_diagnostics_.tracking_depth <= 1);
     if(drag_diagnostics_.tracking_depth > 1) {
         drag_diagnostics_.tracking_depth--;
         CancelCatalogDrag();
@@ -358,10 +377,7 @@ void UiDesignerInteractionOverlay::EndCatalogDrag(UiDesignerCatalogDragState ter
         return;
     cleaning_drag_ = true;
     drag_state_ = terminal;
-    if(HasCapture()) {
-        ReleaseCapture();
-        drag_diagnostics_.capture_releases++;
-    }
+    ReleaseOwnedCaptureSafely();
     drop_plan_ = UiDesignerDropPlan();
     drop_indicator_ = Rect();
     drag_type_id_.Clear();

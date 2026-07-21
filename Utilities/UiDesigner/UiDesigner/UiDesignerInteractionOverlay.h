@@ -50,6 +50,7 @@ public:
 private:
     UiDesignerWindow *owner_ = nullptr;
     bool resizing_ = false;
+    bool capture_owned_ = false;
     int resize_edge_ = 0;
     Point resize_start_;
     Rect resize_start_rect_;
@@ -69,6 +70,7 @@ private:
     Rect ResizeDocumentTo(Point p) const;
     void ClearDropPlan();
     void EndCatalogDrag(UiDesignerCatalogDragState terminal);
+    void ReleaseOwnedCaptureSafely();
     void UpdateDropPlan(const String& type_id, Point screen, bool allow_invalid_feedback = true);
 };
 
