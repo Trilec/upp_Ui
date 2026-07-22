@@ -30,7 +30,8 @@ static UiDesignerControlSpec MakeSpec(
     spec.defaults.Set("visible", true);
     spec.defaults.Set("enabled", true);
     spec.defaults.Set("role", "Standard");
-    if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
+    if((flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) &&
+       strcmp(type, "UiAbsoluteLayout") != 0) {
         const int inset_default = !strcmp(type, "UiPanel") ||
                                   !strcmp(type, "UiBoxLayout") ||
                                   !strcmp(type, "UiGridLayout") ? 8 : 0;
@@ -227,6 +228,142 @@ static void AddButtonProperties(UiDesignerControlSpec& spec)
     checked.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
     spec.properties.Add(checked);
     spec.defaults.Set("checked", false);
+}
+
+static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
+{
+    auto add_bool = [&](const char *id, const char *label, const char *group,
+                        bool value,
+                        PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+        UiDesignerThemeOverrideSpec item;
+        item.id = id;
+        item.label = label;
+        item.group = group;
+        item.kind = PropertyEditorKind::Boolean;
+        item.domain = group == String("State") ? PropertyEditorDomain::Behaviour
+                                               : PropertyEditorDomain::Appearance;
+        item.default_value = value;
+        item.impact = impact;
+        spec.theme_overrides.Add(pick(item));
+    };
+    auto add_int = [&](const char *id, const char *label, const char *group,
+                       int value, int min_value, int max_value, int step = 1,
+                       PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+        UiDesignerThemeOverrideSpec item;
+        item.id = id;
+        item.label = label;
+        item.group = group;
+        item.kind = PropertyEditorKind::Integer;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = value;
+        item.minimum = min_value;
+        item.maximum = max_value;
+        item.step = step;
+        item.impact = impact;
+        spec.theme_overrides.Add(pick(item));
+    };
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "role";
+        item.label = "Role";
+        item.group = "Appearance";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = "Standard";
+        item.impact = PropertyImpactPaint | PropertyImpactThemeGlobal | PropertyImpactCode;
+        item.Choice("Standard", "Standard");
+        item.Choice("Subtle", "Subtle");
+        item.Choice("Accent", "Accent");
+        item.Choice("Alert", "Alert");
+        spec.theme_overrides.Add(pick(item));
+    }
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "icon";
+        item.label = "Icon";
+        item.group = "Content";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Content;
+        item.default_value = "None";
+        item.impact = PropertyImpactPaint | PropertyImpactCode;
+        item.Choice("None", "None");
+        item.Choice("ICON_DESIGN_DESCRIPTION_48", "Description");
+        item.Choice("ICON_DESIGN_WIDGETS_48", "Widgets");
+        item.Choice("ICON_DESIGN_ACCOUNT_TREE_48", "Hierarchy");
+        item.Choice("ICON_DESIGN_TUNE_48", "Inspector");
+        spec.theme_overrides.Add(pick(item));
+    }
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "icon_side";
+        item.label = "Icon side";
+        item.group = "Appearance";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = "Left";
+        item.impact = PropertyImpactPaint | PropertyImpactCode;
+        item.Choice("Left", "Left");
+        item.Choice("Right", "Right");
+        item.Choice("Top", "Top");
+        item.Choice("Bottom", "Bottom");
+        spec.theme_overrides.Add(pick(item));
+    }
+    add_int("icon_width", "Icon width", "Appearance", 18, 0, 256);
+    add_int("icon_height", "Icon height", "Appearance", 18, 0, 256);
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "icon_render_mode";
+        item.label = "Icon render mode";
+        item.group = "Appearance";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = "MonoTint";
+        item.impact = PropertyImpactPaint | PropertyImpactCode;
+        item.Choice("Auto", "Auto");
+        item.Choice("MonoTint", "Mono tint");
+        item.Choice("PreserveColor", "Preserve color");
+        spec.theme_overrides.Add(pick(item));
+    }
+    add_bool("scale_icon_to_content", "Scale icon to content", "Appearance", false);
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "align_h";
+        item.label = "Horizontal align";
+        item.group = "Appearance";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = "Center";
+        item.impact = PropertyImpactPaint | PropertyImpactCode;
+        item.Choice("Left", "Left");
+        item.Choice("Center", "Center");
+        item.Choice("Right", "Right");
+        spec.theme_overrides.Add(pick(item));
+    }
+    {
+        UiDesignerThemeOverrideSpec item;
+        item.id = "align_v";
+        item.label = "Vertical align";
+        item.group = "Appearance";
+        item.kind = PropertyEditorKind::Choice;
+        item.domain = PropertyEditorDomain::Appearance;
+        item.default_value = "Center";
+        item.impact = PropertyImpactPaint | PropertyImpactCode;
+        item.Choice("Top", "Top");
+        item.Choice("Center", "Center");
+        item.Choice("Bottom", "Bottom");
+        spec.theme_overrides.Add(pick(item));
+    }
+    add_int("content_gap", "Content gap", "Appearance", 4, 0, 100);
+    add_int("content_inset_left", "Content inset left", "Appearance", 4, 0, 100);
+    add_int("content_inset_top", "Content inset top", "Appearance", 4, 0, 100);
+    add_int("content_inset_right", "Content inset right", "Appearance", 4, 0, 100);
+    add_int("content_inset_bottom", "Content inset bottom", "Appearance", 4, 0, 100);
+    add_bool("click_focus", "Click focus", "State", true,
+             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
+    add_bool("checkable", "Checkable", "State", false,
+             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
+    add_bool("checked", "Checked", "State", false,
+             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
 }
 
 static void AddTitle(UiDesignerControlSpec& spec, const String& value)
@@ -825,7 +962,22 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                 PropertyImpactCode);
             icon.domain = PropertyEditorDomain::Content;
             s.properties.Add(icon);
-            s.defaults.Set("icon", "None");
+            s.defaults.Set("icon", "ICON_DESIGN_DESCRIPTION_48");
+        }
+        if(String(c.type) == "UiTab" || String(c.type) == "UiAccordion" ||
+           String(c.type) == "UiStack") {
+            UiDesignerThemeOverrideSpec hint;
+            hint.id = "empty_hint";
+            hint.label = "Empty-state hint";
+            hint.group = "Preview";
+            hint.kind = PropertyEditorKind::ReadOnly;
+            hint.domain = PropertyEditorDomain::DesignerOnly;
+            hint.default_value = "";
+            hint.impact = PropertyImpactFullPreview;
+            hint.read_only = true;
+            hint.designer_only = true;
+            hint.help = "Preview-only hint shown when the page container has no authored child yet.";
+            s.theme_overrides.Add(pick(hint));
         }
         catalog.Register(pick(s));
     }
@@ -884,10 +1036,12 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.defaults.Set("checked", false);
             AddEvent(s, "WhenAction", "Changed", "Runs after the checked state changes.");
         }
-        if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton")
-        {
+        if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton") {
             AddButtonProperties(s);
+            AddButtonThemeOverrides(s);
             AddEvent(s, "WhenAction", "Clicked", "Runs when the button is activated.");
+            if(String(c.type) == "UiToolButton")
+                s.defaults.Set("icon", "ICON_DESIGN_TUNE_48");
         }
         if(String(c.type) == "UiSplitButton") {
             AddEvent(s, "WhenAction", "Primary action", "Runs when the main button is activated.");

@@ -1197,7 +1197,8 @@ Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
                                          const String& property,
                                          const Value& fallback) const
 {
-    const Value canonical = node.GetProperty(property, fallback);
+    const Value canonical = node.GetThemeOverride(property,
+        node.GetProperty(property, fallback));
     return overlay_ ? overlay_->Resolve(node.id, property, canonical) : canonical;
 }
 

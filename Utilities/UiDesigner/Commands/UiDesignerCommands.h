@@ -24,6 +24,15 @@ public:
     bool SetProperty(const Vector<UiDesignerNodeId>& nodes, const String& property,
                      const Value& value, UiDesignerChangeImpact impact,
                      const String& label = String());
+    bool SetThemeOverride(UiDesignerNodeId node, const String& property,
+                          const Value& value, UiDesignerChangeImpact impact,
+                          const String& label = String());
+    bool RemoveThemeOverride(UiDesignerNodeId node, const String& property,
+                             UiDesignerChangeImpact impact,
+                             const String& label = String());
+    bool ClearThemeOverrides(UiDesignerNodeId node,
+                             UiDesignerChangeImpact impact,
+                             const String& label = String());
     bool SetVirtualSize(Size size, const String& label = "Set canvas size");
 
     UiDesignerNodeId AddNode(const String& type, const String& name,

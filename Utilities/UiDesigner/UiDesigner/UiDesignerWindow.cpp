@@ -80,6 +80,7 @@ UiDesignerWindow::UiDesignerWindow() : interaction_overlay_(*this)
     Add(footer_surface_);
 
     ConnectServices();
+    interaction_overlay_.SetDecorationsVisible(decorations_visible_);
     session_.AttachProjection(&preview_canvas_);
     ApplyThemeToShell();
     RefreshHierarchy();
@@ -87,6 +88,13 @@ UiDesignerWindow::UiDesignerWindow() : interaction_overlay_(*this)
     RefreshBehavior();
     RefreshThemeInspector();
     RefreshCode();
+}
+
+void UiDesignerWindow::UpdateDecorationsButton()
+{
+    decorations_.SetIcon(decorations_visible_
+        ? ICON_ACTION_OUTLINED_VISIBILITY_48()
+        : ICON_ACTION_OUTLINED_VISIBILITY_OFF_48());
 }
 
 void UiDesignerWindow::BuildHeader()
@@ -229,7 +237,7 @@ void UiDesignerWindow::BuildDesigner()
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
-    designer_right_.SetActiveSection(1);
+    designer_right_.SetActiveSection(0);
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
@@ -251,12 +259,13 @@ void UiDesignerWindow::BuildDesigner()
                   .Add("Landscape 2:1", "2:1");
     square_.SetIcon(ICON_TOGGLE_CHECK_BOX_OUTLINE_BLANK_48())
            .SetIconSize(DPI(17), DPI(17)).Tip("Square");
-    decorations_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(16), DPI(16))
+    UpdateDecorationsButton();
+    decorations_.SetIconSize(DPI(16), DPI(16))
                 .Tip("Toggle Designer decorations");
     decorations_.WhenAction = [=] {
-        static bool visible = true;
-        visible = !visible;
-        interaction_overlay_.SetDecorationsVisible(visible);
+        decorations_visible_ = !decorations_visible_;
+        UpdateDecorationsButton();
+        interaction_overlay_.SetDecorationsVisible(decorations_visible_);
     };
 
     portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(576, 1024)); };
@@ -388,6 +397,22 @@ void UiDesignerWindow::ConnectServices()
         else RefreshBehavior();
     };
 
+    overrides_.SetModel(&session_.ThemeOverrideModel());
+    overrides_.WhenPreview = [=](const String& id, const Value& value) {
+        String error;
+        if(!session_.PreviewThemeOverride(id, value, error))
+            RefreshStatus(error);
+    };
+    overrides_.WhenCommit = [=](const String& id, const Value& value) {
+        String error;
+        if(!session_.CommitThemeOverride(id, value, error))
+            RefreshStatus(error);
+    };
+    overrides_.WhenReset = [=](const String& id) {
+        String error;
+        if(!session_.ResetThemeOverride(id, error))
+            RefreshStatus(error);
+    };
     theme_inspector_.SetModel(&session_.ThemeModel());
     theme_inspector_.WhenPreview = [=](const String& id, const Value& value) {
         String error;
@@ -412,6 +437,7 @@ void UiDesignerWindow::ConnectServices()
         // not affect the selected control, so coalesce their heavier rebuild.
         RefreshHierarchy();
         RefreshInspector();
+        overrides_.Refresh();
         preview_canvas_.Refresh();
         interaction_overlay_.Refresh();
         PostSelectionDetailsRefresh();
@@ -428,6 +454,7 @@ void UiDesignerWindow::ConnectServices()
             RefreshLayout();
         interaction_overlay_.Refresh();
         RefreshHierarchy(); RefreshCode(); RefreshBehavior();
+        overrides_.Refresh();
     };
     session_.Theme().WhenChanged = [=] {
         ApplyThemeToShell(); RefreshThemeInspector(); RefreshCode();

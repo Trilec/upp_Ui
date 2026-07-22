@@ -55,6 +55,8 @@ static Value NodeToValue(const UiDesignerNode& node)
         children.Add(id);
     out.Set("children", children);
     out.Set("properties", node.properties);
+    if(!node.theme_overrides.IsEmpty())
+        out.Set("theme_overrides", node.theme_overrides);
     ValueArray actions;
     for(const UiDesignerActionBinding& binding : node.actions)
         actions.Add(ActionToValue(binding));
@@ -221,6 +223,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
     window->properties = legacy
         ? LegacyProperties(UiDesignerMapValue(root_node, "properties", ValueMap()))
         : (ValueMap)UiDesignerMapValue(root_node, "properties", ValueMap());
+    window->theme_overrides = legacy
+        ? ValueMap()
+        : (ValueMap)UiDesignerMapValue(root_node, "theme_overrides", ValueMap());
     NormalizePlacementProperties(window->properties);
 
     VectorMap<int64, int64> id_map;
@@ -310,6 +315,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             }
             UiDesignerNode* created = loaded.Find(new_id);
             created->properties = pick(properties);
+            created->theme_overrides = legacy
+                ? ValueMap()
+                : (ValueMap)UiDesignerMapValue(n, "theme_overrides", ValueMap());
             id_map.Add(old_id, new_id);
             pending_actions.Add(new_id,
                 UiDesignerMapValue(n, "actions", ValueArray()));

@@ -32,6 +32,31 @@ static bool BehaviorActionNeedsHandler(UiDesignerActionType action)
     return action == UiDesignerActionType::CallNamedHandler;
 }
 
+static bool ThemeOverrideSelectable(const UiDesignerSession& session,
+                                    const String& property,
+                                    const UiDesignerThemeOverrideSpec **out_spec = nullptr)
+{
+    if(session.State().selection.nodes.GetCount() != 1)
+        return false;
+    const UiDesignerNode* node = session.Document().Find(session.State().selection.primary);
+    if(!node)
+        return false;
+    const UiDesignerControlSpec* spec = session.Catalog().Find(node->type);
+    if(!spec)
+        return false;
+    const UiDesignerThemeOverrideSpec* property_spec = nullptr;
+    for(const UiDesignerThemeOverrideSpec& candidate : spec->theme_overrides)
+        if(candidate.id == property) {
+            property_spec = &candidate;
+            break;
+        }
+    if(!property_spec)
+        return false;
+    if(out_spec)
+        *out_spec = property_spec;
+    return true;
+}
+
 static UiDesignerActionBinding CopySessionBinding(
     const UiDesignerActionBinding& source)
 {
@@ -324,6 +349,88 @@ bool UiDesignerSession::RemoveActiveBehavior(String& error)
     RebuildBehaviorModel();
     WhenBehaviorChanged();
     WhenCodeChanged();
+    error.Clear();
+    return true;
+}
+
+bool UiDesignerSession::PreviewThemeOverride(const String& property,
+                                            const Value& value,
+                                            String& error)
+{
+    const UiDesignerThemeOverrideSpec *override_spec = nullptr;
+    if(!ThemeOverrideSelectable(*this, property, &override_spec)) {
+        error = "Selection does not support " + property;
+        return false;
+    }
+    if(override_spec->read_only) {
+        error = property + " is read only";
+        return false;
+    }
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    if(!node)
+        return false;
+    overlay_.Set(node->id, property, value);
+    if(projection_)
+        projection_->ApplyTransient(node->id, property, value);
+    if(PropertyEditorItem *item = theme_override_model_.Find(property)) {
+        theme_override_model_.SetValue(property, value, false);
+        item->SetInherited(false);
+        theme_override_model_.ValueChanged(property);
+    }
+    error.Clear();
+    return true;
+}
+
+bool UiDesignerSession::CommitThemeOverride(const String& property,
+                                           const Value& value,
+                                           String& error)
+{
+    const UiDesignerThemeOverrideSpec *override_spec = nullptr;
+    if(!ThemeOverrideSelectable(*this, property, &override_spec)) {
+        error = "Selection does not support " + property;
+        return false;
+    }
+    if(override_spec->read_only) {
+        error = property + " is read only";
+        return false;
+    }
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    if(!node)
+        return false;
+    const UiDesignerChangeImpact impact =
+        (UiDesignerChangeImpact)(dword)override_spec->impact;
+    if(!commands_.SetThemeOverride(node->id, property, value, impact,
+                                   "Set theme " + property)) {
+        error = commands_.GetLastError();
+        return false;
+    }
+    overlay_.Remove(node->id, property);
+    error.Clear();
+    return true;
+}
+
+bool UiDesignerSession::ResetThemeOverride(const String& property, String& error)
+{
+    const UiDesignerThemeOverrideSpec *override_spec = nullptr;
+    if(!ThemeOverrideSelectable(*this, property, &override_spec)) {
+        error = "Selection does not support " + property;
+        return false;
+    }
+    if(override_spec->read_only) {
+        error = property + " is read only";
+        return false;
+    }
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    if(!node)
+        return false;
+    const UiDesignerChangeImpact impact =
+        (UiDesignerChangeImpact)(dword)override_spec->impact;
+    if(!commands_.RemoveThemeOverride(node->id, property, impact,
+                                      "Reset theme " + property)) {
+        error = commands_.GetLastError();
+        return false;
+    }
+    overlay_.Remove(node->id, property);
     error.Clear();
     return true;
 }

@@ -20,6 +20,10 @@ void UiDesignerSession::WireEvents()
             RebuildInspector();
         else
             SyncInspectorValues(changes);
+        if(changes.schema_changed || !changes.structure.IsEmpty())
+            RebuildThemeOverrideModel();
+        else
+            SyncThemeOverrideValues(changes);
         WhenCodeChanged();
     };
 
@@ -206,6 +210,7 @@ void UiDesignerSession::NewDocument(const String& preset)
     if(projection_)
         projection_->RebuildDocument();
     RebuildInspector();
+    RebuildThemeOverrideModel();
     WhenSelectionChanged();
     WhenCodeChanged();
     WhenStatus("New document");
@@ -258,6 +263,7 @@ bool UiDesignerSession::Load(const String& path, String& error)
     if(projection_)
         projection_->RebuildDocument();
     RebuildInspector();
+    RebuildThemeOverrideModel();
     WhenSelectionChanged();
     WhenCodeChanged();
     WhenStatus("Loaded " + GetFileName(path));
@@ -384,6 +390,7 @@ void UiDesignerSession::Select(UiDesignerNodeId node, bool toggle)
     if(projection_)
         projection_->SetSelection(&state_.selection);
     RebuildInspector();
+    RebuildThemeOverrideModel();
     WhenSelectionChanged();
 }
 
@@ -394,6 +401,7 @@ void UiDesignerSession::ClearSelection()
     if(projection_)
         projection_->SetSelection(&state_.selection);
     RebuildInspector();
+    RebuildThemeOverrideModel();
     WhenSelectionChanged();
 }
 
@@ -614,6 +622,59 @@ bool UiDesignerSession::ResetProperty(
     return CommitProperty(property, property_spec->default_value, error);
 }
 
+void UiDesignerSession::RebuildThemeOverrideModel()
+{
+    theme_override_model_.Clear(false);
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+    if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
+       spec->theme_overrides.IsEmpty()) {
+        theme_override_model_.StructureChanged();
+        return;
+    }
+
+    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
+        const int q = node->theme_overrides.Find(property.id);
+        const bool inherited = q < 0;
+        property.AddTo(theme_override_model_,
+                       inherited ? property.default_value
+                                 : node->theme_overrides.GetValue(q),
+                       inherited);
+        if(property.id == "empty_hint") {
+            if(PropertyEditorItem *item = theme_override_model_.Find(property.id))
+                item->SetVisible(node->children.IsEmpty());
+        }
+    }
+    theme_override_model_.StructureChanged();
+}
+
+void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& changes)
+{
+    if(state_.selection.nodes.IsEmpty())
+        return;
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+    if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
+       spec->theme_overrides.IsEmpty())
+        return;
+
+    for(const UiDesignerPropertyChange& change : changes.properties) {
+        if(change.node != node->id)
+            continue;
+        if(PropertyEditorItem *item = theme_override_model_.Find(change.property)) {
+            const int q = node->theme_overrides.Find(change.property);
+            const bool inherited = q < 0;
+            const Value value = inherited ? item->default_value
+                                          : node->theme_overrides.GetValue(q);
+            if(item->value != value || item->inherited != inherited) {
+                theme_override_model_.SetValue(change.property, value, false);
+                item->SetInherited(inherited);
+                theme_override_model_.ValueChanged(change.property);
+            }
+        }
+    }
+}
+
 void UiDesignerSession::CancelPreview()
 {
     if(!projection_ || overlay_.GetValues().IsEmpty()) {
@@ -657,6 +718,7 @@ bool UiDesignerSession::Undo()
         if(projection_)
             projection_->RebuildDocument();
         RebuildInspector();
+        RebuildThemeOverrideModel();
         WhenSelectionChanged();
     }
     return ok;
@@ -671,6 +733,7 @@ bool UiDesignerSession::Redo()
         if(projection_)
             projection_->RebuildDocument();
         RebuildInspector();
+        RebuildThemeOverrideModel();
         WhenSelectionChanged();
     }
     return ok;

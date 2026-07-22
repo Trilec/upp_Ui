@@ -82,6 +82,16 @@ CONSOLE_APP_MAIN
               absolute->FindProperty("width") &&
               absolute->FindProperty("height"),
           "absolute layout exposes Inspector geometry bindings");
+    const UiDesignerControlSpec* tool_button = catalog.Find("UiToolButton");
+    Check(tool_button &&
+              UiDesignerMapValue(tool_button->defaults, "icon", Value()) ==
+                  "ICON_DESIGN_TUNE_48",
+          "UiToolButton default icon is the inspector glyph");
+    const UiDesignerControlSpec* title_card = catalog.Find("UiTitleCard");
+    Check(title_card &&
+              UiDesignerMapValue(title_card->defaults, "icon", Value()) ==
+                  "ICON_DESIGN_DESCRIPTION_48",
+          "UiTitleCard default icon is the description glyph");
     One<Ctrl> absolute_preview;
     if(absolute)
         absolute_preview = UiDesignerPreviewFactory::Create(*absolute);
@@ -513,6 +523,8 @@ CONSOLE_APP_MAIN
 
     UiDesignerSession session;
     session.NewDocument("blank");
+    Check(session.State().selection.nodes.IsEmpty(),
+          "blank session starts without a selected node");
     UiDesignerNodeId a = session.AddControl("UiLabel");
     UiDesignerNodeId b = session.AddControl("UiLabel");
     session.Select(a, false);
@@ -539,6 +551,36 @@ CONSOLE_APP_MAIN
           "integer commit succeeds: " + error);
     Check(session.Commands().CanUndo(), "bulk edit is one history entry");
     Check(session.Undo(), "bulk edit undo");
+
+    UiDesignerSession override_session;
+    override_session.NewDocument("blank");
+    UiDesignerNodeId override_button = override_session.AddControl("UiButton");
+    override_session.Select(override_button, false);
+    Check(override_session.ThemeOverrideModel().Find("icon") != nullptr,
+          "button theme overrides populate for the selected control");
+    const int override_structure_before =
+        override_session.ThemeOverrideModel().GetStructureRevision();
+    Check(override_session.PreviewThemeOverride(
+              "icon", "ICON_DESIGN_WIDGETS_48", error),
+          "theme override preview succeeds: " + error);
+    Check(override_session.ThemeOverrideModel().Find("icon") &&
+              override_session.ThemeOverrideModel().Find("icon")->value ==
+                  "ICON_DESIGN_WIDGETS_48",
+          "theme override model receives the preview value");
+    Check(override_session.CommitThemeOverride(
+              "icon", "ICON_DESIGN_WIDGETS_48", error),
+          "theme override commit succeeds: " + error);
+    Check(override_session.Document().GetThemeOverride(
+              override_button, "icon") == "ICON_DESIGN_WIDGETS_48",
+          "theme override persists to the document");
+    Check(override_session.ThemeOverrideModel().GetStructureRevision() ==
+              override_structure_before,
+          "theme override commit keeps the model structure stable");
+    Check(override_session.ResetThemeOverride("icon", error),
+          "theme override reset succeeds: " + error);
+    Check(IsNull(override_session.Document().GetThemeOverride(
+              override_button, "icon")),
+          "theme override reset clears the authored override");
 
     UiDesignerSession preview_session;
     UiDesignerPreviewCanvas preview_projection;

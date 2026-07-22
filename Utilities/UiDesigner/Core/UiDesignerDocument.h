@@ -13,12 +13,14 @@ struct UiDesignerNode {
     dword flags = UiDesignerNodeNone;
     Vector<UiDesignerNodeId> children;
     ValueMap properties;
+    ValueMap theme_overrides;
     Vector<UiDesignerActionBinding> actions;
 
     UiDesignerNode() {}
     UiDesignerNode(const UiDesignerNode& other)
         : id(other.id), parent(other.parent), type(other.type), name(other.name),
-          flags(other.flags), properties(other.properties)
+          flags(other.flags), properties(other.properties),
+          theme_overrides(other.theme_overrides)
     {
         children.Append(clone(other.children));
         actions.Append(clone(other.actions));
@@ -26,6 +28,10 @@ struct UiDesignerNode {
 
     Value GetProperty(const String& id, const Value& fallback = Value()) const;
     void SetProperty(const String& id, const Value& value);
+    Value GetThemeOverride(const String& id, const Value& fallback = Value()) const;
+    void SetThemeOverride(const String& id, const Value& value);
+    bool RemoveThemeOverride(const String& id);
+    void ClearThemeOverrides();
 
     int FindAction(const String& event_id) const;
     const UiDesignerActionBinding* GetAction(const String& event_id) const;
@@ -70,8 +76,15 @@ public:
     bool RenameNode(UiDesignerNodeId id, const String& name);
     bool SetProperty(UiDesignerNodeId id, const String& property, const Value& value,
                      UiDesignerChangeImpact impact);
+    bool SetThemeOverride(UiDesignerNodeId id, const String& property,
+                          const Value& value, UiDesignerChangeImpact impact);
+    bool RemoveThemeOverride(UiDesignerNodeId id, const String& property,
+                             UiDesignerChangeImpact impact);
+    bool ClearThemeOverrides(UiDesignerNodeId id, UiDesignerChangeImpact impact);
     Value GetProperty(UiDesignerNodeId id, const String& property,
                       const Value& fallback = Value()) const;
+    Value GetThemeOverride(UiDesignerNodeId id, const String& property,
+                           const Value& fallback = Value()) const;
 
     bool SetActionBinding(UiDesignerNodeId id, UiDesignerActionBinding binding);
     bool RemoveActionBinding(UiDesignerNodeId id, const String& event_id);

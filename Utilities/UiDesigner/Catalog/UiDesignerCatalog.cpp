@@ -36,6 +36,84 @@ UiDesignerPropertySpec& UiDesignerPropertySpec::Domain(PropertyEditorDomain valu
     return *this;
 }
 
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Range(
+    const Value& min_value, const Value& max_value, const Value& step_value)
+{
+    minimum = min_value;
+    maximum = max_value;
+    step = step_value;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Choice(
+    const Value& value, const String& text, const Image& icon)
+{
+    choices.Add(PropertyEditorChoice(value, text, icon));
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Help(const String& text)
+{
+    help = text;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Impact(
+    PropertyEditorImpact value)
+{
+    impact = value;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Domain(
+    PropertyEditorDomain value)
+{
+    domain = value;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Default(
+    const Value& value, bool can_reset)
+{
+    default_value = value;
+    resettable = can_reset;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::ReadOnly(bool on)
+{
+    read_only = on;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::DesignerOnly(bool on)
+{
+    designer_only = on;
+    if(on)
+        domain = PropertyEditorDomain::DesignerOnly;
+    return *this;
+}
+
+void UiDesignerThemeOverrideSpec::AddTo(PropertyEditorModel& model,
+                                        const Value& value, bool mixed) const
+{
+    PropertyEditorItem& item = model.Add(id, label, kind,
+                                         IsNull(value) ? default_value : value,
+                                         group);
+    item.help = help;
+    item.domain = domain;
+    item.impact = impact;
+    item.default_value = default_value;
+    item.minimum = minimum;
+    item.maximum = maximum;
+    item.step = step;
+    item.decimals = decimals;
+    item.resettable = resettable;
+    item.read_only = read_only;
+    item.mixed = mixed;
+    item.choices = clone(choices);
+}
+
 UiDesignerPropertySpec& UiDesignerPropertySpec::Default(const Value& value,
                                                         bool can_reset)
 {
@@ -356,6 +434,23 @@ bool UiDesignerCatalog::Validate(String& error) const
                 return false;
             }
             property_ids.Add(property.id);
+            if(property.impact == PropertyImpactNone && !property.read_only) {
+                error = spec.type_id + "." + property.id +
+                        " has no declared impact";
+                return false;
+            }
+        }
+        Index<String> override_ids;
+        for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+            if(property.id.IsEmpty()) {
+                error = spec.type_id + " has an empty theme override id";
+                return false;
+            }
+            if(override_ids.Find(property.id) >= 0) {
+                error = spec.type_id + " has duplicate theme override " + property.id;
+                return false;
+            }
+            override_ids.Add(property.id);
             if(property.impact == PropertyImpactNone && !property.read_only) {
                 error = spec.type_id + "." + property.id +
                         " has no declared impact";

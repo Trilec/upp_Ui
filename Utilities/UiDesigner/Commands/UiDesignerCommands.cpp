@@ -139,6 +139,77 @@ bool UiDesignerCommandService::SetProperty(
         });
 }
 
+bool UiDesignerCommandService::SetThemeOverride(
+    UiDesignerNodeId node, const String& property, const Value& value,
+    UiDesignerChangeImpact impact, const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Set theme override " + property : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const Value old = document_.GetThemeOverride(node, property);
+            if(!document_.SetThemeOverride(node, property, value, impact)) {
+                last_error_ = "Unable to set theme override " + property;
+                return false;
+            }
+            UiDesignerPropertyChange& change = aggregate.properties.Add();
+            change.node = node;
+            change.property = property;
+            change.old_value = old;
+            change.new_value = value;
+            change.impact = impact;
+            return true;
+        });
+}
+
+bool UiDesignerCommandService::RemoveThemeOverride(
+    UiDesignerNodeId node, const String& property, UiDesignerChangeImpact impact,
+    const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Remove theme override " + property : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const Value old = document_.GetThemeOverride(node, property);
+            if(IsNull(old))
+                return true;
+            if(!document_.RemoveThemeOverride(node, property, impact)) {
+                last_error_ = "Unable to remove theme override " + property;
+                return false;
+            }
+            UiDesignerPropertyChange& change = aggregate.properties.Add();
+            change.node = node;
+            change.property = property;
+            change.old_value = old;
+            change.new_value = Value();
+            change.impact = impact;
+            return true;
+        });
+}
+
+bool UiDesignerCommandService::ClearThemeOverrides(
+    UiDesignerNodeId node, UiDesignerChangeImpact impact, const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Clear theme overrides" : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const UiDesignerNode* found = document_.Find(node);
+            if(!found)
+                return false;
+            if(found->theme_overrides.IsEmpty())
+                return true;
+            ValueMap old_overrides = found->theme_overrides;
+            if(!document_.ClearThemeOverrides(node, impact)) {
+                last_error_ = "Unable to clear theme overrides";
+                return false;
+            }
+            for(int i = 0; i < old_overrides.GetCount(); i++) {
+                UiDesignerPropertyChange& change = aggregate.properties.Add();
+                change.node = node;
+                change.property = AsString(old_overrides.GetKey(i));
+                change.old_value = old_overrides.GetValue(i);
+                change.new_value = Value();
+                change.impact = impact;
+            }
+            return true;
+        });
+}
+
 bool UiDesignerCommandService::SetVirtualSize(Size size, const String& label)
 {
     return ApplyAtomic(label,

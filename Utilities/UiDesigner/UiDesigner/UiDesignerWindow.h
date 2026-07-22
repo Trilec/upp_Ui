@@ -34,6 +34,7 @@ private:
     void BuildTheme();
     void ConnectServices();
     void ApplyThemeToShell();
+    void UpdateDecorationsButton();
 
     void ShowDesigner();
     void ShowTheme();
@@ -126,6 +127,7 @@ private:
     bool selection_details_refresh_posted_ = false;
     String active_catalog_drag_type_;
     bool catalog_drag_active_ = false;
+    bool decorations_visible_ = true;
 };
 
 }

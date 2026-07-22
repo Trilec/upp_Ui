@@ -102,6 +102,55 @@ struct UiDesignerEventSpec : Moveable<UiDesignerEventSpec> {
     String help;
 };
 
+struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
+    String id;
+    String label;
+    String group;
+    String help;
+    PropertyEditorKind kind = PropertyEditorKind::Text;
+    PropertyEditorDomain domain = PropertyEditorDomain::Theme;
+    PropertyEditorImpact impact = PropertyImpactNone;
+
+    Value default_value;
+    Value minimum;
+    Value maximum;
+    Value step;
+    int decimals = 3;
+
+    Array<PropertyEditorChoice> choices;
+
+    bool resettable = true;
+    bool read_only = false;
+    bool designer_only = false;
+
+    UiDesignerThemeOverrideSpec() {}
+    UiDesignerThemeOverrideSpec(const UiDesignerThemeOverrideSpec& other)
+        : id(other.id), label(other.label), group(other.group), help(other.help),
+          kind(other.kind), domain(other.domain), impact(other.impact),
+          default_value(other.default_value), minimum(other.minimum),
+          maximum(other.maximum), step(other.step), decimals(other.decimals),
+          resettable(other.resettable), read_only(other.read_only),
+          designer_only(other.designer_only)
+    {
+        choices.Append(clone(other.choices));
+    }
+
+    UiDesignerThemeOverrideSpec& Range(const Value& min_value,
+                                       const Value& max_value,
+                                       const Value& step_value = Value());
+    UiDesignerThemeOverrideSpec& Choice(const Value& value, const String& text,
+                                        const Image& icon = Image());
+    UiDesignerThemeOverrideSpec& Help(const String& text);
+    UiDesignerThemeOverrideSpec& Impact(PropertyEditorImpact value);
+    UiDesignerThemeOverrideSpec& Domain(PropertyEditorDomain value);
+    UiDesignerThemeOverrideSpec& Default(const Value& value, bool can_reset = true);
+    UiDesignerThemeOverrideSpec& ReadOnly(bool on = true);
+    UiDesignerThemeOverrideSpec& DesignerOnly(bool on = true);
+
+    void AddTo(PropertyEditorModel& model, const Value& value,
+               bool mixed = false) const;
+};
+
 struct UiDesignerPropertySpec : Moveable<UiDesignerPropertySpec> {
     String id;
     String label;
@@ -166,6 +215,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
 
     Vector<UiDesignerPropertySpec> properties;
     Vector<UiDesignerEventSpec> events;
+    Vector<UiDesignerThemeOverrideSpec> theme_overrides;
     ValueMap defaults;
 
     String preview_adapter_id;

@@ -238,6 +238,8 @@ static void RunTests(FoundationTester& t)
                 absolute_spec->FindProperty("width") &&
                 absolute_spec->FindProperty("height"),
             "AbsoluteLayout geometry is Inspector-bindable");
+    t.Check(absolute_spec && !absolute_spec->FindProperty("inset"),
+            "AbsoluteLayout omits inherited layout inset");
 
     UiDesignerDocument legacy;
     t.Check(UiDesignerDeserialize(LegacySpacerJson(), legacy, error),

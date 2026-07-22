@@ -28,6 +28,32 @@ void UiDesignerNode::SetProperty(const String& id, const Value& value)
     properties.Set(id, value);
 }
 
+Value UiDesignerNode::GetThemeOverride(const String& id,
+                                       const Value& fallback) const
+{
+    const int q = theme_overrides.Find(id);
+    return q >= 0 ? theme_overrides.GetValue(q) : fallback;
+}
+
+void UiDesignerNode::SetThemeOverride(const String& id, const Value& value)
+{
+    theme_overrides.Set(id, value);
+}
+
+bool UiDesignerNode::RemoveThemeOverride(const String& id)
+{
+    const int q = theme_overrides.Find(id);
+    if(q < 0)
+        return false;
+    theme_overrides.Remove(q);
+    return true;
+}
+
+void UiDesignerNode::ClearThemeOverrides()
+{
+    theme_overrides.Clear();
+}
+
 int UiDesignerNode::FindAction(const String& event_id) const
 {
     for(int i = 0; i < actions.GetCount(); i++)
@@ -340,12 +366,94 @@ bool UiDesignerDocument::SetProperty(UiDesignerNodeId id,
     return true;
 }
 
+bool UiDesignerDocument::SetThemeOverride(UiDesignerNodeId id,
+                                          const String& property,
+                                          const Value& value,
+                                          UiDesignerChangeImpact impact)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node)
+        return false;
+    const Value old = node->GetThemeOverride(property);
+    if(old == value)
+        return true;
+    node->SetThemeOverride(property, value);
+
+    UiDesignerChangeSet changes;
+    changes.reason = "Set theme override " + property;
+    UiDesignerPropertyChange& change = changes.properties.Add();
+    change.node = id;
+    change.property = property;
+    change.old_value = old;
+    change.new_value = value;
+    change.impact = impact;
+    QueueChange(changes);
+    return true;
+}
+
+bool UiDesignerDocument::RemoveThemeOverride(UiDesignerNodeId id,
+                                             const String& property,
+                                             UiDesignerChangeImpact impact)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node)
+        return false;
+    const Value old = node->GetThemeOverride(property);
+    if(IsNull(old))
+        return true;
+    if(!node->RemoveThemeOverride(property))
+        return false;
+
+    UiDesignerChangeSet changes;
+    changes.reason = "Remove theme override " + property;
+    UiDesignerPropertyChange& change = changes.properties.Add();
+    change.node = id;
+    change.property = property;
+    change.old_value = old;
+    change.new_value = Value();
+    change.impact = impact;
+    QueueChange(changes);
+    return true;
+}
+
+bool UiDesignerDocument::ClearThemeOverrides(UiDesignerNodeId id,
+                                            UiDesignerChangeImpact impact)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node)
+        return false;
+    if(node->theme_overrides.IsEmpty())
+        return true;
+
+    UiDesignerChangeSet changes;
+    changes.reason = "Clear theme overrides";
+    for(int i = 0; i < node->theme_overrides.GetCount(); i++) {
+        UiDesignerPropertyChange& change = changes.properties.Add();
+        change.node = id;
+        change.property = AsString(node->theme_overrides.GetKey(i));
+        change.old_value = node->theme_overrides.GetValue(i);
+        change.new_value = Value();
+        change.impact = impact;
+    }
+    node->ClearThemeOverrides();
+    QueueChange(changes);
+    return true;
+}
+
 Value UiDesignerDocument::GetProperty(UiDesignerNodeId id,
                                       const String& property,
                                       const Value& fallback) const
 {
     const UiDesignerNode* node = Find(id);
     return node ? node->GetProperty(property, fallback) : fallback;
+}
+
+Value UiDesignerDocument::GetThemeOverride(UiDesignerNodeId id,
+                                           const String& property,
+                                           const Value& fallback) const
+{
+    const UiDesignerNode* node = Find(id);
+    return node ? node->GetThemeOverride(property, fallback) : fallback;
 }
 
 bool UiDesignerDocument::SetActionBinding(UiDesignerNodeId id,

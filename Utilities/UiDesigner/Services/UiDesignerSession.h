@@ -51,6 +51,10 @@ public:
     const PropertyEditorModel& InspectorModel() const { return inspector_model_; }
     PropertyEditorModel& BehaviorModel() { return behavior_model_; }
     const PropertyEditorModel& BehaviorModel() const { return behavior_model_; }
+    PropertyEditorModel& ThemeOverrideModel() { return theme_override_model_; }
+    const PropertyEditorModel& ThemeOverrideModel() const {
+        return theme_override_model_;
+    }
     PropertyEditorModel& ThemeModel() {
         theme_.BuildPropertyModel(theme_model_);
         return theme_model_;
@@ -88,6 +92,7 @@ public:
     void ClearSelection();
     void RebuildInspector();
     void RebuildBehaviorModel();
+    void RebuildThemeOverrideModel();
 
     bool PreviewProperty(const String& property, const Value& value,
                          String& error);
@@ -104,6 +109,12 @@ public:
                              String& error);
     bool RemoveActiveBehavior(String& error);
     const UiDesignerActionBinding* GetActiveBehavior() const;
+
+    bool PreviewThemeOverride(const String& property, const Value& value,
+                              String& error);
+    bool CommitThemeOverride(const String& property, const Value& value,
+                             String& error);
+    bool ResetThemeOverride(const String& property, String& error);
 
     bool Undo();
     bool Redo();
@@ -131,6 +142,7 @@ private:
     UiDesignerActionBinding MakeEditableBehavior() const;
     String DefaultHandlerName(const UiDesignerNode& node,
                               const String& event_id) const;
+    void SyncThemeOverrideValues(const UiDesignerChangeSet& changes);
 
     UiDesignerDocument document_;
     UiDesignerCommandService commands_;
@@ -142,6 +154,7 @@ private:
 
     PropertyEditorModel inspector_model_;
     PropertyEditorModel behavior_model_;
+    PropertyEditorModel theme_override_model_;
     UiDesignerThemeDocument theme_;
     PropertyEditorModel theme_model_;
 
