@@ -1299,6 +1299,17 @@ void UiDesignerPreviewCanvas::Layout()
     root_record.selectable = true;
     root_record.drop_target = true;
     snapshot.Add(pick(root_record));
+    {
+        UiDesignerDropRegion region;
+        region.owner = root->id;
+        region.kind = UiDesignerDropRegionKind::WindowContent;
+        region.rect = root_record.rect;
+        region.visual_rect = root_record.rect;
+        region.depth = 0;
+        region.paint_order = 0;
+        region.label = "Window";
+        snapshot.AddRegion(pick(region));
+    }
     int order = 0;
     for(const UiDesignerPreviewInstance& instance : instances_) {
         const UiDesignerNode* node = document_->Find(instance.node);

@@ -31,6 +31,23 @@ CONSOLE_APP_MAIN
     Check(catalog.FindCategory("U++ Controls").GetCount() >= 18, "stock U++ catalog");
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
 
+    UiDesignerDocument blank_preview_document;
+    UiDesignerPreviewCanvas blank_preview;
+    blank_preview.SetRect(0, 0, 512, 250);
+    UiDesignerSelection blank_selection;
+    blank_preview.Bind(&blank_preview_document, &catalog, nullptr, &blank_selection);
+    blank_preview.RebuildDocument();
+    const UiDesignerGeometrySnapshot& blank_geometry = blank_preview.GetGeometrySnapshot();
+    const UiDesignerNodeId blank_root = blank_preview_document.GetRootId();
+    Check(blank_geometry.GetDropRegionCount() == 1,
+          Format("blank document publishes one root drop region (%d)",
+                 blank_geometry.GetDropRegionCount()));
+    const UiDesignerDropRegion* blank_root_drop =
+        blank_geometry.HitDropRegion(blank_preview.GetNodeRect(blank_root).CenterPoint());
+    Check(blank_root_drop && blank_root_drop->owner == blank_root &&
+              blank_root_drop->kind == UiDesignerDropRegionKind::WindowContent,
+          "blank root hit testing resolves the Window region");
+
     static const char *required_ui[] = {
         "UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiPanel",
         "UiDirectContentHost", "UiGroupPanel", "UiStack", "UiAccordion",

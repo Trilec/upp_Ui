@@ -87,6 +87,10 @@ private:
     bool decorations_visible_ = true;
 
     Rect WorkspaceRootRect() const;
+    Point ScreenToWorkspace(Point screen) const;
+    Point WorkspaceToCanvas(Point workspace) const;
+    Point ScreenToCanvas(Point screen) const;
+    Rect CanvasToWorkspace(Rect canvas) const;
     UiDesignerNodeId HitNode(Point p) const;
     int HitDocumentResizeEdge(Point p) const;
     Rect ResizeDocumentTo(Point p) const;

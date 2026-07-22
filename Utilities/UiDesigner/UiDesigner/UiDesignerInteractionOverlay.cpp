@@ -317,8 +317,6 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     const UiDesignerNode* root = document.Find(document.GetRootId());
     if(!root)
         return;
-    if(!decorations_visible_ && drag_type_id_.IsEmpty())
-        return;
 
     const Point canvas_origin = owner_->preview_canvas_.GetRect().TopLeft();
     const UiDesignerGeometryRecord* root_geometry =
@@ -334,6 +332,31 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     w.DrawRect(root_rect.left - half, root_rect.bottom - half, root_rect.Width() + thickness, thickness, frame);
     w.DrawRect(root_rect.left - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
     w.DrawRect(root_rect.right - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
+
+    const bool show_details = decorations_visible_ || !drag_type_id_.IsEmpty() || resizing_;
+    if(!show_details) {
+        const int handle = DPI(12);
+        const Color fill = Blend(frame, White(), 170);
+        const Point points[] = {
+            root_rect.TopLeft(),
+            Point(root_rect.CenterPoint().x, root_rect.top),
+            Point(root_rect.right, root_rect.top),
+            Point(root_rect.left, root_rect.CenterPoint().y),
+            Point(root_rect.right, root_rect.CenterPoint().y),
+            Point(root_rect.left, root_rect.bottom),
+            Point(root_rect.CenterPoint().x, root_rect.bottom),
+            root_rect.BottomRight()
+        };
+        for(const Point& point : points) {
+            Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
+            w.DrawRect(grip, fill);
+            w.DrawRect(grip.left, grip.top, grip.Width(), 1, frame);
+            w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, frame);
+            w.DrawRect(grip.left, grip.top, 1, grip.Height(), frame);
+            w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
+        }
+        return;
+    }
 
     const UiDesignerSelection& selection = owner_->session_.State().selection;
     const int step = DPI(7);
@@ -625,6 +648,30 @@ Rect UiDesignerInteractionOverlay::WorkspaceRootRect() const
     return owner_->preview_canvas_.GetRect();
 }
 
+Point UiDesignerInteractionOverlay::ScreenToWorkspace(Point screen) const
+{
+    return screen - GetScreenRect().TopLeft();
+}
+
+Point UiDesignerInteractionOverlay::WorkspaceToCanvas(Point workspace) const
+{
+    if(!owner_)
+        return workspace;
+    return workspace - owner_->preview_canvas_.GetRect().TopLeft();
+}
+
+Point UiDesignerInteractionOverlay::ScreenToCanvas(Point screen) const
+{
+    return WorkspaceToCanvas(ScreenToWorkspace(screen));
+}
+
+Rect UiDesignerInteractionOverlay::CanvasToWorkspace(Rect canvas) const
+{
+    if(!owner_)
+        return canvas;
+    return canvas.Offseted(owner_->preview_canvas_.GetRect().TopLeft());
+}
+
 UiDesignerNodeId UiDesignerInteractionOverlay::HitNode(Point p) const
 {
     if(!owner_)
@@ -715,10 +762,10 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
 
     drag_diagnostics_.target_resolutions++;
 
-    const Point overlay_local = screen - GetScreenRect().TopLeft();
+    const Point workspace_local = ScreenToWorkspace(screen);
     const Rect root = WorkspaceRootRect();
     drag_type_id_ = type_id;
-    if(!root.Contains(overlay_local)) {
+    if(!root.Contains(workspace_local)) {
         resolved_drop_ = UiDesignerResolvedDrop();
         SetDragStatus(Format("drag %s -> outside Window", type_id));
         Refresh();
@@ -726,7 +773,7 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
     }
 
     const UiDesignerDocument& document = owner_->session_.Document();
-    const Point doc_local = overlay_local - root.TopLeft();
+    const Point doc_local = WorkspaceToCanvas(workspace_local);
     const UiDesignerGeometrySnapshot& geometry = owner_->preview_canvas_.GetGeometrySnapshot();
     const UiDesignerDropRegion* region = geometry.HitDropRegion(doc_local);
     if(!region) {
