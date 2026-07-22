@@ -184,6 +184,52 @@ static bool UsesLabelSetter(UiDesignerRuntimeKind kind)
            kind == UiDesignerRuntimeKind::UppOption;
 }
 
+static bool IsButtonFamily(UiDesignerRuntimeKind kind)
+{
+    return kind == UiDesignerRuntimeKind::UiButton ||
+           kind == UiDesignerRuntimeKind::UiToolButton ||
+           kind == UiDesignerRuntimeKind::UiSplitButton;
+}
+
+static String EmitButtonIcon(const String& name)
+{
+    if(name.IsEmpty() || name == "None")
+        return "Image()";
+    return name + "()";
+}
+
+static String EmitAlign(const String& value)
+{
+    if(value == "Left") return "UiAlign::LEFT";
+    if(value == "Right") return "UiAlign::RIGHT";
+    if(value == "Top") return "UiAlign::TOP";
+    if(value == "Bottom") return "UiAlign::BOTTOM";
+    return "UiAlign::CENTER";
+}
+
+static String EmitIconRenderMode(const String& value)
+{
+    if(value == "Auto")
+        return "UiIconRenderMode::Auto";
+    if(value == "PreserveColor")
+        return "UiIconRenderMode::PreserveColor";
+    return "UiIconRenderMode::MonoTint";
+}
+
+static String EmitUiSpan(const String& value)
+{
+    if(value == "None") return "NONE";
+    if(value == "Small") return "SMALL";
+    return "LARGE";
+}
+
+static String EmitUiLineStyle(const String& value)
+{
+    if(value == "Dashed") return "DASHED";
+    if(value == "Dotted") return "DOTTED";
+    return "SOLID";
+}
+
 void UiDesignerCodeGenerator::EmitSetup(
     String& out, const UiDesignerNode& node,
     const UiDesignerControlSpec& spec) const
@@ -210,6 +256,56 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetGap(DPI("
             << max(0, (int)node.GetProperty("gap", 0)) << "));\n";
 
+    if(spec.FindProperty("tooltip"))
+        out << "\t" << member << ".Tip(" << EmitValue(
+            node.GetProperty("tooltip", spec.FindProperty("tooltip")->default_value))
+            << ");\n";
+    if(spec.FindProperty("icon")) {
+        const String icon_name = node.GetProperty("icon", spec.FindProperty("icon")->default_value);
+        if(IsButtonFamily(spec.runtime_kind))
+            out << "\t" << member << ".SetIcon(" << EmitButtonIcon(icon_name) << ");\n";
+        else if(icon_name == "ICON_DESIGN_DESCRIPTION_48")
+            out << "\t" << member
+                << ".SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));\n";
+    }
+    if(spec.FindProperty("icon_render_mode") && IsButtonFamily(spec.runtime_kind))
+        out << "\t" << member << ".SetIconRenderMode(" << EmitIconRenderMode(
+            AsString(node.GetProperty("icon_render_mode", "MonoTint"))) << ");\n";
+    if(spec.FindProperty("icon_side"))
+        out << "\t" << member << ".SetIconSide(" << EmitAlign(
+            AsString(node.GetProperty("icon_side", "Left"))) << ");\n";
+    if(spec.FindProperty("icon_width") || spec.FindProperty("icon_height")) {
+        const int width = max(0, (int)node.GetProperty("icon_width", 18));
+        const int height = max(0, (int)node.GetProperty("icon_height", 18));
+        out << "\t" << member << ".SetIconSize(DPI(" << width << "), DPI(" << height << "));\n";
+    }
+    if(spec.FindProperty("scale_icon_to_content") && IsButtonFamily(spec.runtime_kind))
+        out << "\t" << member << ".SetIconScaleToContent("
+            << EmitValue(node.GetProperty("scale_icon_to_content", false)) << ");\n";
+    if(spec.FindProperty("align_h") || spec.FindProperty("align_v")) {
+        const String align_h = AsString(node.GetProperty("align_h", "Center"));
+        const String align_v = AsString(node.GetProperty("align_v", "Center"));
+        if(IsButtonFamily(spec.runtime_kind))
+            out << "\t" << member << ".SetAlign(" << EmitAlign(align_h) << ", "
+                << EmitAlign(align_v) << ");\n";
+    }
+    if(spec.FindProperty("content_gap"))
+        out << "\t" << member << ".SetContentGap(DPI("
+            << max(0, (int)node.GetProperty("content_gap", 4)) << "));\n";
+    if(spec.FindProperty("content_inset_left") ||
+       spec.FindProperty("content_inset_top") ||
+       spec.FindProperty("content_inset_right") ||
+       spec.FindProperty("content_inset_bottom")) {
+        out << "\t" << member << ".SetContentInset(Rect(DPI("
+            << max(0, (int)node.GetProperty("content_inset_left", 4)) << "), DPI("
+            << max(0, (int)node.GetProperty("content_inset_top", 4)) << "), DPI("
+            << max(0, (int)node.GetProperty("content_inset_right", 4)) << "), DPI("
+            << max(0, (int)node.GetProperty("content_inset_bottom", 4)) << ")));\n";
+    }
+    if(spec.FindProperty("click_focus") && IsButtonFamily(spec.runtime_kind))
+        out << "\t" << member << ".ClickFocus("
+            << EmitValue(node.GetProperty("click_focus", true)) << ");\n";
+
     if(const UiDesignerPropertySpec* text = spec.FindProperty("text")) {
         const Value value = node.GetProperty("text", text->default_value);
         if(!IsNull(value)) {
@@ -223,15 +319,94 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetTitle("
             << EmitValue(node.GetProperty("title", title->default_value))
             << ");\n";
-    if(const UiDesignerPropertySpec* icon = spec.FindProperty("icon")) {
-        const String icon_name = node.GetProperty("icon", icon->default_value);
-        if(icon_name == "ICON_DESIGN_DESCRIPTION_48")
-            out << "\t" << member
-                << ".SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));\n";
+    if(spec.FindProperty("subtitle"))
+        out << "\t" << member << ".SetSubTitle("
+            << EmitValue(node.GetProperty("subtitle", "Supporting information"))
+            << ");\n";
+    if(spec.FindProperty("copy"))
+        out << "\t" << member << ".SetCopyText("
+            << EmitValue(node.GetProperty("copy", "Add a short description or place content in the card."))
+            << ");\n";
+    if(spec.FindProperty("text_align_h") || spec.FindProperty("text_align_v")) {
+        const String align_h = AsString(node.GetProperty("text_align_h", "Left"));
+        const String align_v = AsString(node.GetProperty("text_align_v", "Center"));
+        if(spec.runtime_kind == UiDesignerRuntimeKind::UiTitleCard)
+            out << "\t" << member << ".SetTextAlign(" << EmitAlign(align_h)
+                << ", " << EmitAlign(align_v) << ");\n";
     }
-    if(spec.FindProperty("checked"))
-        out << "\t" << member << ".SetData("
-            << EmitValue(node.GetProperty("checked", false)) << ");\n";
+    if(spec.FindProperty("media_side"))
+        out << "\t" << member << ".SetMediaSide("
+            << EmitAlign(AsString(node.GetProperty("media_side", "Left"))) << ");\n";
+    if(spec.FindProperty("media_align_h") || spec.FindProperty("media_align_v")) {
+        const String align_h = AsString(node.GetProperty("media_align_h", "Center"));
+        const String align_v = AsString(node.GetProperty("media_align_v", "Center"));
+        if(spec.runtime_kind == UiDesignerRuntimeKind::UiTitleCard)
+            out << "\t" << member << ".SetMediaAlign(" << EmitAlign(align_h)
+                << ", " << EmitAlign(align_v) << ");\n";
+    }
+    if(spec.FindProperty("media_reserve"))
+        out << "\t" << member << ".SetMediaReserve("
+            << max(0, (int)node.GetProperty("media_reserve", 72)) << ");\n";
+    if(spec.FindProperty("media_min"))
+        out << "\t" << member << ".SetMediaMin("
+            << max(0, (int)node.GetProperty("media_min", 24)) << ");\n";
+    if(spec.FindProperty("media_gap"))
+        out << "\t" << member << ".SetMediaGap("
+            << max(0, (int)node.GetProperty("media_gap", 10)) << ");\n";
+    if(spec.FindProperty("media_auto_fit"))
+        out << "\t" << member << ".SetMediaAutoFit("
+            << EmitValue(node.GetProperty("media_auto_fit", true)) << ");\n";
+    if(spec.FindProperty("media_share_percent"))
+        out << "\t" << member << ".SetMediaSharePercent("
+            << max(0, (int)node.GetProperty("media_share_percent", 0)) << ");\n";
+    if(spec.FindProperty("content_inset") && spec.runtime_kind == UiDesignerRuntimeKind::UiTitleCard)
+        out << "\t" << member << ".SetContentInset("
+            << max(0, (int)node.GetProperty("content_inset", 8)) << ");\n";
+    if(spec.FindProperty("content_cell_gap"))
+        out << "\t" << member << ".SetContentCellGap("
+            << max(0, (int)node.GetProperty("content_cell_gap", 8)) << ");\n";
+    if(spec.FindProperty("show_title_line"))
+        out << "\t" << member << ".ShowTitleLine("
+            << EmitValue(node.GetProperty("show_title_line", true)) << ");\n";
+    if(spec.FindProperty("title_line_length") ||
+       spec.FindProperty("title_line_thickness") ||
+       spec.FindProperty("title_line_style")) {
+        out << "\t" << member << ".SetTitleLine("
+            << EmitUiSpan(AsString(node.GetProperty("title_line_length", "Large"))) << ", "
+            << max(0, (int)node.GetProperty("title_line_thickness", 1)) << ", "
+            << EmitUiLineStyle(AsString(node.GetProperty("title_line_style", "Solid"))) << ");\n";
+    }
+    if(spec.FindProperty("show_card_line"))
+        out << "\t" << member << ".ShowCardLine("
+            << EmitValue(node.GetProperty("show_card_line", false)) << ");\n";
+    if(spec.FindProperty("card_line_side"))
+        out << "\t" << member << ".SetCardLineSide("
+            << EmitAlign(AsString(node.GetProperty("card_line_side", "Bottom"))) << ");\n";
+    if(spec.FindProperty("card_line_length") ||
+       spec.FindProperty("card_line_thickness"))
+        out << "\t" << member << ".SetCardLine("
+            << EmitUiSpan(AsString(node.GetProperty("card_line_length", "Large"))) << ", "
+            << max(0, (int)node.GetProperty("card_line_thickness", 1)) << ");\n";
+    if(spec.FindProperty("card_line_gap"))
+        out << "\t" << member << ".SetCardLineGap("
+            << max(0, (int)node.GetProperty("card_line_gap", 0)) << ");\n";
+    if(spec.FindProperty("hover_enabled"))
+        out << "\t" << member << ".EnableHover("
+            << EmitValue(node.GetProperty("hover_enabled", false)) << ");\n";
+    if(spec.FindProperty("selectable"))
+        out << "\t" << member << ".SetSelectable("
+            << EmitValue(node.GetProperty("selectable", true)) << ");\n";
+    if(spec.FindProperty("checkable"))
+        out << "\t" << member << ".SetCheckable("
+            << EmitValue(node.GetProperty("checkable", false)) << ");\n";
+    if(spec.FindProperty("checked")) {
+        if(IsButtonFamily(spec.runtime_kind))
+            out << "\t" << member << ".SetChecked("
+                << EmitValue(node.GetProperty("checked", false)) << ");\n";
+        else
+            out << "\t" << member << ".SetData("
+                << EmitValue(node.GetProperty("checked", false)) << ");\n";
+    }
     if(spec.FindProperty("value")) {
         const Value value = node.GetProperty("value", 50);
         if(spec.runtime_kind == UiDesignerRuntimeKind::UiSlider)

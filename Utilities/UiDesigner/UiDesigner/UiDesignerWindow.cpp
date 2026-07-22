@@ -226,8 +226,8 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
-                   .AddSection("Behaviors", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
+                   .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
     designer_right_.SetActiveSection(1);
     inspector_.SetStyle(UiDesignerInspectorStyle());

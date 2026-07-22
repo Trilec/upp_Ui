@@ -64,12 +64,429 @@ static void AddText(UiDesignerControlSpec& spec, const String& value)
     spec.defaults.Set("text", value);
 }
 
+static void AddButtonProperties(UiDesignerControlSpec& spec)
+{
+    UiDesignerPropertySpec tooltip = UiDesignerTextProperty("tooltip", "Tooltip");
+    tooltip.group = "Content";
+    tooltip.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(tooltip);
+
+    UiDesignerPropertySpec icon;
+    icon.id = "icon";
+    icon.label = "Icon";
+    icon.group = "Content";
+    icon.kind = PropertyEditorKind::Choice;
+    icon.domain = PropertyEditorDomain::Content;
+    icon.default_value = "None";
+    icon.impact = PropertyImpactPaint | PropertyImpactCode;
+    icon.choices.Add(PropertyEditorChoice("None", "None"));
+    icon.choices.Add(PropertyEditorChoice("ICON_DESIGN_DESCRIPTION_48", "Description"));
+    icon.choices.Add(PropertyEditorChoice("ICON_DESIGN_WIDGETS_48", "Widgets"));
+    icon.choices.Add(PropertyEditorChoice("ICON_DESIGN_ACCOUNT_TREE_48", "Hierarchy"));
+    icon.choices.Add(PropertyEditorChoice("ICON_DESIGN_TUNE_48", "Inspector"));
+    spec.properties.Add(icon);
+    spec.defaults.Set("icon", "None");
+
+    UiDesignerPropertySpec icon_side;
+    icon_side.id = "icon_side";
+    icon_side.label = "Icon side";
+    icon_side.group = "Appearance";
+    icon_side.kind = PropertyEditorKind::Choice;
+    icon_side.domain = PropertyEditorDomain::Appearance;
+    icon_side.default_value = "Left";
+    icon_side.impact = PropertyImpactPaint | PropertyImpactCode;
+    icon_side.choices.Add(PropertyEditorChoice("Left", "Left"));
+    icon_side.choices.Add(PropertyEditorChoice("Right", "Right"));
+    icon_side.choices.Add(PropertyEditorChoice("Top", "Top"));
+    icon_side.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(icon_side);
+    spec.defaults.Set("icon_side", "Left");
+
+    UiDesignerPropertySpec icon_width = UiDesignerNumberProperty(
+        "icon_width", "Icon width", 18, 0, 256, 1, PropertyEditorKind::Integer);
+    icon_width.group = "Appearance";
+    icon_width.domain = PropertyEditorDomain::Appearance;
+    icon_width.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(icon_width);
+    spec.defaults.Set("icon_width", 18);
+
+    UiDesignerPropertySpec icon_height = UiDesignerNumberProperty(
+        "icon_height", "Icon height", 18, 0, 256, 1, PropertyEditorKind::Integer);
+    icon_height.group = "Appearance";
+    icon_height.domain = PropertyEditorDomain::Appearance;
+    icon_height.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(icon_height);
+    spec.defaults.Set("icon_height", 18);
+
+    UiDesignerPropertySpec icon_render_mode;
+    icon_render_mode.id = "icon_render_mode";
+    icon_render_mode.label = "Icon render mode";
+    icon_render_mode.group = "Appearance";
+    icon_render_mode.kind = PropertyEditorKind::Choice;
+    icon_render_mode.domain = PropertyEditorDomain::Appearance;
+    icon_render_mode.default_value = "MonoTint";
+    icon_render_mode.impact = PropertyImpactPaint | PropertyImpactCode;
+    icon_render_mode.choices.Add(PropertyEditorChoice("Auto", "Auto"));
+    icon_render_mode.choices.Add(PropertyEditorChoice("MonoTint", "Mono tint"));
+    icon_render_mode.choices.Add(PropertyEditorChoice("PreserveColor", "Preserve color"));
+    spec.properties.Add(icon_render_mode);
+    spec.defaults.Set("icon_render_mode", "MonoTint");
+
+    UiDesignerPropertySpec scale_icon = UiDesignerBoolProperty(
+        "scale_icon_to_content", "Scale icon to content", false);
+    scale_icon.group = "Appearance";
+    scale_icon.domain = PropertyEditorDomain::Appearance;
+    scale_icon.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(scale_icon);
+    spec.defaults.Set("scale_icon_to_content", false);
+
+    UiDesignerPropertySpec align_h;
+    align_h.id = "align_h";
+    align_h.label = "Horizontal align";
+    align_h.group = "Appearance";
+    align_h.kind = PropertyEditorKind::Choice;
+    align_h.domain = PropertyEditorDomain::Appearance;
+    align_h.default_value = "Center";
+    align_h.impact = PropertyImpactPaint | PropertyImpactCode;
+    align_h.choices.Add(PropertyEditorChoice("Left", "Left"));
+    align_h.choices.Add(PropertyEditorChoice("Center", "Center"));
+    align_h.choices.Add(PropertyEditorChoice("Right", "Right"));
+    spec.properties.Add(align_h);
+    spec.defaults.Set("align_h", "Center");
+
+    UiDesignerPropertySpec align_v;
+    align_v.id = "align_v";
+    align_v.label = "Vertical align";
+    align_v.group = "Appearance";
+    align_v.kind = PropertyEditorKind::Choice;
+    align_v.domain = PropertyEditorDomain::Appearance;
+    align_v.default_value = "Center";
+    align_v.impact = PropertyImpactPaint | PropertyImpactCode;
+    align_v.choices.Add(PropertyEditorChoice("Top", "Top"));
+    align_v.choices.Add(PropertyEditorChoice("Center", "Center"));
+    align_v.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(align_v);
+    spec.defaults.Set("align_v", "Center");
+
+    UiDesignerPropertySpec content_gap = UiDesignerNumberProperty(
+        "content_gap", "Content gap", 4, 0, 100, 1, PropertyEditorKind::Integer);
+    content_gap.group = "Appearance";
+    content_gap.domain = PropertyEditorDomain::Appearance;
+    content_gap.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_gap);
+
+    UiDesignerPropertySpec content_inset_left = UiDesignerNumberProperty(
+        "content_inset_left", "Content inset left", 4, 0, 100, 1, PropertyEditorKind::Integer);
+    content_inset_left.group = "Appearance";
+    content_inset_left.domain = PropertyEditorDomain::Appearance;
+    content_inset_left.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_inset_left);
+    spec.defaults.Set("content_inset_left", 4);
+
+    UiDesignerPropertySpec content_inset_top = UiDesignerNumberProperty(
+        "content_inset_top", "Content inset top", 4, 0, 100, 1, PropertyEditorKind::Integer);
+    content_inset_top.group = "Appearance";
+    content_inset_top.domain = PropertyEditorDomain::Appearance;
+    content_inset_top.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_inset_top);
+    spec.defaults.Set("content_inset_top", 4);
+
+    UiDesignerPropertySpec content_inset_right = UiDesignerNumberProperty(
+        "content_inset_right", "Content inset right", 4, 0, 100, 1, PropertyEditorKind::Integer);
+    content_inset_right.group = "Appearance";
+    content_inset_right.domain = PropertyEditorDomain::Appearance;
+    content_inset_right.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_inset_right);
+    spec.defaults.Set("content_inset_right", 4);
+
+    UiDesignerPropertySpec content_inset_bottom = UiDesignerNumberProperty(
+        "content_inset_bottom", "Content inset bottom", 4, 0, 100, 1, PropertyEditorKind::Integer);
+    content_inset_bottom.group = "Appearance";
+    content_inset_bottom.domain = PropertyEditorDomain::Appearance;
+    content_inset_bottom.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_inset_bottom);
+    spec.defaults.Set("content_inset_bottom", 4);
+
+    UiDesignerPropertySpec click_focus = UiDesignerBoolProperty("click_focus", "Click focus", true);
+    click_focus.group = "State";
+    click_focus.domain = PropertyEditorDomain::Behaviour;
+    click_focus.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(click_focus);
+    spec.defaults.Set("click_focus", true);
+
+    UiDesignerPropertySpec checkable = UiDesignerBoolProperty("checkable", "Checkable", false);
+    checkable.group = "State";
+    checkable.domain = PropertyEditorDomain::Behaviour;
+    checkable.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(checkable);
+    spec.defaults.Set("checkable", false);
+
+    UiDesignerPropertySpec checked = UiDesignerBoolProperty("checked", "Checked", false);
+    checked.group = "State";
+    checked.domain = PropertyEditorDomain::Behaviour;
+    checked.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(checked);
+    spec.defaults.Set("checked", false);
+}
+
 static void AddTitle(UiDesignerControlSpec& spec, const String& value)
 {
     UiDesignerPropertySpec property = UiDesignerTextProperty("title", "Title");
     property.default_value = value;
     spec.properties.Add(property);
     spec.defaults.Set("title", value);
+}
+
+static void AddTitleCardProperties(UiDesignerControlSpec& spec)
+{
+    UiDesignerPropertySpec subtitle = UiDesignerTextProperty("subtitle", "Subtitle");
+    subtitle.group = "Content";
+    subtitle.impact = PropertyImpactPaint | PropertyImpactCode;
+    subtitle.default_value = "Supporting information";
+    spec.properties.Add(subtitle);
+    spec.defaults.Set("subtitle", "Supporting information");
+
+    UiDesignerPropertySpec copy = UiDesignerTextProperty("copy", "Copy");
+    copy.group = "Content";
+    copy.impact = PropertyImpactPaint | PropertyImpactCode;
+    copy.default_value = "Add a short description or place content in the card.";
+    spec.properties.Add(copy);
+    spec.defaults.Set("copy", "Add a short description or place content in the card.");
+
+    UiDesignerPropertySpec text_align_h;
+    text_align_h.id = "text_align_h";
+    text_align_h.label = "Text align horizontal";
+    text_align_h.group = "Appearance";
+    text_align_h.kind = PropertyEditorKind::Choice;
+    text_align_h.domain = PropertyEditorDomain::Appearance;
+    text_align_h.default_value = "Left";
+    text_align_h.impact = PropertyImpactPaint | PropertyImpactCode;
+    text_align_h.choices.Add(PropertyEditorChoice("Left", "Left"));
+    text_align_h.choices.Add(PropertyEditorChoice("Center", "Center"));
+    text_align_h.choices.Add(PropertyEditorChoice("Right", "Right"));
+    spec.properties.Add(text_align_h);
+    spec.defaults.Set("text_align_h", "Left");
+
+    UiDesignerPropertySpec text_align_v;
+    text_align_v.id = "text_align_v";
+    text_align_v.label = "Text align vertical";
+    text_align_v.group = "Appearance";
+    text_align_v.kind = PropertyEditorKind::Choice;
+    text_align_v.domain = PropertyEditorDomain::Appearance;
+    text_align_v.default_value = "Center";
+    text_align_v.impact = PropertyImpactPaint | PropertyImpactCode;
+    text_align_v.choices.Add(PropertyEditorChoice("Top", "Top"));
+    text_align_v.choices.Add(PropertyEditorChoice("Center", "Center"));
+    text_align_v.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(text_align_v);
+    spec.defaults.Set("text_align_v", "Center");
+
+    UiDesignerPropertySpec media_side;
+    media_side.id = "media_side";
+    media_side.label = "Media side";
+    media_side.group = "Appearance";
+    media_side.kind = PropertyEditorKind::Choice;
+    media_side.domain = PropertyEditorDomain::Appearance;
+    media_side.default_value = "Left";
+    media_side.impact = PropertyImpactPaint | PropertyImpactCode;
+    media_side.choices.Add(PropertyEditorChoice("Left", "Left"));
+    media_side.choices.Add(PropertyEditorChoice("Right", "Right"));
+    media_side.choices.Add(PropertyEditorChoice("Top", "Top"));
+    media_side.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(media_side);
+    spec.defaults.Set("media_side", "Left");
+
+    UiDesignerPropertySpec media_align_h;
+    media_align_h.id = "media_align_h";
+    media_align_h.label = "Media align horizontal";
+    media_align_h.group = "Appearance";
+    media_align_h.kind = PropertyEditorKind::Choice;
+    media_align_h.domain = PropertyEditorDomain::Appearance;
+    media_align_h.default_value = "Center";
+    media_align_h.impact = PropertyImpactPaint | PropertyImpactCode;
+    media_align_h.choices.Add(PropertyEditorChoice("Left", "Left"));
+    media_align_h.choices.Add(PropertyEditorChoice("Center", "Center"));
+    media_align_h.choices.Add(PropertyEditorChoice("Right", "Right"));
+    spec.properties.Add(media_align_h);
+    spec.defaults.Set("media_align_h", "Center");
+
+    UiDesignerPropertySpec media_align_v;
+    media_align_v.id = "media_align_v";
+    media_align_v.label = "Media align vertical";
+    media_align_v.group = "Appearance";
+    media_align_v.kind = PropertyEditorKind::Choice;
+    media_align_v.domain = PropertyEditorDomain::Appearance;
+    media_align_v.default_value = "Center";
+    media_align_v.impact = PropertyImpactPaint | PropertyImpactCode;
+    media_align_v.choices.Add(PropertyEditorChoice("Top", "Top"));
+    media_align_v.choices.Add(PropertyEditorChoice("Center", "Center"));
+    media_align_v.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(media_align_v);
+    spec.defaults.Set("media_align_v", "Center");
+
+    UiDesignerPropertySpec media_reserve = UiDesignerNumberProperty(
+        "media_reserve", "Media reserve", 72, 0, 1000, 1, PropertyEditorKind::Integer);
+    media_reserve.group = "Appearance";
+    media_reserve.domain = PropertyEditorDomain::Appearance;
+    media_reserve.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(media_reserve);
+    spec.defaults.Set("media_reserve", 72);
+
+    UiDesignerPropertySpec media_min = UiDesignerNumberProperty(
+        "media_min", "Media min", 24, 0, 1000, 1, PropertyEditorKind::Integer);
+    media_min.group = "Appearance";
+    media_min.domain = PropertyEditorDomain::Appearance;
+    media_min.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(media_min);
+    spec.defaults.Set("media_min", 24);
+
+    UiDesignerPropertySpec media_gap = UiDesignerNumberProperty(
+        "media_gap", "Media gap", 10, 0, 100, 1, PropertyEditorKind::Integer);
+    media_gap.group = "Appearance";
+    media_gap.domain = PropertyEditorDomain::Appearance;
+    media_gap.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(media_gap);
+    spec.defaults.Set("media_gap", 10);
+
+    UiDesignerPropertySpec media_auto_fit = UiDesignerBoolProperty("media_auto_fit", "Media auto fit", true);
+    media_auto_fit.group = "Appearance";
+    media_auto_fit.domain = PropertyEditorDomain::Appearance;
+    media_auto_fit.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(media_auto_fit);
+    spec.defaults.Set("media_auto_fit", true);
+
+    UiDesignerPropertySpec media_share_percent = UiDesignerNumberProperty(
+        "media_share_percent", "Media share percent", 0, 0, 100, 1, PropertyEditorKind::Integer);
+    media_share_percent.group = "Appearance";
+    media_share_percent.domain = PropertyEditorDomain::Appearance;
+    media_share_percent.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(media_share_percent);
+    spec.defaults.Set("media_share_percent", 0);
+
+    UiDesignerPropertySpec content_inset = UiDesignerNumberProperty(
+        "content_inset", "Content inset", 8, 0, 1000, 1, PropertyEditorKind::Integer);
+    content_inset.group = "Appearance";
+    content_inset.domain = PropertyEditorDomain::Appearance;
+    content_inset.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_inset);
+    spec.defaults.Set("content_inset", 8);
+
+    UiDesignerPropertySpec content_cell_gap = UiDesignerNumberProperty(
+        "content_cell_gap", "Content-cell gap", 8, 0, 1000, 1, PropertyEditorKind::Integer);
+    content_cell_gap.group = "Appearance";
+    content_cell_gap.domain = PropertyEditorDomain::Appearance;
+    content_cell_gap.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(content_cell_gap);
+    spec.defaults.Set("content_cell_gap", 8);
+
+    UiDesignerPropertySpec show_title_line = UiDesignerBoolProperty("show_title_line", "Show title line", true);
+    show_title_line.group = "Appearance";
+    show_title_line.domain = PropertyEditorDomain::Appearance;
+    show_title_line.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(show_title_line);
+    spec.defaults.Set("show_title_line", true);
+
+    UiDesignerPropertySpec title_line_length;
+    title_line_length.id = "title_line_length";
+    title_line_length.label = "Title line length";
+    title_line_length.group = "Appearance";
+    title_line_length.kind = PropertyEditorKind::Choice;
+    title_line_length.domain = PropertyEditorDomain::Appearance;
+    title_line_length.default_value = "Large";
+    title_line_length.impact = PropertyImpactPaint | PropertyImpactCode;
+    title_line_length.choices.Add(PropertyEditorChoice("None", "None"));
+    title_line_length.choices.Add(PropertyEditorChoice("Small", "Small"));
+    title_line_length.choices.Add(PropertyEditorChoice("Large", "Large"));
+    spec.properties.Add(title_line_length);
+    spec.defaults.Set("title_line_length", "Large");
+
+    UiDesignerPropertySpec title_line_thickness = UiDesignerNumberProperty(
+        "title_line_thickness", "Title line thickness", 1, 0, 20, 1, PropertyEditorKind::Integer);
+    title_line_thickness.group = "Appearance";
+    title_line_thickness.domain = PropertyEditorDomain::Appearance;
+    title_line_thickness.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(title_line_thickness);
+    spec.defaults.Set("title_line_thickness", 1);
+
+    UiDesignerPropertySpec title_line_style;
+    title_line_style.id = "title_line_style";
+    title_line_style.label = "Title line style";
+    title_line_style.group = "Appearance";
+    title_line_style.kind = PropertyEditorKind::Choice;
+    title_line_style.domain = PropertyEditorDomain::Appearance;
+    title_line_style.default_value = "Solid";
+    title_line_style.impact = PropertyImpactPaint | PropertyImpactCode;
+    title_line_style.choices.Add(PropertyEditorChoice("Solid", "Solid"));
+    title_line_style.choices.Add(PropertyEditorChoice("Dashed", "Dashed"));
+    title_line_style.choices.Add(PropertyEditorChoice("Dotted", "Dotted"));
+    spec.properties.Add(title_line_style);
+    spec.defaults.Set("title_line_style", "Solid");
+
+    UiDesignerPropertySpec show_card_line = UiDesignerBoolProperty("show_card_line", "Show card line", false);
+    show_card_line.group = "Appearance";
+    show_card_line.domain = PropertyEditorDomain::Appearance;
+    show_card_line.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(show_card_line);
+    spec.defaults.Set("show_card_line", false);
+
+    UiDesignerPropertySpec card_line_side;
+    card_line_side.id = "card_line_side";
+    card_line_side.label = "Card line side";
+    card_line_side.group = "Appearance";
+    card_line_side.kind = PropertyEditorKind::Choice;
+    card_line_side.domain = PropertyEditorDomain::Appearance;
+    card_line_side.default_value = "Bottom";
+    card_line_side.impact = PropertyImpactPaint | PropertyImpactCode;
+    card_line_side.choices.Add(PropertyEditorChoice("Left", "Left"));
+    card_line_side.choices.Add(PropertyEditorChoice("Right", "Right"));
+    card_line_side.choices.Add(PropertyEditorChoice("Top", "Top"));
+    card_line_side.choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    spec.properties.Add(card_line_side);
+    spec.defaults.Set("card_line_side", "Bottom");
+
+    UiDesignerPropertySpec card_line_length;
+    card_line_length.id = "card_line_length";
+    card_line_length.label = "Card line length";
+    card_line_length.group = "Appearance";
+    card_line_length.kind = PropertyEditorKind::Choice;
+    card_line_length.domain = PropertyEditorDomain::Appearance;
+    card_line_length.default_value = "Large";
+    card_line_length.impact = PropertyImpactPaint | PropertyImpactCode;
+    card_line_length.choices.Add(PropertyEditorChoice("None", "None"));
+    card_line_length.choices.Add(PropertyEditorChoice("Small", "Small"));
+    card_line_length.choices.Add(PropertyEditorChoice("Large", "Large"));
+    spec.properties.Add(card_line_length);
+    spec.defaults.Set("card_line_length", "Large");
+
+    UiDesignerPropertySpec card_line_thickness = UiDesignerNumberProperty(
+        "card_line_thickness", "Card line thickness", 1, 0, 20, 1, PropertyEditorKind::Integer);
+    card_line_thickness.group = "Appearance";
+    card_line_thickness.domain = PropertyEditorDomain::Appearance;
+    card_line_thickness.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(card_line_thickness);
+    spec.defaults.Set("card_line_thickness", 1);
+
+    UiDesignerPropertySpec card_line_gap = UiDesignerNumberProperty(
+        "card_line_gap", "Card line gap", 0, 0, 1000, 1, PropertyEditorKind::Integer);
+    card_line_gap.group = "Appearance";
+    card_line_gap.domain = PropertyEditorDomain::Appearance;
+    card_line_gap.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(card_line_gap);
+    spec.defaults.Set("card_line_gap", 0);
+
+    UiDesignerPropertySpec hover_enabled = UiDesignerBoolProperty("hover_enabled", "Hover enabled", false);
+    hover_enabled.group = "Appearance";
+    hover_enabled.domain = PropertyEditorDomain::Appearance;
+    hover_enabled.impact = PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(hover_enabled);
+    spec.defaults.Set("hover_enabled", false);
+
+    UiDesignerPropertySpec selectable = UiDesignerBoolProperty("selectable", "Selectable", true);
+    selectable.group = "State";
+    selectable.domain = PropertyEditorDomain::Behaviour;
+    selectable.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+    spec.properties.Add(selectable);
+    spec.defaults.Set("selectable", true);
 }
 
 static void AddValueRange(UiDesignerControlSpec& spec,
@@ -399,6 +816,7 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
         if(String(c.type) == "UiTitleCard") {
+            AddTitleCardProperties(s);
             UiDesignerPropertySpec icon = ChoiceProperty(
                 "icon", "Icon", "Content", "None",
                 {{"None", "None"},
@@ -467,7 +885,10 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             AddEvent(s, "WhenAction", "Changed", "Runs after the checked state changes.");
         }
         if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton")
+        {
+            AddButtonProperties(s);
             AddEvent(s, "WhenAction", "Clicked", "Runs when the button is activated.");
+        }
         if(String(c.type) == "UiSplitButton") {
             AddEvent(s, "WhenAction", "Primary action", "Runs when the main button is activated.");
             AddEvent(s, "WhenSelect", "Menu selection", "Runs after a split-menu item is selected.");

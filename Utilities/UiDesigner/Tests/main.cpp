@@ -261,6 +261,78 @@ CONSOLE_APP_MAIN
     const UiDesignerNodeId sample_comp_color = sample_add("UiCompositeColor", "sample_comp_color");
     const UiDesignerNodeId sample_comp_label = sample_add("UiCompositeLabel", "sample_comp_label");
     const UiDesignerNodeId sample_comp_edit = sample_add("UiCompositeEdit", "sample_comp_edit");
+    const UiDesignerNodeId sample_button = sample_add("UiButton", "sample_button");
+    const UiDesignerNodeId sample_title_card = sample_add("UiTitleCard", "sample_title_card");
+    Check(sample_commands.SetProperty(
+        sample_button, "icon_render_mode", "PreserveColor",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button icon render mode"),
+          "button icon render mode command");
+    Check(sample_commands.SetProperty(
+        sample_button, "icon_width", 24,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button icon width"),
+          "button icon width command");
+    Check(sample_commands.SetProperty(
+        sample_button, "icon_height", 20,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button icon height"),
+          "button icon height command");
+    Check(sample_commands.SetProperty(
+        sample_button, "content_inset_left", 7,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button content inset left"),
+          "button content inset left command");
+    Check(sample_commands.SetProperty(
+        sample_button, "content_inset_top", 6,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button content inset top"),
+          "button content inset top command");
+    Check(sample_commands.SetProperty(
+        sample_button, "content_inset_right", 5,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button content inset right"),
+          "button content inset right command");
+    Check(sample_commands.SetProperty(
+        sample_button, "content_inset_bottom", 4,
+        UiDesignerImpactLocalLayout | UiDesignerImpactCode, "Set button content inset bottom"),
+          "button content inset bottom command");
+    Check(sample_commands.SetProperty(
+        sample_button, "checkable", true,
+        UiDesignerImpactControlState | UiDesignerImpactPaint | UiDesignerImpactCode,
+        "Set button checkable"), "button checkable command");
+    Check(sample_commands.SetProperty(
+        sample_button, "checked", true,
+        UiDesignerImpactControlState | UiDesignerImpactPaint | UiDesignerImpactCode,
+        "Set button checked"), "button checked command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "subtitle", "Supporting information",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card subtitle"),
+          "title card subtitle command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "copy",
+        "Add a short description or place content in the card.",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card copy"),
+          "title card copy command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "text_align_h", "Center",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card text align"),
+          "title card text align command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "media_side", "Right",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card media side"),
+          "title card media side command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "media_reserve", 80,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card media reserve"),
+          "title card media reserve command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "media_share_percent", 25,
+        UiDesignerImpactPaint | UiDesignerImpactCode,
+        "Set title card media share percent"),
+          "title card media share percent command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "show_title_line", false,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card title line"),
+          "title card title line command");
+    Check(sample_commands.SetProperty(
+        sample_title_card, "show_card_line", true,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set title card card line"),
+          "title card card line command");
     UiDesignerSelection sample_selection;
     UiDesignerPreviewCanvas sample_preview;
     sample_preview.SetRect(0, 0, 512, 250);
@@ -325,6 +397,38 @@ CONSOLE_APP_MAIN
     if(auto *composite = dynamic_cast<UiCompositeEdit *>(CheckRuntime(sample_comp_edit, "UiCompositeEdit")))
         Check(composite->GetData().ToString() == "Editable value",
               "UiCompositeEdit representative text");
+    if(auto *button = dynamic_cast<UiButton *>(CheckRuntime(sample_button, "UiButton"))) {
+        Check(button->IsCheckable() && button->IsChecked(),
+              "UiButton representative checked state");
+        Check(button->GetIconRenderMode() == UiIconRenderMode::PreserveColor,
+              "UiButton icon render mode applies");
+        Check(button->GetIconSize() == Size(DPI(24), DPI(20)),
+              Format("UiButton icon size applies (got %d x %d)",
+                     button->GetIconSize().cx, button->GetIconSize().cy));
+        Check(button->GetContentInset() == Rect(DPI(7), DPI(6), DPI(5), DPI(4)),
+              "UiButton content inset applies");
+        Check(button->GetContentGap() == 4,
+              "UiButton content gap remains default");
+        Check(button->GetStyle().align_h == UiAlign::CENTER &&
+              button->GetStyle().align_v == UiAlign::CENTER,
+              "UiButton content alignment remains centered");
+    }
+    if(auto *card = dynamic_cast<UiTitleCard *>(CheckRuntime(sample_title_card, "UiTitleCard"))) {
+        Check(card->GetStyle().text_align_h == UiAlign::CENTER &&
+              card->GetStyle().text_align_v == UiAlign::CENTER,
+              "UiTitleCard text alignment applies");
+        Check(card->GetStyle().media_side == UiAlign::RIGHT,
+              "UiTitleCard media side applies");
+        Check(card->GetStyle().media_reserve == 80,
+              "UiTitleCard media reserve applies");
+        Check(card->GetStyle().media_share_percent == 25,
+              Format("UiTitleCard media share percent applies (got %d)",
+                     card->GetStyle().media_share_percent));
+        Check(!card->GetStyle().title_line,
+              "UiTitleCard title line visibility applies");
+        Check(card->GetStyle().card_line,
+              "UiTitleCard card line visibility applies");
+    }
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);
@@ -525,6 +629,26 @@ CONSOLE_APP_MAIN
           "generated JSON");
     Check(json.Find("geometry") < 0 && generated.source.Find("GeometrySnapshot") < 0,
           "geometry snapshot remains outside serialization and codegen");
+
+    UiDesignerGeneratedProject sample_generated =
+        generator.Generate(sample_document, "SampleUiWindow");
+    Check(sample_generated.source.Find(".SetIconRenderMode(UiIconRenderMode::PreserveColor)") >= 0,
+          "generated UiButton icon render mode");
+    Check(sample_generated.source.Find(".SetIconSize(DPI(24), DPI(20))") >= 0,
+          "generated UiButton icon size");
+    Check(sample_generated.source.Find(".SetContentInset(Rect(DPI(7), DPI(6), DPI(5), DPI(4)))") >= 0,
+          "generated UiButton content inset");
+    Check(sample_generated.source.Find(".SetSubTitle(\"Supporting information\")") >= 0,
+          "generated UiTitleCard subtitle");
+    Check(sample_generated.source.Find(".SetCopyText(\"Add a short description or place content in the card.\")") >= 0,
+          "generated UiTitleCard copy");
+    Check(sample_generated.source.Find(".SetTextAlign(UiAlign::CENTER, UiAlign::CENTER)") >= 0,
+          "generated UiTitleCard text alignment");
+    Check(sample_generated.source.Find(".SetMediaSide(UiAlign::RIGHT)") >= 0,
+          "generated UiTitleCard media side");
+    Check(sample_generated.source.Find(".ShowTitleLine(false)") >= 0 &&
+              sample_generated.source.Find(".ShowCardLine(true)") >= 0,
+          "generated UiTitleCard line visibility");
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

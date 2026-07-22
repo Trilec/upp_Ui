@@ -14,6 +14,68 @@ static UiRole ParseRole(const Value& value)
     return UiRole::Standard;
 }
 
+static Image ResolveButtonIcon(const String& name)
+{
+    if(name.IsEmpty() || name == "None")
+        return Image();
+    if(name == "ICON_DESIGN_DESCRIPTION_48") return ICON_DESIGN_DESCRIPTION_48();
+    if(name == "ICON_DESIGN_WIDGETS_48") return ICON_DESIGN_WIDGETS_48();
+    if(name == "ICON_DESIGN_ACCOUNT_TREE_48") return ICON_DESIGN_ACCOUNT_TREE_48();
+    if(name == "ICON_DESIGN_TUNE_48") return ICON_DESIGN_TUNE_48();
+    return Image();
+}
+
+static UiIconRenderMode ParseIconRenderMode(const Value& value)
+{
+    const String mode = value;
+    if(mode == "Auto")
+        return UiIconRenderMode::Auto;
+    if(mode == "PreserveColor")
+        return UiIconRenderMode::PreserveColor;
+    return UiIconRenderMode::MonoTint;
+}
+
+static UiAlign ParseSideAlignChoice(const Value& value)
+{
+    const String align = value;
+    if(align == "Right") return UiAlign::RIGHT;
+    if(align == "Top") return UiAlign::TOP;
+    if(align == "Bottom") return UiAlign::BOTTOM;
+    return UiAlign::LEFT;
+}
+
+static UiAlign ParseHorizontalAlignChoice(const Value& value)
+{
+    const String align = value;
+    if(align == "Left") return UiAlign::LEFT;
+    if(align == "Right") return UiAlign::RIGHT;
+    return UiAlign::CENTER;
+}
+
+static UiAlign ParseVerticalAlignChoice(const Value& value)
+{
+    const String align = value;
+    if(align == "Top") return UiAlign::TOP;
+    if(align == "Bottom") return UiAlign::BOTTOM;
+    return UiAlign::CENTER;
+}
+
+static UiSpan ParseUiSpanChoice(const Value& value)
+{
+    const String span = value;
+    if(span == "None") return NONE;
+    if(span == "Small") return SMALL;
+    return LARGE;
+}
+
+static UiLineStyle ParseUiLineStyleChoice(const Value& value)
+{
+    const String style = value;
+    if(style == "Dashed") return DASHED;
+    if(style == "Dotted") return DOTTED;
+    return SOLID;
+}
+
 static UiCrossAlign ParseCrossAlign(const Value& value)
 {
     const String align = value;
@@ -565,6 +627,112 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
+    if(property == "tooltip") {
+        ctrl.Tip(AsString(value));
+        ctrl.Refresh();
+        return UiDesignerApplyResult::AppliedPaint;
+    }
+    if(property == "icon") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetIcon(ResolveButtonIcon(AsString(value)));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "icon_width" || property == "icon_height") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            Size icon_size = button->GetIconSize();
+            const int v = max(0, (int)value);
+            if(property == "icon_width")
+                icon_size.cx = DPI(v);
+            else
+                icon_size.cy = DPI(v);
+            button->SetIconSize(icon_size);
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "icon_render_mode") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetIconRenderMode(ParseIconRenderMode(value));
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "icon_side") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetIconSide(ParseSideAlignChoice(value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "align_h" || property == "align_v") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            const String current_h = property == "align_h"
+                ? AsString(value)
+                : String(button->GetStyle().align_h == UiAlign::LEFT ? "Left" :
+                         button->GetStyle().align_h == UiAlign::RIGHT ? "Right" : "Center");
+            const String current_v = property == "align_v"
+                ? AsString(value)
+                : String(button->GetStyle().align_v == UiAlign::TOP ? "Top" :
+                         button->GetStyle().align_v == UiAlign::BOTTOM ? "Bottom" : "Center");
+            const UiAlign align_h =
+                current_h == "Left" ? UiAlign::LEFT :
+                current_h == "Right" ? UiAlign::RIGHT : UiAlign::CENTER;
+            const UiAlign align_v =
+                current_v == "Top" ? UiAlign::TOP :
+                current_v == "Bottom" ? UiAlign::BOTTOM : UiAlign::CENTER;
+            button->SetAlign(align_h, align_v);
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "content_gap") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetContentGap(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "content_inset_left" ||
+       property == "content_inset_top" ||
+       property == "content_inset_right" ||
+       property == "content_inset_bottom") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            Rect inset = button->GetContentInset();
+            const int v = max(0, (int)value);
+            if(property == "content_inset_left") inset.left = DPI(v);
+            else if(property == "content_inset_top") inset.top = DPI(v);
+            else if(property == "content_inset_right") inset.right = DPI(v);
+            else inset.bottom = DPI(v);
+            button->SetContentInset(inset);
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "click_focus") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->ClickFocus((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "checkable") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetCheckable((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
     if(property == "text") {
         const String text = value;
         if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) label->SetText(text);
@@ -588,7 +756,202 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.RefreshLayout();
         return UiDesignerApplyResult::AppliedLocalLayout;
     }
+    if(property == "subtitle") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetSubTitle(AsString(value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "copy") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetCopyText(AsString(value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "text_align_h" || property == "text_align_v") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            const String current_h = property == "text_align_h"
+                ? AsString(value)
+                : String(card->GetStyle().text_align_h == UiAlign::LEFT ? "Left" :
+                         card->GetStyle().text_align_h == UiAlign::RIGHT ? "Right" : "Center");
+            const String current_v = property == "text_align_v"
+                ? AsString(value)
+                : String(card->GetStyle().text_align_v == UiAlign::TOP ? "Top" :
+                         card->GetStyle().text_align_v == UiAlign::BOTTOM ? "Bottom" : "Center");
+            card->SetTextAlign(ParseHorizontalAlignChoice(current_h), ParseVerticalAlignChoice(current_v));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_side") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaSide(ParseSideAlignChoice(value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_align_h" || property == "media_align_v") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            const String current_h = property == "media_align_h"
+                ? AsString(value)
+                : String(card->GetStyle().media_align_h == UiAlign::LEFT ? "Left" :
+                         card->GetStyle().media_align_h == UiAlign::RIGHT ? "Right" : "Center");
+            const String current_v = property == "media_align_v"
+                ? AsString(value)
+                : String(card->GetStyle().media_align_v == UiAlign::TOP ? "Top" :
+                         card->GetStyle().media_align_v == UiAlign::BOTTOM ? "Bottom" : "Center");
+            card->SetMediaAlign(ParseHorizontalAlignChoice(current_h), ParseVerticalAlignChoice(current_v));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_reserve") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaReserve(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_min") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaMin(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_gap") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaGap(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_auto_fit") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaAutoFit((bool)value);
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "media_share_percent") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetMediaSharePercent(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "content_inset") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetContentInset(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "content_cell_gap") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetContentCellGap(max(0, (int)value));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "show_title_line") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->ShowTitleLine((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "title_line_length" ||
+       property == "title_line_thickness" ||
+       property == "title_line_style") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            const UiSpan length = property == "title_line_length"
+                ? ParseUiSpanChoice(value) : card->GetStyle().title_line_length;
+            const int thickness = property == "title_line_thickness"
+                ? max(0, (int)value) : card->GetStyle().title_line_thickness;
+            const UiLineStyle style = property == "title_line_style"
+                ? ParseUiLineStyleChoice(value) : card->GetStyle().title_line_style;
+            card->SetTitleLine(length, thickness, style);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "show_card_line") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->ShowCardLine((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "card_line_side") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetCardLineSide(ParseSideAlignChoice(value));
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "card_line_length" ||
+       property == "card_line_thickness" ||
+       property == "card_line_gap") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            const UiSpan length = property == "card_line_length"
+                ? ParseUiSpanChoice(value) : card->GetStyle().card_line_length;
+            const int thickness = property == "card_line_thickness"
+                ? max(0, (int)value) : card->GetStyle().card_line_thickness;
+            const int gap = property == "card_line_gap"
+                ? max(0, (int)value) : card->GetStyle().card_line_gap;
+            card->SetCardLine(length, thickness);
+            card->SetCardLineGap(gap);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "hover_enabled") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->EnableHover((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "selectable") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            card->SetSelectable((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "tooltip") {
+        ctrl.Tip(AsString(value));
+        ctrl.Refresh();
+        return UiDesignerApplyResult::AppliedPaint;
+    }
     if(property == "icon") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetIcon(ResolveButtonIcon(AsString(value)));
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
         auto *card = dynamic_cast<UiTitleCard *>(&ctrl);
         if(!card)
             return UiDesignerApplyResult::Rejected;
@@ -601,6 +964,11 @@ static UiDesignerApplyResult ApplyRuntime(
         return UiDesignerApplyResult::AppliedLocalLayout;
     }
     if(property == "checked") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            button->SetChecked((bool)value);
+            ctrl.Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
         ctrl.SetData(value);
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedControlState;

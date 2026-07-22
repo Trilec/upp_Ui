@@ -2,6 +2,36 @@
 
 namespace Upp {
 
+static bool BehaviorActionNeedsTarget(UiDesignerActionType action)
+{
+    return action == UiDesignerActionType::SetProperty ||
+           action == UiDesignerActionType::ToggleProperty ||
+           action == UiDesignerActionType::AdjustValue ||
+           action == UiDesignerActionType::ActivatePage;
+}
+
+static bool BehaviorActionNeedsProperty(UiDesignerActionType action)
+{
+    return action == UiDesignerActionType::SetProperty ||
+           action == UiDesignerActionType::ToggleProperty;
+}
+
+static bool BehaviorActionNeedsValue(UiDesignerActionType action)
+{
+    return action == UiDesignerActionType::SetProperty ||
+           action == UiDesignerActionType::ActivatePage;
+}
+
+static bool BehaviorActionNeedsDelta(UiDesignerActionType action)
+{
+    return action == UiDesignerActionType::AdjustValue;
+}
+
+static bool BehaviorActionNeedsHandler(UiDesignerActionType action)
+{
+    return action == UiDesignerActionType::CallNamedHandler;
+}
+
 static UiDesignerActionBinding CopySessionBinding(
     const UiDesignerActionBinding& source)
 {
@@ -171,27 +201,37 @@ void UiDesignerSession::RebuildBehaviorModel()
             UiDesignerActionTypeName(type), UiDesignerActionTypeName(type)));
     }
 
-    PropertyEditorItem& target = behavior_model_.Add(
-        "behavior.target", "Target", PropertyEditorKind::Choice,
-        binding.target, "Target");
-    target.choices.Add(PropertyEditorChoice((int64)0, "Current window"));
-    for(const UiDesignerNode& candidate : document_.GetNodes())
-        target.choices.Add(PropertyEditorChoice(
-            candidate.id, candidate.name + "  [" + candidate.type + "]"));
+    if(BehaviorActionNeedsTarget(binding.action)) {
+        PropertyEditorItem& target = behavior_model_.Add(
+            "behavior.target", "Target", PropertyEditorKind::Choice,
+            binding.target, "Target");
+        target.choices.Add(PropertyEditorChoice((int64)0, "Current window"));
+        for(const UiDesignerNode& candidate : document_.GetNodes())
+            target.choices.Add(PropertyEditorChoice(
+                candidate.id, candidate.name + "  [" + candidate.type + "]"));
+    }
 
-    behavior_model_.Add("behavior.property", "Property",
-                        PropertyEditorKind::Text,
-                        binding.target_property, "Target");
-    behavior_model_.Add("behavior.value", "Value / page",
-                        PropertyEditorKind::Text,
-                        BehaviorValueText(binding.value), "Target");
-    PropertyEditorItem& delta = behavior_model_.Add(
-        "behavior.delta", "Adjustment", PropertyEditorKind::Double,
-        binding.delta, "Target");
-    delta.step = 1.0;
-    behavior_model_.Add("behavior.handler", "Handler name",
-                        PropertyEditorKind::Text,
-                        binding.handler_name, "Custom code");
+    if(BehaviorActionNeedsProperty(binding.action)) {
+        behavior_model_.Add("behavior.property", "Property",
+                            PropertyEditorKind::Text,
+                            binding.target_property, "Target");
+    }
+    if(BehaviorActionNeedsValue(binding.action)) {
+        behavior_model_.Add("behavior.value", "Value / page",
+                            PropertyEditorKind::Text,
+                            BehaviorValueText(binding.value), "Target");
+    }
+    if(BehaviorActionNeedsDelta(binding.action)) {
+        PropertyEditorItem& delta = behavior_model_.Add(
+            "behavior.delta", "Adjustment", PropertyEditorKind::Double,
+            binding.delta, "Target");
+        delta.step = 1.0;
+    }
+    if(BehaviorActionNeedsHandler(binding.action)) {
+        behavior_model_.Add("behavior.handler", "Handler name",
+                            PropertyEditorKind::Text,
+                            binding.handler_name, "Custom code");
+    }
     behavior_model_.Add("behavior.enabled", "Enabled",
                         PropertyEditorKind::Boolean,
                         binding.enabled, "Binding");
