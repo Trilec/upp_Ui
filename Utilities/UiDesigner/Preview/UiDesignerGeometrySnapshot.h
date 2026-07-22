@@ -14,6 +14,14 @@ enum class UiDesignerDropRegionKind : byte {
     GridCell,
 };
 
+enum class UiDesignerCueKind : byte {
+    None = 0,
+    ControlBounds,
+    ContainerBounds,
+    LayoutBounds,
+    SemanticItemBounds,
+};
+
 struct UiDesignerDropRegion : Moveable<UiDesignerDropRegion> {
     UiDesignerNodeId owner = 0;
     UiDesignerDropRegionKind kind = UiDesignerDropRegionKind::WindowContent;
@@ -33,6 +41,7 @@ struct UiDesignerGeometryRecord : Moveable<UiDesignerGeometryRecord> {
     Rect rect, body;
     int depth = 0, order = 0, inset = 0, gap = 0;
     bool selectable = false, drop_target = false;
+    UiDesignerCueKind cue_kind = UiDesignerCueKind::None;
     bool debug_layout = false;
     Color debug_color = Null;
     Vector<Rect> item_rects, gap_rects, inset_rects;

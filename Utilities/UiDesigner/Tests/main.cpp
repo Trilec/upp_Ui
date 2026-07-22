@@ -39,6 +39,11 @@ CONSOLE_APP_MAIN
     blank_preview.RebuildDocument();
     const UiDesignerGeometrySnapshot& blank_geometry = blank_preview.GetGeometrySnapshot();
     const UiDesignerNodeId blank_root = blank_preview_document.GetRootId();
+    Check(blank_selection.nodes.IsEmpty() && blank_selection.primary == 0,
+          "blank preview starts without a selected child");
+    const UiDesignerGeometryRecord* blank_root_geometry = blank_geometry.Find(blank_root);
+    Check(blank_root_geometry && blank_root_geometry->cue_kind == UiDesignerCueKind::ContainerBounds,
+          "blank root publishes a container cue");
     Check(blank_geometry.GetDropRegionCount() == 1,
           Format("blank document publishes one root drop region (%d)",
                  blank_geometry.GetDropRegionCount()));
@@ -167,6 +172,10 @@ CONSOLE_APP_MAIN
     const UiDesignerGeometryRecord* panel_geometry = geometry.Find(preview_panel_a);
     Check(box_geometry && panel_geometry && box_geometry->rect == preview.GetNodeRect(preview_box),
           "geometry snapshot matches final Box rectangle");
+    Check(box_geometry && box_geometry->cue_kind == UiDesignerCueKind::LayoutBounds,
+          "Box publishes a layout cue");
+    Check(panel_geometry && panel_geometry->cue_kind == UiDesignerCueKind::ContainerBounds,
+          "Panel publishes a container cue");
     Check(panel_geometry && panel_geometry->parent == preview_box &&
               panel_geometry->depth > (box_geometry ? box_geometry->depth : -1),
           "Panel geometry is ordered ahead of its Box parent");
@@ -213,6 +222,109 @@ CONSOLE_APP_MAIN
                  box_inset_drop ? (int)box_inset_drop->kind : -1));
     Check(panel_drop && geometry.FindDropRegion(panel_drop->paint_order) == panel_drop,
           "drop region lookup is stable");
+
+    UiDesignerDocument sample_document;
+    UiDesignerCommandService sample_commands(sample_document);
+    UiDesignerNodeId sample_box = sample_commands.AddNode(
+        "UiBoxLayout", "sample_box", sample_document.GetRootId(),
+        box_spec ? box_spec->node_flags : 0,
+        box_spec ? box_spec->defaults : ValueMap(), "Add sample Box");
+    Check(sample_box != 0, "sample Box created");
+    auto sample_add = [&](const char *type, const char *name) -> UiDesignerNodeId {
+        const UiDesignerControlSpec* spec = catalog.Find(type);
+        return sample_commands.AddNode(
+            type, name, sample_box,
+            spec ? spec->node_flags : 0,
+            spec ? spec->defaults : ValueMap(),
+            Format("Add sample %s", type));
+    };
+    const UiDesignerNodeId sample_line = sample_add("UiLineEdit", "sample_line");
+    const UiDesignerNodeId sample_int = sample_add("UiIntEdit", "sample_int");
+    const UiDesignerNodeId sample_float = sample_add("UiFloatEdit", "sample_float");
+    const UiDesignerNodeId sample_password = sample_add("UiPasswordEdit", "sample_password");
+    const UiDesignerNodeId sample_multi = sample_add("UiMultiEdit", "sample_multi");
+    const UiDesignerNodeId sample_mask = sample_add("UiMaskEdit", "sample_mask");
+    const UiDesignerNodeId sample_slider_edit = sample_add("UiSliderEdit", "sample_slider_edit");
+    const UiDesignerNodeId sample_progress = sample_add("UiProgressBar", "sample_progress");
+    const UiDesignerNodeId sample_edit_string = sample_add("UppEditString", "sample_edit_string");
+    const UiDesignerNodeId sample_edit_int = sample_add("UppEditInt", "sample_edit_int");
+    const UiDesignerNodeId sample_edit_double = sample_add("UppEditDouble", "sample_edit_double");
+    const UiDesignerNodeId sample_line_edit = sample_add("UppLineEdit", "sample_line_edit");
+    const UiDesignerNodeId sample_drop = sample_add("UppDropList", "sample_drop");
+    const UiDesignerNodeId sample_tab = sample_add("UppTabCtrl", "sample_tab");
+    const UiDesignerNodeId sample_doc = sample_add("UiDoc", "sample_doc");
+    const UiDesignerNodeId sample_slider = sample_add("UiSlider", "sample_slider");
+    const UiDesignerNodeId sample_slider_ctrl = sample_add("UppSliderCtrl", "sample_slider_ctrl");
+    const UiDesignerNodeId sample_dropdown = sample_add("UiCompositeDropdown", "sample_dropdown");
+    const UiDesignerNodeId sample_comp_slider = sample_add("UiCompositeSlider", "sample_comp_slider");
+    const UiDesignerNodeId sample_comp_toggle = sample_add("UiCompositeToggle", "sample_comp_toggle");
+    const UiDesignerNodeId sample_comp_color = sample_add("UiCompositeColor", "sample_comp_color");
+    const UiDesignerNodeId sample_comp_label = sample_add("UiCompositeLabel", "sample_comp_label");
+    const UiDesignerNodeId sample_comp_edit = sample_add("UiCompositeEdit", "sample_comp_edit");
+    UiDesignerSelection sample_selection;
+    UiDesignerPreviewCanvas sample_preview;
+    sample_preview.SetRect(0, 0, 512, 250);
+    sample_preview.Bind(&sample_document, &catalog, nullptr, &sample_selection);
+    sample_preview.RebuildDocument();
+    const auto CheckRuntime = [&](UiDesignerNodeId id, const char *type) -> Ctrl* {
+        Ctrl *runtime = sample_preview.FindRuntime(id);
+        Check(runtime != nullptr, String(type) + " preview instance exists");
+        return runtime;
+    };
+    if(auto *edit = dynamic_cast<UiLineEdit *>(CheckRuntime(sample_line, "UiLineEdit")))
+        Check(edit->GetTextUtf8() == "Line edit", "UiLineEdit representative text");
+    if(auto *edit = dynamic_cast<UiIntEdit *>(CheckRuntime(sample_int, "UiIntEdit")))
+        Check(edit->GetValue() == 0, "UiIntEdit representative value");
+    if(auto *edit = dynamic_cast<UiFloatEdit *>(CheckRuntime(sample_float, "UiFloatEdit")))
+        Check(edit->GetValue() == 0.0, "UiFloatEdit representative value");
+    if(auto *edit = dynamic_cast<UiPasswordEdit *>(CheckRuntime(sample_password, "UiPasswordEdit")))
+        Check(edit->GetTextUtf8() == "password" && !edit->IsPlainTextVisible() &&
+              edit->GetPasswordChar() == 0x2022, "UiPasswordEdit representative masked text");
+    if(auto *edit = dynamic_cast<UiMultiEdit *>(CheckRuntime(sample_multi, "UiMultiEdit")))
+        Check(edit->GetTextUtf8() == "Multi-line\nfollowed by text on a second line",
+              "UiMultiEdit representative multiline text");
+    if(auto *edit = dynamic_cast<UiMaskEdit *>(CheckRuntime(sample_mask, "UiMaskEdit")))
+        Check(edit->GetMask() == "##/##/####" && edit->GetTextUtf8() == "01/02/2026",
+              "UiMaskEdit representative masked text");
+    if(auto *edit = dynamic_cast<UiSliderEdit *>(CheckRuntime(sample_slider_edit, "UiSliderEdit")))
+        Check(edit->GetValue() == 50, "UiSliderEdit representative value");
+    if(auto *bar = dynamic_cast<UiProgressBar *>(CheckRuntime(sample_progress, "UiProgressBar")))
+        Check(bar->GetText() == "Loading assets" && bar->GetPercent() == 50,
+              "UiProgressBar representative value");
+    if(auto *edit = dynamic_cast<EditString *>(CheckRuntime(sample_edit_string, "EditString")))
+        Check(edit->GetData().ToString() == "Edit string", "EditString representative text");
+    if(auto *edit = dynamic_cast<EditInt *>(CheckRuntime(sample_edit_int, "EditInt")))
+        Check(edit->GetData() == 0, "EditInt representative value");
+    if(auto *edit = dynamic_cast<EditDouble *>(CheckRuntime(sample_edit_double, "EditDouble")))
+        Check(edit->GetData() == 0.0, "EditDouble representative value");
+    if(auto *edit = dynamic_cast<LineEdit *>(CheckRuntime(sample_line_edit, "LineEdit")))
+        Check(edit->GetData().ToString() == "Line edit", "LineEdit representative text");
+    if(auto *drop = dynamic_cast<DropList *>(CheckRuntime(sample_drop, "DropList")))
+        Check(drop->GetData() == 1 && drop->GetCount() == 2,
+              "DropList representative selection");
+    if(auto *tab = dynamic_cast<TabCtrl *>(CheckRuntime(sample_tab, "TabCtrl")))
+        Check(tab->GetData() == 0, "TabCtrl representative selection");
+    if(auto *doc = dynamic_cast<UiDoc *>(CheckRuntime(sample_doc, "UiDoc")))
+        Check(doc->GetText() == "UiDoc sample", "UiDoc representative text");
+    if(auto *slider = dynamic_cast<UiSlider *>(CheckRuntime(sample_slider, "UiSlider")))
+        Check(slider->GetValue() == 50, "UiSlider representative value");
+    if(auto *slider = dynamic_cast<SliderCtrl *>(CheckRuntime(sample_slider_ctrl, "SliderCtrl")))
+        Check(slider->GetData() == 50, "SliderCtrl representative value");
+    if(auto *dropdown = dynamic_cast<UiCompositeDropdown *>(CheckRuntime(sample_dropdown, "UiCompositeDropdown")))
+        Check(dropdown->GetData() == 1, "UiCompositeDropdown representative selection");
+    if(auto *composite = dynamic_cast<UiCompositeSlider *>(CheckRuntime(sample_comp_slider, "UiCompositeSlider")))
+        Check(composite->GetData() == 50, "UiCompositeSlider representative value");
+    if(auto *composite = dynamic_cast<UiCompositeToggle *>(CheckRuntime(sample_comp_toggle, "UiCompositeToggle")))
+        Check(composite->GetData() == true, "UiCompositeToggle representative value");
+    if(auto *composite = dynamic_cast<UiCompositeColor *>(CheckRuntime(sample_comp_color, "UiCompositeColor")))
+        Check(composite->GetColors().GetCount() == 1 &&
+              composite->GetColors()[0] == Color(58, 132, 255),
+              "UiCompositeColor representative swatch");
+    if(auto *composite = dynamic_cast<UiCompositeLabel *>(CheckRuntime(sample_comp_label, "UiCompositeLabel")))
+        Check(composite->GetData().ToString() == "Value", "UiCompositeLabel representative text");
+    if(auto *composite = dynamic_cast<UiCompositeEdit *>(CheckRuntime(sample_comp_edit, "UiCompositeEdit")))
+        Check(composite->GetData().ToString() == "Editable value",
+              "UiCompositeEdit representative text");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);

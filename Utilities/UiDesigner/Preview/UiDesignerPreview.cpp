@@ -1,4 +1,5 @@
 #include "UiDesignerPreview.h"
+#include "UiDesignerVisuals.h"
 #include <Ui/UiIcons.h>
 #include <Ui/UiColorPicker.h>
 
@@ -39,32 +40,6 @@ static UiLineStyle ParseLineDash(const Value& value)
     return SOLID;
 }
 
-static Color StableLayoutColor(UiDesignerNodeId node, int depth, Color parent_color = Null)
-{
-    static const Color palette[] = {
-        Color(125, 211, 252),
-        Color(167, 243, 208),
-        Color(254, 240, 138),
-        Color(252, 211, 77),
-        Color(196, 181, 253),
-        Color(251, 191, 36),
-        Color(165, 180, 252),
-        Color(134, 239, 172),
-        Color(253, 186, 116),
-        Color(244, 114, 182),
-        Color(147, 197, 253),
-        Color(192, 132, 252),
-    };
-    CombineHash h;
-    h << (int64)node << depth;
-    const int count = __countof(palette);
-    int index = (int)((dword)h % count);
-    Color color = palette[index];
-    if(color == parent_color)
-        color = palette[(index + 5) % count];
-    return color;
-}
-
 static String LayoutNodeName(const UiDesignerCatalog *catalog, const UiDesignerNode& node)
 {
     if(catalog) {
@@ -94,6 +69,24 @@ static String BoxGapLabel(const UiDesignerCatalog *catalog, const UiDesignerNode
     if(next)
         return Format("%s \"%s\" -- before %s", base, node.name, next->name);
     return Format("%s \"%s\" -- slot %d", base, node.name, index);
+}
+
+static UiDesignerCueKind ResolveCueKind(const UiDesignerControlSpec& spec,
+                                        const UiDesignerNode& node)
+{
+    if(node.type == "Spacer")
+        return UiDesignerCueKind::SemanticItemBounds;
+    if(node.type == "UiBoxLayout" || node.type == "UiGridLayout" ||
+       node.type == "UiAbsoluteLayout")
+        return UiDesignerCueKind::LayoutBounds;
+    if(node.type == "UiPanel" || node.type == "UiDirectContentHost" ||
+       node.type == "UiGroupPanel" || node.type == "UiScrollPanel" ||
+       node.type == "UiStack" || node.type == "UiAccordion" ||
+       node.type == "UiTab" || node.type == "UiTitleCard")
+        return UiDesignerCueKind::ContainerBounds;
+    if(spec.IsSemanticItem())
+        return UiDesignerCueKind::SemanticItemBounds;
+    return UiDesignerCueKind::ControlBounds;
 }
 
 static void AddRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
@@ -424,17 +417,66 @@ static void InitializeRuntime(Ctrl& ctrl, const UiDesignerControlSpec& spec)
     if(auto *radio = dynamic_cast<UiRadioButton *>(&ctrl)) radio->SetText(spec.display_name);
     if(auto *split = dynamic_cast<UiSplitButton *>(&ctrl))
         split->SetText(spec.display_name).Add("First", 1).Add("Second", 2);
+    if(auto *edit = dynamic_cast<UiLineEdit *>(&ctrl))
+        edit->SetTextUtf8("Line edit");
+    if(auto *edit = dynamic_cast<UiMultiEdit *>(&ctrl))
+        edit->SetTextUtf8("Multi-line\nfollowed by text on a second line");
+    if(auto *edit = dynamic_cast<UiIntEdit *>(&ctrl))
+        edit->SetValue(0);
+    if(auto *edit = dynamic_cast<UiFloatEdit *>(&ctrl))
+        edit->Precision(2).SetValue(0.0);
+    if(auto *edit = dynamic_cast<UiPasswordEdit *>(&ctrl))
+        edit->SetPlaceholder("Password");
+    if(auto *edit = dynamic_cast<UiPasswordEdit *>(&ctrl))
+        edit->SetPasswordChar(0x2022);
+    if(auto *edit = dynamic_cast<UiPasswordEdit *>(&ctrl))
+        edit->SetPlainTextVisible(false).EnableVisibilityIcon(true).SetTextUtf8("password");
+    if(auto *edit = dynamic_cast<UiMaskEdit *>(&ctrl))
+        edit->SetMask("##/##/####", '_')
+            .ShowError(false)
+            .SetTextUtf8("01/02/2026");
     if(auto *drop = dynamic_cast<UiDropdown *>(&ctrl)) {
         drop->UseInternalModel().Clear().Add("First", 1).Add("Second", 2).Add("Third", 3);
         drop->Select(0);
     }
-    if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl)) progress->Percent(true).Set(50, 100);
+    if(auto *progress = dynamic_cast<UiProgressBar *>(&ctrl)) {
+        progress->Percent(true);
+        progress->SetText("Loading assets");
+        progress->Set(50, 100);
+    }
     if(auto *slider = dynamic_cast<UiSlider *>(&ctrl)) slider->SetRange(0, 100).SetValue(50);
     if(auto *breadcrumbs = dynamic_cast<UiBreadcrumbs *>(&ctrl)) {
         breadcrumbs->AddCrumb("Home", "0");
         breadcrumbs->AddCrumb("Current", "1");
         breadcrumbs->SetCurrentIndex(1);
     }
+    if(auto *slider = dynamic_cast<UiSliderEdit *>(&ctrl))
+        slider->SetValue(50);
+    if(auto *progress = dynamic_cast<ProgressIndicator *>(&ctrl)) {
+        progress->Percent(true);
+        progress->Set(50, 100);
+    }
+    if(auto *slider = dynamic_cast<SliderCtrl *>(&ctrl))
+        slider->MinMax(0, 100).SetData(50);
+    if(auto *text = dynamic_cast<EditString *>(&ctrl))
+        text->SetText("Edit string");
+    if(auto *text = dynamic_cast<EditInt *>(&ctrl))
+        text->SetData(0);
+    if(auto *text = dynamic_cast<EditDouble *>(&ctrl))
+        text->SetData(0.0);
+    if(auto *text = dynamic_cast<LineEdit *>(&ctrl))
+        text->SetData("Line edit");
+    if(auto *drop = dynamic_cast<DropList *>(&ctrl))
+        drop->Add("First", 1).Add("Second", 2).SetData(1);
+    if(auto *tab = dynamic_cast<TabCtrl *>(&ctrl)) {
+        tab->Add("Overview");
+        tab->Add("Details");
+        tab->SetData(0);
+    }
+    if(auto *rect = dynamic_cast<StaticRect *>(&ctrl))
+        rect->Background(Color(240, 240, 240));
+    if(auto *parent = dynamic_cast<ParentCtrl *>(&ctrl))
+        parent->SetMinSize(Size(DPI(80), DPI(48)));
     if(auto *tree = dynamic_cast<UiTree *>(&ctrl)) {
         tree->GetInternalModel().AddChild(tree->GetInternalModel().Root(),
                                           UiModelItem("Workspace", "workspace"));
@@ -449,6 +491,28 @@ static void InitializeRuntime(Ctrl& ctrl, const UiDesignerControlSpec& spec)
     if(auto *composite = dynamic_cast<UiCompositeSlider *>(&ctrl)) {
         composite->SetLabel(spec.display_name);
         composite->SetData(50);
+    }
+    if(auto *composite = dynamic_cast<UiCompositeToggle *>(&ctrl)) {
+        composite->SetLabel(spec.display_name);
+        composite->SetData(true);
+    }
+    if(auto *composite = dynamic_cast<UiCompositeColor *>(&ctrl)) {
+        composite->SetLabel(spec.display_name);
+        Vector<Color> colors;
+        colors.Add(Color(58, 132, 255));
+        composite->SetColors(colors).SetValueText("Blue");
+    }
+    if(auto *composite = dynamic_cast<UiCompositeDropdown *>(&ctrl)) {
+        composite->SetLabel(spec.display_name);
+        composite->Clear().Add("First", 1).Add("Second", 2).Select(0);
+    }
+    if(auto *composite = dynamic_cast<UiCompositeLabel *>(&ctrl)) {
+        composite->SetLabel(spec.display_name);
+        composite->SetData("Value");
+    }
+    if(auto *composite = dynamic_cast<UiCompositeEdit *>(&ctrl)) {
+        composite->SetLabel(spec.display_name);
+        composite->SetData("Editable value");
     }
     if(auto *label = dynamic_cast<Label *>(&ctrl)) label->SetLabel(spec.display_name);
     if(auto *button = dynamic_cast<Button *>(&ctrl)) button->SetLabel(spec.display_name);
@@ -483,11 +547,11 @@ static UiDesignerApplyResult ApplyRuntime(
     if(property == "debug_layout") {
         const bool on = (bool)value;
         if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
-            box->SetDebug(on).SetDebugColor(Color(139, 92, 246));
+            box->SetDebug(on);
             return UiDesignerApplyResult::AppliedPaint;
         }
         if(auto *grid = dynamic_cast<UiGridLayout *>(&ctrl)) {
-            grid->SetDebug(on).SetDebugColor(Color(14, 165, 233));
+            grid->SetDebug(on);
             return UiDesignerApplyResult::AppliedPaint;
         }
         return UiDesignerApplyResult::Rejected;
@@ -1298,6 +1362,7 @@ void UiDesignerPreviewCanvas::Layout()
     root_record.body = root_record.rect;
     root_record.selectable = true;
     root_record.drop_target = true;
+    root_record.cue_kind = UiDesignerCueKind::ContainerBounds;
     snapshot.Add(pick(root_record));
     {
         UiDesignerDropRegion region;
@@ -1331,9 +1396,13 @@ void UiDesignerPreviewCanvas::Layout()
         record.drop_target = node->id == document_->GetRootId() ||
             node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
             node->type == "UiPanel";
+        const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node->type) : nullptr;
+        record.cue_kind = spec
+            ? ResolveCueKind(*spec, *node)
+            : UiDesignerCueKind::ControlBounds;
         record.debug_layout = node->GetProperty("debug_layout", false);
         if(node->type == "UiBoxLayout" || node->type == "UiGridLayout")
-            record.debug_color = StableLayoutColor(node->id, record.depth);
+            record.debug_color = UiDesignerStableLayoutColor(node->id, record.depth);
         record.inset = max(0, (int)node->GetProperty("inset", 0));
         record.gap = max(0, (int)node->GetProperty("gap", 0));
         record.body = record.inset ? record.rect.Deflated(DPI(record.inset)) : record.rect;

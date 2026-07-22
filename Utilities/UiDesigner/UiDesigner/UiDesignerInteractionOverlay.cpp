@@ -1,35 +1,10 @@
 #include "UiDesignerInteractionOverlay.h"
 #include "UiDesignerWindow.h"
+#include <Utilities/UiDesigner/Preview/UiDesignerVisuals.h>
 
 namespace Upp {
 
 namespace {
-
-static Color StableLayoutColor(UiDesignerNodeId node, int depth, Color parent_color = Null)
-{
-    static const Color palette[] = {
-        Color(125, 211, 252),
-        Color(167, 243, 208),
-        Color(254, 240, 138),
-        Color(252, 211, 77),
-        Color(196, 181, 253),
-        Color(251, 191, 36),
-        Color(165, 180, 252),
-        Color(134, 239, 172),
-        Color(253, 186, 116),
-        Color(244, 114, 182),
-        Color(147, 197, 253),
-        Color(192, 132, 252),
-    };
-    CombineHash h;
-    h << (int64)node << depth;
-    const int count = __countof(palette);
-    int index = (int)((dword)h % count);
-    Color color = palette[index];
-    if(color == parent_color)
-        color = palette[(index + 5) % count];
-    return color;
-}
 
 static String LayoutNodeName(const UiDesignerCatalog *catalog, const UiDesignerNode& node)
 {
@@ -292,6 +267,63 @@ static Rect VisualDropRect(const UiDesignerResolvedDrop& drop)
     return drop.visual_rect.IsEmpty() ? drop.exact_rect : drop.visual_rect;
 }
 
+static void DrawDashedRect(Draw& w, Rect r, Color color, int thickness,
+                           int dash, int gap)
+{
+    if(r.IsEmpty() || thickness <= 0)
+        return;
+    const int span = max(1, dash + gap);
+    for(int x = r.left; x < r.right; x += span) {
+        const int len = min(dash, r.right - x);
+        if(len > 0) {
+            w.DrawRect(x, r.top, len, thickness, color);
+            w.DrawRect(x, r.bottom - thickness, len, thickness, color);
+        }
+    }
+    for(int y = r.top; y < r.bottom; y += span) {
+        const int len = min(dash, r.bottom - y);
+        if(len > 0) {
+            w.DrawRect(r.left, y, thickness, len, color);
+            w.DrawRect(r.right - thickness, y, thickness, len, color);
+        }
+    }
+}
+
+static void DrawFrame(Draw& w, Rect r, Color color, int thickness)
+{
+    if(r.IsEmpty() || thickness <= 0)
+        return;
+    const int half = thickness / 2;
+    w.DrawRect(r.left - half, r.top - half, r.Width() + thickness, thickness, color);
+    w.DrawRect(r.left - half, r.bottom - half, r.Width() + thickness, thickness, color);
+    w.DrawRect(r.left - half, r.top - half, thickness, r.Height() + thickness, color);
+    w.DrawRect(r.right - half, r.top - half, thickness, r.Height() + thickness, color);
+}
+
+static void DrawResizeHandles(Draw& w, Rect r, Color frame)
+{
+    const int handle = DPI(12);
+    const Color fill = Blend(frame, White(), 170);
+    const Point points[] = {
+        r.TopLeft(),
+        Point(r.CenterPoint().x, r.top),
+        Point(r.right, r.top),
+        Point(r.left, r.CenterPoint().y),
+        Point(r.right, r.CenterPoint().y),
+        Point(r.left, r.bottom),
+        Point(r.CenterPoint().x, r.bottom),
+        r.BottomRight()
+    };
+    for(const Point& point : points) {
+        Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
+        w.DrawRect(grip, fill);
+        w.DrawRect(grip.left, grip.top, grip.Width(), 1, frame);
+        w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, frame);
+        w.DrawRect(grip.left, grip.top, 1, grip.Height(), frame);
+        w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
+    }
+}
+
 }
 
 UiDesignerInteractionOverlay::UiDesignerInteractionOverlay(UiDesignerWindow& owner)
@@ -325,118 +357,76 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
     if(resizing_)
         root_rect = resize_pending_rect_;
 
-    const Color frame = Color(103, 232, 249);
-    const int thickness = DPI(4);
-    const int half = thickness / 2;
-    w.DrawRect(root_rect.left - half, root_rect.top - half, root_rect.Width() + thickness, thickness, frame);
-    w.DrawRect(root_rect.left - half, root_rect.bottom - half, root_rect.Width() + thickness, thickness, frame);
-    w.DrawRect(root_rect.left - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
-    w.DrawRect(root_rect.right - half, root_rect.top - half, thickness, root_rect.Height() + thickness, frame);
+    const Color frame = decorations_visible_
+        ? Color(103, 232, 249)
+        : Color(101, 116, 153);
+    DrawFrame(w, root_rect, frame, decorations_visible_ ? DPI(4) : DPI(1));
 
-    const bool show_details = decorations_visible_ || !drag_type_id_.IsEmpty() || resizing_;
-    if(!show_details) {
-        const int handle = DPI(12);
-        const Color fill = Blend(frame, White(), 170);
-        const Point points[] = {
-            root_rect.TopLeft(),
-            Point(root_rect.CenterPoint().x, root_rect.top),
-            Point(root_rect.right, root_rect.top),
-            Point(root_rect.left, root_rect.CenterPoint().y),
-            Point(root_rect.right, root_rect.CenterPoint().y),
-            Point(root_rect.left, root_rect.bottom),
-            Point(root_rect.CenterPoint().x, root_rect.bottom),
-            root_rect.BottomRight()
-        };
-        for(const Point& point : points) {
-            Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
-            w.DrawRect(grip, fill);
-            w.DrawRect(grip.left, grip.top, grip.Width(), 1, frame);
-            w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, frame);
-            w.DrawRect(grip.left, grip.top, 1, grip.Height(), frame);
-            w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
-        }
-        return;
-    }
+    if(decorations_visible_) {
+        const UiDesignerGeometrySnapshot& geometry = owner_->preview_canvas_.GetGeometrySnapshot();
+        const UiDesignerSelection& selection = owner_->session_.State().selection;
+        const int dash = DPI(5);
+        const int gap = DPI(2);
 
-    const UiDesignerSelection& selection = owner_->session_.State().selection;
-    const int step = DPI(7);
-    const int dot = DPI(3);
-    for(UiDesignerNodeId id : selection.nodes) {
-        const UiDesignerGeometryRecord* geometry =
-            owner_->preview_canvas_.GetGeometrySnapshot().Find(id);
-        Rect r = geometry ? geometry->rect : Rect();
-        if(r.IsEmpty())
-            continue;
-        r.Offset(canvas_origin.x, canvas_origin.y);
-        if(r == root_rect)
-            r = r.Deflated(DPI(5));
-        if(id == root->id && resizing_)
-            r = resize_pending_rect_;
-        const Color color = id == selection.primary
-            ? Color(245, 158, 11) : Blend(Color(245, 158, 11), White(), 110);
-        const int thickness = id == selection.primary ? DPI(2) : DPI(1);
-        for(int x = r.left; x < r.right; x += step) {
-            w.DrawRect(x, r.top, min(dot, r.right - x), thickness, color);
-            w.DrawRect(x, r.bottom - thickness, min(dot, r.right - x), thickness, color);
+        for(const UiDesignerNode& node : document.GetNodes()) {
+            if(node.id == root->id)
+                continue;
+            const UiDesignerGeometryRecord* record = geometry.Find(node.id);
+            if(!record || record->cue_kind == UiDesignerCueKind::None)
+                continue;
+            Rect r = record->rect.Offseted(canvas_origin);
+            const Color cue = Blend(SColorText(), SColorPaper(), 170);
+            DrawDashedRect(w, r, cue, DPI(1), dash, gap);
         }
-        for(int y = r.top; y < r.bottom; y += step) {
-            w.DrawRect(r.left, y, thickness, min(dot, r.bottom - y), color);
-            w.DrawRect(r.right - thickness, y, thickness, min(dot, r.bottom - y), color);
-        }
-    }
 
-    for(const UiDesignerNode& node : document.GetNodes()) {
-        if(node.type != "UiBoxLayout" && node.type != "UiGridLayout")
-            continue;
-        const UiDesignerGeometryRecord* geometry =
-            owner_->preview_canvas_.GetGeometrySnapshot().Find(node.id);
-        if(!geometry || !geometry->debug_layout)
-            continue;
-        const Color outline = IsNull(geometry->debug_color)
-            ? StableLayoutColor(node.id, geometry ? geometry->depth : 0)
-            : geometry->debug_color;
-        const Color fill = Blend(outline, SColorPaper(), 215);
-        for(const Rect& inset : geometry->inset_rects) {
-            Rect ir = inset.Offseted(canvas_origin);
-            w.DrawRect(ir, fill);
+        for(const UiDesignerNode& node : document.GetNodes()) {
+            if(node.type != "UiBoxLayout" && node.type != "UiGridLayout")
+                continue;
+            const UiDesignerGeometryRecord* geometry_record = geometry.Find(node.id);
+            if(!geometry_record || !geometry_record->debug_layout)
+                continue;
+            const Color outline = IsNull(geometry_record->debug_color)
+                ? UiDesignerStableLayoutColor(node.id, geometry_record->depth)
+                : geometry_record->debug_color;
+            const Color fill = Blend(outline, SColorPaper(), 215);
+            for(const Rect& inset : geometry_record->inset_rects) {
+                Rect ir = inset.Offseted(canvas_origin);
+                w.DrawRect(ir, fill);
+            }
+            for(const Rect& gap_rect : geometry_record->gap_rects) {
+                Rect gr = gap_rect.Offseted(canvas_origin);
+                w.DrawRect(gr, Blend(outline, SColorPaper(), 195));
+            }
+            for(const Rect& item : geometry_record->item_rects) {
+                Rect ir = item.Offseted(canvas_origin);
+                w.DrawRect(ir.left, ir.top, ir.Width(), 2, outline);
+                w.DrawRect(ir.left, ir.bottom - 2, ir.Width(), 2, outline);
+                w.DrawRect(ir.left, ir.top, 2, ir.Height(), outline);
+                w.DrawRect(ir.right - 2, ir.top, 2, ir.Height(), outline);
+            }
+            Rect body = geometry_record->body.Offseted(canvas_origin);
+            w.DrawRect(body.left, body.top, body.Width(), 1, outline);
+            w.DrawRect(body.left, body.bottom - 1, body.Width(), 1, outline);
+            w.DrawRect(body.left, body.top, 1, body.Height(), outline);
+            w.DrawRect(body.right - 1, body.top, 1, body.Height(), outline);
         }
-        for(const Rect& gap : geometry->gap_rects) {
-            Rect gr = gap.Offseted(canvas_origin);
-            w.DrawRect(gr, Blend(outline, SColorPaper(), 195));
-        }
-        for(const Rect& item : geometry->item_rects) {
-            Rect ir = item.Offseted(canvas_origin);
-            w.DrawRect(ir.left, ir.top, ir.Width(), 2, outline);
-            w.DrawRect(ir.left, ir.bottom - 2, ir.Width(), 2, outline);
-            w.DrawRect(ir.left, ir.top, 2, ir.Height(), outline);
-            w.DrawRect(ir.right - 2, ir.top, 2, ir.Height(), outline);
-        }
-        Rect body = geometry->body.Offseted(canvas_origin);
-        w.DrawRect(body.left, body.top, body.Width(), 1, outline);
-        w.DrawRect(body.left, body.bottom - 1, body.Width(), 1, outline);
-        w.DrawRect(body.left, body.top, 1, body.Height(), outline);
-        w.DrawRect(body.right - 1, body.top, 1, body.Height(), outline);
-    }
 
-    const int handle = DPI(12);
-    const Color fill = Blend(frame, White(), 170);
-    const Point points[] = {
-        root_rect.TopLeft(),
-        Point(root_rect.CenterPoint().x, root_rect.top),
-        Point(root_rect.right, root_rect.top),
-        Point(root_rect.left, root_rect.CenterPoint().y),
-        Point(root_rect.right, root_rect.CenterPoint().y),
-        Point(root_rect.left, root_rect.bottom),
-        Point(root_rect.CenterPoint().x, root_rect.bottom),
-        root_rect.BottomRight()
-    };
-    for(const Point& point : points) {
-        Rect grip = RectC(point.x - handle / 2, point.y - handle / 2, handle, handle);
-        w.DrawRect(grip, fill);
-        w.DrawRect(grip.left, grip.top, grip.Width(), 1, frame);
-        w.DrawRect(grip.left, grip.bottom - 1, grip.Width(), 1, frame);
-        w.DrawRect(grip.left, grip.top, 1, grip.Height(), frame);
-        w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
+        for(UiDesignerNodeId id : selection.nodes) {
+            const UiDesignerGeometryRecord* geometry_record = geometry.Find(id);
+            Rect r = geometry_record ? geometry_record->rect : Rect();
+            if(r.IsEmpty())
+                continue;
+            r.Offset(canvas_origin.x, canvas_origin.y);
+            if(id == root->id && resizing_)
+                r = resize_pending_rect_;
+            const Color color = id == selection.primary
+                ? Color(245, 158, 11)
+                : Blend(Color(245, 158, 11), White(), 110);
+            const int thickness = id == selection.primary ? DPI(3) : DPI(2);
+            DrawDashedRect(w, r, color, thickness, dash, gap);
+        }
+
+        DrawResizeHandles(w, root_rect, frame);
     }
 
     if(!resolved_drop_.visual_rect.IsEmpty() || !resolved_drop_.exact_rect.IsEmpty()) {
