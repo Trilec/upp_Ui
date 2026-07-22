@@ -39,6 +39,307 @@ static UiLineStyle ParseLineDash(const Value& value)
     return SOLID;
 }
 
+static Color StableLayoutColor(UiDesignerNodeId node, int depth, Color parent_color = Null)
+{
+    static const Color palette[] = {
+        Color(125, 211, 252),
+        Color(167, 243, 208),
+        Color(254, 240, 138),
+        Color(252, 211, 77),
+        Color(196, 181, 253),
+        Color(251, 191, 36),
+        Color(165, 180, 252),
+        Color(134, 239, 172),
+        Color(253, 186, 116),
+        Color(244, 114, 182),
+        Color(147, 197, 253),
+        Color(192, 132, 252),
+    };
+    CombineHash h;
+    h << (int64)node << depth;
+    const int count = __countof(palette);
+    int index = (int)((dword)h % count);
+    Color color = palette[index];
+    if(color == parent_color)
+        color = palette[(index + 5) % count];
+    return color;
+}
+
+static String LayoutNodeName(const UiDesignerCatalog *catalog, const UiDesignerNode& node)
+{
+    if(catalog) {
+        const UiDesignerControlSpec* spec = catalog->Find(node.type);
+        if(spec && !spec->display_name.IsEmpty())
+            return spec->display_name;
+    }
+    return node.type;
+}
+
+static Rect ExpandVisualRect(Rect rect, int amount = DPI(1))
+{
+    if(amount <= 0)
+        return rect;
+    return rect.Inflated(amount);
+}
+
+static String BoxGapLabel(const UiDesignerCatalog *catalog, const UiDesignerNode& node,
+                          const UiDesignerNode* prev, const UiDesignerNode* next,
+                          int index)
+{
+    String base = LayoutNodeName(catalog, node);
+    if(prev && next)
+        return Format("%s \"%s\" -- between %s and %s", base, node.name, prev->name, next->name);
+    if(prev)
+        return Format("%s \"%s\" -- after %s", base, node.name, prev->name);
+    if(next)
+        return Format("%s \"%s\" -- before %s", base, node.name, next->name);
+    return Format("%s \"%s\" -- slot %d", base, node.name, index);
+}
+
+static void AddRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                      UiDesignerDropRegion region)
+{
+    if(region.visual_rect.IsEmpty())
+        region.visual_rect = region.rect;
+    snapshot.AddRegion(pick(region));
+}
+
+static void AddWindowDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                const UiDesignerNode& node,
+                                const UiDesignerGeometryRecord& record)
+{
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::WindowContent;
+    region.rect = record.rect;
+    region.visual_rect = record.rect;
+    region.depth = record.depth;
+    region.paint_order = record.order * 100;
+    region.label = "Window";
+    AddRegion(snapshot, pick(region));
+}
+
+static void AddPanelDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                               const UiDesignerNode& node,
+                               const UiDesignerGeometryRecord& record)
+{
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::PanelBody;
+    region.rect = record.body;
+    region.visual_rect = record.body;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100;
+    region.label = LayoutNodeName(nullptr, node) + " body";
+    AddRegion(snapshot, pick(region));
+}
+
+static void AddGridDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                               const UiDesignerDocument& document,
+                               const UiDesignerCatalog* catalog,
+                               const UiDesignerNode& node,
+                               const UiDesignerGeometryRecord& record,
+                               const UiDesignerPreviewInstance* instance)
+{
+    const UiGridLayout *grid = instance && instance->control
+        ? dynamic_cast<const UiGridLayout *>(instance->control.Get()) : nullptr;
+    if(!grid)
+        return;
+    const int rows = max(1, (int)node.GetProperty("rows", 1));
+    const int cols = max(1, (int)node.GetProperty("columns", 1));
+    int order = 0;
+    for(int row = 0; row < rows; row++) {
+        for(int col = 0; col < cols; col++) {
+            UiDesignerDropRegion region;
+            region.owner = node.id;
+            region.kind = UiDesignerDropRegionKind::GridCell;
+            region.rect = grid->GetCellRect(row, col).Offseted(record.rect.TopLeft());
+            region.visual_rect = region.rect;
+            region.grid_row = row;
+            region.grid_column = col;
+            region.depth = record.depth + 1;
+            region.paint_order = record.order * 1000 + order++;
+            bool occupied = false;
+            for(UiDesignerNodeId child_id : node.children) {
+                const UiDesignerNode* child = document.Find(child_id);
+                if(child && (int)child->GetProperty("grid_row", 0) == row &&
+                          (int)child->GetProperty("grid_column", 0) == col) {
+                    occupied = true;
+                    break;
+                }
+            }
+            region.occupied = occupied;
+            region.label = Format("%s \"%s\" -- row %d, column %d",
+                                  LayoutNodeName(catalog, node), node.name, row, col);
+            AddRegion(snapshot, pick(region));
+        }
+    }
+}
+
+static void AddBoxDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                              const UiDesignerDocument& document,
+                              const UiDesignerCatalog* catalog,
+                              const UiDesignerNode& node,
+                              const UiDesignerGeometryRecord& record,
+                              const UiDesignerPreviewInstance* instance)
+{
+    const UiBoxLayout *box = instance && instance->control
+        ? dynamic_cast<const UiBoxLayout *>(instance->control.Get()) : nullptr;
+    if(!box)
+        return;
+
+    const int count = record.item_rects.GetCount();
+    if(count == 0) {
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxEmptyBody;
+        region.rect = record.rect;
+        region.visual_rect = record.rect;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100;
+        region.label = Format("%s \"%s\" -- empty body", LayoutNodeName(catalog, node), node.name);
+        AddRegion(snapshot, pick(region));
+        return;
+    }
+
+    UiDesignerDropRegion body;
+    body.owner = node.id;
+    body.kind = UiDesignerDropRegionKind::BoxBody;
+    body.rect = record.body;
+    body.visual_rect = record.body;
+    body.depth = record.depth + 1;
+    body.paint_order = record.order * 100 + 5;
+    body.label = Format("%s \"%s\" -- body", LayoutNodeName(catalog, node), node.name);
+    AddRegion(snapshot, pick(body));
+
+    UiDesignerDropRegion frame;
+    frame.owner = node.id;
+    frame.kind = UiDesignerDropRegionKind::BoxFrame;
+    frame.rect = record.rect;
+    frame.visual_rect = record.rect;
+    frame.depth = record.depth + 1;
+    frame.paint_order = record.order * 100 + 4;
+    frame.label = Format("%s \"%s\" -- inset frame", LayoutNodeName(catalog, node), node.name);
+    AddRegion(snapshot, pick(frame));
+
+    const bool horizontal = node.GetProperty("direction", "V") == "H";
+    if(count > 0) {
+        const Rect first = record.item_rects[0];
+        Rect before;
+        if(horizontal) {
+            const int width = max(0, first.left - record.body.left);
+            if(width > 0)
+                before = RectC(record.body.left, first.top, width, first.Height());
+        }
+        else {
+            const int height = max(0, first.top - record.body.top);
+            if(height > 0)
+                before = RectC(first.left, record.body.top, first.Width(), height);
+        }
+        if(!before.IsEmpty()) {
+            UiDesignerDropRegion region;
+            region.owner = node.id;
+            region.kind = UiDesignerDropRegionKind::BoxBeforeItem;
+            region.rect = before;
+            region.visual_rect = ExpandVisualRect(before);
+            region.insertion_index = 0;
+            region.depth = record.depth + 1;
+            region.paint_order = record.order * 100 + 1;
+            region.label = BoxGapLabel(catalog, node, nullptr,
+                                       document.Find(node.children[0]), 0);
+            AddRegion(snapshot, pick(region));
+        }
+    }
+
+    for(int i = 1; i < count; i++) {
+        const Rect prev = record.item_rects[i - 1];
+        const Rect next = record.item_rects[i];
+        Rect gap;
+        if(horizontal) {
+            const int width = max(0, next.left - prev.right);
+            const int top = max(prev.top, next.top);
+            const int bottom = min(prev.bottom, next.bottom);
+            if(width > 0 && bottom > top)
+                gap = RectC(prev.right, top, width, bottom - top);
+        }
+        else {
+            const int height = max(0, next.top - prev.bottom);
+            const int left = max(prev.left, next.left);
+            const int right = min(prev.right, next.right);
+            if(height > 0 && right > left)
+                gap = RectC(left, prev.bottom, right - left, height);
+        }
+        if(gap.IsEmpty())
+            continue;
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxGap;
+        region.rect = gap;
+        region.visual_rect = ExpandVisualRect(gap);
+        region.insertion_index = i;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100 + 10 + i;
+        const UiDesignerNode* prev_node = i - 1 < node.children.GetCount()
+            ? document.Find(node.children[i - 1]) : nullptr;
+        const UiDesignerNode* next_node = i < node.children.GetCount()
+            ? document.Find(node.children[i]) : nullptr;
+        region.label = BoxGapLabel(catalog, node, prev_node, next_node, i);
+        AddRegion(snapshot, pick(region));
+    }
+
+    const Rect last = record.item_rects.Top();
+    Rect after;
+    if(horizontal) {
+        const int width = max(0, record.body.right - last.right);
+        if(width > 0)
+            after = RectC(last.right, last.top, width, last.Height());
+    }
+    else {
+        const int height = max(0, record.body.bottom - last.bottom);
+        if(height > 0)
+            after = RectC(last.left, last.bottom, last.Width(), height);
+    }
+    if(!after.IsEmpty()) {
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxAfterItem;
+        region.rect = after;
+        region.visual_rect = ExpandVisualRect(after);
+        region.insertion_index = count;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100 + 90;
+        region.label = BoxGapLabel(catalog, node,
+                                   document.Find(node.children[count - 1]), nullptr,
+                                   count);
+        AddRegion(snapshot, pick(region));
+    }
+}
+
+static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                 const UiDesignerDocument& document,
+                                 const UiDesignerCatalog* catalog,
+                                 const UiDesignerNode& node,
+                                 const UiDesignerGeometryRecord& record,
+                                 const UiDesignerPreviewInstance* instance)
+{
+    if(node.id == document.GetRootId()) {
+        AddWindowDropRegion(snapshot, node, record);
+        return;
+    }
+    if(node.type == "UiPanel") {
+        AddPanelDropRegion(snapshot, node, record);
+        return;
+    }
+    if(node.type == "UiGridLayout") {
+        AddGridDropRegions(snapshot, document, catalog, node, record, instance);
+        return;
+    }
+    if(node.type == "UiBoxLayout") {
+        AddBoxDropRegions(snapshot, document, catalog, node, record, instance);
+        return;
+    }
+}
+
 static One<Ctrl> CreateRuntime(UiDesignerRuntimeKind kind)
 {
     switch(kind) {
@@ -1019,6 +1320,9 @@ void UiDesignerPreviewCanvas::Layout()
         record.drop_target = node->id == document_->GetRootId() ||
             node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
             node->type == "UiPanel";
+        record.debug_layout = node->GetProperty("debug_layout", false);
+        if(node->type == "UiBoxLayout" || node->type == "UiGridLayout")
+            record.debug_color = StableLayoutColor(node->id, record.depth);
         record.inset = max(0, (int)node->GetProperty("inset", 0));
         record.gap = max(0, (int)node->GetProperty("gap", 0));
         record.body = record.inset ? record.rect.Deflated(DPI(record.inset)) : record.rect;
@@ -1059,9 +1363,12 @@ void UiDesignerPreviewCanvas::Layout()
                                          DPI(record.inset), record.body.Height()));
         }
         snapshot.Add(pick(record));
+        AddLayoutDropRegions(snapshot, *document_, catalog_, *node, record,
+                             q >= 0 ? &instances_[q] : nullptr);
     }
     geometry_ = snapshot.Publish();
     stats_.snapshot_publications++;
+    stats_.drop_region_publications++;
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(

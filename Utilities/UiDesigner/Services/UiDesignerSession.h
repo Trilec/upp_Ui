@@ -68,11 +68,13 @@ public:
     UiDesignerDropPlan PlanAddControl(
         const String& type_id, UiDesignerNodeId target = 0,
         Point canvas_position = Point(0, 0),
-        bool has_canvas_position = false, int index = -1) const;
+        bool has_canvas_position = false, int index = -1,
+        int grid_row = -1, int grid_column = -1) const;
     UiDesignerDropPlan PlanMoveSelection(
         UiDesignerNodeId target,
         Point canvas_position = Point(0, 0),
-        bool has_canvas_position = false, int index = -1) const;
+        bool has_canvas_position = false, int index = -1,
+        int grid_row = -1, int grid_column = -1) const;
     bool ExecuteDrop(const UiDesignerDropPlan& plan,
                      UiDesignerNodeId *created, String& error);
 

@@ -3,6 +3,297 @@
 
 namespace Upp {
 
+namespace {
+
+static Color StableLayoutColor(UiDesignerNodeId node, int depth, Color parent_color = Null)
+{
+    static const Color palette[] = {
+        Color(125, 211, 252),
+        Color(167, 243, 208),
+        Color(254, 240, 138),
+        Color(252, 211, 77),
+        Color(196, 181, 253),
+        Color(251, 191, 36),
+        Color(165, 180, 252),
+        Color(134, 239, 172),
+        Color(253, 186, 116),
+        Color(244, 114, 182),
+        Color(147, 197, 253),
+        Color(192, 132, 252),
+    };
+    CombineHash h;
+    h << (int64)node << depth;
+    const int count = __countof(palette);
+    int index = (int)((dword)h % count);
+    Color color = palette[index];
+    if(color == parent_color)
+        color = palette[(index + 5) % count];
+    return color;
+}
+
+static String LayoutNodeName(const UiDesignerCatalog *catalog, const UiDesignerNode& node)
+{
+    if(catalog) {
+        const UiDesignerControlSpec* spec = catalog->Find(node.type);
+        if(spec && !spec->display_name.IsEmpty())
+            return spec->display_name;
+    }
+    return node.type;
+}
+
+static Rect ExpandVisualRect(Rect rect, int amount = DPI(1))
+{
+    if(amount <= 0)
+        return rect;
+    return rect.Inflated(amount);
+}
+
+static String BoxGapLabel(const UiDesignerCatalog *catalog, const UiDesignerNode& node,
+                         const UiDesignerNode* prev, const UiDesignerNode* next,
+                         int index)
+{
+    String base = LayoutNodeName(catalog, node);
+    if(prev && next)
+        return Format("%s \"%s\" — between %s and %s", base, node.name, prev->name, next->name);
+    if(prev)
+        return Format("%s \"%s\" — after %s", base, node.name, prev->name);
+    if(next)
+        return Format("%s \"%s\" — before %s", base, node.name, next->name);
+    return Format("%s \"%s\" — slot %d", base, node.name, index);
+}
+
+static void AddRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                      UiDesignerDropRegion region)
+{
+    if(region.visual_rect.IsEmpty())
+        region.visual_rect = region.rect;
+    snapshot.AddRegion(pick(region));
+}
+
+static void AddWindowDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                const UiDesignerNode& node,
+                                const UiDesignerGeometryRecord& record)
+{
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::WindowContent;
+    region.rect = record.rect;
+    region.visual_rect = record.rect;
+    region.depth = record.depth;
+    region.paint_order = record.order * 100;
+    region.label = "Window";
+    AddRegion(snapshot, pick(region));
+}
+
+static void AddPanelDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                               const UiDesignerNode& node,
+                               const UiDesignerGeometryRecord& record)
+{
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::PanelBody;
+    region.rect = record.body;
+    region.visual_rect = record.body;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100;
+    region.label = LayoutNodeName(nullptr, node) + " body";
+    AddRegion(snapshot, pick(region));
+}
+
+static void AddGridDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                               const UiDesignerDocument& document,
+                               const UiDesignerCatalog* catalog,
+                               const UiDesignerNode& node,
+                               const UiDesignerGeometryRecord& record,
+                               const UiDesignerPreviewInstance* instance)
+{
+    const UiGridLayout *grid = instance && instance->control
+        ? dynamic_cast<const UiGridLayout *>(instance->control.Get()) : nullptr;
+    if(!grid)
+        return;
+    const int rows = max(1, (int)node.GetProperty("rows", 1));
+    const int cols = max(1, (int)node.GetProperty("columns", 1));
+    Index<UiDesignerDropRegionKind> used;
+    int order = 0;
+    for(int row = 0; row < rows; row++) {
+        for(int col = 0; col < cols; col++) {
+            UiDesignerDropRegion region;
+            region.owner = node.id;
+            region.kind = UiDesignerDropRegionKind::GridCell;
+            region.rect = grid->GetCellRect(row, col).Offseted(record.rect.TopLeft());
+            region.visual_rect = region.rect;
+            region.grid_row = row;
+            region.grid_column = col;
+            region.depth = record.depth + 1;
+            region.paint_order = record.order * 1000 + order++;
+            bool occupied = false;
+            for(UiDesignerNodeId child_id : node.children) {
+                const UiDesignerNode* child = document.Find(child_id);
+                if(child && (int)child->GetProperty("grid_row", 0) == row &&
+                          (int)child->GetProperty("grid_column", 0) == col) {
+                    occupied = true;
+                    break;
+                }
+            }
+            region.occupied = occupied;
+            region.label = Format("%s \"%s\" — row %d, column %d",
+                                  LayoutNodeName(catalog, node), node.name, row, col);
+            AddRegion(snapshot, pick(region));
+        }
+    }
+}
+
+static void AddBoxDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                              const UiDesignerDocument& document,
+                              const UiDesignerCatalog* catalog,
+                              const UiDesignerNode& node,
+                              const UiDesignerGeometryRecord& record,
+                              const UiDesignerPreviewInstance* instance)
+{
+    const UiBoxLayout *box = instance && instance->control
+        ? dynamic_cast<const UiBoxLayout *>(instance->control.Get()) : nullptr;
+    if(!box)
+        return;
+
+    const int count = record.item_rects.GetCount();
+    if(count == 0) {
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxEmptyBody;
+        region.rect = record.body;
+        region.visual_rect = record.body;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100;
+        region.label = Format("%s \"%s\" — empty body", LayoutNodeName(catalog, node), node.name);
+        AddRegion(snapshot, pick(region));
+        return;
+    }
+
+    const bool horizontal = node.GetProperty("direction", "V") == "H";
+    if(count > 0) {
+        const Rect first = record.item_rects[0];
+        Rect before;
+        if(horizontal) {
+            const int width = max(0, first.left - record.body.left);
+            if(width > 0)
+                before = RectC(record.body.left, first.top, width, first.Height());
+        }
+        else {
+            const int height = max(0, first.top - record.body.top);
+            if(height > 0)
+                before = RectC(first.left, record.body.top, first.Width(), height);
+        }
+        if(!before.IsEmpty()) {
+            UiDesignerDropRegion region;
+            region.owner = node.id;
+            region.kind = UiDesignerDropRegionKind::BoxBeforeItem;
+            region.rect = before;
+            region.visual_rect = ExpandVisualRect(before);
+            region.insertion_index = 0;
+            region.depth = record.depth + 1;
+            region.paint_order = record.order * 100 + 1;
+            region.label = BoxGapLabel(catalog, node, nullptr,
+                                       document.Find(node.children[0]), 0);
+            AddRegion(snapshot, pick(region));
+        }
+    }
+
+    for(int i = 1; i < count; i++) {
+        const Rect prev = record.item_rects[i - 1];
+        const Rect next = record.item_rects[i];
+        Rect gap;
+        if(horizontal) {
+            const int width = max(0, next.left - prev.right);
+            const int top = max(prev.top, next.top);
+            const int bottom = min(prev.bottom, next.bottom);
+            if(width > 0 && bottom > top)
+                gap = RectC(prev.right, top, width, bottom - top);
+        }
+        else {
+            const int height = max(0, next.top - prev.bottom);
+            const int left = max(prev.left, next.left);
+            const int right = min(prev.right, next.right);
+            if(height > 0 && right > left)
+                gap = RectC(left, prev.bottom, right - left, height);
+        }
+        if(gap.IsEmpty())
+            continue;
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxGap;
+        region.rect = gap;
+        region.visual_rect = ExpandVisualRect(gap);
+        region.insertion_index = i;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100 + 10 + i;
+        const UiDesignerNode* prev_node = i - 1 < node.children.GetCount()
+            ? document.Find(node.children[i - 1]) : nullptr;
+        const UiDesignerNode* next_node = i < node.children.GetCount()
+            ? document.Find(node.children[i]) : nullptr;
+        region.label = BoxGapLabel(catalog, node, prev_node, next_node, i);
+        AddRegion(snapshot, pick(region));
+    }
+
+    const Rect last = record.item_rects.Top();
+    Rect after;
+    if(horizontal) {
+        const int width = max(0, record.body.right - last.right);
+        if(width > 0)
+            after = RectC(last.right, last.top, width, last.Height());
+    }
+    else {
+        const int height = max(0, record.body.bottom - last.bottom);
+        if(height > 0)
+            after = RectC(last.left, last.bottom, last.Width(), height);
+    }
+    if(!after.IsEmpty()) {
+        UiDesignerDropRegion region;
+        region.owner = node.id;
+        region.kind = UiDesignerDropRegionKind::BoxAfterItem;
+        region.rect = after;
+        region.visual_rect = ExpandVisualRect(after);
+        region.insertion_index = count;
+        region.depth = record.depth + 1;
+        region.paint_order = record.order * 100 + 90;
+        region.label = BoxGapLabel(catalog, node,
+                                   document.Find(node.children[count - 1]), nullptr,
+                                   count);
+        AddRegion(snapshot, pick(region));
+    }
+}
+
+static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                 const UiDesignerDocument& document,
+                                 const UiDesignerCatalog* catalog,
+                                 const UiDesignerNode& node,
+                                 const UiDesignerGeometryRecord& record,
+                                 const UiDesignerPreviewInstance* instance)
+{
+    if(node.id == document.GetRootId()) {
+        AddWindowDropRegion(snapshot, node, record);
+        return;
+    }
+    if(node.type == "UiPanel") {
+        AddPanelDropRegion(snapshot, node, record);
+        return;
+    }
+    if(node.type == "UiGridLayout") {
+        AddGridDropRegions(snapshot, document, catalog, node, record, instance);
+        return;
+    }
+    if(node.type == "UiBoxLayout") {
+        AddBoxDropRegions(snapshot, document, catalog, node, record, instance);
+        return;
+    }
+}
+
+static Rect VisualDropRect(const UiDesignerResolvedDrop& drop)
+{
+    return drop.visual_rect.IsEmpty() ? drop.exact_rect : drop.visual_rect;
+}
+
+}
+
 UiDesignerInteractionOverlay::UiDesignerInteractionOverlay(UiDesignerWindow& owner)
     : owner_(&owner)
 {
@@ -71,36 +362,37 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         }
     }
 
-    // Layout boundaries are Designer guidance, not runtime decoration.
     for(const UiDesignerNode& node : document.GetNodes()) {
-        if(node.type != "UiBoxLayout" && node.type != "UiGridLayout" &&
-           node.type != "UiAbsoluteLayout")
+        if(node.type != "UiBoxLayout" && node.type != "UiGridLayout")
             continue;
         const UiDesignerGeometryRecord* geometry =
             owner_->preview_canvas_.GetGeometrySnapshot().Find(node.id);
-        Rect r = geometry ? geometry->rect : Rect();
-        if(r.IsEmpty())
+        if(!geometry || !geometry->debug_layout)
             continue;
-        r.Offset(canvas_origin.x, canvas_origin.y);
-        if(r == root_rect)
-            r = r.Deflated(DPI(5));
-        const Color outline = Blend(SColorText(), SColorPaper(), 150);
-        for(int x = r.left + 1; x < r.right - 1; x += DPI(6)) {
-            w.DrawRect(x, r.top + 1, min(DPI(3), r.right - x - 1), 1, outline);
-            w.DrawRect(x, r.bottom - 2, min(DPI(3), r.right - x - 1), 1, outline);
+        const Color outline = IsNull(geometry->debug_color)
+            ? StableLayoutColor(node.id, geometry ? geometry->depth : 0)
+            : geometry->debug_color;
+        const Color fill = Blend(outline, SColorPaper(), 215);
+        for(const Rect& inset : geometry->inset_rects) {
+            Rect ir = inset.Offseted(canvas_origin);
+            w.DrawRect(ir, fill);
         }
-        for(int y = r.top + 1; y < r.bottom - 1; y += DPI(6)) {
-            w.DrawRect(r.left + 1, y, 1, min(DPI(3), r.bottom - y - 1), outline);
-            w.DrawRect(r.right - 2, y, 1, min(DPI(3), r.bottom - y - 1), outline);
+        for(const Rect& gap : geometry->gap_rects) {
+            Rect gr = gap.Offseted(canvas_origin);
+            w.DrawRect(gr, Blend(outline, SColorPaper(), 195));
         }
-        if(node.GetProperty("debug_layout", false) && node.type == "UiPanel") {
-            const Color debug = Color(168, 85, 247);
-            Rect body = geometry ? geometry->body.Offseted(canvas_origin) : r;
-            w.DrawRect(body.left, body.top, body.Width(), 1, debug);
-            w.DrawRect(body.left, body.bottom - 1, body.Width(), 1, debug);
-            w.DrawRect(body.left, body.top, 1, body.Height(), debug);
-            w.DrawRect(body.right - 1, body.top, 1, body.Height(), debug);
+        for(const Rect& item : geometry->item_rects) {
+            Rect ir = item.Offseted(canvas_origin);
+            w.DrawRect(ir.left, ir.top, ir.Width(), 2, outline);
+            w.DrawRect(ir.left, ir.bottom - 2, ir.Width(), 2, outline);
+            w.DrawRect(ir.left, ir.top, 2, ir.Height(), outline);
+            w.DrawRect(ir.right - 2, ir.top, 2, ir.Height(), outline);
         }
+        Rect body = geometry->body.Offseted(canvas_origin);
+        w.DrawRect(body.left, body.top, body.Width(), 1, outline);
+        w.DrawRect(body.left, body.bottom - 1, body.Width(), 1, outline);
+        w.DrawRect(body.left, body.top, 1, body.Height(), outline);
+        w.DrawRect(body.right - 1, body.top, 1, body.Height(), outline);
     }
 
     const int handle = DPI(12);
@@ -124,16 +416,17 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         w.DrawRect(grip.right - 1, grip.top, 1, grip.Height(), frame);
     }
 
-    if(!drop_indicator_.IsEmpty()) {
-        const Color color = drop_plan_.valid ? Color(34, 197, 94) : Color(220, 38, 38);
-        w.DrawRect(drop_indicator_.left, drop_indicator_.top,
-                   drop_indicator_.Width(), 2, color);
-        w.DrawRect(drop_indicator_.left, drop_indicator_.bottom - 2,
-                   drop_indicator_.Width(), 2, color);
-        w.DrawRect(drop_indicator_.left, drop_indicator_.top,
-                   2, drop_indicator_.Height(), color);
-        w.DrawRect(drop_indicator_.right - 2, drop_indicator_.top,
-                   2, drop_indicator_.Height(), color);
+    if(!resolved_drop_.visual_rect.IsEmpty() || !resolved_drop_.exact_rect.IsEmpty()) {
+        const Rect indicator = VisualDropRect(resolved_drop_).Offseted(canvas_origin);
+        const Color color = resolved_drop_.valid ? Color(34, 197, 94) : Color(220, 38, 38);
+        w.DrawRect(indicator.left, indicator.top,
+                   indicator.Width(), 3, color);
+        w.DrawRect(indicator.left, indicator.bottom - 3,
+                   indicator.Width(), 3, color);
+        w.DrawRect(indicator.left, indicator.top,
+                   3, indicator.Height(), color);
+        w.DrawRect(indicator.right - 3, indicator.top,
+                   3, indicator.Height(), color);
     }
 }
 
@@ -195,11 +488,13 @@ void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
         capture_release_in_progress_ = true;
         ReleaseOwnedCaptureSafely();
         capture_release_in_progress_ = false;
-        SetDragStatus(Format("resize root done %dx%d",
-                             final_size.cx, final_size.cy));
-        Refresh();
         if(keep_alive && final_size != resize_start_rect_.Size())
             owner_->session_.SetVirtualSize(final_size);
+        if(keep_alive) {
+            SetDragStatus(Format("resize root done %dx%d",
+                                 final_size.cx, final_size.cy));
+            Refresh();
+        }
     }
 }
 
@@ -296,16 +591,16 @@ bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Poin
         return false;
     }
     UpdateDropPlan(type_id, screen, false);
-    if(!drop_plan_.valid) {
+    if(!resolved_drop_.valid) {
         CancelCatalogDrag();
         return false;
     }
     String error;
-    const bool ok = owner_->session_.ExecuteDrop(drop_plan_, nullptr, error);
+    const bool ok = owner_->session_.ExecuteDrop(resolved_drop_.plan, nullptr, error);
     if(ok)
-        SetDragStatus(drop_plan_.label + " completed");
+        SetDragStatus(resolved_drop_.label + " completed");
     else
-        SetDragStatus(error.IsEmpty() ? drop_plan_.reason : error);
+        SetDragStatus(error.IsEmpty() ? resolved_drop_.reason : error);
     EndCatalogDrag(UiDesignerCatalogDragState::Idle);
     return ok;
 }
@@ -319,8 +614,7 @@ void UiDesignerInteractionOverlay::InvalidateCatalogDrag()
 {
     if(drag_state_ == UiDesignerCatalogDragState::Idle)
         return;
-    drop_plan_ = UiDesignerDropPlan();
-    drop_indicator_ = Rect();
+    resolved_drop_ = UiDesignerResolvedDrop();
     Refresh();
 }
 
@@ -381,8 +675,7 @@ Rect UiDesignerInteractionOverlay::ResizeDocumentTo(Point p) const
 
 void UiDesignerInteractionOverlay::ClearDropPlan()
 {
-    drop_plan_ = UiDesignerDropPlan();
-    drop_indicator_ = Rect(0, 0, 0, 0);
+    resolved_drop_ = UiDesignerResolvedDrop();
     Refresh();
 }
 
@@ -399,8 +692,7 @@ void UiDesignerInteractionOverlay::EndCatalogDrag(UiDesignerCatalogDragState ter
     drag_state_ = UiDesignerCatalogDragState::Idle;
     pointer_gesture_ = UiDesignerPointerGesture::None;
     drag_type_id_.Clear();
-    drop_plan_ = UiDesignerDropPlan();
-    drop_indicator_ = Rect();
+    resolved_drop_ = UiDesignerResolvedDrop();
     drag_diagnostics_.tracking_depth = 0;
 
     if(release_capture) {
@@ -427,8 +719,7 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
     const Rect root = WorkspaceRootRect();
     drag_type_id_ = type_id;
     if(!root.Contains(overlay_local)) {
-        drop_plan_ = UiDesignerDropPlan();
-        drop_indicator_ = Rect();
+        resolved_drop_ = UiDesignerResolvedDrop();
         SetDragStatus(Format("drag %s -> outside Window", type_id));
         Refresh();
         return;
@@ -436,51 +727,64 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
 
     const UiDesignerDocument& document = owner_->session_.Document();
     const Point doc_local = overlay_local - root.TopLeft();
-    drop_plan_ = UiDesignerDropPlan();
-    UiDesignerNodeId target = owner_->preview_canvas_.GetGeometrySnapshot().HitDropTarget(doc_local);
-    if(!target)
-        target = document.GetRootId();
-    for(UiDesignerNodeId candidate = target; candidate; ) {
-        const UiDesignerNode* node = document.Find(candidate);
-        if(!node)
-            break;
-        UiDesignerDropPlan candidate_plan = owner_->session_.PlanAddControl(
-            type_id, candidate,
-            doc_local - owner_->preview_canvas_.GetGeometrySnapshot().Find(candidate)->rect.TopLeft(),
-            true);
-        if(candidate_plan.valid) {
-            drop_plan_ = pick(candidate_plan);
-            target = candidate;
-            break;
-        }
-        candidate = node->parent;
+    const UiDesignerGeometrySnapshot& geometry = owner_->preview_canvas_.GetGeometrySnapshot();
+    const UiDesignerDropRegion* region = geometry.HitDropRegion(doc_local);
+    if(!region) {
+        resolved_drop_ = UiDesignerResolvedDrop();
+        SetDragStatus(Format("drag %s -> Window : invalid, no region", type_id));
+        Refresh();
+        return;
     }
-    if(!drop_plan_.valid)
-        drop_plan_ = owner_->session_.PlanAddControl(type_id,
-            document.GetRootId(), doc_local, true);
-    const UiDesignerGeometryRecord* target_geometry =
-        owner_->preview_canvas_.GetGeometrySnapshot().Find(drop_plan_.parent);
-    Rect target_rect = target_geometry ? target_geometry->rect : Rect();
-    if(target_rect.IsEmpty())
-        target_rect = root;
-    drop_indicator_ = target_rect.Offseted(root.TopLeft());
-    const UiDesignerNode* target_node = document.Find(drop_plan_.parent);
+
+    resolved_drop_.region_id = region->paint_order;
+    resolved_drop_.region = *region;
+    resolved_drop_.exact_rect = region->rect;
+    resolved_drop_.visual_rect = region->visual_rect.IsEmpty() ? region->rect : region->visual_rect;
+    resolved_drop_.insertion_index = region->insertion_index;
+    resolved_drop_.grid_row = region->grid_row;
+    resolved_drop_.grid_column = region->grid_column;
+    resolved_drop_.label = region->label;
+    resolved_drop_.reason.Clear();
+    resolved_drop_.plan = UiDesignerDropPlan();
+    resolved_drop_.valid = false;
+
+    const UiDesignerNode* target_node = document.Find(region->owner);
+    if(!target_node) {
+        resolved_drop_.reason = "Drop target does not exist";
+    }
+    else {
+        Point position = region->rect.CenterPoint();
+        resolved_drop_.plan = owner_->session_.PlanAddControl(
+            type_id, region->owner, position, true,
+            region->insertion_index, region->grid_row, region->grid_column);
+        resolved_drop_.valid = resolved_drop_.plan.valid;
+        resolved_drop_.reason = resolved_drop_.plan.reason;
+        if(resolved_drop_.valid) {
+            resolved_drop_.plan.label = region->label;
+            const UiDesignerGeometryRecord* target_geometry = geometry.Find(region->owner);
+            if(target_geometry && !target_geometry->rect.IsEmpty())
+                resolved_drop_.visual_rect = region->visual_rect.IsEmpty()
+                    ? target_geometry->rect
+                    : region->visual_rect;
+            if(!allow_invalid_feedback && !resolved_drop_.valid)
+                resolved_drop_.visual_rect = Rect();
+        }
+    }
+
     const String target_name = target_node && target_node->id != document.GetRootId()
-        ? (owner_->session_.Catalog().Find(target_node->type)
-            ? owner_->session_.Catalog().Find(target_node->type)->display_name
-            : target_node->type)
+        ? LayoutNodeName(&owner_->session_.Catalog(), *target_node)
         : "Window";
-    if(drop_plan_.valid) {
-        SetDragStatus(Format("drag %s -> %s : valid", type_id, target_name));
+    if(resolved_drop_.valid) {
+        SetDragStatus(resolved_drop_.label + " : valid");
     }
     else {
         SetDragStatus(Format("drag %s -> %s : invalid%s",
                              type_id,
                              target_name,
-                             drop_plan_.reason.IsEmpty() ? String()
-                                                         : ", " + drop_plan_.reason));
+                             resolved_drop_.reason.IsEmpty() ? String()
+                                                             : ", " + resolved_drop_.reason));
         if(!allow_invalid_feedback)
-            drop_indicator_ = Rect();
+            resolved_drop_.visual_rect = Rect();
     }
     Refresh();
 }

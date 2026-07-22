@@ -30,6 +30,20 @@ struct UiDesignerCatalogDragDiagnostics {
     int terminal_cancellations = 0;
 };
 
+struct UiDesignerResolvedDrop : Moveable<UiDesignerResolvedDrop> {
+    int region_id = -1;
+    UiDesignerDropRegion region;
+    Rect exact_rect;
+    Rect visual_rect;
+    int insertion_index = -1;
+    int grid_row = -1;
+    int grid_column = -1;
+    bool valid = false;
+    String label;
+    String reason;
+    UiDesignerDropPlan plan;
+};
+
 class UiDesignerInteractionOverlay : public Ctrl {
 public:
     typedef UiDesignerInteractionOverlay CLASSNAME;
@@ -68,8 +82,7 @@ private:
     UiDesignerPointerGesture pointer_gesture_ = UiDesignerPointerGesture::None;
     UiDesignerCatalogDragDiagnostics drag_diagnostics_;
     bool cleaning_drag_ = false;
-    UiDesignerDropPlan drop_plan_;
-    Rect drop_indicator_;
+    UiDesignerResolvedDrop resolved_drop_;
     String drag_status_;
     bool decorations_visible_ = true;
 

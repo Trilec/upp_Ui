@@ -40,7 +40,8 @@ static Value ParseBehaviorValue(const Value& value)
 
 UiDesignerDropPlan UiDesignerSession::PlanAddControl(
     const String& type_id, UiDesignerNodeId target,
-    Point canvas_position, bool has_canvas_position, int index) const
+    Point canvas_position, bool has_canvas_position, int index,
+    int grid_row, int grid_column) const
 {
     UiDesignerDropService service(
         const_cast<UiDesignerDocument&>(document_), catalog_,
@@ -49,18 +50,20 @@ UiDesignerDropPlan UiDesignerSession::PlanAddControl(
         target = state_.selection.primary ? state_.selection.primary
                                           : document_.GetRootId();
     return service.PlanAdd(type_id, target, canvas_position,
-                           has_canvas_position, index);
+                           has_canvas_position, index, grid_row, grid_column);
 }
 
 UiDesignerDropPlan UiDesignerSession::PlanMoveSelection(
     UiDesignerNodeId target, Point canvas_position,
-    bool has_canvas_position, int index) const
+    bool has_canvas_position, int index,
+    int grid_row, int grid_column) const
 {
     UiDesignerDropService service(
         const_cast<UiDesignerDocument&>(document_), catalog_,
         const_cast<UiDesignerCommandService&>(commands_));
     return service.PlanMove(state_.selection.nodes, target,
-                            canvas_position, has_canvas_position, index);
+                            canvas_position, has_canvas_position, index,
+                            grid_row, grid_column);
 }
 
 bool UiDesignerSession::ExecuteDrop(const UiDesignerDropPlan& plan,

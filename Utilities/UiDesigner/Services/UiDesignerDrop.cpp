@@ -63,7 +63,7 @@ String UiDesignerDropService::MakeUniqueName(
 
 void UiDesignerDropService::PopulatePlacement(
     const UiDesignerControlSpec& child, const UiDesignerNode& parent,
-    Point position, ValueMap& properties) const
+    Point position, int grid_row, int grid_column, ValueMap& properties) const
 {
     if(!document_ || !catalog_)
         return;
@@ -74,10 +74,10 @@ void UiDesignerDropService::PopulatePlacement(
     if(parent.type == "UiGridLayout") {
         const int rows = max(1, (int)parent.GetProperty("rows", 1));
         const int columns = max(1, (int)parent.GetProperty("columns", 1));
-        const int width = max(1, (int)parent.GetProperty("width", 320));
-        const int height = max(1, (int)parent.GetProperty("height", 180));
-        const int column = minmax(position.x * columns / width, 0, columns - 1);
-        const int row = minmax(position.y * rows / height, 0, rows - 1);
+        const int row = grid_row >= 0 ? minmax(grid_row, 0, rows - 1)
+                                      : minmax(position.y * rows / max(1, (int)parent.GetProperty("height", 180)), 0, rows - 1);
+        const int column = grid_column >= 0 ? minmax(grid_column, 0, columns - 1)
+                                            : minmax(position.x * columns / max(1, (int)parent.GetProperty("width", 320)), 0, columns - 1);
         properties.Set("grid_row", row);
         properties.Set("grid_column", column);
         return;
@@ -111,13 +111,16 @@ void UiDesignerDropService::PopulatePlacement(
 
 UiDesignerDropPlan UiDesignerDropService::PlanAdd(
     const String& type_id, UiDesignerNodeId target,
-    Point canvas_position, bool has_canvas_position, int index) const
+    Point canvas_position, bool has_canvas_position, int index,
+    int grid_row, int grid_column) const
 {
     UiDesignerDropPlan plan;
     plan.operation = UiDesignerDropOperation::AddCatalogItem;
     plan.type_id = type_id;
     plan.canvas_position = canvas_position;
     plan.has_canvas_position = has_canvas_position;
+    plan.grid_row = grid_row;
+    plan.grid_column = grid_column;
 
     if(!IsBound()) {
         plan.reason = "Drop service is not bound";
@@ -152,7 +155,8 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
 
     plan.add_defaults = clone(spec->defaults);
     if(has_canvas_position)
-        PopulatePlacement(*spec, *parent, canvas_position, plan.add_defaults);
+        PopulatePlacement(*spec, *parent, canvas_position,
+                          grid_row, grid_column, plan.add_defaults);
     plan.label = "Add " + spec->display_name;
     plan.valid = true;
     return plan;
@@ -160,7 +164,8 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
 
 UiDesignerDropPlan UiDesignerDropService::PlanMove(
     const Vector<UiDesignerNodeId>& nodes, UiDesignerNodeId target,
-    Point canvas_position, bool has_canvas_position, int index) const
+    Point canvas_position, bool has_canvas_position, int index,
+    int grid_row, int grid_column) const
 {
     UiDesignerDropPlan plan;
     plan.operation = UiDesignerDropOperation::MoveNodes;
@@ -168,6 +173,8 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
     plan.canvas_position = canvas_position;
     plan.has_canvas_position = has_canvas_position;
     plan.index = index;
+    plan.grid_row = grid_row;
+    plan.grid_column = grid_column;
     plan.label = nodes.GetCount() == 1 ? "Move control" : "Move selection";
 
     if(!IsBound()) {
@@ -241,7 +248,8 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
                 continue;
             ValueMap placement;
             PopulatePlacement(*spec, *parent,
-                              canvas_position + Point(offset, offset), placement);
+                              canvas_position + Point(offset, offset),
+                              grid_row, grid_column, placement);
             // Moving an absolute child changes only its origin; its authored
             // size remains part of the node contract.
             if(placement.Find("width") >= 0)

@@ -170,6 +170,32 @@ CONSOLE_APP_MAIN
                  (int)geometry.HitDropTarget(preview_a.CenterPoint()), (int)preview_panel_a));
     Check(geometry.Hit(preview_a.CenterPoint()) == preview_panel_a,
           "snapshot hit testing agrees with the painted Panel target");
+    Check(geometry.GetDropRegionCount() >= 3,
+          Format("geometry snapshot publishes drop regions (%d)",
+                 geometry.GetDropRegionCount()));
+    if(geometry.GetDropRegionCount() < 3) {
+        for(const UiDesignerDropRegion& region : geometry.GetDropRegions())
+            Cout() << Format("region owner=%d kind=%d depth=%d order=%d label=%s\n",
+                             (int)region.owner, (int)region.kind,
+                             region.depth, region.paint_order, region.label);
+    }
+    const UiDesignerDropRegion* panel_drop = geometry.HitDropRegion(preview_a.CenterPoint());
+    Check(panel_drop && panel_drop->owner == preview_panel_a &&
+              panel_drop->kind == UiDesignerDropRegionKind::PanelBody,
+          Format("panel drop region wins over its Box parent (%d, kind=%d)",
+                 panel_drop ? (int)panel_drop->owner : 0,
+                 panel_drop ? (int)panel_drop->kind : -1));
+    const UiDesignerDropRegion* box_inset_drop =
+        geometry.HitDropRegion(preview.GetNodeRect(preview_box).TopLeft() + Point(1, 1));
+    Check(box_inset_drop && box_inset_drop->owner == preview_box &&
+              (box_inset_drop->kind == UiDesignerDropRegionKind::BoxFrame ||
+               box_inset_drop->kind == UiDesignerDropRegionKind::BoxEmptyBody ||
+               box_inset_drop->kind == UiDesignerDropRegionKind::BoxBody),
+          Format("Box inset resolves to the Box itself (%d, kind=%d)",
+                 box_inset_drop ? (int)box_inset_drop->owner : 0,
+                 box_inset_drop ? (int)box_inset_drop->kind : -1));
+    Check(panel_drop && geometry.FindDropRegion(panel_drop->paint_order) == panel_drop,
+          "drop region lookup is stable");
 
     UiDesignerDocument document;
     UiDesignerCommandService commands(document);
