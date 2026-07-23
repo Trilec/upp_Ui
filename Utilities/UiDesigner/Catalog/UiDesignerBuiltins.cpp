@@ -1,4 +1,6 @@
 #include "UiDesignerCatalog.h"
+#include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
+#include <Utilities/UiDesigner/UiDesigner/UiDesignerButtonStyle.h>
 
 namespace Upp {
 
@@ -30,6 +32,7 @@ static UiDesignerControlSpec MakeSpec(
     spec.defaults.Set("visible", true);
     spec.defaults.Set("enabled", true);
     spec.defaults.Set("role", "Standard");
+    spec.theme = false;
     if((flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) &&
        strcmp(type, "UiAbsoluteLayout") != 0) {
         const int inset_default = !strcmp(type, "UiPanel") ||
@@ -255,7 +258,7 @@ static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
         item.domain = PropertyEditorDomain::Theme;
         item.default_value = value;
         item.impact = impact;
-        item.StyleField(field);
+        item.AdapterField(UiDesignerButtonStyleFieldName(field));
         if(help)
             item.help = help;
         spec.theme_overrides.Add(pick(item));
@@ -280,7 +283,7 @@ static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
         item.maximum = max_value;
         item.step = step;
         item.impact = impact;
-        item.StyleField(field);
+        item.AdapterField(UiDesignerButtonStyleFieldName(field));
         spec.theme_overrides.Add(pick(item));
     };
     auto add_color = [&](UiDesignerButtonStyleField field, const char *label,
@@ -373,7 +376,7 @@ static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
         item.domain = PropertyEditorDomain::Theme;
         item.default_value = UiDesignerBuiltinsShadowModeName(base.metrics.shadow.mode);
         item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.StyleField(UiDesignerButtonStyleField::ShadowMode);
+        item.AdapterField(UiDesignerButtonStyleFieldName(UiDesignerButtonStyleField::ShadowMode));
         item.Choice("Hard", "Hard");
         item.Choice("Curve", "Curve");
         spec.theme_overrides.Add(pick(item));
@@ -1050,7 +1053,10 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         }
         if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton") {
             AddButtonProperties(s);
-            AddButtonThemeOverrides(s);
+            s.theme_adapter_id = String(c.type) == "UiToolButton" ? "tool_button" : "button";
+            s.theme = true;
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenAction", "Clicked", "Runs when the button is activated.");
             if(String(c.type) == "UiToolButton")
                 s.defaults.Set("icon", "ICON_DESIGN_TUNE_48");
@@ -1095,6 +1101,13 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             AddEvent(s, "WhenChanging", "Colour changing", "Runs during colour preview.");
             AddEvent(s, "WhenAccept", "Colour accepted", "Runs after colour acceptance.");
             AddEvent(s, "WhenCancel", "Colour cancelled", "Runs when colour editing is cancelled.");
+        }
+        if(String(c.type) == "UiTree" || String(c.type) == "UiList" || String(c.type) == "UiMenu") {
+            s.theme_adapter_id = String(c.type) == "UiTree" ? "tree" :
+                                 String(c.type) == "UiList" ? "list" : "menu";
+            s.theme = true;
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
         }
         catalog.Register(pick(s));
     }

@@ -3,7 +3,6 @@
 
 #include <Utilities/PropertyEditorCore/PropertyEditorCore.h>
 #include <Utilities/UiDesigner/Core/UiDesignerCore.h>
-#include <Utilities/UiDesigner/UiDesigner/UiDesignerButtonStyle.h>
 
 namespace Upp {
 
@@ -117,7 +116,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     Value maximum;
     Value step;
     int decimals = 3;
-    UiDesignerButtonStyleField button_style_field = UiDesignerButtonStyleField::None;
+    String adapter_field_id;
 
     Array<PropertyEditorChoice> choices;
 
@@ -131,7 +130,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
           kind(other.kind), domain(other.domain), impact(other.impact),
           default_value(other.default_value), minimum(other.minimum),
           maximum(other.maximum), step(other.step), decimals(other.decimals),
-          button_style_field(other.button_style_field),
+          adapter_field_id(other.adapter_field_id),
           resettable(other.resettable), read_only(other.read_only),
           designer_only(other.designer_only)
     {
@@ -147,7 +146,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     UiDesignerThemeOverrideSpec& Impact(PropertyEditorImpact value);
     UiDesignerThemeOverrideSpec& Domain(PropertyEditorDomain value);
     UiDesignerThemeOverrideSpec& Default(const Value& value, bool can_reset = true);
-    UiDesignerThemeOverrideSpec& StyleField(UiDesignerButtonStyleField value);
+    UiDesignerThemeOverrideSpec& AdapterField(const String& value);
     UiDesignerThemeOverrideSpec& ReadOnly(bool on = true);
     UiDesignerThemeOverrideSpec& DesignerOnly(bool on = true);
 
@@ -211,6 +210,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     String default_base_name;
     String help;
     String icon_key;
+    String theme_adapter_id;
 
     UiDesignerRuntimeKind runtime_kind = UiDesignerRuntimeKind::Placeholder;
     dword node_flags = UiDesignerNodeNone;

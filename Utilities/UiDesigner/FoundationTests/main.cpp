@@ -226,6 +226,17 @@ static void RunTests(FoundationTester& t)
     const UiDesignerControlSpec* button_spec = session.Catalog().Find("UiButton");
     t.Check(button_spec && button_spec->FindEvent("WhenAction"),
             "Button exposes typed action event");
+    t.Check(button_spec && button_spec->theme_adapter_id == "button",
+            "Button uses the typed button theme adapter");
+    const UiDesignerControlSpec* tree_spec = session.Catalog().Find("UiTree");
+    const UiDesignerControlSpec* list_spec = session.Catalog().Find("UiList");
+    const UiDesignerControlSpec* menu_spec = session.Catalog().Find("UiMenu");
+    t.Check(tree_spec && tree_spec->theme_adapter_id == "tree",
+            "Tree uses the typed tree theme adapter");
+    t.Check(list_spec && list_spec->theme_adapter_id == "list",
+            "List uses the typed list theme adapter");
+    t.Check(menu_spec && menu_spec->theme_adapter_id == "menu",
+            "Menu uses the typed menu theme adapter");
     const UiDesignerControlSpec* absolute_spec =
         session.Catalog().Find("UiAbsoluteLayout");
     t.Check(absolute_spec && absolute_spec->child_adapter_id == "absolute",

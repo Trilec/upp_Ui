@@ -78,6 +78,11 @@ Forbid-Text 'Utilities\UiDesigner\UiDesigner\UiDesignerWindow.cpp' 'GetNodes\(\)
 
 Require-Text 'Utilities\UiDesigner\Catalog\UiDesignerBuiltins.cpp' 'type_id\s*=\s*"Spacer"'
 Require-Text 'Utilities\UiDesigner\Catalog\UiDesignerBuiltins.cpp' 'UiDesignerNodeSemanticItem'
+Require-Text 'Utilities\UiDesigner\Theme\UiDesignerThemeAdapter.h' 'class UiDesignerThemeAdapter'
+Require-Text 'Utilities\UiDesigner\Theme\UiDesignerThemeAdapter.cpp' 'ButtonThemeAdapter'
+Require-Text 'Utilities\UiDesigner\Theme\UiDesignerThemeAdapter.cpp' 'TreeThemeAdapter'
+Require-Text 'Utilities\UiDesigner\Theme\UiDesignerThemeAdapter.cpp' 'ListThemeAdapter'
+Require-Text 'Utilities\UiDesigner\Theme\UiDesignerThemeAdapter.cpp' 'MenuThemeAdapter'
 Require-Text 'Utilities\UiDesigner\Core\UiDesignerTypes.h' 'UiDesignerActionBinding'
 Require-Text 'Utilities\UiDesigner\Services\UiDesignerDrop.cpp' 'UiDesignerDropService::PlanAdd'
 Require-Text 'Utilities\UiDesigner\Services\UiDesignerDrop.cpp' 'UiDesignerDropService::PlanMove'
@@ -90,6 +95,11 @@ Require-Text 'Utilities\UiDesigner\CLI\main.cpp' 'behavior-set'
 Require-Text 'Utilities\UiDesigner\Services\UiDesignerAutomation.cpp' 'uidesigner_apply_drop'
 Require-Text 'Utilities\UiDesigner\Services\UiDesignerAutomation.cpp' 'uidesigner_set_behavior'
 Require-Text 'Utilities\UiDesigner\Services\UiDesignerAutomation.cpp' 'uidesigner_export'
+Require-Text 'Utilities\UiDesigner\Catalog\UiDesignerCatalog.h' 'theme_adapter_id'
+Forbid-Text 'Utilities\UiDesigner\Catalog\UiDesignerCatalog.cpp' 'button_style_field'
+Forbid-Text 'Utilities\UiDesigner\Preview\UiDesignerPreview.cpp' 'button_style_field'
+Forbid-Text 'Utilities\UiDesigner\CodeGen\UiDesignerCodeGen.cpp' 'button_style_field'
+Forbid-Text 'Utilities\UiDesigner\Services\UiDesignerSession.cpp' 'button_style_field'
 
 foreach($obsolete in @(
     'Utilities\UiDesigner\.integrated',

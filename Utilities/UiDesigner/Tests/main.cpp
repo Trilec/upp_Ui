@@ -87,6 +87,20 @@ CONSOLE_APP_MAIN
               UiDesignerMapValue(tool_button->defaults, "icon", Value()) ==
                   "ICON_DESIGN_TUNE_48",
           "UiToolButton default icon is the inspector glyph");
+    Check(tool_button && tool_button->theme_adapter_id == "tool_button",
+          "UiToolButton is wired to the tool-button theme adapter");
+    const UiDesignerControlSpec* button = catalog.Find("UiButton");
+    Check(button && button->theme_adapter_id == "button",
+          "UiButton is wired to the button theme adapter");
+    const UiDesignerControlSpec* tree = catalog.Find("UiTree");
+    const UiDesignerControlSpec* list = catalog.Find("UiList");
+    const UiDesignerControlSpec* menu = catalog.Find("UiMenu");
+    Check(tree && tree->theme_adapter_id == "tree",
+          "UiTree is wired to the tree theme adapter");
+    Check(list && list->theme_adapter_id == "list",
+          "UiList is wired to the list theme adapter");
+    Check(menu && menu->theme_adapter_id == "menu",
+          "UiMenu is wired to the menu theme adapter");
     const UiDesignerControlSpec* title_card = catalog.Find("UiTitleCard");
     Check(title_card &&
               UiDesignerMapValue(title_card->defaults, "icon", Value()) ==

@@ -1,4 +1,5 @@
 #include "UiDesignerSession.h"
+#include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 
 namespace Upp {
 
@@ -19,22 +20,6 @@ static bool HasPropertyChange(const UiDesignerChangeSet& changes,
         if(change.property == property)
             return true;
     return false;
-}
-
-static UiRole ParseUiRole(const Value& value)
-{
-    const String role = value;
-    if(role == "Subtle") return UiRole::Subtle;
-    if(role == "Accent") return UiRole::Accent;
-    if(role == "Alert") return UiRole::Alert;
-    return UiRole::Standard;
-}
-
-static bool IsButtonStyleControl(const UiDesignerRuntimeKind kind)
-{
-    return kind == UiDesignerRuntimeKind::UiButton ||
-           kind == UiDesignerRuntimeKind::UiToolButton ||
-           kind == UiDesignerRuntimeKind::UiSplitButton;
 }
 
 UiDesignerSession::UiDesignerSession()
@@ -104,22 +89,11 @@ Value UiDesignerSession::ResolveThemeOverrideValue(
     const UiDesignerNode& node, const UiDesignerThemeOverrideSpec& property) const
 {
     const UiDesignerControlSpec* spec = catalog_.Find(node.type);
-    if(!spec || property.button_style_field == UiDesignerButtonStyleField::None)
+    const UiDesignerThemeAdapter* adapter = spec ? UiDesignerGetThemeAdapter(*spec) : nullptr;
+    if(!spec || !adapter || !adapter->Supports(spec->runtime_kind) ||
+       property.adapter_field_id.IsEmpty())
         return property.default_value;
-
-    const UiButton::Style base = spec->runtime_kind == UiDesignerRuntimeKind::UiToolButton
-        ? UiTheme::ResolveToolButton(ParseUiRole(node.GetProperty("role", "Standard")))
-        : UiTheme::ResolveButton(ParseUiRole(node.GetProperty("role", "Standard")));
-    UiButton::Style style = base;
-    for(const UiDesignerThemeOverrideSpec& candidate : spec->theme_overrides) {
-        if(candidate.button_style_field == UiDesignerButtonStyleField::None)
-            continue;
-        const int q = node.theme_overrides.Find(candidate.id);
-        if(q >= 0)
-            UiDesignerApplyButtonStyleField(style, candidate.button_style_field,
-                                            node.theme_overrides.GetValue(q));
-    }
-    return UiDesignerButtonStyleFieldValue(style, property.button_style_field);
+    return adapter->ResolveFieldValue(node, *spec, property.adapter_field_id);
 }
 
 void UiDesignerSession::AttachProjection(UiDesignerProjectionSink *projection)

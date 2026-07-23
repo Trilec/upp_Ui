@@ -8,6 +8,8 @@ uses
     Utilities/UiDesigner/ThemeCore;
 
 file
+    UiDesignerThemeAdapter.h,
+    UiDesignerThemeAdapter.cpp,
     UiDesignerThemeGallery.h,
     UiDesignerThemeGallery.cpp,
     README.md;

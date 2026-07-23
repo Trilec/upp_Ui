@@ -1,392 +1,7 @@
 #include "UiDesignerCatalog.h"
+#include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 
 namespace Upp {
-
-static bool UiDesignerIsButtonStyleFieldValid(UiDesignerButtonStyleField field)
-{
-    return field != UiDesignerButtonStyleField::None;
-}
-
-const char *UiDesignerButtonStyleFieldName(UiDesignerButtonStyleField field)
-{
-    switch(field) {
-    case UiDesignerButtonStyleField::FontFace: return "font_face";
-    case UiDesignerButtonStyleField::FontSize: return "font_size";
-    case UiDesignerButtonStyleField::FontBold: return "font_bold";
-    case UiDesignerButtonStyleField::FontItalic: return "font_italic";
-    case UiDesignerButtonStyleField::FaceEnabled: return "face_enabled";
-    case UiDesignerButtonStyleField::FaceNormal: return "face_normal";
-    case UiDesignerButtonStyleField::FaceHot: return "face_hot";
-    case UiDesignerButtonStyleField::FacePressed: return "face_pressed";
-    case UiDesignerButtonStyleField::FaceDisabled: return "face_disabled";
-    case UiDesignerButtonStyleField::Transparent: return "transparent";
-    case UiDesignerButtonStyleField::FrameEnabled: return "frame_enabled";
-    case UiDesignerButtonStyleField::FrameNormal: return "frame_normal";
-    case UiDesignerButtonStyleField::FrameHot: return "frame_hot";
-    case UiDesignerButtonStyleField::FramePressed: return "frame_pressed";
-    case UiDesignerButtonStyleField::FrameDisabled: return "frame_disabled";
-    case UiDesignerButtonStyleField::FrameWidth: return "frame_width";
-    case UiDesignerButtonStyleField::Radius: return "radius";
-    case UiDesignerButtonStyleField::FrameDashed: return "frame_dashed";
-    case UiDesignerButtonStyleField::FrameDashPattern: return "frame_dash_pattern";
-    case UiDesignerButtonStyleField::TextNormal: return "text_normal";
-    case UiDesignerButtonStyleField::TextHot: return "text_hot";
-    case UiDesignerButtonStyleField::TextPressed: return "text_pressed";
-    case UiDesignerButtonStyleField::TextDisabled: return "text_disabled";
-    case UiDesignerButtonStyleField::IconNormal: return "icon_normal";
-    case UiDesignerButtonStyleField::IconHot: return "icon_hot";
-    case UiDesignerButtonStyleField::IconPressed: return "icon_pressed";
-    case UiDesignerButtonStyleField::IconDisabled: return "icon_disabled";
-    case UiDesignerButtonStyleField::ShadowEnabled: return "shadow_enabled";
-    case UiDesignerButtonStyleField::ShadowDistance: return "shadow_distance";
-    case UiDesignerButtonStyleField::ShadowOffsetX: return "shadow_offset_x";
-    case UiDesignerButtonStyleField::ShadowOffsetY: return "shadow_offset_y";
-    case UiDesignerButtonStyleField::ShadowAlpha: return "shadow_alpha";
-    case UiDesignerButtonStyleField::ShadowColor: return "shadow_color";
-    case UiDesignerButtonStyleField::ShadowInset: return "shadow_inset";
-    case UiDesignerButtonStyleField::ShadowMode: return "shadow_mode";
-    case UiDesignerButtonStyleField::PressOffsetX: return "press_offset_x";
-    case UiDesignerButtonStyleField::PressOffsetY: return "press_offset_y";
-    case UiDesignerButtonStyleField::Overpaint: return "overpaint";
-    case UiDesignerButtonStyleField::UnderlineEnabled: return "underline_enabled";
-    case UiDesignerButtonStyleField::UnderlineWidth: return "underline_width";
-    case UiDesignerButtonStyleField::UnderlineOffset: return "underline_offset";
-    default: break;
-    }
-    return "unknown";
-}
-
-bool UiDesignerParseButtonStyleField(const String& id,
-                                    UiDesignerButtonStyleField& field)
-{
-    static const struct {
-        const char *id;
-        UiDesignerButtonStyleField field;
-    } map[] = {
-        {"font_face", UiDesignerButtonStyleField::FontFace},
-        {"font_size", UiDesignerButtonStyleField::FontSize},
-        {"font_bold", UiDesignerButtonStyleField::FontBold},
-        {"font_italic", UiDesignerButtonStyleField::FontItalic},
-        {"face_enabled", UiDesignerButtonStyleField::FaceEnabled},
-        {"face_normal", UiDesignerButtonStyleField::FaceNormal},
-        {"face_hot", UiDesignerButtonStyleField::FaceHot},
-        {"face_pressed", UiDesignerButtonStyleField::FacePressed},
-        {"face_disabled", UiDesignerButtonStyleField::FaceDisabled},
-        {"transparent", UiDesignerButtonStyleField::Transparent},
-        {"frame_enabled", UiDesignerButtonStyleField::FrameEnabled},
-        {"frame_normal", UiDesignerButtonStyleField::FrameNormal},
-        {"frame_hot", UiDesignerButtonStyleField::FrameHot},
-        {"frame_pressed", UiDesignerButtonStyleField::FramePressed},
-        {"frame_disabled", UiDesignerButtonStyleField::FrameDisabled},
-        {"frame_width", UiDesignerButtonStyleField::FrameWidth},
-        {"radius", UiDesignerButtonStyleField::Radius},
-        {"frame_dashed", UiDesignerButtonStyleField::FrameDashed},
-        {"frame_dash_pattern", UiDesignerButtonStyleField::FrameDashPattern},
-        {"text_normal", UiDesignerButtonStyleField::TextNormal},
-        {"text_hot", UiDesignerButtonStyleField::TextHot},
-        {"text_pressed", UiDesignerButtonStyleField::TextPressed},
-        {"text_disabled", UiDesignerButtonStyleField::TextDisabled},
-        {"icon_normal", UiDesignerButtonStyleField::IconNormal},
-        {"icon_hot", UiDesignerButtonStyleField::IconHot},
-        {"icon_pressed", UiDesignerButtonStyleField::IconPressed},
-        {"icon_disabled", UiDesignerButtonStyleField::IconDisabled},
-        {"shadow_enabled", UiDesignerButtonStyleField::ShadowEnabled},
-        {"shadow_distance", UiDesignerButtonStyleField::ShadowDistance},
-        {"shadow_offset_x", UiDesignerButtonStyleField::ShadowOffsetX},
-        {"shadow_offset_y", UiDesignerButtonStyleField::ShadowOffsetY},
-        {"shadow_alpha", UiDesignerButtonStyleField::ShadowAlpha},
-        {"shadow_color", UiDesignerButtonStyleField::ShadowColor},
-        {"shadow_inset", UiDesignerButtonStyleField::ShadowInset},
-        {"shadow_mode", UiDesignerButtonStyleField::ShadowMode},
-        {"press_offset_x", UiDesignerButtonStyleField::PressOffsetX},
-        {"press_offset_y", UiDesignerButtonStyleField::PressOffsetY},
-        {"overpaint", UiDesignerButtonStyleField::Overpaint},
-        {"underline_enabled", UiDesignerButtonStyleField::UnderlineEnabled},
-        {"underline_width", UiDesignerButtonStyleField::UnderlineWidth},
-        {"underline_offset", UiDesignerButtonStyleField::UnderlineOffset},
-    };
-    for(const auto& item : map)
-        if(id == item.id) {
-            field = item.field;
-            return true;
-        }
-    field = UiDesignerButtonStyleField::None;
-    return false;
-}
-
-bool UiDesignerButtonStyleFieldAffectsLayout(UiDesignerButtonStyleField field)
-{
-    switch(field) {
-    case UiDesignerButtonStyleField::FontFace:
-    case UiDesignerButtonStyleField::FontSize:
-    case UiDesignerButtonStyleField::FontBold:
-    case UiDesignerButtonStyleField::FontItalic:
-    case UiDesignerButtonStyleField::FrameWidth:
-    case UiDesignerButtonStyleField::Radius:
-    case UiDesignerButtonStyleField::ShadowEnabled:
-    case UiDesignerButtonStyleField::ShadowDistance:
-    case UiDesignerButtonStyleField::ShadowOffsetX:
-    case UiDesignerButtonStyleField::ShadowOffsetY:
-    case UiDesignerButtonStyleField::ShadowInset:
-    case UiDesignerButtonStyleField::PressOffsetX:
-    case UiDesignerButtonStyleField::PressOffsetY:
-    case UiDesignerButtonStyleField::UnderlineEnabled:
-    case UiDesignerButtonStyleField::UnderlineWidth:
-    case UiDesignerButtonStyleField::UnderlineOffset:
-        return true;
-    default:
-        return false;
-    }
-}
-
-static String UiDesignerShadowModeName(ShadowMode mode)
-{
-    return mode == SHADOW_HARD ? "Hard" : "Curve";
-}
-
-static ShadowMode UiDesignerShadowModeFromValue(const Value& value)
-{
-    const String text = value;
-    if(text == "Hard")
-        return SHADOW_HARD;
-    return SHADOW_CURVE;
-}
-
-static Color UiDesignerFillColor(const UiFill& fill)
-{
-    return fill.IsSolid() ? fill.color : Null;
-}
-
-Value UiDesignerButtonStyleFieldValue(const UiButton::Style& style,
-                                      UiDesignerButtonStyleField field)
-{
-    switch(field) {
-    case UiDesignerButtonStyleField::FontFace:
-        return style.font.GetFaceName();
-    case UiDesignerButtonStyleField::FontSize:
-        return style.font.GetHeight();
-    case UiDesignerButtonStyleField::FontBold:
-        return style.font.IsBold();
-    case UiDesignerButtonStyleField::FontItalic:
-        return style.font.IsItalic();
-    case UiDesignerButtonStyleField::FaceEnabled:
-        return style.metrics.face_enabled;
-    case UiDesignerButtonStyleField::FaceNormal:
-        return UiDesignerFillColor(style.palette.face[ST_NORMAL]);
-    case UiDesignerButtonStyleField::FaceHot:
-        return UiDesignerFillColor(style.palette.face[ST_HOT]);
-    case UiDesignerButtonStyleField::FacePressed:
-        return UiDesignerFillColor(style.palette.face[ST_PRESSED]);
-    case UiDesignerButtonStyleField::FaceDisabled:
-        return UiDesignerFillColor(style.palette.face[ST_DISABLED]);
-    case UiDesignerButtonStyleField::Transparent:
-        return style.transparent;
-    case UiDesignerButtonStyleField::FrameEnabled:
-        return style.metrics.frame_enabled;
-    case UiDesignerButtonStyleField::FrameNormal:
-        return style.palette.frame[ST_NORMAL];
-    case UiDesignerButtonStyleField::FrameHot:
-        return style.palette.frame[ST_HOT];
-    case UiDesignerButtonStyleField::FramePressed:
-        return style.palette.frame[ST_PRESSED];
-    case UiDesignerButtonStyleField::FrameDisabled:
-        return style.palette.frame[ST_DISABLED];
-    case UiDesignerButtonStyleField::FrameWidth:
-        return style.metrics.frame_width;
-    case UiDesignerButtonStyleField::Radius:
-        return style.metrics.radius;
-    case UiDesignerButtonStyleField::FrameDashed:
-        return style.metrics.dashed;
-    case UiDesignerButtonStyleField::FrameDashPattern:
-        return style.metrics.dash_pattern;
-    case UiDesignerButtonStyleField::TextNormal:
-        return style.palette.ink[ST_NORMAL];
-    case UiDesignerButtonStyleField::TextHot:
-        return style.palette.ink[ST_HOT];
-    case UiDesignerButtonStyleField::TextPressed:
-        return style.palette.ink[ST_PRESSED];
-    case UiDesignerButtonStyleField::TextDisabled:
-        return style.palette.ink[ST_DISABLED];
-    case UiDesignerButtonStyleField::IconNormal:
-        return style.palette.icon[ST_NORMAL];
-    case UiDesignerButtonStyleField::IconHot:
-        return style.palette.icon[ST_HOT];
-    case UiDesignerButtonStyleField::IconPressed:
-        return style.palette.icon[ST_PRESSED];
-    case UiDesignerButtonStyleField::IconDisabled:
-        return style.palette.icon[ST_DISABLED];
-    case UiDesignerButtonStyleField::ShadowEnabled:
-        return style.metrics.shadow.enabled;
-    case UiDesignerButtonStyleField::ShadowDistance:
-        return style.metrics.shadow.distance;
-    case UiDesignerButtonStyleField::ShadowOffsetX:
-        return style.metrics.shadow.offset_x;
-    case UiDesignerButtonStyleField::ShadowOffsetY:
-        return style.metrics.shadow.offset_y;
-    case UiDesignerButtonStyleField::ShadowAlpha:
-        return style.metrics.shadow.alpha;
-    case UiDesignerButtonStyleField::ShadowColor:
-        return style.metrics.shadow.color;
-    case UiDesignerButtonStyleField::ShadowInset:
-        return style.metrics.shadow.inset;
-    case UiDesignerButtonStyleField::ShadowMode:
-        return UiDesignerShadowModeName(style.metrics.shadow.mode);
-    case UiDesignerButtonStyleField::PressOffsetX:
-        return style.press_offset.x;
-    case UiDesignerButtonStyleField::PressOffsetY:
-        return style.press_offset.y;
-    case UiDesignerButtonStyleField::Overpaint:
-        return style.overpaint;
-    case UiDesignerButtonStyleField::UnderlineEnabled:
-        return style.underline;
-    case UiDesignerButtonStyleField::UnderlineWidth:
-        return style.underline_width;
-    case UiDesignerButtonStyleField::UnderlineOffset:
-        return style.underline_offset;
-    default:
-        return Value();
-    }
-}
-
-void UiDesignerApplyButtonStyleField(UiButton::Style& style,
-                                     UiDesignerButtonStyleField field,
-                                     const Value& value)
-{
-    switch(field) {
-    case UiDesignerButtonStyleField::FontFace:
-        style.font.FaceName(AsString(value));
-        break;
-    case UiDesignerButtonStyleField::FontSize:
-        style.font.Height(max(1, (int)value));
-        break;
-    case UiDesignerButtonStyleField::FontBold:
-        style.font.Bold((bool)value);
-        break;
-    case UiDesignerButtonStyleField::FontItalic:
-        style.font.Italic((bool)value);
-        break;
-    case UiDesignerButtonStyleField::FaceEnabled:
-        style.metrics.face_enabled = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::FaceNormal:
-        style.palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
-        break;
-    case UiDesignerButtonStyleField::FaceHot:
-        style.palette.face[ST_HOT] = UiFill::Solid((Color)value);
-        break;
-    case UiDesignerButtonStyleField::FacePressed:
-        style.palette.face[ST_PRESSED] = UiFill::Solid((Color)value);
-        break;
-    case UiDesignerButtonStyleField::FaceDisabled:
-        style.palette.face[ST_DISABLED] = UiFill::Solid((Color)value);
-        break;
-    case UiDesignerButtonStyleField::Transparent:
-        style.transparent = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::FrameEnabled:
-        style.metrics.frame_enabled = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::FrameNormal:
-        style.palette.frame[ST_NORMAL] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::FrameHot:
-        style.palette.frame[ST_HOT] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::FramePressed:
-        style.palette.frame[ST_PRESSED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::FrameDisabled:
-        style.palette.frame[ST_DISABLED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::FrameWidth:
-        style.metrics.frame_width = max(0, (int)value);
-        break;
-    case UiDesignerButtonStyleField::Radius:
-        style.metrics.radius = max(0, (int)value);
-        break;
-    case UiDesignerButtonStyleField::FrameDashed:
-        style.metrics.dashed = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::FrameDashPattern:
-        style.metrics.dash_pattern = AsString(value);
-        break;
-    case UiDesignerButtonStyleField::TextNormal:
-        style.palette.ink[ST_NORMAL] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::TextHot:
-        style.palette.ink[ST_HOT] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::TextPressed:
-        style.palette.ink[ST_PRESSED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::TextDisabled:
-        style.palette.ink[ST_DISABLED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::IconNormal:
-        style.palette.icon[ST_NORMAL] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::IconHot:
-        style.palette.icon[ST_HOT] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::IconPressed:
-        style.palette.icon[ST_PRESSED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::IconDisabled:
-        style.palette.icon[ST_DISABLED] = (Color)value;
-        break;
-    case UiDesignerButtonStyleField::ShadowEnabled:
-        style.metrics.shadow.enabled = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::ShadowDistance:
-        style.metrics.shadow.distance = max(0, (int)value);
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowOffsetX:
-        style.metrics.shadow.offset_x = (int)value;
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowOffsetY:
-        style.metrics.shadow.offset_y = (int)value;
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowAlpha:
-        style.metrics.shadow.alpha = minmax((int)value, 0, 255);
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowColor:
-        style.metrics.shadow.color = (Color)value;
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowInset:
-        style.metrics.shadow.inset = (bool)value;
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::ShadowMode:
-        style.metrics.shadow.mode = UiDesignerShadowModeFromValue(value);
-        style.metrics.shadow.enabled = true;
-        break;
-    case UiDesignerButtonStyleField::PressOffsetX:
-        style.press_offset.x = (int)value;
-        break;
-    case UiDesignerButtonStyleField::PressOffsetY:
-        style.press_offset.y = (int)value;
-        break;
-    case UiDesignerButtonStyleField::Overpaint:
-        style.overpaint = max(0, (int)value);
-        break;
-    case UiDesignerButtonStyleField::UnderlineEnabled:
-        style.underline = (bool)value;
-        break;
-    case UiDesignerButtonStyleField::UnderlineWidth:
-        style.underline_width = max(0, (int)value);
-        break;
-    case UiDesignerButtonStyleField::UnderlineOffset:
-        style.underline_offset = (int)value;
-        break;
-    default:
-        break;
-    }
-}
 
 UiDesignerPropertySpec& UiDesignerPropertySpec::Range(
     const Value& min_value, const Value& max_value, const Value& step_value)
@@ -466,10 +81,10 @@ UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::Default(
     return *this;
 }
 
-UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::StyleField(
-    UiDesignerButtonStyleField value)
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::AdapterField(
+    const String& value)
 {
-    button_style_field = value;
+    adapter_field_id = value;
     return *this;
 }
 
@@ -848,18 +463,6 @@ bool UiDesignerCatalog::Validate(String& error) const
                 error = spec.type_id + " has an empty theme override id";
                 return false;
             }
-            if(property.read_only &&
-               UiDesignerIsButtonStyleFieldValid(property.button_style_field)) {
-                error = spec.type_id + "." + property.id +
-                        " is read only but still maps to a style field";
-                return false;
-            }
-            if(!property.read_only &&
-               !UiDesignerIsButtonStyleFieldValid(property.button_style_field)) {
-                error = spec.type_id + "." + property.id +
-                        " has no theme style-field mapping";
-                return false;
-            }
             if(override_ids.Find(property.id) >= 0) {
                 error = spec.type_id + " has duplicate theme override " + property.id;
                 return false;
@@ -873,6 +476,57 @@ bool UiDesignerCatalog::Validate(String& error) const
             if(property.impact == PropertyImpactNone && !property.read_only) {
                 error = spec.type_id + "." + property.id +
                         " has no declared impact";
+                return false;
+            }
+            if(!property.adapter_field_id.IsEmpty() &&
+               property.adapter_field_id.Find(" ") >= 0) {
+                error = spec.type_id + "." + property.id +
+                        " has an invalid adapter field id";
+                return false;
+            }
+        }
+        if(spec.theme) {
+            if(spec.theme_adapter_id.IsEmpty()) {
+                error = spec.type_id + " has no theme adapter id";
+                return false;
+            }
+            if(spec.theme_overrides.IsEmpty()) {
+                error = spec.type_id + " has theme enabled but no overrides";
+                return false;
+            }
+            const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(spec.theme_adapter_id);
+            if(!adapter) {
+                error = spec.type_id + " has an unknown theme adapter id " + spec.theme_adapter_id;
+                return false;
+            }
+            if(!adapter->Supports(spec.runtime_kind)) {
+                error = spec.type_id + " theme adapter " + spec.theme_adapter_id +
+                        " does not support its runtime kind";
+                return false;
+            }
+            Index<String> field_ids;
+            for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+                if(property.adapter_field_id.IsEmpty()) {
+                    error = spec.type_id + "." + property.id +
+                            " has no adapter field id";
+                    return false;
+                }
+                if(!adapter->HasField(property.adapter_field_id)) {
+                    error = spec.type_id + "." + property.id +
+                            " uses unknown adapter field " + property.adapter_field_id;
+                    return false;
+                }
+                if(field_ids.Find(property.adapter_field_id) >= 0) {
+                    error = spec.type_id + " has duplicate adapter field " +
+                            property.adapter_field_id;
+                    return false;
+                }
+                field_ids.Add(property.adapter_field_id);
+            }
+        }
+        else {
+            if(!spec.theme_adapter_id.IsEmpty()) {
+                error = spec.type_id + " has a theme adapter id while theme is disabled";
                 return false;
             }
         }
