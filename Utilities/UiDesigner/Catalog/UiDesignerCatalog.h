@@ -3,7 +3,7 @@
 
 #include <Utilities/PropertyEditorCore/PropertyEditorCore.h>
 #include <Utilities/UiDesigner/Core/UiDesignerCore.h>
-#include <Ui/UiTheme.h>
+#include <Utilities/UiDesigner/UiDesigner/UiDesignerButtonStyle.h>
 
 namespace Upp {
 
@@ -77,61 +77,6 @@ enum class UiDesignerRuntimeKind : word {
     UppHScrollBar,
     UppVScrollBar,
 };
-
-enum class UiDesignerButtonStyleField : byte {
-    None = 0,
-    FontFace,
-    FontSize,
-    FontBold,
-    FontItalic,
-    FaceEnabled,
-    FaceNormal,
-    FaceHot,
-    FacePressed,
-    FaceDisabled,
-    Transparent,
-    FrameEnabled,
-    FrameNormal,
-    FrameHot,
-    FramePressed,
-    FrameDisabled,
-    FrameWidth,
-    Radius,
-    FrameDashed,
-    FrameDashPattern,
-    TextNormal,
-    TextHot,
-    TextPressed,
-    TextDisabled,
-    IconNormal,
-    IconHot,
-    IconPressed,
-    IconDisabled,
-    ShadowEnabled,
-    ShadowDistance,
-    ShadowOffsetX,
-    ShadowOffsetY,
-    ShadowAlpha,
-    ShadowColor,
-    ShadowInset,
-    ShadowMode,
-    PressOffsetX,
-    PressOffsetY,
-    Overpaint,
-    UnderlineEnabled,
-    UnderlineWidth,
-    UnderlineOffset,
-};
-
-const char *UiDesignerButtonStyleFieldName(UiDesignerButtonStyleField field);
-bool UiDesignerParseButtonStyleField(const String& id,
-                                     UiDesignerButtonStyleField& field);
-bool UiDesignerButtonStyleFieldAffectsLayout(UiDesignerButtonStyleField field);
-Value UiDesignerButtonStyleFieldValue(const UiButton::Style& style,
-                                      UiDesignerButtonStyleField field);
-void UiDesignerApplyButtonStyleField(UiButton::Style& style,
-                                     UiDesignerButtonStyleField field,
-                                     const Value& value);
 
 enum UiDesignerControlCapability : dword {
     UiDesignerCapabilityNone          = 0,

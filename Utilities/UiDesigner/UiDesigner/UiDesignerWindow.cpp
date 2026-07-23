@@ -229,7 +229,7 @@ void UiDesignerWindow::BuildDesigner()
                   .AddSection("Controls", ICON_DESIGN_WIDGETS_48(), controls_list_)
                   .AddSection("Composites", ICON_DESIGN_DYNAMIC_FORM_48(), composites_list_)
                   .AddSection("Presets", ICON_DESIGN_DASHBOARD_EDIT_48(), presets_list_)
-                  .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), upp_controls_list_);
+                  .AddSection("U++ Controls", ICON_EDITOR_CLARIFY_48(), upp_controls_list_);
 
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
