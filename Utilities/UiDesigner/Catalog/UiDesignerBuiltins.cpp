@@ -57,12 +57,12 @@ static void AddEvent(UiDesignerControlSpec& spec, const char *id,
     spec.capabilities |= UiDesignerCapabilityAcceptActions;
 }
 
-static Color UiDesignerFillColor(const UiFill& fill)
+static Color UiDesignerBuiltinsFillColor(const UiFill& fill)
 {
     return fill.IsSolid() ? fill.color : Null;
 }
 
-static String UiDesignerShadowModeName(ShadowMode mode)
+static String UiDesignerBuiltinsShadowModeName(ShadowMode mode)
 {
     return mode == SHADOW_HARD ? "Hard" : "Curve";
 }
@@ -302,13 +302,13 @@ static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
     add_bool(UiDesignerButtonStyleField::FaceEnabled, "Face enabled", "Face",
              base.metrics.face_enabled);
     add_color(UiDesignerButtonStyleField::FaceNormal, "Face normal", "Face",
-              UiDesignerFillColor(base.palette.face[ST_NORMAL]));
+              UiDesignerBuiltinsFillColor(base.palette.face[ST_NORMAL]));
     add_color(UiDesignerButtonStyleField::FaceHot, "Face hot", "Face",
-              UiDesignerFillColor(base.palette.face[ST_HOT]));
+              UiDesignerBuiltinsFillColor(base.palette.face[ST_HOT]));
     add_color(UiDesignerButtonStyleField::FacePressed, "Face pressed", "Face",
-              UiDesignerFillColor(base.palette.face[ST_PRESSED]));
+              UiDesignerBuiltinsFillColor(base.palette.face[ST_PRESSED]));
     add_color(UiDesignerButtonStyleField::FaceDisabled, "Face disabled", "Face",
-              UiDesignerFillColor(base.palette.face[ST_DISABLED]));
+              UiDesignerBuiltinsFillColor(base.palette.face[ST_DISABLED]));
     add_bool(UiDesignerButtonStyleField::Transparent, "Transparent", "Face",
              base.transparent);
 
@@ -371,7 +371,7 @@ static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
         item.group = "Shadow";
         item.kind = PropertyEditorKind::Choice;
         item.domain = PropertyEditorDomain::Theme;
-        item.default_value = UiDesignerShadowModeName(base.metrics.shadow.mode);
+        item.default_value = UiDesignerBuiltinsShadowModeName(base.metrics.shadow.mode);
         item.impact = PropertyImpactPaint | PropertyImpactCode;
         item.StyleField(UiDesignerButtonStyleField::ShadowMode);
         item.Choice("Hard", "Hard");
