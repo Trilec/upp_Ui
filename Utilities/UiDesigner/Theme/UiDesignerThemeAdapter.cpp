@@ -803,8 +803,8 @@ public:
         if(!button)
             return;
 
-        const UiButton::Style style_base = ResolveButtonStyleBase(tool_button_, node);
-        UiButton::Style style = style_base;
+        const UiButton::Style preserve = button->GetStyle();
+        UiButton::Style style = ResolveButtonStyleBase(tool_button_, node);
         bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             UiDesignerButtonStyleField mapped;
@@ -821,8 +821,21 @@ public:
             UiDesignerApplyButtonStyleField(style, mapped, effective);
         }
         const UiRole role = ParseRole(node.GetProperty("role", "Standard"));
-        if(authored || role != UiRole::Standard)
+        if(authored) {
+            style.align_h = preserve.align_h;
+            style.align_v = preserve.align_v;
+            style.icon_side = preserve.icon_side;
+            style.content_gap = preserve.content_gap;
+            style.metrics.content_margin = preserve.metrics.content_margin;
+            style.underline = preserve.underline;
+            style.underline_width = preserve.underline_width;
+            style.underline_offset = preserve.underline_offset;
+            style.press_offset = preserve.press_offset;
+            style.overpaint = preserve.overpaint;
             button->SetCustomStyle(style);
+        } else if(role != UiRole::Standard) {
+            button->SetCustomStyle(style);
+        }
         else
             button->ClearCustomStyle();
     }
@@ -837,8 +850,20 @@ public:
             return;
 
         if(!authored) {
-            out << "\t" << member << ".SetCustomStyle("
-                << ButtonStyleExpr(tool_button_, role) << ");\n";
+            const String style_var = member + "_style";
+            out << "\tUiButton::Style " << style_var << " = "
+                << ButtonStyleExpr(tool_button_, role) << ";\n";
+            for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+                UiDesignerButtonStyleField field;
+                if(!UiDesignerParseButtonStyleField(property.adapter_field_id, field))
+                    continue;
+                const int q = node.theme_overrides.Find(property.id);
+                if(q < 0)
+                    continue;
+                EmitButtonStyleField(out, style_var, field,
+                    node.theme_overrides.GetValue(q));
+            }
+            out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
             return;
         }
 
