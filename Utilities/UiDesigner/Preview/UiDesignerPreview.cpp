@@ -1213,11 +1213,15 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
     const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node.type) : nullptr;
     if(!spec || !instance.control)
         return;
+    const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(*spec);
+    if(adapter)
+        adapter->ApplyPreviewStyle(*instance.control, node, *spec, overlay_);
     for(const UiDesignerPropertySpec& property : spec->properties)
+        if(property.id == "role" && adapter)
+            continue;
+        else
         UiDesignerPreviewFactory::Apply(*instance.control, *spec,
             property.id, Effective(node, property.id, property.default_value));
-    if(const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(*spec))
-        adapter->ApplyPreviewStyle(*instance.control, node, *spec, overlay_);
 }
 
 static void ConfigureBoxSpacer(UiBoxLayout& box,

@@ -686,32 +686,25 @@ static void EmitButtonStyleField(String& out, const String& style_var,
         break;
     case UiDesignerButtonStyleField::ShadowDistance:
         out << "\t" << style_var << ".metrics.shadow.distance = " << max(0, (int)value) << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowOffsetX:
         out << "\t" << style_var << ".metrics.shadow.offset_x = " << (int)value << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowOffsetY:
         out << "\t" << style_var << ".metrics.shadow.offset_y = " << (int)value << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowAlpha:
         out << "\t" << style_var << ".metrics.shadow.alpha = " << minmax((int)value, 0, 255) << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowColor:
         out << "\t" << style_var << ".metrics.shadow.color = " << EmitValue(value) << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowInset:
         out << "\t" << style_var << ".metrics.shadow.inset = " << AsString((bool)value) << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::ShadowMode:
         out << "\t" << style_var << ".metrics.shadow.mode = "
             << (AsString(value) == "Hard" ? "SHADOW_HARD" : "SHADOW_CURVE") << ";\n";
-        out << "\t" << style_var << ".metrics.shadow.enabled = true;\n";
         break;
     case UiDesignerButtonStyleField::PressOffsetX:
         out << "\t" << style_var << ".press_offset.x = " << (int)value << ";\n";
@@ -791,6 +784,9 @@ public:
             if(!UiDesignerParseButtonStyleField(property.adapter_field_id, mapped))
                 continue;
             const int q = node.theme_overrides.Find(property.id);
+            const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
+            if(!active)
+                continue;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -807,8 +803,9 @@ public:
         if(!button)
             return;
 
-        const UiButton::Style preserve = button->GetStyle();
-        UiButton::Style style = ResolveButtonStyleBase(tool_button_, node);
+        const UiButton::Style style_base = ResolveButtonStyleBase(tool_button_, node);
+        UiButton::Style style = style_base;
+        bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             UiDesignerButtonStyleField mapped;
             if(!UiDesignerParseButtonStyleField(property.adapter_field_id, mapped))
@@ -817,22 +814,17 @@ public:
             const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
             if(!active)
                 continue;
+            authored = true;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
             UiDesignerApplyButtonStyleField(style, mapped, effective);
         }
-        style.align_h = preserve.align_h;
-        style.align_v = preserve.align_v;
-        style.icon_side = preserve.icon_side;
-        style.content_gap = preserve.content_gap;
-        style.metrics.content_margin = preserve.metrics.content_margin;
-        style.underline = preserve.underline;
-        style.underline_width = preserve.underline_width;
-        style.underline_offset = preserve.underline_offset;
-        style.press_offset = preserve.press_offset;
-        style.overpaint = preserve.overpaint;
-        button->SetCustomStyle(style);
+        const UiRole role = ParseRole(node.GetProperty("role", "Standard"));
+        if(authored || role != UiRole::Standard)
+            button->SetCustomStyle(style);
+        else
+            button->ClearCustomStyle();
     }
 
     void EmitSetup(String& out, const String& member,
@@ -841,26 +833,29 @@ public:
     {
         const String role = AsString(node.GetProperty("role", "Standard"));
         const bool authored = ButtonStyleHasAuthoredOverride(node, spec);
-        if(authored) {
-            const String style_var = member + "_style";
-            out << "\tUiButton::Style " << style_var << " = "
-                << ButtonStyleExpr(tool_button_, role) << ";\n";
-            for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
-                UiDesignerButtonStyleField field;
-                if(!UiDesignerParseButtonStyleField(property.adapter_field_id, field))
-                    continue;
-                const int q = node.theme_overrides.Find(property.id);
-                if(q < 0)
-                    continue;
-                EmitButtonStyleField(out, style_var, field,
-                    node.theme_overrides.GetValue(q));
-            }
-            out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
-        }
-        else {
+        if(!authored && role == "Standard")
+            return;
+
+        if(!authored) {
             out << "\t" << member << ".SetCustomStyle("
                 << ButtonStyleExpr(tool_button_, role) << ");\n";
+            return;
         }
+
+        const String style_var = member + "_style";
+        out << "\tUiButton::Style " << style_var << " = "
+            << ButtonStyleExpr(tool_button_, role) << ";\n";
+        for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+            UiDesignerButtonStyleField field;
+            if(!UiDesignerParseButtonStyleField(property.adapter_field_id, field))
+                continue;
+            const int q = node.theme_overrides.Find(property.id);
+            if(q < 0)
+                continue;
+            EmitButtonStyleField(out, style_var, field,
+                node.theme_overrides.GetValue(q));
+        }
+        out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
     }
 
 private:
@@ -1042,6 +1037,9 @@ public:
         UiTree::Style style = UiTheme::ResolveTree();
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
+            const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
+            if(!active)
+                continue;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1117,11 +1115,13 @@ public:
         if(!tree)
             return;
         UiTree::Style style = UiTheme::ResolveTree();
+        bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
             const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
             if(!active)
                 continue;
+            authored = true;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1156,13 +1156,22 @@ public:
             else if(property.id == "glyph_hot_color") style.glyph_hot_color = (Color)effective;
             else if(property.id == "glyph_selected_color") style.glyph_selected_color = (Color)effective;
         }
-        tree->SetCustomStyle(style);
+        if(authored)
+            tree->SetCustomStyle(style);
+        else
+            tree->ClearCustomStyle();
     }
 
     void EmitSetup(String& out, const String& member,
                    const UiDesignerNode& node,
                    const UiDesignerControlSpec& spec) const override
     {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(property.id) >= 0;
+        if(!authored)
+            return;
+
         const String style_var = member + "_style";
         out << "\tUiTree::Style " << style_var << " = UiTheme::ResolveTree();\n";
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
@@ -1368,6 +1377,9 @@ public:
         UiList::Style style = UiTheme::ResolveList();
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
+            const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
+            if(!active)
+                continue;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1475,11 +1487,13 @@ public:
         if(!list)
             return;
         UiList::Style style = UiTheme::ResolveList();
+        bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
             const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
             if(!active)
                 continue;
+            authored = true;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1530,13 +1544,22 @@ public:
             else if(property.id == "check_fill") style.check_fill = (Color)effective;
             else if(property.id == "drag_marker") style.drag_marker = (Color)effective;
         }
-        list->SetCustomStyle(style);
+        if(authored)
+            list->SetCustomStyle(style);
+        else
+            list->ClearCustomStyle();
     }
 
     void EmitSetup(String& out, const String& member,
                    const UiDesignerNode& node,
                    const UiDesignerControlSpec& spec) const override
     {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(property.id) >= 0;
+        if(!authored)
+            return;
+
         const String style_var = member + "_style";
         out << "\tUiList::Style " << style_var << " = UiTheme::ResolveList();\n";
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
@@ -1712,6 +1735,9 @@ public:
         UiMenu::Style style = UiTheme::ResolveMenu();
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
+            const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
+            if(!active)
+                continue;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1795,11 +1821,13 @@ public:
         if(!menu)
             return;
         UiMenu::Style style = UiTheme::ResolveMenu();
+        bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(property.id);
             const bool active = q >= 0 || HasThemeValue(node, overlay, property.id);
             if(!active)
                 continue;
+            authored = true;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                            : property.default_value;
             const Value effective = ResolveThemeValue(node, overlay, property.id, canonical);
@@ -1838,13 +1866,22 @@ public:
             else if(property.id == "arrow_color") style.arrow_color = (Color)effective;
             else if(property.id == "shadow_color") style.shadow_color = (Color)effective;
         }
-        menu->SetCustomStyle(style);
+        if(authored)
+            menu->SetCustomStyle(style);
+        else
+            menu->ClearCustomStyle();
     }
 
     void EmitSetup(String& out, const String& member,
                    const UiDesignerNode& node,
                    const UiDesignerControlSpec& spec) const override
     {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(property.id) >= 0;
+        if(!authored)
+            return;
+
         const String style_var = member + "_style";
         out << "\tUiMenu::Style " << style_var << " = UiTheme::ResolveMenu();\n";
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {

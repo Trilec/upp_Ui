@@ -658,9 +658,9 @@ CONSOLE_APP_MAIN
     Value init_response = automation.Handle(initialize);
     Check((bool)UiDesignerMapValue(ValueMap(init_response), "ok", false), "automation initialize");
 
-    ValueMap list;
-    list.Set("method", "list_controls");
-    Value list_response = automation.Handle(list);
+    ValueMap list_request;
+    list_request.Set("method", "list_controls");
+    Value list_response = automation.Handle(list_request);
     Check((bool)UiDesignerMapValue(ValueMap(list_response), "ok", false), "automation list controls");
     Check((bool)UiDesignerMapValue(ValueMap(automation.ValidateDocument()), "ok", false),
           "automation validation");
@@ -719,6 +719,85 @@ CONSOLE_APP_MAIN
     Check(sample_generated.source.Find(".ShowTitleLine(false)") >= 0 &&
               sample_generated.source.Find(".ShowCardLine(true)") >= 0,
           "generated UiTitleCard line visibility");
+
+    UiDesignerDocument standard_button_document;
+    UiDesignerCommandService standard_button_commands(standard_button_document);
+    UiDesignerNodeId standard_button = standard_button_commands.AddNode(
+        "UiButton", "standard_button", standard_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add standard button");
+    Check(standard_button != 0, "standard button created");
+    UiDesignerGeneratedProject standard_button_generated =
+        generator.Generate(standard_button_document, "StandardButtonWindow");
+    Check(standard_button_generated.source.Find("SetCustomStyle(") < 0 &&
+              standard_button_generated.source.Find("UiButton::Style") < 0,
+          "standard Button emits no redundant style block");
+
+    UiDesignerDocument role_button_document;
+    UiDesignerCommandService role_button_commands(role_button_document);
+    UiDesignerNodeId role_button = role_button_commands.AddNode(
+        "UiButton", "role_button", role_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add role button");
+    Check(role_button_commands.SetProperty(
+        role_button, "role", "Accent",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set accent role"),
+          "accent role command");
+    UiDesignerGeneratedProject role_button_generated =
+        generator.Generate(role_button_document, "RoleButtonWindow");
+    Check(role_button_generated.source.Find(
+              "SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent))") >= 0,
+          "Accent Button emits role-only custom style");
+    Check(role_button_generated.source.Find("UiButton::Style") < 0,
+          "Accent Button with no overrides emits no patched style block");
+
+    UiDesignerDocument override_button_document;
+    UiDesignerCommandService override_button_commands(override_button_document);
+    UiDesignerNodeId override_theme_button = override_button_commands.AddNode(
+        "UiButton", "override_button", override_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add override button");
+    Check(override_button_commands.SetProperty(
+        override_theme_button, "role", "Accent",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set accent role"),
+          "accent role command for override button");
+    Check(override_button_commands.SetThemeOverride(
+        override_theme_button, "font_size", 24,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button font size"),
+          "accent button font-size override command");
+    UiDesignerGeneratedProject override_button_generated =
+        generator.Generate(override_button_document, "OverrideButtonWindow");
+    Check(override_button_generated.source.Find(
+              "UiTheme::ResolveButton(UiRole::Accent)") >= 0,
+          "Accent Button override resolves the selected role");
+    Check(override_button_generated.source.Find(".font.Height(24)") >= 0,
+          "Accent Button override emits the authored font size");
+    Check(override_button_generated.source.Find(".SetCustomStyle(") >= 0,
+          "Accent Button with overrides emits a style patch");
+
+    UiDesignerDocument subtle_tool_document;
+    UiDesignerCommandService subtle_tool_commands(subtle_tool_document);
+    const UiDesignerControlSpec* tool_button_spec = catalog.Find("UiToolButton");
+    UiDesignerNodeId subtle_tool = subtle_tool_commands.AddNode(
+        "UiToolButton", "subtle_tool", subtle_tool_document.GetRootId(),
+        tool_button_spec ? tool_button_spec->node_flags : 0,
+        tool_button_spec ? tool_button_spec->defaults : ValueMap(),
+        "Add subtle tool button");
+    Check(subtle_tool_commands.SetProperty(
+        subtle_tool, "role", "Subtle",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set subtle role"),
+          "subtle tool-button role command");
+    Check(subtle_tool_commands.SetThemeOverride(
+        subtle_tool, "icon_normal", Color(12, 34, 56),
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set tool icon ink"),
+          "subtle tool-button icon-ink override command");
+    UiDesignerGeneratedProject subtle_tool_generated =
+        generator.Generate(subtle_tool_document, "SubtleToolButtonWindow");
+    Check(subtle_tool_generated.source.Find(
+              "UiTheme::ResolveToolButton(UiRole::Subtle)") >= 0,
+          "ToolButton Subtle emits role-only custom style");
+    Check(subtle_tool_generated.source.Find(".palette.icon[ST_NORMAL] = Color(12, 34, 56)") >= 0,
+          "ToolButton icon ink override is emitted");
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);
