@@ -658,9 +658,9 @@ CONSOLE_APP_MAIN
     Value init_response = automation.Handle(initialize);
     Check((bool)UiDesignerMapValue(ValueMap(init_response), "ok", false), "automation initialize");
 
-    ValueMap list;
-    list.Set("method", "list_controls");
-    Value list_response = automation.Handle(list);
+    ValueMap list_request;
+    list_request.Set("method", "list_controls");
+    Value list_response = automation.Handle(list_request);
     Check((bool)UiDesignerMapValue(ValueMap(list_response), "ok", false), "automation list controls");
     Check((bool)UiDesignerMapValue(ValueMap(automation.ValidateDocument()), "ok", false),
           "automation validation");

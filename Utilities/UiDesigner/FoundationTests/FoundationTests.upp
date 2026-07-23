@@ -8,6 +8,7 @@ uses
     Utilities/UiDesigner/Commands,
     Utilities/UiDesigner/Catalog,
     Utilities/UiDesigner/CodeGen,
+    Utilities/UiDesigner/Theme,
     Utilities/UiDesigner/ThemeCore,
     Utilities/UiDesigner/Services;
 
