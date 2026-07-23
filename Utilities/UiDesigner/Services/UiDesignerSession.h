@@ -139,6 +139,10 @@ private:
     bool SelectionSupports(const String& property,
                            const UiDesignerPropertySpec **primary_spec = nullptr) const;
     void SyncInspectorValues(const UiDesignerChangeSet& changes);
+    bool HasThemeOverrideChange(const UiDesignerChangeSet& changes) const;
+    bool HasNormalPropertyChange(const UiDesignerChangeSet& changes) const;
+    Value ResolveThemeOverrideValue(const UiDesignerNode& node,
+                                    const UiDesignerThemeOverrideSpec& property) const;
     UiDesignerActionBinding MakeEditableBehavior() const;
     String DefaultHandlerName(const UiDesignerNode& node,
                               const String& event_id) const;

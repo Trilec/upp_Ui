@@ -134,6 +134,7 @@ bool UiDesignerCommandService::SetProperty(
                 change.old_value = old;
                 change.new_value = value;
                 change.impact = impact;
+                change.kind = UiDesignerPropertyChangeKind::Normal;
             }
             return true;
         });
@@ -156,6 +157,7 @@ bool UiDesignerCommandService::SetThemeOverride(
             change.old_value = old;
             change.new_value = value;
             change.impact = impact;
+            change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
             return true;
         });
 }
@@ -179,6 +181,7 @@ bool UiDesignerCommandService::RemoveThemeOverride(
             change.old_value = old;
             change.new_value = Value();
             change.impact = impact;
+            change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
             return true;
         });
 }
@@ -205,6 +208,7 @@ bool UiDesignerCommandService::ClearThemeOverrides(
                 change.old_value = old_overrides.GetValue(i);
                 change.new_value = Value();
                 change.impact = impact;
+                change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
             }
             return true;
         });
@@ -363,6 +367,7 @@ bool UiDesignerCommandService::MoveNodesConfigured(
                     change.old_value = old;
                     change.new_value = value;
                     change.impact = impact;
+                    change.kind = UiDesignerPropertyChangeKind::Normal;
                 }
             }
             return true;

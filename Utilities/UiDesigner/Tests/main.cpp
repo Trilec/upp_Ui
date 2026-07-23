@@ -556,30 +556,32 @@ CONSOLE_APP_MAIN
     override_session.NewDocument("blank");
     UiDesignerNodeId override_button = override_session.AddControl("UiButton");
     override_session.Select(override_button, false);
-    Check(override_session.ThemeOverrideModel().Find("icon") != nullptr,
+    Check(!override_session.ThemeOverrideModel().Find("role"),
+          "ordinary properties stay out of theme overrides");
+    Check(override_session.ThemeOverrideModel().Find("icon_normal") != nullptr,
           "button theme overrides populate for the selected control");
     const int override_structure_before =
         override_session.ThemeOverrideModel().GetStructureRevision();
     Check(override_session.PreviewThemeOverride(
-              "icon", "ICON_DESIGN_WIDGETS_48", error),
+              "icon_normal", Color(12, 34, 56), error),
           "theme override preview succeeds: " + error);
-    Check(override_session.ThemeOverrideModel().Find("icon") &&
-              override_session.ThemeOverrideModel().Find("icon")->value ==
-                  "ICON_DESIGN_WIDGETS_48",
+    Check(override_session.ThemeOverrideModel().Find("icon_normal") &&
+              override_session.ThemeOverrideModel().Find("icon_normal")->value ==
+                  Color(12, 34, 56),
           "theme override model receives the preview value");
     Check(override_session.CommitThemeOverride(
-              "icon", "ICON_DESIGN_WIDGETS_48", error),
+              "icon_normal", Color(12, 34, 56), error),
           "theme override commit succeeds: " + error);
     Check(override_session.Document().GetThemeOverride(
-              override_button, "icon") == "ICON_DESIGN_WIDGETS_48",
+              override_button, "icon_normal") == Color(12, 34, 56),
           "theme override persists to the document");
     Check(override_session.ThemeOverrideModel().GetStructureRevision() ==
               override_structure_before,
           "theme override commit keeps the model structure stable");
-    Check(override_session.ResetThemeOverride("icon", error),
+    Check(override_session.ResetThemeOverride("icon_normal", error),
           "theme override reset succeeds: " + error);
     Check(IsNull(override_session.Document().GetThemeOverride(
-              override_button, "icon")),
+              override_button, "icon_normal")),
           "theme override reset clears the authored override");
 
     UiDesignerSession preview_session;

@@ -362,6 +362,7 @@ bool UiDesignerDocument::SetProperty(UiDesignerNodeId id,
     change.old_value = old;
     change.new_value = value;
     change.impact = impact;
+    change.kind = UiDesignerPropertyChangeKind::Normal;
     QueueChange(changes);
     return true;
 }
@@ -387,6 +388,7 @@ bool UiDesignerDocument::SetThemeOverride(UiDesignerNodeId id,
     change.old_value = old;
     change.new_value = value;
     change.impact = impact;
+    change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
     QueueChange(changes);
     return true;
 }
@@ -412,6 +414,7 @@ bool UiDesignerDocument::RemoveThemeOverride(UiDesignerNodeId id,
     change.old_value = old;
     change.new_value = Value();
     change.impact = impact;
+    change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
     QueueChange(changes);
     return true;
 }
@@ -434,6 +437,7 @@ bool UiDesignerDocument::ClearThemeOverrides(UiDesignerNodeId id,
         change.old_value = node->theme_overrides.GetValue(i);
         change.new_value = Value();
         change.impact = impact;
+        change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
     }
     node->ClearThemeOverrides();
     QueueChange(changes);

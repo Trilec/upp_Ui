@@ -101,6 +101,11 @@ struct UiDesignerActionBinding : Moveable<UiDesignerActionBinding> {
     }
 };
 
+enum class UiDesignerPropertyChangeKind : byte {
+    Normal = 0,
+    ThemeOverride,
+};
+
 enum UiDesignerChangeImpact : dword {
     UiDesignerImpactNone             = 0,
     UiDesignerImpactPaint            = 1 << 0,
@@ -138,6 +143,7 @@ struct UiDesignerPropertyChange : Moveable<UiDesignerPropertyChange> {
     Value old_value;
     Value new_value;
     UiDesignerChangeImpact impact = UiDesignerImpactNone;
+    UiDesignerPropertyChangeKind kind = UiDesignerPropertyChangeKind::Normal;
 };
 
 enum class UiDesignerStructureChangeKind : byte {

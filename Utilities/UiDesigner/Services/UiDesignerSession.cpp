@@ -2,6 +2,41 @@
 
 namespace Upp {
 
+static bool IsThemeOverrideChange(const UiDesignerPropertyChange& change)
+{
+    return change.kind == UiDesignerPropertyChangeKind::ThemeOverride;
+}
+
+static bool IsNormalPropertyChange(const UiDesignerPropertyChange& change)
+{
+    return change.kind == UiDesignerPropertyChangeKind::Normal;
+}
+
+static bool HasPropertyChange(const UiDesignerChangeSet& changes,
+                              const String& property)
+{
+    for(const UiDesignerPropertyChange& change : changes.properties)
+        if(change.property == property)
+            return true;
+    return false;
+}
+
+static UiRole ParseUiRole(const Value& value)
+{
+    const String role = value;
+    if(role == "Subtle") return UiRole::Subtle;
+    if(role == "Accent") return UiRole::Accent;
+    if(role == "Alert") return UiRole::Alert;
+    return UiRole::Standard;
+}
+
+static bool IsButtonStyleControl(const UiDesignerRuntimeKind kind)
+{
+    return kind == UiDesignerRuntimeKind::UiButton ||
+           kind == UiDesignerRuntimeKind::UiToolButton ||
+           kind == UiDesignerRuntimeKind::UiSplitButton;
+}
+
 UiDesignerSession::UiDesignerSession()
     : commands_(document_)
 {
@@ -18,12 +53,19 @@ void UiDesignerSession::WireEvents()
             projection_->ApplyChangeSet(changes);
         if(changes.schema_changed || !changes.structure.IsEmpty())
             RebuildInspector();
-        else
+        else if(HasNormalPropertyChange(changes))
             SyncInspectorValues(changes);
         if(changes.schema_changed || !changes.structure.IsEmpty())
             RebuildThemeOverrideModel();
-        else
+        else if(HasThemeOverrideChange(changes))
             SyncThemeOverrideValues(changes);
+        else if(HasNormalPropertyChange(changes) && HasPropertyChange(changes, "role")) {
+            const UiDesignerNode* node = document_.Find(state_.selection.primary);
+            const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+            if(node && spec && state_.selection.nodes.GetCount() == 1 &&
+               !spec->theme_overrides.IsEmpty())
+                RebuildThemeOverrideModel();
+        }
         WhenCodeChanged();
     };
 
@@ -40,6 +82,44 @@ void UiDesignerSession::WireEvents()
         WhenInspectorChanged();
         WhenCodeChanged();
     };
+}
+
+bool UiDesignerSession::HasThemeOverrideChange(const UiDesignerChangeSet& changes) const
+{
+    for(const UiDesignerPropertyChange& change : changes.properties)
+        if(IsThemeOverrideChange(change))
+            return true;
+    return false;
+}
+
+bool UiDesignerSession::HasNormalPropertyChange(const UiDesignerChangeSet& changes) const
+{
+    for(const UiDesignerPropertyChange& change : changes.properties)
+        if(IsNormalPropertyChange(change))
+            return true;
+    return false;
+}
+
+Value UiDesignerSession::ResolveThemeOverrideValue(
+    const UiDesignerNode& node, const UiDesignerThemeOverrideSpec& property) const
+{
+    const UiDesignerControlSpec* spec = catalog_.Find(node.type);
+    if(!spec || property.button_style_field == UiDesignerButtonStyleField::None)
+        return property.default_value;
+
+    const UiButton::Style base = spec->runtime_kind == UiDesignerRuntimeKind::UiToolButton
+        ? UiTheme::ResolveToolButton(ParseUiRole(node.GetProperty("role", "Standard")))
+        : UiTheme::ResolveButton(ParseUiRole(node.GetProperty("role", "Standard")));
+    UiButton::Style style = base;
+    for(const UiDesignerThemeOverrideSpec& candidate : spec->theme_overrides) {
+        if(candidate.button_style_field == UiDesignerButtonStyleField::None)
+            continue;
+        const int q = node.theme_overrides.Find(candidate.id);
+        if(q >= 0)
+            UiDesignerApplyButtonStyleField(style, candidate.button_style_field,
+                                            node.theme_overrides.GetValue(q));
+    }
+    return UiDesignerButtonStyleFieldValue(style, property.button_style_field);
 }
 
 void UiDesignerSession::AttachProjection(UiDesignerProjectionSink *projection)
@@ -578,6 +658,8 @@ void UiDesignerSession::SyncInspectorValues(const UiDesignerChangeSet& changes)
     const bool root_selected = state_.selection.primary == document_.GetRootId();
 
     for(const UiDesignerPropertyChange& change : changes.properties) {
+        if(!IsNormalPropertyChange(change))
+            continue;
         if(!state_.selection.Contains(change.node))
             continue;
         if(PropertyEditorItem *item = inspector_model_.Find(change.property)) {
@@ -636,14 +718,12 @@ void UiDesignerSession::RebuildThemeOverrideModel()
     for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
         const int q = node->theme_overrides.Find(property.id);
         const bool inherited = q < 0;
-        property.AddTo(theme_override_model_,
-                       inherited ? property.default_value
-                                 : node->theme_overrides.GetValue(q),
-                       inherited);
-        if(property.id == "empty_hint") {
-            if(PropertyEditorItem *item = theme_override_model_.Find(property.id))
-                item->SetVisible(node->children.IsEmpty());
-        }
+        const Value value = inherited
+            ? ResolveThemeOverrideValue(*node, property)
+            : node->theme_overrides.GetValue(q);
+        property.AddTo(theme_override_model_, value, inherited);
+        if(PropertyEditorItem *item = theme_override_model_.Find(property.id))
+            item->SetInherited(inherited);
     }
     theme_override_model_.StructureChanged();
 }
@@ -659,13 +739,20 @@ void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& chang
         return;
 
     for(const UiDesignerPropertyChange& change : changes.properties) {
+        if(!IsThemeOverrideChange(change))
+            continue;
         if(change.node != node->id)
+            continue;
+        const UiDesignerThemeOverrideSpec* override_spec =
+            spec->FindThemeOverride(change.property);
+        if(!override_spec)
             continue;
         if(PropertyEditorItem *item = theme_override_model_.Find(change.property)) {
             const int q = node->theme_overrides.Find(change.property);
             const bool inherited = q < 0;
-            const Value value = inherited ? item->default_value
-                                          : node->theme_overrides.GetValue(q);
+            const Value value = inherited
+                ? ResolveThemeOverrideValue(*node, *override_spec)
+                : node->theme_overrides.GetValue(q);
             if(item->value != value || item->inherited != inherited) {
                 theme_override_model_.SetValue(change.property, value, false);
                 item->SetInherited(inherited);
@@ -702,10 +789,14 @@ void UiDesignerSession::CancelPreview()
         const UiDesignerNode* node = document_.Find(item.node);
         const UiDesignerControlSpec* spec =
             node ? catalog_.Find(node->type) : nullptr;
-        if(!node || !spec || !spec->FindProperty(item.property))
+        if(!node || !spec)
             continue;
-        projection_->ApplyTransient(item.node, item.property,
-                                    ResolvePropertyValue(*node, *spec->FindProperty(item.property)));
+        if(const UiDesignerPropertySpec* property = spec->FindProperty(item.property))
+            projection_->ApplyTransient(item.node, item.property,
+                                        ResolvePropertyValue(*node, *property));
+        else if(const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(item.property))
+            projection_->ApplyTransient(item.node, item.property,
+                                        ResolveThemeOverrideValue(*node, *override_spec));
     }
 }
 

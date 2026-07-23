@@ -14,6 +14,49 @@ static UiRole ParseRole(const Value& value)
     return UiRole::Standard;
 }
 
+static bool IsButtonStyleControl(UiDesignerRuntimeKind kind)
+{
+    return kind == UiDesignerRuntimeKind::UiButton ||
+           kind == UiDesignerRuntimeKind::UiToolButton ||
+           kind == UiDesignerRuntimeKind::UiSplitButton;
+}
+
+static UiButton::Style ResolveButtonStyleBase(const UiDesignerNode& node,
+                                              const UiDesignerControlSpec& spec)
+{
+    const UiRole role = ParseRole(node.GetProperty("role", "Standard"));
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiToolButton)
+        return UiTheme::ResolveToolButton(role);
+    return UiTheme::ResolveButton(role);
+}
+
+static void ApplyButtonStyleOverrides(Ctrl& ctrl,
+                                      const UiDesignerNode& node,
+                                      const UiDesignerControlSpec& spec,
+                                      const UiDesignerTransientOverlay *overlay)
+{
+    if(!IsButtonStyleControl(spec.runtime_kind))
+        return;
+    UiButton *button = dynamic_cast<UiButton *>(&ctrl);
+    if(!button)
+        return;
+
+    UiButton::Style style = ResolveButtonStyleBase(node, spec);
+    for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+        if(property.button_style_field == UiDesignerButtonStyleField::None)
+            continue;
+        const int q = node.theme_overrides.Find(property.id);
+        const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
+                                       : property.default_value;
+        const Value effective = overlay
+            ? overlay->Resolve(node.id, property.id, canonical)
+            : canonical;
+        UiDesignerApplyButtonStyleField(style, property.button_style_field,
+                                        effective);
+    }
+    button->SetCustomStyle(style);
+}
+
 static Image ResolveButtonIcon(const String& name)
 {
     if(name.IsEmpty() || name == "None")
@@ -620,8 +663,11 @@ static UiDesignerApplyResult ApplyRuntime(
     }
     if(property == "role") {
         const UiRole role = ParseRole(value);
+        if(auto *button = dynamic_cast<UiToolButton *>(&ctrl))
+            button->SetCustomStyle(UiTheme::ResolveToolButton(role));
+        else if(auto *button = dynamic_cast<UiButton *>(&ctrl))
+            button->SetCustomStyle(UiTheme::ResolveButton(role));
         if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) panel->SetCustomStyle(UiTheme::ResolvePanel(role));
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) button->SetCustomStyle(UiTheme::ResolveButton(role));
         if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) label->SetCustomStyle(UiTheme::ResolveLabel(role));
         if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl)) group->SetCustomStyle(UiTheme::ResolveGroupPanel(role));
         ctrl.Refresh();
@@ -1197,8 +1243,7 @@ Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
                                          const String& property,
                                          const Value& fallback) const
 {
-    const Value canonical = node.GetThemeOverride(property,
-        node.GetProperty(property, fallback));
+    const Value canonical = node.GetProperty(property, fallback);
     return overlay_ ? overlay_->Resolve(node.id, property, canonical) : canonical;
 }
 
@@ -1211,6 +1256,7 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
     for(const UiDesignerPropertySpec& property : spec->properties)
         UiDesignerPreviewFactory::Apply(*instance.control, *spec,
             property.id, Effective(node, property.id, property.default_value));
+    ApplyButtonStyleOverrides(*instance.control, node, *spec, overlay_);
 }
 
 static void ConfigureBoxSpacer(UiBoxLayout& box,
@@ -1537,6 +1583,40 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
     if(q < 0 || !spec) {
         stats_.rejected++;
         return UiDesignerApplyResult::Rejected;
+    }
+
+    if(const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(property)) {
+        if(!IsButtonStyleControl(spec->runtime_kind) || override_spec->button_style_field == UiDesignerButtonStyleField::None) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        UiDesignerPreviewInstance& instance = instances_[q];
+        if(!instance.control) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        ApplyButtonStyleOverrides(*instance.control, *node, *spec, overlay_);
+        UiButton *button = dynamic_cast<UiButton *>(instance.control.Get());
+        if(!button) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        UiButton::Style style = button->GetCustomStyle();
+        UiDesignerApplyButtonStyleField(style, override_spec->button_style_field, value);
+        button->SetCustomStyle(style);
+        const UiDesignerApplyResult result = UiDesignerButtonStyleFieldAffectsLayout(
+            override_spec->button_style_field)
+                ? UiDesignerApplyResult::AppliedAncestorLayout
+                : UiDesignerApplyResult::AppliedPaint;
+        if(result == UiDesignerApplyResult::AppliedAncestorLayout) {
+            stats_.ancestor_layouts++;
+            Layout();
+        }
+        else
+            stats_.paint_updates++;
+        stats_.live_applies++;
+        Refresh();
+        return result;
     }
 
     UiDesignerApplyResult result;

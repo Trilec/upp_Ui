@@ -342,6 +342,22 @@ static void RunTests(FoundationTester& t)
                 (int)roundtrip_absolute_button->GetProperty("height", -1) == 34,
             "AbsoluteLayout child rectangle survives serialization");
 
+    UiDesignerSession normalized_theme;
+    normalized_theme.NewDocument("blank");
+    UiDesignerNodeId themed_button = normalized_theme.AddControl("UiButton");
+    normalized_theme.Select(themed_button, false);
+    t.Check(normalized_theme.CommitThemeOverride(
+                "icon_normal", Color(12, 34, 56), error),
+            "theme override commit prepares normalization");
+    String legacy_theme_json = UiDesignerSerialize(normalized_theme.Document(), true);
+    legacy_theme_json.Replace("\"icon_normal\"", "\"icon\"");
+    UiDesignerDocument normalized_theme_roundtrip;
+    t.Check(UiDesignerDeserialize(legacy_theme_json, normalized_theme_roundtrip, error),
+            "legacy theme override keys normalize");
+    t.Check(IsNull(normalized_theme_roundtrip.GetThemeOverride(
+                themed_button, "icon")),
+            "legacy theme override key is stripped on load");
+
     UiDesignerNodeId child_panel = AddThroughDrop(session, "UiPanel", box);
     UiDesignerNodeId nested = AddThroughDrop(session, "UiPanel", child_panel);
     Vector<UiDesignerNodeId> move_nodes;

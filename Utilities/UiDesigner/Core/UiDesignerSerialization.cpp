@@ -210,6 +210,28 @@ static void NormalizePlacementProperties(ValueMap& properties)
     }
 }
 
+static bool IsLegacyButtonThemeOverride(const String& id)
+{
+    static const char *obsolete[] = {
+        "role", "icon", "icon_side", "icon_width", "icon_height",
+        "icon_render_mode", "scale_icon_to_content", "align_h", "align_v",
+        "content_gap", "content_inset_left", "content_inset_top",
+        "content_inset_right", "content_inset_bottom", "click_focus",
+        "checkable", "checked", "empty_hint"
+    };
+    for(const char *candidate : obsolete)
+        if(id == candidate)
+            return true;
+    return false;
+}
+
+static void NormalizeThemeOverrides(ValueMap& theme_overrides)
+{
+    for(int i = theme_overrides.GetCount() - 1; i >= 0; i--)
+        if(IsLegacyButtonThemeOverride(AsString(theme_overrides.GetKey(i))))
+            theme_overrides.Remove(i);
+}
+
 static bool LoadNodes(const ValueArray& nodes, bool legacy,
                       UiDesignerDocument& loaded, String& error)
 {
@@ -227,6 +249,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
         ? ValueMap()
         : (ValueMap)UiDesignerMapValue(root_node, "theme_overrides", ValueMap());
     NormalizePlacementProperties(window->properties);
+    NormalizeThemeOverrides(window->theme_overrides);
 
     VectorMap<int64, int64> id_map;
     id_map.Add((int64)UiDesignerMapValue(root_node, "id", 1), loaded.GetRootId());
@@ -318,6 +341,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             created->theme_overrides = legacy
                 ? ValueMap()
                 : (ValueMap)UiDesignerMapValue(n, "theme_overrides", ValueMap());
+            NormalizeThemeOverrides(created->theme_overrides);
             id_map.Add(old_id, new_id);
             pending_actions.Add(new_id,
                 UiDesignerMapValue(n, "actions", ValueArray()));

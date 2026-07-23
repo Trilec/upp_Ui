@@ -57,6 +57,16 @@ static void AddEvent(UiDesignerControlSpec& spec, const char *id,
     spec.capabilities |= UiDesignerCapabilityAcceptActions;
 }
 
+static Color UiDesignerFillColor(const UiFill& fill)
+{
+    return fill.IsSolid() ? fill.color : Null;
+}
+
+static String UiDesignerShadowModeName(ShadowMode mode)
+{
+    return mode == SHADOW_HARD ? "Hard" : "Curve";
+}
+
 static void AddText(UiDesignerControlSpec& spec, const String& value)
 {
     UiDesignerPropertySpec property = UiDesignerTextProperty();
@@ -232,138 +242,155 @@ static void AddButtonProperties(UiDesignerControlSpec& spec)
 
 static void AddButtonThemeOverrides(UiDesignerControlSpec& spec)
 {
-    auto add_bool = [&](const char *id, const char *label, const char *group,
-                        bool value,
-                        PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+    const UiButton::Style base = UiTheme::ResolveButton(UiRole::Standard);
+    auto add = [&](UiDesignerButtonStyleField field, const char *label,
+                   const char *group, PropertyEditorKind kind,
+                   const Value& value, PropertyEditorImpact impact,
+                   const char *help = nullptr) {
         UiDesignerThemeOverrideSpec item;
-        item.id = id;
+        item.id = UiDesignerButtonStyleFieldName(field);
         item.label = label;
         item.group = group;
-        item.kind = PropertyEditorKind::Boolean;
-        item.domain = group == String("State") ? PropertyEditorDomain::Behaviour
-                                               : PropertyEditorDomain::Appearance;
+        item.kind = kind;
+        item.domain = PropertyEditorDomain::Theme;
         item.default_value = value;
         item.impact = impact;
+        item.StyleField(field);
+        if(help)
+            item.help = help;
         spec.theme_overrides.Add(pick(item));
     };
-    auto add_int = [&](const char *id, const char *label, const char *group,
-                       int value, int min_value, int max_value, int step = 1,
+    auto add_bool = [&](UiDesignerButtonStyleField field, const char *label,
+                        const char *group, bool value,
+                        PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+        add(field, label, group, PropertyEditorKind::Boolean, value, impact);
+    };
+    auto add_int = [&](UiDesignerButtonStyleField field, const char *label,
+                       const char *group, int value, int min_value, int max_value,
+                       int step = 1,
                        PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
         UiDesignerThemeOverrideSpec item;
-        item.id = id;
+        item.id = UiDesignerButtonStyleFieldName(field);
         item.label = label;
         item.group = group;
         item.kind = PropertyEditorKind::Integer;
-        item.domain = PropertyEditorDomain::Appearance;
+        item.domain = PropertyEditorDomain::Theme;
         item.default_value = value;
         item.minimum = min_value;
         item.maximum = max_value;
         item.step = step;
         item.impact = impact;
+        item.StyleField(field);
         spec.theme_overrides.Add(pick(item));
     };
+    auto add_color = [&](UiDesignerButtonStyleField field, const char *label,
+                         const char *group, Color value,
+                         PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+        add(field, label, group, PropertyEditorKind::Color, value, impact);
+    };
+
+    add(UiDesignerButtonStyleField::FontFace, "Font face", "Typography",
+        PropertyEditorKind::Text, base.font.GetFaceName(),
+        PropertyImpactPaint | PropertyImpactCode);
+    add_int(UiDesignerButtonStyleField::FontSize, "Font size", "Typography",
+            base.font.GetHeight(), 1, 256, 1);
+    add_bool(UiDesignerButtonStyleField::FontBold, "Font bold", "Typography",
+             base.font.IsBold());
+    add_bool(UiDesignerButtonStyleField::FontItalic, "Font italic", "Typography",
+             base.font.IsItalic());
+
+    add_bool(UiDesignerButtonStyleField::FaceEnabled, "Face enabled", "Face",
+             base.metrics.face_enabled);
+    add_color(UiDesignerButtonStyleField::FaceNormal, "Face normal", "Face",
+              UiDesignerFillColor(base.palette.face[ST_NORMAL]));
+    add_color(UiDesignerButtonStyleField::FaceHot, "Face hot", "Face",
+              UiDesignerFillColor(base.palette.face[ST_HOT]));
+    add_color(UiDesignerButtonStyleField::FacePressed, "Face pressed", "Face",
+              UiDesignerFillColor(base.palette.face[ST_PRESSED]));
+    add_color(UiDesignerButtonStyleField::FaceDisabled, "Face disabled", "Face",
+              UiDesignerFillColor(base.palette.face[ST_DISABLED]));
+    add_bool(UiDesignerButtonStyleField::Transparent, "Transparent", "Face",
+             base.transparent);
+
+    add_bool(UiDesignerButtonStyleField::FrameEnabled, "Frame enabled", "Frame",
+             base.metrics.frame_enabled);
+    add_color(UiDesignerButtonStyleField::FrameNormal, "Frame normal", "Frame",
+              base.palette.frame[ST_NORMAL]);
+    add_color(UiDesignerButtonStyleField::FrameHot, "Frame hot", "Frame",
+              base.palette.frame[ST_HOT]);
+    add_color(UiDesignerButtonStyleField::FramePressed, "Frame pressed", "Frame",
+              base.palette.frame[ST_PRESSED]);
+    add_color(UiDesignerButtonStyleField::FrameDisabled, "Frame disabled", "Frame",
+              base.palette.frame[ST_DISABLED]);
+    add_int(UiDesignerButtonStyleField::FrameWidth, "Frame width", "Frame",
+            base.metrics.frame_width, 0, 20, 1);
+    add_int(UiDesignerButtonStyleField::Radius, "Radius", "Frame",
+            base.metrics.radius, 0, 40, 1);
+    add_bool(UiDesignerButtonStyleField::FrameDashed, "Frame dashed", "Frame",
+             base.metrics.dashed);
+    add(UiDesignerButtonStyleField::FrameDashPattern, "Frame dash pattern",
+        "Frame", PropertyEditorKind::Text, base.metrics.dash_pattern,
+        PropertyImpactPaint | PropertyImpactCode);
+
+    add_color(UiDesignerButtonStyleField::TextNormal, "Text normal", "Text ink",
+              base.palette.ink[ST_NORMAL]);
+    add_color(UiDesignerButtonStyleField::TextHot, "Text hot", "Text ink",
+              base.palette.ink[ST_HOT]);
+    add_color(UiDesignerButtonStyleField::TextPressed, "Text pressed", "Text ink",
+              base.palette.ink[ST_PRESSED]);
+    add_color(UiDesignerButtonStyleField::TextDisabled, "Text disabled", "Text ink",
+              base.palette.ink[ST_DISABLED]);
+
+    add_color(UiDesignerButtonStyleField::IconNormal, "Icon normal", "Icon ink",
+              base.palette.icon[ST_NORMAL]);
+    add_color(UiDesignerButtonStyleField::IconHot, "Icon hot", "Icon ink",
+              base.palette.icon[ST_HOT]);
+    add_color(UiDesignerButtonStyleField::IconPressed, "Icon pressed", "Icon ink",
+              base.palette.icon[ST_PRESSED]);
+    add_color(UiDesignerButtonStyleField::IconDisabled, "Icon disabled", "Icon ink",
+              base.palette.icon[ST_DISABLED]);
+
+    add_bool(UiDesignerButtonStyleField::ShadowEnabled, "Shadow enabled", "Shadow",
+             base.metrics.shadow.enabled);
+    add_int(UiDesignerButtonStyleField::ShadowDistance, "Shadow distance", "Shadow",
+            base.metrics.shadow.distance, 0, 64, 1);
+    add_int(UiDesignerButtonStyleField::ShadowOffsetX, "Shadow offset X", "Shadow",
+            base.metrics.shadow.offset_x, -64, 64, 1);
+    add_int(UiDesignerButtonStyleField::ShadowOffsetY, "Shadow offset Y", "Shadow",
+            base.metrics.shadow.offset_y, -64, 64, 1);
+    add_int(UiDesignerButtonStyleField::ShadowAlpha, "Shadow alpha", "Shadow",
+            base.metrics.shadow.alpha, 0, 255, 1);
+    add_color(UiDesignerButtonStyleField::ShadowColor, "Shadow color", "Shadow",
+              base.metrics.shadow.color);
+    add_bool(UiDesignerButtonStyleField::ShadowInset, "Shadow inset", "Shadow",
+             base.metrics.shadow.inset);
     {
         UiDesignerThemeOverrideSpec item;
-        item.id = "role";
-        item.label = "Role";
-        item.group = "Appearance";
+        item.id = UiDesignerButtonStyleFieldName(UiDesignerButtonStyleField::ShadowMode);
+        item.label = "Shadow mode";
+        item.group = "Shadow";
         item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Appearance;
-        item.default_value = "Standard";
-        item.impact = PropertyImpactPaint | PropertyImpactThemeGlobal | PropertyImpactCode;
-        item.Choice("Standard", "Standard");
-        item.Choice("Subtle", "Subtle");
-        item.Choice("Accent", "Accent");
-        item.Choice("Alert", "Alert");
-        spec.theme_overrides.Add(pick(item));
-    }
-    {
-        UiDesignerThemeOverrideSpec item;
-        item.id = "icon";
-        item.label = "Icon";
-        item.group = "Content";
-        item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Content;
-        item.default_value = "None";
+        item.domain = PropertyEditorDomain::Theme;
+        item.default_value = UiDesignerShadowModeName(base.metrics.shadow.mode);
         item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.Choice("None", "None");
-        item.Choice("ICON_DESIGN_DESCRIPTION_48", "Description");
-        item.Choice("ICON_DESIGN_WIDGETS_48", "Widgets");
-        item.Choice("ICON_DESIGN_ACCOUNT_TREE_48", "Hierarchy");
-        item.Choice("ICON_DESIGN_TUNE_48", "Inspector");
+        item.StyleField(UiDesignerButtonStyleField::ShadowMode);
+        item.Choice("Hard", "Hard");
+        item.Choice("Curve", "Curve");
         spec.theme_overrides.Add(pick(item));
     }
-    {
-        UiDesignerThemeOverrideSpec item;
-        item.id = "icon_side";
-        item.label = "Icon side";
-        item.group = "Appearance";
-        item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Appearance;
-        item.default_value = "Left";
-        item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.Choice("Left", "Left");
-        item.Choice("Right", "Right");
-        item.Choice("Top", "Top");
-        item.Choice("Bottom", "Bottom");
-        spec.theme_overrides.Add(pick(item));
-    }
-    add_int("icon_width", "Icon width", "Appearance", 18, 0, 256);
-    add_int("icon_height", "Icon height", "Appearance", 18, 0, 256);
-    {
-        UiDesignerThemeOverrideSpec item;
-        item.id = "icon_render_mode";
-        item.label = "Icon render mode";
-        item.group = "Appearance";
-        item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Appearance;
-        item.default_value = "MonoTint";
-        item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.Choice("Auto", "Auto");
-        item.Choice("MonoTint", "Mono tint");
-        item.Choice("PreserveColor", "Preserve color");
-        spec.theme_overrides.Add(pick(item));
-    }
-    add_bool("scale_icon_to_content", "Scale icon to content", "Appearance", false);
-    {
-        UiDesignerThemeOverrideSpec item;
-        item.id = "align_h";
-        item.label = "Horizontal align";
-        item.group = "Appearance";
-        item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Appearance;
-        item.default_value = "Center";
-        item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.Choice("Left", "Left");
-        item.Choice("Center", "Center");
-        item.Choice("Right", "Right");
-        spec.theme_overrides.Add(pick(item));
-    }
-    {
-        UiDesignerThemeOverrideSpec item;
-        item.id = "align_v";
-        item.label = "Vertical align";
-        item.group = "Appearance";
-        item.kind = PropertyEditorKind::Choice;
-        item.domain = PropertyEditorDomain::Appearance;
-        item.default_value = "Center";
-        item.impact = PropertyImpactPaint | PropertyImpactCode;
-        item.Choice("Top", "Top");
-        item.Choice("Center", "Center");
-        item.Choice("Bottom", "Bottom");
-        spec.theme_overrides.Add(pick(item));
-    }
-    add_int("content_gap", "Content gap", "Appearance", 4, 0, 100);
-    add_int("content_inset_left", "Content inset left", "Appearance", 4, 0, 100);
-    add_int("content_inset_top", "Content inset top", "Appearance", 4, 0, 100);
-    add_int("content_inset_right", "Content inset right", "Appearance", 4, 0, 100);
-    add_int("content_inset_bottom", "Content inset bottom", "Appearance", 4, 0, 100);
-    add_bool("click_focus", "Click focus", "State", true,
-             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
-    add_bool("checkable", "Checkable", "State", false,
-             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
-    add_bool("checked", "Checked", "State", false,
-             PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode);
+
+    add_int(UiDesignerButtonStyleField::PressOffsetX, "Press offset X", "Additional",
+            base.press_offset.x, -64, 64, 1);
+    add_int(UiDesignerButtonStyleField::PressOffsetY, "Press offset Y", "Additional",
+            base.press_offset.y, -64, 64, 1);
+    add_int(UiDesignerButtonStyleField::Overpaint, "Overpaint", "Additional",
+            base.overpaint, 0, 8, 1);
+    add_bool(UiDesignerButtonStyleField::UnderlineEnabled, "Underline enabled",
+             "Additional", base.underline);
+    add_int(UiDesignerButtonStyleField::UnderlineWidth, "Underline width",
+            "Additional", base.underline_width, 0, 10, 1);
+    add_int(UiDesignerButtonStyleField::UnderlineOffset, "Underline offset",
+            "Additional", base.underline_offset, -32, 32, 1);
 }
 
 static void AddTitle(UiDesignerControlSpec& spec, const String& value)
@@ -963,21 +990,6 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             icon.domain = PropertyEditorDomain::Content;
             s.properties.Add(icon);
             s.defaults.Set("icon", "ICON_DESIGN_DESCRIPTION_48");
-        }
-        if(String(c.type) == "UiTab" || String(c.type) == "UiAccordion" ||
-           String(c.type) == "UiStack") {
-            UiDesignerThemeOverrideSpec hint;
-            hint.id = "empty_hint";
-            hint.label = "Empty-state hint";
-            hint.group = "Preview";
-            hint.kind = PropertyEditorKind::ReadOnly;
-            hint.domain = PropertyEditorDomain::DesignerOnly;
-            hint.default_value = "";
-            hint.impact = PropertyImpactFullPreview;
-            hint.read_only = true;
-            hint.designer_only = true;
-            hint.help = "Preview-only hint shown when the page container has no authored child yet.";
-            s.theme_overrides.Add(pick(hint));
         }
         catalog.Register(pick(s));
     }

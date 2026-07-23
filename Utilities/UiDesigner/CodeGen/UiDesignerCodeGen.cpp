@@ -191,6 +191,22 @@ static bool IsButtonFamily(UiDesignerRuntimeKind kind)
            kind == UiDesignerRuntimeKind::UiSplitButton;
 }
 
+static String EmitRoleExpr(const String& value)
+{
+    if(value == "Subtle") return "UiRole::Subtle";
+    if(value == "Accent") return "UiRole::Accent";
+    if(value == "Alert") return "UiRole::Alert";
+    return "UiRole::Standard";
+}
+
+static String ButtonStyleResolverExpr(UiDesignerRuntimeKind kind,
+                                      const String& role)
+{
+    if(kind == UiDesignerRuntimeKind::UiToolButton)
+        return "UiTheme::ResolveToolButton(" + EmitRoleExpr(role) + ")";
+    return "UiTheme::ResolveButton(" + EmitRoleExpr(role) + ")";
+}
+
 static String EmitButtonIcon(const String& name)
 {
     if(name.IsEmpty() || name == "None")
@@ -237,27 +253,228 @@ void UiDesignerCodeGenerator::EmitSetup(
     if(spec.IsSemanticItem())
         return;
     const String member = MemberName(node);
-    const auto Effective = [&](const String& property, const Value& fallback) -> Value {
-        return node.GetThemeOverride(property, node.GetProperty(property, fallback));
+    const auto Property = [&](const String& property, const Value& fallback) -> Value {
+        return node.GetProperty(property, fallback);
+    };
+    const auto Effective = Property;
+
+    const auto EmitButtonStyleField = [&](const String& style_var,
+                                          UiDesignerButtonStyleField field,
+                                          const Value& value) {
+        switch(field) {
+        case UiDesignerButtonStyleField::FontFace:
+            out << "\t" << style_var << ".font.FaceName(" << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FontSize:
+            out << "\t" << style_var << ".font.Height("
+                << max(1, (int)value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FontBold:
+            out << "\t" << style_var << ".font.Bold("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FontItalic:
+            out << "\t" << style_var << ".font.Italic("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FaceEnabled:
+            out << "\t" << style_var << ".metrics.face_enabled = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FaceNormal:
+            out << "\t" << style_var << ".palette.face[ST_NORMAL] = UiFill::Solid("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FaceHot:
+            out << "\t" << style_var << ".palette.face[ST_HOT] = UiFill::Solid("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FacePressed:
+            out << "\t" << style_var << ".palette.face[ST_PRESSED] = UiFill::Solid("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::FaceDisabled:
+            out << "\t" << style_var << ".palette.face[ST_DISABLED] = UiFill::Solid("
+                << EmitValue(value) << ");\n";
+            break;
+        case UiDesignerButtonStyleField::Transparent:
+            out << "\t" << style_var << ".transparent = " << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameEnabled:
+            out << "\t" << style_var << ".metrics.frame_enabled = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameNormal:
+            out << "\t" << style_var << ".palette.frame[ST_NORMAL] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameHot:
+            out << "\t" << style_var << ".palette.frame[ST_HOT] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FramePressed:
+            out << "\t" << style_var << ".palette.frame[ST_PRESSED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameDisabled:
+            out << "\t" << style_var << ".palette.frame[ST_DISABLED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameWidth:
+            out << "\t" << style_var << ".metrics.frame_width = "
+                << max(0, (int)value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::Radius:
+            out << "\t" << style_var << ".metrics.radius = "
+                << max(0, (int)value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameDashed:
+            out << "\t" << style_var << ".metrics.dashed = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::FrameDashPattern:
+            out << "\t" << style_var << ".metrics.dash_pattern = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::TextNormal:
+            out << "\t" << style_var << ".palette.ink[ST_NORMAL] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::TextHot:
+            out << "\t" << style_var << ".palette.ink[ST_HOT] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::TextPressed:
+            out << "\t" << style_var << ".palette.ink[ST_PRESSED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::TextDisabled:
+            out << "\t" << style_var << ".palette.ink[ST_DISABLED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::IconNormal:
+            out << "\t" << style_var << ".palette.icon[ST_NORMAL] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::IconHot:
+            out << "\t" << style_var << ".palette.icon[ST_HOT] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::IconPressed:
+            out << "\t" << style_var << ".palette.icon[ST_PRESSED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::IconDisabled:
+            out << "\t" << style_var << ".palette.icon[ST_DISABLED] = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowEnabled:
+            out << "\t" << style_var << ".metrics.shadow.enabled = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowDistance:
+            out << "\t" << style_var << ".metrics.shadow.distance = "
+                << max(0, (int)value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowOffsetX:
+            out << "\t" << style_var << ".metrics.shadow.offset_x = "
+                << (int)value << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowOffsetY:
+            out << "\t" << style_var << ".metrics.shadow.offset_y = "
+                << (int)value << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowAlpha:
+            out << "\t" << style_var << ".metrics.shadow.alpha = "
+                << max(0, min(255, (int)value)) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowColor:
+            out << "\t" << style_var << ".metrics.shadow.color = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowInset:
+            out << "\t" << style_var << ".metrics.shadow.inset = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::ShadowMode:
+            out << "\t" << style_var << ".metrics.shadow.mode = "
+                << (AsString(value) == "Hard" ? "SHADOW_HARD" : "SHADOW_CURVE")
+                << ";\n";
+            break;
+        case UiDesignerButtonStyleField::PressOffsetX:
+            out << "\t" << style_var << ".press_offset.x = "
+                << (int)value << ";\n";
+            break;
+        case UiDesignerButtonStyleField::PressOffsetY:
+            out << "\t" << style_var << ".press_offset.y = "
+                << (int)value << ";\n";
+            break;
+        case UiDesignerButtonStyleField::Overpaint:
+            out << "\t" << style_var << ".overpaint = "
+                << max(0, (int)value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::UnderlineEnabled:
+            out << "\t" << style_var << ".underline = "
+                << EmitValue(value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::UnderlineWidth:
+            out << "\t" << style_var << ".underline_width = "
+                << max(0, (int)value) << ";\n";
+            break;
+        case UiDesignerButtonStyleField::UnderlineOffset:
+            out << "\t" << style_var << ".underline_offset = "
+                << (int)value << ";\n";
+            break;
+        default:
+            break;
+        }
     };
 
+    if(spec.FindProperty("role")) {
+        const String role = AsString(Property("role", "Standard"));
+        if(IsButtonFamily(spec.runtime_kind)) {
+            const String style_var = member + "_style";
+            out << "\tUiButton::Style " << style_var << " = "
+                << ButtonStyleResolverExpr(spec.runtime_kind, role) << ";\n";
+            for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+                if(property.button_style_field == UiDesignerButtonStyleField::None)
+                    continue;
+                const int q = node.theme_overrides.Find(property.id);
+                if(q < 0)
+                    continue;
+                EmitButtonStyleField(style_var, property.button_style_field,
+                                     node.theme_overrides.GetValue(q));
+            }
+            out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
+        }
+        else if(spec.runtime_kind == UiDesignerRuntimeKind::UiPanel)
+            out << "\t" << member << ".SetCustomStyle(UiTheme::ResolvePanel("
+                << EmitRoleExpr(role) << "));\n";
+        else if(spec.runtime_kind == UiDesignerRuntimeKind::UiLabel)
+            out << "\t" << member << ".SetCustomStyle(UiTheme::ResolveLabel("
+                << EmitRoleExpr(role) << "));\n";
+        else if(spec.runtime_kind == UiDesignerRuntimeKind::UiGroupPanel)
+            out << "\t" << member << ".SetCustomStyle(UiTheme::ResolveGroupPanel("
+                << EmitRoleExpr(role) << "));\n";
+    }
+
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout) {
-        const String direction = Effective("direction", "V");
+        const String direction = Property("direction", "V");
         out << "\t" << member << ".SetDirection(UiDirection::"
             << (direction == "H" ? "H" : "V") << ");\n";
     }
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetGridSize("
-            << (int)Effective("columns", 2) << ", "
-            << (int)Effective("rows", 2) << ");\n";
+            << (int)Property("columns", 2) << ", "
+            << (int)Property("rows", 2) << ");\n";
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout ||
        spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetInset(DPI("
-            << max(0, (int)Effective("inset", 0)) << "));\n";
+            << max(0, (int)Property("inset", 0)) << "));\n";
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout ||
        spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetGap(DPI("
-            << max(0, (int)Effective("gap", 0)) << "));\n";
+            << max(0, (int)Property("gap", 0)) << "));\n";
 
     if(spec.FindProperty("tooltip"))
         out << "\t" << member << ".Tip(" << EmitValue(

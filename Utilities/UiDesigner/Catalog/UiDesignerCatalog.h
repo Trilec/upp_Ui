@@ -3,6 +3,7 @@
 
 #include <Utilities/PropertyEditorCore/PropertyEditorCore.h>
 #include <Utilities/UiDesigner/Core/UiDesignerCore.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -77,6 +78,61 @@ enum class UiDesignerRuntimeKind : word {
     UppVScrollBar,
 };
 
+enum class UiDesignerButtonStyleField : byte {
+    None = 0,
+    FontFace,
+    FontSize,
+    FontBold,
+    FontItalic,
+    FaceEnabled,
+    FaceNormal,
+    FaceHot,
+    FacePressed,
+    FaceDisabled,
+    Transparent,
+    FrameEnabled,
+    FrameNormal,
+    FrameHot,
+    FramePressed,
+    FrameDisabled,
+    FrameWidth,
+    Radius,
+    FrameDashed,
+    FrameDashPattern,
+    TextNormal,
+    TextHot,
+    TextPressed,
+    TextDisabled,
+    IconNormal,
+    IconHot,
+    IconPressed,
+    IconDisabled,
+    ShadowEnabled,
+    ShadowDistance,
+    ShadowOffsetX,
+    ShadowOffsetY,
+    ShadowAlpha,
+    ShadowColor,
+    ShadowInset,
+    ShadowMode,
+    PressOffsetX,
+    PressOffsetY,
+    Overpaint,
+    UnderlineEnabled,
+    UnderlineWidth,
+    UnderlineOffset,
+};
+
+const char *UiDesignerButtonStyleFieldName(UiDesignerButtonStyleField field);
+bool UiDesignerParseButtonStyleField(const String& id,
+                                     UiDesignerButtonStyleField& field);
+bool UiDesignerButtonStyleFieldAffectsLayout(UiDesignerButtonStyleField field);
+Value UiDesignerButtonStyleFieldValue(const UiButton::Style& style,
+                                      UiDesignerButtonStyleField field);
+void UiDesignerApplyButtonStyleField(UiButton::Style& style,
+                                     UiDesignerButtonStyleField field,
+                                     const Value& value);
+
 enum UiDesignerControlCapability : dword {
     UiDesignerCapabilityNone          = 0,
     UiDesignerCapabilityRuntimeCtrl   = 1 << 0,
@@ -116,6 +172,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     Value maximum;
     Value step;
     int decimals = 3;
+    UiDesignerButtonStyleField button_style_field = UiDesignerButtonStyleField::None;
 
     Array<PropertyEditorChoice> choices;
 
@@ -129,6 +186,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
           kind(other.kind), domain(other.domain), impact(other.impact),
           default_value(other.default_value), minimum(other.minimum),
           maximum(other.maximum), step(other.step), decimals(other.decimals),
+          button_style_field(other.button_style_field),
           resettable(other.resettable), read_only(other.read_only),
           designer_only(other.designer_only)
     {
@@ -144,6 +202,7 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     UiDesignerThemeOverrideSpec& Impact(PropertyEditorImpact value);
     UiDesignerThemeOverrideSpec& Domain(PropertyEditorDomain value);
     UiDesignerThemeOverrideSpec& Default(const Value& value, bool can_reset = true);
+    UiDesignerThemeOverrideSpec& StyleField(UiDesignerButtonStyleField value);
     UiDesignerThemeOverrideSpec& ReadOnly(bool on = true);
     UiDesignerThemeOverrideSpec& DesignerOnly(bool on = true);
 
@@ -229,6 +288,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     bool stock_upp = false;
 
     const UiDesignerPropertySpec* FindProperty(const String& id) const;
+    const UiDesignerThemeOverrideSpec* FindThemeOverride(const String& id) const;
     const UiDesignerEventSpec* FindEvent(const String& id) const;
     bool IsSemanticItem() const {
         return HasUiDesignerCapability(capabilities,
