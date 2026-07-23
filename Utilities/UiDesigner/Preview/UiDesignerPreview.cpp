@@ -41,19 +41,35 @@ static void ApplyButtonStyleOverrides(Ctrl& ctrl,
     if(!button)
         return;
 
+    const UiButton::Style preserve = button->GetStyle();
     UiButton::Style style = ResolveButtonStyleBase(node, spec);
     for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
         if(property.button_style_field == UiDesignerButtonStyleField::None)
             continue;
         const int q = node.theme_overrides.Find(property.id);
+        if(q < 0 && !(overlay && overlay->Has(node.id,
+                UiDesignerTransientValueKind::ThemeOverride, property.id)))
+            continue;
         const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q)
                                        : property.default_value;
         const Value effective = overlay
-            ? overlay->Resolve(node.id, property.id, canonical)
+            ? overlay->Resolve(node.id,
+                               UiDesignerTransientValueKind::ThemeOverride,
+                               property.id, canonical)
             : canonical;
         UiDesignerApplyButtonStyleField(style, property.button_style_field,
                                         effective);
     }
+    style.align_h = preserve.align_h;
+    style.align_v = preserve.align_v;
+    style.icon_side = preserve.icon_side;
+    style.content_gap = preserve.content_gap;
+    style.metrics.content_margin = preserve.metrics.content_margin;
+    style.underline = preserve.underline;
+    style.underline_width = preserve.underline_width;
+    style.underline_offset = preserve.underline_offset;
+    style.press_offset = preserve.press_offset;
+    style.overpaint = preserve.overpaint;
     button->SetCustomStyle(style);
 }
 
@@ -1244,7 +1260,9 @@ Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
                                          const Value& fallback) const
 {
     const Value canonical = node.GetProperty(property, fallback);
-    return overlay_ ? overlay_->Resolve(node.id, property, canonical) : canonical;
+    return overlay_ ? overlay_->Resolve(node.id,
+                                        UiDesignerTransientValueKind::NormalProperty,
+                                        property, canonical) : canonical;
 }
 
 void UiDesignerPreviewCanvas::ApplyAllProperties(
@@ -1575,7 +1593,8 @@ bool UiDesignerPreviewCanvas::RebuildSubtree(UiDesignerNodeId root)
 }
 
 UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
-    UiDesignerNodeId node_id, const String& property, const Value& value)
+    UiDesignerNodeId node_id, const String& property, const Value& value,
+    UiDesignerTransientValueKind kind)
 {
     const int q = FindInstance(node_id);
     const UiDesignerNode* node = document_ ? document_->Find(node_id) : nullptr;
@@ -1585,7 +1604,12 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         return UiDesignerApplyResult::Rejected;
     }
 
-    if(const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(property)) {
+    if(kind == UiDesignerTransientValueKind::ThemeOverride) {
+        const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(property);
+        if(!override_spec) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
         if(!IsButtonStyleControl(spec->runtime_kind) || override_spec->button_style_field == UiDesignerButtonStyleField::None) {
             stats_.rejected++;
             return UiDesignerApplyResult::Rejected;
@@ -1671,7 +1695,10 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
         Refresh();
     }
     for(const UiDesignerPropertyChange& change : changes.properties)
-        ApplyProperty(change.node, change.property, change.new_value);
+        ApplyProperty(change.node, change.property, change.new_value,
+                      change.kind == UiDesignerPropertyChangeKind::ThemeOverride
+                          ? UiDesignerTransientValueKind::ThemeOverride
+                          : UiDesignerTransientValueKind::NormalProperty);
     if(!changes.behaviors.IsEmpty())
         Refresh();
 }

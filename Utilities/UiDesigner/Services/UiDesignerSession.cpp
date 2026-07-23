@@ -595,9 +595,11 @@ bool UiDesignerSession::PreviewProperty(
     }
 
     for(UiDesignerNodeId id : state_.selection.nodes) {
-        overlay_.Set(id, property, value);
-        if(projection_)
-            projection_->ApplyTransient(id, property, value);
+        overlay_.Set(id, UiDesignerTransientValueKind::NormalProperty,
+                     property, value);
+    if(projection_)
+        projection_->ApplyTransient(id, UiDesignerTransientValueKind::NormalProperty,
+                                    property, value);
     }
     error.Clear();
     return true;
@@ -645,7 +647,8 @@ bool UiDesignerSession::CommitProperty(
     }
 
     for(UiDesignerNodeId id : targets)
-        overlay_.Remove(id, property);
+        overlay_.Remove(id, UiDesignerTransientValueKind::NormalProperty,
+                        property);
     error.Clear();
     return true;
 }
@@ -792,10 +795,14 @@ void UiDesignerSession::CancelPreview()
         if(!node || !spec)
             continue;
         if(const UiDesignerPropertySpec* property = spec->FindProperty(item.property))
-            projection_->ApplyTransient(item.node, item.property,
+            projection_->ApplyTransient(item.node,
+                                        UiDesignerTransientValueKind::NormalProperty,
+                                        item.property,
                                         ResolvePropertyValue(*node, *property));
         else if(const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(item.property))
-            projection_->ApplyTransient(item.node, item.property,
+            projection_->ApplyTransient(item.node,
+                                        UiDesignerTransientValueKind::ThemeOverride,
+                                        item.property,
                                         ResolveThemeOverrideValue(*node, *override_spec));
     }
 }

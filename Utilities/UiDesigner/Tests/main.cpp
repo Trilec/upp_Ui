@@ -416,7 +416,11 @@ CONSOLE_APP_MAIN
               Format("UiButton icon size applies (got %d x %d)",
                      button->GetIconSize().cx, button->GetIconSize().cy));
         Check(button->GetContentInset() == Rect(DPI(7), DPI(6), DPI(5), DPI(4)),
-              "UiButton content inset applies");
+              Format("UiButton content inset applies (got %d,%d,%d,%d)",
+                     button->GetContentInset().left,
+                     button->GetContentInset().top,
+                     button->GetContentInset().right,
+                     button->GetContentInset().bottom));
         Check(button->GetContentGap() == 4,
               "UiButton content gap remains default");
         Check(button->GetStyle().align_h == UiAlign::CENTER &&
@@ -498,11 +502,15 @@ CONSOLE_APP_MAIN
           "legacy property unwrapping");
 
     UiDesignerTransientOverlay overlay;
-    overlay.Set(node, "text", "Transient");
-    Check(overlay.Resolve(node, "text", "Hello") == "Transient",
+    overlay.Set(node, UiDesignerTransientValueKind::NormalProperty,
+                "text", "Transient");
+    Check(overlay.Resolve(node, UiDesignerTransientValueKind::NormalProperty,
+                          "text", "Hello") == "Transient",
           "transient overlay");
-    overlay.Remove(node, "text");
-    Check(overlay.Resolve(node, "text", "Hello") == "Hello",
+    overlay.Remove(node, UiDesignerTransientValueKind::NormalProperty,
+                   "text");
+    Check(overlay.Resolve(node, UiDesignerTransientValueKind::NormalProperty,
+                          "text", "Hello") == "Hello",
           "overlay cancellation");
 
     UiDesignerThemeDocument theme;
@@ -594,10 +602,14 @@ CONSOLE_APP_MAIN
         preview_session.Commands().GetHistoryPosition();
     Check(preview_session.PreviewProperty("inset", 20, error),
           "transient inset preview succeeds");
-    Check(preview_session.PreviewOverlay().Has(transient_box, "inset"),
+    Check(preview_session.PreviewOverlay().Has(
+              transient_box, UiDesignerTransientValueKind::NormalProperty,
+              "inset"),
           "transient inset is tracked by node/property");
     preview_session.CancelPreview();
-    Check(!preview_session.PreviewOverlay().Has(transient_box, "inset"),
+    Check(!preview_session.PreviewOverlay().Has(
+              transient_box, UiDesignerTransientValueKind::NormalProperty,
+              "inset"),
           "cancel clears only tracked transient properties");
     Check(preview_session.Document().GetProperty(transient_box, "inset") == 8,
           "cancel leaves canonical inset unchanged");

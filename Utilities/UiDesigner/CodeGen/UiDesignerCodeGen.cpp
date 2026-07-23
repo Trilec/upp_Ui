@@ -433,19 +433,33 @@ void UiDesignerCodeGenerator::EmitSetup(
     if(spec.FindProperty("role")) {
         const String role = AsString(Property("role", "Standard"));
         if(IsButtonFamily(spec.runtime_kind)) {
-            const String style_var = member + "_style";
-            out << "\tUiButton::Style " << style_var << " = "
-                << ButtonStyleResolverExpr(spec.runtime_kind, role) << ";\n";
+            bool has_override = false;
             for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
                 if(property.button_style_field == UiDesignerButtonStyleField::None)
                     continue;
-                const int q = node.theme_overrides.Find(property.id);
-                if(q < 0)
-                    continue;
-                EmitButtonStyleField(style_var, property.button_style_field,
-                                     node.theme_overrides.GetValue(q));
+                if(node.theme_overrides.Find(property.id) >= 0) {
+                    has_override = true;
+                    break;
+                }
             }
-            out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
+            if(has_override) {
+                const String style_var = member + "_style";
+                out << "\tUiButton::Style " << style_var << " = "
+                    << ButtonStyleResolverExpr(spec.runtime_kind, role) << ";\n";
+                for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
+                    if(property.button_style_field == UiDesignerButtonStyleField::None)
+                        continue;
+                    const int q = node.theme_overrides.Find(property.id);
+                    if(q < 0)
+                        continue;
+                    EmitButtonStyleField(style_var, property.button_style_field,
+                                         node.theme_overrides.GetValue(q));
+                }
+                out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
+            }
+            else
+                out << "\t" << member << ".SetCustomStyle("
+                    << ButtonStyleResolverExpr(spec.runtime_kind, role) << ");\n";
         }
         else if(spec.runtime_kind == UiDesignerRuntimeKind::UiPanel)
             out << "\t" << member << ".SetCustomStyle(UiTheme::ResolvePanel("

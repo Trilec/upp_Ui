@@ -108,12 +108,16 @@ public:
     bool RebuildSubtree(UiDesignerNodeId root);
     UiDesignerApplyResult ApplyProperty(UiDesignerNodeId node,
                                         const String& property,
-                                        const Value& value);
+                                        const Value& value,
+                                        UiDesignerTransientValueKind kind
+                                            = UiDesignerTransientValueKind::NormalProperty);
     void ApplyChangeSet(const UiDesignerChangeSet& changes) override;
-    void ApplyTransient(UiDesignerNodeId node, const String& property,
+    void ApplyTransient(UiDesignerNodeId node,
+                        UiDesignerTransientValueKind kind,
+                        const String& property,
                         const Value& value) override
     {
-        ApplyProperty(node, property, value);
+        ApplyProperty(node, property, value, kind);
     }
 
     Ctrl* FindRuntime(UiDesignerNodeId node);

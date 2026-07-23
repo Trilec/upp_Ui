@@ -369,9 +369,12 @@ bool UiDesignerSession::PreviewThemeOverride(const String& property,
     const UiDesignerNode* node = document_.Find(state_.selection.primary);
     if(!node)
         return false;
-    overlay_.Set(node->id, property, value);
+    overlay_.Set(node->id, UiDesignerTransientValueKind::ThemeOverride,
+                 property, value);
     if(projection_)
-        projection_->ApplyTransient(node->id, property, value);
+        projection_->ApplyTransient(node->id,
+                                    UiDesignerTransientValueKind::ThemeOverride,
+                                    property, value);
     if(PropertyEditorItem *item = theme_override_model_.Find(property)) {
         theme_override_model_.SetValue(property, value, false);
         item->SetInherited(false);
@@ -404,7 +407,8 @@ bool UiDesignerSession::CommitThemeOverride(const String& property,
         error = commands_.GetLastError();
         return false;
     }
-    overlay_.Remove(node->id, property);
+    overlay_.Remove(node->id, UiDesignerTransientValueKind::ThemeOverride,
+                    property);
     error.Clear();
     return true;
 }
@@ -430,7 +434,8 @@ bool UiDesignerSession::ResetThemeOverride(const String& property, String& error
         error = commands_.GetLastError();
         return false;
     }
-    overlay_.Remove(node->id, property);
+    overlay_.Remove(node->id, UiDesignerTransientValueKind::ThemeOverride,
+                    property);
     error.Clear();
     return true;
 }

@@ -18,6 +18,7 @@ public:
     virtual void RebuildDocument() = 0;
     virtual void ApplyChangeSet(const UiDesignerChangeSet& changes) = 0;
     virtual void ApplyTransient(UiDesignerNodeId node,
+                                UiDesignerTransientValueKind kind,
                                 const String& property,
                                 const Value& value) = 0;
 };
