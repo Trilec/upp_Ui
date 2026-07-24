@@ -16,6 +16,53 @@ static void Check(bool condition, const String& message)
     }
 }
 
+static bool SameButtonStyle(const UiButton::Style& a, const UiButton::Style& b)
+{
+    auto SameFill = [](const UiFill& x, const UiFill& y) {
+        if(x.IsNone() || y.IsNone())
+            return x.IsNone() && y.IsNone();
+        if(x.IsSolid() || y.IsSolid())
+            return x.IsSolid() && y.IsSolid() && x.color == y.color;
+        return x.IsImage() && y.IsImage();
+    };
+    for(int i = 0; i < 4; i++) {
+        if(!SameFill(a.palette.face[i], b.palette.face[i]))
+            return false;
+        if(a.palette.frame[i] != b.palette.frame[i])
+            return false;
+        if(a.palette.ink[i] != b.palette.ink[i])
+            return false;
+        if(a.palette.icon[i] != b.palette.icon[i])
+            return false;
+    }
+    return a.metrics.face_enabled == b.metrics.face_enabled &&
+           a.metrics.frame_enabled == b.metrics.frame_enabled &&
+           a.metrics.content_margin == b.metrics.content_margin &&
+           a.metrics.shadow.enabled == b.metrics.shadow.enabled &&
+           a.metrics.shadow.distance == b.metrics.shadow.distance &&
+           a.metrics.shadow.offset_x == b.metrics.shadow.offset_x &&
+           a.metrics.shadow.offset_y == b.metrics.shadow.offset_y &&
+           a.metrics.shadow.alpha == b.metrics.shadow.alpha &&
+           a.metrics.shadow.color == b.metrics.shadow.color &&
+           a.metrics.shadow.inset == b.metrics.shadow.inset &&
+           a.metrics.shadow.mode == b.metrics.shadow.mode &&
+           a.press_offset == b.press_offset &&
+           a.overpaint == b.overpaint &&
+           a.font.GetHeight() == b.font.GetHeight() &&
+           a.font.IsBold() == b.font.IsBold() &&
+           a.font.IsItalic() == b.font.IsItalic() &&
+           a.transparent == b.transparent &&
+           a.align_h == b.align_h &&
+           a.align_v == b.align_v &&
+           a.icon_side == b.icon_side &&
+           a.content_gap == b.content_gap &&
+           a.underline == b.underline &&
+           a.underline_width == b.underline_width &&
+           a.underline_offset == b.underline_offset &&
+           a.skin.enabled == b.skin.enabled &&
+           a.skin.content_inset == b.skin.content_inset;
+}
+
 CONSOLE_APP_MAIN
 {
     UiDesignerCatalog catalog;
@@ -629,6 +676,220 @@ CONSOLE_APP_MAIN
           "cancel leaves canonical inset unchanged");
     Check(preview_session.Commands().GetHistoryPosition() == history_before_preview_cancel,
           "cancel preview creates no undo command");
+
+    {
+    auto build_preview = [&](UiDesignerDocument& document,
+                             UiDesignerPreviewCanvas& preview,
+                             UiDesignerSelection& selection) {
+        preview.SetRect(0, 0, 512, 250);
+        preview.Bind(&document, &catalog, nullptr, &selection);
+        preview.RebuildDocument();
+    };
+
+    UiDesignerDocument standard_button_document;
+    UiDesignerCommandService standard_button_commands(standard_button_document);
+    UiDesignerNodeId standard_button = standard_button_commands.AddNode(
+        "UiButton", "standard_button", standard_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add standard button");
+    UiDesignerSelection standard_button_selection;
+    UiDesignerPreviewCanvas standard_button_preview;
+    build_preview(standard_button_document, standard_button_preview, standard_button_selection);
+    if(auto *runtime_button = dynamic_cast<UiButton *>(
+            standard_button_preview.FindRuntime(standard_button))) {
+    }
+
+    UiDesignerDocument accent_button_document;
+    UiDesignerCommandService accent_button_commands(accent_button_document);
+    UiDesignerNodeId accent_button = accent_button_commands.AddNode(
+        "UiButton", "accent_button", accent_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add accent button");
+    Check(accent_button_commands.SetProperty(
+        accent_button, "role", "Accent",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set accent role"),
+          "accent button role command");
+    UiDesignerSelection accent_button_selection;
+    UiDesignerPreviewCanvas accent_button_preview;
+    build_preview(accent_button_document, accent_button_preview, accent_button_selection);
+    if(auto *runtime_button = dynamic_cast<UiButton *>(
+            accent_button_preview.FindRuntime(accent_button))) {
+        Check(runtime_button->HasCustomStyle(),
+              "accent Button without overrides uses a custom style");
+        Check(runtime_button->GetStyle().palette.icon[ST_NORMAL] ==
+                  UiTheme::ResolveButton(UiRole::Accent).palette.icon[ST_NORMAL],
+              "accent Button uses the Accent icon ink");
+    }
+
+    UiDesignerDocument override_button_document;
+    UiDesignerCommandService override_button_commands(override_button_document);
+    UiDesignerNodeId override_button = override_button_commands.AddNode(
+        "UiButton", "override_button", override_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add override button");
+    Check(override_button_commands.SetProperty(
+        override_button, "role", "Accent",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set accent role"),
+          "override button role command");
+    Check(override_button_commands.SetThemeOverride(
+        override_button, "font_size", 24,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button font size"),
+          "override button font-size command");
+    Check(override_button_commands.SetProperty(
+        override_button, "align_h", "Right",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button align h"),
+          "override button align_h command");
+    Check(override_button_commands.SetProperty(
+        override_button, "align_v", "Top",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button align v"),
+          "override button align_v command");
+    Check(override_button_commands.SetProperty(
+        override_button, "icon_side", "Right",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button icon side"),
+          "override button icon_side command");
+    Check(override_button_commands.SetProperty(
+        override_button, "content_gap", 9,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button content gap"),
+          "override button content_gap command");
+    Check(override_button_commands.SetProperty(
+        override_button, "content_inset_left", 1,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button inset left"),
+          "override button inset left command");
+    Check(override_button_commands.SetProperty(
+        override_button, "content_inset_top", 2,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button inset top"),
+          "override button inset top command");
+    Check(override_button_commands.SetProperty(
+        override_button, "content_inset_right", 3,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button inset right"),
+          "override button inset right command");
+    Check(override_button_commands.SetProperty(
+        override_button, "content_inset_bottom", 4,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set button inset bottom"),
+          "override button inset bottom command");
+    UiDesignerSelection override_button_selection;
+    UiDesignerPreviewCanvas override_button_preview;
+    build_preview(override_button_document, override_button_preview, override_button_selection);
+    if(auto *runtime_button = dynamic_cast<UiButton *>(
+            override_button_preview.FindRuntime(override_button))) {
+        Check(runtime_button->HasCustomStyle(),
+              "accent Button with overrides keeps custom style");
+        Check(runtime_button->GetStyle().font.GetHeight() == 24,
+              "accent Button keeps authored font size");
+        Check(runtime_button->GetStyle().align_h == UiAlign::RIGHT &&
+              runtime_button->GetStyle().align_v == UiAlign::TOP,
+              "accent Button keeps authored alignment");
+        Check(runtime_button->GetStyle().icon_side == UiAlign::RIGHT,
+              "accent Button keeps authored icon side");
+        Check(runtime_button->GetStyle().content_gap == 9,
+              "accent Button keeps authored content gap");
+        Check(runtime_button->GetStyle().metrics.content_margin ==
+                  Rect(DPI(1), DPI(2), DPI(3), DPI(4)),
+              "accent Button keeps authored content inset");
+    }
+    Check(override_button_commands.RemoveThemeOverride(
+        override_button, "font_size",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Remove button font size"),
+          "remove final button override command");
+    override_button_preview.RebuildDocument();
+    if(auto *runtime_button = dynamic_cast<UiButton *>(
+            override_button_preview.FindRuntime(override_button))) {
+        Check(runtime_button->HasCustomStyle(),
+              "accent Button retains custom style after the last override is removed");
+        Check(runtime_button->GetStyle().font.GetHeight() != 24,
+              "accent Button no longer keeps the removed font override");
+    }
+
+    UiDesignerDocument subtle_tool_document;
+    UiDesignerCommandService subtle_tool_commands(subtle_tool_document);
+    const UiDesignerControlSpec* tool_button_spec = catalog.Find("UiToolButton");
+    UiDesignerNodeId subtle_tool = subtle_tool_commands.AddNode(
+        "UiToolButton", "subtle_tool", subtle_tool_document.GetRootId(),
+        tool_button_spec ? tool_button_spec->node_flags : 0,
+        tool_button_spec ? tool_button_spec->defaults : ValueMap(),
+        "Add subtle tool button");
+    Check(subtle_tool_commands.SetProperty(
+        subtle_tool, "role", "Subtle",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set subtle role"),
+          "subtle tool button role command");
+    UiDesignerSelection subtle_tool_selection;
+    UiDesignerPreviewCanvas subtle_tool_preview;
+    build_preview(subtle_tool_document, subtle_tool_preview, subtle_tool_selection);
+    if(auto *runtime_tool = dynamic_cast<UiToolButton *>(
+            subtle_tool_preview.FindRuntime(subtle_tool))) {
+        Check(runtime_tool->HasCustomStyle(),
+              "subtle ToolButton without overrides uses a custom style");
+        Check(runtime_tool->GetStyle().palette.icon[ST_NORMAL] ==
+                  UiTheme::ResolveToolButton(UiRole::Subtle).palette.icon[ST_NORMAL],
+              "subtle ToolButton uses the resolved tool-button icon ink");
+    }
+
+    UiDesignerDocument shadow_button_document;
+    UiDesignerCommandService shadow_button_commands(shadow_button_document);
+    UiDesignerNodeId shadow_button = shadow_button_commands.AddNode(
+        "UiButton", "shadow_button", shadow_button_document.GetRootId(),
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add shadow button");
+    Check(shadow_button_commands.SetProperty(
+        shadow_button, "role", "Accent",
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set accent role"),
+          "shadow button role command");
+    Check(shadow_button_commands.SetThemeOverride(
+        shadow_button, "shadow_distance", 12,
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set shadow distance"),
+          "shadow distance command");
+    Check(shadow_button_commands.SetThemeOverride(
+        shadow_button, "shadow_color", Color(12, 34, 56),
+        UiDesignerImpactPaint | UiDesignerImpactCode, "Set shadow color"),
+          "shadow color command");
+    UiDesignerSelection shadow_button_selection;
+    UiDesignerPreviewCanvas shadow_button_preview;
+    build_preview(shadow_button_document, shadow_button_preview, shadow_button_selection);
+    if(auto *runtime_button = dynamic_cast<UiButton *>(
+            shadow_button_preview.FindRuntime(shadow_button))) {
+        Check(!runtime_button->GetStyle().metrics.shadow.enabled,
+              "shadow subfields do not enable the master shadow flag");
+        Check(runtime_button->GetStyle().metrics.shadow.distance == 12 &&
+              runtime_button->GetStyle().metrics.shadow.color == Color(12, 34, 56),
+              "shadow subfields still author their values");
+    }
+
+    UiDesignerDocument tree_document;
+    UiDesignerCommandService tree_commands(tree_document);
+    UiDesignerNodeId tree_node = tree_commands.AddNode(
+        "UiTree", "tree_node", tree_document.GetRootId(),
+        tree ? tree->node_flags : 0, tree ? tree->defaults : ValueMap(),
+        "Add tree");
+    UiDesignerSelection tree_selection;
+    UiDesignerPreviewCanvas tree_preview;
+    build_preview(tree_document, tree_preview, tree_selection);
+    if(auto *runtime_tree = dynamic_cast<UiTree *>(tree_preview.FindRuntime(tree_node)))
+        Check(!runtime_tree->HasCustomStyle(), "UiTree no overrides clears stale custom style");
+
+    UiDesignerDocument list_document;
+    UiDesignerCommandService list_commands(list_document);
+    UiDesignerNodeId list_node = list_commands.AddNode(
+        "UiList", "list_node", list_document.GetRootId(),
+        list ? list->node_flags : 0, list ? list->defaults : ValueMap(),
+        "Add list");
+    UiDesignerSelection list_selection;
+    UiDesignerPreviewCanvas list_preview;
+    build_preview(list_document, list_preview, list_selection);
+    if(auto *runtime_list = dynamic_cast<UiList *>(list_preview.FindRuntime(list_node)))
+        Check(!runtime_list->HasCustomStyle(), "UiList no overrides clears stale custom style");
+
+    UiDesignerDocument menu_document;
+    UiDesignerCommandService menu_commands(menu_document);
+    UiDesignerNodeId menu_node = menu_commands.AddNode(
+        "UiMenu", "menu_node", menu_document.GetRootId(),
+        menu ? menu->node_flags : 0, menu ? menu->defaults : ValueMap(),
+        "Add menu");
+    UiDesignerSelection menu_selection;
+    UiDesignerPreviewCanvas menu_preview;
+    build_preview(menu_document, menu_preview, menu_selection);
+    if(auto *runtime_menu = dynamic_cast<UiMenu *>(menu_preview.FindRuntime(menu_node)))
+        Check(!runtime_menu->HasCustomStyle(), "UiMenu no overrides clears stale custom style");
+    }
 
     UiDesignerNodeId c = session.AddControl("UiLabel");
     session.Select(c, false);

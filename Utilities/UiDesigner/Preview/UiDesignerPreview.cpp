@@ -1580,6 +1580,21 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         return result;
     }
 
+    const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(*spec);
+    if(adapter && property == "role") {
+        UiDesignerPreviewInstance& instance = instances_[q];
+        if(!instance.control) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        ApplyAllProperties(instance, *node);
+        stats_.paint_updates++;
+        stats_.live_applies++;
+        Layout();
+        Refresh();
+        return UiDesignerApplyResult::AppliedPaint;
+    }
+
     UiDesignerApplyResult result;
     if(instances_[q].semantic) {
         result = UiDesignerApplyResult::RequiresSubtreeRebuild;

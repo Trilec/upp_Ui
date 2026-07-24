@@ -314,31 +314,24 @@ void UiDesignerApplyButtonStyleField(UiButton::Style& style,
         break;
     case UiDesignerButtonStyleField::ShadowDistance:
         style.metrics.shadow.distance = max(0, (int)value);
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowOffsetX:
         style.metrics.shadow.offset_x = (int)value;
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowOffsetY:
         style.metrics.shadow.offset_y = (int)value;
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowAlpha:
         style.metrics.shadow.alpha = minmax((int)value, 0, 255);
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowColor:
         style.metrics.shadow.color = (Color)value;
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowInset:
         style.metrics.shadow.inset = (bool)value;
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::ShadowMode:
         style.metrics.shadow.mode = value == "Hard" ? SHADOW_HARD : SHADOW_CURVE;
-        style.metrics.shadow.enabled = true;
         break;
     case UiDesignerButtonStyleField::PressOffsetX:
         style.press_offset.x = (int)value;
@@ -803,7 +796,6 @@ public:
         if(!button)
             return;
 
-        const UiButton::Style preserve = button->GetStyle();
         UiButton::Style style = ResolveButtonStyleBase(tool_button_, node);
         bool authored = false;
         for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
@@ -821,21 +813,10 @@ public:
             UiDesignerApplyButtonStyleField(style, mapped, effective);
         }
         const UiRole role = ParseRole(node.GetProperty("role", "Standard"));
-        if(authored) {
-            style.align_h = preserve.align_h;
-            style.align_v = preserve.align_v;
-            style.icon_side = preserve.icon_side;
-            style.content_gap = preserve.content_gap;
-            style.metrics.content_margin = preserve.metrics.content_margin;
-            style.underline = preserve.underline;
-            style.underline_width = preserve.underline_width;
-            style.underline_offset = preserve.underline_offset;
-            style.press_offset = preserve.press_offset;
-            style.overpaint = preserve.overpaint;
+        if(authored)
             button->SetCustomStyle(style);
-        } else if(role != UiRole::Standard) {
+        else if(role != UiRole::Standard)
             button->SetCustomStyle(style);
-        }
         else
             button->ClearCustomStyle();
     }
@@ -850,20 +831,8 @@ public:
             return;
 
         if(!authored) {
-            const String style_var = member + "_style";
-            out << "\tUiButton::Style " << style_var << " = "
-                << ButtonStyleExpr(tool_button_, role) << ";\n";
-            for(const UiDesignerThemeOverrideSpec& property : spec.theme_overrides) {
-                UiDesignerButtonStyleField field;
-                if(!UiDesignerParseButtonStyleField(property.adapter_field_id, field))
-                    continue;
-                const int q = node.theme_overrides.Find(property.id);
-                if(q < 0)
-                    continue;
-                EmitButtonStyleField(out, style_var, field,
-                    node.theme_overrides.GetValue(q));
-            }
-            out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
+            out << "\t" << member << ".SetCustomStyle("
+                << ButtonStyleExpr(tool_button_, role) << ");\n";
             return;
         }
 
