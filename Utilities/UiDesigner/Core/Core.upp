@@ -7,6 +7,7 @@ uses
 file
     UiDesignerCore.h,
     UiDesignerTypes.h,
+    UiDesignerSizing.h,
     UiDesignerDocument.h,
     UiDesignerDocument.cpp,
     UiDesignerOverlay.h,

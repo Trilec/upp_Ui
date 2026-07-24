@@ -1,5 +1,6 @@
 #include "UiDesignerPreview.h"
 #include "UiDesignerVisuals.h"
+#include <Utilities/UiDesigner/Core/UiDesignerSizing.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiColorPicker.h>
@@ -1214,14 +1215,23 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
     if(!spec || !instance.control)
         return;
     const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(*spec);
+    UiDesignerNode effective = node;
+    if(overlay_) {
+        const Value canonical_role = node.GetProperty("role", "Standard");
+        const Value transient_role = overlay_->Resolve(
+            node.id, UiDesignerTransientValueKind::NormalProperty,
+            "role", canonical_role);
+        if(transient_role != canonical_role)
+            effective.SetProperty("role", transient_role);
+    }
     if(adapter)
-        adapter->ApplyPreviewStyle(*instance.control, node, *spec, overlay_);
+        adapter->ApplyPreviewStyle(*instance.control, effective, *spec, overlay_);
     for(const UiDesignerPropertySpec& property : spec->properties)
         if(property.id == "role" && adapter)
             continue;
         else
         UiDesignerPreviewFactory::Apply(*instance.control, *spec,
-            property.id, Effective(node, property.id, property.default_value));
+            property.id, Effective(effective, property.id, property.default_value));
 }
 
 static void ConfigureBoxSpacer(UiBoxLayout& box,
