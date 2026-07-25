@@ -1194,12 +1194,27 @@ UiDesignerNodeId UiDesignerPreviewCanvas::HitNode(Point p) const
 
 void UiDesignerPreviewCanvas::DestroyInstances()
 {
+    int destroyed = 0;
     for(UiDesignerPreviewInstance& instance : instances_)
-        if(instance.control)
+        if(instance.control) {
             instance.control->Remove();
+            destroyed++;
+        }
     instances_.Clear();
     rects_.Clear();
     geometry_ = UiDesignerGeometrySnapshot();
+    stats_.live_instance_destructions += destroyed;
+}
+
+void UiDesignerPreviewCanvas::ResetPerformance()
+{
+    stats_.Clear();
+    resize_history_.Clear();
+}
+
+void UiDesignerPreviewCanvas::RecordResizeSample(const UiDesignerResizeSample& sample)
+{
+    resize_history_.Add(sample);
 }
 
 Value UiDesignerPreviewCanvas::Effective(const UiDesignerNode& node,
@@ -1418,6 +1433,7 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
             max(0, (int)Effective(node, "width", 160)),
             max(0, (int)Effective(node, "height", 32)));
         stats_.layout_item_updates++;
+        stats_.absolute_layout_updates++;
         return;
     }
 
@@ -1458,6 +1474,7 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
             item.AlignSelf(UiDesignerResolveBoxAlign(sizing.cross_align));
         }
         stats_.layout_item_updates++;
+        stats_.box_layout_passes++;
         return;
     }
 
@@ -1481,6 +1498,7 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
             sizing.max.cy > 0 ? max(sizing.max.cy, max(sizing.min.cy, natural.cy)) : INT_MAX));
         grid->ResumeLayout(true);
         stats_.layout_item_updates++;
+        stats_.grid_layout_passes++;
         return;
     }
 }
@@ -1530,6 +1548,7 @@ void UiDesignerPreviewCanvas::BuildNode(
     instance.control = UiDesignerPreviewFactory::Create(*spec);
     if(!instance.control)
         return;
+    stats_.live_instance_creations++;
     UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
     if(parent_instance && parent_instance->control)
         AttachRuntimeChild(*parent_instance->control, *instance.control,
@@ -1879,10 +1898,14 @@ void UiDesignerPreviewCanvas::Layout()
 {
     if(!document_)
         return;
+    const int layout_start = msecs();
+    const int geometry_walk_start = msecs();
     const UiDesignerNode* root = document_->Find(document_->GetRootId());
     if(!root)
         return;
     stats_.layout_count++;
+    stats_.preview_layout_calls++;
+    stats_.full_geometry_walks++;
     rects_.Clear();
     // Window is an implicit document host, not another runtime Ctrl. Its
     // rectangle is nevertheless real so hierarchy selection and resize
@@ -1891,7 +1914,9 @@ void UiDesignerPreviewCanvas::Layout()
     int ordinal = 0;
     for(UiDesignerNodeId child : root->children)
         LayoutNode(child, ordinal++, 0);
+    const int geometry_walk_ms = msecs(geometry_walk_start);
 
+    const int snapshot_start = msecs();
     UiDesignerGeometrySnapshotBuilder snapshot;
     UiDesignerGeometryRecord root_record;
     root_record.node = root->id;
@@ -1951,10 +1976,12 @@ void UiDesignerPreviewCanvas::Layout()
                     record.item_rects.Add(box->GetItemRect(i).Offseted(record.rect.TopLeft()));
             if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get())) {
                 grid->GetCellRects(record.cell_rects);
+                stats_.cached_grid_geometry_reads++;
                 for(Rect& cell : record.cell_rects)
                     cell = cell.Offseted(record.rect.TopLeft());
                 for(int i = 0; i < grid->GetItemCount(); i++)
                     record.item_rects.Add(grid->GetItemRect(i).Offseted(record.rect.TopLeft()));
+                stats_.cached_grid_geometry_publications++;
             }
             for(int i = 1; i < record.item_rects.GetCount(); i++) {
                 Rect a = record.item_rects[i - 1], b = record.item_rects[i];
@@ -1990,6 +2017,20 @@ void UiDesignerPreviewCanvas::Layout()
     geometry_ = snapshot.Publish();
     stats_.snapshot_publications++;
     stats_.drop_region_publications++;
+    const int snapshot_ms = msecs(snapshot_start);
+    int grid_builds = 0;
+    int grid_queries = 0;
+    for(const UiDesignerPreviewInstance& instance : instances_)
+        if(const UiGridLayout *grid = instance.control
+            ? dynamic_cast<const UiGridLayout *>(instance.control.Get()) : nullptr) {
+            grid_builds += grid->GetResolvedCellGeometryBuildCount();
+            grid_queries += grid->GetResolvedCellGeometryQueryCount();
+        }
+    stats_.track_size_calculations = grid_builds;
+    stats_.cached_grid_geometry_reads = grid_queries;
+    stats_.geometry_walk_time_ms = geometry_walk_ms;
+    stats_.snapshot_time_ms = snapshot_ms;
+    stats_.layout_time_ms = msecs(layout_start);
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(
@@ -2026,12 +2067,15 @@ void UiDesignerPreviewCanvas::PaintSemantic(
 
 void UiDesignerPreviewCanvas::Paint(Draw& w)
 {
+    const int paint_start = msecs();
+    stats_.full_canvas_repaints++;
     w.DrawRect(GetSize(), SColorPaper());
     if(document_)
         for(const UiDesignerPreviewInstance& instance : instances_)
             if(instance.semantic)
                 if(const UiDesignerNode* node = document_->Find(instance.node))
                     PaintSemantic(w, instance, *node);
+    stats_.canvas_paint_time_ms = msecs(paint_start);
 }
 
 }

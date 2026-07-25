@@ -572,22 +572,10 @@ void UiGridLayout::PaintDebug(Draw& w) const
     Color fill = Blend(c, SColorPaper(), 205);
     Rect outer = GetSize();
     Rect area = GetClientGridRect();
-    int gap = this->gap;
-    Vector<int> col_widths, row_heights;
-    ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
-    Vector<int> col_pos, row_pos;
-    col_pos.SetCount(col_widths.GetCount());
-    row_pos.SetCount(row_heights.GetCount());
-    int x = area.left;
-    for(int i = 0; i < col_widths.GetCount(); i++) {
-        col_pos[i] = x;
-        x += col_widths[i] + gap;
-    }
-    int y = area.top;
-    for(int i = 0; i < row_heights.GetCount(); i++) {
-        row_pos[i] = y;
-        y += row_heights[i] + gap;
-    }
+    const int cols = max(1, grid_cols);
+    const int rows = max(1, grid_rows);
+    if(resolved_cell_rects.GetCount() < cols * rows)
+        return;
 
     if(inset.top > 0)
         w.DrawRect(Rect(outer.left, outer.top, outer.right, area.top), fill);
@@ -598,22 +586,24 @@ void UiGridLayout::PaintDebug(Draw& w) const
     if(inset.right > 0)
         w.DrawRect(Rect(area.right, area.top, outer.right, area.bottom), fill);
 
-    for(int i = 0; i + 1 < col_widths.GetCount(); i++) {
-        Rect gr(col_pos[i] + col_widths[i], area.top,
-                col_pos[i + 1], area.top + max(0, y - area.top - gap));
+    for(int i = 0; i + 1 < cols; i++) {
+        const Rect left = resolved_cell_rects[i];
+        const Rect right = resolved_cell_rects[i + 1];
+        Rect gr(left.right, area.top, right.left, area.bottom);
         if(!gr.IsEmpty())
             w.DrawRect(gr, fill);
     }
-    for(int i = 0; i + 1 < row_heights.GetCount(); i++) {
-        Rect gr(area.left, row_pos[i] + row_heights[i],
-                area.left + max(0, x - area.left - gap), row_pos[i + 1]);
+    for(int i = 0; i + 1 < rows; i++) {
+        const Rect top = resolved_cell_rects[i * cols];
+        const Rect bottom = resolved_cell_rects[(i + 1) * cols];
+        Rect gr(area.left, top.bottom, area.right, bottom.top);
         if(!gr.IsEmpty())
             w.DrawRect(gr, fill);
     }
 
-    for(int row = 0; row < row_heights.GetCount(); row++) {
-        for(int col = 0; col < col_widths.GetCount(); col++) {
-            Rect cell = RectC(col_pos[col], row_pos[row], col_widths[col], row_heights[row]);
+    for(int row = 0; row < rows; row++) {
+        for(int col = 0; col < cols; col++) {
+            Rect cell = resolved_cell_rects[row * cols + col];
             w.DrawRect(cell.left, cell.top, cell.GetWidth(), 1, c);
             w.DrawRect(cell.left, cell.bottom - 1, cell.GetWidth(), 1, c);
             w.DrawRect(cell.left, cell.top, 1, cell.GetHeight(), c);

@@ -60,6 +60,19 @@ static PropertyEditorStyle UiDesignerInspectorStyle()
     return style;
 }
 
+static Size UiDesignerScaleVirtualSize(Size current, int width, int height)
+{
+    width = max(1, width);
+    height = max(1, height);
+    const int base = max(1, max(current.cx, current.cy));
+    if(width >= height) {
+        const int scaled_height = max(1, int(base * (double)height / width + 0.5));
+        return Size(base, scaled_height);
+    }
+    const int scaled_width = max(1, int(base * (double)width / height + 0.5));
+    return Size(scaled_width, base);
+}
+
 UiDesignerWindow::UiDesignerWindow() : interaction_overlay_(*this)
 {
     Title("Ui Designer").Sizeable().Zoomable();
@@ -241,7 +254,7 @@ void UiDesignerWindow::BuildDesigner()
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
-                   .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_shell_,
+                   .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_panel_,
                                "Inspect live preview performance and projection activity");
     designer_right_.SetActiveSection(0);
     inspector_.SetStyle(UiDesignerInspectorStyle());
@@ -249,6 +262,56 @@ void UiDesignerWindow::BuildDesigner()
     overrides_.SetStyle(UiDesignerInspectorStyle());
     data_shell_.SetReadOnly();
     diagnostics_shell_.SetReadOnly();
+    diagnostics_panel_.SetCustomStyle(UiDesignerSurfaceStyle());
+    diagnostics_panel_.Add(diagnostics_layout_);
+    diagnostics_layout_.SetDirection(UiDirection::V)
+                       .SetGap(DPI(6), DPI(6))
+                       .SetInset(DPI(6));
+    diagnostics_toolbar_.SetDirection(UiDirection::H)
+                        .SetGap(DPI(4), DPI(4))
+                        .SetInset(DPI(0))
+                        .SetWrap(UiBoxWrap::None);
+    diagnostics_reset_.SetText("Reset").SetIcon(ICON_DESIGN_CLEAR_ALL_48())
+                      .SetIconSize(DPI(16), DPI(16));
+    diagnostics_pause_.SetText("Pause").SetCheckable();
+    diagnostics_copy_.SetText("Copy").SetIcon(ICON_CONTENT_CONTENT_COPY_48())
+                     .SetIconSize(DPI(16), DPI(16));
+    diagnostics_log_.SetText("Write log");
+    diagnostics_timing_.SetText("Timing").SetCheckable();
+    diagnostics_toolbar_.Add(diagnostics_reset_).Fixed(DPI(84)).MinCross(DPI(24));
+    diagnostics_toolbar_.Add(diagnostics_pause_).Fixed(DPI(84)).MinCross(DPI(24));
+    diagnostics_toolbar_.Add(diagnostics_copy_).Fixed(DPI(74)).MinCross(DPI(24));
+    diagnostics_toolbar_.Add(diagnostics_log_).Fixed(DPI(90)).MinCross(DPI(24));
+    diagnostics_toolbar_.Add(diagnostics_timing_).Fixed(DPI(82)).MinCross(DPI(24));
+    diagnostics_layout_.Add(diagnostics_toolbar_).Fixed(DPI(28)).MinCross(DPI(24));
+    diagnostics_layout_.Add(diagnostics_shell_).Expand(1);
+    diagnostics_reset_.WhenAction = [=] {
+        preview_canvas_.ResetPerformance();
+        RefreshDiagnostics();
+        RefreshStatus("Diagnostics counters reset");
+    };
+    diagnostics_pause_.WhenAction = [=] {
+        diagnostics_capture_paused_ = diagnostics_pause_.IsChecked();
+        RefreshStatus(diagnostics_capture_paused_ ? "Diagnostics capture paused"
+                                                  : "Diagnostics capture resumed");
+    };
+    diagnostics_copy_.WhenAction = [=] {
+        WriteClipboardText(AsString(diagnostics_shell_.GetData()));
+        RefreshStatus("Diagnostics copied");
+    };
+    diagnostics_log_.WhenAction = [=] {
+        const String path = AppendFileName(GetTempPath(), "uidesigner-performance.log");
+        if(SaveFile(path, AsString(diagnostics_shell_.GetData())))
+            RefreshStatus("Diagnostics written to " + path);
+        else
+            RefreshStatus("Unable to write diagnostics log");
+    };
+    diagnostics_timing_.WhenAction = [=] {
+        preview_canvas_.SetDetailedTiming(diagnostics_timing_.IsChecked());
+        RefreshDiagnostics();
+        RefreshStatus(preview_canvas_.IsDetailedTimingEnabled()
+            ? "Detailed timing enabled" : "Detailed timing disabled");
+    };
 
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle());
     aspect_pill_.SetCustomStyle(UiDesignerReferencePillStyle()).SetInset(DPI(5));
@@ -276,19 +339,25 @@ void UiDesignerWindow::BuildDesigner()
         interaction_overlay_.SetDecorationsVisible(decorations_visible_);
     };
 
-    portrait_.WhenAction = [=] { session_.SetVirtualSize(Size(576, 1024)); };
-    landscape_.WhenAction = [=] { session_.SetVirtualSize(Size(1024, 576)); };
-    square_.WhenAction = [=] { session_.SetVirtualSize(Size(720, 720)); };
+    portrait_.WhenAction = [=] {
+        session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 9, 16));
+    };
+    landscape_.WhenAction = [=] {
+        session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 16, 9));
+    };
+    square_.WhenAction = [=] {
+        session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 1, 1));
+    };
     aspect_preset_.WhenSelect = [=](int, const Value& value) {
         const String ratio = value;
-        if(ratio == "9:16") session_.SetVirtualSize(Size(576, 1024));
-        else if(ratio == "2:3") session_.SetVirtualSize(Size(600, 900));
-        else if(ratio == "3:4") session_.SetVirtualSize(Size(600, 800));
-        else if(ratio == "1:1") session_.SetVirtualSize(Size(720, 720));
-        else if(ratio == "4:3") session_.SetVirtualSize(Size(800, 600));
-        else if(ratio == "3:2") session_.SetVirtualSize(Size(900, 600));
-        else if(ratio == "2:1") session_.SetVirtualSize(Size(1000, 500));
-        else session_.SetVirtualSize(Size(1024, 576));
+        if(ratio == "9:16") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 9, 16));
+        else if(ratio == "2:3") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 2, 3));
+        else if(ratio == "3:4") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 3, 4));
+        else if(ratio == "1:1") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 1, 1));
+        else if(ratio == "4:3") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 4, 3));
+        else if(ratio == "3:2") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 3, 2));
+        else if(ratio == "2:1") session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 2, 1));
+        else session_.SetVirtualSize(UiDesignerScaleVirtualSize(session_.Document().GetVirtualSize(), 16, 9));
     };
     aspect_pill_.AddControl(portrait_, DPI(32))
                 .AddControl(landscape_, DPI(32))
@@ -449,6 +518,7 @@ void UiDesignerWindow::ConnectServices()
         preview_canvas_.Refresh();
         interaction_overlay_.Refresh();
         PostSelectionDetailsRefresh();
+        RequestDiagnosticsRefresh();
     };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
@@ -463,9 +533,11 @@ void UiDesignerWindow::ConnectServices()
         interaction_overlay_.Refresh();
         RefreshHierarchy(); RefreshCode(); RefreshBehavior();
         overrides_.Refresh();
+        RequestDiagnosticsRefresh();
     };
     session_.Theme().WhenChanged = [=] {
         ApplyThemeToShell(); RefreshThemeInspector(); RefreshCode();
+        RequestDiagnosticsRefresh();
     };
     session_.Theme().WhenPreviewChanged = [=] { ApplyThemeToShell(); };
 
@@ -609,12 +681,14 @@ void UiDesignerWindow::ExportProject(UiDesignerExportProfile profile)
 
 void UiDesignerWindow::RefreshHierarchy()
 {
+    preview_canvas_.BumpHierarchyRefresh();
     hierarchy_.SetSelection(&session_.State().selection);
     hierarchy_.Rebuild();
 }
 
 void UiDesignerWindow::RefreshInspector()
 {
+    preview_canvas_.BumpPropertyEditorRefresh();
     inspector_.SetModel(&session_.InspectorModel());
     inspector_.Refresh();
 }
@@ -654,6 +728,7 @@ void UiDesignerWindow::RefreshThemeInspector()
 
 void UiDesignerWindow::RefreshCode()
 {
+    preview_canvas_.BumpCodeRefresh();
     code_.SetCode(session_.GenerateHeader("GeneratedUiWindow") + "\n" +
                   session_.GenerateCode("GeneratedUiWindow"));
 }
@@ -671,27 +746,64 @@ void UiDesignerWindow::RefreshDiagnostics()
     out << "  document nodes: " << document.GetNodes().GetCount() << "\n";
     out << "  live instances: " << preview_canvas_.GetLiveInstanceCount() << "\n";
     out << "  preview layout calls: " << stats.layout_count << "\n";
+    out << "  grid layout passes: " << stats.grid_layout_passes << "\n";
+    out << "  box layout passes: " << stats.box_layout_passes << "\n";
+    out << "  absolute updates: " << stats.absolute_layout_updates << "\n";
+    out << "  live instance creations: " << stats.live_instance_creations << "\n";
+    out << "  live instance destructions: " << stats.live_instance_destructions << "\n";
+    out << "  cached grid geometry publications: " << stats.cached_grid_geometry_publications << "\n";
+    out << "  cached grid geometry reads: " << stats.cached_grid_geometry_reads << "\n";
     out << "  full rebuilds: " << stats.full_rebuilds << "\n";
     out << "  subtree rebuilds: " << stats.subtree_rebuilds << "\n";
     out << "  direct applies: " << stats.live_applies << "\n";
     out << "  layout-item updates: " << stats.layout_item_updates << "\n";
-    out << "  deferred batches: not available\n\n";
+    out << "  deferred batches: " << stats.deferred_batches << "\n\n";
+    out << "  timing: " << (preview_canvas_.IsDetailedTimingEnabled() ? "enabled" : "disabled") << "\n";
+    out << "  capture: " << (diagnostics_capture_paused_ ? "paused" : "running") << "\n\n";
     out << "LATEST RESIZE\n";
-    out << "  total event: not available\n";
-    out << "  live mutation: not available\n";
-    out << "  grid/box layout: not available\n";
-    out << "  geometry snapshot: not available\n";
-    out << "  overlay repaint: not available\n";
-    out << "  canvas paint: not available\n";
-    out << "  inspector: not available\n";
-    out << "  code: not available\n\n";
+    const UiDesignerResizeHistory& history = preview_canvas_.GetResizeHistory();
+    if(!history.IsEmpty()) {
+        const UiDesignerResizeSample& sample = history.GetLatest();
+        out << "  total event: " << sample.total_ms << " ms\n";
+        out << "  window resize: " << sample.window_resize_ms << " ms\n";
+        out << "  preview layout: " << sample.immediate_preview_ms << " ms\n";
+        out << "  geometry walk: " << sample.geometry_walk_ms << " ms\n";
+        out << "  geometry snapshot: " << sample.snapshot_ms << " ms\n";
+        out << "  overlay repaint: " << sample.overlay_paint_ms << " ms\n";
+        out << "  canvas paint: " << sample.canvas_paint_ms << " ms\n";
+        out << "  inspector: " << sample.inspector_ms << " ms\n";
+        out << "  code: " << sample.code_ms << " ms\n";
+    }
+    else {
+        out << "  total event: no sample\n";
+        out << "  window resize: no sample\n";
+        out << "  preview layout: no sample\n";
+        out << "  geometry walk: no sample\n";
+        out << "  geometry snapshot: no sample\n";
+        out << "  overlay repaint: no sample\n";
+        out << "  canvas paint: no sample\n";
+        out << "  inspector: no sample\n";
+        out << "  code: no sample\n";
+    }
+    out << "\n";
     out << "RECENT PERFORMANCE\n";
-    out << "  resize fps: not available\n";
-    out << "  avg frame: not available\n";
-    out << "  max frame: not available\n";
-    out << "  >16.7 ms: not available\n";
-    out << "  >33.3 ms: not available\n";
-    out << "  >66.7 ms: not available\n\n";
+    if(history.IsEmpty()) {
+        out << "  resize fps: not available\n";
+        out << "  avg frame: not available\n";
+        out << "  max frame: not available\n";
+        out << "  >16.7 ms: not available\n";
+        out << "  >33.3 ms: not available\n";
+        out << "  >66.7 ms: not available\n";
+    }
+    else {
+        out << "  resize fps: " << Format("%.1f", history.GetEstimatedFps()) << "\n";
+        out << "  avg frame: " << Format("%.1f", history.GetRecentAverageDuration()) << " ms\n";
+        out << "  max frame: " << history.GetRecentMaximumDuration() << " ms\n";
+        out << "  >16.7 ms: " << history.GetFramesAbove(17) << "\n";
+        out << "  >33.3 ms: " << history.GetFramesAbove(34) << "\n";
+        out << "  >66.7 ms: " << history.GetFramesAbove(67) << "\n";
+    }
+    out << "\n";
     out << "SELECTED CONTROL\n";
     if(node) {
         out << "  node id: " << (int64)node->id << "\n";
@@ -710,6 +822,22 @@ void UiDesignerWindow::RefreshDiagnostics()
     diagnostics_shell_.SetData(out);
 }
 
+void UiDesignerWindow::RequestDiagnosticsRefresh()
+{
+    if(diagnostics_refresh_posted_)
+        return;
+    diagnostics_refresh_posted_ = true;
+    Ptr<UiDesignerWindow> self = this;
+    PostCallback([self] {
+        if(!self)
+            return;
+        self->diagnostics_refresh_posted_ = false;
+        if(self->diagnostics_capture_paused_)
+            return;
+        self->RefreshDiagnostics();
+    });
+}
+
 void UiDesignerWindow::PostSelectionDetailsRefresh()
 {
     if(selection_details_refresh_posted_)
@@ -720,10 +848,11 @@ void UiDesignerWindow::PostSelectionDetailsRefresh()
         if(!self)
             return;
         self->selection_details_refresh_posted_ = false;
+        self->preview_canvas_.BumpDeferredBatch();
         self->RefreshBehavior();
         self->RefreshData();
         self->RefreshCode();
-        self->RefreshDiagnostics();
+        self->RequestDiagnosticsRefresh();
     });
 }
 
@@ -757,6 +886,8 @@ void UiDesignerWindow::WriteLaunchDiagnostic()
 
 void UiDesignerWindow::Layout()
 {
+    const int layout_start = msecs();
+    const Size window_size = GetSize();
     const int margin = UiDesignerStyleMetrics::Gap();
     const int gap = UiDesignerStyleMetrics::Gap();
     const Size size = GetSize();
@@ -818,6 +949,55 @@ void UiDesignerWindow::Layout()
     theme_gallery_.SetRect(DPI(8), DPI(8),
                            max(0, gallery_surface_.GetSize().cx - DPI(16)),
                            max(0, gallery_surface_.GetSize().cy - DPI(16)));
+
+    if(window_size != last_layout_size_) {
+        last_layout_size_ = window_size;
+        UiDesignerResizeSample sample;
+        sample.total_ms = msecs(layout_start);
+        sample.window_resize_ms = sample.total_ms;
+        sample.resize_events = 1;
+        sample.decorations_visible = decorations_visible_;
+        sample.document_nodes = session_.Document().GetNodes().GetCount();
+        sample.live_runtime_controls = preview_canvas_.GetLiveInstanceCount();
+        const UiDesignerNodeId selected = session_.State().selection.primary;
+        const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
+        const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
+        sample.selected_node = selected;
+        sample.authored_type = node ? node->type : String();
+        sample.runtime_type = spec ? spec->runtime_cpp_type : String();
+        sample.generation = node ? preview_canvas_.GetInstanceGeneration(node->id) : 0;
+        sample.rect = node ? preview_canvas_.GetNodeRect(node->id) : Rect();
+        sample.virtual_size = virtual_size;
+        const UiDesignerPreviewStats& stats = preview_canvas_.GetStats();
+        sample.immediate_live_rect_updates = stats.immediate_live_rect_updates;
+        sample.grid_layout_passes = stats.grid_layout_passes;
+        sample.box_layout_passes = stats.box_layout_passes;
+        sample.absolute_layout_updates = stats.absolute_layout_updates;
+        sample.layout_item_updates = stats.layout_item_updates;
+        sample.preview_layout_calls = stats.preview_layout_calls;
+        sample.full_geometry_walks = stats.full_geometry_walks;
+        sample.immediate_preview_ms = stats.layout_time_ms;
+        sample.geometry_walk_ms = stats.geometry_walk_time_ms;
+        sample.snapshot_ms = stats.snapshot_time_ms;
+        sample.overlay_paint_ms = stats.overlay_paint_time_ms;
+        sample.canvas_paint_ms = stats.canvas_paint_time_ms;
+        sample.geometry_snapshot_publications = stats.snapshot_publications;
+        sample.drop_region_publications = stats.drop_region_publications;
+        sample.overlay_only_repaints = stats.overlay_only_repaints;
+        sample.full_canvas_repaints = stats.full_canvas_repaints;
+        sample.property_editor_refreshes = stats.property_editor_refreshes;
+        sample.hierarchy_refreshes = stats.hierarchy_refreshes;
+        sample.code_refreshes = stats.code_refreshes;
+        sample.deferred_batches = stats.deferred_batches;
+        sample.subtree_rebuilds = stats.subtree_rebuilds;
+        sample.full_document_rebuilds = stats.full_document_rebuilds;
+        sample.live_instance_creations = stats.live_instance_creations;
+        sample.live_instance_destructions = stats.live_instance_destructions;
+        sample.track_size_calculations = stats.track_size_calculations;
+        sample.cached_grid_geometry_publications = stats.cached_grid_geometry_publications;
+        sample.cached_grid_geometry_reads = stats.cached_grid_geometry_reads;
+        preview_canvas_.RecordResizeSample(sample);
+    }
 }
 
 void UiDesignerWindow::Close()

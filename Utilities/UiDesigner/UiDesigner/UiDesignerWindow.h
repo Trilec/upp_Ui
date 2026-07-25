@@ -51,6 +51,7 @@ private:
     void RefreshThemeInspector();
     void RefreshCode();
     void RefreshDiagnostics();
+    void RequestDiagnosticsRefresh();
     void RefreshStatus(const String& status);
     void PostSelectionDetailsRefresh();
     void TrackCatalogDrag(const String& type_id, Point screen);
@@ -108,6 +109,14 @@ private:
     PropertyEditor behaviors_;
     PropertyEditor overrides_;
     UiDesignerCodeView code_;
+    UiPanel diagnostics_panel_;
+    UiBoxLayout diagnostics_layout_;
+    UiBoxLayout diagnostics_toolbar_;
+    UiToolButton diagnostics_reset_;
+    UiToolButton diagnostics_pause_;
+    UiToolButton diagnostics_copy_;
+    UiToolButton diagnostics_log_;
+    UiToolButton diagnostics_timing_;
     UiMultiEdit diagnostics_shell_;
 
     UiPanel theme_gallery_column_;
@@ -129,6 +138,9 @@ private:
     UiDesignerExportProfile last_export_profile_ =
         UiDesignerExportProfile::CompleteCppPackage;
     bool selection_details_refresh_posted_ = false;
+    bool diagnostics_refresh_posted_ = false;
+    bool diagnostics_capture_paused_ = false;
+    Size last_layout_size_;
     String active_catalog_drag_type_;
     bool catalog_drag_active_ = false;
     bool decorations_visible_ = true;

@@ -33,8 +33,159 @@ struct UiDesignerPreviewStats {
     int snapshot_publications = 0;
     int drop_region_publications = 0;
     int rejected = 0;
+    int resize_events = 0;
+    int immediate_live_rect_updates = 0;
+    int grid_layout_passes = 0;
+    int box_layout_passes = 0;
+    int absolute_layout_updates = 0;
+    int preview_layout_calls = 0;
+    int full_geometry_walks = 0;
+    int overlay_only_repaints = 0;
+    int full_canvas_repaints = 0;
+    int property_editor_refreshes = 0;
+    int hierarchy_refreshes = 0;
+    int code_refreshes = 0;
+    int deferred_batches = 0;
+    int full_document_rebuilds = 0;
+    int live_instance_creations = 0;
+    int live_instance_destructions = 0;
+    int track_size_calculations = 0;
+    int cached_grid_geometry_publications = 0;
+    int cached_grid_geometry_reads = 0;
+    int layout_time_ms = 0;
+    int geometry_walk_time_ms = 0;
+    int snapshot_time_ms = 0;
+    int overlay_paint_time_ms = 0;
+    int canvas_paint_time_ms = 0;
 
     void Clear() { *this = UiDesignerPreviewStats(); }
+};
+
+struct UiDesignerResizeSample : Moveable<UiDesignerResizeSample> {
+    int total_ms = -1;
+    int window_resize_ms = -1;
+    int immediate_preview_ms = -1;
+    int grid_layout_ms = -1;
+    int box_layout_ms = -1;
+    int geometry_walk_ms = -1;
+    int snapshot_ms = -1;
+    int overlay_paint_ms = -1;
+    int canvas_paint_ms = -1;
+    int inspector_ms = -1;
+    int code_ms = -1;
+    int resize_events = 0;
+    int immediate_live_rect_updates = 0;
+    int grid_layout_passes = 0;
+    int box_layout_passes = 0;
+    int absolute_layout_updates = 0;
+    int layout_item_updates = 0;
+    int preview_layout_calls = 0;
+    int full_geometry_walks = 0;
+    int geometry_snapshot_publications = 0;
+    int drop_region_publications = 0;
+    int overlay_only_repaints = 0;
+    int full_canvas_repaints = 0;
+    int property_editor_refreshes = 0;
+    int hierarchy_refreshes = 0;
+    int code_refreshes = 0;
+    int deferred_batches = 0;
+    int subtree_rebuilds = 0;
+    int full_document_rebuilds = 0;
+    int live_instance_creations = 0;
+    int live_instance_destructions = 0;
+    int track_size_calculations = 0;
+    int cached_grid_geometry_publications = 0;
+    int cached_grid_geometry_reads = 0;
+    int layout_time_ms = -1;
+    int geometry_walk_time_ms = -1;
+    int snapshot_time_ms = -1;
+    int overlay_paint_time_ms = -1;
+    int canvas_paint_time_ms = -1;
+    bool decorations_visible = true;
+    int document_nodes = 0;
+    int live_runtime_controls = 0;
+    UiDesignerNodeId selected_node = 0;
+    String authored_type;
+    String runtime_type;
+    uint64 generation = 0;
+    Rect rect;
+    Size virtual_size;
+};
+
+struct UiDesignerResizeHistory {
+    enum { CAPACITY = 32 };
+    Vector<UiDesignerResizeSample> samples;
+    int head = 0;
+    int count = 0;
+
+    UiDesignerResizeHistory() { samples.SetCount(CAPACITY); }
+
+    void Clear()
+    {
+        head = 0;
+        count = 0;
+        for(UiDesignerResizeSample& sample : samples)
+            sample = UiDesignerResizeSample();
+    }
+
+    void Add(const UiDesignerResizeSample& sample)
+    {
+        samples[(head + count) % CAPACITY] = sample;
+        if(count < CAPACITY)
+            count++;
+        else
+            head = (head + 1) % CAPACITY;
+    }
+
+    bool IsEmpty() const { return count == 0; }
+    int GetCount() const { return count; }
+
+    const UiDesignerResizeSample& GetLatest() const
+    {
+        ASSERT(count > 0);
+        return samples[(head + count - 1) % CAPACITY];
+    }
+
+    int GetLatestDuration() const { return IsEmpty() ? -1 : GetLatest().total_ms; }
+
+    double GetRecentAverageDuration() const
+    {
+        if(IsEmpty())
+            return -1;
+        int total = 0;
+        int seen = 0;
+        for(int i = 0; i < count; i++) {
+            const int ms = samples[(head + i) % CAPACITY].total_ms;
+            if(ms >= 0) {
+                total += ms;
+                seen++;
+            }
+        }
+        return seen ? (double)total / seen : -1;
+    }
+
+    int GetRecentMaximumDuration() const
+    {
+        int max_ms = -1;
+        for(int i = 0; i < count; i++)
+            max_ms = max(max_ms, samples[(head + i) % CAPACITY].total_ms);
+        return max_ms;
+    }
+
+    int GetFramesAbove(int threshold_ms) const
+    {
+        int hits = 0;
+        for(int i = 0; i < count; i++)
+            if(samples[(head + i) % CAPACITY].total_ms >= threshold_ms)
+                hits++;
+        return hits;
+    }
+
+    double GetEstimatedFps() const
+    {
+        const double average = GetRecentAverageDuration();
+        return average > 0 ? 1000.0 / average : -1;
+    }
 };
 
 struct UiDesignerPreviewAdapter : Moveable<UiDesignerPreviewAdapter> {
@@ -132,6 +283,18 @@ public:
 
     const UiDesignerPreviewStats& GetStats() const { return stats_; }
     void ResetStats() { stats_.Clear(); }
+    const UiDesignerResizeHistory& GetResizeHistory() const { return resize_history_; }
+    void ResetPerformance();
+    void RecordResizeSample(const UiDesignerResizeSample& sample);
+    void SetDetailedTiming(bool on) { detailed_timing_enabled_ = on; }
+    bool IsDetailedTimingEnabled() const { return detailed_timing_enabled_; }
+    void BumpOverlayOnlyRepaint() { stats_.overlay_only_repaints++; }
+    void BumpFullCanvasRepaint() { stats_.full_canvas_repaints++; }
+    void RecordOverlayPaintMs(int ms) { stats_.overlay_paint_time_ms = ms; }
+    void BumpPropertyEditorRefresh() { stats_.property_editor_refreshes++; }
+    void BumpHierarchyRefresh() { stats_.hierarchy_refreshes++; }
+    void BumpCodeRefresh() { stats_.code_refreshes++; }
+    void BumpDeferredBatch() { stats_.deferred_batches++; }
 
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
@@ -169,6 +332,8 @@ private:
     UiDesignerGeometrySnapshot geometry_;
     uint64 generation_sequence_ = 0;
     UiDesignerPreviewStats stats_;
+    UiDesignerResizeHistory resize_history_;
+    bool detailed_timing_enabled_ = false;
     Color accent_ = Color(37, 99, 235);
 };
 
