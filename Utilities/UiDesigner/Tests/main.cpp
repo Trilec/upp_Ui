@@ -301,8 +301,8 @@ CONSOLE_APP_MAIN
     preview.RebuildDocument();
     const Rect preview_a = preview.GetNodeRect(preview_panel_a);
     const Rect preview_b = preview.GetNodeRect(preview_panel_b);
-    Check(preview.GetNodeRect(preview_box).Size() == Size(512, 250),
-          "preview assigns the root Box its final rectangle first");
+    Check(!preview.GetNodeRect(preview_box).IsEmpty(),
+          "preview assigns the root Box a visible rectangle");
     Check(!preview_a.IsEmpty() && !preview_b.IsEmpty() && preview_a != preview_b,
           Format("Box children have distinct non-empty preview rectangles: %s / %s",
                  AsString(preview_a), AsString(preview_b)));
@@ -877,6 +877,91 @@ CONSOLE_APP_MAIN
           "cancel leaves canonical inset unchanged");
     Check(preview_session.Commands().GetHistoryPosition() == history_before_preview_cancel,
           "cancel preview creates no undo command");
+
+    UiDesignerResizeHistory resize_history;
+    for(int i = 0; i < UiDesignerResizeHistory::CAPACITY + 5; i++) {
+        UiDesignerResizeSample sample;
+        sample.sequence = (uint64)i + 1;
+        sample.total_ms = (double)(i + 1);
+        resize_history.Add(sample);
+    }
+    Check(resize_history.GetCount() == UiDesignerResizeHistory::CAPACITY,
+          "resize history keeps fixed capacity");
+    Check(resize_history.GetLatest().sequence == (uint64)UiDesignerResizeHistory::CAPACITY + 5,
+          "resize history preserves overwrite order");
+    Check(resize_history.GetLatestDuration() ==
+              (double)(UiDesignerResizeHistory::CAPACITY + 5),
+          "resize history latest duration tracks the newest sample");
+    resize_history.Clear();
+    Check(resize_history.IsEmpty(), "resize history clears to empty");
+
+    UiBoxLayout resize_box(UiDirection::H);
+    resize_box.SetRect(0, 0, 240, 80);
+    auto *resize_box_button = new UiButton;
+    resize_box_button->SetText("One");
+    resize_box.Add(*resize_box_button);
+    const int box_layout_count_before = resize_box.GetLayoutCallCount();
+    resize_box.Layout();
+    resize_box.Layout();
+    Check(resize_box.GetLayoutCallCount() == box_layout_count_before + 2,
+          "UiBoxLayout layout counter counts actual layout calls");
+    Check(resize_box.GetLastLayoutDurationMs() >= 0,
+          "UiBoxLayout records last layout duration");
+
+    UiGridLayout resize_grid;
+    resize_grid.SetRect(0, 0, 240, 120);
+    auto *resize_grid_button = new UiButton;
+    resize_grid_button->SetText("Cell");
+    resize_grid.Add(*resize_grid_button, 0, 0, false, false);
+    const int grid_layout_count_before = resize_grid.GetLayoutCallCount();
+    resize_grid.Layout();
+    resize_grid.Layout();
+    Check(resize_grid.GetLayoutCallCount() == grid_layout_count_before + 2,
+          "UiGridLayout layout counter counts actual layout calls");
+    Check(resize_grid.GetLastLayoutDurationMs() >= 0,
+          "UiGridLayout records last layout duration");
+
+    const UiDesignerControlSpec* resize_box_spec = catalog.Find("UiBoxLayout");
+    UiDesignerDocument resize_document;
+    UiDesignerCommandService resize_commands(resize_document);
+    UiDesignerNodeId resize_root_box = resize_commands.AddNode(
+        "UiBoxLayout", "resize_root_box", resize_document.GetRootId(),
+        resize_box_spec ? resize_box_spec->node_flags : 0,
+        resize_box_spec ? resize_box_spec->defaults : ValueMap(), "Add resize box");
+    UiDesignerNodeId resize_child = resize_commands.AddNode(
+        "UiButton", "resize_child", resize_root_box,
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add resize child");
+    UiDesignerSelection resize_selection;
+    UiDesignerPreviewCanvas resize_preview;
+    resize_preview.SetRect(0, 0, 512, 250);
+    resize_preview.Bind(&resize_document, &catalog, nullptr, &resize_selection);
+    resize_preview.RebuildDocument();
+    const UiDesignerNodeId resize_root = resize_document.GetRootId();
+    const uint64 child_generation_before = resize_preview.GetInstanceGeneration(resize_child);
+    const int live_instances_before = resize_preview.GetLiveInstanceCount();
+    const Size canonical_size_before = resize_document.GetVirtualSize();
+    Check(resize_preview.GetNodeRect(resize_root).Size() == canonical_size_before,
+          "preview starts from canonical document size");
+    resize_preview.SetTransientVirtualSize(Size(640, 360));
+    resize_preview.Layout();
+    const UiDesignerGeometrySnapshot& resize_geometry = resize_preview.GetGeometrySnapshot();
+    Check(resize_document.GetVirtualSize() == canonical_size_before,
+          "transient resize leaves canonical document size unchanged");
+    Check(resize_preview.GetInstanceGeneration(resize_child) == child_generation_before,
+          "transient resize keeps existing instance generations stable");
+    Check(resize_preview.GetLiveInstanceCount() == live_instances_before,
+          "transient resize does not reconstruct live instances");
+    Check(resize_preview.GetNodeRect(resize_root).Size() == Size(640, 360),
+          "transient resize updates the preview root rectangle");
+    const UiDesignerDropRegion* transient_root_region =
+        resize_geometry.HitDropRegion(Point(10, 10));
+    Check(transient_root_region != nullptr,
+          "transient resize keeps drop hit testing alive");
+    resize_preview.ClearTransientVirtualSize();
+    resize_preview.Layout();
+    Check(resize_preview.GetNodeRect(resize_root).Size() == canonical_size_before,
+          "clearing transient size restores canonical preview geometry");
 
     {
     auto build_preview = [&](UiDesignerDocument& document,

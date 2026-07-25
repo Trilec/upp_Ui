@@ -292,6 +292,7 @@ void UiDesignerWindow::BuildDesigner()
     };
     diagnostics_pause_.WhenAction = [=] {
         diagnostics_capture_paused_ = diagnostics_pause_.IsChecked();
+        preview_canvas_.SetCapturePaused(diagnostics_capture_paused_);
         RefreshStatus(diagnostics_capture_paused_ ? "Diagnostics capture paused"
                                                   : "Diagnostics capture resumed");
     };
@@ -308,6 +309,7 @@ void UiDesignerWindow::BuildDesigner()
     };
     diagnostics_timing_.WhenAction = [=] {
         preview_canvas_.SetDetailedTiming(diagnostics_timing_.IsChecked());
+        preview_canvas_.SetCapturePaused(diagnostics_capture_paused_);
         RefreshDiagnostics();
         RefreshStatus(preview_canvas_.IsDetailedTimingEnabled()
             ? "Detailed timing enabled" : "Detailed timing disabled");
@@ -741,6 +743,9 @@ void UiDesignerWindow::RefreshDiagnostics()
     const UiDesignerNode* node = selected ? document.Find(selected) : nullptr;
     const UiDesignerNode* parent = node && node->parent ? document.Find(node->parent) : nullptr;
     const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
+    const auto FmtMs = [](double ms) {
+        return ms >= 0 ? Format("%.3f ms", ms) : String("unavailable");
+    };
     String out;
     out << "LIVE PREVIEW\n";
     out << "  document nodes: " << document.GetNodes().GetCount() << "\n";
@@ -759,31 +764,49 @@ void UiDesignerWindow::RefreshDiagnostics()
     out << "  layout-item updates: " << stats.layout_item_updates << "\n";
     out << "  deferred batches: " << stats.deferred_batches << "\n\n";
     out << "  timing: " << (preview_canvas_.IsDetailedTimingEnabled() ? "enabled" : "disabled") << "\n";
-    out << "  capture: " << (diagnostics_capture_paused_ ? "paused" : "running") << "\n\n";
+    out << "  capture: " << (preview_canvas_.IsCapturePaused() ? "paused" : "running") << "\n\n";
     out << "LATEST RESIZE\n";
     const UiDesignerResizeHistory& history = preview_canvas_.GetResizeHistory();
     if(!history.IsEmpty()) {
         const UiDesignerResizeSample& sample = history.GetLatest();
-        out << "  total event: " << sample.total_ms << " ms\n";
-        out << "  window resize: " << sample.window_resize_ms << " ms\n";
-        out << "  preview layout: " << sample.immediate_preview_ms << " ms\n";
-        out << "  geometry walk: " << sample.geometry_walk_ms << " ms\n";
-        out << "  geometry snapshot: " << sample.snapshot_ms << " ms\n";
-        out << "  overlay repaint: " << sample.overlay_paint_ms << " ms\n";
-        out << "  canvas paint: " << sample.canvas_paint_ms << " ms\n";
-        out << "  inspector: " << sample.inspector_ms << " ms\n";
-        out << "  code: " << sample.code_ms << " ms\n";
+        if(!sample.timing_enabled)
+            out << "  state: timing disabled\n";
+        else if(sample.paint_complete)
+            out << "  state: complete sample\n";
+        else
+            out << "  state: incomplete asynchronous paint data\n";
+        out << "  sequence: " << (int64)sample.sequence << "\n";
+        out << "  total event: " << FmtMs(sample.total_ms) << "\n";
+        out << "  window resize: " << FmtMs(sample.window_resize_ms) << "\n";
+        out << "  preview update: " << FmtMs(sample.immediate_preview_ms) << "\n";
+        out << "  grid layout: " << FmtMs(sample.grid_layout_ms) << "\n";
+        out << "  box layout: " << FmtMs(sample.box_layout_ms) << "\n";
+        out << "  geometry walk: " << FmtMs(sample.geometry_walk_ms) << "\n";
+        out << "  geometry snapshot: " << FmtMs(sample.snapshot_ms) << "\n";
+        out << "  overlay paint: " << FmtMs(sample.overlay_paint_ms) << "\n";
+        out << "  canvas paint: " << FmtMs(sample.canvas_paint_ms) << "\n";
+        out << "  inspector: " << FmtMs(sample.inspector_ms) << "\n";
+        out << "  code: " << FmtMs(sample.code_ms) << "\n";
+        out << "  counters: grid=" << sample.grid_layout_passes
+            << " box=" << sample.box_layout_passes
+            << " layout=" << sample.preview_layout_calls
+            << " snapshot=" << sample.geometry_snapshot_publications
+            << " repaint=" << sample.overlay_only_repaints
+            << "/" << sample.full_canvas_repaints << "\n";
     }
     else {
-        out << "  total event: no sample\n";
-        out << "  window resize: no sample\n";
-        out << "  preview layout: no sample\n";
-        out << "  geometry walk: no sample\n";
-        out << "  geometry snapshot: no sample\n";
-        out << "  overlay repaint: no sample\n";
-        out << "  canvas paint: no sample\n";
-        out << "  inspector: no sample\n";
-        out << "  code: no sample\n";
+        out << "  state: no sample\n";
+        out << "  total event: unavailable\n";
+        out << "  window resize: unavailable\n";
+        out << "  preview update: unavailable\n";
+        out << "  grid layout: unavailable\n";
+        out << "  box layout: unavailable\n";
+        out << "  geometry walk: unavailable\n";
+        out << "  geometry snapshot: unavailable\n";
+        out << "  overlay paint: unavailable\n";
+        out << "  canvas paint: unavailable\n";
+        out << "  inspector: unavailable\n";
+        out << "  code: unavailable\n";
     }
     out << "\n";
     out << "RECENT PERFORMANCE\n";
@@ -797,8 +820,8 @@ void UiDesignerWindow::RefreshDiagnostics()
     }
     else {
         out << "  resize fps: " << Format("%.1f", history.GetEstimatedFps()) << "\n";
-        out << "  avg frame: " << Format("%.1f", history.GetRecentAverageDuration()) << " ms\n";
-        out << "  max frame: " << history.GetRecentMaximumDuration() << " ms\n";
+        out << "  avg frame: " << FmtMs(history.GetRecentAverageDuration()) << "\n";
+        out << "  max frame: " << FmtMs(history.GetRecentMaximumDuration()) << "\n";
         out << "  >16.7 ms: " << history.GetFramesAbove(17) << "\n";
         out << "  >33.3 ms: " << history.GetFramesAbove(34) << "\n";
         out << "  >66.7 ms: " << history.GetFramesAbove(67) << "\n";
@@ -886,8 +909,6 @@ void UiDesignerWindow::WriteLaunchDiagnostic()
 
 void UiDesignerWindow::Layout()
 {
-    const int layout_start = msecs();
-    const Size window_size = GetSize();
     const int margin = UiDesignerStyleMetrics::Gap();
     const int gap = UiDesignerStyleMetrics::Gap();
     const Size size = GetSize();
@@ -930,7 +951,7 @@ void UiDesignerWindow::Layout()
     Put(theme_gallery_pill_, 0, 0, theme_gallery_column_.GetSize().cx, pill_h);
     Put(gallery_scroll_, 0, pill_h + gap, theme_gallery_column_.GetSize().cx,
         max(0, theme_gallery_column_.GetSize().cy - pill_h - gap));
-    const Size virtual_size = session_.Document().GetVirtualSize();
+    const Size virtual_size = preview_canvas_.GetEffectiveVirtualSize();
     const int preview_margin = DPI(40);
     const Size preview_size(max(preview_scroll_.GetSize().cx,
                                 virtual_size.cx + preview_margin * 2),
@@ -950,54 +971,6 @@ void UiDesignerWindow::Layout()
                            max(0, gallery_surface_.GetSize().cx - DPI(16)),
                            max(0, gallery_surface_.GetSize().cy - DPI(16)));
 
-    if(window_size != last_layout_size_) {
-        last_layout_size_ = window_size;
-        UiDesignerResizeSample sample;
-        sample.total_ms = msecs(layout_start);
-        sample.window_resize_ms = sample.total_ms;
-        sample.resize_events = 1;
-        sample.decorations_visible = decorations_visible_;
-        sample.document_nodes = session_.Document().GetNodes().GetCount();
-        sample.live_runtime_controls = preview_canvas_.GetLiveInstanceCount();
-        const UiDesignerNodeId selected = session_.State().selection.primary;
-        const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
-        const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
-        sample.selected_node = selected;
-        sample.authored_type = node ? node->type : String();
-        sample.runtime_type = spec ? spec->runtime_cpp_type : String();
-        sample.generation = node ? preview_canvas_.GetInstanceGeneration(node->id) : 0;
-        sample.rect = node ? preview_canvas_.GetNodeRect(node->id) : Rect();
-        sample.virtual_size = virtual_size;
-        const UiDesignerPreviewStats& stats = preview_canvas_.GetStats();
-        sample.immediate_live_rect_updates = stats.immediate_live_rect_updates;
-        sample.grid_layout_passes = stats.grid_layout_passes;
-        sample.box_layout_passes = stats.box_layout_passes;
-        sample.absolute_layout_updates = stats.absolute_layout_updates;
-        sample.layout_item_updates = stats.layout_item_updates;
-        sample.preview_layout_calls = stats.preview_layout_calls;
-        sample.full_geometry_walks = stats.full_geometry_walks;
-        sample.immediate_preview_ms = stats.layout_time_ms;
-        sample.geometry_walk_ms = stats.geometry_walk_time_ms;
-        sample.snapshot_ms = stats.snapshot_time_ms;
-        sample.overlay_paint_ms = stats.overlay_paint_time_ms;
-        sample.canvas_paint_ms = stats.canvas_paint_time_ms;
-        sample.geometry_snapshot_publications = stats.snapshot_publications;
-        sample.drop_region_publications = stats.drop_region_publications;
-        sample.overlay_only_repaints = stats.overlay_only_repaints;
-        sample.full_canvas_repaints = stats.full_canvas_repaints;
-        sample.property_editor_refreshes = stats.property_editor_refreshes;
-        sample.hierarchy_refreshes = stats.hierarchy_refreshes;
-        sample.code_refreshes = stats.code_refreshes;
-        sample.deferred_batches = stats.deferred_batches;
-        sample.subtree_rebuilds = stats.subtree_rebuilds;
-        sample.full_document_rebuilds = stats.full_document_rebuilds;
-        sample.live_instance_creations = stats.live_instance_creations;
-        sample.live_instance_destructions = stats.live_instance_destructions;
-        sample.track_size_calculations = stats.track_size_calculations;
-        sample.cached_grid_geometry_publications = stats.cached_grid_geometry_publications;
-        sample.cached_grid_geometry_reads = stats.cached_grid_geometry_reads;
-        preview_canvas_.RecordResizeSample(sample);
-    }
 }
 
 void UiDesignerWindow::Close()

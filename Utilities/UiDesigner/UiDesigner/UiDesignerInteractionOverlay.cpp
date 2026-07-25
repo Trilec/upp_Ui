@@ -155,7 +155,9 @@ void UiDesignerInteractionOverlay::SetDragStatus(const String& status)
 
 void UiDesignerInteractionOverlay::Paint(Draw& w)
 {
-    const int paint_start = msecs();
+    const bool measure = owner_ && owner_->preview_canvas_.IsDetailedTimingEnabled() &&
+                         !owner_->preview_canvas_.IsCapturePaused();
+    const int64 paint_start = measure ? usecs() : 0;
     if(owner_)
         owner_->preview_canvas_.BumpOverlayOnlyRepaint();
     if(!owner_ || !owner_->preview_canvas_.GetParent())
@@ -264,8 +266,11 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
         w.DrawRect(indicator.right - 3, indicator.top,
                    3, indicator.Height(), color);
     }
-    if(owner_)
-        owner_->preview_canvas_.RecordOverlayPaintMs(msecs(paint_start));
+    if(owner_ && measure) {
+        const double overlay_ms = (double)usecs(paint_start) / 1000.0;
+        owner_->preview_canvas_.RecordOverlayPaintMs(overlay_ms);
+        FinalizeRootResizePaint(overlay_ms);
+    }
 }
 
 void UiDesignerInteractionOverlay::LeftDown(Point p, dword keyflags)
@@ -280,6 +285,8 @@ void UiDesignerInteractionOverlay::LeftDown(Point p, dword keyflags)
         resize_start_ = p;
         resize_start_rect_ = WorkspaceRootRect();
         resize_pending_rect_ = resize_start_rect_;
+        resize_sample_ = UiDesignerResizeSample();
+        resize_sample_valid_ = false;
         SetDragStatus(Format("resize root edge=%d %dx%d",
                              resize_edge,
                              resize_start_rect_.Width(),
@@ -304,11 +311,7 @@ void UiDesignerInteractionOverlay::MouseMove(Point p, dword)
     if(!owner_)
         return;
     if(resizing_) {
-        resize_pending_rect_ = ResizeDocumentTo(p);
-        SetDragStatus(Format("resize root %dx%d",
-                             resize_pending_rect_.Width(),
-                             resize_pending_rect_.Height()));
-        Refresh();
+        ApplyRootResize(p);
     }
 }
 
@@ -317,22 +320,7 @@ void UiDesignerInteractionOverlay::LeftUp(Point p, dword)
     if(!owner_)
         return;
     if(resizing_) {
-        resize_pending_rect_ = ResizeDocumentTo(p);
-        const Size final_size = resize_pending_rect_.Size();
-        resizing_ = false;
-        resize_edge_ = 0;
-        pointer_gesture_ = UiDesignerPointerGesture::None;
-        Ptr<UiDesignerInteractionOverlay> keep_alive = this;
-        capture_release_in_progress_ = true;
-        ReleaseOwnedCaptureSafely();
-        capture_release_in_progress_ = false;
-        if(keep_alive && final_size != resize_start_rect_.Size())
-            owner_->session_.SetVirtualSize(final_size);
-        if(keep_alive) {
-            SetDragStatus(Format("resize root done %dx%d",
-                                 final_size.cx, final_size.cy));
-            Refresh();
-        }
+        FinishRootResize(p);
     }
 }
 
@@ -367,11 +355,7 @@ void UiDesignerInteractionOverlay::CancelMode()
     if(capture_release_in_progress_ || drag_cleanup_in_progress_)
         return;
     if(pointer_gesture_ == UiDesignerPointerGesture::RootResize) {
-        resizing_ = false;
-        resize_edge_ = 0;
-        pointer_gesture_ = UiDesignerPointerGesture::None;
-        ReleaseOwnedCaptureSafely();
-        Refresh();
+        CancelRootResize();
         return;
     }
     if(pointer_gesture_ == UiDesignerPointerGesture::CatalogDrag ||
@@ -390,6 +374,196 @@ void UiDesignerInteractionOverlay::ReleaseOwnedCaptureSafely()
         drag_diagnostics_.capture_releases++;
     }
     capture_owned_ = false;
+}
+
+void UiDesignerInteractionOverlay::RecordRootResizeSample(
+    const UiDesignerPreviewStats& before, const UiDesignerPreviewStats& after,
+    double sync_ms, double preview_ms, const Rect& final_rect)
+{
+    if(!owner_)
+        return;
+
+    resize_sample_ = UiDesignerResizeSample();
+    resize_sample_.sequence = ++resize_sample_sequence_;
+    resize_sample_.timing_enabled = owner_->preview_canvas_.IsDetailedTimingEnabled() &&
+                                    !owner_->preview_canvas_.IsCapturePaused();
+    resize_sample_.complete = true;
+    resize_sample_.paint_complete = !resize_sample_.timing_enabled;
+    resize_sample_.total_ms = sync_ms;
+    resize_sample_.window_resize_ms = sync_ms;
+    resize_sample_.immediate_preview_ms = preview_ms;
+    resize_sample_.grid_layout_ms = after.grid_layout_passes > before.grid_layout_passes
+        ? owner_->preview_canvas_.GetGridLayoutDurationTotalMs() : -1;
+    resize_sample_.box_layout_ms = after.box_layout_passes > before.box_layout_passes
+        ? owner_->preview_canvas_.GetBoxLayoutDurationTotalMs() : -1;
+    resize_sample_.geometry_walk_ms = after.geometry_walk_time_ms;
+    resize_sample_.snapshot_ms = after.snapshot_time_ms;
+    resize_sample_.overlay_paint_ms = -1;
+    resize_sample_.canvas_paint_ms = -1;
+    resize_sample_.inspector_ms = -1;
+    resize_sample_.code_ms = -1;
+    resize_sample_.resize_events = after.resize_events - before.resize_events;
+    resize_sample_.immediate_live_rect_updates =
+        after.immediate_live_rect_updates - before.immediate_live_rect_updates;
+    resize_sample_.grid_layout_passes = after.grid_layout_passes - before.grid_layout_passes;
+    resize_sample_.box_layout_passes = after.box_layout_passes - before.box_layout_passes;
+    resize_sample_.absolute_layout_updates =
+        after.absolute_layout_updates - before.absolute_layout_updates;
+    resize_sample_.layout_item_updates = after.layout_item_updates - before.layout_item_updates;
+    resize_sample_.preview_layout_calls = after.preview_layout_calls - before.preview_layout_calls;
+    resize_sample_.full_geometry_walks = after.full_geometry_walks - before.full_geometry_walks;
+    resize_sample_.geometry_snapshot_publications =
+        after.snapshot_publications - before.snapshot_publications;
+    resize_sample_.drop_region_publications =
+        after.drop_region_publications - before.drop_region_publications;
+    resize_sample_.overlay_only_repaints =
+        after.overlay_only_repaints - before.overlay_only_repaints;
+    resize_sample_.full_canvas_repaints =
+        after.full_canvas_repaints - before.full_canvas_repaints;
+    resize_sample_.property_editor_refreshes =
+        after.property_editor_refreshes - before.property_editor_refreshes;
+    resize_sample_.hierarchy_refreshes = after.hierarchy_refreshes - before.hierarchy_refreshes;
+    resize_sample_.code_refreshes = after.code_refreshes - before.code_refreshes;
+    resize_sample_.deferred_batches = after.deferred_batches - before.deferred_batches;
+    resize_sample_.subtree_rebuilds = after.subtree_rebuilds - before.subtree_rebuilds;
+    resize_sample_.full_document_rebuilds =
+        after.full_document_rebuilds - before.full_document_rebuilds;
+    resize_sample_.live_instance_creations =
+        after.live_instance_creations - before.live_instance_creations;
+    resize_sample_.live_instance_destructions =
+        after.live_instance_destructions - before.live_instance_destructions;
+    resize_sample_.track_size_calculations =
+        after.track_size_calculations - before.track_size_calculations;
+    resize_sample_.cached_grid_geometry_publications =
+        after.cached_grid_geometry_publications - before.cached_grid_geometry_publications;
+    resize_sample_.cached_grid_geometry_reads =
+        after.cached_grid_geometry_reads - before.cached_grid_geometry_reads;
+    resize_sample_.transient_root_size_updates =
+        after.transient_root_size_updates - before.transient_root_size_updates;
+    resize_sample_.layout_time_ms = after.layout_time_ms;
+    resize_sample_.geometry_walk_time_ms = after.geometry_walk_time_ms;
+    resize_sample_.snapshot_time_ms = after.snapshot_time_ms;
+    resize_sample_.overlay_paint_time_ms = after.overlay_paint_time_ms;
+    resize_sample_.canvas_paint_time_ms = after.canvas_paint_time_ms;
+    resize_sample_.decorations_visible = decorations_visible_;
+    resize_sample_.document_nodes = owner_->session_.Document().GetNodes().GetCount();
+    resize_sample_.live_runtime_controls = owner_->preview_canvas_.GetLiveInstanceCount();
+    resize_sample_.selected_node = owner_->session_.State().selection.primary;
+    if(const UiDesignerNode* node = owner_->session_.Document().Find(resize_sample_.selected_node)) {
+        resize_sample_.authored_type = node->type;
+        if(const UiDesignerControlSpec* spec = owner_->session_.Catalog().Find(node->type))
+            resize_sample_.runtime_type = spec->runtime_cpp_type;
+    }
+    resize_sample_.generation = owner_->preview_canvas_.GetInstanceGeneration(resize_sample_.selected_node);
+    resize_sample_.rect = final_rect;
+    resize_sample_.virtual_size = final_rect.Size();
+
+    if(owner_->preview_canvas_.IsCapturePaused()) {
+        resize_sample_valid_ = false;
+        return;
+    }
+
+    owner_->preview_canvas_.RecordResizeSample(resize_sample_);
+    resize_sample_valid_ = resize_sample_.timing_enabled;
+    if(!resize_sample_valid_)
+        owner_->RequestDiagnosticsRefresh();
+}
+
+void UiDesignerInteractionOverlay::FinalizeRootResizePaint(double overlay_ms)
+{
+    if(!owner_ || !resize_sample_valid_)
+        return;
+
+    UiDesignerResizeSample* latest = owner_->preview_canvas_.GetResizeHistory().GetMutableLatest();
+    if(!latest || latest->sequence != resize_sample_sequence_)
+        return;
+
+    latest->overlay_paint_ms = overlay_ms;
+    latest->overlay_paint_time_ms = overlay_ms;
+    latest->canvas_paint_ms = owner_->preview_canvas_.GetStats().canvas_paint_time_ms;
+    latest->canvas_paint_time_ms = latest->canvas_paint_ms;
+    if(latest->canvas_paint_ms >= 0) {
+        latest->paint_complete = true;
+        resize_sample_valid_ = false;
+        owner_->RequestDiagnosticsRefresh();
+    }
+}
+
+void UiDesignerInteractionOverlay::ApplyRootResize(Point p)
+{
+    if(!owner_ || !resizing_)
+        return;
+
+    resize_pending_rect_ = ResizeDocumentTo(p);
+    const Size final_size = resize_pending_rect_.Size();
+    const bool timing_enabled = owner_->preview_canvas_.IsDetailedTimingEnabled() &&
+                                !owner_->preview_canvas_.IsCapturePaused();
+    const UiDesignerPreviewStats before = owner_->preview_canvas_.GetStats();
+    const int64 sync_start = timing_enabled ? usecs() : 0;
+    const int64 preview_start = timing_enabled ? usecs() : 0;
+
+    owner_->preview_canvas_.SetTransientVirtualSize(final_size);
+    owner_->Layout();
+    owner_->preview_canvas_.Layout();
+    owner_->preview_canvas_.Refresh();
+
+    const double preview_ms = timing_enabled ? (double)usecs(preview_start) / 1000.0 : -1;
+    const double sync_ms = timing_enabled ? (double)usecs(sync_start) / 1000.0 : -1;
+    const UiDesignerPreviewStats after = owner_->preview_canvas_.GetStats();
+
+    SetDragStatus(Format("resize root %dx%d", final_size.cx, final_size.cy));
+    RecordRootResizeSample(before, after, sync_ms, preview_ms, resize_pending_rect_);
+    if(!timing_enabled)
+        Refresh();
+}
+
+void UiDesignerInteractionOverlay::FinishRootResize(Point p)
+{
+    if(!owner_ || !resizing_)
+        return;
+
+    resize_pending_rect_ = ResizeDocumentTo(p);
+    const Size final_size = resize_pending_rect_.Size();
+    resizing_ = false;
+    resize_edge_ = 0;
+    pointer_gesture_ = UiDesignerPointerGesture::None;
+    Ptr<UiDesignerInteractionOverlay> keep_alive = this;
+
+    capture_release_in_progress_ = true;
+    ReleaseOwnedCaptureSafely();
+    capture_release_in_progress_ = false;
+
+    if(!keep_alive)
+        return;
+
+    owner_->preview_canvas_.ClearTransientVirtualSize();
+    owner_->session_.SetVirtualSize(final_size);
+    owner_->Layout();
+    owner_->preview_canvas_.Layout();
+    owner_->preview_canvas_.Refresh();
+
+    SetDragStatus(Format("resize root done %dx%d",
+                         final_size.cx, final_size.cy));
+    Refresh();
+}
+
+void UiDesignerInteractionOverlay::CancelRootResize()
+{
+    if(!owner_ || !resizing_)
+        return;
+
+    resizing_ = false;
+    resize_edge_ = 0;
+    pointer_gesture_ = UiDesignerPointerGesture::None;
+    capture_owned_ = false;
+    resize_sample_valid_ = false;
+    resize_pending_rect_ = resize_start_rect_;
+    owner_->preview_canvas_.ClearTransientVirtualSize();
+    owner_->Layout();
+    owner_->preview_canvas_.Layout();
+    owner_->preview_canvas_.Refresh();
+    SetDragStatus("resize root cancelled");
+    Refresh();
 }
 
 void UiDesignerInteractionOverlay::TrackCatalogDrag(const String& type_id, Point screen)

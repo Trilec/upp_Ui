@@ -52,27 +52,32 @@ struct UiDesignerPreviewStats {
     int track_size_calculations = 0;
     int cached_grid_geometry_publications = 0;
     int cached_grid_geometry_reads = 0;
-    int layout_time_ms = 0;
-    int geometry_walk_time_ms = 0;
-    int snapshot_time_ms = 0;
-    int overlay_paint_time_ms = 0;
-    int canvas_paint_time_ms = 0;
+    int transient_root_size_updates = 0;
+    double layout_time_ms = -1;
+    double geometry_walk_time_ms = -1;
+    double snapshot_time_ms = -1;
+    double overlay_paint_time_ms = -1;
+    double canvas_paint_time_ms = -1;
 
     void Clear() { *this = UiDesignerPreviewStats(); }
 };
 
 struct UiDesignerResizeSample : Moveable<UiDesignerResizeSample> {
-    int total_ms = -1;
-    int window_resize_ms = -1;
-    int immediate_preview_ms = -1;
-    int grid_layout_ms = -1;
-    int box_layout_ms = -1;
-    int geometry_walk_ms = -1;
-    int snapshot_ms = -1;
-    int overlay_paint_ms = -1;
-    int canvas_paint_ms = -1;
-    int inspector_ms = -1;
-    int code_ms = -1;
+    uint64 sequence = 0;
+    bool timing_enabled = false;
+    bool complete = false;
+    bool paint_complete = false;
+    double total_ms = -1;
+    double window_resize_ms = -1;
+    double immediate_preview_ms = -1;
+    double grid_layout_ms = -1;
+    double box_layout_ms = -1;
+    double geometry_walk_ms = -1;
+    double snapshot_ms = -1;
+    double overlay_paint_ms = -1;
+    double canvas_paint_ms = -1;
+    double inspector_ms = -1;
+    double code_ms = -1;
     int resize_events = 0;
     int immediate_live_rect_updates = 0;
     int grid_layout_passes = 0;
@@ -96,11 +101,12 @@ struct UiDesignerResizeSample : Moveable<UiDesignerResizeSample> {
     int track_size_calculations = 0;
     int cached_grid_geometry_publications = 0;
     int cached_grid_geometry_reads = 0;
-    int layout_time_ms = -1;
-    int geometry_walk_time_ms = -1;
-    int snapshot_time_ms = -1;
-    int overlay_paint_time_ms = -1;
-    int canvas_paint_time_ms = -1;
+    int transient_root_size_updates = 0;
+    double layout_time_ms = -1;
+    double geometry_walk_time_ms = -1;
+    double snapshot_time_ms = -1;
+    double overlay_paint_time_ms = -1;
+    double canvas_paint_time_ms = -1;
     bool decorations_visible = true;
     int document_nodes = 0;
     int live_runtime_controls = 0;
@@ -146,16 +152,26 @@ struct UiDesignerResizeHistory {
         return samples[(head + count - 1) % CAPACITY];
     }
 
-    int GetLatestDuration() const { return IsEmpty() ? -1 : GetLatest().total_ms; }
+    UiDesignerResizeSample* GetMutableLatest()
+    {
+        return IsEmpty() ? nullptr : &samples[(head + count - 1) % CAPACITY];
+    }
+
+    const UiDesignerResizeSample* GetMutableLatest() const
+    {
+        return IsEmpty() ? nullptr : &samples[(head + count - 1) % CAPACITY];
+    }
+
+    double GetLatestDuration() const { return IsEmpty() ? -1 : GetLatest().total_ms; }
 
     double GetRecentAverageDuration() const
     {
         if(IsEmpty())
             return -1;
-        int total = 0;
+        double total = 0;
         int seen = 0;
         for(int i = 0; i < count; i++) {
-            const int ms = samples[(head + i) % CAPACITY].total_ms;
+            const double ms = samples[(head + i) % CAPACITY].total_ms;
             if(ms >= 0) {
                 total += ms;
                 seen++;
@@ -164,9 +180,9 @@ struct UiDesignerResizeHistory {
         return seen ? (double)total / seen : -1;
     }
 
-    int GetRecentMaximumDuration() const
+    double GetRecentMaximumDuration() const
     {
-        int max_ms = -1;
+        double max_ms = -1;
         for(int i = 0; i < count; i++)
             max_ms = max(max_ms, samples[(head + i) % CAPACITY].total_ms);
         return max_ms;
@@ -255,6 +271,14 @@ public:
     void SetOverlay(const UiDesignerTransientOverlay *overlay);
     void SetSelection(const UiDesignerSelection *selection) override;
     void SetAccent(Color accent) { accent_ = accent; Refresh(); }
+    void SetTransientVirtualSize(const Size& size);
+    void ClearTransientVirtualSize();
+    bool HasTransientVirtualSize() const { return transient_virtual_size_set_; }
+    Size GetEffectiveVirtualSize() const;
+    void SetCapturePaused(bool on) { capture_paused_ = on; }
+    bool IsCapturePaused() const { return capture_paused_; }
+    double GetGridLayoutDurationTotalMs() const;
+    double GetBoxLayoutDurationTotalMs() const;
 
     void RebuildDocument() override;
     bool RebuildSubtree(UiDesignerNodeId root);
@@ -283,6 +307,7 @@ public:
 
     const UiDesignerPreviewStats& GetStats() const { return stats_; }
     void ResetStats() { stats_.Clear(); }
+    UiDesignerResizeHistory& GetResizeHistory() { return resize_history_; }
     const UiDesignerResizeHistory& GetResizeHistory() const { return resize_history_; }
     void ResetPerformance();
     void RecordResizeSample(const UiDesignerResizeSample& sample);
@@ -290,7 +315,7 @@ public:
     bool IsDetailedTimingEnabled() const { return detailed_timing_enabled_; }
     void BumpOverlayOnlyRepaint() { stats_.overlay_only_repaints++; }
     void BumpFullCanvasRepaint() { stats_.full_canvas_repaints++; }
-    void RecordOverlayPaintMs(int ms) { stats_.overlay_paint_time_ms = ms; }
+    void RecordOverlayPaintMs(double ms) { stats_.overlay_paint_time_ms = ms; }
     void BumpPropertyEditorRefresh() { stats_.property_editor_refreshes++; }
     void BumpHierarchyRefresh() { stats_.hierarchy_refreshes++; }
     void BumpCodeRefresh() { stats_.code_refreshes++; }
@@ -334,6 +359,9 @@ private:
     UiDesignerPreviewStats stats_;
     UiDesignerResizeHistory resize_history_;
     bool detailed_timing_enabled_ = false;
+    bool transient_virtual_size_set_ = false;
+    bool capture_paused_ = false;
+    Size transient_virtual_size_;
     Color accent_ = Color(37, 99, 235);
 };
 

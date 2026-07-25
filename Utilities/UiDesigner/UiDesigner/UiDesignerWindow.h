@@ -140,7 +140,6 @@ private:
     bool selection_details_refresh_posted_ = false;
     bool diagnostics_refresh_posted_ = false;
     bool diagnostics_capture_paused_ = false;
-    Size last_layout_size_;
     String active_catalog_drag_type_;
     bool catalog_drag_active_ = false;
     bool decorations_visible_ = true;

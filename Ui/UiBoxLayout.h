@@ -667,6 +667,8 @@ public:
     Size GetPreferredSize() const;
     int  GetMinWrapWidth() const;
     int  MeasureHeightForWidth(int total_width) const;
+    int  GetLayoutCallCount() const { return layout_call_count; }
+    double GetLastLayoutDurationMs() const { return last_layout_duration_ms; }
     Direction GetDirection() const { return dir; }
     UiBoxWrap GetWrapMode() const { return wrap; }
     bool IsWrapAutoResize() const { return wrap_auto_resize; }
@@ -711,6 +713,8 @@ private:
     mutable uint64 measure_cache_theme_revision_[4] = { 0, 0, 0, 0 };
     mutable uint64 measure_cache_sig_[4] = { 0, 0, 0, 0 };
     mutable byte measure_cache_slot_ = 0;
+    mutable int  layout_call_count = 0;
+    mutable double last_layout_duration_ms = -1;
 };
 
 } // namespace Upp

@@ -97,6 +97,8 @@ public:
     void GetCellRects(Vector<Rect>& rects) const;
     int  GetResolvedCellGeometryBuildCount() const { return resolved_cell_geometry_build_count; }
     int  GetResolvedCellGeometryQueryCount() const { return resolved_cell_geometry_query_count; }
+    int  GetLayoutCallCount() const { return layout_call_count; }
+    double GetLastLayoutDurationMs() const { return last_layout_duration_ms; }
     Rect GetItemRect(int index) const { return index >= 0 && index < items.GetCount() ? items[index].rect : Rect(0, 0, 0, 0); }
     bool IsItemVisible(int index) const { return index >= 0 && index < items.GetCount() ? items[index].visible && !items[index].rect.IsEmpty() : false; }
 
@@ -206,6 +208,8 @@ private:
     Vector<Rect> resolved_cell_rects;
     mutable int   resolved_cell_geometry_build_count = 0;
     mutable int   resolved_cell_geometry_query_count = 0;
+    mutable int   layout_call_count = 0;
+    mutable double last_layout_duration_ms = -1;
     Vector<Item> items;
     Vector<int> selection;
     int focus_item = -1;

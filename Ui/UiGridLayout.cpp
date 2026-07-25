@@ -442,6 +442,8 @@ void UiGridLayout::GetCellRects(Vector<Rect>& rects) const
 
 void UiGridLayout::Layout()
 {
+    const int64 layout_start = usecs();
+    layout_call_count++;
     Rect area = GetClientGridRect();
     int gap = this->gap;
     Vector<int> col_widths, row_heights;
@@ -524,6 +526,7 @@ void UiGridLayout::Layout()
         if(WhenContentSize)
             WhenContentSize(content);
     }
+    last_layout_duration_ms = (double)usecs(layout_start) / 1000.0;
 }
 
 void UiGridLayout::RefreshGridLayout()

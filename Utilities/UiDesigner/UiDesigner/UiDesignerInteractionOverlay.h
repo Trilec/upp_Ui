@@ -83,6 +83,9 @@ private:
     UiDesignerCatalogDragDiagnostics drag_diagnostics_;
     bool cleaning_drag_ = false;
     UiDesignerResolvedDrop resolved_drop_;
+    UiDesignerResizeSample resize_sample_;
+    uint64 resize_sample_sequence_ = 0;
+    bool resize_sample_valid_ = false;
     String drag_status_;
     bool decorations_visible_ = true;
 
@@ -94,6 +97,14 @@ private:
     UiDesignerNodeId HitNode(Point p) const;
     int HitDocumentResizeEdge(Point p) const;
     Rect ResizeDocumentTo(Point p) const;
+    void ApplyRootResize(Point p);
+    void FinishRootResize(Point p);
+    void CancelRootResize();
+    void RecordRootResizeSample(const UiDesignerPreviewStats& before,
+                                const UiDesignerPreviewStats& after,
+                                double sync_ms, double preview_ms,
+                                const Rect& final_rect);
+    void FinalizeRootResizePaint(double overlay_ms);
     void ClearDropPlan();
     void EndCatalogDrag(UiDesignerCatalogDragState terminal);
     void ReleaseOwnedCaptureSafely();
