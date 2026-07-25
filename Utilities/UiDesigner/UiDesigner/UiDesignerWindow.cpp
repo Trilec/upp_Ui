@@ -86,8 +86,10 @@ UiDesignerWindow::UiDesignerWindow() : interaction_overlay_(*this)
     RefreshHierarchy();
     RefreshInspector();
     RefreshBehavior();
+    RefreshData();
     RefreshThemeInspector();
     RefreshCode();
+    RefreshDiagnostics();
 }
 
 void UiDesignerWindow::UpdateDecorationsButton()
@@ -613,31 +615,24 @@ void UiDesignerWindow::RefreshInspector()
 {
     inspector_.SetModel(&session_.InspectorModel());
     inspector_.Refresh();
-    RefreshData();
-    RefreshDiagnostics();
 }
 
 void UiDesignerWindow::RefreshData()
 {
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
-    const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
     String out;
-    if(!node) {
-        out = "This control has no authored data model.\n\nNo node is selected.";
-    }
-    else {
-        out << "Selected control\n";
+    out << "Selected control\n";
+    if(node) {
         out << "  name: " << node->name << "\n";
-        out << "  type: " << node->type << "\n";
-        out << "  adapter: " << (spec ? spec->preview_adapter_id : String()) << "\n";
-        out << "  storage: " << (spec ? spec->child_adapter_id : String()) << "\n";
-        out << "  count: " << node->children.GetCount() << "\n\n";
-        if(spec)
-            out << "Data editing will be available through this adapter.";
-        else
-            out << "This control has no authored data model.";
+        out << "  type: " << node->type << "\n\n";
     }
+    else
+        out << "  none\n\n";
+    out << "Data support: not yet implemented\n";
+    out << "Data adapter: none\n";
+    out << "Canonical data storage: unavailable\n";
+    out << "Authored data count: unavailable";
     data_shell_.SetData(out);
 }
 
@@ -659,7 +654,6 @@ void UiDesignerWindow::RefreshCode()
 {
     code_.SetCode(session_.GenerateHeader("GeneratedUiWindow") + "\n" +
                   session_.GenerateCode("GeneratedUiWindow"));
-    RefreshDiagnostics();
 }
 
 void UiDesignerWindow::RefreshDiagnostics()
@@ -672,22 +666,30 @@ void UiDesignerWindow::RefreshDiagnostics()
     const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
     String out;
     out << "LIVE PREVIEW\n";
-    out << "  controls: " << document.GetNodes().GetCount() << "\n";
-    out << "  instances: " << stats.layout_count << "\n";
+    out << "  document nodes: " << document.GetNodes().GetCount() << "\n";
+    out << "  live instances: " << preview_canvas_.GetLiveInstanceCount() << "\n";
+    out << "  preview layout calls: " << stats.layout_count << "\n";
     out << "  full rebuilds: " << stats.full_rebuilds << "\n";
     out << "  subtree rebuilds: " << stats.subtree_rebuilds << "\n";
     out << "  direct applies: " << stats.live_applies << "\n";
     out << "  layout-item updates: " << stats.layout_item_updates << "\n";
-    out << "  deferred batches: 0\n\n";
+    out << "  deferred batches: not available\n\n";
     out << "LATEST RESIZE\n";
-    out << "  total event: 0 ms\n";
-    out << "  live mutation: 0 ms\n";
-    out << "  grid/box layout: 0 ms\n";
-    out << "  geometry snapshot: 0 ms\n";
-    out << "  overlay repaint: 0 ms\n";
-    out << "  canvas paint: 0 ms\n";
-    out << "  inspector: 0 ms\n";
-    out << "  code: 0 ms\n\n";
+    out << "  total event: not available\n";
+    out << "  live mutation: not available\n";
+    out << "  grid/box layout: not available\n";
+    out << "  geometry snapshot: not available\n";
+    out << "  overlay repaint: not available\n";
+    out << "  canvas paint: not available\n";
+    out << "  inspector: not available\n";
+    out << "  code: not available\n\n";
+    out << "RECENT PERFORMANCE\n";
+    out << "  resize fps: not available\n";
+    out << "  avg frame: not available\n";
+    out << "  max frame: not available\n";
+    out << "  >16.7 ms: not available\n";
+    out << "  >33.3 ms: not available\n";
+    out << "  >66.7 ms: not available\n\n";
     out << "SELECTED CONTROL\n";
     if(node) {
         out << "  node id: " << (int64)node->id << "\n";
@@ -699,6 +701,7 @@ void UiDesignerWindow::RefreshDiagnostics()
         out << "  sizing: "
             << AsString(node->GetProperty("width_mode", "Expand")) << " / "
             << AsString(node->GetProperty("height_mode", "Expand")) << "\n";
+        out << "  latest direct-apply result: not available\n";
     }
     else
         out << "  none\n";

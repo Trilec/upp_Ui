@@ -63,7 +63,8 @@ String UiDesignerDropService::MakeUniqueName(
 
 void UiDesignerDropService::PopulatePlacement(
     const UiDesignerControlSpec& child, const UiDesignerNode& parent,
-    Point position, int grid_row, int grid_column, ValueMap& properties) const
+    Point position, int grid_row, int grid_column, ValueMap& properties,
+    bool preserve_existing_layout) const
 {
     if(!document_ || !catalog_)
         return;
@@ -80,12 +81,14 @@ void UiDesignerDropService::PopulatePlacement(
                                             : minmax(position.x * columns / max(1, (int)parent.GetProperty("width", 320)), 0, columns - 1);
         properties.Set("grid_row", row);
         properties.Set("grid_column", column);
-        // Grid children should remain visibly separable by default. Let the
-        // user author an explicit Expand if they want a cell-spanning item.
-        properties.Set("width_mode", "Fit");
-        properties.Set("height_mode", "Fit");
-        properties.Set("cell_align_x", "Center");
-        properties.Set("cell_align_y", "Center");
+        if(!preserve_existing_layout) {
+            // Fresh grid children should begin as a single cell, not a
+            // surprising cell-spanning layout.
+            properties.Set("width_mode", "Fit");
+            properties.Set("height_mode", "Fit");
+            properties.Set("cell_align_x", "Center");
+            properties.Set("cell_align_y", "Center");
+        }
         return;
     }
 
@@ -162,7 +165,7 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
     plan.add_defaults = clone(spec->defaults);
     if(has_canvas_position)
         PopulatePlacement(*spec, *parent, canvas_position,
-                          grid_row, grid_column, plan.add_defaults);
+                          grid_row, grid_column, plan.add_defaults, false);
     plan.label = "Add " + spec->display_name;
     plan.valid = true;
     return plan;
@@ -255,9 +258,9 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
             ValueMap placement;
             PopulatePlacement(*spec, *parent,
                               canvas_position + Point(offset, offset),
-                              grid_row, grid_column, placement);
-            // Moving an absolute child changes only its origin; its authored
-            // size remains part of the node contract.
+                              grid_row, grid_column, placement, true);
+            // A move should keep authored sizing and only adjust the
+            // placement metadata needed by the destination layout.
             if(placement.Find("width") >= 0)
                 placement.Remove(placement.Find("width"));
             if(placement.Find("height") >= 0)

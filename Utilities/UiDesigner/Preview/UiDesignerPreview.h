@@ -128,6 +128,7 @@ public:
     UiDesignerNodeId HitNode(Point p) const;
     const UiDesignerGeometrySnapshot& GetGeometrySnapshot() const { return geometry_; }
     const UiDesignerGeometryRecord* FindGeometry(UiDesignerNodeId node) const { return geometry_.Find(node); }
+    int GetLiveInstanceCount() const { return instances_.GetCount(); }
 
     const UiDesignerPreviewStats& GetStats() const { return stats_; }
     void ResetStats() { stats_.Clear(); }

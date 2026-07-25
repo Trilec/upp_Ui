@@ -74,7 +74,8 @@ private:
                            Point position,
                            int grid_row,
                            int grid_column,
-                           ValueMap& properties) const;
+                           ValueMap& properties,
+                           bool preserve_existing_layout = false) const;
     bool IsDescendantOf(UiDesignerNodeId node,
                         UiDesignerNodeId ancestor) const;
     String MakeUniqueName(const UiDesignerControlSpec& spec) const;

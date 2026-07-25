@@ -188,6 +188,62 @@ CONSOLE_APP_MAIN
     Check(!drop_session.PlanAddControl("UiLabel", root, Point(10, 10), true).valid,
           "root window rejects a second direct child");
 
+    UiDesignerSession move_session;
+    move_session.NewDocument("blank");
+    UiDesignerCommandService& move_commands = move_session.Commands();
+    const UiDesignerControlSpec* move_grid_spec = catalog.Find("UiGridLayout");
+    const UiDesignerControlSpec* move_button_spec = catalog.Find("UiButton");
+    UiDesignerNodeId move_grid = move_commands.AddNode(
+        "UiGridLayout", "move_grid", move_session.Document().GetRootId(),
+        move_grid_spec ? move_grid_spec->node_flags : 0,
+        move_grid_spec ? move_grid_spec->defaults : ValueMap(), "Add move Grid");
+    Check(move_grid != 0, "move Grid created");
+    UiDesignerNodeId move_button = move_commands.AddNode(
+        "UiButton", "move_button", move_grid,
+        move_button_spec ? move_button_spec->node_flags : 0,
+        move_button_spec ? move_button_spec->defaults : ValueMap(),
+        "Add move Button");
+    Check(move_button != 0, "move Button created");
+    Check(move_commands.SetProperty(
+              move_button, "width_mode", "Expand",
+              UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+              "Set move button width mode"),
+          "move Button width mode command");
+    Check(move_commands.SetProperty(
+              move_button, "height_mode", "Fixed",
+              UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+              "Set move button height mode"),
+          "move Button height mode command");
+    Check(move_commands.SetProperty(
+              move_button, "fixed_height", 44,
+              UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+              "Set move button fixed height"),
+          "move Button fixed height command");
+    move_session.Select(move_button);
+    UiDesignerDropPlan move_plan = move_session.PlanMoveSelection(
+        move_grid, Point(144, 96), true, -1, 1, 1);
+    Check(move_plan.valid && move_plan.property_updates.GetCount() == 1,
+          "move plan is valid and targets one node");
+    if(move_plan.property_updates.GetCount() == 1) {
+        const ValueMap& updates = move_plan.property_updates[0];
+        Check(updates.Find("grid_row") >= 0 && updates.Find("grid_column") >= 0,
+              "move plan updates grid coordinates");
+        Check(updates.Find("width_mode") < 0 && updates.Find("height_mode") < 0 &&
+                  updates.Find("fixed_height") < 0 &&
+                  updates.Find("cell_align_x") < 0 &&
+                  updates.Find("cell_align_y") < 0,
+              "move plan preserves authored sizing and alignment");
+    }
+    String move_error;
+    Check(move_session.ExecuteDrop(move_plan, nullptr, move_error),
+          "move executes without disturbing authored sizing: " + move_error);
+    Check(move_session.Document().GetProperty(move_button, "width_mode") == "Expand",
+          "moved Button keeps width mode");
+    Check(move_session.Document().GetProperty(move_button, "height_mode") == "Fixed",
+          "moved Button keeps height mode");
+    Check((int)move_session.Document().GetProperty(move_button, "fixed_height") == 44,
+          "moved Button keeps fixed height");
+
     const UiDesignerControlSpec* box_spec = catalog.Find("UiBoxLayout");
     Check(box_spec && box_spec->defaults.GetValue(box_spec->defaults.Find("inset")) == 8,
           "Box default inset is 8");

@@ -1945,14 +1945,13 @@ void UiDesignerPreviewCanvas::Layout()
             if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get()))
                 for(int i = 0; i < box->GetItemCount(); i++)
                     record.item_rects.Add(box->GetItemRect(i).Offseted(record.rect.TopLeft()));
-            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get()))
-                for(int row = 0; row < max(1, (int)node->GetProperty("rows", 1)); row++)
-                    for(int col = 0; col < max(1, (int)node->GetProperty("columns", 1)); col++)
-                        record.cell_rects.Add(
-                            grid->GetCellRect(row, col).Offseted(record.rect.TopLeft()));
-            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get()))
+            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get())) {
+                grid->GetCellRects(record.cell_rects);
+                for(Rect& cell : record.cell_rects)
+                    cell = cell.Offseted(record.rect.TopLeft());
                 for(int i = 0; i < grid->GetItemCount(); i++)
                     record.item_rects.Add(grid->GetItemRect(i).Offseted(record.rect.TopLeft()));
+            }
             for(int i = 1; i < record.item_rects.GetCount(); i++) {
                 Rect a = record.item_rects[i - 1], b = record.item_rects[i];
                 if(a.right < b.left)

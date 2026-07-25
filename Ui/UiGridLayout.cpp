@@ -422,25 +422,33 @@ Rect UiGridLayout::GetClientGridRect() const
 
 Rect UiGridLayout::GetCellRect(int row, int col) const
 {
+    Vector<Rect> rects;
+    GetCellRects(rects);
+    int cols = max(1, grid_cols);
+    if(row < 0 || col < 0 || row >= max(1, grid_rows) || col >= cols)
+        return Rect(0, 0, 0, 0);
+    int index = row * cols + col;
+    return index >= 0 && index < rects.GetCount() ? rects[index] : Rect(0, 0, 0, 0);
+}
+
+void UiGridLayout::GetCellRects(Vector<Rect>& rects) const
+{
+    rects.Clear();
     int cols = max(1, grid_cols);
     int rows = max(1, grid_rows);
-    if(row < 0 || col < 0 || row >= rows || col >= cols)
-        return Rect(0, 0, 0, 0);
-
     Rect area = GetClientGridRect();
-    int gap = this->gap;
     Vector<int> col_widths, row_heights;
     ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
-
-    int x = area.left;
-    for(int i = 0; i < col; i++)
-        x += col_widths[i] + gap;
-
+    rects.SetCount(cols * rows);
     int y = area.top;
-    for(int i = 0; i < row; i++)
-        y += row_heights[i] + gap;
-
-    return RectC(x, y, col_widths[col], row_heights[row]);
+    for(int row = 0; row < rows; row++) {
+        int x = area.left;
+        for(int col = 0; col < cols; col++) {
+            rects[row * cols + col] = RectC(x, y, col_widths[col], row_heights[row]);
+            x += col_widths[col] + gap;
+        }
+        y += row_heights[row] + gap;
+    }
 }
 
 void UiGridLayout::Layout()
