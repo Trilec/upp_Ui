@@ -294,6 +294,33 @@ CONSOLE_APP_MAIN
     Check(panel_drop && geometry.FindDropRegion(panel_drop->paint_order) == panel_drop,
           "drop region lookup is stable");
 
+    UiDesignerDocument grid_document;
+    UiDesignerCommandService grid_commands(grid_document);
+    UiDesignerNodeId grid_node = grid_commands.AddNode(
+        "UiGridLayout", "grid_node", grid_document.GetRootId(),
+        grid_spec ? grid_spec->node_flags : 0,
+        grid_spec ? grid_spec->defaults : ValueMap(), "Add test Grid");
+    Check(grid_node != 0, "grid node created");
+    UiDesignerSelection grid_selection;
+    UiDesignerPreviewCanvas grid_preview;
+    grid_preview.SetRect(0, 0, 512, 250);
+    grid_preview.Bind(&grid_document, &catalog, nullptr, &grid_selection);
+    grid_preview.RebuildDocument();
+    const UiDesignerGeometrySnapshot& grid_geometry_snapshot = grid_preview.GetGeometrySnapshot();
+    const UiDesignerGeometryRecord* grid_geometry = grid_geometry_snapshot.Find(grid_node);
+    Check(grid_geometry && grid_geometry->cell_rects.GetCount() == 4,
+          Format("grid snapshot publishes explicit 2x2 cell rectangles (%d)",
+                 grid_geometry ? grid_geometry->cell_rects.GetCount() : -1));
+    Check(grid_geometry && !grid_geometry->cell_rects.IsEmpty() &&
+              grid_geometry->cell_rects[0].Size().cx > 0 &&
+              grid_geometry->cell_rects[0].Size().cy > 0,
+          "grid cell rectangles are non-empty");
+    const UiDesignerDropRegion* grid_cell_drop =
+        grid_geometry_snapshot.HitDropRegion(grid_geometry->cell_rects[0].CenterPoint());
+    Check(grid_cell_drop && grid_cell_drop->owner == grid_node &&
+              grid_cell_drop->kind == UiDesignerDropRegionKind::GridCell,
+          "grid cell hit testing resolves the grid cell");
+
     UiDesignerDocument sample_document;
     UiDesignerCommandService sample_commands(sample_document);
     UiDesignerNodeId sample_box = sample_commands.AddNode(

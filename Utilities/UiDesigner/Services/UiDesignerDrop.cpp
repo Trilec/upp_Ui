@@ -80,6 +80,12 @@ void UiDesignerDropService::PopulatePlacement(
                                             : minmax(position.x * columns / max(1, (int)parent.GetProperty("width", 320)), 0, columns - 1);
         properties.Set("grid_row", row);
         properties.Set("grid_column", column);
+        // Grid children should remain visibly separable by default. Let the
+        // user author an explicit Expand if they want a cell-spanning item.
+        properties.Set("width_mode", "Fit");
+        properties.Set("height_mode", "Fit");
+        properties.Set("cell_align_x", "Center");
+        properties.Set("cell_align_y", "Center");
         return;
     }
 

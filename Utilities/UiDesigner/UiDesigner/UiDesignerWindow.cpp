@@ -234,13 +234,17 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
+                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_shell_)
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
-                   .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_);
+                   .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
+                   .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_shell_);
     designer_right_.SetActiveSection(0);
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
+    data_shell_.SetReadOnly();
+    diagnostics_shell_.SetReadOnly();
 
     designer_center_.SetCustomStyle(UiDesignerSurfaceStyle());
     aspect_pill_.SetCustomStyle(UiDesignerReferencePillStyle()).SetInset(DPI(5));
@@ -609,6 +613,32 @@ void UiDesignerWindow::RefreshInspector()
 {
     inspector_.SetModel(&session_.InspectorModel());
     inspector_.Refresh();
+    RefreshData();
+    RefreshDiagnostics();
+}
+
+void UiDesignerWindow::RefreshData()
+{
+    const UiDesignerNodeId selected = session_.State().selection.primary;
+    const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
+    const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
+    String out;
+    if(!node) {
+        out = "This control has no authored data model.\n\nNo node is selected.";
+    }
+    else {
+        out << "Selected control\n";
+        out << "  name: " << node->name << "\n";
+        out << "  type: " << node->type << "\n";
+        out << "  adapter: " << (spec ? spec->preview_adapter_id : String()) << "\n";
+        out << "  storage: " << (spec ? spec->child_adapter_id : String()) << "\n";
+        out << "  count: " << node->children.GetCount() << "\n\n";
+        if(spec)
+            out << "Data editing will be available through this adapter.";
+        else
+            out << "This control has no authored data model.";
+    }
+    data_shell_.SetData(out);
 }
 
 void UiDesignerWindow::RefreshBehavior()
@@ -629,6 +659,50 @@ void UiDesignerWindow::RefreshCode()
 {
     code_.SetCode(session_.GenerateHeader("GeneratedUiWindow") + "\n" +
                   session_.GenerateCode("GeneratedUiWindow"));
+    RefreshDiagnostics();
+}
+
+void UiDesignerWindow::RefreshDiagnostics()
+{
+    const UiDesignerPreviewStats& stats = preview_canvas_.GetStats();
+    const UiDesignerDocument& document = session_.Document();
+    const UiDesignerNodeId selected = session_.State().selection.primary;
+    const UiDesignerNode* node = selected ? document.Find(selected) : nullptr;
+    const UiDesignerNode* parent = node && node->parent ? document.Find(node->parent) : nullptr;
+    const UiDesignerControlSpec* spec = node ? session_.Catalog().Find(node->type) : nullptr;
+    String out;
+    out << "LIVE PREVIEW\n";
+    out << "  controls: " << document.GetNodes().GetCount() << "\n";
+    out << "  instances: " << stats.layout_count << "\n";
+    out << "  full rebuilds: " << stats.full_rebuilds << "\n";
+    out << "  subtree rebuilds: " << stats.subtree_rebuilds << "\n";
+    out << "  direct applies: " << stats.live_applies << "\n";
+    out << "  layout-item updates: " << stats.layout_item_updates << "\n";
+    out << "  deferred batches: 0\n\n";
+    out << "LATEST RESIZE\n";
+    out << "  total event: 0 ms\n";
+    out << "  live mutation: 0 ms\n";
+    out << "  grid/box layout: 0 ms\n";
+    out << "  geometry snapshot: 0 ms\n";
+    out << "  overlay repaint: 0 ms\n";
+    out << "  canvas paint: 0 ms\n";
+    out << "  inspector: 0 ms\n";
+    out << "  code: 0 ms\n\n";
+    out << "SELECTED CONTROL\n";
+    if(node) {
+        out << "  node id: " << (int64)node->id << "\n";
+        out << "  type: " << node->type << "\n";
+        out << "  runtime: " << (spec ? spec->runtime_cpp_type : String()) << "\n";
+        out << "  runtime generation: " << (int64)preview_canvas_.GetInstanceGeneration(node->id) << "\n";
+        out << "  parent runtime type: " << (parent ? parent->type : String()) << "\n";
+        out << "  rect: " << AsString(preview_canvas_.GetNodeRect(node->id)) << "\n";
+        out << "  sizing: "
+            << AsString(node->GetProperty("width_mode", "Expand")) << " / "
+            << AsString(node->GetProperty("height_mode", "Expand")) << "\n";
+    }
+    else
+        out << "  none\n";
+    diagnostics_shell_.SetData(out);
 }
 
 void UiDesignerWindow::PostSelectionDetailsRefresh()
@@ -642,7 +716,9 @@ void UiDesignerWindow::PostSelectionDetailsRefresh()
             return;
         self->selection_details_refresh_posted_ = false;
         self->RefreshBehavior();
+        self->RefreshData();
         self->RefreshCode();
+        self->RefreshDiagnostics();
     });
 }
 

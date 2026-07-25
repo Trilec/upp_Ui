@@ -318,7 +318,9 @@ void UiDesignerSideColumn::Select(int index)
 void UiDesignerSideColumn::UpdateToolSelection()
 {
     for(int i = 0; i < section_buttons_.GetCount(); i++)
-        section_buttons_[i].SetChecked(i == active_section_);
+        section_buttons_[i].SetChecked(i == active_section_)
+                              .SetCustomStyle(UiTheme::ResolveToolButton(
+                                  i == active_section_ ? UiRole::Accent : UiRole::Subtle));
 }
 
 int UiDesignerSideColumn::GetToolRowHeight(int width) const
@@ -409,7 +411,10 @@ UiDesignerCatalogList::UiDesignerCatalogList()
 {
     BackPaint();
     Add(filter_edit_);
+    Add(scope_label_);
     filter_edit_.SetPlaceholder("Filter controls...");
+    scope_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+    UpdateScopeLabel();
     filter_edit_.WhenChange = [=] {
         filter_ = AsString(filter_edit_.GetData());
         RebuildMatches();
@@ -420,6 +425,7 @@ UiDesignerCatalogList::UiDesignerCatalogList()
 void UiDesignerCatalogList::SetCatalog(const UiDesignerCatalog *catalog)
 {
     catalog_ = catalog;
+    UpdateScopeLabel();
     RebuildMatches();
 }
 
@@ -427,12 +433,14 @@ void UiDesignerCatalogList::SetCategory(const String& category)
 {
     category_ = category;
     presets_ = false;
+    UpdateScopeLabel();
     RebuildMatches();
 }
 
 void UiDesignerCatalogList::SetPresets(bool on)
 {
     presets_ = on;
+    UpdateScopeLabel();
     RebuildMatches();
 }
 
@@ -441,6 +449,15 @@ void UiDesignerCatalogList::SetFilter(const String& filter)
     filter_ = filter;
     filter_edit_.SetData(filter);
     RebuildMatches();
+}
+
+void UiDesignerCatalogList::UpdateScopeLabel()
+{
+    const String scope = presets_
+        ? "Presets"
+        : (category_.IsEmpty() ? "All controls" : category_);
+    scope_label_.SetText(scope);
+    scope_label_.Tip("Current catalog scope");
 }
 
 void UiDesignerCatalogList::RebuildMatches()
@@ -530,7 +547,8 @@ int UiDesignerCatalogList::GetContentHeight() const
 
 void UiDesignerCatalogList::Layout()
 {
-    filter_edit_.SetRect(DPI(6), DPI(6), max(0, GetSize().cx - DPI(12)), DPI(60));
+    filter_edit_.SetRect(DPI(6), DPI(6), max(0, GetSize().cx - DPI(12)), DPI(34));
+    scope_label_.SetRect(DPI(8), DPI(42), max(0, GetSize().cx - DPI(16)), DPI(16));
 }
 
 void UiDesignerCatalogList::Paint(Draw& w)

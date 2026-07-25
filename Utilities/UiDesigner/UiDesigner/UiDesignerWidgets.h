@@ -136,6 +136,7 @@ private:
     Image ItemIcon(int index) const;
     Rect ItemRect(int index) const;
     void Activate(int index);
+    void UpdateScopeLabel();
 
     const UiDesignerCatalog *catalog_ = nullptr;
     String category_;
@@ -143,6 +144,7 @@ private:
     bool presets_ = false;
     Vector<int> matches_;
     UiLineEdit filter_edit_;
+    UiLabel scope_label_;
     int hover_ = -1;
     int selected_ = -1;
     int pressed_ = -1;

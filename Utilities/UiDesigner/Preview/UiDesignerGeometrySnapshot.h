@@ -44,7 +44,7 @@ struct UiDesignerGeometryRecord : Moveable<UiDesignerGeometryRecord> {
     UiDesignerCueKind cue_kind = UiDesignerCueKind::None;
     bool debug_layout = false;
     Color debug_color = Null;
-    Vector<Rect> item_rects, gap_rects, inset_rects;
+    Vector<Rect> item_rects, cell_rects, gap_rects, inset_rects;
 };
 class UiDesignerGeometrySnapshot {
 public:

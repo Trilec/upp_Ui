@@ -397,6 +397,13 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
                 Rect gr = gap_rect.Offseted(canvas_origin);
                 w.DrawRect(gr, Blend(outline, SColorPaper(), 195));
             }
+            for(const Rect& cell : geometry_record->cell_rects) {
+                Rect cr = cell.Offseted(canvas_origin);
+                w.DrawRect(cr.left, cr.top, cr.Width(), 1, outline);
+                w.DrawRect(cr.left, cr.bottom - 1, cr.Width(), 1, outline);
+                w.DrawRect(cr.left, cr.top, 1, cr.Height(), outline);
+                w.DrawRect(cr.right - 1, cr.top, 1, cr.Height(), outline);
+            }
             for(const Rect& item : geometry_record->item_rects) {
                 Rect ir = item.Offseted(canvas_origin);
                 w.DrawRect(ir.left, ir.top, ir.Width(), 2, outline);

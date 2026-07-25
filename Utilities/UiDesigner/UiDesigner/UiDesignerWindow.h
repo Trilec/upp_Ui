@@ -46,9 +46,11 @@ private:
 
     void RefreshHierarchy();
     void RefreshInspector();
+    void RefreshData();
     void RefreshBehavior();
     void RefreshThemeInspector();
     void RefreshCode();
+    void RefreshDiagnostics();
     void RefreshStatus(const String& status);
     void PostSelectionDetailsRefresh();
     void TrackCatalogDrag(const String& type_id, Point screen);
@@ -102,9 +104,11 @@ private:
 
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;
+    UiMultiEdit data_shell_;
     PropertyEditor behaviors_;
     PropertyEditor overrides_;
     UiDesignerCodeView code_;
+    UiMultiEdit diagnostics_shell_;
 
     UiPanel theme_gallery_column_;
     UiDesignerPillBar theme_gallery_pill_;
