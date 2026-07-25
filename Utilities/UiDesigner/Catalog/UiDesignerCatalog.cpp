@@ -624,8 +624,8 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
         const char *label;
         const char *value;
     } modes[] = {
-        {"width_mode", "Width mode", "Expand"},
-        {"height_mode", "Height mode", "Expand"},
+        {"width_mode", "Width mode", "Fit"},
+        {"height_mode", "Height mode", "Fit"},
         {"cell_align_x", "Cell align X", "Center"},
         {"cell_align_y", "Cell align Y", "Center"},
     };

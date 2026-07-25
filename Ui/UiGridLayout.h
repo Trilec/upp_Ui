@@ -89,6 +89,8 @@ public:
                                        UiSpacerLineOrientation orientation = UiSpacerLineOrientation::Auto,
                                        int thickness = DPI(1),
                                        UiLineStyle dash = SOLID, int inset = 0, Color c = Null);
+    UiGridLayout& SetItem(int index, int row, int col, bool scale_x, bool scale_y,
+                          Size fixed = Size(0, 0));
     int  GetItemCount() const { return items.GetCount(); }
     Rect GetCellRect(int row, int col) const;
     Rect GetItemRect(int index) const { return index >= 0 && index < items.GetCount() ? items[index].rect : Rect(0, 0, 0, 0); }

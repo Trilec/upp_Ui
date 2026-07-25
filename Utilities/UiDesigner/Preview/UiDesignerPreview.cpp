@@ -1340,61 +1340,16 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     }
     if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(&parent)) {
         layout_item_index = absolute->GetItemCount();
-        absolute->Add(child,
-                      node.GetProperty("x", 20),
-                      node.GetProperty("y", 20),
-                      max(0, (int)node.GetProperty("width", 160)),
-                      max(0, (int)node.GetProperty("height", 32)));
+        absolute->Add(child, 0, 0, 0, 0);
     }
     else if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
         layout_item_index = box->GetItemCount();
-        UiBoxLayout::ItemRef item = box->Add(child);
-        const bool horizontal = box->GetDirection() == UiDirection::H;
-        const String main_mode = node.GetProperty(
-            horizontal ? "width_mode" : "height_mode",
-            node.GetProperty(horizontal ? "h_sizing" : "v_sizing", "Fit"));
-        const int fixed_main = node.GetProperty(
-            horizontal ? "fixed_width" : "fixed_height", 0);
-        if(main_mode == "Expand" || main_mode == "Fill")
-            item.Expand(max(1, (int)(double)node.GetProperty("weight", 1.0)));
-        else if(main_mode == "Fixed")
-            item.Fixed(max(1, fixed_main > 0 ? fixed_main :
-                          (horizontal ? child.GetMinSize().cx : child.GetMinSize().cy)));
-        else
-            item.Fit();
-
-        const int min_main = node.GetProperty(
-            horizontal ? "min_width" : "min_height", 0);
-        const int max_main = node.GetProperty(
-            horizontal ? "max_width" : "max_height", 0);
-        const int min_cross = node.GetProperty(
-            horizontal ? "min_height" : "min_width", 0);
-        const int max_cross = node.GetProperty(
-            horizontal ? "max_height" : "max_width", 0);
-        const String cross_mode = node.GetProperty(
-            horizontal ? "height_mode" : "width_mode", "Fit");
-        const int natural_main = horizontal ? catalog_size.cx : catalog_size.cy;
-        const int natural_cross = horizontal ? catalog_size.cy : catalog_size.cx;
-        item.MinMaxMain(main_mode == "Fixed" ? min_main : max(min_main, natural_main),
-                        main_mode == "Fixed" ? (max_main > 0 ? max_main : fixed_main) :
-                        max(max_main, natural_main));
-        if(cross_mode == "Expand") {
-            item.MinMaxCross(min_cross, max_cross > 0 ? max_cross : INT_MAX)
-                .AlignSelf(UiCrossAlign::Stretch);
-        }
-        else {
-            item.MinMaxCross(max(min_cross, natural_cross),
-                             max(max_cross, natural_cross));
-            const String cross = node.GetProperty(horizontal ? "cell_align_y" : "cell_align_x", "Center");
-            item.AlignSelf(cross == "Center" ? UiCrossAlign::Center :
-                           cross == "Right" || cross == "Bottom" ? UiCrossAlign::End :
-                           UiCrossAlign::Start);
-        }
+        box->Add(child);
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
         grid->Add(child, node.GetProperty("grid_row", 0),
-                  node.GetProperty("grid_column", 0), true);
+                  node.GetProperty("grid_column", 0), false, false);
     }
     else if(auto *tab = dynamic_cast<UiTab *>(&parent))
         tab->Add(child, node.GetProperty("title", node.name));
@@ -1415,6 +1370,115 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
         *split << child;
     else
         parent.Add(child);
+}
+
+static UiGridLayout::Align ParseGridAlign(const String& align)
+{
+    if(align == "Center")
+        return UiGridLayout::Align::Center;
+    if(align == "Right" || align == "Bottom" || align == "End")
+        return UiGridLayout::Align::End;
+    if(align == "Stretch" || align == "Fill")
+        return UiGridLayout::Align::Stretch;
+    return UiGridLayout::Align::Start;
+}
+
+static bool IsManagedLayoutProperty(const String& property)
+{
+    return property == "x" || property == "y" ||
+           property == "width" || property == "height" ||
+           property == "width_mode" || property == "height_mode" ||
+           property == "fixed_width" || property == "fixed_height" ||
+           property == "min_width" || property == "min_height" ||
+           property == "max_width" || property == "max_height" ||
+           property == "cell_align_x" || property == "cell_align_y" ||
+           property == "grid_row" || property == "grid_column";
+}
+
+void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
+    UiDesignerPreviewInstance& instance, const UiDesignerNode& node)
+{
+    if(!instance.control || instance.layout_item_index < 0 || !document_ || !catalog_)
+        return;
+
+    const UiDesignerNode* parent_node = document_->Find(node.parent);
+    const UiDesignerControlSpec* parent_spec = parent_node ? catalog_->Find(parent_node->type) : nullptr;
+    if(!parent_spec)
+        return;
+
+    if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(FindRuntime(instance.runtime_parent))) {
+        absolute->SetItemRect(
+            instance.layout_item_index,
+            (int)Effective(node, "x", 20),
+            (int)Effective(node, "y", 20),
+            max(0, (int)Effective(node, "width", 160)),
+            max(0, (int)Effective(node, "height", 32)));
+        stats_.layout_item_updates++;
+        return;
+    }
+
+    if(auto *box = dynamic_cast<UiBoxLayout *>(FindRuntime(instance.runtime_parent))) {
+        const bool horizontal = box->GetDirection() == UiDirection::H;
+        const Size natural = max(box->GetMinSize(), instance.control->GetMinSize());
+        const UiDesignerBoxSizing sizing = UiDesignerResolveBoxSizing(
+            node, horizontal, max(1, horizontal ? natural.cx : natural.cy),
+            max(1, horizontal ? natural.cy : natural.cx));
+        UiBoxLayout::PauseScope pause(*box);
+        UiBoxLayout::ItemRef item = box->ItemAt(instance.layout_item_index);
+
+        if(sizing.main.mode == "Expand")
+            item.Expand(max(1, sizing.weight));
+        else if(sizing.main.mode == "Fixed")
+            item.Fixed(max(1, sizing.main.fixed > 0 ? sizing.main.fixed : sizing.main.natural));
+        else
+            item.Fit();
+        item.MinMaxMain(max(sizing.main.min, sizing.main.mode == "Fixed"
+                                      ? max(1, sizing.main.fixed > 0 ? sizing.main.fixed : sizing.main.natural)
+                                      : sizing.main.natural),
+                        sizing.main.max > 0 ? max(sizing.main.max,
+                                                  max(sizing.main.min, sizing.main.natural)) : INT_MAX);
+
+        if(sizing.cross.mode == "Expand") {
+            item.MinMaxCross(max(sizing.cross.min, sizing.cross.natural),
+                             sizing.cross.max > 0 ? max(sizing.cross.max,
+                                                        max(sizing.cross.min, sizing.cross.natural))
+                                                  : INT_MAX)
+                .AlignSelf(UiCrossAlign::Stretch);
+        }
+        else {
+            const int extent = max(sizing.cross.min,
+                                   sizing.cross.mode == "Fixed"
+                                       ? max(1, sizing.cross.fixed > 0 ? sizing.cross.fixed : sizing.cross.natural)
+                                       : sizing.cross.natural);
+            item.MinMaxCross(extent, sizing.cross.max > 0 ? max(sizing.cross.max, extent) : extent);
+            item.AlignSelf(UiDesignerResolveBoxAlign(sizing.cross_align));
+        }
+        stats_.layout_item_updates++;
+        return;
+    }
+
+    if(auto *grid = dynamic_cast<UiGridLayout *>(FindRuntime(instance.runtime_parent))) {
+        const UiDesignerGridSizing sizing = UiDesignerResolveGridSizing(node);
+        const Size natural = max(instance.control->GetMinSize(), Size(1, 1));
+        const Size fixed = Size(
+            sizing.fixed.cx > 0 ? sizing.fixed.cx : natural.cx,
+            sizing.fixed.cy > 0 ? sizing.fixed.cy : natural.cy);
+        grid->PauseLayout();
+        grid->SetItem(instance.layout_item_index,
+                      max(0, (int)node.GetProperty("grid_row", 0)),
+                      max(0, (int)node.GetProperty("grid_column", 0)),
+                      sizing.scale_x, sizing.scale_y, fixed);
+        grid->SetItemAlign(instance.layout_item_index, ParseGridAlign(sizing.align_x),
+                           ParseGridAlign(sizing.align_y));
+        grid->SetItemMinSize(instance.layout_item_index, Size(
+            max(sizing.min.cx, natural.cx), max(sizing.min.cy, natural.cy)));
+        grid->SetItemMaxSize(instance.layout_item_index, Size(
+            sizing.max.cx > 0 ? max(sizing.max.cx, max(sizing.min.cx, natural.cx)) : INT_MAX,
+            sizing.max.cy > 0 ? max(sizing.max.cy, max(sizing.min.cy, natural.cy)) : INT_MAX));
+        grid->ResumeLayout(true);
+        stats_.layout_item_updates++;
+        return;
+    }
 }
 
 void UiDesignerPreviewCanvas::BuildNode(
@@ -1471,6 +1535,8 @@ void UiDesignerPreviewCanvas::BuildNode(
     else
         fallback_parent.Add(*instance.control);
     ApplyAllProperties(instance, *node);
+    if(instance.layout_item_index >= 0)
+        UpdateManagedLayoutItem(instance, *node);
 
     ParentCtrl* child_fallback = dynamic_cast<ParentCtrl *>(instance.control.Get());
     if(!child_fallback)
@@ -1613,14 +1679,43 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             RebuildDocument();
     }
     else if(instances_[q].control) {
+        if(property == "direction") {
+            if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
+                const bool horizontal = AsString(value) == "H";
+                box->SetDirection(horizontal ? UiDirection::H : UiDirection::V);
+                stats_.ancestor_layouts++;
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return UiDesignerApplyResult::AppliedAncestorLayout;
+            }
+        }
+        else if(property == "rows" || property == "columns") {
+            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get())) {
+                const int rows = max(1, (int)node->GetProperty("rows", 1));
+                const int cols = max(1, (int)node->GetProperty("columns", 1));
+                grid->SetGridSize(cols, rows);
+                stats_.ancestor_layouts++;
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return UiDesignerApplyResult::AppliedAncestorLayout;
+            }
+        }
+
         result = UiDesignerPreviewFactory::Apply(*instances_[q].control,
                                                   *spec, property, value);
+        if(result == UiDesignerApplyResult::Rejected && IsManagedLayoutProperty(property)) {
+            UpdateManagedLayoutItem(instances_[q], *node);
+            result = UiDesignerApplyResult::AppliedAncestorLayout;
+            stats_.ancestor_layouts++;
+        }
         switch(result) {
         case UiDesignerApplyResult::AppliedPaint: stats_.paint_updates++; break;
         case UiDesignerApplyResult::AppliedLocalLayout:
             stats_.local_layouts++; Layout(); break;
         case UiDesignerApplyResult::AppliedAncestorLayout:
-            stats_.ancestor_layouts++; Layout(); break;
+            Layout(); break;
         case UiDesignerApplyResult::RequiresSubtreeRebuild:
             RebuildSubtree(node_id); break;
         case UiDesignerApplyResult::RequiresFullRebuild:

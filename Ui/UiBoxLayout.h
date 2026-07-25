@@ -560,6 +560,10 @@ public:
     // Add a child Ctrl to the layout. Returns an ItemRef to configure it.
     ItemRef Add(Ctrl& c);
 
+    // Return a mutable handle for an existing item. Use after PauseLayout()
+    // when mutating several fields together.
+    ItemRef ItemAt(int index) { return ItemRef(this, index); }
+
     // Add a child with a fixed size on the main axis.
     ItemRef AddFixed(Ctrl& c, int px) {
         return Add(c).Fixed(px);

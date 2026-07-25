@@ -47,6 +47,14 @@ static UiDesignerControlSpec MakeSpec(
         spec.properties.Add(inset);
         spec.defaults.Set("inset", inset_default);
     }
+    if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
+        spec.defaults.Set("width_mode", "Expand");
+        spec.defaults.Set("height_mode", "Expand");
+    }
+    else {
+        spec.defaults.Set("width_mode", "Fit");
+        spec.defaults.Set("height_mode", "Fit");
+    }
     return spec;
 }
 

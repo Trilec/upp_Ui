@@ -246,6 +246,29 @@ UiGridLayout& UiGridLayout::SetItemSeparatorLine(int index, bool on, Align align
     return *this;
 }
 
+UiGridLayout& UiGridLayout::SetItem(int index, int row, int col, bool scale_x,
+                                    bool scale_y, Size fixed)
+{
+    if(index >= 0 && index < items.GetCount()) {
+        Item& it = items[index];
+        it.row = max(0, row);
+        it.col = max(0, col);
+        it.scale_x = scale_x;
+        it.scale_y = scale_y;
+        it.fixed = fixed;
+        grid_rows = 0;
+        grid_cols = 0;
+        for(const Item& item : items) {
+            grid_rows = max(grid_rows, item.row + 1);
+            grid_cols = max(grid_cols, item.col + 1);
+        }
+        grid_rows = max(1, grid_rows);
+        grid_cols = max(1, grid_cols);
+        RefreshGridLayout();
+    }
+    return *this;
+}
+
 UiGridLayout& UiGridLayout::SetItemAlign(int index, Align x, Align y)
 {
     if(index >= 0 && index < items.GetCount()) {

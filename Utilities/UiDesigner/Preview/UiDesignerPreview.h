@@ -26,6 +26,7 @@ struct UiDesignerPreviewStats {
     int paint_updates = 0;
     int local_layouts = 0;
     int ancestor_layouts = 0;
+    int layout_item_updates = 0;
     int subtree_rebuilds = 0;
     int full_rebuilds = 0;
     int layout_count = 0;
@@ -142,6 +143,8 @@ private:
     void AttachSemanticItem(UiDesignerPreviewInstance& instance,
                             const UiDesignerNode& node,
                             UiDesignerPreviewInstance& parent_instance);
+    void UpdateManagedLayoutItem(UiDesignerPreviewInstance& instance,
+                                 const UiDesignerNode& node);
     void LayoutNode(UiDesignerNodeId node, int ordinal, int depth);
     void RemoveInstanceTree(UiDesignerNodeId node, bool include_root);
     bool IsRuntimeDescendant(UiDesignerNodeId candidate,
