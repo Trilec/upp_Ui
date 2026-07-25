@@ -57,8 +57,8 @@ public:
     UiDesignerSideColumn();
 
     UiDesignerSideColumn& RightColumn(bool on = true);
-    UiDesignerSideColumn& AddSection(const String& tip, const Image& icon,
-                                      Ctrl& content);
+    UiDesignerSideColumn& AddSection(const String& title, const Image& icon,
+                                     Ctrl& content, const String& tip = String());
     UiDesignerSideColumn& ApplyTheme(const UiDesignerThemeSnapshot& theme);
 
     void SetPaneWidth(UiDesignerPaneWidth width);

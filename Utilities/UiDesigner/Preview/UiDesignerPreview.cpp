@@ -195,37 +195,41 @@ static void AddGridDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
                                const UiDesignerDocument& document,
                                const UiDesignerCatalog* catalog,
                                const UiDesignerNode& node,
-                               const UiDesignerGeometryRecord& record,
-                               const UiDesignerPreviewInstance* instance)
+                               const UiDesignerGeometryRecord& record)
 {
-    const UiGridLayout *grid = instance && instance->control
-        ? dynamic_cast<const UiGridLayout *>(instance->control.Get()) : nullptr;
-    if(!grid)
-        return;
     const int rows = max(1, (int)node.GetProperty("rows", 1));
     const int cols = max(1, (int)node.GetProperty("columns", 1));
+    const int cell_count = min(rows * cols, record.cell_rects.GetCount());
+    if(cell_count <= 0)
+        return;
+    Vector<bool> occupied;
+    occupied.SetCount(rows * cols, false);
+    for(UiDesignerNodeId child_id : node.children) {
+        const UiDesignerNode* child = document.Find(child_id);
+        if(!child)
+            continue;
+        const int row = (int)child->GetProperty("grid_row", -1);
+        const int col = (int)child->GetProperty("grid_column", -1);
+        if(row < 0 || col < 0 || row >= rows || col >= cols)
+            continue;
+        occupied[row * cols + col] = true;
+    }
     int order = 0;
     for(int row = 0; row < rows; row++) {
         for(int col = 0; col < cols; col++) {
+            const int index = row * cols + col;
+            if(index >= cell_count)
+                continue;
             UiDesignerDropRegion region;
             region.owner = node.id;
             region.kind = UiDesignerDropRegionKind::GridCell;
-            region.rect = grid->GetCellRect(row, col).Offseted(record.rect.TopLeft());
+            region.rect = record.cell_rects[index];
             region.visual_rect = region.rect;
             region.grid_row = row;
             region.grid_column = col;
             region.depth = record.depth + 1;
             region.paint_order = record.order * 1000 + order++;
-            bool occupied = false;
-            for(UiDesignerNodeId child_id : node.children) {
-                const UiDesignerNode* child = document.Find(child_id);
-                if(child && (int)child->GetProperty("grid_row", 0) == row &&
-                          (int)child->GetProperty("grid_column", 0) == col) {
-                    occupied = true;
-                    break;
-                }
-            }
-            region.occupied = occupied;
+            region.occupied = occupied[index];
             region.label = Format("%s \"%s\" -- row %d, column %d",
                                   LayoutNodeName(catalog, node), node.name, row, col);
             AddRegion(snapshot, pick(region));
@@ -388,7 +392,7 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
         return;
     }
     if(node.type == "UiGridLayout") {
-        AddGridDropRegions(snapshot, document, catalog, node, record, instance);
+        AddGridDropRegions(snapshot, document, catalog, node, record);
         return;
     }
     if(node.type == "UiBoxLayout") {
@@ -1979,9 +1983,9 @@ void UiDesignerPreviewCanvas::Layout()
             record.inset_rects.Add(RectC(record.body.right, record.body.top,
                                          DPI(record.inset), record.body.Height()));
         }
-        snapshot.Add(pick(record));
         AddLayoutDropRegions(snapshot, *document_, catalog_, *node, record,
                              q >= 0 ? &instances_[q] : nullptr);
+        snapshot.Add(pick(record));
     }
     geometry_ = snapshot.Publish();
     stats_.snapshot_publications++;

@@ -247,7 +247,7 @@ UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool on)
 }
 
 UiDesignerSideColumn& UiDesignerSideColumn::AddSection(
-    const String& tip, const Image& icon, Ctrl& content)
+    const String& title, const Image& icon, Ctrl& content, const String& tip)
 {
     const int section_index = section_buttons_.GetCount();
     UiToolButton& button = section_buttons_.Add();
@@ -256,10 +256,10 @@ UiDesignerSideColumn& UiDesignerSideColumn::AddSection(
           .SetContentInset(DPI(4))
           .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     button.SetCheckable();
-    button.Tip(tip);
+    button.Tip(tip.IsEmpty() ? title : tip);
     button.WhenAction = [=] { Select(section_index); };
     tool_layout_.Add(button).Fixed(DPI(24)).MinCross(DPI(24));
-    pages_.Add(content, tip);
+    pages_.Add(content, title);
     if(pages_.GetCount() == 1)
         pages_.SetActivePage(0);
     UpdateToolSelection();

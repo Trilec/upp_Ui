@@ -92,8 +92,11 @@ public:
     UiGridLayout& SetItem(int index, int row, int col, bool scale_x, bool scale_y,
                           Size fixed = Size(0, 0));
     int  GetItemCount() const { return items.GetCount(); }
+    // Returned cell rectangles are local to the UiGridLayout client area.
     Rect GetCellRect(int row, int col) const;
     void GetCellRects(Vector<Rect>& rects) const;
+    int  GetResolvedCellGeometryBuildCount() const { return resolved_cell_geometry_build_count; }
+    int  GetResolvedCellGeometryQueryCount() const { return resolved_cell_geometry_query_count; }
     Rect GetItemRect(int index) const { return index >= 0 && index < items.GetCount() ? items[index].rect : Rect(0, 0, 0, 0); }
     bool IsItemVisible(int index) const { return index >= 0 && index < items.GetCount() ? items[index].visible && !items[index].rect.IsEmpty() : false; }
 
@@ -200,6 +203,9 @@ private:
     bool  pending_layout = false;
     Size  content = Size(0, 0);
     Size  last_reported_content = Size(-1, -1);
+    Vector<Rect> resolved_cell_rects;
+    mutable int   resolved_cell_geometry_build_count = 0;
+    mutable int   resolved_cell_geometry_query_count = 0;
     Vector<Item> items;
     Vector<int> selection;
     int focus_item = -1;

@@ -1,6 +1,7 @@
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
 #include <Ui/UiAbsoluteLayout.h>
+#include <Ui/UiGridLayout.h>
 
 using namespace Upp;
 
@@ -219,6 +220,16 @@ CONSOLE_APP_MAIN
               UiDesignerImpactLocalLayout | UiDesignerImpactCode,
               "Set move button fixed height"),
           "move Button fixed height command");
+    Check(move_commands.SetProperty(
+              move_button, "cell_align_x", "End",
+              UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+              "Set move button cell align x"),
+          "move Button cell align x command");
+    Check(move_commands.SetProperty(
+              move_button, "cell_align_y", "Center",
+              UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+              "Set move button cell align y"),
+          "move Button cell align y command");
     move_session.Select(move_button);
     UiDesignerDropPlan move_plan = move_session.PlanMoveSelection(
         move_grid, Point(144, 96), true, -1, 1, 1);
@@ -243,6 +254,10 @@ CONSOLE_APP_MAIN
           "moved Button keeps height mode");
     Check((int)move_session.Document().GetProperty(move_button, "fixed_height") == 44,
           "moved Button keeps fixed height");
+    Check(move_session.Document().GetProperty(move_button, "cell_align_x") == "End",
+          "moved Button keeps cell align x");
+    Check(move_session.Document().GetProperty(move_button, "cell_align_y") == "Center",
+          "moved Button keeps cell align y");
 
     const UiDesignerControlSpec* box_spec = catalog.Find("UiBoxLayout");
     Check(box_spec && box_spec->defaults.GetValue(box_spec->defaults.Find("inset")) == 8,
@@ -375,7 +390,110 @@ CONSOLE_APP_MAIN
         grid_geometry_snapshot.HitDropRegion(grid_geometry->cell_rects[0].CenterPoint());
     Check(grid_cell_drop && grid_cell_drop->owner == grid_node &&
               grid_cell_drop->kind == UiDesignerDropRegionKind::GridCell,
-          "grid cell hit testing resolves the grid cell");
+          Format("grid cell hit testing resolves the grid cell (owner=%d kind=%d point=%s rect=%s)",
+                 grid_cell_drop ? (int)grid_cell_drop->owner : 0,
+                 grid_cell_drop ? (int)grid_cell_drop->kind : -1,
+                 AsString(grid_geometry->cell_rects[0].CenterPoint()),
+                 AsString(grid_geometry->cell_rects[0])));
+    if(!grid_cell_drop || grid_cell_drop->owner != grid_node ||
+       grid_cell_drop->kind != UiDesignerDropRegionKind::GridCell) {
+        Cout() << Format("grid drop region count=%d\n",
+                         grid_geometry_snapshot.GetDropRegionCount());
+        for(const UiDesignerDropRegion& region : grid_geometry_snapshot.GetDropRegions())
+            Cout() << Format("drop owner=%d kind=%d row=%d col=%d depth=%d order=%d rect=%s visual=%s occupied=%d label=%s\n",
+                             (int)region.owner, (int)region.kind, region.grid_row,
+                             region.grid_column, region.depth, region.paint_order,
+                             AsString(region.rect), AsString(region.visual_rect),
+                             (int)region.occupied, region.label);
+    }
+
+    UiGridLayout empty_grid_probe;
+    empty_grid_probe.SetGridSize(3, 2);
+    empty_grid_probe.SetRect(0, 0, 420, 280);
+    Vector<Rect> empty_cells;
+    empty_grid_probe.GetCellRects(empty_cells);
+    Check(empty_cells.GetCount() == 6,
+          Format("empty non-square grid publishes row-major cell count (%d)",
+                 empty_cells.GetCount()));
+    Check(empty_grid_probe.GetCellRect(1, 2) == empty_cells[5],
+          "GetCellRect matches the cached row-major collection");
+    Check(empty_grid_probe.GetCellRect(-1, 0).IsEmpty() &&
+              empty_grid_probe.GetCellRect(9, 9).IsEmpty(),
+          "invalid grid coordinates return an empty rectangle");
+    const int empty_builds = empty_grid_probe.GetResolvedCellGeometryBuildCount();
+    Vector<Rect> repeated_cells;
+    empty_grid_probe.GetCellRects(repeated_cells);
+    (void)empty_grid_probe.GetCellRect(0, 0);
+    Check(empty_grid_probe.GetResolvedCellGeometryBuildCount() == empty_builds,
+          "grid cell accessors reuse cached geometry without rebuilding");
+
+    UiDesignerDocument populated_grid_document;
+    UiDesignerCommandService populated_grid_commands(populated_grid_document);
+    UiDesignerNodeId populated_grid = populated_grid_commands.AddNode(
+        "UiGridLayout", "populated_grid", populated_grid_document.GetRootId(),
+        grid_spec ? grid_spec->node_flags : 0,
+        grid_spec ? grid_spec->defaults : ValueMap(), "Add populated Grid");
+    Check(populated_grid != 0, "populated Grid created");
+    Check(populated_grid_commands.SetProperty(
+              populated_grid, "columns", 3,
+              UiDesignerImpactStructure | UiDesignerImpactCode,
+              "Set populated grid columns"),
+          "populated grid columns command");
+    Check(populated_grid_commands.SetProperty(
+              populated_grid, "rows", 2,
+              UiDesignerImpactStructure | UiDesignerImpactCode,
+              "Set populated grid rows"),
+          "populated grid rows command");
+    UiDesignerNodeId populated_button = populated_grid_commands.AddNode(
+        "UiButton", "populated_button", populated_grid,
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add populated Button");
+    Check(populated_button != 0, "populated Button created");
+    populated_grid_commands.SetProperty(
+        populated_button, "grid_row", 1,
+        UiDesignerImpactAncestorLayout | UiDesignerImpactCode, "Set populated row");
+    populated_grid_commands.SetProperty(
+        populated_button, "grid_column", 2,
+        UiDesignerImpactAncestorLayout | UiDesignerImpactCode, "Set populated column");
+    UiDesignerSelection populated_selection;
+    UiDesignerPreviewCanvas populated_preview;
+    populated_preview.SetRect(0, 0, 420, 280);
+    populated_preview.Bind(&populated_grid_document, &catalog, nullptr, &populated_selection);
+    populated_preview.RebuildDocument();
+    const UiDesignerGeometrySnapshot& populated_geometry =
+        populated_preview.GetGeometrySnapshot();
+    const UiDesignerGeometryRecord* populated_grid_geometry =
+        populated_geometry.Find(populated_grid);
+    Check(populated_grid_geometry && populated_grid_geometry->cell_rects.GetCount() == 6,
+          Format("populated non-square grid publishes row-major cell count (%d)",
+                 populated_grid_geometry ? populated_grid_geometry->cell_rects.GetCount() : -1));
+    for(const UiDesignerDropRegion& region : populated_geometry.GetDropRegions()) {
+        if(region.owner != populated_grid || region.kind != UiDesignerDropRegionKind::GridCell)
+            continue;
+        const int index = region.grid_row * 3 + region.grid_column;
+        Check(index >= 0 && index < populated_grid_geometry->cell_rects.GetCount(),
+              "grid cell metadata stays in row-major range");
+        if(index >= 0 && index < populated_grid_geometry->cell_rects.GetCount()) {
+            Check(region.rect == populated_grid_geometry->cell_rects[index],
+                  "grid drop region rectangle equals the published cell rectangle");
+            Check(region.grid_row * 3 + region.grid_column == index,
+                  "grid cell row-major metadata is stable");
+        }
+    }
+    UiGridLayout* populated_runtime_grid =
+        dynamic_cast<UiGridLayout *>(populated_preview.FindRuntime(populated_grid));
+    Check(populated_runtime_grid != nullptr, "preview creates a runtime grid instance");
+    if(populated_runtime_grid) {
+        const int populated_query_count = populated_runtime_grid->GetResolvedCellGeometryQueryCount();
+        Check(populated_query_count == 1,
+              "preview snapshot queries the cached grid geometry once rather than once per cell");
+        Vector<Rect> populated_runtime_cells;
+        populated_runtime_grid->GetCellRects(populated_runtime_cells);
+        Check(populated_runtime_cells == populated_grid_geometry->cell_rects,
+              "populated grid uses the same resolved cell geometry contract as the runtime grid");
+        Check(populated_runtime_grid->GetResolvedCellGeometryQueryCount() == populated_query_count + 1,
+              "runtime grid geometry is still served from cache for the comparison read");
+    }
 
     UiDesignerDocument sample_document;
     UiDesignerCommandService sample_commands(sample_document);

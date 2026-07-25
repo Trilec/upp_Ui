@@ -236,11 +236,13 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
-                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_shell_)
+                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_shell_,
+                               "Edit the selected control’s data")
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
-                   .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_shell_);
+                   .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_shell_,
+                               "Inspect live preview performance and projection activity");
     designer_right_.SetActiveSection(0);
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());

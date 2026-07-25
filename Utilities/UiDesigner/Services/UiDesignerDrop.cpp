@@ -82,8 +82,8 @@ void UiDesignerDropService::PopulatePlacement(
         properties.Set("grid_row", row);
         properties.Set("grid_column", column);
         if(!preserve_existing_layout) {
-            // Fresh grid children should begin as a single cell, not a
-            // surprising cell-spanning layout.
+            // Fresh grid children should begin at their natural size and be
+            // centered within the assigned grid cell.
             properties.Set("width_mode", "Fit");
             properties.Set("height_mode", "Fit");
             properties.Set("cell_align_x", "Center");

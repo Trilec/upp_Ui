@@ -352,6 +352,7 @@ static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<bool>& e
 
 void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const
 {
+    resolved_cell_geometry_build_count++;
     int cols = max(1, grid_cols);
     int rows = max(1, grid_rows);
     int gap = this->gap;
@@ -422,33 +423,21 @@ Rect UiGridLayout::GetClientGridRect() const
 
 Rect UiGridLayout::GetCellRect(int row, int col) const
 {
-    Vector<Rect> rects;
-    GetCellRects(rects);
+    resolved_cell_geometry_query_count++;
     int cols = max(1, grid_cols);
-    if(row < 0 || col < 0 || row >= max(1, grid_rows) || col >= cols)
+    int rows = max(1, grid_rows);
+    if(row < 0 || col < 0 || row >= rows || col >= cols)
         return Rect(0, 0, 0, 0);
     int index = row * cols + col;
-    return index >= 0 && index < rects.GetCount() ? rects[index] : Rect(0, 0, 0, 0);
+    return index >= 0 && index < resolved_cell_rects.GetCount()
+        ? resolved_cell_rects[index] : Rect(0, 0, 0, 0);
 }
 
 void UiGridLayout::GetCellRects(Vector<Rect>& rects) const
 {
+    resolved_cell_geometry_query_count++;
     rects.Clear();
-    int cols = max(1, grid_cols);
-    int rows = max(1, grid_rows);
-    Rect area = GetClientGridRect();
-    Vector<int> col_widths, row_heights;
-    ComputeTrackSizes(area.GetSize(), col_widths, row_heights);
-    rects.SetCount(cols * rows);
-    int y = area.top;
-    for(int row = 0; row < rows; row++) {
-        int x = area.left;
-        for(int col = 0; col < cols; col++) {
-            rects[row * cols + col] = RectC(x, y, col_widths[col], row_heights[row]);
-            x += col_widths[col] + gap;
-        }
-        y += row_heights[row] + gap;
-    }
+    rects.Append(resolved_cell_rects);
 }
 
 void UiGridLayout::Layout()
@@ -517,6 +506,18 @@ void UiGridLayout::Layout()
     for(int v : row_heights)
         content_h += v;
     content = Size(content_w, content_h);
+    resolved_cell_rects.SetCount(col_widths.GetCount() * row_heights.GetCount());
+    int idx = 0;
+    int cell_y = area.top;
+    for(int row = 0; row < row_heights.GetCount(); row++) {
+        int cell_x = area.left;
+        for(int col = 0; col < col_widths.GetCount(); col++) {
+            resolved_cell_rects[idx++] = RectC(cell_x, cell_y,
+                                               col_widths[col], row_heights[row]);
+            cell_x += col_widths[col] + gap;
+        }
+        cell_y += row_heights[row] + gap;
+    }
     NormalizeSelectionState();
     if(content != last_reported_content) {
         last_reported_content = content;
