@@ -1,11 +1,13 @@
 description "UiColorPicker demo\377";
 
 uses
-	Ui;
+	Ui,
+	plugin/png,
+	plugin/jpg,
+	plugin/bmp;
 
 file
 	main.cpp;
 
 mainconfig
 	"" = "GUI";
-
