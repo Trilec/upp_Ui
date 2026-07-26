@@ -55,6 +55,7 @@ public:
     bool FinishCatalogDrag(const String& type_id, Point screen);
     void CancelCatalogDrag();
     void InvalidateCatalogDrag();
+    void ApplyQueuedRootResize();
     UiDesignerCatalogDragState GetCatalogDragState() const { return drag_state_; }
     const UiDesignerCatalogDragDiagnostics& GetDragDiagnostics() const { return drag_diagnostics_; }
     void SetDecorationsVisible(bool on) { decorations_visible_ = on; Refresh(); }
@@ -84,6 +85,9 @@ private:
     bool cleaning_drag_ = false;
     UiDesignerResolvedDrop resolved_drop_;
     UiDesignerResizeSample resize_sample_;
+    UiDesignerPreviewStats resize_batch_before_;
+    int64 resize_batch_start_us_ = 0;
+    bool resize_batch_timing_ = false;
     uint64 resize_sample_sequence_ = 0;
     bool resize_sample_valid_ = false;
     String drag_status_;
@@ -105,6 +109,9 @@ private:
                                 double sync_ms, double preview_ms,
                                 const Rect& final_rect);
     void FinalizeRootResizePaint(double overlay_ms);
+    void RecordAppliedRootResize(const UiDesignerPreviewStats& before,
+                                 const UiDesignerPreviewStats& after,
+                                 double sync_ms, double preview_ms);
     void ClearDropPlan();
     void EndCatalogDrag(UiDesignerCatalogDragState terminal);
     void ReleaseOwnedCaptureSafely();

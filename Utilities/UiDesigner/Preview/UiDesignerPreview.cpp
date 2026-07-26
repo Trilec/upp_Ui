@@ -1216,6 +1216,8 @@ void UiDesignerPreviewCanvas::SetTransientVirtualSize(const Size& size)
 {
     transient_virtual_size_ = Size(max(1, size.cx), max(1, size.cy));
     transient_virtual_size_set_ = true;
+    if(capture_paused_)
+        return;
     stats_.resize_events++;
     stats_.immediate_live_rect_updates++;
     stats_.transient_root_size_updates++;
@@ -1235,22 +1237,12 @@ Size UiDesignerPreviewCanvas::GetEffectiveVirtualSize() const
 
 double UiDesignerPreviewCanvas::GetGridLayoutDurationTotalMs() const
 {
-    double total = 0;
-    for(const UiDesignerPreviewInstance& instance : instances_)
-        if(const UiGridLayout *grid = instance.control
-            ? dynamic_cast<const UiGridLayout *>(instance.control.Get()) : nullptr)
-            total += max(0.0, grid->GetLastLayoutDurationMs());
-    return total;
+    return stats_.grid_layout_time_ms;
 }
 
 double UiDesignerPreviewCanvas::GetBoxLayoutDurationTotalMs() const
 {
-    double total = 0;
-    for(const UiDesignerPreviewInstance& instance : instances_)
-        if(const UiBoxLayout *box = instance.control
-            ? dynamic_cast<const UiBoxLayout *>(instance.control.Get()) : nullptr)
-            total += max(0.0, box->GetLastLayoutDurationMs());
-    return total;
+    return stats_.box_layout_time_ms;
 }
 
 void UiDesignerPreviewCanvas::RecordResizeSample(const UiDesignerResizeSample& sample)
@@ -1926,7 +1918,22 @@ void UiDesignerPreviewCanvas::LayoutNode(
     rects_.GetAdd(node_id) = local.Offseted(origin);
     // Parent layout has already assigned managed children. Layout this
     // control only after its own rectangle is authoritative, then recurse.
+    const bool measure = detailed_timing_enabled_ && !capture_paused_;
+    const bool is_grid = dynamic_cast<UiGridLayout *>(instance.control.Get());
+    const bool is_box = dynamic_cast<UiBoxLayout *>(instance.control.Get());
+    const int64 control_layout_start = (measure && (is_grid || is_box)) ? usecs() : 0;
     instance.control->Layout();
+    if(control_layout_start) {
+        const double elapsed = (double)usecs(control_layout_start) / 1000.0;
+        if(is_grid) {
+            if(stats_.grid_layout_time_ms < 0) stats_.grid_layout_time_ms = 0;
+            stats_.grid_layout_time_ms += elapsed;
+        }
+        if(is_box) {
+            if(stats_.box_layout_time_ms < 0) stats_.box_layout_time_ms = 0;
+            stats_.box_layout_time_ms += elapsed;
+        }
+    }
 
     int child_ordinal = 0;
     for(UiDesignerNodeId child : node->children)
@@ -1943,9 +1950,11 @@ void UiDesignerPreviewCanvas::Layout()
     const UiDesignerNode* root = document_->Find(document_->GetRootId());
     if(!root)
         return;
-    stats_.layout_count++;
-    stats_.preview_layout_calls++;
-    stats_.full_geometry_walks++;
+    if(!capture_paused_) {
+        stats_.layout_count++;
+        stats_.preview_layout_calls++;
+        stats_.full_geometry_walks++;
+    }
     rects_.Clear();
     // Window is an implicit document host, not another runtime Ctrl. Its
     // rectangle is nevertheless real so hierarchy selection and resize
@@ -2056,8 +2065,10 @@ void UiDesignerPreviewCanvas::Layout()
         snapshot.Add(pick(record));
     }
     geometry_ = snapshot.Publish();
-    stats_.snapshot_publications++;
-    stats_.drop_region_publications++;
+    if(!capture_paused_) {
+        stats_.snapshot_publications++;
+        stats_.drop_region_publications++;
+    }
     const double snapshot_ms = measure ? (double)usecs(snapshot_start) / 1000.0 : -1;
     int grid_builds = 0;
     int grid_queries = 0;
@@ -2074,13 +2085,15 @@ void UiDesignerPreviewCanvas::Layout()
             ? dynamic_cast<const UiBoxLayout *>(instance.control.Get()) : nullptr) {
             box_layout_calls += box->GetLayoutCallCount();
         }
-    stats_.track_size_calculations = grid_builds;
-    stats_.cached_grid_geometry_reads = grid_queries;
-    stats_.grid_layout_passes = grid_layout_calls;
-    stats_.box_layout_passes = box_layout_calls;
-    stats_.geometry_walk_time_ms = geometry_walk_ms;
-    stats_.snapshot_time_ms = snapshot_ms;
-    stats_.layout_time_ms = measure ? (double)usecs(layout_start) / 1000.0 : -1;
+    if(!capture_paused_) {
+        stats_.track_size_calculations = grid_builds;
+        stats_.cached_grid_geometry_reads = grid_queries;
+        stats_.grid_layout_passes = grid_layout_calls;
+        stats_.box_layout_passes = box_layout_calls;
+        stats_.geometry_walk_time_ms = geometry_walk_ms;
+        stats_.snapshot_time_ms = snapshot_ms;
+        stats_.layout_time_ms = measure ? (double)usecs(layout_start) / 1000.0 : -1;
+    }
 }
 
 void UiDesignerPreviewCanvas::PaintSemantic(

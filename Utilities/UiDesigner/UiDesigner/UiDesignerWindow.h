@@ -27,6 +27,12 @@ public:
     virtual void Layout() override;
     virtual void Close() override;
 
+    void ApplyPreviewVirtualSize(const Size& virtual_size);
+    void QueuePreviewVirtualSize(const Size& virtual_size,
+                                 Function<void()> applied = Function<void()>());
+    void FlushPreviewVirtualSize();
+    void CancelQueuedPreviewVirtualSize();
+
 private:
     friend class UiDesignerInteractionOverlay;
     void BuildHeader();
@@ -143,6 +149,10 @@ private:
     String active_catalog_drag_type_;
     bool catalog_drag_active_ = false;
     bool decorations_visible_ = true;
+    bool preview_resize_posted_ = false;
+    bool preview_resize_pending_ = false;
+    Size pending_preview_virtual_size_;
+    Function<void()> pending_preview_resize_callback_;
 };
 
 }

@@ -54,6 +54,8 @@ struct UiDesignerPreviewStats {
     int cached_grid_geometry_reads = 0;
     int transient_root_size_updates = 0;
     double layout_time_ms = -1;
+    double grid_layout_time_ms = -1;
+    double box_layout_time_ms = -1;
     double geometry_walk_time_ms = -1;
     double snapshot_time_ms = -1;
     double overlay_paint_time_ms = -1;
@@ -103,6 +105,8 @@ struct UiDesignerResizeSample : Moveable<UiDesignerResizeSample> {
     int cached_grid_geometry_reads = 0;
     int transient_root_size_updates = 0;
     double layout_time_ms = -1;
+    double grid_layout_time_ms = -1;
+    double box_layout_time_ms = -1;
     double geometry_walk_time_ms = -1;
     double snapshot_time_ms = -1;
     double overlay_paint_time_ms = -1;

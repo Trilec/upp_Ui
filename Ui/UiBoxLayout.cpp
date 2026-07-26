@@ -497,7 +497,6 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
 
 void UiBoxLayout::Layout()
 {
-    const int64 layout_start = usecs();
     layout_call_count++;
     Rect r = GetSize();
     Rect irc = r.Deflated(inset.left, inset.top, inset.right, inset.bottom);
@@ -516,7 +515,7 @@ void UiBoxLayout::Layout()
         it.c->Show();
         it.c->SetRect(it.cl.rect);
     }
-    last_layout_duration_ms = (double)usecs(layout_start) / 1000.0;
+    last_layout_duration_ms = -1;
 }
 
 void UiBoxLayout::Paint(Draw& w)

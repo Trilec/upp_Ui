@@ -905,8 +905,8 @@ CONSOLE_APP_MAIN
     resize_box.Layout();
     Check(resize_box.GetLayoutCallCount() == box_layout_count_before + 2,
           "UiBoxLayout layout counter counts actual layout calls");
-    Check(resize_box.GetLastLayoutDurationMs() >= 0,
-          "UiBoxLayout records last layout duration");
+    Check(resize_box.GetLastLayoutDurationMs() < 0,
+          "UiBoxLayout does not collect unconditional timing");
 
     UiGridLayout resize_grid;
     resize_grid.SetRect(0, 0, 240, 120);
@@ -918,8 +918,8 @@ CONSOLE_APP_MAIN
     resize_grid.Layout();
     Check(resize_grid.GetLayoutCallCount() == grid_layout_count_before + 2,
           "UiGridLayout layout counter counts actual layout calls");
-    Check(resize_grid.GetLastLayoutDurationMs() >= 0,
-          "UiGridLayout records last layout duration");
+    Check(resize_grid.GetLastLayoutDurationMs() < 0,
+          "UiGridLayout does not collect unconditional timing");
 
     const UiDesignerControlSpec* resize_box_spec = catalog.Find("UiBoxLayout");
     UiDesignerDocument resize_document;

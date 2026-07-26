@@ -333,6 +333,10 @@ Image UiDesignerInteractionOverlay::CursorImage(Point, dword)
 
 bool UiDesignerInteractionOverlay::Key(dword key, int)
 {
+    if(key == K_ESCAPE && resizing_) {
+        CancelRootResize();
+        return true;
+    }
     if(key == K_ESCAPE && drag_state_ != UiDesignerCatalogDragState::Idle) {
         CancelCatalogDrag();
         return true;
@@ -441,6 +445,8 @@ void UiDesignerInteractionOverlay::RecordRootResizeSample(
     resize_sample_.transient_root_size_updates =
         after.transient_root_size_updates - before.transient_root_size_updates;
     resize_sample_.layout_time_ms = after.layout_time_ms;
+    resize_sample_.grid_layout_time_ms = after.grid_layout_time_ms;
+    resize_sample_.box_layout_time_ms = after.box_layout_time_ms;
     resize_sample_.geometry_walk_time_ms = after.geometry_walk_time_ms;
     resize_sample_.snapshot_time_ms = after.snapshot_time_ms;
     resize_sample_.overlay_paint_time_ms = after.overlay_paint_time_ms;
@@ -496,25 +502,32 @@ void UiDesignerInteractionOverlay::ApplyRootResize(Point p)
 
     resize_pending_rect_ = ResizeDocumentTo(p);
     const Size final_size = resize_pending_rect_.Size();
-    const bool timing_enabled = owner_->preview_canvas_.IsDetailedTimingEnabled() &&
-                                !owner_->preview_canvas_.IsCapturePaused();
-    const UiDesignerPreviewStats before = owner_->preview_canvas_.GetStats();
-    const int64 sync_start = timing_enabled ? usecs() : 0;
-    const int64 preview_start = timing_enabled ? usecs() : 0;
-
-    owner_->preview_canvas_.SetTransientVirtualSize(final_size);
-    owner_->Layout();
-    owner_->preview_canvas_.Layout();
-    owner_->preview_canvas_.Refresh();
-
-    const double preview_ms = timing_enabled ? (double)usecs(preview_start) / 1000.0 : -1;
-    const double sync_ms = timing_enabled ? (double)usecs(sync_start) / 1000.0 : -1;
-    const UiDesignerPreviewStats after = owner_->preview_canvas_.GetStats();
+    if(!resize_batch_timing_) {
+        resize_batch_before_ = owner_->preview_canvas_.GetStats();
+        resize_batch_timing_ = owner_->preview_canvas_.IsDetailedTimingEnabled() &&
+                               !owner_->preview_canvas_.IsCapturePaused();
+        resize_batch_start_us_ = resize_batch_timing_ ? usecs() : 0;
+    }
+    Ptr<UiDesignerInteractionOverlay> self = this;
+    owner_->QueuePreviewVirtualSize(final_size, [self] {
+        if(!self || !self->owner_)
+            return;
+        const UiDesignerPreviewStats after = self->owner_->preview_canvas_.GetStats();
+        const double sync_ms = self->resize_batch_timing_
+            ? (double)usecs(self->resize_batch_start_us_) / 1000.0 : -1;
+        self->RecordRootResizeSample(self->resize_batch_before_, after, sync_ms, sync_ms,
+                                     self->resize_pending_rect_);
+        self->resize_batch_timing_ = false;
+    });
 
     SetDragStatus(Format("resize root %dx%d", final_size.cx, final_size.cy));
-    RecordRootResizeSample(before, after, sync_ms, preview_ms, resize_pending_rect_);
-    if(!timing_enabled)
-        Refresh();
+    Refresh();
+}
+
+void UiDesignerInteractionOverlay::ApplyQueuedRootResize()
+{
+    if(owner_)
+        owner_->FlushPreviewVirtualSize();
 }
 
 void UiDesignerInteractionOverlay::FinishRootResize(Point p)
@@ -529,6 +542,8 @@ void UiDesignerInteractionOverlay::FinishRootResize(Point p)
     pointer_gesture_ = UiDesignerPointerGesture::None;
     Ptr<UiDesignerInteractionOverlay> keep_alive = this;
 
+    owner_->FlushPreviewVirtualSize();
+
     capture_release_in_progress_ = true;
     ReleaseOwnedCaptureSafely();
     capture_release_in_progress_ = false;
@@ -537,10 +552,11 @@ void UiDesignerInteractionOverlay::FinishRootResize(Point p)
         return;
 
     owner_->preview_canvas_.ClearTransientVirtualSize();
+    owner_->CancelQueuedPreviewVirtualSize();
+    resize_batch_timing_ = false;
     owner_->session_.SetVirtualSize(final_size);
-    owner_->Layout();
+    owner_->ApplyPreviewVirtualSize(final_size);
     owner_->preview_canvas_.Layout();
-    owner_->preview_canvas_.Refresh();
 
     SetDragStatus(Format("resize root done %dx%d",
                          final_size.cx, final_size.cy));
@@ -555,13 +571,16 @@ void UiDesignerInteractionOverlay::CancelRootResize()
     resizing_ = false;
     resize_edge_ = 0;
     pointer_gesture_ = UiDesignerPointerGesture::None;
-    capture_owned_ = false;
     resize_sample_valid_ = false;
     resize_pending_rect_ = resize_start_rect_;
+    owner_->CancelQueuedPreviewVirtualSize();
+    resize_batch_timing_ = false;
+    capture_release_in_progress_ = true;
+    ReleaseOwnedCaptureSafely();
+    capture_release_in_progress_ = false;
     owner_->preview_canvas_.ClearTransientVirtualSize();
-    owner_->Layout();
+    owner_->ApplyPreviewVirtualSize(resize_start_rect_.Size());
     owner_->preview_canvas_.Layout();
-    owner_->preview_canvas_.Refresh();
     SetDragStatus("resize root cancelled");
     Refresh();
 }

@@ -907,6 +907,61 @@ void UiDesignerWindow::WriteLaunchDiagnostic()
              AsJSON(diagnostic, true));
 }
 
+void UiDesignerWindow::ApplyPreviewVirtualSize(const Size& virtual_size)
+{
+    const Size size(max(1, virtual_size.cx), max(1, virtual_size.cy));
+    const Size workspace_size = preview_scroll_.GetSize();
+    const int preview_margin = DPI(40);
+    const Size extent(max(workspace_size.cx, size.cx + preview_margin * 2),
+                      max(workspace_size.cy, size.cy + preview_margin * 2));
+    preview_workspace_.SetRect(0, 0, extent.cx, extent.cy);
+    preview_canvas_.SetRect((extent.cx - size.cx) / 2,
+                            (extent.cy - size.cy) / 2, size.cx, size.cy);
+    interaction_overlay_.SetRect(0, 0, extent.cx, extent.cy);
+    preview_canvas_.Refresh();
+    interaction_overlay_.Refresh();
+}
+
+void UiDesignerWindow::QueuePreviewVirtualSize(const Size& virtual_size,
+                                                Function<void()> applied)
+{
+    pending_preview_virtual_size_ = virtual_size;
+    pending_preview_resize_callback_ = pick(applied);
+    preview_resize_pending_ = true;
+    if(preview_resize_posted_)
+        return;
+    preview_resize_posted_ = true;
+    Ptr<UiDesignerWindow> self = this;
+    PostCallback([self] {
+        if(!self)
+            return;
+        self->preview_resize_posted_ = false;
+        self->FlushPreviewVirtualSize();
+    });
+}
+
+void UiDesignerWindow::FlushPreviewVirtualSize()
+{
+    if(!preview_resize_pending_)
+        return;
+    preview_resize_pending_ = false;
+    const Size size = pending_preview_virtual_size_;
+    Function<void()> callback = pick(pending_preview_resize_callback_);
+    preview_canvas_.SetTransientVirtualSize(size);
+    ApplyPreviewVirtualSize(size);
+    preview_canvas_.Layout();
+    if(callback)
+        callback();
+    preview_canvas_.BumpDeferredBatch();
+    RequestDiagnosticsRefresh();
+}
+
+void UiDesignerWindow::CancelQueuedPreviewVirtualSize()
+{
+    preview_resize_pending_ = false;
+    pending_preview_resize_callback_.Clear();
+}
+
 void UiDesignerWindow::Layout()
 {
     const int margin = UiDesignerStyleMetrics::Gap();
