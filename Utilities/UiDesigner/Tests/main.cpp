@@ -278,6 +278,14 @@ CONSOLE_APP_MAIN
         box_spec ? box_spec->defaults : ValueMap(), "Add preview Box");
     const UiDesignerControlSpec* panel_spec = catalog.Find("UiPanel");
     const UiDesignerControlSpec* grid_spec = catalog.Find("UiGridLayout");
+    const UiDesignerControlSpec* color_picker_spec = catalog.Find("UiColorPicker");
+    Check(color_picker_spec && color_picker_spec->theme_adapter_id == "color_picker" &&
+              color_picker_spec->theme_overrides.GetCount() >= 10,
+          "Color Picker exposes a typed theme override surface");
+    Check(color_picker_spec && color_picker_spec->FindProperty("color") &&
+              color_picker_spec->FindProperty("alpha") &&
+              color_picker_spec->FindProperty("page_mode"),
+          "Color Picker ordinary properties remain separate from theme overrides");
     Check(panel_spec && panel_spec->FindProperty("inset") &&
               panel_spec->FindProperty("inset")->default_value == 8 &&
               panel_spec->defaults.GetValue(panel_spec->defaults.Find("inset")) == 8,

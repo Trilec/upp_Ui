@@ -1724,7 +1724,6 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
-
     UiDesignerApplyResult result;
     if(instances_[q].semantic) {
         result = UiDesignerApplyResult::RequiresSubtreeRebuild;
@@ -1733,6 +1732,27 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             RebuildDocument();
     }
     else if(instances_[q].control) {
+        if(auto *picker = dynamic_cast<UiColorPicker *>(instances_[q].control.Get())) {
+            if(property == "color") {
+                picker->SetColor((Color)value, false);
+                return UiDesignerApplyResult::AppliedPaint;
+            }
+            if(property == "alpha") {
+                picker->SetAlpha(minmax((int)value, 0, 255), false);
+                return UiDesignerApplyResult::AppliedPaint;
+            }
+            if(property == "alpha_enabled") {
+                picker->SetAlphaEnabled((bool)value);
+                return UiDesignerApplyResult::AppliedPaint;
+            }
+            if(property == "page_mode") {
+                const String mode = value;
+                picker->SetPageMode(mode == "Palettes" ? UiColorPicker::PAGE_PALETTES
+                                  : mode == "Generator" ? UiColorPicker::PAGE_GENERATOR
+                                  : UiColorPicker::PAGE_COLOR);
+                return UiDesignerApplyResult::AppliedLocalLayout;
+            }
+        }
         if(property == "direction") {
             if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
                 const bool horizontal = AsString(value) == "H";

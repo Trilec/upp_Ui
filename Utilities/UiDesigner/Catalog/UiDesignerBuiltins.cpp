@@ -1121,6 +1121,24 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                            PropertyImpactCode;
             s.properties.Add(color);
             s.defaults.Set("color", color.default_value);
+            auto alpha = UiDesignerNumberProperty("alpha", "Alpha", 255, 0, 255, 1,
+                                                  PropertyEditorKind::Integer);
+            alpha.group = "Value";
+            alpha.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+            s.properties.Add(alpha);
+            s.defaults.Set("alpha", 255);
+            auto alpha_enabled = UiDesignerBoolProperty("alpha_enabled", "Alpha enabled", true);
+            alpha_enabled.group = "Value";
+            alpha_enabled.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+            s.properties.Add(alpha_enabled);
+            s.defaults.Set("alpha_enabled", true);
+            s.properties.Add(ChoiceProperty("page_mode", "Page mode", "Configuration", "Color",
+                {{"Color", "Color"}, {"Palettes", "Palettes"}, {"Generator", "Generator"}}));
+            s.defaults.Set("page_mode", "Color");
+            s.theme_adapter_id = "color_picker";
+            s.theme = true;
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenChanging", "Colour changing", "Runs during colour preview.");
             AddEvent(s, "WhenAccept", "Colour accepted", "Runs after colour acceptance.");
             AddEvent(s, "WhenCancel", "Colour cancelled", "Runs when colour editing is cancelled.");

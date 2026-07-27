@@ -6,6 +6,7 @@
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
 #include <Ui/UiMenu.h>
+#include <Ui/UiColorPicker.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -1922,6 +1923,146 @@ public:
     }
 };
 
+class ColorPickerThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    const char *Id() const override { return "color_picker"; }
+    bool Supports(UiDesignerRuntimeKind kind) const override
+    {
+        return kind == UiDesignerRuntimeKind::UiColorPicker;
+    }
+
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override
+    {
+        const UiColorPicker::Style& base = UiColorPicker::StyleDefault();
+        AddOverride(spec, "face", "Face colour", "Surface", PropertyEditorKind::Color,
+                    UiDesignerFillColor(base.palette.face[ST_NORMAL]),
+                    PropertyImpactPaint | PropertyImpactCode, "face");
+        AddOverride(spec, "frame", "Frame colour", "Surface", PropertyEditorKind::Color,
+                    base.palette.frame[ST_NORMAL],
+                    PropertyImpactPaint | PropertyImpactCode, "frame");
+        AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer,
+                    base.metrics.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "navigation_height", "Navigation height", "Metrics",
+                    PropertyEditorKind::Integer, base.navigation_height,
+                    PropertyImpactPaint | PropertyImpactCode, "navigation_height");
+        AddOverride(spec, "footer_height", "Footer height", "Metrics",
+                    PropertyEditorKind::Integer, base.footer_height,
+                    PropertyImpactPaint | PropertyImpactCode, "footer_height");
+        AddOverride(spec, "slot_size", "Slot size", "Metrics", PropertyEditorKind::Integer,
+                    base.slot_size, PropertyImpactPaint | PropertyImpactCode, "slot_size");
+        AddOverride(spec, "slot_gap", "Slot gap", "Metrics", PropertyEditorKind::Integer,
+                    base.slot_gap, PropertyImpactPaint | PropertyImpactCode, "slot_gap");
+        AddOverride(spec, "page_gap", "Page gap", "Metrics", PropertyEditorKind::Integer,
+                    base.page_gap, PropertyImpactPaint | PropertyImpactCode, "page_gap");
+        AddOverride(spec, "right_panel_width", "Right panel width", "Metrics",
+                    PropertyEditorKind::Integer, base.right_panel_width,
+                    PropertyImpactPaint | PropertyImpactCode, "right_panel_width");
+        AddOverride(spec, "section_gap", "Section gap", "Metrics", PropertyEditorKind::Integer,
+                    base.section_gap, PropertyImpactPaint | PropertyImpactCode, "section_gap");
+        AddOverride(spec, "readout_row_height", "Readout row height", "Metrics",
+                    PropertyEditorKind::Integer, base.readout_row_height,
+                    PropertyImpactPaint | PropertyImpactCode, "readout_row_height");
+        AddOverride(spec, "channel_row_height", "Channel row height", "Metrics",
+                    PropertyEditorKind::Integer, base.channel_row_height,
+                    PropertyImpactPaint | PropertyImpactCode, "channel_row_height");
+        AddOverride(spec, "button_height", "Button height", "Metrics",
+                    PropertyEditorKind::Integer, base.button_height,
+                    PropertyImpactPaint | PropertyImpactCode, "button_height");
+    }
+
+    bool HasField(const String& field_id) const override
+    {
+        static const char *fields[] = {"face", "frame", "radius", "navigation_height",
+            "footer_height", "slot_size", "slot_gap", "page_gap", "right_panel_width",
+            "section_gap", "readout_row_height", "channel_row_height", "button_height"};
+        return FieldMatches(field_id, fields, (int)(sizeof(fields) / sizeof(fields[0])));
+    }
+
+    bool FieldAffectsLayout(const String& field_id) const override
+    {
+        return field_id != "face" && field_id != "frame" && field_id != "radius";
+    }
+
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec,
+                            const String& field_id,
+                            const UiDesignerTransientOverlay* overlay) const override
+    {
+        const UiColorPicker::Style& base = UiColorPicker::StyleDefault();
+        Value value;
+        if(field_id == "face") value = UiDesignerFillColor(base.palette.face[ST_NORMAL]);
+        else if(field_id == "frame") value = base.palette.frame[ST_NORMAL];
+        else if(field_id == "radius") value = base.metrics.radius;
+        else if(field_id == "navigation_height") value = base.navigation_height;
+        else if(field_id == "footer_height") value = base.footer_height;
+        else if(field_id == "slot_size") value = base.slot_size;
+        else if(field_id == "slot_gap") value = base.slot_gap;
+        else if(field_id == "page_gap") value = base.page_gap;
+        else if(field_id == "right_panel_width") value = base.right_panel_width;
+        else if(field_id == "section_gap") value = base.section_gap;
+        else if(field_id == "readout_row_height") value = base.readout_row_height;
+        else if(field_id == "channel_row_height") value = base.channel_row_height;
+        else if(field_id == "button_height") value = base.button_height;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+            if(p.adapter_field_id == field_id && (node.theme_overrides.Find(p.id) >= 0 || HasThemeValue(node, overlay, p.id))) {
+                const int q = node.theme_overrides.Find(p.id);
+                value = ResolveThemeValue(node, overlay, p.id,
+                                          q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
+            }
+        return value;
+    }
+
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node,
+                           const UiDesignerControlSpec& spec,
+                           const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiColorPicker *picker = dynamic_cast<UiColorPicker *>(&ctrl);
+        if(!picker) return;
+        UiColorPicker::Style style = UiColorPicker::StyleDefault();
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            if(node.theme_overrides.Find(p.id) < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            authored = true;
+            Value v = ResolveFieldValue(node, spec, p.adapter_field_id, overlay);
+            if(p.adapter_field_id == "face") style.palette.face[ST_NORMAL] = UiFill::Solid((Color)v);
+            else if(p.adapter_field_id == "frame") style.palette.frame[ST_NORMAL] = (Color)v;
+            else if(p.adapter_field_id == "radius") style.metrics.radius = max(0, (int)v);
+            else if(p.adapter_field_id == "navigation_height") style.navigation_height = max(1, (int)v);
+            else if(p.adapter_field_id == "footer_height") style.footer_height = max(1, (int)v);
+            else if(p.adapter_field_id == "slot_size") style.slot_size = max(1, (int)v);
+            else if(p.adapter_field_id == "slot_gap") style.slot_gap = max(0, (int)v);
+            else if(p.adapter_field_id == "page_gap") style.page_gap = max(0, (int)v);
+            else if(p.adapter_field_id == "right_panel_width") style.right_panel_width = max(1, (int)v);
+            else if(p.adapter_field_id == "section_gap") style.section_gap = max(0, (int)v);
+            else if(p.adapter_field_id == "readout_row_height") style.readout_row_height = max(1, (int)v);
+            else if(p.adapter_field_id == "channel_row_height") style.channel_row_height = max(1, (int)v);
+            else if(p.adapter_field_id == "button_height") style.button_height = max(1, (int)v);
+        }
+        if(authored) picker->SetCustomStyle(style);
+        else picker->ClearCustomStyle();
+    }
+
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node,
+                   const UiDesignerControlSpec& spec) const override
+    {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(p.id) >= 0;
+        if(!authored) return;
+        String var = member + "_style";
+        out << "\tUiColorPicker::Style " << var << " = UiColorPicker::StyleDefault();\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            int q = node.theme_overrides.Find(p.id);
+            if(q < 0) continue;
+            Value v = node.theme_overrides.GetValue(q);
+            if(p.adapter_field_id == "face") out << "\t" << var << ".palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "frame") out << "\t" << var << ".palette.frame[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "radius") out << "\t" << var << ".metrics.radius = " << (int)v << ";\n";
+            else out << "\t" << var << "." << p.adapter_field_id << " = " << (int)v << ";\n";
+        }
+        out << "\t" << member << ".SetCustomStyle(" << var << ");\n";
+    }
+};
+
 class ThemeAdapterRegistry {
 public:
     ThemeAdapterRegistry()
@@ -1931,6 +2072,7 @@ public:
         adapters.Add(&tree_adapter_);
         adapters.Add(&list_adapter_);
         adapters.Add(&menu_adapter_);
+        adapters.Add(&color_picker_adapter_);
     }
 
     const UiDesignerThemeAdapter* Find(const String& id) const
@@ -1955,6 +2097,7 @@ private:
     TreeThemeAdapter tree_adapter_;
     ListThemeAdapter list_adapter_;
     MenuThemeAdapter menu_adapter_;
+    ColorPickerThemeAdapter color_picker_adapter_;
     Array<const UiDesignerThemeAdapter*> adapters;
 };
 
