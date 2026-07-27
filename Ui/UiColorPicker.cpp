@@ -1204,12 +1204,12 @@ struct SharedColorPickerSession_ {
     int page_mode = UiColorPicker::PAGE_COLOR;
     int spectrum_mode = UiColorPicker::SPECTRUM_HUE_STRIP;
     int channel_mode = UiColorPicker::CHANNEL_RGB_FLOAT;
-    int harmony_mode = UiColorPicker::HARMONY_ANALOGOUS;
+    int harmony_mode = UiColorPicker::HARMONY_TRIAD;
     int palette_category = 0;
     int palette_index = 0;
     int selected_curve_channel = 0;
     int generator_mode = 2;
-    int generator_count = 5;
+    int generator_count = 3;
     int generator_gain = 100;
     Vector<Point> generator_handles;
     Vector<int> generator_values;
@@ -1758,6 +1758,8 @@ public:
         payload.Add("application/x-upp-uicolor-swatch-v1",
                     ClipData(FormatHex8_(value.color, value.alpha)));
         Append(payload, FormatHex8_(value.color, value.alpha));
+        if(HasCapture())
+            ReleaseCapture();
         DoDragAndDrop(payload,
                       MakeAlphaSwatchImage_(value.color,
                                             value.alpha,
@@ -1778,13 +1780,18 @@ public:
 
     virtual void DragAndDrop(Point, PasteClip& clip) override
     {
-        bool internal = accept_drop_ && AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
-        if(!internal && (!accept_drop_ || !AcceptText(clip))) {
+        bool internal = accept_drop_ && IsAvailableInternal<ColorDragSource_>(clip, "uicolor-value");
+        bool text = accept_drop_ && clip.IsAnyAvailable(ClipFmtsText());
+        if(!internal && !text) {
             clip.Reject();
             drop_hot_ = false;
             Refresh();
             return;
         }
+        if(internal)
+            AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
+        else
+            AcceptText(clip);
         clip.SetAction(DND_COPY);
         drop_hot_ = true;
         Refresh();
@@ -1942,6 +1949,8 @@ public:
         payload.Add("application/x-upp-uicolor-swatch-v1",
                     ClipData(FormatHex8_(value_.color, value_.alpha)));
         Append(payload, FormatHex8_(value_.color, value_.alpha));
+        if(HasCapture())
+            ReleaseCapture();
         DoDragAndDrop(payload,
                       MakeAlphaSwatchImage_(value_.color, value_.alpha,
                                             Size(DPI(34), DPI(34)), true),
@@ -1958,13 +1967,18 @@ public:
 
     virtual void DragAndDrop(Point, PasteClip& clip) override
     {
-        bool internal = accept_drop_ && owner_ && AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
-        if(!internal && (!accept_drop_ || !owner_ || !AcceptText(clip))) {
+        bool internal = accept_drop_ && owner_ && IsAvailableInternal<ColorDragSource_>(clip, "uicolor-value");
+        bool text = accept_drop_ && owner_ && clip.IsAnyAvailable(ClipFmtsText());
+        if(!internal && !text) {
             clip.Reject();
             drop_hot_ = false;
             Refresh();
             return;
         }
+        if(internal)
+            AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
+        else
+            AcceptText(clip);
         clip.SetAction(DND_COPY);
         drop_hot_ = true;
         Refresh();
@@ -2808,6 +2822,7 @@ UiColorPicker::UiColorPicker()
     ConfigureControls();
     WireEvents();
     LoadSharedSession();
+    SetGeneratorMode(generator_mode_);
 
     opening_slots_ = clone(slots_);
     curve_source_color_ = GetColor();
@@ -3105,8 +3120,8 @@ void UiColorPicker::ConfigureControls()
     generator_gain_edit_.SetTextUtf8("85");
     generator_gain_edit_.SetTextAlign(UiAlign::RIGHT);
     generator_count_label_.SetText("Colours");
-    generator_count_slider_.SetRange(2, 9).SetStep(1).SetValue(5);
-    generator_count_edit_.SetTextUtf8("5");
+    generator_count_slider_.SetRange(2, 9).SetStep(1).SetValue(3);
+    generator_count_edit_.SetTextUtf8("3");
     generator_count_edit_.SetTextAlign(UiAlign::RIGHT);
     generator_use_button_.SetText("Use Selected");
     generator_save_button_.SetText("Save Palette");
@@ -3115,7 +3130,7 @@ void UiColorPicker::ConfigureControls()
     generator_base_color_ = GetColor();
     generator_wheel_->SetBase(generator_base_color_);
     generator_wheel_->SetMode(harmony_mode_);
-    generator_wheel_->SetPaletteCount(5);
+    generator_wheel_->SetPaletteCount(3);
     for(int i = 0; i < 3; i++)
         generator_mode_button_[i].SetChecked(i == generator_mode_);
     generator_image_preview_->Show(false);
@@ -3892,12 +3907,12 @@ void UiColorPicker::ClearSharedSession()
     session.page_mode = PAGE_COLOR;
     session.spectrum_mode = SPECTRUM_HUE_STRIP;
     session.channel_mode = CHANNEL_RGB_FLOAT;
-    session.harmony_mode = HARMONY_ANALOGOUS;
+    session.harmony_mode = HARMONY_TRIAD;
     session.palette_category = 0;
     session.palette_index = 0;
     session.selected_curve_channel = 0;
     session.generator_mode = 2;
-    session.generator_count = 5;
+    session.generator_count = 3;
     session.generator_gain = 100;
     session.generator_handles.Clear();
     session.generator_values.Clear();
@@ -4766,6 +4781,8 @@ void UiColorPicker::SetGeneratorMode(int mode)
     generator_mode_ = minmax(mode, 1, 2);
     for(int i = 0; i < 3; i++)
         generator_mode_button_[i].SetChecked(i == generator_mode_);
+    generator_mode_button_[1].SetCustomStyle(UiTheme::ResolveButton(generator_mode_ == 1 ? UiRole::Accent : UiRole::Subtle));
+    generator_mode_button_[2].SetCustomStyle(UiTheme::ResolveButton(generator_mode_ == 2 ? UiRole::Accent : UiRole::Subtle));
     if(generator_mode_ == 0)
         generator_base_color_ = GetColor();
     generator_image_preview_->Show(generator_mode_ == 1);

@@ -340,7 +340,7 @@ private:
     PageMode       page_mode_ = PAGE_COLOR;
     SpectrumMode   spectrum_mode_ = SPECTRUM_HUE_STRIP;
     ChannelMode    channel_mode_ = CHANNEL_RGB_FLOAT;
-    HarmonyMode    harmony_mode_ = HARMONY_ANALOGOUS;
+    HarmonyMode    harmony_mode_ = HARMONY_TRIAD;
     int            remembered_hue_ = 0;
 
     int            palette_category_ = 0;
