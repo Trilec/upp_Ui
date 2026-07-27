@@ -284,7 +284,12 @@ CONSOLE_APP_MAIN
           "Color Picker exposes a typed theme override surface");
     Check(color_picker_spec && color_picker_spec->FindProperty("color") &&
               color_picker_spec->FindProperty("alpha") &&
-              color_picker_spec->FindProperty("page_mode"),
+              color_picker_spec->FindProperty("page_mode") &&
+              color_picker_spec->FindProperty("channel_mode") &&
+              color_picker_spec->FindProperty("spectrum_mode") &&
+              color_picker_spec->FindProperty("harmony_mode") &&
+              color_picker_spec->FindProperty("slot_count") &&
+              color_picker_spec->FindProperty("active_slot"),
           "Color Picker ordinary properties remain separate from theme overrides");
     Check(panel_spec && panel_spec->FindProperty("inset") &&
               panel_spec->FindProperty("inset")->default_value == 8 &&

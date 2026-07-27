@@ -1135,6 +1135,35 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.properties.Add(ChoiceProperty("page_mode", "Page mode", "Configuration", "Color",
                 {{"Color", "Color"}, {"Palettes", "Palettes"}, {"Generator", "Generator"}}));
             s.defaults.Set("page_mode", "Color");
+            s.properties.Add(ChoiceProperty("channel_mode", "Channel mode", "Configuration", "RGB float",
+                {{"RGB float", "RGB float"}, {"RGB integer", "RGB integer"}, {"HSV", "HSV"},
+                 {"HSL", "HSL"}, {"TMI", "TMI"}, {"CMYK", "CMYK"}, {"Lab", "Lab"}},
+                PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode));
+            s.defaults.Set("channel_mode", "RGB float");
+            s.properties.Add(ChoiceProperty("spectrum_mode", "Spectrum mode", "Configuration", "Hue strip",
+                {{"HSV rectangle", "HSV rectangle"}, {"Hue strip", "Hue strip"},
+                 {"RGB spectrum", "RGB spectrum"}, {"HSV wheel", "HSV wheel"}},
+                PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode));
+            s.defaults.Set("spectrum_mode", "Hue strip");
+            s.properties.Add(ChoiceProperty("harmony_mode", "Harmony mode", "Configuration", "Triad",
+                {{"Custom", "Custom"}, {"Analogous", "Analogous"}, {"Complementary", "Complementary"},
+                 {"Split complementary", "Split complementary"}, {"Triad", "Triad"}, {"Square", "Square"},
+                 {"Compound", "Compound"}, {"Shades", "Shades"}, {"Monochromatic", "Monochromatic"},
+                 {"Image extract", "Image extract"}},
+                PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode));
+            s.defaults.Set("harmony_mode", "Triad");
+            auto slots = UiDesignerNumberProperty("slot_count", "Slot count", 4, 1, 32, 1,
+                                                  PropertyEditorKind::Integer);
+            slots.group = "Configuration";
+            slots.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+            s.properties.Add(slots);
+            s.defaults.Set("slot_count", 4);
+            auto active_slot = UiDesignerNumberProperty("active_slot", "Active slot", 0, 0, 31, 1,
+                                                        PropertyEditorKind::Integer);
+            active_slot.group = "Configuration";
+            active_slot.impact = PropertyImpactControlState | PropertyImpactPaint | PropertyImpactCode;
+            s.properties.Add(active_slot);
+            s.defaults.Set("active_slot", 0);
             s.theme_adapter_id = "color_picker";
             s.theme = true;
             if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))

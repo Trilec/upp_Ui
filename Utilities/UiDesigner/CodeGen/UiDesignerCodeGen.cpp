@@ -432,6 +432,32 @@ void UiDesignerCodeGenerator::EmitSetup(
         }
     };
 
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiColorPicker) {
+        out << "\t" << member << ".SetColor(" << EmitValue(Effective("color", Color(58, 132, 255))) << ", false);\n";
+        out << "\t" << member << ".SetAlpha(" << (int)Effective("alpha", 255) << ", false);\n";
+        out << "\t" << member << ".SetAlphaEnabled(" << EmitValue(Effective("alpha_enabled", true)) << ");\n";
+        const String page = AsString(Effective("page_mode", "Color"));
+        const String channel = AsString(Effective("channel_mode", "RGB float"));
+        const String spectrum = AsString(Effective("spectrum_mode", "Hue strip"));
+        const String harmony = AsString(Effective("harmony_mode", "Triad"));
+        const char *pages[] = {"PAGE_COLOR", "PAGE_PALETTES", "PAGE_GENERATOR"};
+        int pi = page == "Palettes" ? 1 : page == "Generator" ? 2 : 0;
+        const char *channels[] = {"CHANNEL_RGB_FLOAT", "CHANNEL_RGB_INT", "CHANNEL_HSV", "CHANNEL_HSL", "CHANNEL_TMI", "CHANNEL_CMYK", "CHANNEL_LAB"};
+        const char *channel_names[] = {"RGB float", "RGB integer", "HSV", "HSL", "TMI", "CMYK", "Lab"};
+        int ci = 0; while(ci < 7 && channel != channel_names[ci]) ci++;
+        const char *spectra[] = {"SPECTRUM_HSV_RECT", "SPECTRUM_HUE_STRIP", "SPECTRUM_RGB_SPECTRUM", "SPECTRUM_HSV_WHEEL"};
+        const char *spectrum_names[] = {"HSV rectangle", "Hue strip", "RGB spectrum", "HSV wheel"};
+        int si = 0; while(si < 4 && spectrum != spectrum_names[si]) si++;
+        const char *harmonies[] = {"HARMONY_CUSTOM", "HARMONY_ANALOGOUS", "HARMONY_COMPLEMENTARY", "HARMONY_SPLIT_COMPLEMENTARY", "HARMONY_TRIAD", "HARMONY_SQUARE", "HARMONY_COMPOUND", "HARMONY_SHADES", "HARMONY_MONOCHROMATIC", "HARMONY_IMAGE_EXTRACT"};
+        const char *harmony_names[] = {"Custom", "Analogous", "Complementary", "Split complementary", "Triad", "Square", "Compound", "Shades", "Monochromatic", "Image extract"};
+        int hi = 0; while(hi < 10 && harmony != harmony_names[hi]) hi++;
+        out << "\t" << member << ".SetPageMode(UiColorPicker::" << pages[pi] << ");\n";
+        out << "\t" << member << ".SetChannelMode(UiColorPicker::" << channels[min(ci, 6)] << ");\n";
+        out << "\t" << member << ".SetSpectrumMode(UiColorPicker::" << spectra[min(si, 3)] << ");\n";
+        out << "\t" << member << ".SetHarmonyMode(UiColorPicker::" << harmonies[min(hi, 9)] << ");\n";
+        out << "\t" << member << ".SetSlotCount(" << max(1, (int)Effective("slot_count", 4)) << ");\n";
+        out << "\t" << member << ".SetActiveSlot(" << max(0, (int)Effective("active_slot", 0)) << ");\n";
+    }
     if(spec.FindProperty("role")) {
         const String role = AsString(Property("role", "Standard"));
         if(const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(spec)) {
