@@ -6,8 +6,7 @@ uses
 	Ui;
 
 file
-	main.cpp,
-	../Designer/DesignerTrace.cpp;
+	main.cpp;
 
 mainconfig
 	"" = "";

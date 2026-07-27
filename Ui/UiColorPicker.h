@@ -103,6 +103,7 @@ public:
         CHANNEL_HSL,
         CHANNEL_TMI,
         CHANNEL_CMYK,
+        CHANNEL_LAB,
         CHANNEL_COUNT
     };
 
@@ -246,6 +247,7 @@ private:
     class ChannelGroup;
     class ReadoutRow;
     class ImagePreview;
+    class HarmonyWheel;
 
     Style&         StyleEdit();
     void           InvalidateStyleCache();
@@ -280,6 +282,7 @@ private:
     void           HandlePreviousSlot(int index);
     void           HandleColorDrop(int slot, const SlotValue& value);
     bool           TryApplyColorText(const String& text, bool final_commit);
+    bool           TryApplyReadoutText(int readout, const String& text, bool final_commit);
 
     void           HandleChannelValue(ChannelMode mode, int row, double value, bool final_commit);
     void           RefreshChannelModeValues(ChannelMode mode);
@@ -301,6 +304,7 @@ private:
     void           ApplyCurves(bool final_commit);
 
     void           RefreshGeneratorPalette();
+    void           SetGeneratorMode(int mode);
     void           HandleGeneratorPick(int index, const SlotValue& value);
     void           LoadGeneratorImage();
     void           SaveGeneratedToStash();
@@ -337,6 +341,7 @@ private:
     SpectrumMode   spectrum_mode_ = SPECTRUM_HUE_STRIP;
     ChannelMode    channel_mode_ = CHANNEL_RGB_FLOAT;
     HarmonyMode    harmony_mode_ = HARMONY_ANALOGOUS;
+    int            remembered_hue_ = 0;
 
     int            palette_category_ = 0;
     int            palette_index_ = 0;
@@ -357,6 +362,8 @@ private:
     SlotValue        selected_generated_value_;
 
     Image            generator_image_;
+    Color            generator_base_color_ = Color(0, 120, 212);
+    int              generator_mode_ = 2;
     Color            curve_source_color_ = Black();
 
     UiBoxLayout      main_root_ { UiBoxLayout::Direction::V };
@@ -392,6 +399,7 @@ private:
     UiLineEdit       gain_axis_edit_;
 
     UiButton         channel_button_[CHANNEL_COUNT];
+    UiDropdown       channel_mode_drop_;
     UiToggle         alpha_toggle_;
     UiLabel          alpha_toggle_label_;
     UiStack          channel_stack_;
@@ -425,11 +433,20 @@ private:
     UiLabel          curve_hint_;
 
     UiDropdown       harmony_drop_;
+    UiButton         generator_mode_button_[3];
     UiButton         generator_refresh_button_;
     UiButton         generator_load_image_button_;
+    UiButton         generator_clear_samples_button_;
+    UiLabel          generator_gain_label_;
+    UiSlider         generator_gain_slider_ { UiDirection::H };
+    UiLineEdit       generator_gain_edit_;
+    UiLabel          generator_count_label_;
+    UiSlider         generator_count_slider_ { UiDirection::H };
+    UiLineEdit       generator_count_edit_;
     UiButton         generator_use_button_;
     UiButton         generator_save_button_;
     One<ImagePreview> generator_image_preview_;
+    One<HarmonyWheel> generator_wheel_;
     One<SwatchGrid>  generator_grid_;
     UiLabel          generator_hint_;
 };
