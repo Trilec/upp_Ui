@@ -904,6 +904,112 @@ static PaletteDefinition_ MakeXritePalette_()
     return palette;
 }
 
+static PaletteDefinition_ MakeBigColorGrayPalette_()
+{
+    PaletteDefinition_ palette;
+    palette.name = "B.I.G. Color & Gray Card";
+    palette.category = "Reference";
+    palette.columns = 3;
+    palette.rows = 3;
+    palette.badge = "9 patch sRGB";
+    const Color values[9] = {
+        Color(245, 245, 245), Color(119, 119, 119), Color(35, 35, 35),
+        Color(175, 50, 50), Color(50, 150, 50), Color(50, 50, 170),
+        Color(0, 180, 180), Color(180, 50, 140), Color(220, 190, 30)
+    };
+    const char *labels[9] = {
+        "Pure White", "18% Mid-Gray", "Deep Black", "Primary Red", "Primary Green",
+        "Primary Blue", "Cyan", "Magenta", "Yellow"
+    };
+    for(int i = 0; i < 9; i++)
+        AddPaletteColor_(palette, values[i], labels[i]);
+    return palette;
+}
+
+static PaletteDefinition_ MakePassportVideoPalette_()
+{
+    PaletteDefinition_ palette;
+    palette.name = "ColorChecker Passport Video";
+    palette.category = "Reference";
+    palette.columns = 6;
+    palette.rows = 4;
+    palette.badge = "24 patch sRGB";
+    const Color values[24] = {
+        Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255), Color(0, 255, 255), Color(255, 0, 255), Color(255, 255, 0),
+        Color(245, 215, 196), Color(232, 184, 154), Color(212, 154, 122), Color(184, 122, 92), Color(154, 92, 66), Color(122, 66, 46),
+        Color(245, 245, 245), Color(208, 208, 208), Color(171, 171, 171), Color(134, 134, 134), Color(97, 97, 97), Color(60, 60, 60),
+        Color(255, 250, 240), Color(240, 230, 210), Color(46, 46, 46), Color(31, 31, 31), Color(255, 107, 61), Color(61, 107, 255)
+    };
+    for(int i = 0; i < 24; i++)
+        AddPaletteColor_(palette, values[i], Format("Video Patch %02d", i + 1));
+    return palette;
+}
+
+static PaletteDefinition_ MakeSpyderCheckr24Palette_()
+{
+    PaletteDefinition_ palette;
+    palette.name = "SpyderCheckr 24";
+    palette.category = "Reference";
+    palette.columns = 6;
+    palette.rows = 4;
+    palette.badge = "24 patch sRGB";
+    const Color values[24] = {
+        Color(157, 107, 83), Color(199, 154, 125), Color(110, 139, 90), Color(90, 122, 184),
+        Color(184, 90, 110), Color(83, 110, 157), Color(142, 76, 54), Color(196, 150, 110),
+        Color(78, 62, 48), Color(175, 119, 84), Color(122, 139, 175), Color(191, 175, 153),
+        Color(240, 240, 240), Color(192, 192, 192), Color(144, 144, 144), Color(96, 96, 96),
+        Color(48, 48, 48), Color(0, 0, 0), Color(255, 0, 0), Color(0, 255, 0),
+        Color(0, 0, 255), Color(255, 255, 0), Color(255, 0, 255), Color(0, 255, 255)
+    };
+    for(int i = 0; i < 24; i++)
+        AddPaletteColor_(palette, values[i], Format("Spyder24 Patch %02d", i + 1));
+    return palette;
+}
+
+static PaletteDefinition_ MakeSpyderCheckr48Palette_()
+{
+    PaletteDefinition_ palette;
+    palette.name = "SpyderCheckr 48";
+    palette.category = "Reference";
+    palette.columns = 8;
+    palette.rows = 6;
+    palette.badge = "48 patch sRGB";
+    const Color values[48] = {
+        Color(157, 107, 83), Color(199, 154, 125), Color(110, 139, 90), Color(90, 122, 184),
+        Color(184, 90, 110), Color(83, 110, 157), Color(142, 76, 54), Color(196, 150, 110),
+        Color(78, 62, 48), Color(175, 119, 84), Color(122, 139, 175), Color(191, 175, 153),
+        Color(240, 240, 240), Color(192, 192, 192), Color(144, 144, 144), Color(96, 96, 96),
+        Color(48, 48, 48), Color(0, 0, 0), Color(255, 0, 0), Color(0, 255, 0),
+        Color(0, 0, 255), Color(255, 255, 0), Color(255, 0, 255), Color(0, 255, 255),
+        Color(134, 98, 62), Color(178, 134, 98), Color(82, 106, 62), Color(62, 98, 134),
+        Color(134, 62, 82), Color(62, 82, 134), Color(106, 54, 38), Color(154, 114, 82),
+        Color(54, 42, 34), Color(134, 90, 62), Color(90, 106, 134), Color(154, 138, 118),
+        Color(220, 220, 220), Color(176, 176, 176), Color(128, 128, 128), Color(80, 80, 80),
+        Color(32, 32, 32), Color(16, 16, 16), Color(238, 0, 0), Color(0, 238, 0),
+        Color(0, 0, 238), Color(238, 238, 0), Color(238, 0, 238), Color(0, 238, 238)
+    };
+    for(int i = 0; i < 48; i++)
+        AddPaletteColor_(palette, values[i], Format("Spyder48 Patch %02d", i + 1));
+    return palette;
+}
+
+static PaletteDefinition_ MakeMonkSkinTonePalette_()
+{
+    PaletteDefinition_ palette;
+    palette.name = "Monk Skin Tone Scale";
+    palette.category = "Reference";
+    palette.columns = 10;
+    palette.rows = 1;
+    palette.badge = "10 tone sRGB";
+    const Color values[10] = {
+        Color(245, 230, 215), Color(237, 210, 192), Color(224, 184, 160), Color(208, 154, 122), Color(192, 130, 92),
+        Color(168, 106, 66), Color(139, 82, 50), Color(110, 62, 38), Color(82, 46, 30), Color(62, 34, 24)
+    };
+    for(int i = 0; i < 10; i++)
+        AddPaletteColor_(palette, values[i], Format("MSTS %d", i + 1));
+    return palette;
+}
+
 static PaletteDefinition_ MakeSkinPalette_()
 {
     PaletteDefinition_ palette;
@@ -965,6 +1071,11 @@ static const Vector<PaletteDefinition_>& PaletteRegistry_()
         palettes.Add(MakeWebSafePalette_());
         palettes.Add(MakeHdriPalette_());
         palettes.Add(MakeXritePalette_());
+        palettes.Add(MakeBigColorGrayPalette_());
+        palettes.Add(MakePassportVideoPalette_());
+        palettes.Add(MakeSpyderCheckr24Palette_());
+        palettes.Add(MakeSpyderCheckr48Palette_());
+        palettes.Add(MakeMonkSkinTonePalette_());
         palettes.Add(MakeSkinPalette_());
         palettes.Add(MakeIndustryPalette_());
 
@@ -1207,20 +1318,12 @@ struct SharedColorPickerSession_ {
     int harmony_mode = UiColorPicker::HARMONY_TRIAD;
     int palette_category = 0;
     int palette_index = 0;
-    int selected_curve_channel = 0;
     int generator_mode = 2;
     int generator_count = 3;
     int generator_gain = 100;
     Vector<Point> generator_handles;
     Vector<int> generator_values;
     Image generator_image;
-    ShadowCurve curves[4];
-
-    SharedColorPickerSession_()
-    {
-        for(int i = 0; i < 4; i++)
-            curves[i] = ShadowLinear();
-    }
 };
 
 static SharedColorPickerSession_& SharedSession_()
@@ -1416,7 +1519,7 @@ public:
             cache_changed = cache_changed || hue_ != hue;
         else if(mode == SPECTRUM_RGB_SPECTRUM)
             cache_changed = cache_changed || color_.GetB() != color.GetB();
-        else if(mode == SPECTRUM_HUE_STRIP)
+        else if(mode == SPECTRUM_HUE_STRIP || mode == SPECTRUM_HSV_WHEEL || mode == SPECTRUM_HSV_HEX)
             cache_changed = cache_changed || gain_ != gain;
 
         mode_ = mode;
@@ -1493,7 +1596,7 @@ private:
         key_builder.Add(size).Add((int)mode_);
         if(mode_ == SPECTRUM_HSV_RECT)
             key_builder.Add(hue_);
-        else if(mode_ == SPECTRUM_HUE_STRIP)
+        else if(mode_ == SPECTRUM_HUE_STRIP || mode_ == SPECTRUM_HSV_WHEEL || mode_ == SPECTRUM_HSV_HEX)
             key_builder.Add(gain_);
         else if(mode_ == SPECTRUM_RGB_SPECTRUM)
             key_builder.Add(color_.GetB());
@@ -1540,6 +1643,22 @@ private:
             return Color(ClampByte_(red), ClampByte_(green), color_.GetB());
         }
 
+        case SPECTRUM_HSV_WHEEL:
+        case SPECTRUM_HSV_HEX: {
+            Point center(width / 2, height / 2);
+            double dx = x - center.x;
+            double dy = center.y - y;
+            double radius = max(1.0, min(width, height) * 0.5);
+            double distance = mode_ == SPECTRUM_HSV_HEX
+                            ? max(fabs(dx), fabs(dy) * 1.154700538)
+                            : sqrt(dx * dx + dy * dy);
+            if(distance > radius)
+                return SColorPaper();
+            int hue = NormalizeHue_(int(atan2(dy, dx) * 180.0 / M_PI + 0.5));
+            int saturation = ClampPercent_(int(distance / radius * 100.0 + 0.5));
+            return HsvToColor_(hue, saturation, gain_);
+        }
+
         case SPECTRUM_HSV_RECT:
         default: {
             int saturation = int(x / double(width) * 100.0 + 0.5);
@@ -1557,6 +1676,8 @@ private:
         int saturation = 0;
         int value = 0;
         ColorToHsv_(color_, hue, saturation, value);
+        if(saturation == 0 || value == 0)
+            hue = hue_;
 
         switch(mode_) {
         case SPECTRUM_HUE_STRIP:
@@ -1566,6 +1687,15 @@ private:
         case SPECTRUM_RGB_SPECTRUM:
             return Point(int(color_.GetR() / 255.0 * width + 0.5),
                          int((255 - color_.GetG()) / 255.0 * height + 0.5));
+
+        case SPECTRUM_HSV_WHEEL:
+        case SPECTRUM_HSV_HEX: {
+            double angle = hue * M_PI / 180.0;
+            double radius = saturation / 100.0 * min(width, height) * 0.5;
+            Point center(width / 2, height / 2);
+            return Point(center.x + int(cos(angle) * radius + 0.5),
+                         center.y - int(sin(angle) * radius + 0.5));
+        }
 
         case SPECTRUM_HSV_RECT:
         default:
@@ -2049,6 +2179,8 @@ public:
             Add(row_[i].label);
             Add(row_[i].slider);
             Add(row_[i].edit);
+            row_[i].slider.SetTrackSize(Size(DPI(4096), DPI(5)))
+                          .SetThumbSize(Size(DPI(14), DPI(18)));
             UiLineEdit::Style edit_style = UiTheme::ResolveEdit(UiRole::Subtle);
             edit_style.font = Monospace().Height(DPI(10));
             row_[i].edit.SetCustomStyle(edit_style);
@@ -2711,13 +2843,35 @@ private:
             break;
         }
         case HARMONY_TRIAD: {
-            const int offsets[] = { 0, 120, 240, -15, 15, 105, 135, 225, 255 };
-            for(int i = 0; i < count_; i++) add(offsets[i]);
+            int per_anchor = count_ / 3;
+            int remainder = count_ % 3;
+            for(int anchor = 0; anchor < 3; anchor++) {
+                int cluster_count = per_anchor + (anchor < remainder ? 1 : 0);
+                for(int i = 0; i < cluster_count; i++) {
+                    int spread = i == 0 ? 0
+                               : ((i + 1) / 2) * 15 * (i & 1 ? 1 : -1);
+                    add(anchor * 120 + spread);
+                }
+            }
             break;
         }
-        case HARMONY_SQUARE:
-            for(int i = 0; i < count_; i++) add((i % 4) * 90, i < 4 ? saturation_ : max(20, saturation_ - 25));
+        case HARMONY_SQUARE: {
+            // Keep each cardinal hue's variants adjacent so the generated
+            // palette reads as four colour groups rather than outer/inner rings.
+            int per_anchor = count_ / 4;
+            int remainder = count_ % 4;
+            for(int anchor = 0; anchor < 4; anchor++) {
+                int cluster_count = per_anchor + (anchor < remainder ? 1 : 0);
+                for(int i = 0; i < cluster_count; i++) {
+                    int spread = i == 0 ? 0
+                               : ((i + 1) / 2) * 12 * (i & 1 ? 1 : -1);
+                    int saturation = i == 0 ? saturation_
+                                            : max(20, saturation_ - i * 20);
+                    add(anchor * 90 + spread, saturation);
+                }
+            }
             break;
+        }
         case HARMONY_COMPOUND: {
             const int offsets[] = { -30, 0, 30, 150, 210, 180, 60, 300, 330 };
             for(int i = 0; i < count_; i++) add(offsets[i], i & 1 ? max(20, saturation_ - 20) : saturation_);
@@ -2825,7 +2979,6 @@ UiColorPicker::UiColorPicker()
     SetGeneratorMode(generator_mode_);
 
     opening_slots_ = clone(slots_);
-    curve_source_color_ = GetColor();
     SyncThemeToChildren();
     SyncPageButtons();
     SyncChannelButtons();
@@ -2849,6 +3002,7 @@ void UiColorPicker::BuildChildTree()
     color_field_.Create();
     current_slot_button_.Create();
     recent_grid_.Create();
+    footer_palette_grid_.Create();
     palette_grid_.Create();
     stash_grid_.Create();
     generator_grid_.Create();
@@ -2888,12 +3042,11 @@ void UiColorPicker::BuildChildTree()
 
     page_stack_.AddPage(color_page_, "color");
     page_stack_.AddPage(palette_page_, "palettes");
-    page_stack_.AddPage(curves_page_, "curves");
     page_stack_.AddPage(generator_page_, "generator");
 
     footer_bar_.SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
-    footer_bar_.Add(footer_information_).Expand(1);
-    footer_bar_.Add(footer_spacer_).Fixed(DPI(4));
+    footer_bar_.Add(footer_information_).Fixed(DPI(120));
+    footer_bar_.Add(*footer_palette_grid_).Expand(1);
     footer_bar_.Add(accept_button_).Fixed(DPI(110));
     footer_bar_.Add(cancel_button_).Fixed(DPI(110));
 
@@ -2925,15 +3078,8 @@ void UiColorPicker::BuildChildTree()
     palette_page_.Add(stash_title_);
     palette_page_.Add(palette_hint_);
     palette_page_.Add(*stash_grid_);
-
-    for(int i = 0; i < 4; i++) {
-        curves_page_.Add(curve_button_[i]);
-        curve_stack_.AddPage(curve_editor_[i], AsString(i));
-    }
-    curves_page_.Add(curve_capture_button_);
-    curves_page_.Add(curve_reset_button_);
-    curves_page_.Add(curve_stack_);
-    curves_page_.Add(curve_hint_);
+    palette_page_.Add(palette_export_button_);
+    palette_page_.Add(palette_import_button_);
 
     generator_page_.Add(harmony_drop_);
     for(int i = 0; i < 3; i++)
@@ -2957,7 +3103,7 @@ void UiColorPicker::BuildChildTree()
 
 void UiColorPicker::ConfigureControls()
 {
-    const char *page_names[PAGE_COUNT] = { "Color", "Palettes", "Curves", "Generator" };
+    const char *page_names[PAGE_COUNT] = { "Color", "Palettes", "Generator" };
     for(int i = 0; i < PAGE_COUNT; i++) {
         page_button_[i].SetText(page_names[i]);
         page_button_[i].SetCheckable(true);
@@ -2973,11 +3119,14 @@ void UiColorPicker::ConfigureControls()
     cancel_button_.SetText("Cancel");
     footer_information_.SetText("Information / Detail");
     footer_information_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+    footer_palette_grid_->SetFlow(3, true);
 
     spectrum_mode_drop_.Clear();
     spectrum_mode_drop_.Add("Hue Strip", (int)SPECTRUM_HUE_STRIP);
     spectrum_mode_drop_.Add("HSV Rectangle", (int)SPECTRUM_HSV_RECT);
     spectrum_mode_drop_.Add("RGB Spectrum", (int)SPECTRUM_RGB_SPECTRUM);
+    spectrum_mode_drop_.Add("HSV Wheel", (int)SPECTRUM_HSV_WHEEL);
+    spectrum_mode_drop_.Add("HSV Hex Field", (int)SPECTRUM_HSV_HEX);
     spectrum_mode_drop_.SetDataSilently((int)spectrum_mode_);
     spectrum_mode_drop_.SetPlaceholderText("Spectrum type");
 
@@ -3080,21 +3229,9 @@ void UiColorPicker::ConfigureControls()
     stash_title_.SetText("User Stash");
     palette_hint_.SetText("Drag palette colours into the stash or directly onto C1-C4.");
     palette_badge_.SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
-    palette_use_button_.SetText("Use Selected");
-    palette_save_button_.SetText("Save to Stash");
-    stash_use_button_.SetText("Use Stash");
-    stash_save_active_button_.SetText("Save Current");
+    palette_export_button_.SetText("Export JSON");
+    palette_import_button_.SetText("Import JSON");
     PopulatePaletteSelectors();
-
-    const char *curve_names[4] = { "Master", "Red", "Green", "Blue" };
-    for(int i = 0; i < 4; i++) {
-        curve_button_[i].SetText(curve_names[i]);
-        curve_button_[i].SetCheckable(true);
-        curve_editor_[i].SetCurve(ShadowLinear());
-    }
-    curve_capture_button_.SetText("Capture Current");
-    curve_reset_button_.SetText("Reset");
-    curve_hint_.SetText("Curves apply to the captured source colour; Master is evaluated before each channel curve.");
 
     harmony_drop_.Clear();
     harmony_drop_.Add("Custom / Slots", (int)HARMONY_CUSTOM);
@@ -3145,7 +3282,6 @@ void UiColorPicker::ConfigureControls()
     generator_count_slider_.Show(false);
     generator_count_edit_.Show(false);
 
-    curve_stack_.SetActivePage(0);
     channel_stack_.SetActivePage((int)channel_mode_);
     page_stack_.SetActivePage((int)page_mode_);
     UpdateAlphaAvailability();
@@ -3200,6 +3336,22 @@ void UiColorPicker::WireEvents()
                             ClampByte_(255 - int(y / double(max(1, rect.GetHeight() - 1)) * 255.0 + 0.5)),
                             current.GetB());
             break;
+        case SPECTRUM_HSV_WHEEL:
+        case SPECTRUM_HSV_HEX: {
+            Point center(rect.GetWidth() / 2, rect.GetHeight() / 2);
+            double dx = x - center.x;
+            double dy = center.y - y;
+            double radius = max(1.0, min(rect.GetWidth() - 1, rect.GetHeight() - 1) * 0.5);
+            double distance = spectrum_mode_ == SPECTRUM_HSV_HEX
+                            ? max(fabs(dx), fabs(dy) * 1.154700538)
+                            : sqrt(dx * dx + dy * dy);
+            if(distance > radius)
+                return;
+            h = remembered_hue_ = NormalizeHue_(int(atan2(dy, dx) * 180.0 / M_PI + 0.5));
+            s = ClampPercent_(int(distance / radius * 100.0 + 0.5));
+            current = HsvToColor_(h, s, gain_axis_slider_.GetValue());
+            break;
+        }
         case SPECTRUM_HSV_RECT:
         default:
             s = int(x / double(max(1, rect.GetWidth() - 1)) * 100.0 + 0.5);
@@ -3344,19 +3496,11 @@ void UiColorPicker::WireEvents()
         UseSelectedStashColor();
     };
     stash_grid_->WhenDropValue = [=](SlotValue value) { HandlePaletteDropToStash(value); };
-    palette_use_button_.WhenAction = [=] { UseSelectedPaletteColor(); };
-    palette_save_button_.WhenAction = [=] { SaveSelectedPaletteToStash(); };
-    stash_use_button_.WhenAction = [=] { UseSelectedStashColor(); };
-    stash_save_active_button_.WhenAction = [=] { AddUserSwatch(GetColor(), GetAlpha()); };
-
-    for(int i = 0; i < 4; i++) {
-        const int index = i;
-        curve_button_[i].WhenAction = [=] { SelectCurveChannel(index); };
-        curve_editor_[i].WhenChanging = [=] { ApplyCurves(false); };
-        curve_editor_[i].WhenAction = [=] { ApplyCurves(true); };
-    }
-    curve_capture_button_.WhenAction = [=] { CaptureCurveSource(); };
-    curve_reset_button_.WhenAction = [=] { ResetCurves(); };
+    palette_export_button_.WhenAction = [=] { SavePaletteJson(); };
+    palette_import_button_.WhenAction = [=] { LoadPaletteJson(); };
+    footer_palette_grid_->WhenDoublePick = [=](int, SlotValue value) {
+        CommitSlotValue(active_slot_, value.color, value.alpha, true);
+    };
 
     harmony_drop_.WhenSelectData = [=](const Value& data) {
         if(!IsNull(data))
@@ -3540,9 +3684,7 @@ UiColorPicker& UiColorPicker::SetPageMode(PageMode mode)
 
     page_mode_ = mode;
     page_stack_.SetActivePage((int)mode);
-    if(mode == PAGE_CURVES)
-        curve_source_color_ = GetColor();
-    else if(mode == PAGE_GENERATOR)
+    if(mode == PAGE_GENERATOR)
         RefreshGeneratorPalette();
     SyncPageButtons();
     SaveSharedSession(false);
@@ -3593,7 +3735,6 @@ UiColorPicker& UiColorPicker::SetActiveSlot(int index)
         return *this;
     FinishLiveGesture();
     active_slot_ = index;
-    curve_source_color_ = GetColor();
     SyncAllFromActiveSlot();
     SaveSharedSession(false);
     if(WhenSlotChanged)
@@ -3742,7 +3883,7 @@ UiColorPicker& UiColorPicker::SetAlphaEnabled(bool on)
 
 UiColorPicker& UiColorPicker::SetSpectrumMode(SpectrumMode mode)
 {
-    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_RGB_SPECTRUM)
+    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_HSV_HEX)
         mode = SPECTRUM_HUE_STRIP;
     if(spectrum_mode_ == mode) {
         SyncSpectrumMode();
@@ -3910,15 +4051,12 @@ void UiColorPicker::ClearSharedSession()
     session.harmony_mode = HARMONY_TRIAD;
     session.palette_category = 0;
     session.palette_index = 0;
-    session.selected_curve_channel = 0;
     session.generator_mode = 2;
     session.generator_count = 3;
     session.generator_gain = 100;
     session.generator_handles.Clear();
     session.generator_values.Clear();
     session.generator_image = Image();
-    for(int i = 0; i < 4; i++)
-        session.curves[i] = ShadowLinear();
 }
 
 bool UiColorPicker::IsScreenEyedropperAvailable() const
@@ -4039,12 +4177,11 @@ void UiColorPicker::LoadSharedSession()
     active_slot_ = minmax(session.active_slot, 0, slot_count_ - 1);
     alpha_enabled_ = session.alpha_enabled;
     page_mode_ = (PageMode)minmax(session.page_mode, (int)PAGE_COLOR, (int)PAGE_GENERATOR);
-    spectrum_mode_ = (SpectrumMode)minmax(session.spectrum_mode, (int)SPECTRUM_HSV_RECT, (int)SPECTRUM_RGB_SPECTRUM);
+    spectrum_mode_ = (SpectrumMode)minmax(session.spectrum_mode, (int)SPECTRUM_HSV_RECT, (int)SPECTRUM_HSV_HEX);
     channel_mode_ = (ChannelMode)minmax(session.channel_mode, (int)CHANNEL_RGB_FLOAT, (int)CHANNEL_COUNT - 1);
     harmony_mode_ = (HarmonyMode)minmax(session.harmony_mode, (int)HARMONY_CUSTOM, (int)HARMONY_IMAGE_EXTRACT);
     palette_category_ = minmax(session.palette_category, 0, 2);
     palette_index_ = minmax(session.palette_index, 0, PaletteRegistry_().GetCount() - 1);
-    selected_curve_channel_ = minmax(session.selected_curve_channel, 0, 3);
     generator_mode_ = minmax(session.generator_mode, 0, 2);
     generator_image_ = session.generator_image;
     generator_image_preview_->SetImage(generator_image_);
@@ -4057,9 +4194,6 @@ void UiColorPicker::LoadSharedSession()
     generator_count_edit_.SetTextUtf8(AsString(generator_wheel_->GetPaletteCount()));
     generator_gain_slider_.SetValue(generator_wheel_->GetGlobalGain());
     generator_gain_edit_.SetTextUtf8(AsString(generator_wheel_->GetGlobalGain()));
-    for(int i = 0; i < 4; i++)
-        curve_editor_[i].SetCurve(session.curves[i]);
-    curve_stack_.SetActivePage(selected_curve_channel_);
     alpha_toggle_.SetOn(alpha_enabled_);
     UpdateAlphaAvailability();
 
@@ -4113,15 +4247,12 @@ void UiColorPicker::SaveSharedSession(bool include_slots)
     session.harmony_mode = (int)harmony_mode_;
     session.palette_category = palette_category_;
     session.palette_index = palette_index_;
-    session.selected_curve_channel = selected_curve_channel_;
     session.generator_mode = generator_mode_;
     session.generator_count = generator_wheel_->GetPaletteCount();
     session.generator_gain = generator_wheel_->GetGlobalGain();
     session.generator_handles = clone(generator_wheel_->GetHandles());
     session.generator_values = clone(generator_wheel_->GetValues());
     session.generator_image = generator_image_;
-    for(int i = 0; i < 4; i++)
-        session.curves[i] = curve_editor_[i].GetCurve();
 }
 
 void UiColorPicker::HandleAccept()
@@ -4212,18 +4343,20 @@ void UiColorPicker::SyncReadouts()
     ColorToHsl_(color, hh, hs, l);
     ColorToCmyk_(color, c, m, y, k);
 
-    readout_hsv_->SetValue(Format("%d, %d, %d, %.4f", h, s, v, alpha / 255.0));
-    readout_hex_->SetValue(FormatHex8_(color, alpha));
-    readout_hsl_->SetValue(Format("%d, %d, %d, %.4f", hh, hs, l, alpha / 255.0));
-    readout_rgb_float_->SetValue(Format("%.4f, %.4f, %.4f, %.4f",
-                                        color.GetR() / 255.0,
-                                        color.GetG() / 255.0,
-                                        color.GetB() / 255.0,
-                                        alpha / 255.0));
-    readout_cmyk_->SetValue(Format("%d, %d, %d, %d, %.4f",
-                                   c, m, y, k, alpha / 255.0));
-    readout_rgb_int_->SetValue(Format("%d, %d, %d, %d",
-                                      color.GetR(), color.GetG(), color.GetB(), alpha));
+    readout_hsv_->SetValue(alpha_enabled_ ? Format("%d, %d, %d, %.4f", h, s, v, alpha / 255.0)
+                                          : Format("%d, %d, %d", h, s, v));
+    readout_hex_->SetValue(alpha_enabled_ ? FormatHex8_(color, alpha) : FormatHex_(color));
+    readout_hsl_->SetValue(alpha_enabled_ ? Format("%d, %d, %d, %.4f", hh, hs, l, alpha / 255.0)
+                                          : Format("%d, %d, %d", hh, hs, l));
+    readout_rgb_float_->SetValue(alpha_enabled_
+        ? Format("%.4f, %.4f, %.4f, %.4f", color.GetR() / 255.0, color.GetG() / 255.0,
+                 color.GetB() / 255.0, alpha / 255.0)
+        : Format("%.4f, %.4f, %.4f", color.GetR() / 255.0, color.GetG() / 255.0,
+                 color.GetB() / 255.0));
+    readout_cmyk_->SetValue(alpha_enabled_ ? Format("%d, %d, %d, %d, %.4f", c, m, y, k, alpha / 255.0)
+                                           : Format("%d, %d, %d, %d", c, m, y, k));
+    readout_rgb_int_->SetValue(alpha_enabled_ ? Format("%d, %d, %d, %d", color.GetR(), color.GetG(), color.GetB(), alpha)
+                                              : Format("%d, %d, %d", color.GetR(), color.GetG(), color.GetB()));
 }
 
 void UiColorPicker::SyncSlotButtons()
@@ -4650,6 +4783,9 @@ void UiColorPicker::UpdateAlphaAvailability()
     readout_cmyk_->Enable();
     readout_rgb_int_->Enable();
     alpha_toggle_label_.SetText("Alpha");
+    readout_hsv_->SetTitle(alpha_enabled_ ? "HSV-A" : "HSV");
+    readout_hsl_->SetTitle(alpha_enabled_ ? "HLS-A" : "HLS");
+    readout_cmyk_->SetTitle(alpha_enabled_ ? "CMYK-A" : "CMYK");
 }
 
 void UiColorPicker::PopulatePaletteSelectors()
@@ -4690,6 +4826,7 @@ void UiColorPicker::RefreshPaletteGrid()
                               palette.colors.GetCount()));
     selected_palette_index_ = -1;
     selected_palette_value_ = SlotValue();
+    SyncFooterPalette(palette.colors);
 }
 
 void UiColorPicker::HandlePalettePick(int index, const SlotValue& value)
@@ -4733,47 +4870,6 @@ void UiColorPicker::UseSelectedStashColor()
     if(selected_stash_index_ >= 0 && !IsNull(selected_stash_value_.color))
         CommitSlotValue(active_slot_, selected_stash_value_.color,
                         selected_stash_value_.alpha, true);
-}
-
-void UiColorPicker::SelectCurveChannel(int index)
-{
-    index = minmax(index, 0, 3);
-    selected_curve_channel_ = index;
-    curve_stack_.SetActivePage(index);
-    children_style_dirty_ = true;
-    for(int i = 0; i < 4; i++)
-        curve_button_[i].SetChecked(i == index);
-    SyncThemeToChildren();
-}
-
-void UiColorPicker::CaptureCurveSource()
-{
-    FinishLiveGesture();
-    curve_source_color_ = GetColor();
-    footer_information_.SetText(Format("Curve source captured: %s", FormatHex_(curve_source_color_)));
-}
-
-void UiColorPicker::ResetCurves()
-{
-    for(int i = 0; i < 4; i++)
-        curve_editor_[i].SetCurve(ShadowLinear());
-    curve_source_color_ = GetColor();
-    SaveSharedSession(false);
-    ApplyCurves(true);
-}
-
-void UiColorPicker::ApplyCurves(bool final_commit)
-{
-    auto evaluate = [&](double input, int channel) {
-        double master = UiShadowCurveEval(curve_editor_[0].GetCurve(), ClampUnit_(input));
-        return ClampUnit_(UiShadowCurveEval(curve_editor_[channel].GetCurve(), master));
-    };
-
-    Color result(ClampByte_(int(evaluate(curve_source_color_.GetR() / 255.0, 1) * 255.0 + 0.5)),
-                 ClampByte_(int(evaluate(curve_source_color_.GetG() / 255.0, 2) * 255.0 + 0.5)),
-                 ClampByte_(int(evaluate(curve_source_color_.GetB() / 255.0, 3) * 255.0 + 0.5)));
-    CommitColor(result, final_commit);
-    SaveSharedSession(false);
 }
 
 void UiColorPicker::SetGeneratorMode(int mode)
@@ -4828,6 +4924,7 @@ void UiColorPicker::RefreshGeneratorPalette()
     for(const SlotValue& value : base_values)
         values.Add(value);
     generated_base_count_ = base_values.GetCount();
+    SyncFooterPalette(base_values);
     const int white_mix[] = { 205, 145, 85 };
     const int black_mix[] = { 40, 80, 125, 175 };
     for(int mix : white_mix)
@@ -4987,8 +5084,6 @@ void UiColorPicker::SyncThemeToChildren()
         page_button_[i].SetCustomStyle(UiTheme::ResolveButton(i == (int)page_mode_ ? UiRole::Accent : UiRole::Subtle));
     for(int i = 0; i < CHANNEL_COUNT; i++)
         channel_button_[i].SetCustomStyle(UiTheme::ResolveButton(i == (int)channel_mode_ ? UiRole::Accent : UiRole::Subtle));
-    for(int i = 0; i < 4; i++)
-        curve_button_[i].SetCustomStyle(UiTheme::ResolveButton(i == selected_curve_channel_ ? UiRole::Accent : UiRole::Subtle));
 
     accept_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     cancel_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
@@ -4997,8 +5092,6 @@ void UiColorPicker::SyncThemeToChildren()
     palette_save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     stash_use_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     stash_save_active_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    curve_capture_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    curve_reset_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_refresh_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_load_image_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_clear_samples_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
@@ -5082,7 +5175,6 @@ void UiColorPicker::Layout()
         int axis_row = compact_height ? DPI(24) : DPI(28);
         int axis_gap = DPI(4);
         int field_top = left.top + top_height + DPI(6);
-        color_field_->SetRect(left.left, field_top, left.GetWidth(), max(0, left.bottom - field_top));
 
         int label_width = DPI(24);
         int edit_width = DPI(64);
@@ -5115,6 +5207,9 @@ void UiColorPicker::Layout()
 
         int axes_top = channel_top + channel_height + DPI(2);
         int readout_top = axes_top + axes_height + DPI(3);
+        int field_bottom = readout_top + readout_total;
+        color_field_->SetRect(left.left, field_top, left.GetWidth(),
+                              max(DPI(100), field_bottom - field_top));
         int y = axes_top;
         hue_axis_label_.SetRect(right.left, y, label_width, axis_row);
         hue_axis_slider_.SetRect(slider_left, y, slider_width, axis_row);
@@ -5160,27 +5255,6 @@ void UiColorPicker::Layout()
         int stash_top = stash_label_top + DPI(20);
         stash_grid_->SetRect(content.left, stash_top, content.GetWidth(), stash_height);
 
-    }
-    else if(page_mode_ == PAGE_CURVES) {
-        int top_height = DPI(30);
-        int gap = DPI(5);
-        int button_width = max(DPI(76), (content.GetWidth() - DPI(230) - gap * 5) / 4);
-        int x = content.left;
-        for(int i = 0; i < 4; i++) {
-            curve_button_[i].SetRect(x, content.top, button_width, top_height);
-            x += button_width + gap;
-        }
-        curve_capture_button_.SetRect(x, content.top, DPI(120), top_height);
-        x += DPI(125);
-        curve_reset_button_.SetRect(x, content.top, max(DPI(80), content.right - x), top_height);
-
-        int hint_height = DPI(24);
-        curve_stack_.SetRect(content.left, content.top + top_height + DPI(6),
-                             content.GetWidth(),
-                             max(DPI(120), content.GetHeight() - top_height - hint_height - DPI(12)));
-        curve_stack_.Layout();
-        curve_hint_.SetRect(content.left, content.bottom - hint_height,
-                            content.GetWidth(), hint_height);
     }
     else {
         int top_height = DPI(28);

@@ -78,22 +78,21 @@ public:
     enum PageMode : byte {
         PAGE_COLOR = 0,
         PAGE_PALETTES,
-        PAGE_CURVES,
         PAGE_GENERATOR,
         PAGE_COUNT
     };
 
-    // Kept numerically aligned with the previous public page values.
     enum TabPage : byte {
         PAGE_PICKER = PAGE_COLOR,
-        PAGE_SWATCHES = PAGE_PALETTES,
-        PAGE_MIXER = PAGE_CURVES
+        PAGE_SWATCHES = PAGE_PALETTES
     };
 
     enum SpectrumMode : byte {
         SPECTRUM_HSV_RECT = 0,
         SPECTRUM_HUE_STRIP,
-        SPECTRUM_RGB_SPECTRUM
+        SPECTRUM_RGB_SPECTRUM,
+        SPECTRUM_HSV_WHEEL,
+        SPECTRUM_HSV_HEX
     };
 
     enum ChannelMode : byte {
@@ -298,17 +297,15 @@ private:
     void           UseSelectedPaletteColor();
     void           UseSelectedStashColor();
 
-    void           SelectCurveChannel(int index);
-    void           CaptureCurveSource();
-    void           ResetCurves();
-    void           ApplyCurves(bool final_commit);
-
     void           RefreshGeneratorPalette();
     void           SetGeneratorMode(int mode);
     void           HandleGeneratorPick(int index, const SlotValue& value);
     void           LoadGeneratorImage();
     void           SaveGeneratedToStash();
     void           UseGeneratedColor();
+    void           SavePaletteJson();
+    void           LoadPaletteJson();
+    void           SyncFooterPalette(const Vector<SlotValue>& values);
 
     void           StartEyedropper();
     void           FinishEyedropperState(bool commit);
@@ -349,7 +346,6 @@ private:
     int            selected_stash_index_ = -1;
     int            selected_generated_index_ = -1;
     int            generated_base_count_ = 0;
-    int            selected_curve_channel_ = 0;
 
     Vector<SlotData> slots_;
     Vector<SlotData> opening_slots_;
@@ -361,11 +357,11 @@ private:
     SlotValue        selected_palette_value_;
     SlotValue        selected_stash_value_;
     SlotValue        selected_generated_value_;
+    Vector<SlotValue> footer_palette_values_;
 
     Image            generator_image_;
     Color            generator_base_color_ = Color(0, 120, 212);
     int              generator_mode_ = 2;
-    Color            curve_source_color_ = Black();
 
     UiBoxLayout      main_root_ { UiBoxLayout::Direction::V };
     UiBoxLayout      navigation_bar_ { UiBoxLayout::Direction::H };
@@ -375,6 +371,7 @@ private:
 
     UiButton         page_button_[PAGE_COUNT];
     UiLabel          footer_information_;
+    One<SwatchGrid>  footer_palette_grid_;
     UiButton         accept_button_;
     UiButton         cancel_button_;
 
@@ -421,17 +418,8 @@ private:
     UiLabel          stash_title_;
     UiLabel          palette_hint_;
     One<SwatchGrid>  stash_grid_;
-    UiButton         palette_use_button_;
-    UiButton         palette_save_button_;
-    UiButton         stash_use_button_;
-    UiButton         stash_save_active_button_;
-
-    UiButton         curve_button_[4];
-    UiButton         curve_capture_button_;
-    UiButton         curve_reset_button_;
-    UiStack          curve_stack_;
-    UiBezierCurveEditor curve_editor_[4];
-    UiLabel          curve_hint_;
+    UiButton         palette_export_button_;
+    UiButton         palette_import_button_;
 
     UiDropdown       harmony_drop_;
     UiButton         generator_mode_button_[3];
