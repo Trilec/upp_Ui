@@ -140,9 +140,9 @@ public:
     {
         Title("Brand color slots");
         Sizeable().Zoomable();
-        SetRect(0, 0, DPI(800), DPI(610));
-        SetMinSize(Size(DPI(760), DPI(580)));
-        CenterOwner();
+        SetRect(0, 0, DPI(800), DPI(480));
+        SetMinSize(Size(DPI(780), DPI(480)));
+       // CenterOwner();
 
         Add(host_);
         host_.Add(picker_);
@@ -165,9 +165,9 @@ public:
 
     virtual void Layout() override
     {
-        Rect r = Rect(GetSize()).Deflated(DPI(14));
+        Rect r = Rect(GetSize()).Deflated(DPI(6));
         host_.SetRect(r);
-        picker_.SetRect(r.Deflated(DPI(12)));
+        picker_.SetRect(r);
     }
 
 private:

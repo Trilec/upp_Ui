@@ -12,11 +12,11 @@
     =============
 
     Purpose
-    - Professional multi-slot colour picker with spectrum, palette, RGB curves,
-      harmony generation, image extraction, drag-and-drop, and screen sampling.
+    - Professional multi-slot colour picker with spectrum, palette, harmony
+      generation, image extraction, drag-and-drop, and screen sampling.
 
     Architecture
-    - Four permanent navigation buttons drive a headless UiStack.
+    - Three permanent navigation buttons drive a headless UiStack.
     - Slot controls and the OK/Cancel footer live outside the stack and therefore
       never move or disappear when pages change.
     - All user colour changes converge through one committed model path.
@@ -24,8 +24,8 @@
 
     Changelog
     - 2026-07: four-mode stack refactor, persistent footer and slots, full
-      colour-expression editing, native internal drag-and-drop, corrected
-      palette registry, curves, harmony/image generation, and eyedropper.
+       colour-expression editing, native internal drag-and-drop, corrected
+       palette registry, harmony/image generation, and eyedropper.
 */
 
 #include <Ui/Ui.h>
@@ -91,8 +91,7 @@ public:
         SPECTRUM_HSV_RECT = 0,
         SPECTRUM_HUE_STRIP,
         SPECTRUM_RGB_SPECTRUM,
-        SPECTRUM_HSV_WHEEL,
-        SPECTRUM_HSV_HEX
+        SPECTRUM_HSV_WHEEL
     };
 
     enum ChannelMode : byte {
@@ -117,6 +116,14 @@ public:
         HARMONY_SHADES,
         HARMONY_MONOCHROMATIC,
         HARMONY_IMAGE_EXTRACT
+    };
+
+    enum StashDropMode : byte {
+        STASH_REPLACE = 0,
+        STASH_MIX,
+        STASH_ADD,
+        STASH_SUBTRACT,
+        STASH_MULTIPLY
     };
 
     static const Style& StyleDefault();
@@ -292,7 +299,8 @@ private:
     void           RefreshPaletteGrid();
     void           HandlePalettePick(int index, const SlotValue& value);
     void           HandleStashPick(int index, const SlotValue& value);
-    void           HandlePaletteDropToStash(const SlotValue& value);
+    void           HandlePaletteDropToStash(int index, const SlotValue& value);
+    void           RefreshUserStash();
     void           SaveSelectedPaletteToStash();
     void           UseSelectedPaletteColor();
     void           UseSelectedStashColor();
@@ -305,7 +313,7 @@ private:
     void           UseGeneratedColor();
     void           SavePaletteJson();
     void           LoadPaletteJson();
-    void           SyncFooterPalette(const Vector<SlotValue>& values);
+    void           SyncFooterReadout(const SlotValue& value);
 
     void           StartEyedropper();
     void           FinishEyedropperState(bool commit);
@@ -346,6 +354,7 @@ private:
     int            selected_stash_index_ = -1;
     int            selected_generated_index_ = -1;
     int            generated_base_count_ = 0;
+    StashDropMode  stash_drop_mode_ = STASH_MIX;
 
     Vector<SlotData> slots_;
     Vector<SlotData> opening_slots_;
@@ -357,7 +366,7 @@ private:
     SlotValue        selected_palette_value_;
     SlotValue        selected_stash_value_;
     SlotValue        selected_generated_value_;
-    Vector<SlotValue> footer_palette_values_;
+    SlotValue        footer_value_;
 
     Image            generator_image_;
     Color            generator_base_color_ = Color(0, 120, 212);
@@ -367,11 +376,9 @@ private:
     UiBoxLayout      navigation_bar_ { UiBoxLayout::Direction::H };
     UiBoxLayout      footer_bar_ { UiBoxLayout::Direction::H };
     Ctrl             navigation_spacer_;
-    Ctrl             footer_spacer_;
-
     UiButton         page_button_[PAGE_COUNT];
-    UiLabel          footer_information_;
-    One<SwatchGrid>  footer_palette_grid_;
+    UiLineEdit       footer_hex_;
+    UiLineEdit       footer_detail_;
     UiButton         accept_button_;
     UiButton         cancel_button_;
 
@@ -383,7 +390,6 @@ private:
     UiStack          page_stack_;
     ParentCtrl       color_page_;
     ParentCtrl       palette_page_;
-    ParentCtrl       curves_page_;
     ParentCtrl       generator_page_;
 
     One<ColorField>  color_field_;
@@ -416,10 +422,11 @@ private:
     UiLabel          palette_badge_;
     One<SwatchGrid>  palette_grid_;
     UiLabel          stash_title_;
-    UiLabel          palette_hint_;
     One<SwatchGrid>  stash_grid_;
+    UiDropdown       stash_drop_mode_drop_;
     UiButton         palette_export_button_;
     UiButton         palette_import_button_;
+    UiButton         stash_clear_button_;
 
     UiDropdown       harmony_drop_;
     UiButton         generator_mode_button_[3];

@@ -60,6 +60,20 @@ static Color CheckerColor_(int x, int y, int tile = 4)
     return alternate ? Blend(paper, ink, 34) : Blend(paper, ink, 18);
 }
 
+static Color PickerSurface_(UiRole role = UiRole::Subtle)
+{
+    const UiPanel::Style& style = UiTheme::ResolvePanel(role);
+    return style.palette.face[ST_NORMAL].IsSolid() ? style.palette.face[ST_NORMAL].color
+                                                   : SColorPaper();
+}
+
+static Color PickerFrame_(UiRole role = UiRole::Subtle)
+{
+    const UiPanel::Style& style = UiTheme::ResolvePanel(role);
+    return IsNull(style.palette.frame[ST_NORMAL]) ? Blend(PickerSurface_(role), SColorText(), 36)
+                                                   : style.palette.frame[ST_NORMAL];
+}
+
 static Image MakeAlphaSwatchImage_(Color color, int alpha, Size size, bool split_preview = true)
 {
     if(size.cx <= 0 || size.cy <= 0)
@@ -415,6 +429,12 @@ struct ParsedColor_ {
     int alpha = 255;
     bool has_alpha = false;
 };
+
+static Value JsonGet_(const ValueMap& map, const char *key, const Value& fallback = Null)
+{
+    int index = map.Find(key);
+    return index >= 0 ? map.GetValue(index) : fallback;
+}
 
 static Vector<ParsedNumber_> ExtractNumbers_(const String& text)
 {
@@ -1418,7 +1438,9 @@ public:
         UiLineEdit::Style edit_style = UiTheme::ResolveEdit(UiRole::Subtle);
         edit_style.font = Monospace().Height(DPI(10));
         edit_.SetCustomStyle(edit_style);
-        title_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        UiLabel::Style title_style = UiTheme::ResolveLabel(UiRole::Standard);
+        title_style.font = title_style.font.Height(DPI(10));
+        title_.SetCustomStyle(title_style);
         copy_.SetText("")
              .SetIcon(ICON_CONTENT_CONTENT_COPY_48())
              .SetIconSize(DPI(14), DPI(14))
@@ -1519,7 +1541,7 @@ public:
             cache_changed = cache_changed || hue_ != hue;
         else if(mode == SPECTRUM_RGB_SPECTRUM)
             cache_changed = cache_changed || color_.GetB() != color.GetB();
-        else if(mode == SPECTRUM_HUE_STRIP || mode == SPECTRUM_HSV_WHEEL || mode == SPECTRUM_HSV_HEX)
+        else if(mode == SPECTRUM_HUE_STRIP || mode == SPECTRUM_HSV_WHEEL)
             cache_changed = cache_changed || gain_ != gain;
 
         mode_ = mode;
@@ -1542,12 +1564,10 @@ public:
         if(rect.IsEmpty())
             return;
 
+        draw.DrawRect(rect, PickerSurface_());
         const Image& image = EnsureCache();
         if(!image.IsEmpty())
             draw.DrawImage(rect.left, rect.top, image);
-
-        Color frame = Blend(SColorShadow(), SColorPaper(), 90);
-        DrawFrame_(draw, rect, frame);
 
         Point marker = GetMarkerPosition();
         Rect outer = RectC(rect.left + marker.x - DPI(5),
@@ -1596,7 +1616,7 @@ private:
         key_builder.Add(size).Add((int)mode_);
         if(mode_ == SPECTRUM_HSV_RECT)
             key_builder.Add(hue_);
-        else if(mode_ == SPECTRUM_HUE_STRIP || mode_ == SPECTRUM_HSV_WHEEL || mode_ == SPECTRUM_HSV_HEX)
+        else if(mode_ == SPECTRUM_HUE_STRIP || mode_ == SPECTRUM_HSV_WHEEL)
             key_builder.Add(gain_);
         else if(mode_ == SPECTRUM_RGB_SPECTRUM)
             key_builder.Add(color_.GetB());
@@ -1612,8 +1632,9 @@ private:
                 for(int y = 0; y < size.cy; y++) {
                     RGBA *row = buffer[y];
                     for(int x = 0; x < size.cx; x++) {
-                        row[x] = RGBA(SampleAt(Point(x, y)));
-                        row[x].a = 255;
+                        Point point(x, y);
+                        row[x] = RGBA(SampleAt(point));
+                        row[x].a = IsInside(point) ? 255 : 0;
                     }
                 }
                 return Image(buffer);
@@ -1643,17 +1664,12 @@ private:
             return Color(ClampByte_(red), ClampByte_(green), color_.GetB());
         }
 
-        case SPECTRUM_HSV_WHEEL:
-        case SPECTRUM_HSV_HEX: {
+        case SPECTRUM_HSV_WHEEL: {
             Point center(width / 2, height / 2);
             double dx = x - center.x;
             double dy = center.y - y;
             double radius = max(1.0, min(width, height) * 0.5);
-            double distance = mode_ == SPECTRUM_HSV_HEX
-                            ? max(fabs(dx), fabs(dy) * 1.154700538)
-                            : sqrt(dx * dx + dy * dy);
-            if(distance > radius)
-                return SColorPaper();
+            double distance = sqrt(dx * dx + dy * dy);
             int hue = NormalizeHue_(int(atan2(dy, dx) * 180.0 / M_PI + 0.5));
             int saturation = ClampPercent_(int(distance / radius * 100.0 + 0.5));
             return HsvToColor_(hue, saturation, gain_);
@@ -1666,6 +1682,20 @@ private:
             return HsvToColor_(hue_, saturation, value);
         }
         }
+    }
+
+    bool IsInside(Point point) const
+    {
+        int width = max(1, GetSize().cx - 1);
+        int height = max(1, GetSize().cy - 1);
+        if(mode_ != SPECTRUM_HSV_WHEEL)
+            return true;
+        Point center(width / 2, height / 2);
+        double dx = point.x - center.x;
+        double dy = center.y - point.y;
+        double radius = max(1.0, min(width, height) * 0.5);
+        double distance = sqrt(dx * dx + dy * dy);
+        return distance <= radius;
     }
 
     Point GetMarkerPosition() const
@@ -1688,8 +1718,7 @@ private:
             return Point(int(color_.GetR() / 255.0 * width + 0.5),
                          int((255 - color_.GetG()) / 255.0 * height + 0.5));
 
-        case SPECTRUM_HSV_WHEEL:
-        case SPECTRUM_HSV_HEX: {
+        case SPECTRUM_HSV_WHEEL: {
             double angle = hue * M_PI / 180.0;
             double radius = saturation / 100.0 * min(width, height) * 0.5;
             Point center(width / 2, height / 2);
@@ -1788,6 +1817,11 @@ public:
         accept_drop_ = on;
     }
 
+    void SetAvailabilityFrame(bool on = true)
+    {
+        availability_frame_ = on;
+    }
+
     SlotValue GetDragValue() const
     {
         if(drag_index_ >= 0 && drag_index_ < items_.GetCount())
@@ -1801,7 +1835,7 @@ public:
 
     Event<int, SlotValue> WhenPick;
     Event<int, SlotValue> WhenDoublePick;
-    Event<SlotValue>      WhenDropValue;
+    Event<int, SlotValue> WhenDropValue;
 
     virtual void Paint(Draw& draw) override
     {
@@ -1809,7 +1843,7 @@ public:
         if(rect.IsEmpty())
             return;
 
-        draw.DrawRect(rect, SColorPaper());
+        draw.DrawRect(rect, PickerSurface_());
 
         int gap = DPI(4);
         int cell = DPI(30);
@@ -1827,21 +1861,36 @@ public:
                 Rect cell_rect = RectC(start_x + column * (cell + gap),
                                        start_y + row * (cell + gap),
                                        cell, cell);
-                Color empty_face = Blend(SColorPaper(), SColorText(), 12);
+                Color empty_face = Blend(PickerSurface_(), SColorText(), 12);
                 draw.DrawRect(cell_rect, empty_face);
 
                 if(index >= items_.GetCount())
                     continue;
 
                 const SlotValue& value = items_[index];
+                if(IsNull(value.color)) {
+                    Color frame = Blend(PickerSurface_(), SColorText(), 90);
+                    int dash = DPI(3);
+                    for(int x = cell_rect.left; x < cell_rect.right; x += dash * 2) {
+                        int width = min(dash, cell_rect.right - x);
+                        draw.DrawRect(x, cell_rect.top, width, 1, frame);
+                        draw.DrawRect(x, cell_rect.bottom - 1, width, 1, frame);
+                    }
+                    for(int y = cell_rect.top; y < cell_rect.bottom; y += dash * 2) {
+                        int height = min(dash, cell_rect.bottom - y);
+                        draw.DrawRect(cell_rect.left, y, 1, height, frame);
+                        draw.DrawRect(cell_rect.right - 1, y, 1, height, frame);
+                    }
+                    continue;
+                }
                 DrawAlphaSwatch_(draw, cell_rect.Deflated(DPI(2)),
                                   value.color, value.alpha);
 
                 bool selected = index == selected_index_;
                 bool active = value.color == active_.color && value.alpha == active_.alpha;
                 Color frame = selected ? SColorHighlight()
-                            : active ? Blend(SColorHighlight(), SColorPaper(), 85)
-                                     : Blend(SColorShadow(), SColorPaper(), 110);
+                            : active ? Blend(SColorHighlight(), PickerSurface_(), 85)
+                                     : PickerFrame_();
                 DrawFrame_(draw, cell_rect, frame, selected ? DPI(2) : DPI(1));
 
             }
@@ -1849,6 +1898,20 @@ public:
 
         if(drop_hot_ && accept_drop_)
             DrawFrame_(draw, rect.Deflated(DPI(1)), SColorHighlight(), DPI(2));
+        else if(availability_frame_) {
+            Color frame = Blend(PickerSurface_(), SColorText(), 90);
+            int dash = DPI(4);
+            for(int x = rect.left; x < rect.right; x += dash * 2) {
+                int width = min(dash, rect.right - x);
+                draw.DrawRect(x, rect.top, width, 1, frame);
+                draw.DrawRect(x, rect.bottom - 1, width, 1, frame);
+            }
+            for(int y = rect.top; y < rect.bottom; y += dash * 2) {
+                int height = min(dash, rect.bottom - y);
+                draw.DrawRect(rect.left, y, 1, height, frame);
+                draw.DrawRect(rect.right - 1, y, 1, height, frame);
+            }
+        }
     }
 
     virtual void LeftDown(Point point, dword) override
@@ -1878,7 +1941,7 @@ public:
 
     virtual void LeftDrag(Point, dword) override
     {
-        if(drag_index_ < 0 || drag_index_ >= items_.GetCount())
+        if(drag_index_ < 0 || drag_index_ >= items_.GetCount() || IsNull(items_[drag_index_].color))
             return;
 
         dragging_ = true;
@@ -1941,8 +2004,11 @@ public:
                     value.alpha = alpha;
                 }
             }
-            if(!IsNull(value.color) && WhenDropValue)
-                WhenDropValue(value);
+            // U++ drag callbacks can report coordinates in the drag source's
+            // space; resolve the target from the current screen position.
+            int index = HitTest(GetMousePos() - GetScreenRect().TopLeft());
+            if(!IsNull(value.color) && index >= 0 && WhenDropValue)
+                WhenDropValue(index, value);
             drop_hot_ = false;
             Refresh();
         }
@@ -2003,6 +2069,7 @@ private:
     int drag_index_ = -1;
     bool dragging_ = false;
     bool accept_drop_ = false;
+    bool availability_frame_ = false;
     bool drop_hot_ = false;
     int forced_columns_ = 0;
     bool fit_rows_ = false;
@@ -2366,6 +2433,8 @@ public:
     void SetImage(const Image& image)
     {
         image_ = image;
+        zoom_ = 1.0;
+        pan_ = Point(0, 0);
         points_.Clear();
         if(!image_.IsEmpty()) {
             points_.Add(Pointf(0.25, 0.25));
@@ -2418,8 +2487,8 @@ public:
     virtual void Paint(Draw& draw) override
     {
         Rect rect(Point(0, 0), GetSize());
-        draw.DrawRect(rect, Blend(SColorPaper(), SColorText(), 8));
-        DrawFrame_(draw, rect, Blend(SColorShadow(), SColorPaper(), 120));
+        draw.DrawRect(rect, PickerSurface_());
+        DrawFrame_(draw, rect, PickerFrame_());
 
         if(image_.IsEmpty()) {
             String text = "No image loaded";
@@ -2433,11 +2502,11 @@ public:
 
         Size source = image_.GetSize();
         double scale = min(rect.GetWidth() / double(max(1, source.cx)),
-                           rect.GetHeight() / double(max(1, source.cy)));
+                           rect.GetHeight() / double(max(1, source.cy))) * zoom_;
         Size target(max(1, int(source.cx * scale + 0.5)),
                     max(1, int(source.cy * scale + 0.5)));
-        int x = rect.left + (rect.GetWidth() - target.cx) / 2;
-        int y = rect.top + (rect.GetHeight() - target.cy) / 2;
+        int x = rect.left + (rect.GetWidth() - target.cx) / 2 + pan_.x;
+        int y = rect.top + (rect.GetHeight() - target.cy) / 2 + pan_.y;
         draw.DrawImage(x, y, target.cx, target.cy, image_);
         for(const Pointf& point : points_) {
             int index = int(&point - points_.Begin());
@@ -2487,6 +2556,12 @@ public:
 
     virtual void MouseMove(Point point, dword flags) override
     {
+        if(panning_ && HasCapture() && (flags & K_MOUSEMIDDLE)) {
+            pan_ += point - pan_anchor_;
+            pan_anchor_ = point;
+            Refresh();
+            return;
+        }
         if(!HasCapture() || !(flags & K_MOUSELEFT) || selected_ < 0)
             return;
         Rect image_rect = GetImageRect();
@@ -2503,6 +2578,30 @@ public:
     {
         if(HasCapture())
             ReleaseCapture();
+    }
+
+    virtual void MiddleDown(Point point, dword) override
+    {
+        if(image_.IsEmpty())
+            return;
+        panning_ = true;
+        pan_anchor_ = point;
+        SetCapture();
+    }
+
+    virtual void MiddleUp(Point, dword) override
+    {
+        panning_ = false;
+        if(HasCapture())
+            ReleaseCapture();
+    }
+
+    virtual void MouseWheel(Point, int zdelta, dword) override
+    {
+        if(image_.IsEmpty() || zdelta == 0)
+            return;
+        zoom_ = minmax(zoom_ * (zdelta > 0 ? 1.15 : 1.0 / 1.15), 0.25, 8.0);
+        Refresh();
     }
 
     virtual bool Key(dword key, int) override
@@ -2531,11 +2630,11 @@ private:
         if(source.IsEmpty())
             return Rect(0, 0, 0, 0);
         double scale = min(rect.GetWidth() / double(max(1, source.cx)),
-                           rect.GetHeight() / double(max(1, source.cy)));
+                           rect.GetHeight() / double(max(1, source.cy))) * zoom_;
         Size target(max(1, int(source.cx * scale + 0.5)),
                     max(1, int(source.cy * scale + 0.5)));
-        return RectC((rect.GetWidth() - target.cx) / 2,
-                     (rect.GetHeight() - target.cy) / 2, target.cx, target.cy);
+        return RectC((rect.GetWidth() - target.cx) / 2 + pan_.x,
+                     (rect.GetHeight() - target.cy) / 2 + pan_.y, target.cx, target.cy);
     }
 
     int HitSample(Point point, const Rect& image_rect) const
@@ -2553,6 +2652,10 @@ private:
     Image image_;
     Vector<Pointf> points_;
     int selected_ = -1;
+    double zoom_ = 1.0;
+    Point pan_;
+    Point pan_anchor_;
+    bool panning_ = false;
 };
 
 class UiColorPicker::HarmonyWheel : public Ctrl {
@@ -2658,7 +2761,7 @@ public:
     virtual void Paint(Draw& draw) override
     {
         Rect wheel = WheelRect();
-        draw.DrawRect(GetSize(), SColorPaper());
+        draw.DrawRect(GetSize(), PickerSurface_());
         if(wheel.IsEmpty())
             return;
         EnsureCache(wheel.GetSize());
@@ -2971,11 +3074,15 @@ UiColorPicker::UiColorPicker()
         previous_slots_[i] = slots_[i];
         opening_slots_[i] = slots_[i];
     }
+    user_swatches_.SetCount(36);
+    for(SlotData& item : user_swatches_)
+        item.color = Null;
 
     BuildChildTree();
     ConfigureControls();
     WireEvents();
     LoadSharedSession();
+    RefreshUserStash();
     SetGeneratorMode(generator_mode_);
 
     opening_slots_ = clone(slots_);
@@ -3002,7 +3109,6 @@ void UiColorPicker::BuildChildTree()
     color_field_.Create();
     current_slot_button_.Create();
     recent_grid_.Create();
-    footer_palette_grid_.Create();
     palette_grid_.Create();
     stash_grid_.Create();
     generator_grid_.Create();
@@ -3045,8 +3151,8 @@ void UiColorPicker::BuildChildTree()
     page_stack_.AddPage(generator_page_, "generator");
 
     footer_bar_.SetGap(DPI(8), DPI(8)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
-    footer_bar_.Add(footer_information_).Fixed(DPI(120));
-    footer_bar_.Add(*footer_palette_grid_).Expand(1);
+    footer_bar_.Add(footer_hex_).Fixed(DPI(110));
+    footer_bar_.Add(footer_detail_).Expand(1);
     footer_bar_.Add(accept_button_).Fixed(DPI(110));
     footer_bar_.Add(cancel_button_).Fixed(DPI(110));
 
@@ -3076,10 +3182,11 @@ void UiColorPicker::BuildChildTree()
     palette_page_.Add(palette_badge_);
     palette_page_.Add(*palette_grid_);
     palette_page_.Add(stash_title_);
-    palette_page_.Add(palette_hint_);
     palette_page_.Add(*stash_grid_);
+    palette_page_.Add(stash_drop_mode_drop_);
     palette_page_.Add(palette_export_button_);
     palette_page_.Add(palette_import_button_);
+    palette_page_.Add(stash_clear_button_);
 
     generator_page_.Add(harmony_drop_);
     for(int i = 0; i < 3; i++)
@@ -3117,16 +3224,16 @@ void UiColorPicker::ConfigureControls()
 
     accept_button_.SetText("OK");
     cancel_button_.SetText("Cancel");
-    footer_information_.SetText("Information / Detail");
-    footer_information_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-    footer_palette_grid_->SetFlow(3, true);
+    UiLineEdit::Style footer_style = UiTheme::ResolveEdit(UiRole::Subtle);
+    footer_style.font = Monospace().Height(DPI(11));
+    footer_hex_.SetCustomStyle(footer_style);
+    footer_detail_.SetCustomStyle(footer_style);
 
     spectrum_mode_drop_.Clear();
     spectrum_mode_drop_.Add("Hue Strip", (int)SPECTRUM_HUE_STRIP);
     spectrum_mode_drop_.Add("HSV Rectangle", (int)SPECTRUM_HSV_RECT);
     spectrum_mode_drop_.Add("RGB Spectrum", (int)SPECTRUM_RGB_SPECTRUM);
     spectrum_mode_drop_.Add("HSV Wheel", (int)SPECTRUM_HSV_WHEEL);
-    spectrum_mode_drop_.Add("HSV Hex Field", (int)SPECTRUM_HSV_HEX);
     spectrum_mode_drop_.SetDataSilently((int)spectrum_mode_);
     spectrum_mode_drop_.SetPlaceholderText("Spectrum type");
 
@@ -3134,11 +3241,24 @@ void UiColorPicker::ConfigureControls()
                        .SetIcon(ICON_DESIGN_FORMAT_PAINT_48())
                        .SetIconSize(DPI(15), DPI(15))
                        .SetIconRenderMode(UiIconRenderMode::MonoTint);
+    eyedropper_button_.SetCheckable(true);
     eyedropper_button_.Tip("Sample a colour from the screen");
     eyedropper_button_.Enable(IsScreenEyedropperAvailable());
 
     hue_axis_label_.SetText("Hue");
     gain_axis_label_.SetText("Gain");
+    UiLabel::Style axis_label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    axis_label_style.font = Monospace().Height(DPI(10));
+    hue_axis_label_.SetCustomStyle(axis_label_style);
+    gain_axis_label_.SetCustomStyle(axis_label_style);
+    hue_axis_slider_.SetCustomStyle(UiTheme::ResolveSlider(UiRole::Subtle));
+    gain_axis_slider_.SetCustomStyle(UiTheme::ResolveSlider(UiRole::Subtle));
+    UiLineEdit::Style axis_edit_style = UiTheme::ResolveEdit(UiRole::Subtle);
+    axis_edit_style.font = Monospace().Height(DPI(10));
+    axis_edit_style.metrics.frame_enabled = false;
+    axis_edit_style.metrics.frame_width = 0;
+    hue_axis_edit_.SetCustomStyle(axis_edit_style);
+    gain_axis_edit_.SetCustomStyle(axis_edit_style);
     hue_axis_slider_.SetRange(0, 359).SetStep(1);
     gain_axis_slider_.SetRange(0, 100).SetStep(1);
     hue_axis_edit_.SetPlaceholder("359");
@@ -3146,8 +3266,8 @@ void UiColorPicker::ConfigureControls()
     hue_axis_edit_.SetTextAlign(UiAlign::RIGHT);
     gain_axis_edit_.SetTextAlign(UiAlign::RIGHT);
 
-    const Size track_size(DPI(4096), DPI(5));
-    const Size thumb_size(DPI(14), DPI(18));
+    const Size track_size(DPI(4096), DPI(7));
+    const Size thumb_size(DPI(18), DPI(18));
     hue_axis_slider_.SetTrackSize(track_size).SetThumbSize(thumb_size);
     gain_axis_slider_.SetTrackSize(track_size).SetThumbSize(thumb_size);
 
@@ -3208,6 +3328,10 @@ void UiColorPicker::ConfigureControls()
     alpha_toggle_.SetOn(alpha_enabled_);
     alpha_toggle_label_.SetText("Alpha");
     alpha_toggle_label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+    UiLabel::Style alpha_label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    alpha_label_style.font = alpha_label_style.font.Height(DPI(10));
+    alpha_toggle_label_.SetCustomStyle(alpha_label_style);
+    alpha_toggle_.SetCustomStyle(UiTheme::ResolveToggle(UiRole::Subtle));
 
     readout_hsv_->SetTitle("HSV-A");
     readout_hsv_->SetPlaceholder("hsv(200, 100%, 83%, 1.0)");
@@ -3224,13 +3348,22 @@ void UiColorPicker::ConfigureControls()
 
     recent_grid_->SetGrid(12, 1);
     palette_grid_->SetGrid(12, 8);
-    stash_grid_->SetGrid(12, 2);
+    stash_grid_->SetGrid(12, 3);
+    stash_grid_->SetFlow(12, true);
     stash_grid_->EnableDropTarget(true);
+    stash_grid_->SetAvailabilityFrame();
     stash_title_.SetText("User Stash");
-    palette_hint_.SetText("Drag palette colours into the stash or directly onto C1-C4.");
+    stash_drop_mode_drop_.Clear();
+    stash_drop_mode_drop_.Add("Replace on drag", (int)STASH_REPLACE);
+    stash_drop_mode_drop_.Add("Mix on drag", (int)STASH_MIX);
+    stash_drop_mode_drop_.Add("Add on drag", (int)STASH_ADD);
+    stash_drop_mode_drop_.Add("Subtract on drag", (int)STASH_SUBTRACT);
+    stash_drop_mode_drop_.Add("Multiply on drag", (int)STASH_MULTIPLY);
+    stash_drop_mode_drop_.SetDataSilently((int)stash_drop_mode_);
     palette_badge_.SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
     palette_export_button_.SetText("Export JSON");
     palette_import_button_.SetText("Import JSON");
+    stash_clear_button_.SetText("Clear");
     PopulatePaletteSelectors();
 
     harmony_drop_.Clear();
@@ -3309,7 +3442,10 @@ void UiColorPicker::WireEvents()
             SetSpectrumMode((SpectrumMode)(int)data);
     };
     eyedropper_button_.WhenAction = [=] {
-        PostCallback([=] { BeginScreenEyedropper(); });
+        if(eyedropper_active_)
+            StopEyedropper(false);
+        else
+            PostCallback([=] { BeginScreenEyedropper(); });
     };
 
     color_field_->WhenPick = [=](Point point, bool final_commit) {
@@ -3336,15 +3472,12 @@ void UiColorPicker::WireEvents()
                             ClampByte_(255 - int(y / double(max(1, rect.GetHeight() - 1)) * 255.0 + 0.5)),
                             current.GetB());
             break;
-        case SPECTRUM_HSV_WHEEL:
-        case SPECTRUM_HSV_HEX: {
+        case SPECTRUM_HSV_WHEEL: {
             Point center(rect.GetWidth() / 2, rect.GetHeight() / 2);
             double dx = x - center.x;
             double dy = center.y - y;
             double radius = max(1.0, min(rect.GetWidth() - 1, rect.GetHeight() - 1) * 0.5);
-            double distance = spectrum_mode_ == SPECTRUM_HSV_HEX
-                            ? max(fabs(dx), fabs(dy) * 1.154700538)
-                            : sqrt(dx * dx + dy * dy);
+            double distance = sqrt(dx * dx + dy * dy);
             if(distance > radius)
                 return;
             h = remembered_hue_ = NormalizeHue_(int(atan2(dy, dx) * 180.0 / M_PI + 0.5));
@@ -3487,7 +3620,9 @@ void UiColorPicker::WireEvents()
         HandlePalettePick(index, value);
         UseSelectedPaletteColor();
     };
+    recent_grid_->WhenPick = [=](int, SlotValue value) { SyncFooterReadout(value); };
     recent_grid_->WhenDoublePick = [=](int, SlotValue value) {
+        SyncFooterReadout(value);
         CommitSlotValue(active_slot_, value.color, value.alpha, true);
     };
     stash_grid_->WhenPick = [=](int index, SlotValue value) { HandleStashPick(index, value); };
@@ -3495,11 +3630,16 @@ void UiColorPicker::WireEvents()
         HandleStashPick(index, value);
         UseSelectedStashColor();
     };
-    stash_grid_->WhenDropValue = [=](SlotValue value) { HandlePaletteDropToStash(value); };
+    stash_grid_->WhenDropValue = [=](int index, SlotValue value) { HandlePaletteDropToStash(index, value); };
+    stash_drop_mode_drop_.WhenSelectData = [=](const Value& data) {
+        if(!IsNull(data))
+            stash_drop_mode_ = (StashDropMode)minmax((int)data, (int)STASH_REPLACE, (int)STASH_MULTIPLY);
+    };
     palette_export_button_.WhenAction = [=] { SavePaletteJson(); };
     palette_import_button_.WhenAction = [=] { LoadPaletteJson(); };
-    footer_palette_grid_->WhenDoublePick = [=](int, SlotValue value) {
-        CommitSlotValue(active_slot_, value.color, value.alpha, true);
+    stash_clear_button_.WhenAction = [=] {
+        if(PromptYesNo("Clear every User Stash slot?"))
+            ClearUserSwatches();
     };
 
     harmony_drop_.WhenSelectData = [=](const Value& data) {
@@ -3707,6 +3847,7 @@ UiColorPicker& UiColorPicker::SetChannelMode(ChannelMode mode)
     channel_mode_ = mode;
     channel_stack_.SetActivePage((int)mode);
     RefreshChannelModeValues(mode);
+    SyncFooterReadout(footer_value_);
     SyncChannelButtons();
     SaveSharedSession(false);
     RefreshLayout();
@@ -3883,7 +4024,7 @@ UiColorPicker& UiColorPicker::SetAlphaEnabled(bool on)
 
 UiColorPicker& UiColorPicker::SetSpectrumMode(SpectrumMode mode)
 {
-    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_HSV_HEX)
+    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_HSV_WHEEL)
         mode = SPECTRUM_HUE_STRIP;
     if(spectrum_mode_ == mode) {
         SyncSpectrumMode();
@@ -3962,38 +4103,36 @@ UiColorPicker& UiColorPicker::AddUserSwatch(Color color, int alpha)
 
     for(int i = 0; i < user_swatches_.GetCount(); i++) {
         if(user_swatches_[i].color == color && user_swatches_[i].alpha == alpha) {
-            SlotData existing = user_swatches_[i];
-            user_swatches_.Remove(i);
-            user_swatches_.Insert(0, existing);
-            selected_stash_index_ = 0;
-            selected_stash_value_ = existing.Export(true);
-            Vector<SlotValue> values;
-            for(const SlotData& item : user_swatches_)
-                values.Add(item.Export(true));
-            stash_grid_->SetItems(values);
-            stash_grid_->SetSelectedIndex(0);
+            selected_stash_index_ = i;
+            selected_stash_value_ = user_swatches_[i].Export(true);
+            RefreshUserStash();
             SaveSharedSession(false);
             return *this;
         }
     }
 
-    SlotData item;
-    item.color = color;
-    item.alpha = alpha;
-    item.label = Format("Stash %d", user_swatches_.GetCount() + 1);
-    user_swatches_.Insert(0, item);
-    while(user_swatches_.GetCount() > 108)
-        user_swatches_.Remove(user_swatches_.GetCount() - 1);
-
-    Vector<SlotValue> values;
-    for(const SlotData& swatch : user_swatches_)
-        values.Add(swatch.Export(true));
-    stash_grid_->SetItems(values);
-    selected_stash_index_ = 0;
-    selected_stash_value_ = item.Export(true);
-    stash_grid_->SetSelectedIndex(0);
+    int index = -1;
+    for(int i = 0; i < user_swatches_.GetCount(); i++)
+        if(IsNull(user_swatches_[i].color)) { index = i; break; }
+    if(index < 0)
+        return *this;
+    user_swatches_[index].color = color;
+    user_swatches_[index].alpha = alpha;
+    user_swatches_[index].label = Format("Stash %d", index + 1);
+    selected_stash_index_ = index;
+    selected_stash_value_ = user_swatches_[index].Export(true);
+    RefreshUserStash();
     SaveSharedSession(false);
     return *this;
+}
+
+void UiColorPicker::RefreshUserStash()
+{
+    Vector<SlotValue> values;
+    for(const SlotData& item : user_swatches_)
+        values.Add(item.Export(true));
+    stash_grid_->SetItems(values);
+    stash_grid_->SetSelectedIndex(selected_stash_index_);
 }
 
 UiColorPicker& UiColorPicker::ClearUserSwatches()
@@ -4001,7 +4140,10 @@ UiColorPicker& UiColorPicker::ClearUserSwatches()
     user_swatches_.Clear();
     selected_stash_index_ = -1;
     selected_stash_value_ = SlotValue();
-    stash_grid_->SetItems(Vector<SlotValue>());
+    user_swatches_.SetCount(36);
+    for(SlotData& item : user_swatches_)
+        item.color = Null;
+    RefreshUserStash();
     stash_grid_->SetSelectedIndex(-1);
     SaveSharedSession(false);
     return *this;
@@ -4017,7 +4159,11 @@ UiColorPicker& UiColorPicker::ClearRecentSwatches()
 
 int UiColorPicker::GetUserSwatchCount() const
 {
-    return user_swatches_.GetCount();
+    int count = 0;
+    for(const SlotData& item : user_swatches_)
+        if(!IsNull(item.color))
+            count++;
+    return count;
 }
 
 int UiColorPicker::GetRecentSwatchCount() const
@@ -4168,16 +4314,21 @@ void UiColorPicker::LoadSharedSession()
 
     user_swatches_.Clear();
     for(const SlotValue& value : session.stash) {
+        if(user_swatches_.GetCount() >= 36)
+            break;
         SlotData& item = user_swatches_.Add();
         item.color = value.color;
         item.alpha = ClampByte_(value.alpha);
         item.label = value.label;
     }
+    user_swatches_.SetCount(36);
+    for(int i = session.stash.GetCount(); i < user_swatches_.GetCount(); i++)
+        user_swatches_[i].color = Null;
 
     active_slot_ = minmax(session.active_slot, 0, slot_count_ - 1);
     alpha_enabled_ = session.alpha_enabled;
     page_mode_ = (PageMode)minmax(session.page_mode, (int)PAGE_COLOR, (int)PAGE_GENERATOR);
-    spectrum_mode_ = (SpectrumMode)minmax(session.spectrum_mode, (int)SPECTRUM_HSV_RECT, (int)SPECTRUM_HSV_HEX);
+    spectrum_mode_ = (SpectrumMode)minmax(session.spectrum_mode, (int)SPECTRUM_HSV_RECT, (int)SPECTRUM_HSV_WHEEL);
     channel_mode_ = (ChannelMode)minmax(session.channel_mode, (int)CHANNEL_RGB_FLOAT, (int)CHANNEL_COUNT - 1);
     harmony_mode_ = (HarmonyMode)minmax(session.harmony_mode, (int)HARMONY_CUSTOM, (int)HARMONY_IMAGE_EXTRACT);
     palette_category_ = minmax(session.palette_category, 0, 2);
@@ -4209,10 +4360,7 @@ void UiColorPicker::LoadSharedSession()
         recent_values.Add(item.Export(true));
     recent_grid_->SetItems(recent_values);
 
-    Vector<SlotValue> stash_values;
-    for(const SlotData& item : user_swatches_)
-        stash_values.Add(item.Export(true));
-    stash_grid_->SetItems(stash_values);
+    RefreshUserStash();
     SetGeneratorMode(generator_mode_);
 }
 
@@ -4317,10 +4465,7 @@ void UiColorPicker::SyncAllFromActiveSlot()
     stash_grid_->SetActive(active);
     generator_grid_->SetActive(active);
 
-    footer_information_.SetText(Format("C%d  %s  Alpha %d",
-                                       active_slot_ + 1,
-                                       FormatHex_(color),
-                                       GetAlpha()));
+    SyncFooterReadout(active);
 
     syncing_controls_ = old_sync;
 }
@@ -4786,6 +4931,7 @@ void UiColorPicker::UpdateAlphaAvailability()
     readout_hsv_->SetTitle(alpha_enabled_ ? "HSV-A" : "HSV");
     readout_hsl_->SetTitle(alpha_enabled_ ? "HLS-A" : "HLS");
     readout_cmyk_->SetTitle(alpha_enabled_ ? "CMYK-A" : "CMYK");
+    SyncFooterReadout(footer_value_);
 }
 
 void UiColorPicker::PopulatePaletteSelectors()
@@ -4826,7 +4972,6 @@ void UiColorPicker::RefreshPaletteGrid()
                               palette.colors.GetCount()));
     selected_palette_index_ = -1;
     selected_palette_value_ = SlotValue();
-    SyncFooterPalette(palette.colors);
 }
 
 void UiColorPicker::HandlePalettePick(int index, const SlotValue& value)
@@ -4836,6 +4981,7 @@ void UiColorPicker::HandlePalettePick(int index, const SlotValue& value)
     selected_palette_index_ = index;
     selected_palette_value_ = value;
     palette_grid_->SetSelectedIndex(index);
+    SyncFooterReadout(value);
 }
 
 void UiColorPicker::HandleStashPick(int index, const SlotValue& value)
@@ -4845,11 +4991,37 @@ void UiColorPicker::HandleStashPick(int index, const SlotValue& value)
     selected_stash_index_ = index;
     selected_stash_value_ = value;
     stash_grid_->SetSelectedIndex(index);
+    SyncFooterReadout(value);
 }
 
-void UiColorPicker::HandlePaletteDropToStash(const SlotValue& value)
+void UiColorPicker::HandlePaletteDropToStash(int index, const SlotValue& value)
 {
-    AddUserSwatch(value.color, value.alpha);
+    if(index < 0 || index >= user_swatches_.GetCount() || IsNull(value.color))
+        return;
+    SlotData& target = user_swatches_[index];
+    Color color = value.color;
+    if(!IsNull(target.color)) {
+        auto apply = [](int destination, int source, StashDropMode mode) {
+            switch(mode) {
+            case STASH_ADD: return ClampByte_(destination + source);
+            case STASH_SUBTRACT: return ClampByte_(destination - source);
+            case STASH_MULTIPLY: return ClampByte_(destination * source / 255);
+            case STASH_MIX: return (destination + source + 1) / 2;
+            default: return source;
+            }
+        };
+        color = Color(apply(target.color.GetR(), value.color.GetR(), stash_drop_mode_),
+                      apply(target.color.GetG(), value.color.GetG(), stash_drop_mode_),
+                      apply(target.color.GetB(), value.color.GetB(), stash_drop_mode_));
+    }
+    target.color = color;
+    target.alpha = value.alpha;
+    target.label = Format("Stash %d", index + 1);
+    selected_stash_index_ = index;
+    selected_stash_value_ = target.Export(true);
+    RefreshUserStash();
+    SyncFooterReadout(selected_stash_value_);
+    SaveSharedSession(false);
 }
 
 void UiColorPicker::SaveSelectedPaletteToStash()
@@ -4924,7 +5096,6 @@ void UiColorPicker::RefreshGeneratorPalette()
     for(const SlotValue& value : base_values)
         values.Add(value);
     generated_base_count_ = base_values.GetCount();
-    SyncFooterPalette(base_values);
     const int white_mix[] = { 205, 145, 85 };
     const int black_mix[] = { 40, 80, 125, 175 };
     for(int mix : white_mix)
@@ -4966,6 +5137,7 @@ void UiColorPicker::HandleGeneratorPick(int index, const SlotValue& value)
     selected_generated_index_ = index;
     selected_generated_value_ = value;
     generator_grid_->SetSelectedIndex(index);
+    SyncFooterReadout(value);
     if(generator_mode_ == 2) {
         generator_wheel_->SelectHandle(index % max(1, generator_wheel_->GetPaletteCount()));
         int gain = generator_wheel_->GetGlobalGain();
@@ -5003,6 +5175,141 @@ void UiColorPicker::UseGeneratedColor()
                         selected_generated_value_.alpha, true);
 }
 
+void UiColorPicker::SyncFooterReadout(const SlotValue& value)
+{
+    if(IsNull(value.color))
+        return;
+    footer_value_ = value;
+    int h = 0, s = 0, v = 0;
+    int hsl_h = 0, hsl_s = 0, l = 0;
+    int c = 0, m = 0, y = 0, k = 0;
+    double t = 0.0, magenta = 0.0, intensity = 0.0;
+    double lab_l = 0.0, lab_a = 0.0, lab_b = 0.0;
+    String detail;
+    switch(channel_mode_) {
+    case CHANNEL_RGB_FLOAT:
+        detail = Format("RGBF %.4f, %.4f, %.4f", value.color.GetR() / 255.0,
+                        value.color.GetG() / 255.0, value.color.GetB() / 255.0);
+        break;
+    case CHANNEL_RGB_INT:
+        detail = Format("RGB8 %d, %d, %d", value.color.GetR(), value.color.GetG(), value.color.GetB());
+        break;
+    case CHANNEL_HSV:
+        ColorToHsv_(value.color, h, s, v);
+        detail = Format("HSV %d, %d, %d", h, s, v);
+        break;
+    case CHANNEL_HSL:
+        ColorToHsl_(value.color, hsl_h, hsl_s, l);
+        detail = Format("HLS %d, %d, %d", hsl_h, hsl_s, l);
+        break;
+    case CHANNEL_TMI:
+        ColorToTmi_(value.color, t, magenta, intensity);
+        detail = Format("TMI %.1f, %.1f, %.1f", t, magenta, intensity);
+        break;
+    case CHANNEL_CMYK:
+        ColorToCmyk_(value.color, c, m, y, k);
+        detail = Format("CMYK %d, %d, %d, %d", c, m, y, k);
+        break;
+    case CHANNEL_LAB:
+        ColorToLab_(value.color, lab_l, lab_a, lab_b);
+        detail = Format("Lab %.1f, %.1f, %.1f", lab_l, lab_a, lab_b);
+        break;
+    default:
+        break;
+    }
+    footer_hex_.SetTextUtf8(alpha_enabled_ ? FormatHex8_(value.color, value.alpha) : FormatHex_(value.color));
+    footer_detail_.SetTextUtf8(detail);
+    footer_hex_.ClearDirty();
+    footer_detail_.ClearDirty();
+}
+
+void UiColorPicker::SavePaletteJson()
+{
+    if(GetUserSwatchCount() == 0) {
+        Exclamation("There is no palette to export.");
+        return;
+    }
+    FileSel selector;
+    selector.Type("Color palette JSON", "*.json").DefaultExt("json").DefaultName("color-palette.json");
+    if(!selector.ExecuteSaveAs())
+        return;
+
+    ValueMap root;
+    root.Set("format", "upp-uicolor-palette");
+    root.Set("version", 1);
+    ValueArray colors;
+    for(const SlotData& entry : user_swatches_) {
+        if(IsNull(entry.color))
+            continue;
+        ValueMap json_entry;
+        json_entry.Set("hex", FormatHex8_(entry.color, entry.alpha));
+        json_entry.Set("label", entry.label);
+        colors.Add(json_entry);
+    }
+    root.Set("colors", colors);
+    if(!SaveFile(~selector, AsJSON(root, true)))
+        Exclamation("Unable to save the palette JSON file.");
+}
+
+void UiColorPicker::LoadPaletteJson()
+{
+    FileSel selector;
+    selector.Type("Color palette JSON", "*.json");
+    if(!selector.ExecuteOpen())
+        return;
+
+    Value parsed = ParseJSON(LoadFile(~selector));
+    if(parsed.IsError() || !IsValueMap(parsed)) {
+        Exclamation("The selected file is not valid palette JSON.");
+        return;
+    }
+    ValueMap root = parsed;
+    Value colors_value = JsonGet_(root, "colors");
+    if(AsString(JsonGet_(root, "format")) != "upp-uicolor-palette" ||
+       (int)JsonGet_(root, "version", 0) != 1 || !IsValueArray(colors_value)) {
+        Exclamation("The selected file is not a UiColorPicker palette.");
+        return;
+    }
+
+    Vector<SlotValue> values;
+    ValueArray colors = colors_value;
+    for(int i = 0; i < colors.GetCount() && values.GetCount() < 36; i++) {
+        if(!IsValueMap(colors[i]))
+            continue;
+        ValueMap item = colors[i];
+        Color color;
+        int alpha = 255;
+        if(!ParseColorText(AsString(JsonGet_(item, "hex")), color, alpha))
+            continue;
+        SlotValue& value = values.Add();
+        value.color = color;
+        value.alpha = alpha;
+        value.label = AsString(JsonGet_(item, "label"));
+    }
+    if(values.IsEmpty()) {
+        Exclamation("The palette JSON file contains no recognised colors.");
+        return;
+    }
+    int decision = GetUserSwatchCount() ? PromptYesNoCancel("Replace the current User Stash?\n\nYes replaces it. No adds imported colours to empty slots.") : 1;
+    if(decision < 0)
+        return;
+    if(decision > 0)
+        ClearUserSwatches();
+    int slot = 0;
+    for(const SlotValue& value : values) {
+        while(slot < user_swatches_.GetCount() && !IsNull(user_swatches_[slot].color))
+            slot++;
+        if(slot >= user_swatches_.GetCount())
+            break;
+        user_swatches_[slot].color = value.color;
+        user_swatches_[slot].alpha = value.alpha;
+        user_swatches_[slot].label = value.label.IsEmpty() ? Format("Stash %d", slot + 1) : value.label;
+        slot++;
+    }
+    RefreshUserStash();
+    SaveSharedSession(false);
+}
+
 void UiColorPicker::StartEyedropper()
 {
     if(eyedropper_active_ || !IsScreenEyedropperAvailable())
@@ -5012,9 +5319,11 @@ void UiColorPicker::StartEyedropper()
     live_slot_ = active_slot_;
     eyedropper_active_ = true;
     eyedropper_dragging_ = false;
+    eyedropper_button_.SetChecked(true);
+    eyedropper_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+    eyedropper_button_.Tip("Click anywhere to sample. Press Escape to cancel.");
     SetFocus();
     SetCapture();
-    footer_information_.SetText("Eyedropper: drag anywhere, release to accept, Escape to cancel");
     Refresh();
 }
 
@@ -5040,7 +5349,9 @@ void UiColorPicker::FinishEyedropperState(bool commit)
     }
 
     finishing_eyedropper_ = false;
-    footer_information_.SetText("Information / Detail");
+    eyedropper_button_.SetChecked(false);
+    eyedropper_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    eyedropper_button_.Tip("Sample a colour from the screen");
     Refresh();
 }
 
@@ -5087,16 +5398,14 @@ void UiColorPicker::SyncThemeToChildren()
 
     accept_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     cancel_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
-    palette_use_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
     generator_use_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-    palette_save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    stash_use_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    stash_save_active_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+    palette_export_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
+    palette_import_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_refresh_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_load_image_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_clear_samples_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
     generator_save_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    eyedropper_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    eyedropper_button_.SetCustomStyle(UiTheme::ResolveToolButton(eyedropper_active_ ? UiRole::Accent : UiRole::Subtle));
 
     UiToolButton::Style slot_style = UiTheme::ResolveToolButton(UiRole::Subtle);
     slot_style.metrics.content_margin = Rect(0, 0, 0, 0);
@@ -5183,13 +5492,13 @@ void UiColorPicker::Layout()
 
         int selector_height = DPI(25);
         int x = right.left;
-        int mode_width = max(DPI(130), right.GetWidth() - DPI(110));
+        int mode_width = max(DPI(130), right.GetWidth() - DPI(105));
         channel_mode_drop_.SetRect(x, right.top, mode_width, selector_height);
         x += mode_width + DPI(3);
         eyedropper_button_.SetRect(x, right.top, DPI(25), selector_height);
         x += DPI(28);
         alpha_toggle_label_.SetRect(x, right.top, DPI(30), selector_height);
-        x += DPI(30);
+        x += DPI(36);
         alpha_toggle_.SetRect(x, right.top, max(DPI(38), right.right - x), selector_height);
 
         int readout_gap = DPI(4);
@@ -5199,15 +5508,18 @@ void UiColorPicker::Layout()
         int channel_top = right.top + selector_height + DPI(3);
         int channel_rows = channel_group_[channel_mode_]->GetRowCount();
         int desired_channel_height = channel_rows * (compact_height ? DPI(20) : DPI(25));
-        int available_channel_height = right.bottom - channel_top - axes_height - readout_total - DPI(6);
+        int axis_separation = DPI(8);
+        int readout_separation = DPI(10);
+        int available_channel_height = right.bottom - channel_top - axis_separation
+                                     - axes_height - readout_separation - readout_total - DPI(6);
         int channel_height = min(desired_channel_height,
                                  max(channel_rows * DPI(16), available_channel_height));
         channel_stack_.SetRect(right.left, channel_top, right.GetWidth(), channel_height);
         channel_stack_.Layout();
 
-        int axes_top = channel_top + channel_height + DPI(2);
-        int readout_top = axes_top + axes_height + DPI(3);
-        int field_bottom = readout_top + readout_total;
+        int axes_top = channel_top + channel_height + axis_separation;
+        int readout_top = axes_top + axes_height + readout_separation;
+        int field_bottom = min(left.bottom, readout_top + readout_total);
         color_field_->SetRect(left.left, field_top, left.GetWidth(),
                               max(DPI(100), field_bottom - field_top));
         int y = axes_top;
@@ -5249,10 +5561,16 @@ void UiColorPicker::Layout()
         palette_grid_->SetRect(content.left, grid_top, content.GetWidth(), max(DPI(80), grid_bottom - grid_top));
 
         int stash_label_top = max(grid_top + DPI(80), grid_bottom + DPI(5));
-        stash_title_.SetRect(content.left, stash_label_top, DPI(120), DPI(18));
-        palette_hint_.SetRect(content.left + DPI(125), stash_label_top,
-                              max(0, content.GetWidth() - DPI(125)), DPI(18));
-        int stash_top = stash_label_top + DPI(20);
+        stash_title_.SetRect(content.left, stash_label_top, DPI(72), DPI(24));
+        int action_x = content.left + DPI(76);
+        stash_drop_mode_drop_.SetRect(action_x, stash_label_top, DPI(205), DPI(24));
+        action_x += DPI(210);
+        palette_export_button_.SetRect(action_x, stash_label_top, DPI(78), DPI(24));
+        action_x += DPI(82);
+        palette_import_button_.SetRect(action_x, stash_label_top, DPI(78), DPI(24));
+        action_x += DPI(82);
+        stash_clear_button_.SetRect(action_x, stash_label_top, DPI(58), DPI(24));
+        int stash_top = stash_label_top + DPI(26);
         stash_grid_->SetRect(content.left, stash_top, content.GetWidth(), stash_height);
 
     }
@@ -5306,7 +5624,7 @@ void UiColorPicker::Layout()
 
 Size UiColorPicker::GetMinSize() const
 {
-    return Size(DPI(620), DPI(380));
+    return Size(DPI(620), DPI(330));
 }
 
 void UiColorPicker::SetData(const Value& value)
