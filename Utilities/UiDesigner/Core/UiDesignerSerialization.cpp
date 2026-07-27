@@ -2,6 +2,65 @@
 
 namespace Upp {
 
+// Designer documents may contain Color and nested Value containers, while
+// U++'s JSON writer deliberately rejects arbitrary runtime Value types.
+static Value EncodeDocumentValue(const Value& value)
+{
+    if(value.Is<Color>()) {
+        Color c = value;
+        ValueMap color;
+        color.Set("$type", "Color");
+        color.Set("r", c.GetR());
+        color.Set("g", c.GetG());
+        color.Set("b", c.GetB());
+        return color;
+    }
+    if(value.Is<ValueArray>()) {
+        ValueArray array = value;
+        ValueArray encoded;
+        for(const Value& item : array)
+            encoded.Add(EncodeDocumentValue(item));
+        return encoded;
+    }
+    if(value.Is<ValueMap>()) {
+        ValueMap map = value;
+        ValueMap encoded;
+        for(int i = 0; i < map.GetCount(); i++)
+            encoded.Set(map.GetKey(i), EncodeDocumentValue(map.GetValue(i)));
+        return encoded;
+    }
+    return value;
+}
+
+static Value DecodeDocumentValue(const Value& value)
+{
+    if(value.Is<ValueMap>()) {
+        ValueMap map = value;
+        if((String)UiDesignerMapValue(map, "$type", "") == "Color")
+            return Color((int)UiDesignerMapValue(map, "r", 0),
+                         (int)UiDesignerMapValue(map, "g", 0),
+                         (int)UiDesignerMapValue(map, "b", 0));
+        ValueMap decoded;
+        for(int i = 0; i < map.GetCount(); i++)
+            decoded.Set(map.GetKey(i), DecodeDocumentValue(map.GetValue(i)));
+        return decoded;
+    }
+    if(value.Is<ValueArray>()) {
+        ValueArray array = value;
+        ValueArray decoded;
+        for(const Value& item : array)
+            decoded.Add(DecodeDocumentValue(item));
+        return decoded;
+    }
+    return value;
+}
+
+static ValueMap DecodeDocumentMap(const Value& value)
+{
+    Value decoded = DecodeDocumentValue(value);
+    return decoded.Is<ValueMap>() ? (ValueMap)decoded : ValueMap();
+}
+
 static Value ActionToValue(const UiDesignerActionBinding& binding)
 {
     ValueMap out;
@@ -10,7 +69,7 @@ static Value ActionToValue(const UiDesignerActionBinding& binding)
     out.Set("action", UiDesignerActionTypeName(binding.action));
     out.Set("target", binding.target);
     out.Set("property", binding.target_property);
-    out.Set("value", binding.value);
+    out.Set("value", EncodeDocumentValue(binding.value));
     out.Set("delta", binding.delta);
     out.Set("handler", binding.handler_name);
     out.Set("enabled", binding.enabled);
@@ -35,7 +94,7 @@ static bool ActionFromValue(const Value& value,
     }
     binding.target = (int64)UiDesignerMapValue(map, "target", 0);
     binding.target_property = UiDesignerMapValue(map, "property", "");
-    binding.value = UiDesignerMapValue(map, "value", Value());
+    binding.value = DecodeDocumentValue(UiDesignerMapValue(map, "value", Value()));
     binding.delta = (double)UiDesignerMapValue(map, "delta", 0.0);
     binding.handler_name = UiDesignerMapValue(map, "handler", "");
     binding.enabled = (bool)UiDesignerMapValue(map, "enabled", true);
@@ -54,9 +113,9 @@ static Value NodeToValue(const UiDesignerNode& node)
     for(UiDesignerNodeId id : node.children)
         children.Add(id);
     out.Set("children", children);
-    out.Set("properties", node.properties);
+    out.Set("properties", EncodeDocumentValue(node.properties));
     if(!node.theme_overrides.IsEmpty())
-        out.Set("theme_overrides", node.theme_overrides);
+        out.Set("theme_overrides", EncodeDocumentValue(node.theme_overrides));
     ValueArray actions;
     for(const UiDesignerActionBinding& binding : node.actions)
         actions.Add(ActionToValue(binding));
@@ -244,10 +303,10 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
     window->name = UiDesignerMapValue(root_node, "name", "Window");
     window->properties = legacy
         ? LegacyProperties(UiDesignerMapValue(root_node, "properties", ValueMap()))
-        : (ValueMap)UiDesignerMapValue(root_node, "properties", ValueMap());
+        : DecodeDocumentMap(UiDesignerMapValue(root_node, "properties", ValueMap()));
     window->theme_overrides = legacy
         ? ValueMap()
-        : (ValueMap)UiDesignerMapValue(root_node, "theme_overrides", ValueMap());
+        : DecodeDocumentMap(UiDesignerMapValue(root_node, "theme_overrides", ValueMap()));
     NormalizePlacementProperties(window->properties);
     NormalizeThemeOverrides(window->theme_overrides);
 
@@ -288,7 +347,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
 
             ValueMap properties = legacy
                 ? LegacyProperties(UiDesignerMapValue(n, "properties", ValueMap()))
-                : (ValueMap)UiDesignerMapValue(n, "properties", ValueMap());
+                : DecodeDocumentMap(UiDesignerMapValue(n, "properties", ValueMap()));
             NormalizePlacementProperties(properties);
             if(legacy && UiDesignerMapValue(n, "last_rect", Value()).Is<ValueMap>()) {
                 ValueMap r = UiDesignerMapValue(n, "last_rect", ValueMap());
@@ -340,7 +399,7 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             created->properties = pick(properties);
             created->theme_overrides = legacy
                 ? ValueMap()
-                : (ValueMap)UiDesignerMapValue(n, "theme_overrides", ValueMap());
+                : DecodeDocumentMap(UiDesignerMapValue(n, "theme_overrides", ValueMap()));
             NormalizeThemeOverrides(created->theme_overrides);
             id_map.Add(old_id, new_id);
             pending_actions.Add(new_id,

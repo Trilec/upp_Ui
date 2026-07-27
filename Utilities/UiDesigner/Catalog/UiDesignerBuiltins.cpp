@@ -907,6 +907,21 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         s.properties.Add(columns);
         s.defaults.Set("rows", 2);
         s.defaults.Set("columns", 2);
+        auto min_cell_width = UiDesignerNumberProperty(
+            "min_cell_width", "Minimum cell width", 10, 0, 10000, 1,
+            PropertyEditorKind::Integer);
+        min_cell_width.group = "Structure";
+        min_cell_width.impact = PropertyImpactLocalLayout |
+                                 PropertyImpactAncestorLayout | PropertyImpactCode;
+        auto min_cell_height = UiDesignerNumberProperty(
+            "min_cell_height", "Minimum cell height", 10, 0, 10000, 1,
+            PropertyEditorKind::Integer);
+        min_cell_height.group = "Structure";
+        min_cell_height.impact = min_cell_width.impact;
+        s.properties.Add(min_cell_width);
+        s.properties.Add(min_cell_height);
+        s.defaults.Set("min_cell_width", 10);
+        s.defaults.Set("min_cell_height", 10);
         catalog.Register(pick(s));
     }
     {

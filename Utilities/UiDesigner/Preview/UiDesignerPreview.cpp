@@ -1756,6 +1756,18 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
                 return UiDesignerApplyResult::AppliedAncestorLayout;
             }
         }
+        else if(property == "min_cell_width" || property == "min_cell_height") {
+            if(auto *grid = dynamic_cast<UiGridLayout *>(instances_[q].control.Get())) {
+                const int width = max(0, (int)node->GetProperty("min_cell_width", 10));
+                const int height = max(0, (int)node->GetProperty("min_cell_height", 10));
+                grid->SetMinCellSize(Size(DPI(width), DPI(height)));
+                stats_.ancestor_layouts++;
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return UiDesignerApplyResult::AppliedAncestorLayout;
+            }
+        }
 
         result = UiDesignerPreviewFactory::Apply(*instances_[q].control,
                                                   *spec, property, value);

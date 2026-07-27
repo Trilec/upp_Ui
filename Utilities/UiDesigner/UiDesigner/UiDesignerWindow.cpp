@@ -256,6 +256,7 @@ void UiDesignerWindow::BuildDesigner()
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
                    .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_panel_,
                                "Inspect live preview performance and projection activity");
+    designer_right_.SetPaneWidth(PANE_MEDIUM);
     designer_right_.SetActiveSection(0);
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());
@@ -707,9 +708,9 @@ void UiDesignerWindow::RefreshData()
     }
     else
         out << "  none\n\n";
-    out << "Data support: not yet implemented\n";
-    out << "Data adapter: none\n";
-    out << "Canonical data storage: unavailable\n";
+    out << "Data editor: planned for the next milestone\n";
+    out << "UID-DATA-001 - Canonical control data models and the first usable Data editor\n";
+    out << "Canonical data storage: not yet implemented\n";
     out << "Authored data count: unavailable";
     data_shell_.SetData(out);
 }

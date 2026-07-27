@@ -256,14 +256,10 @@ UiGridLayout& UiGridLayout::SetItem(int index, int row, int col, bool scale_x,
         it.scale_x = scale_x;
         it.scale_y = scale_y;
         it.fixed = fixed;
-        grid_rows = 0;
-        grid_cols = 0;
-        for(const Item& item : items) {
-            grid_rows = max(grid_rows, item.row + 1);
-            grid_cols = max(grid_cols, item.col + 1);
-        }
-        grid_rows = max(1, grid_rows);
-        grid_cols = max(1, grid_cols);
+        // Authored dimensions are a lower bound, not occupied extent.
+        // Moving an item must not erase configured empty cells.
+        grid_rows = max(grid_rows, it.row + 1);
+        grid_cols = max(grid_cols, it.col + 1);
         RefreshGridLayout();
     }
     return *this;

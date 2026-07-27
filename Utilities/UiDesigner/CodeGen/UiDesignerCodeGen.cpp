@@ -459,6 +459,10 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetGridSize("
             << (int)Property("columns", 2) << ", "
             << (int)Property("rows", 2) << ");\n";
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
+        out << "\t" << member << ".SetMinCellSize(Size(DPI("
+            << max(0, (int)Property("min_cell_width", 10)) << "), DPI("
+            << max(0, (int)Property("min_cell_height", 10)) << "));\n";
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout ||
        spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetInset(DPI("

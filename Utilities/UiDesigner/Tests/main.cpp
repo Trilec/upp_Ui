@@ -286,6 +286,11 @@ CONSOLE_APP_MAIN
               grid_spec->FindProperty("inset")->default_value == 8 &&
               grid_spec->defaults.GetValue(grid_spec->defaults.Find("inset")) == 8,
           "Grid inset metadata and defaults are 8");
+    Check(grid_spec && grid_spec->FindProperty("min_cell_width") &&
+              grid_spec->FindProperty("min_cell_height") &&
+              grid_spec->defaults.GetValue(grid_spec->defaults.Find("min_cell_width")) == 10 &&
+              grid_spec->defaults.GetValue(grid_spec->defaults.Find("min_cell_height")) == 10,
+          "Grid exposes 10x10 minimum cell defaults");
     UiDesignerNodeId preview_panel_a = preview_commands.AddNode(
         "UiPanel", "preview_panel_a", preview_box,
         panel_spec ? panel_spec->node_flags : 0,
@@ -420,6 +425,13 @@ CONSOLE_APP_MAIN
     Check(empty_grid_probe.GetCellRect(-1, 0).IsEmpty() &&
               empty_grid_probe.GetCellRect(9, 9).IsEmpty(),
           "invalid grid coordinates return an empty rectangle");
+    Button grid_item_probe;
+    const int grid_item = empty_grid_probe.Add(grid_item_probe, 0, 0, false);
+    empty_grid_probe.SetItem(grid_item, 0, 0, false, false);
+    Vector<Rect> after_item_cells;
+    empty_grid_probe.GetCellRects(after_item_cells);
+    Check(after_item_cells.GetCount() == 6,
+          "SetItem preserves configured 3x2 dimensions after insertion");
     const int empty_builds = empty_grid_probe.GetResolvedCellGeometryBuildCount();
     Vector<Rect> repeated_cells;
     empty_grid_probe.GetCellRects(repeated_cells);
@@ -730,6 +742,10 @@ CONSOLE_APP_MAIN
           "undo restores property default");
     Check(commands.Redo(), "redo succeeds");
     Check(document.GetProperty(node, "text") == "Hello", "redo restores property");
+    Check(commands.SetProperty(node, "accent_color", Color(12, 34, 56),
+                               UiDesignerImpactControlState,
+                               "Set serializable color"),
+          "color property committed");
     const int history_before_invalid = commands.GetHistoryPosition();
     Check(!commands.MoveNode(node, node, -1, "Invalid self move"),
           "invalid command rejected");
@@ -743,6 +759,8 @@ CONSOLE_APP_MAIN
     Check(roundtrip.GetCount() == document.GetCount(), "round-trip node count");
     Check(roundtrip.GetVirtualSize() == document.GetVirtualSize(),
           "round-trip virtual size");
+    Check(roundtrip.GetProperty(node, "accent_color") == Color(12, 34, 56),
+          "color property survives JSON round trip");
 
     const String legacy_json =
         "{\"format\":\"upp-ui-designer\",\"schema\":1,"

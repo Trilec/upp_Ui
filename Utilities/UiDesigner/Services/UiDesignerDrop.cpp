@@ -162,6 +162,26 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
                             plan.index, plan.reason))
         return plan;
 
+    if(parent->type == "UiGridLayout") {
+        const int rows = max(1, (int)parent->GetProperty("rows", 2));
+        const int columns = max(1, (int)parent->GetProperty("columns", 2));
+        const int row = grid_row >= 0 ? minmax(grid_row, 0, rows - 1)
+                                      : minmax(canvas_position.y * rows /
+                                               max(1, (int)parent->GetProperty("height", 180)),
+                                               0, rows - 1);
+        const int column = grid_column >= 0 ? minmax(grid_column, 0, columns - 1)
+                                            : minmax(canvas_position.x * columns /
+                                                     max(1, (int)parent->GetProperty("width", 320)),
+                                                     0, columns - 1);
+        for(const UiDesignerNode& child : document_->GetNodes())
+            if(child.parent == parent->id &&
+               (int)child.GetProperty("grid_row", -1) == row &&
+               (int)child.GetProperty("grid_column", -1) == column) {
+                plan.reason = Format("Grid row %d, column %d is occupied", row, column);
+                return plan;
+            }
+    }
+
     plan.add_defaults = clone(spec->defaults);
     if(has_canvas_position)
         PopulatePlacement(*spec, *parent, canvas_position,
