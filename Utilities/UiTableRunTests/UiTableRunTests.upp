@@ -1,0 +1,9 @@
+uses
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "";

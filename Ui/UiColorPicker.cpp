@@ -1293,6 +1293,12 @@ public:
 
 } // namespace
 
+class ColorDragSource_ {
+public:
+    virtual ~ColorDragSource_() {}
+    virtual UiColorPicker::SlotValue GetColorDragValue() const = 0;
+};
+
 class UiColorPicker::ReadoutRow : public ParentCtrl {
 public:
     typedef ReadoutRow CLASSNAME;
@@ -1576,7 +1582,7 @@ private:
     mutable Image cache_;
 };
 
-class UiColorPicker::SwatchGrid : public Ctrl {
+class UiColorPicker::SwatchGrid : public Ctrl, public ColorDragSource_ {
 public:
     typedef SwatchGrid CLASSNAME;
 
@@ -1660,6 +1666,8 @@ public:
         empty.color = Null;
         return empty;
     }
+
+    virtual SlotValue GetColorDragValue() const override { return drag_payload_; }
 
     Event<int, SlotValue> WhenPick;
     Event<int, SlotValue> WhenDoublePick;
@@ -1745,7 +1753,8 @@ public:
 
         dragging_ = true;
         const SlotValue value = items_[drag_index_];
-        VectorMap<String, ClipData> payload;
+        drag_payload_ = value;
+        VectorMap<String, ClipData> payload = InternalClip<ColorDragSource_>(*this, "uicolor-value");
         payload.Add("application/x-upp-uicolor-swatch-v1",
                     ClipData(FormatHex8_(value.color, value.alpha)));
         Append(payload, FormatHex8_(value.color, value.alpha));
@@ -1769,7 +1778,8 @@ public:
 
     virtual void DragAndDrop(Point, PasteClip& clip) override
     {
-        if(!accept_drop_ || !AcceptText(clip)) {
+        bool internal = accept_drop_ && AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
+        if(!internal && (!accept_drop_ || !AcceptText(clip))) {
             clip.Reject();
             drop_hot_ = false;
             Refresh();
@@ -1780,15 +1790,22 @@ public:
         Refresh();
 
         if(clip.IsPaste()) {
-            Color color;
-            int alpha = 255;
-            String text = GetString(clip);
-            if(UiColorPicker::ParseColorText(text, color, alpha) && WhenDropValue) {
-                SlotValue value;
-                value.color = color;
-                value.alpha = alpha;
-                WhenDropValue(value);
+            SlotValue value;
+            if(internal) {
+                const ColorDragSource_ *source = GetInternalPtr<ColorDragSource_>(clip, "uicolor-value");
+                if(source)
+                    value = source->GetColorDragValue();
             }
+            else {
+                Color color;
+                int alpha = 255;
+                if(UiColorPicker::ParseColorText(GetString(clip), color, alpha)) {
+                    value.color = color;
+                    value.alpha = alpha;
+                }
+            }
+            if(!IsNull(value.color) && WhenDropValue)
+                WhenDropValue(value);
             drop_hot_ = false;
             Refresh();
         }
@@ -1852,9 +1869,10 @@ private:
     bool drop_hot_ = false;
     int forced_columns_ = 0;
     bool fit_rows_ = false;
+    SlotValue drag_payload_;
 };
 
-class UiColorPicker::ColorSlotButton : public UiToolButton {
+class UiColorPicker::ColorSlotButton : public UiToolButton, public ColorDragSource_ {
 public:
     typedef ColorSlotButton CLASSNAME;
 
@@ -1919,7 +1937,8 @@ public:
     {
         if(kind_ == CURRENT || IsNull(value_.color))
             return;
-        VectorMap<String, ClipData> payload;
+        drag_payload_ = value_;
+        VectorMap<String, ClipData> payload = InternalClip<ColorDragSource_>(*this, "uicolor-value");
         payload.Add("application/x-upp-uicolor-swatch-v1",
                     ClipData(FormatHex8_(value_.color, value_.alpha)));
         Append(payload, FormatHex8_(value_.color, value_.alpha));
@@ -1939,7 +1958,8 @@ public:
 
     virtual void DragAndDrop(Point, PasteClip& clip) override
     {
-        if(!accept_drop_ || !owner_ || !AcceptText(clip)) {
+        bool internal = accept_drop_ && owner_ && AcceptInternal<ColorDragSource_>(clip, "uicolor-value");
+        if(!internal && (!accept_drop_ || !owner_ || !AcceptText(clip))) {
             clip.Reject();
             drop_hot_ = false;
             Refresh();
@@ -1950,13 +1970,21 @@ public:
         Refresh();
 
         if(clip.IsPaste()) {
-            Color color;
-            int alpha = 255;
-            String text = GetString(clip);
-            if(UiColorPicker::ParseColorText(text, color, alpha)) {
-                SlotValue value;
-                value.color = color;
-                value.alpha = alpha;
+            SlotValue value;
+            if(internal) {
+                const ColorDragSource_ *source = GetInternalPtr<ColorDragSource_>(clip, "uicolor-value");
+                if(source)
+                    value = source->GetColorDragValue();
+            }
+            else {
+                Color color;
+                int alpha = 255;
+                if(UiColorPicker::ParseColorText(GetString(clip), color, alpha)) {
+                    value.color = color;
+                    value.alpha = alpha;
+                }
+            }
+            if(!IsNull(value.color)) {
                 int target = kind_ == CURRENT ? owner_->GetActiveSlot() : slot_;
                 owner_->HandleColorDrop(target, value);
             }
@@ -1974,6 +2002,7 @@ public:
     }
 
 private:
+    virtual SlotValue GetColorDragValue() const override { return drag_payload_; }
     UiColorPicker *owner_ = nullptr;
     int slot_ = 0;
     Kind kind_ = PRIMARY;
@@ -1982,6 +2011,7 @@ private:
     bool alpha_enabled_ = true;
     bool accept_drop_ = true;
     bool drop_hot_ = false;
+    SlotValue drag_payload_;
 };
 
 class UiColorPicker::ChannelGroup : public ParentCtrl {
@@ -2397,6 +2427,7 @@ public:
             base_hue_ = hue;
         saturation_ = saturation;
         value_ = value;
+        manipulator_ = Point(base_hue_, 50);
         RebuildHandles();
         cache_ = Image();
         Refresh();
@@ -2456,6 +2487,10 @@ public:
         }
         selected_ = minmax(selected_, 0, handles_.GetCount() - 1);
         base_hue_ = handles_[0].x;
+        int average_saturation = 0;
+        for(const Point& handle : handles_)
+            average_saturation += handle.y;
+        manipulator_ = Point(base_hue_, average_saturation / max(1, handles_.GetCount()));
         Refresh();
     }
 
@@ -2484,7 +2519,7 @@ public:
         draw.DrawImage(wheel.left, wheel.top, cache_);
 
         Point center = wheel.CenterPoint();
-        for(int i = 1; i < handles_.GetCount(); i++) {
+        for(int i = 0; i < handles_.GetCount(); i++) {
             Point p = HandlePoint(i, wheel);
             draw.DrawLine(center.x, center.y, p.x, p.y, DPI(2), White());
             draw.DrawLine(center.x, center.y + DPI(1), p.x, p.y + DPI(1), DPI(1), SColorShadow());
@@ -2499,21 +2534,37 @@ public:
             draw.DrawEllipse(marker, color, DPI(2), White());
             if(i == selected_)
                 draw.DrawEllipse(marker.Inflated(DPI(4)), Null, DPI(2), SColorHighlight());
-            if(i == 0)
-                draw.DrawEllipse(marker.Deflated(DPI(5)), Null, DPI(2), White());
         }
+        Point manipulator = PointFor(manipulator_, wheel);
+        Rect tool = RectC(manipulator.x - DPI(10), manipulator.y - DPI(10), DPI(20), DPI(20));
+        draw.DrawEllipse(tool.Inflated(DPI(3)), SColorPaper(), DPI(1), SColorShadow());
+        draw.DrawEllipse(tool, Blend(SColorPaper(), SColorText(), 65), DPI(2), White());
+        draw.DrawEllipse(tool.Deflated(DPI(5)), Null, DPI(2), White());
     }
 
     virtual void LeftDown(Point point, dword) override
     {
         Rect wheel = WheelRect();
-        selected_ = HitHandle(point, wheel);
-        if(selected_ < 0 && wheel.Contains(point))
-            selected_ = 0;
-        if(selected_ >= 0) {
+        manipulating_ = HitManipulator(point, wheel);
+        if(!manipulating_)
+            selected_ = HitHandle(point, wheel);
+        if(manipulating_ || selected_ >= 0) {
             SetCapture();
             UpdateHandle(point, false);
         }
+    }
+
+    virtual void LeftDouble(Point point, dword) override
+    {
+        Rect wheel = WheelRect();
+        if(!HitManipulator(point, wheel))
+            return;
+        if(mode_ != HARMONY_MONOCHROMATIC)
+            for(Point& handle : handles_)
+                handle.y = manipulator_.y;
+        Refresh();
+        if(WhenChange)
+            WhenChange(true);
     }
 
     virtual void MouseMove(Point point, dword flags) override
@@ -2528,6 +2579,7 @@ public:
             return;
         UpdateHandle(point, true);
         ReleaseCapture();
+        manipulating_ = false;
     }
 
 private:
@@ -2541,11 +2593,23 @@ private:
 
     Point HandlePoint(int index, const Rect& wheel) const
     {
-        double angle = handles_[index].x * M_PI / 180.0;
-        double radius = handles_[index].y / 100.0 * wheel.GetWidth() / 2.0;
+        return PointFor(handles_[index], wheel);
+    }
+
+    Point PointFor(const Point& value, const Rect& wheel) const
+    {
+        double angle = value.x * M_PI / 180.0;
+        double radius = value.y / 100.0 * wheel.GetWidth() / 2.0;
         Point center = wheel.CenterPoint();
         return Point(center.x + int(cos(angle) * radius + 0.5),
                      center.y - int(sin(angle) * radius + 0.5));
+    }
+
+    bool HitManipulator(Point point, const Rect& wheel) const
+    {
+        Point p = PointFor(manipulator_, wheel);
+        int dx = point.x - p.x, dy = point.y - p.y;
+        return dx * dx + dy * dy <= DPI(16) * DPI(16);
     }
 
     int HitHandle(Point point, const Rect& wheel) const
@@ -2562,7 +2626,7 @@ private:
 
     void UpdateHandle(Point point, bool final_commit)
     {
-        if(selected_ < 0 || selected_ >= handles_.GetCount())
+        if(!manipulating_ && (selected_ < 0 || selected_ >= handles_.GetCount()))
             return;
         Rect wheel = WheelRect();
         Point center = wheel.CenterPoint();
@@ -2571,13 +2635,16 @@ private:
         int hue = NormalizeHue_(int(atan2(dy, dx) * 180.0 / M_PI + 0.5));
         int saturation = ClampPercent_(int(sqrt(dx * dx + dy * dy) /
                                              max(1.0, wheel.GetWidth() / 2.0) * 100.0 + 0.5));
-        if(selected_ == 0) {
-            int delta = hue - handles_[0].x;
+        if(manipulating_) {
+            int delta = hue - manipulator_.x;
+            double radial_scale = saturation / double(max(1, manipulator_.y));
             for(Point& handle : handles_)
                 handle.x = NormalizeHue_(handle.x + delta);
-            saturation_ = saturation;
-            handles_[0].y = saturation;
-            base_hue_ = hue;
+            if(mode_ != HARMONY_MONOCHROMATIC)
+                for(Point& handle : handles_)
+                    handle.y = ClampPercent_(int(handle.y * radial_scale + 0.5));
+            manipulator_ = Point(hue, saturation);
+            base_hue_ = handles_.IsEmpty() ? hue : handles_[0].x;
         }
         else if(mode_ == HARMONY_CUSTOM) {
             handles_[selected_] = Point(hue, saturation);
@@ -2643,10 +2710,10 @@ private:
             break;
         }
         case HARMONY_SHADES:
-            for(int i = 0; i < count_; i++) add(0, saturation_, 100 - i * 75 / max(1, count_ - 1));
+            for(int i = 0; i < count_; i++) add(0, (i + 1) * 100 / (count_ + 1), 100 - i * 75 / max(1, count_ - 1));
             break;
         case HARMONY_MONOCHROMATIC:
-            for(int i = 0; i < count_; i++) add(0, 100 - i * 75 / max(1, count_ - 1), 100 - (i % 3) * 18);
+            for(int i = 0; i < count_; i++) add(0, (i + 1) * 100 / (count_ + 1), 100);
             break;
         case HARMONY_CUSTOM:
         default:
@@ -2691,6 +2758,8 @@ private:
     int value_ = 85;
     int count_ = 5;
     Vector<int> values_;
+    Point manipulator_ = Point(200, 50);
+    bool manipulating_ = false;
     int cache_value_ = -1;
     Image cache_;
 };
@@ -3283,15 +3352,7 @@ void UiColorPicker::WireEvents()
         generator_mode_button_[i].WhenAction = [=] { SetGeneratorMode(mode); };
     }
     generator_wheel_->WhenChange = [=](bool) {
-        Vector<SlotValue> values = generator_wheel_->GetColors();
-        generated_swatches_.Clear();
-        for(const SlotValue& value : values) {
-            SlotData& item = generated_swatches_.Add();
-            item.color = value.color;
-            item.alpha = value.alpha;
-            item.label = value.label;
-        }
-        generator_grid_->SetItems(values);
+        RefreshGeneratorPalette();
         int gain = generator_wheel_->GetGlobalGain();
         generator_gain_slider_.SetValue(gain);
         generator_gain_edit_.SetTextUtf8(AsString(gain));
@@ -3320,6 +3381,7 @@ void UiColorPicker::WireEvents()
         generator_count_slider_.SetValue(count);
         generator_count_edit_.SetTextUtf8(AsString(count));
         RefreshGeneratorPalette();
+        RefreshLayout();
         SaveSharedSession(false);
     };
     generator_count_slider_.WhenChanging = [=] { update_generator_count(generator_count_slider_.GetValue()); };
@@ -3343,6 +3405,7 @@ void UiColorPicker::WireEvents()
                                       Format("Image sample %d", i + 1)));
         }
         Vector<SlotValue> values = clone(base_values);
+        generated_base_count_ = base_values.GetCount();
         const int white_mix[] = { 205, 145, 85 };
         const int black_mix[] = { 40, 80, 125, 175 };
         for(int mix : white_mix)
@@ -4612,7 +4675,6 @@ void UiColorPicker::RefreshPaletteGrid()
                               palette.colors.GetCount()));
     selected_palette_index_ = -1;
     selected_palette_value_ = SlotValue();
-    RefreshLayout();
 }
 
 void UiColorPicker::HandlePalettePick(int index, const SlotValue& value)
@@ -4748,6 +4810,7 @@ void UiColorPicker::RefreshGeneratorPalette()
     Vector<SlotValue> values;
     for(const SlotValue& value : base_values)
         values.Add(value);
+    generated_base_count_ = base_values.GetCount();
     const int white_mix[] = { 205, 145, 85 };
     const int black_mix[] = { 40, 80, 125, 175 };
     for(int mix : white_mix)
@@ -4814,8 +4877,9 @@ void UiColorPicker::LoadGeneratorImage()
 
 void UiColorPicker::SaveGeneratedToStash()
 {
-    for(const SlotData& item : generated_swatches_)
-        AddUserSwatch(item.color, item.alpha);
+    int count = min(generated_base_count_, generated_swatches_.GetCount());
+    for(int i = 0; i < count; i++)
+        AddUserSwatch(generated_swatches_[i].color, generated_swatches_[i].alpha);
 }
 
 void UiColorPicker::UseGeneratedColor()

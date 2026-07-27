@@ -348,6 +348,7 @@ private:
     int            selected_palette_index_ = -1;
     int            selected_stash_index_ = -1;
     int            selected_generated_index_ = -1;
+    int            generated_base_count_ = 0;
     int            selected_curve_channel_ = 0;
 
     Vector<SlotData> slots_;
