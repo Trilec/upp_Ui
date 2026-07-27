@@ -3137,7 +3137,7 @@ void UiColorPicker::BuildChildTree()
 
     navigation_bar_.SetGap(DPI(5), DPI(5)).SetInset(DPI(2));
     for(int i = 0; i < PAGE_COUNT; i++)
-        navigation_bar_.Add(page_button_[i]).Fixed(i == PAGE_GENERATOR ? DPI(88) : DPI(68));
+        navigation_bar_.Add(page_button_[i]).Fixed(DPI(80));
     navigation_bar_.Add(navigation_spacer_).Expand(1);
     navigation_bar_.Add(slot_grid_host_).Fixed(DPI(220));
 
@@ -5391,8 +5391,26 @@ void UiColorPicker::SyncThemeToChildren()
     if(!children_style_dirty_ && children_theme_revision_ == revision)
         return;
 
-    for(int i = 0; i < PAGE_COUNT; i++)
-        page_button_[i].SetCustomStyle(UiTheme::ResolveButton(i == (int)page_mode_ ? UiRole::Accent : UiRole::Subtle));
+    for(int i = 0; i < PAGE_COUNT; i++) {
+        bool active = i == (int)page_mode_;
+        UiButton::Style tab_style = UiTheme::ResolveButton(UiRole::Subtle);
+        UiButton::Style accent_style = UiTheme::ResolveButton(UiRole::Accent);
+        Color ink = active && accent_style.palette.face[ST_NORMAL].IsSolid()
+                  ? accent_style.palette.face[ST_NORMAL].color
+                  : tab_style.palette.ink[ST_NORMAL];
+        for(int state = 0; state < 4; state++) {
+            tab_style.palette.ink[state] = ink;
+            tab_style.palette.icon[state] = ink;
+        }
+        tab_style.metrics.face_enabled = false;
+        tab_style.metrics.frame_enabled = false;
+        tab_style.metrics.frame_width = 0;
+        tab_style.metrics.focus_enabled = false;
+        tab_style.underline = active;
+        tab_style.underline_width = DPI(3);
+        tab_style.underline_offset = DPI(4);
+        page_button_[i].SetCustomStyle(tab_style);
+    }
     for(int i = 0; i < CHANNEL_COUNT; i++)
         channel_button_[i].SetCustomStyle(UiTheme::ResolveButton(i == (int)channel_mode_ ? UiRole::Accent : UiRole::Subtle));
 
