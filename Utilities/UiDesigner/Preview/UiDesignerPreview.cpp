@@ -537,21 +537,6 @@ static void InitializeRuntime(Ctrl& ctrl, const UiDesignerControlSpec& spec)
         text->SetData("Line edit");
     if(auto *drop = dynamic_cast<DropList *>(&ctrl))
         drop->Add("First", 1).Add("Second", 2).SetData(1);
-    if(auto *tab = dynamic_cast<UiTab *>(&ctrl)) {
-        tab->Add(*new ParentCtrl, "Page 1");
-        tab->Add(*new ParentCtrl, "Page 2");
-        tab->SetActiveTab(0);
-    }
-    if(auto *stack = dynamic_cast<UiStack *>(&ctrl)) {
-        stack->AddPage(*new ParentCtrl, "page_1");
-        stack->AddPage(*new ParentCtrl, "page_2");
-        stack->SetActivePage(0);
-    }
-    if(auto *accordion = dynamic_cast<UiAccordion *>(&ctrl)) {
-        accordion->AddSection("Section 1");
-        accordion->AddSection("Section 2");
-        accordion->AddSection("Section 3");
-    }
     if(auto *tab = dynamic_cast<TabCtrl *>(&ctrl)) {
         tab->Add("Overview");
         tab->Add("Details");
@@ -1392,6 +1377,14 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
 {
     instance.semantic = true;
     instance.runtime_parent = parent_instance.node;
+    if(node.type == "UiTabPage") {
+        if(auto *tab = dynamic_cast<UiTab *>(parent_instance.control.Get())) {
+            instance.control = MakeOne<ParentCtrl>();
+            tab->Add(*instance.control, node.GetProperty("title", node.name));
+            tab->EnableTab(tab->GetCount() - 1, node.GetProperty("enabled", true));
+        }
+        return;
+    }
     if(auto *box = dynamic_cast<UiBoxLayout *>(parent_instance.control.Get())) {
         instance.layout_item_index = box->GetItemCount();
         UiBoxLayout::ItemRef item = node.GetProperty("layout_break", false)
@@ -1600,6 +1593,11 @@ void UiDesignerPreviewCanvas::BuildNode(
     if(instance.semantic) {
         if(parent_instance && parent_instance->control)
             AttachSemanticItem(instance, *node, *parent_instance);
+        if(instance.control) {
+            ParentCtrl *host = dynamic_cast<ParentCtrl *>(instance.control.Get());
+            for(UiDesignerNodeId child : node->children)
+                BuildNode(child, host ? *host : fallback_parent, depth + 1, node_id);
+        }
         return;
     }
 

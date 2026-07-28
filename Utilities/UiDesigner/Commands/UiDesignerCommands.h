@@ -58,6 +58,12 @@ public:
         const String& label = "Move selection");
     bool RenameNode(UiDesignerNodeId node, const String& name,
                     const String& label = String());
+    UiDesignerNodeId AddTabPage(UiDesignerNodeId tab, const String& title);
+    bool RemoveTabPage(UiDesignerNodeId page, const String& label = String());
+    bool RenameTabPage(UiDesignerNodeId page, const String& title);
+    bool MoveTabPage(UiDesignerNodeId page, int index);
+    bool SetTabPageEnabled(UiDesignerNodeId page, bool enabled);
+    bool SetActiveTabPage(UiDesignerNodeId tab, UiDesignerNodeId page);
 
     bool SetActionBinding(UiDesignerNodeId node,
                           const UiDesignerActionBinding& binding,

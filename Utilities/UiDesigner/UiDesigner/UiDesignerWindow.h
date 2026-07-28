@@ -112,6 +112,8 @@ private:
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;
     UiMultiEdit data_shell_;
+    UiList data_list_;
+    UiListModel data_model_;
     PropertyEditor behaviors_;
     PropertyEditor overrides_;
     UiDesignerCodeView code_;

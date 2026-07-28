@@ -1267,6 +1267,30 @@ static void RegisterStock(UiDesignerCatalog& catalog)
     }
 }
 
+static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
+{
+    UiDesignerControlSpec page = MakeSpec("UiTabPage", "Tab Page", "Internal",
+        "", "tab_page", UiDesignerRuntimeKind::SemanticSpacer,
+        "none", UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
+    page.capabilities = UiDesignerCapabilitySemanticItem;
+    page.preview_adapter_id = "semantic:tab_page";
+    page.codegen_adapter_id = "spacer";
+    page.properties.Clear();
+    page.defaults.Clear();
+    UiDesignerPropertySpec key;
+    key.id = "key"; key.label = "Key"; key.group = "Page";
+    key.kind = PropertyEditorKind::Text; key.default_value = "page_1";
+    key.impact = PropertyImpactStructure | PropertyImpactCode;
+    page.properties.Add(key); page.defaults.Set("key", "page_1");
+    UiDesignerPropertySpec title = key;
+    title.id = "title"; title.label = "Title"; title.default_value = "Page 1";
+    page.properties.Add(title); page.defaults.Set("title", "Page 1");
+    UiDesignerPropertySpec enabled = UiDesignerBoolProperty("enabled", "Enabled", true);
+    enabled.group = "Page"; enabled.impact = PropertyImpactStructure | PropertyImpactPaint;
+    page.properties.Add(enabled); page.defaults.Set("enabled", true);
+    catalog.Register(pick(page));
+}
+
 static void RegisterPresets(UiDesignerCatalog& catalog)
 {
     catalog.RegisterPreset({"blank", "Blank Form",
@@ -1285,6 +1309,7 @@ void RegisterUiDesignerBuiltins(UiDesignerCatalog& catalog)
     RegisterPresets(catalog);
     RegisterNative(catalog);
     RegisterStock(catalog);
+    RegisterInternalSemanticItems(catalog);
 }
 
 }

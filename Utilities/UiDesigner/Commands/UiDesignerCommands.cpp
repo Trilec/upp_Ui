@@ -247,6 +247,33 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
             UiDesignerNode* node = document_.Find(result);
             node->properties = clone(defaults);
 
+            if(type == "UiTab") {
+                const UiDesignerNodeId page1 = document_.AddNode("UiTabPage", "page_1", result,
+                    UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
+                const UiDesignerNodeId page2 = document_.AddNode("UiTabPage", "page_2", result,
+                    UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
+                if(!page1 || !page2) {
+                    last_error_ = "Unable to create default Tab pages";
+                    return false;
+                }
+                UiDesignerNode *p1 = document_.Find(page1), *p2 = document_.Find(page2);
+                p1->properties.Set("key", "page_1");
+                p1->properties.Set("title", "Page 1");
+                p1->properties.Set("enabled", true);
+                p2->properties.Set("key", "page_2");
+                p2->properties.Set("title", "Page 2");
+                p2->properties.Set("enabled", true);
+                node->properties.Set("active_page", page1);
+                UiDesignerStructureChange& page_change1 = aggregate.structure.Add();
+                page_change1.kind = UiDesignerStructureChangeKind::Created;
+                page_change1.node = page1;
+                page_change1.new_parent = result;
+                UiDesignerStructureChange& page_change2 = aggregate.structure.Add();
+                page_change2.kind = UiDesignerStructureChangeKind::Created;
+                page_change2.node = page2;
+                page_change2.new_parent = result;
+            }
+
             UiDesignerStructureChange& change = aggregate.structure.Add();
             change.kind = UiDesignerStructureChangeKind::Created;
             change.node = result;
@@ -415,6 +442,73 @@ bool UiDesignerCommandService::SetActionBinding(
             }
             return true;
         });
+}
+
+UiDesignerNodeId UiDesignerCommandService::AddTabPage(UiDesignerNodeId tab, const String& title)
+{
+    const UiDesignerNode *parent = document_.Find(tab);
+    if(!parent || parent->type != "UiTab") return 0;
+    int suffix = 1;
+    String key;
+    for(;;) {
+        key = "page_" + AsString(suffix++);
+        bool used = false;
+        for(UiDesignerNodeId id : parent->children) {
+            const UiDesignerNode *p = document_.Find(id);
+            if(p && p->type == "UiTabPage" && p->GetProperty("key", "") == key)
+                used = true;
+        }
+        if(!used) break;
+    }
+    ValueMap defaults;
+    defaults.Set("key", key);
+    defaults.Set("title", title.IsEmpty() ? key : title);
+    defaults.Set("enabled", true);
+    return AddNode("UiTabPage", key, tab,
+                   UiDesignerNodeStructural | UiDesignerNodeSemanticItem,
+                   defaults, "Add Tab page");
+}
+
+bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String& label)
+{
+    const UiDesignerNode *p = document_.Find(page);
+    const UiDesignerNode *parent = p ? document_.Find(p->parent) : nullptr;
+    if(!p || p->type != "UiTabPage" || !parent || parent->type != "UiTab" ||
+       parent->children.GetCount() <= 1)
+        return false;
+    return RemoveNode(page, label.IsEmpty() ? "Remove Tab page" : label);
+}
+
+bool UiDesignerCommandService::RenameTabPage(UiDesignerNodeId page, const String& title)
+{
+    const UiDesignerNode *p = document_.Find(page);
+    return p && p->type == "UiTabPage" &&
+           SetProperty(page, "title", title, UiDesignerImpactStructure | UiDesignerImpactCode,
+                       "Rename Tab page");
+}
+
+bool UiDesignerCommandService::MoveTabPage(UiDesignerNodeId page, int index)
+{
+    const UiDesignerNode *p = document_.Find(page);
+    const UiDesignerNode *parent = p ? document_.Find(p->parent) : nullptr;
+    return p && parent && p->type == "UiTabPage" && parent->type == "UiTab" &&
+           MoveNode(page, parent->id, index, "Move Tab page");
+}
+
+bool UiDesignerCommandService::SetTabPageEnabled(UiDesignerNodeId page, bool enabled)
+{
+    const UiDesignerNode *p = document_.Find(page);
+    return p && p->type == "UiTabPage" &&
+           SetProperty(page, "enabled", enabled, UiDesignerImpactStructure,
+                       "Enable Tab page");
+}
+
+bool UiDesignerCommandService::SetActiveTabPage(UiDesignerNodeId tab, UiDesignerNodeId page)
+{
+    const UiDesignerNode *p = document_.Find(page);
+    return p && p->parent == tab && p->type == "UiTabPage" &&
+           SetProperty(tab, "active_page", page, UiDesignerImpactLocalLayout | UiDesignerImpactCode,
+                       "Select Tab page");
 }
 
 bool UiDesignerCommandService::RemoveActionBinding(

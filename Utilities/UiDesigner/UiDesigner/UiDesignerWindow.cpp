@@ -249,7 +249,7 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
-                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_shell_,
+                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_list_,
                                "Edit the selected control’s data")
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
@@ -261,7 +261,7 @@ void UiDesignerWindow::BuildDesigner()
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
-    data_shell_.SetReadOnly();
+    data_list_.SetModel(data_model_).SetSelectionMode(UILISTSEL_SINGLE);
     diagnostics_shell_.SetReadOnly();
     diagnostics_panel_.SetCustomStyle(UiDesignerSurfaceStyle());
     diagnostics_panel_.Add(diagnostics_layout_);
@@ -700,19 +700,19 @@ void UiDesignerWindow::RefreshData()
 {
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
-    String out;
-    out << "Selected control\n";
-    if(node) {
-        out << "  name: " << node->name << "\n";
-        out << "  type: " << node->type << "\n\n";
+    data_model_.Clear();
+    if(node && node->type == "UiTab") {
+        for(UiDesignerNodeId id : node->children) {
+            const UiDesignerNode *page = session_.Document().Find(id);
+            if(page && page->type == "UiTabPage")
+                data_model_.Add(AsString(page->GetProperty("title", page->name)),
+                                page->id, page->GetProperty("enabled", true));
+        }
+        data_list_.SetData(node->GetProperty("active_page", Value()));
+        return;
     }
-    else
-        out << "  none\n\n";
-    out << "Data editor: planned for the next milestone\n";
-    out << "UID-DATA-001 - Canonical control data models and the first usable Data editor\n";
-    out << "Canonical data storage: not yet implemented\n";
-    out << "Authored data count: unavailable";
-    data_shell_.SetData(out);
+    data_model_.Add(node ? "Data is not supported for this control yet" : "Select a control to view data",
+                    Value(), true);
 }
 
 void UiDesignerWindow::RefreshBehavior()
