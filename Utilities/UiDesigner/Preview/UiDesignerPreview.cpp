@@ -4,6 +4,7 @@
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiColorPicker.h>
+#include <Utilities/UiDesigner/Catalog/UiDesignerColorPickerContract.h>
 
 namespace Upp {
 
@@ -1746,41 +1747,31 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
                 return UiDesignerApplyResult::AppliedPaint;
             }
             if(property == "page_mode") {
-                const String mode = value;
-                picker->SetPageMode(mode == "Palettes" ? UiColorPicker::PAGE_PALETTES
-                                  : mode == "Generator" ? UiColorPicker::PAGE_GENERATOR
-                                  : UiColorPicker::PAGE_COLOR);
+                UiColorPicker::PageMode mode;
+                if(!UiDesignerColorPickerChoiceId(String(value), mode))
+                    return UiDesignerApplyResult::Rejected;
+                picker->SetPageMode(mode);
                 return UiDesignerApplyResult::AppliedLocalLayout;
             }
             if(property == "channel_mode") {
-                static const UiColorPicker::ChannelMode modes[] = {
-                    UiColorPicker::CHANNEL_RGB_FLOAT, UiColorPicker::CHANNEL_RGB_INT,
-                    UiColorPicker::CHANNEL_HSV, UiColorPicker::CHANNEL_HSL,
-                    UiColorPicker::CHANNEL_TMI, UiColorPicker::CHANNEL_CMYK,
-                    UiColorPicker::CHANNEL_LAB};
-                int mode = 0;
-                const String v = value;
-                const char *names[] = {"RGB float", "RGB integer", "HSV", "HSL", "TMI", "CMYK", "Lab"};
-                while(mode < 7 && v != names[mode]) mode++;
-                picker->SetChannelMode(modes[min(mode, 6)]);
+                UiColorPicker::ChannelMode mode;
+                if(!UiDesignerColorPickerChoiceId(String(value), mode))
+                    return UiDesignerApplyResult::Rejected;
+                picker->SetChannelMode(mode);
                 return UiDesignerApplyResult::AppliedLocalLayout;
             }
             if(property == "spectrum_mode") {
-                static const UiColorPicker::SpectrumMode modes[] = {
-                    UiColorPicker::SPECTRUM_HSV_RECT, UiColorPicker::SPECTRUM_HUE_STRIP,
-                    UiColorPicker::SPECTRUM_RGB_SPECTRUM, UiColorPicker::SPECTRUM_HSV_WHEEL};
-                const String names[] = {"HSV rectangle", "Hue strip", "RGB spectrum", "HSV wheel"};
-                int mode = 0;
-                while(mode < 4 && String(value) != names[mode]) mode++;
-                picker->SetSpectrumMode(modes[min(mode, 3)]);
+                UiColorPicker::SpectrumMode mode;
+                if(!UiDesignerColorPickerChoiceId(String(value), mode))
+                    return UiDesignerApplyResult::Rejected;
+                picker->SetSpectrumMode(mode);
                 return UiDesignerApplyResult::AppliedLocalLayout;
             }
             if(property == "harmony_mode") {
-                const String names[] = {"Custom", "Analogous", "Complementary", "Split complementary",
-                    "Triad", "Square", "Compound", "Shades", "Monochromatic", "Image extract"};
-                int mode = 0;
-                while(mode < 10 && String(value) != names[mode]) mode++;
-                picker->SetHarmonyMode((UiColorPicker::HarmonyMode)min(mode, 9));
+                UiColorPicker::HarmonyMode mode;
+                if(!UiDesignerColorPickerChoiceId(String(value), mode))
+                    return UiDesignerApplyResult::Rejected;
+                picker->SetHarmonyMode(mode);
                 return UiDesignerApplyResult::AppliedLocalLayout;
             }
             if(property == "slot_count") {
