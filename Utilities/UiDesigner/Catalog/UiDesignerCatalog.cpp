@@ -378,6 +378,21 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
             error = node.name + ": " + reason;
             return false;
         }
+        if(node.type == "UiTabPage") {
+            if(!(node.flags & UiDesignerNodeSemanticItem)) {
+                error = "UiTabPage " + AsString(node.id) + " is not semantic";
+                return false;
+            }
+            if(TrimBoth(AsString(node.GetProperty("key", ""))).IsEmpty() ||
+               TrimBoth(AsString(node.GetProperty("title", ""))).IsEmpty()) {
+                error = "UiTabPage " + AsString(node.id) + " requires key and title";
+                return false;
+            }
+            if(!node.children.IsEmpty()) {
+                error = "UiTabPage " + AsString(node.id) + " cannot contain children in this slice";
+                return false;
+            }
+        }
         if(names.Find(node.name) >= 0) {
             error = "Duplicate generated member name: " + node.name;
             return false;
@@ -420,6 +435,28 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
         if(parent.type == "UiQuadSplitter" && parent.children.GetCount() > 4) {
             error = parent.name + " has more than four quad panes";
             return false;
+        }
+        if(parent.type == "UiTab") {
+            Index<String> keys;
+            int page_count = 0;
+            const UiDesignerNodeId active = parent.GetProperty("active_page", (UiDesignerNodeId)0);
+            bool active_found = false;
+            for(UiDesignerNodeId child_id : parent.children) {
+                const UiDesignerNode *page = document.Find(child_id);
+                if(!page || page->type != "UiTabPage") continue;
+                page_count++;
+                const String key = AsString(page->GetProperty("key", ""));
+                if(keys.Find(key) >= 0) {
+                    error = parent.name + " contains duplicate Tab page key " + key;
+                    return false;
+                }
+                keys.Add(key);
+                active_found |= page->id == active;
+            }
+            if(page_count && !active_found) {
+                error = parent.name + " active_page is not a direct Tab page";
+                return false;
+            }
         }
     }
     error.Clear();

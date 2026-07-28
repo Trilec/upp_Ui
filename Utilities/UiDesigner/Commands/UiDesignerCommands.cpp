@@ -476,7 +476,23 @@ bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String
     if(!p || p->type != "UiTabPage" || !parent || parent->type != "UiTab" ||
        parent->children.GetCount() <= 1)
         return false;
-    return RemoveNode(page, label.IsEmpty() ? "Remove Tab page" : label);
+    int index = -1;
+    for(int i = 0; i < parent->children.GetCount(); i++)
+        if(parent->children[i] == page) { index = i; break; }
+    if(index < 0) return false;
+    UiDesignerNodeId replacement = parent->GetProperty("active_page", (UiDesignerNodeId)0);
+    if(replacement == page) {
+        if(index + 1 < parent->children.GetCount()) replacement = parent->children[index + 1];
+        else replacement = parent->children[index - 1];
+    }
+    return ApplyAtomic(label.IsEmpty() ? "Remove Tab page" : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            if(!document_.RemoveNode(page)) { last_error_ = "Unable to remove Tab page"; return false; }
+            if(replacement != parent->GetProperty("active_page", (UiDesignerNodeId)0))
+                document_.SetProperty(parent->id, "active_page", replacement,
+                                      UiDesignerImpactLocalLayout | UiDesignerImpactCode);
+            return true;
+        });
 }
 
 bool UiDesignerCommandService::RenameTabPage(UiDesignerNodeId page, const String& title)

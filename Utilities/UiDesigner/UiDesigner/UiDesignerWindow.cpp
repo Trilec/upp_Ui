@@ -268,9 +268,9 @@ void UiDesignerWindow::BuildDesigner()
     data_layout_.Add(data_actions_);
     data_actions_.SetDirection(UiDirection::H).SetWrap(UiBoxWrap::Flow).SetGap(DPI(3), DPI(3));
     data_actions_.Add(data_add_); data_actions_.Add(data_remove_); data_actions_.Add(data_rename_);
-    data_actions_.Add(data_up_); data_actions_.Add(data_down_); data_actions_.Add(data_enable_);
+    data_actions_.Add(data_up_); data_actions_.Add(data_down_); data_actions_.Add(data_enable_); data_actions_.Add(data_active_);
     data_add_.SetText("Add"); data_remove_.SetText("Remove"); data_rename_.SetText("Rename");
-    data_up_.SetText("Up"); data_down_.SetText("Down"); data_enable_.SetText("Enable");
+    data_up_.SetText("Up"); data_down_.SetText("Down"); data_enable_.SetText("Enable"); data_active_.SetText("Set Active");
     diagnostics_shell_.SetReadOnly();
     diagnostics_panel_.SetCustomStyle(UiDesignerSurfaceStyle());
     diagnostics_panel_.Add(diagnostics_layout_);
@@ -534,12 +534,6 @@ void UiDesignerWindow::ConnectServices()
     };
     data_list_.EnableRenameOnDblClick(true);
     data_list_.WhenSelection = [=] {
-        const UiDesignerNodeId tab = session_.State().selection.primary;
-        const UiDesignerNode *node = session_.Document().Find(tab);
-        if(!node || node->type != "UiTab") return;
-        const Value selected = data_list_.GetData();
-        if(!IsNull(selected))
-            session_.Commands().SetActiveTabPage(tab, (UiDesignerNodeId)(int64)selected);
         RefreshData();
     };
     data_list_.WhenRename = [=](int index, const String& title) {
@@ -570,6 +564,7 @@ void UiDesignerWindow::ConnectServices()
     data_up_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1)); RefreshData(); };
     data_down_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1); RefreshData(); };
     data_enable_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true)); RefreshData(); };
+    data_active_.WhenAction = [=] { const UiDesignerNodeId tab = session_.State().selection.primary; const UiDesignerNodeId page = SelectedTabPage(); if(page) session_.Commands().SetActiveTabPage(tab, page); RefreshData(); };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
     session_.WhenCodeChanged = [=] { RefreshCode(); };
@@ -745,6 +740,7 @@ void UiDesignerWindow::RefreshInspector()
 
 void UiDesignerWindow::RefreshData()
 {
+    const Value prior = data_list_.GetData();
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
     data_model_.Clear();
@@ -755,11 +751,25 @@ void UiDesignerWindow::RefreshData()
                 data_model_.Add(AsString(page->GetProperty("title", page->name)),
                                 page->id, page->GetProperty("enabled", true));
         }
-        data_list_.SetData(node->GetProperty("active_page", Value()));
+        bool keep = false;
+        for(int i = 0; i < data_model_.GetCount(); i++)
+            keep |= data_model_.Get(i).data == prior;
+        data_list_.SetData(keep ? prior : data_model_.GetCount() ? data_model_.Get(0).data : Value());
+        data_add_.Enable(true);
+        data_remove_.Enable(data_model_.GetCount() > 1 && !IsNull(data_list_.GetData()));
+        data_rename_.Enable(!IsNull(data_list_.GetData()));
+        int selected = -1;
+        for(int i = 0; i < data_model_.GetCount(); i++) if(data_model_.Get(i).data == data_list_.GetData()) selected = i;
+        data_up_.Enable(selected > 0);
+        data_down_.Enable(selected >= 0 && selected + 1 < data_model_.GetCount());
+        data_enable_.Enable(selected >= 0);
+        data_active_.Enable(!IsNull(data_list_.GetData()) && data_list_.GetData() != node->GetProperty("active_page", Value()));
         return;
     }
     data_model_.Add(node ? "Data is not supported for this control yet" : "Select a control to view data",
                     Value(), true);
+    data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
+    data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
 }
 
 void UiDesignerWindow::RefreshBehavior()
