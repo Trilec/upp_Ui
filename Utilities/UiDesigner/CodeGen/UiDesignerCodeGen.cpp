@@ -1088,6 +1088,10 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
         const UiDesignerControlSpec* spec = catalog_.Find(node.type);
         if(!spec)
             continue;
+        if(node.type == "UiTabPage") {
+            result.diagnostics.Add("UiTabPage generated page content is deferred to UID-DATA-001A2");
+            return result;
+        }
         if(spec->codegen_adapter_id != "control" &&
            spec->codegen_adapter_id != "spacer") {
             result.diagnostics.Add("Unsupported code-generation adapter: " +

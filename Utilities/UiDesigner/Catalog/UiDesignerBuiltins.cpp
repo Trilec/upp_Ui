@@ -1270,11 +1270,12 @@ static void RegisterStock(UiDesignerCatalog& catalog)
 static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
 {
     UiDesignerControlSpec page = MakeSpec("UiTabPage", "Tab Page", "Internal",
-        "", "tab_page", UiDesignerRuntimeKind::SemanticSpacer,
+        "", "tab_page", UiDesignerRuntimeKind::SemanticTabPage,
         "none", UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
     page.capabilities = UiDesignerCapabilitySemanticItem;
     page.preview_adapter_id = "semantic:tab_page";
-    page.codegen_adapter_id = "spacer";
+    page.codegen_adapter_id = "tab_page_deferred";
+    page.semantic_owner_type = "UiTab";
     page.properties.Clear();
     page.defaults.Clear();
     UiDesignerPropertySpec key;

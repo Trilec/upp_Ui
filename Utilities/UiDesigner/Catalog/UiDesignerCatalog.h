@@ -9,6 +9,7 @@ namespace Upp {
 enum class UiDesignerRuntimeKind : word {
     Placeholder = 0,
     SemanticSpacer,
+    SemanticTabPage,
     UiLabel,
     UiCheckBox,
     UiRadioButton,
@@ -225,6 +226,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     String preview_adapter_id;
     String codegen_adapter_id;
     String child_adapter_id;
+    String semantic_owner_type;
 
     bool preview = true;
     bool inspector = true;

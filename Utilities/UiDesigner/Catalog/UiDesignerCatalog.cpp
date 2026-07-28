@@ -287,6 +287,14 @@ bool UiDesignerCatalog::CanParent(const String& child_type,
         reason = "Unknown parent type: " + parent_type;
         return false;
     }
+    if(child->IsSemanticItem() && !child->semantic_owner_type.IsEmpty()) {
+        if(parent_type != child->semantic_owner_type) {
+            reason = child->display_name + " requires parent " + child->semantic_owner_type;
+            return false;
+        }
+        reason.Clear();
+        return true;
+    }
     if(!HasUiDesignerCapability(parent->capabilities,
                                 UiDesignerCapabilityContainer)) {
         reason = parent->display_name + " cannot contain children";
