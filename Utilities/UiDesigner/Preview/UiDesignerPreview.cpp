@@ -537,6 +537,21 @@ static void InitializeRuntime(Ctrl& ctrl, const UiDesignerControlSpec& spec)
         text->SetData("Line edit");
     if(auto *drop = dynamic_cast<DropList *>(&ctrl))
         drop->Add("First", 1).Add("Second", 2).SetData(1);
+    if(auto *tab = dynamic_cast<UiTab *>(&ctrl)) {
+        tab->Add(*new ParentCtrl, "Page 1");
+        tab->Add(*new ParentCtrl, "Page 2");
+        tab->SetActiveTab(0);
+    }
+    if(auto *stack = dynamic_cast<UiStack *>(&ctrl)) {
+        stack->AddPage(*new ParentCtrl, "page_1");
+        stack->AddPage(*new ParentCtrl, "page_2");
+        stack->SetActivePage(0);
+    }
+    if(auto *accordion = dynamic_cast<UiAccordion *>(&ctrl)) {
+        accordion->AddSection("Section 1");
+        accordion->AddSection("Section 2");
+        accordion->AddSection("Section 3");
+    }
     if(auto *tab = dynamic_cast<TabCtrl *>(&ctrl)) {
         tab->Add("Overview");
         tab->Add("Details");
