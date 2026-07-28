@@ -249,7 +249,7 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
-                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_list_,
+                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,
                                "Edit the selected control’s data")
                    .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
@@ -262,6 +262,15 @@ void UiDesignerWindow::BuildDesigner()
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
     data_list_.SetModel(data_model_).SetSelectionMode(UILISTSEL_SINGLE);
+    data_panel_.Add(data_layout_);
+    data_layout_.SetDirection(UiDirection::V).SetGap(DPI(4), DPI(4)).SetInset(DPI(6));
+    data_layout_.Add(data_list_.SizePos());
+    data_layout_.Add(data_actions_);
+    data_actions_.SetDirection(UiDirection::H).SetWrap(UiBoxWrap::Flow).SetGap(DPI(3), DPI(3));
+    data_actions_.Add(data_add_); data_actions_.Add(data_remove_); data_actions_.Add(data_rename_);
+    data_actions_.Add(data_up_); data_actions_.Add(data_down_); data_actions_.Add(data_enable_);
+    data_add_.SetText("Add"); data_remove_.SetText("Remove"); data_rename_.SetText("Rename");
+    data_up_.SetText("Up"); data_down_.SetText("Down"); data_enable_.SetText("Enable");
     diagnostics_shell_.SetReadOnly();
     diagnostics_panel_.SetCustomStyle(UiDesignerSurfaceStyle());
     diagnostics_panel_.Add(diagnostics_layout_);
@@ -523,6 +532,44 @@ void UiDesignerWindow::ConnectServices()
         PostSelectionDetailsRefresh();
         RequestDiagnosticsRefresh();
     };
+    data_list_.EnableRenameOnDblClick(true);
+    data_list_.WhenSelection = [=] {
+        const UiDesignerNodeId tab = session_.State().selection.primary;
+        const UiDesignerNode *node = session_.Document().Find(tab);
+        if(!node || node->type != "UiTab") return;
+        const Value selected = data_list_.GetData();
+        if(!IsNull(selected))
+            session_.Commands().SetActiveTabPage(tab, (UiDesignerNodeId)(int64)selected);
+        RefreshData();
+    };
+    data_list_.WhenRename = [=](int index, const String& title) {
+        if(index < 0 || index >= data_model_.GetCount()) return;
+        const UiDesignerNodeId page = (UiDesignerNodeId)(int64)data_model_.Get(index).data;
+        session_.Commands().RenameTabPage(page, title);
+        RefreshData();
+    };
+    auto SelectedTabPage = [=]() -> UiDesignerNodeId {
+        const Value v = data_list_.GetData();
+        return IsNull(v) ? 0 : (UiDesignerNodeId)(int64)v;
+    };
+    auto PageIndex = [=](UiDesignerNodeId page) {
+        const UiDesignerNode *p = session_.Document().Find(page);
+        if(!p) return -1;
+        const UiDesignerNode *parent = session_.Document().Find(p->parent);
+        if(!parent) return -1;
+        for(int i = 0; i < parent->children.GetCount(); i++)
+            if(parent->children[i] == page) return i;
+        return -1;
+    };
+    data_add_.WhenAction = [=] {
+        const UiDesignerNode *tab = session_.Document().Find(session_.State().selection.primary);
+        if(tab && tab->type == "UiTab") session_.Commands().AddTabPage(tab->id, "New Page");
+        RefreshData();
+    };
+    data_remove_.WhenAction = [=] { session_.Commands().RemoveTabPage(SelectedTabPage()); RefreshData(); };
+    data_up_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1)); RefreshData(); };
+    data_down_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1); RefreshData(); };
+    data_enable_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true)); RefreshData(); };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
     session_.WhenCodeChanged = [=] { RefreshCode(); };

@@ -112,6 +112,15 @@ private:
     UiDesignerHierarchyView hierarchy_;
     PropertyEditor inspector_;
     UiMultiEdit data_shell_;
+    UiPanel data_panel_;
+    UiBoxLayout data_layout_;
+    UiBoxLayout data_actions_;
+    UiButton data_add_;
+    UiButton data_remove_;
+    UiButton data_rename_;
+    UiButton data_up_;
+    UiButton data_down_;
+    UiButton data_enable_;
     UiList data_list_;
     UiListModel data_model_;
     PropertyEditor behaviors_;
