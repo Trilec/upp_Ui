@@ -534,12 +534,13 @@ void UiDesignerWindow::ConnectServices()
     };
     data_list_.EnableRenameOnDblClick(true);
     data_list_.WhenSelection = [=] {
-        RefreshData();
+        if(!data_projection_refreshing_) RefreshData();
     };
     data_list_.WhenRename = [=](int index, const String& title) {
         if(index < 0 || index >= data_model_.GetCount()) return;
         const UiDesignerNodeId page = (UiDesignerNodeId)(int64)data_model_.Get(index).data;
-        session_.Commands().RenameTabPage(page, title);
+        if(!session_.Commands().RenameTabPage(page, title))
+            RefreshStatus(session_.Commands().GetLastError());
         RefreshData();
     };
     auto SelectedTabPage = [=]() -> UiDesignerNodeId {
@@ -555,16 +556,27 @@ void UiDesignerWindow::ConnectServices()
             if(parent->children[i] == page) return i;
         return -1;
     };
-    data_add_.WhenAction = [=] {
-        const UiDesignerNode *tab = session_.Document().Find(session_.State().selection.primary);
-        if(tab && tab->type == "UiTab") session_.Commands().AddTabPage(tab->id, "New Page");
+    data_rename_.WhenAction = [=] {
+        const UiDesignerNodeId page = SelectedTabPage();
+        const UiDesignerNode *p = session_.Document().Find(page);
+        if(!p) return;
+        String title = p->GetProperty("title", p->name);
+        if(EditText(title, "Rename Tab page", "Title") &&
+           !session_.Commands().RenameTabPage(page, title))
+            RefreshStatus(session_.Commands().GetLastError());
         RefreshData();
     };
-    data_remove_.WhenAction = [=] { session_.Commands().RemoveTabPage(SelectedTabPage()); RefreshData(); };
-    data_up_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1)); RefreshData(); };
-    data_down_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1); RefreshData(); };
-    data_enable_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p) session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true)); RefreshData(); };
-    data_active_.WhenAction = [=] { const UiDesignerNodeId tab = session_.State().selection.primary; const UiDesignerNodeId page = SelectedTabPage(); if(page) session_.Commands().SetActiveTabPage(tab, page); RefreshData(); };
+    data_add_.WhenAction = [=] {
+        const UiDesignerNode *tab = session_.Document().Find(session_.State().selection.primary);
+        if(tab && tab->type == "UiTab" && !session_.Commands().AddTabPage(tab->id, "New Page"))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_remove_.WhenAction = [=] { if(!session_.Commands().RemoveTabPage(SelectedTabPage())) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
+    data_up_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1))) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
+    data_down_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1)) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
+    data_enable_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true))) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
+    data_active_.WhenAction = [=] { const UiDesignerNodeId tab = session_.State().selection.primary; const UiDesignerNodeId page = SelectedTabPage(); if(page && !session_.Commands().SetActiveTabPage(tab, page)) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
     session_.WhenCodeChanged = [=] { RefreshCode(); };
@@ -576,7 +588,7 @@ void UiDesignerWindow::ConnectServices()
         if(changes.virtual_size_changed)
             RefreshLayout();
         interaction_overlay_.Refresh();
-        RefreshHierarchy(); RefreshCode(); RefreshBehavior();
+        RefreshHierarchy(); RefreshData(); RefreshCode(); RefreshBehavior();
         overrides_.Refresh();
         RequestDiagnosticsRefresh();
     };
@@ -711,7 +723,7 @@ void UiDesignerWindow::LoadDocument()
     String error;
     if(!session_.Load(~fs, error)) { Exclamation(error); return; }
     current_file_ = ~fs;
-    RefreshHierarchy(); RefreshInspector(); RefreshBehavior(); RefreshCode();
+    RefreshHierarchy(); RefreshInspector(); RefreshData(); RefreshBehavior(); RefreshCode();
     RefreshStatus("Loaded " + current_file_);
 }
 
@@ -740,6 +752,9 @@ void UiDesignerWindow::RefreshInspector()
 
 void UiDesignerWindow::RefreshData()
 {
+    if(data_projection_refreshing_)
+        return;
+    data_projection_refreshing_ = true;
     const Value prior = data_list_.GetData();
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
@@ -764,12 +779,16 @@ void UiDesignerWindow::RefreshData()
         data_down_.Enable(selected >= 0 && selected + 1 < data_model_.GetCount());
         data_enable_.Enable(selected >= 0);
         data_active_.Enable(!IsNull(data_list_.GetData()) && data_list_.GetData() != node->GetProperty("active_page", Value()));
+        data_enable_.SetText(selected >= 0 && data_model_.Get(selected).enabled ? "Disable" : "Enable");
+        data_projection_refreshing_ = false;
         return;
     }
     data_model_.Add(node ? "Data is not supported for this control yet" : "Select a control to view data",
                     Value(), true);
     data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
     data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
+    data_enable_.SetText("Enable");
+    data_projection_refreshing_ = false;
 }
 
 void UiDesignerWindow::RefreshBehavior()

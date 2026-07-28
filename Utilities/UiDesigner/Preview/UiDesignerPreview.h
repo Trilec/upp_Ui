@@ -350,6 +350,7 @@ private:
                             const UiDesignerNode& node);
     void PaintSemantic(Draw& w, const UiDesignerPreviewInstance& instance,
                        const UiDesignerNode& node) const;
+    void ApplyActiveTabProjection();
 
     const UiDesignerCatalog *catalog_ = nullptr;
     const UiDesignerDocument *document_ = nullptr;

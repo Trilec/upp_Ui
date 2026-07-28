@@ -1631,6 +1631,7 @@ void UiDesignerPreviewCanvas::RebuildDocument()
     DestroyInstances();
     if(document_ && catalog_)
         BuildNode(document_->GetRootId(), *this, 0, 0);
+    ApplyActiveTabProjection();
     stats_.full_rebuilds++;
     Layout();
     Refresh();
@@ -1702,6 +1703,26 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
     const UiDesignerNode* node = document_ ? document_->Find(node_id) : nullptr;
     const UiDesignerControlSpec* spec = node && catalog_ ? catalog_->Find(node->type) : nullptr;
     if(q < 0 || !spec) {
+        stats_.rejected++;
+        return UiDesignerApplyResult::Rejected;
+    }
+
+    if(kind == UiDesignerTransientValueKind::NormalProperty &&
+       property == "active_page" && node->type == "UiTab") {
+        UiTab *tab = dynamic_cast<UiTab *>(instances_[q].control.Get());
+        if(tab) {
+            for(int i = 0; i < node->children.GetCount(); i++)
+                if(node->children[i] == (UiDesignerNodeId)value) {
+                    const UiDesignerNode *page = document_->Find(node->children[i]);
+                    if(page && page->type == "UiTabPage" && i < tab->GetCount()) {
+                        tab->SetActiveTab(i);
+                        stats_.live_applies++;
+                        Refresh();
+                        return UiDesignerApplyResult::AppliedLocalLayout;
+                    }
+                    break;
+                }
+        }
         stats_.rejected++;
         return UiDesignerApplyResult::Rejected;
     }
@@ -1831,6 +1852,21 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
         return;
     }
     if(!changes.structure.IsEmpty()) {
+        UiDesignerNodeId tab = 0;
+        bool tab_only = true;
+        for(const UiDesignerStructureChange& change : changes.structure) {
+            const UiDesignerNodeId parent = change.new_parent ? change.new_parent : change.old_parent;
+            const UiDesignerNode *page = document_->Find(change.node);
+            const UiDesignerNode *owner = document_->Find(parent);
+            if(!owner || owner->type != "UiTab" ||
+               (page && page->type != "UiTabPage") || (tab && tab != parent)) {
+                tab_only = false;
+                break;
+            }
+            tab = parent;
+        }
+        if(tab_only && tab && RebuildSubtree(tab))
+            return;
         // Managed Box/Grid controls retain internal item references. A complete
         // rebuild is the safe structural boundary until those items have an
         // explicit removal API; correctness beats a stale partial tree here.
@@ -2129,6 +2165,28 @@ void UiDesignerPreviewCanvas::Layout()
         stats_.geometry_walk_time_ms = geometry_walk_ms;
         stats_.snapshot_time_ms = snapshot_ms;
         stats_.layout_time_ms = measure ? (double)usecs(layout_start) / 1000.0 : -1;
+    }
+}
+
+void UiDesignerPreviewCanvas::ApplyActiveTabProjection()
+{
+    if(!document_)
+        return;
+    for(UiDesignerPreviewInstance& instance : instances_) {
+        if(instance.type != "UiTab" || !instance.control)
+            continue;
+        UiTab *tab = dynamic_cast<UiTab *>(instance.control.Get());
+        const UiDesignerNode *node = document_->Find(instance.node);
+        if(!tab || !node)
+            continue;
+        const UiDesignerNodeId active = node->GetProperty("active_page", (UiDesignerNodeId)0);
+        for(int i = 0; i < node->children.GetCount(); i++)
+            if(node->children[i] == active) {
+                const UiDesignerNode *page = document_->Find(active);
+                if(page && page->type == "UiTabPage" && i < tab->GetCount())
+                    tab->SetActiveTab(i);
+                break;
+            }
     }
 }
 

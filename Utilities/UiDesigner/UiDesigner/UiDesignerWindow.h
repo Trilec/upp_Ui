@@ -162,6 +162,7 @@ private:
     bool catalog_drag_active_ = false;
     bool decorations_visible_ = true;
     bool preview_resize_posted_ = false;
+    bool data_projection_refreshing_ = false;
     bool preview_resize_pending_ = false;
     Size pending_preview_virtual_size_;
     Function<void()> pending_preview_resize_callback_;

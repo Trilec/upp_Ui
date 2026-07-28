@@ -1377,6 +1377,44 @@ CONSOLE_APP_MAIN
     Check(subtle_tool_generated.source.Find(".palette.icon[ST_NORMAL] = Color(12, 34, 56)") >= 0,
           "ToolButton icon ink override is emitted");
 
+    // UiTab Data contract: semantic pages are owned by one Tab, activation is
+    // authored state, and the preview follows it without a document rebuild.
+    UiDesignerDocument tab_document;
+    UiDesignerCommandService tab_commands(tab_document);
+    const UiDesignerControlSpec *tab_spec = catalog.Find("UiTab");
+    UiDesignerNodeId tab_a = tab_commands.AddNode(
+        "UiTab", "tab_a", tab_document.GetRootId(),
+        tab_spec ? tab_spec->node_flags : 0,
+        tab_spec ? tab_spec->defaults : ValueMap(), "Add first Tab");
+    UiDesignerNodeId tab_b = tab_commands.AddNode(
+        "UiTab", "tab_b", tab_document.GetRootId(),
+        tab_spec ? tab_spec->node_flags : 0,
+        tab_spec ? tab_spec->defaults : ValueMap(), "Add second Tab");
+    String tab_error;
+    Check(tab_a && tab_b && catalog.ValidateDocument(tab_document, tab_error),
+          "two Tabs validate with globally safe semantic names");
+    Check(tab_document.Find(tab_a)->children.GetCount() == 2,
+          "new Tab gets two canonical pages");
+    const UiDesignerNodeId tab_page = tab_document.Find(tab_a)->children[1];
+    Check(tab_commands.SetActiveTabPage(tab_a, tab_page),
+          "Set Active updates canonical active_page");
+    UiDesignerSelection tab_selection;
+    UiDesignerPreviewCanvas tab_preview;
+    tab_preview.Bind(&tab_document, &catalog, nullptr, &tab_selection);
+    tab_preview.RebuildDocument();
+    if(auto *runtime_tab = dynamic_cast<UiTab *>(tab_preview.FindRuntime(tab_a)))
+        Check(runtime_tab->GetActiveTab() == 1,
+              "preview follows the second active Tab page");
+    else
+        Check(false, "runtime UiTab exists for active-page projection");
+    Check(!tab_commands.RenameTabPage(tab_page, "   "),
+          "blank Tab page title is rejected");
+    Check(tab_commands.RemoveTabPage(tab_page),
+          "active middle/last page removal succeeds atomically");
+    Check(tab_document.Find(tab_a)->GetProperty("active_page", (UiDesignerNodeId)0) ==
+              tab_document.Find(tab_a)->children[0],
+          "page removal selects the deterministic replacement");
+
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);
 }

@@ -248,9 +248,10 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
             node->properties = clone(defaults);
 
             if(type == "UiTab") {
-                const UiDesignerNodeId page1 = document_.AddNode("UiTabPage", "page_1", result,
+                const String stem = "tab_" + AsString(result) + "_";
+                const UiDesignerNodeId page1 = document_.AddNode("UiTabPage", stem + "page_1", result,
                     UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
-                const UiDesignerNodeId page2 = document_.AddNode("UiTabPage", "page_2", result,
+                const UiDesignerNodeId page2 = document_.AddNode("UiTabPage", stem + "page_2", result,
                     UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
                 if(!page1 || !page2) {
                     last_error_ = "Unable to create default Tab pages";
@@ -474,23 +475,43 @@ bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String
     const UiDesignerNode *p = document_.Find(page);
     const UiDesignerNode *parent = p ? document_.Find(p->parent) : nullptr;
     if(!p || p->type != "UiTabPage" || !parent || parent->type != "UiTab" ||
-       parent->children.GetCount() <= 1)
+       parent->children.GetCount() <= 1) {
+        last_error_ = "A Tab must retain at least one page";
         return false;
+    }
     int index = -1;
     for(int i = 0; i < parent->children.GetCount(); i++)
         if(parent->children[i] == page) { index = i; break; }
     if(index < 0) return false;
     UiDesignerNodeId replacement = parent->GetProperty("active_page", (UiDesignerNodeId)0);
+    const UiDesignerNodeId old_active = replacement;
     if(replacement == page) {
         if(index + 1 < parent->children.GetCount()) replacement = parent->children[index + 1];
         else replacement = parent->children[index - 1];
     }
     return ApplyAtomic(label.IsEmpty() ? "Remove Tab page" : label,
         [&](UiDesignerChangeSet& aggregate) {
+            UiDesignerStructureChange& removed = aggregate.structure.Add();
+            removed.kind = UiDesignerStructureChangeKind::Removed;
+            removed.node = page;
+            removed.old_parent = parent->id;
+            removed.old_index = index;
             if(!document_.RemoveNode(page)) { last_error_ = "Unable to remove Tab page"; return false; }
-            if(replacement != parent->GetProperty("active_page", (UiDesignerNodeId)0))
-                document_.SetProperty(parent->id, "active_page", replacement,
-                                      UiDesignerImpactLocalLayout | UiDesignerImpactCode);
+            if(replacement != old_active) {
+                const Value old = old_active;
+                if(!document_.SetProperty(parent->id, "active_page", replacement,
+                                          UiDesignerImpactLocalLayout | UiDesignerImpactCode)) {
+                    last_error_ = "Unable to select replacement Tab page";
+                    return false;
+                }
+                UiDesignerPropertyChange& change = aggregate.properties.Add();
+                change.node = parent->id;
+                change.property = "active_page";
+                change.old_value = old;
+                change.new_value = replacement;
+                change.impact = UiDesignerImpactLocalLayout | UiDesignerImpactCode;
+                change.kind = UiDesignerPropertyChangeKind::Normal;
+            }
             return true;
         });
 }
@@ -498,6 +519,10 @@ bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String
 bool UiDesignerCommandService::RenameTabPage(UiDesignerNodeId page, const String& title)
 {
     const UiDesignerNode *p = document_.Find(page);
+    if(TrimBoth(title).IsEmpty()) {
+        last_error_ = "Tab page title cannot be empty";
+        return false;
+    }
     return p && p->type == "UiTabPage" &&
            SetProperty(page, "title", title, UiDesignerImpactStructure | UiDesignerImpactCode,
                        "Rename Tab page");
