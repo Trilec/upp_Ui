@@ -592,6 +592,17 @@ static UiDesignerApplyResult ApplyRuntime(
     Ctrl& ctrl, const UiDesignerControlSpec& spec,
     const String& property, const Value& value)
 {
+    if(auto *picker = dynamic_cast<UiColorPicker *>(&ctrl)) {
+        if(property == "color") { picker->SetColor((Color)value, false); return UiDesignerApplyResult::AppliedPaint; }
+        if(property == "alpha") { picker->SetAlpha(minmax((int)value, 0, 255), false); return UiDesignerApplyResult::AppliedPaint; }
+        if(property == "alpha_enabled") { picker->SetAlphaEnabled((bool)value); return UiDesignerApplyResult::AppliedPaint; }
+        if(property == "page_mode") { UiColorPicker::PageMode m; if(!UiDesignerColorPickerChoiceId(String(value), m)) return UiDesignerApplyResult::Rejected; picker->SetPageMode(m); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "channel_mode") { UiColorPicker::ChannelMode m; if(!UiDesignerColorPickerChoiceId(String(value), m)) return UiDesignerApplyResult::Rejected; picker->SetChannelMode(m); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "spectrum_mode") { UiColorPicker::SpectrumMode m; if(!UiDesignerColorPickerChoiceId(String(value), m)) return UiDesignerApplyResult::Rejected; picker->SetSpectrumMode(m); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "harmony_mode") { UiColorPicker::HarmonyMode m; if(!UiDesignerColorPickerChoiceId(String(value), m)) return UiDesignerApplyResult::Rejected; picker->SetHarmonyMode(m); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "slot_count") { picker->SetSlotCount(minmax((int)value, 1, 4)); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "active_slot") { picker->SetActiveSlot(minmax((int)value, 0, 3)); return UiDesignerApplyResult::AppliedPaint; }
+    }
     if(property == "visible") {
         ctrl.Show((bool)value);
         return UiDesignerApplyResult::AppliedControlState;
@@ -1733,56 +1744,6 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             RebuildDocument();
     }
     else if(instances_[q].control) {
-        if(auto *picker = dynamic_cast<UiColorPicker *>(instances_[q].control.Get())) {
-            if(property == "color") {
-                picker->SetColor((Color)value, false);
-                return UiDesignerApplyResult::AppliedPaint;
-            }
-            if(property == "alpha") {
-                picker->SetAlpha(minmax((int)value, 0, 255), false);
-                return UiDesignerApplyResult::AppliedPaint;
-            }
-            if(property == "alpha_enabled") {
-                picker->SetAlphaEnabled((bool)value);
-                return UiDesignerApplyResult::AppliedPaint;
-            }
-            if(property == "page_mode") {
-                UiColorPicker::PageMode mode;
-                if(!UiDesignerColorPickerChoiceId(String(value), mode))
-                    return UiDesignerApplyResult::Rejected;
-                picker->SetPageMode(mode);
-                return UiDesignerApplyResult::AppliedLocalLayout;
-            }
-            if(property == "channel_mode") {
-                UiColorPicker::ChannelMode mode;
-                if(!UiDesignerColorPickerChoiceId(String(value), mode))
-                    return UiDesignerApplyResult::Rejected;
-                picker->SetChannelMode(mode);
-                return UiDesignerApplyResult::AppliedLocalLayout;
-            }
-            if(property == "spectrum_mode") {
-                UiColorPicker::SpectrumMode mode;
-                if(!UiDesignerColorPickerChoiceId(String(value), mode))
-                    return UiDesignerApplyResult::Rejected;
-                picker->SetSpectrumMode(mode);
-                return UiDesignerApplyResult::AppliedLocalLayout;
-            }
-            if(property == "harmony_mode") {
-                UiColorPicker::HarmonyMode mode;
-                if(!UiDesignerColorPickerChoiceId(String(value), mode))
-                    return UiDesignerApplyResult::Rejected;
-                picker->SetHarmonyMode(mode);
-                return UiDesignerApplyResult::AppliedLocalLayout;
-            }
-            if(property == "slot_count") {
-                picker->SetSlotCount(max(1, (int)value));
-                return UiDesignerApplyResult::AppliedLocalLayout;
-            }
-            if(property == "active_slot") {
-                picker->SetActiveSlot(max(0, (int)value));
-                return UiDesignerApplyResult::AppliedPaint;
-            }
-        }
         if(property == "direction") {
             if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
                 const bool horizontal = AsString(value) == "H";
