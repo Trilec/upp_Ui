@@ -1492,7 +1492,7 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
 
     if(auto *box = dynamic_cast<UiBoxLayout *>(FindRuntime(instance.runtime_parent))) {
         const bool horizontal = box->GetDirection() == UiDirection::H;
-        const Size natural = max(box->GetMinSize(), instance.control->GetMinSize());
+        const Size natural = instance.control->GetMinSize();
         const UiDesignerBoxSizing sizing = UiDesignerResolveBoxSizing(
             node, horizontal, max(1, horizontal ? natural.cx : natural.cy),
             max(1, horizontal ? natural.cy : natural.cx));
@@ -1505,25 +1505,25 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
             item.Fixed(max(1, sizing.main.fixed > 0 ? sizing.main.fixed : sizing.main.natural));
         else
             item.Fit();
-        item.MinMaxMain(max(sizing.main.min, sizing.main.mode == "Fixed"
-                                      ? max(1, sizing.main.fixed > 0 ? sizing.main.fixed : sizing.main.natural)
-                                      : sizing.main.natural),
-                        sizing.main.max > 0 ? max(sizing.main.max,
-                                                  max(sizing.main.min, sizing.main.natural)) : INT_MAX);
+        const int main_fixed = max(1, sizing.main.fixed > 0 ? sizing.main.fixed : sizing.main.natural);
+        const int main_min = sizing.main.mode == "Fixed" ? main_fixed : sizing.main.min;
+        const int main_max = sizing.main.mode == "Fixed" ? main_fixed :
+                             (sizing.main.max > 0 ? max(sizing.main.max, main_min) : INT_MAX);
+        item.MinMaxMain(main_min, main_max);
 
         if(sizing.cross.mode == "Expand") {
-            item.MinMaxCross(max(sizing.cross.min, sizing.cross.natural),
-                             sizing.cross.max > 0 ? max(sizing.cross.max,
-                                                        max(sizing.cross.min, sizing.cross.natural))
-                                                  : INT_MAX)
+            const int cross_min = sizing.cross.min;
+            const int cross_max = sizing.cross.max > 0 ? max(sizing.cross.max, cross_min) : INT_MAX;
+            item.MinMaxCross(cross_min, cross_max)
                 .AlignSelf(UiCrossAlign::Stretch);
         }
         else {
-            const int extent = max(sizing.cross.min,
-                                   sizing.cross.mode == "Fixed"
-                                       ? max(1, sizing.cross.fixed > 0 ? sizing.cross.fixed : sizing.cross.natural)
-                                       : sizing.cross.natural);
-            item.MinMaxCross(extent, sizing.cross.max > 0 ? max(sizing.cross.max, extent) : extent);
+            const int extent = sizing.cross.mode == "Fixed"
+                ? max(1, sizing.cross.fixed > 0 ? sizing.cross.fixed : sizing.cross.natural)
+                : sizing.cross.min;
+            const int cross_max = sizing.cross.mode == "Fixed" ? extent
+                : (sizing.cross.max > 0 ? max(sizing.cross.max, extent) : INT_MAX);
+            item.MinMaxCross(extent, cross_max);
             item.AlignSelf(UiDesignerResolveBoxAlign(sizing.cross_align));
         }
         stats_.layout_item_updates++;
@@ -1534,8 +1534,8 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
         const UiDesignerGridSizing sizing = UiDesignerResolveGridSizing(node);
         const Size natural = max(instance.control->GetMinSize(), Size(1, 1));
         const Size fixed = Size(
-            sizing.fixed.cx > 0 ? sizing.fixed.cx : natural.cx,
-            sizing.fixed.cy > 0 ? sizing.fixed.cy : natural.cy);
+            sizing.fixed.cx > 0 ? sizing.fixed.cx : 0,
+            sizing.fixed.cy > 0 ? sizing.fixed.cy : 0);
         grid->PauseLayout();
         grid->SetItem(instance.layout_item_index,
                       max(0, (int)node.GetProperty("grid_row", 0)),
@@ -1543,8 +1543,7 @@ void UiDesignerPreviewCanvas::UpdateManagedLayoutItem(
                       sizing.scale_x, sizing.scale_y, fixed);
         grid->SetItemAlign(instance.layout_item_index, ParseGridAlign(sizing.align_x),
                            ParseGridAlign(sizing.align_y));
-        grid->SetItemMinSize(instance.layout_item_index, Size(
-            max(sizing.min.cx, natural.cx), max(sizing.min.cy, natural.cy)));
+        grid->SetItemMinSize(instance.layout_item_index, sizing.min);
         grid->SetItemMaxSize(instance.layout_item_index, Size(
             sizing.max.cx > 0 ? max(sizing.max.cx, max(sizing.min.cx, natural.cx)) : INT_MAX,
             sizing.max.cy > 0 ? max(sizing.max.cy, max(sizing.min.cy, natural.cy)) : INT_MAX));

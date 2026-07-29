@@ -154,6 +154,14 @@ CONSOLE_APP_MAIN
               UiDesignerMapValue(title_card->defaults, "icon", Value()) ==
                   "ICON_DESIGN_DESCRIPTION_48",
           "UiTitleCard default icon is the description glyph");
+    Check(title_card && title_card->FindProperty("icon") &&
+              title_card->FindProperty("icon")->default_value ==
+                  "ICON_DESIGN_DESCRIPTION_48",
+          "UiTitleCard icon property and defaults agree");
+    Check(title_card &&
+              !TrimBoth(AsString(UiDesignerMapValue(title_card->defaults,
+                                                     "subtitle", Value()))).IsEmpty(),
+          "UiTitleCard default subtitle is non-empty");
     One<Ctrl> absolute_preview;
     if(absolute)
         absolute_preview = UiDesignerPreviewFactory::Create(*absolute);

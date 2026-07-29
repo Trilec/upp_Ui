@@ -1008,7 +1008,7 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         if(String(c.type) == "UiTitleCard") {
             AddTitleCardProperties(s);
             UiDesignerPropertySpec icon = ChoiceProperty(
-                "icon", "Icon", "Content", "None",
+                "icon", "Icon", "Content", "ICON_DESIGN_DESCRIPTION_48",
                 {{"None", "None"},
                  {"ICON_DESIGN_DESCRIPTION_48", "Description"}},
                 PropertyImpactControlState | PropertyImpactLocalLayout |
