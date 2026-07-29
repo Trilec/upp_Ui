@@ -236,6 +236,25 @@ void UiDesignerInteractionOverlay::Paint(Draw& w)
             w.DrawRect(body.right - 1, body.top, 1, body.Height(), outline);
         }
 
+        // Selected layouts expose their existing snapshot regions without
+        // turning on the heavier debug paint for every layout in the document.
+        const UiDesignerNodeId selected_id = selection.primary;
+        const UiDesignerGeometryRecord *selected_record =
+            geometry.Find(selected_id);
+        const UiDesignerNode *selected_node = document.Find(selected_id);
+        if(selected_record && selected_node && selected_record->drop_target) {
+            const Color region = Color(245, 158, 11);
+            for(const Rect& cell : selected_record->cell_rects)
+                DrawDashedRect(w, cell.Offseted(canvas_origin), region,
+                               DPI(2), dash, gap);
+            for(const UiDesignerDropRegion& drop : geometry.GetDropRegions()) {
+                if(drop.owner != selected_id || drop.kind == UiDesignerDropRegionKind::WindowContent)
+                    continue;
+                DrawDashedRect(w, drop.visual_rect.Offseted(canvas_origin), region,
+                               DPI(2), dash, gap);
+            }
+        }
+
         for(UiDesignerNodeId id : selection.nodes) {
             const UiDesignerGeometryRecord* geometry_record = geometry.Find(id);
             Rect r = geometry_record ? geometry_record->rect : Rect();

@@ -1,5 +1,4 @@
 #include "UiDesignerCodeGen.h"
-#include <Utilities/UiDesigner/Preview/UiDesignerColorPickerContract.h>
 #include <Utilities/UiDesigner/UiDesigner/UiDesignerButtonStyle.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 

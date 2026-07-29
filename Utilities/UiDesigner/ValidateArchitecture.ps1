@@ -69,6 +69,7 @@ foreach($headless in @(
 )) {
     Forbid-InTree $headless '^\s*#include\s+<Ui/'
     Forbid-InTree $headless '^\s*#include\s+<CtrlLib/'
+    Forbid-InTree $headless 'Utilities/UiDesigner/Preview/'
     Forbid-InTree $headless 'Utilities/Designer/'
 }
 

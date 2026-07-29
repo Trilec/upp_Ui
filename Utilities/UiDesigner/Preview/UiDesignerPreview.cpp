@@ -1983,21 +1983,16 @@ void UiDesignerPreviewCanvas::LayoutNode(
             instance.control->SetRect(grid->GetItemRect(instance.layout_item_index));
     }
 
-    Point origin(0, 0);
-    if(instance.runtime_parent) {
-        const int p = rects_.Find(instance.runtime_parent);
-        if(p >= 0)
-            origin = rects_[p].TopLeft();
-    }
-    const Rect local = instance.control->GetRect();
-    rects_.GetAdd(node_id) = local.Offseted(origin);
     // Parent layout has already assigned managed children. Layout this
     // control only after its own rectangle is authoritative, then recurse.
     const bool measure = detailed_timing_enabled_ && !capture_paused_;
     const bool is_grid = dynamic_cast<UiGridLayout *>(instance.control.Get());
     const bool is_box = dynamic_cast<UiBoxLayout *>(instance.control.Get());
     const int64 control_layout_start = (measure && (is_grid || is_box)) ? usecs() : 0;
+    const Rect parent_assigned_rect = instance.control->GetRect();
     instance.control->Layout();
+    if(instance.runtime_parent && managed && adapter != "absolute")
+        instance.control->SetRect(parent_assigned_rect);
     if(control_layout_start) {
         const double elapsed = (double)usecs(control_layout_start) / 1000.0;
         if(is_grid) {
@@ -2009,6 +2004,14 @@ void UiDesignerPreviewCanvas::LayoutNode(
             stats_.box_layout_time_ms += elapsed;
         }
     }
+
+    Point origin(0, 0);
+    if(instance.runtime_parent) {
+        const int p = rects_.Find(instance.runtime_parent);
+        if(p >= 0)
+            origin = rects_[p].TopLeft();
+    }
+    rects_.GetAdd(node_id) = instance.control->GetRect().Offseted(origin);
 
     int child_ordinal = 0;
     for(UiDesignerNodeId child : node->children)

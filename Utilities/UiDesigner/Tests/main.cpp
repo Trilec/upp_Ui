@@ -1441,6 +1441,59 @@ CONSOLE_APP_MAIN
     Check(tab_round_trip.Find(tab_b) && tab_round_trip.Find(tab_b)->children.GetCount() == 3,
           "round trip preserves additional Tab page");
 
+    UiDesignerDocument fit_document;
+    UiDesignerCommandService fit_commands(fit_document);
+    const UiDesignerControlSpec *fit_grid = catalog.Find("UiGridLayout");
+    UiDesignerNodeId fit_grid_id = fit_commands.AddNode(
+        "UiGridLayout", "fit_grid", fit_document.GetRootId(),
+        fit_grid ? fit_grid->node_flags : 0,
+        fit_grid ? fit_grid->defaults : ValueMap(), "Add Fit Grid");
+    fit_commands.SetProperty(fit_grid_id, "rows", 2, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_grid_id, "columns", 2, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_grid_id, "width_mode", "Fixed", UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_grid_id, "height_mode", "Fixed", UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_grid_id, "fixed_width", 260, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_grid_id, "fixed_height", 180, UiDesignerImpactLocalLayout);
+    const UiDesignerControlSpec *card_spec = catalog.Find("UiTitleCard");
+    const UiDesignerControlSpec *button_spec = catalog.Find("UiButton");
+    UiDesignerNodeId fit_card = fit_commands.AddNode(
+        "UiTitleCard", "fit_card", fit_grid_id,
+        card_spec ? card_spec->node_flags : 0,
+        card_spec ? card_spec->defaults : ValueMap(), "Add Fit Card");
+    UiDesignerNodeId fit_tab = fit_commands.AddNode(
+        "UiTab", "fit_tab", fit_grid_id,
+        tab_spec ? tab_spec->node_flags : 0,
+        tab_spec ? tab_spec->defaults : ValueMap(), "Add Fit Tab");
+    UiDesignerNodeId fit_button = fit_commands.AddNode(
+        "UiButton", "fit_button", fit_grid_id,
+        button ? button->node_flags : 0,
+        button ? button->defaults : ValueMap(), "Add Fit Button");
+    fit_commands.SetProperty(fit_card, "grid_row", 0, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_card, "grid_column", 0, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_tab, "grid_row", 0, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_tab, "grid_column", 1, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_button, "grid_row", 1, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_button, "grid_column", 0, UiDesignerImpactLocalLayout);
+    UiDesignerSelection fit_selection;
+    UiDesignerPreviewCanvas fit_preview;
+    fit_preview.SetRect(0, 0, 512, 250);
+    fit_preview.Bind(&fit_document, &catalog, nullptr, &fit_selection);
+    fit_preview.RebuildDocument();
+    const UiDesignerGeometryRecord *fit_geometry =
+        fit_preview.GetGeometrySnapshot().Find(fit_grid_id);
+    Check(fit_geometry && fit_geometry->cell_rects.GetCount() == 4,
+          "Fit contract preserves a 2x2 Grid");
+    for(UiDesignerNodeId child : {fit_card, fit_tab, fit_button}) {
+        const UiDesignerNode *child_node = fit_document.Find(child);
+        const Rect child_rect = fit_preview.GetNodeRect(child);
+        const int cell_index = child_node
+            ? (int)child_node->GetProperty("grid_row", 0) * 2 +
+              (int)child_node->GetProperty("grid_column", 0) : -1;
+        Check(fit_geometry && cell_index >= 0 && cell_index < fit_geometry->cell_rects.GetCount() &&
+              fit_geometry->cell_rects[cell_index].Contains(child_rect),
+              "Fit child remains inside its assigned Grid cell");
+    }
+
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);
 }
