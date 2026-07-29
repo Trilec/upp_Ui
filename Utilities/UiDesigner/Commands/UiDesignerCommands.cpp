@@ -448,7 +448,14 @@ bool UiDesignerCommandService::SetActionBinding(
 UiDesignerNodeId UiDesignerCommandService::AddTabPage(UiDesignerNodeId tab, const String& title)
 {
     const UiDesignerNode *parent = document_.Find(tab);
-    if(!parent || parent->type != "UiTab") return 0;
+    if(!parent || parent->type != "UiTab") {
+        last_error_ = "Page owner is not a UiTab";
+        return 0;
+    }
+    if(TrimBoth(title).IsEmpty()) {
+        last_error_ = "Tab page title cannot be empty";
+        return 0;
+    }
     int suffix = 1;
     String key;
     for(;;) {
@@ -465,7 +472,7 @@ UiDesignerNodeId UiDesignerCommandService::AddTabPage(UiDesignerNodeId tab, cons
     defaults.Set("key", key);
     defaults.Set("title", title.IsEmpty() ? key : title);
     defaults.Set("enabled", true);
-    return AddNode("UiTabPage", key, tab,
+    return AddNode("UiTabPage", "tab_" + AsString(tab) + "_" + key, tab,
                    UiDesignerNodeStructural | UiDesignerNodeSemanticItem,
                    defaults, "Add Tab page");
 }
@@ -483,6 +490,7 @@ bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String
     for(int i = 0; i < parent->children.GetCount(); i++)
         if(parent->children[i] == page) { index = i; break; }
     if(index < 0) return false;
+    const UiDesignerNodeId tab_id = parent->id;
     UiDesignerNodeId replacement = parent->GetProperty("active_page", (UiDesignerNodeId)0);
     const UiDesignerNodeId old_active = replacement;
     if(replacement == page) {
@@ -494,18 +502,18 @@ bool UiDesignerCommandService::RemoveTabPage(UiDesignerNodeId page, const String
             UiDesignerStructureChange& removed = aggregate.structure.Add();
             removed.kind = UiDesignerStructureChangeKind::Removed;
             removed.node = page;
-            removed.old_parent = parent->id;
+            removed.old_parent = tab_id;
             removed.old_index = index;
             if(!document_.RemoveNode(page)) { last_error_ = "Unable to remove Tab page"; return false; }
             if(replacement != old_active) {
                 const Value old = old_active;
-                if(!document_.SetProperty(parent->id, "active_page", replacement,
+                if(!document_.SetProperty(tab_id, "active_page", replacement,
                                           UiDesignerImpactLocalLayout | UiDesignerImpactCode)) {
                     last_error_ = "Unable to select replacement Tab page";
                     return false;
                 }
                 UiDesignerPropertyChange& change = aggregate.properties.Add();
-                change.node = parent->id;
+                change.node = tab_id;
                 change.property = "active_page";
                 change.old_value = old;
                 change.new_value = replacement;
@@ -532,22 +540,37 @@ bool UiDesignerCommandService::MoveTabPage(UiDesignerNodeId page, int index)
 {
     const UiDesignerNode *p = document_.Find(page);
     const UiDesignerNode *parent = p ? document_.Find(p->parent) : nullptr;
-    return p && parent && p->type == "UiTabPage" && parent->type == "UiTab" &&
-           MoveNode(page, parent->id, index, "Move Tab page");
+    if(!p || !parent || p->type != "UiTabPage" || parent->type != "UiTab") {
+        last_error_ = "Invalid Tab page";
+        return false;
+    }
+    if(index < 0 || index >= parent->children.GetCount()) {
+        last_error_ = "Invalid Tab page destination";
+        return false;
+    }
+    return MoveNode(page, parent->id, index, "Move Tab page");
 }
 
 bool UiDesignerCommandService::SetTabPageEnabled(UiDesignerNodeId page, bool enabled)
 {
     const UiDesignerNode *p = document_.Find(page);
-    return p && p->type == "UiTabPage" &&
-           SetProperty(page, "enabled", enabled, UiDesignerImpactStructure,
+    if(!p || p->type != "UiTabPage") {
+        last_error_ = "Invalid Tab page";
+        return false;
+    }
+    return SetProperty(page, "enabled", enabled, UiDesignerImpactStructure,
                        "Enable Tab page");
 }
 
 bool UiDesignerCommandService::SetActiveTabPage(UiDesignerNodeId tab, UiDesignerNodeId page)
 {
+    const UiDesignerNode *owner = document_.Find(tab);
     const UiDesignerNode *p = document_.Find(page);
-    return p && p->parent == tab && p->type == "UiTabPage" &&
+    if(!owner || owner->type != "UiTab" || !p || p->parent != tab || p->type != "UiTabPage") {
+        last_error_ = "Page is not a direct child of the specified UiTab";
+        return false;
+    }
+    return
            SetProperty(tab, "active_page", page, UiDesignerImpactLocalLayout | UiDesignerImpactCode,
                        "Select Tab page");
 }

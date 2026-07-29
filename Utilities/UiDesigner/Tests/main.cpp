@@ -1414,6 +1414,32 @@ CONSOLE_APP_MAIN
     Check(tab_document.Find(tab_a)->GetProperty("active_page", (UiDesignerNodeId)0) ==
               tab_document.Find(tab_a)->children[0],
           "page removal selects the deterministic replacement");
+    Check(tab_commands.Undo(), "Tab page removal undo succeeds");
+    Check(tab_document.Find(tab_page) != nullptr &&
+              tab_document.Find(tab_a)->children.GetCount() == 2,
+          "Tab page removal undo restores exact page identity");
+    Check(tab_commands.Redo(), "Tab page removal redo succeeds");
+    Check(!tab_commands.AddTabPage(tab_b, "   "),
+          "empty additional page title is rejected");
+    UiDesignerNodeId extra = tab_commands.AddTabPage(tab_b, "Extra");
+    Check(extra != 0, "additional page is created");
+    Check(!tab_commands.MoveTabPage(extra, 99),
+          "out of range page move is rejected");
+    Check(tab_commands.SetTabPageEnabled(extra, false),
+          "page disable command succeeds");
+    Check(tab_commands.SetTabPageEnabled(extra, true),
+          "page enable command succeeds");
+    Check(!tab_commands.SetActiveTabPage(tab_a, extra),
+          "activation rejects a page owned by another Tab");
+    String tab_json = UiDesignerSerialize(tab_document);
+    UiDesignerDocument tab_round_trip;
+    String tab_load_error;
+    Check(UiDesignerDeserialize(tab_json, tab_round_trip, tab_load_error),
+          "Tab JSON round trip succeeds");
+    Check(catalog.ValidateDocument(tab_round_trip, tab_load_error),
+          "round-tripped Tabs remain valid");
+    Check(tab_round_trip.Find(tab_b) && tab_round_trip.Find(tab_b)->children.GetCount() == 3,
+          "round trip preserves additional Tab page");
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

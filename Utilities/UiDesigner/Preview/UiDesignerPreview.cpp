@@ -4,7 +4,7 @@
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiColorPicker.h>
-#include <Utilities/UiDesigner/Catalog/UiDesignerColorPickerContract.h>
+#include "UiDesignerColorPickerContract.h"
 
 namespace Upp {
 
@@ -1689,6 +1689,9 @@ bool UiDesignerPreviewCanvas::RebuildSubtree(UiDesignerNodeId root)
     }
     RemoveInstanceTree(root, true);
     BuildNode(root, *fallback, 0, runtime_parent);
+    if(const UiDesignerNode *rebuilt = document_->Find(root))
+        if(rebuilt->type == "UiTab")
+            ApplyActiveTabProjection();
     stats_.subtree_rebuilds++;
     Layout();
     Refresh();

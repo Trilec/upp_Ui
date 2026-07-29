@@ -443,7 +443,10 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
             bool active_found = false;
             for(UiDesignerNodeId child_id : parent.children) {
                 const UiDesignerNode *page = document.Find(child_id);
-                if(!page || page->type != "UiTabPage") continue;
+                if(!page || page->type != "UiTabPage") {
+                    error = parent.name + " may contain only direct UiTabPage children";
+                    return false;
+                }
                 page_count++;
                 const String key = AsString(page->GetProperty("key", ""));
                 if(keys.Find(key) >= 0) {
