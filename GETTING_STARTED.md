@@ -45,10 +45,10 @@ Notes:
 - `Ui` depends on `Painter` and `Animation` (see `Ui/Ui.upp`).
 - For local development, use this repo's `GitHubOut.var`; it includes the
   external animation nest and writes build intermediates to
-  `E:/apps/github/upp_Ui/out`. Avoid using `E:/upp-18468/out` for this repo,
+  `E:/apps/github/upp_Ui/build`. Avoid using `E:/upp-18468/build` for this repo,
   as shared or locked object files there can cause permission errors.
 
-Note: `Animation/` in this repo is a vendored copy of the animation/easing package from `E:\apps\github\upp_AnimationEasing`.
+Note: `Animation/` in this repo is a vendored copy of the animation/easing package from `E:\apps\github\upp_animation`.
 
 ## Conventions (important)
 

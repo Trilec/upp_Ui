@@ -180,12 +180,11 @@ Example on Windows:
 For this repository, prefer the checked-in `GitHubOut.var` assembly when doing
 local development. It includes the `E:\apps\github\upp_animation` nest
 required by `Ui/Ui.upp` and writes intermediates to
-`E:\apps\github\upp_Ui\out`, avoiding locked/shared objects under
+`E:\apps\github\upp_Ui\build`, avoiding locked/shared objects under
 `E:\upp-18468\out`.
 
-Keep ad-hoc CLI build artifacts in the repository `out` root
-(`E:\apps\github\upp_Ui\out`). Do not place current demo/designer outputs in
-`build` or `bin`.
+Keep ad-hoc CLI build artifacts in the repository `build` root
+(`E:\apps\github\upp_Ui\build`). 
 
 ## Public API direction
 
