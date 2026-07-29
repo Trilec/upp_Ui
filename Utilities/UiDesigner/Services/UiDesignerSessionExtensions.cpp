@@ -199,6 +199,15 @@ void UiDesignerSession::RebuildBehaviorModel()
     if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
        spec->events.IsEmpty()) {
         active_behavior_event_.Clear();
+        String status = node ? "Events & Actions are not registered for this control yet."
+                             : "Select one control to view Events & Actions.";
+        if(node) {
+            if(node->type == "UiTitleCard") status = "Title Card events are not registered yet.";
+            else if(node->type == "UiTree") status = "Tree events are not registered yet.";
+            else if(node->type == "UiList") status = "List events are not registered yet.";
+            else if(node->type == "UiMenu") status = "Menu events are not registered yet.";
+        }
+        behavior_model_.AddReadOnly("behavior.status", "Status", status, "Status");
         behavior_model_.StructureChanged();
         return;
     }

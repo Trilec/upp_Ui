@@ -317,17 +317,54 @@ UiGridLayout& UiGridLayout::SetItemMaxSize(int index, Size sz)
     return *this;
 }
 
-static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<bool>& expand, int available, int gap)
+static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<int>& floors,
+                                       const Vector<bool>& expand, int available, int gap)
 {
     int count = sizes.GetCount();
     if(count <= 0)
         return;
 
     int inner = max(0, available - gap * max(0, count - 1));
-    int base = 0;
+    for(int i = 0; i < count; i++)
+        sizes[i] = max(sizes[i], floors[i]);
+
+    int total = 0;
     for(int v : sizes)
-        base += v;
-    int extra = inner - base;
+        total += v;
+
+    if(total > inner) {
+        // First shrink preferred sizes toward their authored floors. The
+        // second pass is only a rendered compression when even the floors do
+        // not fit; authored values remain unchanged in the model.
+        int excess = total - inner;
+        while(excess > 0) {
+            bool changed = false;
+            for(int i = 0; i < count && excess > 0; i++) {
+                int floor = max(0, floors[i]);
+                if(sizes[i] > floor) {
+                    sizes[i]--;
+                    excess--;
+                    changed = true;
+                }
+            }
+            if(changed)
+                continue;
+            for(int i = 0; i < count && excess > 0; i++) {
+                if(sizes[i] > 0) {
+                    sizes[i]--;
+                    excess--;
+                }
+            }
+            if(!changed && excess > 0) {
+                bool any = false;
+                for(int v : sizes) any |= v > 0;
+                if(!any) break;
+            }
+        }
+        return;
+    }
+
+    int extra = inner - total;
     if(extra <= 0)
         return;
 
@@ -373,6 +410,10 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
             col_widths[i] = cell_w;
         for(int i = 0; i < rows; i++)
             row_heights[i] = cell_h;
+        Vector<int> col_floors(cols, min_cell_size.cx);
+        Vector<int> row_floors(rows, min_cell_size.cy);
+        UiDistributeGridTrackSpace(col_widths, col_floors, expand_cols, available.cx, gap);
+        UiDistributeGridTrackSpace(row_heights, row_floors, expand_rows, available.cy, gap);
         return;
     }
 
@@ -398,7 +439,15 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
             expand_rows[it.row] = true;
     }
 
-    UiDistributeGridTrackSpace(col_widths, expand_cols, available.cx, gap);
+    Vector<int> col_floors(cols, min_cell_size.cx);
+    Vector<int> row_floors(rows, min_cell_size.cy);
+    for(const Item& it : items) {
+        if(it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
+            continue;
+        col_floors[it.col] = max(col_floors[it.col], it.min_size.cx);
+        row_floors[it.row] = max(row_floors[it.row], it.min_size.cy);
+    }
+    UiDistributeGridTrackSpace(col_widths, col_floors, expand_cols, available.cx, gap);
 
     // Wrapped children determine their row height from the resolved column,
     // not from a stale panel rectangle or their one-column minimum width.
@@ -409,7 +458,7 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
         if(measure.width_dependent)
             row_heights[it.row] = max(row_heights[it.row], max(0, measure.measured.cy));
     }
-    UiDistributeGridTrackSpace(row_heights, expand_rows, available.cy, gap);
+    UiDistributeGridTrackSpace(row_heights, row_floors, expand_rows, available.cy, gap);
 }
 
 Rect UiGridLayout::GetClientGridRect() const

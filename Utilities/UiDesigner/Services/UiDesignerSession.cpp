@@ -688,6 +688,15 @@ void UiDesignerSession::RebuildThemeOverrideModel()
     const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
     if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
        spec->theme_overrides.IsEmpty()) {
+        String status = node ? "Theme Overrides are not registered for this control yet."
+                             : "Select one control to view Theme Overrides.";
+        if(node) {
+            if(node->type == "UiTab") status = "Tab Theme adapter is not implemented yet.";
+            else if(node->type == "UiAccordion") status = "Accordion Theme adapter is not implemented yet.";
+            else if(node->type == "UiTitleCard") status = "Title Card Theme adapter is not implemented yet.";
+            else if(node->type == "UiDropdown") status = "Dropdown Theme adapter is not implemented yet.";
+        }
+        theme_override_model_.AddReadOnly("theme.status", "Status", status, "Status");
         theme_override_model_.StructureChanged();
         return;
     }

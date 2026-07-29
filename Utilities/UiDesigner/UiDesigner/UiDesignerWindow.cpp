@@ -783,7 +783,17 @@ void UiDesignerWindow::RefreshData()
         data_projection_refreshing_ = false;
         return;
     }
-    data_model_.Add(node ? "Data is not supported for this control yet" : "Select a control to view data",
+    String data_status = "Select a control to view data";
+    if(node) {
+        if(node->type == "UiAccordion") data_status = "Accordion section data is not implemented yet.";
+        else if(node->type == "UiTree") data_status = "Tree item data is not implemented yet.";
+        else if(node->type == "UiList") data_status = "List item data is not implemented yet.";
+        else if(node->type == "UiDropdown") data_status = "Dropdown item data is not implemented yet.";
+        else if(node->type == "UiMenu") data_status = "Menu item data is not implemented yet.";
+        else if(node->type == "UiTitleCard") data_status = "Title Card data is not implemented yet.";
+        else data_status = "Data is not supported for this control yet.";
+    }
+    data_model_.Add(data_status,
                     Value(), true);
     data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
     data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
@@ -808,8 +818,16 @@ void UiDesignerWindow::RefreshThemeInspector()
 void UiDesignerWindow::RefreshCode()
 {
     preview_canvas_.BumpCodeRefresh();
-    code_.SetCode(session_.GenerateHeader("GeneratedUiWindow") + "\n" +
-                  session_.GenerateCode("GeneratedUiWindow"));
+    const String header = session_.GenerateHeader("GeneratedUiWindow");
+    const String source = session_.GenerateCode("GeneratedUiWindow");
+    if(header.IsEmpty() && source.IsEmpty()) {
+        const UiDesignerNodeId selected = session_.State().selection.primary;
+        const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
+        code_.SetCode(Format("Code generation unavailable for selected control: %s",
+                             node ? node->type : String("none")));
+        return;
+    }
+    code_.SetCode(header + "\n" + source);
 }
 
 void UiDesignerWindow::RefreshDiagnostics()

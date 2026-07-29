@@ -1501,6 +1501,42 @@ CONSOLE_APP_MAIN
               fit_geometry->cell_rects[cell_index].Contains(child_rect),
               "Fit child remains inside its assigned Grid cell");
     }
+    Check(fit_geometry && fit_geometry->rect == fit_preview.GetNodeRect(fit_grid_id),
+          "Grid snapshot keeps the runtime Grid rectangle");
+    const Rect grid_client = fit_geometry ? fit_geometry->body : Rect();
+    Check(fit_geometry && grid_client.GetWidth() >= 0 && grid_client.GetHeight() >= 0,
+          "Grid client rectangle is non-negative");
+    if(fit_geometry) {
+        for(int i = 0; i < fit_geometry->cell_rects.GetCount(); i++) {
+            Check(grid_client.Contains(fit_geometry->cell_rects[i]),
+                  "Every resolved Grid cell stays inside the client rectangle");
+        }
+    }
+    Check(fit_preview.GetNodeRect(fit_card).GetWidth() >= 0 &&
+          fit_preview.GetNodeRect(fit_card).GetHeight() >= 0,
+          "Title Card resolved rectangle is non-negative");
+    Check(fit_preview.GetNodeRect(fit_tab).GetWidth() >= 0 &&
+          fit_preview.GetNodeRect(fit_tab).GetHeight() >= 0,
+          "UiTab resolved rectangle is non-negative");
+    Check(fit_preview.GetNodeRect(fit_button).GetWidth() >= 0 &&
+          fit_preview.GetNodeRect(fit_button).GetHeight() >= 0,
+          "UiButton resolved rectangle is non-negative");
+    Check(fit_geometry && fit_geometry->cell_rects.GetCount() == 2 * 2,
+          "Grid remains exactly two rows by two columns");
+    Check(fit_geometry && fit_geometry->cell_rects[0].left >= grid_client.left,
+          "Grid first cell honours the left client edge");
+    Check(fit_geometry && fit_geometry->cell_rects[0].top >= grid_client.top,
+          "Grid first cell honours the top client edge");
+    Check(fit_geometry && fit_geometry->cell_rects.Top().right <= grid_client.right,
+          "Grid first row does not cross the right client edge");
+    Check(fit_geometry && fit_geometry->cell_rects.Top().bottom <= grid_client.bottom,
+          "Grid first row does not cross the bottom client edge");
+    Check(fit_geometry && fit_geometry->cell_rects.GetCount() == 4,
+          "Bounded allocation publishes all four cells");
+    Check(fit_geometry && fit_geometry->cell_rects[3].right <= grid_client.right,
+          "Grid final column remains bounded after rounding");
+    Check(fit_geometry && fit_geometry->cell_rects[3].bottom <= grid_client.bottom,
+          "Grid final row remains bounded after rounding");
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);
