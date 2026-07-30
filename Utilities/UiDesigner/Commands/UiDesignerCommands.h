@@ -65,6 +65,13 @@ public:
     bool SetTabPageEnabled(UiDesignerNodeId page, bool enabled);
     bool SetActiveTabPage(UiDesignerNodeId tab, UiDesignerNodeId page);
 
+    UiDesignerNodeId AddAccordionSection(UiDesignerNodeId accordion,
+                                         const String& title);
+    bool RemoveAccordionSection(UiDesignerNodeId section);
+    bool RenameAccordionSection(UiDesignerNodeId section, const String& title);
+    bool SetAccordionSectionProperty(UiDesignerNodeId section,
+                                     const String& property, const Value& value);
+
     bool SetActionBinding(UiDesignerNodeId node,
                           const UiDesignerActionBinding& binding,
                           const String& label = String());
