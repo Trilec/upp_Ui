@@ -1385,6 +1385,21 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
         }
         return;
     }
+    if(node.type == "UiAccordionSection") {
+        if(auto *accordion = dynamic_cast<UiAccordion *>(parent_instance.control.Get())) {
+            const int index = accordion->AddSection(
+                node.GetProperty("title", node.name),
+                node.GetProperty("subtitle", String()),
+                node.GetProperty("copy", String()),
+                node.GetProperty("open", false));
+            const String lock = node.GetProperty("lock", "None");
+            accordion->SetLockMode(index,
+                lock == "Open" ? UiAccordion::Lock::Open :
+                lock == "Closed" ? UiAccordion::Lock::Closed :
+                UiAccordion::Lock::None);
+        }
+        return;
+    }
     if(auto *box = dynamic_cast<UiBoxLayout *>(parent_instance.control.Get())) {
         instance.layout_item_index = box->GetItemCount();
         UiBoxLayout::ItemRef item = node.GetProperty("layout_break", false)

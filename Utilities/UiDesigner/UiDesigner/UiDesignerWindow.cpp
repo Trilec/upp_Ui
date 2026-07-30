@@ -783,6 +783,20 @@ void UiDesignerWindow::RefreshData()
         data_projection_refreshing_ = false;
         return;
     }
+    if(node && node->type == "UiAccordion") {
+        for(UiDesignerNodeId id : node->children) {
+            const UiDesignerNode *section = session_.Document().Find(id);
+            if(section && section->type == "UiAccordionSection")
+                data_model_.Add(AsString(section->GetProperty("title", section->name)),
+                                section->id, section->GetProperty("open", false));
+        }
+        data_list_.SetData(data_model_.GetCount() ? data_model_.Get(0).data : Value());
+        data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
+        data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
+        data_enable_.SetText("Open");
+        data_projection_refreshing_ = false;
+        return;
+    }
     String data_status = "Select a control to view data";
     if(node) {
         if(node->type == "UiAccordion") data_status = "Accordion section data is not implemented yet.";

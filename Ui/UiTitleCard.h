@@ -179,6 +179,8 @@ public:
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
           StyledState, bool> WhenPaintForeground;
 
+    Event<> WhenAction;
+
 private:
     void InvalidateStyleCache();
     Style& StyleEdit();
@@ -209,6 +211,7 @@ private:
 
     bool hot_ = false;
     bool down_ = false;
+    bool selectable_ = true;
 
     Size user_min_size_ = Size(0, 0);
 

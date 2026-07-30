@@ -898,14 +898,34 @@ void UiDesignerCodeGenerator::EmitChildren(
         const UiDesignerControlSpec* child_spec = catalog_.Find(child->type);
         if(!child_spec)
             continue;
+        const String member = MemberName(*child);
+        const String title = child->GetProperty(
+            "title", child->GetProperty("text", child->name));
+        if(child->type == "UiAccordionSection" && node.type == "UiAccordion") {
+            out << "\tconst int " << MemberName(*child) << "_index = "
+                << parent << ".AddSection(" << CppString(title) << ", "
+                << EmitValue(child->GetProperty("subtitle", String())) << ", "
+                << EmitValue(child->GetProperty("copy", String())) << ", "
+                << EmitValue(child->GetProperty("open", false)) << ");\n";
+            const String lock = child->GetProperty("lock", "None");
+            if(lock != "None")
+                out << "\t" << parent << ".SetLockMode(" << MemberName(*child)
+                    << "_index, UiAccordion::Lock::" << lock << ");\n";
+            continue;
+        }
+        if(child->type == "UiTabPage" && node.type == "UiTab") {
+            out << "\tconst int " << MemberName(*child) << "_index = "
+                << parent << ".Add(" << member << ", "
+                << CppString(title) << ");\n"
+                << "\t" << parent << ".EnableTab(" << MemberName(*child)
+                << "_index, " << EmitValue(child->GetProperty("enabled", true)) << ");\n";
+            continue;
+        }
         if(child_spec->IsSemanticItem()) {
             EmitSpacer(out, *child, node);
             continue;
         }
 
-        const String member = MemberName(*child);
-        const String title = child->GetProperty(
-            "title", child->GetProperty("text", child->name));
         if(adapter) {
             UiDesignerChildAttachContext context{out, parent, member, *child, title};
             adapter->emit(context);
@@ -914,6 +934,18 @@ void UiDesignerCodeGenerator::EmitChildren(
             out << "\t#error Unsupported UiDesigner child adapter "
                 << CppString(adapter_id) << "\n";
         EmitChildren(out, document, *child);
+    }
+    if(node.type == "UiTab") {
+        const UiDesignerNodeId active = node.GetProperty("active_page", (UiDesignerNodeId)0);
+        int index = 0;
+        for(UiDesignerNodeId child_id : node.children) {
+            const UiDesignerNode* child = document.Find(child_id);
+            if(child && child->type == "UiTabPage") {
+                if(child->id == active)
+                    out << "\t" << parent << ".SetActiveTab(" << index << ");\n";
+                index++;
+            }
+        }
     }
 }
 
@@ -1087,12 +1119,10 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
         const UiDesignerControlSpec* spec = catalog_.Find(node.type);
         if(!spec)
             continue;
-        if(node.type == "UiTabPage") {
-            result.diagnostics.Add("UiTabPage generated page content is deferred to UID-DATA-001A2");
-            return result;
-        }
         if(spec->codegen_adapter_id != "control" &&
-           spec->codegen_adapter_id != "spacer") {
+           spec->codegen_adapter_id != "spacer" &&
+           spec->codegen_adapter_id != "tab_page_deferred" &&
+           spec->codegen_adapter_id != "accordion_section") {
             result.diagnostics.Add("Unsupported code-generation adapter: " +
                                    spec->codegen_adapter_id);
             return result;
@@ -1127,7 +1157,13 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
         if(node.id == document.GetRootId())
             continue;
         const UiDesignerControlSpec* spec = catalog_.Find(node.type);
-        if(!spec || spec->IsSemanticItem())
+        if(!spec)
+            continue;
+        if(node.type == "UiTabPage") {
+            gh << "\tParentCtrl " << MemberName(node) << ";\n";
+            continue;
+        }
+        if(spec->IsSemanticItem())
             continue;
         gh << "\t" << spec->runtime_cpp_type << " " << MemberName(node) << ";\n";
     }

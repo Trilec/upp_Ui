@@ -275,6 +275,35 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
                 page_change2.new_parent = result;
             }
 
+            if(type == "UiAccordion") {
+                struct DefaultSection { const char *key, *title, *subtitle, *copy; bool open; };
+                const DefaultSection defaults[] = {
+                    {"overview", "Overview", "Summary", "Overview content", true},
+                    {"details", "Details", "Supporting information", "Detailed content", false},
+                    {"notes", "Notes", "Additional information", "Notes and supporting content", false}
+                };
+                for(const DefaultSection& d : defaults) {
+                    const UiDesignerNodeId sid = document_.AddNode(
+                        "UiAccordionSection", "accordion_" + AsString(result) + "_" + d.key,
+                        result, UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
+                    if(!sid) {
+                        last_error_ = "Unable to create default Accordion sections";
+                        return false;
+                    }
+                    UiDesignerNode *section = document_.Find(sid);
+                    section->properties.Set("key", d.key);
+                    section->properties.Set("title", d.title);
+                    section->properties.Set("subtitle", d.subtitle);
+                    section->properties.Set("copy", d.copy);
+                    section->properties.Set("open", d.open);
+                    section->properties.Set("lock", "None");
+                    UiDesignerStructureChange& sc = aggregate.structure.Add();
+                    sc.kind = UiDesignerStructureChangeKind::Created;
+                    sc.node = sid;
+                    sc.new_parent = result;
+                }
+            }
+
             UiDesignerStructureChange& change = aggregate.structure.Add();
             change.kind = UiDesignerStructureChangeKind::Created;
             change.node = result;

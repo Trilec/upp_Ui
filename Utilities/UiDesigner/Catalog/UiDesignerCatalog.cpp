@@ -393,6 +393,29 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 return false;
             }
         }
+        if(node.type == "UiAccordionSection") {
+            if(!(node.flags & UiDesignerNodeSemanticItem) || !parent || parent->type != "UiAccordion") {
+                error = "Accordion section " + AsString(node.id) + " must be a direct UiAccordion child";
+                return false;
+            }
+            if(TrimBoth(AsString(node.GetProperty("key", ""))).IsEmpty() ||
+               TrimBoth(AsString(node.GetProperty("title", ""))).IsEmpty()) {
+                error = "Accordion section " + AsString(node.id) + " requires key and title";
+                return false;
+            }
+            if(node.GetProperty("lock", "None") == "Open" && !node.GetProperty("open", false)) {
+                error = "Accordion section " + AsString(node.id) + " locks open but is closed";
+                return false;
+            }
+            if(node.GetProperty("lock", "None") == "Closed" && node.GetProperty("open", true)) {
+                error = "Accordion section " + AsString(node.id) + " locks closed but is open";
+                return false;
+            }
+            if(!node.children.IsEmpty()) {
+                error = "Accordion section " + AsString(node.id) + " cannot contain children in this slice";
+                return false;
+            }
+        }
         if(names.Find(node.name) >= 0) {
             error = "Duplicate generated member name: " + node.name;
             return false;
@@ -458,6 +481,26 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
             }
             if(page_count && !active_found) {
                 error = parent.name + " active_page is not a direct Tab page";
+                return false;
+            }
+        }
+        if(parent.type == "UiAccordion") {
+            Index<String> keys;
+            for(UiDesignerNodeId child_id : parent.children) {
+                const UiDesignerNode *section = document.Find(child_id);
+                if(!section || section->type != "UiAccordionSection") {
+                    error = parent.name + " may contain only direct UiAccordionSection children";
+                    return false;
+                }
+                const String key = AsString(section->GetProperty("key", ""));
+                if(keys.Find(key) >= 0) {
+                    error = parent.name + " contains duplicate Accordion section key " + key;
+                    return false;
+                }
+                keys.Add(key);
+            }
+            if(parent.children.IsEmpty()) {
+                error = parent.name + " requires at least one Accordion section";
                 return false;
             }
         }

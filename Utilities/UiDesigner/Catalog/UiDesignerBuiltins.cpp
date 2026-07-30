@@ -997,8 +997,14 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.child_adapter_id = String(c.type) == "UiTab" ? "tab" :
                                  String(c.type) == "UiStack" ? "stack" :
                                  "accordion";
-            AddEvent(s, "WhenAction", "Page changed",
-                     "Runs after the active page changes.");
+            if(String(c.type) == "UiAccordion") {
+                AddEvent(s, "WhenSectionToggled", "Section toggled", "Runs after a section changes open state.");
+                AddEvent(s, "WhenReordered", "Sections reordered", "Runs after sections are reordered.");
+                AddEvent(s, "WhenRemoved", "Section removed", "Runs after a section is removed.");
+                AddEvent(s, "WhenAdded", "Section added", "Runs after a section is added.");
+            }
+            else
+                AddEvent(s, "WhenAction", "Page changed", "Runs after the active page changes.");
         }
         if(String(c.type) == "UiScrollPanel" ||
            String(c.type) == "UiDirectContentHost")
@@ -1006,6 +1012,7 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
         if(String(c.type) == "UiTitleCard") {
+            AddEvent(s, "WhenAction", "Action", "Runs when the card is activated.");
             AddTitleCardProperties(s);
             UiDesignerPropertySpec icon = ChoiceProperty(
                 "icon", "Icon", "Content", "ICON_DESIGN_DESCRIPTION_48",
@@ -1289,6 +1296,36 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     enabled.group = "Page"; enabled.impact = PropertyImpactStructure | PropertyImpactPaint;
     page.properties.Add(enabled); page.defaults.Set("enabled", true);
     catalog.Register(pick(page));
+
+    UiDesignerControlSpec section = MakeSpec("UiAccordionSection", "Accordion Section", "Internal",
+        "", "accordion_section", UiDesignerRuntimeKind::SemanticTabPage,
+        "none", UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
+    section.capabilities = UiDesignerCapabilitySemanticItem;
+    section.preview_adapter_id = "semantic:accordion_section";
+    section.codegen_adapter_id = "accordion_section";
+    section.semantic_owner_type = "UiAccordion";
+    section.properties.Clear();
+    section.defaults.Clear();
+    UiDesignerPropertySpec skey = key;
+    skey.default_value = "overview";
+    section.properties.Add(skey); section.defaults.Set("key", "overview");
+    UiDesignerPropertySpec stitle = title;
+    stitle.default_value = "Overview";
+    section.properties.Add(stitle); section.defaults.Set("title", "Overview");
+    UiDesignerPropertySpec subtitle = UiDesignerTextProperty("subtitle", "Subtitle");
+    subtitle.group = "Section"; subtitle.impact = PropertyImpactStructure | PropertyImpactCode;
+    section.properties.Add(subtitle); section.defaults.Set("subtitle", "Summary");
+    UiDesignerPropertySpec copy = UiDesignerTextProperty("copy", "Copy");
+    copy.group = "Section"; copy.impact = PropertyImpactStructure | PropertyImpactCode;
+    section.properties.Add(copy); section.defaults.Set("copy", "Overview content");
+    UiDesignerPropertySpec open = UiDesignerBoolProperty("open", "Open", true);
+    open.group = "Section"; open.impact = PropertyImpactControlState | PropertyImpactCode;
+    section.properties.Add(open); section.defaults.Set("open", true);
+    UiDesignerPropertySpec lock = ChoiceProperty("lock", "Lock", "Section", "None",
+        {{"None", "None"}, {"Open", "Open"}, {"Closed", "Closed"}},
+        PropertyImpactControlState | PropertyImpactCode);
+    section.properties.Add(lock); section.defaults.Set("lock", "None");
+    catalog.Register(pick(section));
 }
 
 static void RegisterPresets(UiDesignerCatalog& catalog)

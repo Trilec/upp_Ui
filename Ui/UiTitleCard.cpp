@@ -368,6 +368,7 @@ UiTitleCard& UiTitleCard::EnableHover(bool on)
 
 UiTitleCard& UiTitleCard::SetSelectable(bool on)
 {
+    selectable_ = on;
     if(on)
         WantFocus();
     else
@@ -1101,20 +1102,27 @@ void UiTitleCard::LeftDown(Point, dword)
     if(!IsEnabled())
         return;
     SetFocus();
+    if(selectable_)
+        SetCapture();
     const Style& style = GetEffectiveStyle();
-    if(style.hover_enabled) {
+    if(style.hover_enabled || selectable_) {
         down_ = true;
         Refresh();
     }
 }
 
-void UiTitleCard::LeftUp(Point, dword)
+void UiTitleCard::LeftUp(Point p, dword)
 {
     const Style& style = GetEffectiveStyle();
-    if(style.hover_enabled) {
+    const bool valid = selectable_ && IsEnabled() && Rect(GetSize()).Contains(p);
+    if(HasCapture())
+        ReleaseCapture();
+    if(style.hover_enabled || selectable_) {
         down_ = false;
         Refresh();
     }
+    if(valid)
+        WhenAction();
 }
 
 }
