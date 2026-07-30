@@ -50,6 +50,11 @@ UiTitleCard::UiTitleCard()
     OnStyleChanged();
 }
 
+UiTitleCard::~UiTitleCard()
+{
+    CancelMode();
+}
+
 void UiTitleCard::InvalidateStyleCache()
 {
     theme_revision_ = 0;
@@ -113,6 +118,16 @@ void UiTitleCard::OnStyleChanged()
     InvalidateTextCache();
     RefreshLayout();
     Refresh();
+}
+
+void UiTitleCard::CancelMode()
+{
+    if(press_captured_ && HasCapture())
+        ReleaseCapture();
+    pressed_ = false;
+    press_captured_ = false;
+    Refresh();
+    Ctrl::CancelMode();
 }
 
 UiTitleCard& UiTitleCard::SetTitle(const String& s)
@@ -347,21 +362,11 @@ UiTitleCard& UiTitleCard::ShowCardLine(bool on)
     return *this;
 }
 
-void UiTitleCard::ChildRemoved(Ctrl *child)
-{
-    Ctrl::ChildRemoved(child);
-    if(child == content_cell_) {
-        content_cell_ = nullptr;
-        RefreshLayout();
-        Refresh();
-    }
-}
-
 UiTitleCard& UiTitleCard::EnableHover(bool on)
 {
     StyleEdit().hover_enabled = on;
     if(!on)
-        hot_ = down_ = false;
+        hot_ = false;
     Refresh();
     return *this;
 }
@@ -683,7 +688,7 @@ void UiTitleCard::Paint(Draw& w)
     const Style& style = GetEffectiveStyle();
     StyledState st = ST_DISABLED;
     if(IsEnabled()) {
-        if(style.hover_enabled && down_)
+        if(pressed_)
             st = ST_PRESSED;
         else if(style.hover_enabled && hot_)
             st = ST_HOT;
@@ -1092,7 +1097,8 @@ void UiTitleCard::MouseLeave()
     const Style& style = GetEffectiveStyle();
     if(style.hover_enabled) {
         hot_ = false;
-        down_ = false;
+        if(!press_captured_)
+            pressed_ = false;
         Refresh();
     }
 }
@@ -1102,27 +1108,38 @@ void UiTitleCard::LeftDown(Point, dword)
     if(!IsEnabled())
         return;
     SetFocus();
-    if(selectable_)
+    if(selectable_) {
         SetCapture();
+        press_captured_ = true;
+    }
     const Style& style = GetEffectiveStyle();
-    if(style.hover_enabled || selectable_) {
-        down_ = true;
+    if(selectable_ || style.hover_enabled) {
+        pressed_ = true;
         Refresh();
     }
 }
 
 void UiTitleCard::LeftUp(Point p, dword)
 {
-    const Style& style = GetEffectiveStyle();
-    const bool valid = selectable_ && IsEnabled() && Rect(GetSize()).Contains(p);
+    const bool valid = selectable_ && IsEnabled() && Rect(GetSize()).Contains(p) && pressed_;
     if(HasCapture())
         ReleaseCapture();
-    if(style.hover_enabled || selectable_) {
-        down_ = false;
+    const bool had_press = pressed_;
+    pressed_ = false;
+    press_captured_ = false;
+    Refresh();
+    if(valid && had_press)
+        WhenAction();
+}
+
+void UiTitleCard::ChildRemoved(Ctrl *child)
+{
+    Ctrl::ChildRemoved(child);
+    if(child == content_cell_) {
+        content_cell_ = nullptr;
+        RefreshLayout();
         Refresh();
     }
-    if(valid)
-        WhenAction();
 }
 
 }

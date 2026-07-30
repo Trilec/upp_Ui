@@ -43,6 +43,53 @@ static UiDesignerChangeImpact PlacementImpact(const String& property)
     return UiDesignerImpactControlState | UiDesignerImpactCode;
 }
 
+static bool IsAccordionLockValue(const String& lock)
+{
+    return lock == "None" || lock == "Open" || lock == "Closed";
+}
+
+static bool IsAccordionSectionNode(const UiDesignerNode* node)
+{
+    return node && node->type == "UiAccordionSection";
+}
+
+static String MakeUniqueAccordionSectionKey(const UiDesignerDocument& document,
+                                           const UiDesignerNode& owner)
+{
+    int suffix = max(1, owner.children.GetCount() + 1);
+    for(;; suffix++) {
+        const String key = "section_" + AsString(suffix);
+        bool used = false;
+        for(UiDesignerNodeId child_id : owner.children) {
+            const UiDesignerNode* child = document.Find(child_id);
+            if(child && child->type == "UiAccordionSection" &&
+               child->GetProperty("key", "") == key) {
+                used = true;
+                break;
+            }
+        }
+        if(!used)
+            return key;
+    }
+}
+
+static String MakeUniqueAccordionSectionName(const UiDesignerDocument& document,
+                                            UiDesignerNodeId accordion,
+                                            const String& key)
+{
+    String name = "accordion_" + AsString(accordion) + "_" + key;
+    Index<String> names;
+    for(const UiDesignerNode& node : document.GetNodes())
+        names.Add(node.name);
+    if(names.Find(name) < 0)
+        return name;
+    for(int suffix = 2; ; suffix++) {
+        String candidate = name + "_" + AsString(suffix);
+        if(names.Find(candidate) < 0)
+            return candidate;
+    }
+}
+
 UiDesignerCommandService::UiDesignerCommandService(UiDesignerDocument& document)
     : document_(document)
 {
@@ -605,7 +652,9 @@ bool UiDesignerCommandService::SetActiveTabPage(UiDesignerNodeId tab, UiDesigner
 }
 
 UiDesignerNodeId UiDesignerCommandService::AddAccordionSection(
-    UiDesignerNodeId accordion, const String& title)
+    UiDesignerNodeId accordion, const String& title,
+    const String& subtitle, const String& copy, bool open,
+    const String& lock)
 {
     const UiDesignerNode *owner = document_.Find(accordion);
     if(!owner || owner->type != "UiAccordion") {
@@ -616,15 +665,20 @@ UiDesignerNodeId UiDesignerCommandService::AddAccordionSection(
         last_error_ = "Accordion section title cannot be empty";
         return 0;
     }
-    int n = owner->children.GetCount() + 1;
-    String key;
-    do key = "section_" + AsString(n++);
-    while(owner->children.GetCount() && [&] { for(UiDesignerNodeId id : owner->children) if(document_.Find(id)->GetProperty("key", "") == key) return true; return false; }());
-    const String name = "accordion_" + AsString(accordion) + "_" + key;
+    if(!IsAccordionLockValue(lock)) {
+        last_error_ = "Accordion section lock value is invalid";
+        return 0;
+    }
+
+    const String key = MakeUniqueAccordionSectionKey(document_, *owner);
+    const String name = MakeUniqueAccordionSectionName(document_, accordion, key);
     ValueMap defaults;
-    defaults.Set("key", key); defaults.Set("title", title);
-    defaults.Set("subtitle", ""); defaults.Set("copy", "");
-    defaults.Set("open", false); defaults.Set("lock", "None");
+    defaults.Set("key", key);
+    defaults.Set("title", title);
+    defaults.Set("subtitle", subtitle);
+    defaults.Set("copy", copy);
+    defaults.Set("open", lock == "Open" ? true : lock == "Closed" ? false : open);
+    defaults.Set("lock", lock);
     return AddNode("UiAccordionSection", name, accordion,
                    UiDesignerNodeStructural | UiDesignerNodeSemanticItem,
                    defaults, "Add Accordion section");
@@ -634,7 +688,7 @@ bool UiDesignerCommandService::RemoveAccordionSection(UiDesignerNodeId section)
 {
     const UiDesignerNode *s = document_.Find(section);
     const UiDesignerNode *owner = s ? document_.Find(s->parent) : nullptr;
-    if(!s || s->type != "UiAccordionSection" || !owner || owner->type != "UiAccordion") {
+    if(!IsAccordionSectionNode(s) || !owner || owner->type != "UiAccordion") {
         last_error_ = "Accordion section owner is invalid";
         return false;
     }
@@ -645,36 +699,245 @@ bool UiDesignerCommandService::RemoveAccordionSection(UiDesignerNodeId section)
     return RemoveNode(section, "Remove Accordion section");
 }
 
-bool UiDesignerCommandService::RenameAccordionSection(UiDesignerNodeId section, const String& title)
+bool UiDesignerCommandService::RenameAccordionSection(UiDesignerNodeId section,
+                                                     const String& title)
+{
+    return SetAccordionSectionTitle(section, title);
+}
+
+bool UiDesignerCommandService::MoveAccordionSection(UiDesignerNodeId section,
+                                                    int index)
+{
+    const UiDesignerNode *s = document_.Find(section);
+    const UiDesignerNode *owner = s ? document_.Find(s->parent) : nullptr;
+    if(!IsAccordionSectionNode(s) || !owner || owner->type != "UiAccordion") {
+        last_error_ = "Accordion section owner is invalid";
+        return false;
+    }
+    if(index < 0 || index >= owner->children.GetCount()) {
+        last_error_ = "Invalid Accordion section destination";
+        return false;
+    }
+    return MoveNode(section, owner->id, index, "Move Accordion section");
+}
+
+bool UiDesignerCommandService::SetAccordionSectionTitle(UiDesignerNodeId section,
+                                                        const String& title)
 {
     if(TrimBoth(title).IsEmpty()) {
         last_error_ = "Accordion section title cannot be empty";
         return false;
     }
-    return SetAccordionSectionProperty(section, "title", title);
+    return SetProperty(section, "title", title,
+                       UiDesignerImpactStructure | UiDesignerImpactControlState |
+                       UiDesignerImpactCode, "Set Accordion section title");
+}
+
+bool UiDesignerCommandService::SetAccordionSectionSubtitle(
+    UiDesignerNodeId section, const String& subtitle)
+{
+    return SetProperty(section, "subtitle", subtitle,
+                       UiDesignerImpactStructure | UiDesignerImpactControlState |
+                       UiDesignerImpactCode, "Set Accordion section subtitle");
+}
+
+bool UiDesignerCommandService::SetAccordionSectionCopy(
+    UiDesignerNodeId section, const String& copy)
+{
+    return SetProperty(section, "copy", copy,
+                       UiDesignerImpactStructure | UiDesignerImpactControlState |
+                       UiDesignerImpactCode, "Set Accordion section copy");
+}
+
+bool UiDesignerCommandService::SetAccordionSectionOpen(UiDesignerNodeId section,
+                                                       bool open)
+{
+    const UiDesignerNode *s = document_.Find(section);
+    const UiDesignerNode *owner = s ? document_.Find(s->parent) : nullptr;
+    if(!IsAccordionSectionNode(s) || !owner || owner->type != "UiAccordion") {
+        last_error_ = "Accordion section owner is invalid";
+        return false;
+    }
+    const String lock = AsString(s->GetProperty("lock", "None"));
+    if(lock == "Open" && !open) {
+        last_error_ = "Accordion section is locked open";
+        return false;
+    }
+    if(lock == "Closed" && open) {
+        last_error_ = "Accordion section is locked closed";
+        return false;
+    }
+    if(!(bool)owner->GetProperty("single_open", false))
+        return SetProperty(section, "open", open,
+                           UiDesignerImpactStructure | UiDesignerImpactControlState |
+                           UiDesignerImpactCode, "Set Accordion section open");
+
+    return ApplyAtomic("Set Accordion section open",
+        [&](UiDesignerChangeSet& aggregate) {
+            const UiDesignerNode* current = document_.Find(section);
+            const UiDesignerNode* current_owner = current ? document_.Find(current->parent) : nullptr;
+            if(!IsAccordionSectionNode(current) || !current_owner || current_owner->type != "UiAccordion") {
+                last_error_ = "Accordion section owner is invalid";
+                return false;
+            }
+            if(!open) {
+                int open_count = 0;
+                for(UiDesignerNodeId child_id : current_owner->children) {
+                    const UiDesignerNode* child = document_.Find(child_id);
+                    if(IsAccordionSectionNode(child) &&
+                       child->GetProperty("open", false) &&
+                       child->GetProperty("lock", "None") != "Closed")
+                        open_count++;
+                }
+                const bool current_open = current->GetProperty("open", false);
+                const bool current_permitted =
+                    current->GetProperty("lock", "None") != "Closed";
+                if(current_open && current_permitted && open_count <= 1 &&
+                   current_owner->GetProperty("enforce_one", false)) {
+                    last_error_ = "Accordion must keep one section open";
+                    return false;
+                }
+            }
+
+            const Value old_open = current->GetProperty("open", false);
+            if(!document_.SetProperty(section, "open", open,
+                                      UiDesignerImpactStructure |
+                                      UiDesignerImpactControlState |
+                                      UiDesignerImpactCode)) {
+                last_error_ = "Unable to set Accordion section open";
+                return false;
+            }
+            UiDesignerPropertyChange& change = aggregate.properties.Add();
+            change.node = section;
+            change.property = "open";
+            change.old_value = old_open;
+            change.new_value = open;
+            change.impact = UiDesignerImpactStructure |
+                            UiDesignerImpactControlState |
+                            UiDesignerImpactCode;
+            change.kind = UiDesignerPropertyChangeKind::Normal;
+
+            if(open) {
+                for(UiDesignerNodeId child_id : current_owner->children) {
+                    if(child_id == section)
+                        continue;
+                    const UiDesignerNode* child = document_.Find(child_id);
+                    if(!IsAccordionSectionNode(child))
+                        continue;
+                    if(child->GetProperty("lock", "None") == "Open" ||
+                       child->GetProperty("lock", "None") == "Closed")
+                        continue;
+                    if(!current_owner->GetProperty("single_open", false))
+                        continue;
+                    const Value other_old = child->GetProperty("open", false);
+                    if(other_old == false)
+                        continue;
+                    if(!document_.SetProperty(child_id, "open", false,
+                                              UiDesignerImpactStructure |
+                                              UiDesignerImpactControlState |
+                                              UiDesignerImpactCode)) {
+                        last_error_ = "Unable to close Accordion section";
+                        return false;
+                    }
+                    UiDesignerPropertyChange& other = aggregate.properties.Add();
+                    other.node = child_id;
+                    other.property = "open";
+                    other.old_value = other_old;
+                    other.new_value = false;
+                    other.impact = UiDesignerImpactStructure |
+                                   UiDesignerImpactControlState |
+                                   UiDesignerImpactCode;
+                    other.kind = UiDesignerPropertyChangeKind::Normal;
+                }
+            }
+            return true;
+        });
+}
+
+bool UiDesignerCommandService::SetAccordionSectionLock(UiDesignerNodeId section,
+                                                       const String& lock)
+{
+    const UiDesignerNode *s = document_.Find(section);
+    const UiDesignerNode *owner = s ? document_.Find(s->parent) : nullptr;
+    if(!IsAccordionSectionNode(s) || !owner || owner->type != "UiAccordion") {
+        last_error_ = "Accordion section owner is invalid";
+        return false;
+    }
+    if(!IsAccordionLockValue(lock)) {
+        last_error_ = "Accordion section lock value is invalid";
+        return false;
+    }
+    return ApplyAtomic("Set Accordion section lock",
+        [&](UiDesignerChangeSet& aggregate) {
+            const UiDesignerNode* current = document_.Find(section);
+            const UiDesignerNode* current_owner = current ? document_.Find(current->parent) : nullptr;
+            if(!IsAccordionSectionNode(current) || !current_owner || current_owner->type != "UiAccordion") {
+                last_error_ = "Accordion section owner is invalid";
+                return false;
+            }
+            const String old_lock = current->GetProperty("lock", "None");
+            const bool old_open = current->GetProperty("open", false);
+            bool new_open = old_open;
+            if(lock == "Open")
+                new_open = true;
+            else if(lock == "Closed")
+                new_open = false;
+
+            if(old_open != new_open) {
+                if(!document_.SetProperty(section, "open", new_open,
+                                          UiDesignerImpactStructure |
+                                          UiDesignerImpactControlState |
+                                          UiDesignerImpactCode)) {
+                    last_error_ = "Unable to set Accordion section open";
+                    return false;
+                }
+                UiDesignerPropertyChange& open_change = aggregate.properties.Add();
+                open_change.node = section;
+                open_change.property = "open";
+                open_change.old_value = old_open;
+                open_change.new_value = new_open;
+                open_change.impact = UiDesignerImpactStructure |
+                                     UiDesignerImpactControlState |
+                                     UiDesignerImpactCode;
+                open_change.kind = UiDesignerPropertyChangeKind::Normal;
+            }
+            if(old_lock != lock) {
+                if(!document_.SetProperty(section, "lock", lock,
+                                          UiDesignerImpactStructure |
+                                          UiDesignerImpactControlState |
+                                          UiDesignerImpactCode)) {
+                    last_error_ = "Unable to set Accordion section lock";
+                    return false;
+                }
+                UiDesignerPropertyChange& lock_change = aggregate.properties.Add();
+                lock_change.node = section;
+                lock_change.property = "lock";
+                lock_change.old_value = old_lock;
+                lock_change.new_value = lock;
+                lock_change.impact = UiDesignerImpactStructure |
+                                     UiDesignerImpactControlState |
+                                     UiDesignerImpactCode;
+                lock_change.kind = UiDesignerPropertyChangeKind::Normal;
+            }
+            return true;
+        });
 }
 
 bool UiDesignerCommandService::SetAccordionSectionProperty(
     UiDesignerNodeId section, const String& property, const Value& value)
 {
-    const UiDesignerNode *s = document_.Find(section);
-    const UiDesignerNode *owner = s ? document_.Find(s->parent) : nullptr;
-    if(!s || s->type != "UiAccordionSection" || !owner || owner->type != "UiAccordion") {
-        last_error_ = "Accordion section owner is invalid";
-        return false;
-    }
-    if(property == "title" && TrimBoth(AsString(value)).IsEmpty()) {
-        last_error_ = "Accordion section title cannot be empty";
-        return false;
-    }
-    if(property == "lock" && AsString(value) != "None" &&
-       AsString(value) != "Open" && AsString(value) != "Closed") {
-        last_error_ = "Accordion section lock value is invalid";
-        return false;
-    }
-    return SetProperty(section, property, value,
-                       UiDesignerImpactStructure | UiDesignerImpactControlState |
-                       UiDesignerImpactCode, "Edit Accordion section");
+    if(property == "title")
+        return SetAccordionSectionTitle(section, AsString(value));
+    if(property == "subtitle")
+        return SetAccordionSectionSubtitle(section, AsString(value));
+    if(property == "copy")
+        return SetAccordionSectionCopy(section, AsString(value));
+    if(property == "open")
+        return SetAccordionSectionOpen(section, (bool)value);
+    if(property == "lock")
+        return SetAccordionSectionLock(section, AsString(value));
+    last_error_ = "Unknown Accordion section property";
+    return false;
 }
 
 bool UiDesignerCommandService::RemoveActionBinding(

@@ -42,6 +42,41 @@ static UiPanel::Style UiDesignerFooterStyle(
     return style;
 }
 
+static UiDesignerNodeId SelectedModelNodeId(const Value& value)
+{
+    return IsNull(value) ? 0 : (UiDesignerNodeId)(int64)value;
+}
+
+static const UiDesignerNode* ResolveAccordionOwner(const UiDesignerDocument& document,
+                                                   const UiDesignerNode* node)
+{
+    if(!node)
+        return nullptr;
+    if(node->type == "UiAccordion")
+        return node;
+    if(node->type == "UiAccordionSection")
+        return document.Find(node->parent);
+    return nullptr;
+}
+
+static const UiDesignerNode* ResolveAccordionSection(const UiDesignerDocument& document,
+                                                     UiDesignerNodeId section_id)
+{
+    const UiDesignerNode* section = document.Find(section_id);
+    if(!section || section->type != "UiAccordionSection")
+        return nullptr;
+    const UiDesignerNode* owner = document.Find(section->parent);
+    return owner && owner->type == "UiAccordion" ? section : nullptr;
+}
+
+static int FindChildIndex(const UiDesignerNode& parent, UiDesignerNodeId child)
+{
+    for(int i = 0; i < parent.children.GetCount(); i++)
+        if(parent.children[i] == child)
+            return i;
+    return -1;
+}
+
 static UiScrollPanel::Style UiDesignerPreviewStyle()
 {
     UiScrollPanel::Style style = UiTheme::ResolveScrollPanel(UiRole::Subtle);
@@ -262,9 +297,12 @@ void UiDesignerWindow::BuildDesigner()
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
     data_list_.SetModel(data_model_).SetSelectionMode(UILISTSEL_SINGLE);
+    data_editor_.SetStyle(UiDesignerInspectorStyle());
+    data_editor_.SetModel(&data_editor_model_);
     data_panel_.Add(data_layout_);
     data_layout_.SetDirection(UiDirection::V).SetGap(DPI(4), DPI(4)).SetInset(DPI(6));
     data_layout_.Add(data_list_.SizePos());
+    data_layout_.Add(data_editor_).Fixed(DPI(176)).MinCross(DPI(24));
     data_layout_.Add(data_actions_);
     data_actions_.SetDirection(UiDirection::H).SetWrap(UiBoxWrap::Flow).SetGap(DPI(3), DPI(3));
     data_actions_.Add(data_add_); data_actions_.Add(data_remove_); data_actions_.Add(data_rename_);
@@ -532,16 +570,77 @@ void UiDesignerWindow::ConnectServices()
         PostSelectionDetailsRefresh();
         RequestDiagnosticsRefresh();
     };
+    data_editor_.WhenCommit = [=](const String& id, const Value& value) {
+        const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
+        if(!owner || owner->type != "UiAccordion")
+            return;
+        const UiDesignerNodeId section = SelectedModelNodeId(data_list_.GetData());
+        if(!section)
+            return;
+        String error;
+        bool ok = false;
+        if(id == "title")
+            ok = session_.Commands().SetAccordionSectionTitle(section, AsString(value));
+        else if(id == "subtitle")
+            ok = session_.Commands().SetAccordionSectionSubtitle(section, AsString(value));
+        else if(id == "copy")
+            ok = session_.Commands().SetAccordionSectionCopy(section, AsString(value));
+        else if(id == "open")
+            ok = session_.Commands().SetAccordionSectionOpen(section, (bool)value);
+        else if(id == "lock")
+            ok = session_.Commands().SetAccordionSectionLock(section, AsString(value));
+        if(!ok)
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_editor_.WhenReset = [=](const String& id) {
+        const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
+        if(!owner || owner->type != "UiAccordion")
+            return;
+        const UiDesignerNodeId section = SelectedModelNodeId(data_list_.GetData());
+        if(!section)
+            return;
+        const UiDesignerNode* current = ResolveAccordionSection(session_.Document(), section);
+        if(!current)
+            return;
+        bool ok = false;
+        if(id == "title")
+            ok = session_.Commands().SetAccordionSectionTitle(section, current->GetProperty("title", String()));
+        else if(id == "subtitle")
+            ok = session_.Commands().SetAccordionSectionSubtitle(section, current->GetProperty("subtitle", String()));
+        else if(id == "copy")
+            ok = session_.Commands().SetAccordionSectionCopy(section, current->GetProperty("copy", String()));
+        else if(id == "open")
+            ok = session_.Commands().SetAccordionSectionOpen(section, current->GetProperty("open", false));
+        else if(id == "lock")
+            ok = session_.Commands().SetAccordionSectionLock(section, current->GetProperty("lock", "None"));
+        if(!ok)
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
     data_list_.EnableRenameOnDblClick(true);
     data_list_.WhenSelection = [=] {
         if(!data_projection_refreshing_) RefreshData();
     };
     data_list_.WhenRename = [=](int index, const String& title) {
         if(index < 0 || index >= data_model_.GetCount()) return;
-        const UiDesignerNodeId page = (UiDesignerNodeId)(int64)data_model_.Get(index).data;
-        if(!session_.Commands().RenameTabPage(page, title))
-            RefreshStatus(session_.Commands().GetLastError());
+        const UiDesignerNodeId item_id = SelectedModelNodeId(data_model_.Get(index).data);
+        const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            if(!session_.Commands().RenameAccordionSection(item_id, title))
+                RefreshStatus(session_.Commands().GetLastError());
+        }
+        else if(node && node->type == "UiTab") {
+            if(!session_.Commands().RenameTabPage(item_id, title))
+                RefreshStatus(session_.Commands().GetLastError());
+        }
         RefreshData();
+    };
+    auto SelectedDataNode = [=]() -> const UiDesignerNode* {
+        return ResolveAccordionSection(session_.Document(), SelectedModelNodeId(data_list_.GetData()));
     };
     auto SelectedTabPage = [=]() -> UiDesignerNodeId {
         const Value v = data_list_.GetData();
@@ -552,31 +651,147 @@ void UiDesignerWindow::ConnectServices()
         if(!p) return -1;
         const UiDesignerNode *parent = session_.Document().Find(p->parent);
         if(!parent) return -1;
-        for(int i = 0; i < parent->children.GetCount(); i++)
-            if(parent->children[i] == page) return i;
-        return -1;
+        return FindChildIndex(*parent, page);
     };
     data_rename_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            if(!section)
+                return;
+            String title = section->GetProperty("title", section->name);
+            if(EditText(title, "Rename Accordion section", "Title") &&
+               !session_.Commands().RenameAccordionSection(section->id, title))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
         const UiDesignerNodeId page = SelectedTabPage();
-        const UiDesignerNode *p = session_.Document().Find(page);
-        if(!p) return;
-        String title = p->GetProperty("title", p->name);
+        const UiDesignerNode *page_node = session_.Document().Find(page);
+        if(!page_node) return;
+        String title = page_node->GetProperty("title", page_node->name);
         if(EditText(title, "Rename Tab page", "Title") &&
            !session_.Commands().RenameTabPage(page, title))
             RefreshStatus(session_.Commands().GetLastError());
         RefreshData();
     };
     data_add_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            if(!session_.Commands().AddAccordionSection(owner->id, "New Section"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
         const UiDesignerNode *tab = session_.Document().Find(session_.State().selection.primary);
         if(tab && tab->type == "UiTab" && !session_.Commands().AddTabPage(tab->id, "New Page"))
             RefreshStatus(session_.Commands().GetLastError());
         RefreshData();
     };
-    data_remove_.WhenAction = [=] { if(!session_.Commands().RemoveTabPage(SelectedTabPage())) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
-    data_up_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1))) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
-    data_down_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1)) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
-    data_enable_.WhenAction = [=] { const UiDesignerNode *p=session_.Document().Find(SelectedTabPage()); if(p && !session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true))) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
-    data_active_.WhenAction = [=] { const UiDesignerNodeId tab = session_.State().selection.primary; const UiDesignerNodeId page = SelectedTabPage(); if(page && !session_.Commands().SetActiveTabPage(tab, page)) RefreshStatus(session_.Commands().GetLastError()); RefreshData(); };
+    data_remove_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            if(section && !session_.Commands().RemoveAccordionSection(section->id))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        if(!session_.Commands().RemoveTabPage(SelectedTabPage()))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_up_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            const int index = section ? FindChildIndex(*owner, section->id) : -1;
+            if(section && index > 0 &&
+               !session_.Commands().MoveAccordionSection(section->id, index - 1))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        const UiDesignerNode *p = session_.Document().Find(SelectedTabPage());
+        if(p && !session_.Commands().MoveTabPage(p->id, max(0, PageIndex(p->id)-1)))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_down_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            const int index = section ? FindChildIndex(*owner, section->id) : -1;
+            if(section && index >= 0 && index + 1 < owner->children.GetCount() &&
+               !session_.Commands().MoveAccordionSection(section->id, index + 1))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        const UiDesignerNode *p = session_.Document().Find(SelectedTabPage());
+        if(p && !session_.Commands().MoveTabPage(p->id, PageIndex(p->id)+1))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_enable_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            if(!section)
+                return;
+            const String lock = section->GetProperty("lock", "None");
+            if(lock == "Open") {
+                if(!session_.Commands().SetAccordionSectionOpen(section->id, false))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            else if(lock == "Closed") {
+                if(!session_.Commands().SetAccordionSectionOpen(section->id, true))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            else {
+                if(!session_.Commands().SetAccordionSectionOpen(section->id, !section->GetProperty("open", false)))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
+        const UiDesignerNode *p = session_.Document().Find(SelectedTabPage());
+        if(p && !session_.Commands().SetTabPageEnabled(p->id, !p->GetProperty("enabled", true)))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
+    data_active_.WhenAction = [=] {
+        const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
+        if(owner && owner->type == "UiAccordion") {
+            const UiDesignerNode *section = SelectedDataNode();
+            if(!section)
+                return;
+            const String lock = section->GetProperty("lock", "None");
+            const bool open = section->GetProperty("open", false);
+            if(lock == "None") {
+                if(!session_.Commands().SetAccordionSectionLock(section->id, open ? "Open" : "Closed"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            else {
+                if(!session_.Commands().SetAccordionSectionLock(section->id, "None"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
+        const UiDesignerNodeId tab = session_.State().selection.primary;
+        const UiDesignerNodeId page = SelectedTabPage();
+        if(page && !session_.Commands().SetActiveTabPage(tab, page))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
     session_.WhenInspectorChanged = [=] { RefreshInspector(); };
     session_.WhenBehaviorChanged = [=] { RefreshBehavior(); };
     session_.WhenCodeChanged = [=] { RefreshCode(); };
@@ -755,11 +970,16 @@ void UiDesignerWindow::RefreshData()
     if(data_projection_refreshing_)
         return;
     data_projection_refreshing_ = true;
-    const Value prior = data_list_.GetData();
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
+    const UiDesignerNode* accordion_owner = ResolveAccordionOwner(session_.Document(), node);
+    const auto Finish = [&] {
+        data_projection_refreshing_ = false;
+    };
     data_model_.Clear();
+    data_editor_model_.Clear();
     if(node && node->type == "UiTab") {
+        const Value prior = data_list_.GetData();
         for(UiDesignerNodeId id : node->children) {
             const UiDesignerNode *page = session_.Document().Find(id);
             if(page && page->type == "UiTabPage")
@@ -780,26 +1000,71 @@ void UiDesignerWindow::RefreshData()
         data_enable_.Enable(selected >= 0);
         data_active_.Enable(!IsNull(data_list_.GetData()) && data_list_.GetData() != node->GetProperty("active_page", Value()));
         data_enable_.SetText(selected >= 0 && data_model_.Get(selected).enabled ? "Disable" : "Enable");
-        data_projection_refreshing_ = false;
+        data_editor_.SetModel(&data_editor_model_);
+        data_editor_model_.StructureChanged();
+        Finish();
         return;
     }
-    if(node && node->type == "UiAccordion") {
-        for(UiDesignerNodeId id : node->children) {
+    if(accordion_owner && accordion_owner->type == "UiAccordion") {
+        const Value prior = data_list_.GetData();
+        for(UiDesignerNodeId id : accordion_owner->children) {
             const UiDesignerNode *section = session_.Document().Find(id);
             if(section && section->type == "UiAccordionSection")
                 data_model_.Add(AsString(section->GetProperty("title", section->name)),
                                 section->id, section->GetProperty("open", false));
         }
-        data_list_.SetData(data_model_.GetCount() ? data_model_.Get(0).data : Value());
-        data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
-        data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
-        data_enable_.SetText("Open");
-        data_projection_refreshing_ = false;
+        bool keep = false;
+        for(int i = 0; i < data_model_.GetCount(); i++)
+            keep |= data_model_.Get(i).data == prior;
+        if(!keep && data_model_.GetCount() > 0)
+            data_list_.SetData(data_model_.Get(0).data);
+        else
+            data_list_.SetData(prior);
+
+        const UiDesignerNode* section = ResolveAccordionSection(session_.Document(), SelectedModelNodeId(data_list_.GetData()));
+        const int index = section ? FindChildIndex(*accordion_owner, section->id) : -1;
+        const String lock = section ? AsString(section->GetProperty("lock", "None")) : "None";
+        const bool open = section ? (bool)section->GetProperty("open", false) : false;
+        data_add_.Enable(true);
+        data_remove_.Enable(section && accordion_owner->children.GetCount() > 1);
+        data_rename_.Enable(section != nullptr);
+        data_up_.Enable(section && index > 0);
+        data_down_.Enable(section && index >= 0 && index + 1 < accordion_owner->children.GetCount());
+        data_enable_.Enable(section && lock != "Open" && lock != "Closed");
+        data_active_.Enable(section != nullptr);
+        data_enable_.SetText(open ? "Close" : "Open");
+        data_active_.SetText(lock == "None"
+            ? (open ? "Lock Open" : "Lock Closed")
+            : "Unlock");
+
+        if(section) {
+            data_editor_model_.Add("title", "Title", PropertyEditorKind::Text,
+                                   section->GetProperty("title", section->name),
+                                   "Section");
+            data_editor_model_.Add("subtitle", "Subtitle", PropertyEditorKind::Text,
+                                   section->GetProperty("subtitle", String()),
+                                   "Section");
+            data_editor_model_.Add("copy", "Copy", PropertyEditorKind::Text,
+                                   section->GetProperty("copy", String()),
+                                   "Section");
+            data_editor_model_.Add("open", "Open", PropertyEditorKind::Boolean,
+                                   section->GetProperty("open", false),
+                                   "Section");
+            PropertyEditorItem& lock_item = data_editor_model_.Add(
+                "lock", "Lock", PropertyEditorKind::Choice,
+                section->GetProperty("lock", "None"), "Section");
+            lock_item.choices.Add(PropertyEditorChoice("None", "None"));
+            lock_item.choices.Add(PropertyEditorChoice("Open", "Open"));
+            lock_item.choices.Add(PropertyEditorChoice("Closed", "Closed"));
+        }
+        data_editor_model_.StructureChanged();
+        data_editor_.SetModel(&data_editor_model_);
+        Finish();
         return;
     }
     String data_status = "Select a control to view data";
     if(node) {
-        if(node->type == "UiAccordion") data_status = "Accordion section data is not implemented yet.";
+        if(node->type == "UiAccordion") data_status = "Accordion sections are not selected.";
         else if(node->type == "UiTree") data_status = "Tree item data is not implemented yet.";
         else if(node->type == "UiList") data_status = "List item data is not implemented yet.";
         else if(node->type == "UiDropdown") data_status = "Dropdown item data is not implemented yet.";
@@ -812,7 +1077,9 @@ void UiDesignerWindow::RefreshData()
     data_add_.Enable(false); data_remove_.Enable(false); data_rename_.Enable(false);
     data_up_.Enable(false); data_down_.Enable(false); data_enable_.Enable(false); data_active_.Enable(false);
     data_enable_.SetText("Enable");
-    data_projection_refreshing_ = false;
+    data_editor_.SetModel(&data_editor_model_);
+    data_editor_model_.StructureChanged();
+    Finish();
 }
 
 void UiDesignerWindow::RefreshBehavior()

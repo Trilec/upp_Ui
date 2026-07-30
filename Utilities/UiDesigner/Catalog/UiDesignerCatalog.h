@@ -10,6 +10,7 @@ enum class UiDesignerRuntimeKind : word {
     Placeholder = 0,
     SemanticSpacer,
     SemanticTabPage,
+    SemanticAccordionSection,
     UiLabel,
     UiCheckBox,
     UiRadioButton,

@@ -7,6 +7,8 @@
 #include <Ui/UiList.h>
 #include <Ui/UiMenu.h>
 #include <Ui/UiColorPicker.h>
+#include <Ui/UiTitleCard.h>
+#include <Ui/UiAccordion.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -54,6 +56,23 @@ static String CppString(const String& text)
     }
     out << "\"";
     return out;
+}
+
+static String EmitRoleExpr(const String& value)
+{
+    if(value == "Subtle") return "UiRole::Subtle";
+    if(value == "Accent") return "UiRole::Accent";
+    if(value == "Alert") return "UiRole::Alert";
+    return "UiRole::Standard";
+}
+
+static String EmitAlign(const String& value)
+{
+    if(value == "Left") return "UiAlign::LEFT";
+    if(value == "Right") return "UiAlign::RIGHT";
+    if(value == "Top") return "UiAlign::TOP";
+    if(value == "Bottom") return "UiAlign::BOTTOM";
+    return "UiAlign::CENTER";
 }
 
 static String EmitValue(const Value& value)
@@ -2063,6 +2082,524 @@ public:
     }
 };
 
+static UiTitleCard::Style ResolveTitleCardThemeBase(UiRole role)
+{
+    return UiTheme::ResolveTitleCard(role);
+}
+
+static void ApplyTitleCardThemeField(UiTitleCard::Style& style,
+                                     const String& field_id,
+                                     const Value& value)
+{
+    if(field_id == "face_enabled") style.metrics.face_enabled = (bool)value;
+    else if(field_id == "face_normal") style.palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
+    else if(field_id == "face_hot") style.palette.face[ST_HOT] = UiFill::Solid((Color)value);
+    else if(field_id == "face_pressed") style.palette.face[ST_PRESSED] = UiFill::Solid((Color)value);
+    else if(field_id == "face_disabled") style.palette.face[ST_DISABLED] = UiFill::Solid((Color)value);
+    else if(field_id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
+    else if(field_id == "frame_normal") style.palette.frame[ST_NORMAL] = (Color)value;
+    else if(field_id == "frame_hot") style.palette.frame[ST_HOT] = (Color)value;
+    else if(field_id == "frame_pressed") style.palette.frame[ST_PRESSED] = (Color)value;
+    else if(field_id == "frame_disabled") style.palette.frame[ST_DISABLED] = (Color)value;
+    else if(field_id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(field_id == "radius") style.metrics.radius = max(0, (int)value);
+    else if(field_id == "text_normal") style.palette.ink[ST_NORMAL] = (Color)value;
+    else if(field_id == "text_disabled") style.palette.ink[ST_DISABLED] = (Color)value;
+    else if(field_id == "title_color") style.title_color = (Color)value;
+    else if(field_id == "subtitle_color") style.subtitle_color = (Color)value;
+    else if(field_id == "copy_color") style.copy_color = (Color)value;
+    else if(field_id == "title_font_face") style.title_font.FaceName(AsString(value));
+    else if(field_id == "title_font_size") style.title_font.Height(max(1, (int)value));
+    else if(field_id == "title_font_bold") style.title_font.Bold((bool)value);
+    else if(field_id == "subtitle_font_face") style.subtitle_font.FaceName(AsString(value));
+    else if(field_id == "subtitle_font_size") style.subtitle_font.Height(max(1, (int)value));
+    else if(field_id == "subtitle_font_bold") style.subtitle_font.Bold((bool)value);
+    else if(field_id == "copy_font_face") style.copy_font.FaceName(AsString(value));
+    else if(field_id == "copy_font_size") style.copy_font.Height(max(1, (int)value));
+    else if(field_id == "content_margin") style.metrics.content_margin = Rect(DPI(max(0, (int)value)), DPI(max(0, (int)value)), DPI(max(0, (int)value)), DPI(max(0, (int)value)));
+    else if(field_id == "theme_title_subtitle_gap") style.title_subtitle_gap = DPI(max(0, (int)value));
+    else if(field_id == "theme_subtitle_copy_gap") style.subtitle_copy_gap = DPI(max(0, (int)value));
+    else if(field_id == "theme_media_reserve") style.media_reserve = DPI(max(0, (int)value));
+    else if(field_id == "theme_media_min") style.media_min = DPI(max(0, (int)value));
+    else if(field_id == "theme_media_gap") style.media_gap = DPI(max(0, (int)value));
+    else if(field_id == "theme_media_auto_fit") style.media_auto_fit = (bool)value;
+    else if(field_id == "theme_title_line") style.title_line = (bool)value;
+    else if(field_id == "theme_title_line_thickness") style.title_line_thickness = DPI(max(0, (int)value));
+    else if(field_id == "theme_title_line_style") style.title_line_style = AsString(value) == "Dashed" ? DASHED : AsString(value) == "Dotted" ? DOTTED : SOLID;
+    else if(field_id == "theme_card_line") style.card_line = (bool)value;
+    else if(field_id == "theme_card_line_side") style.card_line_side = AsString(value) == "Top" ? UiAlign::TOP : AsString(value) == "Bottom" ? UiAlign::BOTTOM : AsString(value) == "Right" ? UiAlign::RIGHT : UiAlign::LEFT;
+    else if(field_id == "theme_card_line_thickness") style.card_line_thickness = DPI(max(0, (int)value));
+    else if(field_id == "theme_card_line_gap") style.card_line_gap = DPI(max(0, (int)value));
+    else if(field_id == "theme_transparent") style.transparent = (bool)value;
+    else if(field_id == "theme_hover_enabled") style.hover_enabled = (bool)value;
+}
+
+static void AddTitleCardThemeOverrides(UiDesignerControlSpec& spec)
+{
+    const UiTitleCard::Style base = ResolveTitleCardThemeBase(UiRole::Standard);
+    AddOverride(spec, "face_enabled", "Face enabled", "Surface", PropertyEditorKind::Boolean,
+                base.metrics.face_enabled, PropertyImpactPaint | PropertyImpactCode, "face_enabled");
+    AddOverride(spec, "face_normal", "Face normal", "Surface", PropertyEditorKind::Color,
+                base.palette.face[ST_NORMAL].IsSolid() ? base.palette.face[ST_NORMAL].color : White(),
+                PropertyImpactPaint | PropertyImpactCode, "face_normal");
+    AddOverride(spec, "frame_enabled", "Frame enabled", "Surface", PropertyEditorKind::Boolean,
+                base.metrics.frame_enabled, PropertyImpactPaint | PropertyImpactCode, "frame_enabled");
+    AddOverride(spec, "frame_normal", "Frame normal", "Surface", PropertyEditorKind::Color,
+                base.palette.frame[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "frame_normal");
+    AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer,
+                base.metrics.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width");
+    AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer,
+                base.metrics.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+    AddOverride(spec, "text_normal", "Text normal", "Ink", PropertyEditorKind::Color,
+                base.palette.ink[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "text_normal");
+    AddOverride(spec, "text_disabled", "Text disabled", "Ink", PropertyEditorKind::Color,
+                base.palette.ink[ST_DISABLED], PropertyImpactPaint | PropertyImpactCode, "text_disabled");
+    AddOverride(spec, "title_color", "Title color", "Ink", PropertyEditorKind::Color,
+                base.title_color, PropertyImpactPaint | PropertyImpactCode, "title_color");
+    AddOverride(spec, "subtitle_color", "Subtitle color", "Ink", PropertyEditorKind::Color,
+                base.subtitle_color, PropertyImpactPaint | PropertyImpactCode, "subtitle_color");
+    AddOverride(spec, "copy_color", "Copy color", "Ink", PropertyEditorKind::Color,
+                base.copy_color, PropertyImpactPaint | PropertyImpactCode, "copy_color");
+    AddOverride(spec, "title_font_face", "Title font face", "Typography", PropertyEditorKind::Text,
+                base.title_font.GetFaceName(), PropertyImpactPaint | PropertyImpactCode, "title_font_face");
+    AddOverride(spec, "title_font_size", "Title font size", "Typography", PropertyEditorKind::Integer,
+                base.title_font.GetHeight(), PropertyImpactPaint | PropertyImpactCode, "title_font_size");
+    AddOverride(spec, "title_font_bold", "Title bold", "Typography", PropertyEditorKind::Boolean,
+                base.title_font.IsBold(), PropertyImpactPaint | PropertyImpactCode, "title_font_bold");
+    AddOverride(spec, "subtitle_font_face", "Subtitle font face", "Typography", PropertyEditorKind::Text,
+                base.subtitle_font.GetFaceName(), PropertyImpactPaint | PropertyImpactCode, "subtitle_font_face");
+    AddOverride(spec, "subtitle_font_size", "Subtitle font size", "Typography", PropertyEditorKind::Integer,
+                base.subtitle_font.GetHeight(), PropertyImpactPaint | PropertyImpactCode, "subtitle_font_size");
+    AddOverride(spec, "subtitle_font_bold", "Subtitle bold", "Typography", PropertyEditorKind::Boolean,
+                base.subtitle_font.IsBold(), PropertyImpactPaint | PropertyImpactCode, "subtitle_font_bold");
+    AddOverride(spec, "copy_font_face", "Copy font face", "Typography", PropertyEditorKind::Text,
+                base.copy_font.GetFaceName(), PropertyImpactPaint | PropertyImpactCode, "copy_font_face");
+    AddOverride(spec, "copy_font_size", "Copy font size", "Typography", PropertyEditorKind::Integer,
+                base.copy_font.GetHeight(), PropertyImpactPaint | PropertyImpactCode, "copy_font_size");
+    AddOverride(spec, "content_margin", "Content inset", "Layout", PropertyEditorKind::Integer,
+                base.metrics.content_margin.left, PropertyImpactPaint | PropertyImpactCode, "content_margin");
+    AddOverride(spec, "theme_title_subtitle_gap", "Title/subtitle gap", "Layout", PropertyEditorKind::Integer,
+                base.title_subtitle_gap / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_title_subtitle_gap");
+    AddOverride(spec, "theme_subtitle_copy_gap", "Subtitle/copy gap", "Layout", PropertyEditorKind::Integer,
+                base.subtitle_copy_gap / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_subtitle_copy_gap");
+    AddOverride(spec, "theme_media_reserve", "Media reserve", "Layout", PropertyEditorKind::Integer,
+                base.media_reserve / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_media_reserve");
+    AddOverride(spec, "theme_media_min", "Media minimum", "Layout", PropertyEditorKind::Integer,
+                base.media_min / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_media_min");
+    AddOverride(spec, "theme_media_gap", "Media gap", "Layout", PropertyEditorKind::Integer,
+                base.media_gap / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_media_gap");
+    AddOverride(spec, "theme_media_auto_fit", "Media auto-fit", "Layout", PropertyEditorKind::Boolean,
+                base.media_auto_fit, PropertyImpactPaint | PropertyImpactCode, "theme_media_auto_fit");
+    AddOverride(spec, "theme_title_line", "Title line", "Layout", PropertyEditorKind::Boolean,
+                base.title_line, PropertyImpactPaint | PropertyImpactCode, "theme_title_line");
+    AddOverride(spec, "theme_title_line_thickness", "Title line thickness", "Layout", PropertyEditorKind::Integer,
+                base.title_line_thickness / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_title_line_thickness");
+    AddOverride(spec, "theme_title_line_style", "Title line style", "Layout", PropertyEditorKind::Choice,
+                String("Solid"), PropertyImpactPaint | PropertyImpactCode, "theme_title_line_style");
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Solid", "Solid"));
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Dashed", "Dashed"));
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Dotted", "Dotted"));
+    AddOverride(spec, "theme_card_line", "Card line", "Layout", PropertyEditorKind::Boolean,
+                base.card_line, PropertyImpactPaint | PropertyImpactCode, "theme_card_line");
+    AddOverride(spec, "theme_card_line_side", "Card line side", "Layout", PropertyEditorKind::Choice,
+                String("Bottom"), PropertyImpactPaint | PropertyImpactCode, "theme_card_line_side");
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Left", "Left"));
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Right", "Right"));
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Top", "Top"));
+    spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+    AddOverride(spec, "theme_card_line_thickness", "Card line thickness", "Layout", PropertyEditorKind::Integer,
+                base.card_line_thickness / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_card_line_thickness");
+    AddOverride(spec, "theme_card_line_gap", "Card line gap", "Layout", PropertyEditorKind::Integer,
+                base.card_line_gap / DPI(1), PropertyImpactPaint | PropertyImpactCode, "theme_card_line_gap");
+    AddOverride(spec, "theme_transparent", "Transparent", "Surface", PropertyEditorKind::Boolean,
+                base.transparent, PropertyImpactPaint | PropertyImpactCode, "theme_transparent");
+    AddOverride(spec, "theme_hover_enabled", "Hover enabled", "Surface", PropertyEditorKind::Boolean,
+                base.hover_enabled, PropertyImpactPaint | PropertyImpactCode, "theme_hover_enabled");
+}
+
+class TitleCardThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    const char *Id() const override { return "title_card"; }
+    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == UiDesignerRuntimeKind::UiTitleCard; }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override { AddTitleCardThemeOverrides(spec); }
+    bool HasField(const String& field_id) const override
+    {
+        static const char *fields[] = {
+            "face_enabled", "face_normal", "frame_enabled", "frame_normal", "frame_width", "radius",
+            "text_normal", "text_disabled", "title_color", "subtitle_color", "copy_color",
+            "title_font_face", "title_font_size", "title_font_bold",
+            "subtitle_font_face", "subtitle_font_size", "subtitle_font_bold",
+            "copy_font_face", "copy_font_size", "content_margin", "theme_title_subtitle_gap",
+            "theme_subtitle_copy_gap", "theme_media_reserve", "theme_media_min", "theme_media_gap", "theme_media_auto_fit",
+            "theme_title_line", "theme_title_line_thickness", "theme_title_line_style", "theme_card_line", "theme_card_line_side",
+            "theme_card_line_thickness", "theme_card_line_gap", "theme_transparent", "theme_hover_enabled"
+        };
+        for(const char *field : fields) if(field_id == field) return true;
+        return false;
+    }
+    bool FieldAffectsLayout(const String& field_id) const override
+    {
+        return field_id != "face_normal" && field_id != "frame_normal" &&
+               field_id != "text_normal" && field_id != "text_disabled" &&
+               field_id != "title_color" && field_id != "subtitle_color" &&
+               field_id != "copy_color";
+    }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec,
+                            const String& field_id, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiTitleCard::Style style = ResolveTitleCardThemeBase(ParseRole(node.GetProperty("role", "Standard")));
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id))
+                continue;
+            const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
+            ApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+        }
+        if(field_id == "face_enabled") return style.metrics.face_enabled;
+        if(field_id == "face_normal") return UiDesignerFillColor(style.palette.face[ST_NORMAL]);
+        if(field_id == "frame_enabled") return style.metrics.frame_enabled;
+        if(field_id == "frame_normal") return style.palette.frame[ST_NORMAL];
+        if(field_id == "frame_width") return style.metrics.frame_width;
+        if(field_id == "radius") return style.metrics.radius;
+        if(field_id == "text_normal") return style.palette.ink[ST_NORMAL];
+        if(field_id == "text_disabled") return style.palette.ink[ST_DISABLED];
+        if(field_id == "title_color") return style.title_color;
+        if(field_id == "subtitle_color") return style.subtitle_color;
+        if(field_id == "copy_color") return style.copy_color;
+        if(field_id == "title_font_face") return style.title_font.GetFaceName();
+        if(field_id == "title_font_size") return style.title_font.GetHeight();
+        if(field_id == "title_font_bold") return style.title_font.IsBold();
+        if(field_id == "subtitle_font_face") return style.subtitle_font.GetFaceName();
+        if(field_id == "subtitle_font_size") return style.subtitle_font.GetHeight();
+        if(field_id == "subtitle_font_bold") return style.subtitle_font.IsBold();
+        if(field_id == "copy_font_face") return style.copy_font.GetFaceName();
+        if(field_id == "copy_font_size") return style.copy_font.GetHeight();
+        if(field_id == "content_margin") return style.metrics.content_margin.left;
+        if(field_id == "theme_title_subtitle_gap") return style.title_subtitle_gap / DPI(1);
+        if(field_id == "theme_subtitle_copy_gap") return style.subtitle_copy_gap / DPI(1);
+        if(field_id == "theme_media_reserve") return style.media_reserve / DPI(1);
+        if(field_id == "theme_media_min") return style.media_min / DPI(1);
+        if(field_id == "theme_media_gap") return style.media_gap / DPI(1);
+        if(field_id == "theme_media_auto_fit") return style.media_auto_fit;
+        if(field_id == "theme_title_line") return style.title_line;
+        if(field_id == "theme_title_line_thickness") return style.title_line_thickness / DPI(1);
+        if(field_id == "theme_title_line_style") return style.title_line_style == DASHED ? "Dashed" : style.title_line_style == DOTTED ? "Dotted" : "Solid";
+        if(field_id == "theme_card_line") return style.card_line;
+        if(field_id == "theme_card_line_side") return style.card_line_side == UiAlign::TOP ? "Top" : style.card_line_side == UiAlign::BOTTOM ? "Bottom" : style.card_line_side == UiAlign::RIGHT ? "Right" : "Left";
+        if(field_id == "theme_card_line_thickness") return style.card_line_thickness / DPI(1);
+        if(field_id == "theme_card_line_gap") return style.card_line_gap / DPI(1);
+        if(field_id == "theme_transparent") return style.transparent;
+        if(field_id == "theme_hover_enabled") return style.hover_enabled;
+        return Value();
+    }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiTitleCard *card = dynamic_cast<UiTitleCard *>(&ctrl);
+        if(!card)
+            return;
+        UiTitleCard::Style style = ResolveTitleCardThemeBase(ParseRole(node.GetProperty("role", "Standard")));
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id))
+                continue;
+            authored = true;
+            const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
+            ApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+        }
+        if(authored) card->SetCustomStyle(style); else card->ClearCustomStyle();
+    }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override
+    {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(p.id) >= 0;
+        if(!authored)
+            return;
+        out << "\tUiTitleCard::Style " << member << "_style = UiTheme::ResolveTitleCard("
+            << EmitRoleExpr(AsString(node.GetProperty("role", "Standard"))) << ");\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0)
+                continue;
+            const Value v = node.theme_overrides.GetValue(q);
+            if(p.adapter_field_id == "face_enabled") out << "\t" << member << "_style.metrics.face_enabled = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "face_normal") out << "\t" << member << "_style.palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "frame_enabled") out << "\t" << member << "_style.metrics.frame_enabled = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "frame_normal") out << "\t" << member << "_style.palette.frame[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "frame_width") out << "\t" << member << "_style.metrics.frame_width = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "radius") out << "\t" << member << "_style.metrics.radius = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "text_normal") out << "\t" << member << "_style.palette.ink[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "text_disabled") out << "\t" << member << "_style.palette.ink[ST_DISABLED] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "title_color") out << "\t" << member << "_style.title_color = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "subtitle_color") out << "\t" << member << "_style.subtitle_color = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "copy_color") out << "\t" << member << "_style.copy_color = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "title_font_face") out << "\t" << member << "_style.title_font.FaceName(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "title_font_size") out << "\t" << member << "_style.title_font.Height(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "title_font_bold") out << "\t" << member << "_style.title_font.Bold(" << AsString((bool)v) << ");\n";
+            else if(p.adapter_field_id == "subtitle_font_face") out << "\t" << member << "_style.subtitle_font.FaceName(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "subtitle_font_size") out << "\t" << member << "_style.subtitle_font.Height(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "subtitle_font_bold") out << "\t" << member << "_style.subtitle_font.Bold(" << AsString((bool)v) << ");\n";
+            else if(p.adapter_field_id == "copy_font_face") out << "\t" << member << "_style.copy_font.FaceName(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "copy_font_size") out << "\t" << member << "_style.copy_font.Height(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "content_margin") out << "\t" << member << "_style.metrics.content_margin = Rect(DPI(" << (int)v << "), DPI(" << (int)v << "), DPI(" << (int)v << "), DPI(" << (int)v << "));\n";
+            else if(p.adapter_field_id == "theme_title_subtitle_gap") out << "\t" << member << "_style.title_subtitle_gap = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_subtitle_copy_gap") out << "\t" << member << "_style.subtitle_copy_gap = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_media_reserve") out << "\t" << member << "_style.media_reserve = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_media_min") out << "\t" << member << "_style.media_min = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_media_gap") out << "\t" << member << "_style.media_gap = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_media_auto_fit") out << "\t" << member << "_style.media_auto_fit = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "theme_title_line") out << "\t" << member << "_style.title_line = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "theme_title_line_thickness") out << "\t" << member << "_style.title_line_thickness = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_title_line_style") out << "\t" << member << "_style.title_line_style = " << (AsString(v) == "Dashed" ? "DASHED" : AsString(v) == "Dotted" ? "DOTTED" : "SOLID") << ";\n";
+            else if(p.adapter_field_id == "theme_card_line") out << "\t" << member << "_style.card_line = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "theme_card_line_side") out << "\t" << member << "_style.card_line_side = " << EmitAlign(AsString(v)) << ";\n";
+            else if(p.adapter_field_id == "theme_card_line_thickness") out << "\t" << member << "_style.card_line_thickness = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_card_line_gap") out << "\t" << member << "_style.card_line_gap = DPI(" << (int)v << ");\n";
+            else if(p.adapter_field_id == "theme_transparent") out << "\t" << member << "_style.transparent = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "theme_hover_enabled") out << "\t" << member << "_style.hover_enabled = " << AsString((bool)v) << ";\n";
+        }
+        out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n";
+    }
+};
+
+static UiAccordion::Style ResolveAccordionThemeBase()
+{
+    UiAccordion::Style style = UiAccordion::StyleDefault();
+    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    style.palette = panel.palette;
+    style.metrics.radius = max(DPI(8), panel.metrics.radius);
+    style.transparent = true;
+    style.metrics.frame_width = 0;
+    style.metrics.frame_enabled = false;
+    style.metrics.face_enabled = false;
+    style.metrics.shadow.enabled = false;
+    style.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    style.body_style.transparent = true;
+    style.body_style.metrics.face_enabled = false;
+    style.body_style.metrics.frame_enabled = false;
+    style.body_style.metrics.frame_width = 0;
+    style.body_style.metrics.radius = 0;
+    style.body_style.metrics.focus_enabled = false;
+    style.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
+    style.body_style.metrics.shadow.enabled = false;
+    style.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+    style.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+    style.header_style.hover_enabled = false;
+    style.header_style.metrics.focus_enabled = false;
+    style.header_style.title_line = false;
+    style.header_style.card_line = true;
+    style.header_style.media_tint_mono = true;
+    style.header_style.title_font = SansSerifZ(11).Bold();
+    style.header_style.subtitle_font = SansSerifZ(8);
+    return style;
+}
+
+static void ApplyAccordionThemeField(UiAccordion::Style& style, const String& field_id, const Value& value)
+{
+    if(field_id == "face_enabled") style.metrics.face_enabled = (bool)value;
+    else if(field_id == "face_normal") style.palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
+    else if(field_id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
+    else if(field_id == "frame_normal") style.palette.frame[ST_NORMAL] = (Color)value;
+    else if(field_id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(field_id == "radius") style.metrics.radius = max(0, (int)value);
+    else if(field_id == "ink_normal") style.palette.ink[ST_NORMAL] = (Color)value;
+    else if(field_id == "ink_disabled") style.palette.ink[ST_DISABLED] = (Color)value;
+    else if(field_id == "header_height") style.header_height = max(1, (int)value);
+    else if(field_id == "item_spacing") style.item_spacing = max(0, (int)value);
+    else if(field_id == "header_body_gap") style.header_body_gap = max(0, (int)value);
+    else if(field_id == "body_min_height") style.body_min_height = max(0, (int)value);
+    else if(field_id == "single_open") style.single_open = (bool)value;
+    else if(field_id == "enforce_one") style.enforce_one = (bool)value;
+    else if(field_id == "show_chevron") style.show_chevron = (bool)value;
+    else if(field_id == "chevron_side") style.chevron_side = AsString(value) == "Top" ? UiAlign::TOP : AsString(value) == "Bottom" ? UiAlign::BOTTOM : AsString(value) == "Left" ? UiAlign::LEFT : UiAlign::RIGHT;
+    else if(field_id == "show_drag_handle") style.show_drag_handle = (bool)value;
+    else if(field_id == "drag_side") style.drag_side = AsString(value) == "Left" ? UiAlign::LEFT : UiAlign::RIGHT;
+    else if(field_id == "unified_section_frame") style.unified_section_frame = (bool)value;
+    else if(field_id == "unified_section_radius") style.unified_section_radius = max(0, (int)value);
+    else if(field_id == "unified_section_frame_width") style.unified_section_frame_width = max(0, (int)value);
+    else if(field_id == "body_line_extent") style.body_line_extent = AsString(value) == "Small" ? SMALL : AsString(value) == "Medium" ? MEDIUM : AsString(value) == "Large" ? LARGE : NONE;
+    else if(field_id == "body_line_thickness") style.body_line_thickness = max(0, (int)value);
+    else if(field_id == "transparent") style.transparent = (bool)value;
+    else if(field_id == "animation_enabled") style.animation_enabled = (bool)value;
+    else if(field_id == "anim_open_ms") style.anim_open_ms = max(0, (int)value);
+    else if(field_id == "anim_close_ms") style.anim_close_ms = max(0, (int)value);
+}
+
+class AccordionThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    const char *Id() const override { return "accordion"; }
+    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == UiDesignerRuntimeKind::UiAccordion; }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override
+    {
+        const UiAccordion::Style base = ResolveAccordionThemeBase();
+        AddOverride(spec, "face_enabled", "Face enabled", "Surface", PropertyEditorKind::Boolean, base.metrics.face_enabled, PropertyImpactPaint | PropertyImpactCode, "face_enabled");
+        AddOverride(spec, "face_normal", "Face normal", "Surface", PropertyEditorKind::Color, base.palette.face[ST_NORMAL].IsSolid() ? base.palette.face[ST_NORMAL].color : White(), PropertyImpactPaint | PropertyImpactCode, "face_normal");
+        AddOverride(spec, "frame_enabled", "Frame enabled", "Surface", PropertyEditorKind::Boolean, base.metrics.frame_enabled, PropertyImpactPaint | PropertyImpactCode, "frame_enabled");
+        AddOverride(spec, "frame_normal", "Frame normal", "Surface", PropertyEditorKind::Color, base.palette.frame[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "frame_normal");
+        AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer, base.metrics.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width");
+        AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer, base.metrics.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "ink_normal", "Ink normal", "Ink", PropertyEditorKind::Color, base.palette.ink[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "ink_normal");
+        AddOverride(spec, "ink_disabled", "Ink disabled", "Ink", PropertyEditorKind::Color, base.palette.ink[ST_DISABLED], PropertyImpactPaint | PropertyImpactCode, "ink_disabled");
+        AddOverride(spec, "header_height", "Header height", "Layout", PropertyEditorKind::Integer, base.header_height, PropertyImpactPaint | PropertyImpactCode, "header_height");
+        AddOverride(spec, "item_spacing", "Item spacing", "Layout", PropertyEditorKind::Integer, base.item_spacing, PropertyImpactPaint | PropertyImpactCode, "item_spacing");
+        AddOverride(spec, "header_body_gap", "Header/body gap", "Layout", PropertyEditorKind::Integer, base.header_body_gap, PropertyImpactPaint | PropertyImpactCode, "header_body_gap");
+        AddOverride(spec, "body_min_height", "Body min height", "Layout", PropertyEditorKind::Integer, base.body_min_height, PropertyImpactPaint | PropertyImpactCode, "body_min_height");
+        AddOverride(spec, "single_open", "Single open", "Behavior", PropertyEditorKind::Boolean, base.single_open, PropertyImpactPaint | PropertyImpactCode, "single_open");
+        AddOverride(spec, "enforce_one", "Enforce one open", "Behavior", PropertyEditorKind::Boolean, base.enforce_one, PropertyImpactPaint | PropertyImpactCode, "enforce_one");
+        AddOverride(spec, "show_chevron", "Show chevron", "Header", PropertyEditorKind::Boolean, base.show_chevron, PropertyImpactPaint | PropertyImpactCode, "show_chevron");
+        AddOverride(spec, "chevron_side", "Chevron side", "Header", PropertyEditorKind::Choice, String("Right"), PropertyImpactPaint | PropertyImpactCode, "chevron_side");
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Left", "Left"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Right", "Right"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Top", "Top"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Bottom", "Bottom"));
+        AddOverride(spec, "show_drag_handle", "Show drag handle", "Header", PropertyEditorKind::Boolean, base.show_drag_handle, PropertyImpactPaint | PropertyImpactCode, "show_drag_handle");
+        AddOverride(spec, "drag_side", "Drag side", "Header", PropertyEditorKind::Choice, String("Right"), PropertyImpactPaint | PropertyImpactCode, "drag_side");
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Left", "Left"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Right", "Right"));
+        AddOverride(spec, "unified_section_frame", "Unified section frame", "Body", PropertyEditorKind::Boolean, base.unified_section_frame, PropertyImpactPaint | PropertyImpactCode, "unified_section_frame");
+        AddOverride(spec, "unified_section_radius", "Unified section radius", "Body", PropertyEditorKind::Integer, base.unified_section_radius, PropertyImpactPaint | PropertyImpactCode, "unified_section_radius");
+        AddOverride(spec, "unified_section_frame_width", "Unified section frame width", "Body", PropertyEditorKind::Integer, base.unified_section_frame_width, PropertyImpactPaint | PropertyImpactCode, "unified_section_frame_width");
+        AddOverride(spec, "body_line_extent", "Body line extent", "Body", PropertyEditorKind::Choice, String("None"), PropertyImpactPaint | PropertyImpactCode, "body_line_extent");
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("None", "None"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Small", "Small"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Medium", "Medium"));
+        spec.theme_overrides.Top().choices.Add(PropertyEditorChoice("Large", "Large"));
+        AddOverride(spec, "body_line_thickness", "Body line thickness", "Body", PropertyEditorKind::Integer, base.body_line_thickness, PropertyImpactPaint | PropertyImpactCode, "body_line_thickness");
+        AddOverride(spec, "transparent", "Transparent", "Surface", PropertyEditorKind::Boolean, base.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
+        AddOverride(spec, "animation_enabled", "Animation enabled", "Behavior", PropertyEditorKind::Boolean, base.animation_enabled, PropertyImpactPaint | PropertyImpactCode, "animation_enabled");
+        AddOverride(spec, "anim_open_ms", "Open animation ms", "Behavior", PropertyEditorKind::Integer, base.anim_open_ms, PropertyImpactPaint | PropertyImpactCode, "anim_open_ms");
+        AddOverride(spec, "anim_close_ms", "Close animation ms", "Behavior", PropertyEditorKind::Integer, base.anim_close_ms, PropertyImpactPaint | PropertyImpactCode, "anim_close_ms");
+    }
+    bool HasField(const String& field_id) const override
+    {
+        static const char *fields[] = {
+            "face_enabled","face_normal","frame_enabled","frame_normal","frame_width","radius",
+            "ink_normal","ink_disabled","header_height","item_spacing","header_body_gap",
+            "body_min_height","single_open","enforce_one","show_chevron","chevron_side",
+            "show_drag_handle","drag_side","unified_section_frame","unified_section_radius",
+            "unified_section_frame_width","body_line_extent","body_line_thickness","transparent",
+            "animation_enabled","anim_open_ms","anim_close_ms"
+        };
+        for(const char *field : fields) if(field_id == field) return true;
+        return false;
+    }
+    bool FieldAffectsLayout(const String& field_id) const override
+    {
+        return field_id == "face_enabled" || field_id == "frame_enabled" || field_id == "frame_width" ||
+               field_id == "radius" || field_id == "header_height" || field_id == "item_spacing" ||
+               field_id == "header_body_gap" || field_id == "body_min_height" || field_id == "show_chevron" ||
+               field_id == "chevron_side" || field_id == "show_drag_handle" || field_id == "drag_side" ||
+               field_id == "unified_section_frame" || field_id == "unified_section_radius" ||
+               field_id == "unified_section_frame_width" || field_id == "body_line_extent" ||
+               field_id == "body_line_thickness" || field_id == "animation_enabled" ||
+               field_id == "anim_open_ms" || field_id == "anim_close_ms";
+    }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec,
+                            const String& field_id, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiAccordion::Style style = ResolveAccordionThemeBase();
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id))
+                continue;
+            const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
+            ApplyAccordionThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+        }
+        if(field_id == "face_enabled") return style.metrics.face_enabled;
+        if(field_id == "face_normal") return UiDesignerFillColor(style.palette.face[ST_NORMAL]);
+        if(field_id == "frame_enabled") return style.metrics.frame_enabled;
+        if(field_id == "frame_normal") return style.palette.frame[ST_NORMAL];
+        if(field_id == "frame_width") return style.metrics.frame_width;
+        if(field_id == "radius") return style.metrics.radius;
+        if(field_id == "ink_normal") return style.palette.ink[ST_NORMAL];
+        if(field_id == "ink_disabled") return style.palette.ink[ST_DISABLED];
+        if(field_id == "header_height") return style.header_height;
+        if(field_id == "item_spacing") return style.item_spacing;
+        if(field_id == "header_body_gap") return style.header_body_gap;
+        if(field_id == "body_min_height") return style.body_min_height;
+        if(field_id == "single_open") return style.single_open;
+        if(field_id == "enforce_one") return style.enforce_one;
+        if(field_id == "show_chevron") return style.show_chevron;
+        if(field_id == "chevron_side") return style.chevron_side == UiAlign::TOP ? "Top" : style.chevron_side == UiAlign::BOTTOM ? "Bottom" : style.chevron_side == UiAlign::LEFT ? "Left" : "Right";
+        if(field_id == "show_drag_handle") return style.show_drag_handle;
+        if(field_id == "drag_side") return style.drag_side == UiAlign::LEFT ? "Left" : "Right";
+        if(field_id == "unified_section_frame") return style.unified_section_frame;
+        if(field_id == "unified_section_radius") return style.unified_section_radius;
+        if(field_id == "unified_section_frame_width") return style.unified_section_frame_width;
+        if(field_id == "body_line_extent") return style.body_line_extent == SMALL ? "Small" : style.body_line_extent == MEDIUM ? "Medium" : style.body_line_extent == LARGE ? "Large" : "None";
+        if(field_id == "body_line_thickness") return style.body_line_thickness;
+        if(field_id == "transparent") return style.transparent;
+        if(field_id == "animation_enabled") return style.animation_enabled;
+        if(field_id == "anim_open_ms") return style.anim_open_ms;
+        if(field_id == "anim_close_ms") return style.anim_close_ms;
+        return Value();
+    }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiAccordion *accordion = dynamic_cast<UiAccordion *>(&ctrl);
+        if(!accordion)
+            return;
+        UiAccordion::Style style = ResolveAccordionThemeBase();
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id))
+                continue;
+            authored = true;
+            const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
+            ApplyAccordionThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+        }
+        if(authored) accordion->SetCustomStyle(style); else accordion->ClearCustomStyle();
+    }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override
+    {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(p.id) >= 0;
+        if(!authored)
+            return;
+        out << "\tUiAccordion::Style " << member << "_style = UiAccordion::StyleDefault();\n";
+        out << "\tUiPanel::Style " << member << "_panel = UiTheme::ResolvePanel(UiPanelRole::Surface);\n";
+        out << "\t" << member << "_style.palette = " << member << "_panel.palette;\n";
+        out << "\t" << member << "_style.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0)
+                continue;
+            const Value v = node.theme_overrides.GetValue(q);
+            if(p.adapter_field_id == "face_enabled") out << "\t" << member << "_style.metrics.face_enabled = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "face_normal") out << "\t" << member << "_style.palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n";
+            else if(p.adapter_field_id == "frame_enabled") out << "\t" << member << "_style.metrics.frame_enabled = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "frame_normal") out << "\t" << member << "_style.palette.frame[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "frame_width") out << "\t" << member << "_style.metrics.frame_width = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "radius") out << "\t" << member << "_style.metrics.radius = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "ink_normal") out << "\t" << member << "_style.palette.ink[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "ink_disabled") out << "\t" << member << "_style.palette.ink[ST_DISABLED] = " << EmitValue(v) << ";\n";
+            else if(p.adapter_field_id == "header_height") out << "\t" << member << "_style.header_height = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "item_spacing") out << "\t" << member << "_style.item_spacing = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "header_body_gap") out << "\t" << member << "_style.header_body_gap = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "body_min_height") out << "\t" << member << "_style.body_min_height = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "single_open") out << "\t" << member << "_style.single_open = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "enforce_one") out << "\t" << member << "_style.enforce_one = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "show_chevron") out << "\t" << member << "_style.show_chevron = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "chevron_side") out << "\t" << member << "_style.chevron_side = " << EmitAlign(AsString(v)) << ";\n";
+            else if(p.adapter_field_id == "show_drag_handle") out << "\t" << member << "_style.show_drag_handle = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "drag_side") out << "\t" << member << "_style.drag_side = " << EmitAlign(AsString(v)) << ";\n";
+            else if(p.adapter_field_id == "unified_section_frame") out << "\t" << member << "_style.unified_section_frame = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "unified_section_radius") out << "\t" << member << "_style.unified_section_radius = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "unified_section_frame_width") out << "\t" << member << "_style.unified_section_frame_width = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "body_line_extent") out << "\t" << member << "_style.body_line_extent = " << (AsString(v) == "Small" ? "SMALL" : AsString(v) == "Medium" ? "MEDIUM" : AsString(v) == "Large" ? "LARGE" : "NONE") << ";\n";
+            else if(p.adapter_field_id == "body_line_thickness") out << "\t" << member << "_style.body_line_thickness = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "transparent") out << "\t" << member << "_style.transparent = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "animation_enabled") out << "\t" << member << "_style.animation_enabled = " << AsString((bool)v) << ";\n";
+            else if(p.adapter_field_id == "anim_open_ms") out << "\t" << member << "_style.anim_open_ms = " << (int)v << ";\n";
+            else if(p.adapter_field_id == "anim_close_ms") out << "\t" << member << "_style.anim_close_ms = " << (int)v << ";\n";
+        }
+        out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n";
+    }
+};
+
 class ThemeAdapterRegistry {
 public:
     ThemeAdapterRegistry()
@@ -2073,6 +2610,8 @@ public:
         adapters.Add(&list_adapter_);
         adapters.Add(&menu_adapter_);
         adapters.Add(&color_picker_adapter_);
+        adapters.Add(&title_card_adapter_);
+        adapters.Add(&accordion_adapter_);
     }
 
     const UiDesignerThemeAdapter* Find(const String& id) const
@@ -2098,6 +2637,8 @@ private:
     ListThemeAdapter list_adapter_;
     MenuThemeAdapter menu_adapter_;
     ColorPickerThemeAdapter color_picker_adapter_;
+    TitleCardThemeAdapter title_card_adapter_;
+    AccordionThemeAdapter accordion_adapter_;
     Array<const UiDesignerThemeAdapter*> adapters;
 };
 

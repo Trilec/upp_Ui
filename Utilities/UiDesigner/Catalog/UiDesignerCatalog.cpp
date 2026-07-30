@@ -368,6 +368,12 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
             error = "Unregistered control type: " + node.type;
             return false;
         }
+        if(node.type == "UiAccordionSection" &&
+           spec->runtime_kind != UiDesignerRuntimeKind::SemanticAccordionSection) {
+            error = "Accordion section " + AsString(node.id) +
+                    " has the wrong semantic kind";
+            return false;
+        }
         const UiDesignerNode* parent = document.Find(node.parent);
         if(!parent) {
             error = node.name + " has a missing parent";

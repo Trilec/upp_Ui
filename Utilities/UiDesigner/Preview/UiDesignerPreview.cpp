@@ -973,16 +973,16 @@ static UiDesignerApplyResult ApplyRuntime(
             ctrl.RefreshLayout();
             return UiDesignerApplyResult::AppliedLocalLayout;
         }
-        auto *card = dynamic_cast<UiTitleCard *>(&ctrl);
-        if(!card)
-            return UiDesignerApplyResult::Rejected;
-        const String icon = value;
-        if(icon == "ICON_DESIGN_DESCRIPTION_48")
-            card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
-        else
-            card->ClearMedia();
-        ctrl.RefreshLayout();
-        return UiDesignerApplyResult::AppliedLocalLayout;
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            const String icon = AsString(value);
+            if(icon == "ICON_DESIGN_DESCRIPTION_48")
+                card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
+            else
+                card->ClearMedia();
+            ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
     }
     if(property == "checked") {
         if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {

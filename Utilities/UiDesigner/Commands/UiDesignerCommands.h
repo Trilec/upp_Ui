@@ -66,9 +66,19 @@ public:
     bool SetActiveTabPage(UiDesignerNodeId tab, UiDesignerNodeId page);
 
     UiDesignerNodeId AddAccordionSection(UiDesignerNodeId accordion,
-                                         const String& title);
+                                         const String& title,
+                                         const String& subtitle = String(),
+                                         const String& copy = String(),
+                                         bool open = false,
+                                         const String& lock = "None");
     bool RemoveAccordionSection(UiDesignerNodeId section);
     bool RenameAccordionSection(UiDesignerNodeId section, const String& title);
+    bool MoveAccordionSection(UiDesignerNodeId section, int index);
+    bool SetAccordionSectionTitle(UiDesignerNodeId section, const String& title);
+    bool SetAccordionSectionSubtitle(UiDesignerNodeId section, const String& subtitle);
+    bool SetAccordionSectionCopy(UiDesignerNodeId section, const String& copy);
+    bool SetAccordionSectionOpen(UiDesignerNodeId section, bool open);
+    bool SetAccordionSectionLock(UiDesignerNodeId section, const String& lock);
     bool SetAccordionSectionProperty(UiDesignerNodeId section,
                                      const String& property, const Value& value);
 

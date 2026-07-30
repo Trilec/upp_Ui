@@ -1006,12 +1006,22 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             else
                 AddEvent(s, "WhenAction", "Page changed", "Runs after the active page changes.");
         }
+        if(String(c.type) == "UiAccordion") {
+            s.theme = true;
+            s.theme_adapter_id = "accordion";
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
+        }
         if(String(c.type) == "UiScrollPanel" ||
            String(c.type) == "UiDirectContentHost")
             s.child_adapter_id = "single";
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
         if(String(c.type) == "UiTitleCard") {
+            s.theme = true;
+            s.theme_adapter_id = "title_card";
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenAction", "Action", "Runs when the card is activated.");
             AddTitleCardProperties(s);
             UiDesignerPropertySpec icon = ChoiceProperty(
@@ -1298,7 +1308,7 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     catalog.Register(pick(page));
 
     UiDesignerControlSpec section = MakeSpec("UiAccordionSection", "Accordion Section", "Internal",
-        "", "accordion_section", UiDesignerRuntimeKind::SemanticTabPage,
+        "", "accordion_section", UiDesignerRuntimeKind::SemanticAccordionSection,
         "none", UiDesignerNodeStructural | UiDesignerNodeSemanticItem);
     section.capabilities = UiDesignerCapabilitySemanticItem;
     section.preview_adapter_id = "semantic:accordion_section";

@@ -124,6 +124,8 @@ private:
     UiButton data_active_;
     UiList data_list_;
     UiListModel data_model_;
+    PropertyEditor data_editor_;
+    PropertyEditorModel data_editor_model_;
     PropertyEditor behaviors_;
     PropertyEditor overrides_;
     UiDesignerCodeView code_;

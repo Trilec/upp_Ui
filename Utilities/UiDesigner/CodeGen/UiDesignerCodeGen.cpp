@@ -506,9 +506,13 @@ void UiDesignerCodeGenerator::EmitSetup(
         const String icon_name = Effective("icon", spec.FindProperty("icon")->default_value);
         if(IsButtonFamily(spec.runtime_kind))
             out << "\t" << member << ".SetIcon(" << EmitButtonIcon(icon_name) << ");\n";
+        else if(icon_name == "None")
+            out << "\t" << member << ".ClearMedia();\n";
         else if(icon_name == "ICON_DESIGN_DESCRIPTION_48")
             out << "\t" << member
                 << ".SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));\n";
+        else
+            out << "\t" << member << ".ClearMedia();\n";
     }
     if(spec.FindProperty("icon_render_mode") && IsButtonFamily(spec.runtime_kind))
         out << "\t" << member << ".SetIconRenderMode(" << EmitIconRenderMode(

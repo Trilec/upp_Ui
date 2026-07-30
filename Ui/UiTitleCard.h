@@ -113,6 +113,7 @@ public:
     };
 
     UiTitleCard();
+    virtual ~UiTitleCard() override;
 
     static const Style& StyleDefault();
 
@@ -169,6 +170,7 @@ public:
     virtual void MouseLeave() override;
     virtual void LeftDown(Point, dword) override;
     virtual void LeftUp(Point, dword) override;
+    virtual void CancelMode() override;
     virtual void ChildRemoved(Ctrl *child) override;
 
     Event<Draw&, const Rect&,
@@ -210,7 +212,8 @@ private:
     Ctrl* content_cell_ = nullptr;
 
     bool hot_ = false;
-    bool down_ = false;
+    bool pressed_ = false;
+    bool press_captured_ = false;
     bool selectable_ = true;
 
     Size user_min_size_ = Size(0, 0);
