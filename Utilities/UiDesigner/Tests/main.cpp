@@ -1592,6 +1592,32 @@ CONSOLE_APP_MAIN
         card_preview.GetGeometrySnapshot().Find(inserted_card);
     Check(card_record && card_record->drop_target,
           "Selected Title Card is a content drop target");
+    UiDesignerDropPlan contract_panel_plan = card_session.PlanAddControl(
+        "UiPanel", card_grid, Point(40, 40), true, -1, 0, 0);
+    UiDesignerNodeId panel_node = 0;
+    String panel_drop_error;
+    Check(card_session.ExecuteDrop(contract_panel_plan, &panel_node, panel_drop_error),
+          "Panel insertion into the Grid succeeds: " + panel_drop_error);
+    card_preview.RebuildDocument();
+    const UiDesignerGeometryRecord* panel_record =
+        card_preview.GetGeometrySnapshot().Find(panel_node);
+    const UiDesignerDropRegion* panel_region = nullptr;
+    for(const UiDesignerDropRegion& region : card_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == panel_node && region.kind == UiDesignerDropRegionKind::PanelBody)
+            panel_region = &region;
+    Check(panel_record && panel_record->drop_target && panel_region,
+          "Selected Panel publishes its inner body region");
+    if(panel_region) {
+        const UiDesignerDropRegion* winning = card_preview.GetGeometrySnapshot().HitDropRegion(
+            panel_region->rect.CenterPoint());
+        Check(winning && winning->owner == panel_node &&
+                  winning->kind == UiDesignerDropRegionKind::PanelBody,
+              "Panel body wins hit testing over its surrounding Grid cell");
+        UiDesignerDropPlan nested_card_plan = card_session.PlanAddControl(
+            "UiTitleCard", panel_node, panel_region->rect.CenterPoint(), true);
+        Check(nested_card_plan.valid && nested_card_plan.parent == panel_node,
+              "Title Card drop over Panel resolves to the Panel owner");
+    }
     if(UiTitleCard* runtime_card = dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))) {
         Check(runtime_card->HasMedia(), "Inserted Title Card runtime media is present");
         Check(card_preview.RebuildSubtree(inserted_card),
@@ -1722,6 +1748,62 @@ CONSOLE_APP_MAIN
         for(UiDesignerNodeId section_id : accordion_authored->children)
             all_closed &= !(bool)accordion_document.Find(section_id)->GetProperty("open", true);
     Check(all_closed, "New Accordion sections default closed");
+    const UiDesignerNodeId overview_node = accordion_authored
+        ? accordion_authored->children[0] : 0;
+    const UiDesignerControlSpec* accordion_box_spec = catalog.Find("UiBoxLayout");
+    const UiDesignerNodeId overview_box = accordion_commands.AddNode(
+        "UiBoxLayout", "overview_content", overview_node,
+        accordion_box_spec ? accordion_box_spec->node_flags : 0,
+        accordion_box_spec ? accordion_box_spec->defaults : ValueMap(),
+        "Add Accordion section content");
+    UiDesignerPreviewCanvas accordion_preview;
+    UiDesignerSelection accordion_selection;
+    accordion_preview.SetRect(0, 0, 320, 260);
+    accordion_preview.Bind(&accordion_document, &catalog, nullptr, &accordion_selection);
+    accordion_preview.RebuildDocument();
+    UiAccordion* runtime_accordion = dynamic_cast<UiAccordion *>(
+        accordion_preview.FindRuntime(accordion_node));
+    Check(runtime_accordion && runtime_accordion->GetCount() == 3,
+          "Preview creates all canonical Accordion sections");
+    Check(runtime_accordion && runtime_accordion->GetSectionContent(0).GetFirstChild() ==
+              accordion_preview.FindRuntime(overview_box),
+          "Accordion section content attaches through its runtime section host");
+    const UiDesignerGeometryRecord* overview_record =
+        accordion_preview.GetGeometrySnapshot().Find(overview_node);
+    Check(overview_record && !overview_record->rect.IsEmpty(),
+          "Accordion section has a stable published runtime rectangle");
+    bool section_region = false;
+    if(runtime_accordion)
+        for(const UiDesignerDropRegion& region : accordion_preview.GetGeometrySnapshot().GetDropRegions())
+            if(region.owner == overview_node &&
+               region.kind == UiDesignerDropRegionKind::AccordionSectionContent) {
+                section_region = true;
+                Check(region.occupied, "Occupied Accordion section region is marked occupied");
+            }
+    Check(section_region, "Accordion section content region is published");
+    accordion_selection.nodes.Add(overview_node);
+    accordion_selection.primary = overview_node;
+    const UiDesignerGeometryRecord* selected_overview =
+        accordion_preview.GetGeometrySnapshot().Find(overview_node);
+    Check(selected_overview && selected_overview->drop_target,
+          "Selected Accordion section exposes its content target");
+    bool selected_section_region = false;
+    for(const UiDesignerDropRegion& region : accordion_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == overview_node &&
+           region.kind == UiDesignerDropRegionKind::AccordionSectionContent)
+            selected_section_region = true;
+    Check(selected_section_region, "Selected Accordion section retains its orange region");
+    accordion_selection.nodes.Clear();
+    accordion_selection.primary = accordion_node;
+    UiDesignerGeometryRecord const* selected_accordion =
+        accordion_preview.GetGeometrySnapshot().Find(accordion_node);
+    Check(selected_accordion && selected_accordion->drop_target,
+          "Selected Accordion exposes section content targets");
+    String second_section_child_error;
+    Check(!catalog.CanInsert(accordion_document, "UiPanel", overview_node, -1,
+                             second_section_child_error) &&
+              second_section_child_error.Find("one direct content child") >= 0,
+          "Accordion section rejects a second direct child with guidance");
     UiAccordion contract_runtime;
     contract_runtime.SetRect(0, 0, 260, 120);
     const int overview = contract_runtime.AddSection("Overview", false);
@@ -1757,6 +1839,11 @@ CONSOLE_APP_MAIN
     Check(accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(notes)) &&
               (notes_body.IsEmpty() || accordion_bounds.Contains(notes_body)),
           "Multiple open Accordion sections remain bounded");
+
+    UiDesignerGeneratedProject accordion_generated = generator.Generate(
+        accordion_document, "GeneratedAccordionWindow");
+    Check(accordion_generated.source.Find("GetSectionContent(") >= 0,
+          "Generated Accordion uses typed section content attachment");
 
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";

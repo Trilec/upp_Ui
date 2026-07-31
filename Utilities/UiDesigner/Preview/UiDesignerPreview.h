@@ -238,6 +238,8 @@ struct UiDesignerPreviewInstance {
     One<Ctrl> control;
     bool semantic = false;
     int layout_item_index = -1;
+    int semantic_host_index = -1;
+    UiDesignerNodeId semantic_host_runtime_parent = 0;
     uint64 generation = 0;
 };
 

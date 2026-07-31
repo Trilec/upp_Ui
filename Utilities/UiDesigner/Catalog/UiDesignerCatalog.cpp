@@ -297,6 +297,10 @@ bool UiDesignerCatalog::CanParent(const String& child_type,
     }
     if(!HasUiDesignerCapability(parent->capabilities,
                                 UiDesignerCapabilityContainer)) {
+        if(parent_type == "UiAccordionSection" && !child->IsSemanticItem()) {
+            reason.Clear();
+            return true;
+        }
         reason = parent->display_name + " cannot contain children";
         return false;
     }
@@ -355,6 +359,10 @@ bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
     }
     if(parent->type == "UiTitleCard" && parent->children.GetCount() >= 1) {
         reason = "Title Card accepts one direct content child; place a layout inside the card";
+        return false;
+    }
+    if(parent->type == "UiAccordionSection" && parent->children.GetCount() >= 1) {
+        reason = "Accordion sections accept one direct content child. Place a layout inside the section to contain multiple controls.";
         return false;
     }
     reason.Clear();
@@ -429,8 +437,8 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 error = "Accordion section " + AsString(node.id) + " locks closed but is open";
                 return false;
             }
-            if(!node.children.IsEmpty()) {
-                error = "Accordion section " + AsString(node.id) + " cannot contain children in this slice";
+            if(node.children.GetCount() > 1) {
+                error = "Accordion sections accept one direct content child. Place a layout inside the section to contain multiple controls.";
                 return false;
             }
         }

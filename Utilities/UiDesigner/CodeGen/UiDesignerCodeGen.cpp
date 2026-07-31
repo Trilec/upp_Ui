@@ -924,6 +924,17 @@ void UiDesignerCodeGenerator::EmitChildren(
             if(lock != "None")
                 out << "\t" << parent << ".SetLockMode(" << MemberName(*child)
                     << "_index, UiAccordion::Lock::" << lock << ");\n";
+            for(UiDesignerNodeId content_id : child->children) {
+                const UiDesignerNode* content = document.Find(content_id);
+                if(!content)
+                    continue;
+                const UiDesignerControlSpec* content_spec = catalog_.Find(content->type);
+                if(!content_spec || content_spec->IsSemanticItem())
+                    continue;
+                out << "\t" << parent << ".GetSectionContent(" << MemberName(*child)
+                    << "_index).Add(" << MemberName(*content) << ".SizePos());\n";
+                EmitChildren(out, document, *content);
+            }
             continue;
         }
         if(child->type == "UiTabPage" && node.type == "UiTab") {

@@ -181,11 +181,12 @@ static void AddPanelDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
                                const UiDesignerNode& node,
                                const UiDesignerGeometryRecord& record)
 {
+    const Rect body = record.body.IsEmpty() ? record.rect : record.body;
     UiDesignerDropRegion region;
     region.owner = node.id;
     region.kind = UiDesignerDropRegionKind::PanelBody;
-    region.rect = record.body;
-    region.visual_rect = record.body;
+    region.rect = body;
+    region.visual_rect = body;
     region.depth = record.depth + 1;
     region.paint_order = record.order * 100;
     region.label = LayoutNodeName(nullptr, node) + " body";
@@ -214,6 +215,39 @@ static void AddTitleCardDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
     region.depth = record.depth + 1;
     region.paint_order = record.order * 100 + 50;
     region.label = region.occupied ? "Title Card content (occupied)" : "Title Card content";
+    AddRegion(snapshot, pick(region));
+}
+
+static void AddAccordionSectionDropRegion(
+    UiDesignerGeometrySnapshotBuilder& snapshot,
+    const UiDesignerNode& node, const UiDesignerGeometryRecord& record,
+    const UiDesignerPreviewInstance* instance, const UiAccordion* accordion,
+    const Rect& accordion_rect)
+{
+    if(!instance || instance->semantic_host_index < 0 || !accordion)
+        return;
+    const int index = instance->semantic_host_index;
+    const Rect header = accordion->GetSectionHeaderRect(index);
+    const Rect body = accordion->GetSectionContentRect(index);
+    Rect local = body;
+    if(local.IsEmpty()) {
+        const int y = min(accordion_rect.GetHeight(), header.bottom);
+        local = RectC(header.left, y, header.GetWidth(),
+                      min(DPI(16), max(0, accordion_rect.GetHeight() - y)));
+    }
+    if(local.IsEmpty())
+        return;
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::AccordionSectionContent;
+    region.rect = local.Offseted(accordion_rect.TopLeft());
+    region.visual_rect = region.rect;
+    region.occupied = node.children.GetCount() > 0;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100 + 60;
+    region.label = region.occupied
+        ? "Accordion section content (occupied)"
+        : "Accordion section content";
     AddRegion(snapshot, pick(region));
 }
 
@@ -407,7 +441,9 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
                                  const UiDesignerCatalog* catalog,
                                  const UiDesignerNode& node,
                                  const UiDesignerGeometryRecord& record,
-                                 const UiDesignerPreviewInstance* instance)
+                                 const UiDesignerPreviewInstance* instance,
+                                 const UiAccordion* accordion = nullptr,
+                                 const Rect& accordion_rect = Rect())
 {
     if(node.id == document.GetRootId()) {
         AddWindowDropRegion(snapshot, node, record);
@@ -427,6 +463,11 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
     }
     if(node.type == "UiTitleCard") {
         AddTitleCardDropRegion(snapshot, node, record, instance);
+        return;
+    }
+    if(node.type == "UiAccordionSection") {
+        AddAccordionSectionDropRegion(snapshot, node, record, instance,
+                                      accordion, accordion_rect);
         return;
     }
 }
@@ -1433,6 +1474,8 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
                 lock == "Open" ? UiAccordion::Lock::Open :
                 lock == "Closed" ? UiAccordion::Lock::Closed :
                 UiAccordion::Lock::None);
+            instance.semantic_host_index = index;
+            instance.semantic_host_runtime_parent = parent_instance.node;
         }
         return;
     }
@@ -1476,8 +1519,12 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();
+        const bool scale_x = node.GetProperty("width_mode", "Fit") == "Expand" ||
+                             node.GetProperty("cell_align_x", "Auto") == "Stretch";
+        const bool scale_y = node.GetProperty("height_mode", "Fit") == "Expand" ||
+                             node.GetProperty("cell_align_y", "Auto") == "Stretch";
         grid->Add(child, node.GetProperty("grid_row", 0),
-                  node.GetProperty("grid_column", 0), false, false);
+                  node.GetProperty("grid_column", 0), scale_x, scale_y);
     }
     else if(auto *tab = dynamic_cast<UiTab *>(&parent))
         tab->Add(child, node.GetProperty("title", node.name));
@@ -1661,7 +1708,20 @@ void UiDesignerPreviewCanvas::BuildNode(
         return;
     stats_.live_instance_creations++;
     UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
-    if(parent_instance && parent_instance->control)
+    if(parent_instance && parent_instance->semantic &&
+       parent_instance->type == "UiAccordionSection" &&
+       parent_instance->semantic_host_index >= 0 &&
+       parent_instance->semantic_host_runtime_parent) {
+        const int owner = FindInstance(parent_instance->semantic_host_runtime_parent);
+        UiAccordion* accordion = owner >= 0
+            ? dynamic_cast<UiAccordion *>(instances_[owner].control.Get()) : nullptr;
+        if(accordion)
+            accordion->GetSectionContent(parent_instance->semantic_host_index)
+                .Add(instance.control->SizePos());
+        instance.semantic_host_runtime_parent = parent_instance->semantic_host_runtime_parent;
+        instance.semantic_host_index = parent_instance->semantic_host_index;
+    }
+    else if(parent_instance && parent_instance->control)
         AttachRuntimeChild(*parent_instance->control, *instance.control,
                            *node,
                            parent_spec ? parent_spec->child_adapter_id : "add",
@@ -1948,6 +2008,13 @@ void UiDesignerPreviewCanvas::UpdateSemanticRect(
     UiDesignerPreviewInstance& instance, const UiDesignerNode& node)
 {
     Rect local;
+    if(node.type == "UiAccordionSection" && instance.semantic_host_index >= 0) {
+        if(UiAccordion* accordion = dynamic_cast<UiAccordion *>(
+               FindRuntime(instance.semantic_host_runtime_parent))) {
+            local = accordion->GetSectionHeaderRect(instance.semantic_host_index);
+            local |= accordion->GetSectionBodyRect(instance.semantic_host_index);
+        }
+    }
     if(Ctrl* parent = FindRuntime(instance.runtime_parent)) {
         if(auto *box = dynamic_cast<UiBoxLayout *>(parent))
             local = box->GetItemRect(instance.layout_item_index);
@@ -1984,6 +2051,8 @@ void UiDesignerPreviewCanvas::LayoutNode(
                          adapter == "quad" || adapter == "single" ||
                          adapter == "title_card" ||
                          adapter == "upp_tab" || adapter == "upp_splitter";
+    const bool section_host = instance.semantic_host_runtime_parent != 0 &&
+                              instance.semantic_host_index >= 0;
     if(adapter == "absolute" && instance.runtime_parent) {
         Ctrl* parent = FindRuntime(instance.runtime_parent);
         if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(parent))
@@ -1994,7 +2063,16 @@ void UiDesignerPreviewCanvas::LayoutNode(
                 max(0, (int)Effective(*node, "width", 160)),
                 max(0, (int)Effective(*node, "height", 32)));
     }
-    if(node->parent == document_->GetRootId() || !managed) {
+    if(section_host) {
+        UiAccordion* accordion = dynamic_cast<UiAccordion *>(
+            FindRuntime(instance.semantic_host_runtime_parent));
+        Rect section = GetNodeRect(node->parent);
+        Rect body = accordion
+            ? accordion->GetSectionContentRect(instance.semantic_host_index) : Rect();
+        Rect local = body.Offseted(Point(-section.left, -section.top));
+        instance.control->SetRect(local);
+    }
+    else if(node->parent == document_->GetRootId() || !managed) {
         Rect available = node->parent == document_->GetRootId()
             ? rects_.Get(node->parent) : RectC(0, 0, GetSize().cx, GetSize().cy);
         const UiDesignerNode* host = document_->Find(node->parent);
@@ -2049,7 +2127,7 @@ void UiDesignerPreviewCanvas::LayoutNode(
     const int64 control_layout_start = (measure && (is_grid || is_box)) ? usecs() : 0;
     const Rect parent_assigned_rect = instance.control->GetRect();
     instance.control->Layout();
-    if(instance.runtime_parent && managed && adapter != "absolute")
+    if(instance.runtime_parent && (managed || section_host) && adapter != "absolute")
         instance.control->SetRect(parent_assigned_rect);
     if(control_layout_start) {
         const double elapsed = (double)usecs(control_layout_start) / 1000.0;
@@ -2143,7 +2221,8 @@ void UiDesignerPreviewCanvas::Layout()
         record.selectable = true;
         record.drop_target = node->id == document_->GetRootId() ||
             node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
-            node->type == "UiPanel" || node->type == "UiTitleCard";
+            node->type == "UiPanel" || node->type == "UiTitleCard" ||
+            node->type == "UiAccordion" || node->type == "UiAccordionSection";
         const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node->type) : nullptr;
         record.cue_kind = spec
             ? ResolveCueKind(*spec, *node)
@@ -2196,8 +2275,18 @@ void UiDesignerPreviewCanvas::Layout()
             record.inset_rects.Add(RectC(record.body.right, record.body.top,
                                          DPI(record.inset), record.body.Height()));
         }
+        const UiAccordion* host_accordion = nullptr;
+        Rect host_rect;
+        if(q >= 0 && instances_[q].semantic_host_runtime_parent) {
+            const int host = FindInstance(instances_[q].semantic_host_runtime_parent);
+            if(host >= 0) {
+                host_accordion = dynamic_cast<const UiAccordion *>(instances_[host].control.Get());
+                host_rect = GetNodeRect(instances_[q].semantic_host_runtime_parent);
+            }
+        }
         AddLayoutDropRegions(snapshot, *document_, catalog_, *node, record,
-                             q >= 0 ? &instances_[q] : nullptr);
+                             q >= 0 ? &instances_[q] : nullptr,
+                             host_accordion, host_rect);
         snapshot.Add(pick(record));
     }
     geometry_ = snapshot.Publish();

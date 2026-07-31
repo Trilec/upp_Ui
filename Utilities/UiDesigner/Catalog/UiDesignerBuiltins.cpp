@@ -1318,6 +1318,7 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     section.capabilities = UiDesignerCapabilitySemanticItem;
     section.preview_adapter_id = "semantic:accordion_section";
     section.codegen_adapter_id = "accordion_section";
+    section.child_adapter_id = "accordion_section";
     section.semantic_owner_type = "UiAccordion";
     section.properties.Clear();
     section.defaults.Clear();
