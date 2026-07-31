@@ -1683,6 +1683,81 @@ CONSOLE_APP_MAIN
         }
     Check(found_empty_region, "Removing content restores the empty Title Card drop area");
 
+    const UiDesignerControlSpec* accordion_spec = catalog.Find("UiAccordion");
+    const UiDesignerControlSpec* label_spec = catalog.Find("UiLabel");
+    Check(accordion_spec && accordion_spec->sizing_class == UiDesignerSizingClass::Container &&
+              label_spec && label_spec->sizing_class == UiDesignerSizingClass::Leaf,
+          "Catalog classifies containers and leaves for fresh sizing");
+    UiDesignerSession sizing_session;
+    sizing_session.NewDocument("blank");
+    UiDesignerNodeId sizing_grid = sizing_session.Commands().AddNode(
+        "UiGridLayout", "sizing_grid", sizing_session.Document().GetRootId(),
+        grid_spec ? grid_spec->node_flags : 0,
+        grid_spec ? grid_spec->defaults : ValueMap(), "Add sizing Grid");
+    UiDesignerDropPlan sizing_panel = sizing_session.PlanAddControl(
+        "UiPanel", sizing_grid, Point(0, 0), true, -1, 0, 0);
+    UiDesignerDropPlan sizing_label = sizing_session.PlanAddControl(
+        "UiLabel", sizing_grid, Point(0, 0), true, -1, 0, 1);
+    Check(sizing_panel.valid && sizing_panel.add_defaults.GetValue(
+              sizing_panel.add_defaults.Find("width_mode")) == "Expand" &&
+              sizing_panel.add_defaults.GetValue(
+                  sizing_panel.add_defaults.Find("cell_align_x")) == "Stretch",
+          "Fresh container Grid drops use Expand and Stretch");
+    Check(sizing_label.valid && sizing_label.add_defaults.GetValue(
+              sizing_label.add_defaults.Find("width_mode")) == "Fit",
+          "Fresh leaf Grid drops remain Fit");
+
+    UiDesignerDocument accordion_document;
+    UiDesignerCommandService accordion_commands(accordion_document);
+    UiDesignerNodeId accordion_node = accordion_commands.AddNode(
+        "UiAccordion", "contract_accordion", accordion_document.GetRootId(),
+        accordion_spec ? accordion_spec->node_flags : 0,
+        accordion_spec ? accordion_spec->defaults : ValueMap(),
+        "Add contract Accordion");
+    const UiDesignerNode* accordion_authored = accordion_document.Find(accordion_node);
+    Check(accordion_authored && accordion_authored->children.GetCount() == 3,
+          "New Accordion creates Overview, Details and Notes");
+    bool all_closed = true;
+    if(accordion_authored)
+        for(UiDesignerNodeId section_id : accordion_authored->children)
+            all_closed &= !(bool)accordion_document.Find(section_id)->GetProperty("open", true);
+    Check(all_closed, "New Accordion sections default closed");
+    UiAccordion contract_runtime;
+    contract_runtime.SetRect(0, 0, 260, 120);
+    const int overview = contract_runtime.AddSection("Overview", false);
+    const int details = contract_runtime.AddSection("Details", false);
+    const int notes = contract_runtime.AddSection("Notes", false);
+    contract_runtime.Layout();
+    Check(!contract_runtime.IsOpen(overview) && !contract_runtime.IsOpen(details) &&
+              !contract_runtime.IsOpen(notes),
+          "Runtime Accordion preserves closed section state");
+    const Rect accordion_bounds = RectC(0, 0, 260, 120);
+    Check(accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(overview)) &&
+              accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(details)) &&
+              accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(notes)),
+          "Closed Accordion headers remain inside the boundary");
+    Check(contract_runtime.GetSectionBodyHeight(overview) == 0,
+          "Empty closed Accordion body has zero rendered height");
+    contract_runtime.Open(overview);
+    contract_runtime.Layout();
+    Check(contract_runtime.GetSectionBodyHeight(overview) == 0,
+          "Opening an empty Accordion section does not reserve a fake body");
+    UiBoxLayout contract_box;
+    contract_runtime.GetSectionContent(overview).Add(contract_box.SizePos());
+    contract_runtime.Open(overview);
+    contract_runtime.Layout();
+    Check(accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(overview)) &&
+              accordion_bounds.Contains(contract_runtime.GetSectionBodyRect(overview)) &&
+              contract_runtime.GetSectionBodyHeight(overview) >= 0,
+          "Populated Accordion body remains bounded");
+    contract_runtime.Open(details);
+    contract_runtime.Open(notes);
+    contract_runtime.Layout();
+    const Rect notes_body = contract_runtime.GetSectionBodyRect(notes);
+    Check(accordion_bounds.Contains(contract_runtime.GetSectionHeaderRect(notes)) &&
+              (notes_body.IsEmpty() || accordion_bounds.Contains(notes_body)),
+          "Multiple open Accordion sections remain bounded");
+
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

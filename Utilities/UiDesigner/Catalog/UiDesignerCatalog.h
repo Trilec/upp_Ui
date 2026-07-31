@@ -215,6 +215,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     String theme_adapter_id;
 
     UiDesignerRuntimeKind runtime_kind = UiDesignerRuntimeKind::Placeholder;
+    UiDesignerSizingClass sizing_class = UiDesignerSizingClass::Leaf;
     dword node_flags = UiDesignerNodeNone;
     dword capabilities = UiDesignerCapabilityRuntimeCtrl;
     Size default_size = Size(160, 32);

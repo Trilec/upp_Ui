@@ -186,6 +186,10 @@ public:
     ParentCtrl&  GetSectionContent(int i);
     UiTitleCard& GetSectionHeader(int i);
     UiPanel&     GetSectionBody(int i);
+    Rect         GetSectionHeaderRect(int i) const;
+    Rect         GetSectionBodyRect(int i) const;
+    Rect         GetSectionContentRect(int i) const;
+    int          GetSectionBodyHeight(int i) const;
 
     UiAccordion& SetSectionText(int i, const String& title,
                                 const String& subtitle = String(),

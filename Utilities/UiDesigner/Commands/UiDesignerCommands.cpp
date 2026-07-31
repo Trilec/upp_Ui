@@ -325,7 +325,7 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
             if(type == "UiAccordion") {
                 struct DefaultSection { const char *key, *title, *subtitle, *copy; bool open; };
                 const DefaultSection defaults[] = {
-                    {"overview", "Overview", "Summary", "Overview content", true},
+                    {"overview", "Overview", "Summary", "Overview content", false},
                     {"details", "Details", "Supporting information", "Detailed content", false},
                     {"notes", "Notes", "Additional information", "Notes and supporting content", false}
                 };

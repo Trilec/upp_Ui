@@ -17,6 +17,8 @@ static UiDesignerControlSpec MakeSpec(
     spec.runtime_cpp_type = cpp_type;
     spec.default_base_name = base_name;
     spec.runtime_kind = runtime_kind;
+    spec.sizing_class = (flags & (UiDesignerNodeContainer | UiDesignerNodeLayout))
+        ? UiDesignerSizingClass::Container : UiDesignerSizingClass::Leaf;
     spec.icon_key = icon_key;
     spec.node_flags = flags;
     spec.default_size = size;
@@ -50,6 +52,8 @@ static UiDesignerControlSpec MakeSpec(
     if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
         spec.defaults.Set("width_mode", "Expand");
         spec.defaults.Set("height_mode", "Expand");
+        spec.defaults.Set("cell_align_x", "Stretch");
+        spec.defaults.Set("cell_align_y", "Stretch");
     }
     else {
         spec.defaults.Set("width_mode", "Fit");
@@ -1017,7 +1021,7 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.child_adapter_id = "single";
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
-        if(String(c.type) == "UiTitleCard") {
+    if(String(c.type) == "UiTitleCard") {
             s.child_adapter_id = "title_card";
             s.theme = true;
             s.theme_adapter_id = "title_card";
@@ -1025,10 +1029,6 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                 adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenAction", "Action", "Runs when the card is activated.");
             AddTitleCardProperties(s);
-            s.defaults.Set("width_mode", "Expand");
-            s.defaults.Set("height_mode", "Expand");
-            s.defaults.Set("cell_align_x", "Stretch");
-            s.defaults.Set("cell_align_y", "Stretch");
             UiDesignerPropertySpec icon = ChoiceProperty(
                 "icon", "Icon", "Content", "ICON_DESIGN_DESCRIPTION_48",
                 {{"None", "None"},
@@ -1333,9 +1333,9 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     UiDesignerPropertySpec copy = UiDesignerTextProperty("copy", "Copy");
     copy.group = "Section"; copy.impact = PropertyImpactStructure | PropertyImpactCode;
     section.properties.Add(copy); section.defaults.Set("copy", "Overview content");
-    UiDesignerPropertySpec open = UiDesignerBoolProperty("open", "Open", true);
+    UiDesignerPropertySpec open = UiDesignerBoolProperty("open", "Open", false);
     open.group = "Section"; open.impact = PropertyImpactControlState | PropertyImpactCode;
-    section.properties.Add(open); section.defaults.Set("open", true);
+    section.properties.Add(open); section.defaults.Set("open", false);
     UiDesignerPropertySpec lock = ChoiceProperty("lock", "Lock", "Section", "None",
         {{"None", "None"}, {"Open", "Open"}, {"Closed", "Closed"}},
         PropertyImpactControlState | PropertyImpactCode);

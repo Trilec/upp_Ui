@@ -501,6 +501,26 @@ UiPanel& UiAccordion::GetSectionBody(int i)
     return sections_[i].body;
 }
 
+Rect UiAccordion::GetSectionHeaderRect(int i) const
+{
+    return i >= 0 && i < sections_.GetCount() ? sections_[i].header.GetRect() : Rect();
+}
+
+Rect UiAccordion::GetSectionBodyRect(int i) const
+{
+    return i >= 0 && i < sections_.GetCount() ? sections_[i].body.GetRect() : Rect();
+}
+
+Rect UiAccordion::GetSectionContentRect(int i) const
+{
+    return GetSectionBodyRect(i);
+}
+
+int UiAccordion::GetSectionBodyHeight(int i) const
+{
+    return i >= 0 && i < sections_.GetCount() ? max(0, sections_[i].current_body_cy) : 0;
+}
+
 UiAccordion& UiAccordion::SetSectionText(int i, const String& title, const String& subtitle, const String& copy)
 {
     if(i < 0 || i >= sections_.GetCount())
@@ -1150,7 +1170,9 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
     Rect b(0, 0, 0, 0);
     bool first = true;
     int measured = 0;
+    bool has_content = false;
     for(Ctrl* q = s.content.GetFirstChild(); q; q = q->GetNext()) {
+        has_content = true;
         Size ms = q->GetMinSize();
         int body_h = MeasureAccordionChildHeight(q, width);
         measured = max(measured, max(ms.cy, body_h));
@@ -1177,6 +1199,8 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
     if(!first)
         measured = max(measured, b.GetHeight());
 
+    if(!has_content)
+        return 0;
     measured = max(measured, style.body_min_height);
 
     Size outer = UiStyledOuterSizeFromContent(Size(max(0, width), measured),
@@ -1195,8 +1219,9 @@ Size UiAccordion::GetMinSize() const
         const Section& s = sections_[i];
         w = max(w, s.header.GetMinSize().cx);
         h += max(max(DPI(24), style.header_height), s.header.GetMinSize().cy);
-        if(s.open)
-            h += style.header_body_gap + MeasureSectionBodyHeight(s, max(1, w));
+        const int body = s.open ? MeasureSectionBodyHeight(s, max(1, w)) : 0;
+        if(body > 0)
+            h += style.header_body_gap + body;
         if(i + 1 < sections_.GetCount())
             h += style.item_spacing;
     }
@@ -1213,19 +1238,61 @@ void UiAccordion::Layout()
     if(content.IsEmpty())
         return;
 
-    int y = content.top;
-    int w = content.GetWidth();
-
-    for(int i = 0; i < sections_.GetCount(); i++) {
+    const int w = content.GetWidth();
+    const int count = sections_.GetCount();
+    Vector<int> header_height, body_height, preferred;
+    header_height.SetCount(count, 0);
+    body_height.SetCount(count, 0);
+    preferred.SetCount(count, 0);
+    int remaining = max(0, content.GetHeight() - max(0, count - 1) * style.item_spacing);
+    for(int i = 0; i < count; i++) {
         Section& s = sections_[i];
+        const int desired = max(max(DPI(24), style.header_height), s.header.GetMinSize().cy);
+        header_height[i] = min(desired, remaining);
+        remaining -= header_height[i];
+    }
+    int open_gaps = 0;
+    int preferred_total = 0;
+    int last_preferred = -1;
+    for(int i = 0; i < count; i++) {
+        Section& s = sections_[i];
+        if(!s.open && !s.animating && s.current_body_cy <= 0)
+            continue;
+        preferred[i] = max(0, MeasureSectionBodyHeight(s, w));
+        if(preferred[i] > 0) {
+            open_gaps++;
+            preferred_total += preferred[i];
+            last_preferred = i;
+        }
+    }
+    remaining = max(0, remaining - open_gaps * max(0, style.header_body_gap));
+    int body_remaining = remaining;
+    if(preferred_total > 0) {
+        int assigned = 0;
+        for(int i = 0; i < count; i++) {
+            if(preferred[i] <= 0)
+                continue;
+            const int allocation = i == last_preferred
+                ? max(0, body_remaining - assigned)
+                : min(preferred[i], (int)((int64)body_remaining * preferred[i] / preferred_total));
+            body_height[i] = min(preferred[i], max(0, allocation));
+            assigned += body_height[i];
+        }
+    }
 
-        int hh = max(max(DPI(24), style.header_height), s.header.GetMinSize().cy);
+    int y = content.top;
+    for(int i = 0; i < count; i++) {
+        Section& s = sections_[i];
+        const int hh = min(header_height[i], max(0, content.bottom - y));
         s.header.SetRect(content.left, y, w, hh);
         y += hh;
 
-        if(s.open || s.animating || s.current_body_cy > 0) {
+        const int allocated_body = body_height[i];
+        if(preferred[i] > 0 || s.animating) {
             y += style.header_body_gap;
-            int bh = s.animating ? s.current_body_cy : (s.open ? MeasureSectionBodyHeight(s, w) : 0);
+            y = min(y, content.bottom);
+            int bh = s.animating ? min(max(0, s.current_body_cy), allocated_body) : allocated_body;
+            bh = min(bh, max(0, content.bottom - y));
             if(!s.animating)
                 s.current_body_cy = bh;
             s.body.SetRect(content.left, y, w, bh);
@@ -1247,7 +1314,7 @@ void UiAccordion::Layout()
             s.body.SetRect(content.left, y, w, 0);
         }
 
-        if(i + 1 < sections_.GetCount())
+        if(i + 1 < count)
             y += style.item_spacing;
     }
 

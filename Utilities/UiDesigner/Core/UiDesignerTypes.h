@@ -101,6 +101,11 @@ struct UiDesignerActionBinding : Moveable<UiDesignerActionBinding> {
     }
 };
 
+enum class UiDesignerSizingClass : byte {
+    Leaf = 0,
+    Container,
+};
+
 enum class UiDesignerPropertyChangeKind : byte {
     Normal = 0,
     ThemeOverride,
