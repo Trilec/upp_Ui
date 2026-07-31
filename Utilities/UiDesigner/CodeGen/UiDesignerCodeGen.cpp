@@ -488,7 +488,7 @@ void UiDesignerCodeGenerator::EmitSetup(
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetMinCellSize(Size(DPI("
             << max(0, (int)Property("min_cell_width", 10)) << "), DPI("
-            << max(0, (int)Property("min_cell_height", 10)) << "));\n";
+            << max(0, (int)Property("min_cell_height", 10)) << ")));\n";
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout ||
        spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetInset(DPI("
@@ -498,10 +498,13 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetGap(DPI("
             << max(0, (int)Property("gap", 0)) << "));\n";
 
-    if(spec.FindProperty("tooltip"))
-        out << "\t" << member << ".Tip(" << EmitValue(
-            Effective("tooltip", spec.FindProperty("tooltip")->default_value))
+    if(spec.FindProperty("tooltip")) {
+        const Value tooltip = Effective(
+            "tooltip", spec.FindProperty("tooltip")->default_value);
+        out << "\t" << member << ".Tip("
+            << (IsNull(tooltip) ? String("\"\"") : EmitValue(tooltip))
             << ");\n";
+    }
     if(spec.FindProperty("icon")) {
         const String icon_name = Effective("icon", spec.FindProperty("icon")->default_value);
         if(IsButtonFamily(spec.runtime_kind))
@@ -856,6 +859,11 @@ static void AttachSplitter(UiDesignerChildAttachContext& c)
     c.out << "\t" << c.parent << " << " << c.member << ";\n";
 }
 
+static void AttachTitleCard(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".SetContentCell(" << c.member << ");\n";
+}
+
 struct UiDesignerChildAdapterEntry {
     const char *id;
     UiDesignerChildAttachFn emit;
@@ -867,6 +875,7 @@ static const UiDesignerChildAdapterEntry *FindChildAdapter(const String& id)
         {"root", AttachRoot},
         {"add", AttachAdd},
         {"single", AttachAdd},
+        {"title_card", AttachTitleCard},
         {"box", AttachBox},
         {"grid", AttachGrid},
         {"absolute", AttachAbsolute},

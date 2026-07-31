@@ -1018,12 +1018,17 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
         if(String(c.type) == "UiTitleCard") {
+            s.child_adapter_id = "title_card";
             s.theme = true;
             s.theme_adapter_id = "title_card";
             if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
                 adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenAction", "Action", "Runs when the card is activated.");
             AddTitleCardProperties(s);
+            s.defaults.Set("width_mode", "Expand");
+            s.defaults.Set("height_mode", "Expand");
+            s.defaults.Set("cell_align_x", "Stretch");
+            s.defaults.Set("cell_align_y", "Stretch");
             UiDesignerPropertySpec icon = ChoiceProperty(
                 "icon", "Icon", "Content", "ICON_DESIGN_DESCRIPTION_48",
                 {{"None", "None"},

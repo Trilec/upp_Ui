@@ -1478,6 +1478,10 @@ CONSOLE_APP_MAIN
         button ? button->defaults : ValueMap(), "Add Fit Button");
     fit_commands.SetProperty(fit_card, "grid_row", 0, UiDesignerImpactLocalLayout);
     fit_commands.SetProperty(fit_card, "grid_column", 0, UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_card, "width_mode", "Fit", UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_card, "height_mode", "Fit", UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_card, "cell_align_x", "Center", UiDesignerImpactLocalLayout);
+    fit_commands.SetProperty(fit_card, "cell_align_y", "Center", UiDesignerImpactLocalLayout);
     fit_commands.SetProperty(fit_tab, "grid_row", 0, UiDesignerImpactLocalLayout);
     fit_commands.SetProperty(fit_tab, "grid_column", 1, UiDesignerImpactLocalLayout);
     fit_commands.SetProperty(fit_button, "grid_row", 1, UiDesignerImpactLocalLayout);
@@ -1537,6 +1541,148 @@ CONSOLE_APP_MAIN
           "Grid final column remains bounded after rounding");
     Check(fit_geometry && fit_geometry->cell_rects[3].bottom <= grid_client.bottom,
           "Grid final row remains bounded after rounding");
+
+    // Focused reproduction of the reported Title Card insertion defects.
+    UiDesignerSession card_session;
+    card_session.NewDocument("blank");
+    UiDesignerCommandService& card_commands = card_session.Commands();
+    const UiDesignerNodeId card_grid = card_commands.AddNode(
+        "UiGridLayout", "card_grid", card_session.Document().GetRootId(),
+        grid_spec ? grid_spec->node_flags : 0,
+        grid_spec ? grid_spec->defaults : ValueMap(), "Add Title Card Grid");
+    card_commands.SetProperty(card_grid, "rows", 2, UiDesignerImpactLocalLayout);
+    card_commands.SetProperty(card_grid, "columns", 2, UiDesignerImpactLocalLayout);
+    card_commands.SetProperty(card_grid, "width_mode", "Fixed", UiDesignerImpactLocalLayout);
+    card_commands.SetProperty(card_grid, "height_mode", "Fixed", UiDesignerImpactLocalLayout);
+    card_commands.SetProperty(card_grid, "fixed_width", 320, UiDesignerImpactLocalLayout);
+    card_commands.SetProperty(card_grid, "fixed_height", 220, UiDesignerImpactLocalLayout);
+    UiDesignerDropPlan card_plan = card_session.PlanAddControl(
+        "UiTitleCard", card_grid, Point(240, 120), true, -1, 0, 1);
+    UiDesignerNodeId inserted_card = 0;
+    String card_drop_error;
+    Check(card_session.ExecuteDrop(card_plan, &inserted_card, card_drop_error),
+          "Title Card insertion reproduction executes: " + card_drop_error);
+    const UiDesignerNode* inserted_card_node = card_session.Document().Find(inserted_card);
+    Check(inserted_card_node &&
+              inserted_card_node->GetProperty("icon", "") == "ICON_DESIGN_DESCRIPTION_48",
+          "Reproduction canonical Title Card icon is the description glyph");
+    Check(inserted_card_node && inserted_card_node->GetProperty("width_mode", "") == "Expand" &&
+              inserted_card_node->GetProperty("height_mode", "") == "Expand" &&
+              inserted_card_node->GetProperty("cell_align_x", "") == "Stretch" &&
+              inserted_card_node->GetProperty("cell_align_y", "") == "Stretch",
+          "Reproduction Title Card uses container placement defaults");
+    UiDesignerSelection card_selection;
+    UiDesignerPreviewCanvas card_preview;
+    card_preview.SetRect(0, 0, 512, 320);
+    card_preview.Bind(&card_session.Document(), &catalog, nullptr, &card_selection);
+    card_preview.RebuildDocument();
+    const UiDesignerGeometryRecord* card_grid_geometry =
+        card_preview.GetGeometrySnapshot().Find(card_grid);
+    const Rect card_cell = card_grid_geometry && card_grid_geometry->cell_rects.GetCount() > 1
+        ? card_grid_geometry->cell_rects[1] : Rect();
+    const Rect card_rect = card_preview.GetNodeRect(inserted_card);
+    Check(card_grid_geometry && card_cell == card_rect,
+          "Reproduction Title Card fills its assigned Grid cell");
+    if(UiTitleCard* runtime_card = dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card)))
+        Check(!runtime_card->GetContentCellRect().IsEmpty(),
+              "Reproduction empty Title Card publishes prospective content geometry");
+    Check(card_preview.GetGeometrySnapshot().GetDropRegionCount() > 0,
+          "Reproduction publishes a Title Card content drop region");
+    const UiDesignerGeometryRecord* card_record =
+        card_preview.GetGeometrySnapshot().Find(inserted_card);
+    Check(card_record && card_record->drop_target,
+          "Selected Title Card is a content drop target");
+    if(UiTitleCard* runtime_card = dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))) {
+        Check(runtime_card->HasMedia(), "Inserted Title Card runtime media is present");
+        Check(card_preview.RebuildSubtree(inserted_card),
+              "Title Card subtree rebuild succeeds");
+        Check(dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))->HasMedia(),
+              "Title Card icon survives subtree rebuild");
+    }
+    Check(card_commands.SetProperty(inserted_card, "icon", "None",
+                                    UiDesignerImpactControlState | UiDesignerImpactLocalLayout),
+          "Title Card icon can be cleared");
+    card_preview.RebuildDocument();
+    Check(!dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))->HasMedia(),
+          "Title Card None clears runtime media");
+    Check(card_commands.Undo(), "Title Card icon undo succeeds");
+    card_preview.RebuildDocument();
+    Check(dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))->HasMedia(),
+          "Title Card icon undo restores media");
+    Check(card_commands.Redo(), "Title Card icon redo succeeds");
+    card_preview.RebuildDocument();
+    Check(!dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))->HasMedia(),
+          "Title Card icon redo clears media");
+
+    const UiDesignerControlSpec* card_box_spec = catalog.Find("UiBoxLayout");
+    const UiDesignerNodeId card_box = card_commands.AddNode(
+        "UiBoxLayout", "card_content", inserted_card,
+        card_box_spec ? card_box_spec->node_flags : 0,
+        card_box_spec ? card_box_spec->defaults : ValueMap(),
+        "Add Title Card content");
+    const UiDesignerControlSpec* card_button_spec = catalog.Find("UiButton");
+    const UiDesignerNodeId card_button = card_commands.AddNode(
+        "UiButton", "card_button", card_box,
+        card_button_spec ? card_button_spec->node_flags : 0,
+        card_button_spec ? card_button_spec->defaults : ValueMap(),
+        "Add Title Card Button");
+    card_preview.RebuildDocument();
+    UiTitleCard* occupied_card = dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card));
+    Check(occupied_card && occupied_card->GetContentCell() == card_preview.FindRuntime(card_box),
+          "Title Card child attaches through SetContentCell");
+    bool found_occupied_region = false;
+    for(const UiDesignerDropRegion& region : card_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == inserted_card && region.kind == UiDesignerDropRegionKind::TitleCardContent) {
+            found_occupied_region = true;
+            Check(region.occupied, "Occupied Title Card region is marked occupied");
+        }
+    Check(found_occupied_region, "Occupied Title Card publishes its content region");
+    UiDesignerDropPlan second_card_child = card_session.PlanAddControl(
+        "UiPanel", inserted_card, Point(0, 0), true);
+    Check(!second_card_child.valid &&
+              second_card_child.reason.Find("one direct content child") >= 0,
+          "Title Card rejects a second direct child with guidance");
+    Check(card_commands.SetProperty(inserted_card, "icon", "ICON_DESIGN_DESCRIPTION_48",
+                                    UiDesignerImpactControlState | UiDesignerImpactLocalLayout),
+          "Title Card authored icon is restored for code generation");
+    String card_json = UiDesignerSerialize(card_session.Document());
+    UiDesignerDocument card_round_trip;
+    String card_json_error;
+    Check(UiDesignerDeserialize(card_json, card_round_trip, card_json_error),
+          "Title Card JSON round trip succeeds");
+    Check(card_round_trip.Find(inserted_card) &&
+              card_round_trip.Find(inserted_card)->GetProperty("icon", "") ==
+                  "ICON_DESIGN_DESCRIPTION_48" &&
+              card_round_trip.Find(card_box),
+          "Title Card JSON preserves icon and content child");
+    UiDesignerGeneratedProject card_generated = generator.Generate(
+        card_session.Document(), "GeneratedTitleCardWindow");
+    Check(card_generated.source.Find(".SetContentCell(") >= 0,
+          "Generated Title Card uses SetContentCell");
+    Check(card_generated.source.Find(".SetMedia(ICON_DESIGN_DESCRIPTION_48()") >= 0,
+          "Generated Title Card emits its description media");
+    UiDesignerExportWriteOptions card_write_options;
+    Vector<String> card_written_files;
+    String card_write_error;
+    Check(UiDesignerWriteGeneratedProject(
+              "E:/apps/github/upp_Ui/build/TitleCardGeneratedFixture",
+              card_generated, card_write_options, card_written_files, card_write_error),
+          "Title Card generated package writes: " + card_write_error);
+    Check(card_commands.RemoveNode(card_box, "Remove Title Card content"),
+          "Title Card content removal succeeds");
+    card_preview.RebuildDocument();
+    Check(dynamic_cast<UiTitleCard *>(card_preview.FindRuntime(inserted_card))->GetContentCell() == nullptr,
+          "Removing Title Card content clears the runtime relationship");
+    bool found_empty_region = false;
+    for(const UiDesignerDropRegion& region : card_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == inserted_card && region.kind == UiDesignerDropRegionKind::TitleCardContent) {
+            found_empty_region = true;
+            Check(!region.occupied, "Empty Title Card region is marked available");
+            Check(card_preview.GetGeometrySnapshot().HitDropRegion(region.rect.CenterPoint()) == &region,
+                  "Title Card drag hit testing uses the published content region");
+        }
+    Check(found_empty_region, "Removing content restores the empty Title Card drop area");
+
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

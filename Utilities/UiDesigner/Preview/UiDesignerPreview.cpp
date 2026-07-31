@@ -192,6 +192,31 @@ static void AddPanelDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
     AddRegion(snapshot, pick(region));
 }
 
+static void AddTitleCardDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                   const UiDesignerNode& node,
+                                   const UiDesignerGeometryRecord& record,
+                                   const UiDesignerPreviewInstance* instance)
+{
+    if(!instance || !instance->control)
+        return;
+    const UiTitleCard* card = dynamic_cast<const UiTitleCard *>(instance->control.Get());
+    if(!card)
+        return;
+    const Rect local = card->GetContentCellRect();
+    if(local.IsEmpty())
+        return;
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::TitleCardContent;
+    region.rect = local.Offseted(record.rect.TopLeft());
+    region.visual_rect = region.rect;
+    region.occupied = card->GetContentCell() != nullptr;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100 + 50;
+    region.label = region.occupied ? "Title Card content (occupied)" : "Title Card content";
+    AddRegion(snapshot, pick(region));
+}
+
 static void AddGridDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
                                const UiDesignerDocument& document,
                                const UiDesignerCatalog* catalog,
@@ -398,6 +423,10 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
     }
     if(node.type == "UiBoxLayout") {
         AddBoxDropRegions(snapshot, document, catalog, node, record, instance);
+        return;
+    }
+    if(node.type == "UiTitleCard") {
+        AddTitleCardDropRegion(snapshot, node, record, instance);
         return;
     }
 }
@@ -657,6 +686,13 @@ static UiDesignerApplyResult ApplyRuntime(
         if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
             button->SetIcon(ResolveButtonIcon(AsString(value)));
             ctrl.RefreshLayout();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            if(AsString(value) == "ICON_DESIGN_DESCRIPTION_48")
+                card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
+            else
+                card->ClearMedia();
             return UiDesignerApplyResult::AppliedLocalLayout;
         }
         return UiDesignerApplyResult::Rejected;
@@ -1421,6 +1457,11 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
                                int& layout_item_index,
                                Size catalog_size = Size(160, 32))
 {
+    if(adapter == "title_card") {
+        if(auto *card = dynamic_cast<UiTitleCard *>(&parent))
+            card->SetContentCell(child);
+        return;
+    }
     if(adapter == "single") {
         parent.Add(child.SizePos());
         return;
@@ -1941,6 +1982,7 @@ void UiDesignerPreviewCanvas::LayoutNode(
                          adapter == "tab" || adapter == "stack" ||
                          adapter == "accordion" || adapter == "splitter" ||
                          adapter == "quad" || adapter == "single" ||
+                         adapter == "title_card" ||
                          adapter == "upp_tab" || adapter == "upp_splitter";
     if(adapter == "absolute" && instance.runtime_parent) {
         Ctrl* parent = FindRuntime(instance.runtime_parent);
@@ -1995,6 +2037,8 @@ void UiDesignerPreviewCanvas::LayoutNode(
             instance.control->SetRect(box->GetItemRect(instance.layout_item_index));
         else if(auto *grid = dynamic_cast<UiGridLayout *>(parent))
             instance.control->SetRect(grid->GetItemRect(instance.layout_item_index));
+        else if(auto *card = dynamic_cast<UiTitleCard *>(parent))
+            instance.control->SetRect(card->GetContentCellRect());
     }
 
     // Parent layout has already assigned managed children. Layout this
@@ -2099,7 +2143,7 @@ void UiDesignerPreviewCanvas::Layout()
         record.selectable = true;
         record.drop_target = node->id == document_->GetRootId() ||
             node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
-            node->type == "UiPanel";
+            node->type == "UiPanel" || node->type == "UiTitleCard";
         const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node->type) : nullptr;
         record.cue_kind = spec
             ? ResolveCueKind(*spec, *node)

@@ -490,12 +490,16 @@ Size UiTitleCard::GetHeadingMinSize() const
 
 Rect UiTitleCard::GetContentCellRect(const Rect& content) const
 {
-    if(!content_cell_ || content.IsEmpty())
+    if(content.IsEmpty())
         return RectC(0, 0, 0, 0);
 
     const Style& style = GetEffectiveStyle();
     Size heading = GetHeadingMinSize();
-    int heading_w = max(0, min(content.GetWidth(), heading.cx));
+    // Keep a visible prospective content lane even when the card is narrower
+    // than its natural heading. The same reservation is used once a child is
+    // attached, so preview geometry and runtime placement cannot diverge.
+    const int content_lane = max(1, content.GetWidth() / 3);
+    int heading_w = max(0, min(max(0, content.GetWidth() - content_lane), heading.cx));
     int gap = max(0, style.content_cell_gap);
     bool split = style.card_line && style.card_line_length != NONE &&
                  (style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT);
@@ -511,8 +515,6 @@ Rect UiTitleCard::GetContentCellRect(const Rect& content) const
 
 Rect UiTitleCard::GetContentCellRect() const
 {
-    if(!content_cell_ || content_cell_->GetParent() != this)
-        return RectC(0, 0, 0, 0);
     Rect content = UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
     return GetContentCellRect(content);
 }

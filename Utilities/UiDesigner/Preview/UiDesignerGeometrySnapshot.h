@@ -12,6 +12,7 @@ enum class UiDesignerDropRegionKind : byte {
     BoxGap,
     BoxAfterItem,
     GridCell,
+    TitleCardContent,
 };
 
 enum class UiDesignerCueKind : byte {

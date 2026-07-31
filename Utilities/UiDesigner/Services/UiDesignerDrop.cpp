@@ -84,11 +84,20 @@ void UiDesignerDropService::PopulatePlacement(
         if(!preserve_existing_layout) {
             // Fresh grid children should begin at their natural size and be
             // centered within the assigned grid cell.
-            properties.Set("width_mode", "Fit");
-            properties.Set("height_mode", "Fit");
-            properties.Set("cell_align_x", "Center");
-            properties.Set("cell_align_y", "Center");
+            const bool title_card = child.type_id == "UiTitleCard";
+            properties.Set("width_mode", title_card ? "Expand" : "Fit");
+            properties.Set("height_mode", title_card ? "Expand" : "Fit");
+            properties.Set("cell_align_x", title_card ? "Stretch" : "Center");
+            properties.Set("cell_align_y", title_card ? "Stretch" : "Center");
         }
+        return;
+    }
+
+    if(parent.type == "UiTitleCard") {
+        properties.Set("width_mode", "Expand");
+        properties.Set("height_mode", "Expand");
+        properties.Set("cell_align_x", "Stretch");
+        properties.Set("cell_align_y", "Stretch");
         return;
     }
 

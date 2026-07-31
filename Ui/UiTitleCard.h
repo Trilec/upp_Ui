@@ -147,6 +147,8 @@ public:
     UiTitleCard& SetContentCell(Ctrl& child);
     UiTitleCard& ClearContentCell();
     Ctrl*        GetContentCell() const { return content_cell_; }
+    bool         HasMedia() const { return !IsNull(media_); }
+    const Image& GetMedia() const { return media_; }
     Rect         GetContentCellRect() const;
     UiTitleCard& SetContentCellGap(int pixels);
 

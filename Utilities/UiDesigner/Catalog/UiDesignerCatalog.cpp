@@ -300,6 +300,14 @@ bool UiDesignerCatalog::CanParent(const String& child_type,
         reason = parent->display_name + " cannot contain children";
         return false;
     }
+    if(parent_type == "UiTitleCard") {
+        if(child->IsSemanticItem()) {
+            reason = child->display_name + " cannot be a direct Title Card child; place a layout inside the card";
+            return false;
+        }
+        reason.Clear();
+        return true;
+    }
     if(child->IsSemanticItem() &&
        !HasUiDesignerCapability(parent->capabilities,
                                 UiDesignerCapabilityAcceptSpacer)) {
@@ -343,6 +351,10 @@ bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
         parent->type == "UiDirectContentHost") &&
        parent->children.GetCount() >= 1) {
         reason = parent->type + " accepts one direct content child";
+        return false;
+    }
+    if(parent->type == "UiTitleCard" && parent->children.GetCount() >= 1) {
+        reason = "Title Card accepts one direct content child; place a layout inside the card";
         return false;
     }
     reason.Clear();
@@ -509,6 +521,10 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 error = parent.name + " requires at least one Accordion section";
                 return false;
             }
+        }
+        if(parent.type == "UiTitleCard" && parent.children.GetCount() > 1) {
+            error = parent.name + " accepts one direct content child; place a layout inside the card";
+            return false;
         }
     }
     error.Clear();
