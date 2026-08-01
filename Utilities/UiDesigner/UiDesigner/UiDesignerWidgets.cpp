@@ -656,23 +656,10 @@ void UiDesignerCatalogList::MouseMove(Point p, dword)
     if(drag_armed_) {
         if(!HasCapture())
             SetCapture();
-        if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5)) {
+        if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5))
             dragging_ = true;
-            const String type = drag_type_;
-            // Native DND owns the gesture after this transition. Clear local
-            // state before starting it so CancelMode cannot re-enter us.
-            pressed_ = -1;
-            drag_type_.Clear();
-            drag_armed_ = false;
-            if(HasCapture())
-                ReleaseCapture();
-            VectorMap<String, ClipData> payload;
-            Append(payload, UiDesignerCatalogDragText(type));
-            DoDragAndDrop(payload, UiDesignerResolveCatalogIcon("containers"), DND_COPY);
-            dragging_ = false;
-            Refresh();
-            return;
-        }
+        if(dragging_ && WhenToolDrag)
+            WhenToolDrag(drag_type_, GetMousePos());
         return;
     }
     const int next = RowAt(p);
