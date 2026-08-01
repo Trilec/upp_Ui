@@ -1844,6 +1844,14 @@ CONSOLE_APP_MAIN
         accordion_document, "GeneratedAccordionWindow");
     Check(accordion_generated.source.Find("GetSectionContent(") >= 0,
           "Generated Accordion uses typed section content attachment");
+    UiDesignerSession accordion_theme_session;
+    const UiDesignerNodeId accordion_theme_node =
+        accordion_theme_session.AddControl("UiAccordion");
+    accordion_theme_session.Select(accordion_theme_node);
+    Check(accordion_theme_session.Catalog().Find("UiAccordion") &&
+              accordion_theme_session.Catalog().Find("UiAccordion")->theme_overrides.GetCount() > 0 &&
+              accordion_theme_session.ThemeOverrideModel().GetCount() > 0,
+          "Accordion theme override model is populated");
 
     // Regression fixture for managed-parent detachment and incremental
     // Accordion section projection.
