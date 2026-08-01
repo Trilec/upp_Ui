@@ -19,7 +19,10 @@ UiDesignerNodeId UiDesignerDropService::ResolveParent(
     const UiDesignerNode* node = document_->Find(target);
     if(!node)
         return document_->GetRootId();
-    if(node->flags & UiDesignerNodeContainer)
+    const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node->type) : nullptr;
+    if(spec && (spec->content_host != UiDesignerContentHostKind::None ||
+                HasUiDesignerCapability(spec->capabilities,
+                                        UiDesignerCapabilityContainer)))
         return node->id;
     return node->parent ? node->parent : document_->GetRootId();
 }
@@ -93,7 +96,7 @@ void UiDesignerDropService::PopulatePlacement(
         return;
     }
 
-    if(parent.type == "UiTitleCard") {
+    if(parent_spec && parent_spec->content_host == UiDesignerContentHostKind::Single) {
         properties.Set("width_mode", "Expand");
         properties.Set("height_mode", "Expand");
         properties.Set("cell_align_x", "Stretch");
@@ -159,8 +162,12 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
     }
 
     plan.index = index;
+    const UiDesignerControlSpec* target_spec = target_node && catalog_
+        ? catalog_->Find(target_node->type) : nullptr;
     if(plan.index < 0 && target_node &&
-       !(target_node->flags & UiDesignerNodeContainer) &&
+       (!target_spec || (target_spec->content_host == UiDesignerContentHostKind::None &&
+                         !HasUiDesignerCapability(target_spec->capabilities,
+                                                   UiDesignerCapabilityContainer))) &&
        target_node->parent == plan.parent) {
         const int q = FindIndex(parent->children, target_node->id);
         if(q >= 0)
@@ -198,6 +205,17 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
     plan.label = "Add " + spec->display_name;
     plan.valid = true;
     return plan;
+}
+
+bool UiDesignerDropService::IsContentHost(UiDesignerNodeId node_id) const
+{
+    if(!document_ || !catalog_)
+        return false;
+    const UiDesignerNode* node = document_->Find(node_id);
+    const UiDesignerControlSpec* spec = node ? catalog_->Find(node->type) : nullptr;
+    return spec && (spec->content_host != UiDesignerContentHostKind::None ||
+                    HasUiDesignerCapability(spec->capabilities,
+                                            UiDesignerCapabilityContainer));
 }
 
 UiDesignerDropPlan UiDesignerDropService::PlanMove(
@@ -266,9 +284,12 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
         plan.reason = "Quad Splitter accepts at most four panes";
         return plan;
     }
-    if((parent->type == "UiScrollPanel" ||
-        parent->type == "UiDirectContentHost") && resulting_count > 1) {
-        plan.reason = parent->type + " accepts one direct content child";
+    const UiDesignerControlSpec* parent_spec = catalog_->Find(parent->type);
+    if(parent_spec && parent_spec->max_direct_children > 0 &&
+       resulting_count > parent_spec->max_direct_children) {
+        plan.reason = parent_spec->display_name +
+                      " accepts one direct content child. Place a layout inside the " +
+                      parent_spec->display_name + " to contain multiple controls.";
         return plan;
     }
     if(plan.index < -1 || plan.index > parent->children.GetCount()) {
@@ -326,10 +347,16 @@ bool UiDesignerDropService::Execute(const UiDesignerDropPlan& plan,
         if(!catalog_->CanInsert(*document_, spec->type_id, plan.parent,
                                 plan.index, reason))
             return Fail(reason);
+        UiDesignerNodeId open_section = 0;
+        const UiDesignerNode* insertion_parent = document_->Find(plan.parent);
+        if(insertion_parent && insertion_parent->type == "UiAccordionSection" &&
+           !insertion_parent->GetProperty("open", false))
+            open_section = insertion_parent->id;
         const UiDesignerNodeId id = commands_->AddNodeAt(
             spec->type_id, MakeUniqueName(*spec), plan.parent, plan.index,
             spec->node_flags, plan.add_defaults,
-            plan.label.IsEmpty() ? "Add " + spec->display_name : plan.label);
+            plan.label.IsEmpty() ? "Add " + spec->display_name : plan.label,
+            open_section);
         if(!id)
             return Fail(commands_->GetLastError());
         if(created)

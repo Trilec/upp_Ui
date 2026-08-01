@@ -864,6 +864,11 @@ static void AttachTitleCard(UiDesignerChildAttachContext& c)
     c.out << "\t" << c.parent << ".SetContentCell(" << c.member << ");\n";
 }
 
+static void AttachGroupPanel(UiDesignerChildAttachContext& c)
+{
+    c.out << "\t" << c.parent << ".SetContent(" << c.member << ");\n";
+}
+
 struct UiDesignerChildAdapterEntry {
     const char *id;
     UiDesignerChildAttachFn emit;
@@ -876,6 +881,7 @@ static const UiDesignerChildAdapterEntry *FindChildAdapter(const String& id)
         {"add", AttachAdd},
         {"single", AttachAdd},
         {"title_card", AttachTitleCard},
+        {"group_panel", AttachGroupPanel},
         {"box", AttachBox},
         {"grid", AttachGrid},
         {"absolute", AttachAbsolute},
@@ -943,6 +949,15 @@ void UiDesignerCodeGenerator::EmitChildren(
                 << CppString(title) << ");\n"
                 << "\t" << parent << ".EnableTab(" << MemberName(*child)
                 << "_index, " << EmitValue(child->GetProperty("enabled", true)) << ");\n";
+            for(UiDesignerNodeId content_id : child->children) {
+                const UiDesignerNode* content = document.Find(content_id);
+                const UiDesignerControlSpec* content_spec = content
+                    ? catalog_.Find(content->type) : nullptr;
+                if(!content || !content_spec || content_spec->IsSemanticItem())
+                    continue;
+                out << "\t" << member << ".Add(" << MemberName(*content) << ".SizePos());\n";
+                EmitChildren(out, document, *content);
+            }
             continue;
         }
         if(child_spec->IsSemanticItem()) {
@@ -1151,7 +1166,8 @@ UiDesignerGeneratedProject UiDesignerCodeGenerator::Generate(
                                    spec->codegen_adapter_id);
             return result;
         }
-        if((spec->node_flags & UiDesignerNodeContainer) &&
+        if(spec->content_host != UiDesignerContentHostKind::None &&
+           !spec->IsSemanticItem() &&
            !FindChildAdapter(spec->child_adapter_id)) {
             result.diagnostics.Add("Unsupported child adapter: " +
                                    spec->child_adapter_id);

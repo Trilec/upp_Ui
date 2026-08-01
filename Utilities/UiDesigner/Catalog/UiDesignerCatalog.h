@@ -79,6 +79,14 @@ enum class UiDesignerRuntimeKind : word {
     UppVScrollBar,
 };
 
+enum class UiDesignerContentHostKind : byte {
+    None,
+    Normal,
+    Single,
+    Semantic,
+    Page,
+};
+
 enum UiDesignerControlCapability : dword {
     UiDesignerCapabilityNone          = 0,
     UiDesignerCapabilityRuntimeCtrl   = 1 << 0,
@@ -229,6 +237,9 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     String codegen_adapter_id;
     String child_adapter_id;
     String semantic_owner_type;
+    UiDesignerContentHostKind content_host = UiDesignerContentHostKind::None;
+    int max_direct_children = 0;
+    bool accepts_semantic_children = false;
 
     bool preview = true;
     bool inspector = true;

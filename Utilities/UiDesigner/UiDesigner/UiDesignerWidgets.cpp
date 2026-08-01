@@ -831,15 +831,19 @@ void UiDesignerHierarchyView::ClearDrop()
     drop_edge_ = 0;
     drag_payload_.Clear();
     drop_plan_ = UiDesignerDropPlan();
+    catalog_drag_ = false;
     Refresh();
 }
 
 void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
 {
-    if(!document_ || !PlanDrop)
+    if(!document_ || (!PlanDrop && !PlanCatalogDrop))
         return;
     Vector<UiDesignerNodeId> nodes;
-    if(!UiDesignerParseNodesDragText(payload, nodes)) {
+    String catalog_type;
+    const bool node_drag = UiDesignerParseNodesDragText(payload, nodes);
+    const bool catalog_drag = UiDesignerParseCatalogDragText(payload, catalog_type);
+    if(!node_drag && !catalog_drag) {
         ClearDrop();
         return;
     }
@@ -859,7 +863,15 @@ void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
                : p.y >= rr.bottom - third ? 1 : 0;
     UiDesignerNodeId parent = target->id;
     int index = -1;
-    if(drop_edge_ != 0 || !(target->flags & UiDesignerNodeContainer)) {
+    if(drop_edge_ == 0) {
+        drop_plan_ = node_drag && PlanDrop
+            ? PlanDrop(nodes, target->id, -1)
+            : PlanCatalogDrop ? PlanCatalogDrop(catalog_type, target->id, -1)
+                              : UiDesignerDropPlan();
+        if(!drop_plan_.valid && (!IsContentHost || !IsContentHost(target->id)))
+            drop_edge_ = 1;
+    }
+    if(drop_edge_ != 0) {
         parent = target->parent;
         const UiDesignerNode* parent_node = document_->Find(parent);
         index = parent_node ? FindIndex(parent_node->children, target->id) : -1;
@@ -867,9 +879,14 @@ void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
             index++;
         drop_edge_ = drop_edge_ == 0 ? 1 : drop_edge_;
     }
-    drop_plan_ = PlanDrop(nodes, parent, index);
+    if(drop_edge_ != 0)
+        drop_plan_ = node_drag && PlanDrop
+            ? PlanDrop(nodes, parent, index)
+            : PlanCatalogDrop ? PlanCatalogDrop(catalog_type, parent, index)
+                              : UiDesignerDropPlan();
     drop_row_ = row;
     drag_payload_ = payload;
+    catalog_drag_ = catalog_drag;
     if(WhenDropStatus)
         WhenDropStatus(drop_plan_.valid ? drop_plan_.label : drop_plan_.reason);
     Refresh();
@@ -895,12 +912,12 @@ void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
         return;
     }
     d.Accept();
-    d.SetAction(DND_MOVE);
+    d.SetAction(catalog_drag_ ? DND_COPY : DND_MOVE);
     if(d.IsPaste()) {
         String error;
         const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
         if(WhenDropStatus)
-            WhenDropStatus(ok ? "Move completed" : error);
+            WhenDropStatus(ok ? String(catalog_drag_ ? "Control added" : "Move completed") : error);
         ClearDrop();
     }
 }

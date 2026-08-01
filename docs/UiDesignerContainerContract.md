@@ -21,11 +21,12 @@ outer rectangle rather than becoming an invalid rectangle.
 | `UiBoxLayout` | Container/layout | ordered items | Box body/frame/gap |
 | `UiAbsoluteLayout` | Container/layout | positioned children | Layout bounds |
 | `UiPanel` | Container | ordinary direct children | Panel body |
-| `UiGroupPanel` | Container | ordinary direct children | Group body |
+| `UiGroupPanel` | Container | zero or one direct child | Group body |
 | `UiDirectContentHost` | Container | one direct child | Host body |
 | `UiScrollPanel` | Container | one direct child | Scroll body |
 | `UiTitleCard` | Container | zero or one content child | Title Card content |
 | `UiTab` | Container | semantic pages | Tab page |
+| `UiTabPage` | Semantic page | zero or one direct child | Page host |
 | `UiStack` | Container | ordered stacked children | Stack bounds |
 | `UiAccordion` | Container | semantic sections | Section content |
 | `UiSplitter` | Container | bounded panes | Splitter pane |
@@ -36,6 +37,14 @@ section content is attached through the section's runtime host. Both are
 one-child relationships in the document model and are rejected with guidance
 when a second direct child is attempted. They are not encoded as ordinary
 properties or JSON strings.
+
+`UiGroupPanel` content is attached with `UiGroupPanel::SetContent` and cleared
+with `ClearContent`; its prospective body is `GetBodyRect()`. `UiTabPage`
+content is attached to the page's `ParentCtrl` host, never to `UiTab` as a
+generic sibling. Catalog metadata supplies the host kind, direct-child limit,
+semantic allowance, preview/code-generation adapter and drop-region kind. Drop
+planning and hierarchy inside-drops consume this metadata rather than node
+flags or control-name branches.
 
 Accordion section body height is zero for an empty section, and populated
 open sections are allocated deterministically within the Accordion rectangle.

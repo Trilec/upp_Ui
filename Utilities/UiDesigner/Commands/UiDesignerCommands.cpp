@@ -281,7 +281,8 @@ UiDesignerNodeId UiDesignerCommandService::AddNode(
 
 UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
     const String& type, const String& name, UiDesignerNodeId parent,
-    int index, dword flags, const ValueMap& defaults, const String& label)
+    int index, dword flags, const ValueMap& defaults, const String& label,
+    UiDesignerNodeId open_accordion_section)
 {
     UiDesignerNodeId result = 0;
     const bool ok = ApplyAtomic(label.IsEmpty() ? "Add " + type : label,
@@ -293,6 +294,32 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
             }
             UiDesignerNode* node = document_.Find(result);
             node->properties = clone(defaults);
+
+            if(open_accordion_section) {
+                UiDesignerNode* section = document_.Find(open_accordion_section);
+                if(!section || section->type != "UiAccordionSection" ||
+                   section->GetProperty("lock", "None") == "Closed") {
+                    last_error_ = "Accordion section cannot be opened for content drop";
+                    return false;
+                }
+                const Value old_open = section->GetProperty("open", false);
+                if(!document_.SetProperty(open_accordion_section, "open", true,
+                                          UiDesignerImpactStructure |
+                                          UiDesignerImpactControlState |
+                                          UiDesignerImpactCode)) {
+                    last_error_ = "Unable to open Accordion section";
+                    return false;
+                }
+                UiDesignerPropertyChange& open_change = aggregate.properties.Add();
+                open_change.node = open_accordion_section;
+                open_change.property = "open";
+                open_change.old_value = old_open;
+                open_change.new_value = true;
+                open_change.impact = UiDesignerImpactStructure |
+                                      UiDesignerImpactControlState |
+                                      UiDesignerImpactCode;
+                open_change.kind = UiDesignerPropertyChangeKind::Normal;
+            }
 
             if(type == "UiTab") {
                 const String stem = "tab_" + AsString(result) + "_";

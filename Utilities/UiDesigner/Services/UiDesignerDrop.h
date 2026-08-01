@@ -66,6 +66,7 @@ public:
     bool Execute(const UiDesignerDropPlan& plan,
                  UiDesignerNodeId *created = nullptr,
                  String *error = nullptr);
+    bool IsContentHost(UiDesignerNodeId node) const;
 
 private:
     UiDesignerNodeId ResolveParent(UiDesignerNodeId target) const;

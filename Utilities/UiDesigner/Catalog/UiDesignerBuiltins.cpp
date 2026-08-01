@@ -29,6 +29,10 @@ static UiDesignerControlSpec MakeSpec(
     spec.preview_adapter_id = "runtime:" + String(type);
     spec.codegen_adapter_id = "control";
     spec.child_adapter_id = (flags & UiDesignerNodeContainer) ? "add" : "none";
+    if(flags & (UiDesignerNodeContainer | UiDesignerNodeLayout)) {
+        spec.content_host = UiDesignerContentHostKind::Normal;
+        spec.max_direct_children = -1;
+    }
     AddUiDesignerCommonProperties(spec);
 
     spec.defaults.Set("visible", true);
@@ -1002,6 +1006,7 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                                  String(c.type) == "UiStack" ? "stack" :
                                  "accordion";
             if(String(c.type) == "UiAccordion") {
+                s.accepts_semantic_children = true;
                 AddEvent(s, "WhenSectionToggled", "Section toggled", "Runs after a section changes open state.");
                 AddEvent(s, "WhenReordered", "Sections reordered", "Runs after sections are reordered.");
                 AddEvent(s, "WhenRemoved", "Section removed", "Runs after a section is removed.");
@@ -1021,8 +1026,16 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.child_adapter_id = "single";
         if(String(c.type) == "UiGroupPanel" || String(c.type) == "UiTitleCard")
             AddTitle(s, c.display);
+        if(String(c.type) == "UiGroupPanel") {
+            s.capabilities &= ~(dword)UiDesignerCapabilityFreeform;
+            s.child_adapter_id = "group_panel";
+            s.content_host = UiDesignerContentHostKind::Single;
+            s.max_direct_children = 1;
+        }
     if(String(c.type) == "UiTitleCard") {
             s.child_adapter_id = "title_card";
+            s.content_host = UiDesignerContentHostKind::Single;
+            s.max_direct_children = 1;
             s.theme = true;
             s.theme_adapter_id = "title_card";
             if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
@@ -1296,7 +1309,10 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     page.capabilities = UiDesignerCapabilitySemanticItem;
     page.preview_adapter_id = "semantic:tab_page";
     page.codegen_adapter_id = "tab_page_deferred";
+    page.child_adapter_id = "single";
     page.semantic_owner_type = "UiTab";
+    page.content_host = UiDesignerContentHostKind::Page;
+    page.max_direct_children = 1;
     page.properties.Clear();
     page.defaults.Clear();
     UiDesignerPropertySpec key;
@@ -1320,6 +1336,8 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
     section.codegen_adapter_id = "accordion_section";
     section.child_adapter_id = "accordion_section";
     section.semantic_owner_type = "UiAccordion";
+    section.content_host = UiDesignerContentHostKind::Semantic;
+    section.max_direct_children = 1;
     section.properties.Clear();
     section.defaults.Clear();
     UiDesignerPropertySpec skey = key;

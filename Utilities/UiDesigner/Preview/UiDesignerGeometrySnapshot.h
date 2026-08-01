@@ -5,6 +5,7 @@ namespace Upp {
 enum class UiDesignerDropRegionKind : byte {
     WindowContent = 0,
     PanelBody,
+    GroupPanelBody,
     BoxBody,
     BoxFrame,
     BoxEmptyBody,

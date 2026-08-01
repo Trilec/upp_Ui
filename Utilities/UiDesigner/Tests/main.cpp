@@ -1709,6 +1709,86 @@ CONSOLE_APP_MAIN
         }
     Check(found_empty_region, "Removing content restores the empty Title Card drop area");
 
+    UiDesignerSession host_session;
+    host_session.NewDocument("blank");
+    UiDesignerCommandService& host_commands = host_session.Commands();
+    const UiDesignerControlSpec* group_spec = catalog.Find("UiGroupPanel");
+    const UiDesignerNodeId group = host_commands.AddNode(
+        "UiGroupPanel", "group_host", host_session.Document().GetRootId(),
+        group_spec ? group_spec->node_flags : 0,
+        group_spec ? group_spec->defaults : ValueMap(), "Add GroupPanel");
+    UiDesignerDropPlan group_child_plan = host_session.PlanAddControl(
+        "UiBoxLayout", group, Point(), false);
+    UiDesignerNodeId group_child = 0;
+    String group_error;
+    Check(group_child_plan.valid && host_session.ExecuteDrop(group_child_plan,
+          &group_child, group_error),
+          "GroupPanel accepts one content child: " + group_error);
+    UiDesignerPreviewCanvas host_preview;
+    host_preview.SetRect(0, 0, 320, 220);
+    host_preview.Bind(&host_session.Document(), &catalog, nullptr, nullptr);
+    host_preview.RebuildDocument();
+    UiGroupPanel* runtime_group = dynamic_cast<UiGroupPanel *>(host_preview.FindRuntime(group));
+    Check(runtime_group && runtime_group->GetContent() == host_preview.FindRuntime(group_child),
+          "GroupPanel child attaches through SetContent");
+    bool group_region = false;
+    for(const UiDesignerDropRegion& region : host_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == group && region.kind == UiDesignerDropRegionKind::GroupPanelBody)
+            group_region = true;
+    Check(group_region, "GroupPanel publishes its body drop region");
+    Check(!host_session.PlanAddControl("UiPanel", group, Point(), false).valid,
+          "GroupPanel rejects a second direct child");
+
+    UiDesignerSession tab_session;
+    tab_session.NewDocument("blank");
+    const UiDesignerControlSpec* tab_host_spec = catalog.Find("UiTab");
+    const UiDesignerNodeId tab = tab_session.Commands().AddNode(
+        "UiTab", "tab_host", tab_session.Document().GetRootId(),
+        tab_host_spec ? tab_host_spec->node_flags : 0,
+        tab_host_spec ? tab_host_spec->defaults : ValueMap(), "Add Tab");
+    const UiDesignerNode* tab_node = tab_session.Document().Find(tab);
+    const UiDesignerNodeId page = tab_node && tab_node->children.GetCount()
+        ? tab_node->children[0] : 0;
+    UiDesignerDropPlan page_child_plan = tab_session.PlanAddControl(
+        "UiPanel", page, Point(), false);
+    UiDesignerNodeId page_child = 0;
+    String page_error;
+    Check(page_child_plan.valid && tab_session.ExecuteDrop(page_child_plan,
+          &page_child, page_error),
+          "Tab Page accepts one direct content child: " + page_error);
+    Check(!tab_session.PlanAddControl("UiPanel", page, Point(), false).valid,
+          "Tab Page rejects a second direct child");
+    UiDesignerGeneratedProject tab_generated = generator.Generate(
+        tab_session.Document(), "GeneratedTabHost");
+    const String page_member = tab_session.Document().Find(page)
+        ? tab_session.Document().Find(page)->name + "_n" + AsString(page) : String();
+    Check(!page_member.IsEmpty() && tab_generated.source.Find(page_member + ".Add(") >= 0,
+          "Generated Tab Page attaches content to the page host");
+
+    UiDesignerSession accordion_drop_session;
+    accordion_drop_session.NewDocument("blank");
+    const UiDesignerControlSpec* accordion_drop_spec = catalog.Find("UiAccordion");
+    const UiDesignerNodeId accordion_drop = accordion_drop_session.Commands().AddNode(
+        "UiAccordion", "accordion_drop", accordion_drop_session.Document().GetRootId(),
+        accordion_drop_spec ? accordion_drop_spec->node_flags : 0,
+        accordion_drop_spec ? accordion_drop_spec->defaults : ValueMap(), "Add Accordion");
+    const UiDesignerNode* accordion_drop_node = accordion_drop_session.Document().Find(accordion_drop);
+    const UiDesignerNodeId closed_section = accordion_drop_node &&
+        accordion_drop_node->children.GetCount() ? accordion_drop_node->children[0] : 0;
+    UiDesignerDropPlan section_drop_plan = accordion_drop_session.PlanAddControl(
+        "UiPanel", closed_section, Point(), false);
+    UiDesignerNodeId section_child = 0;
+    String section_error;
+    Check(section_drop_plan.valid && accordion_drop_session.ExecuteDrop(
+          section_drop_plan, &section_child, section_error),
+          "Closed Accordion section accepts content: " + section_error);
+    Check(accordion_drop_session.Document().Find(closed_section)->GetProperty("open", false),
+          "Accordion section opens with content drop");
+    Check(accordion_drop_session.Commands().Undo() &&
+          !accordion_drop_session.Document().Find(closed_section)->GetProperty("open", false) &&
+          !accordion_drop_session.Document().Find(section_child),
+          "Accordion content drop undo is atomic");
+
     const UiDesignerControlSpec* accordion_spec = catalog.Find("UiAccordion");
     const UiDesignerControlSpec* label_spec = catalog.Find("UiLabel");
     Check(accordion_spec && accordion_spec->sizing_class == UiDesignerSizingClass::Container &&

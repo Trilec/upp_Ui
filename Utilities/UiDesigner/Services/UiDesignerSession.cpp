@@ -376,7 +376,11 @@ UiDesignerNodeId UiDesignerSession::ResolveInsertParent() const
 {
     if(state_.selection.primary) {
         const UiDesignerNode* selected = document_.Find(state_.selection.primary);
-        if(selected && (selected->flags & UiDesignerNodeContainer))
+        const UiDesignerControlSpec* selected_spec = selected
+            ? catalog_.Find(selected->type) : nullptr;
+        if(selected_spec && (selected_spec->content_host != UiDesignerContentHostKind::None ||
+                             HasUiDesignerCapability(selected_spec->capabilities,
+                                                     UiDesignerCapabilityContainer)))
             return selected->id;
         if(selected && selected->parent)
             return selected->parent;

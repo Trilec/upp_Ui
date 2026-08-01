@@ -30,6 +30,7 @@ static int DropRegionPriority(UiDesignerDropRegionKind kind)
     case UiDesignerDropRegionKind::TitleCardContent: return 45;
     case UiDesignerDropRegionKind::AccordionSectionContent: return 60;
     case UiDesignerDropRegionKind::PanelBody: return 40;
+    case UiDesignerDropRegionKind::GroupPanelBody: return 42;
     case UiDesignerDropRegionKind::BoxBody: return 38;
     case UiDesignerDropRegionKind::BoxFrame: return 36;
     case UiDesignerDropRegionKind::BoxGap: return 35;

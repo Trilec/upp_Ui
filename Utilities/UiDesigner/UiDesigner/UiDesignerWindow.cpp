@@ -493,6 +493,13 @@ void UiDesignerWindow::ConnectServices()
                               UiDesignerNodeId parent, int index) {
         return session_.Drops().PlanMove(nodes, parent, Point(), false, index);
     };
+    hierarchy_.PlanCatalogDrop = [=](const String& type,
+                                     UiDesignerNodeId parent, int index) {
+        return session_.Drops().PlanAdd(type, parent, Point(), false, index);
+    };
+    hierarchy_.IsContentHost = [=](UiDesignerNodeId node) {
+        return session_.Drops().IsContentHost(node);
+    };
     hierarchy_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
         return session_.ExecuteDrop(plan, nullptr, error);
     };
@@ -1069,7 +1076,6 @@ void UiDesignerWindow::RefreshData()
         else if(node->type == "UiList") data_status = "List item data is not implemented yet.";
         else if(node->type == "UiDropdown") data_status = "Dropdown item data is not implemented yet.";
         else if(node->type == "UiMenu") data_status = "Menu item data is not implemented yet.";
-        else if(node->type == "UiTitleCard") data_status = "Title Card data is not implemented yet.";
         else data_status = "Data is not supported for this control yet.";
     }
     data_model_.Add(data_status,

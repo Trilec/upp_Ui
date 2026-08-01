@@ -295,27 +295,25 @@ bool UiDesignerCatalog::CanParent(const String& child_type,
         reason.Clear();
         return true;
     }
-    if(!HasUiDesignerCapability(parent->capabilities,
+    if(parent->content_host == UiDesignerContentHostKind::None &&
+       !HasUiDesignerCapability(parent->capabilities,
                                 UiDesignerCapabilityContainer)) {
-        if(parent_type == "UiAccordionSection" && !child->IsSemanticItem()) {
-            reason.Clear();
-            return true;
-        }
         reason = parent->display_name + " cannot contain children";
         return false;
     }
-    if(parent_type == "UiTitleCard") {
-        if(child->IsSemanticItem()) {
-            reason = child->display_name + " cannot be a direct Title Card child; place a layout inside the card";
-            return false;
-        }
-        reason.Clear();
-        return true;
-    }
     if(child->IsSemanticItem() &&
+       !parent->accepts_semantic_children &&
        !HasUiDesignerCapability(parent->capabilities,
                                 UiDesignerCapabilityAcceptSpacer)) {
         reason = child->display_name + " is only valid in Box or Grid layouts";
+        return false;
+    }
+    if(child->IsSemanticItem() &&
+       (parent->content_host == UiDesignerContentHostKind::Single ||
+        parent->content_host == UiDesignerContentHostKind::Semantic ||
+        parent->content_host == UiDesignerContentHostKind::Page)) {
+        reason = child->display_name + " cannot be a direct content child of " +
+                 parent->display_name;
         return false;
     }
     reason.Clear();
@@ -357,12 +355,11 @@ bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
         reason = parent->type + " accepts one direct content child";
         return false;
     }
-    if(parent->type == "UiTitleCard" && parent->children.GetCount() >= 1) {
-        reason = "Title Card accepts one direct content child; place a layout inside the card";
-        return false;
-    }
-    if(parent->type == "UiAccordionSection" && parent->children.GetCount() >= 1) {
-        reason = "Accordion sections accept one direct content child. Place a layout inside the section to contain multiple controls.";
+    const UiDesignerControlSpec* parent_spec = Find(parent->type);
+    if(parent_spec && parent_spec->max_direct_children > 0 &&
+       parent->children.GetCount() >= parent_spec->max_direct_children) {
+        reason = parent_spec->display_name + " accepts one direct content child. Place a layout inside the " +
+                 parent_spec->display_name + " to contain multiple controls.";
         return false;
     }
     reason.Clear();
@@ -414,8 +411,8 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 error = "UiTabPage " + AsString(node.id) + " requires key and title";
                 return false;
             }
-            if(!node.children.IsEmpty()) {
-                error = "UiTabPage " + AsString(node.id) + " cannot contain children in this slice";
+            if(node.children.GetCount() > spec->max_direct_children) {
+                error = "Tab Page accepts one direct content child. Place a layout inside the Tab Page to contain multiple controls.";
                 return false;
             }
         }
@@ -437,8 +434,9 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 error = "Accordion section " + AsString(node.id) + " locks closed but is open";
                 return false;
             }
-            if(node.children.GetCount() > 1) {
-                error = "Accordion sections accept one direct content child. Place a layout inside the section to contain multiple controls.";
+            if(spec->max_direct_children > 0 &&
+               node.children.GetCount() > spec->max_direct_children) {
+                error = "Accordion Section accepts one direct content child. Place a layout inside the Accordion Section to contain multiple controls.";
                 return false;
             }
         }
@@ -530,8 +528,10 @@ bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                 return false;
             }
         }
-        if(parent.type == "UiTitleCard" && parent.children.GetCount() > 1) {
-            error = parent.name + " accepts one direct content child; place a layout inside the card";
+        const UiDesignerControlSpec* parent_spec = Find(parent.type);
+        if(parent_spec && parent_spec->max_direct_children > 0 &&
+           parent.children.GetCount() > parent_spec->max_direct_children) {
+            error = parent.name + " accepts one direct content child; place a layout inside the " + parent_spec->display_name;
             return false;
         }
     }

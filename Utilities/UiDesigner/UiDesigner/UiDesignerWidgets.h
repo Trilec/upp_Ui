@@ -167,6 +167,8 @@ public:
 
     Function<UiDesignerDropPlan(const Vector<UiDesignerNodeId>&,
                                 UiDesignerNodeId, int)> PlanDrop;
+    Function<UiDesignerDropPlan(const String&, UiDesignerNodeId, int)> PlanCatalogDrop;
+    Function<bool(UiDesignerNodeId)> IsContentHost;
     Function<bool(const UiDesignerDropPlan&, String&)> ExecuteDrop;
 
     Event<UiDesignerNodeId, bool> WhenSelectNode;
@@ -205,6 +207,7 @@ private:
     int drop_edge_ = 0; // -1 before, 0 inside, +1 after
     String drag_payload_;
     UiDesignerDropPlan drop_plan_;
+    bool catalog_drag_ = false;
 };
 
 class UiDesignerCodeView : public UiMultiEdit {

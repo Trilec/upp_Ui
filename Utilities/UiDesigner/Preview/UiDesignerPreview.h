@@ -247,6 +247,8 @@ struct UiDesignerPreviewInstance {
 String UiDesignerNodesDragText(const Vector<UiDesignerNodeId>& nodes);
 bool UiDesignerParseNodesDragText(const String& text,
                                   Vector<UiDesignerNodeId>& nodes);
+String UiDesignerCatalogDragText(const String& type_id);
+bool UiDesignerParseCatalogDragText(const String& text, String& type_id);
 // Read Designer-owned drag data without accepting the drop. Targets must only
 // accept once a concrete drop plan has been validated.
 bool UiDesignerReadDragText(PasteClip& clip, String& text);

@@ -218,6 +218,31 @@ static void AddTitleCardDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
     AddRegion(snapshot, pick(region));
 }
 
+static void AddGroupPanelDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                    const UiDesignerNode& node,
+                                    const UiDesignerGeometryRecord& record,
+                                    const UiDesignerPreviewInstance* instance)
+{
+    if(!instance || !instance->control)
+        return;
+    const UiGroupPanel* group = dynamic_cast<const UiGroupPanel *>(instance->control.Get());
+    if(!group)
+        return;
+    const Rect local = group->GetBodyRect();
+    if(local.IsEmpty())
+        return;
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::GroupPanelBody;
+    region.rect = local.Offseted(record.rect.TopLeft());
+    region.visual_rect = region.rect;
+    region.occupied = group->GetContent() != nullptr;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100 + 42;
+    region.label = region.occupied ? "Group Panel content (occupied)" : "Group Panel content";
+    AddRegion(snapshot, pick(region));
+}
+
 static void AddAccordionSectionDropRegion(
     UiDesignerGeometrySnapshotBuilder& snapshot,
     const UiDesignerNode& node, const UiDesignerGeometryRecord& record,
@@ -463,6 +488,10 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
     }
     if(node.type == "UiTitleCard") {
         AddTitleCardDropRegion(snapshot, node, record, instance);
+        return;
+    }
+    if(node.type == "UiGroupPanel") {
+        AddGroupPanelDropRegion(snapshot, node, record, instance);
         return;
     }
     if(node.type == "UiAccordionSection") {
@@ -1203,6 +1232,20 @@ bool UiDesignerParseNodesDragText(const String& text,
     return !nodes.IsEmpty();
 }
 
+String UiDesignerCatalogDragText(const String& type_id)
+{
+    return "uidesigner/catalog/v1:" + type_id;
+}
+
+bool UiDesignerParseCatalogDragText(const String& text, String& type_id)
+{
+    const String prefix = "uidesigner/catalog/v1:";
+    if(!text.StartsWith(prefix))
+        return false;
+    type_id = text.Mid(prefix.GetCount());
+    return !type_id.IsEmpty() && type_id.Find(',') < 0;
+}
+
 bool UiDesignerReadDragText(PasteClip& clip, String& text)
 {
     text.Clear();
@@ -1340,6 +1383,11 @@ void UiDesignerPreviewCanvas::DetachInstance(UiDesignerPreviewInstance& instance
     if(auto *card = dynamic_cast<UiTitleCard *>(parent))
         if(card->GetContentCell() == child) {
             card->ClearContentCell();
+            return;
+        }
+    if(auto *group = dynamic_cast<UiGroupPanel *>(parent))
+        if(group->GetContent() == child) {
+            group->ClearContent();
             return;
         }
     if(auto *tab = dynamic_cast<UiTab *>(parent)) {
@@ -1569,6 +1617,11 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     if(adapter == "title_card") {
         if(auto *card = dynamic_cast<UiTitleCard *>(&parent))
             card->SetContentCell(child);
+        return;
+    }
+    if(adapter == "group_panel") {
+        if(auto *group = dynamic_cast<UiGroupPanel *>(&parent))
+            group->SetContent(child);
         return;
     }
     if(adapter == "single") {
@@ -1802,7 +1855,9 @@ void UiDesignerPreviewCanvas::BuildNode(
     if(!child_fallback)
         child_fallback = &fallback_parent;
     const UiDesignerNodeId next_runtime_parent =
-        (spec->node_flags & UiDesignerNodeContainer) ? node_id : runtime_parent;
+        (spec->content_host != UiDesignerContentHostKind::None ||
+         HasUiDesignerCapability(spec->capabilities, UiDesignerCapabilityContainer))
+            ? node_id : runtime_parent;
     for(UiDesignerNodeId child : node->children)
         BuildNode(child, *child_fallback, depth + 1, next_runtime_parent);
 }
@@ -2180,6 +2235,7 @@ void UiDesignerPreviewCanvas::LayoutNode(
                          adapter == "accordion" || adapter == "splitter" ||
                          adapter == "quad" || adapter == "single" ||
                          adapter == "title_card" ||
+                         adapter == "group_panel" ||
                          adapter == "upp_tab" || adapter == "upp_splitter";
     const bool section_host = instance.semantic_host_runtime_parent != 0 &&
                               instance.semantic_host_index >= 0;
@@ -2201,6 +2257,10 @@ void UiDesignerPreviewCanvas::LayoutNode(
             ? accordion->GetSectionContentRect(instance.semantic_host_index) : Rect();
         Rect local = body.Offseted(Point(-section.left, -section.top));
         instance.control->SetRect(local);
+    }
+    else if(adapter == "group_panel" && instance.runtime_parent) {
+        if(auto *group = dynamic_cast<UiGroupPanel *>(FindRuntime(instance.runtime_parent)))
+            instance.control->SetRect(group->GetBodyRect());
     }
     else if(node->parent == document_->GetRootId() || !managed) {
         Rect available = node->parent == document_->GetRootId()

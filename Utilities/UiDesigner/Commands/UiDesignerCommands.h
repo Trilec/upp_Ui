@@ -42,7 +42,8 @@ public:
     UiDesignerNodeId AddNodeAt(const String& type, const String& name,
                                UiDesignerNodeId parent, int index, dword flags,
                                const ValueMap& defaults = ValueMap(),
-                               const String& label = String());
+                               const String& label = String(),
+                               UiDesignerNodeId open_accordion_section = 0);
     bool RemoveNode(UiDesignerNodeId node, const String& label = String());
     bool RemoveNodes(const Vector<UiDesignerNodeId>& nodes,
                      const String& label = "Delete selection");
