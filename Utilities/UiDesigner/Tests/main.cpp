@@ -1852,6 +1852,15 @@ CONSOLE_APP_MAIN
               accordion_theme_session.Catalog().Find("UiAccordion")->theme_overrides.GetCount() > 0 &&
               accordion_theme_session.ThemeOverrideModel().GetCount() > 0,
           "Accordion theme override model is populated");
+    UiDesignerSession title_card_model_session;
+    const UiDesignerNodeId title_card_model_node =
+        title_card_model_session.AddControl("UiTitleCard");
+    title_card_model_session.Select(title_card_model_node);
+    title_card_model_session.RebuildBehaviorModel();
+    Check(title_card_model_session.ThemeOverrideModel().GetCount() > 0,
+          "Title Card theme override model is populated");
+    Check(title_card_model_session.BehaviorModel().GetCount() > 0,
+          "Title Card behavior model is populated");
 
     // Regression fixture for managed-parent detachment and incremental
     // Accordion section projection.

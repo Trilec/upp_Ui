@@ -721,7 +721,6 @@ void UiDesignerSession::RebuildThemeOverrideModel()
                              : "Select one control to view Theme Overrides.";
         if(node) {
             if(node->type == "UiTab") status = "Tab Theme adapter is not implemented yet.";
-            else if(node->type == "UiTitleCard") status = "Title Card Theme adapter is not implemented yet.";
             else if(node->type == "UiDropdown") status = "Dropdown Theme adapter is not implemented yet.";
         }
         theme_override_model_.AddReadOnly("theme.status", "Status", status, "Status");

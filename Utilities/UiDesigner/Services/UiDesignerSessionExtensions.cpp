@@ -202,8 +202,7 @@ void UiDesignerSession::RebuildBehaviorModel()
         String status = node ? "Events & Actions are not registered for this control yet."
                              : "Select one control to view Events & Actions.";
         if(node) {
-            if(node->type == "UiTitleCard") status = "Title Card events are not registered yet.";
-            else if(node->type == "UiTree") status = "Tree events are not registered yet.";
+            if(node->type == "UiTree") status = "Tree events are not registered yet.";
             else if(node->type == "UiList") status = "List events are not registered yet.";
             else if(node->type == "UiMenu") status = "Menu events are not registered yet.";
         }
