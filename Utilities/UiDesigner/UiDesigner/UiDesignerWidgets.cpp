@@ -632,7 +632,7 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
         if(!HasCapture())
             SetCapture();
     }
-    if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5)) {
+    if(!dragging_) {
         dragging_ = true;
         const String type = drag_type_;
         // Native DND owns the gesture after this point. Clear local capture
@@ -656,10 +656,6 @@ void UiDesignerCatalogList::MouseMove(Point p, dword)
     if(drag_armed_) {
         if(!HasCapture())
             SetCapture();
-        if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5))
-            dragging_ = true;
-        if(dragging_ && WhenToolDrag)
-            WhenToolDrag(drag_type_, GetMousePos());
         return;
     }
     const int next = RowAt(p);
