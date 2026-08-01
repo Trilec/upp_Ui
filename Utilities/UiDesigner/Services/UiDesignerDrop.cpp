@@ -160,6 +160,11 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
         plan.reason = "Insertion parent does not exist";
         return plan;
     }
+    if(parent->type == "UiAccordionSection" &&
+       parent->GetProperty("lock", "None") == "Closed") {
+        plan.reason = "Accordion section is locked closed";
+        return plan;
+    }
 
     plan.index = index;
     const UiDesignerControlSpec* target_spec = target_node && catalog_
@@ -246,6 +251,11 @@ UiDesignerDropPlan UiDesignerDropService::PlanMove(
     const UiDesignerNode* parent = document_->Find(plan.parent);
     if(!parent) {
         plan.reason = "Drop target does not exist";
+        return plan;
+    }
+    if(parent->type == "UiAccordionSection" &&
+       parent->GetProperty("lock", "None") == "Closed") {
+        plan.reason = "Accordion section is locked closed";
         return plan;
     }
 
@@ -363,10 +373,16 @@ bool UiDesignerDropService::Execute(const UiDesignerDropPlan& plan,
             *created = id;
     }
     else {
+        UiDesignerNodeId open_section = 0;
+        const UiDesignerNode* insertion_parent = document_->Find(plan.parent);
+        if(insertion_parent && insertion_parent->type == "UiAccordionSection" &&
+           !insertion_parent->GetProperty("open", false))
+            open_section = insertion_parent->id;
         if(!commands_->MoveNodesConfigured(
                 plan.nodes, plan.parent, plan.index,
                 plan.property_updates,
-                plan.label.IsEmpty() ? "Move selection" : plan.label))
+                plan.label.IsEmpty() ? "Move selection" : plan.label,
+                open_section))
             return Fail(commands_->GetLastError());
     }
 

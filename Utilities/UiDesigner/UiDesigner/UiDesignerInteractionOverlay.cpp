@@ -668,6 +668,45 @@ void UiDesignerInteractionOverlay::InvalidateCatalogDrag()
     Refresh();
 }
 
+void UiDesignerInteractionOverlay::DragEnter()
+{
+    Refresh();
+}
+
+void UiDesignerInteractionOverlay::DragRepeat(Point)
+{
+    if(drag_state_ != UiDesignerCatalogDragState::Idle && !drag_type_id_.IsEmpty())
+        TrackCatalogDrag(drag_type_id_, GetMousePos());
+}
+
+void UiDesignerInteractionOverlay::DragAndDrop(Point, PasteClip& d)
+{
+    String payload;
+    String type;
+    if(!UiDesignerReadDragText(d, payload) ||
+       !UiDesignerParseCatalogDragText(payload, type)) {
+        d.Reject();
+        CancelCatalogDrag();
+        return;
+    }
+    TrackCatalogDrag(type, GetMousePos());
+    UpdateDropPlan(type, GetMousePos(), false);
+    if(!resolved_drop_.valid) {
+        d.Reject();
+        CancelCatalogDrag();
+        return;
+    }
+    d.Accept();
+    d.SetAction(DND_COPY);
+    if(d.IsPaste())
+        FinishCatalogDrag(type, GetMousePos());
+}
+
+void UiDesignerInteractionOverlay::DragLeave()
+{
+    CancelCatalogDrag();
+}
+
 Rect UiDesignerInteractionOverlay::WorkspaceRootRect() const
 {
     if(!owner_)

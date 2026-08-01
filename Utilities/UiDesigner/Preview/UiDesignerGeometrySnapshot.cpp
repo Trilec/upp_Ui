@@ -27,7 +27,8 @@ static int DropRegionPriority(UiDesignerDropRegionKind kind)
 {
     switch(kind) {
     case UiDesignerDropRegionKind::GridCell: return 50;
-    case UiDesignerDropRegionKind::TitleCardContent: return 45;
+    case UiDesignerDropRegionKind::TitleCardContent: return 70;
+    case UiDesignerDropRegionKind::TabPageContent: return 65;
     case UiDesignerDropRegionKind::AccordionSectionContent: return 60;
     case UiDesignerDropRegionKind::PanelBody: return 40;
     case UiDesignerDropRegionKind::GroupPanelBody: return 42;

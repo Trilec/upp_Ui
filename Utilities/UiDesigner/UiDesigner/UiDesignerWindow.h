@@ -122,6 +122,8 @@ private:
     UiButton data_down_;
     UiButton data_enable_;
     UiButton data_active_;
+    UiButton data_select_content_;
+    UiButton data_remove_content_;
     UiList data_list_;
     UiListModel data_model_;
     PropertyEditor data_editor_;

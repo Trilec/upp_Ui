@@ -1681,12 +1681,58 @@ CONSOLE_APP_MAIN
                   "ICON_DESIGN_DESCRIPTION_48" &&
               card_round_trip.Find(card_box),
           "Title Card JSON preserves icon and content child");
+    const UiDesignerControlSpec* nested_group_spec = catalog.Find("UiGroupPanel");
+    const UiDesignerNodeId nested_group = card_commands.AddNode(
+        "UiGroupPanel", "generated_group", card_session.Document().GetRootId(),
+        nested_group_spec ? nested_group_spec->node_flags : 0,
+        nested_group_spec ? nested_group_spec->defaults : ValueMap(),
+        "Add generated GroupPanel");
+    const UiDesignerControlSpec* nested_button_spec = catalog.Find("UiButton");
+    card_commands.AddNode("UiButton", "generated_group_button", nested_group,
+                          nested_button_spec ? nested_button_spec->node_flags : 0,
+                          nested_button_spec ? nested_button_spec->defaults : ValueMap(),
+                          "Add generated GroupPanel Button");
+    const UiDesignerControlSpec* nested_tab_spec = catalog.Find("UiTab");
+    const UiDesignerNodeId nested_tab = card_commands.AddNode(
+        "UiTab", "generated_tab", card_session.Document().GetRootId(),
+        nested_tab_spec ? nested_tab_spec->node_flags : 0,
+        nested_tab_spec ? nested_tab_spec->defaults : ValueMap(), "Add generated Tab");
+    const UiDesignerNode* nested_tab_node = card_session.Document().Find(nested_tab);
+    const UiDesignerNodeId nested_page = nested_tab_node && !nested_tab_node->children.IsEmpty()
+        ? nested_tab_node->children[0] : 0;
+    card_commands.AddNode("UiButton", "generated_tab_button", nested_page,
+                          nested_button_spec ? nested_button_spec->node_flags : 0,
+                          nested_button_spec ? nested_button_spec->defaults : ValueMap(),
+                          "Add generated Tab Button");
+    const UiDesignerControlSpec* nested_accordion_spec = catalog.Find("UiAccordion");
+    const UiDesignerNodeId nested_accordion = card_commands.AddNode(
+        "UiAccordion", "generated_accordion", card_session.Document().GetRootId(),
+        nested_accordion_spec ? nested_accordion_spec->node_flags : 0,
+        nested_accordion_spec ? nested_accordion_spec->defaults : ValueMap(),
+        "Add generated Accordion");
+    const UiDesignerNode* nested_accordion_node = card_session.Document().Find(nested_accordion);
+    const UiDesignerNodeId nested_section = nested_accordion_node &&
+        !nested_accordion_node->children.IsEmpty() ? nested_accordion_node->children[0] : 0;
+    card_commands.AddNode("UiButton", "generated_accordion_button", nested_section,
+                          nested_button_spec ? nested_button_spec->node_flags : 0,
+                          nested_button_spec ? nested_button_spec->defaults : ValueMap(),
+                          "Add generated Accordion Button");
     UiDesignerGeneratedProject card_generated = generator.Generate(
         card_session.Document(), "GeneratedTitleCardWindow");
     Check(card_generated.source.Find(".SetContentCell(") >= 0,
           "Generated Title Card uses SetContentCell");
     Check(card_generated.source.Find(".SetMedia(ICON_DESIGN_DESCRIPTION_48()") >= 0,
           "Generated Title Card emits its description media");
+    Check(card_generated.source.Find(".SetContent(") >= 0,
+          "Generated nested GroupPanel uses SetContent");
+    Check(card_generated.source.Find(".GetSectionContent(") >= 0,
+          "Generated nested Accordion uses section content attachment");
+    const UiDesignerNode* generated_page_node = card_session.Document().Find(nested_page);
+    const String generated_page_member = generated_page_node
+        ? generated_page_node->name + "_n" + AsString(nested_page) : String();
+    Check(!generated_page_member.IsEmpty() &&
+              card_generated.source.Find(generated_page_member + ".Add(") >= 0,
+          "Generated nested Tab includes its page host");
     UiDesignerExportWriteOptions card_write_options;
     Vector<String> card_written_files;
     String card_write_error;
@@ -1704,10 +1750,22 @@ CONSOLE_APP_MAIN
         if(region.owner == inserted_card && region.kind == UiDesignerDropRegionKind::TitleCardContent) {
             found_empty_region = true;
             Check(!region.occupied, "Empty Title Card region is marked available");
-            Check(card_preview.GetGeometrySnapshot().HitDropRegion(region.rect.CenterPoint()) == &region,
+            const UiDesignerDropRegion* hit = card_preview.GetGeometrySnapshot().HitDropRegion(
+                region.rect.CenterPoint());
+            Check(hit && hit->owner == inserted_card &&
+                      hit->kind == UiDesignerDropRegionKind::TitleCardContent,
                   "Title Card drag hit testing uses the published content region");
         }
     Check(found_empty_region, "Removing content restores the empty Title Card drop area");
+
+    const String catalog_drag_payload = UiDesignerCatalogDragText("UiButton");
+    String parsed_catalog_type;
+    Check(UiDesignerParseCatalogDragText(catalog_drag_payload, parsed_catalog_type) &&
+              parsed_catalog_type == "UiButton",
+          "Catalog drag payload round trips through the shared parser");
+    Check(!UiDesignerParseCatalogDragText(UiDesignerNodesDragText(Vector<UiDesignerNodeId>()),
+                                          parsed_catalog_type),
+          "Catalog parser rejects node drag payloads");
 
     UiDesignerSession host_session;
     host_session.NewDocument("blank");
@@ -1738,6 +1796,26 @@ CONSOLE_APP_MAIN
     Check(group_region, "GroupPanel publishes its body drop region");
     Check(!host_session.PlanAddControl("UiPanel", group, Point(), false).valid,
           "GroupPanel rejects a second direct child");
+    Check(host_preview.FindGeometry(group) &&
+              host_preview.FindGeometry(group)->drop_target,
+          "GroupPanel drop-target state comes from content-host metadata");
+    UiDesignerGeneratedProject group_generated = generator.Generate(
+        host_session.Document(), "GeneratedGroupHost");
+    Check(group_generated.source.Find(".SetContent(") >= 0,
+          "Generated GroupPanel uses SetContent");
+
+    UiDesignerSession direct_group_session;
+    direct_group_session.NewDocument("blank");
+    const UiDesignerNodeId direct_group = direct_group_session.Commands().AddNode(
+        "UiGroupPanel", "direct_group", direct_group_session.Document().GetRootId(),
+        group_spec ? group_spec->node_flags : 0,
+        group_spec ? group_spec->defaults : ValueMap(), "Add direct GroupPanel");
+    UiDesignerNodeId direct_button = 0;
+    String direct_group_error;
+    Check(direct_group_session.ExecuteDrop(direct_group_session.PlanAddControl(
+              "UiButton", direct_group, Point(), false), &direct_button,
+          direct_group_error),
+          "GroupPanel accepts a direct Button: " + direct_group_error);
 
     UiDesignerSession tab_session;
     tab_session.NewDocument("blank");
@@ -1758,6 +1836,17 @@ CONSOLE_APP_MAIN
           "Tab Page accepts one direct content child: " + page_error);
     Check(!tab_session.PlanAddControl("UiPanel", page, Point(), false).valid,
           "Tab Page rejects a second direct child");
+    UiDesignerPreviewCanvas tab_host_preview;
+    tab_host_preview.SetRect(0, 0, 320, 220);
+    tab_host_preview.Bind(&tab_session.Document(), &catalog, nullptr, nullptr);
+    tab_host_preview.RebuildDocument();
+    Check(tab_host_preview.FindGeometry(page) && tab_host_preview.FindGeometry(page)->drop_target,
+          "Tab Page drop-target state comes from content-host metadata");
+    bool tab_page_region = false;
+    for(const UiDesignerDropRegion& region : tab_host_preview.GetGeometrySnapshot().GetDropRegions())
+        if(region.owner == page && region.kind == UiDesignerDropRegionKind::TabPageContent)
+            tab_page_region = true;
+    Check(tab_page_region, "Active Tab Page publishes its content region");
     UiDesignerGeneratedProject tab_generated = generator.Generate(
         tab_session.Document(), "GeneratedTabHost");
     const String page_member = tab_session.Document().Find(page)
@@ -1788,6 +1877,39 @@ CONSOLE_APP_MAIN
           !accordion_drop_session.Document().Find(closed_section)->GetProperty("open", false) &&
           !accordion_drop_session.Document().Find(section_child),
           "Accordion content drop undo is atomic");
+
+    UiDesignerSession move_section_session;
+    move_section_session.NewDocument("blank");
+    const UiDesignerNodeId move_accordion = move_section_session.AddControl("UiAccordion");
+    const UiDesignerNode* move_accordion_node = move_section_session.Document().Find(move_accordion);
+    const UiDesignerNodeId move_section = move_accordion_node->children[0];
+    const UiDesignerNodeId moved_section_button = move_section_session.AddControl("UiButton");
+    const UiDesignerNodeId moved_button_original_parent =
+        move_section_session.Document().Find(moved_section_button)->parent;
+    UiDesignerDropPlan move_section_plan = move_section_session.Drops().PlanMove(
+        Vector<UiDesignerNodeId>{moved_section_button}, move_section);
+    String move_section_error;
+    Check(move_section_session.ExecuteDrop(move_section_plan, nullptr, move_section_error),
+          "Existing Button moves into a closed Accordion section: " + move_section_error);
+    Check(move_section_session.Document().Find(move_section)->GetProperty("open", false) &&
+              move_section_session.Document().Find(moved_section_button)->parent == move_section,
+          "Accordion move opens the destination section atomically");
+    const bool move_undo = move_section_session.Commands().Undo();
+    Check(move_undo, "Accordion move undo executes");
+    Check(move_section_session.Document().Find(moved_section_button)->parent ==
+              moved_button_original_parent,
+          "Accordion move undo restores the original parent");
+    Check(!move_section_session.Document().Find(move_section)->GetProperty("open", false),
+          "Accordion move undo restores closed state");
+    Check(move_section_session.Commands().Redo() &&
+              move_section_session.Document().Find(moved_section_button)->parent == move_section &&
+              move_section_session.Document().Find(move_section)->GetProperty("open", false),
+          "Accordion move redo restores parent and open state");
+    Check(move_section_session.Commands().SetAccordionSectionLock(move_section, "Closed"),
+          "Accordion section can be locked closed");
+    Check(!move_section_session.Drops().PlanMove(
+              Vector<UiDesignerNodeId>{moved_section_button}, move_section).valid,
+          "Locked closed Accordion section rejects existing-node moves");
 
     const UiDesignerControlSpec* accordion_spec = catalog.Find("UiAccordion");
     const UiDesignerControlSpec* label_spec = catalog.Find("UiLabel");

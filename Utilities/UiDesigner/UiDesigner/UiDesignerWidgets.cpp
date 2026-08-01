@@ -632,7 +632,23 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
         if(!HasCapture())
             SetCapture();
     }
-    MouseMove(GetMousePos() - GetScreenRect().TopLeft(), K_MOUSELEFT);
+    if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5)) {
+        dragging_ = true;
+        const String type = drag_type_;
+        // Native DND owns the gesture after this point. Clear local capture
+        // state first so cancellation cannot re-enter the catalog callback.
+        pressed_ = -1;
+        drag_type_.Clear();
+        drag_armed_ = false;
+        if(HasCapture())
+            ReleaseCapture();
+        VectorMap<String, ClipData> payload;
+        Append(payload, UiDesignerCatalogDragText(type));
+        DoDragAndDrop(payload, UiDesignerResolveCatalogIcon("containers"), DND_COPY);
+        dragging_ = false;
+        Refresh();
+        return;
+    }
 }
 
 void UiDesignerCatalogList::MouseMove(Point p, dword)

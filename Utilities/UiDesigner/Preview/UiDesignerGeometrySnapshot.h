@@ -14,6 +14,7 @@ enum class UiDesignerDropRegionKind : byte {
     BoxAfterItem,
     GridCell,
     TitleCardContent,
+    TabPageContent,
     AccordionSectionContent,
 };
 

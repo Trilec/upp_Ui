@@ -276,6 +276,29 @@ static void AddAccordionSectionDropRegion(
     AddRegion(snapshot, pick(region));
 }
 
+static void AddTabPageDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
+                                 const UiDesignerDocument& document,
+                                 const UiDesignerNode& node,
+                                 const UiDesignerGeometryRecord& record,
+                                 const UiDesignerPreviewInstance* instance)
+{
+    if(!instance || !instance->control)
+        return;
+    const UiDesignerNode* tab = document.Find(node.parent);
+    if(tab && tab->GetProperty("active_page", (UiDesignerNodeId)0) != node.id)
+        return;
+    UiDesignerDropRegion region;
+    region.owner = node.id;
+    region.kind = UiDesignerDropRegionKind::TabPageContent;
+    region.rect = record.rect;
+    region.visual_rect = record.rect;
+    region.occupied = node.children.GetCount() > 0;
+    region.depth = record.depth + 1;
+    region.paint_order = record.order * 100 + 55;
+    region.label = region.occupied ? "Tab Page content (occupied)" : "Tab Page content";
+    AddRegion(snapshot, pick(region));
+}
+
 static void AddGridDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
                                const UiDesignerDocument& document,
                                const UiDesignerCatalog* catalog,
@@ -497,6 +520,10 @@ static void AddLayoutDropRegions(UiDesignerGeometrySnapshotBuilder& snapshot,
     if(node.type == "UiAccordionSection") {
         AddAccordionSectionDropRegion(snapshot, node, record, instance,
                                       accordion, accordion_rect);
+        return;
+    }
+    if(node.type == "UiTabPage") {
+        AddTabPageDropRegion(snapshot, document, node, record, instance);
         return;
     }
 }
@@ -2200,6 +2227,14 @@ void UiDesignerPreviewCanvas::UpdateSemanticRect(
             local |= accordion->GetSectionBodyRect(instance.semantic_host_index);
         }
     }
+    else if(node.type == "UiTabPage") {
+        if(UiTab* tab = dynamic_cast<UiTab *>(FindRuntime(instance.runtime_parent))) {
+            const UiDesignerNode* tab_node = document_->Find(node.parent);
+            const int page_index = tab_node ? FindIndex(tab_node->children, node.id) : -1;
+            if(page_index >= 0 && page_index < tab->GetCount())
+                local = tab->GetPage(page_index).GetRect();
+        }
+    }
     if(Ctrl* parent = FindRuntime(instance.runtime_parent)) {
         if(auto *box = dynamic_cast<UiBoxLayout *>(parent))
             local = box->GetItemRect(instance.layout_item_index);
@@ -2409,11 +2444,9 @@ void UiDesignerPreviewCanvas::Layout()
         }
         record.order = order++;
         record.selectable = true;
-        record.drop_target = node->id == document_->GetRootId() ||
-            node->type == "UiBoxLayout" || node->type == "UiGridLayout" ||
-            node->type == "UiPanel" || node->type == "UiTitleCard" ||
-            node->type == "UiAccordion" || node->type == "UiAccordionSection";
         const UiDesignerControlSpec* spec = catalog_ ? catalog_->Find(node->type) : nullptr;
+        record.drop_target = spec &&
+            spec->content_host != UiDesignerContentHostKind::None;
         record.cue_kind = spec
             ? ResolveCueKind(*spec, *node)
             : UiDesignerCueKind::ControlBounds;

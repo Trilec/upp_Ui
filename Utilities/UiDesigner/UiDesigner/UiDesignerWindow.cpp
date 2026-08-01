@@ -307,8 +307,10 @@ void UiDesignerWindow::BuildDesigner()
     data_actions_.SetDirection(UiDirection::H).SetWrap(UiBoxWrap::Flow).SetGap(DPI(3), DPI(3));
     data_actions_.Add(data_add_); data_actions_.Add(data_remove_); data_actions_.Add(data_rename_);
     data_actions_.Add(data_up_); data_actions_.Add(data_down_); data_actions_.Add(data_enable_); data_actions_.Add(data_active_);
+    data_actions_.Add(data_select_content_); data_actions_.Add(data_remove_content_);
     data_add_.SetText("Add"); data_remove_.SetText("Remove"); data_rename_.SetText("Rename");
     data_up_.SetText("Up"); data_down_.SetText("Down"); data_enable_.SetText("Enable"); data_active_.SetText("Set Active");
+    data_select_content_.SetText("Select Content"); data_remove_content_.SetText("Remove Content");
     diagnostics_shell_.SetReadOnly();
     diagnostics_panel_.SetCustomStyle(UiDesignerSurfaceStyle());
     diagnostics_panel_.Add(diagnostics_layout_);
@@ -711,6 +713,22 @@ void UiDesignerWindow::ConnectServices()
             RefreshStatus(session_.Commands().GetLastError());
         RefreshData();
     };
+    data_select_content_.WhenAction = [=] {
+        const UiDesignerNode* section = SelectedDataNode();
+        if(section && !section->children.IsEmpty())
+            session_.Select(section->children[0]);
+        else
+            RefreshStatus("Accordion section has no content");
+    };
+    data_remove_content_.WhenAction = [=] {
+        const UiDesignerNode* section = SelectedDataNode();
+        if(!section || section->children.IsEmpty())
+            return;
+        if(!session_.Commands().RemoveNode(section->children[0],
+                                           "Remove Accordion section content"))
+            RefreshStatus(session_.Commands().GetLastError());
+        RefreshData();
+    };
     data_up_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
@@ -985,6 +1003,8 @@ void UiDesignerWindow::RefreshData()
     };
     data_model_.Clear();
     data_editor_model_.Clear();
+    data_select_content_.Enable(false);
+    data_remove_content_.Enable(false);
     if(node && node->type == "UiTab") {
         const Value prior = data_list_.GetData();
         for(UiDesignerNodeId id : node->children) {
@@ -1063,6 +1083,13 @@ void UiDesignerWindow::RefreshData()
             lock_item.choices.Add(PropertyEditorChoice("None", "None"));
             lock_item.choices.Add(PropertyEditorChoice("Open", "Open"));
             lock_item.choices.Add(PropertyEditorChoice("Closed", "Closed"));
+            const UiDesignerNode* content = section->children.IsEmpty()
+                ? nullptr : session_.Document().Find(section->children[0]);
+            data_model_.Add(content
+                ? "Content: " + content->name + " [" + content->type + "]"
+                : "Content: Empty", Value(), false);
+            data_select_content_.Enable(content != nullptr);
+            data_remove_content_.Enable(content != nullptr);
         }
         data_editor_model_.StructureChanged();
         data_editor_.SetModel(&data_editor_model_);

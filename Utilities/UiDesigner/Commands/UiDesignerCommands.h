@@ -56,7 +56,8 @@ public:
         const Vector<UiDesignerNodeId>& nodes,
         UiDesignerNodeId parent, int index,
         const VectorMap<UiDesignerNodeId, ValueMap>& property_updates,
-        const String& label = "Move selection");
+        const String& label = "Move selection",
+        UiDesignerNodeId open_accordion_section = 0);
     bool RenameNode(UiDesignerNodeId node, const String& name,
                     const String& label = String());
     UiDesignerNodeId AddTabPage(UiDesignerNodeId tab, const String& title);
