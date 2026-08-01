@@ -673,14 +673,15 @@ void UiDesignerInteractionOverlay::DragEnter()
     Refresh();
 }
 
-void UiDesignerInteractionOverlay::DragRepeat(Point)
+void UiDesignerInteractionOverlay::DragRepeat(Point p)
 {
     if(drag_state_ != UiDesignerCatalogDragState::Idle && !drag_type_id_.IsEmpty())
-        TrackCatalogDrag(drag_type_id_, GetMousePos());
+        TrackCatalogDrag(drag_type_id_, GetScreenRect().TopLeft() + p);
 }
 
-void UiDesignerInteractionOverlay::DragAndDrop(Point, PasteClip& d)
+void UiDesignerInteractionOverlay::DragAndDrop(Point p, PasteClip& d)
 {
+    const Point screen = GetScreenRect().TopLeft() + p;
     String payload;
     String type;
     if(!UiDesignerReadDragText(d, payload) ||
@@ -689,8 +690,8 @@ void UiDesignerInteractionOverlay::DragAndDrop(Point, PasteClip& d)
         CancelCatalogDrag();
         return;
     }
-    TrackCatalogDrag(type, GetMousePos());
-    UpdateDropPlan(type, GetMousePos(), false);
+    TrackCatalogDrag(type, screen);
+    UpdateDropPlan(type, screen, false);
     if(!resolved_drop_.valid) {
         d.Reject();
         CancelCatalogDrag();
@@ -699,7 +700,7 @@ void UiDesignerInteractionOverlay::DragAndDrop(Point, PasteClip& d)
     d.Accept();
     d.SetAction(DND_COPY);
     if(d.IsPaste())
-        FinishCatalogDrag(type, GetMousePos());
+        FinishCatalogDrag(type, screen);
 }
 
 void UiDesignerInteractionOverlay::DragLeave()
