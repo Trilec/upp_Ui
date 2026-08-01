@@ -1845,6 +1845,127 @@ CONSOLE_APP_MAIN
     Check(accordion_generated.source.Find("GetSectionContent(") >= 0,
           "Generated Accordion uses typed section content attachment");
 
+    // Regression fixture for managed-parent detachment and incremental
+    // Accordion section projection.
+    UiDesignerSession lifecycle_session;
+    UiDesignerPreviewCanvas lifecycle_preview;
+    lifecycle_preview.SetRect(0, 0, 640, 320);
+    lifecycle_session.AttachProjection(&lifecycle_preview);
+    UiDesignerNodeId lifecycle_grid = lifecycle_session.AddControl("UiGridLayout");
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "rows", 2,
+                                              UiDesignerImpactLocalLayout);
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "columns", 2,
+                                              UiDesignerImpactLocalLayout);
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "width_mode", "Fixed",
+                                              UiDesignerImpactLocalLayout);
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "height_mode", "Fixed",
+                                              UiDesignerImpactLocalLayout);
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "fixed_width", 640,
+                                              UiDesignerImpactLocalLayout);
+    lifecycle_session.Commands().SetProperty(lifecycle_grid, "fixed_height", 320,
+                                              UiDesignerImpactLocalLayout);
+    String lifecycle_error;
+    UiDesignerNodeId lifecycle_card = 0;
+    UiDesignerDropPlan lifecycle_card_plan = lifecycle_session.PlanAddControl(
+        "UiTitleCard", lifecycle_grid, Point(480, 40), true, -1, 0, 1);
+    Check(lifecycle_session.ExecuteDrop(lifecycle_card_plan, &lifecycle_card,
+                                        lifecycle_error),
+          "Lifecycle fixture adds Title Card: " + lifecycle_error);
+    UiDesignerNodeId lifecycle_accordion = 0;
+    UiDesignerDropPlan lifecycle_accordion_plan = lifecycle_session.PlanAddControl(
+        "UiAccordion", lifecycle_grid, Point(40, 40), true, -1, 0, 0);
+    Check(lifecycle_session.ExecuteDrop(lifecycle_accordion_plan,
+                                        &lifecycle_accordion, lifecycle_error),
+          "Lifecycle fixture adds Accordion: " + lifecycle_error);
+    lifecycle_preview.RebuildDocument();
+    UiGridLayout* lifecycle_grid_runtime = dynamic_cast<UiGridLayout *>(
+        lifecycle_preview.FindRuntime(lifecycle_grid));
+    UiAccordion* lifecycle_accordion_runtime = dynamic_cast<UiAccordion *>(
+        lifecycle_preview.FindRuntime(lifecycle_accordion));
+    Check(lifecycle_grid_runtime && lifecycle_grid_runtime->GetItemCount() == 2 &&
+              lifecycle_accordion_runtime && lifecycle_accordion_runtime->GetCount() == 3,
+          "Lifecycle fixture starts with two Grid items and three closed sections");
+    const int lifecycle_grid_items_before = lifecycle_grid_runtime
+        ? lifecycle_grid_runtime->GetItemCount() : -1;
+    const uint64 lifecycle_card_generation =
+        lifecycle_preview.GetInstanceGeneration(lifecycle_card);
+    const UiDesignerNode* lifecycle_accordion_node =
+        lifecycle_session.Document().Find(lifecycle_accordion);
+    UiDesignerNodeId lifecycle_removed = lifecycle_accordion_node
+        ? lifecycle_accordion_node->children[0] : 0;
+    lifecycle_session.Select(lifecycle_removed);
+    Check(lifecycle_session.RemoveSelection(),
+          "Lifecycle fixture removes the selected first Accordion section");
+    Check(lifecycle_session.State().selection.primary != lifecycle_removed &&
+              lifecycle_session.Document().Find(lifecycle_session.State().selection.primary),
+          "Deleted Accordion section selects a remaining section");
+    lifecycle_grid_runtime = dynamic_cast<UiGridLayout *>(
+        lifecycle_preview.FindRuntime(lifecycle_grid));
+    Check(lifecycle_grid_runtime && lifecycle_grid_runtime->GetItemCount() ==
+              lifecycle_grid_items_before,
+          "Deleting a section preserves the parent Grid item count");
+    const UiDesignerNodeId lifecycle_selected =
+        lifecycle_session.State().selection.primary;
+    Check(lifecycle_selected != 0, "Lifecycle fixture retains a selected section");
+    const uint64 lifecycle_generation_before_property =
+        lifecycle_preview.GetInstanceGeneration(lifecycle_accordion);
+    Check(lifecycle_session.PreviewProperty("open", true, lifecycle_error),
+          "Accordion open transient preview succeeds: " + lifecycle_error);
+    Check(lifecycle_preview.GetInstanceGeneration(lifecycle_accordion) ==
+              lifecycle_generation_before_property &&
+              lifecycle_preview.GetInstanceGeneration(lifecycle_card) ==
+                  lifecycle_card_generation,
+          "Transient Accordion open does not rebuild Accordion or Title Card");
+    lifecycle_session.CancelPreview();
+    lifecycle_accordion_runtime = dynamic_cast<UiAccordion *>(
+        lifecycle_preview.FindRuntime(lifecycle_accordion));
+    Check(!lifecycle_session.Document().GetProperty(lifecycle_selected, "open", false) &&
+              lifecycle_accordion_runtime && !lifecycle_accordion_runtime->IsOpen(0),
+          "Cancelling Accordion open restores canonical state");
+    Check(lifecycle_session.PreviewProperty("open", true, lifecycle_error),
+          "Repeated Accordion open preview succeeds");
+    lifecycle_session.CancelPreview();
+    Check(lifecycle_session.CommitProperty("open", true, lifecycle_error),
+          "Committed Accordion open succeeds without subtree rebuild");
+    Check(lifecycle_session.Document().GetProperty(lifecycle_selected, "open", false),
+          "Committed Accordion open changes canonical state");
+    Check(lifecycle_session.Undo(), "Accordion open undo succeeds");
+    Check(!lifecycle_session.Document().GetProperty(lifecycle_selected, "open", true),
+          "Accordion open undo restores closed state");
+    Check(lifecycle_session.Redo(), "Accordion open redo succeeds");
+    Check(lifecycle_session.Document().GetProperty(lifecycle_selected, "open", false),
+          "Accordion open redo restores open state");
+    lifecycle_session.Select(lifecycle_selected);
+    for(int cycle = 0; cycle < 100; cycle++) {
+        const bool open = (cycle & 1) != 0;
+        const bool preview_ok = lifecycle_session.PreviewProperty("open", open, lifecycle_error);
+        Check(preview_ok, "Accordion repeated transient open/close preview succeeds");
+        lifecycle_session.CancelPreview();
+        lifecycle_preview.RebuildSubtree(lifecycle_accordion);
+        lifecycle_grid_runtime = dynamic_cast<UiGridLayout *>(
+            lifecycle_preview.FindRuntime(lifecycle_grid));
+        Check(lifecycle_grid_runtime && lifecycle_grid_runtime->GetItemCount() ==
+                  lifecycle_grid_items_before,
+              "Accordion rebuild cycle preserves Grid item count");
+    }
+    Check(lifecycle_preview.GetInstanceGeneration(lifecycle_card) != 0,
+          "Unrelated Title Card remains live after Accordion stress cycles");
+    Check(lifecycle_grid_runtime && lifecycle_grid_runtime->ValidateItems(),
+          "Grid item invariants remain valid after Accordion stress cycles");
+    for(int cycle = 0; cycle < 25; cycle++) {
+        const UiDesignerNodeId added = lifecycle_session.Commands().AddAccordionSection(
+            lifecycle_accordion, "Cycle " + AsString(cycle), "", "", false, "None");
+        Check(added != 0, "Repeated Accordion section addition succeeds");
+        lifecycle_session.Select(added);
+        Check(lifecycle_session.RemoveSelection(),
+              "Repeated Accordion section deletion succeeds");
+        lifecycle_grid_runtime = dynamic_cast<UiGridLayout *>(
+            lifecycle_preview.FindRuntime(lifecycle_grid));
+        Check(lifecycle_grid_runtime && lifecycle_grid_runtime->GetItemCount() ==
+                  lifecycle_grid_items_before && lifecycle_grid_runtime->ValidateItems(),
+              "Repeated section add/remove preserves Grid invariants");
+    }
+
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";
     SetExitCode(fails ? 1 : 0);

@@ -77,6 +77,19 @@ void UiQuadSplitter::Add(Ctrl& pane)
     }
 }
 
+void UiQuadSplitter::Remove(Ctrl& pane)
+{
+    for(int i = 0; i < 4; i++)
+        if(panes_[i] == &pane) {
+            if(i < 2)
+                top_.Remove(pane);
+            else
+                bottom_.Remove(pane);
+            panes_[i] = nullptr;
+            return;
+        }
+}
+
 void UiQuadSplitter::Clear()
 {
     top_.Clear();

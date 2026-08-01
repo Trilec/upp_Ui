@@ -240,6 +240,7 @@ struct UiDesignerPreviewInstance {
     int layout_item_index = -1;
     int semantic_host_index = -1;
     UiDesignerNodeId semantic_host_runtime_parent = 0;
+    Vector<UiDesignerNodeId> accordion_section_nodes;
     uint64 generation = 0;
 };
 
@@ -333,6 +334,7 @@ public:
 private:
     int FindInstance(UiDesignerNodeId node) const;
     void DestroyInstances();
+    void DetachInstance(UiDesignerPreviewInstance& instance);
     void BuildNode(UiDesignerNodeId node, ParentCtrl& parent, int depth,
                    UiDesignerNodeId runtime_parent = 0);
     void AttachSemanticItem(UiDesignerPreviewInstance& instance,

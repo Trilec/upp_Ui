@@ -649,6 +649,8 @@ public:
 
     // Remove all children and internal items; reset sizes and relayout.
     UiBoxLayout& ClearItems();
+    bool RemoveItem(int index);
+    int FindItem(const Ctrl& child) const;
 
     // Query how much space the layout actually used in the last Layout pass
     // (excluding inset). This is useful when the container has more space

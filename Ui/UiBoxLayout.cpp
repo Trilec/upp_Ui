@@ -123,6 +123,28 @@ UiBoxLayout::ItemRef UiBoxLayout::Add(Ctrl& c)
     return ItemRef(this, items.GetCount() - 1);
 }
 
+int UiBoxLayout::FindItem(const Ctrl& child) const
+{
+    for(int i = 0; i < items.GetCount(); i++)
+        if(items[i].c == &child)
+            return i;
+    return -1;
+}
+
+bool UiBoxLayout::RemoveItem(int index)
+{
+    if(index < 0 || index >= items.GetCount())
+        return false;
+    Ctrl *child = items[index].c;
+    if(child)
+        child->Remove();
+    items.Remove(index);
+    ++cur_gen;
+    if(layout_pause == 0)
+        Layout();
+    return true;
+}
+
 Size UiBoxLayout::GetCtrlMinSize(Item& it)
 {
     if(!it.c)

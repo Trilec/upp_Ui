@@ -44,6 +44,7 @@ public:
 
     UiQuadSplitter& Set(Ctrl& top_left, Ctrl& top_right, Ctrl& bottom_left, Ctrl& bottom_right);
     void Add(Ctrl& pane);
+    void Remove(Ctrl& pane);
     UiQuadSplitter& operator<<(Ctrl& pane) { Add(pane); return *this; }
     void Clear();
     UiQuadSplitter& SetColumnSplitPercent(double percent);

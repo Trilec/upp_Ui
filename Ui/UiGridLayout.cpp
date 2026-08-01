@@ -317,6 +317,30 @@ UiGridLayout& UiGridLayout::SetItemMaxSize(int index, Size sz)
     return *this;
 }
 
+int UiGridLayout::FindItem(const Ctrl& child) const
+{
+    for(int i = 0; i < items.GetCount(); i++)
+        if(items[i].ctrl == &child)
+            return i;
+    return -1;
+}
+
+bool UiGridLayout::RemoveItem(int index)
+{
+    if(index < 0 || index >= items.GetCount())
+        return false;
+    Ctrl *child = items[index].ctrl;
+    if(child)
+        child->Remove();
+    items.Remove(index);
+    for(int& selected : selection)
+        if(selected > index)
+            --selected;
+    NormalizeSelectionState();
+    RefreshGridLayout();
+    return true;
+}
+
 static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<int>& floors,
                                        const Vector<bool>& expand, int available, int gap)
 {
@@ -385,6 +409,7 @@ static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<int>& fl
 
 void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Vector<int>& row_heights) const
 {
+    ASSERT(ValidateItems());
     resolved_cell_geometry_build_count++;
     int cols = max(1, grid_cols);
     int rows = max(1, grid_rows);
@@ -459,6 +484,27 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
             row_heights[it.row] = max(row_heights[it.row], max(0, measure.measured.cy));
     }
     UiDistributeGridTrackSpace(row_heights, row_floors, expand_rows, available.cy, gap);
+}
+
+bool UiGridLayout::ValidateItems(String *error) const
+{
+    for(int i = 0; i < items.GetCount(); i++) {
+        const Item& item = items[i];
+        if(!item.ctrl)
+            continue;
+        if(item.ctrl->GetParent() != this) {
+            if(error)
+                *error = Format("Grid item %d has an invalid parent", i);
+            return false;
+        }
+        for(int j = i + 1; j < items.GetCount(); j++)
+            if(items[j].ctrl == item.ctrl) {
+                if(error)
+                    *error = Format("Grid item %d duplicates item %d", j, i);
+                return false;
+            }
+    }
+    return true;
 }
 
 Rect UiGridLayout::GetClientGridRect() const

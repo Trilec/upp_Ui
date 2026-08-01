@@ -417,9 +417,38 @@ bool UiDesignerSession::RemoveSelection()
     if(state_.selection.nodes.IsEmpty())
         return false;
     Vector<UiDesignerNodeId> nodes = clone(state_.selection.nodes);
+    UiDesignerNodeId replacement = 0;
+    if(nodes.GetCount() == 1) {
+        const UiDesignerNode *selected = document_.Find(nodes[0]);
+        const UiDesignerNode *owner = selected ? document_.Find(selected->parent) : nullptr;
+        if(selected && selected->type == "UiAccordionSection" && owner &&
+           owner->type == "UiAccordion") {
+            int index = -1;
+            for(int i = 0; i < owner->children.GetCount(); i++)
+                if(owner->children[i] == selected->id) {
+                    index = i;
+                    break;
+                }
+            if(index >= 0) {
+                const int next = index < owner->children.GetCount() - 1 ? index + 1 : index - 1;
+                if(next >= 0)
+                    replacement = owner->children[next];
+            }
+        }
+    }
     const bool ok = commands_.RemoveNodes(nodes, "Delete selection");
-    if(ok)
-        ClearSelection();
+    if(ok) {
+        overlay_.Clear();
+        if(replacement && document_.Find(replacement))
+            state_.selection.Set(replacement);
+        else
+            state_.selection.Clear();
+        if(projection_)
+            projection_->SetSelection(&state_.selection);
+        RebuildInspector();
+        RebuildThemeOverrideModel();
+        WhenSelectionChanged();
+    }
     return ok;
 }
 

@@ -1284,15 +1284,80 @@ UiDesignerNodeId UiDesignerPreviewCanvas::HitNode(Point p) const
 void UiDesignerPreviewCanvas::DestroyInstances()
 {
     int destroyed = 0;
-    for(UiDesignerPreviewInstance& instance : instances_)
+    for(int i = instances_.GetCount() - 1; i >= 0; i--) {
+        UiDesignerPreviewInstance& instance = instances_[i];
         if(instance.control) {
-            instance.control->Remove();
+            DetachInstance(instance);
+            if(instance.control->GetParent())
+                instance.control->Remove();
             destroyed++;
         }
+    }
     instances_.Clear();
     rects_.Clear();
     geometry_ = UiDesignerGeometrySnapshot();
     stats_.live_instance_destructions += destroyed;
+}
+
+void UiDesignerPreviewCanvas::DetachInstance(UiDesignerPreviewInstance& instance)
+{
+    if(!instance.control)
+        return;
+    Ctrl *child = instance.control.Get();
+    if(instance.semantic_host_runtime_parent && instance.semantic_host_index >= 0) {
+        const int owner = FindInstance(instance.semantic_host_runtime_parent);
+        if(owner >= 0 && instance.semantic)
+            if(UiAccordion *accordion = dynamic_cast<UiAccordion *>(instances_[owner].control.Get()))
+                accordion->Remove(instance.semantic_host_index);
+        if(!instance.semantic)
+            child->Remove();
+        return;
+    }
+    const int parent_index = instance.runtime_parent
+        ? FindInstance(instance.runtime_parent) : -1;
+    if(parent_index < 0) {
+        child->Remove();
+        return;
+    }
+    Ctrl *parent = instances_[parent_index].control.Get();
+    if(auto *grid = dynamic_cast<UiGridLayout *>(parent)) {
+        const int item = grid->FindItem(*child);
+        if(item >= 0) {
+            grid->RemoveItem(item);
+            return;
+        }
+    }
+    if(auto *box = dynamic_cast<UiBoxLayout *>(parent)) {
+        const int item = box->FindItem(*child);
+        if(item >= 0) {
+            box->RemoveItem(item);
+            return;
+        }
+    }
+    if(auto *absolute = dynamic_cast<UiAbsoluteLayout *>(parent))
+        if(absolute->Remove(*child))
+            return;
+    if(auto *card = dynamic_cast<UiTitleCard *>(parent))
+        if(card->GetContentCell() == child) {
+            card->ClearContentCell();
+            return;
+        }
+    if(auto *tab = dynamic_cast<UiTab *>(parent)) {
+        for(int i = 0; i < tab->GetCount(); i++)
+            if(&tab->GetPage(i) == child) {
+                tab->Remove(i);
+                return;
+            }
+    }
+    if(auto *split = dynamic_cast<UiSplitter *>(parent)) {
+        split->Remove(*child);
+        return;
+    }
+    if(auto *quad = dynamic_cast<UiQuadSplitter *>(parent)) {
+        quad->Remove(*child);
+        return;
+    }
+    child->Remove();
 }
 
 void UiDesignerPreviewCanvas::ResetPerformance()
@@ -1476,6 +1541,7 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
                 UiAccordion::Lock::None);
             instance.semantic_host_index = index;
             instance.semantic_host_runtime_parent = parent_instance.node;
+            parent_instance.accordion_section_nodes.Add(node.id);
         }
         return;
     }
@@ -1773,8 +1839,11 @@ void UiDesignerPreviewCanvas::RemoveInstanceTree(
     for(int i = instances_.GetCount() - 1; i >= 0; i--) {
         const UiDesignerNodeId candidate = instances_[i].node;
         if((include_root && candidate == node) || IsRuntimeDescendant(candidate, node)) {
-            if(instances_[i].control)
-                instances_[i].control->Remove();
+            if(instances_[i].control) {
+                DetachInstance(instances_[i]);
+                if(instances_[i].control->GetParent())
+                    instances_[i].control->Remove();
+            }
             rects_.RemoveKey(candidate);
             instances_.Remove(i);
         }
@@ -1843,6 +1912,59 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         }
         stats_.rejected++;
         return UiDesignerApplyResult::Rejected;
+    }
+
+    if(node->type == "UiAccordionSection" &&
+       (property == "title" || property == "subtitle" || property == "copy" ||
+        property == "open" || property == "lock")) {
+        const int owner_index = FindInstance(node->parent);
+        if(owner_index < 0 || !instances_[owner_index].control) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        UiAccordion *accordion = dynamic_cast<UiAccordion *>(
+            instances_[owner_index].control.Get());
+        if(!accordion) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        int section_index = -1;
+        for(int i = 0; i < instances_[owner_index].accordion_section_nodes.GetCount(); i++)
+            if(instances_[owner_index].accordion_section_nodes[i] == node_id) {
+                section_index = i;
+                break;
+            }
+        if(section_index < 0 || section_index >= accordion->GetCount()) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        if(property == "title" || property == "subtitle" || property == "copy") {
+            const Value title = property == "title" ? value : node->GetProperty("title", "");
+            const Value subtitle = property == "subtitle" ? value : node->GetProperty("subtitle", "");
+            const Value copy = property == "copy" ? value : node->GetProperty("copy", "");
+            accordion->SetSectionText(section_index, title, subtitle, copy);
+            stats_.paint_updates++;
+            stats_.live_applies++;
+            Refresh();
+            return UiDesignerApplyResult::AppliedPaint;
+        }
+        if(property == "open") {
+            accordion->Open(section_index, (bool)value);
+            stats_.ancestor_layouts++;
+            stats_.live_applies++;
+            Layout();
+            Refresh();
+            return UiDesignerApplyResult::AppliedAncestorLayout;
+        }
+        const String lock = AsString(value);
+        accordion->SetLockMode(section_index,
+            lock == "Open" ? UiAccordion::Lock::Open :
+            lock == "Closed" ? UiAccordion::Lock::Closed :
+            UiAccordion::Lock::None);
+        stats_.live_applies++;
+        Layout();
+        Refresh();
+        return UiDesignerApplyResult::AppliedLocalLayout;
     }
 
     if(kind == UiDesignerTransientValueKind::ThemeOverride) {
@@ -1972,6 +2094,8 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
     if(!changes.structure.IsEmpty()) {
         UiDesignerNodeId tab = 0;
         bool tab_only = true;
+        UiDesignerNodeId accordion = 0;
+        bool accordion_only = true;
         for(const UiDesignerStructureChange& change : changes.structure) {
             const UiDesignerNodeId parent = change.new_parent ? change.new_parent : change.old_parent;
             const UiDesignerNode *page = document_->Find(change.node);
@@ -1979,15 +2103,21 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
             if(!owner || owner->type != "UiTab" ||
                (page && page->type != "UiTabPage") || (tab && tab != parent)) {
                 tab_only = false;
-                break;
             }
-            tab = parent;
+            else
+                tab = parent;
+            if(!owner || owner->type != "UiAccordion" ||
+               (page && page->type != "UiAccordionSection") ||
+               (accordion && accordion != parent)) {
+                accordion_only = false;
+            }
+            else
+                accordion = parent;
         }
         if(tab_only && tab && RebuildSubtree(tab))
             return;
-        // Managed Box/Grid controls retain internal item references. A complete
-        // rebuild is the safe structural boundary until those items have an
-        // explicit removal API; correctness beats a stale partial tree here.
+        if(accordion_only && accordion && RebuildSubtree(accordion))
+            return;
         RebuildDocument();
         return;
     }

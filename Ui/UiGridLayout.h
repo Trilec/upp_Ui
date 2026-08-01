@@ -83,6 +83,8 @@ public:
     UiGridLayout& SetItemAlign(int index, Align x, Align y);
     UiGridLayout& SetItemMinSize(int index, Size sz);
     UiGridLayout& SetItemMaxSize(int index, Size sz);
+    bool RemoveItem(int index);
+    int FindItem(const Ctrl& child) const;
 
     int AddSeparator(int px = DPI(1));
     UiGridLayout& SetItemSeparatorLine(int index, bool on = true, Align align = Align::Center,
@@ -92,6 +94,7 @@ public:
     UiGridLayout& SetItem(int index, int row, int col, bool scale_x, bool scale_y,
                           Size fixed = Size(0, 0));
     int  GetItemCount() const { return items.GetCount(); }
+    bool ValidateItems(String *error = nullptr) const;
     // Returned cell rectangles are local to the UiGridLayout client area.
     Rect GetCellRect(int row, int col) const;
     void GetCellRects(Vector<Rect>& rects) const;

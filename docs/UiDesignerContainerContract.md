@@ -46,3 +46,15 @@ The orange dashed region is shown for the selected container and is reused as
 the drag target. Empty regions are available; occupied one-child regions are
 shown as occupied and reject a second direct child. Leaf selection does not
 publish a container content region.
+
+## Managed Rebuilds
+
+Preview subtree replacement detaches through the owning adapter before the
+old `Ctrl` is destroyed: `UiGridLayout::RemoveItem`,
+`UiBoxLayout::RemoveItem`, `UiAbsoluteLayout::Remove`,
+`UiTitleCard::ClearContentCell`, `UiAccordion::GetSectionContent` removal,
+`UiTab::Remove`, and the splitter removal APIs. Grid validation checks that
+every registered control is non-null, parented by the Grid and unique before
+measurement. Accordion text, open and lock edits project directly to the
+current runtime section index; structural section changes rebuild only the
+Accordion subtree.
