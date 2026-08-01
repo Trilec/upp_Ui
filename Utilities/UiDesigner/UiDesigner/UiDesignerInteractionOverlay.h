@@ -64,10 +64,6 @@ public:
     virtual void LeftDown(Point p, dword keyflags) override;
     virtual void MouseMove(Point p, dword keyflags) override;
     virtual void LeftUp(Point p, dword keyflags) override;
-    virtual void DragEnter() override;
-    virtual void DragRepeat(Point p) override;
-    virtual void DragAndDrop(Point p, PasteClip& d) override;
-    virtual void DragLeave() override;
     virtual Image CursorImage(Point p, dword keyflags) override;
     virtual bool Key(dword key, int count) override;
     virtual void CancelMode() override;

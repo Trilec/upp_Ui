@@ -164,6 +164,9 @@ public:
     void SetDocument(const UiDesignerDocument *document);
     void SetSelection(const UiDesignerSelection *selection);
     void Rebuild();
+    void TrackCatalogDrop(const String& type_id, Point screen);
+    bool FinishCatalogDrop(const String& type_id, Point screen);
+    void CancelCatalogDrop();
 
     Function<UiDesignerDropPlan(const Vector<UiDesignerNodeId>&,
                                 UiDesignerNodeId, int)> PlanDrop;
@@ -177,7 +180,11 @@ public:
 
     virtual void Paint(Draw& w) override;
     virtual void LeftDown(Point p, dword flags) override;
+    virtual void LeftUp(Point p, dword flags) override;
     virtual void LeftDrag(Point p, dword flags) override;
+    virtual void MouseMove(Point p, dword flags) override;
+    virtual Image CursorImage(Point p, dword flags) override;
+    virtual void CancelMode() override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
     virtual void DragEnter() override;
     virtual void DragAndDrop(Point p, PasteClip& d) override;
@@ -196,6 +203,9 @@ private:
     int RowAt(Point p) const;
     Rect RowRect(int index) const;
     void UpdateDrop(Point p, const String& payload);
+    void PollNodeDrag();
+    bool FinishNodeDrop(Point screen);
+    void ResetNodeDrag();
     void ClearDrop();
 
     const UiDesignerDocument *document_ = nullptr;
@@ -203,6 +213,9 @@ private:
     Vector<Row> rows_;
     int scroll_ = 0;
     int pressed_ = -1;
+    Point node_drag_start_;
+    Vector<UiDesignerNodeId> node_drag_nodes_;
+    bool node_dragging_ = false;
     int drop_row_ = -1;
     int drop_edge_ = 0; // -1 before, 0 inside, +1 after
     String drag_payload_;

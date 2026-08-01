@@ -3,6 +3,8 @@
 
 namespace Upp {
 
+static constexpr int UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID = 102;
+
 Image UiDesignerResolveCatalogIcon(const String& key)
 {
     if(key == "layouts" || key == "spacer") return ICON_DESIGN_LAYOUTS_CATEGORY_48();
@@ -632,23 +634,7 @@ void UiDesignerCatalogList::LeftDrag(Point, dword)
         if(!HasCapture())
             SetCapture();
     }
-    if(!dragging_) {
-        dragging_ = true;
-        const String type = drag_type_;
-        // Native DND owns the gesture after this point. Clear local capture
-        // state first so cancellation cannot re-enter the catalog callback.
-        pressed_ = -1;
-        drag_type_.Clear();
-        drag_armed_ = false;
-        if(HasCapture())
-            ReleaseCapture();
-        VectorMap<String, ClipData> payload;
-        Append(payload, UiDesignerCatalogDragText(type));
-        DoDragAndDrop(payload, UiDesignerResolveCatalogIcon("containers"), DND_COPY);
-        dragging_ = false;
-        Refresh();
-        return;
-    }
+    MouseMove(GetMousePos() - GetScreenRect().TopLeft(), K_MOUSELEFT);
 }
 
 void UiDesignerCatalogList::MouseMove(Point p, dword)
@@ -656,6 +642,10 @@ void UiDesignerCatalogList::MouseMove(Point p, dword)
     if(drag_armed_) {
         if(!HasCapture())
             SetCapture();
+        if(!dragging_ && Length(GetMousePos() - drag_start_) >= DPI(5))
+            dragging_ = true;
+        if(dragging_ && WhenToolDrag)
+            WhenToolDrag(drag_type_, GetMousePos());
         return;
     }
     const int next = RowAt(p);
@@ -807,27 +797,71 @@ void UiDesignerHierarchyView::Paint(Draw& w)
 void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
 {
     pressed_ = RowAt(p);
-    if(pressed_ >= 0)
+    if(pressed_ >= 0) {
         WhenSelectNode(rows_[pressed_].node, (flags & K_CTRL) != 0);
+        const UiDesignerNodeId node = rows_[pressed_].node;
+        if(document_ && node != document_->GetRootId()) {
+            node_drag_nodes_.Clear();
+            if(selection_ && selection_->Contains(node))
+                node_drag_nodes_ = clone(selection_->nodes);
+            else
+                node_drag_nodes_.Add(node);
+            node_drag_start_ = GetMousePos();
+            node_dragging_ = false;
+            SetCapture();
+            SetTimeCallback(16, [=] { PollNodeDrag(); },
+                            UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+        }
+    }
     SetFocus();
+}
+
+void UiDesignerHierarchyView::LeftUp(Point, dword)
+{
+    const bool was_dragging = node_dragging_;
+    const Point screen = GetMousePos();
+    if(was_dragging)
+        FinishNodeDrop(screen);
+    ResetNodeDrag();
+    if(HasCapture())
+        ReleaseCapture();
 }
 
 void UiDesignerHierarchyView::LeftDrag(Point, dword)
 {
-    if(pressed_ < 0 || pressed_ >= rows_.GetCount() || !document_)
+    PollNodeDrag();
+}
+
+void UiDesignerHierarchyView::MouseMove(Point, dword flags)
+{
+    if(node_drag_nodes_.IsEmpty())
         return;
-    const UiDesignerNodeId pressed_node = rows_[pressed_].node;
-    if(pressed_node == document_->GetRootId())
+    if(!(flags & K_MOUSELEFT) && !GetMouseLeft()) {
+        ResetNodeDrag();
+        if(HasCapture())
+            ReleaseCapture();
         return;
-    Vector<UiDesignerNodeId> nodes;
-    if(selection_ && selection_->Contains(pressed_node))
-        nodes = clone(selection_->nodes);
+    }
+    const Point screen = GetMousePos();
+    if(!node_dragging_ && Length(screen - node_drag_start_) >= DPI(5))
+        node_dragging_ = true;
+    if(!node_dragging_)
+        return;
+    if(GetScreenRect().Contains(screen))
+        UpdateDrop(screen - GetScreenRect().TopLeft(), UiDesignerNodesDragText(node_drag_nodes_));
     else
-        nodes.Add(pressed_node);
-    VectorMap<String, ClipData> payload;
-    Append(payload, UiDesignerNodesDragText(nodes));
-    DoDragAndDrop(payload, ICON_DESIGN_ACCOUNT_TREE_48(), DND_MOVE);
-    pressed_ = -1;
+        ClearDrop();
+}
+
+Image UiDesignerHierarchyView::CursorImage(Point p, dword flags)
+{
+    return node_dragging_ ? Image::SizeAll() : ParentCtrl::CursorImage(p, flags);
+}
+
+void UiDesignerHierarchyView::CancelMode()
+{
+    ResetNodeDrag();
+    ParentCtrl::CancelMode();
 }
 
 void UiDesignerHierarchyView::MouseWheel(Point, int zdelta, dword)
@@ -904,26 +938,96 @@ void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
     Refresh();
 }
 
+void UiDesignerHierarchyView::PollNodeDrag()
+{
+    if(node_drag_nodes_.IsEmpty())
+        return;
+    const Point screen = GetMousePos();
+    MouseMove(screen - GetScreenRect().TopLeft(), K_MOUSELEFT);
+    if(!node_drag_nodes_.IsEmpty())
+        SetTimeCallback(16, [=] { PollNodeDrag(); }, UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+}
+
+bool UiDesignerHierarchyView::FinishNodeDrop(Point screen)
+{
+    if(!GetScreenRect().Contains(screen)) {
+        ClearDrop();
+        return false;
+    }
+    UpdateDrop(screen - GetScreenRect().TopLeft(), UiDesignerNodesDragText(node_drag_nodes_));
+    if(!drop_plan_.valid) {
+        if(WhenDropStatus)
+            WhenDropStatus(drop_plan_.reason);
+        ClearDrop();
+        return false;
+    }
+    String error;
+    const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
+    if(WhenDropStatus)
+        WhenDropStatus(ok ? "Move completed" : error);
+    ClearDrop();
+    return ok;
+}
+
+void UiDesignerHierarchyView::ResetNodeDrag()
+{
+    KillTimeCallback(UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+    pressed_ = -1;
+    node_drag_nodes_.Clear();
+    node_dragging_ = false;
+    ClearDrop();
+}
+
 void UiDesignerHierarchyView::DragEnter()
 {
     Refresh();
+}
+
+void UiDesignerHierarchyView::TrackCatalogDrop(const String& type_id, Point screen)
+{
+    UpdateDrop(screen - GetScreenRect().TopLeft(), UiDesignerCatalogDragText(type_id));
+}
+
+bool UiDesignerHierarchyView::FinishCatalogDrop(const String& type_id, Point screen)
+{
+    UpdateDrop(screen - GetScreenRect().TopLeft(), UiDesignerCatalogDragText(type_id));
+    if(!drop_plan_.valid) {
+        if(WhenDropStatus)
+            WhenDropStatus(drop_plan_.reason);
+        ClearDrop();
+        return false;
+    }
+    String error;
+    const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
+    if(WhenDropStatus)
+        WhenDropStatus(ok ? "Control added" : error);
+    ClearDrop();
+    return ok;
+}
+
+void UiDesignerHierarchyView::CancelCatalogDrop()
+{
+    ClearDrop();
 }
 
 void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
 {
     String payload;
     if(!UiDesignerReadDragText(d, payload)) {
-        d.Reject();
         ClearDrop();
         return;
     }
     UpdateDrop(p, payload);
     if(!drop_plan_.valid) {
-        d.Reject();
         ClearDrop();
         return;
     }
-    d.Accept();
+    // The source publishes a text payload. Accept that concrete format only
+    // after the shared drop planner has approved the target.
+    if(!AcceptText(d)) {
+        ClearDrop();
+        return;
+    }
     d.SetAction(catalog_drag_ ? DND_COPY : DND_MOVE);
     if(d.IsPaste()) {
         String error;

@@ -919,26 +919,57 @@ void UiDesignerWindow::TrackCatalogDrag(const String& type_id, Point screen)
     active_catalog_drag_type_ = type_id;
     catalog_drag_active_ = !type_id.IsEmpty();
     if(!catalog_drag_active_) {
-        interaction_overlay_.CancelCatalogDrag();
+        CancelCatalogDrag();
         return;
     }
-    interaction_overlay_.TrackCatalogDrag(type_id, screen);
+    const CatalogDragDestination destination = ResolveCatalogDragDestination(screen);
+    SetCatalogDragDestination(destination);
+    if(destination == CatalogDragDestination::Hierarchy)
+        hierarchy_.TrackCatalogDrop(type_id, screen);
+    else if(destination == CatalogDragDestination::Canvas)
+        interaction_overlay_.TrackCatalogDrag(type_id, screen);
 }
 
 void UiDesignerWindow::FinishCatalogDrag(const String& type_id, Point screen)
 {
     const String drag_type = active_catalog_drag_type_.IsEmpty() ? type_id
                                                                  : active_catalog_drag_type_;
+    const CatalogDragDestination destination = ResolveCatalogDragDestination(screen);
+    SetCatalogDragDestination(destination);
     catalog_drag_active_ = false;
     active_catalog_drag_type_.Clear();
-    interaction_overlay_.FinishCatalogDrag(drag_type, screen);
+    if(destination == CatalogDragDestination::Hierarchy)
+        hierarchy_.FinishCatalogDrop(drag_type, screen);
+    else if(destination == CatalogDragDestination::Canvas)
+        interaction_overlay_.FinishCatalogDrag(drag_type, screen);
 }
 
 void UiDesignerWindow::CancelCatalogDrag()
 {
     catalog_drag_active_ = false;
     active_catalog_drag_type_.Clear();
-    interaction_overlay_.CancelCatalogDrag();
+    SetCatalogDragDestination(CatalogDragDestination::None);
+}
+
+UiDesignerWindow::CatalogDragDestination UiDesignerWindow::ResolveCatalogDragDestination(
+    Point screen) const
+{
+    if(hierarchy_.GetScreenRect().Contains(screen))
+        return CatalogDragDestination::Hierarchy;
+    if(interaction_overlay_.GetScreenRect().Contains(screen))
+        return CatalogDragDestination::Canvas;
+    return CatalogDragDestination::None;
+}
+
+void UiDesignerWindow::SetCatalogDragDestination(CatalogDragDestination destination)
+{
+    if(catalog_drag_destination_ == destination)
+        return;
+    if(catalog_drag_destination_ == CatalogDragDestination::Hierarchy)
+        hierarchy_.CancelCatalogDrop();
+    else if(catalog_drag_destination_ == CatalogDragDestination::Canvas)
+        interaction_overlay_.CancelCatalogDrag();
+    catalog_drag_destination_ = destination;
 }
 
 void UiDesignerWindow::SaveDocument(bool save_as)

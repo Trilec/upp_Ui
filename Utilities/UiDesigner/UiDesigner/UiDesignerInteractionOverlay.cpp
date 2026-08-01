@@ -668,46 +668,6 @@ void UiDesignerInteractionOverlay::InvalidateCatalogDrag()
     Refresh();
 }
 
-void UiDesignerInteractionOverlay::DragEnter()
-{
-    Refresh();
-}
-
-void UiDesignerInteractionOverlay::DragRepeat(Point p)
-{
-    if(drag_state_ != UiDesignerCatalogDragState::Idle && !drag_type_id_.IsEmpty())
-        TrackCatalogDrag(drag_type_id_, GetScreenRect().TopLeft() + p);
-}
-
-void UiDesignerInteractionOverlay::DragAndDrop(Point p, PasteClip& d)
-{
-    const Point screen = GetScreenRect().TopLeft() + p;
-    String payload;
-    String type;
-    if(!UiDesignerReadDragText(d, payload) ||
-       !UiDesignerParseCatalogDragText(payload, type)) {
-        d.Reject();
-        CancelCatalogDrag();
-        return;
-    }
-    TrackCatalogDrag(type, screen);
-    UpdateDropPlan(type, screen, false);
-    if(!resolved_drop_.valid) {
-        d.Reject();
-        CancelCatalogDrag();
-        return;
-    }
-    d.Accept();
-    d.SetAction(DND_COPY);
-    if(d.IsPaste())
-        FinishCatalogDrag(type, screen);
-}
-
-void UiDesignerInteractionOverlay::DragLeave()
-{
-    CancelCatalogDrag();
-}
-
 Rect UiDesignerInteractionOverlay::WorkspaceRootRect() const
 {
     if(!owner_)

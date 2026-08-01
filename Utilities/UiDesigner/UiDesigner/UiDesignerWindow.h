@@ -64,6 +64,14 @@ private:
     void FinishCatalogDrag(const String& type_id, Point screen);
     void CancelCatalogDrag();
 
+    enum class CatalogDragDestination : byte {
+        None,
+        Canvas,
+        Hierarchy,
+    };
+    CatalogDragDestination ResolveCatalogDragDestination(Point screen) const;
+    void SetCatalogDragDestination(CatalogDragDestination destination);
+
     UiDesignerSession session_;
 
     UiPanel header_surface_;
@@ -164,6 +172,7 @@ private:
     bool diagnostics_capture_paused_ = false;
     String active_catalog_drag_type_;
     bool catalog_drag_active_ = false;
+    CatalogDragDestination catalog_drag_destination_ = CatalogDragDestination::None;
     bool decorations_visible_ = true;
     bool preview_resize_posted_ = false;
     bool data_projection_refreshing_ = false;
