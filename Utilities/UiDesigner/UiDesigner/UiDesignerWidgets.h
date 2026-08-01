@@ -160,6 +160,7 @@ public:
     typedef UiDesignerHierarchyView CLASSNAME;
 
     UiDesignerHierarchyView();
+    ~UiDesignerHierarchyView();
 
     void SetDocument(const UiDesignerDocument *document);
     void SetSelection(const UiDesignerSelection *selection);
@@ -167,6 +168,9 @@ public:
     void TrackCatalogDrop(const String& type_id, Point screen);
     bool FinishCatalogDrop(const String& type_id, Point screen);
     void CancelCatalogDrop();
+    bool IsNodeDragPollArmed() const { return node_drag_poll_armed_; }
+    int GetNodeDragPollArmCount() const { return node_drag_poll_arm_count_; }
+    bool HasDropTarget() const { return drop_row_ >= 0; }
 
     Function<UiDesignerDropPlan(const Vector<UiDesignerNodeId>&,
                                 UiDesignerNodeId, int)> PlanDrop;
@@ -206,6 +210,7 @@ private:
     void PollNodeDrag();
     bool FinishNodeDrop(Point screen);
     void ResetNodeDrag();
+    void ArmNodeDragPoll();
     void ClearDrop();
 
     const UiDesignerDocument *document_ = nullptr;
@@ -216,6 +221,10 @@ private:
     Point node_drag_start_;
     Vector<UiDesignerNodeId> node_drag_nodes_;
     bool node_dragging_ = false;
+    TimeCallback node_drag_poll_;
+    bool node_drag_poll_armed_ = false;
+    int node_drag_poll_arm_count_ = 0;
+    bool node_drag_cleanup_ = false;
     int drop_row_ = -1;
     int drop_edge_ = 0; // -1 before, 0 inside, +1 after
     String drag_payload_;

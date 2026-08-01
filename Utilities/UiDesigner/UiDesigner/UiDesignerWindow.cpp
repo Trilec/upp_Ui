@@ -938,6 +938,7 @@ void UiDesignerWindow::FinishCatalogDrag(const String& type_id, Point screen)
     SetCatalogDragDestination(destination);
     catalog_drag_active_ = false;
     active_catalog_drag_type_.Clear();
+    catalog_drag_destination_ = CatalogDragDestination::None;
     if(destination == CatalogDragDestination::Hierarchy)
         hierarchy_.FinishCatalogDrop(drag_type, screen);
     else if(destination == CatalogDragDestination::Canvas)

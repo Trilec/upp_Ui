@@ -3,8 +3,6 @@
 
 namespace Upp {
 
-static constexpr int UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID = 102;
-
 Image UiDesignerResolveCatalogIcon(const String& key)
 {
     if(key == "layouts" || key == "spacer") return ICON_DESIGN_LAYOUTS_CATEGORY_48();
@@ -238,6 +236,11 @@ UiDesignerSideColumn::UiDesignerSideColumn()
 UiDesignerHierarchyView::UiDesignerHierarchyView()
 {
     WantFocus();
+}
+
+UiDesignerHierarchyView::~UiDesignerHierarchyView()
+{
+    ResetNodeDrag();
 }
 
 UiDesignerSideColumn& UiDesignerSideColumn::RightColumn(bool on)
@@ -809,8 +812,7 @@ void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
             node_drag_start_ = GetMousePos();
             node_dragging_ = false;
             SetCapture();
-            SetTimeCallback(16, [=] { PollNodeDrag(); },
-                            UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+            ArmNodeDragPoll();
         }
     }
     SetFocus();
@@ -818,13 +820,10 @@ void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
 
 void UiDesignerHierarchyView::LeftUp(Point, dword)
 {
-    const bool was_dragging = node_dragging_;
-    const Point screen = GetMousePos();
-    if(was_dragging)
-        FinishNodeDrop(screen);
-    ResetNodeDrag();
-    if(HasCapture())
-        ReleaseCapture();
+    if(node_dragging_)
+        FinishNodeDrop(GetMousePos());
+    else
+        ResetNodeDrag();
 }
 
 void UiDesignerHierarchyView::LeftDrag(Point, dword)
@@ -940,42 +939,76 @@ void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
 
 void UiDesignerHierarchyView::PollNodeDrag()
 {
+    node_drag_poll_armed_ = false;
+    if(!GetMouseLeft()) {
+        ResetNodeDrag();
+        return;
+    }
     if(node_drag_nodes_.IsEmpty())
         return;
     const Point screen = GetMousePos();
-    MouseMove(screen - GetScreenRect().TopLeft(), K_MOUSELEFT);
+    MouseMove(screen - GetScreenRect().TopLeft(), 0);
     if(!node_drag_nodes_.IsEmpty())
-        SetTimeCallback(16, [=] { PollNodeDrag(); }, UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+        ArmNodeDragPoll();
 }
 
 bool UiDesignerHierarchyView::FinishNodeDrop(Point screen)
 {
-    if(!GetScreenRect().Contains(screen)) {
-        ClearDrop();
+    if(node_drag_cleanup_)
         return false;
+    UiDesignerDropPlan plan;
+    String status;
+    bool execute = false;
+    if(GetScreenRect().Contains(screen)) {
+        UpdateDrop(screen - GetScreenRect().TopLeft(),
+                   UiDesignerNodesDragText(node_drag_nodes_));
+        execute = drop_plan_.valid;
+        status = execute ? drop_plan_.label : drop_plan_.reason;
+        if(execute)
+            plan = pick(drop_plan_);
     }
-    UpdateDrop(screen - GetScreenRect().TopLeft(), UiDesignerNodesDragText(node_drag_nodes_));
-    if(!drop_plan_.valid) {
-        if(WhenDropStatus)
-            WhenDropStatus(drop_plan_.reason);
-        ClearDrop();
-        return false;
-    }
-    String error;
-    const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
-    if(WhenDropStatus)
-        WhenDropStatus(ok ? "Move completed" : error);
+
+    node_drag_cleanup_ = true;
+    node_drag_poll_.Kill();
+    node_drag_poll_armed_ = false;
+    pressed_ = -1;
+    node_drag_nodes_.Clear();
+    node_dragging_ = false;
     ClearDrop();
+    if(HasCapture())
+        ReleaseCapture();
+    node_drag_cleanup_ = false;
+
+    String error;
+    const bool ok = execute && ExecuteDrop && ExecuteDrop(plan, error);
+    if(WhenDropStatus)
+        WhenDropStatus(ok ? "Move completed" : (error.IsEmpty() ? status : error));
     return ok;
 }
 
 void UiDesignerHierarchyView::ResetNodeDrag()
 {
-    KillTimeCallback(UI_DESIGNER_HIERARCHY_DRAG_TIMER_ID);
+    if(node_drag_cleanup_)
+        return;
+    node_drag_cleanup_ = true;
+    node_drag_poll_.Kill();
+    node_drag_poll_armed_ = false;
     pressed_ = -1;
     node_drag_nodes_.Clear();
     node_dragging_ = false;
     ClearDrop();
+    if(HasCapture())
+        ReleaseCapture();
+    node_drag_cleanup_ = false;
+}
+
+void UiDesignerHierarchyView::ArmNodeDragPoll()
+{
+    if(node_drag_poll_armed_ || node_drag_nodes_.IsEmpty())
+        return;
+    node_drag_poll_armed_ = true;
+    node_drag_poll_arm_count_++;
+    node_drag_poll_.KillSet(16, [=] { PollNodeDrag(); });
 }
 
 void UiDesignerHierarchyView::DragEnter()

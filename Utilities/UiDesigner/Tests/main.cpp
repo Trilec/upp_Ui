@@ -2,6 +2,7 @@
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
 #include <Ui/UiAbsoluteLayout.h>
 #include <Ui/UiGridLayout.h>
+#include <Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h>
 
 using namespace Upp;
 
@@ -2184,6 +2185,33 @@ CONSOLE_APP_MAIN
                   lifecycle_grid_items_before && lifecycle_grid_runtime->ValidateItems(),
               "Repeated section add/remove preserves Grid invariants");
     }
+
+    UiDesignerSession drag_session;
+    drag_session.NewDocument("blank");
+    UiDesignerHierarchyView drag_hierarchy;
+    drag_hierarchy.SetRect(0, 0, 320, 200);
+    drag_hierarchy.SetDocument(&drag_session.Document());
+    drag_hierarchy.SetSelection(&drag_session.State().selection);
+    drag_hierarchy.PlanCatalogDrop = [&](const String& type,
+                                         UiDesignerNodeId parent, int index) {
+        return drag_session.Drops().PlanAdd(type, parent, Point(), false, index);
+    };
+    drag_hierarchy.ExecuteDrop = [&](const UiDesignerDropPlan& plan, String& drop_error) {
+        return drag_session.ExecuteDrop(plan, nullptr, drop_error);
+    };
+    drag_hierarchy.Rebuild();
+    drag_hierarchy.CancelMode();
+    drag_hierarchy.CancelMode();
+    Check(!drag_hierarchy.IsNodeDragPollArmed() &&
+              drag_hierarchy.GetNodeDragPollArmCount() == 0,
+          "Hierarchy repeated cancellation leaves no poll armed");
+    drag_hierarchy.TrackCatalogDrop("UiPanel", Point(20, 15));
+    Check(drag_hierarchy.HasDropTarget(),
+          "Hierarchy catalog tracking publishes a target");
+    Check(drag_hierarchy.FinishCatalogDrop("UiPanel", Point(20, 15)) &&
+              !drag_hierarchy.HasDropTarget() &&
+              drag_session.Document().GetCount() == 2,
+          "Hierarchy catalog completion clears its target after one execution");
 
 
     Cout() << "Checks: " << checks << " Fails: " << fails << "\n";

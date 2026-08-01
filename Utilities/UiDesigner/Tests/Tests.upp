@@ -15,6 +15,7 @@ uses
 
 file
     main.cpp,
+    ../UiDesigner/UiDesignerWidgets.cpp,
     README.md;
 
 mainconfig
