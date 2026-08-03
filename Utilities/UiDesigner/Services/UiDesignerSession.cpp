@@ -741,8 +741,11 @@ void UiDesignerSession::RebuildThemeOverrideModel()
         // Inheritance is a source-state flag, not a mixed-value state. A
         // single inherited node still has one concrete effective value.
         property.AddTo(theme_override_model_, value, false);
-        if(PropertyEditorItem *item = theme_override_model_.Find(property.id))
+        if(PropertyEditorItem *item = theme_override_model_.Find(property.id)) {
             item->SetInherited(inherited);
+            item->overrideable = true;
+            item->override_active = !inherited;
+        }
     }
     theme_override_model_.StructureChanged();
     RefreshThemeOverrideVisibility();

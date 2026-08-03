@@ -1,4 +1,5 @@
 #include "PropertyEditor.h"
+#include <Ui/UiIcons.h>
 
 namespace Upp {
 
@@ -25,6 +26,7 @@ static PropertyEditorStyle PeMakeStyle(Color background,
     style.inherited_ink = Blend(text, disabled, 128);
     style.error_ink = Color(190, 48, 48);
     style.divider = Blend(background, text, 40);
+    style.reset_icon = ICON_DESIGN_ARROW_CIRCLE_LEFT_48();
     return style;
 }
 
@@ -414,8 +416,7 @@ Rect PropertyEditor::GetValueRect(int display_index) const
         if(!row.group && row.model_index >= 0)
             item = &(*model_)[row.model_index];
     }
-    if(item && item->resettable)
-        r.right -= style_.reset_width;
+    r.right -= style_.action_width;
 
     r.Deflate(DPI(2), DPI(2));
     return r;
@@ -423,10 +424,14 @@ Rect PropertyEditor::GetValueRect(int display_index) const
 
 int PropertyEditor::GetLabelColumnWidth(const Rect& row) const
 {
-    const int available = max(DPI(60), row.GetWidth() - DPI(80));
+    const int available = max(style_.label_min_width,
+                              row.GetWidth() - style_.action_width);
     if(style_.label_ratio > 0)
-        return min(available, max(DPI(60), available * style_.label_ratio / 100));
-    return min(max(DPI(60), style_.label_width), available);
+        return min(style_.label_max_width,
+                   max(style_.label_min_width,
+                       available * style_.label_ratio / 100));
+    return min(style_.label_max_width,
+               max(style_.label_min_width, style_.label_width));
 }
 
 Rect PropertyEditor::GetResetRect(int display_index) const
@@ -436,6 +441,15 @@ Rect PropertyEditor::GetResetRect(int display_index) const
         return r;
     return Rect(r.right - style_.reset_width, r.top,
                 r.right, r.bottom);
+}
+
+Rect PropertyEditor::GetOverrideRect(int display_index) const
+{
+    Rect r = GetRowRect(display_index);
+    if(r.IsEmpty())
+        return r;
+    const int right = r.right - style_.reset_width - style_.action_gap;
+    return Rect(right - style_.override_width, r.top, right, r.bottom);
 }
 
 int PropertyEditor::FindDisplayRow(Point p) const
@@ -747,6 +761,21 @@ void PropertyEditor::ResetSelected()
     }
 }
 
+void PropertyEditor::ToggleOverride(int display_index)
+{
+    if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
+        return;
+    const DisplayRow& row = rows_[display_index];
+    if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
+        return;
+    PropertyEditorItem& item = (*model_)[row.model_index];
+    if(!item.overrideable || !item.enabled || item.read_only)
+        return;
+    item.override_active = !item.override_active;
+    WhenOverride(item.id, item.override_active);
+    RefreshValue(item.id);
+}
+
 void PropertyEditor::LeftDown(Point p, dword)
 {
     int row = FindDisplayRow(p);
@@ -761,7 +790,11 @@ void PropertyEditor::LeftDown(Point p, dword)
     selected_display_row_ = row;
 
     const PropertyEditorItem& item = (*model_)[rows_[row].model_index];
-    if(item.resettable && GetResetRect(row).Contains(p)) {
+    if(item.overrideable && GetOverrideRect(row).Contains(p)) {
+        ToggleOverride(row);
+        return;
+    }
+    if(item.resettable && !item.overrideable && GetResetRect(row).Contains(p)) {
         ResetSelected();
         return;
     }
@@ -856,7 +889,7 @@ void PropertyEditor::ChildGotFocus()
 }
 
 void PropertyEditor::DrawGroupRow(Draw& w,
-                                  int,
+                                  int display_index,
                                   const DisplayRow& row,
                                   const Rect& r)
 {
@@ -869,6 +902,25 @@ void PropertyEditor::DrawGroupRow(Draw& w,
 
     w.DrawText(r.left + padding, y, mark, font, style_.group_ink);
     w.DrawText(r.left + padding + DPI(16), y, row.group_id, font, style_.group_ink);
+
+    if(style_.show_group_summaries && model_) {
+        int total = 0;
+        int local = 0;
+        for(int i = display_index + 1; i < rows_.GetCount() && rows_[i].group == false; i++) {
+            if(rows_[i].model_index < 0 || rows_[i].model_index >= model_->GetCount())
+                continue;
+            const PropertyEditorItem& item = (*model_)[rows_[i].model_index];
+            total++;
+            if(!item.inherited)
+                local++;
+        }
+        if(total > 0) {
+            const String summary = Format("%d of %d local", local, total);
+            const int summary_width = GetTextSize(summary, font).cx;
+            w.DrawText(r.right - summary_width - padding, y, summary,
+                       StdFont(), style_.inherited_ink);
+        }
+    }
 
     if(style_.show_dividers)
         w.DrawLine(r.left, r.bottom - 1, r.right, r.bottom - 1,
@@ -908,13 +960,32 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
 
     if(item.resettable) {
         Rect reset = GetResetRect(display_index);
-        Color ink = item.inherited ? style_.inherited_ink : style_.value_ink;
-        w.DrawText(reset.left + DPI(6), text_y, "R", font.Bold(), ink);
+        if(!style_.reset_icon.IsEmpty()) {
+            const int size = min(DPI(16), reset.GetHeight() - DPI(6));
+            Rect icon(reset.left + (reset.GetWidth() - size) / 2,
+                     reset.top + (reset.GetHeight() - size) / 2,
+                     size, size);
+            w.DrawImage(icon, style_.reset_icon);
+        }
+    }
+
+    if(item.overrideable) {
+        Rect override = GetOverrideRect(display_index);
+        const Image icon = item.override_active
+            ? ICON_ACTION_CHECK_CIRCLE_48()
+            : ICON_DESIGN_CIRCLE_48();
+        const int size = min(DPI(16), override.GetHeight() - DPI(6));
+        Rect icon_rect(override.left + (override.GetWidth() - size) / 2,
+                       override.top + (override.GetHeight() - size) / 2,
+                       size, size);
+        w.DrawImage(icon_rect, icon);
     }
 
     if(!item.validation_error.IsEmpty()) {
         Rect reset = GetResetRect(display_index);
-        int x = item.resettable ? reset.left - DPI(14) : r.right - DPI(16);
+        int x = item.resettable || item.overrideable
+            ? GetOverrideRect(display_index).left - DPI(14)
+            : r.right - DPI(16);
         w.DrawText(x, text_y, "!", font.Bold(), style_.error_ink);
     }
 

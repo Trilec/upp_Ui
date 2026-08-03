@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <Ui/UiColorPicker.h>
+#include <Ui/UiIcons.h>
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiTheme.h>
@@ -198,7 +199,7 @@ public:
         Add(slider_);
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
-        toggle_.SetText("S");
+        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48()).SetIconSize(DPI(16), DPI(16));
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;
@@ -372,7 +373,7 @@ public:
         Add(slider_);
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
-        toggle_.SetText("S");
+        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48()).SetIconSize(DPI(16), DPI(16));
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;

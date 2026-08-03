@@ -12,7 +12,7 @@ struct UiDesignerDesignMetrics {
     static int FooterHeight()      { return DPI(27); }
     static int RailWidth()         { return DPI(42); }
     static int PanelNormalWidth()  { return DPI(230); }
-    static int PanelMediumWidth()  { return DPI(280); }
+    static int PanelMediumWidth()  { return DPI(304); }
     static int PanelWideWidth()    { return DPI(340); }
     static int CenterToolbarHeight(){ return DPI(42); }
     static int Gap()               { return DPI(8); }

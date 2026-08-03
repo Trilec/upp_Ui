@@ -6,6 +6,7 @@
 #include <Ui/UiAbsoluteLayout.h>
 #include <Ui/UiGridLayout.h>
 #include <Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h>
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 
 using namespace Upp;
 
@@ -76,6 +77,11 @@ CONSOLE_APP_MAIN
               PropertyEditorKindName(PropertyEditorKind::NumericInt) == "NumericInt" &&
               PropertyEditorKindName(PropertyEditorKind::NumericDouble) == "NumericDouble",
           "PropertyEditor exposes palette, file-path and dual numeric editor kinds");
+    const PropertyEditorStyle property_style = PropertyEditorStyle::System();
+    Check(property_style.row_odd != property_style.row_even &&
+              property_style.row_hover != property_style.row_even &&
+              property_style.row_selected != property_style.row_odd,
+          "PropertyEditor row backgrounds remain visually distinguishable");
     RegisterUiDesignerBuiltins(catalog);
 
     String error;
@@ -257,6 +263,8 @@ CONSOLE_APP_MAIN
     Check(panel_override_session.ThemeOverrideModel().Find("face_surface") &&
               panel_override_session.ThemeOverrideModel().Find("face_surface")->value == "UseTheme" &&
               !panel_override_session.ThemeOverrideModel().Find("face_surface")->mixed &&
+              panel_override_session.ThemeOverrideModel().Find("face_surface")->overrideable &&
+              !panel_override_session.ThemeOverrideModel().Find("face_surface")->override_active &&
               panel_override_session.ThemeOverrideModel().Find("face_colors") &&
               !panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
           "Panel Inspector defaults to Use theme without showing Solid-only palette");

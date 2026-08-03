@@ -13,7 +13,7 @@ struct UiDesignerStyleMetrics {
     // The reference shell starts each side column at 250px. The width button
     // changes this fixed column width; the center takes only the remainder.
     static int PanelNormalWidth()      { return DPI(250); }
-    static int PanelMediumWidth()      { return DPI(300); }
+    static int PanelMediumWidth()      { return DPI(324); }
     static int PanelWideWidth()        { return DPI(346); }
     static int DesignerToolbarHeight() { return DPI(63); }
     static int Gap()                   { return DPI(8); }

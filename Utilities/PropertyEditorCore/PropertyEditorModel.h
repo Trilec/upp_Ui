@@ -116,6 +116,8 @@ struct PropertyEditorItem {
     bool inherited = false;
     bool allow_null = false;
     bool show_slider_toggle = false;
+    bool overrideable = false;
+    bool override_active = false;
 
     int indent = 0;
     int color_count = 1;

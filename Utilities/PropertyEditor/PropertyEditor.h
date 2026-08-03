@@ -30,6 +30,7 @@ struct PropertyEditorStyle {
     Color inherited_ink;
     Color error_ink;
     Color divider;
+    Image reset_icon;
 
     int frame_width = 1;
     int row_height = DPI(28);
@@ -38,13 +39,19 @@ struct PropertyEditorStyle {
     int cell_padding = DPI(6);
     int label_width = DPI(170);
     int label_ratio = 40;
+    int label_min_width = DPI(115);
+    int label_max_width = DPI(155);
     int indent_width = DPI(14);
     int reset_width = DPI(22);
+    int override_width = DPI(22);
+    int action_gap = DPI(4);
+    int action_width = DPI(48);
 
     bool show_frame = true;
     bool show_filter = true;
     bool alternate_rows = true;
     bool show_dividers = true;
+    bool show_group_summaries = false;
 
     static PropertyEditorStyle System();
     static PropertyEditorStyle Light();
@@ -105,6 +112,7 @@ public:
     Event<String, Value> WhenPreview;
     Event<String, Value> WhenCommit;
     Event<String> WhenReset;
+    Event<String, bool> WhenOverride;
     Event<String> WhenSelection;
     Event<String> WhenHelp;
 
@@ -124,6 +132,7 @@ private:
     Rect GetValueRect(int display_index) const;
     int GetLabelColumnWidth(const Rect& row) const;
     Rect GetResetRect(int display_index) const;
+    Rect GetOverrideRect(int display_index) const;
 
     int FindDisplayRow(Point p) const;
     int FindDisplayRowByProperty(const String& id) const;
@@ -140,6 +149,7 @@ private:
     void ApplyEditorPreview(const Value& value);
     void ApplyEditorCommit(const Value& value);
     void ResetSelected();
+    void ToggleOverride(int display_index);
 
     void DrawGroupRow(Draw& w, int display_index, const DisplayRow& row,
                       const Rect& r);

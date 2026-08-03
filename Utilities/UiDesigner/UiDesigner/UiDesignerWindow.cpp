@@ -167,6 +167,14 @@ static PropertyEditorStyle UiDesignerInspectorStyle()
 {
     PropertyEditorStyle style = PropertyEditorStyle::System();
     style.filter_height = DPI(72);
+    style.row_odd = Color(250, 249, 247);
+    style.row_even = Color(255, 247, 238);
+    style.row_hover = Color(255, 238, 214);
+    style.row_selected = Color(220, 235, 248);
+    style.group_background = Color(233, 226, 217);
+    style.group_ink = Color(70, 60, 52);
+    style.label_ratio = 38;
+    style.show_group_summaries = true;
     return style;
 }
 
@@ -623,6 +631,15 @@ void UiDesignerWindow::ConnectServices()
     overrides_.WhenReset = [=](const String& id) {
         String error;
         if(!session_.ResetThemeOverride(id, error))
+            RefreshStatus(error);
+    };
+    overrides_.WhenOverride = [=](const String& id, bool active) {
+        String error;
+        const PropertyEditorItem *item = session_.ThemeOverrideModel().Find(id);
+        const bool ok = active && item
+            ? session_.CommitThemeOverride(id, item->value, error)
+            : !active && session_.ResetThemeOverride(id, error);
+        if(!ok)
             RefreshStatus(error);
     };
     theme_inspector_.SetModel(&session_.ThemeModel());
