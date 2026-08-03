@@ -832,6 +832,22 @@ bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
         break;
     }
 
+    case PropertyEditorKind::FillRecipe: {
+        if(!candidate.Is<ValueMap>()) {
+            error = "Expected a fill recipe";
+            return false;
+        }
+        ValueMap recipe = candidate;
+        const String mode = AsString(recipe.GetValue(recipe.Find("mode")));
+        if(mode != "None" && mode != "Solid" &&
+           mode != "QuadGradient" && mode != "Image") {
+            error = "Fill recipe has an invalid mode";
+            return false;
+        }
+        normalized = recipe;
+        break;
+    }
+
     case PropertyEditorKind::FilePath:
         normalized = AsString(candidate);
         break;
@@ -897,6 +913,7 @@ String PropertyEditorKindName(PropertyEditorKind kind)
     case PropertyEditorKind::Choice: return "Choice";
     case PropertyEditorKind::Color: return "Color";
     case PropertyEditorKind::ColorPalette: return "ColorPalette";
+    case PropertyEditorKind::FillRecipe: return "FillRecipe";
     case PropertyEditorKind::FilePath: return "FilePath";
     case PropertyEditorKind::SliderInt: return "SliderInt";
     case PropertyEditorKind::SliderDouble: return "SliderDouble";

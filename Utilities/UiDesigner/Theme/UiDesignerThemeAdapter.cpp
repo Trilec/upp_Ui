@@ -26,6 +26,56 @@
 
 namespace Upp {
 
+bool UiDesignerFillRecipe::IsValid() const
+{
+    return schema == 1 &&
+           (mode == "None" || mode == "Solid" ||
+            mode == "QuadGradient" || mode == "Image") &&
+           tile_size > 0 && blur >= 0 &&
+           (image_mode == "Fit" || image_mode == "Fill");
+}
+
+Value UiDesignerFillRecipe::ToValue() const
+{
+    ValueMap out;
+    out.Set("schema", schema);
+    out.Set("mode", mode);
+    out.Set("solid", solid);
+    out.Set("top_left", top_left);
+    out.Set("top_right", top_right);
+    out.Set("bottom_left", bottom_left);
+    out.Set("bottom_right", bottom_right);
+    out.Set("tile_size", tile_size);
+    out.Set("blur", blur);
+    out.Set("resource_key", resource_key);
+    out.Set("image_mode", image_mode);
+    return out;
+}
+
+UiDesignerFillRecipe UiDesignerFillRecipe::FromValue(const Value& value)
+{
+    UiDesignerFillRecipe out;
+    if(!value.Is<ValueMap>())
+        return out;
+    ValueMap map = value;
+    auto get = [&](const String& key, const Value& fallback) {
+        const int q = map.Find(key);
+        return q >= 0 ? map.GetValue(q) : fallback;
+    };
+    out.schema = (int)get("schema", 1);
+    out.mode = AsString(get("mode", "None"));
+    out.solid = get("solid", Color(128, 128, 128));
+    out.top_left = get("top_left", Color(128, 128, 128));
+    out.top_right = get("top_right", Color(128, 128, 128));
+    out.bottom_left = get("bottom_left", Color(128, 128, 128));
+    out.bottom_right = get("bottom_right", Color(128, 128, 128));
+    out.tile_size = max(1, (int)get("tile_size", 32));
+    out.blur = max(0, (int)get("blur", 0));
+    out.resource_key = AsString(get("resource_key", ""));
+    out.image_mode = AsString(get("image_mode", "Fill"));
+    return out;
+}
+
 UiDesignerSurfaceKind UiDesignerParseSurfaceKind(const Value& value)
 {
     const String name = value;
@@ -2652,9 +2702,7 @@ public:
 };
 
 struct PanelThemeValues {
-    UiDesignerSurfaceKind face_surface = UiDesignerSurfaceKind::UseTheme;
     Color face[4];
-    UiDesignerSurfaceKind frame_surface = UiDesignerSurfaceKind::UseTheme;
     Color frame[4];
     int frame_width;
     int radius;
@@ -2682,81 +2730,100 @@ static PanelThemeValues ResolvePanelThemeValues(UiDesignerRuntimeKind kind, UiRo
     return v;
 }
 
+static UiDesignerFillRecipe MakeSolidFillRecipe(Color color)
+{
+    UiDesignerFillRecipe recipe;
+    recipe.mode = "Solid";
+    recipe.solid = color;
+    recipe.top_left = color;
+    recipe.top_right = color;
+    recipe.bottom_left = color;
+    recipe.bottom_right = color;
+    return recipe;
+}
+
+static int FaceStateIndex(const String& field)
+{
+    if(field == "face.normal") return ST_NORMAL;
+    if(field == "face.hot") return ST_HOT;
+    if(field == "face.pressed") return ST_PRESSED;
+    if(field == "face.disabled") return ST_DISABLED;
+    return -1;
+}
+
+static int FrameStateIndex(const String& field)
+{
+    if(field == "frame.normal") return ST_NORMAL;
+    if(field == "frame.hot") return ST_HOT;
+    if(field == "frame.pressed") return ST_PRESSED;
+    if(field == "frame.disabled") return ST_DISABLED;
+    return -1;
+}
+
+static void ApplyFillRecipe(StyledPalette& palette, int state, const Value& value)
+{
+    if(state < 0 || state >= 4)
+        return;
+    const UiDesignerFillRecipe recipe = UiDesignerFillRecipe::FromValue(value);
+    if(recipe.mode == "Solid")
+        palette.face[state] = UiFill::Solid(recipe.solid);
+    else if(recipe.mode == "QuadGradient")
+        palette.face[state] = UiFill::ImageFill(MakeQuadGradientTile(
+            recipe.tile_size, recipe.top_left, recipe.top_right,
+            recipe.bottom_left, recipe.bottom_right, recipe.blur));
+    else
+        palette.face[state] = UiFill::None();
+}
+
+static void ApplyPanelRecipe(StyledPalette& palette, StyledMetrics& metrics,
+                             const String& field, const Value& value)
+{
+    const int state = FaceStateIndex(field);
+    if(state >= 0) {
+        ApplyFillRecipe(palette, state, value);
+        return;
+    }
+    const int frame_state = FrameStateIndex(field);
+    if(frame_state >= 0 && value.GetType() == COLOR_V) {
+        palette.frame[frame_state] = Color(value);
+        return;
+    }
+    if(field == "frame.style") {
+        const String style = AsString(value);
+        metrics.frame_enabled = style != "None";
+        metrics.dashed = style == "Dashed" || style == "Dotted";
+        return;
+    }
+    if(field == "frame.width") {
+        metrics.frame_width = max(0, (int)value);
+        return;
+    }
+}
+
 static void ApplyPanelThemeField(UiPanel::Style& s, const String& id, const Value& v)
 {
-    if(id == "face_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
-    }
-    else if(id == "frame_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
-    }
-    else if(id == "face_colors" || id == "frame_colors") {
-        if(!v.Is<ValueArray>()) return;
-        ValueArray colors = v;
-        for(int i = 0; i < min(4, colors.GetCount()); i++)
-            if(colors[i].Is<Color>()) {
-                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
-                else s.palette.frame[i] = (Color)colors[i];
-            }
-    }
-    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
-    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    ApplyPanelRecipe(s.palette, s.metrics, id, v);
+    if(id.StartsWith("face.") || id.StartsWith("frame.") || id == "frame.style")
+        return;
+    if(id == "radius") s.metrics.radius = max(0, (int)v);
     else if(id == "transparent") s.transparent = (bool)v;
 }
 
 static void ApplyPanelThemeField(UiGroupPanel::Style& s, const String& id, const Value& v)
 {
-    if(id == "face_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
-    }
-    else if(id == "frame_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
-    }
-    else if(id == "face_colors" || id == "frame_colors") {
-        if(!v.Is<ValueArray>()) return;
-        ValueArray colors = v;
-        for(int i = 0; i < min(4, colors.GetCount()); i++)
-            if(colors[i].Is<Color>()) {
-                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
-                else s.palette.frame[i] = (Color)colors[i];
-            }
-    }
-    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
-    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    ApplyPanelRecipe(s.palette, s.metrics, id, v);
+    if(id.StartsWith("face.") || id.StartsWith("frame.") || id == "frame.style")
+        return;
+    if(id == "radius") s.metrics.radius = max(0, (int)v);
     else if(id == "transparent") s.transparent = (bool)v;
 }
 
 static void ApplyPanelThemeField(UiScrollPanel::Style& s, const String& id, const Value& v)
 {
-    if(id == "face_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
-    }
-    else if(id == "frame_surface") {
-        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
-        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
-        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
-    }
-    else if(id == "face_colors" || id == "frame_colors") {
-        if(!v.Is<ValueArray>()) return;
-        ValueArray colors = v;
-        for(int i = 0; i < min(4, colors.GetCount()); i++)
-            if(colors[i].Is<Color>()) {
-                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
-                else s.palette.frame[i] = (Color)colors[i];
-            }
-    }
-    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
-    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    ApplyPanelRecipe(s.palette, s.metrics, id, v);
+    if(id.StartsWith("face.") || id.StartsWith("frame.") || id == "frame.style")
+        return;
+    if(id == "radius") s.metrics.radius = max(0, (int)v);
     else if(id == "transparent") s.transparent = (bool)v;
 }
 
@@ -2768,62 +2835,91 @@ public:
     void AddThemeOverrides(UiDesignerControlSpec& spec) const override
     {
         PanelThemeValues b = ResolvePanelThemeValues(kind_, UiRole::Standard);
-        AddOverride(spec, "face_surface", "Face", "Surface", PropertyEditorKind::Choice, String("UseTheme"), PropertyImpactPaint | PropertyImpactCode, "face_surface", "Use theme inherits the active theme; None explicitly removes the face.");
-        UiDesignerAddSurfaceChoices(spec.theme_overrides.Top());
-        ValueArray face_colors;
-        for(int i = 0; i < 4; i++) face_colors.Add(b.face[i]);
-        AddOverride(spec, "face_colors", "Face colours", "Face", PropertyEditorKind::ColorPalette,
-                    face_colors, PropertyImpactPaint | PropertyImpactCode, "face_colors");
-        spec.theme_overrides.Top().ColorCount(4).VisibleWhen("face_surface", "Solid");
-        AddOverride(spec, "frame_surface", "Frame", "Surface", PropertyEditorKind::Choice, String("UseTheme"), PropertyImpactPaint | PropertyImpactCode, "frame_surface", "Use theme inherits the active theme; None explicitly removes the frame.");
-        UiDesignerAddSurfaceChoices(spec.theme_overrides.Top(), true);
-        ValueArray frame_colors;
-        for(int i = 0; i < 4; i++) frame_colors.Add(b.frame[i]);
-        AddOverride(spec, "frame_colors", "Frame colours", "Frame", PropertyEditorKind::ColorPalette,
-                    frame_colors, PropertyImpactPaint | PropertyImpactCode, "frame_colors");
-        spec.theme_overrides.Top().ColorCount(4).VisibleWhen("frame_surface", "Solid");
-        AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer, b.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width");
+        static const char *face_ids[] = {
+            "face.normal", "face.hot", "face.pressed", "face.disabled"
+        };
+        static const char *face_labels[] = {
+            "Normal", "Hot", "Pressed", "Disabled"
+        };
+        for(int i = 0; i < 4; i++)
+            AddOverride(spec, face_ids[i], face_labels[i], "Face",
+                        PropertyEditorKind::FillRecipe,
+                        MakeSolidFillRecipe(b.face[i]).ToValue(),
+                        PropertyImpactPaint | PropertyImpactCode, face_ids[i]);
+        AddOverride(spec, "frame.style", "Style", "Frame",
+                    PropertyEditorKind::Choice, "Solid",
+                    PropertyImpactPaint | PropertyImpactCode, "frame.style");
+        spec.theme_overrides.Top().Choice("None", "None")
+            .Choice("Solid", "Solid")
+            .Choice("Dashed", "Dashed")
+            .Choice("Dotted", "Dotted")
+            .Choice("Custom", "Custom");
+        static const char *frame_ids[] = {
+            "frame.normal", "frame.hot", "frame.pressed", "frame.disabled"
+        };
+        for(int i = 0; i < 4; i++)
+            AddOverride(spec, frame_ids[i], face_labels[i], "Frame",
+                        PropertyEditorKind::Color, b.frame[i],
+                        PropertyImpactPaint | PropertyImpactCode, frame_ids[i]);
+        AddOverride(spec, "frame.width", "Width", "Frame",
+                    PropertyEditorKind::NumericInt, b.frame_width,
+                    PropertyImpactPaint | PropertyImpactCode, "frame.width");
+        AddOverride(spec, "skin", "Skin", "Skin",
+                    PropertyEditorKind::Choice, "None",
+                    PropertyImpactPaint | PropertyImpactCode, "skin");
+        spec.theme_overrides.Top().Choice("Image", "Image")
+            .Choice("NineSlice", "Nine-slice");
         AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
         AddOverride(spec, "transparent", "Transparent", "Surface", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
     }
-    bool HasField(const String& id) const override { return id == "face_surface" || id == "frame_surface" || id == "face_colors" || id == "frame_colors" || id == "frame_width" || id == "radius" || id == "transparent"; }
-    bool FieldAffectsLayout(const String& id) const override { return id == "face_surface" || id == "frame_surface" || id == "frame_width" || id == "radius"; }
+    bool HasField(const String& id) const override { return id.StartsWith("face.") || id.StartsWith("frame.") || id == "skin" || id == "radius" || id == "transparent"; }
+    bool FieldAffectsLayout(const String& id) const override { return id.StartsWith("face.") || id == "frame.style" || id == "frame.width" || id == "radius"; }
     Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec, const String& id, const UiDesignerTransientOverlay* overlay) const override
     {
         PanelThemeValues v = ResolvePanelThemeValues(kind_, ParseRole(node.GetProperty("role", "Standard")));
+        const int face_state = FaceStateIndex(id);
+        if(face_state >= 0) {
+            UiDesignerFillRecipe recipe = MakeSolidFillRecipe(v.face[face_state]);
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+                if(p.adapter_field_id == id) {
+                    const int q = node.theme_overrides.Find(p.id);
+                    if(q >= 0 || HasThemeValue(node, overlay, p.id))
+                        return ResolveThemeValue(node, overlay, p.id,
+                            q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
+                }
+            return recipe.ToValue();
+        }
+        const int frame_state = FrameStateIndex(id);
+        if(frame_state >= 0) {
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+                if(p.adapter_field_id == id) {
+                    const int q = node.theme_overrides.Find(p.id);
+                    if(q >= 0 || HasThemeValue(node, overlay, p.id))
+                        return ResolveThemeValue(node, overlay, p.id,
+                            q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
+                }
+            return v.frame[frame_state];
+        }
+        if(id == "frame.style" || id == "frame.width" || id == "skin") {
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+                if(p.adapter_field_id != id)
+                    continue;
+                const int q = node.theme_overrides.Find(p.id);
+                if(q >= 0 || HasThemeValue(node, overlay, p.id))
+                    return ResolveThemeValue(node, overlay, p.id,
+                        q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
+            }
+            if(id == "frame.style") return v.frame_width > 0 ? "Solid" : "None";
+            if(id == "frame.width") return v.frame_width;
+            return "None";
+        }
         for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(p.id);
             if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
             Value x = ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
-            if(p.adapter_field_id == "face_surface") v.face_surface = UiDesignerParseSurfaceKind(x);
-            else if(p.adapter_field_id == "frame_surface") v.frame_surface = UiDesignerParseSurfaceKind(x);
-            else if(p.adapter_field_id == "face_colors" && x.Is<ValueArray>()) {
-                ValueArray colors = x;
-                for(int i = 0; i < min(4, colors.GetCount()); i++)
-                    if(colors[i].Is<Color>()) v.face[i] = (Color)colors[i];
-            }
-            else if(p.adapter_field_id == "frame_colors" && x.Is<ValueArray>()) {
-                ValueArray colors = x;
-                for(int i = 0; i < min(4, colors.GetCount()); i++)
-                    if(colors[i].Is<Color>()) v.frame[i] = (Color)colors[i];
-            }
-            else if(p.adapter_field_id == "frame_width") v.frame_width = (int)x;
-            else if(p.adapter_field_id == "radius") v.radius = (int)x;
+            if(p.adapter_field_id == "radius") v.radius = (int)x;
             else if(p.adapter_field_id == "transparent") v.transparent = (bool)x;
         }
-        if(id == "face_surface") return UiDesignerSurfaceKindName(v.face_surface);
-        if(id == "frame_surface") return UiDesignerSurfaceKindName(v.frame_surface);
-        if(id == "face_colors") {
-            ValueArray colors;
-            for(int i = 0; i < 4; i++) colors.Add(v.face[i]);
-            return colors;
-        }
-        if(id == "frame_colors") {
-            ValueArray colors;
-            for(int i = 0; i < 4; i++) colors.Add(v.frame[i]);
-            return colors;
-        }
-        if(id == "frame_width") return v.frame_width; if(id == "radius") return v.radius;
         if(id == "transparent") return v.transparent; return Value();
     }
     void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
@@ -2834,51 +2930,91 @@ public:
         if(kind_ == UiDesignerRuntimeKind::UiGroupPanel) {
             UiGroupPanel *c = dynamic_cast<UiGroupPanel *>(&ctrl); if(!c) return;
             UiGroupPanel::Style s = UiTheme::ResolveGroupPanel(role);
+            bool face_recipe = false, face_visible = false;
             for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) { if(FaceStateIndex(p.adapter_field_id) >= 0) { face_recipe = true; face_visible |= UiDesignerFillRecipe::FromValue(ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)).mode != "None"; } } }
+            if(face_recipe) s.metrics.face_enabled = face_visible;
             if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
         }
         else if(kind_ == UiDesignerRuntimeKind::UiScrollPanel) {
             UiScrollPanel *c = dynamic_cast<UiScrollPanel *>(&ctrl); if(!c) return;
             UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(role);
+            bool face_recipe = false, face_visible = false;
             for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) { if(FaceStateIndex(p.adapter_field_id) >= 0) { face_recipe = true; face_visible |= UiDesignerFillRecipe::FromValue(ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)).mode != "None"; } } }
+            if(face_recipe) s.metrics.face_enabled = face_visible;
             if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
         }
         else {
             UiPanel *c = dynamic_cast<UiPanel *>(&ctrl); if(!c) return;
             UiPanel::Style s = UiTheme::ResolvePanel(role);
+            bool face_recipe = false, face_visible = false;
             for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) { if(FaceStateIndex(p.adapter_field_id) >= 0) { face_recipe = true; face_visible |= UiDesignerFillRecipe::FromValue(ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)).mode != "None"; } } }
+            if(face_recipe) s.metrics.face_enabled = face_visible;
             if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
         }
     }
     void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override
     {
-        bool authored = false; for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) authored |= node.theme_overrides.Find(p.id) >= 0;
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides)
+            authored |= node.theme_overrides.Find(p.id) >= 0;
         if(!authored) return;
         const char *resolver = kind_ == UiDesignerRuntimeKind::UiGroupPanel ? "UiTheme::ResolveGroupPanel(UiRole::Standard)" : kind_ == UiDesignerRuntimeKind::UiScrollPanel ? "UiTheme::ResolveScrollPanel(UiRole::Standard)" : "UiTheme::ResolvePanel(UiRole::Standard)";
         out << "\t" << node.type << "::Style " << member << "_style = " << resolver << ";\n";
-        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q < 0) continue; const Value v = node.theme_overrides.GetValue(q); const String f = p.adapter_field_id;
-            if(f == "face_surface" && AsString(v) == "None") out << "\t" << member << "_style.metrics.face_enabled = false;\n";
-            else if(f == "face_surface" && AsString(v) == "Solid") out << "\t" << member << "_style.metrics.face_enabled = true;\n";
-            else if(f == "frame_surface" && AsString(v) == "None") out << "\t" << member << "_style.metrics.frame_enabled = false;\n";
-            else if(f == "frame_surface" && (AsString(v) == "Solid" || AsString(v) == "Dashed")) out << "\t" << member << "_style.metrics.frame_enabled = true;\n";
-            else if(f == "face_colors" && v.Is<ValueArray>()) {
-                ValueArray colors = v;
-                static const char *states[] = {"ST_NORMAL", "ST_HOT", "ST_PRESSED", "ST_DISABLED"};
-                for(int i = 0; i < min(4, colors.GetCount()); i++)
-                    if(colors[i].Is<Color>())
-                        out << "\t" << member << "_style.palette.face[" << states[i] << "] = UiFill::Solid(" << EmitValue(colors[i]) << ");\n";
+        static const char *states[] = {"ST_NORMAL", "ST_HOT", "ST_PRESSED", "ST_DISABLED"};
+        bool has_face_visible = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0)
+                continue;
+            const Value v = node.theme_overrides.GetValue(q);
+            const String f = p.adapter_field_id;
+            const int face_state = FaceStateIndex(f);
+            if(face_state >= 0) {
+                UiDesignerFillRecipe recipe = UiDesignerFillRecipe::FromValue(v);
+                has_face_visible |= recipe.mode != "None";
+                if(recipe.mode == "Solid")
+                    out << "\t" << member << "_style.palette.face[" << states[face_state]
+                        << "] = UiFill::Solid(" << EmitValue(recipe.solid) << ");\n";
+                else if(recipe.mode == "QuadGradient")
+                    out << "\t" << member << "_style.palette.face[" << states[face_state]
+                        << "] = UiFill::ImageFill(MakeQuadGradientTile(DPI(" << recipe.tile_size
+                        << "), " << EmitValue(recipe.top_left) << ", "
+                        << EmitValue(recipe.top_right) << ", "
+                        << EmitValue(recipe.bottom_left) << ", "
+                        << EmitValue(recipe.bottom_right) << ", " << recipe.blur << "));\n";
+                else if(recipe.mode == "None")
+                    out << "\t" << member << "_style.palette.face[" << states[face_state]
+                        << "] = UiFill::None();\n";
+                continue;
             }
-            else if(f == "frame_colors" && v.Is<ValueArray>()) {
-                ValueArray colors = v;
-                static const char *states[] = {"ST_NORMAL", "ST_HOT", "ST_PRESSED", "ST_DISABLED"};
-                for(int i = 0; i < min(4, colors.GetCount()); i++)
-                    if(colors[i].Is<Color>())
-                        out << "\t" << member << "_style.palette.frame[" << states[i] << "] = " << EmitValue(colors[i]) << ";\n";
+            const int frame_state = FrameStateIndex(f);
+            if(frame_state >= 0) {
+                out << "\t" << member << "_style.palette.frame[" << states[frame_state]
+                    << "] = " << EmitValue(v) << ";\n";
+                continue;
             }
-            else if(f == "frame_width") out << "\t" << member << "_style.metrics.frame_width = DPI(" << (int)v << ");\n";
-            else if(f == "radius") out << "\t" << member << "_style.metrics.radius = DPI(" << (int)v << ");\n";
-            else if(f == "transparent") out << "\t" << member << "_style.transparent = " << AsString((bool)v) << ";\n";
+            if(f == "frame.style") {
+                const String style = AsString(v);
+                out << "\t" << member << "_style.metrics.frame_enabled = "
+                    << (style == "None" ? "false" : "true") << ";\n";
+                out << "\t" << member << "_style.metrics.dashed = "
+                    << (style == "Dashed" || style == "Dotted" ? "true" : "false") << ";\n";
+                continue;
+            }
+            if(f == "frame.width") {
+                out << "\t" << member << "_style.metrics.frame_width = DPI(" << (int)v << ");\n";
+                continue;
+            }
+            if(f == "radius")
+                out << "\t" << member << "_style.metrics.radius = DPI(" << (int)v << ");\n";
+            else if(f == "transparent")
+                out << "\t" << member << "_style.transparent = " << AsString((bool)v) << ";\n";
         }
+        if(has_face_visible)
+            out << "\t" << member << "_style.metrics.face_enabled = true;\n";
         out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n";
     }
 private:

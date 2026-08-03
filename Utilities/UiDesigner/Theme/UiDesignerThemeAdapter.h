@@ -36,6 +36,24 @@ struct UiDesignerSurfaceRecipe {
     bool IsExplicitlyNone() const { return kind == UiDesignerSurfaceKind::None; }
 };
 
+struct UiDesignerFillRecipe {
+    int schema = 1;
+    String mode = "None";
+    Color solid;
+    Color top_left;
+    Color top_right;
+    Color bottom_left;
+    Color bottom_right;
+    int tile_size = 32;
+    int blur = 0;
+    String resource_key;
+    String image_mode = "Fill";
+
+    bool IsValid() const;
+    Value ToValue() const;
+    static UiDesignerFillRecipe FromValue(const Value& value);
+};
+
 UiDesignerSurfaceKind UiDesignerParseSurfaceKind(const Value& value);
 String UiDesignerSurfaceKindName(UiDesignerSurfaceKind kind);
 void UiDesignerAddSurfaceChoices(UiDesignerThemeOverrideSpec& spec,

@@ -902,6 +902,173 @@ private:
     bool mixed_ = false;
 };
 
+class PropertyFillRecipeValueEditor : public PropertyValueEditor {
+public:
+    PropertyFillRecipeValueEditor()
+    {
+        Add(mode_);
+        mode_.Add("None", "None")
+             .Add("Solid", "Solid")
+             .Add("QuadGradient", "Quad gradient")
+             .Add("Image", "Image");
+        mode_.WhenSelectData = [=](const Value& value) {
+            recipe_.Set("mode", value);
+            UpdateVisible();
+            WhenPreview(recipe_);
+            WhenCommit(recipe_);
+        };
+        for(int i = 0; i < 4; i++) {
+            Add(swatches_[i]);
+            const int index = i;
+            swatches_[i].SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+            swatches_[i].WhenAction = [=] { OpenColorDialog(index); };
+        }
+        Add(image_);
+        image_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        image_.WhenAction = [=] {
+            if(RecipeValue("mode", "None") != "Image")
+                return;
+            WhenCommit(recipe_);
+        };
+    }
+
+    void Configure(const PropertyEditorItem& item) override
+    {
+        enabled_ = item.value_editable && item.enabled && !item.read_only;
+        mode_.Enable(enabled_);
+        for(int i = 0; i < 4; i++)
+            swatches_[i].Enable(enabled_);
+        image_.Enable(enabled_);
+        UpdateVisible();
+    }
+
+    void SetEditorValue(const Value& value, bool mixed) override
+    {
+        mixed_ = mixed;
+        recipe_ = value.Is<ValueMap>() ? (ValueMap)value : ValueMap();
+        if(recipe_.Find("mode") < 0)
+            recipe_.Set("mode", "None");
+        for(int i = 0; i < 4; i++)
+            if(recipe_.Find(Key(i)) < 0)
+                recipe_.Set(Key(i), Color(128, 128, 128));
+        mode_.SetDataSilently(RecipeValue("mode", "None"));
+        UpdateVisible();
+    }
+
+    Value GetEditorValue() const override { return recipe_; }
+
+    void FocusEditor() override { mode_.SetFocus(); }
+
+    void Layout() override
+    {
+        const int mode_width = DPI(92);
+        mode_.SetRect(0, 0, mode_width, GetSize().cy);
+        const String mode = RecipeValue("mode", "None");
+        int x = mode_width + DPI(4);
+        if(mode == "QuadGradient") {
+            const int width = DPI(20);
+            for(int i = 0; i < 4; i++)
+                swatches_[i].SetRect(x + i * (width + DPI(3)), 0,
+                                     width, GetSize().cy);
+        }
+        else if(mode == "Solid") {
+            swatches_[0].SetRect(x, 0, DPI(24), GetSize().cy);
+        }
+        else if(mode == "Image") {
+            image_.SetRect(x, 0, max(DPI(24), GetSize().cx - x), GetSize().cy);
+        }
+    }
+
+private:
+    static String Key(int index)
+    {
+        static const char *keys[] = {
+            "top_left", "top_right", "bottom_left", "bottom_right"
+        };
+        return keys[index];
+    }
+
+    static Image MakeSwatch(Color c)
+    {
+        ImageBuffer ib(Size(DPI(18), DPI(18)));
+        for(int y = 0; y < ib.GetSize().cy; y++) {
+            RGBA *line = ib[y];
+            for(int x = 0; x < ib.GetSize().cx; x++)
+                line[x] = RGBA(c);
+        }
+        return ib;
+    }
+
+    void UpdateVisible()
+    {
+        const String mode = RecipeValue("mode", "None");
+        for(int i = 0; i < 4; i++)
+            swatches_[i].Show(mode == "Solid" && i == 0 ||
+                              mode == "QuadGradient");
+        image_.Show(mode == "Image");
+        if(mode == "Image")
+            image_.SetText(AsString(RecipeValue("resource_key", "Choose image")));
+        for(int i = 0; i < 4; i++)
+            swatches_[i].SetIcon(MakeSwatch(
+                RecipeValue(Key(i), Color(128, 128, 128))));
+        Layout();
+    }
+
+    void OpenColorDialog(int index)
+    {
+        if(!enabled_ || mixed_ || index < 0 || index >= 4)
+            return;
+        ValueMap original = recipe_;
+        Color chosen = RecipeValue(Key(index), Color(128, 128, 128));
+        bool accepted = false;
+        class ColorDialog : public TopWindow {
+        public:
+            UiColorPicker picker;
+            ColorDialog()
+            {
+                Title("Fill colour");
+                Sizeable().Zoomable();
+                SetRect(0, 0, DPI(720), DPI(520));
+                Add(picker.SizePos());
+            }
+        } dlg;
+        dlg.picker.SetColor(chosen);
+        dlg.picker.WhenChanging = [&] {
+            recipe_.Set(Key(index), dlg.picker.GetColor());
+            UpdateVisible();
+            WhenPreview(recipe_);
+        };
+        dlg.picker.WhenAccept = [&] {
+            recipe_.Set(Key(index), dlg.picker.GetColor());
+            accepted = true;
+            dlg.AcceptBreak(IDOK);
+        };
+        dlg.picker.WhenCancel = [&] { dlg.RejectBreak(IDCANCEL); };
+        dlg.CenterOwner();
+        if(dlg.Run() == IDOK && accepted)
+            WhenCommit(recipe_);
+        else {
+            recipe_ = original;
+            UpdateVisible();
+            WhenPreview(recipe_);
+        }
+    }
+
+private:
+    Value RecipeValue(const String& key, const Value& fallback) const
+    {
+        const int q = recipe_.Find(key);
+        return q >= 0 ? recipe_.GetValue(q) : fallback;
+    }
+
+    UiDropdown mode_;
+    UiButton swatches_[4];
+    UiButton image_;
+    ValueMap recipe_;
+    bool enabled_ = true;
+    bool mixed_ = false;
+};
+
 class PropertySliderIntValueEditor : public PropertyValueEditor {
 public:
     PropertySliderIntValueEditor()
@@ -986,7 +1153,6 @@ public:
         edit_.SetSelection();
     }
 
-private:
     UiSlider slider_;
     PropertyCommitIntEdit edit_;
     bool syncing_ = false;
@@ -1339,6 +1505,8 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
         return One<PropertyValueEditor>(new PropertyColorValueEditor);
     case PropertyEditorKind::ColorPalette:
         return One<PropertyValueEditor>(new PropertyColorPaletteValueEditor);
+    case PropertyEditorKind::FillRecipe:
+        return One<PropertyValueEditor>(new PropertyFillRecipeValueEditor);
     case PropertyEditorKind::FilePath:
         return One<PropertyValueEditor>(new PropertyFilePathValueEditor);
     case PropertyEditorKind::SliderInt:

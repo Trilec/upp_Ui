@@ -26,6 +26,7 @@ enum class PropertyEditorKind : byte {
     Choice,
     Color,
     ColorPalette,
+    FillRecipe,
     FilePath,
     SliderInt,
     SliderDouble,

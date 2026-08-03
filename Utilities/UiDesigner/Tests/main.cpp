@@ -230,85 +230,53 @@ CONSOLE_APP_MAIN
           "UiGroupPanel is wired to the typed theme adapter with overrides");
     Check(scroll_panel_theme_spec && scroll_panel_theme_spec->theme_adapter_id == "scroll_panel" && !scroll_panel_theme_spec->theme_overrides.IsEmpty(),
           "UiScrollPanel is wired to the typed theme adapter with overrides");
-    const UiDesignerThemeOverrideSpec* panel_face =
-        panel_theme_spec ? panel_theme_spec->FindThemeOverride("face_surface") : nullptr;
-    const UiDesignerThemeOverrideSpec* panel_frame =
-        panel_theme_spec ? panel_theme_spec->FindThemeOverride("frame_surface") : nullptr;
-    Check(panel_face && panel_face->kind == PropertyEditorKind::Choice &&
-              panel_face->default_value == "UseTheme" &&
-              panel_face->choices.GetCount() == 6,
-          "UiPanel face uses the typed surface selector with Use theme default");
-    Check(panel_frame && panel_frame->kind == PropertyEditorKind::Choice &&
-              panel_frame->default_value == "UseTheme" &&
-              panel_frame->choices.GetCount() == 7,
-          "UiPanel frame uses the typed surface selector with dashed support");
-    Check(panel_theme_spec && panel_theme_spec->FindThemeOverride("face_enabled") == nullptr &&
-              panel_theme_spec->FindThemeOverride("frame_enabled") == nullptr &&
-              panel_theme_spec->FindThemeOverride("face_normal") == nullptr &&
-              panel_theme_spec->FindThemeOverride("face_colors") &&
-              panel_theme_spec->FindThemeOverride("face_colors")->kind ==
-                  PropertyEditorKind::ColorPalette &&
-              panel_theme_spec->FindThemeOverride("face_colors")->color_count == 4 &&
-              panel_theme_spec->FindThemeOverride("face_colors")->visible_when_id ==
-                  "face_surface",
-          "UiPanel removes legacy enable fields and uses one four-state face palette");
-    Check(UiDesignerParseSurfaceKind("UseTheme") == UiDesignerSurfaceKind::UseTheme &&
-              UiDesignerParseSurfaceKind("None") == UiDesignerSurfaceKind::None &&
-              UiDesignerSurfaceKindName(UiDesignerSurfaceKind::Image) == "Image",
-          "surface selector values have stable resolver semantics");
+    const char *face_ids[] = {"face.normal", "face.hot", "face.pressed", "face.disabled"};
+    bool panel_face_rows = panel_theme_spec != nullptr;
+    for(const char *id : face_ids) {
+        const UiDesignerThemeOverrideSpec *row = panel_theme_spec
+            ? panel_theme_spec->FindThemeOverride(id) : nullptr;
+        panel_face_rows &= row && row->kind == PropertyEditorKind::FillRecipe &&
+                           row->default_value.Is<ValueMap>();
+    }
+    Check(panel_face_rows && panel_theme_spec &&
+              panel_theme_spec->FindThemeOverride("face_surface") == nullptr &&
+              panel_theme_spec->FindThemeOverride("face_colors") == nullptr,
+          "UiPanel exposes four independent FillRecipe face states without legacy rows");
+    Check(panel_theme_spec && panel_theme_spec->FindThemeOverride("frame.style") &&
+              panel_theme_spec->FindThemeOverride("frame.width") &&
+              panel_theme_spec->FindThemeOverride("skin") &&
+              panel_theme_spec->FindThemeOverride("frame.normal"),
+          "UiPanel exposes shared frame style, width, per-state colors and separate skin");
     UiDesignerSession panel_override_session;
     const UiDesignerNodeId panel_override_node =
         panel_override_session.AddControl("UiPanel");
     panel_override_session.Select(panel_override_node);
-    Check(panel_override_session.ThemeOverrideModel().Find("face_surface") &&
-              panel_override_session.ThemeOverrideModel().Find("face_surface")->value == "UseTheme" &&
-              !panel_override_session.ThemeOverrideModel().Find("face_surface")->mixed &&
-              panel_override_session.ThemeOverrideModel().Find("face_surface")->overrideable &&
-              !panel_override_session.ThemeOverrideModel().Find("face_surface")->override_active &&
-              panel_override_session.ThemeOverrideModel().Find("face_colors") &&
-              !panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
-          "Panel Inspector defaults to Use theme without showing Solid-only palette");
+    Check(panel_override_session.ThemeOverrideModel().Find("face.normal") &&
+              panel_override_session.ThemeOverrideModel().Find("face.normal")->kind ==
+                  PropertyEditorKind::FillRecipe &&
+              !panel_override_session.ThemeOverrideModel().Find("face.normal")->override_active,
+          "Panel Inspector exposes inherited FillRecipe face state");
     String panel_override_error;
-    Check(panel_override_session.CommitThemeOverride("face_surface", "Solid",
+    ValueMap solid_recipe = panel_override_session.ThemeOverrideModel().Find("face.normal")->value;
+    solid_recipe.Set("mode", "Solid");
+    solid_recipe.Set("solid", Color(12, 34, 56));
+    Check(panel_override_session.CommitThemeOverride("face.normal", solid_recipe,
                                                      panel_override_error),
-          "Panel Face Solid override commits: " + panel_override_error);
-    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
-              panel_override_session.ThemeOverrideModel().Find("face_colors")->visible &&
-              panel_override_session.ThemeOverrideModel().Find("face_colors")->kind ==
-                  PropertyEditorKind::ColorPalette &&
-              panel_override_session.ThemeOverrideModel().Find("face_colors")->color_count == 4,
-          "Panel Inspector exposes one four-swatch face palette for Solid");
-    Check(panel_override_session.ResetThemeOverride("face_surface",
-                                                   panel_override_error),
-          "Panel Face reset returns to theme: " + panel_override_error);
-    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
-              !panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
-          "Panel Inspector hides Solid-only palette after reset");
-    Check(panel_override_session.PreviewThemeOverride("face_surface", "Solid",
-                                                      panel_override_error),
-          "Panel Face preview accepts Solid: " + panel_override_error);
-    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
-              panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
-          "Panel Inspector exposes Solid-only palette during preview");
-    panel_override_session.CancelPreview();
-    Check(panel_override_session.CommitThemeOverride("face_surface", "Solid",
-                                                     panel_override_error),
-          "Panel Face Solid is committed before active-state checks: " +
-              panel_override_error);
+          "Panel Normal FillRecipe override commits: " + panel_override_error);
     UiDesignerNode *panel_override_document_node =
         panel_override_session.Document().Find(panel_override_node);
     Check(panel_override_document_node &&
-              panel_override_document_node->IsThemeOverrideActive("face_surface"),
+              panel_override_document_node->IsThemeOverrideActive("face.normal"),
           "Theme override is active after commit");
-    Check(panel_override_session.SetThemeOverrideActive("face_surface", false,
+    Check(panel_override_session.SetThemeOverrideActive("face.normal", false,
                                                         panel_override_error),
           "Theme override can be deactivated without deleting its value: " +
               panel_override_error);
     panel_override_document_node =
         panel_override_session.Document().Find(panel_override_node);
     Check(panel_override_document_node &&
-              !panel_override_document_node->IsThemeOverrideActive("face_surface") &&
-              panel_override_document_node->theme_override_saved.Find("face_surface") >= 0,
+              !panel_override_document_node->IsThemeOverrideActive("face.normal") &&
+              panel_override_document_node->theme_override_saved.Find("face.normal") >= 0,
           "Inactive theme override retains its saved authored value");
     UiDesignerDocument inactive_roundtrip;
     String inactive_json = UiDesignerSerialize(
@@ -318,19 +286,19 @@ CONSOLE_APP_MAIN
           "Theme override state JSON round-trip succeeds");
     Check(inactive_roundtrip.Find(panel_override_node) &&
               !inactive_roundtrip.Find(panel_override_node)->IsThemeOverrideActive(
-                  "face_surface") &&
+                  "face.normal") &&
               inactive_roundtrip.Find(panel_override_node)->theme_override_saved
                   .GetValue(inactive_roundtrip.Find(panel_override_node)
-                      ->theme_override_saved.Find("face_surface")) == "Solid",
+                      ->theme_override_saved.Find("face.normal")).Is<ValueMap>(),
           "Inactive theme override state and value survive JSON round-trip");
-    Check(panel_override_session.SetThemeOverrideActive("face_surface", true,
+    Check(panel_override_session.SetThemeOverrideActive("face.normal", true,
                                                         panel_override_error) &&
               panel_override_session.Document().GetThemeOverride(
-                  panel_override_node, "face_surface") == "Solid",
+                  panel_override_node, "face.normal").Is<ValueMap>(),
           "Reactivating restores the saved authored value: " +
               panel_override_error + " [" +
               AsString(panel_override_session.Document().GetThemeOverride(
-                  panel_override_node, "face_surface")) + "]");
+                  panel_override_node, "face.normal")) + "]");
     const char *basic_theme_types[] = {"UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiProgressBar", "UiSlider", "UiScrollBar", "UiDropdown"};
     for(const char *type : basic_theme_types) {
         const UiDesignerControlSpec* basic = catalog.Find(type);

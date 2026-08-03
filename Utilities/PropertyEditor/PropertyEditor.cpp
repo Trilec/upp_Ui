@@ -1031,6 +1031,38 @@ void PropertyEditor::DrawValueSummary(Draw& w,
     else if(item.inherited)
         ink = style_.inherited_ink;
 
+    if(item.kind == PropertyEditorKind::FillRecipe &&
+       !item.mixed && item.value.Is<ValueMap>()) {
+        ValueMap recipe = item.value;
+        const int mode_q = recipe.Find("mode");
+        const String mode = mode_q >= 0 ? AsString(recipe.GetValue(mode_q)) : "None";
+        static const char *keys[] = {
+            "top_left", "top_right", "bottom_left", "bottom_right"
+        };
+        const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
+        const int diameter = min(DPI(16), max(0, value_rect.GetHeight() - DPI(8)));
+        int x = value_rect.left;
+        for(int i = 0; i < count; i++) {
+            const int q = recipe.Find(keys[i]);
+            Color color = q >= 0 ? Color(recipe.GetValue(q))
+                                 : Color(128, 128, 128);
+            Rect dot(x, value_rect.top + (value_rect.GetHeight() - diameter) / 2,
+                     x + diameter,
+                     value_rect.top + (value_rect.GetHeight() - diameter) / 2 + diameter);
+            if(!dot.IsEmpty())
+                w.DrawEllipse(dot, color);
+            x += diameter + DPI(4);
+        }
+        if(mode == "Image") {
+            const int q = recipe.Find("resource_key");
+            const String name = q >= 0 ? AsString(recipe.GetValue(q)) : "Choose image";
+            w.DrawText(x, y, name, font, ink);
+        }
+        else if(count == 0)
+            w.DrawText(x, y, mode, font, ink);
+        return;
+    }
+
     if(item.kind == PropertyEditorKind::Color &&
        !item.mixed && item.value.GetType() == COLOR_V) {
         Color color(item.value);
@@ -1072,6 +1104,14 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
             return Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB());
         }
         return "<none>";
+
+    case PropertyEditorKind::FillRecipe:
+        if(item.value.Is<ValueMap>()) {
+            ValueMap recipe = item.value;
+            const int q = recipe.Find("mode");
+            return q >= 0 ? AsString(recipe.GetValue(q)) : "None";
+        }
+        return "None";
 
     case PropertyEditorKind::Multiline:
         return PeFormatMultilineSummary(item.value);
