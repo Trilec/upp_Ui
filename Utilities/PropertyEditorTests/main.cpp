@@ -226,6 +226,60 @@ CONSOLE_APP_MAIN
     Check(!PropertyEditorFactory::Global().Create(missing_custom),
           "missing custom editor returns null");
 
+    PropertyEditorModel override_model;
+    PropertyEditorItem& override_item =
+        override_model.AddChoice("surface", "Surface", "UseTheme", "Surface");
+    override_item.AddChoice("UseTheme", "Use theme")
+                 .AddChoice("Solid", "Solid");
+    override_item.overrideable = true;
+    override_item.override_active = false;
+    override_item.inherited = true;
+    override_item.enabled = true;
+    override_item.value_editable = false;
+    override_model.StructureChanged();
+    Check(override_item.enabled && !override_item.value_editable,
+          "inherited override keeps row action enabled while value editor is locked");
+
+    PropertyEditor override_editor;
+    override_editor.SetRect(0, 0, 320, 160);
+    override_editor.SetModel(&override_model);
+    int override_requests = 0;
+    override_editor.WhenOverride = [&](String id, bool active) {
+        override_requests++;
+        Check(id == "surface" && active,
+              "override request identifies inherited activation");
+        PropertyEditorItem* item = override_model.Find(id);
+        item->override_active = true;
+        item->inherited = false;
+        item->value_editable = true;
+    };
+    Check(override_editor.SelectProperty("surface"),
+          "select inherited override row");
+    override_editor.Key(K_ENTER, 1);
+    Check(override_requests == 1,
+          "Enter requests inherited override activation exactly once");
+    override_editor.Key(K_SPACE, 1);
+    Check(override_requests == 1,
+          "Space opens active value editing without another activation request");
+
+    PropertyEditor mouse_override_editor;
+    mouse_override_editor.SetRect(0, 0, 320, 160);
+    mouse_override_editor.SetModel(&override_model);
+    override_model.Find("surface")->override_active = false;
+    override_model.Find("surface")->inherited = true;
+    override_model.Find("surface")->value_editable = false;
+    int mouse_requests = 0;
+    mouse_override_editor.WhenOverride = [&](String id, bool active) {
+        mouse_requests++;
+        Check(id == "surface" && active,
+              "mouse override request identifies inherited activation");
+    };
+    Check(mouse_override_editor.SelectProperty("surface"),
+          "select inherited row for mouse activation");
+    mouse_override_editor.LeftDown(Point(310, 75), 0);
+    Check(mouse_requests == 1,
+          "mouse circle requests inherited activation exactly once");
+
     Cout() << "PropertyEditorTests: Checks: " << checks
            << " Fails: " << fails << "\n";
 

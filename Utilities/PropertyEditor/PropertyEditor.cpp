@@ -243,6 +243,11 @@ void PropertyEditor::RefreshValue(const String& property_id)
     int display = FindDisplayRowByProperty(property_id);
     if(display >= 0 && display == active_display_row_ && active_editor_) {
         const PropertyEditorItem& item = (*model_)[rows_[display].model_index];
+        if(!item.value_editable || item.read_only) {
+            DeactivateEditor();
+            Refresh();
+            return;
+        }
         syncing_editor_ = true;
         active_editor_->Configure(item);
         active_editor_->SetEditorValue(item.value, item.mixed);
@@ -630,6 +635,12 @@ void PropertyEditor::ActivateRow(int display_index)
         return;
     }
 
+    if(!item.value_editable || item.read_only) {
+        selected_display_row_ = display_index;
+        Refresh();
+        return;
+    }
+
     DeactivateEditor();
     selected_display_row_ = display_index;
     active_display_row_ = display_index;
@@ -850,10 +861,11 @@ bool PropertyEditor::Key(dword key, int count)
         return true;
     }
 
-    if(key == K_ENTER && selected_display_row_ >= 0) {
+    if((key == K_ENTER || key == K_SPACE) && selected_display_row_ >= 0) {
         const DisplayRow& row = rows_[selected_display_row_];
         if(!row.group && row.model_index >= 0 && model_ &&
-           (*model_)[row.model_index].overrideable) {
+           (*model_)[row.model_index].overrideable &&
+           !(*model_)[row.model_index].override_active) {
             ToggleOverride(selected_display_row_);
             return true;
         }
@@ -913,12 +925,12 @@ void PropertyEditor::DrawGroupRow(Draw& w,
     if(style_.show_group_summaries && model_) {
         int total = 0;
         int local = 0;
-        for(int i = display_index + 1; i < rows_.GetCount() && rows_[i].group == false; i++) {
-            if(rows_[i].model_index < 0 || rows_[i].model_index >= model_->GetCount())
+        for(int i = 0; i < model_->GetCount(); i++) {
+            const PropertyEditorItem& item = (*model_)[i];
+            if(!item.overrideable || item.group != row.group_id)
                 continue;
-            const PropertyEditorItem& item = (*model_)[rows_[i].model_index];
             total++;
-            if(!item.inherited)
+            if(item.override_active)
                 local++;
         }
         if(total > 0) {
@@ -1042,7 +1054,7 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
     if(item.mixed)
         return "<multiple values>";
     if(item.inherited)
-        return "<inherited>";
+        return "Using theme";
 
     switch(item.kind) {
     case PropertyEditorKind::Boolean:

@@ -110,6 +110,7 @@ struct PropertyEditorItem {
 
     bool visible = true;
     bool enabled = true;
+    bool value_editable = true;
     bool read_only = false;
     bool resettable = false;
     bool mixed = false;
