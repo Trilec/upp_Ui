@@ -1587,6 +1587,10 @@ void UiDesignerPreviewCanvas::ApplyAllProperties(
         return;
     const UiDesignerThemeAdapter* adapter = UiDesignerGetThemeAdapter(*spec);
     UiDesignerNode effective = node;
+    if(theme_overrides_suppressed_) {
+        effective.theme_overrides.Clear();
+        effective.theme_override_saved.Clear();
+    }
     if(overlay_) {
         const Value canonical_role = node.GetProperty("role", "Standard");
         const Value transient_role = overlay_->Resolve(
@@ -2064,6 +2068,9 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
     UiDesignerNodeId node_id, const String& property, const Value& value,
     UiDesignerTransientValueKind kind)
 {
+    if(kind == UiDesignerTransientValueKind::ThemeOverride &&
+       theme_overrides_suppressed_)
+        return UiDesignerApplyResult::AppliedPaint;
     const int q = FindInstance(node_id);
     const UiDesignerNode* node = document_ ? document_->Find(node_id) : nullptr;
     const UiDesignerControlSpec* spec = node && catalog_ ? catalog_->Find(node->type) : nullptr;

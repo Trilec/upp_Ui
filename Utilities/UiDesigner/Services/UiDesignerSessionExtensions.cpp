@@ -422,6 +422,55 @@ bool UiDesignerSession::CommitThemeOverride(const String& property,
     return true;
 }
 
+bool UiDesignerSession::SetThemeOverrideActive(const String& property,
+                                               bool active,
+                                               String& error)
+{
+    const UiDesignerThemeOverrideSpec *override_spec = nullptr;
+    if(!ThemeOverrideSelectable(*this, property, &override_spec)) {
+        error = "Selection does not support " + property;
+        return false;
+    }
+    if(override_spec->read_only) {
+        error = property + " is read only";
+        return false;
+    }
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    if(!node) {
+        error = "No selected control";
+        return false;
+    }
+    const UiDesignerChangeImpact impact =
+        (UiDesignerChangeImpact)(dword)override_spec->impact;
+    if(active && node->theme_overrides.Find(property) < 0 &&
+       node->theme_override_saved.Find(property) < 0) {
+        const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
+        if(!commands_.SetThemeOverride(node->id, property, seed, impact,
+                                       "Seed theme " + property)) {
+            error = commands_.GetLastError();
+            return false;
+        }
+    }
+    if(!active || node->theme_override_saved.Find(property) >= 0) {
+        if(!commands_.SetThemeOverrideActive(
+               node->id, property, active, impact,
+               active ? "Activate theme " + property
+                      : "Use theme for " + property)) {
+            error = commands_.GetLastError();
+            return false;
+        }
+    }
+    else if(node->theme_overrides.Find(property) < 0) {
+        error = commands_.GetLastError();
+        return false;
+    }
+    overlay_.Remove(node->id, UiDesignerTransientValueKind::ThemeOverride,
+                    property);
+    RebuildThemeOverrideModel();
+    error.Clear();
+    return true;
+}
+
 bool UiDesignerSession::ResetThemeOverride(const String& property, String& error)
 {
     const UiDesignerThemeOverrideSpec *override_spec = nullptr;

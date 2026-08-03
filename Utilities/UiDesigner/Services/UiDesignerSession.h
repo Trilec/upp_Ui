@@ -115,6 +115,8 @@ public:
                               String& error);
     bool CommitThemeOverride(const String& property, const Value& value,
                              String& error);
+    bool SetThemeOverrideActive(const String& property, bool active,
+                                String& error);
     bool ResetThemeOverride(const String& property, String& error);
 
     bool Undo();

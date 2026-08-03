@@ -369,7 +369,7 @@ void UiDesignerWindow::BuildDesigner()
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
                    .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,
                                "Edit the selected control’s data")
-                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_)
+                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
                    .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_panel_,
@@ -379,6 +379,27 @@ void UiDesignerWindow::BuildDesigner()
     inspector_.SetStyle(UiDesignerInspectorStyle());
     behaviors_.SetStyle(UiDesignerInspectorStyle());
     overrides_.SetStyle(UiDesignerInspectorStyle());
+    overrides_shell_.Add(overrides_layout_.SizePos());
+    overrides_layout_.SetDirection(UiDirection::V)
+                    .SetGap(DPI(4), DPI(4))
+                    .SetInset(DPI(4));
+    overrides_visibility_.SetIcon(ICON_ACTION_OUTLINED_VISIBILITY_48())
+                         .SetIconSize(DPI(16), DPI(16))
+                         .Tip("Theme overrides visible in Preview");
+    overrides_layout_.Add(overrides_visibility_).Fixed(DPI(28)).MinCross(DPI(24));
+    overrides_layout_.Add(overrides_).Expand(1);
+    overrides_visibility_.WhenAction = [=] {
+        const bool suppress = !preview_canvas_.AreThemeOverridesSuppressed();
+        preview_canvas_.SetThemeOverridesSuppressed(suppress);
+        overrides_visibility_.SetIcon(suppress
+            ? ICON_ACTION_OUTLINED_VISIBILITY_OFF_48()
+            : ICON_ACTION_OUTLINED_VISIBILITY_48());
+        overrides_visibility_.Tip(suppress
+            ? "Theme overrides suppressed in Preview"
+            : "Theme overrides visible in Preview");
+        RefreshStatus(suppress ? "Theme overrides suppressed in Preview"
+                               : "Theme overrides restored in Preview");
+    };
     data_list_.SetModel(data_model_).SetSelectionMode(UILISTSEL_SINGLE);
     data_editor_.SetStyle(UiDesignerInspectorStyle());
     data_editor_.SetModel(&data_editor_model_);
@@ -635,11 +656,7 @@ void UiDesignerWindow::ConnectServices()
     };
     overrides_.WhenOverride = [=](const String& id, bool active) {
         String error;
-        const PropertyEditorItem *item = session_.ThemeOverrideModel().Find(id);
-        const bool ok = active && item
-            ? session_.CommitThemeOverride(id, item->value, error)
-            : !active && session_.ResetThemeOverride(id, error);
-        if(!ok)
+        if(!session_.SetThemeOverrideActive(id, active, error))
             RefreshStatus(error);
     };
     theme_inspector_.SetModel(&session_.ThemeModel());

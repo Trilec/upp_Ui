@@ -163,6 +163,8 @@ static Value NodeToValue(const UiDesignerNode& node)
         out.Set("data", EncodeDocumentValue(node.data));
     if(!node.theme_overrides.IsEmpty())
         out.Set("theme_overrides", EncodeDocumentValue(node.theme_overrides));
+    if(!node.theme_override_saved.IsEmpty())
+        out.Set("theme_override_saved", EncodeDocumentValue(node.theme_override_saved));
     ValueArray actions;
     for(const UiDesignerActionBinding& binding : node.actions)
         actions.Add(ActionToValue(binding));
@@ -454,6 +456,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             created->theme_overrides = legacy
                 ? ValueMap()
                 : DecodeDocumentMap(UiDesignerMapValue(n, "theme_overrides", ValueMap()));
+            created->theme_override_saved = legacy
+                ? ValueMap()
+                : DecodeDocumentMap(UiDesignerMapValue(n, "theme_override_saved", ValueMap()));
             NormalizeThemeOverrides(created->theme_overrides);
             id_map.Add(old_id, new_id);
             pending_actions.Add(new_id,

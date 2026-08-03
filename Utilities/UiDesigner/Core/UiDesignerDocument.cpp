@@ -49,20 +49,55 @@ Value UiDesignerNode::GetThemeOverride(const String& id,
 void UiDesignerNode::SetThemeOverride(const String& id, const Value& value)
 {
     theme_overrides.Set(id, value);
+    const int saved = theme_override_saved.Find(id);
+    if(saved >= 0)
+        theme_override_saved.Remove(saved);
+}
+
+bool UiDesignerNode::SetThemeOverrideActive(const String& id, bool active)
+{
+    if(active) {
+        if(theme_overrides.Find(id) >= 0)
+            return true;
+        const int saved = theme_override_saved.Find(id);
+        if(saved < 0)
+            return false;
+        theme_overrides.Set(id, theme_override_saved.GetValue(saved));
+        theme_override_saved.Remove(saved);
+    }
+    else {
+        const int active_q = theme_overrides.Find(id);
+        if(active_q < 0)
+            return theme_override_saved.Find(id) >= 0;
+        theme_override_saved.Set(id, theme_overrides.GetValue(active_q));
+        theme_overrides.Remove(active_q);
+    }
+    return true;
+}
+
+bool UiDesignerNode::IsThemeOverrideActive(const String& id) const
+{
+    return theme_overrides.Find(id) >= 0;
 }
 
 bool UiDesignerNode::RemoveThemeOverride(const String& id)
 {
     const int q = theme_overrides.Find(id);
-    if(q < 0)
+    const int saved_q = theme_override_saved.Find(id);
+    if(q < 0 && saved_q < 0)
         return false;
-    theme_overrides.Remove(q);
+    if(q >= 0)
+        theme_overrides.Remove(q);
+    const int remaining_saved_q = theme_override_saved.Find(id);
+    if(remaining_saved_q >= 0)
+        theme_override_saved.Remove(remaining_saved_q);
     return true;
 }
 
 void UiDesignerNode::ClearThemeOverrides()
 {
     theme_overrides.Clear();
+    theme_override_saved.Clear();
 }
 
 int UiDesignerNode::FindAction(const String& event_id) const
@@ -516,6 +551,28 @@ bool UiDesignerDocument::SetThemeOverride(UiDesignerNodeId id,
     return true;
 }
 
+bool UiDesignerDocument::SetThemeOverrideActive(UiDesignerNodeId id,
+                                                const String& property,
+                                                bool active,
+                                                UiDesignerChangeImpact impact)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node || !node->SetThemeOverrideActive(property, active))
+        return false;
+    UiDesignerChangeSet changes;
+    changes.reason = (active ? "Activate theme override " : "Deactivate theme override ")
+        + property;
+    UiDesignerPropertyChange& change = changes.properties.Add();
+    change.node = id;
+    change.property = property;
+    change.old_value = !active;
+    change.new_value = active;
+    change.impact = impact;
+    change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
+    QueueChange(changes);
+    return true;
+}
+
 bool UiDesignerDocument::RemoveThemeOverride(UiDesignerNodeId id,
                                              const String& property,
                                              UiDesignerChangeImpact impact)
@@ -524,9 +581,10 @@ bool UiDesignerDocument::RemoveThemeOverride(UiDesignerNodeId id,
     if(!node)
         return false;
     const Value old = node->GetThemeOverride(property);
-    if(IsNull(old))
+    const int saved_q = node->theme_override_saved.Find(property);
+    if(IsNull(old) && saved_q < 0)
         return true;
-    if(!node->RemoveThemeOverride(property))
+    if(!node->RemoveThemeOverride(property) && saved_q < 0)
         return false;
 
     UiDesignerChangeSet changes;
@@ -548,7 +606,7 @@ bool UiDesignerDocument::ClearThemeOverrides(UiDesignerNodeId id,
     UiDesignerNode* node = Find(id);
     if(!node)
         return false;
-    if(node->theme_overrides.IsEmpty())
+    if(node->theme_overrides.IsEmpty() && node->theme_override_saved.IsEmpty())
         return true;
 
     UiDesignerChangeSet changes;
@@ -558,6 +616,15 @@ bool UiDesignerDocument::ClearThemeOverrides(UiDesignerNodeId id,
         change.node = id;
         change.property = AsString(node->theme_overrides.GetKey(i));
         change.old_value = node->theme_overrides.GetValue(i);
+        change.new_value = Value();
+        change.impact = impact;
+        change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
+    }
+    for(int i = 0; i < node->theme_override_saved.GetCount(); i++) {
+        UiDesignerPropertyChange& change = changes.properties.Add();
+        change.node = id;
+        change.property = AsString(node->theme_override_saved.GetKey(i));
+        change.old_value = node->theme_override_saved.GetValue(i);
         change.new_value = Value();
         change.impact = impact;
         change.kind = UiDesignerPropertyChangeKind::ThemeOverride;

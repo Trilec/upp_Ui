@@ -231,6 +231,37 @@ bool UiDesignerCommandService::SetThemeOverride(
         });
 }
 
+bool UiDesignerCommandService::SetThemeOverrideActive(
+    UiDesignerNodeId node, const String& property, bool active,
+    UiDesignerChangeImpact impact, const String& label)
+{
+    return ApplyAtomic(label.IsEmpty()
+        ? (active ? "Activate theme override " : "Deactivate theme override ") + property
+        : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const UiDesignerNode* found = document_.Find(node);
+            if(!found || (found->theme_overrides.Find(property) < 0 &&
+                          found->theme_override_saved.Find(property) < 0)) {
+                last_error_ = "Unable to change theme override state " + property;
+                return false;
+            }
+            if(found->IsThemeOverrideActive(property) == active)
+                return true;
+            if(!document_.SetThemeOverrideActive(node, property, active, impact)) {
+                last_error_ = "Unable to change theme override state " + property;
+                return false;
+            }
+            UiDesignerPropertyChange& change = aggregate.properties.Add();
+            change.node = node;
+            change.property = property;
+            change.old_value = !active;
+            change.new_value = active;
+            change.impact = impact;
+            change.kind = UiDesignerPropertyChangeKind::ThemeOverride;
+            return true;
+        });
+}
+
 bool UiDesignerCommandService::RemoveThemeOverride(
     UiDesignerNodeId node, const String& property, UiDesignerChangeImpact impact,
     const String& label)

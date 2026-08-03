@@ -291,6 +291,46 @@ CONSOLE_APP_MAIN
               panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
           "Panel Inspector exposes Solid-only palette during preview");
     panel_override_session.CancelPreview();
+    Check(panel_override_session.CommitThemeOverride("face_surface", "Solid",
+                                                     panel_override_error),
+          "Panel Face Solid is committed before active-state checks: " +
+              panel_override_error);
+    UiDesignerNode *panel_override_document_node =
+        panel_override_session.Document().Find(panel_override_node);
+    Check(panel_override_document_node &&
+              panel_override_document_node->IsThemeOverrideActive("face_surface"),
+          "Theme override is active after commit");
+    Check(panel_override_session.SetThemeOverrideActive("face_surface", false,
+                                                        panel_override_error),
+          "Theme override can be deactivated without deleting its value: " +
+              panel_override_error);
+    panel_override_document_node =
+        panel_override_session.Document().Find(panel_override_node);
+    Check(panel_override_document_node &&
+              !panel_override_document_node->IsThemeOverrideActive("face_surface") &&
+              panel_override_document_node->theme_override_saved.Find("face_surface") >= 0,
+          "Inactive theme override retains its saved authored value");
+    UiDesignerDocument inactive_roundtrip;
+    String inactive_json = UiDesignerSerialize(
+        panel_override_session.Document(), false);
+    Check(UiDesignerDeserialize(inactive_json, inactive_roundtrip,
+                                panel_override_error),
+          "Theme override state JSON round-trip succeeds");
+    Check(inactive_roundtrip.Find(panel_override_node) &&
+              !inactive_roundtrip.Find(panel_override_node)->IsThemeOverrideActive(
+                  "face_surface") &&
+              inactive_roundtrip.Find(panel_override_node)->theme_override_saved
+                  .GetValue(inactive_roundtrip.Find(panel_override_node)
+                      ->theme_override_saved.Find("face_surface")) == "Solid",
+          "Inactive theme override state and value survive JSON round-trip");
+    Check(panel_override_session.SetThemeOverrideActive("face_surface", true,
+                                                        panel_override_error) &&
+              panel_override_session.Document().GetThemeOverride(
+                  panel_override_node, "face_surface") == "Solid",
+          "Reactivating restores the saved authored value: " +
+              panel_override_error + " [" +
+              AsString(panel_override_session.Document().GetThemeOverride(
+                  panel_override_node, "face_surface")) + "]");
     const char *basic_theme_types[] = {"UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiProgressBar", "UiSlider", "UiScrollBar", "UiDropdown"};
     for(const char *type : basic_theme_types) {
         const UiDesignerControlSpec* basic = catalog.Find(type);

@@ -291,6 +291,15 @@ public:
     Size GetEffectiveVirtualSize() const;
     void SetCapturePaused(bool on) { capture_paused_ = on; }
     bool IsCapturePaused() const { return capture_paused_; }
+    void SetThemeOverridesSuppressed(bool on) {
+        if(theme_overrides_suppressed_ == on)
+            return;
+        theme_overrides_suppressed_ = on;
+        RebuildDocument();
+    }
+    bool AreThemeOverridesSuppressed() const {
+        return theme_overrides_suppressed_;
+    }
     double GetGridLayoutDurationTotalMs() const;
     double GetBoxLayoutDurationTotalMs() const;
 
@@ -378,6 +387,7 @@ private:
     bool detailed_timing_enabled_ = false;
     bool transient_virtual_size_set_ = false;
     bool capture_paused_ = false;
+    bool theme_overrides_suppressed_ = false;
     Size transient_virtual_size_;
     Color accent_ = Color(37, 99, 235);
 };

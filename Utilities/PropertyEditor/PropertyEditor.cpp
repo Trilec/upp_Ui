@@ -448,7 +448,7 @@ Rect PropertyEditor::GetOverrideRect(int display_index) const
     Rect r = GetRowRect(display_index);
     if(r.IsEmpty())
         return r;
-    const int right = r.right - style_.reset_width - style_.action_gap;
+    const int right = r.right;
     return Rect(right - style_.override_width, r.top, right, r.bottom);
 }
 
@@ -771,9 +771,9 @@ void PropertyEditor::ToggleOverride(int display_index)
     PropertyEditorItem& item = (*model_)[row.model_index];
     if(!item.overrideable || !item.enabled || item.read_only)
         return;
-    item.override_active = !item.override_active;
-    WhenOverride(item.id, item.override_active);
-    RefreshValue(item.id);
+    // The session owns override state. The editor only requests a transition;
+    // the model is refreshed from the command result.
+    WhenOverride(item.id, !item.override_active);
 }
 
 void PropertyEditor::LeftDown(Point p, dword)
@@ -851,12 +851,19 @@ bool PropertyEditor::Key(dword key, int count)
     }
 
     if(key == K_ENTER && selected_display_row_ >= 0) {
+        const DisplayRow& row = rows_[selected_display_row_];
+        if(!row.group && row.model_index >= 0 && model_ &&
+           (*model_)[row.model_index].overrideable) {
+            ToggleOverride(selected_display_row_);
+            return true;
+        }
         ActivateRow(selected_display_row_);
         return true;
     }
 
     if((key == K_DELETE || key == K_BACKSPACE) && GetSelectedProperty()) {
-        ResetSelected();
+        if(!GetSelectedProperty()->overrideable)
+            ResetSelected();
         return true;
     }
 
@@ -958,7 +965,7 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
     if(display_index != active_display_row_ || !active_editor_)
         DrawValueSummary(w, item, value_rect);
 
-    if(item.resettable) {
+    if(item.resettable && !item.overrideable) {
         Rect reset = GetResetRect(display_index);
         if(!style_.reset_icon.IsEmpty()) {
             const int size = min(DPI(16), reset.GetHeight() - DPI(6));

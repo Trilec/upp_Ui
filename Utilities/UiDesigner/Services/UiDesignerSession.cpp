@@ -734,7 +734,7 @@ void UiDesignerSession::RebuildThemeOverrideModel()
 
     for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
         const int q = node->theme_overrides.Find(property.id);
-        const bool inherited = q < 0;
+        const bool inherited = q < 0 || !node->IsThemeOverrideActive(property.id);
         const Value value = inherited
             ? ResolveThemeOverrideValue(*node, property)
             : node->theme_overrides.GetValue(q);
@@ -745,6 +745,7 @@ void UiDesignerSession::RebuildThemeOverrideModel()
             item->SetInherited(inherited);
             item->overrideable = true;
             item->override_active = !inherited;
+            item->enabled = !inherited;
         }
     }
     theme_override_model_.StructureChanged();
@@ -798,10 +799,13 @@ void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& chang
             continue;
         if(PropertyEditorItem *item = theme_override_model_.Find(change.property)) {
             const int q = node->theme_overrides.Find(change.property);
-            const bool inherited = q < 0;
+            const bool inherited = q < 0 ||
+                !node->IsThemeOverrideActive(change.property);
             const Value value = inherited
                 ? ResolveThemeOverrideValue(*node, *override_spec)
                 : node->theme_overrides.GetValue(q);
+            item->override_active = !inherited;
+            item->enabled = !inherited;
             if(item->value != value || item->inherited != inherited) {
                 theme_override_model_.SetValue(change.property, value, false);
                 item->SetInherited(inherited);

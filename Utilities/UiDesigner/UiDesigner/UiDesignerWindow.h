@@ -138,6 +138,9 @@ private:
     PropertyEditor data_editor_;
     PropertyEditorModel data_editor_model_;
     PropertyEditor behaviors_;
+    UiPanel overrides_shell_;
+    UiBoxLayout overrides_layout_;
+    UiToolButton overrides_visibility_;
     PropertyEditor overrides_;
     UiDesignerCodeView code_;
     UiPanel diagnostics_panel_;

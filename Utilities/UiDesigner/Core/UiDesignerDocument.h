@@ -15,13 +15,15 @@ struct UiDesignerNode {
     ValueMap properties;
     ValueMap data;
     ValueMap theme_overrides;
+    ValueMap theme_override_saved;
     Vector<UiDesignerActionBinding> actions;
 
     UiDesignerNode() {}
     UiDesignerNode(const UiDesignerNode& other)
         : id(other.id), parent(other.parent), type(other.type), name(other.name),
           flags(other.flags), properties(other.properties), data(other.data),
-          theme_overrides(other.theme_overrides)
+          theme_overrides(other.theme_overrides),
+          theme_override_saved(other.theme_override_saved)
     {
         children.Append(clone(other.children));
         actions.Append(clone(other.actions));
@@ -33,6 +35,8 @@ struct UiDesignerNode {
     void SetData(const String& id, const Value& value);
     Value GetThemeOverride(const String& id, const Value& fallback = Value()) const;
     void SetThemeOverride(const String& id, const Value& value);
+    bool SetThemeOverrideActive(const String& id, bool active);
+    bool IsThemeOverrideActive(const String& id) const;
     bool RemoveThemeOverride(const String& id);
     void ClearThemeOverrides();
 
@@ -113,6 +117,8 @@ public:
                  UiDesignerChangeImpact impact);
     bool SetThemeOverride(UiDesignerNodeId id, const String& property,
                           const Value& value, UiDesignerChangeImpact impact);
+    bool SetThemeOverrideActive(UiDesignerNodeId id, const String& property,
+                                bool active, UiDesignerChangeImpact impact);
     bool RemoveThemeOverride(UiDesignerNodeId id, const String& property,
                              UiDesignerChangeImpact impact);
     bool ClearThemeOverrides(UiDesignerNodeId id, UiDesignerChangeImpact impact);

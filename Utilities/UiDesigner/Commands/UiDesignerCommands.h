@@ -30,6 +30,9 @@ public:
     bool SetThemeOverride(UiDesignerNodeId node, const String& property,
                           const Value& value, UiDesignerChangeImpact impact,
                           const String& label = String());
+    bool SetThemeOverrideActive(UiDesignerNodeId node, const String& property,
+                                bool active, UiDesignerChangeImpact impact,
+                                const String& label = String());
     bool RemoveThemeOverride(UiDesignerNodeId node, const String& property,
                              UiDesignerChangeImpact impact,
                              const String& label = String());

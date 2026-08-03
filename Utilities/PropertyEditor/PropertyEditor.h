@@ -45,7 +45,7 @@ struct PropertyEditorStyle {
     int reset_width = DPI(22);
     int override_width = DPI(22);
     int action_gap = DPI(4);
-    int action_width = DPI(48);
+    int action_width = DPI(22);
 
     bool show_frame = true;
     bool show_filter = true;
