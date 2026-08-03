@@ -187,6 +187,28 @@ bool UiDesignerCommandService::SetProperty(
         });
 }
 
+bool UiDesignerCommandService::SetData(
+    UiDesignerNodeId node, const String& key, const Value& value,
+    UiDesignerChangeImpact impact, const String& label)
+{
+    return ApplyAtomic(label.IsEmpty() ? "Set data " + key : label,
+        [&](UiDesignerChangeSet& aggregate) {
+            const Value old = document_.GetData(node, key);
+            if(!document_.SetData(node, key, value, impact)) {
+                last_error_ = "Unable to set data " + key;
+                return false;
+            }
+            UiDesignerPropertyChange& change = aggregate.properties.Add();
+            change.node = node;
+            change.property = "data." + key;
+            change.old_value = old;
+            change.new_value = value;
+            change.impact = impact;
+            change.kind = UiDesignerPropertyChangeKind::Normal;
+            return true;
+        });
+}
+
 bool UiDesignerCommandService::SetThemeOverride(
     UiDesignerNodeId node, const String& property, const Value& value,
     UiDesignerChangeImpact impact, const String& label)
@@ -274,15 +296,17 @@ bool UiDesignerCommandService::SetVirtualSize(Size size, const String& label)
 
 UiDesignerNodeId UiDesignerCommandService::AddNode(
     const String& type, const String& name, UiDesignerNodeId parent,
-    dword flags, const ValueMap& defaults, const String& label)
+    dword flags, const ValueMap& defaults, const String& label,
+    const ValueMap& data_defaults)
 {
-    return AddNodeAt(type, name, parent, -1, flags, defaults, label);
+    return AddNodeAt(type, name, parent, -1, flags, defaults, label, 0,
+                     data_defaults);
 }
 
 UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
     const String& type, const String& name, UiDesignerNodeId parent,
     int index, dword flags, const ValueMap& defaults, const String& label,
-    UiDesignerNodeId open_accordion_section)
+    UiDesignerNodeId open_accordion_section, const ValueMap& data_defaults)
 {
     UiDesignerNodeId result = 0;
     const bool ok = ApplyAtomic(label.IsEmpty() ? "Add " + type : label,
@@ -294,6 +318,7 @@ UiDesignerNodeId UiDesignerCommandService::AddNodeAt(
             }
             UiDesignerNode* node = document_.Find(result);
             node->properties = clone(defaults);
+            node->data = clone(data_defaults);
 
             if(open_accordion_section) {
                 UiDesignerNode* section = document_.Find(open_accordion_section);

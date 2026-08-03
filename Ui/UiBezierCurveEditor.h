@@ -63,7 +63,8 @@ public:
     UiBezierCurveEditor();
 
     UiBezierCurveEditor& SetCustomStyle(const Style& s);
-    const Style& GetStyle() const { return style_; }
+    UiBezierCurveEditor& ClearCustomStyle();
+    const Style& GetStyle() const;
 
     UiBezierCurveEditor& SetCurve(const ShadowCurve& c);
     const ShadowCurve&   GetCurve() const { return curve_; }
@@ -97,6 +98,9 @@ private:
     void   UpdateHandle(Point p);
 
     Style       style_;
+    mutable Style themed_style_;
+    mutable uint64 theme_revision_ = 0;
+    bool        has_custom_style_ = false;
     ShadowCurve curve_;
     Handle      selected_ = HANDLE_NONE;
     bool        dragging_ = false;

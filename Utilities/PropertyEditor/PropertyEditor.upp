@@ -2,7 +2,8 @@ uses
     Core,
     Draw,
     Utilities/PropertyEditorCore,
-    Ui;
+    Ui,
+    Ui/UiOsFileDialog;
 
 file
     PropertyValueEditors.h,

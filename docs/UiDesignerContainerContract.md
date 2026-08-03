@@ -12,6 +12,15 @@ the same published rectangles. A container must not escape its assigned cell;
 when an inset cannot fit in a very small cell, its drop body is bounded to the
 outer rectangle rather than becoming an invalid rectangle.
 
+Host controls are content slots, not layout engines. `UiPanel`, `UiGroupPanel`,
+`UiScrollPanel` and `UiTitleCard` accept zero or one direct child. That child may
+be a single control, such as a Button, or a layout such as `UiBoxLayout`,
+`UiGridLayout` or `UiAbsoluteLayout`. Use a layout when the content needs more
+than one descendant. The host supplies its body rectangle and framing or inset;
+the child or layout owns its internal arrangement. A second direct child is
+rejected rather than silently overlapped. `UiAbsoluteLayout` is the freeform
+placement system; putting one inside a host does not make the host freeform.
+
 ## Conformance Matrix
 
 | Control | Sizing class | Direct content contract | Published drop region |
@@ -20,7 +29,7 @@ outer rectangle rather than becoming an invalid rectangle.
 | `UiGridLayout` | Container/layout | ordered grid cells | Grid cell |
 | `UiBoxLayout` | Container/layout | ordered items | Box body/frame/gap |
 | `UiAbsoluteLayout` | Container/layout | positioned children | Layout bounds |
-| `UiPanel` | Container | ordinary direct children | Panel body |
+| `UiPanel` | Container | zero or one direct child | Panel body |
 | `UiGroupPanel` | Container | zero or one direct child | Group body |
 | `UiDirectContentHost` | Container | one direct child | Host body |
 | `UiScrollPanel` | Container | one direct child | Scroll body |

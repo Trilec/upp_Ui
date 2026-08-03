@@ -13,13 +13,14 @@ struct UiDesignerNode {
     dword flags = UiDesignerNodeNone;
     Vector<UiDesignerNodeId> children;
     ValueMap properties;
+    ValueMap data;
     ValueMap theme_overrides;
     Vector<UiDesignerActionBinding> actions;
 
     UiDesignerNode() {}
     UiDesignerNode(const UiDesignerNode& other)
         : id(other.id), parent(other.parent), type(other.type), name(other.name),
-          flags(other.flags), properties(other.properties),
+          flags(other.flags), properties(other.properties), data(other.data),
           theme_overrides(other.theme_overrides)
     {
         children.Append(clone(other.children));
@@ -28,6 +29,8 @@ struct UiDesignerNode {
 
     Value GetProperty(const String& id, const Value& fallback = Value()) const;
     void SetProperty(const String& id, const Value& value);
+    Value GetData(const String& id, const Value& fallback = Value()) const;
+    void SetData(const String& id, const Value& value);
     Value GetThemeOverride(const String& id, const Value& fallback = Value()) const;
     void SetThemeOverride(const String& id, const Value& value);
     bool RemoveThemeOverride(const String& id);
@@ -38,6 +41,25 @@ struct UiDesignerNode {
     UiDesignerActionBinding* GetAction(const String& event_id);
     void SetAction(UiDesignerActionBinding binding);
     bool RemoveAction(const String& event_id);
+};
+
+struct UiDesignerResource : Moveable<UiDesignerResource> {
+    String key;
+    String resource_type;
+    String content_hash;
+    String bytes;
+    String mime;
+    String original_name;
+    ValueMap metadata;
+    int width = 0;
+    int height = 0;
+
+    UiDesignerResource() {}
+    UiDesignerResource(const UiDesignerResource& other)
+        : key(other.key), resource_type(other.resource_type),
+          content_hash(other.content_hash), bytes(other.bytes), mime(other.mime),
+          original_name(other.original_name), metadata(other.metadata),
+          width(other.width), height(other.height) {}
 };
 
 class UiDesignerDocument {
@@ -64,6 +86,17 @@ public:
     String GetDocumentId() const { return document_id_; }
     void SetDocumentId(const String& id) { document_id_ = id; }
 
+    const Vector<UiDesignerResource>& GetResources() const { return resources_; }
+    String AddResource(const String& resource_type, const String& bytes,
+                       const String& mime = String(),
+                       const String& original_name = String(),
+                       int width = 0, int height = 0,
+                       const ValueMap& metadata = ValueMap(),
+                       bool deduplicate = true);
+    bool AddResource(const UiDesignerResource& resource, bool notify = true);
+    bool RemoveResource(const String& key);
+    bool GetResource(const String& key, UiDesignerResource& out) const;
+
     UiDesignerNodeId AddNode(const String& type, const String& name,
                              UiDesignerNodeId parent, dword flags,
                              int index = -1);
@@ -76,6 +109,8 @@ public:
     bool RenameNode(UiDesignerNodeId id, const String& name);
     bool SetProperty(UiDesignerNodeId id, const String& property, const Value& value,
                      UiDesignerChangeImpact impact);
+    bool SetData(UiDesignerNodeId id, const String& key, const Value& value,
+                 UiDesignerChangeImpact impact);
     bool SetThemeOverride(UiDesignerNodeId id, const String& property,
                           const Value& value, UiDesignerChangeImpact impact);
     bool RemoveThemeOverride(UiDesignerNodeId id, const String& property,
@@ -83,6 +118,8 @@ public:
     bool ClearThemeOverrides(UiDesignerNodeId id, UiDesignerChangeImpact impact);
     Value GetProperty(UiDesignerNodeId id, const String& property,
                       const Value& fallback = Value()) const;
+    Value GetData(UiDesignerNodeId id, const String& key,
+                  const Value& fallback = Value()) const;
     Value GetThemeOverride(UiDesignerNodeId id, const String& property,
                            const Value& fallback = Value()) const;
 
@@ -116,6 +153,8 @@ private:
     uint64 revision_ = 0;
     uint64 transaction_sequence_ = 0;
     String document_id_;
+    Vector<UiDesignerResource> resources_;
+    int next_resource_id_ = 1;
 
     int batch_depth_ = 0;
     UiDesignerChangeSet pending_;

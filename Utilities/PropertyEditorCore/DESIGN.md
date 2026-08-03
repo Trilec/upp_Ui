@@ -51,7 +51,14 @@ The property browser does not own the application document, undo stack, selectio
 
 The current API deliberately leaves room for:
 
-- font, file, image, icon and resource editors;
+- `ColorPalette` provides one atomic array of one to four colour swatches.
+- `FilePath` provides an editable path with a standard browse action; the host
+  remains responsible for deciding whether the path is external or a document
+  resource.
+- `SliderInt` and `SliderDouble` are the range-aware numeric editors. They
+  provide both slider manipulation and direct numeric entry; callers should
+  use them when a bounded value benefits from visual adjustment.
+- font, image, icon and resource editors;
 - quaternion and matrix editors;
 - nested object/sub-inspector properties;
 - keyframe and animation indicators;

@@ -595,7 +595,7 @@ void UiDesignerCodeGenerator::EmitSetup(
     }
     if(spec.FindProperty("media_reserve"))
         out << "\t" << member << ".SetMediaReserve("
-            << max(0, (int)Effective("media_reserve", 72)) << ");\n";
+            << max(0, (int)Effective("media_reserve", 10)) << ");\n";
     if(spec.FindProperty("media_min"))
         out << "\t" << member << ".SetMediaMin("
             << max(0, (int)Effective("media_min", 24)) << ");\n";

@@ -11,6 +11,11 @@
 
 namespace Upp {
 
+// Resolves an embedded Designer resource through the normal raster decoder.
+// The document owns the bytes; Preview owns decoding and runtime image use.
+bool UiDesignerLoadResourceImage(const UiDesignerDocument& document,
+                                 const String& resource_key, Image& out);
+
 enum class UiDesignerApplyResult : byte {
     AppliedPaint = 0,
     AppliedControlState,
@@ -357,6 +362,7 @@ private:
     void PaintSemantic(Draw& w, const UiDesignerPreviewInstance& instance,
                        const UiDesignerNode& node) const;
     void ApplyActiveTabProjection();
+    void ApplySelectionProjection();
 
     const UiDesignerCatalog *catalog_ = nullptr;
     const UiDesignerDocument *document_ = nullptr;

@@ -60,9 +60,9 @@ Support controls:
 - Do not restate defaults just because a setter exists. If a call does not materially change behavior, remove it.
 - For UiLabel, remember that metrics.text_font is the actual paint path when metrics.use_text_font is enabled. Setting only style.font can be a no-op.
 - `GetMinSize()` is the stable floor. `GetContentSize()` is the logical child/content extent. Container controls that host children should expose content extent so callers do not hand-measure panels.
-- `UiPanel` reports visible child bounds as content size, but it is still a host surface, not a flow layout. Use `UiBoxLayout` when rows/items need wrapping or responsive sequence layout. Use `UiGridLayout` when children belong to stable row/column cells.
-- `UiGroupPanel` is the titled grouping container. It paints group chrome and hosts one child through `SetContent()`. Put a box/grid layout inside that slot when the grouped body needs arrangement; do not add group chrome to layout engines.
-- `UiScrollPanel`, `UiAccordion`, and other single-content hosts follow the same rule: the host provides chrome, scrolling, or section behavior, while the inserted child or inner layout does the real placement. If you need centering or alignment inside one of these hosts, do it through the host body contract or an internal layout host, not through paint-only offsets.
+- `UiPanel` reports visible child bounds as content size and provides one body slot. It accepts one layout or one control, but it is still a host surface, not a flow or freeform layout. Use `UiBoxLayout` when rows/items need wrapping or responsive sequence layout. Use `UiGridLayout` when children belong to stable row/column cells.
+- `UiGroupPanel` is the titled grouping container. It paints group chrome and hosts one child through `SetContent()`. The child may be a layout or a single control. Put a box/grid layout inside that slot when the grouped body needs arrangement; do not add group chrome to layout engines.
+- `UiScrollPanel`, `UiTitleCard`, `UiAccordion`, and other single-content hosts follow the same rule: the host provides chrome, scrolling, or section behavior, while the inserted child or inner layout does the real placement. A single Button is valid as the direct child. If more content is needed, put a layout inside the host; a second direct child is rejected. If you need centering or alignment inside one of these hosts, do it through the host body contract or an internal layout host, not through paint-only offsets.
 - `UiProgressBar` is a status/control surface, not a layout primitive. Keep its determinate/indeterminate state, orientation, text, and role defaults in the control layer; demos should show the real runtime behavior first, then only minimal overrides.
 - For accordions inside scroll panels, section body heights must be explicit only when a section intentionally contains a bounded viewport. Otherwise, accordion bodies should be able to measure real content through `MeasureHeightForWidth()` / `GetContentSize()`.
 - Use UiLayoutCursor for lightweight shell/manual placement, but keep box/grid layouts for repeated stacked content.
@@ -91,11 +91,11 @@ Use these meanings consistently:
 
 Container rules:
 
-- `UiPanel` is a styled host. It reports visible child bounds through `GetContentSize()`, but it does not arrange children.
-- `UiGroupPanel` is a styled titled host with one content slot. It reports the title/header and body content extent, but it does not arrange multiple body children by itself.
+- `UiPanel` is a styled host with zero or one direct child. It reports visible child bounds through `GetContentSize()`, but it does not arrange children.
+- `UiGroupPanel` is a styled titled host with zero or one direct child in its content slot. It reports the title/header and body content extent, but it does not arrange multiple body children by itself.
 - `UiBoxLayout` and `UiGridLayout` are measured layout engines, but they have different contracts. `UiBoxLayout` owns wrapping/free-form sequence layout. `UiGridLayout` owns stable row/column placement; resizing may change track sizes, but it must not silently move an item to a different logical cell.
-- `UiAbsoluteLayout` reports the union of its exact child rectangles as content/minimum extent. Overlap is permitted and insertion order remains stable; runtime placement does not snap or reflow.
-- `UiScrollPanel` is a bounded viewport. Its `GetContentSize()` is the scrollable document extent, not the viewport height.
+- `UiAbsoluteLayout` reports the union of its exact child rectangles as content/minimum extent. It is the freeform placement system. Overlap is permitted and insertion order remains stable; runtime placement does not snap or reflow.
+- `UiScrollPanel` is a bounded viewport with one direct scroll-content child. Its `GetContentSize()` is the scrollable document extent, not the viewport height.
 - `UiAccordion` should measure real section content through width-aware measurement or `GetContentSize()`. Use explicit section body height only when the section intentionally contains a bounded viewport.
 
 Demo and inspector rules:
@@ -489,6 +489,56 @@ It allows a developer to take the fully resolved control style and modify it loc
 
 This must remain possible, but it must remain the highest-precedence exception layer,
 not the primary authoring model.
+
+### Designer surface overrides
+
+The Designer must describe an appearance override as a choice of source, not as
+an unexplained Boolean followed by a collection of always-visible fields.
+
+The user-facing default is **Use theme**. It means that the control inherits the
+active theme and that no authored surface value is stored for that surface.
+`NoOverride` or `InheritTheme` may be used for the corresponding internal enum,
+but the Inspector label must explain the behavior rather than expose the
+implementation term.
+
+The face and frame are separate override surfaces. Their selectors are
+conditional:
+
+```text
+Face:  Use theme | None | Solid | Gradient | Image | Nine-slice
+Frame: Use theme | None | Solid | Dashed | Gradient | Nine-slice
+```
+
+`None` is different from `Use theme`: it is an explicit authored instruction to
+remove that surface. `Use theme` is inheritance. Selecting a non-default mode
+reveals only the fields required by that mode. Face colors are state-aware, so a
+solid face exposes the normal, hot, pressed, disabled, and other supported state
+values as defined by the control. A gradient uses the same state model with
+gradient parameters. An image uses a resource reference and an image placement
+mode.
+
+Background images are authored resources, not theme identity. A theme may still
+provide an image through its resolved style, but a document-level image chosen
+for one control belongs to the control's authored surface override. Images are
+stored in the Designer resource table and referenced by stable resource key;
+raw filesystem paths and raw image objects must not be serialized into a node.
+
+The shared runtime surface API is `StyledSkin` plus `UiDraw` helpers. The image
+placement contract has two modes:
+
+* **Fill**: scale the image to the complete target rectangle, allowing the
+  aspect ratio to change.
+* **Fit**: preserve the aspect ratio while filling the target rectangle and crop
+  overflow around the centered image.
+
+There is intentionally no third letterbox mode in this contract yet. The public
+names are `UiBackgroundImageMode::Fill` and `UiBackgroundImageMode::Fit`.
+
+The same resolved surface recipe must be consumed by runtime painting, preview,
+selection geometry, serialization, and generated C++. Preview must resolve the
+resource key through the document resource table. Generated packages must carry
+the referenced resource and include the image decoder package required by the
+chosen format, such as `plugin/png` for PNG assets.
 
 ---
 
@@ -1352,10 +1402,11 @@ For inspector-style panes, fixed body height is valid and often preferable.
 
 ### 7. Host panels report child bounds, layouts report flow
 
-`UiPanel` is a styled host, not a layout engine. Its `GetContentSize()` reports
-the bounding extent of visible child controls, including its own styled outer
-metrics. This makes simple panel hosting work correctly in accordions and scroll
-containers.
+`UiPanel` is a styled host with one direct-child slot, not a layout engine. Its
+`GetContentSize()` reports the bounding extent of its visible child, including
+its own styled outer metrics. This makes simple panel hosting work correctly in
+accordions and scroll containers. The one child may be a control or an inner
+layout; use the inner layout when the panel body needs multiple descendants.
 
 Use `UiBoxLayout` when content must be arranged, wrapped, or remeasured as a
 sequence for a new width. Use `UiGridLayout` when content belongs to stable
@@ -1364,6 +1415,7 @@ decide where they should go.
 
 Practical rule:
 - simple painted host: `UiPanel`
+- titled or header-focused single-content host: `UiGroupPanel` or `UiTitleCard`
 - stacked/repeated property rows and responsive wrapping sequences: `UiBoxLayout`
 - stable row/column placement: `UiGridLayout`
 - bounded scrolling viewport: `UiScrollPanel`

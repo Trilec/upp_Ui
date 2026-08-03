@@ -388,6 +388,7 @@ bool UiDesignerSession::PreviewThemeOverride(const String& property,
         item->SetInherited(false);
         theme_override_model_.ValueChanged(property);
     }
+    RefreshThemeOverrideVisibility();
     error.Clear();
     return true;
 }

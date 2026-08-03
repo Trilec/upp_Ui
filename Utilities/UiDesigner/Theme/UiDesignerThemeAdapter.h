@@ -3,13 +3,43 @@
 
 #include <CtrlCore/CtrlCore.h>
 #include <Utilities/UiDesigner/Core/UiDesignerCore.h>
+#include <Ui/UiStyle.h>
 
 namespace Upp {
 
 struct UiDesignerControlSpec;
+struct UiDesignerThemeOverrideSpec;
 struct UiDesignerNode;
 class UiDesignerTransientOverlay;
 enum class UiDesignerRuntimeKind : word;
+
+// User-facing surface choices are intentionally source choices, not Boolean
+// enable flags. UseTheme means inherit the active theme; None is an explicit
+// authored removal. The remaining values select authored surface recipes.
+enum class UiDesignerSurfaceKind : byte {
+    UseTheme,
+    None,
+    Solid,
+    Gradient,
+    Image,
+    NineSlice,
+    Dashed,
+};
+
+struct UiDesignerSurfaceRecipe {
+    UiDesignerSurfaceKind kind = UiDesignerSurfaceKind::UseTheme;
+    Color solid_color;
+    String resource_key;
+    UiBackgroundImageMode image_mode = UiBackgroundImageMode::Fill;
+
+    bool InheritsTheme() const { return kind == UiDesignerSurfaceKind::UseTheme; }
+    bool IsExplicitlyNone() const { return kind == UiDesignerSurfaceKind::None; }
+};
+
+UiDesignerSurfaceKind UiDesignerParseSurfaceKind(const Value& value);
+String UiDesignerSurfaceKindName(UiDesignerSurfaceKind kind);
+void UiDesignerAddSurfaceChoices(UiDesignerThemeOverrideSpec& spec,
+                                 bool include_dashed = false);
 
 class UiDesignerThemeAdapter {
 public:

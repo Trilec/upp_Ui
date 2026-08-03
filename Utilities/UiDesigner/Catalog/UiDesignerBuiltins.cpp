@@ -508,12 +508,12 @@ static void AddTitleCardProperties(UiDesignerControlSpec& spec)
     spec.defaults.Set("media_align_v", "Center");
 
     UiDesignerPropertySpec media_reserve = UiDesignerNumberProperty(
-        "media_reserve", "Media reserve", 72, 0, 1000, 1, PropertyEditorKind::Integer);
+        "media_reserve", "Media reserve", 10, 0, 1000, 1, PropertyEditorKind::Integer);
     media_reserve.group = "Appearance";
     media_reserve.domain = PropertyEditorDomain::Appearance;
     media_reserve.impact = PropertyImpactPaint | PropertyImpactCode;
     spec.properties.Add(media_reserve);
-    spec.defaults.Set("media_reserve", 72);
+    spec.defaults.Set("media_reserve", 10);
 
     UiDesignerPropertySpec media_min = UiDesignerNumberProperty(
         "media_min", "Media min", 24, 0, 1000, 1, PropertyEditorKind::Integer);
@@ -1021,6 +1021,20 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
                 adapter->AddThemeOverrides(s);
         }
+        if(String(c.type) == "UiTab") {
+            s.theme = true;
+            s.theme_adapter_id = "tab";
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
+        }
+        if(String(c.type) == "UiPanel" || String(c.type) == "UiGroupPanel" ||
+           String(c.type) == "UiScrollPanel") {
+            s.theme = true;
+            s.theme_adapter_id = String(c.type) == "UiPanel" ? "panel" :
+                                 String(c.type) == "UiGroupPanel" ? "group_panel" : "scroll_panel";
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
+        }
         if(String(c.type) == "UiScrollPanel" ||
            String(c.type) == "UiDirectContentHost")
             s.child_adapter_id = "single";
@@ -1109,15 +1123,50 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.defaults.Set("checked", false);
             AddEvent(s, "WhenAction", "Changed", "Runs after the checked state changes.");
         }
-        if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton") {
+        if(String(c.type) == "UiButton" || String(c.type) == "UiToolButton" || String(c.type) == "UiSplitButton") {
             AddButtonProperties(s);
             s.theme_adapter_id = String(c.type) == "UiToolButton" ? "tool_button" : "button";
             s.theme = true;
             if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
                 adapter->AddThemeOverrides(s);
-            AddEvent(s, "WhenAction", "Clicked", "Runs when the button is activated.");
+            if(String(c.type) != "UiSplitButton")
+                AddEvent(s, "WhenAction", "Clicked", "Runs when the button is activated.");
             if(String(c.type) == "UiToolButton")
                 s.defaults.Set("icon", "ICON_DESIGN_TUNE_48");
+        }
+        if(String(c.type) == "UiLabel" || String(c.type) == "UiCheckBox" ||
+           String(c.type) == "UiRadioButton" || String(c.type) == "UiToggle" ||
+           String(c.type) == "UiProgressBar" || String(c.type) == "UiSlider" ||
+           String(c.type) == "UiScrollBar" || String(c.type) == "UiDropdown") {
+            s.theme = true;
+            s.theme_adapter_id = String(c.type) == "UiLabel" ? "label" :
+                                 String(c.type) == "UiCheckBox" ? "check" :
+                                 String(c.type) == "UiRadioButton" ? "radio" :
+                                 String(c.type) == "UiToggle" ? "toggle" :
+                                 String(c.type) == "UiProgressBar" ? "progress" :
+                                 String(c.type) == "UiSlider" ? "slider" :
+                                 String(c.type) == "UiScrollBar" ? "scroll_bar" : "dropdown";
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
+        }
+        if(String(c.type) == "UiTree") {
+            ValueMap root;
+            root.Set("text", "Root");
+            ValueArray children;
+            ValueMap first; first.Set("text", "First"); first.Set("key", "first");
+            ValueMap second; second.Set("text", "Second"); second.Set("key", "second");
+            children.Add(first); children.Add(second);
+            root.Set("children", children);
+            s.data_defaults.Set("root", root);
+        }
+        if(String(c.type) == "UiList") {
+            ValueMap root;
+            ValueArray items;
+            ValueMap first; first.Set("text", "First"); first.Set("key", "first");
+            ValueMap second; second.Set("text", "Second"); second.Set("key", "second");
+            items.Add(first); items.Add(second);
+            root.Set("items", items);
+            s.data_defaults.Set("root", root);
         }
         if(String(c.type) == "UiSplitButton") {
             AddEvent(s, "WhenAction", "Primary action", "Runs when the main button is activated.");
@@ -1126,6 +1175,10 @@ static void RegisterNative(UiDesignerCatalog& catalog)
         if(String(c.type) == "UiLineEdit" || String(c.type) == "UiIntEdit" ||
            String(c.type) == "UiFloatEdit" || String(c.type) == "UiPasswordEdit" ||
            String(c.type) == "UiMultiEdit" || String(c.type) == "UiMaskEdit") {
+            s.theme_adapter_id = "edit";
+            s.theme = true;
+            if(const UiDesignerThemeAdapter* adapter = UiDesignerFindThemeAdapter(s.theme_adapter_id))
+                adapter->AddThemeOverrides(s);
             AddEvent(s, "WhenChanging", "Changing", "Runs during interactive editing.");
             AddEvent(s, "WhenAction", "Committed", "Runs when editing is committed.");
         }

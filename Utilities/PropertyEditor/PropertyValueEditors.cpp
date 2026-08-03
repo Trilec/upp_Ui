@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <Ui/UiColorPicker.h>
+#include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiTheme.h>
 
@@ -177,11 +178,7 @@ public:
         syncing_ = false;
     }
 
-    virtual Value GetEditorValue() const override
-    {
-        return edit_.GetData();
-    }
-
+    virtual Value GetEditorValue() const override { return edit_.GetData(); }
     virtual void FocusEditor() override
     {
         edit_.SetFocus();
@@ -191,6 +188,123 @@ public:
 private:
     PropertyCommitIntEdit edit_;
     bool syncing_ = false;
+};
+
+class PropertyNumericIntValueEditor : public PropertyValueEditor {
+public:
+    PropertyNumericIntValueEditor()
+    {
+        Add(edit_);
+        Add(slider_);
+        Add(toggle_);
+        slider_.SetCustomStyle(UiTheme::ResolveSlider());
+        toggle_.SetText("S");
+        toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        toggle_.WhenAction = [=] {
+            slider_mode_ = !slider_mode_;
+            UpdateVisible();
+            FocusEditor();
+        };
+        slider_.WhenChanging = [=] {
+            if(syncing_) return;
+            syncing_ = true;
+            edit_.SetValue((int)slider_.GetValue());
+            syncing_ = false;
+            WhenPreview(edit_.GetData());
+        };
+        slider_.WhenAction = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+        edit_.SetTextAlign(UiAlign::RIGHT);
+        edit_.WhenChange = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
+        };
+        edit_.WhenCommit = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        enabled_ = item.enabled && !item.read_only;
+        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
+                             item.inherited ? "<inherited>" : "");
+        minimum_ = IsNumber(item.minimum) ? (int)item.minimum : INT_MIN;
+        maximum_ = IsNumber(item.maximum) ? (int)item.maximum : INT_MAX;
+        step_ = IsNumber(item.step) ? max(1, (int)item.step) : 1;
+        bounded_ = IsNumber(item.minimum) && IsNumber(item.maximum) && maximum_ > minimum_;
+        edit_.Min(minimum_);
+        edit_.Max(maximum_);
+        edit_.Step(step_);
+        slider_.SetRange(minimum_, maximum_);
+        slider_.SetStep(step_);
+        edit_.Enable(enabled_);
+        slider_.Enable(enabled_);
+        toggle_.Show(item.show_slider_toggle && bounded_);
+        toggle_.Enable(enabled_);
+        slider_mode_ = slider_mode_ && bounded_;
+        UpdateVisible();
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        syncing_ = true;
+        if(mixed || IsNull(value)) {
+            edit_.SetData(String());
+            slider_.SetValue(bounded_ ? minimum_ : 0);
+        }
+        else {
+            edit_.SetValue((int)value);
+            slider_.SetValue((int)value);
+        }
+        syncing_ = false;
+    }
+
+    virtual Value GetEditorValue() const override
+    {
+        return edit_.GetData();
+    }
+
+    virtual void FocusEditor() override
+    {
+        if(slider_mode_)
+            slider_.SetFocus();
+        else {
+            edit_.SetFocus();
+            edit_.SetSelection();
+        }
+    }
+
+    virtual void Layout() override
+    {
+        const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;
+        toggle_.SetRect(max(0, GetSize().cx - toggle_width), 0, toggle_width, GetSize().cy);
+        const int width = max(0, GetSize().cx - toggle_width - DPI(4));
+        edit_.SetRect(0, 0, width, GetSize().cy);
+        slider_.SetRect(0, 0, width, GetSize().cy);
+    }
+
+private:
+    void UpdateVisible()
+    {
+        edit_.Show(!slider_mode_);
+        slider_.Show(slider_mode_ && bounded_);
+        Layout();
+    }
+
+    PropertyCommitIntEdit edit_;
+    UiSlider slider_;
+    UiButton toggle_;
+    bool syncing_ = false;
+    bool enabled_ = true;
+    bool bounded_ = false;
+    bool slider_mode_ = false;
+    int minimum_ = INT_MIN;
+    int maximum_ = INT_MAX;
+    int step_ = 1;
 };
 
 class PropertyDoubleValueEditor : public PropertyValueEditor {
@@ -247,6 +361,124 @@ public:
 private:
     PropertyCommitFloatEdit edit_;
     bool syncing_ = false;
+    int decimals_ = 3;
+};
+
+class PropertyNumericDoubleValueEditor : public PropertyValueEditor {
+public:
+    PropertyNumericDoubleValueEditor()
+    {
+        Add(edit_);
+        Add(slider_);
+        Add(toggle_);
+        slider_.SetCustomStyle(UiTheme::ResolveSlider());
+        toggle_.SetText("S");
+        toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        toggle_.WhenAction = [=] {
+            slider_mode_ = !slider_mode_;
+            UpdateVisible();
+            FocusEditor();
+        };
+        slider_.WhenChanging = [=] {
+            if(syncing_) return;
+            syncing_ = true;
+            edit_.SetValue(slider_.GetValue());
+            syncing_ = false;
+            WhenPreview(edit_.GetData());
+        };
+        slider_.WhenAction = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+        edit_.WhenChange = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
+        };
+        edit_.WhenCommit = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        enabled_ = item.enabled && !item.read_only;
+        decimals_ = max(0, item.decimals);
+        minimum_ = IsNumber(item.minimum) ? (double)item.minimum : 0.0;
+        maximum_ = IsNumber(item.maximum) ? (double)item.maximum : 100.0;
+        step_ = IsNumber(item.step) ? max(0.0, (double)item.step) : 0.0;
+        bounded_ = IsNumber(item.minimum) && IsNumber(item.maximum) && maximum_ > minimum_;
+        slider_mode_ = slider_mode_ && bounded_;
+        if(bounded_) {
+            slider_.SetRange(minimum_, maximum_);
+            slider_.SetStep(step_);
+        }
+        edit_.Min(minimum_);
+        edit_.Max(maximum_);
+        if(step_ > 0) edit_.Step(step_);
+        edit_.Precision(decimals_);
+        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
+                             item.inherited ? "<inherited>" : "");
+        edit_.Enable(enabled_);
+        slider_.Enable(enabled_);
+        toggle_.Show(item.show_slider_toggle && bounded_);
+        toggle_.Enable(enabled_);
+        UpdateVisible();
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        syncing_ = true;
+        if(mixed || IsNull(value)) {
+            edit_.SetData(String());
+            slider_.SetValue(bounded_ ? minimum_ : 0.0);
+        }
+        else {
+            const double v = (double)value;
+            edit_.SetValue(v);
+            slider_.SetValue(v);
+        }
+        syncing_ = false;
+    }
+
+    virtual Value GetEditorValue() const override { return edit_.GetData(); }
+    virtual void FocusEditor() override
+    {
+        if(slider_mode_)
+            slider_.SetFocus();
+        else {
+            edit_.SetFocus();
+            edit_.SetSelection();
+        }
+    }
+
+    virtual void Layout() override
+    {
+        const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;
+        toggle_.SetRect(max(0, GetSize().cx - toggle_width), 0, toggle_width, GetSize().cy);
+        const int width = max(0, GetSize().cx - toggle_width - DPI(4));
+        edit_.SetRect(0, 0, width, GetSize().cy);
+        slider_.SetRect(0, 0, width, GetSize().cy);
+    }
+
+private:
+    void UpdateVisible()
+    {
+        edit_.Show(!slider_mode_);
+        slider_.Show(slider_mode_ && bounded_);
+        Layout();
+    }
+
+    PropertyCommitFloatEdit edit_;
+    UiSlider slider_;
+    UiButton toggle_;
+    bool syncing_ = false;
+    bool enabled_ = true;
+    bool bounded_ = false;
+    bool slider_mode_ = false;
+    double minimum_ = 0.0;
+    double maximum_ = 100.0;
+    double step_ = 0.0;
     int decimals_ = 3;
 };
 
@@ -459,6 +691,214 @@ private:
 
     UiButton button_;
     Value value_;
+};
+
+class PropertyFilePathValueEditor : public PropertyValueEditor {
+public:
+    PropertyFilePathValueEditor()
+    {
+        Add(edit_);
+        Add(browse_);
+        browse_.SetText("...");
+        browse_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        browse_.WhenAction = [=] { Browse(); };
+        edit_.WhenChange = [=] {
+            if(!syncing_)
+                WhenPreview(edit_.GetData());
+        };
+        edit_.WhenCommit = [=] {
+            if(!syncing_)
+                WhenCommit(edit_.GetData());
+        };
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        const bool enabled = item.enabled && !item.read_only;
+        edit_.Enable(enabled);
+        browse_.Enable(enabled);
+        edit_.SetPlaceholder(item.mixed ? "<multiple values>" :
+                             item.inherited ? "<inherited>" : "");
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        syncing_ = true;
+        edit_.SetData(mixed ? Value(String()) : Value(AsString(value)));
+        syncing_ = false;
+    }
+
+    virtual Value GetEditorValue() const override
+    {
+        return edit_.GetData();
+    }
+
+    virtual void FocusEditor() override
+    {
+        edit_.SetFocus();
+        edit_.SetSelection();
+    }
+
+    virtual void Layout() override
+    {
+        const int gap = DPI(4);
+        const int button_width = DPI(30);
+        edit_.SetRect(0, 0, max(0, GetSize().cx - button_width - gap), GetSize().cy);
+        browse_.SetRect(max(0, GetSize().cx - button_width), 0, button_width, GetSize().cy);
+    }
+
+private:
+    void Browse()
+    {
+        const String selected = UiOsFileDialog::SelectOpenFile("Select file", String(), this);
+        if(selected.IsEmpty())
+            return;
+        syncing_ = true;
+        edit_.SetData(selected);
+        syncing_ = false;
+        WhenPreview(selected);
+        WhenCommit(selected);
+    }
+
+    PropertyCommitEdit edit_;
+    UiButton browse_;
+    bool syncing_ = false;
+};
+
+class PropertyColorPaletteValueEditor : public PropertyValueEditor {
+public:
+    PropertyColorPaletteValueEditor()
+    {
+        for(int i = 0; i < 4; i++) {
+            Add(swatches_[i]);
+            swatches_[i].SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+            const int index = i;
+            swatches_[i].WhenAction = [=] { OpenColorDialog(index); };
+        }
+    }
+
+    virtual void Configure(const PropertyEditorItem& item) override
+    {
+        count_ = clamp(item.color_count, 1, 4);
+        enabled_ = item.enabled && !item.read_only;
+        for(int i = 0; i < 4; i++) {
+            swatches_[i].Show(i < count_);
+            swatches_[i].Enable(enabled_ && i < count_);
+        }
+        Layout();
+    }
+
+    virtual void SetEditorValue(const Value& value, bool mixed) override
+    {
+        mixed_ = mixed;
+        value_.Clear();
+        if(!mixed && value.Is<ValueArray>()) {
+            ValueArray colors = value;
+            for(int i = 0; i < count_; i++)
+                value_.Add(i < colors.GetCount() && colors[i].Is<Color>()
+                               ? Value(colors[i]) : Value(Color(128, 128, 128)));
+        }
+        else {
+            for(int i = 0; i < count_; i++)
+                value_.Add(Color(128, 128, 128));
+        }
+        UpdateSwatches();
+    }
+
+    virtual Value GetEditorValue() const override
+    {
+        return mixed_ ? Value(Null) : Value(value_);
+    }
+
+    virtual void FocusEditor() override
+    {
+        if(count_ > 0)
+            swatches_[0].SetFocus();
+    }
+
+    virtual void Layout() override
+    {
+        const int gap = DPI(4);
+        const int width = max(DPI(24), (GetSize().cx - gap * (count_ - 1)) / count_);
+        for(int i = 0; i < count_; i++)
+            swatches_[i].SetRect(i * (width + gap), 0, width, GetSize().cy);
+    }
+
+private:
+    static Image MakeSwatch(Color c)
+    {
+        ImageBuffer ib(Size(DPI(18), DPI(18)));
+        for(int y = 0; y < ib.GetSize().cy; y++) {
+            RGBA *line = ib[y];
+            for(int x = 0; x < ib.GetSize().cx; x++)
+                line[x] = RGBA(c);
+        }
+        return ib;
+    }
+
+    void UpdateSwatches()
+    {
+        for(int i = 0; i < count_; i++) {
+            swatches_[i].SetText(Null);
+            swatches_[i].SetIcon(mixed_ ? Image() : MakeSwatch(Color(value_[i])));
+        }
+    }
+
+    void OpenColorDialog(int index)
+    {
+        if(index < 0 || index >= count_ || mixed_)
+            return;
+        ValueArray original = value_;
+        Color chosen = Color(value_[index]);
+        bool accepted = false;
+
+        class ColorDialog : public TopWindow {
+        public:
+            UiColorPicker picker;
+            ColorDialog()
+            {
+                Title("Color");
+                Sizeable().Zoomable();
+                SetRect(0, 0, DPI(720), DPI(520));
+                Add(picker.SizePos());
+            }
+        } dlg;
+
+        dlg.picker.SetColor(chosen);
+        dlg.picker.WhenChanging = [&] {
+            chosen = dlg.picker.GetColor();
+            value_.At(index) = chosen;
+            UpdateSwatches();
+            WhenPreview(value_);
+        };
+        dlg.picker.WhenAccept = [&] {
+            chosen = dlg.picker.GetColor();
+            value_.At(index) = chosen;
+            accepted = true;
+            dlg.AcceptBreak(IDOK);
+        };
+        dlg.picker.WhenCancel = [&] {
+            accepted = false;
+            dlg.RejectBreak(IDCANCEL);
+        };
+
+        dlg.CenterOwner();
+        if(dlg.Run() == IDOK && accepted) {
+            UpdateSwatches();
+            WhenCommit(value_);
+        }
+        else {
+            value_ = original;
+            UpdateSwatches();
+            WhenPreview(value_);
+        }
+    }
+
+    UiButton swatches_[4];
+    ValueArray value_;
+    int count_ = 1;
+    bool enabled_ = true;
+    bool mixed_ = false;
 };
 
 class PropertySliderIntValueEditor : public PropertyValueEditor {
@@ -886,12 +1326,20 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
         return One<PropertyValueEditor>(new PropertyIntegerValueEditor);
     case PropertyEditorKind::Double:
         return One<PropertyValueEditor>(new PropertyDoubleValueEditor);
+    case PropertyEditorKind::NumericInt:
+        return One<PropertyValueEditor>(new PropertyNumericIntValueEditor);
+    case PropertyEditorKind::NumericDouble:
+        return One<PropertyValueEditor>(new PropertyNumericDoubleValueEditor);
     case PropertyEditorKind::Boolean:
         return One<PropertyValueEditor>(new PropertyBooleanValueEditor);
     case PropertyEditorKind::Choice:
         return One<PropertyValueEditor>(new PropertyChoiceValueEditor);
     case PropertyEditorKind::Color:
         return One<PropertyValueEditor>(new PropertyColorValueEditor);
+    case PropertyEditorKind::ColorPalette:
+        return One<PropertyValueEditor>(new PropertyColorPaletteValueEditor);
+    case PropertyEditorKind::FilePath:
+        return One<PropertyValueEditor>(new PropertyFilePathValueEditor);
     case PropertyEditorKind::SliderInt:
         return One<PropertyValueEditor>(new PropertySliderIntValueEditor);
     case PropertyEditorKind::SliderDouble:

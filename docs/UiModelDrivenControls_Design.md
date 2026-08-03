@@ -178,6 +178,50 @@ Hierarchy tree operations should:
 
 The tree model is a projection. `DesignerModel` remains authoritative.
 
+## Designer Canonical Data Area
+
+Each Designer node may carry an authored `data` map separate from ordinary
+control properties, theme overrides, and event bindings. This map is the
+canonical editable model seed for model-driven controls; runtime models are
+rebuilt from it and must not become the source of truth.
+
+Data changes use the same command and history path as property changes. The
+Designer document serializes the map under the node's `data` member, and
+generated code consumes the canonical data when a control has authored data.
+
+## Appearance And Theme Source
+
+Appearance is a separate authored concern from canonical control data. A
+control's face and frame each use a typed surface recipe. The default recipe is
+shown to users as **Use theme** and means inheritance from the active theme.
+Explicit `None` means that the surface is intentionally absent. `Solid`,
+`Gradient`, `Image`, `Nine-slice`, and `Dashed` are authored choices where the
+surface supports them.
+
+The Designer must preserve this distinction through the document model,
+preview, undo/redo, JSON, and code generation. It must not convert a choice into
+an ordinary string property or apply a temporary paint patch that is lost on a
+preview rebuild. Image choices reference embedded document resources by stable
+key. The resource bytes are serialized once in the resource table and resolved
+by the preview and generated package paths.
+
+Image placement has two names and meanings: `Fill` scales to the target
+rectangle, while `Fit` preserves aspect ratio and crops overflow. No separate
+Designer-only image calculation is permitted; the same resolved `StyledSkin`
+and `UiDraw` path must determine runtime painting and preview geometry.
+
+This source model is intentionally control-adapter-owned. A new control does
+not inherit a universal panel schema by accident: its adapter declares which
+surface recipes it supports, how state values are represented, how resources
+are resolved, and how the effective style is emitted. Shared resolver helpers
+may implement common behavior, but ownership of the contract remains with the
+control adapter.
+
+For `UiTree`, the first canonical shape is a `root` map containing `text`, an
+optional stable `key`/`data` value, and a `children` array of the same shape.
+List, Dropdown, Menu, and Table data schemas will be defined from their
+respective model APIs rather than represented as ad-hoc control properties.
+
 ## Implementation Guidance
 
 1. Add shared request structs where the operation is conceptually shared.

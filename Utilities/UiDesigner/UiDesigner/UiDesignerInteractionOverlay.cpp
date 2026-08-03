@@ -646,7 +646,8 @@ bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Poin
         return false;
     }
     String error;
-    const bool ok = owner_->session_.ExecuteDrop(resolved_drop_.plan, nullptr, error);
+    UiDesignerNodeId created = 0;
+    const bool ok = owner_->session_.ExecuteDrop(resolved_drop_.plan, &created, error);
     if(ok)
         SetDragStatus(resolved_drop_.label + " completed");
     else
@@ -827,7 +828,10 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
         resolved_drop_.reason = "Drop target does not exist";
     }
     else {
+        const UiDesignerGeometryRecord* target_geometry = geometry.Find(region->owner);
         Point position = region->rect.CenterPoint();
+        if(target_geometry && target_node->id != document.GetRootId())
+            position -= target_geometry->rect.TopLeft();
         resolved_drop_.plan = owner_->session_.PlanAddControl(
             type_id, region->owner, position, true,
             region->insertion_index, region->grid_row, region->grid_column);
@@ -835,7 +839,6 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
         resolved_drop_.reason = resolved_drop_.plan.reason;
         if(resolved_drop_.valid) {
             resolved_drop_.plan.label = region->label;
-            const UiDesignerGeometryRecord* target_geometry = geometry.Find(region->owner);
             if(target_geometry && !target_geometry->rect.IsEmpty())
                 resolved_drop_.visual_rect = region->visual_rect.IsEmpty()
                     ? target_geometry->rect

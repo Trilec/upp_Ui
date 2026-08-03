@@ -26,6 +26,7 @@ public:
 
     virtual void Layout() override;
     virtual void Close() override;
+    virtual bool Key(dword key, int count) override;
 
     void ApplyPreviewVirtualSize(const Size& virtual_size);
     void QueuePreviewVirtualSize(const Size& virtual_size,
@@ -176,6 +177,8 @@ private:
     bool decorations_visible_ = true;
     bool preview_resize_posted_ = false;
     bool data_projection_refreshing_ = false;
+    bool data_selection_refreshing_ = false;
+    Value data_selected_token_;
     bool preview_resize_pending_ = false;
     Size pending_preview_virtual_size_;
     Function<void()> pending_preview_resize_callback_;

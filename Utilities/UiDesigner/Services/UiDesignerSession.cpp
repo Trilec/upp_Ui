@@ -179,7 +179,7 @@ void UiDesignerSession::ApplyPresetDialog()
     auto Add = [&](const UiDesignerControlSpec& spec, const String& name,
                    UiDesignerNodeId parent, const String& label_text) {
         return commands_.AddNode(spec.type_id, name, parent, spec.node_flags,
-                                 spec.defaults, label_text);
+                                 spec.defaults, label_text, spec.data_defaults);
     };
 
     const UiDesignerNodeId column = Add(*box, "dialog_column", root,
@@ -410,7 +410,7 @@ UiDesignerNodeId UiDesignerSession::AddControl(const String& type_id,
 
     UiDesignerNodeId id = commands_.AddNode(
         spec->type_id, name, parent, spec->node_flags,
-        spec->defaults, "Add " + spec->display_name);
+        spec->defaults, "Add " + spec->display_name, spec->data_defaults);
     if(id)
         Select(id, false);
     return id;
@@ -738,11 +738,40 @@ void UiDesignerSession::RebuildThemeOverrideModel()
         const Value value = inherited
             ? ResolveThemeOverrideValue(*node, property)
             : node->theme_overrides.GetValue(q);
-        property.AddTo(theme_override_model_, value, inherited);
+        // Inheritance is a source-state flag, not a mixed-value state. A
+        // single inherited node still has one concrete effective value.
+        property.AddTo(theme_override_model_, value, false);
         if(PropertyEditorItem *item = theme_override_model_.Find(property.id))
             item->SetInherited(inherited);
     }
     theme_override_model_.StructureChanged();
+    RefreshThemeOverrideVisibility();
+}
+
+void UiDesignerSession::RefreshThemeOverrideVisibility()
+{
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+    if(!node || !spec || state_.selection.nodes.GetCount() != 1)
+        return;
+
+    bool changed = false;
+    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
+        if(property.visible_when_id.IsEmpty())
+            continue;
+        PropertyEditorItem *item = theme_override_model_.Find(property.id);
+        const PropertyEditorItem *condition =
+            theme_override_model_.Find(property.visible_when_id);
+        if(!item || !condition)
+            continue;
+        const bool visible = condition->value == property.visible_when_value;
+        if(item->visible != visible) {
+            item->visible = visible;
+            changed = true;
+        }
+    }
+    if(changed)
+        theme_override_model_.StructureChanged();
 }
 
 void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& changes)
@@ -777,6 +806,7 @@ void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& chang
             }
         }
     }
+    RefreshThemeOverrideVisibility();
 }
 
 void UiDesignerSession::CancelPreview()
@@ -824,9 +854,14 @@ void UiDesignerSession::CancelPreview()
 bool UiDesignerSession::Undo()
 {
     CancelPreview();
+    const UiDesignerNodeId selected = state_.selection.primary;
+    const UiDesignerNode* selected_node = document_.Find(selected);
+    const UiDesignerNodeId fallback = selected_node ? selected_node->parent : 0;
     const bool ok = commands_.Undo();
     if(ok) {
-        state_.selection.Clear();
+        const UiDesignerNodeId keep = document_.Find(selected) ? selected
+            : document_.Find(fallback) ? fallback : document_.GetRootId();
+        state_.selection.Set(keep);
         if(projection_)
             projection_->RebuildDocument();
         RebuildInspector();
@@ -839,9 +874,14 @@ bool UiDesignerSession::Undo()
 bool UiDesignerSession::Redo()
 {
     CancelPreview();
+    const UiDesignerNodeId selected = state_.selection.primary;
+    const UiDesignerNode* selected_node = document_.Find(selected);
+    const UiDesignerNodeId fallback = selected_node ? selected_node->parent : 0;
     const bool ok = commands_.Redo();
     if(ok) {
-        state_.selection.Clear();
+        const UiDesignerNodeId keep = document_.Find(selected) ? selected
+            : document_.Find(fallback) ? fallback : document_.GetRootId();
+        state_.selection.Set(keep);
         if(projection_)
             projection_->RebuildDocument();
         RebuildInspector();

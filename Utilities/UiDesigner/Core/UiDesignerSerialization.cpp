@@ -76,6 +76,51 @@ static Value ActionToValue(const UiDesignerActionBinding& binding)
     return out;
 }
 
+static Value ResourceToValue(const UiDesignerResource& resource)
+{
+    ValueMap out;
+    out.Set("key", resource.key);
+    out.Set("resource_type", resource.resource_type);
+    out.Set("content_hash", resource.content_hash);
+    out.Set("bytes", Base64Encode(resource.bytes));
+    out.Set("mime", resource.mime);
+    out.Set("original_name", resource.original_name);
+    out.Set("width", resource.width);
+    out.Set("height", resource.height);
+    out.Set("metadata", EncodeDocumentValue(resource.metadata));
+    return out;
+}
+
+static bool ResourceFromValue(const Value& value, UiDesignerResource& resource,
+                              String& error)
+{
+    if(!value.Is<ValueMap>()) {
+        error = "Resource must be an object";
+        return false;
+    }
+    ValueMap map = value;
+    resource.key = UiDesignerMapValue(map, "key", "");
+    resource.resource_type = UiDesignerMapValue(map, "resource_type", "");
+    resource.content_hash = UiDesignerMapValue(map, "content_hash", "");
+    resource.bytes = Base64Decode(UiDesignerMapValue(map, "bytes", ""));
+    resource.mime = UiDesignerMapValue(map, "mime", "");
+    resource.original_name = UiDesignerMapValue(map, "original_name", "");
+    resource.width = (int)UiDesignerMapValue(map, "width", 0);
+    resource.height = (int)UiDesignerMapValue(map, "height", 0);
+    resource.metadata = DecodeDocumentMap(UiDesignerMapValue(map, "metadata", ValueMap()));
+    if(resource.key.IsEmpty() || resource.resource_type.IsEmpty() || resource.bytes.IsEmpty()) {
+        error = "Resource is missing key, type, or bytes";
+        return false;
+    }
+    if(resource.content_hash.IsEmpty())
+        resource.content_hash = SHA256StringS(resource.bytes);
+    if(resource.content_hash != SHA256StringS(resource.bytes)) {
+        error = "Resource content hash does not match bytes for " + resource.key;
+        return false;
+    }
+    return true;
+}
+
 static bool ActionFromValue(const Value& value,
                             UiDesignerActionBinding& binding,
                             String& error)
@@ -114,6 +159,8 @@ static Value NodeToValue(const UiDesignerNode& node)
         children.Add(id);
     out.Set("children", children);
     out.Set("properties", EncodeDocumentValue(node.properties));
+    if(!node.data.IsEmpty())
+        out.Set("data", EncodeDocumentValue(node.data));
     if(!node.theme_overrides.IsEmpty())
         out.Set("theme_overrides", EncodeDocumentValue(node.theme_overrides));
     ValueArray actions;
@@ -140,6 +187,10 @@ Value UiDesignerDocumentToValue(const UiDesignerDocument& document)
     for(const UiDesignerNode& node : document.GetNodes())
         nodes.Add(NodeToValue(node));
     out.Set("nodes", nodes);
+    ValueArray resources;
+    for(const UiDesignerResource& resource : document.GetResources())
+        resources.Add(ResourceToValue(resource));
+    out.Set("resources", resources);
     return out;
 }
 
@@ -397,6 +448,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             }
             UiDesignerNode* created = loaded.Find(new_id);
             created->properties = pick(properties);
+            created->data = legacy
+                ? ValueMap()
+                : DecodeDocumentMap(UiDesignerMapValue(n, "data", ValueMap()));
             created->theme_overrides = legacy
                 ? ValueMap()
                 : DecodeDocumentMap(UiDesignerMapValue(n, "theme_overrides", ValueMap()));
@@ -458,6 +512,17 @@ bool UiDesignerDocumentFromValue(const Value& value, UiDesignerDocument& documen
     if(!legacy)
         loaded.SetDocumentId(UiDesignerMapValue(root, "document_id",
                                                 AsString(Uuid::Create())));
+
+    if(!legacy) {
+        const ValueArray resources =
+            UiDesignerMapValue(root, "resources", ValueArray());
+        for(const Value& item : resources) {
+            UiDesignerResource resource;
+            if(!ResourceFromValue(item, resource, error) ||
+               !loaded.AddResource(resource, false))
+                return false;
+        }
+    }
 
     if(!LoadNodes(nodes, legacy, loaded, error))
         return false;

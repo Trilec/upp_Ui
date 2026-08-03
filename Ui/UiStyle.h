@@ -566,6 +566,11 @@ struct StyledMetrics {
     }
 };
 
+enum class UiBackgroundImageMode : byte {
+    Fill = 0,
+    Fit,
+};
+
 // SKIN: slice is THICKNESS for drawing, content_inset is THICKNESS for geometry.
 // Public API for content_inset: SetInset(...)
 struct StyledSkin {
@@ -573,6 +578,7 @@ struct StyledSkin {
     Rect slice;
     Rect content_inset;
     bool enabled;
+    UiBackgroundImageMode image_mode = UiBackgroundImageMode::Fill;
 
     StyledSkin()
         : slice(0, 0, 0, 0)
@@ -584,7 +590,10 @@ struct StyledSkin {
     {
         // If you need backward style-stream compatibility, keep the old order
         // and append content_inset at the end.
-        s % base % slice % content_inset % enabled;
+        byte mode = (byte)image_mode;
+        s % base % slice % content_inset % enabled % mode;
+        if(s.IsLoading())
+            image_mode = (UiBackgroundImageMode)mode;
     }
 };
 
@@ -1154,6 +1163,34 @@ public:
 
         OnStyleChanged();
         return Self(); 
+    }
+
+    T& SetBackgroundImage(const Image& image,
+                          UiBackgroundImageMode mode = UiBackgroundImageMode::Fill)
+    {
+        StyledSkin& skin = StyledSkinRef();
+        skin.base = image;
+        skin.slice = Rect(0, 0, 0, 0);
+        skin.image_mode = mode;
+        skin.enabled = !IsNull(image);
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& ClearBackgroundImage()
+    {
+        StyledSkin& skin = StyledSkinRef();
+        skin.base = Image();
+        skin.enabled = false;
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& SetBackgroundImageMode(UiBackgroundImageMode mode)
+    {
+        StyledSkinRef().image_mode = mode;
+        OnStyleChanged();
+        return Self();
     }
 
     // Metrics

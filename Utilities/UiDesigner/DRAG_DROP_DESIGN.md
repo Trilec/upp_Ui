@@ -116,7 +116,8 @@ Compatibility comes from the catalog and document validator, including:
 
 ## Placement modes
 
-- Root/freeform containers: snapped x/y coordinates are written as one transaction.
+- Window/root positioned content: snapped x/y coordinates are written as one transaction.
+- `UiAbsoluteLayout`: exact local child rectangles are authored here; this is the freeform placement system. Host controls such as Panel and GroupPanel are not freeform layout engines.
 - BoxLayout: semantic insertion index; child geometry is not authoritative.
 - GridLayout: row/column are calculated from the target cell and written in the same transaction.
 - Stack/Tab/Accordion: semantic page or section order.

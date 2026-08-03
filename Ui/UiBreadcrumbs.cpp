@@ -28,6 +28,19 @@ const UiBreadcrumbs::Style& UiBreadcrumbs::StyleDefault()
     return s;
 }
 
+UiBreadcrumbs::Style UiBreadcrumbs::ResolveThemeStyle()
+{
+    UiThemeContext ctx = UiTheme::GetContext();
+    Style s = StyleDefault();
+    UiThemeDetail::MinimalRoleColors shell = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Subtle);
+    for(int i = 0; i < 4; i++) {
+        s.palette.face[i] = UiFill::Solid(shell.face);
+        s.palette.frame[i] = shell.frame;
+    }
+    ResolveRoleStyle(s, ctx.mode);
+    return s;
+}
+
 UiBreadcrumbs::UiBreadcrumbs()
     : style_(StyleDefault())
     , themed_style_(StyleDefault())
@@ -60,14 +73,7 @@ void UiBreadcrumbs::SyncThemeStyle()
     if(theme_revision_ == rev)
         return;
 
-    UiThemeContext ctx = UiTheme::GetContext();
-    themed_style_ = StyleDefault();
-    UiThemeDetail::MinimalRoleColors shell = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Subtle);
-    for(int i = 0; i < 4; i++) {
-        themed_style_.palette.face[i] = UiFill::Solid(shell.face);
-        themed_style_.palette.frame[i] = shell.frame;
-    }
-    ResolveRoleStyle(themed_style_, ctx.mode);
+    themed_style_ = ResolveThemeStyle();
     theme_revision_ = rev;
     layout_dirty_ = true;
 }

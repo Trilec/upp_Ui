@@ -20,4 +20,8 @@ file
     UiDesignerSessionExtensions.cpp,
     UiDesignerAutomation.h,
     UiDesignerAutomation.cpp,
+    UiDesignerTreeDataAdapter.h,
+    UiDesignerTreeDataAdapter.cpp,
+    UiDesignerListDataAdapter.h,
+    UiDesignerListDataAdapter.cpp,
     README.md;

@@ -88,6 +88,20 @@ UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::AdapterField(
     return *this;
 }
 
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::VisibleWhen(
+    const String& field_id, const Value& value)
+{
+    visible_when_id = field_id;
+    visible_when_value = value;
+    return *this;
+}
+
+UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::ColorCount(int count)
+{
+    color_count = clamp(count, 1, 4);
+    return *this;
+}
+
 UiDesignerThemeOverrideSpec& UiDesignerThemeOverrideSpec::ReadOnly(bool on)
 {
     read_only = on;
@@ -116,6 +130,7 @@ void UiDesignerThemeOverrideSpec::AddTo(PropertyEditorModel& model,
     item.maximum = maximum;
     item.step = step;
     item.decimals = decimals;
+    item.color_count = color_count;
     item.resettable = resettable;
     item.read_only = read_only;
     item.mixed = mixed;
@@ -705,7 +720,11 @@ UiDesignerPropertySpec UiDesignerNumberProperty(
     property.id = id;
     property.label = label;
     property.group = "Value";
-    property.kind = kind;
+    property.kind = kind == PropertyEditorKind::Integer
+        ? PropertyEditorKind::NumericInt
+        : kind == PropertyEditorKind::Double
+            ? PropertyEditorKind::NumericDouble
+            : kind;
     property.domain = PropertyEditorDomain::Behaviour;
     property.default_value = default_value;
     property.minimum = minimum;

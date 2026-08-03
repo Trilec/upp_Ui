@@ -1,6 +1,8 @@
 #include "UiDesignerWindow.h"
 #include "UiDesignerVersion.h"
 #include <Ui/UiIcons.h>
+#include <Utilities/UiDesigner/Services/UiDesignerTreeDataAdapter.h>
+#include <Utilities/UiDesigner/Services/UiDesignerListDataAdapter.h>
 
 #ifdef PLATFORM_WIN32
 #include <windows.h>
@@ -75,6 +77,79 @@ static int FindChildIndex(const UiDesignerNode& parent, UiDesignerNodeId child)
         if(parent.children[i] == child)
             return i;
     return -1;
+}
+
+static ValueMap DesignerTreeRoot(const UiDesignerNode& node)
+{
+    return UiDesignerTreeDataAdapter::Root(node);
+}
+
+static ValueArray DesignerTreeChildren(const ValueMap& root)
+{
+    return UiDesignerTreeDataAdapter::Children(root);
+}
+
+static ValueArray DesignerTreePath(const Value& value)
+{
+    return UiDesignerTreeDataAdapter::Path(value);
+}
+
+static ValueMap DesignerTreeItemAt(const ValueMap& root, const ValueArray& path)
+{
+    return UiDesignerTreeDataAdapter::ItemAt(root, path);
+}
+
+static bool DesignerTreeSetItemAt(ValueMap& root, const ValueArray& path,
+                                  const ValueMap& replacement, int depth = 0)
+{
+    (void)depth;
+    return UiDesignerTreeDataAdapter::SetItem(root, path, replacement);
+}
+
+static bool DesignerTreeAppendChild(ValueMap& root, const ValueArray& parent_path,
+                                    const ValueMap& child)
+{
+    return UiDesignerTreeDataAdapter::AppendChild(root, parent_path, child);
+}
+
+static bool DesignerTreeRemoveItem(ValueMap& root, const ValueArray& path)
+{
+    return UiDesignerTreeDataAdapter::RemoveItem(root, path);
+}
+
+static bool DesignerTreeMoveItem(ValueMap& root, const ValueArray& path, int delta)
+{
+    return UiDesignerTreeDataAdapter::MoveItem(root, path, delta);
+}
+
+static ValueArray ParentTreePath(const ValueArray& path)
+{
+    ValueArray parent;
+    for(int i = 0; i + 1 < path.GetCount(); i++)
+        parent.Add(path[i]);
+    return parent;
+}
+
+static ValueMap DesignerListRoot(const UiDesignerNode& node)
+{
+    return UiDesignerListDataAdapter::Root(node);
+}
+
+static Value CurrentDataListToken(const UiList& list, const UiListModel& model)
+{
+    const Vector<int> selection = list.GetSelection();
+    if(!selection.IsEmpty() && selection[0] >= 0 &&
+       selection[0] < model.GetCount())
+        return model.Get(selection[0]).data;
+    return list.GetData();
+}
+
+static Value SelectedDataToken(const Value& snapshot, const UiList& list,
+                               const UiListModel& model)
+{
+    if(!IsNull(snapshot))
+        return snapshot;
+    return CurrentDataListToken(list, model);
 }
 
 static UiScrollPanel::Style UiDesignerPreviewStyle()
@@ -299,10 +374,10 @@ void UiDesignerWindow::BuildDesigner()
     data_list_.SetModel(data_model_).SetSelectionMode(UILISTSEL_SINGLE);
     data_editor_.SetStyle(UiDesignerInspectorStyle());
     data_editor_.SetModel(&data_editor_model_);
-    data_panel_.Add(data_layout_);
+    data_panel_.Add(data_layout_.SizePos());
     data_layout_.SetDirection(UiDirection::V).SetGap(DPI(4), DPI(4)).SetInset(DPI(6));
     data_layout_.Add(data_list_.SizePos());
-    data_layout_.Add(data_editor_).Fixed(DPI(176)).MinCross(DPI(24));
+    data_layout_.Add(data_editor_).Fixed(DPI(330)).MinCross(DPI(24));
     data_layout_.Add(data_actions_);
     data_actions_.SetDirection(UiDirection::H).SetWrap(UiBoxWrap::Flow).SetGap(DPI(3), DPI(3));
     data_actions_.Add(data_add_); data_actions_.Add(data_remove_); data_actions_.Add(data_rename_);
@@ -503,7 +578,8 @@ void UiDesignerWindow::ConnectServices()
         return session_.Drops().IsContentHost(node);
     };
     hierarchy_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
-        return session_.ExecuteDrop(plan, nullptr, error);
+        UiDesignerNodeId created = 0;
+        return session_.ExecuteDrop(plan, &created, error);
     };
     hierarchy_.WhenDropStatus = [=](const String& status) { RefreshStatus(status); };
 
@@ -581,6 +657,50 @@ void UiDesignerWindow::ConnectServices()
     };
     data_editor_.WhenCommit = [=](const String& id, const Value& value) {
         const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int index = UiDesignerListDataAdapter::Index(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            ValueMap item = UiDesignerListDataAdapter::Item(root, index);
+            if(item.IsEmpty())
+                return;
+            if(id == "text") item.Set("text", AsString(value));
+            else if(id == "key") item.Set("key", AsString(value));
+            else if(id == "value") item.Set("data", AsString(value));
+            else if(id == "description") item.Set("description", AsString(value));
+            else if(id == "right_text") item.Set("right_text", AsString(value));
+            else if(id == "enabled") item.Set("enabled", (bool)value);
+            else if(id == "checked") item.Set("checked", (bool)value);
+            if(!UiDesignerListDataAdapter::SetItem(root, index, item))
+                return;
+            if(!session_.Commands().SetData(node->id, "root", root,
+                                            UiDesignerImpactStructure,
+                                            "Edit UiList data"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            ValueMap item = DesignerTreeItemAt(root, path);
+            if(item.IsEmpty())
+                return;
+            if(id == "text") item.Set("text", AsString(value));
+            else if(id == "key") item.Set("key", AsString(value));
+            else if(id == "value") item.Set("data", AsString(value));
+            else if(id == "enabled") item.Set("enabled", (bool)value);
+            else if(id == "editable") item.Set("editable", (bool)value);
+            if(!DesignerTreeSetItemAt(root, path, item))
+                return;
+            if(!session_.Commands().SetData(node->id, "root", root,
+                                            UiDesignerImpactStructure,
+                                            "Edit UiTree data"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
         const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
         if(!owner || owner->type != "UiAccordion")
             return;
@@ -605,6 +725,10 @@ void UiDesignerWindow::ConnectServices()
     };
     data_editor_.WhenReset = [=](const String& id) {
         const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiTree") {
+            RefreshData();
+            return;
+        }
         const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
         if(!owner || owner->type != "UiAccordion")
             return;
@@ -631,12 +755,50 @@ void UiDesignerWindow::ConnectServices()
     };
     data_list_.EnableRenameOnDblClick(true);
     data_list_.WhenSelection = [=] {
-        if(!data_projection_refreshing_) RefreshData();
+        if(!data_projection_refreshing_) {
+            const Vector<int> selection = data_list_.GetSelection();
+            if(!selection.IsEmpty() && selection[0] >= 0 &&
+               selection[0] < data_model_.GetCount())
+                data_selected_token_ = data_model_.Get(selection[0]).data;
+            data_selection_refreshing_ = true;
+            RefreshData();
+            data_selection_refreshing_ = false;
+        }
     };
     data_list_.WhenRename = [=](int index, const String& title) {
         if(index < 0 || index >= data_model_.GetCount()) return;
         const UiDesignerNodeId item_id = SelectedModelNodeId(data_model_.Get(index).data);
         const UiDesignerNode* node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int item_index = UiDesignerListDataAdapter::Index(data_model_.Get(index).data);
+            ValueMap item = UiDesignerListDataAdapter::Item(root, item_index);
+            if(!item.IsEmpty()) {
+                item.Set("text", title);
+                UiDesignerListDataAdapter::SetItem(root, item_index, item);
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Rename UiList item"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(data_model_.Get(index).data);
+            ValueMap item = DesignerTreeItemAt(root, path);
+            if(!item.IsEmpty()) {
+                item.Set("text", title);
+                DesignerTreeSetItemAt(root, path, item);
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Rename UiTree item"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
         const UiDesignerNode* owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             if(!session_.Commands().RenameAccordionSection(item_id, title))
@@ -687,6 +849,49 @@ void UiDesignerWindow::ConnectServices()
     };
     data_add_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            ValueMap item;
+            item.Set("text", "New item");
+            item.Set("key", "item_" + AsString(UiDesignerListDataAdapter::Items(root).GetCount() + 1));
+            item.Set("enabled", true);
+            const bool appended = UiDesignerListDataAdapter::AppendItem(root, item);
+            const int new_index = UiDesignerListDataAdapter::Items(root).GetCount() - 1;
+            if(!appended || !session_.Commands().SetData(node->id, "root", root,
+                                                         UiDesignerImpactStructure,
+                                                         "Add UiList item"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            if(appended)
+                data_list_.SetData(UiDesignerListDataAdapter::Token(new_index));
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            ValueMap item;
+            item.Set("text", "New item");
+            item.Set("key", "item_1");
+            item.Set("enabled", true);
+            item.Set("editable", true);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            const bool appended = DesignerTreeAppendChild(root, path, item);
+            const int new_index = DesignerTreeChildren(
+                DesignerTreeItemAt(root, path)).GetCount() - 1;
+            if(!appended)
+                RefreshStatus("Selected UiTree item cannot contain children");
+            if(appended && !session_.Commands().SetData(node->id, "root", root,
+                                                        UiDesignerImpactStructure,
+                                                        "Add UiTree item"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            if(appended) {
+                ValueArray new_path = path;
+                new_path.Add(new_index);
+                data_list_.SetData(UiDesignerTreeDataAdapter::Token(new_path));
+            }
+            return;
+        }
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             if(!session_.Commands().AddAccordionSection(owner->id, "New Section"))
@@ -701,6 +906,32 @@ void UiDesignerWindow::ConnectServices()
     };
     data_remove_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int index = UiDesignerListDataAdapter::Index(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(index >= 0 && UiDesignerListDataAdapter::RemoveItem(root, index) &&
+               !session_.Commands().SetData(node->id, "root", root,
+                                            UiDesignerImpactStructure,
+                                            "Remove UiList item"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(!path.IsEmpty()) {
+                DesignerTreeRemoveItem(root, path);
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Remove UiTree item"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             const UiDesignerNode *section = SelectedDataNode();
@@ -731,6 +962,31 @@ void UiDesignerWindow::ConnectServices()
     };
     data_up_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int index = UiDesignerListDataAdapter::Index(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(UiDesignerListDataAdapter::MoveItem(root, index, -1) &&
+               !session_.Commands().SetData(node->id, "root", root,
+                                            UiDesignerImpactStructure,
+                                            "Move UiList item up"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(!path.IsEmpty() && DesignerTreeMoveItem(root, path, -1)) {
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Move UiTree item up"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             const UiDesignerNode *section = SelectedDataNode();
@@ -748,6 +1004,31 @@ void UiDesignerWindow::ConnectServices()
     };
     data_down_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int index = UiDesignerListDataAdapter::Index(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(UiDesignerListDataAdapter::MoveItem(root, index, 1) &&
+               !session_.Commands().SetData(node->id, "root", root,
+                                            UiDesignerImpactStructure,
+                                            "Move UiList item down"))
+                RefreshStatus(session_.Commands().GetLastError());
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            if(!path.IsEmpty() && DesignerTreeMoveItem(root, path, 1)) {
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Move UiTree item down"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             const UiDesignerNode *section = SelectedDataNode();
@@ -765,6 +1046,38 @@ void UiDesignerWindow::ConnectServices()
     };
     data_enable_.WhenAction = [=] {
         const UiDesignerNode *node = session_.Document().Find(session_.State().selection.primary);
+        if(node && node->type == "UiList") {
+            ValueMap root = DesignerListRoot(*node);
+            const int index = UiDesignerListDataAdapter::Index(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            ValueMap item = UiDesignerListDataAdapter::Item(root, index);
+            if(!item.IsEmpty()) {
+                item.Set("enabled", !(bool)UiDesignerMapValue(item, "enabled", true));
+                UiDesignerListDataAdapter::SetItem(root, index, item);
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Toggle UiList item"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
+        if(node && node->type == "UiTree") {
+            ValueMap root = DesignerTreeRoot(*node);
+            const ValueArray path = DesignerTreePath(
+                SelectedDataToken(data_selected_token_, data_list_, data_model_));
+            ValueMap item = DesignerTreeItemAt(root, path);
+            if(!item.IsEmpty()) {
+                item.Set("enabled", !(bool)UiDesignerMapValue(item, "enabled", true));
+                DesignerTreeSetItemAt(root, path, item);
+                if(!session_.Commands().SetData(node->id, "root", root,
+                                                UiDesignerImpactStructure,
+                                                "Toggle UiTree item"))
+                    RefreshStatus(session_.Commands().GetLastError());
+            }
+            RefreshData();
+            return;
+        }
         const UiDesignerNode *owner = ResolveAccordionOwner(session_.Document(), node);
         if(owner && owner->type == "UiAccordion") {
             const UiDesignerNode *section = SelectedDataNode();
@@ -828,7 +1141,8 @@ void UiDesignerWindow::ConnectServices()
         if(changes.virtual_size_changed)
             RefreshLayout();
         interaction_overlay_.Refresh();
-        RefreshHierarchy(); RefreshData(); RefreshCode(); RefreshBehavior();
+        RefreshHierarchy(); RefreshInspector(); RefreshData();
+        RefreshCode(); RefreshBehavior();
         overrides_.Refresh();
         RequestDiagnosticsRefresh();
     };
@@ -1030,6 +1344,13 @@ void UiDesignerWindow::RefreshData()
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
     const UiDesignerNode* accordion_owner = ResolveAccordionOwner(session_.Document(), node);
+    const Value data_selection = SelectedDataToken(data_selected_token_,
+                                                   data_list_, data_model_);
+    const Vector<int> data_rows = data_list_.GetSelection();
+    Value selected_data = data_selection;
+    if(!data_rows.IsEmpty() && data_rows[0] >= 0 &&
+       data_rows[0] < data_model_.GetCount())
+        selected_data = data_model_.Get(data_rows[0]).data;
     const auto Finish = [&] {
         data_projection_refreshing_ = false;
     };
@@ -1037,6 +1358,106 @@ void UiDesignerWindow::RefreshData()
     data_editor_model_.Clear();
     data_select_content_.Enable(false);
     data_remove_content_.Enable(false);
+    if(node && node->type == "UiList") {
+        const ValueMap root = DesignerListRoot(*node);
+        const Vector<UiDesignerListDataRow> rows =
+            UiDesignerListDataAdapter::Rows(root);
+        for(const UiDesignerListDataRow& row : rows)
+            data_model_.Add(row.text, UiDesignerListDataAdapter::Token(row.index),
+                            row.enabled);
+        const Value prior = selected_data;
+        bool keep = false;
+        for(int i = 0; i < data_model_.GetCount(); i++)
+            keep |= data_model_.Get(i).data == prior;
+        if(!data_selection_refreshing_)
+            data_list_.SetData(keep ? prior : data_model_.GetCount()
+                ? data_model_.Get(0).data : Value());
+        const Value selected_token = data_selection_refreshing_
+            ? prior : (keep ? prior : data_model_.GetCount()
+                ? data_model_.Get(0).data : Value());
+        const int index = UiDesignerListDataAdapter::Index(selected_token);
+        data_selected_token_ = selected_token;
+        const ValueMap item = UiDesignerListDataAdapter::Item(root, index);
+        data_editor_model_.Add("text", "Text", PropertyEditorKind::Text,
+                               UiDesignerMapValue(item, "text", ""), "Item");
+        data_editor_model_.Add("key", "Key", PropertyEditorKind::Text,
+                               UiDesignerMapValue(item, "key", ""), "Item");
+        data_editor_model_.Add("value", "Value", PropertyEditorKind::Text,
+                               UiDesignerMapValue(item, "data", ""), "Item");
+        data_editor_model_.Add("description", "Description", PropertyEditorKind::Text,
+                               UiDesignerMapValue(item, "description", ""), "Item");
+        data_editor_model_.Add("right_text", "Right text", PropertyEditorKind::Text,
+                               UiDesignerMapValue(item, "right_text", ""), "Item");
+        data_editor_model_.Add("enabled", "Enabled", PropertyEditorKind::Boolean,
+                               UiDesignerMapValue(item, "enabled", true), "Item");
+        data_editor_model_.Add("checked", "Checked", PropertyEditorKind::Boolean,
+                               UiDesignerMapValue(item, "checked", false), "Item");
+        data_add_.Enable(true);
+        data_remove_.Enable(index >= 0);
+        data_rename_.Enable(index >= 0);
+        data_up_.Enable(index > 0);
+        data_down_.Enable(index >= 0 && index + 1 < data_model_.GetCount());
+        data_enable_.Enable(index >= 0);
+        data_active_.Enable(false);
+        data_enable_.SetText(index >= 0 &&
+            (bool)UiDesignerMapValue(item, "enabled", true) ? "Disable" : "Enable");
+        data_editor_.SetModel(&data_editor_model_);
+        data_editor_model_.StructureChanged();
+        Finish();
+        return;
+    }
+    if(node && node->type == "UiTree") {
+        const Value prior = selected_data;
+        const ValueMap root = DesignerTreeRoot(*node);
+        const Vector<UiDesignerTreeDataRow> rows =
+            UiDesignerTreeDataAdapter::Rows(root);
+        for(const UiDesignerTreeDataRow& row : rows)
+            data_model_.Add(String(' ', row.depth * 2) + row.text,
+                            UiDesignerTreeDataAdapter::Token(row.path), row.enabled);
+        const ValueArray root_path;
+        bool keep = false;
+        for(int i = 0; i < data_model_.GetCount(); i++)
+            keep |= data_model_.Get(i).data == prior;
+        if(!data_selection_refreshing_)
+            data_list_.SetData(keep ? prior : UiDesignerTreeDataAdapter::Token(root_path));
+        const Value tree_selection = data_selection_refreshing_
+            ? prior : (keep ? prior : UiDesignerTreeDataAdapter::Token(root_path));
+        data_selected_token_ = tree_selection;
+        const ValueArray path = DesignerTreePath(tree_selection);
+        const ValueMap selected_item = DesignerTreeItemAt(root, path);
+        const ValueArray parent_path = ParentTreePath(path);
+        const ValueMap parent = DesignerTreeItemAt(root, parent_path);
+        const ValueArray siblings = DesignerTreeChildren(parent);
+        const int index = path.IsEmpty() ? -1 :
+            (int)(int64)path[path.GetCount() - 1];
+        data_editor_model_.Add("text", "Text", PropertyEditorKind::Text,
+                               UiDesignerMapValue(selected_item, "text", ""), "Item");
+        if(!path.IsEmpty()) {
+            data_editor_model_.Add("key", "Key", PropertyEditorKind::Text,
+                                   UiDesignerMapValue(selected_item, "key", ""), "Item");
+            data_editor_model_.Add("value", "Value", PropertyEditorKind::Text,
+                                   UiDesignerMapValue(selected_item, "data", ""), "Item");
+            data_editor_model_.Add("enabled", "Enabled", PropertyEditorKind::Boolean,
+                                   UiDesignerMapValue(selected_item, "enabled", true), "Item");
+            data_editor_model_.Add("editable", "Editable", PropertyEditorKind::Boolean,
+                                   UiDesignerMapValue(selected_item, "editable", false), "Item");
+        }
+        data_add_.Enable(true);
+        data_remove_.Enable(!path.IsEmpty());
+        data_rename_.Enable(!path.IsEmpty());
+        data_up_.Enable(index > 0);
+        data_down_.Enable(index >= 0 && index + 1 < siblings.GetCount());
+        data_enable_.Enable(!path.IsEmpty());
+        data_active_.Enable(false);
+        data_select_content_.Enable(false);
+        data_remove_content_.Enable(false);
+        data_enable_.SetText(!path.IsEmpty() &&
+            (bool)UiDesignerMapValue(selected_item, "enabled", true) ? "Disable" : "Enable");
+        data_editor_.SetModel(&data_editor_model_);
+        data_editor_model_.StructureChanged();
+        Finish();
+        return;
+    }
     if(node && node->type == "UiTab") {
         const Value prior = data_list_.GetData();
         for(UiDesignerNodeId id : node->children) {
@@ -1132,7 +1553,7 @@ void UiDesignerWindow::RefreshData()
     if(node) {
         if(node->type == "UiAccordion") data_status = "Accordion sections are not selected.";
         else if(node->type == "UiTree") data_status = "Tree item data is not implemented yet.";
-        else if(node->type == "UiList") data_status = "List item data is not implemented yet.";
+        else if(node->type == "UiList") data_status = "List data is unavailable.";
         else if(node->type == "UiDropdown") data_status = "Dropdown item data is not implemented yet.";
         else if(node->type == "UiMenu") data_status = "Menu item data is not implemented yet.";
         else data_status = "Data is not supported for this control yet.";
@@ -1323,6 +1744,25 @@ void UiDesignerWindow::PostSelectionDetailsRefresh()
 void UiDesignerWindow::RefreshStatus(const String& status)
 {
     footer_.SetText(status.IsEmpty() ? "Ready" : status);
+}
+
+bool UiDesignerWindow::Key(dword key, int count)
+{
+    if(key == K_CTRL_Z) {
+        if(session_.Undo()) {
+            RefreshStatus("Undo");
+            return true;
+        }
+        return false;
+    }
+    if(key == K_CTRL_Y) {
+        if(session_.Redo()) {
+            RefreshStatus("Redo");
+            return true;
+        }
+        return false;
+    }
+    return TopWindow::Key(key, count);
 }
 
 void UiDesignerWindow::WriteLaunchDiagnostic()

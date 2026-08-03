@@ -288,6 +288,14 @@ const PropertyEditorItem* PropertyEditor::GetSelectedProperty() const
 void PropertyEditor::SetLabelWidth(int cx)
 {
     style_.label_width = max(DPI(60), cx);
+    style_.label_ratio = 0;
+    LayoutActiveEditor();
+    Refresh();
+}
+
+void PropertyEditor::SetLabelRatio(int percent)
+{
+    style_.label_ratio = clamp(percent, 20, 60);
     LayoutActiveEditor();
     Refresh();
 }
@@ -397,8 +405,7 @@ Rect PropertyEditor::GetValueRect(int display_index) const
     if(r.IsEmpty())
         return r;
 
-    int label_cx = min(max(DPI(60), style_.label_width),
-                       max(DPI(60), r.GetWidth() - DPI(80)));
+    int label_cx = GetLabelColumnWidth(r);
     r.left += label_cx + style_.cell_padding;
 
     const PropertyEditorItem *item = nullptr;
@@ -412,6 +419,14 @@ Rect PropertyEditor::GetValueRect(int display_index) const
 
     r.Deflate(DPI(2), DPI(2));
     return r;
+}
+
+int PropertyEditor::GetLabelColumnWidth(const Rect& row) const
+{
+    const int available = max(DPI(60), row.GetWidth() - DPI(80));
+    if(style_.label_ratio > 0)
+        return min(available, max(DPI(60), available * style_.label_ratio / 100));
+    return min(max(DPI(60), style_.label_width), available);
 }
 
 Rect PropertyEditor::GetResetRect(int display_index) const
@@ -672,8 +687,13 @@ void PropertyEditor::ApplyEditorPreview(const Value& value)
         return;
 
     String error;
-    if(model_->Preview(item->id, value, &error)) {
+    applying_editor_preview_ = true;
+    const bool applied = model_->Preview(item->id, value, &error);
+    applying_editor_preview_ = false;
+    if(applied) {
+        dispatching_editor_callback_ = true;
         WhenPreview(item->id, item->value);
+        dispatching_editor_callback_ = false;
         Refresh();
     }
     else {
@@ -700,7 +720,9 @@ void PropertyEditor::ApplyEditorCommit(const Value& value)
         active_editor_->Configure(*item);
         active_editor_->SetEditorValue(item->value, item->mixed);
         syncing_editor_ = false;
+        dispatching_editor_callback_ = true;
         WhenCommit(item->id, item->value);
+        dispatching_editor_callback_ = false;
         Refresh();
     }
     else {
@@ -869,8 +891,7 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
 
     w.DrawRect(r, paper);
 
-    int label_cx = min(max(DPI(60), style_.label_width),
-                       max(DPI(60), r.GetWidth() - DPI(80)));
+    int label_cx = GetLabelColumnWidth(r);
     int divider_x = r.left + label_cx;
 
     Color label_ink = item.enabled ? style_.label_ink : style_.disabled_ink;
@@ -988,6 +1009,24 @@ void PropertyEditor::ModelStructureChanged(PropertyEditorModel *source)
 {
     if(source != model_)
         return;
+    if(dispatching_editor_callback_) {
+        structure_refresh_pending_ = true;
+        if(!structure_refresh_posted_) {
+            structure_refresh_posted_ = true;
+            Ptr<PropertyEditor> self = this;
+            PostCallback([self] {
+                if(!self)
+                    return;
+                self->structure_refresh_posted_ = false;
+                if(!self->structure_refresh_pending_)
+                    return;
+                self->structure_refresh_pending_ = false;
+                self->selected_display_row_ = -1;
+                self->RebuildRows();
+            });
+        }
+        return;
+    }
     // A model can notify immediately after Clear(). Existing display rows then
     // still refer to the previous model indices, so never retain that selection.
     selected_display_row_ = -1;
@@ -998,6 +1037,8 @@ void PropertyEditor::ModelValueChanged(PropertyEditorModel *source,
                                        const String& id)
 {
     if(source != model_)
+        return;
+    if(applying_editor_preview_ && id == active_property_id_)
         return;
     RefreshValue(id);
 }

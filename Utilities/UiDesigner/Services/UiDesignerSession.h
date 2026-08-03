@@ -93,6 +93,7 @@ public:
     void RebuildInspector();
     void RebuildBehaviorModel();
     void RebuildThemeOverrideModel();
+    void RefreshThemeOverrideVisibility();
 
     bool PreviewProperty(const String& property, const Value& value,
                          String& error);

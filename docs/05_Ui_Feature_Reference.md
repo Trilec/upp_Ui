@@ -320,6 +320,32 @@ Advantages:
 
 Future versions may support linked resources.
 
+### Styled background images
+
+Controls that expose an image surface do not serialize a filename or an in-memory
+`Image` directly in the node. The node stores a stable resource key and the
+surface recipe stores the image placement mode. The resource table owns the
+embedded bytes, content hash, type metadata, and optional original filename.
+
+The Designer Inspector presents the default source as **Use theme**. This means
+the active theme supplies the surface. An explicit **Image** choice means the
+node supplies a resource reference and therefore takes precedence for that
+surface only. An explicit **None** choice removes the surface instead of
+falling back to the theme.
+
+Image placement uses the two published names below:
+
+| Mode | Behavior |
+| --- | --- |
+| `Fill` | Scale to the complete destination rectangle; aspect ratio may change. |
+| `Fit` | Preserve aspect ratio, fill the destination rectangle, and crop overflow. |
+
+The image pipeline is shared: resource lookup happens in the document/preview
+layer, decoding is performed by the registered raster plugin, and the resolved
+image is passed to the control's normal style/draw path. Code generation emits
+the resource and the equivalent `SetBackgroundImage` call rather than adding a
+special Designer-only paint branch.
+
 ---
 
 ## Resource Operations

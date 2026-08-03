@@ -1,5 +1,8 @@
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
+#include <Utilities/UiDesigner/Services/UiDesignerTreeDataAdapter.h>
+#include <Utilities/UiDesigner/Services/UiDesignerListDataAdapter.h>
 #include <Utilities/UiDesigner/Preview/UiDesignerPreview.h>
+#include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
 #include <Ui/UiAbsoluteLayout.h>
 #include <Ui/UiGridLayout.h>
 #include <Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h>
@@ -68,6 +71,11 @@ static bool SameButtonStyle(const UiButton::Style& a, const UiButton::Style& b)
 CONSOLE_APP_MAIN
 {
     UiDesignerCatalog catalog;
+    Check(PropertyEditorKindName(PropertyEditorKind::ColorPalette) == "ColorPalette" &&
+              PropertyEditorKindName(PropertyEditorKind::FilePath) == "FilePath" &&
+              PropertyEditorKindName(PropertyEditorKind::NumericInt) == "NumericInt" &&
+              PropertyEditorKindName(PropertyEditorKind::NumericDouble) == "NumericDouble",
+          "PropertyEditor exposes palette, file-path and dual numeric editor kinds");
     RegisterUiDesignerBuiltins(catalog);
 
     String error;
@@ -79,6 +87,45 @@ CONSOLE_APP_MAIN
     Check(catalog.FindCategory("Composites").GetCount() >= 6, "composite catalog");
     Check(catalog.FindCategory("U++ Controls").GetCount() >= 18, "stock U++ catalog");
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
+
+    ImageBuffer background_buffer(4, 2);
+    Fill(~background_buffer, RGBA(Color(64, 96, 128)), background_buffer.GetLength());
+    UiPanel background_panel;
+    background_panel.SetBackgroundImage(Image(background_buffer),
+                                        UiBackgroundImageMode::Fit);
+    Check(background_panel.GetStyle().skin.enabled &&
+              background_panel.GetStyle().skin.image_mode ==
+                  UiBackgroundImageMode::Fit,
+          "styled controls expose a fit background image contract");
+    background_panel.SetBackgroundImageMode(UiBackgroundImageMode::Fill);
+    Check(background_panel.GetStyle().skin.image_mode ==
+              UiBackgroundImageMode::Fill,
+          "styled controls expose a fill background image contract");
+    background_panel.ClearBackgroundImage();
+    Check(!background_panel.GetStyle().skin.enabled,
+          "styled controls can clear a background image");
+
+    UiDesignerDocument resource_document;
+    ValueMap resource_metadata;
+    resource_metadata.Set("purpose", "designer fixture");
+    const String png_bytes = "embedded-png-fixture-bytes";
+    const String resource_key = resource_document.AddResource(
+        "image", png_bytes, "image/png", "fixture.png", 4, 2,
+        resource_metadata);
+    UiDesignerResource resource;
+    Check(!resource_key.IsEmpty() && resource_document.GetResource(resource_key, resource) &&
+              resource.bytes == png_bytes && resource.mime == "image/png" &&
+              resource.metadata.GetValue(resource_metadata.Find("purpose")) ==
+                  "designer fixture",
+          "Designer resource table stores embedded image bytes and metadata");
+    UiDesignerDocument resource_roundtrip;
+    String resource_error;
+    Check(UiDesignerDocumentFromValue(
+              UiDesignerDocumentToValue(resource_document), resource_roundtrip,
+              resource_error) && resource_roundtrip.GetResources().GetCount() == 1 &&
+              resource_roundtrip.GetResource(resource_key, resource) &&
+              resource.bytes == png_bytes,
+          "embedded image resource survives document round trip: " + resource_error);
 
     UiDesignerDocument blank_preview_document;
     UiDesignerPreviewCanvas blank_preview;
@@ -120,6 +167,19 @@ CONSOLE_APP_MAIN
         Check(catalog.Find(required_ui[i]) != nullptr,
               String("catalog includes ") + required_ui[i]);
 
+    static const char *edit_types[] = {
+        "UiLineEdit", "UiIntEdit", "UiFloatEdit", "UiPasswordEdit",
+        "UiMultiEdit", "UiMaskEdit"
+    };
+    for(int i = 0; i < __countof(edit_types); i++) {
+        const UiDesignerControlSpec* edit = catalog.Find(edit_types[i]);
+        Check(edit && edit->theme && edit->theme_adapter_id == "edit" &&
+              edit->theme_overrides.GetCount() > 0,
+              String("edit has shared theme overrides: ") + edit_types[i]);
+        Check(edit && UiDesignerThemeAdapterSupports(*edit),
+              String("edit theme adapter supports: ") + edit_types[i]);
+    }
+
     const UiDesignerControlSpec* absolute = catalog.Find("UiAbsoluteLayout");
     Check(absolute && absolute->child_adapter_id == "absolute",
           "absolute layout has an exact-rect child adapter");
@@ -129,8 +189,10 @@ CONSOLE_APP_MAIN
     Check(absolute && absolute->FindProperty("x") &&
               absolute->FindProperty("y") &&
               absolute->FindProperty("width") &&
-              absolute->FindProperty("height"),
-          "absolute layout exposes Inspector geometry bindings");
+              absolute->FindProperty("height") &&
+              absolute->FindProperty("width")->kind == PropertyEditorKind::NumericInt &&
+              absolute->FindProperty("height")->kind == PropertyEditorKind::NumericInt,
+          "absolute layout exposes Inspector geometry bindings with numeric toggles");
     const UiDesignerControlSpec* tool_button = catalog.Find("UiToolButton");
     Check(tool_button &&
               UiDesignerMapValue(tool_button->defaults, "icon", Value()) ==
@@ -150,6 +212,314 @@ CONSOLE_APP_MAIN
           "UiList is wired to the list theme adapter");
     Check(menu && menu->theme_adapter_id == "menu",
           "UiMenu is wired to the menu theme adapter");
+    const UiDesignerControlSpec* tab_spec = catalog.Find("UiTab");
+    Check(tab_spec && tab_spec->theme_adapter_id == "tab" && !tab_spec->theme_overrides.IsEmpty(),
+          "UiTab is wired to the typed theme adapter with overrides");
+    const UiDesignerControlSpec* panel_theme_spec = catalog.Find("UiPanel");
+    const UiDesignerControlSpec* group_panel_theme_spec = catalog.Find("UiGroupPanel");
+    const UiDesignerControlSpec* scroll_panel_theme_spec = catalog.Find("UiScrollPanel");
+    Check(panel_theme_spec && panel_theme_spec->theme_adapter_id == "panel" && !panel_theme_spec->theme_overrides.IsEmpty(),
+          "UiPanel is wired to the typed theme adapter with overrides");
+    Check(group_panel_theme_spec && group_panel_theme_spec->theme_adapter_id == "group_panel" && !group_panel_theme_spec->theme_overrides.IsEmpty(),
+          "UiGroupPanel is wired to the typed theme adapter with overrides");
+    Check(scroll_panel_theme_spec && scroll_panel_theme_spec->theme_adapter_id == "scroll_panel" && !scroll_panel_theme_spec->theme_overrides.IsEmpty(),
+          "UiScrollPanel is wired to the typed theme adapter with overrides");
+    const UiDesignerThemeOverrideSpec* panel_face =
+        panel_theme_spec ? panel_theme_spec->FindThemeOverride("face_surface") : nullptr;
+    const UiDesignerThemeOverrideSpec* panel_frame =
+        panel_theme_spec ? panel_theme_spec->FindThemeOverride("frame_surface") : nullptr;
+    Check(panel_face && panel_face->kind == PropertyEditorKind::Choice &&
+              panel_face->default_value == "UseTheme" &&
+              panel_face->choices.GetCount() == 6,
+          "UiPanel face uses the typed surface selector with Use theme default");
+    Check(panel_frame && panel_frame->kind == PropertyEditorKind::Choice &&
+              panel_frame->default_value == "UseTheme" &&
+              panel_frame->choices.GetCount() == 7,
+          "UiPanel frame uses the typed surface selector with dashed support");
+    Check(panel_theme_spec && panel_theme_spec->FindThemeOverride("face_enabled") == nullptr &&
+              panel_theme_spec->FindThemeOverride("frame_enabled") == nullptr &&
+              panel_theme_spec->FindThemeOverride("face_normal") == nullptr &&
+              panel_theme_spec->FindThemeOverride("face_colors") &&
+              panel_theme_spec->FindThemeOverride("face_colors")->kind ==
+                  PropertyEditorKind::ColorPalette &&
+              panel_theme_spec->FindThemeOverride("face_colors")->color_count == 4 &&
+              panel_theme_spec->FindThemeOverride("face_colors")->visible_when_id ==
+                  "face_surface",
+          "UiPanel removes legacy enable fields and uses one four-state face palette");
+    Check(UiDesignerParseSurfaceKind("UseTheme") == UiDesignerSurfaceKind::UseTheme &&
+              UiDesignerParseSurfaceKind("None") == UiDesignerSurfaceKind::None &&
+              UiDesignerSurfaceKindName(UiDesignerSurfaceKind::Image) == "Image",
+          "surface selector values have stable resolver semantics");
+    UiDesignerSession panel_override_session;
+    const UiDesignerNodeId panel_override_node =
+        panel_override_session.AddControl("UiPanel");
+    panel_override_session.Select(panel_override_node);
+    Check(panel_override_session.ThemeOverrideModel().Find("face_surface") &&
+              panel_override_session.ThemeOverrideModel().Find("face_surface")->value == "UseTheme" &&
+              !panel_override_session.ThemeOverrideModel().Find("face_surface")->mixed &&
+              panel_override_session.ThemeOverrideModel().Find("face_colors") &&
+              !panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
+          "Panel Inspector defaults to Use theme without showing Solid-only palette");
+    String panel_override_error;
+    Check(panel_override_session.CommitThemeOverride("face_surface", "Solid",
+                                                     panel_override_error),
+          "Panel Face Solid override commits: " + panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
+              panel_override_session.ThemeOverrideModel().Find("face_colors")->visible &&
+              panel_override_session.ThemeOverrideModel().Find("face_colors")->kind ==
+                  PropertyEditorKind::ColorPalette &&
+              panel_override_session.ThemeOverrideModel().Find("face_colors")->color_count == 4,
+          "Panel Inspector exposes one four-swatch face palette for Solid");
+    Check(panel_override_session.ResetThemeOverride("face_surface",
+                                                   panel_override_error),
+          "Panel Face reset returns to theme: " + panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
+              !panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
+          "Panel Inspector hides Solid-only palette after reset");
+    Check(panel_override_session.PreviewThemeOverride("face_surface", "Solid",
+                                                      panel_override_error),
+          "Panel Face preview accepts Solid: " + panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().Find("face_colors") &&
+              panel_override_session.ThemeOverrideModel().Find("face_colors")->visible,
+          "Panel Inspector exposes Solid-only palette during preview");
+    panel_override_session.CancelPreview();
+    const char *basic_theme_types[] = {"UiLabel", "UiCheckBox", "UiRadioButton", "UiToggle", "UiProgressBar", "UiSlider", "UiScrollBar", "UiDropdown"};
+    for(const char *type : basic_theme_types) {
+        const UiDesignerControlSpec* basic = catalog.Find(type);
+        Check(basic && basic->theme && !basic->theme_adapter_id.IsEmpty() && !basic->theme_overrides.IsEmpty(),
+              String(type) + " is wired to a typed theme adapter with overrides");
+    }
+    const UiDesignerControlSpec* split_button = catalog.Find("UiSplitButton");
+    Check(split_button && split_button->theme_adapter_id == "button" && !split_button->theme_overrides.IsEmpty(),
+          "UiSplitButton reuses the complete button theme contract");
+    const UiDesignerControlSpec* tree_spec = catalog.Find("UiTree");
+    Check(tree_spec && tree_spec->data_defaults.Find("root") >= 0,
+          "UiTree catalog declares canonical root data defaults");
+    const UiDesignerControlSpec* list_data_spec = catalog.Find("UiList");
+    Check(list_data_spec && list_data_spec->data_defaults.Find("root") >= 0,
+          "UiList catalog declares canonical item data defaults");
+    Check(UiBreadcrumbs::ResolveThemeStyle().font.GetHeight() > 0,
+          "UiBreadcrumbs exposes a theme-derived resolver");
+    Check(UiTheme::ResolveTable().row_height > 0,
+          "UiTable exposes a theme-derived resolver");
+    Check(UiTheme::ResolveDoc().font.GetHeight() > 0,
+          "UiDoc exposes a theme-derived resolver");
+    Check(UiTheme::ResolveBezierCurveEditor().stroke > 0,
+          "UiBezierCurveEditor exposes a theme-derived resolver");
+    UiDesignerDocument data_document;
+    UiDesignerCommandService data_commands(data_document);
+    const UiDesignerNodeId data_tree = data_commands.AddNode(
+        "UiTree", "data_tree", data_document.GetRootId(),
+        UiDesignerNodeContainer, ValueMap(), "Add data tree");
+    ValueMap tree_root;
+    tree_root.Set("text", "Root");
+    ValueArray tree_children;
+    ValueMap child_one; child_one.Set("text", "First"); child_one.Set("key", "first");
+    ValueMap child_two; child_two.Set("text", "Second"); child_two.Set("key", "second");
+    tree_children.Add(child_one); tree_children.Add(child_two);
+    tree_root.Set("children", tree_children);
+    Check(data_commands.SetData(data_tree, "root", tree_root,
+                               UiDesignerImpactStructure | UiDesignerImpactCode,
+                               "Set tree data"),
+          "Designer data command stores canonical tree data");
+
+    UiDesignerDocument list_data_document;
+    UiDesignerCommandService list_data_commands(list_data_document);
+    const UiDesignerNodeId data_list_node = list_data_commands.AddNode(
+        "UiList", "data_list", list_data_document.GetRootId(),
+        UiDesignerNodeContainer, ValueMap(), "Add data list");
+    ValueMap list_root;
+    ValueArray list_items;
+    ValueMap list_first; list_first.Set("text", "First"); list_first.Set("key", "first");
+    ValueMap list_second; list_second.Set("text", "Second"); list_second.Set("key", "second");
+    list_items.Add(list_first); list_items.Add(list_second);
+    list_root.Set("items", list_items);
+    Check(list_data_commands.SetData(data_list_node, "root", list_root,
+                                     UiDesignerImpactStructure,
+                                     "Set list data"),
+          "Designer list data command stores canonical items");
+    Check(UiDesignerListDataAdapter::Index(
+              UiDesignerListDataAdapter::Token(1)) == 1,
+          "UiList adapter preserves scalar item selection token");
+    ValueMap list_added = list_root;
+    ValueMap list_third; list_third.Set("text", "Third"); list_third.Set("enabled", true);
+    Check(UiDesignerListDataAdapter::AppendItem(list_added, list_third),
+          "UiList adapter appends item");
+    Check(UiDesignerListDataAdapter::MoveItem(list_added, 2, -1),
+          "UiList adapter reorders item");
+    Check(UiDesignerListDataAdapter::RemoveItem(list_added, 1),
+          "UiList adapter removes item");
+    ValueMap list_changed = UiDesignerListDataAdapter::Item(list_added, 0);
+    list_changed.Set("text", "Edited");
+    list_changed.Set("checked", true);
+    Check(UiDesignerListDataAdapter::SetItem(list_added, 0, list_changed),
+          "UiList adapter edits item state");
+    Check(list_data_commands.SetData(data_list_node, "root", list_added,
+                                     UiDesignerImpactStructure,
+                                     "Edit list data"),
+          "Designer list edit commits through command service");
+    Check(list_data_commands.Undo() && list_data_commands.Redo() &&
+              list_data_document.GetData(data_list_node, "root") == list_added,
+          "UiList data supports undo and redo");
+    UiDesignerDocument list_data_roundtrip;
+    String list_data_error;
+    Check(UiDesignerDocumentFromValue(UiDesignerDocumentToValue(list_data_document),
+                                      list_data_roundtrip, list_data_error) &&
+              list_data_roundtrip.GetData(data_list_node, "root") == list_added,
+          "UiList data survives JSON round trip");
+    Check(data_document.GetData(data_tree, "root", ValueMap()) == tree_root,
+          "Designer data command reads canonical tree data");
+    UiDesignerDocument data_roundtrip;
+    String data_error;
+    Check(UiDesignerDocumentFromValue(UiDesignerDocumentToValue(data_document),
+                                      data_roundtrip, data_error) &&
+              data_roundtrip.GetData(data_tree, "root", ValueMap()) == tree_root,
+          "Designer canonical data survives JSON round trip");
+
+    ValueMap nested_root = tree_root;
+    ValueArray nested_children = (ValueArray)nested_root.GetValue(
+        nested_root.Find("children"));
+    ValueMap nested_first = (ValueMap)nested_children[0];
+    ValueArray nested_first_children;
+    ValueMap nested_leaf; nested_leaf.Set("text", "Leaf"); nested_leaf.Set("key", "leaf");
+    nested_first_children.Add(nested_leaf);
+    nested_first.Set("children", nested_first_children);
+    ValueArray nested_updated;
+    nested_updated.Add(nested_first); nested_updated.Add(nested_children[1]);
+    nested_root.Set("children", nested_updated);
+    Check(data_commands.SetData(data_tree, "root", nested_root,
+                                UiDesignerImpactStructure, "Set nested tree data"),
+          "nested tree data command commits");
+    const Vector<UiDesignerTreeDataRow> nested_rows =
+        UiDesignerTreeDataAdapter::Rows(nested_root);
+    Check(nested_rows.GetCount() == 4,
+          "tree data adapter flattens nested rows without invalidating paths");
+    Check(nested_rows.GetCount() > 2 && nested_rows[2].path.GetCount() == 2 &&
+              nested_rows[2].path[0] == 0 && nested_rows[2].path[1] == 0,
+          "tree data adapter preserves nested index paths");
+    UiList tree_data_list;
+    UiListModel tree_data_model;
+    const Value tree_root_token = UiDesignerTreeDataAdapter::Token(ValueArray());
+    ValueArray first_path; first_path.Add(0);
+    const Value tree_first_token = UiDesignerTreeDataAdapter::Token(first_path);
+    tree_data_model.Add("Root", tree_root_token);
+    tree_data_model.Add("First", tree_first_token);
+    tree_data_list.SetModel(tree_data_model).SetSelectionMode(UILISTSEL_SINGLE);
+    tree_data_list.SetData(tree_first_token);
+    Check(tree_data_list.GetData() == tree_first_token &&
+              tree_data_list.GetSelectionCount() == 1,
+          "tree path token selects one Data Inspector row");
+    Check(data_commands.GetHistoryPosition() > 0 &&
+              UiDesignerMapValue((ValueMap)UiDesignerMapValue(nested_root, "children",
+                                                               ValueArray())[0],
+                                 "children", ValueArray()).Is<ValueArray>(),
+          "nested tree path is represented by child arrays");
+
+    ValueMap edited_root = nested_root;
+    ValueArray edited_children = (ValueArray)edited_root.GetValue(
+        edited_root.Find("children"));
+    ValueMap edited_first = (ValueMap)edited_children[0];
+    ValueArray edited_leafs = (ValueArray)edited_first.GetValue(
+        edited_first.Find("children"));
+    ValueMap edited_leaf = (ValueMap)edited_leafs[0];
+    edited_leaf.Set("text", "Edited leaf");
+    edited_leaf.Set("enabled", false);
+    ValueArray edited_leafs_updated;
+    edited_leafs_updated.Add(edited_leaf);
+    edited_leafs = edited_leafs_updated;
+    edited_first.Set("children", edited_leafs);
+    ValueArray edited_children_updated;
+    edited_children_updated.Add(edited_first);
+    edited_children_updated.Add(edited_children[1]);
+    edited_children = edited_children_updated;
+    edited_root.Set("children", edited_children);
+    Check(data_commands.SetData(data_tree, "root", edited_root,
+                                UiDesignerImpactStructure, "Edit nested tree item"),
+          "nested tree edit commits");
+    Check(data_commands.Undo() && data_document.GetData(data_tree, "root") == nested_root,
+          "nested tree edit undo restores previous map");
+    Check(data_commands.Redo() && data_document.GetData(data_tree, "root") == edited_root,
+          "nested tree edit redo restores edited map");
+
+    ValueMap add_root = edited_root;
+    ValueMap add_parent = edited_first;
+    ValueArray add_children = edited_leafs;
+    ValueMap added_leaf; added_leaf.Set("text", "Added leaf"); added_leaf.Set("key", "added");
+    add_children.Add(added_leaf);
+    add_parent.Set("children", add_children);
+    add_root.Set("children", edited_children);
+    ValueArray add_root_children = (ValueArray)add_root.GetValue(add_root.Find("children"));
+    ValueArray add_root_children_updated;
+    add_root_children_updated.Add(add_parent);
+    add_root_children_updated.Add(add_root_children[1]);
+    add_root_children = add_root_children_updated;
+    add_root.Set("children", add_root_children);
+    Check(data_commands.SetData(data_tree, "root", add_root,
+                                UiDesignerImpactStructure, "Add nested tree item"),
+          "nested tree add commits");
+    Check(((ValueArray)((ValueMap)((ValueArray)add_root.GetValue(add_root.Find("children")))[0])
+               .GetValue(((ValueMap)((ValueArray)add_root.GetValue(add_root.Find("children")))[0]).Find("children"))).GetCount() == 2,
+          "nested tree add increases child count");
+    Check(data_commands.Undo() && data_commands.Redo(),
+          "nested tree add supports undo and redo");
+
+    ValueMap removed_root = add_root;
+    ValueArray removed_root_children = (ValueArray)removed_root.GetValue(
+        removed_root.Find("children"));
+    ValueMap removed_parent = (ValueMap)removed_root_children[0];
+    ValueArray removed_items = (ValueArray)removed_parent.GetValue(
+        removed_parent.Find("children"));
+    ValueArray removed_items_updated;
+    removed_items_updated.Add(removed_items[1]);
+    removed_parent.Set("children", removed_items_updated);
+    ValueArray removed_root_children_updated;
+    removed_root_children_updated.Add(removed_parent);
+    removed_root_children_updated.Add(removed_root_children[1]);
+    removed_root.Set("children", removed_root_children_updated);
+    Check(data_commands.SetData(data_tree, "root", removed_root,
+                                UiDesignerImpactStructure, "Remove nested tree item"),
+          "nested tree remove commits");
+    Check(((ValueArray)((ValueMap)((ValueArray)removed_root.GetValue(
+        removed_root.Find("children")))[0]).GetValue(
+            ((ValueMap)((ValueArray)removed_root.GetValue(
+                removed_root.Find("children")))[0]).Find("children"))).GetCount() == 1,
+          "nested tree remove decreases child count");
+
+    ValueMap reordered_root = removed_root;
+    ValueArray reordered_children = (ValueArray)reordered_root.GetValue(
+        reordered_root.Find("children"));
+    ValueArray reordered_children_updated;
+    reordered_children_updated.Add(reordered_children[1]);
+    reordered_children_updated.Add(reordered_children[0]);
+    reordered_root.Set("children", reordered_children_updated);
+    Check(data_commands.SetData(data_tree, "root", reordered_root,
+                                UiDesignerImpactStructure, "Reorder tree items"),
+          "tree sibling reorder commits");
+    Check((String)UiDesignerMapValue((ValueMap)reordered_children_updated[0],
+                                     "text", "") == "Second",
+          "tree sibling reorder changes authored order");
+
+    ValueMap disabled_root = reordered_root;
+    ValueArray disabled_children = (ValueArray)disabled_root.GetValue(
+        disabled_root.Find("children"));
+    ValueMap disabled_item = (ValueMap)disabled_children[0];
+    disabled_item.Set("enabled", false);
+    ValueArray disabled_children_updated;
+    disabled_children_updated.Add(disabled_item);
+    disabled_children_updated.Add(disabled_children[1]);
+    disabled_root.Set("children", disabled_children_updated);
+    Check(data_commands.SetData(data_tree, "root", disabled_root,
+                                UiDesignerImpactStructure, "Disable tree item"),
+          "tree enabled state commits");
+    Check(!(bool)UiDesignerMapValue((ValueMap)disabled_children_updated[0],
+                                     "enabled", true),
+          "tree enabled state is authored in data");
+
+    UiDesignerDocument nested_roundtrip;
+    Check(UiDesignerDocumentFromValue(UiDesignerDocumentToValue(data_document),
+                                      nested_roundtrip, data_error) &&
+              nested_roundtrip.GetData(data_tree, "root") == disabled_root,
+          "nested tree data survives JSON reload");
     const UiDesignerControlSpec* title_card = catalog.Find("UiTitleCard");
     Check(title_card &&
               UiDesignerMapValue(title_card->defaults, "icon", Value()) ==
@@ -159,6 +529,11 @@ CONSOLE_APP_MAIN
               title_card->FindProperty("icon")->default_value ==
                   "ICON_DESIGN_DESCRIPTION_48",
           "UiTitleCard icon property and defaults agree");
+    Check(title_card && title_card->FindProperty("media_reserve") &&
+              title_card->FindProperty("media_reserve")->default_value == 10 &&
+              title_card->FindProperty("media_reserve")->kind == PropertyEditorKind::NumericInt &&
+              UiDesignerMapValue(title_card->defaults, "media_reserve", Value()) == 10,
+          "UiTitleCard media reserve defaults to 10");
     Check(title_card &&
               !TrimBoth(AsString(UiDesignerMapValue(title_card->defaults,
                                                      "subtitle", Value()))).IsEmpty(),
@@ -197,6 +572,87 @@ CONSOLE_APP_MAIN
           "root drop executes: " + drop_error);
     Check(!drop_session.PlanAddControl("UiLabel", root, Point(10, 10), true).valid,
           "root window rejects a second direct child");
+
+    UiDesignerSession grid_allocation_session;
+    grid_allocation_session.NewDocument("blank");
+    const UiDesignerNodeId allocation_grid =
+        grid_allocation_session.AddControl("UiGridLayout");
+    Check(allocation_grid != 0, "Grid allocation fixture creates its Grid");
+    UiDesignerDropPlan allocation_panel_plan =
+        grid_allocation_session.PlanAddControl("UiPanel", allocation_grid);
+    UiDesignerNodeId allocation_panel = 0;
+    Check(allocation_panel_plan.valid &&
+              grid_allocation_session.ExecuteDrop(allocation_panel_plan,
+                                                   &allocation_panel, drop_error),
+          "non-positioned Grid drop allocates a Panel cell");
+    UiDesignerDropPlan allocation_card_plan =
+        grid_allocation_session.PlanAddControl("UiTitleCard", allocation_grid);
+    UiDesignerNodeId allocation_card = 0;
+    Check(allocation_card_plan.valid &&
+              grid_allocation_session.ExecuteDrop(allocation_card_plan,
+                                                   &allocation_card, drop_error),
+          "non-positioned Grid drop allocates a Title Card cell");
+    Check(allocation_panel && allocation_card &&
+              grid_allocation_session.Document().GetProperty(allocation_panel,
+                                                             "grid_row", -1) == 0 &&
+              grid_allocation_session.Document().GetProperty(allocation_panel,
+                                                             "grid_column", -1) == 0 &&
+              grid_allocation_session.Document().GetProperty(allocation_card,
+                                                             "grid_row", -1) == 0 &&
+              grid_allocation_session.Document().GetProperty(allocation_card,
+                                                             "grid_column", -1) == 1,
+          "non-positioned Grid children receive distinct canonical cells");
+
+    UiDesignerSession nested_host_session;
+    nested_host_session.NewDocument("blank");
+    const UiDesignerNodeId nested_grid = nested_host_session.AddControl("UiGridLayout");
+    UiDesignerNodeId nested_panel_left = 0;
+    UiDesignerNodeId nested_panel_right = 0;
+    Check(nested_host_session.ExecuteDrop(
+              nested_host_session.PlanAddControl("UiPanel", nested_grid,
+                                                  Point(), false, -1, 0, 0),
+              &nested_panel_left, drop_error),
+          "nested geometry fixture adds left Panel");
+    Check(nested_host_session.ExecuteDrop(
+              nested_host_session.PlanAddControl("UiPanel", nested_grid,
+                                                  Point(), false, -1, 0, 1),
+              &nested_panel_right, drop_error),
+          "nested geometry fixture adds right Panel");
+    UiDesignerNodeId nested_test_accordion = 0;
+    UiDesignerNodeId nested_test_tab = 0;
+    Check(nested_host_session.ExecuteDrop(
+              nested_host_session.PlanAddControl("UiAccordion", nested_panel_left,
+                                                  Point(), true),
+              &nested_test_accordion, drop_error),
+          "nested geometry fixture adds Accordion to Panel");
+    Check(nested_host_session.ExecuteDrop(
+              nested_host_session.PlanAddControl("UiTab", nested_panel_right,
+                                                  Point(), true),
+              &nested_test_tab, drop_error),
+          "nested geometry fixture adds Tab to Panel");
+    UiDesignerSelection nested_selection;
+    UiDesignerPreviewCanvas nested_preview;
+    nested_preview.SetRect(0, 0, 512, 320);
+    nested_preview.Bind(&nested_host_session.Document(), &catalog, nullptr,
+                        &nested_selection);
+    nested_preview.RebuildDocument();
+    const Rect left_panel_rect = nested_preview.GetNodeRect(nested_panel_left);
+    const Rect right_panel_rect = nested_preview.GetNodeRect(nested_panel_right);
+    const Rect accordion_rect = nested_preview.GetNodeRect(nested_test_accordion);
+    const Rect tab_rect = nested_preview.GetNodeRect(nested_test_tab);
+    Check(left_panel_rect.Contains(accordion_rect) &&
+              right_panel_rect.Contains(tab_rect),
+          "nested container children remain inside their Panel bodies");
+    const bool accordion_crosses_right = accordion_rect.left < right_panel_rect.right &&
+        accordion_rect.right > right_panel_rect.left &&
+        accordion_rect.top < right_panel_rect.bottom &&
+        accordion_rect.bottom > right_panel_rect.top;
+    const bool tab_crosses_left = tab_rect.left < left_panel_rect.right &&
+        tab_rect.right > left_panel_rect.left &&
+        tab_rect.top < left_panel_rect.bottom &&
+        tab_rect.bottom > left_panel_rect.top;
+    Check(!accordion_crosses_right && !tab_crosses_left,
+          "nested container children do not cross into the sibling Panel cell");
 
     UiDesignerSession move_session;
     move_session.NewDocument("blank");
@@ -1186,11 +1642,49 @@ CONSOLE_APP_MAIN
         "UiTree", "tree_node", tree_document.GetRootId(),
         tree ? tree->node_flags : 0, tree ? tree->defaults : ValueMap(),
         "Add tree");
+    Check(tree_commands.SetData(tree_node, "root", disabled_root,
+                                UiDesignerImpactStructure, "Populate preview tree"),
+          "preview tree data command commits");
     UiDesignerSelection tree_selection;
     UiDesignerPreviewCanvas tree_preview;
     build_preview(tree_document, tree_preview, tree_selection);
-    if(auto *runtime_tree = dynamic_cast<UiTree *>(tree_preview.FindRuntime(tree_node)))
+    if(auto *runtime_tree = dynamic_cast<UiTree *>(tree_preview.FindRuntime(tree_node))) {
         Check(!runtime_tree->HasCustomStyle(), "UiTree no overrides clears stale custom style");
+        Check(runtime_tree->GetInternalModel().GetChildCount(
+                  runtime_tree->GetInternalModel().Root()) == 2,
+              "UiTree preview projects authored root children");
+        UiTreeNodeRef nested = runtime_tree->GetInternalModel().GetChild(
+            runtime_tree->GetInternalModel().Root(), 1);
+        Check(runtime_tree->GetInternalModel().GetChildCount(nested) == 1,
+              "UiTree preview projects nested children");
+        UiTreeNodeRef disabled = runtime_tree->GetInternalModel().GetChild(
+            runtime_tree->GetInternalModel().Root(), 0);
+        Check(!runtime_tree->GetInternalModel().Get(disabled).enabled,
+              "UiTree preview projects disabled item state");
+    }
+    tree_document.WhenChanged = [&](const UiDesignerChangeSet& changes) {
+        tree_preview.ApplyChangeSet(changes);
+    };
+    ValueMap updated_tree_root = tree_root;
+    ValueArray updated_tree_children = (ValueArray)updated_tree_root.GetValue(
+        updated_tree_root.Find("children"));
+    ValueMap updated_tree_item = (ValueMap)updated_tree_children[0];
+    updated_tree_item.Set("text", "Updated first");
+    ValueArray rebuilt_tree_children;
+    for(int i = 0; i < updated_tree_children.GetCount(); i++)
+        rebuilt_tree_children.Add(i == 0 ? Value(updated_tree_item)
+                                         : updated_tree_children[i]);
+    updated_tree_children = rebuilt_tree_children;
+    updated_tree_root.Set("children", updated_tree_children);
+    Check(tree_commands.SetData(tree_node, "root", updated_tree_root,
+                                UiDesignerImpactStructure, "Update tree preview"),
+          "UiTree data change commits through preview projection");
+    if(auto *runtime_tree = dynamic_cast<UiTree *>(tree_preview.FindRuntime(tree_node))) {
+        UiTreeNodeRef updated = runtime_tree->GetInternalModel().GetChild(
+            runtime_tree->GetInternalModel().Root(), 0);
+        Check(runtime_tree->GetInternalModel().Get(updated).text == "Updated first",
+              "UiTree preview reflects committed data edit");
+    }
 
     UiDesignerDocument list_document;
     UiDesignerCommandService list_commands(list_document);
@@ -1198,11 +1692,47 @@ CONSOLE_APP_MAIN
         "UiList", "list_node", list_document.GetRootId(),
         list ? list->node_flags : 0, list ? list->defaults : ValueMap(),
         "Add list");
+    ValueMap preview_list_root;
+    ValueArray preview_list_items;
+    ValueMap preview_list_item;
+    preview_list_item.Set("text", "Preview item");
+    preview_list_item.Set("checked", true);
+    preview_list_items.Add(preview_list_item);
+    preview_list_root.Set("items", preview_list_items);
+    Check(list_commands.SetData(list_node, "root", preview_list_root,
+                                UiDesignerImpactStructure, "Populate list preview"),
+          "list preview data command commits");
     UiDesignerSelection list_selection;
     UiDesignerPreviewCanvas list_preview;
     build_preview(list_document, list_preview, list_selection);
-    if(auto *runtime_list = dynamic_cast<UiList *>(list_preview.FindRuntime(list_node)))
+    if(auto *runtime_list = dynamic_cast<UiList *>(list_preview.FindRuntime(list_node))) {
         Check(!runtime_list->HasCustomStyle(), "UiList no overrides clears stale custom style");
+        Check(runtime_list->GetInternalModel().GetCount() == 1 &&
+              runtime_list->GetInternalModel().Get(0).text == "Preview item" &&
+              runtime_list->GetInternalModel().Get(0).checked,
+              "UiList preview projects canonical item data");
+    }
+    list_document.WhenChanged = [&](const UiDesignerChangeSet& changes) {
+        list_preview.ApplyChangeSet(changes);
+    };
+    ValueMap updated_list_root = preview_list_root;
+    ValueArray updated_list_items = (ValueArray)updated_list_root.GetValue(
+        updated_list_root.Find("items"));
+    ValueMap updated_list_item = (ValueMap)updated_list_items[0];
+    updated_list_item.Set("text", "Updated preview item");
+    ValueArray rebuilt_list_items;
+    for(int i = 0; i < updated_list_items.GetCount(); i++)
+        rebuilt_list_items.Add(i == 0 ? Value(updated_list_item)
+                                      : updated_list_items[i]);
+    updated_list_items = rebuilt_list_items;
+    updated_list_root.Set("items", updated_list_items);
+    Check(list_commands.SetData(list_node, "root", updated_list_root,
+                                UiDesignerImpactStructure, "Update list preview"),
+          "UiList data change commits through preview projection");
+    if(auto *runtime_list = dynamic_cast<UiList *>(list_preview.FindRuntime(list_node)))
+        Check(runtime_list->GetInternalModel().GetCount() == 1 &&
+              runtime_list->GetInternalModel().Get(0).text == "Updated preview item",
+              "UiList preview reflects committed data edit");
 
     UiDesignerDocument menu_document;
     UiDesignerCommandService menu_commands(menu_document);
@@ -1390,11 +1920,11 @@ CONSOLE_APP_MAIN
     // authored state, and the preview follows it without a document rebuild.
     UiDesignerDocument tab_document;
     UiDesignerCommandService tab_commands(tab_document);
-    const UiDesignerControlSpec *tab_spec = catalog.Find("UiTab");
+    const UiDesignerControlSpec *tab_catalog_spec = catalog.Find("UiTab");
     UiDesignerNodeId tab_a = tab_commands.AddNode(
         "UiTab", "tab_a", tab_document.GetRootId(),
-        tab_spec ? tab_spec->node_flags : 0,
-        tab_spec ? tab_spec->defaults : ValueMap(), "Add first Tab");
+        tab_catalog_spec ? tab_catalog_spec->node_flags : 0,
+        tab_catalog_spec ? tab_catalog_spec->defaults : ValueMap(), "Add first Tab");
     UiDesignerNodeId tab_b = tab_commands.AddNode(
         "UiTab", "tab_b", tab_document.GetRootId(),
         tab_spec ? tab_spec->node_flags : 0,

@@ -247,6 +247,32 @@ PropertyEditorItem& PropertyEditorModel::AddDouble(const String& id,
     return Add(id, label, PropertyEditorKind::Double, value, group);
 }
 
+PropertyEditorItem& PropertyEditorModel::AddNumericInt(const String& id,
+                                                       const String& label,
+                                                       int value,
+                                                       int minimum,
+                                                       int maximum,
+                                                       int step,
+                                                       const String& group)
+{
+    PropertyEditorItem& item = Add(id, label, PropertyEditorKind::NumericInt, value, group);
+    item.SetRange(minimum, maximum, step).SetSliderToggle();
+    return item;
+}
+
+PropertyEditorItem& PropertyEditorModel::AddNumericDouble(const String& id,
+                                                          const String& label,
+                                                          double value,
+                                                          double minimum,
+                                                          double maximum,
+                                                          double step,
+                                                          const String& group)
+{
+    PropertyEditorItem& item = Add(id, label, PropertyEditorKind::NumericDouble, value, group);
+    item.SetRange(minimum, maximum, step).SetSliderToggle();
+    return item;
+}
+
 PropertyEditorItem& PropertyEditorModel::AddBoolean(const String& id,
                                                     const String& label,
                                                     bool value,
@@ -269,6 +295,18 @@ PropertyEditorItem& PropertyEditorModel::AddColor(const String& id,
                                                   const String& group)
 {
     return Add(id, label, PropertyEditorKind::Color, value, group);
+}
+
+PropertyEditorItem& PropertyEditorItem::SetColorCount(int count)
+{
+    color_count = clamp(count, 1, 4);
+    return *this;
+}
+
+PropertyEditorItem& PropertyEditorItem::SetSliderToggle(bool on)
+{
+    show_slider_toggle = on;
+    return *this;
 }
 
 PropertyEditorItem& PropertyEditorModel::AddSlider(const String& id,
@@ -719,6 +757,7 @@ bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
         break;
 
     case PropertyEditorKind::Integer:
+    case PropertyEditorKind::NumericInt:
     case PropertyEditorKind::SliderInt: {
         int v = 0;
         if(!PeParseInt(candidate, v)) {
@@ -730,6 +769,7 @@ bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
     }
 
     case PropertyEditorKind::Double:
+    case PropertyEditorKind::NumericDouble:
     case PropertyEditorKind::SliderDouble: {
         double v = 0;
         if(!PeParseDouble(candidate, v)) {
@@ -771,6 +811,29 @@ bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
             return false;
         }
         normalized = candidate;
+        break;
+
+    case PropertyEditorKind::ColorPalette: {
+        if(!candidate.Is<ValueArray>()) {
+            error = "Expected a colour palette";
+            return false;
+        }
+        ValueArray palette = candidate;
+        if(palette.GetCount() != item.color_count) {
+            error = Format("Expected %d colours", item.color_count);
+            return false;
+        }
+        for(const Value& color : palette)
+            if(color.GetType() != COLOR_V) {
+                error = "Palette entries must be colours";
+                return false;
+            }
+        normalized = palette;
+        break;
+    }
+
+    case PropertyEditorKind::FilePath:
+        normalized = AsString(candidate);
         break;
 
     case PropertyEditorKind::Vector2: {
@@ -828,9 +891,13 @@ String PropertyEditorKindName(PropertyEditorKind kind)
     case PropertyEditorKind::Multiline: return "Multiline";
     case PropertyEditorKind::Integer: return "Integer";
     case PropertyEditorKind::Double: return "Double";
+    case PropertyEditorKind::NumericInt: return "NumericInt";
+    case PropertyEditorKind::NumericDouble: return "NumericDouble";
     case PropertyEditorKind::Boolean: return "Boolean";
     case PropertyEditorKind::Choice: return "Choice";
     case PropertyEditorKind::Color: return "Color";
+    case PropertyEditorKind::ColorPalette: return "ColorPalette";
+    case PropertyEditorKind::FilePath: return "FilePath";
     case PropertyEditorKind::SliderInt: return "SliderInt";
     case PropertyEditorKind::SliderDouble: return "SliderDouble";
     case PropertyEditorKind::Vector2: return "Vector2";

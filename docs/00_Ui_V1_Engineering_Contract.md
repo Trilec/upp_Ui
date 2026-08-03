@@ -91,22 +91,29 @@ Every container must be classified explicitly:
 
 Current intended semantics:
 
-- `UiPanel`: styled host; it does not perform flow layout;
+- `UiPanel`: styled single-child host; it provides a framed body area but does not perform flow or freeform layout;
 - `UiGroupPanel`: titled single-content host;
-- `UiScrollPanel`: bounded viewport with a scrollable content host;
+- `UiScrollPanel`: bounded viewport with one scrollable content child;
+- `UiTitleCard`: titled single-content host with its own header and content area;
 - `UiStack`, `UiTab`, and accordion section bodies: page/body hosts;
 - `UiBoxLayout`: ordered row/column flow layout;
 - `UiGridLayout`: stable logical row/column placement;
 - `UiAbsoluteLayout`: exact local child rectangles with no automatic reflow;
 - `UiSplitter` and `UiQuadSplitter`: fixed pane-count containers.
 
-Use Box or Grid layouts when several children require automatic arrangement.
+Use Box or Grid layouts when several children require automatic arrangement. Panel,
+GroupPanel, ScrollPanel, TitleCard and similar host controls normally accept zero
+or one direct child. That child may be a layout or a single control. If more than
+one item is needed, put a Box, Grid or AbsoluteLayout inside the host; a second
+direct child must be rejected rather than silently overlapped.
 
 Single-content containers must reject, replace, or deliberately wrap a second direct content root. They must not silently overlap or discard content.
 
 When a host container accepts only one child, that child may still be centered or aligned inside the available body rect. That positioning belongs to the host/layout contract, not to ad-hoc paint math.
 
-Absolute-positioned content uses `UiAbsoluteLayout`, which is a layout engine rather than a styled host. A panel may host an absolute layout, but the panel itself must not become the placement system.
+Absolute-positioned content uses `UiAbsoluteLayout`, which is the freeform layout
+engine rather than a styled host. A panel may host an absolute layout, but the
+panel itself must not become the placement system.
 
 ## 6. Sizing and alignment
 

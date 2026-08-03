@@ -126,6 +126,7 @@ public:
     const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetCustomStyle() const { return style_; }
     static const Style& StyleDefault();
+    static Style ResolveThemeStyle();
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }

@@ -1,4 +1,5 @@
 #include "UiDesignerPreview.h"
+#include <Utilities/UiDesigner/Services/UiDesignerListDataAdapter.h>
 #include "UiDesignerVisuals.h"
 #include <Utilities/UiDesigner/Core/UiDesignerSizing.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
@@ -7,6 +8,19 @@
 #include "UiDesignerColorPickerContract.h"
 
 namespace Upp {
+
+bool UiDesignerLoadResourceImage(const UiDesignerDocument& document,
+                                 const String& resource_key, Image& out)
+{
+    UiDesignerResource resource;
+    if(!document.GetResource(resource_key, resource))
+        return false;
+    Image image = StreamRaster::LoadStringAny(resource.bytes);
+    if(IsNull(image))
+        return false;
+    out = pick(image);
+    return true;
+}
 
 static UiRole ParseRole(const Value& value)
 {
@@ -284,8 +298,10 @@ static void AddTabPageDropRegion(UiDesignerGeometrySnapshotBuilder& snapshot,
 {
     if(!instance || !instance->control)
         return;
-    const UiDesignerNode* tab = document.Find(node.parent);
-    if(tab && tab->GetProperty("active_page", (UiDesignerNodeId)0) != node.id)
+    (void)document;
+    // Selection may temporarily project a page active without changing the
+    // authored active_page property. The live control is authoritative.
+    if(!instance->control->IsShown())
         return;
     UiDesignerDropRegion region;
     region.owner = node.id;
@@ -764,13 +780,26 @@ static UiDesignerApplyResult ApplyRuntime(
     }
     if(property == "role") {
         const UiRole role = ParseRole(value);
-        if(auto *button = dynamic_cast<UiToolButton *>(&ctrl))
-            button->SetCustomStyle(UiTheme::ResolveToolButton(role));
-        else if(auto *button = dynamic_cast<UiButton *>(&ctrl))
-            button->SetCustomStyle(UiTheme::ResolveButton(role));
-        if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) panel->SetCustomStyle(UiTheme::ResolvePanel(role));
-        if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) label->SetCustomStyle(UiTheme::ResolveLabel(role));
-        if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl)) group->SetCustomStyle(UiTheme::ResolveGroupPanel(role));
+        if(auto *button = dynamic_cast<UiToolButton *>(&ctrl)) {
+            if(role == UiRole::Standard) button->ClearCustomStyle();
+            else button->SetCustomStyle(UiTheme::ResolveToolButton(role));
+        }
+        else if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+            if(role == UiRole::Standard) button->ClearCustomStyle();
+            else button->SetCustomStyle(UiTheme::ResolveButton(role));
+        }
+        if(auto *panel = dynamic_cast<UiPanel *>(&ctrl)) {
+            if(role == UiRole::Standard) panel->ClearCustomStyle();
+            else panel->SetCustomStyle(UiTheme::ResolvePanel(role));
+        }
+        if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) {
+            if(role == UiRole::Standard) label->ClearCustomStyle();
+            else label->SetCustomStyle(UiTheme::ResolveLabel(role));
+        }
+        if(auto *group = dynamic_cast<UiGroupPanel *>(&ctrl)) {
+            if(role == UiRole::Standard) group->ClearCustomStyle();
+            else group->SetCustomStyle(UiTheme::ResolveGroupPanel(role));
+        }
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
@@ -1259,6 +1288,65 @@ bool UiDesignerParseNodesDragText(const String& text,
     return !nodes.IsEmpty();
 }
 
+static void ApplyDesignerTreeData(UiTree& tree, const UiDesignerNode& node)
+{
+    const Value root_value = node.GetData("root");
+    if(!root_value.Is<ValueMap>())
+        return;
+
+    UiTreeModel& model = tree.GetInternalModel();
+    model.Clear();
+    const ValueMap root = root_value;
+    UiModelItem root_item((String)UiDesignerMapValue(root, "text", "Root"),
+                          UiDesignerMapValue(root, "data", Value()));
+    model.Set(model.Root(), root_item);
+
+    Function<void(UiTreeNodeRef, const ValueArray&)> add_children =
+        [&](UiTreeNodeRef parent, const ValueArray& children) {
+            for(const Value& value : children) {
+                if(!value.Is<ValueMap>())
+                    continue;
+                const ValueMap item = value;
+                UiModelItem model_item(
+                    (String)UiDesignerMapValue(item, "text", "Item"),
+                    UiDesignerMapValue(item, "data", Value()));
+                model_item.enabled = (bool)UiDesignerMapValue(item, "enabled", true);
+                model_item.editable = (bool)UiDesignerMapValue(item, "editable", false);
+                UiTreeNodeRef child = model.AddChild(parent, model_item);
+                const Value nested = UiDesignerMapValue(item, "children", ValueArray());
+                if(nested.Is<ValueArray>())
+                    add_children(child, (ValueArray)nested);
+            }
+        };
+
+    const Value children = UiDesignerMapValue(root, "children", ValueArray());
+    if(children.Is<ValueArray>())
+        add_children(model.Root(), (ValueArray)children);
+}
+
+static void ApplyDesignerListData(UiList& list, const UiDesignerNode& node)
+{
+    const ValueMap root = UiDesignerListDataAdapter::Root(node);
+    if(root.IsEmpty())
+        return;
+    UiListModel& model = list.GetInternalModel();
+    model.Clear();
+    for(const Value& value : UiDesignerListDataAdapter::Items(root)) {
+        if(!value.Is<ValueMap>())
+            continue;
+        const ValueMap item = (ValueMap)value;
+        UiModelItem model_item(
+            UiDesignerMapValue(item, "text", "Item"),
+            UiDesignerMapValue(item, "data", Value()));
+        model_item.enabled = UiDesignerMapValue(item, "enabled", true);
+        model_item.description = UiDesignerMapValue(item, "description", "");
+        model_item.right_text = UiDesignerMapValue(item, "right_text", "");
+        model_item.has_check = UiDesignerMapValue(item, "has_check", false);
+        model_item.checked = UiDesignerMapValue(item, "checked", false);
+        model.Add(model_item);
+    }
+}
+
 String UiDesignerCatalogDragText(const String& type_id)
 {
     return "uidesigner/catalog/v1:" + type_id;
@@ -1311,6 +1399,8 @@ void UiDesignerPreviewCanvas::SetOverlay(const UiDesignerTransientOverlay *overl
 void UiDesignerPreviewCanvas::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
+    ApplySelectionProjection();
+    Layout();
     Refresh();
 }
 
@@ -1854,6 +1944,10 @@ void UiDesignerPreviewCanvas::BuildNode(
         return;
     stats_.live_instance_creations++;
     UiDesignerPreviewFactory::Initialize(*instance.control, *spec);
+    if(auto *tree = dynamic_cast<UiTree *>(instance.control.Get()))
+        ApplyDesignerTreeData(*tree, *node);
+    if(auto *list = dynamic_cast<UiList *>(instance.control.Get()))
+        ApplyDesignerListData(*list, *node);
     if(parent_instance && parent_instance->semantic &&
        parent_instance->type == "UiAccordionSection" &&
        parent_instance->semantic_host_index >= 0 &&
@@ -1895,6 +1989,7 @@ void UiDesignerPreviewCanvas::RebuildDocument()
     if(document_ && catalog_)
         BuildNode(document_->GetRootId(), *this, 0, 0);
     ApplyActiveTabProjection();
+    ApplySelectionProjection();
     stats_.full_rebuilds++;
     Layout();
     Refresh();
@@ -1958,6 +2053,7 @@ bool UiDesignerPreviewCanvas::RebuildSubtree(UiDesignerNodeId root)
     if(const UiDesignerNode *rebuilt = document_->Find(root))
         if(rebuilt->type == "UiTab")
             ApplyActiveTabProjection();
+    ApplySelectionProjection();
     stats_.subtree_rebuilds++;
     Layout();
     Refresh();
@@ -2207,6 +2303,41 @@ void UiDesignerPreviewCanvas::ApplyChangeSet(const UiDesignerChangeSet& changes)
         Layout();
         Refresh();
     }
+    bool data_only = !changes.properties.IsEmpty();
+    UiDesignerNodeId data_node = 0;
+    for(const UiDesignerPropertyChange& change : changes.properties) {
+        if(!change.property.StartsWith("data.")) {
+            data_only = false;
+            break;
+        }
+        if(data_node && data_node != change.node) {
+            data_only = false;
+            break;
+        }
+        data_node = change.node;
+    }
+    if(data_only && data_node) {
+        const UiDesignerNode* data_owner = document_->Find(data_node);
+        const int data_index = FindInstance(data_node);
+        if(data_owner && data_index >= 0 && instances_[data_index].control) {
+            if(auto *tree = dynamic_cast<UiTree *>(instances_[data_index].control.Get())) {
+                ApplyDesignerTreeData(*tree, *data_owner);
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return;
+            }
+            if(auto *list = dynamic_cast<UiList *>(instances_[data_index].control.Get())) {
+                ApplyDesignerListData(*list, *data_owner);
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return;
+            }
+        }
+        if(RebuildSubtree(data_node))
+            return;
+    }
     for(const UiDesignerPropertyChange& change : changes.properties)
         ApplyProperty(change.node, change.property, change.new_value,
                       change.kind == UiDesignerPropertyChangeKind::ThemeOverride
@@ -2298,8 +2429,11 @@ void UiDesignerPreviewCanvas::LayoutNode(
             instance.control->SetRect(group->GetBodyRect());
     }
     else if(node->parent == document_->GetRootId() || !managed) {
-        Rect available = node->parent == document_->GetRootId()
-            ? rects_.Get(node->parent) : RectC(0, 0, GetSize().cx, GetSize().cy);
+        Rect host_rect = node->parent == document_->GetRootId()
+            ? rects_.Get(node->parent)
+            : instance.runtime_parent ? rects_.Get(instance.runtime_parent)
+                                      : RectC(0, 0, GetSize().cx, GetSize().cy);
+        Rect available = host_rect;
         const UiDesignerNode* host = document_->Find(node->parent);
         const int inset = host ? max(0, (int)host->GetProperty("inset", 0)) : 0;
         available = available.Deflated(DPI(inset));
@@ -2328,10 +2462,12 @@ void UiDesignerPreviewCanvas::LayoutNode(
         const Rect root_rect = rects_.Get(node->parent);
         const int x = node->parent == document_->GetRootId()
             ? available.left - root_rect.left + Align(ax == "Auto" ? "Left" : ax, available.Width(), cx)
-            : (int)Effective(*node, "x", 20 + depth * 18);
+            : min(max((int)Effective(*node, "x", 0), available.left - host_rect.left),
+                  available.left - host_rect.left + max(0, available.Width() - cx));
         const int y = node->parent == document_->GetRootId()
             ? available.top - root_rect.top + Align(ay == "Auto" ? "Top" : ay, available.Height(), cy)
-            : (int)Effective(*node, "y", 20 + ordinal * 44);
+            : min(max((int)Effective(*node, "y", 0), available.top - host_rect.top),
+                  available.top - host_rect.top + max(0, available.Height() - cy));
         instance.control->SetRect(x, y, cx, cy);
     }
     else if(instance.runtime_parent) {
@@ -2563,6 +2699,62 @@ void UiDesignerPreviewCanvas::ApplyActiveTabProjection()
                     tab->SetActiveTab(i);
                 break;
             }
+    }
+}
+
+void UiDesignerPreviewCanvas::ApplySelectionProjection()
+{
+    if(!document_ || !selection_)
+        return;
+
+    // Restore authored semantic state first. Selection is presentation state,
+    // so it must not create document history entries.
+    for(UiDesignerPreviewInstance& instance : instances_) {
+        const UiDesignerNode* node = document_->Find(instance.node);
+        if(!node || !instance.control)
+            continue;
+        if(node->type == "UiTab") {
+            UiTab* tab = dynamic_cast<UiTab *>(instance.control.Get());
+            const UiDesignerNodeId active = node->GetProperty("active_page", (UiDesignerNodeId)0);
+            const int index = tab && active ? FindIndex(node->children, active) : -1;
+            if(tab && index >= 0 && index < tab->GetCount())
+                tab->SetActiveTab(index);
+        }
+        else if(node->type == "UiAccordion") {
+            UiAccordion* accordion = dynamic_cast<UiAccordion *>(instance.control.Get());
+            if(!accordion)
+                continue;
+            for(int i = 0; i < node->children.GetCount(); i++) {
+                const UiDesignerNode* section = document_->Find(node->children[i]);
+                if(section && i < accordion->GetCount())
+                    accordion->Open(i, section->GetProperty("open", false));
+            }
+        }
+    }
+
+    const UiDesignerNode* selected = document_->Find(selection_->primary);
+    for(const UiDesignerNode* node = selected; node; ) {
+        if(node->type == "UiTabPage") {
+            const UiDesignerNode* owner = document_->Find(node->parent);
+            const int tab_instance = owner ? FindInstance(owner->id) : -1;
+            UiTab* tab = tab_instance >= 0
+                ? dynamic_cast<UiTab *>(instances_[tab_instance].control.Get()) : nullptr;
+            const int index = owner ? FindIndex(owner->children, node->id) : -1;
+            if(tab && index >= 0 && index < tab->GetCount())
+                tab->SetActiveTab(index);
+            break;
+        }
+        if(node->type == "UiAccordionSection") {
+            const UiDesignerNode* owner = document_->Find(node->parent);
+            const int accordion_instance = owner ? FindInstance(owner->id) : -1;
+            UiAccordion* accordion = accordion_instance >= 0
+                ? dynamic_cast<UiAccordion *>(instances_[accordion_instance].control.Get()) : nullptr;
+            const int index = owner ? FindIndex(owner->children, node->id) : -1;
+            if(accordion && index >= 0 && index < accordion->GetCount())
+                accordion->Open(index, true);
+            break;
+        }
+        node = document_->Find(node->parent);
     }
 }
 

@@ -903,6 +903,35 @@ inline void UiDraw9Slice(Draw& w, const Rect& dst, const Image& src, const Rect&
     }
 }
 
+inline void UiDrawImageFill(Draw& w, const Rect& target, const Image& image,
+                            UiBackgroundImageMode mode)
+{
+    if(target.IsEmpty() || IsNull(image))
+        return;
+    if(mode == UiBackgroundImageMode::Fill) {
+        w.DrawImage(target, image);
+        return;
+    }
+
+    const Size source_size = image.GetSize();
+    if(source_size.cx <= 0 || source_size.cy <= 0)
+        return;
+    const double target_ratio = (double)target.GetWidth() / target.GetHeight();
+    const double source_ratio = (double)source_size.cx / source_size.cy;
+    Rect source(0, 0, source_size.cx, source_size.cy);
+    if(source_ratio > target_ratio) {
+        int width = max(1, (int)(source_size.cy * target_ratio + 0.5));
+        source.left = (source_size.cx - width) / 2;
+        source.right = source.left + width;
+    }
+    else {
+        int height = max(1, (int)(source_size.cx / target_ratio + 0.5));
+        source.top = (source_size.cy - height) / 2;
+        source.bottom = source.top + height;
+    }
+    w.DrawImage(target, image, source);
+}
+
 // -------------------------------------------------------------------------
 // Styled icon helper
 // -------------------------------------------------------------------------
@@ -1362,7 +1391,7 @@ inline void UiPaintStyledBackground(Draw& w,
     if(skin.enabled && !IsNull(skin.base)) {
         // slice is THICKNESS; never test with Rect::IsEmpty()
         if(UiIsZeroThicknessRect(skin.slice))
-            w.DrawImage(r, skin.base);
+            UiDrawImageFill(w, r, skin.base, skin.image_mode);
         else
             UiDraw9Slice(w, r, skin.base, skin.slice);
 

@@ -126,7 +126,10 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     Value maximum;
     Value step;
     int decimals = 3;
+    int color_count = 1;
     String adapter_field_id;
+    String visible_when_id;
+    Value visible_when_value;
 
     Array<PropertyEditorChoice> choices;
 
@@ -140,7 +143,10 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
           kind(other.kind), domain(other.domain), impact(other.impact),
           default_value(other.default_value), minimum(other.minimum),
           maximum(other.maximum), step(other.step), decimals(other.decimals),
+          color_count(other.color_count),
           adapter_field_id(other.adapter_field_id),
+          visible_when_id(other.visible_when_id),
+          visible_when_value(other.visible_when_value),
           resettable(other.resettable), read_only(other.read_only),
           designer_only(other.designer_only)
     {
@@ -157,6 +163,9 @@ struct UiDesignerThemeOverrideSpec : Moveable<UiDesignerThemeOverrideSpec> {
     UiDesignerThemeOverrideSpec& Domain(PropertyEditorDomain value);
     UiDesignerThemeOverrideSpec& Default(const Value& value, bool can_reset = true);
     UiDesignerThemeOverrideSpec& AdapterField(const String& value);
+    UiDesignerThemeOverrideSpec& VisibleWhen(const String& field_id,
+                                             const Value& value);
+    UiDesignerThemeOverrideSpec& ColorCount(int count);
     UiDesignerThemeOverrideSpec& ReadOnly(bool on = true);
     UiDesignerThemeOverrideSpec& DesignerOnly(bool on = true);
 
@@ -232,6 +241,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     Vector<UiDesignerEventSpec> events;
     Vector<UiDesignerThemeOverrideSpec> theme_overrides;
     ValueMap defaults;
+    ValueMap data_defaults;
 
     String preview_adapter_id;
     String codegen_adapter_id;

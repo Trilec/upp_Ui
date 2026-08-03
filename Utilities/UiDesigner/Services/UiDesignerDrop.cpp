@@ -105,6 +105,8 @@ void UiDesignerDropService::PopulatePlacement(
     }
 
     if(freeform) {
+        const bool nested_container = child.sizing_class == UiDesignerSizingClass::Container &&
+                                      parent.id != document_->GetRootId();
         const int width = max(20, (int)UiDesignerMapValue(
             properties, "width", child.default_size.cx));
         const int height = max(20, (int)UiDesignerMapValue(
@@ -115,8 +117,12 @@ void UiDesignerDropService::PopulatePlacement(
         const int parent_height = parent.id == document_->GetRootId()
             ? document_->GetVirtualSize().cy
             : max(height, (int)parent.GetProperty("height", height));
-        const int x = min(SnapCoordinate(position.x), max(0, parent_width - width));
-        const int y = min(SnapCoordinate(position.y), max(0, parent_height - height));
+        const int x = nested_container ? 0
+                                       : min(SnapCoordinate(position.x),
+                                             max(0, parent_width - width));
+        const int y = nested_container ? 0
+                                       : min(SnapCoordinate(position.y),
+                                             max(0, parent_height - height));
         properties.Set("x", x);
         properties.Set("y", y);
         properties.Set("width", width);
@@ -186,14 +192,41 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
     if(parent->type == "UiGridLayout") {
         const int rows = max(1, (int)parent->GetProperty("rows", 2));
         const int columns = max(1, (int)parent->GetProperty("columns", 2));
-        const int row = grid_row >= 0 ? minmax(grid_row, 0, rows - 1)
-                                      : minmax(canvas_position.y * rows /
-                                               max(1, (int)parent->GetProperty("height", 180)),
-                                               0, rows - 1);
-        const int column = grid_column >= 0 ? minmax(grid_column, 0, columns - 1)
-                                            : minmax(canvas_position.x * columns /
-                                                     max(1, (int)parent->GetProperty("width", 320)),
-                                                     0, columns - 1);
+        int row = grid_row >= 0 ? minmax(grid_row, 0, rows - 1) : -1;
+        int column = grid_column >= 0 ? minmax(grid_column, 0, columns - 1) : -1;
+        if(row < 0 || column < 0) {
+            if(has_canvas_position) {
+                row = minmax(canvas_position.y * rows /
+                                 max(1, (int)parent->GetProperty("height", 180)),
+                             0, rows - 1);
+                column = minmax(canvas_position.x * columns /
+                                    max(1, (int)parent->GetProperty("width", 320)),
+                                0, columns - 1);
+            }
+            else {
+                for(int candidate = 0; candidate < rows * columns; candidate++) {
+                    const int candidate_row = candidate / columns;
+                    const int candidate_column = candidate % columns;
+                    bool occupied = false;
+                    for(const UiDesignerNode& child : document_->GetNodes())
+                        if(child.parent == parent->id &&
+                           (int)child.GetProperty("grid_row", -1) == candidate_row &&
+                           (int)child.GetProperty("grid_column", -1) == candidate_column) {
+                            occupied = true;
+                            break;
+                        }
+                    if(!occupied) {
+                        row = candidate_row;
+                        column = candidate_column;
+                        break;
+                    }
+                }
+            }
+        }
+        if(row < 0 || column < 0) {
+            plan.reason = "Grid has no free cells";
+            return plan;
+        }
         for(const UiDesignerNode& child : document_->GetNodes())
             if(child.parent == parent->id &&
                (int)child.GetProperty("grid_row", -1) == row &&
@@ -201,12 +234,14 @@ UiDesignerDropPlan UiDesignerDropService::PlanAdd(
                 plan.reason = Format("Grid row %d, column %d is occupied", row, column);
                 return plan;
             }
+        plan.grid_row = row;
+        plan.grid_column = column;
     }
 
     plan.add_defaults = clone(spec->defaults);
-    if(has_canvas_position)
+    if(has_canvas_position || parent->type == "UiGridLayout")
         PopulatePlacement(*spec, *parent, canvas_position,
-                          grid_row, grid_column, plan.add_defaults, false);
+                          plan.grid_row, plan.grid_column, plan.add_defaults, false);
     plan.label = "Add " + spec->display_name;
     plan.valid = true;
     return plan;
@@ -366,7 +401,7 @@ bool UiDesignerDropService::Execute(const UiDesignerDropPlan& plan,
             spec->type_id, MakeUniqueName(*spec), plan.parent, plan.index,
             spec->node_flags, plan.add_defaults,
             plan.label.IsEmpty() ? "Add " + spec->display_name : plan.label,
-            open_section);
+            open_section, spec->data_defaults);
         if(!id)
             return Fail(commands_->GetLastError());
         if(created)

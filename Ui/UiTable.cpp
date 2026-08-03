@@ -133,7 +133,7 @@ const UiTable::Style& UiTable::GetEffectiveStyle() const
 
     uint64 rev = UiTheme::GetRevision();
     if(theme_revision_ != rev) {
-        themed_style_ = StyleDefault();
+        themed_style_ = UiTheme::ResolveTable();
         theme_revision_ = rev;
     }
     return themed_style_;

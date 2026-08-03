@@ -9,9 +9,59 @@
 #include <Ui/UiColorPicker.h>
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiAccordion.h>
+#include <Ui/UiTab.h>
+#include <Ui/UiPanel.h>
+#include <Ui/UiGroupPanel.h>
+#include <Ui/UiScrollPanel.h>
+#include <Ui/UiLabel.h>
+#include <Ui/UiCheckBox.h>
+#include <Ui/UiRadioButton.h>
+#include <Ui/UiToggle.h>
+#include <Ui/UiProgressBar.h>
+#include <Ui/UiSlider.h>
+#include <Ui/UiScrollBar.h>
+#include <Ui/UiDropdown.h>
+#include <Ui/UiBaseEdit.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
+
+UiDesignerSurfaceKind UiDesignerParseSurfaceKind(const Value& value)
+{
+    const String name = value;
+    if(name == "None") return UiDesignerSurfaceKind::None;
+    if(name == "Solid") return UiDesignerSurfaceKind::Solid;
+    if(name == "Gradient") return UiDesignerSurfaceKind::Gradient;
+    if(name == "Image") return UiDesignerSurfaceKind::Image;
+    if(name == "NineSlice") return UiDesignerSurfaceKind::NineSlice;
+    if(name == "Dashed") return UiDesignerSurfaceKind::Dashed;
+    return UiDesignerSurfaceKind::UseTheme;
+}
+
+String UiDesignerSurfaceKindName(UiDesignerSurfaceKind kind)
+{
+    switch(kind) {
+    case UiDesignerSurfaceKind::None: return "None";
+    case UiDesignerSurfaceKind::Solid: return "Solid";
+    case UiDesignerSurfaceKind::Gradient: return "Gradient";
+    case UiDesignerSurfaceKind::Image: return "Image";
+    case UiDesignerSurfaceKind::NineSlice: return "NineSlice";
+    case UiDesignerSurfaceKind::Dashed: return "Dashed";
+    default: return "UseTheme";
+    }
+}
+
+void UiDesignerAddSurfaceChoices(UiDesignerThemeOverrideSpec& spec, bool include_dashed)
+{
+    spec.Choice("UseTheme", "Use theme")
+        .Choice("None", "None")
+        .Choice("Solid", "Solid")
+        .Choice("Gradient", "Gradient")
+        .Choice("Image", "Image")
+        .Choice("NineSlice", "Nine-slice");
+    if(include_dashed)
+        spec.Choice("Dashed", "Dashed");
+}
 
 static UiRole ParseRole(const Value& value)
 {
@@ -761,7 +811,8 @@ public:
     bool Supports(UiDesignerRuntimeKind kind) const override
     {
         return tool_button_ ? kind == UiDesignerRuntimeKind::UiToolButton
-                            : kind == UiDesignerRuntimeKind::UiButton;
+                            : kind == UiDesignerRuntimeKind::UiButton ||
+                              kind == UiDesignerRuntimeKind::UiSplitButton;
     }
 
     void AddThemeOverrides(UiDesignerControlSpec& spec) const override
@@ -2087,6 +2138,243 @@ static UiTitleCard::Style ResolveTitleCardThemeBase(UiRole role)
     return UiTheme::ResolveTitleCard(role);
 }
 
+static const char *const edit_fields[] = {
+    "font_face", "font_size", "font_bold", "font_italic", "text_align",
+    "face_enabled", "face_normal", "face_hot", "face_pressed", "face_disabled",
+    "frame_enabled", "frame_normal", "frame_hot", "frame_pressed", "frame_disabled",
+    "frame_width", "radius", "text_normal", "text_hot", "text_pressed", "text_disabled",
+    "caret_color", "caret_width", "block_caret", "selection_color", "selection_ink",
+    "placeholder_ink", "underline_enabled", "underline_width",
+    "underline_normal", "underline_hot", "underline_pressed", "underline_disabled"
+};
+
+static UiBaseEdit::Style ResolveEditStyleBase(const UiDesignerNode& node)
+{
+    return UiTheme::ResolveEdit(ParseRole(node.GetProperty("role", "Standard")));
+}
+
+static Value EditFieldValue(const UiBaseEdit::Style& s, const String& id)
+{
+    if(id == "font_face") return s.font.GetFaceName();
+    if(id == "font_size") return s.font.GetHeight();
+    if(id == "font_bold") return s.font.IsBold();
+    if(id == "font_italic") return s.font.IsItalic();
+    if(id == "text_align") return s.text_align == UiAlign::RIGHT ? "Right" :
+        s.text_align == UiAlign::CENTER ? "Center" : "Left";
+    if(id == "face_enabled") return s.metrics.face_enabled;
+    if(id == "face_normal") return UiDesignerFillColor(s.palette.face[ST_NORMAL]);
+    if(id == "face_hot") return UiDesignerFillColor(s.palette.face[ST_HOT]);
+    if(id == "face_pressed") return UiDesignerFillColor(s.palette.face[ST_PRESSED]);
+    if(id == "face_disabled") return UiDesignerFillColor(s.palette.face[ST_DISABLED]);
+    if(id == "frame_enabled") return s.metrics.frame_enabled;
+    if(id == "frame_normal") return s.palette.frame[ST_NORMAL];
+    if(id == "frame_hot") return s.palette.frame[ST_HOT];
+    if(id == "frame_pressed") return s.palette.frame[ST_PRESSED];
+    if(id == "frame_disabled") return s.palette.frame[ST_DISABLED];
+    if(id == "frame_width") return s.metrics.frame_width;
+    if(id == "radius") return s.metrics.radius;
+    if(id == "text_normal") return s.palette.ink[ST_NORMAL];
+    if(id == "text_hot") return s.palette.ink[ST_HOT];
+    if(id == "text_pressed") return s.palette.ink[ST_PRESSED];
+    if(id == "text_disabled") return s.palette.ink[ST_DISABLED];
+    if(id == "caret_color") return s.caret_color;
+    if(id == "caret_width") return s.caret_width;
+    if(id == "block_caret") return s.block_caret;
+    if(id == "selection_color") return s.selection_color;
+    if(id == "selection_ink") return s.selection_ink;
+    if(id == "placeholder_ink") return s.placeholder_ink;
+    if(id == "underline_enabled") return s.underline_enabled;
+    if(id == "underline_width") return s.underline_width;
+    if(id == "underline_normal") return s.underline[ST_NORMAL];
+    if(id == "underline_hot") return s.underline[ST_HOT];
+    if(id == "underline_pressed") return s.underline[ST_PRESSED];
+    if(id == "underline_disabled") return s.underline[ST_DISABLED];
+    return Value();
+}
+
+static void ApplyEditField(UiBaseEdit::Style& s, const String& id, const Value& v)
+{
+    if(id == "font_face") s.font.FaceName(AsString(v));
+    else if(id == "font_size") s.font.Height(max(1, (int)v));
+    else if(id == "font_bold") s.font.Bold((bool)v);
+    else if(id == "font_italic") s.font.Italic((bool)v);
+    else if(id == "text_align") s.text_align = AsString(v) == "Right" ? UiAlign::RIGHT :
+        AsString(v) == "Center" ? UiAlign::CENTER : UiAlign::LEFT;
+    else if(id == "face_enabled") s.metrics.face_enabled = (bool)v;
+    else if(id == "face_normal") s.palette.face[ST_NORMAL] = UiFill::Solid(Color(v));
+    else if(id == "face_hot") s.palette.face[ST_HOT] = UiFill::Solid(Color(v));
+    else if(id == "face_pressed") s.palette.face[ST_PRESSED] = UiFill::Solid(Color(v));
+    else if(id == "face_disabled") s.palette.face[ST_DISABLED] = UiFill::Solid(Color(v));
+    else if(id == "frame_enabled") s.metrics.frame_enabled = (bool)v;
+    else if(id == "frame_normal") s.palette.frame[ST_NORMAL] = Color(v);
+    else if(id == "frame_hot") s.palette.frame[ST_HOT] = Color(v);
+    else if(id == "frame_pressed") s.palette.frame[ST_PRESSED] = Color(v);
+    else if(id == "frame_disabled") s.palette.frame[ST_DISABLED] = Color(v);
+    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
+    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    else if(id == "text_normal") s.palette.ink[ST_NORMAL] = Color(v);
+    else if(id == "text_hot") s.palette.ink[ST_HOT] = Color(v);
+    else if(id == "text_pressed") s.palette.ink[ST_PRESSED] = Color(v);
+    else if(id == "text_disabled") s.palette.ink[ST_DISABLED] = Color(v);
+    else if(id == "caret_color") s.caret_color = Color(v);
+    else if(id == "caret_width") s.caret_width = max(1, (int)v);
+    else if(id == "block_caret") s.block_caret = (bool)v;
+    else if(id == "selection_color") s.selection_color = Color(v);
+    else if(id == "selection_ink") s.selection_ink = Color(v);
+    else if(id == "placeholder_ink") s.placeholder_ink = Color(v);
+    else if(id == "underline_enabled") s.underline_enabled = (bool)v;
+    else if(id == "underline_width") s.underline_width = max(1, (int)v);
+    else if(id == "underline_normal") s.underline[ST_NORMAL] = Color(v);
+    else if(id == "underline_hot") s.underline[ST_HOT] = Color(v);
+    else if(id == "underline_pressed") s.underline[ST_PRESSED] = Color(v);
+    else if(id == "underline_disabled") s.underline[ST_DISABLED] = Color(v);
+}
+
+static void AddEditThemeOverrides(UiDesignerControlSpec& spec)
+{
+    const UiBaseEdit::Style base = UiTheme::ResolveEdit(UiRole::Standard);
+    auto add = [&](const char *id, const char *label, const char *group,
+                   PropertyEditorKind kind, const Value& value,
+                   PropertyEditorImpact impact = PropertyImpactPaint | PropertyImpactCode) {
+        UiDesignerThemeOverrideSpec item;
+        item.id = id; item.label = label; item.group = group; item.kind = kind;
+        item.domain = PropertyEditorDomain::Theme; item.default_value = value;
+        item.impact = impact; item.adapter_field_id = id;
+        spec.theme_overrides.Add(pick(item));
+    };
+    add("font_face", "Font face", "Typography", PropertyEditorKind::Text, base.font.GetFaceName(), PropertyImpactPaint | PropertyImpactCode | PropertyImpactLocalLayout);
+    add("font_size", "Font size", "Typography", PropertyEditorKind::Integer, base.font.GetHeight(), PropertyImpactPaint | PropertyImpactCode | PropertyImpactLocalLayout);
+    add("font_bold", "Font bold", "Typography", PropertyEditorKind::Boolean, base.font.IsBold());
+    add("font_italic", "Font italic", "Typography", PropertyEditorKind::Boolean, base.font.IsItalic());
+    UiDesignerThemeOverrideSpec align; align.id = "text_align"; align.label = "Text align"; align.group = "Typography"; align.kind = PropertyEditorKind::Choice; align.domain = PropertyEditorDomain::Theme; align.default_value = "Left"; align.impact = PropertyImpactPaint | PropertyImpactCode; align.adapter_field_id = "text_align"; align.Choice("Left", "Left").Choice("Center", "Center").Choice("Right", "Right"); spec.theme_overrides.Add(pick(align));
+    add("face_enabled", "Face enabled", "Face", PropertyEditorKind::Boolean, base.metrics.face_enabled);
+    add("face_normal", "Face normal", "Face", PropertyEditorKind::Color, UiDesignerFillColor(base.palette.face[ST_NORMAL]));
+    add("face_hot", "Face hot", "Face", PropertyEditorKind::Color, UiDesignerFillColor(base.palette.face[ST_HOT]));
+    add("face_pressed", "Face pressed", "Face", PropertyEditorKind::Color, UiDesignerFillColor(base.palette.face[ST_PRESSED]));
+    add("face_disabled", "Face disabled", "Face", PropertyEditorKind::Color, UiDesignerFillColor(base.palette.face[ST_DISABLED]));
+    add("frame_enabled", "Frame enabled", "Frame", PropertyEditorKind::Boolean, base.metrics.frame_enabled);
+    add("frame_normal", "Frame normal", "Frame", PropertyEditorKind::Color, base.palette.frame[ST_NORMAL]);
+    add("frame_hot", "Frame hot", "Frame", PropertyEditorKind::Color, base.palette.frame[ST_HOT]);
+    add("frame_pressed", "Frame pressed", "Frame", PropertyEditorKind::Color, base.palette.frame[ST_PRESSED]);
+    add("frame_disabled", "Frame disabled", "Frame", PropertyEditorKind::Color, base.palette.frame[ST_DISABLED]);
+    add("frame_width", "Frame width", "Frame", PropertyEditorKind::Integer, base.metrics.frame_width);
+    add("radius", "Radius", "Frame", PropertyEditorKind::Integer, base.metrics.radius);
+    add("text_normal", "Text normal", "Text", PropertyEditorKind::Color, base.palette.ink[ST_NORMAL]);
+    add("text_hot", "Text hot", "Text", PropertyEditorKind::Color, base.palette.ink[ST_HOT]);
+    add("text_pressed", "Text pressed", "Text", PropertyEditorKind::Color, base.palette.ink[ST_PRESSED]);
+    add("text_disabled", "Text disabled", "Text", PropertyEditorKind::Color, base.palette.ink[ST_DISABLED]);
+    add("caret_color", "Caret color", "Editing", PropertyEditorKind::Color, base.caret_color);
+    add("caret_width", "Caret width", "Editing", PropertyEditorKind::Integer, base.caret_width);
+    add("block_caret", "Block caret", "Editing", PropertyEditorKind::Boolean, base.block_caret);
+    add("selection_color", "Selection color", "Editing", PropertyEditorKind::Color, base.selection_color);
+    add("selection_ink", "Selection ink", "Editing", PropertyEditorKind::Color, base.selection_ink);
+    add("placeholder_ink", "Placeholder ink", "Editing", PropertyEditorKind::Color, base.placeholder_ink);
+    add("underline_enabled", "Underline enabled", "Underline", PropertyEditorKind::Boolean, base.underline_enabled);
+    add("underline_width", "Underline width", "Underline", PropertyEditorKind::Integer, base.underline_width);
+    add("underline_normal", "Underline normal", "Underline", PropertyEditorKind::Color, base.underline[ST_NORMAL]);
+    add("underline_hot", "Underline hot", "Underline", PropertyEditorKind::Color, base.underline[ST_HOT]);
+    add("underline_pressed", "Underline pressed", "Underline", PropertyEditorKind::Color, base.underline[ST_PRESSED]);
+    add("underline_disabled", "Underline disabled", "Underline", PropertyEditorKind::Color, base.underline[ST_DISABLED]);
+}
+
+static void EmitEditField(String& out, const String& style, const String& id,
+                          const Value& value)
+{
+    if(id == "font_face") out << style << ".font.FaceName(" << CppString(AsString(value)) << ");\n";
+    else if(id == "font_size") out << style << ".font.Height(" << max(1, (int)value) << ");\n";
+    else if(id == "font_bold") out << style << ".font.Bold(" << ((bool)value ? "true" : "false") << ");\n";
+    else if(id == "font_italic") out << style << ".font.Italic(" << ((bool)value ? "true" : "false") << ");\n";
+    else if(id == "text_align") out << style << ".text_align = " << EmitAlign(AsString(value)) << ";\n";
+    else if(id == "face_enabled") out << style << ".metrics.face_enabled = " << ((bool)value ? "true" : "false") << ";\n";
+    else if(id.StartsWith("face_")) out << style << ".palette.face[ST_" << ToUpper(id.Mid(5)) << "] = UiFill::Solid(" << EmitValue(value) << ");\n";
+    else if(id == "frame_enabled") out << style << ".metrics.frame_enabled = " << ((bool)value ? "true" : "false") << ";\n";
+    else if(id.StartsWith("frame_")) out << style << ".palette.frame[ST_" << ToUpper(id.Mid(6)) << "] = " << EmitValue(value) << ";\n";
+    else if(id == "frame_width") out << style << ".metrics.frame_width = " << (int)value << ";\n";
+    else if(id == "radius") out << style << ".metrics.radius = " << (int)value << ";\n";
+    else if(id.StartsWith("text_")) out << style << ".palette.ink[ST_" << ToUpper(id.Mid(5)) << "] = " << EmitValue(value) << ";\n";
+    else if(id == "caret_color") out << style << ".caret_color = " << EmitValue(value) << ";\n";
+    else if(id == "caret_width") out << style << ".caret_width = " << (int)value << ";\n";
+    else if(id == "block_caret") out << style << ".block_caret = " << ((bool)value ? "true" : "false") << ";\n";
+    else if(id == "selection_color") out << style << ".selection_color = " << EmitValue(value) << ";\n";
+    else if(id == "selection_ink") out << style << ".selection_ink = " << EmitValue(value) << ";\n";
+    else if(id == "placeholder_ink") out << style << ".placeholder_ink = " << EmitValue(value) << ";\n";
+    else if(id == "underline_enabled") out << style << ".underline_enabled = " << ((bool)value ? "true" : "false") << ";\n";
+    else if(id == "underline_width") out << style << ".underline_width = " << (int)value << ";\n";
+    else if(id.StartsWith("underline_")) out << style << ".underline[ST_" << ToUpper(id.Mid(10)) << "] = " << EmitValue(value) << ";\n";
+}
+
+class EditThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    const char *Id() const override { return "edit"; }
+    bool Supports(UiDesignerRuntimeKind kind) const override
+    {
+        return kind == UiDesignerRuntimeKind::UiLineEdit ||
+               kind == UiDesignerRuntimeKind::UiIntEdit ||
+               kind == UiDesignerRuntimeKind::UiFloatEdit ||
+               kind == UiDesignerRuntimeKind::UiPasswordEdit ||
+               kind == UiDesignerRuntimeKind::UiMultiEdit ||
+               kind == UiDesignerRuntimeKind::UiMaskEdit;
+    }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override { AddEditThemeOverrides(spec); }
+    bool HasField(const String& field_id) const override { return FieldMatches(field_id, edit_fields, sizeof(edit_fields) / sizeof(edit_fields[0])); }
+    bool FieldAffectsLayout(const String& field_id) const override
+    {
+        return field_id == "font_face" || field_id == "font_size" || field_id == "frame_width" || field_id == "radius";
+    }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec,
+                            const String& field_id, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiBaseEdit::Style style = ResolveEditStyleBase(node);
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            ApplyEditField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value));
+        }
+        return EditFieldValue(style, field_id);
+    }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node,
+                           const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiBaseEdit* edit = dynamic_cast<UiBaseEdit *>(&ctrl);
+        if(!edit) return;
+        UiBaseEdit::Style style = ResolveEditStyleBase(node);
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            authored = true;
+            ApplyEditField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value));
+        }
+        if(authored || ParseRole(node.GetProperty("role", "Standard")) != UiRole::Standard)
+            edit->SetCustomStyle(style);
+        else
+            edit->ClearCustomStyle();
+    }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node,
+                   const UiDesignerControlSpec& spec) const override
+    {
+        const bool authored = [&] { for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) if(node.theme_overrides.Find(p.id) >= 0) return true; return false; }();
+        const String role = AsString(node.GetProperty("role", "Standard"));
+        if(!authored && role == "Standard") return;
+        const String role_expr = role == "Subtle" ? "UiEditRole::Subtle" : role == "Accent" ? "UiEditRole::Strong" : role == "Alert" ? "UiEditRole::Strong" : "UiEditRole::Field";
+        const String var = member + "_style";
+        out << "\tUiBaseEdit::Style " << var << " = UiTheme::ResolveEdit(" << role_expr << ");\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0) continue;
+            const Value v = node.theme_overrides.GetValue(q);
+            if(p.adapter_field_id == "font_face") out << "\t" << var << ".font.FaceName(" << CppString(AsString(v)) << ");\n";
+            else if(p.adapter_field_id == "font_size") out << "\t" << var << ".font.Height(" << max(1, (int)v) << ");\n";
+            else {
+                String field;
+                EmitEditField(field, var, p.adapter_field_id, v);
+                out << "\t" << field;
+            }
+        }
+        out << "\t" << member << ".SetCustomStyle(" << var << ");\n";
+    }
+};
+
 static void ApplyTitleCardThemeField(UiTitleCard::Style& style,
                                      const String& field_id,
                                      const Value& value)
@@ -2363,6 +2651,463 @@ public:
     }
 };
 
+struct PanelThemeValues {
+    UiDesignerSurfaceKind face_surface = UiDesignerSurfaceKind::UseTheme;
+    Color face[4];
+    UiDesignerSurfaceKind frame_surface = UiDesignerSurfaceKind::UseTheme;
+    Color frame[4];
+    int frame_width;
+    int radius;
+    bool transparent;
+};
+
+static PanelThemeValues ResolvePanelThemeValues(UiDesignerRuntimeKind kind, UiRole role)
+{
+    PanelThemeValues v;
+    if(kind == UiDesignerRuntimeKind::UiGroupPanel) {
+        UiGroupPanel::Style s = UiTheme::ResolveGroupPanel(role);
+        for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
+        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiScrollPanel) {
+        UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(role);
+        for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
+        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+    }
+    else {
+        UiPanel::Style s = UiTheme::ResolvePanel(role);
+        for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
+        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+    }
+    return v;
+}
+
+static void ApplyPanelThemeField(UiPanel::Style& s, const String& id, const Value& v)
+{
+    if(id == "face_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
+    }
+    else if(id == "frame_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
+    }
+    else if(id == "face_colors" || id == "frame_colors") {
+        if(!v.Is<ValueArray>()) return;
+        ValueArray colors = v;
+        for(int i = 0; i < min(4, colors.GetCount()); i++)
+            if(colors[i].Is<Color>()) {
+                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
+                else s.palette.frame[i] = (Color)colors[i];
+            }
+    }
+    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
+    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    else if(id == "transparent") s.transparent = (bool)v;
+}
+
+static void ApplyPanelThemeField(UiGroupPanel::Style& s, const String& id, const Value& v)
+{
+    if(id == "face_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
+    }
+    else if(id == "frame_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
+    }
+    else if(id == "face_colors" || id == "frame_colors") {
+        if(!v.Is<ValueArray>()) return;
+        ValueArray colors = v;
+        for(int i = 0; i < min(4, colors.GetCount()); i++)
+            if(colors[i].Is<Color>()) {
+                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
+                else s.palette.frame[i] = (Color)colors[i];
+            }
+    }
+    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
+    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    else if(id == "transparent") s.transparent = (bool)v;
+}
+
+static void ApplyPanelThemeField(UiScrollPanel::Style& s, const String& id, const Value& v)
+{
+    if(id == "face_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.face_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid) s.metrics.face_enabled = true;
+    }
+    else if(id == "frame_surface") {
+        const UiDesignerSurfaceKind kind = UiDesignerParseSurfaceKind(v);
+        if(kind == UiDesignerSurfaceKind::None) s.metrics.frame_enabled = false;
+        else if(kind == UiDesignerSurfaceKind::Solid || kind == UiDesignerSurfaceKind::Dashed) s.metrics.frame_enabled = true;
+    }
+    else if(id == "face_colors" || id == "frame_colors") {
+        if(!v.Is<ValueArray>()) return;
+        ValueArray colors = v;
+        for(int i = 0; i < min(4, colors.GetCount()); i++)
+            if(colors[i].Is<Color>()) {
+                if(id == "face_colors") s.palette.face[i] = UiFill::Solid((Color)colors[i]);
+                else s.palette.frame[i] = (Color)colors[i];
+            }
+    }
+    else if(id == "frame_width") s.metrics.frame_width = max(0, (int)v);
+    else if(id == "radius") s.metrics.radius = max(0, (int)v);
+    else if(id == "transparent") s.transparent = (bool)v;
+}
+
+class PanelThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    explicit PanelThemeAdapter(const char *id, UiDesignerRuntimeKind kind) : id_(id), kind_(kind) {}
+    const char *Id() const override { return id_; }
+    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == kind_; }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override
+    {
+        PanelThemeValues b = ResolvePanelThemeValues(kind_, UiRole::Standard);
+        AddOverride(spec, "face_surface", "Face", "Surface", PropertyEditorKind::Choice, String("UseTheme"), PropertyImpactPaint | PropertyImpactCode, "face_surface", "Use theme inherits the active theme; None explicitly removes the face.");
+        UiDesignerAddSurfaceChoices(spec.theme_overrides.Top());
+        ValueArray face_colors;
+        for(int i = 0; i < 4; i++) face_colors.Add(b.face[i]);
+        AddOverride(spec, "face_colors", "Face colours", "Face", PropertyEditorKind::ColorPalette,
+                    face_colors, PropertyImpactPaint | PropertyImpactCode, "face_colors");
+        spec.theme_overrides.Top().ColorCount(4).VisibleWhen("face_surface", "Solid");
+        AddOverride(spec, "frame_surface", "Frame", "Surface", PropertyEditorKind::Choice, String("UseTheme"), PropertyImpactPaint | PropertyImpactCode, "frame_surface", "Use theme inherits the active theme; None explicitly removes the frame.");
+        UiDesignerAddSurfaceChoices(spec.theme_overrides.Top(), true);
+        ValueArray frame_colors;
+        for(int i = 0; i < 4; i++) frame_colors.Add(b.frame[i]);
+        AddOverride(spec, "frame_colors", "Frame colours", "Frame", PropertyEditorKind::ColorPalette,
+                    frame_colors, PropertyImpactPaint | PropertyImpactCode, "frame_colors");
+        spec.theme_overrides.Top().ColorCount(4).VisibleWhen("frame_surface", "Solid");
+        AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer, b.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width");
+        AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "transparent", "Transparent", "Surface", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
+    }
+    bool HasField(const String& id) const override { return id == "face_surface" || id == "frame_surface" || id == "face_colors" || id == "frame_colors" || id == "frame_width" || id == "radius" || id == "transparent"; }
+    bool FieldAffectsLayout(const String& id) const override { return id == "face_surface" || id == "frame_surface" || id == "frame_width" || id == "radius"; }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec, const String& id, const UiDesignerTransientOverlay* overlay) const override
+    {
+        PanelThemeValues v = ResolvePanelThemeValues(kind_, ParseRole(node.GetProperty("role", "Standard")));
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            Value x = ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
+            if(p.adapter_field_id == "face_surface") v.face_surface = UiDesignerParseSurfaceKind(x);
+            else if(p.adapter_field_id == "frame_surface") v.frame_surface = UiDesignerParseSurfaceKind(x);
+            else if(p.adapter_field_id == "face_colors" && x.Is<ValueArray>()) {
+                ValueArray colors = x;
+                for(int i = 0; i < min(4, colors.GetCount()); i++)
+                    if(colors[i].Is<Color>()) v.face[i] = (Color)colors[i];
+            }
+            else if(p.adapter_field_id == "frame_colors" && x.Is<ValueArray>()) {
+                ValueArray colors = x;
+                for(int i = 0; i < min(4, colors.GetCount()); i++)
+                    if(colors[i].Is<Color>()) v.frame[i] = (Color)colors[i];
+            }
+            else if(p.adapter_field_id == "frame_width") v.frame_width = (int)x;
+            else if(p.adapter_field_id == "radius") v.radius = (int)x;
+            else if(p.adapter_field_id == "transparent") v.transparent = (bool)x;
+        }
+        if(id == "face_surface") return UiDesignerSurfaceKindName(v.face_surface);
+        if(id == "frame_surface") return UiDesignerSurfaceKindName(v.frame_surface);
+        if(id == "face_colors") {
+            ValueArray colors;
+            for(int i = 0; i < 4; i++) colors.Add(v.face[i]);
+            return colors;
+        }
+        if(id == "frame_colors") {
+            ValueArray colors;
+            for(int i = 0; i < 4; i++) colors.Add(v.frame[i]);
+            return colors;
+        }
+        if(id == "frame_width") return v.frame_width; if(id == "radius") return v.radius;
+        if(id == "transparent") return v.transparent; return Value();
+    }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
+    {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) authored |= HasThemeValue(node, overlay, p.id);
+        const UiRole role = ParseRole(node.GetProperty("role", "Standard"));
+        if(kind_ == UiDesignerRuntimeKind::UiGroupPanel) {
+            UiGroupPanel *c = dynamic_cast<UiGroupPanel *>(&ctrl); if(!c) return;
+            UiGroupPanel::Style s = UiTheme::ResolveGroupPanel(role);
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
+        }
+        else if(kind_ == UiDesignerRuntimeKind::UiScrollPanel) {
+            UiScrollPanel *c = dynamic_cast<UiScrollPanel *>(&ctrl); if(!c) return;
+            UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(role);
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
+        }
+        else {
+            UiPanel *c = dynamic_cast<UiPanel *>(&ctrl); if(!c) return;
+            UiPanel::Style s = UiTheme::ResolvePanel(role);
+            for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q >= 0 || HasThemeValue(node, overlay, p.id)) ApplyPanelThemeField(s, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); }
+            if(authored || role != UiRole::Standard) c->SetCustomStyle(s); else c->ClearCustomStyle();
+        }
+    }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override
+    {
+        bool authored = false; for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) authored |= node.theme_overrides.Find(p.id) >= 0;
+        if(!authored) return;
+        const char *resolver = kind_ == UiDesignerRuntimeKind::UiGroupPanel ? "UiTheme::ResolveGroupPanel(UiRole::Standard)" : kind_ == UiDesignerRuntimeKind::UiScrollPanel ? "UiTheme::ResolveScrollPanel(UiRole::Standard)" : "UiTheme::ResolvePanel(UiRole::Standard)";
+        out << "\t" << node.type << "::Style " << member << "_style = " << resolver << ";\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { const int q = node.theme_overrides.Find(p.id); if(q < 0) continue; const Value v = node.theme_overrides.GetValue(q); const String f = p.adapter_field_id;
+            if(f == "face_surface" && AsString(v) == "None") out << "\t" << member << "_style.metrics.face_enabled = false;\n";
+            else if(f == "face_surface" && AsString(v) == "Solid") out << "\t" << member << "_style.metrics.face_enabled = true;\n";
+            else if(f == "frame_surface" && AsString(v) == "None") out << "\t" << member << "_style.metrics.frame_enabled = false;\n";
+            else if(f == "frame_surface" && (AsString(v) == "Solid" || AsString(v) == "Dashed")) out << "\t" << member << "_style.metrics.frame_enabled = true;\n";
+            else if(f == "face_colors" && v.Is<ValueArray>()) {
+                ValueArray colors = v;
+                static const char *states[] = {"ST_NORMAL", "ST_HOT", "ST_PRESSED", "ST_DISABLED"};
+                for(int i = 0; i < min(4, colors.GetCount()); i++)
+                    if(colors[i].Is<Color>())
+                        out << "\t" << member << "_style.palette.face[" << states[i] << "] = UiFill::Solid(" << EmitValue(colors[i]) << ");\n";
+            }
+            else if(f == "frame_colors" && v.Is<ValueArray>()) {
+                ValueArray colors = v;
+                static const char *states[] = {"ST_NORMAL", "ST_HOT", "ST_PRESSED", "ST_DISABLED"};
+                for(int i = 0; i < min(4, colors.GetCount()); i++)
+                    if(colors[i].Is<Color>())
+                        out << "\t" << member << "_style.palette.frame[" << states[i] << "] = " << EmitValue(colors[i]) << ";\n";
+            }
+            else if(f == "frame_width") out << "\t" << member << "_style.metrics.frame_width = DPI(" << (int)v << ");\n";
+            else if(f == "radius") out << "\t" << member << "_style.metrics.radius = DPI(" << (int)v << ");\n";
+            else if(f == "transparent") out << "\t" << member << "_style.transparent = " << AsString((bool)v) << ";\n";
+        }
+        out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n";
+    }
+private:
+    const char *id_; UiDesignerRuntimeKind kind_;
+};
+
+struct BasicThemeValues {
+    Color face;
+    Color frame;
+    Color ink;
+    bool face_enabled;
+    bool frame_enabled;
+    int frame_width;
+};
+
+static BasicThemeValues ResolveBasicThemeValues(UiDesignerRuntimeKind kind, UiRole role)
+{
+    BasicThemeValues v;
+    if(kind == UiDesignerRuntimeKind::UiLabel) {
+        UiLabel::Style s = UiTheme::ResolveLabel(role); v.face = UiDesignerFillColor(s.palette.face[ST_NORMAL]); v.frame = s.palette.frame[ST_NORMAL]; v.ink = s.palette.ink[ST_NORMAL]; v.face_enabled = s.metrics.face_enabled; v.frame_enabled = s.metrics.frame_enabled; v.frame_width = s.metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiCheckBox) {
+        UiCheckBox::Style s = UiTheme::ResolveCheckBox(role, UICHECKVIS_CLASSIC); v.face = UiDesignerFillColor(s.palette.face[ST_NORMAL]); v.frame = s.palette.frame[ST_NORMAL]; v.ink = s.palette.ink[ST_NORMAL]; v.face_enabled = s.metrics.face_enabled; v.frame_enabled = s.metrics.frame_enabled; v.frame_width = s.metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiRadioButton) {
+        UiRadioButton::Style s = UiTheme::ResolveRadioButton(role, UIRADIOVIS_CLASSIC); v.face = UiDesignerFillColor(s.palette.face[ST_NORMAL]); v.frame = s.palette.frame[ST_NORMAL]; v.ink = s.palette.ink[ST_NORMAL]; v.face_enabled = s.metrics.face_enabled; v.frame_enabled = s.metrics.frame_enabled; v.frame_width = s.metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiToggle) {
+        UiToggle::Style s = UiTheme::ResolveToggle(); v.face = UiDesignerFillColor(s.palette.face[ST_NORMAL]); v.frame = s.palette.frame[ST_NORMAL]; v.ink = s.palette.ink[ST_NORMAL]; v.face_enabled = s.metrics.face_enabled; v.frame_enabled = s.metrics.frame_enabled; v.frame_width = s.metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiProgressBar) {
+        UiProgressBar::Style s = UiTheme::ResolveProgressBar(role); v.face = UiDesignerFillColor(s.track_palette.face[ST_NORMAL]); v.frame = s.track_palette.frame[ST_NORMAL]; v.ink = s.fill_palette.ink[ST_NORMAL]; v.face_enabled = s.track_metrics.face_enabled; v.frame_enabled = s.track_metrics.frame_enabled; v.frame_width = s.track_metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiSlider) {
+        UiSlider::Style s = UiTheme::ResolveSlider(); v.face = UiDesignerFillColor(s.track_palette.face[ST_NORMAL]); v.frame = s.track_palette.frame[ST_NORMAL]; v.ink = UiDesignerFillColor(s.thumb_palette.face[ST_NORMAL]); v.face_enabled = s.track_metrics.face_enabled; v.frame_enabled = s.track_metrics.frame_enabled; v.frame_width = s.track_metrics.frame_width;
+    }
+    else if(kind == UiDesignerRuntimeKind::UiScrollBar) {
+        UiScrollBar::Style s = UiTheme::ResolveScrollBar(); v.face = UiDesignerFillColor(s.track_palette.face[ST_NORMAL]); v.frame = s.track_palette.frame[ST_NORMAL]; v.ink = UiDesignerFillColor(s.thumb_palette.face[ST_NORMAL]); v.face_enabled = s.track_metrics.face_enabled; v.frame_enabled = s.track_metrics.frame_enabled; v.frame_width = s.track_metrics.frame_width;
+    }
+    else {
+        UiDropdown::Style s = UiTheme::ResolveDropdown(role); v.face = UiDesignerFillColor(s.palette.face[ST_NORMAL]); v.frame = s.palette.frame[ST_NORMAL]; v.ink = s.palette.ink[ST_NORMAL]; v.face_enabled = s.metrics.face_enabled; v.frame_enabled = s.metrics.frame_enabled; v.frame_width = s.metrics.frame_width;
+    }
+    return v;
+}
+
+static void ApplyBasicThemeField(BasicThemeValues& v, const String& id, const Value& x)
+{
+    if(id == "face_normal") v.face = (Color)x;
+    else if(id == "frame_normal") v.frame = (Color)x;
+    else if(id == "ink_normal") v.ink = (Color)x;
+    else if(id == "face_enabled") v.face_enabled = (bool)x;
+    else if(id == "frame_enabled") v.frame_enabled = (bool)x;
+    else if(id == "frame_width") v.frame_width = max(0, (int)x);
+}
+
+static void ApplyBasicStyle(Ctrl& ctrl, UiDesignerRuntimeKind kind, const BasicThemeValues& v, bool custom)
+{
+    if(kind == UiDesignerRuntimeKind::UiLabel) { auto *c = dynamic_cast<UiLabel*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.palette.frame[ST_NORMAL] = v.frame; s.palette.ink[ST_NORMAL] = v.ink; s.metrics.face_enabled = v.face_enabled; s.metrics.frame_enabled = v.frame_enabled; s.metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiCheckBox) { auto *c = dynamic_cast<UiCheckBox*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.palette.frame[ST_NORMAL] = v.frame; s.palette.ink[ST_NORMAL] = v.ink; s.metrics.face_enabled = v.face_enabled; s.metrics.frame_enabled = v.frame_enabled; s.metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiRadioButton) { auto *c = dynamic_cast<UiRadioButton*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.palette.frame[ST_NORMAL] = v.frame; s.palette.ink[ST_NORMAL] = v.ink; s.metrics.face_enabled = v.face_enabled; s.metrics.frame_enabled = v.frame_enabled; s.metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiToggle) { auto *c = dynamic_cast<UiToggle*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.palette.frame[ST_NORMAL] = v.frame; s.palette.ink[ST_NORMAL] = v.ink; s.metrics.face_enabled = v.face_enabled; s.metrics.frame_enabled = v.frame_enabled; s.metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiProgressBar) { auto *c = dynamic_cast<UiProgressBar*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.track_palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.track_palette.frame[ST_NORMAL] = v.frame; s.fill_palette.ink[ST_NORMAL] = v.ink; s.track_metrics.face_enabled = v.face_enabled; s.track_metrics.frame_enabled = v.frame_enabled; s.track_metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiSlider) { auto *c = dynamic_cast<UiSlider*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.track_palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.track_palette.frame[ST_NORMAL] = v.frame; s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(v.ink); s.track_metrics.face_enabled = v.face_enabled; s.track_metrics.frame_enabled = v.frame_enabled; s.track_metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else if(kind == UiDesignerRuntimeKind::UiScrollBar) { auto *c = dynamic_cast<UiScrollBar*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.track_palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.track_palette.frame[ST_NORMAL] = v.frame; s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(v.ink); s.track_metrics.face_enabled = v.face_enabled; s.track_metrics.frame_enabled = v.frame_enabled; s.track_metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+    else { auto *c = dynamic_cast<UiDropdown*>(&ctrl); if(!c) return; auto s = c->GetStyle(); s.palette.face[ST_NORMAL] = UiFill::Solid(v.face); s.palette.frame[ST_NORMAL] = v.frame; s.palette.ink[ST_NORMAL] = v.ink; s.metrics.face_enabled = v.face_enabled; s.metrics.frame_enabled = v.frame_enabled; s.metrics.frame_width = v.frame_width; if(custom) c->SetCustomStyle(s); else c->ClearCustomStyle(); }
+}
+
+class BasicThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    BasicThemeAdapter(const char *id, UiDesignerRuntimeKind kind) : id_(id), kind_(kind) {}
+    const char *Id() const override { return id_; }
+    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == kind_; }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override { BasicThemeValues b = ResolveBasicThemeValues(kind_, UiRole::Standard); AddOverride(spec, "face_normal", "Face normal", "Surface", PropertyEditorKind::Color, b.face, PropertyImpactPaint | PropertyImpactCode, "face_normal"); AddOverride(spec, "frame_normal", "Frame normal", "Surface", PropertyEditorKind::Color, b.frame, PropertyImpactPaint | PropertyImpactCode, "frame_normal"); AddOverride(spec, "ink_normal", "Ink normal", "Ink", PropertyEditorKind::Color, b.ink, PropertyImpactPaint | PropertyImpactCode, "ink_normal"); AddOverride(spec, "face_enabled", "Face enabled", "Surface", PropertyEditorKind::Boolean, b.face_enabled, PropertyImpactPaint | PropertyImpactCode, "face_enabled"); AddOverride(spec, "frame_enabled", "Frame enabled", "Surface", PropertyEditorKind::Boolean, b.frame_enabled, PropertyImpactPaint | PropertyImpactCode, "frame_enabled"); AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer, b.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width"); }
+    bool HasField(const String& id) const override { return id == "face_normal" || id == "frame_normal" || id == "ink_normal" || id == "face_enabled" || id == "frame_enabled" || id == "frame_width"; }
+    bool FieldAffectsLayout(const String& id) const override { return id == "face_enabled" || id == "frame_enabled" || id == "frame_width"; }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec, const String& id, const UiDesignerTransientOverlay* overlay) const override { BasicThemeValues v = ResolveBasicThemeValues(kind_, ParseRole(node.GetProperty("role", "Standard"))); for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { int q = node.theme_overrides.Find(p.id); if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue; ApplyBasicThemeField(v, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); } if(id == "face_normal") return v.face; if(id == "frame_normal") return v.frame; if(id == "ink_normal") return v.ink; if(id == "face_enabled") return v.face_enabled; if(id == "frame_enabled") return v.frame_enabled; if(id == "frame_width") return v.frame_width; return Value(); }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override { BasicThemeValues v = ResolveBasicThemeValues(kind_, ParseRole(node.GetProperty("role", "Standard"))); bool authored = false; for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { int q = node.theme_overrides.Find(p.id); if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue; authored = true; ApplyBasicThemeField(v, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value)); } ApplyBasicStyle(ctrl, kind_, v, authored || ParseRole(node.GetProperty("role", "Standard")) != UiRole::Standard); }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override { bool authored = false; for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) authored |= node.theme_overrides.Find(p.id) >= 0; if(!authored) return; const char *type = node.type; const char *palette = (kind_ == UiDesignerRuntimeKind::UiProgressBar || kind_ == UiDesignerRuntimeKind::UiSlider || kind_ == UiDesignerRuntimeKind::UiScrollBar) ? "track_palette" : "palette"; const char *metrics = (kind_ == UiDesignerRuntimeKind::UiProgressBar || kind_ == UiDesignerRuntimeKind::UiSlider || kind_ == UiDesignerRuntimeKind::UiScrollBar) ? "track_metrics" : "metrics"; out << "\t" << type << "::Style " << member << "_style = UiTheme::Resolve" << (kind_ == UiDesignerRuntimeKind::UiLabel ? "Label(UiRole::Standard)" : kind_ == UiDesignerRuntimeKind::UiCheckBox ? "CheckBox(UiRole::Standard, UICHECKVIS_CLASSIC)" : kind_ == UiDesignerRuntimeKind::UiRadioButton ? "RadioButton(UiRole::Standard, UIRADIOVIS_CLASSIC)" : kind_ == UiDesignerRuntimeKind::UiToggle ? "Toggle()" : kind_ == UiDesignerRuntimeKind::UiProgressBar ? "ProgressBar(UiRole::Standard)" : kind_ == UiDesignerRuntimeKind::UiSlider ? "Slider()" : kind_ == UiDesignerRuntimeKind::UiScrollBar ? "ScrollBar()" : "Dropdown(UiRole::Standard)") << ";\n"; for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) { int q = node.theme_overrides.Find(p.id); if(q < 0) continue; String f = p.adapter_field_id; Value v = node.theme_overrides.GetValue(q); if(f == "face_normal") out << "\t" << member << "_style." << palette << ".face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n"; else if(f == "frame_normal") out << "\t" << member << "_style." << palette << ".frame[ST_NORMAL] = " << EmitValue(v) << ";\n"; else if(f == "ink_normal") out << "\t" << member << "_style." << palette << ".ink[ST_NORMAL] = " << EmitValue(v) << ";\n"; else if(f == "face_enabled") out << "\t" << member << "_style." << metrics << ".face_enabled = " << AsString((bool)v) << ";\n"; else if(f == "frame_enabled") out << "\t" << member << "_style." << metrics << ".frame_enabled = " << AsString((bool)v) << ";\n"; else if(f == "frame_width") out << "\t" << member << "_style." << metrics << ".frame_width = DPI(" << (int)v << ");\n"; } out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n"; }
+private: const char *id_; UiDesignerRuntimeKind kind_;
+};
+
+static UiTab::Style ResolveTabThemeBase(UiRole role)
+{
+    return UiTheme::ResolveTab(role, UITAB_CLASSIC);
+}
+
+static void ApplyTabThemeField(UiTab::Style& style, const String& field_id, const Value& value)
+{
+    if(field_id == "face_enabled") style.metrics.face_enabled = (bool)value;
+    else if(field_id == "face_normal") style.palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
+    else if(field_id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
+    else if(field_id == "frame_normal") style.palette.frame[ST_NORMAL] = (Color)value;
+    else if(field_id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(field_id == "radius") style.metrics.radius = max(0, (int)value);
+    else if(field_id == "tab_face_normal") style.tab_palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
+    else if(field_id == "tab_frame_normal") style.tab_palette.frame[ST_NORMAL] = (Color)value;
+    else if(field_id == "tab_ink_normal") style.tab_palette.ink[ST_NORMAL] = (Color)value;
+    else if(field_id == "tab_ink_hot") style.tab_palette.ink[ST_HOT] = (Color)value;
+    else if(field_id == "tab_ink_pressed") style.tab_palette.ink[ST_PRESSED] = (Color)value;
+    else if(field_id == "indicator_color") style.active_frame_color = (Color)value;
+    else if(field_id == "indicator_thickness") style.indicator_thickness = max(0, (int)value);
+    else if(field_id == "active_frame_width") style.active_frame_width = max(0, (int)value);
+    else if(field_id == "tab_extent") style.tab_extent = max(1, (int)value);
+    else if(field_id == "item_spacing") style.item_spacing = max(0, (int)value);
+    else if(field_id == "body_gap") style.body_gap = max(0, (int)value);
+    else if(field_id == "content_gap") style.content_gap = max(0, (int)value);
+    else if(field_id == "expand_tabs") style.expand_tabs = (bool)value, style.fill_tabs = style.expand_tabs;
+    else if(field_id == "active_tab_uses_body_face") style.active_tab_uses_body_face = (bool)value;
+}
+
+class TabThemeAdapter final : public UiDesignerThemeAdapter {
+public:
+    const char *Id() const override { return "tab"; }
+    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == UiDesignerRuntimeKind::UiTab; }
+    void AddThemeOverrides(UiDesignerControlSpec& spec) const override
+    {
+        const UiTab::Style base = ResolveTabThemeBase(UiRole::Standard);
+        AddOverride(spec, "face_enabled", "Face enabled", "Surface", PropertyEditorKind::Boolean, base.metrics.face_enabled, PropertyImpactPaint | PropertyImpactCode, "face_enabled");
+        AddOverride(spec, "face_normal", "Face normal", "Surface", PropertyEditorKind::Color, UiDesignerFillColor(base.palette.face[ST_NORMAL]), PropertyImpactPaint | PropertyImpactCode, "face_normal");
+        AddOverride(spec, "frame_enabled", "Frame enabled", "Surface", PropertyEditorKind::Boolean, base.metrics.frame_enabled, PropertyImpactPaint | PropertyImpactCode, "frame_enabled");
+        AddOverride(spec, "frame_normal", "Frame normal", "Surface", PropertyEditorKind::Color, base.palette.frame[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "frame_normal");
+        AddOverride(spec, "frame_width", "Frame width", "Surface", PropertyEditorKind::Integer, base.metrics.frame_width, PropertyImpactPaint | PropertyImpactCode, "frame_width");
+        AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer, base.metrics.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "tab_face_normal", "Tab face", "Tabs", PropertyEditorKind::Color, UiDesignerFillColor(base.tab_palette.face[ST_NORMAL]), PropertyImpactPaint | PropertyImpactCode, "tab_face_normal");
+        AddOverride(spec, "tab_frame_normal", "Tab frame", "Tabs", PropertyEditorKind::Color, base.tab_palette.frame[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "tab_frame_normal");
+        AddOverride(spec, "tab_ink_normal", "Tab ink", "Tabs", PropertyEditorKind::Color, base.tab_palette.ink[ST_NORMAL], PropertyImpactPaint | PropertyImpactCode, "tab_ink_normal");
+        AddOverride(spec, "tab_ink_hot", "Tab hot ink", "Tabs", PropertyEditorKind::Color, base.tab_palette.ink[ST_HOT], PropertyImpactPaint | PropertyImpactCode, "tab_ink_hot");
+        AddOverride(spec, "tab_ink_pressed", "Tab active ink", "Tabs", PropertyEditorKind::Color, base.tab_palette.ink[ST_PRESSED], PropertyImpactPaint | PropertyImpactCode, "tab_ink_pressed");
+        AddOverride(spec, "indicator_color", "Active indicator", "Tabs", PropertyEditorKind::Color, base.active_frame_color, PropertyImpactPaint | PropertyImpactCode, "indicator_color");
+        AddOverride(spec, "indicator_thickness", "Indicator thickness", "Tabs", PropertyEditorKind::Integer, base.indicator_thickness, PropertyImpactPaint | PropertyImpactCode, "indicator_thickness");
+        AddOverride(spec, "active_frame_width", "Active frame width", "Tabs", PropertyEditorKind::Integer, base.active_frame_width, PropertyImpactPaint | PropertyImpactCode, "active_frame_width");
+        AddOverride(spec, "tab_extent", "Tab extent", "Layout", PropertyEditorKind::Integer, base.tab_extent, PropertyImpactPaint | PropertyImpactCode, "tab_extent");
+        AddOverride(spec, "item_spacing", "Item spacing", "Layout", PropertyEditorKind::Integer, base.item_spacing, PropertyImpactPaint | PropertyImpactCode, "item_spacing");
+        AddOverride(spec, "body_gap", "Body gap", "Layout", PropertyEditorKind::Integer, base.body_gap, PropertyImpactPaint | PropertyImpactCode, "body_gap");
+        AddOverride(spec, "content_gap", "Content gap", "Layout", PropertyEditorKind::Integer, base.content_gap, PropertyImpactPaint | PropertyImpactCode, "content_gap");
+        AddOverride(spec, "expand_tabs", "Expand tabs", "Layout", PropertyEditorKind::Boolean, base.expand_tabs || base.fill_tabs, PropertyImpactPaint | PropertyImpactCode, "expand_tabs");
+        AddOverride(spec, "active_tab_uses_body_face", "Active tab uses body face", "Tabs", PropertyEditorKind::Boolean, base.active_tab_uses_body_face, PropertyImpactPaint | PropertyImpactCode, "active_tab_uses_body_face");
+    }
+    bool HasField(const String& field_id) const override
+    {
+        static const char *fields[] = {"face_enabled", "face_normal", "frame_enabled", "frame_normal", "frame_width", "radius", "tab_face_normal", "tab_frame_normal", "tab_ink_normal", "tab_ink_hot", "tab_ink_pressed", "indicator_color", "indicator_thickness", "active_frame_width", "tab_extent", "item_spacing", "body_gap", "content_gap", "expand_tabs", "active_tab_uses_body_face"};
+        for(const char *field : fields) if(field_id == field) return true;
+        return false;
+    }
+    bool FieldAffectsLayout(const String& field_id) const override
+    {
+        return field_id == "face_enabled" || field_id == "frame_enabled" || field_id == "frame_width" || field_id == "radius" || field_id == "indicator_thickness" || field_id == "active_frame_width" || field_id == "tab_extent" || field_id == "item_spacing" || field_id == "body_gap" || field_id == "content_gap" || field_id == "expand_tabs";
+    }
+    Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec, const String& field_id, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiTab::Style style = ResolveTabThemeBase(ParseRole(node.GetProperty("role", "Standard")));
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            ApplyTabThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value));
+        }
+        if(field_id == "face_enabled") return style.metrics.face_enabled;
+        if(field_id == "face_normal") return UiDesignerFillColor(style.palette.face[ST_NORMAL]);
+        if(field_id == "frame_enabled") return style.metrics.frame_enabled;
+        if(field_id == "frame_normal") return style.palette.frame[ST_NORMAL];
+        if(field_id == "frame_width") return style.metrics.frame_width;
+        if(field_id == "radius") return style.metrics.radius;
+        if(field_id == "tab_face_normal") return UiDesignerFillColor(style.tab_palette.face[ST_NORMAL]);
+        if(field_id == "tab_frame_normal") return style.tab_palette.frame[ST_NORMAL];
+        if(field_id == "tab_ink_normal") return style.tab_palette.ink[ST_NORMAL];
+        if(field_id == "tab_ink_hot") return style.tab_palette.ink[ST_HOT];
+        if(field_id == "tab_ink_pressed") return style.tab_palette.ink[ST_PRESSED];
+        if(field_id == "indicator_color") return style.active_frame_color;
+        if(field_id == "indicator_thickness") return style.indicator_thickness;
+        if(field_id == "active_frame_width") return style.active_frame_width;
+        if(field_id == "tab_extent") return style.tab_extent;
+        if(field_id == "item_spacing") return style.item_spacing;
+        if(field_id == "body_gap") return style.body_gap;
+        if(field_id == "content_gap") return style.content_gap;
+        if(field_id == "expand_tabs") return style.expand_tabs || style.fill_tabs;
+        if(field_id == "active_tab_uses_body_face") return style.active_tab_uses_body_face;
+        return Value();
+    }
+    void ApplyPreviewStyle(Ctrl& ctrl, const UiDesignerNode& node, const UiDesignerControlSpec& spec, const UiDesignerTransientOverlay* overlay) const override
+    {
+        UiTab *tab = dynamic_cast<UiTab *>(&ctrl);
+        if(!tab) return;
+        UiTab::Style style = ResolveTabThemeBase(ParseRole(node.GetProperty("role", "Standard")));
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0 && !HasThemeValue(node, overlay, p.id)) continue;
+            authored = true;
+            ApplyTabThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value));
+        }
+        if(authored || ParseRole(node.GetProperty("role", "Standard")) != UiRole::Standard) tab->SetCustomStyle(style);
+        else tab->ClearCustomStyle();
+    }
+    void EmitSetup(String& out, const String& member, const UiDesignerNode& node, const UiDesignerControlSpec& spec) const override
+    {
+        bool authored = false;
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) authored |= node.theme_overrides.Find(p.id) >= 0;
+        if(!authored) return;
+        out << "\tUiTab::Style " << member << "_style = UiTheme::ResolveTab(UiRole::Standard, UITAB_CLASSIC);\n";
+        for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
+            const int q = node.theme_overrides.Find(p.id);
+            if(q < 0) continue;
+            const Value v = node.theme_overrides.GetValue(q);
+            const String f = p.adapter_field_id;
+            if(f == "face_enabled") out << "\t" << member << "_style.metrics.face_enabled = " << AsString((bool)v) << ";\n";
+            else if(f == "face_normal") out << "\t" << member << "_style.palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n";
+            else if(f == "frame_enabled") out << "\t" << member << "_style.metrics.frame_enabled = " << AsString((bool)v) << ";\n";
+            else if(f == "frame_normal") out << "\t" << member << "_style.palette.frame[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(f == "frame_width") out << "\t" << member << "_style.metrics.frame_width = DPI(" << (int)v << ");\n";
+            else if(f == "radius") out << "\t" << member << "_style.metrics.radius = DPI(" << (int)v << ");\n";
+            else if(f == "tab_face_normal") out << "\t" << member << "_style.tab_palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(v) << ");\n";
+            else if(f == "tab_frame_normal") out << "\t" << member << "_style.tab_palette.frame[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(f == "tab_ink_normal") out << "\t" << member << "_style.tab_palette.ink[ST_NORMAL] = " << EmitValue(v) << ";\n";
+            else if(f == "tab_ink_hot") out << "\t" << member << "_style.tab_palette.ink[ST_HOT] = " << EmitValue(v) << ";\n";
+            else if(f == "tab_ink_pressed") out << "\t" << member << "_style.tab_palette.ink[ST_PRESSED] = " << EmitValue(v) << ";\n";
+            else if(f == "indicator_color") out << "\t" << member << "_style.active_frame_color = " << EmitValue(v) << ";\n";
+            else if(f == "indicator_thickness") out << "\t" << member << "_style.indicator_thickness = DPI(" << (int)v << ");\n";
+            else if(f == "active_frame_width") out << "\t" << member << "_style.active_frame_width = DPI(" << (int)v << ");\n";
+            else if(f == "tab_extent") out << "\t" << member << "_style.tab_extent = DPI(" << (int)v << ");\n";
+            else if(f == "item_spacing") out << "\t" << member << "_style.item_spacing = DPI(" << (int)v << ");\n";
+            else if(f == "body_gap") out << "\t" << member << "_style.body_gap = DPI(" << (int)v << ");\n";
+            else if(f == "content_gap") out << "\t" << member << "_style.content_gap = DPI(" << (int)v << ");\n";
+            else if(f == "expand_tabs") out << "\t" << member << "_style.expand_tabs = " << AsString((bool)v) << "; " << member << "_style.fill_tabs = " << AsString((bool)v) << ";\n";
+            else if(f == "active_tab_uses_body_face") out << "\t" << member << "_style.active_tab_uses_body_face = " << AsString((bool)v) << ";\n";
+        }
+        out << "\t" << member << ".SetCustomStyle(" << member << "_style);\n";
+    }
+};
+
 static UiAccordion::Style ResolveAccordionThemeBase()
 {
     UiAccordion::Style style = UiAccordion::StyleDefault();
@@ -2606,10 +3351,23 @@ public:
     {
         adapters.Add(&button_adapter_);
         adapters.Add(&tool_button_adapter_);
+        adapters.Add(&edit_adapter_);
         adapters.Add(&tree_adapter_);
         adapters.Add(&list_adapter_);
         adapters.Add(&menu_adapter_);
         adapters.Add(&color_picker_adapter_);
+        adapters.Add(&panel_adapter_);
+        adapters.Add(&group_panel_adapter_);
+        adapters.Add(&scroll_panel_adapter_);
+        adapters.Add(&label_adapter_);
+        adapters.Add(&check_adapter_);
+        adapters.Add(&radio_adapter_);
+        adapters.Add(&toggle_adapter_);
+        adapters.Add(&progress_adapter_);
+        adapters.Add(&slider_adapter_);
+        adapters.Add(&scroll_bar_adapter_);
+        adapters.Add(&dropdown_adapter_);
+        adapters.Add(&tab_adapter_);
         adapters.Add(&title_card_adapter_);
         adapters.Add(&accordion_adapter_);
     }
@@ -2633,10 +3391,23 @@ public:
 private:
     ButtonThemeAdapter button_adapter_{"button", false};
     ButtonThemeAdapter tool_button_adapter_{"tool_button", true};
+    EditThemeAdapter edit_adapter_;
     TreeThemeAdapter tree_adapter_;
     ListThemeAdapter list_adapter_;
     MenuThemeAdapter menu_adapter_;
     ColorPickerThemeAdapter color_picker_adapter_;
+    PanelThemeAdapter panel_adapter_{"panel", UiDesignerRuntimeKind::UiPanel};
+    PanelThemeAdapter group_panel_adapter_{"group_panel", UiDesignerRuntimeKind::UiGroupPanel};
+    PanelThemeAdapter scroll_panel_adapter_{"scroll_panel", UiDesignerRuntimeKind::UiScrollPanel};
+    BasicThemeAdapter label_adapter_{"label", UiDesignerRuntimeKind::UiLabel};
+    BasicThemeAdapter check_adapter_{"check", UiDesignerRuntimeKind::UiCheckBox};
+    BasicThemeAdapter radio_adapter_{"radio", UiDesignerRuntimeKind::UiRadioButton};
+    BasicThemeAdapter toggle_adapter_{"toggle", UiDesignerRuntimeKind::UiToggle};
+    BasicThemeAdapter progress_adapter_{"progress", UiDesignerRuntimeKind::UiProgressBar};
+    BasicThemeAdapter slider_adapter_{"slider", UiDesignerRuntimeKind::UiSlider};
+    BasicThemeAdapter scroll_bar_adapter_{"scroll_bar", UiDesignerRuntimeKind::UiScrollBar};
+    BasicThemeAdapter dropdown_adapter_{"dropdown", UiDesignerRuntimeKind::UiDropdown};
+    TabThemeAdapter tab_adapter_;
     TitleCardThemeAdapter title_card_adapter_;
     AccordionThemeAdapter accordion_adapter_;
     Array<const UiDesignerThemeAdapter*> adapters;

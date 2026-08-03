@@ -28,6 +28,17 @@ void UiDesignerNode::SetProperty(const String& id, const Value& value)
     properties.Set(id, value);
 }
 
+Value UiDesignerNode::GetData(const String& id, const Value& fallback) const
+{
+    const int q = data.Find(id);
+    return q >= 0 ? data.GetValue(q) : fallback;
+}
+
+void UiDesignerNode::SetData(const String& id, const Value& value)
+{
+    data.Set(id, value);
+}
+
 Value UiDesignerNode::GetThemeOverride(const String& id,
                                        const Value& fallback) const
 {
@@ -106,6 +117,8 @@ void UiDesignerDocument::Clear()
     revision_ = 0;
     transaction_sequence_ = 0;
     document_id_ = AsString(Uuid::Create());
+    resources_.Clear();
+    next_resource_id_ = 1;
     pending_ = UiDesignerChangeSet();
     batch_depth_ = 0;
 }
@@ -367,6 +380,116 @@ bool UiDesignerDocument::SetProperty(UiDesignerNodeId id,
     return true;
 }
 
+String UiDesignerDocument::AddResource(const String& resource_type,
+                                       const String& bytes,
+                                       const String& mime,
+                                       const String& original_name,
+                                       int width, int height,
+                                       const ValueMap& metadata,
+                                       bool deduplicate)
+{
+    if(resource_type.IsEmpty() || bytes.IsEmpty())
+        return String();
+    const String hash = SHA256StringS(bytes);
+    if(deduplicate) {
+        for(const UiDesignerResource& resource : resources_)
+            if(resource.resource_type == resource_type &&
+               resource.content_hash == hash && resource.bytes == bytes)
+                return resource.key;
+    }
+
+    UiDesignerResource resource;
+    resource.key = Format("res-%d", next_resource_id_++);
+    resource.resource_type = resource_type;
+    resource.content_hash = hash;
+    resource.bytes = bytes;
+    resource.mime = mime;
+    resource.original_name = original_name;
+    resource.metadata = metadata;
+    resource.width = width;
+    resource.height = height;
+    resources_.Add(pick(resource));
+
+    UiDesignerChangeSet changes;
+    changes.reason = "Add resource";
+    changes.resources_changed = true;
+    QueueChange(changes);
+    return resources_.Top().key;
+}
+
+bool UiDesignerDocument::RemoveResource(const String& key)
+{
+    for(int i = 0; i < resources_.GetCount(); i++) {
+        if(resources_[i].key != key)
+            continue;
+        resources_.Remove(i);
+        UiDesignerChangeSet changes;
+        changes.reason = "Remove resource";
+        changes.resources_changed = true;
+        QueueChange(changes);
+        return true;
+    }
+    return false;
+}
+
+bool UiDesignerDocument::AddResource(const UiDesignerResource& resource,
+                                     bool notify)
+{
+    if(resource.key.IsEmpty() || resource.resource_type.IsEmpty() ||
+       resource.bytes.IsEmpty())
+        return false;
+    for(const UiDesignerResource& existing : resources_)
+        if(existing.key == resource.key)
+            return false;
+    resources_.Add(resource);
+    if(resource.key.StartsWith("res-")) {
+        const int id = ScanInt(resource.key.Mid(4));
+        if(id >= next_resource_id_)
+            next_resource_id_ = id + 1;
+    }
+    if(notify) {
+        UiDesignerChangeSet changes;
+        changes.reason = "Add resource";
+        changes.resources_changed = true;
+        QueueChange(changes);
+    }
+    return true;
+}
+
+bool UiDesignerDocument::GetResource(const String& key,
+                                     UiDesignerResource& out) const
+{
+    for(const UiDesignerResource& resource : resources_)
+        if(resource.key == key) {
+            out = resource;
+            return true;
+        }
+    return false;
+}
+
+bool UiDesignerDocument::SetData(UiDesignerNodeId id, const String& key,
+                                 const Value& value, UiDesignerChangeImpact impact)
+{
+    UiDesignerNode* node = Find(id);
+    if(!node || key.IsEmpty())
+        return false;
+    const Value old = node->GetData(key);
+    if(old == value)
+        return true;
+    node->SetData(key, value);
+    UiDesignerChangeSet changes;
+    changes.reason = "Set data " + key;
+    UiDesignerPropertyChange& change = changes.properties.Add();
+    change.node = id;
+    change.property = "data." + key;
+    change.old_value = old;
+    change.new_value = value;
+    change.impact = impact;
+    change.kind = UiDesignerPropertyChangeKind::Normal;
+    QueueChange(changes);
+    return true;
+}
+
 bool UiDesignerDocument::SetThemeOverride(UiDesignerNodeId id,
                                           const String& property,
                                           const Value& value,
@@ -450,6 +573,13 @@ Value UiDesignerDocument::GetProperty(UiDesignerNodeId id,
 {
     const UiDesignerNode* node = Find(id);
     return node ? node->GetProperty(property, fallback) : fallback;
+}
+
+Value UiDesignerDocument::GetData(UiDesignerNodeId id, const String& key,
+                                  const Value& fallback) const
+{
+    const UiDesignerNode* node = Find(id);
+    return node ? node->GetData(key, fallback) : fallback;
 }
 
 Value UiDesignerDocument::GetThemeOverride(UiDesignerNodeId id,
@@ -549,6 +679,8 @@ void UiDesignerDocument::ReplaceFrom(const UiDesignerDocument& other,
     next_id_ = other.next_id_;
     virtual_size_ = other.virtual_size_;
     document_id_ = other.document_id_;
+    resources_ = clone(other.resources_);
+    next_resource_id_ = other.next_resource_id_;
     if(notify) {
         UiDesignerChangeSet changes;
         changes.reason = reason;

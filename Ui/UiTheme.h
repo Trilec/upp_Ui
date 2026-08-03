@@ -43,6 +43,9 @@
 #include <Ui/UiToolButton.h>
 #include <Ui/UiBaseEdit.h>
 #include <Ui/UiLabel.h>
+#include <Ui/UiTable.h>
+#include <Ui/UiDoc.h>
+#include <Ui/UiBezierCurveEditor.h>
 #include <Ui/UiPanel.h>
 #include <Ui/UiGroupPanel.h>
 #include <Ui/UiCheckBox.h>
@@ -2588,6 +2591,44 @@ public:
     static UiMenu::Style ResolveMenu() { return ResolveMenu(GetContext()); }
     static UiLabel::Style ResolveLabel(UiRole role, UiTextSize size = UiTextSize::Body) { return ResolveLabel(GetContext(), role, size); }
     static UiLabel::Style ResolveLabel(UiLabelRole role = UiLabelRole::Body) { return ResolveLabel(GetContext(), role); }
+    static UiTable::Style ResolveTable()
+    {
+        UiThemeContext ctx = GetContext();
+        UiTable::Style s = UiTable::StyleDefault();
+        UiThemeDetail::ApplyMode(s.palette, ctx.mode);
+        s.table_bg = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorPaper();
+        s.header_bg = s.palette.face[ST_HOT].IsSolid() ? s.palette.face[ST_HOT].color : s.table_bg;
+        s.header_hot_bg = s.palette.face[ST_PRESSED].IsSolid() ? s.palette.face[ST_PRESSED].color : s.header_bg;
+        s.header_ink = s.palette.ink[ST_NORMAL];
+        s.cell_ink = s.palette.ink[ST_NORMAL];
+        s.muted_ink = s.palette.ink[ST_DISABLED];
+        s.grid_color = s.palette.frame[ST_NORMAL];
+        s.selection_border = s.palette.frame[ST_PRESSED];
+        s.selection_bg = s.palette.face[ST_PRESSED].IsSolid() ? s.palette.face[ST_PRESSED].color : s.table_bg;
+        return s;
+    }
+    static UiDoc::Style ResolveDoc()
+    {
+        UiThemeContext ctx = GetContext();
+        UiDoc::Style s = UiDoc::StyleDefault();
+        UiThemeDetail::ApplyMode(s.palette, ctx.mode);
+        s.font = ResolveLabel(ctx, UiLabelRole::Body).font;
+        return s;
+    }
+    static UiBezierCurveEditor::Style ResolveBezierCurveEditor()
+    {
+        UiThemeContext ctx = GetContext();
+        UiBezierCurveEditor::Style s = UiBezierCurveEditor::StyleDefault();
+        UiThemeDetail::MinimalRoleColors shell = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Subtle);
+        UiThemeDetail::MinimalRoleColors accent = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Accent);
+        s.background = shell.face;
+        s.axis = shell.frame;
+        s.curve = accent.ink;
+        s.handle_fill = accent.ink;
+        s.handle_selected = accent.frame;
+        s.handle_ring = shell.face;
+        return s;
+    }
 
     static UiButton::Style ResolveButton(const UiThemeContext& ctx, UiRole role)
     {

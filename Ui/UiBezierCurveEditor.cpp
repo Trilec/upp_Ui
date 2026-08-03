@@ -1,4 +1,5 @@
 #include <Ui/UiBezierCurveEditor.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -10,6 +11,7 @@ const UiBezierCurveEditor::Style& UiBezierCurveEditor::StyleDefault()
 
 UiBezierCurveEditor::UiBezierCurveEditor()
     : style_(StyleDefault())
+    , themed_style_(StyleDefault())
     , curve_(ShadowSoft())
 {
     NoWantFocus();
@@ -19,8 +21,31 @@ UiBezierCurveEditor::UiBezierCurveEditor()
 UiBezierCurveEditor& UiBezierCurveEditor::SetCustomStyle(const Style& s)
 {
     style_ = s;
+    has_custom_style_ = true;
     Refresh();
     return *this;
+}
+
+UiBezierCurveEditor& UiBezierCurveEditor::ClearCustomStyle()
+{
+    if(has_custom_style_) {
+        has_custom_style_ = false;
+        theme_revision_ = 0;
+        Refresh();
+    }
+    return *this;
+}
+
+const UiBezierCurveEditor::Style& UiBezierCurveEditor::GetStyle() const
+{
+    if(has_custom_style_)
+        return style_;
+    const uint64 revision = UiTheme::GetRevision();
+    if(theme_revision_ != revision) {
+        themed_style_ = UiTheme::ResolveBezierCurveEditor();
+        theme_revision_ = revision;
+    }
+    return themed_style_;
 }
 
 UiBezierCurveEditor& UiBezierCurveEditor::SetCurve(const ShadowCurve& c)

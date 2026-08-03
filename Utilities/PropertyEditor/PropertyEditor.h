@@ -37,6 +37,7 @@ struct PropertyEditorStyle {
     int filter_height = DPI(30);
     int cell_padding = DPI(6);
     int label_width = DPI(170);
+    int label_ratio = 40;
     int indent_width = DPI(14);
     int reset_width = DPI(22);
 
@@ -85,7 +86,9 @@ public:
     const PropertyEditorItem* GetSelectedProperty() const;
 
     void SetLabelWidth(int cx);
+    void SetLabelRatio(int percent);
     int GetLabelWidth() const { return style_.label_width; }
+    int GetLabelRatio() const { return style_.label_ratio; }
 
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
@@ -119,6 +122,7 @@ private:
     Rect GetViewport() const;
     Rect GetRowRect(int display_index) const;
     Rect GetValueRect(int display_index) const;
+    int GetLabelColumnWidth(const Rect& row) const;
     Rect GetResetRect(int display_index) const;
 
     int FindDisplayRow(Point p) const;
@@ -170,6 +174,10 @@ private:
     int content_height_ = 0;
     bool syncing_editor_ = false;
     bool tearing_down_editor_ = false;
+    bool applying_editor_preview_ = false;
+    bool dispatching_editor_callback_ = false;
+    bool structure_refresh_posted_ = false;
+    bool structure_refresh_pending_ = false;
     String active_property_id_;
     bool layout_in_progress_ = false;
 };

@@ -20,9 +20,13 @@ enum class PropertyEditorKind : byte {
     Multiline,
     Integer,
     Double,
+    NumericInt,
+    NumericDouble,
     Boolean,
     Choice,
     Color,
+    ColorPalette,
+    FilePath,
     SliderInt,
     SliderDouble,
     Vector2,
@@ -111,8 +115,10 @@ struct PropertyEditorItem {
     bool mixed = false;
     bool inherited = false;
     bool allow_null = false;
+    bool show_slider_toggle = false;
 
     int indent = 0;
+    int color_count = 1;
     int decimals = 3;
     int sort_order = 0;
 
@@ -135,6 +141,8 @@ struct PropertyEditorItem {
     PropertyEditorItem& SetUnit(const String& text);
     PropertyEditorItem& SetImpact(PropertyEditorImpact value);
     PropertyEditorItem& SetDomain(PropertyEditorDomain value);
+    PropertyEditorItem& SetColorCount(int count);
+    PropertyEditorItem& SetSliderToggle(bool on = true);
 };
 
 class PropertyEditorModel {
@@ -158,6 +166,12 @@ public:
                                    int value, const String& group = String());
     PropertyEditorItem& AddDouble(const String& id, const String& label,
                                   double value, const String& group = String());
+    PropertyEditorItem& AddNumericInt(const String& id, const String& label,
+                                      int value, int minimum, int maximum,
+                                      int step = 1, const String& group = String());
+    PropertyEditorItem& AddNumericDouble(const String& id, const String& label,
+                                         double value, double minimum, double maximum,
+                                         double step = 0.0, const String& group = String());
     PropertyEditorItem& AddBoolean(const String& id, const String& label,
                                    bool value, const String& group = String());
     PropertyEditorItem& AddChoice(const String& id, const String& label,
