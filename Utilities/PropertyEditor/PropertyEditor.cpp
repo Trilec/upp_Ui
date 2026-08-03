@@ -971,8 +971,10 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
             const int size = min(DPI(16), reset.GetHeight() - DPI(6));
             Rect icon(reset.left + (reset.GetWidth() - size) / 2,
                      reset.top + (reset.GetHeight() - size) / 2,
-                     size, size);
-            w.DrawImage(icon, style_.reset_icon);
+                     reset.left + (reset.GetWidth() - size) / 2 + size,
+                     reset.top + (reset.GetHeight() - size) / 2 + size);
+            if(size > 0)
+                w.DrawImage(icon, style_.reset_icon);
         }
     }
 
@@ -984,8 +986,10 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
         const int size = min(DPI(16), override.GetHeight() - DPI(6));
         Rect icon_rect(override.left + (override.GetWidth() - size) / 2,
                        override.top + (override.GetHeight() - size) / 2,
-                       size, size);
-        w.DrawImage(icon_rect, icon);
+                       override.left + (override.GetWidth() - size) / 2 + size,
+                       override.top + (override.GetHeight() - size) / 2 + size);
+        if(size > 0)
+            w.DrawImage(icon_rect, icon);
     }
 
     if(!item.validation_error.IsEmpty()) {
