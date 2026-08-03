@@ -122,8 +122,6 @@ void UiTitleCard::OnStyleChanged()
 
 void UiTitleCard::CancelMode()
 {
-    if(press_captured_ && HasCapture())
-        ReleaseCapture();
     pressed_ = false;
     press_captured_ = false;
     Refresh();
