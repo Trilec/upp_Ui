@@ -95,7 +95,7 @@ private:
 
     UiDesignerSideColumn designer_left_;
     UiPanel designer_center_;
-    UiDesignerSideColumn designer_right_;
+    UiDesignerInspectorColumn designer_right_;
 
     UiDesignerCatalogList layouts_list_;
     UiDesignerCatalogList containers_list_;
@@ -161,7 +161,7 @@ private:
     UiScrollPanel gallery_scroll_;
     UiPanel gallery_surface_;
     UiDesignerThemeGallery theme_gallery_;
-    UiDesignerSideColumn theme_right_;
+    UiDesignerInspectorColumn theme_right_;
     PropertyEditor theme_inspector_;
     UiDesignerCodeView theme_code_;
 

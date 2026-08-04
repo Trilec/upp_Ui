@@ -17,7 +17,7 @@ Version: **1.0.0-rc1**
 - filter/search;
 - alternate row shading;
 - Follow Ui theme, System, Light and Dark row palettes;
-- one active value editor at a time rather than one permanent control per row;
+- summary-on-idle rows by default, with explicit reusable inline hosting for compact compound editors;
 - preview and final-commit events;
 - custom editor registration;
 - Ui-backed value delegates for live preview and commit;
@@ -31,9 +31,13 @@ Version: **1.0.0-rc1**
 - Multiline text
 - Integer
 - Double
+- Typed numeric integer and double editors with optional slider mode
 - Boolean
 - Choice
 - Color
+- One-to-four color palette
+- Fill recipe with persistent Solid/Gradient controls
+- File path
 - Integer slider
 - Double slider
 - Vector2
@@ -82,12 +86,26 @@ PropertyEditorFactory::Global().RegisterCustom(
 
 Then declare the item with `PropertyEditorKind::Custom` and set `custom_editor`.
 
+A compact compound editor can keep its real controls mounted in the value row:
+
+```cpp
+PropertyEditorItem& item = model.Add(
+    "recipe", "Recipe", PropertyEditorKind::Custom, value, "Appearance");
+item.custom_editor = "my-editor";
+item.SetInlineEditor();
+```
+
+Inline hosting is a presentation choice only. It uses the same factory, model normalization, preview, commit, validation, reset, mixed-value and inherited-value paths as an editor activated on demand. New control adapters should therefore declare the correct property kind and metadata; they should not add control-specific row logic to `PropertyEditor`.
+
+`FillRecipe` keeps its established inline presentation automatically. Its Solid mode edits one colour and Quad Gradient edits four colours as one recipe transaction.
+
 ## Value conventions
 
 - Vector2 and Vector3 use `ValueArray` numeric components.
 - Curves use a `ValueArray` of two-element `ValueArray` points.
 - Curve coordinates are normalized to `0..1`.
 - A mixed value is represented by `PropertyEditorItem::mixed`, not by corrupting the stored value.
+- Numeric ranges and slider-toggle availability belong to the property schema; the view must not invent semantic ranges.
 
 ## Integration boundary
 

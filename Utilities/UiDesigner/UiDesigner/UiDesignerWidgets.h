@@ -94,6 +94,30 @@ private:
     bool right_ = false;
 };
 
+// Right-side columns display dense Inspector, data and code editors. They use
+// the former middle width as their minimum and preserve the same three-state
+// button cycle without changing the compact left catalog column.
+class UiDesignerInspectorColumn : public UiDesignerSideColumn {
+public:
+    typedef UiDesignerInspectorColumn CLASSNAME;
+
+    UiDesignerInspectorColumn()
+    {
+        RightColumn();
+    }
+
+    int GetDesiredWidth() const
+    {
+        switch(GetPaneWidth()) {
+        case PANE_CLOSED: return UiDesignerStyleMetrics::RailWidth();
+        case PANE_NORMAL: return UiDesignerStyleMetrics::InspectorNormalWidth();
+        case PANE_MEDIUM: return UiDesignerStyleMetrics::InspectorMediumWidth();
+        case PANE_WIDE:   return UiDesignerStyleMetrics::InspectorWideWidth();
+        default:          return UiDesignerStyleMetrics::InspectorNormalWidth();
+        }
+    }
+};
+
 class UiDesignerCatalogList : public ParentCtrl {
 public:
     typedef UiDesignerCatalogList CLASSNAME;
