@@ -658,6 +658,14 @@ void UiDesignerWindow::ConnectServices()
         String error;
         if(!session_.SetThemeOverrideActive(id, active, error))
             RefreshStatus(error);
+        else {
+            // Activation changes row editability and may create an inline
+            // numeric editor; refresh this palette immediately after the
+            // command-model rebuild rather than relying on a later selection
+            // refresh.
+            overrides_.Refresh();
+            preview_canvas_.Refresh();
+        }
     };
     theme_inspector_.SetModel(&session_.ThemeModel());
     theme_inspector_.WhenPreview = [=](const String& id, const Value& value) {
