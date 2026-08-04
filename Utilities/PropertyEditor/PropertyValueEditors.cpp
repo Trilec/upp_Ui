@@ -591,64 +591,105 @@ private:
     bool syncing_ = false;
 };
 
+class PropertyColorSwatchCtrl : public Ctrl {
+public:
+    typedef PropertyColorSwatchCtrl CLASSNAME;
+
+    PropertyColorSwatchCtrl()
+    {
+        Transparent();
+        WantFocus();
+    }
+
+    PropertyColorSwatchCtrl& SetColor(Color color, bool mixed = false)
+    {
+        color_ = color;
+        mixed_ = mixed;
+        Tip(mixed ? "Multiple colours" :
+            Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB()));
+        Refresh();
+        return *this;
+    }
+
+    Event<> WhenAction;
+
+    void Paint(Draw& w) override
+    {
+        const Size size = GetSize();
+        const int diameter = min(DPI(16), max(0, min(size.cx, size.cy) - DPI(4)));
+        if(diameter <= 0)
+            return;
+        const Rect dot = RectC((size.cx - diameter) / 2,
+                               (size.cy - diameter) / 2,
+                               diameter, diameter);
+        Color fill = mixed_ ? SColorDisabled() : color_;
+        if(!IsEnabled())
+            fill = Blend(fill, SColorFace(), 110);
+        w.DrawEllipse(dot, fill, 1,
+                      HasFocus() ? SColorHighlight() : SColorShadow());
+    }
+
+    void LeftDown(Point, dword) override
+    {
+        if(!IsEnabled())
+            return;
+        SetFocus();
+        WhenAction();
+    }
+
+    bool Key(dword key, int count) override
+    {
+        if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
+            WhenAction();
+            return true;
+        }
+        return Ctrl::Key(key, count);
+    }
+
+private:
+    Color color_ = Color(128, 128, 128);
+    bool mixed_ = false;
+};
+
 class PropertyColorValueEditor : public PropertyValueEditor {
 public:
     PropertyColorValueEditor()
     {
-        Add(button_.SizePos());
-        button_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        button_.WhenAction = [=] { OpenColorDialog(); };
+        Add(swatch_);
+        swatch_.WhenAction = [=] { OpenColorDialog(); };
     }
 
-    virtual void Configure(const PropertyEditorItem& item) override
+    void Configure(const PropertyEditorItem& item) override
     {
-        button_.Enable(item.enabled && !item.read_only);
+        swatch_.Enable(item.enabled && !item.read_only);
     }
 
-    virtual void SetEditorValue(const Value& value, bool mixed) override
+    void SetEditorValue(const Value& value, bool mixed) override
     {
-        value_ = mixed || IsNull(value) ? Null : value;
-        UpdateButton();
+        mixed_ = mixed;
+        value_ = mixed || IsNull(value) ? Value(Color(128, 128, 128)) : value;
+        swatch_.SetColor(Color(value_), mixed_);
     }
 
-    virtual Value GetEditorValue() const override
+    Value GetEditorValue() const override
     {
-        return value_;
+        return mixed_ ? Value(Null) : value_;
     }
 
-    virtual void FocusEditor() override
+    void FocusEditor() override
     {
-        button_.SetFocus();
+        swatch_.SetFocus();
+    }
+
+    void Layout() override
+    {
+        swatch_.SetRect(0, 0, min(DPI(28), GetSize().cx), GetSize().cy);
     }
 
 private:
-    static Image MakeSwatch(Color c)
-    {
-        ImageBuffer ib(Size(DPI(14), DPI(14)));
-        for(int y = 0; y < ib.GetSize().cy; y++) {
-            RGBA *line = ib[y];
-            for(int x = 0; x < ib.GetSize().cx; x++)
-                line[x] = RGBA(c);
-        }
-        return ib;
-    }
-
-    void UpdateButton()
-    {
-        if(IsNull(value_)) {
-            button_.SetText("<multiple values>");
-            button_.SetIcon(Image());
-        }
-        else {
-            Color c = value_;
-            button_.SetText(Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB()));
-            button_.SetIcon(MakeSwatch(c));
-        }
-    }
-
     void OpenColorDialog()
     {
-        Color original = IsNull(value_) ? Black() : Color(value_);
+        const Color original = Color(value_);
         Color chosen = original;
         bool accepted = false;
 
@@ -667,6 +708,7 @@ private:
         dlg.picker.SetColor(original);
         dlg.picker.WhenChanging = [&] {
             chosen = dlg.picker.GetColor();
+            swatch_.SetColor(chosen);
             WhenPreview(chosen);
         };
         dlg.picker.WhenAccept = [&] {
@@ -682,16 +724,19 @@ private:
         dlg.CenterOwner();
         if(dlg.Run() == IDOK && accepted) {
             value_ = chosen;
-            UpdateButton();
+            mixed_ = false;
+            swatch_.SetColor(chosen);
             WhenCommit(value_);
         }
         else {
+            swatch_.SetColor(original, mixed_);
             WhenPreview(original);
         }
     }
 
-    UiButton button_;
-    Value value_;
+    PropertyColorSwatchCtrl swatch_;
+    Value value_ = Color(128, 128, 128);
+    bool mixed_ = false;
 };
 
 class PropertyFilePathValueEditor : public PropertyValueEditor {
@@ -772,13 +817,12 @@ public:
     {
         for(int i = 0; i < 4; i++) {
             Add(swatches_[i]);
-            swatches_[i].SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
             const int index = i;
             swatches_[i].WhenAction = [=] { OpenColorDialog(index); };
         }
     }
 
-    virtual void Configure(const PropertyEditorItem& item) override
+    void Configure(const PropertyEditorItem& item) override
     {
         count_ = clamp(item.color_count, 1, 4);
         enabled_ = item.enabled && !item.read_only;
@@ -789,7 +833,7 @@ public:
         Layout();
     }
 
-    virtual void SetEditorValue(const Value& value, bool mixed) override
+    void SetEditorValue(const Value& value, bool mixed) override
     {
         mixed_ = mixed;
         value_.Clear();
@@ -806,43 +850,31 @@ public:
         UpdateSwatches();
     }
 
-    virtual Value GetEditorValue() const override
+    Value GetEditorValue() const override
     {
         return mixed_ ? Value(Null) : Value(value_);
     }
 
-    virtual void FocusEditor() override
+    void FocusEditor() override
     {
         if(count_ > 0)
             swatches_[0].SetFocus();
     }
 
-    virtual void Layout() override
+    void Layout() override
     {
-        const int gap = DPI(4);
-        const int width = max(DPI(24), (GetSize().cx - gap * (count_ - 1)) / count_);
+        const int diameter = min(DPI(20), max(DPI(14), GetSize().cy));
+        const int gap = DPI(3);
         for(int i = 0; i < count_; i++)
-            swatches_[i].SetRect(i * (width + gap), 0, width, GetSize().cy);
+            swatches_[i].SetRect(i * (diameter + gap), 0,
+                                diameter, GetSize().cy);
     }
 
 private:
-    static Image MakeSwatch(Color c)
-    {
-        ImageBuffer ib(Size(DPI(18), DPI(18)));
-        for(int y = 0; y < ib.GetSize().cy; y++) {
-            RGBA *line = ib[y];
-            for(int x = 0; x < ib.GetSize().cx; x++)
-                line[x] = RGBA(c);
-        }
-        return ib;
-    }
-
     void UpdateSwatches()
     {
-        for(int i = 0; i < count_; i++) {
-            swatches_[i].SetText(Null);
-            swatches_[i].SetIcon(mixed_ ? Image() : MakeSwatch(Color(value_[i])));
-        }
+        for(int i = 0; i < count_; i++)
+            swatches_[i].SetColor(Color(value_[i]), mixed_);
     }
 
     void OpenColorDialog(int index)
@@ -895,7 +927,7 @@ private:
         }
     }
 
-    UiButton swatches_[4];
+    PropertyColorSwatchCtrl swatches_[4];
     ValueArray value_;
     int count_ = 1;
     bool enabled_ = true;
@@ -907,12 +939,28 @@ public:
     PropertyFillRecipeValueEditor()
     {
         Add(mode_);
-        mode_.Add("None", "None")
-             .Add("Solid", "Solid")
-             .Add("QuadGradient", "Quad gradient")
-             .Add("Image", "Image");
+        mode_.SetCustomStyle(UiTheme::ResolveDropdown());
+        mode_.Add(UiDropdown::Item("None", "None", true));
+        mode_.Add(UiDropdown::Item("Solid", "Solid", true));
+        mode_.Add(UiDropdown::Item("Gradient", "QuadGradient", true));
+        mode_.Add(UiDropdown::Item("Image unavailable", "Image", false));
         mode_.WhenSelectData = [=](const Value& value) {
-            recipe_.Set("mode", value);
+            if(syncing_)
+                return;
+            const String next = AsString(value);
+            if(next == "Image")
+                return;
+            const String previous = RecipeText("mode", "None");
+            const Color seed = previous == "Solid"
+                ? RecipeColor("solid", Color(128, 128, 128))
+                : RecipeColor("top_left", Color(128, 128, 128));
+            if(next == "Solid" && recipe_.Find("solid") < 0)
+                recipe_.Set("solid", seed);
+            if(next == "QuadGradient")
+                for(int i = 0; i < 4; i++)
+                    if(recipe_.Find(Key(i)) < 0)
+                        recipe_.Set(Key(i), seed);
+            recipe_.Set("mode", next);
             UpdateVisible();
             WhenPreview(recipe_);
             WhenCommit(recipe_);
@@ -920,16 +968,8 @@ public:
         for(int i = 0; i < 4; i++) {
             Add(swatches_[i]);
             const int index = i;
-            swatches_[i].SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
             swatches_[i].WhenAction = [=] { OpenColorDialog(index); };
         }
-        Add(image_);
-        image_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        image_.WhenAction = [=] {
-            if(RecipeValue("mode", "None") != "Image")
-                return;
-            WhenCommit(recipe_);
-        };
     }
 
     void Configure(const PropertyEditorItem& item) override
@@ -938,7 +978,6 @@ public:
         mode_.Enable(enabled_);
         for(int i = 0; i < 4; i++)
             swatches_[i].Enable(enabled_);
-        image_.Enable(enabled_);
         UpdateVisible();
     }
 
@@ -948,10 +987,14 @@ public:
         recipe_ = value.Is<ValueMap>() ? (ValueMap)value : ValueMap();
         if(recipe_.Find("mode") < 0)
             recipe_.Set("mode", "None");
+        if(recipe_.Find("solid") < 0)
+            recipe_.Set("solid", Color(128, 128, 128));
         for(int i = 0; i < 4; i++)
             if(recipe_.Find(Key(i)) < 0)
-                recipe_.Set(Key(i), Color(128, 128, 128));
-        mode_.SetDataSilently(RecipeValue("mode", "None"));
+                recipe_.Set(Key(i), RecipeColor("solid", Color(128, 128, 128)));
+        syncing_ = true;
+        mode_.SetDataSilently(RecipeText("mode", "None"));
+        syncing_ = false;
         UpdateVisible();
     }
 
@@ -961,21 +1004,23 @@ public:
 
     void Layout() override
     {
-        const int mode_width = DPI(92);
-        mode_.SetRect(0, 0, mode_width, GetSize().cy);
-        const String mode = RecipeValue("mode", "None");
-        int x = mode_width + DPI(4);
-        if(mode == "QuadGradient") {
-            const int width = DPI(20);
-            for(int i = 0; i < 4; i++)
-                swatches_[i].SetRect(x + i * (width + DPI(3)), 0,
-                                     width, GetSize().cy);
-        }
-        else if(mode == "Solid") {
-            swatches_[0].SetRect(x, 0, DPI(24), GetSize().cy);
-        }
-        else if(mode == "Image") {
-            image_.SetRect(x, 0, max(DPI(24), GetSize().cx - x), GetSize().cy);
+        const String mode = RecipeText("mode", "None");
+        const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
+        const int gap = DPI(3);
+        const int swatch_width = min(DPI(18), max(DPI(14), GetSize().cy - DPI(4)));
+        const int swatch_total = count > 0
+            ? count * swatch_width + (count - 1) * gap : 0;
+        const int inter_gap = count > 0 ? DPI(4) : 0;
+        const int mode_width = min(DPI(88),
+            max(DPI(64), GetSize().cx - swatch_total - inter_gap));
+        mode_.SetRect(0, 0, max(0, min(mode_width, GetSize().cx)), GetSize().cy);
+        int x = min(GetSize().cx, mode_width + inter_gap);
+        for(int i = 0; i < 4; i++) {
+            if(i < count)
+                swatches_[i].SetRect(x + i * (swatch_width + gap), 0,
+                                    swatch_width, GetSize().cy);
+            else
+                swatches_[i].SetRect(0, 0, 0, 0);
         }
     }
 
@@ -988,39 +1033,42 @@ private:
         return keys[index];
     }
 
-    static Image MakeSwatch(Color c)
+    String RecipeText(const String& key, const String& fallback) const
     {
-        ImageBuffer ib(Size(DPI(18), DPI(18)));
-        for(int y = 0; y < ib.GetSize().cy; y++) {
-            RGBA *line = ib[y];
-            for(int x = 0; x < ib.GetSize().cx; x++)
-                line[x] = RGBA(c);
-        }
-        return ib;
+        const int q = recipe_.Find(key);
+        return q >= 0 ? AsString(recipe_.GetValue(q)) : fallback;
+    }
+
+    Color RecipeColor(const String& key, Color fallback) const
+    {
+        const int q = recipe_.Find(key);
+        return q >= 0 && recipe_.GetValue(q).Is<Color>()
+            ? Color(recipe_.GetValue(q)) : fallback;
     }
 
     void UpdateVisible()
     {
-        const String mode = RecipeValue("mode", "None");
-        for(int i = 0; i < 4; i++)
-            swatches_[i].Show(mode == "Solid" && i == 0 ||
-                              mode == "QuadGradient");
-        image_.Show(mode == "Image");
-        if(mode == "Image")
-            image_.SetText(AsString(RecipeValue("resource_key", "Choose image")));
-        for(int i = 0; i < 4; i++)
-            swatches_[i].SetIcon(MakeSwatch(
-                RecipeValue(Key(i), Color(128, 128, 128))));
+        const String mode = RecipeText("mode", "None");
+        const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
+        for(int i = 0; i < 4; i++) {
+            swatches_[i].Show(i < count);
+            const String key = mode == "Solid" ? "solid" : Key(i);
+            swatches_[i].SetColor(RecipeColor(key, Color(128, 128, 128)), mixed_);
+        }
         Layout();
     }
 
     void OpenColorDialog(int index)
     {
-        if(!enabled_ || mixed_ || index < 0 || index >= 4)
+        const String mode = RecipeText("mode", "None");
+        const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
+        if(!enabled_ || mixed_ || index < 0 || index >= count)
             return;
+        const String key = mode == "Solid" ? "solid" : Key(index);
         ValueMap original = recipe_;
-        Color chosen = RecipeValue(Key(index), Color(128, 128, 128));
+        Color chosen = RecipeColor(key, Color(128, 128, 128));
         bool accepted = false;
+
         class ColorDialog : public TopWindow {
         public:
             UiColorPicker picker;
@@ -1032,14 +1080,15 @@ private:
                 Add(picker.SizePos());
             }
         } dlg;
+
         dlg.picker.SetColor(chosen);
         dlg.picker.WhenChanging = [&] {
-            recipe_.Set(Key(index), dlg.picker.GetColor());
+            recipe_.Set(key, dlg.picker.GetColor());
             UpdateVisible();
             WhenPreview(recipe_);
         };
         dlg.picker.WhenAccept = [&] {
-            recipe_.Set(Key(index), dlg.picker.GetColor());
+            recipe_.Set(key, dlg.picker.GetColor());
             accepted = true;
             dlg.AcceptBreak(IDOK);
         };
@@ -1054,19 +1103,12 @@ private:
         }
     }
 
-private:
-    Value RecipeValue(const String& key, const Value& fallback) const
-    {
-        const int q = recipe_.Find(key);
-        return q >= 0 ? recipe_.GetValue(q) : fallback;
-    }
-
     UiDropdown mode_;
-    UiButton swatches_[4];
-    UiButton image_;
+    PropertyColorSwatchCtrl swatches_[4];
     ValueMap recipe_;
     bool enabled_ = true;
     bool mixed_ = false;
+    bool syncing_ = false;
 };
 
 class PropertySliderIntValueEditor : public PropertyValueEditor {
