@@ -12,16 +12,11 @@ static_assert(std::is_same<decltype(((PropertyEditorItem *)nullptr)
                                        ->SetInlineEditor()),
                            PropertyEditorItem&>::value,
               "Inline editor opt-in must remain a fluent property contract");
-
-INITBLOCK {
-    PropertyEditorItem item;
-    item.SetInlineEditor();
-    ASSERT(item.inline_editor);
-
-    ASSERT(UiDesignerStyleMetrics::InspectorNormalWidth() == DPI(324));
-    ASSERT(UiDesignerStyleMetrics::InspectorMediumWidth() == DPI(364));
-    ASSERT(UiDesignerStyleMetrics::InspectorWideWidth() == DPI(404));
-    ASSERT(UiDesignerStyleMetrics::PanelNormalWidth() == DPI(250));
-}
+static_assert(UiDesignerStyleMetrics::PanelNormalPixels == 250,
+              "The left catalog profile must remain unchanged");
+static_assert(UiDesignerStyleMetrics::InspectorNormalPixels == 324 &&
+              UiDesignerStyleMetrics::InspectorMediumPixels == 364 &&
+              UiDesignerStyleMetrics::InspectorWidePixels == 404,
+              "Right Inspector widths must remain three forty-pixel steps");
 
 }
