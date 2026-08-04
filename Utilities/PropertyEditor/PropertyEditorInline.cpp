@@ -56,7 +56,11 @@ void PropertyEditor::LayoutInlineEditors()
 
 bool PropertyEditor::UsesInlineEditor(const PropertyEditorItem& item) const
 {
-    return item.kind == PropertyEditorKind::FillRecipe &&
+    // FillRecipe retains its established direct row interaction. Any other
+    // built-in or custom editor can opt into the same stable-row presentation
+    // through PropertyEditorItem::SetInlineEditor(). Hosting changes only the
+    // presentation; preview, commit, validation and reset use the normal path.
+    return (item.kind == PropertyEditorKind::FillRecipe || item.inline_editor) &&
            item.value_editable && item.enabled && !item.read_only;
 }
 
@@ -198,6 +202,5 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
     }
     Refresh();
 }
-
 
 }
