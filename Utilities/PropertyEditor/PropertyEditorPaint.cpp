@@ -3,6 +3,26 @@
 
 namespace Upp {
 
+static String PeFormatMultilineSummary(const Value& value)
+{
+    String s = AsString(value);
+    s.Replace("\r", "");
+    int line_count = 1;
+    for(int i = 0; i < s.GetCount(); i++)
+        if(s[i] == '\n')
+            line_count++;
+    String first = s;
+    int nl = first.Find('\n');
+    if(nl >= 0)
+        first = first.Left(nl);
+    first = TrimBoth(first);
+    if(first.IsEmpty())
+        first = "<empty>";
+    if(line_count > 1)
+        return Format("%s (%d lines)", first, line_count);
+    return first;
+}
+
 void PropertyEditor::DrawGroupRow(Draw& w, int,
                                   const DisplayRow& row, const Rect& r)
 {
@@ -59,6 +79,7 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
     Color label_ink = item.enabled ? style_.label_ink : style_.disabled_ink;
     Font font = StdFont();
     int text_y = r.top + (r.GetHeight() - font.GetHeight()) / 2;
+
     int indent = max(0, item.indent) * style_.indent_width;
     w.DrawText(r.left + style_.cell_padding + indent,
                text_y, item.label, font, label_ink);
@@ -73,9 +94,9 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
         if(!style_.reset_icon.IsEmpty()) {
             const int size = min(DPI(16), reset.GetHeight() - DPI(6));
             Rect icon(reset.left + (reset.GetWidth() - size) / 2,
-                      reset.top + (reset.GetHeight() - size) / 2,
-                      reset.left + (reset.GetWidth() - size) / 2 + size,
-                      reset.top + (reset.GetHeight() - size) / 2 + size);
+                     reset.top + (reset.GetHeight() - size) / 2,
+                     reset.left + (reset.GetWidth() - size) / 2 + size,
+                     reset.top + (reset.GetHeight() - size) / 2 + size);
             if(size > 0)
                 w.DrawImage(icon, style_.reset_icon);
         }
@@ -103,8 +124,7 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
     }
 
     if(style_.show_dividers) {
-        w.DrawLine(divider_x, r.top, divider_x, r.bottom,
-                   1, style_.divider);
+        w.DrawLine(divider_x, r.top, divider_x, r.bottom, 1, style_.divider);
         w.DrawLine(r.left, r.bottom - 1, r.right, r.bottom - 1,
                    1, style_.divider);
     }
