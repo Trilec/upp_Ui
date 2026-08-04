@@ -223,6 +223,34 @@ void PropertyEditor::RebuildRows()
         for(int i = 0; i < model_->GetCount(); i++) {
             PropertyEditorItem& item = (*model_)[i];
 
+            // Theme metrics are non-negative authored values. Give them the
+            // same compact numeric-entry/slider interaction unless a catalog
+            // adapter has already supplied a narrower range.
+            if(item.domain == PropertyEditorDomain::Theme &&
+               (item.kind == PropertyEditorKind::Integer ||
+                item.kind == PropertyEditorKind::NumericInt)) {
+                const bool non_negative =
+                    (!IsNull(item.value) && IsNumber(item.value) && (int)item.value >= 0) ||
+                    (!IsNull(item.default_value) && IsNumber(item.default_value) &&
+                     (int)item.default_value >= 0);
+                if(non_negative) {
+                    item.kind = PropertyEditorKind::NumericInt;
+                    if(!IsNumber(item.minimum))
+                        item.minimum = 0;
+                    if(!IsNumber(item.maximum))
+                        item.maximum = 128;
+                    if(!IsNumber(item.step))
+                        item.step = 1;
+                    item.show_slider_toggle = true;
+                }
+            }
+            if(item.domain == PropertyEditorDomain::Theme &&
+               item.kind == PropertyEditorKind::Boolean &&
+               item.label == "Transparent background") {
+                item.label = "No background";
+                item.help = "Suppress background painting. This is not an opacity value.";
+            }
+
             if(!item.visible || !MatchesFilter(item))
                 continue;
 
