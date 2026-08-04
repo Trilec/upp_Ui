@@ -94,6 +94,44 @@ private:
     bool right_ = false;
 };
 
+// Right-side columns display dense Inspector, data and code editors. They use
+// the former middle width as their minimum and preserve the same three-state
+// button cycle without changing the compact left catalog column.
+class UiDesignerInspectorColumn : public UiDesignerSideColumn {
+public:
+    typedef UiDesignerInspectorColumn CLASSNAME;
+
+    UiDesignerInspectorColumn()
+    {
+        RightColumn();
+    }
+
+    void SetPaneWidth(UiDesignerPaneWidth width)
+    {
+        // The Designer previously requested PANE_MEDIUM at startup because
+        // 324 px was the shared middle width. Translate that first legacy call
+        // to the new 324 px normal state; later user-driven states remain exact.
+        if(first_width_request_ && width == PANE_MEDIUM)
+            width = PANE_NORMAL;
+        first_width_request_ = false;
+        UiDesignerSideColumn::SetPaneWidth(width);
+    }
+
+    int GetDesiredWidth() const
+    {
+        switch(GetPaneWidth()) {
+        case PANE_CLOSED: return UiDesignerStyleMetrics::RailWidth();
+        case PANE_NORMAL: return UiDesignerStyleMetrics::InspectorNormalWidth();
+        case PANE_MEDIUM: return UiDesignerStyleMetrics::InspectorMediumWidth();
+        case PANE_WIDE:   return UiDesignerStyleMetrics::InspectorWideWidth();
+        default:          return UiDesignerStyleMetrics::InspectorNormalWidth();
+        }
+    }
+
+private:
+    bool first_width_request_ = true;
+};
+
 class UiDesignerCatalogList : public ParentCtrl {
 public:
     typedef UiDesignerCatalogList CLASSNAME;
