@@ -126,6 +126,12 @@ private:
         int property_ordinal = 0;
     };
 
+    struct InlineEditorSlot {
+        String property_id;
+        int display_row = -1;
+        One<PropertyValueEditor> editor;
+    };
+
     Rect GetClientArea() const;
     Rect GetViewport() const;
     Rect GetRowRect(int display_index) const;
@@ -141,6 +147,16 @@ private:
     void RebuildRows();
     void SyncScrollBar();
     void LayoutActiveEditor();
+    void LayoutInlineEditors();
+    void RebuildInlineEditors();
+    void ClearInlineEditors();
+    bool UsesInlineEditor(const PropertyEditorItem& item) const;
+    PropertyValueEditor* FindInlineEditor(int display_index);
+    const PropertyValueEditor* FindInlineEditor(int display_index) const;
+    PropertyValueEditor* FindInlineEditor(const String& property_id);
+    One<PropertyValueEditor> CreateEditor(const PropertyEditorItem& item) const;
+    void ApplyInlineEditorPreview(const String& property_id, const Value& value);
+    void ApplyInlineEditorCommit(const String& property_id, const Value& value);
     void EnsureSelectedVisible();
 
     void ActivateRow(int display_index);
@@ -176,6 +192,7 @@ private:
     UiScrollBar scroll_ { UiDirection::V };
 
     One<PropertyValueEditor> active_editor_;
+    Array<InlineEditorSlot> inline_editors_;
     int active_display_row_ = -1;
     int selected_display_row_ = -1;
     int hover_display_row_ = -1;
@@ -189,6 +206,7 @@ private:
     bool structure_refresh_posted_ = false;
     bool structure_refresh_pending_ = false;
     String active_property_id_;
+    String inline_preview_property_id_;
     bool layout_in_progress_ = false;
 };
 
