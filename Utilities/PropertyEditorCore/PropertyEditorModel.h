@@ -118,6 +118,7 @@ struct PropertyEditorItem {
     bool inherited = false;
     bool allow_null = false;
     bool show_slider_toggle = false;
+    bool inline_editor = false;
     bool overrideable = false;
     bool override_active = false;
 
@@ -147,6 +148,11 @@ struct PropertyEditorItem {
     PropertyEditorItem& SetDomain(PropertyEditorDomain value);
     PropertyEditorItem& SetColorCount(int count);
     PropertyEditorItem& SetSliderToggle(bool on = true);
+    PropertyEditorItem& SetInlineEditor(bool on = true)
+    {
+        inline_editor = on;
+        return *this;
+    }
 };
 
 class PropertyEditorModel {
