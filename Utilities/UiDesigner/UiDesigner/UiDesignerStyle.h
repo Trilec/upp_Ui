@@ -7,18 +7,27 @@
 namespace Upp {
 
 struct UiDesignerStyleMetrics {
+    enum {
+        PanelNormalPixels = 250,
+        PanelMediumPixels = 324,
+        PanelWidePixels = 346,
+        InspectorNormalPixels = 324,
+        InspectorMediumPixels = 364,
+        InspectorWidePixels = 404,
+    };
+
     static int HeaderHeight()          { return DPI(63); }
     static int FooterHeight()          { return DPI(27); }
     static int RailWidth()             { return DPI(56); }
     // The left catalog column retains the reference shell profile.
-    static int PanelNormalWidth()      { return DPI(250); }
-    static int PanelMediumWidth()      { return DPI(324); }
-    static int PanelWideWidth()        { return DPI(346); }
+    static int PanelNormalWidth()      { return DPI(PanelNormalPixels); }
+    static int PanelMediumWidth()      { return DPI(PanelMediumPixels); }
+    static int PanelWideWidth()        { return DPI(PanelWidePixels); }
     // Inspector content now needs the former middle width as its minimum.
     // Each subsequent press adds a clear forty-pixel working increment.
-    static int InspectorNormalWidth()  { return DPI(324); }
-    static int InspectorMediumWidth()  { return DPI(364); }
-    static int InspectorWideWidth()    { return DPI(404); }
+    static int InspectorNormalWidth()  { return DPI(InspectorNormalPixels); }
+    static int InspectorMediumWidth()  { return DPI(InspectorMediumPixels); }
+    static int InspectorWideWidth()    { return DPI(InspectorWidePixels); }
     static int DesignerToolbarHeight() { return DPI(63); }
     static int Gap()                   { return DPI(8); }
     static int HeaderInset()           { return DPI(6); }
