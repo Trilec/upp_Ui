@@ -3,7 +3,7 @@
 
 namespace Upp {
 
-static String PeFormatMultilineSummary(const Value& value)
+static String PeFormatMultilineSummaryPaint(const Value& value)
 {
     String s = AsString(value);
     s.Replace("\r", "");
@@ -207,7 +207,7 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
         }
         return "None";
     case PropertyEditorKind::Multiline:
-        return PeFormatMultilineSummary(item.value);
+        return PeFormatMultilineSummaryPaint(item.value);
     case PropertyEditorKind::Vector2:
         return PropertyEditorFormatVector(item.value, 2, item.decimals);
     case PropertyEditorKind::Vector3:

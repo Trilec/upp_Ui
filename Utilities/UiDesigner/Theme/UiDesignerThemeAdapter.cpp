@@ -2873,7 +2873,7 @@ public:
         AddOverride(spec, "frame.width", "Width", "Frame",
                     PropertyEditorKind::NumericInt, b.frame_width,
                     PropertyImpactPaint | PropertyImpactCode, "frame.width");
-        AddOverride(spec, "radius", "Corner radius", "General", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "radius", "Radius", "General", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
         AddOverride(spec, "transparent", "Transparent", "General", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent",
                     "Allow parent background visibility through this panel. This is separate from the face and frame recipes.");
     }

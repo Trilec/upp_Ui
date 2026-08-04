@@ -257,6 +257,18 @@ CONSOLE_APP_MAIN
               !panel_override_session.ThemeOverrideModel().Find("face.normal")->override_active,
           "Panel Inspector exposes inherited FillRecipe face state");
     String panel_override_error;
+    Check(panel_theme_spec->FindThemeOverride("radius") &&
+              panel_theme_spec->FindThemeOverride("radius")->label == "Radius",
+          "Panel radius uses the concise Radius label");
+    Check(panel_override_session.SetThemeOverrideActive("radius", true,
+                                                        panel_override_error),
+          "Panel Radius override activates: " + panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().Find("radius") &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->override_active &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->value_editable &&
+              panel_override_session.Document().GetThemeOverride(
+                  panel_override_node, "radius").Is<int>(),
+          "Panel Radius becomes an editable local numeric value");
     ValueMap solid_recipe = panel_override_session.ThemeOverrideModel().Find("face.normal")->value;
     solid_recipe.Set("mode", "Solid");
     solid_recipe.Set("solid", Color(12, 34, 56));
