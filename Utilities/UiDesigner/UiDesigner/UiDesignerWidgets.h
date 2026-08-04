@@ -106,17 +106,6 @@ public:
         RightColumn();
     }
 
-    void SetPaneWidth(UiDesignerPaneWidth width)
-    {
-        // The Designer previously requested PANE_MEDIUM at startup because
-        // 324 px was the shared middle width. Translate that first legacy call
-        // to the new 324 px normal state; later user-driven states remain exact.
-        if(first_width_request_ && width == PANE_MEDIUM)
-            width = PANE_NORMAL;
-        first_width_request_ = false;
-        UiDesignerSideColumn::SetPaneWidth(width);
-    }
-
     int GetDesiredWidth() const
     {
         switch(GetPaneWidth()) {
@@ -127,9 +116,6 @@ public:
         default:          return UiDesignerStyleMetrics::InspectorNormalWidth();
         }
     }
-
-private:
-    bool first_width_request_ = true;
 };
 
 class UiDesignerCatalogList : public ParentCtrl {
