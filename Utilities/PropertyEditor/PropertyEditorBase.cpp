@@ -254,12 +254,13 @@ void PropertyEditor::RefreshValue(const String& property_id)
 
     int display = FindDisplayRowByProperty(property_id);
     if(display >= 0) {
-        if(PropertyValueEditor *editor = FindInlineEditor(display)) {
-            const PropertyEditorItem& item = (*model_)[rows_[display].model_index];
-            if(!UsesInlineEditor(item)) {
-                RebuildRows();
-                return;
-            }
+        const PropertyEditorItem& item = (*model_)[rows_[display].model_index];
+        PropertyValueEditor *editor = FindInlineEditor(display);
+        if((editor != nullptr) != UsesInlineEditor(item)) {
+            RebuildRows();
+            return;
+        }
+        if(editor) {
             syncing_editor_ = true;
             editor->Configure(item);
             editor->SetEditorValue(item.value, item.mixed);
