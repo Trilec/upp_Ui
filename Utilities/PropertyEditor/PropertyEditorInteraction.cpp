@@ -209,6 +209,14 @@ void PropertyEditor::LeftDown(Point p, dword)
         ToggleOverride(row);
         return;
     }
+    // Inherited values are not editable yet, but clicking their row should
+    // still provide the same activation path as clicking the action circle.
+    // This is especially important for compact numeric rows whose editor is
+    // only created after the local override exists.
+    if(item.overrideable && !item.override_active && !item.value_editable) {
+        ToggleOverride(row);
+        return;
+    }
     if(item.resettable && !item.overrideable && GetResetRect(row).Contains(p)) {
         ResetSelected();
         return;

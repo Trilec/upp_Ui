@@ -279,6 +279,9 @@ CONSOLE_APP_MAIN
     mouse_override_editor.LeftDown(Point(310, 75), 0);
     Check(mouse_requests == 1,
           "mouse circle requests inherited activation exactly once");
+    mouse_override_editor.LeftDown(Point(120, 75), 0);
+    Check(mouse_requests == 2,
+          "mouse row body also requests inherited activation");
 
     Cout() << "PropertyEditorTests: Checks: " << checks
            << " Fails: " << fails << "\n";
