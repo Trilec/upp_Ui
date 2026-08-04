@@ -2874,7 +2874,8 @@ public:
                     PropertyEditorKind::NumericInt, b.frame_width,
                     PropertyImpactPaint | PropertyImpactCode, "frame.width");
         AddOverride(spec, "radius", "Corner radius", "General", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
-        AddOverride(spec, "transparent", "Transparent background", "General", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
+        AddOverride(spec, "transparent", "Transparent", "General", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent",
+                    "Allow parent background visibility through this panel. This is separate from the face and frame recipes.");
     }
     bool HasField(const String& id) const override { return id.StartsWith("face.") || id.StartsWith("frame.") || id == "radius" || id == "transparent"; }
     bool FieldAffectsLayout(const String& id) const override { return id.StartsWith("face.") || id == "frame.style" || id == "frame.width" || id == "radius"; }

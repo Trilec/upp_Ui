@@ -244,13 +244,6 @@ void PropertyEditor::RebuildRows()
                     item.show_slider_toggle = true;
                 }
             }
-            if(item.domain == PropertyEditorDomain::Theme &&
-               item.kind == PropertyEditorKind::Boolean &&
-               item.label == "Transparent background") {
-                item.label = "No background";
-                item.help = "Suppress background painting. This is not an opacity value.";
-            }
-
             if(!item.visible || !MatchesFilter(item))
                 continue;
 
