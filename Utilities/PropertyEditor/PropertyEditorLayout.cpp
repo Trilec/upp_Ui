@@ -223,31 +223,6 @@ void PropertyEditor::RebuildRows()
         for(int i = 0; i < model_->GetCount(); i++) {
             PropertyEditorItem& item = (*model_)[i];
 
-            // These are truthful presentation constraints for the shared Panel
-            // contract. The runtime Boolean suppresses background painting; it
-            // is not a numeric opacity value.
-            if(item.domain == PropertyEditorDomain::Theme) {
-                if(item.id == "transparent" && item.group == "General")
-                    item.label = "No background";
-                else if(item.id == "frame.width") {
-                    item.kind = PropertyEditorKind::NumericInt;
-                    item.minimum = 0;
-                    item.maximum = 32;
-                    item.step = 1;
-                    item.show_slider_toggle = true;
-                }
-                else if(item.id == "radius") {
-                    item.kind = PropertyEditorKind::NumericInt;
-                    item.minimum = 0;
-                    item.maximum = 128;
-                    item.step = 1;
-                    item.show_slider_toggle = true;
-                    if(IsNull(item.value))
-                        item.value = IsNull(item.default_value) ? Value(0)
-                                                               : item.default_value;
-                }
-            }
-
             if(!item.visible || !MatchesFilter(item))
                 continue;
 
