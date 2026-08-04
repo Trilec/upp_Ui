@@ -63,7 +63,7 @@ public:
 
     void SetPaneWidth(UiDesignerPaneWidth width);
     UiDesignerPaneWidth GetPaneWidth() const { return width_; }
-    int GetDesiredWidth() const;
+    virtual int GetDesiredWidth() const;
     int GetActiveSection() const { return active_section_; }
     void SetActiveSection(int index);
 
@@ -106,7 +106,7 @@ public:
         RightColumn();
     }
 
-    int GetDesiredWidth() const
+    int GetDesiredWidth() const override
     {
         switch(GetPaneWidth()) {
         case PANE_CLOSED: return UiDesignerStyleMetrics::RailWidth();
