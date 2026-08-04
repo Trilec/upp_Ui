@@ -9,7 +9,12 @@ file
     PropertyValueEditors.h,
     PropertyValueEditors.cpp,
     PropertyEditor.h,
-    PropertyEditor.cpp,
+    PropertyAdvancedEditors.cpp,
+    PropertyEditorBase.cpp,
+    PropertyEditorLayout.cpp,
+    PropertyEditorInline.cpp,
+    PropertyEditorInteraction.cpp,
+    PropertyEditorPaint.cpp,
     README.md,
     DESIGN.md,
     CHANGELOG.md;
