@@ -2704,6 +2704,9 @@ public:
 struct PanelThemeValues {
     Color face[4];
     Color frame[4];
+    bool frame_enabled;
+    bool frame_dashed;
+    String frame_dash_pattern;
     int frame_width;
     int radius;
     bool transparent;
@@ -2715,17 +2718,17 @@ static PanelThemeValues ResolvePanelThemeValues(UiDesignerRuntimeKind kind, UiRo
     if(kind == UiDesignerRuntimeKind::UiGroupPanel) {
         UiGroupPanel::Style s = UiTheme::ResolveGroupPanel(role);
         for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
-        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+        v.frame_enabled = s.metrics.frame_enabled; v.frame_dashed = s.metrics.dashed; v.frame_dash_pattern = s.metrics.dash_pattern; v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
     }
     else if(kind == UiDesignerRuntimeKind::UiScrollPanel) {
         UiScrollPanel::Style s = UiTheme::ResolveScrollPanel(role);
         for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
-        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+        v.frame_enabled = s.metrics.frame_enabled; v.frame_dashed = s.metrics.dashed; v.frame_dash_pattern = s.metrics.dash_pattern; v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
     }
     else {
         UiPanel::Style s = UiTheme::ResolvePanel(role);
         for(int i = 0; i < 4; i++) { v.face[i] = UiDesignerFillColor(s.palette.face[i]); v.frame[i] = s.palette.frame[i]; }
-        v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
+        v.frame_enabled = s.metrics.frame_enabled; v.frame_dashed = s.metrics.dashed; v.frame_dash_pattern = s.metrics.dash_pattern; v.frame_width = s.metrics.frame_width; v.radius = s.metrics.radius; v.transparent = s.transparent;
     }
     return v;
 }
@@ -2792,6 +2795,10 @@ static void ApplyPanelRecipe(StyledPalette& palette, StyledMetrics& metrics,
         const String style = AsString(value);
         metrics.frame_enabled = style != "None";
         metrics.dashed = style == "Dashed" || style == "Dotted";
+        if(style == "Dotted")
+            metrics.dash_pattern = "1,3";
+        else if(style == "Dashed")
+            metrics.dash_pattern = "5,5";
         return;
     }
     if(field == "frame.width") {
@@ -2846,14 +2853,16 @@ public:
                         PropertyEditorKind::FillRecipe,
                         MakeSolidFillRecipe(b.face[i]).ToValue(),
                         PropertyImpactPaint | PropertyImpactCode, face_ids[i]);
+        const String default_frame_style = !b.frame_enabled ? "None" :
+            !b.frame_dashed ? "Solid" :
+            b.frame_dash_pattern == "1,3" ? "Dotted" : "Dashed";
         AddOverride(spec, "frame.style", "Style", "Frame",
-                    PropertyEditorKind::Choice, "Solid",
+                    PropertyEditorKind::Choice, default_frame_style,
                     PropertyImpactPaint | PropertyImpactCode, "frame.style");
         spec.theme_overrides.Top().Choice("None", "None")
             .Choice("Solid", "Solid")
             .Choice("Dashed", "Dashed")
-            .Choice("Dotted", "Dotted")
-            .Choice("Custom", "Custom");
+            .Choice("Dotted", "Dotted");
         static const char *frame_ids[] = {
             "frame.normal", "frame.hot", "frame.pressed", "frame.disabled"
         };
@@ -2864,15 +2873,10 @@ public:
         AddOverride(spec, "frame.width", "Width", "Frame",
                     PropertyEditorKind::NumericInt, b.frame_width,
                     PropertyImpactPaint | PropertyImpactCode, "frame.width");
-        AddOverride(spec, "skin", "Skin", "Skin",
-                    PropertyEditorKind::Choice, "None",
-                    PropertyImpactPaint | PropertyImpactCode, "skin");
-        spec.theme_overrides.Top().Choice("Image", "Image")
-            .Choice("NineSlice", "Nine-slice");
-        AddOverride(spec, "radius", "Radius", "Surface", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
-        AddOverride(spec, "transparent", "Transparent", "Surface", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
+        AddOverride(spec, "radius", "Corner radius", "General", PropertyEditorKind::Integer, b.radius, PropertyImpactPaint | PropertyImpactCode, "radius");
+        AddOverride(spec, "transparent", "Transparent background", "General", PropertyEditorKind::Boolean, b.transparent, PropertyImpactPaint | PropertyImpactCode, "transparent");
     }
-    bool HasField(const String& id) const override { return id.StartsWith("face.") || id.StartsWith("frame.") || id == "skin" || id == "radius" || id == "transparent"; }
+    bool HasField(const String& id) const override { return id.StartsWith("face.") || id.StartsWith("frame.") || id == "radius" || id == "transparent"; }
     bool FieldAffectsLayout(const String& id) const override { return id.StartsWith("face.") || id == "frame.style" || id == "frame.width" || id == "radius"; }
     Value ResolveFieldValue(const UiDesignerNode& node, const UiDesignerControlSpec& spec, const String& id, const UiDesignerTransientOverlay* overlay) const override
     {
@@ -2900,7 +2904,7 @@ public:
                 }
             return v.frame[frame_state];
         }
-        if(id == "frame.style" || id == "frame.width" || id == "skin") {
+        if(id == "frame.style" || id == "frame.width") {
             for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
                 if(p.adapter_field_id != id)
                     continue;
@@ -2909,9 +2913,8 @@ public:
                     return ResolveThemeValue(node, overlay, p.id,
                         q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value);
             }
-            if(id == "frame.style") return v.frame_width > 0 ? "Solid" : "None";
-            if(id == "frame.width") return v.frame_width;
-            return "None";
+            if(id == "frame.style") return !v.frame_enabled ? "None" : !v.frame_dashed ? "Solid" : v.frame_dash_pattern == "1,3" ? "Dotted" : "Dashed";
+            return v.frame_width;
         }
         for(const UiDesignerThemeOverrideSpec& p : spec.theme_overrides) {
             const int q = node.theme_overrides.Find(p.id);
@@ -3002,6 +3005,10 @@ public:
                     << (style == "None" ? "false" : "true") << ";\n";
                 out << "\t" << member << "_style.metrics.dashed = "
                     << (style == "Dashed" || style == "Dotted" ? "true" : "false") << ";\n";
+                if(style == "Dotted")
+                    out << "\t" << member << "_style.metrics.dash_pattern = \"1,3\";\n";
+                else if(style == "Dashed")
+                    out << "\t" << member << "_style.metrics.dash_pattern = \"5,5\";\n";
                 continue;
             }
             if(f == "frame.width") {

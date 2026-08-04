@@ -1020,8 +1020,8 @@ void PropertyEditor::DrawPropertyRow(Draw& w,
 }
 
 void PropertyEditor::DrawValueSummary(Draw& w,
-                                      const PropertyEditorItem& item,
-                                      Rect value_rect) const
+                                          const PropertyEditorItem& item,
+                                          Rect value_rect) const
 {
     Font font = StdFont();
     int y = value_rect.top + (value_rect.GetHeight() - font.GetHeight()) / 2;
@@ -1031,49 +1031,73 @@ void PropertyEditor::DrawValueSummary(Draw& w,
     else if(item.inherited)
         ink = style_.inherited_ink;
 
+    if(item.inherited) {
+        w.DrawText(value_rect.left, y, "Using theme", font, ink);
+        return;
+    }
+
+    const auto DrawSwatch = [&](int x, Color color) {
+        const int diameter = min(DPI(16), max(0, value_rect.GetHeight() - DPI(8)));
+        Rect dot = RectC(x, value_rect.top + (value_rect.GetHeight() - diameter) / 2,
+                         diameter, diameter);
+        if(diameter > 0)
+            w.DrawEllipse(dot, color, 1, style_.frame);
+        return diameter;
+    };
+
     if(item.kind == PropertyEditorKind::FillRecipe &&
        !item.mixed && item.value.Is<ValueMap>()) {
         ValueMap recipe = item.value;
-        const int mode_q = recipe.Find("mode");
-        const String mode = mode_q >= 0 ? AsString(recipe.GetValue(mode_q)) : "None";
+        const auto RecipeValue = [&](const String& key, const Value& fallback) {
+            const int q = recipe.Find(key);
+            return q >= 0 ? recipe.GetValue(q) : fallback;
+        };
+        const String mode = AsString(RecipeValue("mode", "None"));
+        const String label = mode == "QuadGradient" ? "Gradient" :
+                             mode == "Image" ? "Image unavailable" : mode;
+        const int mode_width = min(DPI(88), max(DPI(64),
+            GetTextSize(label, font).cx + DPI(24)));
+        Rect mode_rect(value_rect.left, value_rect.top + DPI(1),
+                       min(value_rect.right, value_rect.left + mode_width),
+                       value_rect.bottom - DPI(1));
+        if(!mode_rect.IsEmpty()) {
+            DrawFrame(w, mode_rect, style_.frame);
+            w.DrawText(mode_rect.left + DPI(6), y, label, font, ink);
+            w.DrawText(max(mode_rect.left + DPI(6), mode_rect.right - DPI(12)),
+                       y, "v", font, ink);
+        }
+        int x = mode_rect.right + DPI(4);
         static const char *keys[] = {
             "top_left", "top_right", "bottom_left", "bottom_right"
         };
         const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
-        const int diameter = min(DPI(16), max(0, value_rect.GetHeight() - DPI(8)));
-        int x = value_rect.left;
         for(int i = 0; i < count; i++) {
-            const int q = recipe.Find(keys[i]);
-            Color color = q >= 0 ? Color(recipe.GetValue(q))
-                                 : Color(128, 128, 128);
-            Rect dot(x, value_rect.top + (value_rect.GetHeight() - diameter) / 2,
-                     x + diameter,
-                     value_rect.top + (value_rect.GetHeight() - diameter) / 2 + diameter);
-            if(!dot.IsEmpty())
-                w.DrawEllipse(dot, color);
-            x += diameter + DPI(4);
+            const String key = mode == "Solid" ? "solid" : keys[i];
+            Value color_value = RecipeValue(key, Color(128, 128, 128));
+            Color color = color_value.Is<Color>()
+                ? Color(color_value) : Color(128, 128, 128);
+            x += DrawSwatch(x, color) + DPI(3);
         }
-        if(mode == "Image") {
-            const int q = recipe.Find("resource_key");
-            const String name = q >= 0 ? AsString(recipe.GetValue(q)) : "Choose image";
-            w.DrawText(x, y, name, font, ink);
-        }
-        else if(count == 0)
-            w.DrawText(x, y, mode, font, ink);
         return;
     }
 
     if(item.kind == PropertyEditorKind::Color &&
        !item.mixed && item.value.GetType() == COLOR_V) {
-        Color color(item.value);
-        Rect swatch(value_rect.left, value_rect.top + DPI(4),
-                    min(value_rect.left + DPI(34), value_rect.right),
-                    value_rect.bottom - DPI(4));
-        if(!swatch.IsEmpty()) {
-            w.DrawRect(swatch, color);
-            DrawFrame(w, swatch, style_.frame);
-            value_rect.left = swatch.right + DPI(6);
+        DrawSwatch(value_rect.left, Color(item.value));
+        return;
+    }
+
+    if(item.kind == PropertyEditorKind::ColorPalette &&
+       !item.mixed && item.value.Is<ValueArray>()) {
+        ValueArray colors = item.value;
+        int x = value_rect.left;
+        const int count = min(4, colors.GetCount());
+        for(int i = 0; i < count; i++) {
+            Color color = colors[i].Is<Color>()
+                ? Color(colors[i]) : Color(128, 128, 128);
+            x += DrawSwatch(x, color) + DPI(3);
         }
+        return;
     }
 
     w.DrawText(value_rect.left, y, FormatValueSummary(item), font, ink);
@@ -1100,8 +1124,7 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
 
     case PropertyEditorKind::Color:
         if(item.value.GetType() == COLOR_V) {
-            Color c(item.value);
-            return Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB());
+            return String();
         }
         return "<none>";
 
