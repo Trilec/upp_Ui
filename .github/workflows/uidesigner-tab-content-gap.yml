@@ -18,7 +18,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Apply correction
+      - name: Apply corrected binary payload
         shell: bash
         run: |
           mkdir -p Utilities/UiDesigner/tools
