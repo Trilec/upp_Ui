@@ -32,13 +32,28 @@ static bool BehaviorActionNeedsHandler(UiDesignerActionType action)
     return action == UiDesignerActionType::CallNamedHandler;
 }
 
+UiDesignerNodeId UiDesignerSession::ResolveThemeOverrideOwner() const
+{
+    if(state_.selection.nodes.GetCount() != 1)
+        return 0;
+    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    for(int depth = 0; node && depth < 8; depth++) {
+        const UiDesignerControlSpec* spec = catalog_.Find(node->type);
+        if(spec && !spec->theme_overrides.IsEmpty())
+            return node->id;
+        if(!(node->flags & UiDesignerNodeSemanticItem) || !node->parent)
+            break;
+        node = document_.Find(node->parent);
+    }
+    return 0;
+}
+
 static bool ThemeOverrideSelectable(const UiDesignerSession& session,
                                     const String& property,
                                     const UiDesignerThemeOverrideSpec **out_spec = nullptr)
 {
-    if(session.State().selection.nodes.GetCount() != 1)
-        return false;
-    const UiDesignerNode* node = session.Document().Find(session.State().selection.primary);
+    const UiDesignerNodeId owner_id = session.ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = session.Document().Find(owner_id);
     if(!node)
         return false;
     const UiDesignerControlSpec* spec = session.Catalog().Find(node->type);
@@ -374,7 +389,8 @@ bool UiDesignerSession::PreviewThemeOverride(const String& property,
         error = property + " is read only";
         return false;
     }
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNodeId owner_id = ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = document_.Find(owner_id);
     if(!node)
         return false;
     overlay_.Set(node->id, UiDesignerTransientValueKind::ThemeOverride,
@@ -406,7 +422,8 @@ bool UiDesignerSession::CommitThemeOverride(const String& property,
         error = property + " is read only";
         return false;
     }
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNodeId owner_id = ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = document_.Find(owner_id);
     if(!node)
         return false;
     const UiDesignerChangeImpact impact =
@@ -435,9 +452,10 @@ bool UiDesignerSession::SetThemeOverrideActive(const String& property,
         error = property + " is read only";
         return false;
     }
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNodeId owner_id = ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = document_.Find(owner_id);
     if(!node) {
-        error = "No selected control";
+        error = "No theme-capable owner for the selection";
         return false;
     }
     const UiDesignerChangeImpact impact =
@@ -493,7 +511,8 @@ bool UiDesignerSession::ResetThemeOverride(const String& property, String& error
         error = property + " is read only";
         return false;
     }
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNodeId owner_id = ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = document_.Find(owner_id);
     if(!node)
         return false;
     const UiDesignerChangeImpact impact =
