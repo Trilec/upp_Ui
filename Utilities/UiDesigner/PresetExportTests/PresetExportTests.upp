@@ -1,15 +1,20 @@
+description "UiDesigner blank, three-pane and dialog generated package tests";
+
 uses
     Core,
+    Ui,
     Utilities/PropertyEditorCore,
     Utilities/UiDesigner/Core,
     Utilities/UiDesigner/Commands,
     Utilities/UiDesigner/Catalog,
     Utilities/UiDesigner/CodeGen,
+    Utilities/UiDesigner/Theme,
     Utilities/UiDesigner/ThemeCore,
     Utilities/UiDesigner/Services;
 
-file
-    main.cpp;
-
 mainconfig
-    "" = "CONSOLE";
+    "CONSOLE" = "1";
+
+file
+    main.cpp,
+    BuildPresetFixtures.ps1;
