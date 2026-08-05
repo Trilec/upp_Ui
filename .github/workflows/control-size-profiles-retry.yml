@@ -1,0 +1,92 @@
+name: Retry UiDesigner control size profiles
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'assistant/control-size-profiles'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/control-size-profiles
+          fetch-depth: 0
+
+      - name: Apply guarded sizing patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          catalog_path = Path('Utilities/UiDesigner/Catalog/UiDesignerCatalog.cpp')
+          catalog = catalog_path.read_text(encoding='utf-8')
+          size_pattern = re.compile(
+              r'    const struct \{ const char \*id; const char \*label; \} sizes\[\] = \{'
+              r'.*?        spec\.defaults\.Set\(field\.id, 0\);\n    \}\n',
+              re.S)
+          size_replacement = '''    const struct {
+              const char *id;
+              const char *label;
+              int default_value;
+              int minimum_value;
+          } sizes[] = {
+              {"fixed_width", "Fixed width", max(1, spec.default_size.cx), 1},
+              {"fixed_height", "Fixed height", max(1, spec.default_size.cy), 1},
+              {"min_width", "Min width", max(1, spec.minimum_size.cx), 1},
+              {"min_height", "Min height", max(1, spec.minimum_size.cy), 1},
+              {"max_width", "Max width", 0, 0},
+              {"max_height", "Max height", 0, 0},
+          };
+          for(const auto& field : sizes) {
+              UiDesignerPropertySpec property = UiDesignerNumberProperty(
+                  field.id, field.label, field.default_value,
+                  field.minimum_value, 10000, 1,
+                  PropertyEditorKind::Integer);
+              property.group = "Layout";
+              property.domain = PropertyEditorDomain::Layout;
+              property.impact = PropertyImpactLocalLayout |
+                                PropertyImpactAncestorLayout | PropertyImpactCode;
+              spec.properties.Add(property);
+              spec.defaults.Set(field.id, field.default_value);
+          }
+          '''
+          catalog, size_count = size_pattern.subn(size_replacement, catalog, count=1)
+          if size_count != 1:
+              raise SystemExit(
+                  f'UiDesignerCatalog.cpp: expected one common sizing block, found {size_count}')
+          catalog_path.write_text(catalog, encoding='utf-8')
+
+          source = Path('.github/workflows/control-size-profiles.yml').read_text(
+              encoding='utf-8')
+          marker = "          python3 - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          lines = [line[10:] if line.startswith('          ') else line
+                   for line in source[start:end].splitlines()]
+          script = '\n'.join(lines)
+
+          old_start = script.index("old_sizes = '''")
+          migration_start = script.index("migration = r'''", old_start)
+          script = script[:old_start] + script[migration_start:]
+          exec(compile(script, 'control-size-profiles', 'exec'))
+          Path('.github/workflows/control-size-profiles-retry.yml').unlink()
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit sizing profiles
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner gives every control a visible sizing profile" -m "Use each catalog control's natural size for Fixed width and height, and define a smaller explicit usable minimum for layout constraints. Keep zero exclusively for unbounded maximum dimensions." -m "Cover native, composite and stock U++ controls, upgrade legacy zero sizing fields on load, validate future catalog entries, and add exhaustive profile regression checks."
+          git push origin HEAD:assistant/control-size-profiles
