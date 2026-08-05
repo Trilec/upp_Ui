@@ -17,19 +17,41 @@ jobs:
         with:
           ref: assistant/property-editor-interaction-fix
           fetch-depth: 0
-      - name: Execute guarded patch
+      - name: Apply and verify focused correction
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          session_path = Path('Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp')
-          session = session_path.read_text(encoding='utf-8')
-          function_start = session.index('bool UiDesignerSession::SetThemeOverrideActive')
-          body_start = session.index('    const UiDesignerChangeImpact impact =', function_start)
-          body_end = session.index('    error.Clear();', body_start) + len('    error.Clear();')
-          replacement = '\n'.join([
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              Path(path).write_text(text, encoding='utf-8')
+
+          def replace_once(path, old, new):
+              text = read(path)
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              write(path, text.replace(old, new, 1))
+
+          def replace_count(path, old, new, expected):
+              text = read(path)
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'{path}: expected {expected} matches, found {count}')
+              write(path, text.replace(old, new))
+
+          # First activation is one complete command. Never inspect the old node
+          # pointer after that command has mutated the document.
+          path = 'Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp'
+          text = read(path)
+          fn = text.index('bool UiDesignerSession::SetThemeOverrideActive')
+          start = text.index('    const UiDesignerChangeImpact impact =', fn)
+          end = text.index('    error.Clear();', start) + len('    error.Clear();')
+          body = '\n'.join([
               '    const UiDesignerChangeImpact impact =',
               '        (UiDesignerChangeImpact)(dword)override_spec->impact;',
               '    const UiDesignerNodeId node_id = node->id;',
@@ -48,9 +70,6 @@ jobs:
               '                }',
               '            }',
               '            else {',
-              '                // SetThemeOverride is the complete first-activation command:',
-              '                // it seeds the resolved value and leaves it active. Do not',
-              '                // continue through a stale node pointer after document mutation.',
               '                const Value seed = ResolveThemeOverrideValue(*node, *override_spec);',
               '                if(!commands_.SetThemeOverride(',
               '                       node_id, property, seed, impact,',
@@ -73,43 +92,181 @@ jobs:
               '    RebuildThemeOverrideModel();',
               '    error.Clear();',
           ])
-          session_path.write_text(session[:body_start] + replacement + session[body_end:],
-                                  encoding='utf-8')
+          write(path, text[:start] + body + text[end:])
 
-          interaction_path = Path('Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
-          interaction = interaction_path.read_text(encoding='utf-8')
-          interaction, guard_count = re.subn(
+          # Override actions are independent from value-editor availability.
+          path = 'Utilities/PropertyEditor/PropertyEditorInteraction.cpp'
+          text = read(path)
+          text, n1 = re.subn(
               r'if\(!item\.overrideable\s*\|\|\s*!item\.enabled\s*\|\|\s*item\.read_only\)',
-              'if(!item.overrideable || item.read_only)', interaction, count=1)
-          interaction, inherited_count = re.subn(
+              'if(!item.overrideable || item.read_only)', text, count=1)
+          text, n2 = re.subn(
               r'if\(item\.overrideable\s*&&\s*!item\.override_active\s*&&\s*!item\.value_editable\)',
-              'if(item.overrideable && !item.override_active)', interaction, count=1)
-          if guard_count != 1 or inherited_count != 1:
-              raise SystemExit('PropertyEditorInteraction.cpp: unexpected override interaction shape')
-          interaction_path.write_text(interaction, encoding='utf-8')
+              'if(item.overrideable && !item.override_active)', text, count=1)
+          if n1 != 1 or n2 != 1:
+              raise SystemExit('PropertyEditorInteraction.cpp: override shape changed')
+          write(path, text)
 
-          source = Path('.github/workflows/property-editor-interaction-fix.yml').read_text(encoding='utf-8')
-          marker = "          python3 - <<'PY'\n"
-          start = source.index(marker) + len(marker)
-          end = source.index("\n          PY", start)
-          lines = [line[10:] if line.startswith('          ') else line
-                   for line in source[start:end].splitlines()]
-          script = '\n'.join(lines)
+          # Boolean values are always live one-click controls when editable.
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorInline.cpp',
+              '    return (item.kind == PropertyEditorKind::FillRecipe || item.inline_editor) &&\n'
+              '           item.value_editable && item.enabled && !item.read_only;',
+              '    return (item.kind == PropertyEditorKind::FillRecipe ||\n'
+              '            item.kind == PropertyEditorKind::Boolean || item.inline_editor) &&\n'
+              '           item.value_editable && item.enabled && !item.read_only;')
 
-          session_pattern = (
-              r"replace_once\(\s*'Utilities/UiDesigner/Services/"
-              r"UiDesignerSessionExtensions\.cpp'.*?\)\n\n")
-          interaction_pattern = (
-              r"replace_once\(\s*'Utilities/PropertyEditor/"
-              r"PropertyEditorInteraction\.cpp'.*?\)\n\n")
-          script, session_calls = re.subn(session_pattern, '', script,
-                                          count=1, flags=re.S)
-          script, interaction_calls = re.subn(interaction_pattern, '', script,
-                                              count=2, flags=re.S)
-          if session_calls != 1 or interaction_calls != 2:
-              raise SystemExit('unable to isolate already-handled replacements')
+          # Inheritance is communicated by the circle and subdued ink; keep the
+          # effective value visible instead of replacing it with opaque prose.
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorPaint.cpp',
+              '    if(item.inherited) {\n'
+              '        w.DrawText(value_rect.left, y, "Using theme", font, ink);\n'
+              '        return;\n'
+              '    }\n\n', '')
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorPaint.cpp',
+              '    if(item.inherited)\n'
+              '        return "Using theme";\n\n', '')
 
-          exec(compile(script, 'property-editor-interaction-fix', 'exec'))
+          # Make the numeric/slider action visually legible.
+          replace_once(
+              'Utilities/PropertyEditor/PropertyAdvancedEditors.cpp',
+              '        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())\n'
+              '               .SetIconSize(DPI(16), DPI(16));',
+              '        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())\n'
+              '               .SetIconSize(DPI(20), DPI(20))\n'
+              '               .SetContentInset(DPI(1));')
+          replace_once(
+              'Utilities/PropertyEditor/PropertyAdvancedEditors.cpp',
+              '        const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;',
+              '        const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;')
+          replace_count(
+              'Utilities/PropertyEditor/PropertyValueEditors.cpp',
+              'toggle_.SetIcon(ICON_DESIGN_SLIDERS_48()).SetIconSize(DPI(16), DPI(16));',
+              'toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())\n'
+              '               .SetIconSize(DPI(20), DPI(20))\n'
+              '               .SetContentInset(DPI(1));', 2)
+          replace_count(
+              'Utilities/PropertyEditor/PropertyValueEditors.cpp',
+              'const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;',
+              'const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;', 2)
+
+          # Member names have no live visual projection. Avoid a Preview pass on
+          # every keystroke and commit the rename once editing settles.
+          replace_once(
+              'Utilities/UiDesigner/Services/UiDesignerSession.cpp',
+              '    const UiDesignerPropertySpec* property_spec = nullptr;\n'
+              '    if(!SelectionSupports(property, &property_spec)) {\n'
+              '        error = "Selection does not support " + property;\n'
+              '        return false;\n'
+              '    }\n\n'
+              '    for(UiDesignerNodeId id : state_.selection.nodes) {',
+              '    const UiDesignerPropertySpec* property_spec = nullptr;\n'
+              '    if(!SelectionSupports(property, &property_spec)) {\n'
+              '        error = "Selection does not support " + property;\n'
+              '        return false;\n'
+              '    }\n\n'
+              '    if(property == "name") {\n'
+              '        error.Clear();\n'
+              '        return true;\n'
+              '    }\n\n'
+              '    for(UiDesignerNodeId id : state_.selection.nodes) {')
+
+          # Present General first while preserving canonical order inside groups.
+          path = 'Utilities/UiDesigner/Services/UiDesignerSession.cpp'
+          text = read(path)
+          fn = text.index('void UiDesignerSession::RebuildThemeOverrideModel')
+          loop = text.index('    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {', fn)
+          loop_end = text.index('    theme_override_model_.StructureChanged();', loop)
+          new_loop = '\n'.join([
+              '    const auto AddOverrideRow = [&](const UiDesignerThemeOverrideSpec& property) {',
+              '        const int q = node->theme_overrides.Find(property.id);',
+              '        const bool inherited = q < 0 || !node->IsThemeOverrideActive(property.id);',
+              '        const Value value = inherited',
+              '            ? ResolveThemeOverrideValue(*node, property)',
+              '            : node->theme_overrides.GetValue(q);',
+              '        property.AddTo(theme_override_model_, value, false);',
+              '        if(PropertyEditorItem *item = theme_override_model_.Find(property.id)) {',
+              '            item->SetInherited(inherited);',
+              '            item->overrideable = true;',
+              '            item->override_active = !inherited;',
+              '            item->enabled = true;',
+              '            item->value_editable = !inherited;',
+              '        }',
+              '    };',
+              '    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)',
+              '        if(property.group == "General")',
+              '            AddOverrideRow(property);',
+              '    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)',
+              '        if(property.group != "General")',
+              '            AddOverrideRow(property);',
+              '',
+          ])
+          write(path, text[:loop] + new_loop + text[loop_end:])
+
+          # Put Overrides ahead of Data and rebuild editors after activation.
+          replace_once(
+              'Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp',
+              '                   .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)\n'
+              '                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,\n'
+              '                               "Edit the selected control’s data")\n'
+              '                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)\n'
+              '                   .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)',
+              '                   .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)\n'
+              '                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)\n'
+              '                   .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,\n'
+              '                               "Edit the selected control’s data")\n'
+              '                   .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)')
+          replace_once(
+              'Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp',
+              '            overrides_.Refresh();\n'
+              '            preview_canvas_.Refresh();',
+              '            overrides_.RefreshModel();\n'
+              '            preview_canvas_.Refresh();')
+
+          # Regression proof: action rail works independently of editor state.
+          replace_once(
+              'Utilities/PropertyEditorTests/main.cpp',
+              '    override_model.Find("surface")->override_active = false;\n'
+              '    override_model.Find("surface")->inherited = true;\n'
+              '    override_model.Find("surface")->value_editable = false;\n'
+              '    int mouse_requests = 0;',
+              '    override_model.Find("surface")->override_active = false;\n'
+              '    override_model.Find("surface")->inherited = true;\n'
+              '    override_model.Find("surface")->value_editable = false;\n'
+              '    override_model.Find("surface")->enabled = false;\n'
+              '    int mouse_requests = 0;')
+          replace_once(
+              'Utilities/UiDesigner/Tests/main.cpp',
+              '    Check(panel_override_session.ThemeOverrideModel().Find("radius") &&\n'
+              '              panel_override_session.ThemeOverrideModel().Find("radius")->override_active &&\n'
+              '              panel_override_session.ThemeOverrideModel().Find("radius")->value_editable &&\n'
+              '              panel_override_session.Document().GetThemeOverride(\n'
+              '                  panel_override_node, "radius").Is<int>(),\n'
+              '          "Panel Radius becomes an editable local numeric value");',
+              '    Check(panel_override_session.ThemeOverrideModel().Find("radius") &&\n'
+              '              panel_override_session.ThemeOverrideModel().Find("radius")->override_active &&\n'
+              '              panel_override_session.ThemeOverrideModel().Find("radius")->value_editable &&\n'
+              '              panel_override_session.Document().GetThemeOverride(\n'
+              '                  panel_override_node, "radius").Is<int>(),\n'
+              '          "Panel Radius becomes an editable local numeric value");\n'
+              '    Check(panel_override_session.SetThemeOverrideActive("radius", false,\n'
+              '                                                        panel_override_error) &&\n'
+              '              !panel_override_session.Document().Find(panel_override_node)\n'
+              '                   ->IsThemeOverrideActive("radius"),\n'
+              '          "Panel Radius can return to inherited state: " + panel_override_error);\n'
+              '    Check(panel_override_session.SetThemeOverrideActive("radius", true,\n'
+              '                                                        panel_override_error) &&\n'
+              '              panel_override_session.Document().Find(panel_override_node)\n'
+              '                   ->IsThemeOverrideActive("radius"),\n'
+              '          "Panel Radius restores saved state after first activation: " +\n'
+              '              panel_override_error);\n'
+              '    Check(panel_override_session.ThemeOverrideModel().GetCount() > 0 &&\n'
+              '              panel_override_session.ThemeOverrideModel()[0].group == "General",\n'
+              '          "Panel Theme Overrides present General first");')
+
+          Path('.github/workflows/property-editor-interaction-fix.yml').unlink()
           Path('.github/workflows/property-editor-interaction-pr.yml').unlink()
           PY
           git diff --check
