@@ -95,98 +95,123 @@ CONSOLE_APP_MAIN
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
 
     auto DefaultSizeValue = [](const UiDesignerControlSpec& spec,
-                     const char *field) {
-    const int q = spec.defaults.Find(field);
-    return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
-};
-for(const UiDesignerControlSpec& spec : catalog.GetControls()) {
-    if(spec.IsSemanticItem())
-        continue;
-    Check(spec.default_size.cx > 0 && spec.default_size.cy > 0,
-          spec.type_id + " has a visible natural size");
-    Check(spec.minimum_size.cx > 0 && spec.minimum_size.cy > 0 &&
-              spec.minimum_size.cx <= spec.default_size.cx &&
-              spec.minimum_size.cy <= spec.default_size.cy,
-          spec.type_id + " has a usable minimum size");
-    Check(DefaultSizeValue(spec, "fixed_width") == spec.default_size.cx &&
-              DefaultSizeValue(spec, "fixed_height") == spec.default_size.cy,
-          spec.type_id + " Fixed mode starts from its natural size");
-    Check(DefaultSizeValue(spec, "min_width") == spec.minimum_size.cx &&
-              DefaultSizeValue(spec, "min_height") == spec.minimum_size.cy,
-          spec.type_id + " minimum fields use its visible minimum");
-    Check(DefaultSizeValue(spec, "max_width") == 0 &&
-              DefaultSizeValue(spec, "max_height") == 0,
-          spec.type_id + " keeps zero only for unbounded maximums");
-    const UiDesignerPropertySpec *fixed_width =
-        spec.FindProperty("fixed_width");
-    const UiDesignerPropertySpec *fixed_height =
-        spec.FindProperty("fixed_height");
-    const UiDesignerPropertySpec *min_width =
-        spec.FindProperty("min_width");
-    const UiDesignerPropertySpec *min_height =
-        spec.FindProperty("min_height");
-    Check(fixed_width && fixed_height && min_width && min_height &&
-              (int)fixed_width->minimum == 1 &&
-              (int)fixed_height->minimum == 1 &&
-              (int)min_width->minimum == 1 &&
-              (int)min_height->minimum == 1,
-          spec.type_id + " cannot author zero fixed/minimum dimensions");
-}
+                               const char *field) {
+        const int q = spec.defaults.Find(field);
+        return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
+    };
+    for(const UiDesignerControlSpec& spec : catalog.GetControls()) {
+        if(spec.IsSemanticItem())
+            continue;
+        Check(spec.default_size.cx > 0 && spec.default_size.cy > 0,
+              spec.type_id + " has a visible natural size");
+        Check(spec.minimum_size.cx > 0 && spec.minimum_size.cy > 0 &&
+                  spec.minimum_size.cx <= spec.default_size.cx &&
+                  spec.minimum_size.cy <= spec.default_size.cy,
+              spec.type_id + " has a usable minimum size");
+        Check(DefaultSizeValue(spec, "fixed_width") == spec.default_size.cx &&
+                  DefaultSizeValue(spec, "fixed_height") == spec.default_size.cy,
+              spec.type_id + " Fixed mode starts from its natural size");
+        Check(DefaultSizeValue(spec, "min_width") == spec.minimum_size.cx &&
+                  DefaultSizeValue(spec, "min_height") == spec.minimum_size.cy,
+              spec.type_id + " minimum fields use its visible minimum");
+        Check(DefaultSizeValue(spec, "max_width") == 0 &&
+                  DefaultSizeValue(spec, "max_height") == 0,
+              spec.type_id + " keeps zero only for unbounded maximums");
+        const UiDesignerPropertySpec* fixed_width =
+            spec.FindProperty("fixed_width");
+        const UiDesignerPropertySpec* fixed_height =
+            spec.FindProperty("fixed_height");
+        const UiDesignerPropertySpec* min_width =
+            spec.FindProperty("min_width");
+        const UiDesignerPropertySpec* min_height =
+            spec.FindProperty("min_height");
+        Check(fixed_width && fixed_height && min_width && min_height &&
+                  (int)fixed_width->minimum == 1 &&
+                  (int)fixed_height->minimum == 1 &&
+                  (int)min_width->minimum == 1 &&
+                  (int)min_height->minimum == 1,
+              spec.type_id + " cannot author zero fixed/minimum dimensions");
+    }
 
-auto CheckSizeProfile = [&](const char *type, Size natural,
-                            Size minimum) {
-    const UiDesignerControlSpec *spec = catalog.Find(type);
-    Check(spec && spec->default_size == natural &&
-              spec->minimum_size == minimum,
-          String(type) + " has its expected sizing profile");
-};
-CheckSizeProfile("UiButton", Size(80, 25), Size(50, 25));
-CheckSizeProfile("UiToolButton", Size(25, 25), Size(25, 25));
-CheckSizeProfile("UiLabel", Size(100, 25), Size(40, 20));
-CheckSizeProfile("UiSlider", Size(160, 25), Size(80, 20));
-CheckSizeProfile("UiMultiEdit", Size(190, 90), Size(100, 50));
-CheckSizeProfile("UiColorPicker", Size(480, 360), Size(320, 240));
-CheckSizeProfile("UiGroupPanel", Size(280, 160), Size(100, 70));
-CheckSizeProfile("UppVScrollBar", Size(18, 160), Size(16, 80));
+    auto CheckSizeProfile = [&](const char *type, Size natural,
+                                Size minimum) {
+        const UiDesignerControlSpec* spec = catalog.Find(type);
+        Check(spec && spec->default_size == natural &&
+                  spec->minimum_size == minimum,
+              String(type) + " has its expected sizing profile");
+    };
+    CheckSizeProfile("UiButton", Size(80, 25), Size(50, 25));
+    CheckSizeProfile("UiToolButton", Size(25, 25), Size(25, 25));
+    CheckSizeProfile("UiLabel", Size(100, 25), Size(40, 20));
+    CheckSizeProfile("UiSlider", Size(160, 25), Size(80, 20));
+    CheckSizeProfile("UiMultiEdit", Size(190, 90), Size(100, 50));
+    CheckSizeProfile("UiColorPicker", Size(480, 360), Size(320, 240));
+    CheckSizeProfile("UiGroupPanel", Size(280, 160), Size(100, 70));
+    CheckSizeProfile("UppVScrollBar", Size(18, 160), Size(16, 80));
 
-UiDesignerDocument legacy_sizing_document;
-legacy_sizing_document.NewDocument();
-UiDesignerCommandService legacy_sizing_commands(legacy_sizing_document);
-const UiDesignerControlSpec *legacy_button_spec =
-    catalog.Find("UiButton");
-Check(legacy_button_spec != nullptr,
-      "legacy sizing fixture resolves the Button specification");
-ValueMap legacy_button_defaults;
-dword legacy_button_flags = UiDesignerNodeNone;
-if(legacy_button_spec) {
-    legacy_button_defaults = legacy_button_spec->defaults;
-    legacy_button_flags = legacy_button_spec->node_flags;
-}
-const UiDesignerNodeId legacy_button = legacy_sizing_commands.AddNode(
-    "UiButton", "legacy_button", legacy_sizing_document.GetRootId(),
-    legacy_button_flags, legacy_button_defaults, "Add legacy button");
-UiDesignerNode* legacy_button_node =
-    legacy_sizing_document.Find(legacy_button);
-if(legacy_button_node) {
-    legacy_button_node->SetProperty("fixed_width", 0);
-    legacy_button_node->SetProperty("fixed_height", 0);
-    legacy_button_node->SetProperty("min_width", 0);
-    legacy_button_node->SetProperty("min_height", 0);
-}
-Check(catalog.ApplySizingDefaults(legacy_sizing_document),
-      "legacy zero sizing values are upgraded");
-legacy_button_node = legacy_sizing_document.Find(legacy_button);
-Check(legacy_button_node &&
-          (int)legacy_button_node->GetProperty("fixed_width", 0) == 80 &&
-          (int)legacy_button_node->GetProperty("fixed_height", 0) == 25 &&
-          (int)legacy_button_node->GetProperty("min_width", 0) == 50 &&
-          (int)legacy_button_node->GetProperty("min_height", 0) == 25 &&
-          (int)legacy_button_node->GetProperty("max_width", 0) == 0 &&
-          (int)legacy_button_node->GetProperty("max_height", 0) == 0,
-      "legacy Button receives its profile without bounding maximums");
-Check(!catalog.ApplySizingDefaults(legacy_sizing_document),
-      "legacy sizing upgrade is idempotent");
+    UiDesignerSession sizing_session;
+    const UiDesignerNodeId sizing_button =
+        sizing_session.AddControl("UiButton");
+    const UiDesignerNode* sizing_button_node =
+        sizing_session.Document().Find(sizing_button);
+    Check(sizing_button_node &&
+              (int)sizing_button_node->GetProperty("fixed_width", 0) == 80 &&
+              (int)sizing_button_node->GetProperty("fixed_height", 0) == 25 &&
+              (int)sizing_button_node->GetProperty("min_width", 0) == 50 &&
+              (int)sizing_button_node->GetProperty("min_height", 0) == 25,
+          "new Button stores its natural and minimum sizing profile");
+    Check(sizing_session.InspectorModel().Find("fixed_width") &&
+              (int)sizing_session.InspectorModel().Find("fixed_width")->value == 80 &&
+              sizing_session.InspectorModel().Find("min_width") &&
+              (int)sizing_session.InspectorModel().Find("min_width")->value == 50,
+          "Button Inspector presents non-zero sizing values immediately");
+    String sizing_error;
+    Check(sizing_session.CommitProperty("width_mode", "Fixed", sizing_error),
+          "Button width mode switches to Fixed: " + sizing_error);
+    Check(sizing_session.CommitProperty("fixed_width", 120, sizing_error),
+          "Button Fixed width can be edited: " + sizing_error);
+    Check(sizing_session.ResetProperty("fixed_width", sizing_error) &&
+              (int)sizing_session.Document().Find(sizing_button)
+                  ->GetProperty("fixed_width", 0) == 80,
+          "Button Fixed width reset returns to natural width: " + sizing_error);
 
+    UiDesignerDocument legacy_sizing_document;
+    legacy_sizing_document.NewDocument();
+    UiDesignerCommandService legacy_sizing_commands(legacy_sizing_document);
+    const UiDesignerControlSpec* legacy_button_spec =
+        catalog.Find("UiButton");
+    Check(legacy_button_spec != nullptr,
+          "legacy sizing fixture resolves the Button specification");
+    ValueMap legacy_button_defaults;
+    dword legacy_button_flags = UiDesignerNodeNone;
+    if(legacy_button_spec) {
+        legacy_button_defaults = legacy_button_spec->defaults;
+        legacy_button_flags = legacy_button_spec->node_flags;
+    }
+    const UiDesignerNodeId legacy_button = legacy_sizing_commands.AddNode(
+        "UiButton", "legacy_button", legacy_sizing_document.GetRootId(),
+        legacy_button_flags, legacy_button_defaults, "Add legacy button");
+    UiDesignerNode* legacy_button_node =
+        legacy_sizing_document.Find(legacy_button);
+    if(legacy_button_node) {
+        legacy_button_node->SetProperty("fixed_width", 0);
+        legacy_button_node->SetProperty("fixed_height", 0);
+        legacy_button_node->SetProperty("min_width", 0);
+        legacy_button_node->SetProperty("min_height", 0);
+    }
+    Check(catalog.ApplySizingDefaults(legacy_sizing_document),
+          "legacy zero sizing values are upgraded");
+    legacy_button_node = legacy_sizing_document.Find(legacy_button);
+    Check(legacy_button_node &&
+              (int)legacy_button_node->GetProperty("fixed_width", 0) == 80 &&
+              (int)legacy_button_node->GetProperty("fixed_height", 0) == 25 &&
+              (int)legacy_button_node->GetProperty("min_width", 0) == 50 &&
+              (int)legacy_button_node->GetProperty("min_height", 0) == 25 &&
+              (int)legacy_button_node->GetProperty("max_width", 0) == 0 &&
+              (int)legacy_button_node->GetProperty("max_height", 0) == 0,
+          "legacy Button receives its profile without bounding maximums");
+    Check(!catalog.ApplySizingDefaults(legacy_sizing_document),
+          "legacy sizing upgrade is idempotent");
 ImageBuffer background_buffer(4, 2);
     Fill(~background_buffer, RGBA(Color(64, 96, 128)), background_buffer.GetLength());
     UiPanel background_panel;
