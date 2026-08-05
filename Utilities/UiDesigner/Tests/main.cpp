@@ -95,7 +95,7 @@ CONSOLE_APP_MAIN
     Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");
 
     auto DefaultSizeValue = [](const UiDesignerControlSpec& spec,
-                           const char *field) {
+                     const char *field) {
     const int q = spec.defaults.Find(field);
     return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
 };
@@ -117,10 +117,14 @@ for(const UiDesignerControlSpec& spec : catalog.GetControls()) {
     Check(DefaultSizeValue(spec, "max_width") == 0 &&
               DefaultSizeValue(spec, "max_height") == 0,
           spec.type_id + " keeps zero only for unbounded maximums");
-    const UiDesignerPropertySpec *fixed_width = spec.FindProperty("fixed_width");
-    const UiDesignerPropertySpec *fixed_height = spec.FindProperty("fixed_height");
-    const UiDesignerPropertySpec *min_width = spec.FindProperty("min_width");
-    const UiDesignerPropertySpec *min_height = spec.FindProperty("min_height");
+    const UiDesignerPropertySpec *fixed_width =
+        spec.FindProperty("fixed_width");
+    const UiDesignerPropertySpec *fixed_height =
+        spec.FindProperty("fixed_height");
+    const UiDesignerPropertySpec *min_width =
+        spec.FindProperty("min_width");
+    const UiDesignerPropertySpec *min_height =
+        spec.FindProperty("min_height");
     Check(fixed_width && fixed_height && min_width && min_height &&
               (int)fixed_width->minimum == 1 &&
               (int)fixed_height->minimum == 1 &&
@@ -129,7 +133,8 @@ for(const UiDesignerControlSpec& spec : catalog.GetControls()) {
           spec.type_id + " cannot author zero fixed/minimum dimensions");
 }
 
-auto CheckSizeProfile = [&](const char *type, Size natural, Size minimum) {
+auto CheckSizeProfile = [&](const char *type, Size natural,
+                            Size minimum) {
     const UiDesignerControlSpec *spec = catalog.Find(type);
     Check(spec && spec->default_size == natural &&
               spec->minimum_size == minimum,
@@ -147,13 +152,20 @@ CheckSizeProfile("UppVScrollBar", Size(18, 160), Size(16, 80));
 UiDesignerDocument legacy_sizing_document;
 legacy_sizing_document.NewDocument();
 UiDesignerCommandService legacy_sizing_commands(legacy_sizing_document);
-const UiDesignerControlSpec *legacy_button_spec = catalog.Find("UiButton");
+const UiDesignerControlSpec *legacy_button_spec =
+    catalog.Find("UiButton");
+Check(legacy_button_spec != nullptr,
+      "legacy sizing fixture resolves the Button specification");
+ValueMap legacy_button_defaults;
+dword legacy_button_flags = UiDesignerNodeNone;
+if(legacy_button_spec) {
+    legacy_button_defaults = legacy_button_spec->defaults;
+    legacy_button_flags = legacy_button_spec->node_flags;
+}
 const UiDesignerNodeId legacy_button = legacy_sizing_commands.AddNode(
     "UiButton", "legacy_button", legacy_sizing_document.GetRootId(),
-    legacy_button_spec ? legacy_button_spec->node_flags : UiDesignerNodeNone,
-    legacy_button_spec ? legacy_button_spec->defaults : ValueMap(),
-    "Add legacy button");
-UiDesignerNode *legacy_button_node =
+    legacy_button_flags, legacy_button_defaults, "Add legacy button");
+UiDesignerNode* legacy_button_node =
     legacy_sizing_document.Find(legacy_button);
 if(legacy_button_node) {
     legacy_button_node->SetProperty("fixed_width", 0);
@@ -171,11 +183,11 @@ Check(legacy_button_node &&
           (int)legacy_button_node->GetProperty("min_height", 0) == 25 &&
           (int)legacy_button_node->GetProperty("max_width", 0) == 0 &&
           (int)legacy_button_node->GetProperty("max_height", 0) == 0,
-      "legacy button receives the canonical profile without bounding maximums");
+      "legacy Button receives its profile without bounding maximums");
 Check(!catalog.ApplySizingDefaults(legacy_sizing_document),
       "legacy sizing upgrade is idempotent");
 
-    ImageBuffer background_buffer(4, 2);
+ImageBuffer background_buffer(4, 2);
     Fill(~background_buffer, RGBA(Color(64, 96, 128)), background_buffer.GetLength());
     UiPanel background_panel;
     background_panel.SetBackgroundImage(Image(background_buffer),

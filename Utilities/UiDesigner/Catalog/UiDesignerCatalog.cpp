@@ -393,8 +393,9 @@ bool UiDesignerCatalog::ApplySizingDefaults(
         const UiDesignerNodeId node_id = document.GetNodes()[i].id;
         if(node_id == document.GetRootId())
             continue;
-        UiDesignerNode *node = document.Find(node_id);
-        const UiDesignerControlSpec *spec = node ? Find(node->type) : nullptr;
+        UiDesignerNode* node = document.Find(node_id);
+        const UiDesignerControlSpec* spec =
+            node ? Find(node->type) : nullptr;
         if(!node || !spec || spec->IsSemanticItem())
             continue;
         for(const char *field : fields) {
@@ -611,17 +612,54 @@ bool UiDesignerCatalog::Validate(String& error) const
         error = spec.type_id + " minimum size exceeds its natural size";
         return false;
     }
-    const char *required_sizes[] = {
-        "fixed_width", "fixed_height", "min_width", "min_height",
-        "max_width", "max_height"
+
+    const UiDesignerPropertySpec *fixed_width =
+        spec.FindProperty("fixed_width");
+    const UiDesignerPropertySpec *fixed_height =
+        spec.FindProperty("fixed_height");
+    const UiDesignerPropertySpec *min_width =
+        spec.FindProperty("min_width");
+    const UiDesignerPropertySpec *min_height =
+        spec.FindProperty("min_height");
+    const UiDesignerPropertySpec *max_width =
+        spec.FindProperty("max_width");
+    const UiDesignerPropertySpec *max_height =
+        spec.FindProperty("max_height");
+    if(!fixed_width || !fixed_height || !min_width || !min_height ||
+       !max_width || !max_height) {
+        error = spec.type_id + " is missing common sizing properties";
+        return false;
+    }
+
+    const auto DefaultInt = [&](const char *field) {
+        const int q = spec.defaults.Find(field);
+        return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
     };
-    for(const char *field : required_sizes)
-        if(!spec.FindProperty(field) || spec.defaults.Find(field) < 0) {
-            error = spec.type_id + " is missing common sizing field " + field;
-            return false;
-        }
+    if(DefaultInt("fixed_width") != spec.default_size.cx ||
+       DefaultInt("fixed_height") != spec.default_size.cy) {
+        error = spec.type_id + " Fixed defaults do not match natural size";
+        return false;
+    }
+    if(DefaultInt("min_width") != spec.minimum_size.cx ||
+       DefaultInt("min_height") != spec.minimum_size.cy) {
+        error = spec.type_id + " minimum defaults do not match minimum size";
+        return false;
+    }
+    if(DefaultInt("max_width") != 0 || DefaultInt("max_height") != 0) {
+        error = spec.type_id + " maximum defaults must remain unbounded";
+        return false;
+    }
+    if((int)fixed_width->minimum != 1 ||
+       (int)fixed_height->minimum != 1 ||
+       (int)min_width->minimum != 1 ||
+       (int)min_height->minimum != 1 ||
+       (int)max_width->minimum != 0 ||
+       (int)max_height->minimum != 0) {
+        error = spec.type_id + " has an invalid sizing input range";
+        return false;
+    }
 }
-        if(spec.preview_adapter_id.IsEmpty()) {
+if(spec.preview_adapter_id.IsEmpty()) {
             error = spec.type_id + " has no preview adapter id";
             return false;
         }
@@ -813,38 +851,6 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
     spec.properties.Add(pick(enabled));
 
     const struct {
-        const char *id;
-        const char *label;
-        const char *value;
-    } modes[] = {
-        {"width_mode", "Width mode", "Fit"},
-        {"height_mode", "Height mode", "Fit"},
-        {"cell_align_x", "Cell align X", "Center"},
-        {"cell_align_y", "Cell align Y", "Center"},
-    };
-    for(const auto& field : modes) {
-        UiDesignerPropertySpec property;
-        property.id = field.id;
-        property.label = field.label;
-        property.group = "Layout";
-        property.kind = PropertyEditorKind::Choice;
-        property.domain = PropertyEditorDomain::Layout;
-        property.default_value = field.value;
-        if(field.id[0] == 'w' || field.id[0] == 'h')
-            property.Choice("Fit", "Fit").Choice("Fixed", "Fixed")
-                     .Choice("Expand", "Expand");
-        else if(String(field.id) == "cell_align_x")
-            property.Choice("Left", "Left")
-                     .Choice("Center", "Center").Choice("Right", "Right");
-        else
-            property.Choice("Top", "Top")
-                     .Choice("Center", "Center").Choice("Bottom", "Bottom");
-        property.impact = PropertyImpactLocalLayout |
-                          PropertyImpactAncestorLayout | PropertyImpactCode;
-        spec.properties.Add(property);
-        spec.defaults.Set(field.id, field.value);
-    }
-    const struct {
     const char *id;
     const char *label;
     int default_value;
@@ -870,7 +876,7 @@ for(const auto& field : sizes) {
     spec.defaults.Set(field.id, field.default_value);
 }
 
-    UiDesignerPropertySpec role;
+UiDesignerPropertySpec role;
     role.id = "role";
     role.label = "Role";
     role.group = "Appearance";
