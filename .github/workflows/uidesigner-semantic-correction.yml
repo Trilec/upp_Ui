@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p Utilities/UiDesigner/tools
           gzip -d -c .github/uidesigner-semantic-correction.py.gz > Utilities/UiDesigner/tools/fix_semantic_inspector.py
+          sed -i 's/Default Accordion preserves native chevron and drag glyphs/Generated default Accordion preserves native chevron and drag glyphs/' Utilities/UiDesigner/tools/fix_semantic_inspector.py
           python3 -m py_compile Utilities/UiDesigner/tools/fix_semantic_inspector.py
           python3 Utilities/UiDesigner/tools/fix_semantic_inspector.py
 
