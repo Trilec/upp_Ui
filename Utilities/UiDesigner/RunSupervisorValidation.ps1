@@ -39,6 +39,7 @@ Invoke-Checked 'Architecture guard' {
 $probe = Join-Path $OutputRoot 'PropertyEditorCoreProbe.exe'
 $propertyTests = Join-Path $OutputRoot 'PropertyEditorTests.exe'
 $designerTests = Join-Path $OutputRoot 'UiDesignerTests.exe'
+$regressionTests = Join-Path $OutputRoot 'UiDesignerRegressionTests.exe'
 $foundationTests = Join-Path $OutputRoot 'UiDesignerFoundationTests.exe'
 $cli = Join-Path $OutputRoot 'uidesigner_cli.exe'
 $mcp = Join-Path $OutputRoot 'uidesigner_mcp.exe'
@@ -47,6 +48,7 @@ $app = Join-Path $OutputRoot 'UiDesigner.exe'
 Build-Package 'Utilities/PropertyEditorCoreProbe' $probe
 Build-Package 'Utilities/PropertyEditorTests' $propertyTests $true
 Build-Package 'Utilities/UiDesigner/Tests' $designerTests $true
+Build-Package 'Utilities/UiDesigner/RegressionTests' $regressionTests $true
 Build-Package 'Utilities/UiDesigner/FoundationTests' $foundationTests
 Build-Package 'Utilities/UiDesigner/CLI' $cli
 Build-Package 'Utilities/UiDesigner/MCP' $mcp
@@ -55,6 +57,7 @@ Build-Package 'Utilities/UiDesigner/UiDesigner' $app $true
 Invoke-Checked 'PropertyEditorCoreProbe' { & $probe }
 Invoke-Checked 'PropertyEditorTests' { & $propertyTests }
 Invoke-Checked 'UiDesignerTests' { & $designerTests }
+Invoke-Checked 'UiDesignerRegressionTests' { & $regressionTests }
 Invoke-Checked 'UiDesignerFoundationTests' { & $foundationTests }
 
 Invoke-Checked 'CLI list-controls' { & $cli 'list-controls' 'spacer' }
