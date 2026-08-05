@@ -1,0 +1,60 @@
+name: Retry final UiDesigner sizing profile check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    if: github.head_ref == 'assistant/control-size-profiles'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/control-size-profiles
+          fetch-depth: 0
+
+      - name: Run complete coverage check
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source_path = Path('.github/workflows/control-size-final-check.yml')
+          source = source_path.read_text(encoding='utf-8')
+          marker = "          python3 - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          lines = [line[10:] if line.startswith('          ') else line
+                   for line in source[start:end].splitlines()]
+          script = '\n'.join(lines)
+          old = '''table_types = set(re.findall(
+    r'\\{\"([A-Za-z0-9_]+)\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*'
+    r'UiDesignerRuntimeKind::[A-Za-z0-9_]+', builtins))
+registered = direct_types | table_types'''
+          new = '''table_types = set(re.findall(
+    r'\\{\"([A-Za-z0-9_]+)\"(?:,\\s*\"[^\"]*\"){2,3},\\s*'
+    r'UiDesignerRuntimeKind::[A-Za-z0-9_]+', builtins))
+registered = direct_types | table_types'''
+          if script.count(old) != 1:
+              raise SystemExit('unexpected profile registration matcher')
+          script = script.replace(old, new, 1)
+          exec(compile(script, 'control-size-final-check', 'exec'))
+          Path('.github/workflows/control-size-final-check-retry.yml').unlink()
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit final coverage check
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner closes control sizing profile coverage" -m "Verify every registered non-semantic control, including composite registrations, has one explicit sizing profile and remove the final test formatting join." -m "Retain guards for the complete Width, Height and cell-alignment common property contract."
+          git push origin HEAD:assistant/control-size-profiles
