@@ -300,7 +300,7 @@ static bool LoadActions(UiDesignerNode& node, const ValueArray& encoded,
 static String MigrateLegacySizingMode(const Value& value)
 {
     const String mode = AsString(value);
-    if(mode == "Fill")
+    if(mode == "Fill" || mode == "Expand")
         return "Expand";
     if(mode == "Fixed")
         return "Fixed";
