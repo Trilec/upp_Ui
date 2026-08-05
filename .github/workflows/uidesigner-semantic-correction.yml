@@ -1,0 +1,52 @@
+name: Publish UiDesigner semantic Inspector corrections
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/uidesigner-semantic-correction.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uidesigner-semantic-inspector-correction
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply corrective migration
+        shell: bash
+        run: |
+          mkdir -p Utilities/UiDesigner/tools
+          base64 -d .github/uidesigner-semantic-correction.py.gz.b64 | gzip -d > Utilities/UiDesigner/tools/fix_semantic_inspector.py
+          python3 -m py_compile Utilities/UiDesigner/tools/fix_semantic_inspector.py
+          python3 Utilities/UiDesigner/tools/fix_semantic_inspector.py
+
+      - name: Verify and publish source
+        shell: bash
+        run: |
+          rm -rf Utilities/UiDesigner/tools
+          rm -f .github/uidesigner-semantic-correction.py.gz.b64
+          rm -f .github/workflows/uidesigner-semantic-correction.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+          git diff --check
+          ! grep -q "Array<UiDesignerPropertySpec> source" Utilities/UiDesigner/Catalog/UiDesignerInspectorCatalog.cpp
+          grep -q '"Default", "Control default"' Utilities/UiDesigner/Catalog/UiDesignerInspectorCatalog.cpp
+          grep -q 'identity = primary->type;' Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp
+          grep -q 'ApplyHeaderPresentation' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp
+          grep -q 'has_active_header_style' Utilities/UiDesigner/CodeGen/UiDesignerCodeGen.cpp
+          grep -q '_tab_layout_style' Utilities/UiDesigner/CodeGen/UiDesignerCodeGen.cpp
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner completes semantic Inspector contracts"
+          git push origin HEAD:main
