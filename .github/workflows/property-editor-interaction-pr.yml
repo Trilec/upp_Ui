@@ -22,6 +22,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           session_path = Path('Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp')
           session = session_path.read_text(encoding='utf-8')
@@ -77,22 +78,14 @@ jobs:
 
           interaction_path = Path('Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
           interaction = interaction_path.read_text(encoding='utf-8')
-          old_guard = '    if(!item.overrideable || !item.enabled || item.read_only)\n        return;'
-          old_inherited = '''    if(item.overrideable && !item.override_active && !item.value_editable) {
-              ToggleOverride(row);
-              return;
-          }'''
-          if interaction.count(old_guard) != 1 or interaction.count(old_inherited) != 1:
+          interaction, guard_count = re.subn(
+              r'if\(!item\.overrideable\s*\|\|\s*!item\.enabled\s*\|\|\s*item\.read_only\)',
+              'if(!item.overrideable || item.read_only)', interaction, count=1)
+          interaction, inherited_count = re.subn(
+              r'if\(item\.overrideable\s*&&\s*!item\.override_active\s*&&\s*!item\.value_editable\)',
+              'if(item.overrideable && !item.override_active)', interaction, count=1)
+          if guard_count != 1 or inherited_count != 1:
               raise SystemExit('PropertyEditorInteraction.cpp: unexpected override interaction shape')
-          interaction = interaction.replace(
-              old_guard,
-              '    if(!item.overrideable || item.read_only)\n        return;', 1)
-          interaction = interaction.replace(
-              old_inherited,
-              '''    if(item.overrideable && !item.override_active) {
-              ToggleOverride(row);
-              return;
-          }''', 1)
           interaction_path.write_text(interaction, encoding='utf-8')
 
           source = Path('.github/workflows/property-editor-interaction-fix.yml').read_text(encoding='utf-8')
