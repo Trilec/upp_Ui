@@ -116,6 +116,9 @@ static void PopulateIconChoices(UiDesignerPropertySpec& property)
 {
     property.kind = PropertyEditorKind::Choice;
     property.choices.Clear();
+    if(AsString(property.default_value) == "Default")
+        property.choices.Add(PropertyEditorChoice(
+            "Default", "Control default"));
     property.choices.Add(PropertyEditorChoice("None", "None"));
     for(const UiIconCatalogEntry& entry : UiIconCatalog())
         property.choices.Add(PropertyEditorChoice(
@@ -126,7 +129,8 @@ static void PopulateIconChoices(UiDesignerPropertySpec& property)
 static void EnsureIcon(UiDesignerControlSpec& spec,
                        const String& id = "icon",
                        const String& label = "Icon",
-                       const String& group = "Content")
+                       const String& group = "Content",
+                       const String& default_value = "None")
 {
     UiDesignerPropertySpec* property = FindProperty(spec, id);
     if(!property) {
@@ -136,8 +140,8 @@ static void EnsureIcon(UiDesignerControlSpec& spec,
     property->group = group;
     property->domain = group == "Content" ? PropertyEditorDomain::Content
                                            : PropertyEditorDomain::Appearance;
-    property->default_value = "None";
-    spec.defaults.Set(id, "None");
+    property->default_value = default_value;
+    spec.defaults.Set(id, default_value);
     PopulateIconChoices(*property);
 }
 
@@ -293,12 +297,12 @@ static void NormalizeAccordion(UiDesignerControlSpec& spec)
         {{"Left", "Left"}, {"Right", "Right"}}));
     AddProperty(spec, MakeInt("chevron_size", "Chevron size", "Appearance", style.chevron_size / DPI(1), 0, 256));
     AddProperty(spec, MakeInt("chevron_gap", "Chevron gap", "Appearance", style.chevron_gap / DPI(1), 0, 256));
-    EnsureIcon(spec, "chevron_open_icon", "Open chevron", "Appearance");
-    EnsureIcon(spec, "chevron_closed_icon", "Closed chevron", "Appearance");
-    EnsureIcon(spec, "chevron_lock_icon", "Lock icon", "Appearance");
+    EnsureIcon(spec, "chevron_open_icon", "Open chevron", "Appearance", "Default");
+    EnsureIcon(spec, "chevron_closed_icon", "Closed chevron", "Appearance", "Default");
+    EnsureIcon(spec, "chevron_lock_icon", "Lock icon", "Appearance", "Default");
     AddProperty(spec, MakeChoice("drag_side", "Drag handle side", "Appearance", "Right", PropertyEditorDomain::Appearance,
         {{"Left", "Left"}, {"Right", "Right"}}));
-    EnsureIcon(spec, "drag_icon", "Drag icon", "Appearance");
+    EnsureIcon(spec, "drag_icon", "Drag icon", "Appearance", "Default");
     AddProperty(spec, MakeInt("drag_size", "Drag size", "Appearance", style.drag_size / DPI(1), 0, 256));
     AddProperty(spec, MakeInt("drag_gap", "Drag gap", "Appearance", style.drag_gap / DPI(1), 0, 256));
     AddProperty(spec, MakeBool("unified_section_frame", "Unified section frame", "Appearance", style.unified_section_frame, PropertyEditorDomain::Appearance));
@@ -309,6 +313,65 @@ static void NormalizeAccordion(UiDesignerControlSpec& spec)
 static void NormalizeTab(UiDesignerControlSpec& spec)
 {
     const UiTab::Style& style = UiTab::StyleDefault();
+
+    UiDesignerPropertySpec font_face = MakeText(
+        "tab_font_face", "Tab font face", "Appearance",
+        style.tab_font.GetFaceName());
+    font_face.domain = PropertyEditorDomain::Appearance;
+    font_face.impact = PropertyImpactPaint | PropertyImpactLocalLayout |
+                       PropertyImpactCode;
+    AddProperty(spec, pick(font_face));
+    AddProperty(spec, MakeInt(
+        "tab_font_size", "Tab font size", "Appearance",
+        max(1, style.tab_font.GetHeight()), 1, 256));
+    AddProperty(spec, MakeBool(
+        "tab_font_bold", "Tab font bold", "Appearance",
+        style.tab_font.IsBold(), PropertyEditorDomain::Appearance));
+    AddProperty(spec, MakeBool(
+        "tab_font_italic", "Tab font italic", "Appearance",
+        style.tab_font.IsItalic(), PropertyEditorDomain::Appearance));
+    AddProperty(spec, MakeInt(
+        "tab_extent", "Tab extent", "Appearance",
+        style.tab_extent / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "item_spacing", "Item spacing", "Appearance",
+        style.item_spacing / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "body_gap", "Body gap", "Appearance",
+        style.body_gap / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "content_gap", "Content gap", "Appearance",
+        style.content_gap / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "tab_padding_left", "Tab padding left", "Appearance",
+        style.tab_padding.left / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "tab_padding_top", "Tab padding top", "Appearance",
+        style.tab_padding.top / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "tab_padding_right", "Tab padding right", "Appearance",
+        style.tab_padding.right / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "tab_padding_bottom", "Tab padding bottom", "Appearance",
+        style.tab_padding.bottom / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "strip_inset_left", "Strip inset left", "Appearance",
+        style.strip_inset.left / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "strip_inset_top", "Strip inset top", "Appearance",
+        style.strip_inset.top / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "strip_inset_right", "Strip inset right", "Appearance",
+        style.strip_inset.right / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "strip_inset_bottom", "Strip inset bottom", "Appearance",
+        style.strip_inset.bottom / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "affordance_gap", "Affordance gap", "Appearance",
+        style.affordance_gap / DPI(1), 0, 1000));
+    AddProperty(spec, MakeInt(
+        "min_tab_main", "Minimum tab extent", "Appearance",
+        style.min_tab_main / DPI(1), 0, 4000));
     AddProperty(spec, MakeChoice("placement", "Placement", "Appearance", "Top", PropertyEditorDomain::Appearance,
         {{"Top", "Top"}, {"Bottom", "Bottom"}, {"Left", "Left"}, {"Right", "Right"}}));
     AddProperty(spec, MakeChoice("visual", "Visual", "Appearance", "Classic", PropertyEditorDomain::Appearance,
@@ -340,7 +403,7 @@ static int GroupRank(const String& group)
 
 static void GroupProperties(UiDesignerControlSpec& spec)
 {
-    Array<UiDesignerPropertySpec> source = pick(spec.properties);
+    Vector<UiDesignerPropertySpec> source = pick(spec.properties);
     Vector<String> groups;
     for(const UiDesignerPropertySpec& property : source)
         if(FindIndex(groups, property.group) < 0)

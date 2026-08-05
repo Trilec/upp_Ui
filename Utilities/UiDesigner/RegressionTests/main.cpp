@@ -245,6 +245,60 @@ CONSOLE_APP_MAIN
               UiIconCatalog().GetCount() + 1,
           "Icon properties enumerate the authoritative UiIcons catalogue");
 
+    const UiDesignerControlSpec *accordion_owner_spec =
+        semantic_session.Catalog().Find("UiAccordion");
+    const UiDesignerPropertySpec *open_glyph = accordion_owner_spec
+        ? accordion_owner_spec->FindProperty("chevron_open_icon") : nullptr;
+    Check(open_glyph && open_glyph->default_value == "Default" &&
+              open_glyph->choices.GetCount() == UiIconCatalog().GetCount() + 2,
+          "Accordion glyph choices preserve the control default and expose every catalogue icon");
+
+    const UiDesignerControlSpec *tab_spec =
+        semantic_session.Catalog().Find("UiTab");
+    Check(tab_spec && tab_spec->FindProperty("tab_font_face") &&
+              tab_spec->FindProperty("tab_extent") &&
+              tab_spec->FindProperty("tab_padding_left") &&
+              tab_spec->FindProperty("strip_inset_left") &&
+              tab_spec->FindProperty("content_gap"),
+          "UiTab exposes API-backed font, extent, padding, inset and spacing appearance");
+
+    int content_runs = 0;
+    bool in_content = false;
+    if(section_spec)
+        for(const UiDesignerPropertySpec& property : section_spec->properties) {
+            if(property.group == "Content") {
+                if(!in_content)
+                    content_runs++;
+                in_content = true;
+            }
+            else
+                in_content = false;
+        }
+    Check(content_runs == 1,
+          "Accordion section has one contiguous Content group");
+
+    UiDesignerSession default_glyph_session;
+    const UiDesignerNodeId default_accordion =
+        default_glyph_session.AddControl("UiAccordion");
+    Check(default_accordion != 0,
+          "Default Accordion code-generation fixture is created");
+    const String default_glyph_code =
+        default_glyph_session.GenerateCode("DefaultGlyphFixture");
+    Check(default_glyph_code.Find(".SetChevronGlyphs(") < 0 &&
+              default_glyph_code.Find(".SetDragGlyph(") < 0,
+          "Generated default Accordion preserves native chevron and drag glyphs");
+
+    const String semantic_code =
+        semantic_session.GenerateCode("SemanticInspectorFixture");
+    Check(semantic_code.Find(".SetTabIcon(") >= 0 &&
+              semantic_code.Find(".SetTabTip(") >= 0 &&
+              semantic_code.Find(".SetTabClosable(") >= 0 &&
+              semantic_code.Find(".SetTabDraggable(") >= 0,
+          "Generated Tab pages preserve API-backed content and behaviour");
+    Check(semantic_code.Find(".GetSectionHeader(") >= 0 &&
+              semantic_code.Find(".SetMedia(") >= 0,
+          "Generated Accordion sections author the exposed UiTitleCard header");
+
     UiDesignerDocument migrated;
     Check(UiDesignerDeserialize(LegacySizingJson(), migrated, error),
           "Legacy sizing fixture loads: " + error);

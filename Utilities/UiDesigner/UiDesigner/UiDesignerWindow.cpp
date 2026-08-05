@@ -1405,18 +1405,14 @@ void UiDesignerWindow::RefreshInspector()
                     break;
                 }
             }
-            if(same_type) {
-                const UiDesignerControlSpec* spec = session_.Catalog().Find(primary->type);
-                identity = (spec ? spec->display_name : primary->type) +
+            if(same_type)
+                identity = primary->type +
                            Format(" - %d selected", selection.nodes.GetCount());
-            }
             else
                 identity = Format("%d mixed controls", selection.nodes.GetCount());
         }
-        else if(primary->id != session_.Document().GetRootId()) {
-            const UiDesignerControlSpec* spec = session_.Catalog().Find(primary->type);
-            identity = spec ? spec->display_name : primary->type;
-        }
+        else if(primary->id != session_.Document().GetRootId())
+            identity = primary->type;
 
         if(!identity.IsEmpty())
             model.SetGroupSubtitle("Identity", identity);

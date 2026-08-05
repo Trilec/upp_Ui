@@ -492,12 +492,27 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".SetChevronSide(" << EmitAlign(AsString(Effective("chevron_side", "Right"))) << ");\n";
         out << "\t" << member << ".SetChevronSize(DPI(" << max(0, (int)Effective("chevron_size", 0)) << "));\n";
         out << "\t" << member << ".SetChevronGap(DPI(" << max(0, (int)Effective("chevron_gap", 8)) << "));\n";
-        out << "\t" << member << ".SetChevronGlyphs("
-            << EmitCatalogIcon(AsString(Effective("chevron_open_icon", "None"))) << ", "
-            << EmitCatalogIcon(AsString(Effective("chevron_closed_icon", "None"))) << ", "
-            << EmitCatalogIcon(AsString(Effective("chevron_lock_icon", "None"))) << ");\n";
+        const String open_glyph = AsString(Effective("chevron_open_icon", "Default"));
+        const String closed_glyph = AsString(Effective("chevron_closed_icon", "Default"));
+        const String lock_glyph = AsString(Effective("chevron_lock_icon", "Default"));
+        if(open_glyph != "Default" || closed_glyph != "Default" ||
+           lock_glyph != "Default") {
+            const auto GlyphExpression = [&](const String& value,
+                                             const String& field) {
+                return value == "Default"
+                    ? member + ".GetStyle()." + field
+                    : EmitCatalogIcon(value);
+            };
+            out << "\t" << member << ".SetChevronGlyphs("
+                << GlyphExpression(open_glyph, "glyph_open") << ", "
+                << GlyphExpression(closed_glyph, "glyph_closed") << ", "
+                << GlyphExpression(lock_glyph, "glyph_lock") << ");\n";
+        }
         out << "\t" << member << ".SetDragSide(" << EmitAlign(AsString(Effective("drag_side", "Right"))) << ");\n";
-        out << "\t" << member << ".SetDragGlyph(" << EmitCatalogIcon(AsString(Effective("drag_icon", "None"))) << ");\n";
+        const String drag_glyph = AsString(Effective("drag_icon", "Default"));
+        if(drag_glyph != "Default")
+            out << "\t" << member << ".SetDragGlyph("
+                << EmitCatalogIcon(drag_glyph) << ");\n";
         const String style_var = member + "_accordion_layout_style";
         out << "\tUiAccordion::Style " << style_var << " = " << member << ".GetStyle();\n";
         out << "\t" << style_var << ".header_height = DPI(" << max(0, (int)Effective("header_height", 28)) << ");\n";
@@ -526,6 +541,40 @@ void UiDesignerCodeGenerator::EmitSetup(
         out << "\t" << member << ".EnableCloseButtons(" << EmitValue(Effective("close_buttons", false)) << ");\n";
         out << "\t" << member << ".EnableDragHandles(" << EmitValue(Effective("drag_handles", false)) << ");\n";
         out << "\t" << member << ".EnableDragReorder(" << EmitValue(Effective("drag_reorder", false)) << ");\n";
+
+        const String style_var = member + "_tab_layout_style";
+        out << "\tUiTab::Style " << style_var << " = " << member << ".GetStyle();\n";
+        out << "\t" << style_var << ".tab_font.FaceName("
+            << EmitValue(Effective("tab_font_face", StdFont().GetFaceName())) << ");\n";
+        out << "\t" << style_var << ".tab_font.Height("
+            << max(1, (int)Effective("tab_font_size", StdFont().GetHeight())) << ");\n";
+        out << "\t" << style_var << ".tab_font.Bold("
+            << EmitValue(Effective("tab_font_bold", StdFont().IsBold())) << ");\n";
+        out << "\t" << style_var << ".tab_font.Italic("
+            << EmitValue(Effective("tab_font_italic", StdFont().IsItalic())) << ");\n";
+        out << "\t" << style_var << ".tab_extent = DPI("
+            << max(0, (int)Effective("tab_extent", 32)) << ");\n";
+        out << "\t" << style_var << ".item_spacing = DPI("
+            << max(0, (int)Effective("item_spacing", 4)) << ");\n";
+        out << "\t" << style_var << ".body_gap = DPI("
+            << max(0, (int)Effective("body_gap", 4)) << ");\n";
+        out << "\t" << style_var << ".content_gap = DPI("
+            << max(0, (int)Effective("content_gap", 6)) << ");\n";
+        out << "\t" << style_var << ".tab_padding = Rect(DPI("
+            << max(0, (int)Effective("tab_padding_left", 10)) << "), DPI("
+            << max(0, (int)Effective("tab_padding_top", 6)) << "), DPI("
+            << max(0, (int)Effective("tab_padding_right", 10)) << "), DPI("
+            << max(0, (int)Effective("tab_padding_bottom", 6)) << "));\n";
+        out << "\t" << style_var << ".strip_inset = Rect(DPI("
+            << max(0, (int)Effective("strip_inset_left", 0)) << "), DPI("
+            << max(0, (int)Effective("strip_inset_top", 0)) << "), DPI("
+            << max(0, (int)Effective("strip_inset_right", 0)) << "), DPI("
+            << max(0, (int)Effective("strip_inset_bottom", 0)) << "));\n";
+        out << "\t" << style_var << ".affordance_gap = DPI("
+            << max(0, (int)Effective("affordance_gap", 4)) << ");\n";
+        out << "\t" << style_var << ".min_tab_main = DPI("
+            << max(0, (int)Effective("min_tab_main", 72)) << ");\n";
+        out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
     }
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout) {
         const String direction = Property("direction", "V");
@@ -1021,14 +1070,22 @@ void UiDesignerCodeGenerator::EmitChildren(
             const String header = MemberName(*child) + "_header";
             out << "\tUiTitleCard& " << header << " = " << parent
                 << ".GetSectionHeader(" << MemberName(*child) << "_index);\n";
-            EmitAccordionSectionHeaderProperties(out, header, *child, *child_spec);
-            if(!child->theme_overrides.IsEmpty()) {
+
+            bool has_active_header_style = false;
+            for(const UiDesignerThemeOverrideSpec& property : child_spec->theme_overrides) {
+                const int q = child->theme_overrides.Find(property.id);
+                if(q >= 0 && child->IsThemeOverrideActive(property.id)) {
+                    has_active_header_style = true;
+                    break;
+                }
+            }
+            if(has_active_header_style) {
                 const String style_var = MemberName(*child) + "_header_style";
                 out << "\tUiTitleCard::Style " << style_var << " = " << parent
                     << ".GetStyle().header_style;\n";
                 for(const UiDesignerThemeOverrideSpec& property : child_spec->theme_overrides) {
                     const int q = child->theme_overrides.Find(property.id);
-                    if(q >= 0)
+                    if(q >= 0 && child->IsThemeOverrideActive(property.id))
                         UiDesignerEmitTitleCardThemeField(
                             out, style_var, property.adapter_field_id,
                             child->theme_overrides.GetValue(q));
@@ -1039,6 +1096,11 @@ void UiDesignerCodeGenerator::EmitChildren(
             if(lock != "None")
                 out << "\t" << parent << ".SetLockMode(" << MemberName(*child)
                     << "_index, UiAccordion::Lock::" << lock << ");\n";
+
+            // Section media and presentation are deliberately applied last:
+            // Accordion open/lock operations refresh the exposed header media.
+            EmitAccordionSectionHeaderProperties(out, header, *child, *child_spec);
+
             for(UiDesignerNodeId content_id : child->children) {
                 const UiDesignerNode* content = document.Find(content_id);
                 if(!content)

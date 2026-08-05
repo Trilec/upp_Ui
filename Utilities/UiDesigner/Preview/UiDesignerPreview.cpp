@@ -956,14 +956,29 @@ static UiDesignerApplyResult ApplyRuntime(
         if(property == "chevron_gap") { accordion->SetChevronGap(DPI(max(0, (int)value))); return UiDesignerApplyResult::AppliedLocalLayout; }
         if(property == "chevron_open_icon" || property == "chevron_closed_icon" || property == "chevron_lock_icon") {
             const UiAccordion::Style& current = accordion->GetStyle();
+            const UiAccordion::Style& defaults = UiAccordion::StyleDefault();
+            const auto ResolveGlyph = [&](const Value& choice,
+                                          const Image& fallback) {
+                const String name = AsString(choice);
+                return name == "Default" ? fallback : ResolveCatalogIcon(name);
+            };
             accordion->SetChevronGlyphs(
-                property == "chevron_open_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_open,
-                property == "chevron_closed_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_closed,
-                property == "chevron_lock_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_lock);
+                property == "chevron_open_icon"
+                    ? ResolveGlyph(value, defaults.glyph_open) : current.glyph_open,
+                property == "chevron_closed_icon"
+                    ? ResolveGlyph(value, defaults.glyph_closed) : current.glyph_closed,
+                property == "chevron_lock_icon"
+                    ? ResolveGlyph(value, defaults.glyph_lock) : current.glyph_lock);
             return UiDesignerApplyResult::AppliedLocalLayout;
         }
         if(property == "drag_side") { accordion->SetDragSide(ParseSideAlignChoice(value)); return UiDesignerApplyResult::AppliedLocalLayout; }
-        if(property == "drag_icon") { accordion->SetDragGlyph(ResolveCatalogIcon(AsString(value))); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "drag_icon") {
+            const String name = AsString(value);
+            accordion->SetDragGlyph(name == "Default"
+                ? UiAccordion::StyleDefault().drag_glyph
+                : ResolveCatalogIcon(name));
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
         if(property == "header_height" || property == "item_spacing" ||
            property == "header_body_gap" || property == "body_min_height" ||
            property == "drag_size" || property == "drag_gap" ||
@@ -1001,6 +1016,42 @@ static UiDesignerApplyResult ApplyRuntime(
         if(property == "close_buttons") { tab->EnableCloseButtons((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
         if(property == "drag_handles") { tab->EnableDragHandles((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
         if(property == "drag_reorder") { tab->EnableDragReorder((bool)value); return UiDesignerApplyResult::AppliedControlState; }
+        if(property == "tab_font_face" || property == "tab_font_size" ||
+           property == "tab_font_bold" || property == "tab_font_italic") {
+            Font font = tab->GetTabFont();
+            if(property == "tab_font_face") font.FaceName(AsString(value));
+            else if(property == "tab_font_size") font.Height(max(1, (int)value));
+            else if(property == "tab_font_bold") font.Bold((bool)value);
+            else font.Italic((bool)value);
+            tab->SetTabFont(font);
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        if(property == "tab_extent" || property == "item_spacing" ||
+           property == "body_gap" || property == "content_gap" ||
+           property == "tab_padding_left" || property == "tab_padding_top" ||
+           property == "tab_padding_right" || property == "tab_padding_bottom" ||
+           property == "strip_inset_left" || property == "strip_inset_top" ||
+           property == "strip_inset_right" || property == "strip_inset_bottom" ||
+           property == "affordance_gap" || property == "min_tab_main") {
+            UiTab::Style style = tab->GetStyle();
+            const int amount = DPI(max(0, (int)value));
+            if(property == "tab_extent") style.tab_extent = amount;
+            else if(property == "item_spacing") style.item_spacing = amount;
+            else if(property == "body_gap") style.body_gap = amount;
+            else if(property == "content_gap") style.content_gap = amount;
+            else if(property == "tab_padding_left") style.tab_padding.left = amount;
+            else if(property == "tab_padding_top") style.tab_padding.top = amount;
+            else if(property == "tab_padding_right") style.tab_padding.right = amount;
+            else if(property == "tab_padding_bottom") style.tab_padding.bottom = amount;
+            else if(property == "strip_inset_left") style.strip_inset.left = amount;
+            else if(property == "strip_inset_top") style.strip_inset.top = amount;
+            else if(property == "strip_inset_right") style.strip_inset.right = amount;
+            else if(property == "strip_inset_bottom") style.strip_inset.bottom = amount;
+            else if(property == "affordance_gap") style.affordance_gap = amount;
+            else style.min_tab_main = amount;
+            tab->SetCustomStyle(style);
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
     }
     if(property == "text") {
         const String text = value;
@@ -1787,14 +1838,18 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
             const UiDesignerControlSpec* title_card_spec = catalog_ ? catalog_->Find("UiTitleCard") : nullptr;
             if(section_spec && title_card_spec) {
                 UiTitleCard::Style style = accordion->GetStyle().header_style;
+                bool has_local_style = false;
                 for(const UiDesignerThemeOverrideSpec& property : section_spec->theme_overrides) {
                     const int q = node.theme_overrides.Find(property.id);
-                    if(q >= 0)
+                    if(q >= 0 && node.IsThemeOverrideActive(property.id)) {
                         UiDesignerApplyTitleCardThemeField(
                             style, property.adapter_field_id,
                             node.theme_overrides.GetValue(q));
+                        has_local_style = true;
+                    }
                 }
-                header.SetCustomStyle(style);
+                if(has_local_style)
+                    header.SetCustomStyle(style);
                 for(const UiDesignerPropertySpec& property : section_spec->properties)
                     if(title_card_spec->FindProperty(property.id))
                         UiDesignerPreviewFactory::Apply(
@@ -2239,11 +2294,25 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             stats_.rejected++;
             return UiDesignerApplyResult::Rejected;
         }
+
+        UiTitleCard& header = accordion->GetSectionHeader(section_index);
+        const UiDesignerControlSpec* title_card_spec = catalog_->Find("UiTitleCard");
+        const auto ApplyHeaderPresentation = [&] {
+            if(!title_card_spec)
+                return;
+            for(const UiDesignerPropertySpec& candidate : spec->properties)
+                if(title_card_spec->FindProperty(candidate.id))
+                    UiDesignerPreviewFactory::Apply(
+                        header, *title_card_spec, candidate.id,
+                        Effective(*node, candidate.id, candidate.default_value));
+        };
+
         if(property == "title" || property == "subtitle" || property == "copy") {
             const Value title = property == "title" ? value : node->GetProperty("title", "");
             const Value subtitle = property == "subtitle" ? value : node->GetProperty("subtitle", "");
             const Value copy = property == "copy" ? value : node->GetProperty("copy", "");
             accordion->SetSectionText(section_index, title, subtitle, copy);
+            ApplyHeaderPresentation();
             stats_.paint_updates++;
             stats_.live_applies++;
             Refresh();
@@ -2251,6 +2320,7 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         }
         if(property == "open") {
             accordion->Open(section_index, (bool)value);
+            ApplyHeaderPresentation();
             stats_.ancestor_layouts++;
             stats_.live_applies++;
             Layout();
@@ -2263,13 +2333,12 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
                 lock == "Open" ? UiAccordion::Lock::Open :
                 lock == "Closed" ? UiAccordion::Lock::Closed :
                 UiAccordion::Lock::None);
+            ApplyHeaderPresentation();
             stats_.live_applies++;
             Layout();
             Refresh();
             return UiDesignerApplyResult::AppliedLocalLayout;
         }
-        UiTitleCard& header = accordion->GetSectionHeader(section_index);
-        const UiDesignerControlSpec* title_card_spec = catalog_->Find("UiTitleCard");
         if(kind == UiDesignerTransientValueKind::ThemeOverride) {
             const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(property);
             if(!override_spec) {
@@ -2278,8 +2347,10 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             }
             UiTitleCard::Style style = accordion->GetStyle().header_style;
             for(const UiDesignerThemeOverrideSpec& candidate : spec->theme_overrides) {
+                if(!node->IsThemeOverrideActive(candidate.id))
+                    continue;
                 const int q = node->theme_overrides.Find(candidate.id);
-                if(q < 0 && candidate.id != property)
+                if(q < 0)
                     continue;
                 const Value canonical = candidate.id == property ? value
                     : node->theme_overrides.GetValue(q);
@@ -2291,6 +2362,7 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
                     style, candidate.adapter_field_id, effective);
             }
             header.SetCustomStyle(style);
+            ApplyHeaderPresentation();
             stats_.live_applies++;
             stats_.paint_updates++;
             Layout();
