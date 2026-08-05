@@ -298,6 +298,9 @@ CONSOLE_APP_MAIN
     Check(semantic_code.Find(".GetSectionHeader(") >= 0 &&
               semantic_code.Find(".SetMedia(") >= 0,
           "Generated Accordion sections author the exposed UiTitleCard header");
+    Check(semantic_code.Find("_tab_layout_style.content_gap = DPI(") >= 0 &&
+              semantic_code.Find(".SetContentGap(DPI(") < 0,
+          "Generated UiTab routes content gap through UiTab::Style only");
 
     UiDesignerDocument migrated;
     Check(UiDesignerDeserialize(LegacySizingJson(), migrated, error),

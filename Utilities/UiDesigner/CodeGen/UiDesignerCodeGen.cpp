@@ -643,7 +643,9 @@ void UiDesignerCodeGenerator::EmitSetup(
             out << "\t" << member << ".SetAlign(" << EmitAlign(align_h) << ", "
                 << EmitAlign(align_v) << ");\n";
     }
-    if(spec.FindProperty("content_gap"))
+    if(spec.FindProperty("content_gap") &&
+       (IsButtonFamily(spec.runtime_kind) ||
+        spec.runtime_kind == UiDesignerRuntimeKind::UiLabel))
         out << "\t" << member << ".SetContentGap(DPI("
             << max(0, (int)Effective("content_gap", 4)) << "));\n";
     if(spec.FindProperty("content_inset_left") ||

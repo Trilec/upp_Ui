@@ -884,7 +884,8 @@ static UiDesignerApplyResult ApplyRuntime(
         }
         return UiDesignerApplyResult::Rejected;
     }
-    if(property == "content_gap") {
+    if(property == "content_gap" &&
+       !dynamic_cast<UiTab *>(&ctrl)) {
         if(auto *button = dynamic_cast<UiButton *>(&ctrl))
             button->SetContentGap(max(0, (int)value));
         else if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
