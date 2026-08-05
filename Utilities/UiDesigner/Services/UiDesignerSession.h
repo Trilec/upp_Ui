@@ -94,6 +94,7 @@ public:
     void RebuildBehaviorModel();
     void RebuildThemeOverrideModel();
     void RefreshThemeOverrideVisibility();
+    UiDesignerNodeId ResolveThemeOverrideOwner() const;
 
     bool PreviewProperty(const String& property, const Value& value,
                          String& error);
