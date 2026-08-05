@@ -1,0 +1,45 @@
+name: Run PropertyEditor interaction correction
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'assistant/property-editor-interaction-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/property-editor-interaction-fix
+          fetch-depth: 0
+      - name: Execute guarded patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/property-editor-interaction-fix.yml').read_text(encoding='utf-8')
+          marker = "          python3 - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          block = source[start:end]
+          lines = []
+          for line in block.splitlines():
+              lines.append(line[10:] if line.startswith('          ') else line)
+          exec(compile('\n'.join(lines), 'property-editor-interaction-fix', 'exec'))
+          Path('.github/workflows/property-editor-interaction-pr.yml').unlink()
+          PY
+          git diff --check
+          git status --short
+      - name: Commit correction
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "PropertyEditor makes inherited controls immediately usable" -m "Fix first theme-override activation so it never reads a stale document node after seeding the authored value. Keep override actions independent from value-editor availability, give Boolean values direct inline interaction, and show effective inherited values." -m "Move General and Theme Overrides forward, enlarge numeric slider actions, and avoid unnecessary Preview work while renaming controls. Add focused interaction and session regression coverage."
+          git push origin HEAD:assistant/property-editor-interaction-fix
