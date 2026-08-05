@@ -27,17 +27,19 @@ void PropertyEditor::DrawGroupRow(Draw& w, int,
                                   const DisplayRow& row, const Rect& r)
 {
     w.DrawRect(r, style_.group_background);
-    int padding = style_.cell_padding;
-    String mark = IsGroupOpen(row.group_id) ? "-" : "+";
-    Font font = StdFont().Bold();
-    int y = r.top + (r.GetHeight() - font.GetHeight()) / 2;
+    const int padding = style_.cell_padding;
+    const String mark = IsGroupOpen(row.group_id) ? "-" : "+";
+    const Font title_font = StdFont().Bold();
+    const int title_y = r.top + (r.GetHeight() - title_font.GetHeight()) / 2;
+    const int marker_x = r.left + padding;
+    const int title_left = marker_x + DPI(16);
+    const int title_right = title_left + GetTextSize(row.group_id, title_font).cx;
 
-    w.DrawText(r.left + padding, y, mark, font, style_.group_ink);
-    w.DrawText(r.left + padding + DPI(16), y, row.group_id,
-               font, style_.group_ink);
+    w.DrawText(marker_x, title_y, mark, title_font, style_.group_ink);
+    w.DrawText(title_left, title_y, row.group_id,
+               title_font, style_.group_ink);
 
     int right = r.right - padding;
-    int summary_width = 0;
     if(style_.show_group_summaries && model_) {
         int total = 0;
         int local = 0;
@@ -51,24 +53,30 @@ void PropertyEditor::DrawGroupRow(Draw& w, int,
         }
         if(total > 0) {
             const String summary = Format("%d of %d local", local, total);
-            summary_width = GetTextSize(summary, StdFont()).cx;
-            w.DrawText(right - summary_width, y, summary,
+            const int summary_width = GetTextSize(summary, StdFont()).cx;
+            w.DrawText(right - summary_width, title_y, summary,
                        StdFont(), style_.inherited_ink);
-            right -= summary_width + DPI(8);
+            right -= summary_width + DPI(10);
         }
     }
 
     if(model_) {
         const String subtitle = model_->GetGroupSubtitle(row.group_id);
-        if(!subtitle.IsEmpty() && right > r.left + DPI(80)) {
-            Font small = StdFont();
-            small.Height(max(1, small.GetHeight() - DPI(2)));
-            const int left = r.left + DPI(16) + padding;
-            const int width = max(0, right - left);
-            if(width > DPI(28))
-                DrawTextEllipsis(w, left, r.top + (r.GetHeight() - small.GetHeight()) / 2,
-                                 width, subtitle, "...", small,
+        if(!subtitle.IsEmpty()) {
+            Font subtitle_font = StdFont();
+            subtitle_font.Height(max(1, subtitle_font.GetHeight() - DPI(2)));
+            const int subtitle_left = title_right + DPI(14);
+            const int available = max(0, right - subtitle_left);
+            if(available >= DPI(32)) {
+                const int text_width = min(available,
+                    GetTextSize(subtitle, subtitle_font).cx);
+                const int subtitle_x = right - text_width;
+                const int subtitle_y = r.top +
+                    (r.GetHeight() - subtitle_font.GetHeight()) / 2;
+                DrawTextEllipsis(w, subtitle_x, subtitle_y,
+                                 text_width, subtitle, "...", subtitle_font,
                                  style_.inherited_ink);
+            }
         }
     }
 
