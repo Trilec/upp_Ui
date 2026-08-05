@@ -212,7 +212,8 @@ CONSOLE_APP_MAIN
           "legacy Button receives its profile without bounding maximums");
     Check(!catalog.ApplySizingDefaults(legacy_sizing_document),
           "legacy sizing upgrade is idempotent");
-ImageBuffer background_buffer(4, 2);
+
+    ImageBuffer background_buffer(4, 2);
     Fill(~background_buffer, RGBA(Color(64, 96, 128)), background_buffer.GetLength());
     UiPanel background_panel;
     background_panel.SetBackgroundImage(Image(background_buffer),
