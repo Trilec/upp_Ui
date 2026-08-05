@@ -37,6 +37,34 @@ static String LegacySizingJson()
 
 CONSOLE_APP_MAIN
 {
+    PropertyEditorModel metadata_model;
+    metadata_model.AddText("name", "Name", "button", "Identity");
+    metadata_model.StructureChanged();
+    const int metadata_structure_revision = metadata_model.GetStructureRevision();
+    int metadata_events = 0;
+    String metadata_group;
+    metadata_model.WhenGroupMetadataChanged = [&](String group) {
+        metadata_events++;
+        metadata_group = group;
+    };
+    metadata_model.SetGroupSubtitle("Identity", "UiButton");
+    Check(metadata_events == 1 && metadata_group == "Identity" &&
+              metadata_model.GetStructureRevision() == metadata_structure_revision,
+          "Setting a subtitle emits one non-structural metadata event");
+    metadata_model.SetGroupSubtitle("Identity", "UiButton");
+    Check(metadata_events == 1,
+          "Setting an identical subtitle is a true no-op");
+    metadata_model.SetGroupSubtitle("Missing", String());
+    Check(metadata_events == 1,
+          "Clearing an absent subtitle is a true no-op");
+    metadata_model.SetGroupSubtitle("Identity", "UiPanel");
+    Check(metadata_events == 2 && metadata_group == "Identity",
+          "Changing a subtitle emits one metadata event");
+    metadata_model.ClearGroupSubtitle("Identity");
+    Check(metadata_events == 3 &&
+              metadata_model.GetGroupSubtitle("Identity").IsEmpty(),
+          "Clearing a present subtitle emits one metadata event");
+
     UiDesignerSession session;
     session.NewDocument("blank");
     const UiDesignerNodeId button = session.AddControl("UiButton");
