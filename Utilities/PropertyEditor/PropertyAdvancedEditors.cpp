@@ -49,10 +49,16 @@ public:
 
         edit_.SetTextAlign(UiAlign::RIGHT);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
+        toggle_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+        toggle_.SetText("");
         toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(20), DPI(20))
-               .SetContentInset(DPI(1));
-        toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+               .SetIconSize(DPI(18), DPI(18))
+               .SetContentInset(DPI(3))
+               .SetContentGap(DPI(0))
+               .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
+               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+               .SetIconScaleToContent(false);
+        toggle_.NoWantFocus();
         toggle_.Tip("Switch between numeric entry and slider");
 
         toggle_.WhenAction = [=] {
@@ -146,7 +152,7 @@ public:
 
     void Layout() override
     {
-        const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;
+        const int toggle_width = toggle_.IsShown() ? DPI(34) : 0;
         toggle_.SetRect(max(0, GetSize().cx - toggle_width),
                         0, toggle_width, GetSize().cy);
         const int gap = toggle_width ? DPI(4) : 0;
@@ -160,12 +166,18 @@ private:
     {
         edit_.Show(!slider_mode_ || !bounded_);
         slider_.Show(slider_mode_ && bounded_);
+        toggle_.SetIcon(slider_mode_
+            ? ICON_EDITOR_FORMAT_SIZE_48()
+            : ICON_DESIGN_SLIDERS_48());
+        toggle_.Tip(slider_mode_
+            ? "Switch to numeric entry"
+            : "Switch to slider");
         Layout();
     }
 
     PropertyLiveCommitEdit<UiIntEdit> edit_;
     UiSlider slider_ { UiDirection::H };
-    UiButton toggle_;
+    UiToolButton toggle_;
     bool syncing_ = false;
     bool enabled_ = true;
     bool bounded_ = false;
