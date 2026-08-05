@@ -203,11 +203,15 @@ void PropertyEditorModel::SetGroupSubtitle(const String& group,
 {
     const int q = group_subtitles_.Find(group);
     if(subtitle.IsEmpty()) {
-        if(q >= 0)
-            group_subtitles_.Remove(q);
+        if(q < 0)
+            return;
+        group_subtitles_.Remove(q);
     }
-    else if(q >= 0)
+    else if(q >= 0) {
+        if(group_subtitles_[q] == subtitle)
+            return;
         group_subtitles_[q] = subtitle;
+    }
     else
         group_subtitles_.Add(group, subtitle);
     WhenGroupMetadataChanged(group);
