@@ -28,62 +28,97 @@ jobs:
           function_start = session.index('bool UiDesignerSession::SetThemeOverrideActive')
           body_start = session.index('    const UiDesignerChangeImpact impact =', function_start)
           body_end = session.index('    error.Clear();', body_start) + len('    error.Clear();')
-          replacement = '''    const UiDesignerChangeImpact impact =
-              (UiDesignerChangeImpact)(dword)override_spec->impact;
-          const UiDesignerNodeId node_id = node->id;
-          const bool active_now = node->theme_overrides.Find(property) >= 0 &&
-                                  node->IsThemeOverrideActive(property);
-          const bool saved_now = node->theme_override_saved.Find(property) >= 0;
-
-          if(active != active_now) {
-              if(active) {
-                  if(saved_now) {
-                      if(!commands_.SetThemeOverrideActive(
-                             node_id, property, true, impact,
-                             "Activate theme " + property)) {
-                          error = commands_.GetLastError();
-                          return false;
-                      }
-                  }
-                  else {
-                      // SetThemeOverride is the complete first-activation command:
-                      // it seeds the resolved value and leaves it active. Do not
-                      // continue through a stale node pointer after document mutation.
-                      const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
-                      if(!commands_.SetThemeOverride(
-                             node_id, property, seed, impact,
-                             "Activate theme " + property)) {
-                          error = commands_.GetLastError();
-                          return false;
-                      }
-                  }
-              }
-              else if(!commands_.SetThemeOverrideActive(
-                          node_id, property, false, impact,
-                          "Use theme for " + property)) {
-                  error = commands_.GetLastError();
-                  return false;
-              }
-          }
-
-          overlay_.Remove(node_id, UiDesignerTransientValueKind::ThemeOverride,
-                          property);
-          RebuildThemeOverrideModel();
-          error.Clear();'''
+          replacement = '\n'.join([
+              '    const UiDesignerChangeImpact impact =',
+              '        (UiDesignerChangeImpact)(dword)override_spec->impact;',
+              '    const UiDesignerNodeId node_id = node->id;',
+              '    const bool active_now = node->theme_overrides.Find(property) >= 0 &&',
+              '                            node->IsThemeOverrideActive(property);',
+              '    const bool saved_now = node->theme_override_saved.Find(property) >= 0;',
+              '',
+              '    if(active != active_now) {',
+              '        if(active) {',
+              '            if(saved_now) {',
+              '                if(!commands_.SetThemeOverrideActive(',
+              '                       node_id, property, true, impact,',
+              '                       "Activate theme " + property)) {',
+              '                    error = commands_.GetLastError();',
+              '                    return false;',
+              '                }',
+              '            }',
+              '            else {',
+              '                // SetThemeOverride is the complete first-activation command:',
+              '                // it seeds the resolved value and leaves it active. Do not',
+              '                // continue through a stale node pointer after document mutation.',
+              '                const Value seed = ResolveThemeOverrideValue(*node, *override_spec);',
+              '                if(!commands_.SetThemeOverride(',
+              '                       node_id, property, seed, impact,',
+              '                       "Activate theme " + property)) {',
+              '                    error = commands_.GetLastError();',
+              '                    return false;',
+              '                }',
+              '            }',
+              '        }',
+              '        else if(!commands_.SetThemeOverrideActive(',
+              '                    node_id, property, false, impact,',
+              '                    "Use theme for " + property)) {',
+              '            error = commands_.GetLastError();',
+              '            return false;',
+              '        }',
+              '    }',
+              '',
+              '    overlay_.Remove(node_id, UiDesignerTransientValueKind::ThemeOverride,',
+              '                    property);',
+              '    RebuildThemeOverrideModel();',
+              '    error.Clear();',
+          ])
           session_path.write_text(session[:body_start] + replacement + session[body_end:],
                                   encoding='utf-8')
+
+          interaction_path = Path('Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
+          interaction = interaction_path.read_text(encoding='utf-8')
+          old_guard = '    if(!item.overrideable || !item.enabled || item.read_only)\n        return;'
+          old_inherited = '''    if(item.overrideable && !item.override_active && !item.value_editable) {
+              ToggleOverride(row);
+              return;
+          }'''
+          if interaction.count(old_guard) != 1 or interaction.count(old_inherited) != 1:
+              raise SystemExit('PropertyEditorInteraction.cpp: unexpected override interaction shape')
+          interaction = interaction.replace(
+              old_guard,
+              '    if(!item.overrideable || item.read_only)\n        return;', 1)
+          interaction = interaction.replace(
+              old_inherited,
+              '''    if(item.overrideable && !item.override_active) {
+              ToggleOverride(row);
+              return;
+          }''', 1)
+          interaction_path.write_text(interaction, encoding='utf-8')
 
           source = Path('.github/workflows/property-editor-interaction-fix.yml').read_text(encoding='utf-8')
           marker = "          python3 - <<'PY'\n"
           start = source.index(marker) + len(marker)
           end = source.index("\n          PY", start)
-          block = source[start:end]
           lines = [line[10:] if line.startswith('          ') else line
-                   for line in block.splitlines()]
+                   for line in source[start:end].splitlines()]
           script = '\n'.join(lines)
-          first = script.index("replace_once(\n    'Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp'")
-          second = script.index('\n\nreplace_once(', first + 1)
-          script = script[:first] + script[second + 2:]
+
+          def remove_replace_once(script, path):
+              start = script.index("replace_once(\n    '" + path + "'")
+              candidates = [p for p in (
+                  script.find('\n\nreplace_once(', start + 1),
+                  script.find('\n\nreplace_count(', start + 1)) if p >= 0]
+              if not candidates:
+                  raise SystemExit('unable to isolate replacement for ' + path)
+              end = min(candidates)
+              return script[:start] + script[end + 2:]
+
+          script = remove_replace_once(
+              script, 'Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp')
+          script = remove_replace_once(
+              script, 'Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
+          script = remove_replace_once(
+              script, 'Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
           exec(compile(script, 'property-editor-interaction-fix', 'exec'))
           Path('.github/workflows/property-editor-interaction-pr.yml').unlink()
           PY
