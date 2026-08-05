@@ -115,6 +115,24 @@ CONSOLE_APP_MAIN
     Check(sizing_requests == 2 && sizing_node == button && requested_height,
           "Hierarchy H icon routes one height-mode request");
 
+    hierarchy.PlanCatalogDrop = [&](const String& type,
+                                    UiDesignerNodeId parent, int index) {
+        return session.PlanAddControl(type, parent, Point(0, 0), false, index);
+    };
+    hierarchy.ExecuteDrop = [&](const UiDesignerDropPlan& plan, String& error) {
+        UiDesignerNodeId created = 0;
+        return session.ExecuteDrop(plan, &created, error);
+    };
+    const Point header_screen = hierarchy.GetScreenRect().TopLeft() +
+                                Point(DPI(20), DPI(15));
+    const int count_before_header_drop = session.Document().GetCount();
+    hierarchy.TrackCatalogDrop("UiPanel", header_screen);
+    Check(hierarchy.HasDropTarget(),
+          "Catalog drag over the non-selectable heading targets the document root");
+    Check(hierarchy.FinishCatalogDrop("UiPanel", header_screen) &&
+              session.Document().GetCount() == count_before_header_drop + 1,
+          "Hierarchy heading performs one explicit root catalog drop");
+
     PropertyEditorModel override_model;
     PropertyEditorItem& radius = override_model.AddNumericInt(
         "radius", "Radius", 8, 0, 100, 1, "General");
