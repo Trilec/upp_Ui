@@ -332,9 +332,6 @@ int UiDesignerSideColumn::GetToolRowHeight(int width) const
 {
     const int action_width = DPI(52);
     const int panel_width = max(DPI(32), width - action_width);
-    // The reference panel has both its explicit four-pixel inset and the
-    // resolved panel content margin. Use the same effective 12px side inset
-    // here rather than pinning the flow against the painted frame.
     const int content_width = max(DPI(1), panel_width - DPI(24));
     return max(UiDesignerStyleMetrics::DesignerToolbarHeight(),
                tool_layout_.MeasureHeightForWidth(content_width) + DPI(8));
@@ -376,8 +373,6 @@ void UiDesignerSideColumn::Layout()
         content_surface_.Show();
     }
 
-    // The reference grid mirrors its two cells on the right: expand/close is
-    // on the inner edge, while its tool panel remains against the outer edge.
     const int toolbar_h = width_ == PANE_CLOSED
         ? UiDesignerStyleMetrics::DesignerToolbarHeight() : GetToolRowHeight(w);
     const int action_w = min(DPI(52), max(0, w));
@@ -391,8 +386,6 @@ void UiDesignerSideColumn::Layout()
         action_layout_.SetRect(panel_w, 0, action_w, toolbar_h);
     }
 
-    // UiPanel owns painting, while the flow layout owns the wrapped children.
-    // Keep its natural rows vertically centered inside the explicit inset.
     const Size panel_size = tool_panel_.GetSize();
     const int panel_content_inset = DPI(12);
     const int tool_w = max(0, panel_size.cx - panel_content_inset * 2);
@@ -767,7 +760,8 @@ Rect UiDesignerHierarchyView::RowRect(int index) const
 
 int UiDesignerHierarchyView::RowAt(Point p) const
 {
-    if(!GetHeaderRect().Contains(p))
+    if(GetHeaderRect().Contains(p) || p.x < 0 || p.x >= GetSize().cx ||
+       p.y < GetHeaderRect().bottom || p.y >= GetSize().cy)
         return -1;
     const int index = (p.y - GetHeaderRect().Height() + scroll_) / DPI(30);
     return index >= 0 && index < rows_.GetCount() ? index : -1;
@@ -833,14 +827,13 @@ String UiDesignerHierarchyView::FriendlyType(const UiDesignerNode& node) const
     return node.type;
 }
 
-Image UiDesignerHierarchyView::SizingIcon(const String& mode, bool height) const
+Image UiDesignerHierarchyView::SizingIcon(const String& mode, bool) const
 {
-    if(mode == "Fit")
-        return height ? ICON_DESIGN_FIT_PAGE_48() : ICON_DESIGN_FIT_WIDTH_48();
     if(mode == "Fixed")
-        return ICON_DESIGN_BORDER_HORIZONTAL_48();
-    return height ? ICON_DESIGN_VERTICAL_DISTRIBUTE_48()
-                  : ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48();
+        return ICON_DESIGN_ASPECT_RATIO_48();
+    if(mode == "Expand")
+        return ICON_DESIGN_ARROWS_OUTPUT_48();
+    return ICON_DESIGN_FIT_PAGE_48();
 }
 
 void UiDesignerHierarchyView::UpdateSizingTip(int index, bool height)
@@ -864,10 +857,10 @@ void UiDesignerHierarchyView::Paint(Draw& w)
     w.DrawText(DPI(8), header.top + DPI(5), "Name", SansSerifZ(9).Bold(), SColorText());
     w.DrawText(GetTypeRect(0).left + DPI(4), header.top + DPI(5), "Type",
                SansSerifZ(9), SColorText());
-    w.DrawImage(GetWidthModeRect(0).left + DPI(4), header.top + DPI(4),
-                DPI(16), DPI(16), ICON_DESIGN_FIT_WIDTH_48());
-    w.DrawImage(GetHeightModeRect(0).left + DPI(4), header.top + DPI(4),
-                DPI(16), DPI(16), ICON_DESIGN_FIT_PAGE_48());
+    w.DrawText(GetWidthModeRect(0).left + DPI(7), header.top + DPI(5), "W",
+               SansSerifZ(9).Bold(), SColorText());
+    w.DrawText(GetHeightModeRect(0).left + DPI(7), header.top + DPI(5), "H",
+               SansSerifZ(9).Bold(), SColorText());
     for(int i = 0; i < rows_.GetCount(); i++) {
         Rect r = RowRect(i);
         if(r.bottom < 0 || r.top > GetSize().cy)
@@ -1177,8 +1170,6 @@ void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
         ClearDrop();
         return;
     }
-    // The source publishes a text payload. Accept that concrete format only
-    // after the shared drop planner has approved the target.
     if(!AcceptText(d)) {
         ClearDrop();
         return;
@@ -1216,12 +1207,74 @@ bool UiDesignerHierarchyView::Key(dword key, int)
 
 UiDesignerCodeView::UiDesignerCodeView()
 {
-    SetReadOnly();
+    Add(edit_);
+    Add(copy_);
+    Add(fullscreen_);
+
+    edit_.SetReadOnly();
+
+    copy_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    copy_.SetText("")
+         .SetIcon(ICON_CONTENT_CONTENT_COPY_48())
+         .SetIconSize(DPI(18), DPI(18))
+         .SetContentInset(DPI(3))
+         .SetContentGap(DPI(0))
+         .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
+         .SetIconScaleToContent(false)
+         .NoWantFocus();
+    copy_.Tip("Copy all generated code");
+    copy_.WhenAction = [=] { CopyAll(); };
+
+    fullscreen_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    fullscreen_.SetText("")
+               .SetIcon(ICON_DESIGN_UNFOLD_MORE_48())
+               .SetIconSize(DPI(18), DPI(18))
+               .SetContentInset(DPI(3))
+               .SetContentGap(DPI(0))
+               .SetAlign(UiAlign::CENTER, UiAlign::CENTER)
+               .SetIconScaleToContent(false)
+               .NoWantFocus();
+    fullscreen_.Tip("Open generated code in a full-screen dialog");
+    fullscreen_.WhenAction = [=] { ShowFullscreen(); };
 }
 
 void UiDesignerCodeView::SetCode(const String& code)
 {
-    SetData(code);
+    edit_.SetData(code);
+}
+
+String UiDesignerCodeView::GetCode() const
+{
+    return AsString(edit_.GetData());
+}
+
+void UiDesignerCodeView::Layout()
+{
+    const int toolbar_height = DPI(40);
+    const int button_size = DPI(30);
+    const int y = max(0, (toolbar_height - button_size) / 2);
+    copy_.SetRect(DPI(6), y, button_size, button_size);
+    fullscreen_.SetRect(DPI(42), y, button_size, button_size);
+    edit_.SetRect(0, toolbar_height, GetSize().cx,
+                  max(0, GetSize().cy - toolbar_height));
+}
+
+void UiDesignerCodeView::CopyAll()
+{
+    WriteClipboardText(GetCode());
+}
+
+void UiDesignerCodeView::ShowFullscreen()
+{
+    TopWindow dialog;
+    UiMultiEdit code;
+    code.SetReadOnly();
+    code.SetData(GetCode());
+    dialog.Title("Generated code").Sizeable().Zoomable();
+    dialog.Add(code.SizePos());
+    dialog.SetRect(0, 0, DPI(1200), DPI(800));
+    dialog.Maximize();
+    dialog.Run();
 }
 
 }
