@@ -45,7 +45,7 @@ void UiDesignerSession::WireEvents()
         else if(HasThemeOverrideChange(changes))
             SyncThemeOverrideValues(changes);
         else if(HasNormalPropertyChange(changes) && HasPropertyChange(changes, "role")) {
-            const UiDesignerNode* node = document_.Find(state_.selection.primary);
+            const UiDesignerNode* node = document_.Find(ResolveThemeOverrideOwner());
             const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
             if(node && spec && state_.selection.nodes.GetCount() == 1 &&
                !spec->theme_overrides.IsEmpty())
@@ -107,8 +107,6 @@ void UiDesignerSession::AttachProjection(UiDesignerProjectionSink *projection)
 
 void UiDesignerSession::ApplyPresetBlank()
 {
-    // Window is the document canvas. A blank form has no competing root
-    // layout; users can drop the first layout or control directly into it.
     document_.NewDocument(Size(512, 250));
 }
 
@@ -592,8 +590,6 @@ bool UiDesignerSession::PreviewProperty(
 {
     if(state_.selection.primary == document_.GetRootId() &&
        (property == "document_width" || property == "document_height")) {
-        // Dimension edits are committed atomically below; changing the document
-        // during an active numeric editor would create an undo item per keystroke.
         error.Clear();
         return true;
     }
@@ -611,9 +607,9 @@ bool UiDesignerSession::PreviewProperty(
     for(UiDesignerNodeId id : state_.selection.nodes) {
         overlay_.Set(id, UiDesignerTransientValueKind::NormalProperty,
                      property, value);
-    if(projection_)
-        projection_->ApplyTransient(id, UiDesignerTransientValueKind::NormalProperty,
-                                    property, value);
+        if(projection_)
+            projection_->ApplyTransient(id, UiDesignerTransientValueKind::NormalProperty,
+                                        property, value);
     }
     error.Clear();
     return true;
@@ -724,16 +720,17 @@ bool UiDesignerSession::ResetProperty(
 void UiDesignerSession::RebuildThemeOverrideModel()
 {
     theme_override_model_.Clear(false);
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNode* selected = document_.Find(state_.selection.primary);
+    const UiDesignerNodeId owner_id = ResolveThemeOverrideOwner();
+    const UiDesignerNode* node = document_.Find(owner_id);
     const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
     if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
        spec->theme_overrides.IsEmpty()) {
-        String status = node ? "Theme Overrides are not registered for this control yet."
-                             : "Select one control to view Theme Overrides.";
-        if(node) {
-            if(node->type == "UiTab") status = "Tab Theme adapter is not implemented yet.";
-            else if(node->type == "UiDropdown") status = "Dropdown Theme adapter is not implemented yet.";
-        }
+        String status = selected
+            ? "Theme Overrides are not registered for this selection yet."
+            : "Select one control to view Theme Overrides.";
+        if(selected && selected->type == "UiDropdown")
+            status = "Dropdown Theme adapter is not implemented yet.";
         theme_override_model_.AddReadOnly("theme.status", "Status", status, "Status");
         theme_override_model_.StructureChanged();
         return;
@@ -760,13 +757,19 @@ void UiDesignerSession::RebuildThemeOverrideModel()
     for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)
         if(property.group != "General")
             AddOverrideRow(property);
+
+    if(selected && selected->id != node->id) {
+        const String owner_label = node->type + " owner";
+        theme_override_model_.SetGroupSubtitle("General", owner_label);
+        theme_override_model_.SetGroupSubtitle("Theme Overrides", owner_label);
+    }
     theme_override_model_.StructureChanged();
     RefreshThemeOverrideVisibility();
 }
 
 void UiDesignerSession::RefreshThemeOverrideVisibility()
 {
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNode* node = document_.Find(ResolveThemeOverrideOwner());
     const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
     if(!node || !spec || state_.selection.nodes.GetCount() != 1)
         return;
@@ -794,7 +797,7 @@ void UiDesignerSession::SyncThemeOverrideValues(const UiDesignerChangeSet& chang
 {
     if(state_.selection.nodes.IsEmpty())
         return;
-    const UiDesignerNode* node = document_.Find(state_.selection.primary);
+    const UiDesignerNode* node = document_.Find(ResolveThemeOverrideOwner());
     const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
     if(!node || !spec || state_.selection.nodes.GetCount() != 1 ||
        spec->theme_overrides.IsEmpty())
