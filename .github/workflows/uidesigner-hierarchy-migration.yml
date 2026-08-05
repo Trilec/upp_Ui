@@ -1,0 +1,37 @@
+name: UiDesigner hierarchy migration
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/uidesigner-hierarchy-migration.py.gz.b64
+      - .github/workflows/uidesigner-hierarchy-migration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply model-backed UiTree migration
+        shell: bash
+        run: |
+          base64 -d .github/uidesigner-hierarchy-migration.py.gz.b64 | gzip -d > /tmp/migrate.py
+          python3 /tmp/migrate.py
+          git diff --check
+          grep -R "HierarchyTree : public UiTree" Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h
+          grep -R "EnableInternalMutation(false)" Utilities/UiDesigner/UiDesigner/UiDesignerHierarchyView.cpp
+          ! grep -R "Vector<Row> rows_" Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner switches hierarchy to model-backed UiTree"
+          git push origin main
