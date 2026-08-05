@@ -1,0 +1,352 @@
+name: Apply PropertyEditor interaction correction
+
+on:
+  push:
+    branches:
+      - assistant/property-editor-interaction-fix
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/property-editor-interaction-fix
+          fetch-depth: 0
+      - name: Apply focused source correction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          def replace_count(path, old, new, expected):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'{path}: expected {expected} matches, found {count}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          replace_once(
+              'Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp',
+          '''    const UiDesignerChangeImpact impact =
+              (UiDesignerChangeImpact)(dword)override_spec->impact;
+          if(active && node->theme_overrides.Find(property) < 0 &&
+             node->theme_override_saved.Find(property) < 0) {
+              const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
+              if(!commands_.SetThemeOverride(node->id, property, seed, impact,
+                                             "Seed theme " + property)) {
+                  error = commands_.GetLastError();
+                  return false;
+              }
+          }
+          if(!active || node->theme_override_saved.Find(property) >= 0) {
+              if(!commands_.SetThemeOverrideActive(
+                     node->id, property, active, impact,
+                     active ? "Activate theme " + property
+                            : "Use theme for " + property)) {
+                  error = commands_.GetLastError();
+                  return false;
+              }
+          }
+          else if(node->theme_overrides.Find(property) < 0) {
+              error = commands_.GetLastError();
+              return false;
+          }
+          overlay_.Remove(node->id, UiDesignerTransientValueKind::ThemeOverride,
+                          property);
+          RebuildThemeOverrideModel();
+          error.Clear();''',
+          '''    const UiDesignerChangeImpact impact =
+              (UiDesignerChangeImpact)(dword)override_spec->impact;
+          const UiDesignerNodeId node_id = node->id;
+          const bool active_now = node->theme_overrides.Find(property) >= 0 &&
+                                  node->IsThemeOverrideActive(property);
+          const bool saved_now = node->theme_override_saved.Find(property) >= 0;
+
+          if(active != active_now) {
+              if(active) {
+                  if(saved_now) {
+                      if(!commands_.SetThemeOverrideActive(
+                             node_id, property, true, impact,
+                             "Activate theme " + property)) {
+                          error = commands_.GetLastError();
+                          return false;
+                      }
+                  }
+                  else {
+                      // SetThemeOverride is the complete first-activation command:
+                      // it seeds the resolved value and leaves it active. Do not
+                      // continue through a stale node pointer after document mutation.
+                      const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
+                      if(!commands_.SetThemeOverride(
+                             node_id, property, seed, impact,
+                             "Activate theme " + property)) {
+                          error = commands_.GetLastError();
+                          return false;
+                      }
+                  }
+              }
+              else if(!commands_.SetThemeOverrideActive(
+                          node_id, property, false, impact,
+                          "Use theme for " + property)) {
+                  error = commands_.GetLastError();
+                  return false;
+              }
+          }
+
+          overlay_.Remove(node_id, UiDesignerTransientValueKind::ThemeOverride,
+                          property);
+          RebuildThemeOverrideModel();
+          error.Clear();''')
+
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorInteraction.cpp',
+              '    if(!item.overrideable || !item.enabled || item.read_only)\n        return;',
+              '    if(!item.overrideable || item.read_only)\n        return;')
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorInteraction.cpp',
+          '''    if(item.overrideable && !item.override_active && !item.value_editable) {
+              ToggleOverride(row);
+              return;
+          }''',
+          '''    if(item.overrideable && !item.override_active) {
+              ToggleOverride(row);
+              return;
+          }''')
+
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorInline.cpp',
+          '''    return (item.kind == PropertyEditorKind::FillRecipe || item.inline_editor) &&
+             item.value_editable && item.enabled && !item.read_only;''',
+          '''    return (item.kind == PropertyEditorKind::FillRecipe ||
+              item.kind == PropertyEditorKind::Boolean || item.inline_editor) &&
+             item.value_editable && item.enabled && !item.read_only;''')
+
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorPaint.cpp',
+          '''    if(item.inherited) {
+              w.DrawText(value_rect.left, y, "Using theme", font, ink);
+              return;
+          }
+
+''', '')
+          replace_once(
+              'Utilities/PropertyEditor/PropertyEditorPaint.cpp',
+          '''    if(item.inherited)
+              return "Using theme";
+
+''', '')
+
+          replace_once(
+              'Utilities/PropertyEditor/PropertyAdvancedEditors.cpp',
+          '''        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
+                 .SetIconSize(DPI(16), DPI(16));''',
+          '''        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
+                 .SetIconSize(DPI(20), DPI(20))
+                 .SetContentInset(DPI(1));''')
+          replace_once(
+              'Utilities/PropertyEditor/PropertyAdvancedEditors.cpp',
+              '        const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;',
+              '        const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;')
+
+          replace_count(
+              'Utilities/PropertyEditor/PropertyValueEditors.cpp',
+              'toggle_.SetIcon(ICON_DESIGN_SLIDERS_48()).SetIconSize(DPI(16), DPI(16));',
+              'toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())\n               .SetIconSize(DPI(20), DPI(20))\n               .SetContentInset(DPI(1));',
+              2)
+          replace_count(
+              'Utilities/PropertyEditor/PropertyValueEditors.cpp',
+              'const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;',
+              'const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;',
+              2)
+
+          replace_once(
+              'Utilities/UiDesigner/Services/UiDesignerSession.cpp',
+          '''    const UiDesignerPropertySpec* property_spec = nullptr;
+          if(!SelectionSupports(property, &property_spec)) {
+              error = "Selection does not support " + property;
+              return false;
+          }
+
+          for(UiDesignerNodeId id : state_.selection.nodes) {''',
+          '''    const UiDesignerPropertySpec* property_spec = nullptr;
+          if(!SelectionSupports(property, &property_spec)) {
+              error = "Selection does not support " + property;
+              return false;
+          }
+
+          // The authored member name has no live runtime presentation. Updating
+          // Preview and geometry on every keystroke only adds latency; commit it
+          // once through RenameNode when editing settles.
+          if(property == "name") {
+              error.Clear();
+              return true;
+          }
+
+          for(UiDesignerNodeId id : state_.selection.nodes) {''')
+
+          replace_once(
+              'Utilities/UiDesigner/Services/UiDesignerSession.cpp',
+          '''    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
+              const int q = node->theme_overrides.Find(property.id);
+              const bool inherited = q < 0 || !node->IsThemeOverrideActive(property.id);
+              const Value value = inherited
+                  ? ResolveThemeOverrideValue(*node, property)
+                  : node->theme_overrides.GetValue(q);
+              // Inheritance is a source-state flag, not a mixed-value state. A
+              // single inherited node still has one concrete effective value.
+              property.AddTo(theme_override_model_, value, false);
+              if(PropertyEditorItem *item = theme_override_model_.Find(property.id)) {
+                  item->SetInherited(inherited);
+                  item->overrideable = true;
+                  item->override_active = !inherited;
+                  item->enabled = true;
+                  item->value_editable = !inherited;
+              }
+          }''',
+          '''    const auto AddOverrideRow = [&](const UiDesignerThemeOverrideSpec& property) {
+              const int q = node->theme_overrides.Find(property.id);
+              const bool inherited = q < 0 || !node->IsThemeOverrideActive(property.id);
+              const Value value = inherited
+                  ? ResolveThemeOverrideValue(*node, property)
+                  : node->theme_overrides.GetValue(q);
+              // Inheritance is a source-state flag, not a mixed-value state. A
+              // single inherited node still has one concrete effective value.
+              property.AddTo(theme_override_model_, value, false);
+              if(PropertyEditorItem *item = theme_override_model_.Find(property.id)) {
+                  item->SetInherited(inherited);
+                  item->overrideable = true;
+                  item->override_active = !inherited;
+                  item->enabled = true;
+                  item->value_editable = !inherited;
+              }
+          };
+          // Common geometry and visibility are the most frequently adjusted
+          // values, so a General group is always presented before specialist
+          // Face, Frame, typography and state groups.
+          for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)
+              if(property.group == "General")
+                  AddOverrideRow(property);
+          for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)
+              if(property.group != "General")
+                  AddOverrideRow(property);''')
+
+          replace_once(
+              'Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp',
+          '''                   .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
+                         .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,
+                                     "Edit the selected control’s data")
+                         .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)
+                         .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)''',
+          '''                   .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
+                         .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)
+                         .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,
+                                     "Edit the selected control’s data")
+                         .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)''')
+          replace_once(
+              'Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp',
+          '''            overrides_.Refresh();
+              preview_canvas_.Refresh();''',
+          '''            overrides_.RefreshModel();
+              preview_canvas_.Refresh();''')
+
+          replace_once(
+              'Utilities/PropertyEditorTests/main.cpp',
+          '''    override_model.Find("surface")->override_active = false;
+          override_model.Find("surface")->inherited = true;
+          override_model.Find("surface")->value_editable = false;
+          int mouse_requests = 0;''',
+          '''    override_model.Find("surface")->override_active = false;
+          override_model.Find("surface")->inherited = true;
+          override_model.Find("surface")->value_editable = false;
+          // Generic value/editor availability must not disable the separate
+          // override action rail.
+          override_model.Find("surface")->enabled = false;
+          int mouse_requests = 0;''')
+          replace_once(
+              'Utilities/PropertyEditorTests/main.cpp',
+          '''    Check(mouse_requests == 2,
+              "mouse row body also requests inherited activation");
+
+    Cout()''',
+          '''    Check(mouse_requests == 2,
+              "mouse row body also requests inherited activation");
+
+    PropertyEditorModel boolean_model;
+          PropertyEditorItem& direct_boolean = boolean_model.AddBoolean(
+              "visible", "Visible", true, "State");
+          direct_boolean.resettable = true;
+          boolean_model.StructureChanged();
+          PropertyEditor boolean_editor;
+          boolean_editor.SetRect(0, 0, 320, 140);
+          boolean_editor.SetModel(&boolean_model);
+          int boolean_commits = 0;
+          boolean_editor.WhenCommit = [&](String id, Value value) {
+              boolean_commits++;
+              Check(id == "visible" && !(bool)value,
+                    "inline Boolean commits its toggled value directly");
+          };
+          Check(boolean_editor.SelectProperty("visible"),
+                "select direct Boolean row");
+          boolean_editor.LeftDown(Point(170, 75), 0);
+          Check(boolean_commits == 1,
+                "Boolean value toggles with one click instead of row activation");
+
+    Cout()''')
+
+          replace_once(
+              'Utilities/UiDesigner/Tests/main.cpp',
+          '''    Check(panel_override_session.ThemeOverrideModel().Find("radius") &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->override_active &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->value_editable &&
+              panel_override_session.Document().GetThemeOverride(
+                  panel_override_node, "radius").Is<int>(),
+          "Panel Radius becomes an editable local numeric value");''',
+          '''    Check(panel_override_session.ThemeOverrideModel().Find("radius") &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->override_active &&
+              panel_override_session.ThemeOverrideModel().Find("radius")->value_editable &&
+              panel_override_session.Document().GetThemeOverride(
+                  panel_override_node, "radius").Is<int>(),
+          "Panel Radius becomes an editable local numeric value");
+    Check(panel_override_session.SetThemeOverrideActive("radius", false,
+                                                        panel_override_error) &&
+              !panel_override_session.Document().Find(panel_override_node)
+                   ->IsThemeOverrideActive("radius"),
+          "Panel Radius can return to inherited state: " + panel_override_error);
+    Check(panel_override_session.SetThemeOverrideActive("radius", true,
+                                                        panel_override_error) &&
+              panel_override_session.Document().Find(panel_override_node)
+                   ->IsThemeOverrideActive("radius"),
+          "Panel Radius restores its saved local value without stale node state: " +
+              panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().GetCount() > 0 &&
+              panel_override_session.ThemeOverrideModel()[0].group == "General",
+          "Panel Theme Overrides present General before specialist groups");''')
+
+          workflow = Path('.github/workflows/property-editor-interaction-fix.yml')
+          workflow.unlink()
+          PY
+
+          git diff --check
+          git status --short
+      - name: Commit correction
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "PropertyEditor makes inherited controls immediately usable" -m "Fix first theme-override activation so it never reads a stale document node after seeding the authored value. Keep override actions independent from value-editor availability, give Boolean values direct inline interaction, and show effective inherited values." -m "Move General and Theme Overrides forward, enlarge numeric slider actions, and avoid unnecessary Preview work while renaming controls. Add focused interaction and session regression coverage."
+          git push origin HEAD:assistant/property-editor-interaction-fix
