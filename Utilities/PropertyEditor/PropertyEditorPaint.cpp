@@ -36,6 +36,8 @@ void PropertyEditor::DrawGroupRow(Draw& w, int,
     w.DrawText(r.left + padding + DPI(16), y, row.group_id,
                font, style_.group_ink);
 
+    int right = r.right - padding;
+    int summary_width = 0;
     if(style_.show_group_summaries && model_) {
         int total = 0;
         int local = 0;
@@ -49,9 +51,24 @@ void PropertyEditor::DrawGroupRow(Draw& w, int,
         }
         if(total > 0) {
             const String summary = Format("%d of %d local", local, total);
-            const int summary_width = GetTextSize(summary, StdFont()).cx;
-            w.DrawText(r.right - summary_width - padding, y, summary,
+            summary_width = GetTextSize(summary, StdFont()).cx;
+            w.DrawText(right - summary_width, y, summary,
                        StdFont(), style_.inherited_ink);
+            right -= summary_width + DPI(8);
+        }
+    }
+
+    if(model_) {
+        const String subtitle = model_->GetGroupSubtitle(row.group_id);
+        if(!subtitle.IsEmpty() && right > r.left + DPI(80)) {
+            Font small = StdFont();
+            small.Height(max(1, small.GetHeight() - DPI(2)));
+            const int left = r.left + DPI(16) + padding;
+            const int width = max(0, right - left);
+            if(width > DPI(28))
+                DrawTextEllipsis(w, left, r.top + (r.GetHeight() - small.GetHeight()) / 2,
+                                 width, subtitle, "...", small,
+                                 style_.inherited_ink);
         }
     }
 
@@ -256,6 +273,13 @@ void PropertyEditor::ModelValueChanged(PropertyEditorModel *source,
        (id == active_property_id_ || id == inline_preview_property_id_))
         return;
     RefreshValue(id);
+}
+
+void PropertyEditor::ModelGroupMetadataChanged(PropertyEditorModel *source)
+{
+    if(source != model_)
+        return;
+    Refresh();
 }
 
 }

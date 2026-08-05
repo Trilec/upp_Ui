@@ -720,6 +720,12 @@ void UiDesignerHierarchyView::SetDocument(const UiDesignerDocument *document)
     Rebuild();
 }
 
+void UiDesignerHierarchyView::SetCatalog(const UiDesignerCatalog *catalog)
+{
+    catalog_ = catalog;
+    Refresh();
+}
+
 void UiDesignerHierarchyView::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
@@ -755,18 +761,113 @@ void UiDesignerHierarchyView::Rebuild()
 
 Rect UiDesignerHierarchyView::RowRect(int index) const
 {
-    return RectC(0, index * DPI(30) - scroll_, GetSize().cx, DPI(30));
+    return RectC(0, GetHeaderRect().Height() + index * DPI(30) - scroll_,
+                 GetSize().cx, DPI(30));
 }
 
 int UiDesignerHierarchyView::RowAt(Point p) const
 {
-    const int index = (p.y + scroll_) / DPI(30);
+    if(!GetHeaderRect().Contains(p))
+        return -1;
+    const int index = (p.y - GetHeaderRect().Height() + scroll_) / DPI(30);
     return index >= 0 && index < rows_.GetCount() ? index : -1;
+}
+
+Rect UiDesignerHierarchyView::GetHeaderRect() const
+{
+    return RectC(0, 0, GetSize().cx, DPI(24));
+}
+
+Rect UiDesignerHierarchyView::GetNameRect(int index) const
+{
+    Rect row = RowRect(index);
+    const int type_width = DPI(94);
+    const int mode_width = DPI(24);
+    const int gap = DPI(4);
+    return Rect(row.left, row.top, max(0, row.Width() - type_width - 2 * mode_width - gap), row.Height());
+}
+
+Rect UiDesignerHierarchyView::GetTypeRect(int index) const
+{
+    Rect row = RowRect(index);
+    const int type_width = DPI(94);
+    const int mode_width = DPI(24);
+    const int gap = DPI(4);
+    return Rect(row.right - 2 * mode_width - type_width - gap, row.top,
+                type_width, row.Height());
+}
+
+Rect UiDesignerHierarchyView::ModeRect(int index, bool height) const
+{
+    Rect row = RowRect(index);
+    const int mode_width = DPI(24);
+    const int gap = DPI(4);
+    const int x = row.right - mode_width - (height ? 0 : mode_width + gap);
+    return Rect(x, row.top, mode_width, row.Height());
+}
+
+Rect UiDesignerHierarchyView::GetWidthModeRect(int index) const
+{
+    return ModeRect(index, false);
+}
+
+Rect UiDesignerHierarchyView::GetHeightModeRect(int index) const
+{
+    return ModeRect(index, true);
+}
+
+bool UiDesignerHierarchyView::HasSizingMode(const UiDesignerNode& node) const
+{
+    return node.type != "UiTabPage" && node.type != "UiAccordionSection" &&
+           node.properties.Find("width_mode") >= 0 &&
+           node.properties.Find("height_mode") >= 0;
+}
+
+String UiDesignerHierarchyView::FriendlyType(const UiDesignerNode& node) const
+{
+    if(catalog_) {
+        const UiDesignerControlSpec *spec = catalog_->Find(node.type);
+        if(spec && !spec->display_name.IsEmpty())
+            return spec->display_name;
+    }
+    return node.type;
+}
+
+Image UiDesignerHierarchyView::SizingIcon(const String& mode, bool height) const
+{
+    if(mode == "Fit")
+        return height ? ICON_DESIGN_FIT_PAGE_48() : ICON_DESIGN_FIT_WIDTH_48();
+    if(mode == "Fixed")
+        return ICON_DESIGN_BORDER_HORIZONTAL_48();
+    return height ? ICON_DESIGN_VERTICAL_DISTRIBUTE_48()
+                  : ICON_DESIGN_HORIZONTAL_DISTRIBUTE_48();
+}
+
+void UiDesignerHierarchyView::UpdateSizingTip(int index, bool height)
+{
+    if(index < 0 || index >= rows_.GetCount() || !document_)
+        return;
+    const UiDesignerNode *node = document_->Find(rows_[index].node);
+    if(!node || !HasSizingMode(*node))
+        return;
+    const String property = height ? "height_mode" : "width_mode";
+    const String mode = node->GetProperty(property, "Fit");
+    const String axis = height ? "Height" : "Width";
+    Tip(Format("%s mode: %s. Click to change to the next mode.", axis, mode));
 }
 
 void UiDesignerHierarchyView::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), SColorPaper());
+    const Rect header = GetHeaderRect();
+    w.DrawRect(header, Blend(SColorFace(), SColorPaper(), 70));
+    w.DrawText(DPI(8), header.top + DPI(5), "Name", SansSerifZ(9).Bold(), SColorText());
+    w.DrawText(GetTypeRect(0).left + DPI(4), header.top + DPI(5), "Type",
+               SansSerifZ(9), SColorText());
+    w.DrawImage(GetWidthModeRect(0).left + DPI(4), header.top + DPI(4),
+                DPI(16), DPI(16), ICON_DESIGN_FIT_WIDTH_48());
+    w.DrawImage(GetHeightModeRect(0).left + DPI(4), header.top + DPI(4),
+                DPI(16), DPI(16), ICON_DESIGN_FIT_PAGE_48());
     for(int i = 0; i < rows_.GetCount(); i++) {
         Rect r = RowRect(i);
         if(r.bottom < 0 || r.top > GetSize().cy)
@@ -778,8 +879,17 @@ void UiDesignerHierarchyView::Paint(Draw& w)
         if(selected)
             w.DrawRect(r, Blend(SColorHighlight(), SColorPaper(), 80));
         const int x = DPI(8) + rows_[i].depth * DPI(16);
-        w.DrawText(x, r.top + DPI(7), node->name + "  [" + node->type + "]",
-                   SansSerifZ(10), SColorText());
+        w.DrawText(x, r.top + DPI(7), node->name, SansSerifZ(10), SColorText());
+        w.DrawText(GetTypeRect(i).left + DPI(4), r.top + DPI(8), FriendlyType(*node),
+                   SansSerifZ(9), Blend(SColorText(), SColorPaper(), 55));
+        if(HasSizingMode(*node)) {
+            const String width_mode = node->GetProperty("width_mode", "Fit");
+            const String height_mode = node->GetProperty("height_mode", "Fit");
+            w.DrawImage(GetWidthModeRect(i).left + DPI(4), r.top + DPI(7),
+                        DPI(16), DPI(16), SizingIcon(width_mode, false));
+            w.DrawImage(GetHeightModeRect(i).left + DPI(4), r.top + DPI(7),
+                        DPI(16), DPI(16), SizingIcon(height_mode, true));
+        }
     }
     if(drop_row_ >= 0 && drop_row_ < rows_.GetCount()) {
         Rect r = RowRect(drop_row_);
@@ -803,6 +913,18 @@ void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
     if(pressed_ >= 0) {
         WhenSelectNode(rows_[pressed_].node, (flags & K_CTRL) != 0);
         const UiDesignerNodeId node = rows_[pressed_].node;
+        const UiDesignerNode *item = document_ ? document_->Find(node) : nullptr;
+        if(item && HasSizingMode(*item)) {
+            const bool height = GetHeightModeRect(pressed_).Contains(p);
+            const bool width = GetWidthModeRect(pressed_).Contains(p);
+            if(width || height) {
+                UpdateSizingTip(pressed_, height);
+                if(CycleSizingMode)
+                    CycleSizingMode(node, height);
+                pressed_ = -1;
+                return;
+            }
+        }
         if(document_ && node != document_->GetRootId()) {
             node_drag_nodes_.Clear();
             if(selection_ && selection_->Contains(node))
@@ -865,7 +987,7 @@ void UiDesignerHierarchyView::CancelMode()
 
 void UiDesignerHierarchyView::MouseWheel(Point, int zdelta, dword)
 {
-    const int maximum = max(0, rows_.GetCount() * DPI(30) - GetSize().cy);
+    const int maximum = max(0, rows_.GetCount() * DPI(30) + GetHeaderRect().Height() - GetSize().cy);
     scroll_ = minmax(scroll_ - zdelta / 4, 0, maximum);
     Refresh();
 }

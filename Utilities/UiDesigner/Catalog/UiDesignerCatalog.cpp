@@ -663,6 +663,20 @@ bool UiDesignerCatalog::Validate(String& error) const
             error = spec.type_id + " has no preview adapter id";
             return false;
         }
+        if(!spec.data_defaults.IsEmpty() &&
+           spec.data_capability == UiDesignerDataCapability::None) {
+            error = spec.type_id + " has data defaults but no data capability";
+            return false;
+        }
+        const bool structured_data =
+            spec.data_capability == UiDesignerDataCapability::List ||
+            spec.data_capability == UiDesignerDataCapability::Tree ||
+            spec.data_capability == UiDesignerDataCapability::Pages ||
+            spec.data_capability == UiDesignerDataCapability::AccordionSections;
+        if(structured_data && spec.data_adapter_id.IsEmpty()) {
+            error = spec.type_id + " has structured data but no data adapter id";
+            return false;
+        }
         if(spec.codegen && spec.codegen_adapter_id.IsEmpty()) {
             error = spec.type_id + " has no code-generation adapter id";
             return false;

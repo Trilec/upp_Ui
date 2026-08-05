@@ -178,6 +178,7 @@ private:
     bool MatchesFilter(const PropertyEditorItem& item) const;
     void ModelStructureChanged(PropertyEditorModel *source);
     void ModelValueChanged(PropertyEditorModel *source, const String& id);
+    void ModelGroupMetadataChanged(PropertyEditorModel *source);
 
     PropertyEditorModel *model_ = nullptr;
     PropertyEditorFactory *factory_ = nullptr;

@@ -297,7 +297,18 @@ static bool LoadActions(UiDesignerNode& node, const ValueArray& encoded,
     return true;
 }
 
-static void NormalizePlacementProperties(ValueMap& properties)
+static String MigrateLegacySizingMode(const Value& value)
+{
+    const String mode = AsString(value);
+    if(mode == "Fill")
+        return "Expand";
+    if(mode == "Fixed")
+        return "Fixed";
+    return "Fit";
+}
+
+static void NormalizePlacementProperties(ValueMap& properties,
+                                         const String& type = String())
 {
     if(properties.Find("cell_align_x") >= 0 &&
        (String)properties.GetValue(properties.Find("cell_align_x")) == "Auto")
@@ -319,6 +330,23 @@ static void NormalizePlacementProperties(ValueMap& properties)
     if(properties.Find("height_mode") < 0 && properties.Find("height") >= 0) {
         properties.Set("height_mode", "Fixed");
         properties.Set("fixed_height", properties.GetValue(properties.Find("height")));
+    }
+    // h_sizing/v_sizing were the former common-control contract. Keep them
+    // only for the semantic Spacer, whose line/blank behavior still owns
+    // those fields; ordinary controls are migrated once on load.
+    if(type != "Spacer") {
+        if(properties.Find("width_mode") < 0 && properties.Find("h_sizing") >= 0)
+            properties.Set("width_mode",
+                           MigrateLegacySizingMode(properties.GetValue(properties.Find("h_sizing"))));
+        if(properties.Find("height_mode") < 0 && properties.Find("v_sizing") >= 0)
+            properties.Set("height_mode",
+                           MigrateLegacySizingMode(properties.GetValue(properties.Find("v_sizing"))));
+        const int horizontal = properties.Find("h_sizing");
+        const int vertical = properties.Find("v_sizing");
+        if(horizontal >= 0)
+            properties.Remove(horizontal);
+        if(vertical >= 0)
+            properties.Remove(vertical);
     }
 }
 
@@ -401,7 +429,8 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             ValueMap properties = legacy
                 ? LegacyProperties(UiDesignerMapValue(n, "properties", ValueMap()))
                 : DecodeDocumentMap(UiDesignerMapValue(n, "properties", ValueMap()));
-            NormalizePlacementProperties(properties);
+            NormalizePlacementProperties(properties,
+                                         UiDesignerMapValue(n, "type", String()));
             if(legacy && UiDesignerMapValue(n, "last_rect", Value()).Is<ValueMap>()) {
                 ValueMap r = UiDesignerMapValue(n, "last_rect", ValueMap());
                 const int left = UiDesignerMapValue(r, "left", 0);

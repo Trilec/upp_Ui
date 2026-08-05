@@ -100,6 +100,26 @@ CONSOLE_APP_MAIN
 
     model.StructureChanged();
 
+    const int subtitle_revision = model.GetStructureRevision();
+    model.SetGroupSubtitle("General", "10 local");
+    Check(model.GetGroupSubtitle("General") == "10 local",
+          "group subtitle can be set");
+    model.SetGroupSubtitle("General", "8 local");
+    Check(model.GetGroupSubtitle("General") == "8 local" &&
+              model.GetStructureRevision() == subtitle_revision,
+          "group subtitle replacement is non-structural");
+    model.SetGroupSubtitle("Transform", "2 local");
+    Check(model.GetGroupSubtitle("Transform") == "2 local" &&
+              model.GetGroupSubtitle("General") == "8 local",
+          "independent group subtitles are retained");
+    model.ClearGroupSubtitle("General");
+    Check(model.GetGroupSubtitle("General").IsEmpty() &&
+              model.GetGroupSubtitle("Transform") == "2 local",
+          "one group subtitle can be cleared independently");
+    model.ClearGroupSubtitles();
+    Check(model.GetGroupSubtitle("Transform").IsEmpty(),
+          "ClearGroupSubtitles removes stale metadata");
+
     Check(model.GetCount() == 10, "model item count");
     Check(model.Find("count") != nullptr, "find property");
     Check(model.Find("notes") != nullptr, "find multiline property");

@@ -145,6 +145,10 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
             if(self)
                 self->ModelValueChanged(source, id);
         };
+        model_->WhenGroupMetadataChanged << [self, source](String) {
+            if(self)
+                self->ModelGroupMetadataChanged(source);
+        };
     }
 
     RebuildRows();

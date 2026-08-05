@@ -86,6 +86,28 @@ CONSOLE_APP_MAIN
 
     String error;
     Check(catalog.Validate(error), "catalog validates: " + error);
+    const UiDesignerControlSpec *metadata_tree = catalog.Find("UiTree");
+    const UiDesignerControlSpec *metadata_list = catalog.Find("UiList");
+    const UiDesignerControlSpec *metadata_tab = catalog.Find("UiTab");
+    const UiDesignerControlSpec *metadata_accordion = catalog.Find("UiAccordion");
+    Check(metadata_tree && metadata_tree->data_capability == UiDesignerDataCapability::Tree &&
+              metadata_tree->data_adapter_id == "tree" && !metadata_tree->data_defaults.IsEmpty(),
+          "UiTree declares its canonical tree data adapter");
+    Check(metadata_list && metadata_list->data_capability == UiDesignerDataCapability::List &&
+              metadata_list->data_adapter_id == "list" && !metadata_list->data_defaults.IsEmpty(),
+          "UiList declares its canonical list data adapter");
+    Check(metadata_tab && metadata_tab->data_capability == UiDesignerDataCapability::Pages &&
+              metadata_tab->data_adapter_id == "tab",
+          "UiTab declares its semantic page data adapter");
+    Check(metadata_accordion &&
+              metadata_accordion->data_capability == UiDesignerDataCapability::AccordionSections &&
+              metadata_accordion->data_adapter_id == "accordion",
+          "UiAccordion declares its semantic section data adapter");
+    for(const UiDesignerControlSpec& spec : catalog.GetControls())
+        if(!spec.data_defaults.IsEmpty())
+            Check(spec.data_capability != UiDesignerDataCapability::None &&
+                      !spec.data_adapter_id.IsEmpty(),
+                  spec.type_id + " data defaults have an explicit adapter");
     Check(catalog.GetCount() >= 50, "complete native and U++ catalog");
     Check(catalog.FindCategory("Layouts").GetCount() >= 5, "layout catalog");
     Check(catalog.FindCategory("Containers").GetCount() >= 8, "container catalog");
@@ -149,29 +171,29 @@ CONSOLE_APP_MAIN
     CheckSizeProfile("UiGroupPanel", Size(280, 160), Size(100, 70));
     CheckSizeProfile("UppVScrollBar", Size(18, 160), Size(16, 80));
 
-    UiDesignerSession sizing_session;
+    UiDesignerSession initial_sizing_session;
     const UiDesignerNodeId sizing_button =
-        sizing_session.AddControl("UiButton");
+        initial_sizing_session.AddControl("UiButton");
     const UiDesignerNode* sizing_button_node =
-        sizing_session.Document().Find(sizing_button);
+        initial_sizing_session.Document().Find(sizing_button);
     Check(sizing_button_node &&
               (int)sizing_button_node->GetProperty("fixed_width", 0) == 80 &&
               (int)sizing_button_node->GetProperty("fixed_height", 0) == 25 &&
               (int)sizing_button_node->GetProperty("min_width", 0) == 50 &&
               (int)sizing_button_node->GetProperty("min_height", 0) == 25,
           "new Button stores its natural and minimum sizing profile");
-    Check(sizing_session.InspectorModel().Find("fixed_width") &&
-              (int)sizing_session.InspectorModel().Find("fixed_width")->value == 80 &&
-              sizing_session.InspectorModel().Find("min_width") &&
-              (int)sizing_session.InspectorModel().Find("min_width")->value == 50,
+    Check(initial_sizing_session.InspectorModel().Find("fixed_width") &&
+              (int)initial_sizing_session.InspectorModel().Find("fixed_width")->value == 80 &&
+              initial_sizing_session.InspectorModel().Find("min_width") &&
+              (int)initial_sizing_session.InspectorModel().Find("min_width")->value == 50,
           "Button Inspector presents non-zero sizing values immediately");
     String sizing_error;
-    Check(sizing_session.CommitProperty("width_mode", "Fixed", sizing_error),
+    Check(initial_sizing_session.CommitProperty("width_mode", "Fixed", sizing_error),
           "Button width mode switches to Fixed: " + sizing_error);
-    Check(sizing_session.CommitProperty("fixed_width", 120, sizing_error),
+    Check(initial_sizing_session.CommitProperty("fixed_width", 120, sizing_error),
           "Button Fixed width can be edited: " + sizing_error);
-    Check(sizing_session.ResetProperty("fixed_width", sizing_error) &&
-              (int)sizing_session.Document().Find(sizing_button)
+    Check(initial_sizing_session.ResetProperty("fixed_width", sizing_error) &&
+              (int)initial_sizing_session.Document().Find(sizing_button)
                   ->GetProperty("fixed_width", 0) == 80,
           "Button Fixed width reset returns to natural width: " + sizing_error);
 

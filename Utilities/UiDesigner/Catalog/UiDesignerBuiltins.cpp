@@ -1116,6 +1116,14 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.child_adapter_id = String(c.type) == "UiTab" ? "tab" :
                                  String(c.type) == "UiStack" ? "stack" :
                                  "accordion";
+            if(String(c.type) == "UiTab") {
+                s.data_capability = UiDesignerDataCapability::Pages;
+                s.data_adapter_id = "tab";
+            }
+            else if(String(c.type) == "UiAccordion") {
+                s.data_capability = UiDesignerDataCapability::AccordionSections;
+                s.data_adapter_id = "accordion";
+            }
             if(String(c.type) == "UiAccordion") {
                 s.accepts_semantic_children = true;
                 AddEvent(s, "WhenSectionToggled", "Section toggled", "Runs after a section changes open state.");
@@ -1261,6 +1269,8 @@ static void RegisterNative(UiDesignerCatalog& catalog)
                 adapter->AddThemeOverrides(s);
         }
         if(String(c.type) == "UiTree") {
+            s.data_capability = UiDesignerDataCapability::Tree;
+            s.data_adapter_id = "tree";
             ValueMap root;
             root.Set("text", "Root");
             ValueArray children;
@@ -1271,6 +1281,8 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             s.data_defaults.Set("root", root);
         }
         if(String(c.type) == "UiList") {
+            s.data_capability = UiDesignerDataCapability::List;
+            s.data_adapter_id = "list";
             ValueMap root;
             ValueArray items;
             ValueMap first; first.Set("text", "First"); first.Set("key", "first");

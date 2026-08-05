@@ -193,8 +193,47 @@ PropertyEditorItem& PropertyEditorItem::SetDomain(PropertyEditorDomain value)
 void PropertyEditorModel::Clear(bool notify)
 {
     items_.Clear();
+    group_subtitles_.Clear();
     if(notify)
         StructureChanged();
+}
+
+void PropertyEditorModel::SetGroupSubtitle(const String& group,
+                                           const String& subtitle)
+{
+    const int q = group_subtitles_.Find(group);
+    if(subtitle.IsEmpty()) {
+        if(q >= 0)
+            group_subtitles_.Remove(q);
+    }
+    else if(q >= 0)
+        group_subtitles_[q] = subtitle;
+    else
+        group_subtitles_.Add(group, subtitle);
+    WhenGroupMetadataChanged(group);
+}
+
+String PropertyEditorModel::GetGroupSubtitle(const String& group) const
+{
+    const int q = group_subtitles_.Find(group);
+    return q >= 0 ? group_subtitles_[q] : String();
+}
+
+void PropertyEditorModel::ClearGroupSubtitle(const String& group)
+{
+    const int q = group_subtitles_.Find(group);
+    if(q < 0)
+        return;
+    group_subtitles_.Remove(q);
+    WhenGroupMetadataChanged(group);
+}
+
+void PropertyEditorModel::ClearGroupSubtitles()
+{
+    if(group_subtitles_.IsEmpty())
+        return;
+    group_subtitles_.Clear();
+    WhenGroupMetadataChanged(String());
 }
 
 PropertyEditorItem& PropertyEditorModel::Add(const String& id,

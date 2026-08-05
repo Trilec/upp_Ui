@@ -87,6 +87,16 @@ enum class UiDesignerContentHostKind : byte {
     Page,
 };
 
+enum class UiDesignerDataCapability : byte {
+    None,
+    Scalar,
+    List,
+    Tree,
+    Pages,
+    AccordionSections,
+    Unsupported
+};
+
 enum UiDesignerControlCapability : dword {
     UiDesignerCapabilityNone          = 0,
     UiDesignerCapabilityRuntimeCtrl   = 1 << 0,
@@ -243,6 +253,8 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     Vector<UiDesignerThemeOverrideSpec> theme_overrides;
     ValueMap defaults;
     ValueMap data_defaults;
+    UiDesignerDataCapability data_capability = UiDesignerDataCapability::None;
+    String data_adapter_id;
 
     String preview_adapter_id;
     String codegen_adapter_id;

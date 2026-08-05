@@ -200,8 +200,8 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactControlState |
                           UiDesignerImpactLocalLayout |
                           UiDesignerImpactCode);
-    SetLayout(heading, "h_sizing", "Fill");
-    SetLayout(heading, "v_sizing", "Fixed");
+    SetLayout(heading, "width_mode", "Expand");
+    SetLayout(heading, "height_mode", "Fixed");
     SetLayout(heading, "fixed_height", 44);
 
     const UiDesignerNodeId placeholder = Add(*label, "dialog_content", column,
@@ -210,14 +210,14 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactControlState |
                           UiDesignerImpactLocalLayout |
                           UiDesignerImpactCode);
-    SetLayout(placeholder, "h_sizing", "Fill");
-    SetLayout(placeholder, "v_sizing", "Fill");
+    SetLayout(placeholder, "width_mode", "Expand");
+    SetLayout(placeholder, "height_mode", "Expand");
 
     const UiDesignerNodeId actions = Add(*box, "dialog_actions", column,
                                          "Add dialog actions");
     SetLayout(actions, "direction", "H");
-    SetLayout(actions, "h_sizing", "Fill");
-    SetLayout(actions, "v_sizing", "Fixed");
+    SetLayout(actions, "width_mode", "Expand");
+    SetLayout(actions, "height_mode", "Fixed");
     SetLayout(actions, "fixed_height", 40);
 
     const UiDesignerNodeId action_spacer = Add(*spacer, "dialog_action_spacer",
@@ -231,7 +231,7 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactControlState |
                           UiDesignerImpactLocalLayout |
                           UiDesignerImpactCode);
-    SetLayout(cancel, "h_sizing", "Fixed");
+    SetLayout(cancel, "width_mode", "Fixed");
     SetLayout(cancel, "fixed_width", 88);
 
     const UiDesignerNodeId ok = Add(*button, "ok_button", actions,
@@ -242,7 +242,7 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactCode);
     commands_.SetProperty(ok, "role", "Accent",
                           UiDesignerImpactPaint | UiDesignerImpactCode);
-    SetLayout(ok, "h_sizing", "Fixed");
+    SetLayout(ok, "width_mode", "Fixed");
     SetLayout(ok, "fixed_width", 88);
 }
 
@@ -549,12 +549,12 @@ void UiDesignerSession::RebuildInspector()
     if(primary && primary->id == document_.GetRootId()) {
         const Size size = document_.GetVirtualSize();
         inspector_model_.AddInteger("document_width", "Width", size.cx,
-                                    "Window")
+                                    "Layout")
             .SetRange(1, 8192, 1)
             .SetHelp("Document canvas width in pixels.")
             .SetImpact(PropertyImpactFullPreview | PropertyImpactCode);
         inspector_model_.AddInteger("document_height", "Height", size.cy,
-                                    "Window")
+                                    "Layout")
             .SetRange(1, 8192, 1)
             .SetHelp("Document canvas height in pixels.")
             .SetImpact(PropertyImpactFullPreview | PropertyImpactCode);

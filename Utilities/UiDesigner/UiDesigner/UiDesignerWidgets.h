@@ -186,6 +186,7 @@ public:
     UiDesignerHierarchyView();
     ~UiDesignerHierarchyView();
 
+    void SetCatalog(const UiDesignerCatalog *catalog);
     void SetDocument(const UiDesignerDocument *document);
     void SetSelection(const UiDesignerSelection *selection);
     void Rebuild();
@@ -195,12 +196,18 @@ public:
     bool IsNodeDragPollArmed() const { return node_drag_poll_armed_; }
     int GetNodeDragPollArmCount() const { return node_drag_poll_arm_count_; }
     bool HasDropTarget() const { return drop_row_ >= 0; }
+    Rect GetHeaderRect() const;
+    Rect GetNameRect(int index) const;
+    Rect GetTypeRect(int index) const;
+    Rect GetWidthModeRect(int index) const;
+    Rect GetHeightModeRect(int index) const;
 
     Function<UiDesignerDropPlan(const Vector<UiDesignerNodeId>&,
                                 UiDesignerNodeId, int)> PlanDrop;
     Function<UiDesignerDropPlan(const String&, UiDesignerNodeId, int)> PlanCatalogDrop;
     Function<bool(UiDesignerNodeId)> IsContentHost;
     Function<bool(const UiDesignerDropPlan&, String&)> ExecuteDrop;
+    Function<bool(UiDesignerNodeId, bool)> CycleSizingMode;
 
     Event<UiDesignerNodeId, bool> WhenSelectNode;
     Event<String> WhenDropStatus;
@@ -230,6 +237,11 @@ private:
     void AddRows(UiDesignerNodeId node, int depth);
     int RowAt(Point p) const;
     Rect RowRect(int index) const;
+    Rect ModeRect(int index, bool height) const;
+    bool HasSizingMode(const UiDesignerNode& node) const;
+    String FriendlyType(const UiDesignerNode& node) const;
+    Image SizingIcon(const String& mode, bool height) const;
+    void UpdateSizingTip(int index, bool height);
     void UpdateDrop(Point p, const String& payload);
     void PollNodeDrag();
     bool FinishNodeDrop(Point screen);
@@ -238,6 +250,7 @@ private:
     void ClearDrop();
 
     const UiDesignerDocument *document_ = nullptr;
+    const UiDesignerCatalog *catalog_ = nullptr;
     const UiDesignerSelection *selection_ = nullptr;
     Vector<Row> rows_;
     int scroll_ = 0;

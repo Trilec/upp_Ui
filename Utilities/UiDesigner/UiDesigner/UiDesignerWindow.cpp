@@ -584,6 +584,7 @@ void UiDesignerWindow::BuildTheme()
 
 void UiDesignerWindow::ConnectServices()
 {
+    hierarchy_.SetCatalog(&session_.Catalog());
     hierarchy_.SetDocument(&session_.Document());
     hierarchy_.SetSelection(&session_.State().selection);
     hierarchy_.WhenSelectNode = [=](UiDesignerNodeId id, bool toggle) {
@@ -609,6 +610,21 @@ void UiDesignerWindow::ConnectServices()
     hierarchy_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
         UiDesignerNodeId created = 0;
         return session_.ExecuteDrop(plan, &created, error);
+    };
+    hierarchy_.CycleSizingMode = [=](UiDesignerNodeId id, bool height) {
+        const UiDesignerNode *node = session_.Document().Find(id);
+        if(!node)
+            return false;
+        const String property = height ? "height_mode" : "width_mode";
+        const String current = node->GetProperty(property, "Fit");
+        const String next = current == "Fit" ? "Fixed"
+                            : current == "Fixed" ? "Expand" : "Fit";
+        String error;
+        if(!session_.CommitProperty(property, next, error)) {
+            RefreshStatus(error);
+            return false;
+        }
+        return true;
     };
     hierarchy_.WhenDropStatus = [=](const String& status) { RefreshStatus(status); };
 
@@ -1374,7 +1390,47 @@ void UiDesignerWindow::RefreshHierarchy()
 void UiDesignerWindow::RefreshInspector()
 {
     preview_canvas_.BumpPropertyEditorRefresh();
-    inspector_.SetModel(&session_.InspectorModel());
+    PropertyEditorModel& model = session_.InspectorModel();
+    model.ClearGroupSubtitles();
+    const UiDesignerSelection& selection = session_.State().selection;
+    const UiDesignerNode* primary = session_.Document().Find(selection.primary);
+    if(primary) {
+        String identity;
+        if(selection.nodes.GetCount() > 1) {
+            bool same_type = true;
+            for(UiDesignerNodeId id : selection.nodes) {
+                const UiDesignerNode* node = session_.Document().Find(id);
+                if(!node || node->type != primary->type) {
+                    same_type = false;
+                    break;
+                }
+            }
+            if(same_type) {
+                const UiDesignerControlSpec* spec = session_.Catalog().Find(primary->type);
+                identity = (spec ? spec->display_name : primary->type) +
+                           Format(" - %d selected", selection.nodes.GetCount());
+            }
+            else
+                identity = Format("%d mixed controls", selection.nodes.GetCount());
+        }
+        else if(primary->id != session_.Document().GetRootId()) {
+            const UiDesignerControlSpec* spec = session_.Catalog().Find(primary->type);
+            identity = spec ? spec->display_name : primary->type;
+        }
+
+        if(!identity.IsEmpty())
+            model.SetGroupSubtitle("Identity", identity);
+
+        Rect resolved = preview_canvas_.GetNodeRect(primary->id);
+        Size size = resolved.IsEmpty() ? Size(0, 0) : resolved.GetSize();
+        if(primary->id == session_.Document().GetRootId())
+            size = preview_canvas_.GetEffectiveVirtualSize();
+        const String layout = size.cx > 0 && size.cy > 0
+            ? Format("%d x %d px", size.cx, size.cy)
+            : "Size unavailable";
+        model.SetGroupSubtitle("Layout", layout);
+    }
+    inspector_.SetModel(&model);
     inspector_.Refresh();
 }
 
@@ -1385,7 +1441,10 @@ void UiDesignerWindow::RefreshData()
     data_projection_refreshing_ = true;
     const UiDesignerNodeId selected = session_.State().selection.primary;
     const UiDesignerNode* node = selected ? session_.Document().Find(selected) : nullptr;
+    const UiDesignerControlSpec* node_spec = node ? session_.Catalog().Find(node->type) : nullptr;
     const UiDesignerNode* accordion_owner = ResolveAccordionOwner(session_.Document(), node);
+    const UiDesignerControlSpec* accordion_spec = accordion_owner
+        ? session_.Catalog().Find(accordion_owner->type) : nullptr;
     const Value data_selection = SelectedDataToken(data_selected_token_,
                                                    data_list_, data_model_);
     const Vector<int> data_rows = data_list_.GetSelection();
@@ -1400,7 +1459,7 @@ void UiDesignerWindow::RefreshData()
     data_editor_model_.Clear();
     data_select_content_.Enable(false);
     data_remove_content_.Enable(false);
-    if(node && node->type == "UiList") {
+    if(node_spec && node_spec->data_capability == UiDesignerDataCapability::List) {
         const ValueMap root = DesignerListRoot(*node);
         const Vector<UiDesignerListDataRow> rows =
             UiDesignerListDataAdapter::Rows(root);
@@ -1448,7 +1507,7 @@ void UiDesignerWindow::RefreshData()
         Finish();
         return;
     }
-    if(node && node->type == "UiTree") {
+    if(node_spec && node_spec->data_capability == UiDesignerDataCapability::Tree) {
         const Value prior = selected_data;
         const ValueMap root = DesignerTreeRoot(*node);
         const Vector<UiDesignerTreeDataRow> rows =
@@ -1500,7 +1559,7 @@ void UiDesignerWindow::RefreshData()
         Finish();
         return;
     }
-    if(node && node->type == "UiTab") {
+    if(node_spec && node_spec->data_capability == UiDesignerDataCapability::Pages) {
         const Value prior = data_list_.GetData();
         for(UiDesignerNodeId id : node->children) {
             const UiDesignerNode *page = session_.Document().Find(id);
@@ -1527,7 +1586,8 @@ void UiDesignerWindow::RefreshData()
         Finish();
         return;
     }
-    if(accordion_owner && accordion_owner->type == "UiAccordion") {
+    if(accordion_owner && accordion_spec &&
+       accordion_spec->data_capability == UiDesignerDataCapability::AccordionSections) {
         const Value prior = data_list_.GetData();
         for(UiDesignerNodeId id : accordion_owner->children) {
             const UiDesignerNode *section = session_.Document().Find(id);
@@ -1593,11 +1653,12 @@ void UiDesignerWindow::RefreshData()
     }
     String data_status = "Select a control to view data";
     if(node) {
-        if(node->type == "UiAccordion") data_status = "Accordion sections are not selected.";
-        else if(node->type == "UiTree") data_status = "Tree item data is not implemented yet.";
-        else if(node->type == "UiList") data_status = "List data is unavailable.";
-        else if(node->type == "UiDropdown") data_status = "Dropdown item data is not implemented yet.";
-        else if(node->type == "UiMenu") data_status = "Menu item data is not implemented yet.";
+        if(node_spec && node_spec->data_capability == UiDesignerDataCapability::Pages)
+            data_status = "Select a page or semantic owner to edit page data.";
+        else if(node_spec && node_spec->data_capability == UiDesignerDataCapability::AccordionSections)
+            data_status = "Select an Accordion section to edit section data.";
+        else if(node_spec && node_spec->data_capability == UiDesignerDataCapability::Unsupported)
+            data_status = "This control has no stable serializable Designer data contract.";
         else data_status = "Data is not supported for this control yet.";
     }
     data_model_.Add(data_status,

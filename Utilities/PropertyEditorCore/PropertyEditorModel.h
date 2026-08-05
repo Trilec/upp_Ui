@@ -219,6 +219,11 @@ public:
     bool SetVisible(const String& id, bool visible, bool notify = true);
     bool SetValidationError(const String& id, const String& error, bool notify = true);
 
+    void SetGroupSubtitle(const String& group, const String& subtitle);
+    String GetGroupSubtitle(const String& group) const;
+    void ClearGroupSubtitle(const String& group);
+    void ClearGroupSubtitles();
+
     bool Preview(const String& id, const Value& candidate, String *error = nullptr);
     bool Commit(const String& id, const Value& candidate, String *error = nullptr);
     bool Reset(const String& id, String *error = nullptr);
@@ -234,6 +239,7 @@ public:
     Event<String, Value> WhenPreview;
     Event<String, Value> WhenCommit;
     Event<String> WhenReset;
+    Event<String> WhenGroupMetadataChanged;
 
 private:
     bool Apply(const String& id, const Value& candidate, bool final_commit, String *error);
@@ -241,6 +247,7 @@ private:
     Array<PropertyEditorItem> items_;
     int structure_revision_ = 0;
     int value_revision_ = 0;
+    VectorMap<String, String> group_subtitles_;
 };
 
 Value PropertyEditorMakeVector(double x, double y);
