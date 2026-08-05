@@ -3,14 +3,100 @@
 
 namespace Upp {
 
+static UiTree::Style UiDesignerHierarchyTreeStyle()
+{
+    UiTree::Style style = UiTheme::ResolveTree();
+    style.row_height = DPI(30);
+    style.indent_px = DPI(16);
+    style.glyph_size = DPI(10);
+    style.icon_size = DPI(16);
+    style.content_gap = DPI(5);
+    style.h_padding = DPI(8);
+    style.v_padding = DPI(2);
+    style.row_radius = 0;
+    style.accessory_gap = DPI(4);
+    style.show_icons = true;
+    style.show_connector_lines = false;
+    style.show_metadata_marker = false;
+    style.glyph_style = UITREEGLYPH_CHEVRON;
+    style.metrics.frame_enabled = false;
+    style.metrics.shadow.enabled = false;
+    style.selected_face = Blend(SColorHighlight(), SColorPaper(), 80);
+    style.selected_frame = style.selected_face;
+    style.hot_face = Blend(SColorFace(), SColorPaper(), 55);
+    style.hot_frame = style.hot_face;
+    return style;
+}
+
+bool UiDesignerHierarchyView::HierarchyTree::Key(dword key, int count)
+{
+    if(key == K_DELETE) {
+        if(WhenDelete)
+            WhenDelete();
+        return true;
+    }
+    return UiTree::Key(key, count);
+}
+
 UiDesignerHierarchyView::UiDesignerHierarchyView()
 {
-    WantFocus();
+    Add(tree_);
+    tree_.SetSelectionMode(UITREESEL_MULTI)
+         .SetRootVisible(false)
+         .EnableInternalMutation(false)
+         .EnableDragDrop(true)
+         .EnableRenameOnDblClick(true)
+         .ShowConnectorLines(false)
+         .ShowMetadataMarker(false)
+         .SetCustomStyle(UiDesignerHierarchyTreeStyle());
+
+    Vector<int> widths;
+    widths << DPI(94) << DPI(24) << DPI(24);
+    tree_.SetColumnWidths(widths);
+
+    tree_.WhenSelection = [=] { ForwardTreeSelection(); };
+    tree_.WhenColumnAction = [=](UiTreeNodeRef node, int column) {
+        const UiDesignerNodeId id = model_.FindDesignerNode(node);
+        if(!id || column == 0 || !CycleSizingMode)
+            return;
+        if(column == 1 || column == 2)
+            CycleSizingMode(id, column == 2);
+    };
+    tree_.WhenMoveRequest = [=](UiTreeMoveRequest& request) {
+        request.handled = true;
+        request.accept = false;
+        if(!PlanDrop || !ExecuteDrop)
+            return;
+        Vector<UiDesignerNodeId> nodes;
+        for(const UiTreeNodeRef& node : request.nodes) {
+            const UiDesignerNodeId id = model_.FindDesignerNode(node);
+            if(id)
+                nodes.Add(id);
+        }
+        UiDesignerNodeId parent = model_.FindDesignerNode(request.new_parent);
+        if(!parent && document_)
+            parent = document_->GetRootId();
+        UiDesignerDropPlan plan = PlanDrop(nodes, parent, request.insert_pos);
+        String error;
+        request.accept = plan.valid && ExecuteDrop(plan, error);
+        if(WhenDropStatus)
+            WhenDropStatus(request.accept ? "Move completed"
+                                           : (error.IsEmpty() ? plan.reason : error));
+    };
+    tree_.WhenRename = [=](UiTreeNodeRef node, const String& name) {
+        const UiDesignerNodeId id = model_.FindDesignerNode(node);
+        if(id && RenameNode)
+            RenameNode(id, name);
+    };
+    tree_.WhenDelete = [=] {
+        if(WhenDelete)
+            WhenDelete();
+    };
 }
 
 UiDesignerHierarchyView::~UiDesignerHierarchyView()
 {
-    ResetNodeDrag();
+    tree_.ClearTrackedDropTarget();
 }
 
 void UiDesignerHierarchyView::SetDocument(const UiDesignerDocument *document)
@@ -22,55 +108,117 @@ void UiDesignerHierarchyView::SetDocument(const UiDesignerDocument *document)
 void UiDesignerHierarchyView::SetCatalog(const UiDesignerCatalog *catalog)
 {
     catalog_ = catalog;
-    Refresh();
+    model_.SetCatalog(catalog);
+    model_.SetIconResolver([](const String& key) {
+        return UiDesignerResolveCatalogIcon(key);
+    });
+    Rebuild();
 }
 
 void UiDesignerHierarchyView::SetSelection(const UiDesignerSelection *selection)
 {
     selection_ = selection;
-    Refresh();
-}
-
-void UiDesignerHierarchyView::AddRows(UiDesignerNodeId node, int depth)
-{
-    if(!document_)
-        return;
-    const UiDesignerNode* n = document_->Find(node);
-    if(!n)
-        return;
-    Row& row = rows_.Add();
-    row.node = node;
-    row.depth = depth;
-    for(UiDesignerNodeId child : n->children)
-        AddRows(child, depth + 1);
-}
-
-void UiDesignerHierarchyView::BuildRows()
-{
-    rows_.Clear();
-    if(document_)
-        AddRows(document_->GetRootId(), 0);
+    SyncSelectionFromDesigner();
 }
 
 void UiDesignerHierarchyView::Rebuild()
 {
-    BuildRows();
+    if(!document_)
+        return;
+
+    Vector<UiDesignerNodeId> expanded;
+    for(UiTreeNodeRef node : tree_.GetExpandedNodes()) {
+        UiDesignerNodeId id = model_.FindDesignerNode(node);
+        if(id)
+            expanded.Add(id);
+    }
+
+    model_.Rebuild(*document_);
+    tree_.SetModel(model_.GetModel());
+
+    for(UiDesignerNodeId id : expanded) {
+        UiTreeNodeRef node = model_.FindTreeNode(id);
+        if(node.IsValid())
+            tree_.Expand(node);
+    }
+    UiTreeNodeRef root = model_.FindTreeNode(document_->GetRootId());
+    if(root.IsValid())
+        tree_.Expand(root);
+
+    SyncSelectionFromDesigner();
     Refresh();
 }
 
-Rect UiDesignerHierarchyView::RowRect(int index) const
+void UiDesignerHierarchyView::SyncSelectionFromDesigner()
 {
-    return RectC(0, GetHeaderRect().Height() + index * DPI(30) - scroll_,
-                 GetSize().cx, DPI(30));
+    if(!selection_)
+        return;
+    ValueArray selected;
+    for(UiDesignerNodeId id : selection_->nodes)
+        selected.Add((int64)id);
+    syncing_selection_ = true;
+    tree_.SetData(selected);
+    syncing_selection_ = false;
+
+    if(selection_->primary) {
+        UiTreeNodeRef primary = model_.FindTreeNode(selection_->primary);
+        if(primary.IsValid()) {
+            UiTreeNodeRef p = primary;
+            while(model_.GetModel().IsValid(p)) {
+                UiTreeNodeRef parent = model_.GetModel().GetParent(p);
+                if(!model_.GetModel().IsValid(parent))
+                    break;
+                tree_.Expand(parent);
+                p = parent;
+            }
+            tree_.SetCursor(primary);
+            tree_.ScrollTo(primary);
+        }
+    }
 }
 
-int UiDesignerHierarchyView::RowAt(Point p) const
+void UiDesignerHierarchyView::ForwardTreeSelection()
 {
-    if(GetHeaderRect().Contains(p) || p.x < 0 || p.x >= GetSize().cx ||
-       p.y < GetHeaderRect().bottom || p.y >= GetSize().cy)
-        return -1;
-    const int index = (p.y - GetHeaderRect().Height() + scroll_) / DPI(30);
-    return index >= 0 && index < rows_.GetCount() ? index : -1;
+    if(syncing_selection_ || !WhenSelectNode)
+        return;
+
+    Vector<UiTreeNodeRef> selected = tree_.GetSelection();
+    if(selected.IsEmpty())
+        return;
+
+    bool first = true;
+    for(UiTreeNodeRef node : selected) {
+        UiDesignerNodeId id = model_.FindDesignerNode(node);
+        if(!id)
+            continue;
+        WhenSelectNode(id, !first);
+        first = false;
+    }
+}
+
+void UiDesignerHierarchyView::Layout()
+{
+    const Rect header = GetHeaderRect();
+    tree_.SetRect(0, header.bottom, GetSize().cx,
+                  max(0, GetSize().cy - header.bottom));
+}
+
+void UiDesignerHierarchyView::Paint(Draw& w)
+{
+    w.DrawRect(GetHeaderRect(), Blend(SColorFace(), SColorPaper(), 70));
+    const Font normal = SansSerifZ(9);
+    const Font bold = SansSerifZ(9).Bold();
+    w.DrawText(DPI(8), DPI(5), "Name", bold, SColorText());
+    w.DrawText(GetTypeRect(0).left + DPI(4), DPI(5), "Type", normal, SColorText());
+    w.DrawText(GetWidthModeRect(0).left + DPI(7), DPI(5), "W", bold, SColorText());
+    w.DrawText(GetHeightModeRect(0).left + DPI(7), DPI(5), "H", bold, SColorText());
+
+    if(header_drop_) {
+        const Color color = header_plan_.valid ? Color(34, 197, 94)
+                                                : Color(220, 38, 38);
+        Rect r = GetHeaderRect();
+        w.DrawRect(r.left, r.bottom - DPI(2), r.Width(), DPI(2), color);
+    }
 }
 
 Rect UiDesignerHierarchyView::GetHeaderRect() const
@@ -80,470 +228,83 @@ Rect UiDesignerHierarchyView::GetHeaderRect() const
 
 Rect UiDesignerHierarchyView::GetNameRect(int index) const
 {
-    Rect row = RowRect(index);
-    const int type_width = DPI(94);
-    const int mode_width = DPI(24);
-    const int gap = DPI(4);
-    return Rect(row.left, row.top,
-                max(0, row.Width() - type_width - 2 * mode_width - gap),
-                row.Height());
+    Rect row = RectC(0, GetHeaderRect().bottom + index * DPI(30),
+                     GetSize().cx, DPI(30));
+    return Rect(row.left, row.top, GetTypeRect(index).left, row.bottom);
 }
 
 Rect UiDesignerHierarchyView::GetTypeRect(int index) const
 {
-    Rect row = RowRect(index);
-    const int type_width = DPI(94);
-    const int mode_width = DPI(24);
-    const int gap = DPI(4);
-    return Rect(row.right - 2 * mode_width - type_width - gap, row.top,
-                type_width, row.Height());
-}
-
-Rect UiDesignerHierarchyView::ModeRect(int index, bool height) const
-{
-    Rect row = RowRect(index);
-    const int mode_width = DPI(24);
-    const int gap = DPI(4);
-    const int x = row.right - mode_width - (height ? 0 : mode_width + gap);
-    return Rect(x, row.top, mode_width, row.Height());
+    Rect row = RectC(0, GetHeaderRect().bottom + index * DPI(30),
+                     GetSize().cx, DPI(30));
+    return Rect(row.right - DPI(150), row.top, row.right - DPI(56), row.bottom);
 }
 
 Rect UiDesignerHierarchyView::GetWidthModeRect(int index) const
 {
-    return ModeRect(index, false);
+    Rect row = RectC(0, GetHeaderRect().bottom + index * DPI(30),
+                     GetSize().cx, DPI(30));
+    return RectC(row.right - DPI(52), row.top, DPI(24), row.Height());
 }
 
 Rect UiDesignerHierarchyView::GetHeightModeRect(int index) const
 {
-    return ModeRect(index, true);
+    Rect row = RectC(0, GetHeaderRect().bottom + index * DPI(30),
+                     GetSize().cx, DPI(30));
+    return RectC(row.right - DPI(24), row.top, DPI(24), row.Height());
 }
 
-bool UiDesignerHierarchyView::HasSizingMode(const UiDesignerNode& node) const
+void UiDesignerHierarchyView::UpdateCatalogDrop(const String& type_id, Point screen)
 {
-    return node.type != "UiTabPage" && node.type != "UiAccordionSection" &&
-           node.properties.Find("width_mode") >= 0 &&
-           node.properties.Find("height_mode") >= 0;
-}
-
-String UiDesignerHierarchyView::FriendlyType(const UiDesignerNode& node) const
-{
-    if(catalog_) {
-        const UiDesignerControlSpec *spec = catalog_->Find(node.type);
-        if(spec && !spec->display_name.IsEmpty())
-            return spec->display_name;
-    }
-    return node.type;
-}
-
-Image UiDesignerHierarchyView::SizingIcon(const String& mode, bool) const
-{
-    if(mode == "Fixed")
-        return ICON_DESIGN_ASPECT_RATIO_48();
-    if(mode == "Expand")
-        return ICON_DESIGN_ARROWS_OUTPUT_48();
-    return ICON_DESIGN_FIT_PAGE_48();
-}
-
-void UiDesignerHierarchyView::UpdateSizingTip(int index, bool height)
-{
-    if(index < 0 || index >= rows_.GetCount() || !document_)
+    if(!document_ || !PlanCatalogDrop)
         return;
-    const UiDesignerNode *node = document_->Find(rows_[index].node);
-    if(!node || !HasSizingMode(*node))
-        return;
-    const String property = height ? "height_mode" : "width_mode";
-    const String mode = node->GetProperty(property, "Fit");
-    const String axis = height ? "Height" : "Width";
-    Tip(Format("%s mode: %s. Click to change to the next mode.", axis, mode));
-}
-
-void UiDesignerHierarchyView::Paint(Draw& w)
-{
-    w.DrawRect(GetSize(), SColorPaper());
-    const Rect header = GetHeaderRect();
-    w.DrawRect(header, Blend(SColorFace(), SColorPaper(), 70));
-    w.DrawText(DPI(8), header.top + DPI(5), "Name",
-               SansSerifZ(9).Bold(), SColorText());
-    w.DrawText(GetTypeRect(0).left + DPI(4), header.top + DPI(5), "Type",
-               SansSerifZ(9), SColorText());
-    w.DrawText(GetWidthModeRect(0).left + DPI(7), header.top + DPI(5), "W",
-               SansSerifZ(9).Bold(), SColorText());
-    w.DrawText(GetHeightModeRect(0).left + DPI(7), header.top + DPI(5), "H",
-               SansSerifZ(9).Bold(), SColorText());
-    for(int i = 0; i < rows_.GetCount(); i++) {
-        Rect r = RowRect(i);
-        if(r.bottom < 0 || r.top > GetSize().cy)
-            continue;
-        const UiDesignerNode* node = document_ ? document_->Find(rows_[i].node) : nullptr;
-        if(!node)
-            continue;
-        const bool selected = selection_ && selection_->Contains(node->id);
-        if(selected)
-            w.DrawRect(r, Blend(SColorHighlight(), SColorPaper(), 80));
-        const int x = DPI(8) + rows_[i].depth * DPI(16);
-        w.DrawText(x, r.top + DPI(7), node->name,
-                   SansSerifZ(10), SColorText());
-        w.DrawText(GetTypeRect(i).left + DPI(4), r.top + DPI(8),
-                   FriendlyType(*node), SansSerifZ(9),
-                   Blend(SColorText(), SColorPaper(), 55));
-        if(HasSizingMode(*node)) {
-            const String width_mode = node->GetProperty("width_mode", "Fit");
-            const String height_mode = node->GetProperty("height_mode", "Fit");
-            w.DrawImage(GetWidthModeRect(i).left + DPI(4), r.top + DPI(7),
-                        DPI(16), DPI(16), SizingIcon(width_mode, false));
-            w.DrawImage(GetHeightModeRect(i).left + DPI(4), r.top + DPI(7),
-                        DPI(16), DPI(16), SizingIcon(height_mode, true));
-        }
+    Point local = screen - GetScreenRect().TopLeft();
+    if(GetHeaderRect().Contains(local)) {
+        header_drop_ = true;
+        header_plan_ = PlanCatalogDrop(type_id, document_->GetRootId(), -1);
+        tree_.ClearTrackedDropTarget();
     }
-    if(drop_row_ >= 0 && drop_row_ < rows_.GetCount()) {
-        Rect r = RowRect(drop_row_);
-        const Color color = drop_plan_.valid
-            ? Color(34, 197, 94) : Color(220, 38, 38);
-        if(drop_edge_ < 0)
-            w.DrawRect(r.left, r.top, r.Width(), DPI(2), color);
-        else if(drop_edge_ > 0)
-            w.DrawRect(r.left, r.bottom - DPI(2), r.Width(), DPI(2), color);
-        else {
-            w.DrawRect(r.left, r.top, r.Width(), DPI(2), color);
-            w.DrawRect(r.left, r.bottom - DPI(2), r.Width(), DPI(2), color);
-            w.DrawRect(r.left, r.top, DPI(2), r.Height(), color);
-            w.DrawRect(r.right - DPI(2), r.top, DPI(2), r.Height(), color);
-        }
+    else {
+        header_drop_ = false;
+        UiTree::DropInfo info =
+            tree_.TrackDropTarget(local - Point(0, GetHeaderRect().bottom));
+        UiDesignerNodeId parent = model_.FindDesignerNode(info.parent);
+        if(!parent)
+            parent = document_->GetRootId();
+        header_plan_ = info.valid
+                     ? PlanCatalogDrop(type_id, parent, info.insert_pos)
+                     : UiDesignerDropPlan();
     }
-}
-
-void UiDesignerHierarchyView::LeftDown(Point p, dword flags)
-{
-    pressed_ = RowAt(p);
-    if(pressed_ >= 0) {
-        WhenSelectNode(rows_[pressed_].node, (flags & K_CTRL) != 0);
-        const UiDesignerNodeId node = rows_[pressed_].node;
-        const UiDesignerNode *item = document_ ? document_->Find(node) : nullptr;
-        if(item && HasSizingMode(*item)) {
-            const bool height = GetHeightModeRect(pressed_).Contains(p);
-            const bool width = GetWidthModeRect(pressed_).Contains(p);
-            if(width || height) {
-                UpdateSizingTip(pressed_, height);
-                if(CycleSizingMode)
-                    CycleSizingMode(node, height);
-                pressed_ = -1;
-                return;
-            }
-        }
-        if(document_ && node != document_->GetRootId()) {
-            node_drag_nodes_.Clear();
-            if(selection_ && selection_->Contains(node))
-                node_drag_nodes_ = clone(selection_->nodes);
-            else
-                node_drag_nodes_.Add(node);
-            node_drag_start_ = GetMousePos();
-            node_dragging_ = false;
-            SetCapture();
-            ArmNodeDragPoll();
-        }
-    }
-    SetFocus();
-}
-
-void UiDesignerHierarchyView::LeftUp(Point, dword)
-{
-    if(node_dragging_)
-        FinishNodeDrop(GetMousePos());
-    else
-        ResetNodeDrag();
-}
-
-void UiDesignerHierarchyView::LeftDrag(Point, dword)
-{
-    PollNodeDrag();
-}
-
-void UiDesignerHierarchyView::MouseMove(Point, dword flags)
-{
-    if(node_drag_nodes_.IsEmpty())
-        return;
-    if(!(flags & K_MOUSELEFT) && !GetMouseLeft()) {
-        ResetNodeDrag();
-        if(HasCapture())
-            ReleaseCapture();
-        return;
-    }
-    const Point screen = GetMousePos();
-    if(!node_dragging_ && Length(screen - node_drag_start_) >= DPI(5))
-        node_dragging_ = true;
-    if(!node_dragging_)
-        return;
-    if(GetScreenRect().Contains(screen))
-        UpdateDrop(screen - GetScreenRect().TopLeft(),
-                   UiDesignerNodesDragText(node_drag_nodes_));
-    else
-        ClearDrop();
-}
-
-Image UiDesignerHierarchyView::CursorImage(Point p, dword flags)
-{
-    return node_dragging_ ? Image::SizeAll()
-                          : ParentCtrl::CursorImage(p, flags);
-}
-
-void UiDesignerHierarchyView::CancelMode()
-{
-    ResetNodeDrag();
-    ParentCtrl::CancelMode();
-}
-
-void UiDesignerHierarchyView::MouseWheel(Point, int zdelta, dword)
-{
-    const int maximum = max(0,
-        rows_.GetCount() * DPI(30) + GetHeaderRect().Height() - GetSize().cy);
-    scroll_ = minmax(scroll_ - zdelta / 4, 0, maximum);
-    Refresh();
-}
-
-void UiDesignerHierarchyView::ClearDrop()
-{
-    drop_row_ = -1;
-    drop_edge_ = 0;
-    drag_payload_.Clear();
-    drop_plan_ = UiDesignerDropPlan();
-    catalog_drag_ = false;
-    Refresh();
-}
-
-void UiDesignerHierarchyView::UpdateDrop(Point p, const String& payload)
-{
-    if(!document_ || (!PlanDrop && !PlanCatalogDrop))
-        return;
-    Vector<UiDesignerNodeId> nodes;
-    String catalog_type;
-    const bool node_drag = UiDesignerParseNodesDragText(payload, nodes);
-    const bool catalog_drag = UiDesignerParseCatalogDragText(payload, catalog_type);
-    if(!node_drag && !catalog_drag) {
-        ClearDrop();
-        return;
-    }
-
-    // The heading is never a selectable row. During a catalog drag it is an
-    // explicit document-root drop affordance, preserving the original
-    // hierarchy workflow without reintroducing row-zero click aliasing.
-    if(catalog_drag && GetHeaderRect().Contains(p)) {
-        drop_plan_ = PlanCatalogDrop
-            ? PlanCatalogDrop(catalog_type, document_->GetRootId(), -1)
-            : UiDesignerDropPlan();
-        drop_row_ = rows_.IsEmpty() ? -1 : 0;
-        drop_edge_ = 0;
-        drag_payload_ = payload;
-        catalog_drag_ = true;
-        if(WhenDropStatus)
-            WhenDropStatus(drop_plan_.valid ? drop_plan_.label
-                                            : drop_plan_.reason);
-        Refresh();
-        return;
-    }
-
-    const int row = RowAt(p);
-    if(row < 0) {
-        ClearDrop();
-        return;
-    }
-    const UiDesignerNode* target = document_->Find(rows_[row].node);
-    if(!target) {
-        ClearDrop();
-        return;
-    }
-    Rect rr = RowRect(row);
-    const int third = max(1, rr.Height() / 3);
-    drop_edge_ = p.y < rr.top + third ? -1
-               : p.y >= rr.bottom - third ? 1 : 0;
-    UiDesignerNodeId parent = target->id;
-    int index = -1;
-    if(drop_edge_ == 0) {
-        drop_plan_ = node_drag && PlanDrop
-            ? PlanDrop(nodes, target->id, -1)
-            : PlanCatalogDrop ? PlanCatalogDrop(catalog_type, target->id, -1)
-                              : UiDesignerDropPlan();
-        if(!drop_plan_.valid && (!IsContentHost || !IsContentHost(target->id)))
-            drop_edge_ = 1;
-    }
-    if(drop_edge_ != 0) {
-        parent = target->parent;
-        const UiDesignerNode* parent_node = document_->Find(parent);
-        index = parent_node ? FindIndex(parent_node->children, target->id) : -1;
-        if(drop_edge_ >= 0 && index >= 0)
-            index++;
-        drop_edge_ = drop_edge_ == 0 ? 1 : drop_edge_;
-    }
-    if(drop_edge_ != 0)
-        drop_plan_ = node_drag && PlanDrop
-            ? PlanDrop(nodes, parent, index)
-            : PlanCatalogDrop ? PlanCatalogDrop(catalog_type, parent, index)
-                              : UiDesignerDropPlan();
-    drop_row_ = row;
-    drag_payload_ = payload;
-    catalog_drag_ = catalog_drag;
     if(WhenDropStatus)
-        WhenDropStatus(drop_plan_.valid ? drop_plan_.label : drop_plan_.reason);
+        WhenDropStatus(header_plan_.valid ? header_plan_.label : header_plan_.reason);
     Refresh();
 }
 
-void UiDesignerHierarchyView::PollNodeDrag()
+void UiDesignerHierarchyView::TrackCatalogDrop(const String& type_id, Point screen)
 {
-    node_drag_poll_armed_ = false;
-    if(!GetMouseLeft()) {
-        ResetNodeDrag();
-        return;
-    }
-    if(node_drag_nodes_.IsEmpty())
-        return;
-    const Point screen = GetMousePos();
-    MouseMove(screen - GetScreenRect().TopLeft(), 0);
-    if(!node_drag_nodes_.IsEmpty())
-        ArmNodeDragPoll();
+    UpdateCatalogDrop(type_id, screen);
 }
 
-bool UiDesignerHierarchyView::FinishNodeDrop(Point screen)
+bool UiDesignerHierarchyView::FinishCatalogDrop(const String& type_id, Point screen)
 {
-    if(node_drag_cleanup_)
+    UpdateCatalogDrop(type_id, screen);
+    UiDesignerDropPlan plan = header_plan_;
+    CancelCatalogDrop();
+    if(!plan.valid || !ExecuteDrop)
         return false;
-    UiDesignerDropPlan plan;
-    String status;
-    bool execute = false;
-    if(GetScreenRect().Contains(screen)) {
-        UpdateDrop(screen - GetScreenRect().TopLeft(),
-                   UiDesignerNodesDragText(node_drag_nodes_));
-        execute = drop_plan_.valid;
-        status = execute ? drop_plan_.label : drop_plan_.reason;
-        if(execute)
-            plan = pick(drop_plan_);
-    }
-
-    node_drag_cleanup_ = true;
-    node_drag_poll_.Kill();
-    node_drag_poll_armed_ = false;
-    pressed_ = -1;
-    node_drag_nodes_.Clear();
-    node_dragging_ = false;
-    ClearDrop();
-    if(HasCapture())
-        ReleaseCapture();
-    node_drag_cleanup_ = false;
-
     String error;
-    const bool ok = execute && ExecuteDrop && ExecuteDrop(plan, error);
-    if(WhenDropStatus)
-        WhenDropStatus(ok ? "Move completed"
-                          : (error.IsEmpty() ? status : error));
-    return ok;
-}
-
-void UiDesignerHierarchyView::ResetNodeDrag()
-{
-    if(node_drag_cleanup_)
-        return;
-    node_drag_cleanup_ = true;
-    node_drag_poll_.Kill();
-    node_drag_poll_armed_ = false;
-    pressed_ = -1;
-    node_drag_nodes_.Clear();
-    node_dragging_ = false;
-    ClearDrop();
-    if(HasCapture())
-        ReleaseCapture();
-    node_drag_cleanup_ = false;
-}
-
-void UiDesignerHierarchyView::ArmNodeDragPoll()
-{
-    if(node_drag_poll_armed_ || node_drag_nodes_.IsEmpty())
-        return;
-    node_drag_poll_armed_ = true;
-    node_drag_poll_arm_count_++;
-    node_drag_poll_.KillSet(16, [=] { PollNodeDrag(); });
-}
-
-void UiDesignerHierarchyView::DragEnter()
-{
-    Refresh();
-}
-
-void UiDesignerHierarchyView::TrackCatalogDrop(const String& type_id,
-                                               Point screen)
-{
-    UpdateDrop(screen - GetScreenRect().TopLeft(),
-               UiDesignerCatalogDragText(type_id));
-}
-
-bool UiDesignerHierarchyView::FinishCatalogDrop(const String& type_id,
-                                                Point screen)
-{
-    UpdateDrop(screen - GetScreenRect().TopLeft(),
-               UiDesignerCatalogDragText(type_id));
-    if(!drop_plan_.valid) {
-        if(WhenDropStatus)
-            WhenDropStatus(drop_plan_.reason);
-        ClearDrop();
-        return false;
-    }
-    String error;
-    const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
+    const bool ok = ExecuteDrop(plan, error);
     if(WhenDropStatus)
         WhenDropStatus(ok ? "Control added" : error);
-    ClearDrop();
     return ok;
 }
 
 void UiDesignerHierarchyView::CancelCatalogDrop()
 {
-    ClearDrop();
-}
-
-void UiDesignerHierarchyView::DragAndDrop(Point p, PasteClip& d)
-{
-    String payload;
-    if(!UiDesignerReadDragText(d, payload)) {
-        ClearDrop();
-        return;
-    }
-    UpdateDrop(p, payload);
-    if(!drop_plan_.valid) {
-        ClearDrop();
-        return;
-    }
-    if(!AcceptText(d)) {
-        ClearDrop();
-        return;
-    }
-    d.SetAction(catalog_drag_ ? DND_COPY : DND_MOVE);
-    if(d.IsPaste()) {
-        String error;
-        const bool ok = ExecuteDrop && ExecuteDrop(drop_plan_, error);
-        if(WhenDropStatus)
-            WhenDropStatus(ok
-                ? String(catalog_drag_ ? "Control added" : "Move completed")
-                : error);
-        ClearDrop();
-    }
-}
-
-void UiDesignerHierarchyView::DragRepeat(Point p)
-{
-    if(!drag_payload_.IsEmpty())
-        UpdateDrop(p, drag_payload_);
-}
-
-void UiDesignerHierarchyView::DragLeave()
-{
-    ClearDrop();
-}
-
-bool UiDesignerHierarchyView::Key(dword key, int)
-{
-    if(key == K_DELETE) {
-        if(WhenDelete)
-            WhenDelete();
-        return true;
-    }
-    return ParentCtrl::Key(key, 1);
+    header_drop_ = false;
+    header_plan_ = UiDesignerDropPlan();
+    tree_.ClearTrackedDropTarget();
+    Refresh();
 }
 
 }

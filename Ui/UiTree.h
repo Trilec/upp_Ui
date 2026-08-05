@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiTree_h_
+#ifndef _Ui_UiTree_h_
 #define _Ui_UiTree_h_
 
 /*
@@ -201,6 +201,7 @@ public:
     UiTree& Collapse(UiTreeNodeRef node, bool recursive = false) { return Expand(node, false, recursive); }
     UiTree& Toggle(UiTreeNodeRef node);
     bool IsExpanded(UiTreeNodeRef node) const;
+    Vector<UiTreeNodeRef> GetExpandedNodes() const;
 
     UiTree& SetCursor(UiTreeNodeRef node);
     UiTreeNodeRef GetCursor() const { return UiTreeNodeRef{cursor_id_}; }

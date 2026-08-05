@@ -551,6 +551,15 @@ bool UiTree::IsExpanded(UiTreeNodeRef node) const
     return model_ && model_->IsValid(node) && expanded_ids_.Find(node.id) >= 0;
 }
 
+Vector<UiTreeNodeRef> UiTree::GetExpandedNodes() const
+{
+    Vector<UiTreeNodeRef> out;
+    for(int id : expanded_ids_)
+        if(model_ && model_->IsValid(UiTreeNodeRef{id}))
+            out.Add(UiTreeNodeRef{id});
+    return out;
+}
+
 UiTree& UiTree::Expand(UiTreeNodeRef node, bool on, bool recursive)
 {
     if(!model_ || !model_->IsValid(node))
@@ -1506,6 +1515,20 @@ void UiTree::LeftDrag(Point p, dword)
 
 void UiTree::MouseMove(Point p, dword)
 {
+
+    int tip_row = HitTestRow(p);
+    if(tip_row >= 0 && tip_row < visible_rows_.GetCount()) {
+        UiTreeNodeRef tip_node{visible_rows_[tip_row].id};
+        if(model_ && model_->IsValid(tip_node)) {
+            Rect rr = GetRowRect(tip_row);
+            const UiModelItem& tip_item = model_->Get(tip_node);
+            int tip_column = HitTestColumn(rr, tip_item, p);
+            if(tip_column >= 0 && tip_column < tip_item.columns.GetCount())
+                Tip(tip_item.columns[tip_column].tooltip);
+            else
+                Tip(tip_item.description);
+        }
+    }
     int row = HitTestRow(p);
     int id = (row >= 0 && !visible_rows_[row].placeholder) ? visible_rows_[row].id : -1;
     if(hot_id_ != id) {

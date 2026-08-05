@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiDataModels_h_
+#ifndef _Ui_UiDataModels_h_
 #define _Ui_UiDataModels_h_
 
 /*
@@ -40,6 +40,7 @@ namespace Upp {
 
 struct UiModelColumn : Moveable<UiModelColumn> {
     String text;
+    String tooltip;
     Image  icon;
     UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     Color  ink = Null;

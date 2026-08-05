@@ -193,9 +193,11 @@ public:
     void TrackCatalogDrop(const String& type_id, Point screen);
     bool FinishCatalogDrop(const String& type_id, Point screen);
     void CancelCatalogDrop();
-    bool IsNodeDragPollArmed() const { return node_drag_poll_armed_; }
-    int GetNodeDragPollArmCount() const { return node_drag_poll_arm_count_; }
-    bool HasDropTarget() const { return drop_row_ >= 0; }
+
+    bool IsNodeDragPollArmed() const { return false; }
+    int GetNodeDragPollArmCount() const { return 0; }
+    bool HasDropTarget() const { return header_drop_ || tree_.GetDropInfo().valid; }
+
     Rect GetHeaderRect() const;
     Rect GetNameRect(int index) const;
     Rect GetTypeRect(int index) const;
@@ -208,65 +210,34 @@ public:
     Function<bool(UiDesignerNodeId)> IsContentHost;
     Function<bool(const UiDesignerDropPlan&, String&)> ExecuteDrop;
     Function<bool(UiDesignerNodeId, bool)> CycleSizingMode;
+    Function<bool(UiDesignerNodeId, const String&)> RenameNode;
 
     Event<UiDesignerNodeId, bool> WhenSelectNode;
     Event<String> WhenDropStatus;
     Event<> WhenDelete;
 
+    virtual void Layout() override;
     virtual void Paint(Draw& w) override;
-    virtual void LeftDown(Point p, dword flags) override;
-    virtual void LeftUp(Point p, dword flags) override;
-    virtual void LeftDrag(Point p, dword flags) override;
-    virtual void MouseMove(Point p, dword flags) override;
-    virtual Image CursorImage(Point p, dword flags) override;
-    virtual void CancelMode() override;
-    virtual void MouseWheel(Point p, int zdelta, dword flags) override;
-    virtual void DragEnter() override;
-    virtual void DragAndDrop(Point p, PasteClip& d) override;
-    virtual void DragRepeat(Point p) override;
-    virtual void DragLeave() override;
-    virtual bool Key(dword key, int count) override;
 
 private:
-    struct Row : Moveable<Row> {
-        UiDesignerNodeId node = 0;
-        int depth = 0;
+    class HierarchyTree : public UiTree {
+    public:
+        Event<> WhenDelete;
+        virtual bool Key(dword key, int count) override;
     };
 
-    void BuildRows();
-    void AddRows(UiDesignerNodeId node, int depth);
-    int RowAt(Point p) const;
-    Rect RowRect(int index) const;
-    Rect ModeRect(int index, bool height) const;
-    bool HasSizingMode(const UiDesignerNode& node) const;
-    String FriendlyType(const UiDesignerNode& node) const;
-    Image SizingIcon(const String& mode, bool height) const;
-    void UpdateSizingTip(int index, bool height);
-    void UpdateDrop(Point p, const String& payload);
-    void PollNodeDrag();
-    bool FinishNodeDrop(Point screen);
-    void ResetNodeDrag();
-    void ArmNodeDragPoll();
-    void ClearDrop();
+    void SyncSelectionFromDesigner();
+    void ForwardTreeSelection();
+    void UpdateCatalogDrop(const String& type_id, Point screen);
 
     const UiDesignerDocument *document_ = nullptr;
     const UiDesignerCatalog *catalog_ = nullptr;
     const UiDesignerSelection *selection_ = nullptr;
-    Vector<Row> rows_;
-    int scroll_ = 0;
-    int pressed_ = -1;
-    Point node_drag_start_;
-    Vector<UiDesignerNodeId> node_drag_nodes_;
-    bool node_dragging_ = false;
-    TimeCallback node_drag_poll_;
-    bool node_drag_poll_armed_ = false;
-    int node_drag_poll_arm_count_ = 0;
-    bool node_drag_cleanup_ = false;
-    int drop_row_ = -1;
-    int drop_edge_ = 0; // -1 before, 0 inside, +1 after
-    String drag_payload_;
-    UiDesignerDropPlan drop_plan_;
-    bool catalog_drag_ = false;
+    UiDesignerHierarchyModel model_;
+    HierarchyTree tree_;
+    bool syncing_selection_ = false;
+    bool header_drop_ = false;
+    UiDesignerDropPlan header_plan_;
 };
 
 class UiDesignerCodeView : public ParentCtrl {

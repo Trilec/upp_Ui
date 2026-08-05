@@ -626,6 +626,13 @@ void UiDesignerWindow::ConnectServices()
         }
         return true;
     };
+    hierarchy_.RenameNode = [=](UiDesignerNodeId id, const String& name) {
+        if(!session_.Commands().RenameNode(id, name, "Rename control")) {
+            RefreshStatus(session_.Commands().GetLastError());
+            return false;
+        }
+        return true;
+    };
     hierarchy_.WhenDropStatus = [=](const String& status) { RefreshStatus(status); };
 
     inspector_.SetModel(&session_.InspectorModel());

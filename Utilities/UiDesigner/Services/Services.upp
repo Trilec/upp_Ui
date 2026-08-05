@@ -1,6 +1,7 @@
 description "UiDesigner session, edit, projection and automation services";
 
 uses
+    Ui,
     Utilities/PropertyEditorCore,
     Utilities/UiDesigner/Core,
     Utilities/UiDesigner/Commands,
@@ -10,6 +11,8 @@ uses
 
 file
     UiDesignerServices.h,
+    UiDesignerHierarchyModel.h,
+    UiDesignerHierarchyModel.cpp,
     UiDesignerProjection.h,
     UiDesignerDrop.h,
     UiDesignerDrop.cpp,
