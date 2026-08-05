@@ -601,6 +601,11 @@ bool UiDesignerSession::PreviewProperty(
         return false;
     }
 
+    if(property == "name") {
+        error.Clear();
+        return true;
+    }
+
     for(UiDesignerNodeId id : state_.selection.nodes) {
         overlay_.Set(id, UiDesignerTransientValueKind::NormalProperty,
                      property, value);
@@ -732,14 +737,12 @@ void UiDesignerSession::RebuildThemeOverrideModel()
         return;
     }
 
-    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides) {
+    const auto AddOverrideRow = [&](const UiDesignerThemeOverrideSpec& property) {
         const int q = node->theme_overrides.Find(property.id);
         const bool inherited = q < 0 || !node->IsThemeOverrideActive(property.id);
         const Value value = inherited
             ? ResolveThemeOverrideValue(*node, property)
             : node->theme_overrides.GetValue(q);
-        // Inheritance is a source-state flag, not a mixed-value state. A
-        // single inherited node still has one concrete effective value.
         property.AddTo(theme_override_model_, value, false);
         if(PropertyEditorItem *item = theme_override_model_.Find(property.id)) {
             item->SetInherited(inherited);
@@ -748,7 +751,13 @@ void UiDesignerSession::RebuildThemeOverrideModel()
             item->enabled = true;
             item->value_editable = !inherited;
         }
-    }
+    };
+    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)
+        if(property.group == "General")
+            AddOverrideRow(property);
+    for(const UiDesignerThemeOverrideSpec& property : spec->theme_overrides)
+        if(property.group != "General")
+            AddOverrideRow(property);
     theme_override_model_.StructureChanged();
     RefreshThemeOverrideVisibility();
 }

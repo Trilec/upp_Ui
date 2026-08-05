@@ -142,11 +142,6 @@ void PropertyEditor::DrawValueSummary(Draw& w,
     else if(item.inherited)
         ink = style_.inherited_ink;
 
-    if(item.inherited) {
-        w.DrawText(value_rect.left, y, "Using theme", font, ink);
-        return;
-    }
-
     const auto DrawSwatch = [&](int x, Color color) {
         const int diameter = min(DPI(16),
                                  max(0, value_rect.GetHeight() - DPI(8)));
@@ -186,9 +181,6 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
         return item.validation_error;
     if(item.mixed)
         return "<multiple values>";
-    if(item.inherited)
-        return "Using theme";
-
     switch(item.kind) {
     case PropertyEditorKind::Boolean:
         return (bool)item.value ? "On" : "Off";

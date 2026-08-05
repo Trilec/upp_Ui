@@ -367,9 +367,9 @@ void UiDesignerWindow::BuildDesigner()
     designer_right_.RightColumn()
                    .AddSection("Hierarchy", ICON_DESIGN_ACCOUNT_TREE_48(), hierarchy_)
                    .AddSection("Inspector", ICON_DESIGN_TUNE_48(), inspector_)
+                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)
                    .AddSection("Data", ICON_EDITOR_FORMAT_LIST_BULLETED_48(), data_panel_,
                                "Edit the selected control’s data")
-                   .AddSection("Theme Overrides", ICON_DESIGN_FORMAT_PAINT_48(), overrides_shell_)
                    .AddSection("Events & Actions", ICON_DESIGN_DYNAMIC_FORM_48(), behaviors_)
                    .AddSection("Code", ICON_DESIGN_CODE_BLOCKS_48(), code_)
                    .AddSection("Diagnostics", ICON_DESIGN_INFO_48(), diagnostics_panel_,
@@ -663,7 +663,7 @@ void UiDesignerWindow::ConnectServices()
             // numeric editor; refresh this palette immediately after the
             // command-model rebuild rather than relying on a later selection
             // refresh.
-            overrides_.Refresh();
+            overrides_.RefreshModel();
             preview_canvas_.Refresh();
         }
     };

@@ -188,7 +188,7 @@ void PropertyEditor::ToggleOverride(int display_index)
     if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return;
     PropertyEditorItem& item = (*model_)[row.model_index];
-    if(!item.overrideable || !item.enabled || item.read_only)
+    if(!item.overrideable || item.read_only)
         return;
     WhenOverride(item.id, !item.override_active);
 }
@@ -213,7 +213,7 @@ void PropertyEditor::LeftDown(Point p, dword)
     // still provide the same activation path as clicking the action circle.
     // This is especially important for compact numeric rows whose editor is
     // only created after the local override exists.
-    if(item.overrideable && !item.override_active && !item.value_editable) {
+    if(item.overrideable && !item.override_active) {
         ToggleOverride(row);
         return;
     }
