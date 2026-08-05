@@ -1,0 +1,54 @@
+name: Retry UiDesigner control size repair
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.head_ref == 'assistant/control-size-profiles'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/control-size-profiles
+          fetch-depth: 0
+
+      - name: Run repaired source pass
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source_path = Path('.github/workflows/control-size-final-repair.yml')
+          source = source_path.read_text(encoding='utf-8')
+          marker = "          python3 - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          lines = [line[10:] if line.startswith('          ') else line
+                   for line in source[start:end].splitlines()]
+          script = '\n'.join(lines)
+          old = "tests_start = tests.index('    auto DefaultSizeValue = [](')\nimage_start = tests.index('    ImageBuffer background_buffer(4, 2);', tests_start)"
+          new = "default_marker = tests.index('auto DefaultSizeValue')\ntests_start = tests.rfind('\\n', 0, default_marker) + 1\nimage_marker = tests.index('ImageBuffer background_buffer(4, 2);', tests_start)\nimage_start = tests.rfind('\\n', 0, image_marker) + 1"
+          if script.count(old) != 1:
+              raise SystemExit('unexpected final repair test locator')
+          script = script.replace(old, new, 1)
+          exec(compile(script, 'control-size-final-repair', 'exec'))
+          Path('.github/workflows/control-size-final-repair-retry.yml').unlink()
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit final repair
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner restores the complete common sizing contract" -m "Restore Width mode, Height mode and cell alignment after the sizing-profile refactor, and keep the common property definition canonical and consistently formatted." -m "Exercise the actual Button Inspector, Fixed-mode edit and reset route in addition to exhaustive profile and legacy migration checks."
+          git push origin HEAD:assistant/control-size-profiles
