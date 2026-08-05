@@ -210,6 +210,7 @@ void UiDesignerCatalog::Register(UiDesignerControlSpec spec)
 {
     if(Find(spec.type_id))
         return;
+    OrganizeUiDesignerControlSpec(spec, controls_);
     controls_.Add(pick(spec));
 }
 

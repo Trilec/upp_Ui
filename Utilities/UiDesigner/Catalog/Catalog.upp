@@ -2,6 +2,7 @@ description "UiDesigner control and preset catalog";
 
 uses
     Draw,
+    Ui,
     Utilities/PropertyEditorCore,
     Utilities/UiDesigner/Core;
 
@@ -9,4 +10,5 @@ file
     UiDesignerCatalog.h,
     UiDesignerCatalog.cpp,
     UiDesignerBuiltins.cpp,
+    UiDesignerInspectorCatalog.cpp,
     README.md;

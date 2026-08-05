@@ -31,14 +31,13 @@ static UiRole ParseRole(const Value& value)
     return UiRole::Standard;
 }
 
-static Image ResolveButtonIcon(const String& name)
+static Image ResolveCatalogIcon(const String& name)
 {
     if(name.IsEmpty() || name == "None")
         return Image();
-    if(name == "ICON_DESIGN_DESCRIPTION_48") return ICON_DESIGN_DESCRIPTION_48();
-    if(name == "ICON_DESIGN_WIDGETS_48") return ICON_DESIGN_WIDGETS_48();
-    if(name == "ICON_DESIGN_ACCOUNT_TREE_48") return ICON_DESIGN_ACCOUNT_TREE_48();
-    if(name == "ICON_DESIGN_TUNE_48") return ICON_DESIGN_TUNE_48();
+    for(const UiIconCatalogEntry& entry : UiIconCatalog())
+        if(entry.name == name && entry.factory)
+            return entry.factory();
     return Image();
 }
 
@@ -809,49 +808,59 @@ static UiDesignerApplyResult ApplyRuntime(
         return UiDesignerApplyResult::AppliedPaint;
     }
     if(property == "icon") {
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
-            button->SetIcon(ResolveButtonIcon(AsString(value)));
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
+        const Image icon = ResolveCatalogIcon(AsString(value));
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
+            button->SetIcon(icon);
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) {
+            if(IsNull(icon)) label->ClearIcon(); else label->SetIcon(icon);
         }
-        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
-            if(AsString(value) == "ICON_DESIGN_DESCRIPTION_48")
-                card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
-            else
-                card->ClearMedia();
-            return UiDesignerApplyResult::AppliedLocalLayout;
+        else if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
+            if(IsNull(icon)) card->ClearMedia();
+            else card->SetMedia(icon, Size(DPI(18), DPI(18)));
         }
-        return UiDesignerApplyResult::Rejected;
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
     }
     if(property == "icon_width" || property == "icon_height") {
+        const int v = max(0, (int)value);
         if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
             Size icon_size = button->GetIconSize();
-            const int v = max(0, (int)value);
-            if(property == "icon_width")
-                icon_size.cx = DPI(v);
-            else
-                icon_size.cy = DPI(v);
+            if(property == "icon_width") icon_size.cx = DPI(v);
+            else icon_size.cy = DPI(v);
             button->SetIconSize(icon_size);
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
         }
-        return UiDesignerApplyResult::Rejected;
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl)) {
+            Size icon_size = label->GetIconSize();
+            if(property == "icon_width") icon_size.cx = DPI(v);
+            else icon_size.cy = DPI(v);
+            label->SetIconSize(icon_size);
+        }
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
     }
     if(property == "icon_render_mode") {
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
             button->SetIconRenderMode(ParseIconRenderMode(value));
-            ctrl.Refresh();
-            return UiDesignerApplyResult::AppliedPaint;
-        }
-        return UiDesignerApplyResult::Rejected;
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
+            label->SetIconRenderMode(ParseIconRenderMode(value));
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.Refresh();
+        return UiDesignerApplyResult::AppliedPaint;
     }
     if(property == "icon_side") {
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
             button->SetIconSide(ParseSideAlignChoice(value));
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
-        }
-        return UiDesignerApplyResult::Rejected;
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
+            label->SetIconSide(ParseSideAlignChoice(value));
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
     }
     if(property == "align_h" || property == "align_v") {
         if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
@@ -876,12 +885,24 @@ static UiDesignerApplyResult ApplyRuntime(
         return UiDesignerApplyResult::Rejected;
     }
     if(property == "content_gap") {
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
             button->SetContentGap(max(0, (int)value));
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
-        }
-        return UiDesignerApplyResult::Rejected;
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
+            label->SetContentGap(max(0, (int)value));
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
+    }
+    if(property == "scale_icon_to_content") {
+        if(auto *button = dynamic_cast<UiButton *>(&ctrl))
+            button->SetIconScaleToContent((bool)value);
+        else if(auto *label = dynamic_cast<UiLabel *>(&ctrl))
+            label->SetIconScaleToContent((bool)value);
+        else
+            return UiDesignerApplyResult::Rejected;
+        ctrl.RefreshLayout();
+        return UiDesignerApplyResult::AppliedLocalLayout;
     }
     if(property == "content_inset_left" ||
        property == "content_inset_top" ||
@@ -915,6 +936,71 @@ static UiDesignerApplyResult ApplyRuntime(
             return UiDesignerApplyResult::AppliedPaint;
         }
         return UiDesignerApplyResult::Rejected;
+    }
+    if(auto *accordion = dynamic_cast<UiAccordion *>(&ctrl)) {
+        if(property == "single_open") { accordion->SetSingleOpen((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "enforce_one") { accordion->SetEnforceOne((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "show_chevron") { accordion->ShowChevron((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "drag_reorder") { accordion->EnableDragReorder((bool)value); return UiDesignerApplyResult::AppliedControlState; }
+        if(property == "show_drag_handle") { accordion->ShowDragHandle((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "animation_enabled" || property == "anim_open_ms" || property == "anim_close_ms") {
+            const UiAccordion::Style& current = accordion->GetStyle();
+            accordion->SetAnimation(
+                property == "animation_enabled" ? (bool)value : current.animation_enabled,
+                property == "anim_open_ms" ? max(0, (int)value) : current.anim_open_ms,
+                property == "anim_close_ms" ? max(0, (int)value) : current.anim_close_ms);
+            return UiDesignerApplyResult::AppliedControlState;
+        }
+        if(property == "chevron_side") { accordion->SetChevronSide(ParseSideAlignChoice(value)); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "chevron_size") { accordion->SetChevronSize(DPI(max(0, (int)value))); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "chevron_gap") { accordion->SetChevronGap(DPI(max(0, (int)value))); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "chevron_open_icon" || property == "chevron_closed_icon" || property == "chevron_lock_icon") {
+            const UiAccordion::Style& current = accordion->GetStyle();
+            accordion->SetChevronGlyphs(
+                property == "chevron_open_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_open,
+                property == "chevron_closed_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_closed,
+                property == "chevron_lock_icon" ? ResolveCatalogIcon(AsString(value)) : current.glyph_lock);
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        if(property == "drag_side") { accordion->SetDragSide(ParseSideAlignChoice(value)); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "drag_icon") { accordion->SetDragGlyph(ResolveCatalogIcon(AsString(value))); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "header_height" || property == "item_spacing" ||
+           property == "header_body_gap" || property == "body_min_height" ||
+           property == "drag_size" || property == "drag_gap" ||
+           property == "unified_section_frame" ||
+           property == "unified_section_radius" ||
+           property == "unified_section_frame_width") {
+            UiAccordion::Style style = accordion->GetStyle();
+            if(property == "header_height") style.header_height = DPI(max(0, (int)value));
+            else if(property == "item_spacing") style.item_spacing = DPI(max(0, (int)value));
+            else if(property == "header_body_gap") style.header_body_gap = DPI(max(0, (int)value));
+            else if(property == "body_min_height") style.body_min_height = DPI(max(0, (int)value));
+            else if(property == "drag_size") style.drag_size = DPI(max(0, (int)value));
+            else if(property == "drag_gap") style.drag_gap = DPI(max(0, (int)value));
+            else if(property == "unified_section_frame") style.unified_section_frame = (bool)value;
+            else if(property == "unified_section_radius") style.unified_section_radius = DPI(max(0, (int)value));
+            else style.unified_section_frame_width = max(0, (int)value);
+            accordion->SetCustomStyle(style);
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+    }
+    if(auto *tab = dynamic_cast<UiTab *>(&ctrl)) {
+        if(property == "placement") { tab->SetPlacement(ParseSideAlignChoice(value)); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "visual") {
+            const String visual = AsString(value);
+            tab->SetVisual(visual == "Underline" ? UITAB_UNDERLINE :
+                           visual == "Segmented" ? UITAB_SEGMENTED :
+                           visual == "Rail" ? UITAB_RAIL :
+                           visual == "Document" ? UITAB_DOCUMENT : UITAB_CLASSIC);
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        if(property == "tab_icon_size") { tab->SetTabIconSize(DPI(max(0, (int)value))); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "tab_icon_side") { tab->SetTabIconSide(ParseSideAlignChoice(value)); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "expand_tabs") { tab->SetExpandTabs((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "active_tab_uses_body_face") { tab->SetActiveTabUsesBodyFace((bool)value); return UiDesignerApplyResult::AppliedPaint; }
+        if(property == "close_buttons") { tab->EnableCloseButtons((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "drag_handles") { tab->EnableDragHandles((bool)value); return UiDesignerApplyResult::AppliedLocalLayout; }
+        if(property == "drag_reorder") { tab->EnableDragReorder((bool)value); return UiDesignerApplyResult::AppliedControlState; }
     }
     if(property == "text") {
         const String text = value;
@@ -1128,23 +1214,6 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.Tip(AsString(value));
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
-    }
-    if(property == "icon") {
-        if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
-            button->SetIcon(ResolveButtonIcon(AsString(value)));
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
-        }
-        if(auto *card = dynamic_cast<UiTitleCard *>(&ctrl)) {
-            const String icon = AsString(value);
-            if(icon == "ICON_DESIGN_DESCRIPTION_48")
-                card->SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));
-            else
-                card->ClearMedia();
-            ctrl.RefreshLayout();
-            return UiDesignerApplyResult::AppliedLocalLayout;
-        }
-        return UiDesignerApplyResult::Rejected;
     }
     if(property == "checked") {
         if(auto *button = dynamic_cast<UiButton *>(&ctrl)) {
@@ -1691,8 +1760,13 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
     if(node.type == "UiTabPage") {
         if(auto *tab = dynamic_cast<UiTab *>(parent_instance.control.Get())) {
             instance.control = MakeOne<ParentCtrl>();
-            tab->Add(*instance.control, node.GetProperty("title", node.name));
-            tab->EnableTab(tab->GetCount() - 1, node.GetProperty("enabled", true));
+            const int index = tab->Add(
+                *instance.control, node.GetProperty("title", node.name),
+                ResolveCatalogIcon(node.GetProperty("icon", "None")));
+            tab->SetTabTip(index, node.GetProperty("tooltip", String()));
+            tab->EnableTab(index, node.GetProperty("enabled", true));
+            tab->SetTabClosable(index, node.GetProperty("closable", true));
+            tab->SetTabDraggable(index, node.GetProperty("draggable", true));
         }
         return;
     }
@@ -1708,6 +1782,25 @@ void UiDesignerPreviewCanvas::AttachSemanticItem(
                 lock == "Open" ? UiAccordion::Lock::Open :
                 lock == "Closed" ? UiAccordion::Lock::Closed :
                 UiAccordion::Lock::None);
+            UiTitleCard& header = accordion->GetSectionHeader(index);
+            const UiDesignerControlSpec* section_spec = catalog_ ? catalog_->Find(node.type) : nullptr;
+            const UiDesignerControlSpec* title_card_spec = catalog_ ? catalog_->Find("UiTitleCard") : nullptr;
+            if(section_spec && title_card_spec) {
+                UiTitleCard::Style style = accordion->GetStyle().header_style;
+                for(const UiDesignerThemeOverrideSpec& property : section_spec->theme_overrides) {
+                    const int q = node.theme_overrides.Find(property.id);
+                    if(q >= 0)
+                        UiDesignerApplyTitleCardThemeField(
+                            style, property.adapter_field_id,
+                            node.theme_overrides.GetValue(q));
+                }
+                header.SetCustomStyle(style);
+                for(const UiDesignerPropertySpec& property : section_spec->properties)
+                    if(title_card_spec->FindProperty(property.id))
+                        UiDesignerPreviewFactory::Apply(
+                            header, *title_card_spec, property.id,
+                            node.GetProperty(property.id, property.default_value));
+            }
             instance.semantic_host_index = index;
             instance.semantic_host_runtime_parent = parent_instance.node;
             parent_instance.accordion_section_nodes.Add(node.id);
@@ -2099,9 +2192,32 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
         return UiDesignerApplyResult::Rejected;
     }
 
-    if(node->type == "UiAccordionSection" &&
-       (property == "title" || property == "subtitle" || property == "copy" ||
-        property == "open" || property == "lock")) {
+    if(node->type == "UiTabPage" &&
+       (property == "title" || property == "icon" || property == "tooltip" ||
+        property == "enabled" || property == "closable" ||
+        property == "draggable")) {
+        const int owner_index = FindInstance(node->parent);
+        UiTab* tab = owner_index >= 0
+            ? dynamic_cast<UiTab *>(instances_[owner_index].control.Get()) : nullptr;
+        const UiDesignerNode* owner = document_->Find(node->parent);
+        const int page_index = owner ? FindIndex(owner->children, node_id) : -1;
+        if(!tab || page_index < 0 || page_index >= tab->GetCount()) {
+            stats_.rejected++;
+            return UiDesignerApplyResult::Rejected;
+        }
+        if(property == "title") tab->SetTabText(page_index, AsString(value));
+        else if(property == "icon") tab->SetTabIcon(page_index, ResolveCatalogIcon(AsString(value)));
+        else if(property == "tooltip") tab->SetTabTip(page_index, AsString(value));
+        else if(property == "enabled") tab->EnableTab(page_index, (bool)value);
+        else if(property == "closable") tab->SetTabClosable(page_index, (bool)value);
+        else tab->SetTabDraggable(page_index, (bool)value);
+        stats_.live_applies++;
+        Layout();
+        Refresh();
+        return UiDesignerApplyResult::AppliedLocalLayout;
+    }
+
+    if(node->type == "UiAccordionSection") {
         const int owner_index = FindInstance(node->parent);
         if(owner_index < 0 || !instances_[owner_index].control) {
             stats_.rejected++;
@@ -2141,15 +2257,56 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             Refresh();
             return UiDesignerApplyResult::AppliedAncestorLayout;
         }
-        const String lock = AsString(value);
-        accordion->SetLockMode(section_index,
-            lock == "Open" ? UiAccordion::Lock::Open :
-            lock == "Closed" ? UiAccordion::Lock::Closed :
-            UiAccordion::Lock::None);
-        stats_.live_applies++;
-        Layout();
-        Refresh();
-        return UiDesignerApplyResult::AppliedLocalLayout;
+        if(property == "lock") {
+            const String lock = AsString(value);
+            accordion->SetLockMode(section_index,
+                lock == "Open" ? UiAccordion::Lock::Open :
+                lock == "Closed" ? UiAccordion::Lock::Closed :
+                UiAccordion::Lock::None);
+            stats_.live_applies++;
+            Layout();
+            Refresh();
+            return UiDesignerApplyResult::AppliedLocalLayout;
+        }
+        UiTitleCard& header = accordion->GetSectionHeader(section_index);
+        const UiDesignerControlSpec* title_card_spec = catalog_->Find("UiTitleCard");
+        if(kind == UiDesignerTransientValueKind::ThemeOverride) {
+            const UiDesignerThemeOverrideSpec* override_spec = spec->FindThemeOverride(property);
+            if(!override_spec) {
+                stats_.rejected++;
+                return UiDesignerApplyResult::Rejected;
+            }
+            UiTitleCard::Style style = accordion->GetStyle().header_style;
+            for(const UiDesignerThemeOverrideSpec& candidate : spec->theme_overrides) {
+                const int q = node->theme_overrides.Find(candidate.id);
+                if(q < 0 && candidate.id != property)
+                    continue;
+                const Value canonical = candidate.id == property ? value
+                    : node->theme_overrides.GetValue(q);
+                const Value effective = overlay_
+                    ? overlay_->Resolve(node_id, UiDesignerTransientValueKind::ThemeOverride,
+                                        candidate.id, canonical)
+                    : canonical;
+                UiDesignerApplyTitleCardThemeField(
+                    style, candidate.adapter_field_id, effective);
+            }
+            header.SetCustomStyle(style);
+            stats_.live_applies++;
+            stats_.paint_updates++;
+            Layout();
+            Refresh();
+            return UiDesignerApplyResult::AppliedAncestorLayout;
+        }
+        if(title_card_spec && title_card_spec->FindProperty(property)) {
+            const UiDesignerApplyResult result = UiDesignerPreviewFactory::Apply(
+                header, *title_card_spec, property, value);
+            stats_.live_applies++;
+            Layout();
+            Refresh();
+            return result;
+        }
+        stats_.rejected++;
+        return UiDesignerApplyResult::Rejected;
     }
 
     if(kind == UiDesignerTransientValueKind::ThemeOverride) {

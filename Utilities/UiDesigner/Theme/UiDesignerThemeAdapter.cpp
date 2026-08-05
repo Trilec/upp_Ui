@@ -2425,9 +2425,9 @@ public:
     }
 };
 
-static void ApplyTitleCardThemeField(UiTitleCard::Style& style,
-                                     const String& field_id,
-                                     const Value& value)
+void UiDesignerApplyTitleCardThemeField(UiTitleCard::Style& style,
+                                        const String& field_id,
+                                        const Value& value)
 {
     if(field_id == "face_enabled") style.metrics.face_enabled = (bool)value;
     else if(field_id == "face_normal") style.palette.face[ST_NORMAL] = UiFill::Solid((Color)value);
@@ -2470,6 +2470,47 @@ static void ApplyTitleCardThemeField(UiTitleCard::Style& style,
     else if(field_id == "theme_card_line_gap") style.card_line_gap = DPI(max(0, (int)value));
     else if(field_id == "theme_transparent") style.transparent = (bool)value;
     else if(field_id == "theme_hover_enabled") style.hover_enabled = (bool)value;
+}
+
+void UiDesignerEmitTitleCardThemeField(String& out, const String& style_var,
+                                       const String& field_id,
+                                       const Value& value)
+{
+    if(field_id == "face_enabled") out << "\t" << style_var << ".metrics.face_enabled = " << AsString((bool)value) << ";\n";
+    else if(field_id == "face_normal") out << "\t" << style_var << ".palette.face[ST_NORMAL] = UiFill::Solid(" << EmitValue(value) << ");\n";
+    else if(field_id == "frame_enabled") out << "\t" << style_var << ".metrics.frame_enabled = " << AsString((bool)value) << ";\n";
+    else if(field_id == "frame_normal") out << "\t" << style_var << ".palette.frame[ST_NORMAL] = " << EmitValue(value) << ";\n";
+    else if(field_id == "frame_width") out << "\t" << style_var << ".metrics.frame_width = " << (int)value << ";\n";
+    else if(field_id == "radius") out << "\t" << style_var << ".metrics.radius = " << (int)value << ";\n";
+    else if(field_id == "text_normal") out << "\t" << style_var << ".palette.ink[ST_NORMAL] = " << EmitValue(value) << ";\n";
+    else if(field_id == "text_disabled") out << "\t" << style_var << ".palette.ink[ST_DISABLED] = " << EmitValue(value) << ";\n";
+    else if(field_id == "title_color") out << "\t" << style_var << ".title_color = " << EmitValue(value) << ";\n";
+    else if(field_id == "subtitle_color") out << "\t" << style_var << ".subtitle_color = " << EmitValue(value) << ";\n";
+    else if(field_id == "copy_color") out << "\t" << style_var << ".copy_color = " << EmitValue(value) << ";\n";
+    else if(field_id == "title_font_face") out << "\t" << style_var << ".title_font.FaceName(" << EmitValue(value) << ");\n";
+    else if(field_id == "title_font_size") out << "\t" << style_var << ".title_font.Height(" << (int)value << ");\n";
+    else if(field_id == "title_font_bold") out << "\t" << style_var << ".title_font.Bold(" << AsString((bool)value) << ");\n";
+    else if(field_id == "subtitle_font_face") out << "\t" << style_var << ".subtitle_font.FaceName(" << EmitValue(value) << ");\n";
+    else if(field_id == "subtitle_font_size") out << "\t" << style_var << ".subtitle_font.Height(" << (int)value << ");\n";
+    else if(field_id == "subtitle_font_bold") out << "\t" << style_var << ".subtitle_font.Bold(" << AsString((bool)value) << ");\n";
+    else if(field_id == "copy_font_face") out << "\t" << style_var << ".copy_font.FaceName(" << EmitValue(value) << ");\n";
+    else if(field_id == "copy_font_size") out << "\t" << style_var << ".copy_font.Height(" << (int)value << ");\n";
+    else if(field_id == "content_margin") out << "\t" << style_var << ".metrics.content_margin = Rect(DPI(" << (int)value << "), DPI(" << (int)value << "), DPI(" << (int)value << "), DPI(" << (int)value << "));\n";
+    else if(field_id == "theme_title_subtitle_gap") out << "\t" << style_var << ".title_subtitle_gap = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_subtitle_copy_gap") out << "\t" << style_var << ".subtitle_copy_gap = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_media_reserve") out << "\t" << style_var << ".media_reserve = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_media_min") out << "\t" << style_var << ".media_min = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_media_gap") out << "\t" << style_var << ".media_gap = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_media_auto_fit") out << "\t" << style_var << ".media_auto_fit = " << AsString((bool)value) << ";\n";
+    else if(field_id == "theme_title_line") out << "\t" << style_var << ".title_line = " << AsString((bool)value) << ";\n";
+    else if(field_id == "theme_title_line_thickness") out << "\t" << style_var << ".title_line_thickness = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_title_line_style") out << "\t" << style_var << ".title_line_style = " << (AsString(value) == "Dashed" ? "DASHED" : AsString(value) == "Dotted" ? "DOTTED" : "SOLID") << ";\n";
+    else if(field_id == "theme_card_line") out << "\t" << style_var << ".card_line = " << AsString((bool)value) << ";\n";
+    else if(field_id == "theme_card_line_side") out << "\t" << style_var << ".card_line_side = " << EmitAlign(AsString(value)) << ";\n";
+    else if(field_id == "theme_card_line_thickness") out << "\t" << style_var << ".card_line_thickness = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_card_line_gap") out << "\t" << style_var << ".card_line_gap = DPI(" << (int)value << ");\n";
+    else if(field_id == "theme_transparent") out << "\t" << style_var << ".transparent = " << AsString((bool)value) << ";\n";
+    else if(field_id == "theme_hover_enabled") out << "\t" << style_var << ".hover_enabled = " << AsString((bool)value) << ";\n";
 }
 
 static void AddTitleCardThemeOverrides(UiDesignerControlSpec& spec)
@@ -2558,7 +2599,11 @@ static void AddTitleCardThemeOverrides(UiDesignerControlSpec& spec)
 class TitleCardThemeAdapter final : public UiDesignerThemeAdapter {
 public:
     const char *Id() const override { return "title_card"; }
-    bool Supports(UiDesignerRuntimeKind kind) const override { return kind == UiDesignerRuntimeKind::UiTitleCard; }
+    bool Supports(UiDesignerRuntimeKind kind) const override
+    {
+        return kind == UiDesignerRuntimeKind::UiTitleCard ||
+               kind == UiDesignerRuntimeKind::SemanticAccordionSection;
+    }
     void AddThemeOverrides(UiDesignerControlSpec& spec) const override { AddTitleCardThemeOverrides(spec); }
     bool HasField(const String& field_id) const override
     {
@@ -2591,7 +2636,7 @@ public:
             if(q < 0 && !HasThemeValue(node, overlay, p.id))
                 continue;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
-            ApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+            UiDesignerApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
         }
         if(field_id == "face_enabled") return style.metrics.face_enabled;
         if(field_id == "face_normal") return UiDesignerFillColor(style.palette.face[ST_NORMAL]);
@@ -2643,7 +2688,7 @@ public:
                 continue;
             authored = true;
             const Value canonical = q >= 0 ? node.theme_overrides.GetValue(q) : p.default_value;
-            ApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
+            UiDesignerApplyTitleCardThemeField(style, p.adapter_field_id, ResolveThemeValue(node, overlay, p.id, canonical));
         }
         if(authored) card->SetCustomStyle(style); else card->ClearCustomStyle();
     }

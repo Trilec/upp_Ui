@@ -1,6 +1,7 @@
 #include <Utilities/UiDesigner/Services/UiDesignerServices.h>
 #include <Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
+#include <Ui/UiIcons.h>
 
 using namespace Upp;
 
@@ -178,13 +179,13 @@ CONSOLE_APP_MAIN
     const UiDesignerNodeId section = semantic_session.Commands().AddAccordionSection(
         accordion, "Section", "Subtitle", "Copy", true);
     semantic_session.Select(section);
-    Check(section != 0 && semantic_session.ResolveThemeOverrideOwner() == accordion,
-          "Accordion section resolves its real Accordion theme owner");
+    Check(section != 0 && semantic_session.ResolveThemeOverrideOwner() == section,
+          "Accordion section is its own selectable Theme Override owner");
     Check(semantic_session.ThemeOverrideModel().Find("theme.status") == nullptr &&
               semantic_session.ThemeOverrideModel().GetCount() > 0,
-          "Accordion section selection exposes owner Theme Overrides");
+          "Accordion section selection exposes its UiTitleCard Theme Overrides");
     const UiDesignerControlSpec *accordion_spec =
-        semantic_session.Catalog().Find("UiAccordion");
+        semantic_session.Catalog().Find("UiAccordionSection");
     const UiDesignerThemeOverrideSpec *editable_override = nullptr;
     if(accordion_spec)
         for(const UiDesignerThemeOverrideSpec& candidate : accordion_spec->theme_overrides)
@@ -202,20 +203,47 @@ CONSOLE_APP_MAIN
             semantic_session.Document().Find(accordion);
         const UiDesignerNode *section_node =
             semantic_session.Document().Find(section);
-        Check(accordion_node &&
-                  accordion_node->IsThemeOverrideActive(editable_override->id) &&
-                  section_node && section_node->theme_overrides.IsEmpty(),
-              "Semantic Theme Override is authored on the owner only");
+        Check(section_node &&
+                  section_node->IsThemeOverrideActive(editable_override->id) &&
+                  accordion_node &&
+                  !accordion_node->IsThemeOverrideActive(editable_override->id),
+              "Semantic Theme Override is authored on the selected section only");
     }
 
     const UiDesignerNodeId tab = semantic_session.AddControl("UiTab", root);
     const UiDesignerNodeId page = semantic_session.Commands().AddTabPage(tab, "Page");
     semantic_session.Select(page);
-    Check(page != 0 && semantic_session.ResolveThemeOverrideOwner() == tab,
-          "Tab page resolves its real Tab theme owner");
-    Check(semantic_session.ThemeOverrideModel().Find("theme.status") == nullptr &&
-              semantic_session.ThemeOverrideModel().GetCount() > 0,
-          "Tab page selection exposes owner Theme Overrides without fake per-page style");
+    Check(page != 0 && semantic_session.ResolveThemeOverrideOwner() == 0,
+          "Tab page does not invent a per-page or redirected Theme Override contract");
+    Check(semantic_session.ThemeOverrideModel().GetCount() == 0,
+          "Tab page selection exposes only API-backed content and behaviour");
+
+    const UiDesignerControlSpec *section_spec =
+        semantic_session.Catalog().Find("UiAccordionSection");
+    const UiDesignerControlSpec *page_spec =
+        semantic_session.Catalog().Find("UiTabPage");
+    const UiDesignerControlSpec *label_spec =
+        semantic_session.Catalog().Find("UiLabel");
+    Check(section_spec && section_spec->FindProperty("name") &&
+              section_spec->FindProperty("icon") &&
+              section_spec->FindProperty("open") &&
+              section_spec->FindProperty("media_side"),
+          "Accordion section exposes Identity, Content, Behaviour and Appearance");
+    Check(page_spec && page_spec->FindProperty("name") &&
+              page_spec->FindProperty("icon") &&
+              page_spec->FindProperty("tooltip") &&
+              page_spec->FindProperty("closable") &&
+              page_spec->FindProperty("draggable"),
+          "Tab page exposes API-backed identity, content and behaviour");
+    Check(label_spec && label_spec->FindProperty("icon") &&
+              label_spec->FindProperty("icon_side") &&
+              label_spec->FindProperty("content_gap"),
+          "UiLabel exposes its icon content API");
+    const UiDesignerPropertySpec *section_icon =
+        section_spec ? section_spec->FindProperty("icon") : nullptr;
+    Check(section_icon && section_icon->choices.GetCount() ==
+              UiIconCatalog().GetCount() + 1,
+          "Icon properties enumerate the authoritative UiIcons catalogue");
 
     UiDesignerDocument migrated;
     Check(UiDesignerDeserialize(LegacySizingJson(), migrated, error),

@@ -37,15 +37,8 @@ UiDesignerNodeId UiDesignerSession::ResolveThemeOverrideOwner() const
     if(state_.selection.nodes.GetCount() != 1)
         return 0;
     const UiDesignerNode* node = document_.Find(state_.selection.primary);
-    for(int depth = 0; node && depth < 8; depth++) {
-        const UiDesignerControlSpec* spec = catalog_.Find(node->type);
-        if(spec && !spec->theme_overrides.IsEmpty())
-            return node->id;
-        if(!(node->flags & UiDesignerNodeSemanticItem) || !node->parent)
-            break;
-        node = document_.Find(node->parent);
-    }
-    return 0;
+    const UiDesignerControlSpec* spec = node ? catalog_.Find(node->type) : nullptr;
+    return node && spec && !spec->theme_overrides.IsEmpty() ? node->id : 0;
 }
 
 static bool ThemeOverrideSelectable(const UiDesignerSession& session,

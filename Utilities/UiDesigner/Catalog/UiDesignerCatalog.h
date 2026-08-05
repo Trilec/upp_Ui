@@ -322,6 +322,9 @@ private:
 };
 
 void RegisterUiDesignerBuiltins(UiDesignerCatalog& catalog);
+void OrganizeUiDesignerControlSpec(
+    UiDesignerControlSpec& spec,
+    const Array<UiDesignerControlSpec>& registered);
 
 UiDesignerPropertySpec UiDesignerTextProperty(
     const String& id = "text", const String& label = "Text");

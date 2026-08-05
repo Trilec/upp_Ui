@@ -4,6 +4,7 @@
 #include <CtrlCore/CtrlCore.h>
 #include <Utilities/UiDesigner/Core/UiDesignerCore.h>
 #include <Ui/UiStyle.h>
+#include <Ui/UiTitleCard.h>
 
 namespace Upp {
 
@@ -58,6 +59,12 @@ UiDesignerSurfaceKind UiDesignerParseSurfaceKind(const Value& value);
 String UiDesignerSurfaceKindName(UiDesignerSurfaceKind kind);
 void UiDesignerAddSurfaceChoices(UiDesignerThemeOverrideSpec& spec,
                                  bool include_dashed = false);
+void UiDesignerApplyTitleCardThemeField(UiTitleCard::Style& style,
+                                        const String& field_id,
+                                        const Value& value);
+void UiDesignerEmitTitleCardThemeField(String& out, const String& style_var,
+                                       const String& field_id,
+                                       const Value& value);
 
 class UiDesignerThemeAdapter {
 public:

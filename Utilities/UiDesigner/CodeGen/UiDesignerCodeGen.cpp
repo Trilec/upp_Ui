@@ -1,6 +1,7 @@
 #include "UiDesignerCodeGen.h"
 #include <Utilities/UiDesigner/UiDesigner/UiDesignerButtonStyle.h>
 #include <Utilities/UiDesigner/Theme/UiDesignerThemeAdapter.h>
+#include <Ui/UiIcons.h>
 
 namespace Upp {
 
@@ -209,11 +210,14 @@ static String ButtonStyleResolverExpr(UiDesignerRuntimeKind kind,
     return "UiTheme::ResolveButton(" + EmitRoleExpr(role) + ")";
 }
 
-static String EmitButtonIcon(const String& name)
+static String EmitCatalogIcon(const String& name)
 {
     if(name.IsEmpty() || name == "None")
         return "Image()";
-    return name + "()";
+    for(const UiIconCatalogEntry& entry : UiIconCatalog())
+        if(entry.name == name)
+            return name + "()";
+    return "Image()";
 }
 
 static String EmitAlign(const String& value)
@@ -476,6 +480,53 @@ void UiDesignerCodeGenerator::EmitSetup(
                 << EmitRoleExpr(role) << "));\n";
     }
 
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiAccordion) {
+        out << "\t" << member << ".SetSingleOpen(" << EmitValue(Effective("single_open", false)) << ");\n";
+        out << "\t" << member << ".SetEnforceOne(" << EmitValue(Effective("enforce_one", false)) << ");\n";
+        out << "\t" << member << ".ShowChevron(" << EmitValue(Effective("show_chevron", true)) << ");\n";
+        out << "\t" << member << ".EnableDragReorder(" << EmitValue(Effective("drag_reorder", false)) << ");\n";
+        out << "\t" << member << ".ShowDragHandle(" << EmitValue(Effective("show_drag_handle", true)) << ");\n";
+        out << "\t" << member << ".SetAnimation(" << EmitValue(Effective("animation_enabled", true))
+            << ", " << max(0, (int)Effective("anim_open_ms", 120))
+            << ", " << max(0, (int)Effective("anim_close_ms", 0)) << ");\n";
+        out << "\t" << member << ".SetChevronSide(" << EmitAlign(AsString(Effective("chevron_side", "Right"))) << ");\n";
+        out << "\t" << member << ".SetChevronSize(DPI(" << max(0, (int)Effective("chevron_size", 0)) << "));\n";
+        out << "\t" << member << ".SetChevronGap(DPI(" << max(0, (int)Effective("chevron_gap", 8)) << "));\n";
+        out << "\t" << member << ".SetChevronGlyphs("
+            << EmitCatalogIcon(AsString(Effective("chevron_open_icon", "None"))) << ", "
+            << EmitCatalogIcon(AsString(Effective("chevron_closed_icon", "None"))) << ", "
+            << EmitCatalogIcon(AsString(Effective("chevron_lock_icon", "None"))) << ");\n";
+        out << "\t" << member << ".SetDragSide(" << EmitAlign(AsString(Effective("drag_side", "Right"))) << ");\n";
+        out << "\t" << member << ".SetDragGlyph(" << EmitCatalogIcon(AsString(Effective("drag_icon", "None"))) << ");\n";
+        const String style_var = member + "_accordion_layout_style";
+        out << "\tUiAccordion::Style " << style_var << " = " << member << ".GetStyle();\n";
+        out << "\t" << style_var << ".header_height = DPI(" << max(0, (int)Effective("header_height", 28)) << ");\n";
+        out << "\t" << style_var << ".item_spacing = DPI(" << max(0, (int)Effective("item_spacing", 8)) << ");\n";
+        out << "\t" << style_var << ".header_body_gap = DPI(" << max(0, (int)Effective("header_body_gap", 4)) << ");\n";
+        out << "\t" << style_var << ".body_min_height = DPI(" << max(0, (int)Effective("body_min_height", 88)) << ");\n";
+        out << "\t" << style_var << ".drag_size = DPI(" << max(0, (int)Effective("drag_size", 14)) << ");\n";
+        out << "\t" << style_var << ".drag_gap = DPI(" << max(0, (int)Effective("drag_gap", 8)) << ");\n";
+        out << "\t" << style_var << ".unified_section_frame = " << EmitValue(Effective("unified_section_frame", false)) << ";\n";
+        out << "\t" << style_var << ".unified_section_radius = DPI(" << max(0, (int)Effective("unified_section_radius", 7)) << ");\n";
+        out << "\t" << style_var << ".unified_section_frame_width = " << max(0, (int)Effective("unified_section_frame_width", 1)) << ";\n";
+        out << "\t" << member << ".SetCustomStyle(" << style_var << ");\n";
+    }
+    if(spec.runtime_kind == UiDesignerRuntimeKind::UiTab) {
+        out << "\t" << member << ".SetPlacement(" << EmitAlign(AsString(Effective("placement", "Top"))) << ");\n";
+        const String visual = AsString(Effective("visual", "Classic"));
+        out << "\t" << member << ".SetVisual("
+            << (visual == "Underline" ? "UITAB_UNDERLINE" :
+                visual == "Segmented" ? "UITAB_SEGMENTED" :
+                visual == "Rail" ? "UITAB_RAIL" :
+                visual == "Document" ? "UITAB_DOCUMENT" : "UITAB_CLASSIC") << ");\n";
+        out << "\t" << member << ".SetTabIconSize(DPI(" << max(0, (int)Effective("tab_icon_size", 0)) << "));\n";
+        out << "\t" << member << ".SetTabIconSide(" << EmitAlign(AsString(Effective("tab_icon_side", "Left"))) << ");\n";
+        out << "\t" << member << ".SetExpandTabs(" << EmitValue(Effective("expand_tabs", false)) << ");\n";
+        out << "\t" << member << ".SetActiveTabUsesBodyFace(" << EmitValue(Effective("active_tab_uses_body_face", true)) << ");\n";
+        out << "\t" << member << ".EnableCloseButtons(" << EmitValue(Effective("close_buttons", false)) << ");\n";
+        out << "\t" << member << ".EnableDragHandles(" << EmitValue(Effective("drag_handles", false)) << ");\n";
+        out << "\t" << member << ".EnableDragReorder(" << EmitValue(Effective("drag_reorder", false)) << ");\n";
+    }
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiBoxLayout) {
         const String direction = Property("direction", "V");
         out << "\t" << member << ".SetDirection(UiDirection::"
@@ -507,17 +558,20 @@ void UiDesignerCodeGenerator::EmitSetup(
     }
     if(spec.FindProperty("icon")) {
         const String icon_name = Effective("icon", spec.FindProperty("icon")->default_value);
-        if(IsButtonFamily(spec.runtime_kind))
-            out << "\t" << member << ".SetIcon(" << EmitButtonIcon(icon_name) << ");\n";
-        else if(icon_name == "None")
-            out << "\t" << member << ".ClearMedia();\n";
-        else if(icon_name == "ICON_DESIGN_DESCRIPTION_48")
-            out << "\t" << member
-                << ".SetMedia(ICON_DESIGN_DESCRIPTION_48(), Size(DPI(18), DPI(18)));\n";
-        else
-            out << "\t" << member << ".ClearMedia();\n";
+        if(IsButtonFamily(spec.runtime_kind) ||
+           spec.runtime_kind == UiDesignerRuntimeKind::UiLabel)
+            out << "\t" << member << ".SetIcon(" << EmitCatalogIcon(icon_name) << ");\n";
+        else if(spec.runtime_kind == UiDesignerRuntimeKind::UiTitleCard) {
+            if(icon_name == "None")
+                out << "\t" << member << ".ClearMedia();\n";
+            else
+                out << "\t" << member << ".SetMedia(" << EmitCatalogIcon(icon_name)
+                    << ", Size(DPI(18), DPI(18)));\n";
+        }
     }
-    if(spec.FindProperty("icon_render_mode") && IsButtonFamily(spec.runtime_kind))
+    if(spec.FindProperty("icon_render_mode") &&
+       (IsButtonFamily(spec.runtime_kind) ||
+        spec.runtime_kind == UiDesignerRuntimeKind::UiLabel))
         out << "\t" << member << ".SetIconRenderMode(" << EmitIconRenderMode(
             AsString(Effective("icon_render_mode", "MonoTint"))) << ");\n";
     if(spec.FindProperty("icon_side"))
@@ -528,7 +582,9 @@ void UiDesignerCodeGenerator::EmitSetup(
         const int height = max(0, (int)Effective("icon_height", 18));
         out << "\t" << member << ".SetIconSize(DPI(" << width << "), DPI(" << height << "));\n";
     }
-    if(spec.FindProperty("scale_icon_to_content") && IsButtonFamily(spec.runtime_kind))
+    if(spec.FindProperty("scale_icon_to_content") &&
+       (IsButtonFamily(spec.runtime_kind) ||
+        spec.runtime_kind == UiDesignerRuntimeKind::UiLabel))
         out << "\t" << member << ".SetIconScaleToContent("
             << EmitValue(Effective("scale_icon_to_content", false)) << ");\n";
     if(spec.FindProperty("align_h") || spec.FindProperty("align_v")) {
@@ -899,6 +955,42 @@ static const UiDesignerChildAdapterEntry *FindChildAdapter(const String& id)
     return nullptr;
 }
 
+static void EmitAccordionSectionHeaderProperties(
+    String& out, const String& header, const UiDesignerNode& section,
+    const UiDesignerControlSpec& spec)
+{
+    const String icon = AsString(section.GetProperty("icon", "None"));
+    if(icon == "None")
+        out << "\t" << header << ".ClearMedia();\n";
+    else
+        out << "\t" << header << ".SetMedia(" << EmitCatalogIcon(icon)
+            << ", Size(DPI(18), DPI(18)));\n";
+    if(spec.FindProperty("text_align_h") || spec.FindProperty("text_align_v"))
+        out << "\t" << header << ".SetTextAlign("
+            << EmitAlign(AsString(section.GetProperty("text_align_h", "Left"))) << ", "
+            << EmitAlign(AsString(section.GetProperty("text_align_v", "Center"))) << ");\n";
+    if(spec.FindProperty("media_side")) out << "\t" << header << ".SetMediaSide(" << EmitAlign(AsString(section.GetProperty("media_side", "Left"))) << ");\n";
+    if(spec.FindProperty("media_align_h") || spec.FindProperty("media_align_v"))
+        out << "\t" << header << ".SetMediaAlign("
+            << EmitAlign(AsString(section.GetProperty("media_align_h", "Center"))) << ", "
+            << EmitAlign(AsString(section.GetProperty("media_align_v", "Center"))) << ");\n";
+    if(spec.FindProperty("media_reserve")) out << "\t" << header << ".SetMediaReserve(DPI(" << max(0, (int)section.GetProperty("media_reserve", 72)) << "));\n";
+    if(spec.FindProperty("media_min")) out << "\t" << header << ".SetMediaMin(DPI(" << max(0, (int)section.GetProperty("media_min", 24)) << "));\n";
+    if(spec.FindProperty("media_gap")) out << "\t" << header << ".SetMediaGap(DPI(" << max(0, (int)section.GetProperty("media_gap", 10)) << "));\n";
+    if(spec.FindProperty("media_auto_fit")) out << "\t" << header << ".SetMediaAutoFit(" << ((bool)section.GetProperty("media_auto_fit", true) ? "true" : "false") << ");\n";
+    if(spec.FindProperty("media_share_percent")) out << "\t" << header << ".SetMediaSharePercent(" << max(0, (int)section.GetProperty("media_share_percent", 0)) << ");\n";
+    if(spec.FindProperty("content_inset")) out << "\t" << header << ".SetContentInset(DPI(" << max(0, (int)section.GetProperty("content_inset", 8)) << "));\n";
+    if(spec.FindProperty("content_cell_gap")) out << "\t" << header << ".SetContentCellGap(DPI(" << max(0, (int)section.GetProperty("content_cell_gap", 8)) << "));\n";
+    if(spec.FindProperty("show_title_line")) out << "\t" << header << ".ShowTitleLine(" << ((bool)section.GetProperty("show_title_line", true) ? "true" : "false") << ");\n";
+    if(spec.FindProperty("title_line_length")) out << "\t" << header << ".SetTitleLine(" << EmitUiSpan(AsString(section.GetProperty("title_line_length", "Large"))) << ", DPI(" << max(0, (int)section.GetProperty("title_line_thickness", 1)) << "), " << EmitUiLineStyle(AsString(section.GetProperty("title_line_style", "Solid"))) << ");\n";
+    if(spec.FindProperty("show_card_line")) out << "\t" << header << ".ShowCardLine(" << ((bool)section.GetProperty("show_card_line", false) ? "true" : "false") << ");\n";
+    if(spec.FindProperty("card_line_length")) out << "\t" << header << ".SetCardLine(" << EmitUiSpan(AsString(section.GetProperty("card_line_length", "Large"))) << ", DPI(" << max(0, (int)section.GetProperty("card_line_thickness", 1)) << "));\n";
+    if(spec.FindProperty("card_line_side")) out << "\t" << header << ".SetCardLineSide(" << EmitAlign(AsString(section.GetProperty("card_line_side", "Bottom"))) << ");\n";
+    if(spec.FindProperty("card_line_gap")) out << "\t" << header << ".SetCardLineGap(DPI(" << max(0, (int)section.GetProperty("card_line_gap", 0)) << "));\n";
+    if(spec.FindProperty("hover_enabled")) out << "\t" << header << ".EnableHover(" << ((bool)section.GetProperty("hover_enabled", false) ? "true" : "false") << ");\n";
+    if(spec.FindProperty("selectable")) out << "\t" << header << ".SetSelectable(" << ((bool)section.GetProperty("selectable", true) ? "true" : "false") << ");\n";
+}
+
 void UiDesignerCodeGenerator::EmitChildren(
     String& out, const UiDesignerDocument& document,
     const UiDesignerNode& node) const
@@ -926,6 +1018,23 @@ void UiDesignerCodeGenerator::EmitChildren(
                 << EmitValue(child->GetProperty("subtitle", String())) << ", "
                 << EmitValue(child->GetProperty("copy", String())) << ", "
                 << EmitValue(child->GetProperty("open", false)) << ");\n";
+            const String header = MemberName(*child) + "_header";
+            out << "\tUiTitleCard& " << header << " = " << parent
+                << ".GetSectionHeader(" << MemberName(*child) << "_index);\n";
+            EmitAccordionSectionHeaderProperties(out, header, *child, *child_spec);
+            if(!child->theme_overrides.IsEmpty()) {
+                const String style_var = MemberName(*child) + "_header_style";
+                out << "\tUiTitleCard::Style " << style_var << " = " << parent
+                    << ".GetStyle().header_style;\n";
+                for(const UiDesignerThemeOverrideSpec& property : child_spec->theme_overrides) {
+                    const int q = child->theme_overrides.Find(property.id);
+                    if(q >= 0)
+                        UiDesignerEmitTitleCardThemeField(
+                            out, style_var, property.adapter_field_id,
+                            child->theme_overrides.GetValue(q));
+                }
+                out << "\t" << header << ".SetCustomStyle(" << style_var << ");\n";
+            }
             const String lock = child->GetProperty("lock", "None");
             if(lock != "None")
                 out << "\t" << parent << ".SetLockMode(" << MemberName(*child)
@@ -946,9 +1055,17 @@ void UiDesignerCodeGenerator::EmitChildren(
         if(child->type == "UiTabPage" && node.type == "UiTab") {
             out << "\tconst int " << MemberName(*child) << "_index = "
                 << parent << ".Add(" << member << ", "
-                << CppString(title) << ");\n"
+                << CppString(title) << ", "
+                << EmitCatalogIcon(AsString(child->GetProperty("icon", "None")))
+                << ");\n"
+                << "\t" << parent << ".SetTabTip(" << MemberName(*child)
+                << "_index, " << EmitValue(child->GetProperty("tooltip", String())) << ");\n"
                 << "\t" << parent << ".EnableTab(" << MemberName(*child)
-                << "_index, " << EmitValue(child->GetProperty("enabled", true)) << ");\n";
+                << "_index, " << EmitValue(child->GetProperty("enabled", true)) << ");\n"
+                << "\t" << parent << ".SetTabClosable(" << MemberName(*child)
+                << "_index, " << EmitValue(child->GetProperty("closable", true)) << ");\n"
+                << "\t" << parent << ".SetTabDraggable(" << MemberName(*child)
+                << "_index, " << EmitValue(child->GetProperty("draggable", true)) << ");\n";
             for(UiDesignerNodeId content_id : child->children) {
                 const UiDesignerNode* content = document.Find(content_id);
                 const UiDesignerControlSpec* content_spec = content
