@@ -96,22 +96,19 @@ jobs:
                    for line in source[start:end].splitlines()]
           script = '\n'.join(lines)
 
-          def remove_replace_once(script, path):
-              start = script.index("replace_once(\n    '" + path + "'")
-              candidates = [p for p in (
-                  script.find('\n\nreplace_once(', start + 1),
-                  script.find('\n\nreplace_count(', start + 1)) if p >= 0]
-              if not candidates:
-                  raise SystemExit('unable to isolate replacement for ' + path)
-              end = min(candidates)
-              return script[:start] + script[end + 2:]
+          session_pattern = (
+              r"replace_once\(\s*'Utilities/UiDesigner/Services/"
+              r"UiDesignerSessionExtensions\.cpp'.*?\)\n\n")
+          interaction_pattern = (
+              r"replace_once\(\s*'Utilities/PropertyEditor/"
+              r"PropertyEditorInteraction\.cpp'.*?\)\n\n")
+          script, session_calls = re.subn(session_pattern, '', script,
+                                          count=1, flags=re.S)
+          script, interaction_calls = re.subn(interaction_pattern, '', script,
+                                              count=2, flags=re.S)
+          if session_calls != 1 or interaction_calls != 2:
+              raise SystemExit('unable to isolate already-handled replacements')
 
-          script = remove_replace_once(
-              script, 'Utilities/UiDesigner/Services/UiDesignerSessionExtensions.cpp')
-          script = remove_replace_once(
-              script, 'Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
-          script = remove_replace_once(
-              script, 'Utilities/PropertyEditor/PropertyEditorInteraction.cpp')
           exec(compile(script, 'property-editor-interaction-fix', 'exec'))
           Path('.github/workflows/property-editor-interaction-pr.yml').unlink()
           PY
