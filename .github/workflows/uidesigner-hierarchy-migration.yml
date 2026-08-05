@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
     paths:
-      - .github/uidesigner-hierarchy-migration.py.gz.b64
       - .github/workflows/uidesigner-hierarchy-migration.yml
   workflow_dispatch:
 
@@ -21,8 +20,24 @@ jobs:
       - name: Apply model-backed UiTree migration
         shell: bash
         run: |
-          base64 -d .github/uidesigner-hierarchy-migration.py.gz.b64 | gzip -d > /tmp/migrate.py
+          git show db170234e488ce3cbb22e7da4f6d2f311e70d4d1:.github/uidesigner-hierarchy-migration.py.gz.b64 > /tmp/migration.b64
+          base64 -d /tmp/migration.b64 | gzip -d > /tmp/migrate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/migrate.py')
+          s = p.read_text()
+          s = s.replace(
+              "r'(void UiTree::MouseMove\\(Point p, dword flags\\)\\n\\{\\n    SyncModel\\(\\);\\n)',",
+              "r'(void UiTree::MouseMove\\(Point p, dword\\)\\n\\{\\n)',")
+          s = s.replace("r'''\\1\\n    int tip_row = HitTestRow(p);", "r'''\\1    int tip_row = HitTestRow(p);")
+          s = s.replace('UiTheme::ResolveTree(UiRole::Subtle)', 'UiTheme::ResolveTree()')
+          s = s.replace('SetRootVisible(true)', 'SetRootVisible(false)')
+          p.write_text(s)
+          PY
           python3 /tmp/migrate.py
+          rm -f .github/uidesigner-hierarchy-migration.py.gz.b64
+          rm -f .github/uidesigner-hierarchy-migration.part*
+          rm -f .github/workflows/uidesigner-hierarchy-migration.yml
           git diff --check
           grep -R "HierarchyTree : public UiTree" Utilities/UiDesigner/UiDesigner/UiDesignerWidgets.h
           grep -R "EnableInternalMutation(false)" Utilities/UiDesigner/UiDesigner/UiDesignerHierarchyView.cpp
