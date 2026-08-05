@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p Utilities/UiDesigner/tools
-          base64 -d .github/uidesigner-semantic-correction.py.gz.b64 | gzip -d > Utilities/UiDesigner/tools/fix_semantic_inspector.py
+          gzip -d -c .github/uidesigner-semantic-correction.py.gz > Utilities/UiDesigner/tools/fix_semantic_inspector.py
           python3 -m py_compile Utilities/UiDesigner/tools/fix_semantic_inspector.py
           python3 Utilities/UiDesigner/tools/fix_semantic_inspector.py
 
@@ -34,6 +34,7 @@ jobs:
         shell: bash
         run: |
           rm -rf Utilities/UiDesigner/tools
+          rm -f .github/uidesigner-semantic-correction.py.gz
           rm -f .github/uidesigner-semantic-correction.py.gz.b64
           rm -f .github/workflows/uidesigner-semantic-correction.yml
           rmdir .github/workflows 2>/dev/null || true
