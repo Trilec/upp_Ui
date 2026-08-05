@@ -381,6 +381,36 @@ bool UiDesignerCatalog::CanInsert(const UiDesignerDocument& document,
     return true;
 }
 
+bool UiDesignerCatalog::ApplySizingDefaults(
+    UiDesignerDocument& document) const
+{
+    static const char *fields[] = {
+        "fixed_width", "fixed_height", "min_width", "min_height"
+    };
+    bool changed = false;
+    const int count = document.GetNodes().GetCount();
+    for(int i = 0; i < count; i++) {
+        const UiDesignerNodeId node_id = document.GetNodes()[i].id;
+        if(node_id == document.GetRootId())
+            continue;
+        UiDesignerNode* node = document.Find(node_id);
+        const UiDesignerControlSpec* spec =
+            node ? Find(node->type) : nullptr;
+        if(!node || !spec || spec->IsSemanticItem())
+            continue;
+        for(const char *field : fields) {
+            const int q = spec->defaults.Find(field);
+            const int fallback = q >= 0
+                ? (int)spec->defaults.GetValue(q) : 0;
+            if((int)node->GetProperty(field, 0) <= 0 && fallback > 0) {
+                node->SetProperty(field, fallback);
+                changed = true;
+            }
+        }
+    }
+    return changed;
+}
+
 bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,
                                          String& error) const
 {
@@ -568,6 +598,67 @@ bool UiDesignerCatalog::Validate(String& error) const
             return false;
         }
         ids.Add(spec.type_id);
+        if(!spec.IsSemanticItem()) {
+            if(spec.default_size.cx <= 0 || spec.default_size.cy <= 0) {
+                error = spec.type_id + " has a non-positive natural size";
+                return false;
+            }
+            if(spec.minimum_size.cx <= 0 || spec.minimum_size.cy <= 0) {
+                error = spec.type_id + " has a non-positive minimum size";
+                return false;
+            }
+            if(spec.minimum_size.cx > spec.default_size.cx ||
+               spec.minimum_size.cy > spec.default_size.cy) {
+                error = spec.type_id + " minimum size exceeds its natural size";
+                return false;
+            }
+
+            const UiDesignerPropertySpec* fixed_width =
+                spec.FindProperty("fixed_width");
+            const UiDesignerPropertySpec* fixed_height =
+                spec.FindProperty("fixed_height");
+            const UiDesignerPropertySpec* min_width =
+                spec.FindProperty("min_width");
+            const UiDesignerPropertySpec* min_height =
+                spec.FindProperty("min_height");
+            const UiDesignerPropertySpec* max_width =
+                spec.FindProperty("max_width");
+            const UiDesignerPropertySpec* max_height =
+                spec.FindProperty("max_height");
+            if(!fixed_width || !fixed_height || !min_width || !min_height ||
+               !max_width || !max_height) {
+                error = spec.type_id + " is missing common sizing properties";
+                return false;
+            }
+
+            const auto DefaultInt = [&](const char *field) {
+                const int q = spec.defaults.Find(field);
+                return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
+            };
+            if(DefaultInt("fixed_width") != spec.default_size.cx ||
+               DefaultInt("fixed_height") != spec.default_size.cy) {
+                error = spec.type_id + " Fixed defaults do not match natural size";
+                return false;
+            }
+            if(DefaultInt("min_width") != spec.minimum_size.cx ||
+               DefaultInt("min_height") != spec.minimum_size.cy) {
+                error = spec.type_id + " minimum defaults do not match minimum size";
+                return false;
+            }
+            if(DefaultInt("max_width") != 0 || DefaultInt("max_height") != 0) {
+                error = spec.type_id + " maximum defaults must remain unbounded";
+                return false;
+            }
+            if((int)fixed_width->minimum != 1 ||
+               (int)fixed_height->minimum != 1 ||
+               (int)min_width->minimum != 1 ||
+               (int)min_height->minimum != 1 ||
+               (int)max_width->minimum != 0 ||
+               (int)max_height->minimum != 0) {
+                error = spec.type_id + " has an invalid sizing input range";
+                return false;
+            }
+        }
         if(spec.preview_adapter_id.IsEmpty()) {
             error = spec.type_id + " has no preview adapter id";
             return false;
@@ -791,21 +882,31 @@ void AddUiDesignerCommonProperties(UiDesignerControlSpec& spec)
         spec.properties.Add(property);
         spec.defaults.Set(field.id, field.value);
     }
-    const struct { const char *id; const char *label; } sizes[] = {
-        {"fixed_width", "Fixed width"}, {"fixed_height", "Fixed height"},
-        {"min_width", "Min width"}, {"min_height", "Min height"},
-        {"max_width", "Max width"}, {"max_height", "Max height"},
+
+    const struct {
+        const char *id;
+        const char *label;
+        int default_value;
+        int minimum_value;
+    } sizes[] = {
+        {"fixed_width", "Fixed width", max(1, spec.default_size.cx), 1},
+        {"fixed_height", "Fixed height", max(1, spec.default_size.cy), 1},
+        {"min_width", "Min width", max(1, spec.minimum_size.cx), 1},
+        {"min_height", "Min height", max(1, spec.minimum_size.cy), 1},
+        {"max_width", "Max width", 0, 0},
+        {"max_height", "Max height", 0, 0},
     };
     for(const auto& field : sizes) {
         UiDesignerPropertySpec property = UiDesignerNumberProperty(
-            field.id, field.label, 0, 0, 10000, 1,
+            field.id, field.label, field.default_value,
+            field.minimum_value, 10000, 1,
             PropertyEditorKind::Integer);
         property.group = "Layout";
         property.domain = PropertyEditorDomain::Layout;
         property.impact = PropertyImpactLocalLayout |
                           PropertyImpactAncestorLayout | PropertyImpactCode;
         spec.properties.Add(property);
-        spec.defaults.Set(field.id, 0);
+        spec.defaults.Set(field.id, field.default_value);
     }
 
     UiDesignerPropertySpec role;

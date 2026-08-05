@@ -4,6 +4,114 @@
 
 namespace Upp {
 
+struct UiDesignerSizeProfile {
+    Size natural;
+    Size minimum;
+};
+
+static UiDesignerSizeProfile MakeSizeProfile(int width, int height,
+                                             int min_width, int min_height)
+{
+    UiDesignerSizeProfile profile;
+    profile.natural = Size(width, height);
+    profile.minimum = Size(min_width, min_height);
+    return profile;
+}
+
+static UiDesignerSizeProfile ResolveSizeProfile(const String& type,
+                                                 Size fallback)
+{
+    struct Entry {
+        const char *type;
+        int width;
+        int height;
+        int min_width;
+        int min_height;
+    };
+    static const Entry profiles[] = {
+        {"UiBoxLayout", 320, 180, 80, 60},
+        {"UiGridLayout", 320, 180, 80, 60},
+        {"UiAbsoluteLayout", 320, 180, 80, 60},
+        {"UiSplitter", 360, 200, 120, 80},
+        {"UiQuadSplitter", 420, 260, 160, 100},
+
+        {"UiPanel", 280, 160, 80, 60},
+        {"UiDirectContentHost", 280, 160, 80, 60},
+        {"UiGroupPanel", 280, 160, 100, 70},
+        {"UiStack", 280, 160, 100, 70},
+        {"UiAccordion", 300, 200, 140, 100},
+        {"UiScrollPanel", 280, 160, 100, 70},
+        {"UiTab", 300, 180, 140, 90},
+        {"UiTitleCard", 280, 140, 120, 70},
+
+        {"UiLabel", 100, 25, 40, 20},
+        {"UiCheckBox", 110, 25, 60, 25},
+        {"UiRadioButton", 110, 25, 60, 25},
+        {"UiToggle", 50, 25, 40, 25},
+        {"UiButton", 80, 25, 50, 25},
+        {"UiToolButton", 25, 25, 25, 25},
+        {"UiSplitButton", 100, 25, 70, 25},
+        {"UiLineEdit", 160, 25, 70, 25},
+        {"UiIntEdit", 90, 25, 60, 25},
+        {"UiFloatEdit", 100, 25, 60, 25},
+        {"UiPasswordEdit", 160, 25, 70, 25},
+        {"UiMultiEdit", 190, 90, 100, 50},
+        {"UiMaskEdit", 160, 25, 70, 25},
+        {"UiProgressBar", 160, 20, 80, 16},
+        {"UiSlider", 160, 25, 80, 20},
+        {"UiBreadcrumbs", 190, 25, 100, 25},
+        {"UiSliderEdit", 190, 25, 100, 25},
+        {"UiScrollBar", 160, 18, 80, 16},
+        {"UiTable", 240, 140, 120, 70},
+        {"UiDoc", 240, 140, 120, 70},
+        {"UiTree", 220, 140, 100, 70},
+        {"UiList", 220, 140, 100, 70},
+        {"UiBezierCurveEditor", 260, 180, 140, 90},
+        {"UiBezierCurveField", 220, 100, 120, 60},
+        {"UiDropdown", 140, 25, 80, 25},
+        {"UiMenu", 180, 120, 100, 60},
+        {"UiColorPicker", 480, 360, 320, 240},
+
+        {"UiCompositeSlider", 220, 56, 120, 44},
+        {"UiCompositeToggle", 180, 56, 100, 44},
+        {"UiCompositeColor", 220, 56, 120, 44},
+        {"UiCompositeDropdown", 220, 56, 120, 44},
+        {"UiCompositeLabel", 180, 50, 100, 40},
+        {"UiCompositeEdit", 220, 56, 120, 44},
+
+        {"UppLabel", 100, 25, 40, 20},
+        {"UppButton", 80, 25, 50, 25},
+        {"UppOption", 110, 25, 60, 25},
+        {"UppEditString", 160, 25, 70, 25},
+        {"UppEditInt", 90, 25, 60, 25},
+        {"UppEditDouble", 100, 25, 60, 25},
+        {"UppLineEdit", 190, 90, 100, 50},
+        {"UppDropList", 140, 25, 80, 25},
+        {"UppArrayCtrl", 240, 140, 120, 70},
+        {"UppTreeCtrl", 220, 140, 100, 70},
+        {"UppTabCtrl", 300, 180, 140, 90},
+        {"UppProgressIndicator", 160, 20, 80, 16},
+        {"UppSliderCtrl", 160, 25, 80, 20},
+        {"UppColorPusher", 100, 25, 50, 25},
+        {"UppParentCtrl", 280, 160, 80, 60},
+        {"UppStaticRect", 160, 80, 40, 30},
+        {"UppSplitter", 360, 200, 120, 80},
+        {"UppHScrollBar", 160, 18, 80, 16},
+        {"UppVScrollBar", 18, 160, 16, 80},
+    };
+
+    for(const Entry& profile : profiles)
+        if(type == profile.type)
+            return MakeSizeProfile(profile.width, profile.height,
+                                   profile.min_width, profile.min_height);
+
+    const Size natural(max(1, fallback.cx), max(1, fallback.cy));
+    return MakeSizeProfile(
+        natural.cx, natural.cy,
+        min(natural.cx, max(10, natural.cx / 3)),
+        min(natural.cy, max(10, natural.cy / 3)));
+}
+
 static UiDesignerControlSpec MakeSpec(
     const char *type, const char *display, const char *category,
     const char *cpp_type, const char *base_name,
@@ -21,7 +129,9 @@ static UiDesignerControlSpec MakeSpec(
         ? UiDesignerSizingClass::Container : UiDesignerSizingClass::Leaf;
     spec.icon_key = icon_key;
     spec.node_flags = flags;
-    spec.default_size = size;
+    const UiDesignerSizeProfile sizing = ResolveSizeProfile(type, size);
+    spec.default_size = sizing.natural;
+    spec.minimum_size = sizing.minimum;
     spec.capabilities = UiDesignerCapabilityRuntimeCtrl;
     if(flags & UiDesignerNodeContainer)
         spec.capabilities |= UiDesignerCapabilityContainer |
@@ -730,6 +840,7 @@ static UiDesignerControlSpec MakeSpacer()
     spec.node_flags = UiDesignerNodeStructural | UiDesignerNodeSemanticItem;
     spec.capabilities = UiDesignerCapabilitySemanticItem;
     spec.default_size = Size(80, 24);
+    spec.minimum_size = Size(1, 1);
     spec.preview_adapter_id = "spacer";
     spec.codegen_adapter_id = "spacer";
     spec.child_adapter_id = "none";
