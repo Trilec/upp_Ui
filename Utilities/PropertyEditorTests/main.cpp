@@ -268,6 +268,7 @@ CONSOLE_APP_MAIN
     override_model.Find("surface")->override_active = false;
     override_model.Find("surface")->inherited = true;
     override_model.Find("surface")->value_editable = false;
+    override_model.Find("surface")->enabled = false;
     int mouse_requests = 0;
     mouse_override_editor.WhenOverride = [&](String id, bool active) {
         mouse_requests++;

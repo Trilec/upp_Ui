@@ -269,6 +269,20 @@ CONSOLE_APP_MAIN
               panel_override_session.Document().GetThemeOverride(
                   panel_override_node, "radius").Is<int>(),
           "Panel Radius becomes an editable local numeric value");
+    Check(panel_override_session.SetThemeOverrideActive("radius", false,
+                                                        panel_override_error) &&
+              !panel_override_session.Document().Find(panel_override_node)
+                   ->IsThemeOverrideActive("radius"),
+          "Panel Radius can return to inherited state: " + panel_override_error);
+    Check(panel_override_session.SetThemeOverrideActive("radius", true,
+                                                        panel_override_error) &&
+              panel_override_session.Document().Find(panel_override_node)
+                   ->IsThemeOverrideActive("radius"),
+          "Panel Radius restores saved state after first activation: " +
+              panel_override_error);
+    Check(panel_override_session.ThemeOverrideModel().GetCount() > 0 &&
+              panel_override_session.ThemeOverrideModel()[0].group == "General",
+          "Panel Theme Overrides present General first");
     ValueMap solid_recipe = panel_override_session.ThemeOverrideModel().Find("face.normal")->value;
     solid_recipe.Set("mode", "Solid");
     solid_recipe.Set("solid", Color(12, 34, 56));

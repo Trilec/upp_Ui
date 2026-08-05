@@ -442,29 +442,40 @@ bool UiDesignerSession::SetThemeOverrideActive(const String& property,
     }
     const UiDesignerChangeImpact impact =
         (UiDesignerChangeImpact)(dword)override_spec->impact;
-    if(active && node->theme_overrides.Find(property) < 0 &&
-       node->theme_override_saved.Find(property) < 0) {
-        const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
-        if(!commands_.SetThemeOverride(node->id, property, seed, impact,
-                                       "Seed theme " + property)) {
+    const UiDesignerNodeId node_id = node->id;
+    const bool active_now = node->theme_overrides.Find(property) >= 0 &&
+                            node->IsThemeOverrideActive(property);
+    const bool saved_now = node->theme_override_saved.Find(property) >= 0;
+
+    if(active != active_now) {
+        if(active) {
+            if(saved_now) {
+                if(!commands_.SetThemeOverrideActive(
+                       node_id, property, true, impact,
+                       "Activate theme " + property)) {
+                    error = commands_.GetLastError();
+                    return false;
+                }
+            }
+            else {
+                const Value seed = ResolveThemeOverrideValue(*node, *override_spec);
+                if(!commands_.SetThemeOverride(
+                       node_id, property, seed, impact,
+                       "Activate theme " + property)) {
+                    error = commands_.GetLastError();
+                    return false;
+                }
+            }
+        }
+        else if(!commands_.SetThemeOverrideActive(
+                    node_id, property, false, impact,
+                    "Use theme for " + property)) {
             error = commands_.GetLastError();
             return false;
         }
     }
-    if(!active || node->theme_override_saved.Find(property) >= 0) {
-        if(!commands_.SetThemeOverrideActive(
-               node->id, property, active, impact,
-               active ? "Activate theme " + property
-                      : "Use theme for " + property)) {
-            error = commands_.GetLastError();
-            return false;
-        }
-    }
-    else if(node->theme_overrides.Find(property) < 0) {
-        error = commands_.GetLastError();
-        return false;
-    }
-    overlay_.Remove(node->id, UiDesignerTransientValueKind::ThemeOverride,
+
+    overlay_.Remove(node_id, UiDesignerTransientValueKind::ThemeOverride,
                     property);
     RebuildThemeOverrideModel();
     error.Clear();

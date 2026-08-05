@@ -60,7 +60,8 @@ bool PropertyEditor::UsesInlineEditor(const PropertyEditorItem& item) const
     // built-in or custom editor can opt into the same stable-row presentation
     // through PropertyEditorItem::SetInlineEditor(). Hosting changes only the
     // presentation; preview, commit, validation and reset use the normal path.
-    return (item.kind == PropertyEditorKind::FillRecipe || item.inline_editor) &&
+    return (item.kind == PropertyEditorKind::FillRecipe ||
+            item.kind == PropertyEditorKind::Boolean || item.inline_editor) &&
            item.value_editable && item.enabled && !item.read_only;
 }
 

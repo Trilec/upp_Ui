@@ -50,7 +50,8 @@ public:
         edit_.SetTextAlign(UiAlign::RIGHT);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(16), DPI(16));
+               .SetIconSize(DPI(20), DPI(20))
+               .SetContentInset(DPI(1));
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.Tip("Switch between numeric entry and slider");
 
@@ -145,7 +146,7 @@ public:
 
     void Layout() override
     {
-        const int toggle_width = toggle_.IsShown() ? DPI(26) : 0;
+        const int toggle_width = toggle_.IsShown() ? DPI(30) : 0;
         toggle_.SetRect(max(0, GetSize().cx - toggle_width),
                         0, toggle_width, GetSize().cy);
         const int gap = toggle_width ? DPI(4) : 0;
