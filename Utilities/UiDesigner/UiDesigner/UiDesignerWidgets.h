@@ -269,10 +269,23 @@ private:
     bool catalog_drag_ = false;
 };
 
-class UiDesignerCodeView : public UiMultiEdit {
+class UiDesignerCodeView : public ParentCtrl {
 public:
+    typedef UiDesignerCodeView CLASSNAME;
+
     UiDesignerCodeView();
     void SetCode(const String& code);
+    String GetCode() const;
+
+    virtual void Layout() override;
+
+private:
+    void CopyAll();
+    void ShowFullscreen();
+
+    UiToolButton copy_;
+    UiToolButton fullscreen_;
+    UiMultiEdit edit_;
 };
 
 }
