@@ -154,6 +154,51 @@ CONSOLE_APP_MAIN
               radius_item->value_editable,
           "Panel Radius becomes an editable local value after activation");
 
+    UiDesignerSession semantic_session;
+    const UiDesignerNodeId root = semantic_session.Document().GetRootId();
+    const UiDesignerNodeId accordion = semantic_session.AddControl("UiAccordion", root);
+    const UiDesignerNodeId section = semantic_session.Commands().AddAccordionSection(
+        accordion, "Section", "Subtitle", "Copy", true);
+    semantic_session.Select(section);
+    Check(section != 0 && semantic_session.ResolveThemeOverrideOwner() == accordion,
+          "Accordion section resolves its real Accordion theme owner");
+    Check(semantic_session.ThemeOverrideModel().Find("theme.status") == nullptr &&
+              semantic_session.ThemeOverrideModel().GetCount() > 0,
+          "Accordion section selection exposes owner Theme Overrides");
+    const UiDesignerControlSpec *accordion_spec =
+        semantic_session.Catalog().Find("UiAccordion");
+    const UiDesignerThemeOverrideSpec *editable_override = nullptr;
+    if(accordion_spec)
+        for(const UiDesignerThemeOverrideSpec& candidate : accordion_spec->theme_overrides)
+            if(!candidate.read_only) {
+                editable_override = &candidate;
+                break;
+            }
+    Check(editable_override != nullptr,
+          "Accordion has an editable Theme Override contract");
+    if(editable_override) {
+        Check(semantic_session.SetThemeOverrideActive(
+                  editable_override->id, true, error),
+              "Semantic selection activates an owner override: " + error);
+        const UiDesignerNode *accordion_node =
+            semantic_session.Document().Find(accordion);
+        const UiDesignerNode *section_node =
+            semantic_session.Document().Find(section);
+        Check(accordion_node &&
+                  accordion_node->IsThemeOverrideActive(editable_override->id) &&
+                  section_node && section_node->theme_overrides.IsEmpty(),
+              "Semantic Theme Override is authored on the owner only");
+    }
+
+    const UiDesignerNodeId tab = semantic_session.AddControl("UiTab", root);
+    const UiDesignerNodeId page = semantic_session.Commands().AddTabPage(tab, "Page");
+    semantic_session.Select(page);
+    Check(page != 0 && semantic_session.ResolveThemeOverrideOwner() == tab,
+          "Tab page resolves its real Tab theme owner");
+    Check(semantic_session.ThemeOverrideModel().Find("theme.status") == nullptr &&
+              semantic_session.ThemeOverrideModel().GetCount() > 0,
+          "Tab page selection exposes owner Theme Overrides without fake per-page style");
+
     UiDesignerDocument migrated;
     Check(UiDesignerDeserialize(LegacySizingJson(), migrated, error),
           "Legacy sizing fixture loads: " + error);
