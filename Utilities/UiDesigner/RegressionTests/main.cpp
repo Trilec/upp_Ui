@@ -16,6 +16,25 @@ static void Check(bool condition, const String& message)
     }
 }
 
+static String LegacySizingJson()
+{
+    return R"JSON({
+      "format":"upp-ui-designer-next",
+      "schema":3,
+      "document_id":"sizing-regression",
+      "virtual_size":{"cx":512,"cy":250},
+      "nodes":[
+        {"id":1,"parent":0,"type":"Window","name":"Window","flags":3,
+         "children":[2],"properties":{},"actions":[]},
+        {"id":2,"parent":1,"type":"UiButton","name":"button","flags":0,
+         "children":[],
+         "properties":{"h_sizing":"Expand","v_sizing":"Fill"},
+         "actions":[]}
+      ],
+      "resources":[]
+    })JSON";
+}
+
 CONSOLE_APP_MAIN
 {
     UiDesignerSession session;
@@ -106,6 +125,19 @@ CONSOLE_APP_MAIN
     Check(radius_item && !radius_item->inherited && radius_item->override_active &&
               radius_item->value_editable,
           "Panel Radius becomes an editable local value after activation");
+
+    UiDesignerDocument migrated;
+    Check(UiDesignerDeserialize(LegacySizingJson(), migrated, error),
+          "Legacy sizing fixture loads: " + error);
+    const UiDesignerNode *migrated_button = migrated.Find(2);
+    Check(migrated_button &&
+              migrated_button->GetProperty("width_mode", "") == "Expand" &&
+              migrated_button->GetProperty("height_mode", "") == "Expand",
+          "Legacy Expand and Fill both migrate to canonical Expand");
+    Check(migrated_button &&
+              migrated_button->properties.Find("h_sizing") < 0 &&
+              migrated_button->properties.Find("v_sizing") < 0,
+          "Legacy common-control sizing aliases are removed after migration");
 
     UiDesignerCodeView code_view;
     code_view.SetRect(0, 0, 404, 260);
