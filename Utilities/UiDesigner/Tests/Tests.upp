@@ -17,6 +17,10 @@ file
     main.cpp,
     AuditContracts.cpp,
     ../UiDesigner/UiDesignerWidgets.cpp,
+    ../UiDesigner/UiDesignerSideWidgets.cpp,
+    ../UiDesigner/UiDesignerCatalogList.cpp,
+    ../UiDesigner/UiDesignerHierarchyView.cpp,
+    ../UiDesigner/UiDesignerCodeView.cpp,
     README.md;
 
 mainconfig
