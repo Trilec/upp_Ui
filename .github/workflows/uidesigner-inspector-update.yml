@@ -25,12 +25,14 @@ jobs:
       - name: Apply exact source migration
         shell: bash
         run: |
-          base64 -d .github/uidesigner-inspector-update.py.gz.b64 | gzip -d > /tmp/apply_inspector_update.py
-          python3 /tmp/apply_inspector_update.py
+          mkdir -p Utilities/UiDesigner/tools
+          base64 -d .github/uidesigner-inspector-update.py.gz.b64 | gzip -d > Utilities/UiDesigner/tools/apply_inspector_update.py
+          python3 Utilities/UiDesigner/tools/apply_inspector_update.py
 
       - name: Commit published source
         shell: bash
         run: |
+          rm -rf Utilities/UiDesigner/tools
           rm -f .github/uidesigner-inspector-update.py.gz.b64
           rm -f .github/workflows/uidesigner-inspector-update.yml
           rmdir .github/workflows 2>/dev/null || true
