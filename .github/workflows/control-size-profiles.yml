@@ -1,0 +1,400 @@
+name: Apply UiDesigner control size profiles
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'assistant/control-size-profiles'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assistant/control-size-profiles
+          fetch-depth: 0
+
+      - name: Apply catalog sizing contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerCatalog.h',
+              '    Size default_size = Size(160, 32);\n',
+              '    Size default_size = Size(160, 32);\n'
+              '    Size minimum_size = Size(10, 10);\n')
+
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerCatalog.h',
+              '    bool ValidateDocument(const UiDesignerDocument& document,\n'
+              '                          String& error) const;\n'
+              '    bool Validate(String& error) const;\n',
+              '    bool ValidateDocument(const UiDesignerDocument& document,\n'
+              '                          String& error) const;\n'
+              '    bool ApplySizingDefaults(UiDesignerDocument& document) const;\n'
+              '    bool Validate(String& error) const;\n')
+
+          profile_code = r'''struct UiDesignerSizeProfile {
+              Size natural;
+              Size minimum;
+          };
+
+          static UiDesignerSizeProfile MakeSizeProfile(int width, int height,
+                                                       int min_width, int min_height)
+          {
+              UiDesignerSizeProfile profile;
+              profile.natural = Size(width, height);
+              profile.minimum = Size(min_width, min_height);
+              return profile;
+          }
+
+          static UiDesignerSizeProfile ResolveSizeProfile(const String& type,
+                                                           Size fallback)
+          {
+              struct Entry {
+                  const char *type;
+                  int width;
+                  int height;
+                  int min_width;
+                  int min_height;
+              };
+              static const Entry profiles[] = {
+                  {"UiBoxLayout", 320, 180, 80, 60},
+                  {"UiGridLayout", 320, 180, 80, 60},
+                  {"UiAbsoluteLayout", 320, 180, 80, 60},
+                  {"UiSplitter", 360, 200, 120, 80},
+                  {"UiQuadSplitter", 420, 260, 160, 100},
+
+                  {"UiPanel", 280, 160, 80, 60},
+                  {"UiDirectContentHost", 280, 160, 80, 60},
+                  {"UiGroupPanel", 280, 160, 100, 70},
+                  {"UiStack", 280, 160, 100, 70},
+                  {"UiAccordion", 300, 200, 140, 100},
+                  {"UiScrollPanel", 280, 160, 100, 70},
+                  {"UiTab", 300, 180, 140, 90},
+                  {"UiTitleCard", 280, 140, 120, 70},
+
+                  {"UiLabel", 100, 25, 40, 20},
+                  {"UiCheckBox", 110, 25, 60, 25},
+                  {"UiRadioButton", 110, 25, 60, 25},
+                  {"UiToggle", 50, 25, 40, 25},
+                  {"UiButton", 80, 25, 50, 25},
+                  {"UiToolButton", 25, 25, 25, 25},
+                  {"UiSplitButton", 100, 25, 70, 25},
+                  {"UiLineEdit", 160, 25, 70, 25},
+                  {"UiIntEdit", 90, 25, 60, 25},
+                  {"UiFloatEdit", 100, 25, 60, 25},
+                  {"UiPasswordEdit", 160, 25, 70, 25},
+                  {"UiMultiEdit", 190, 90, 100, 50},
+                  {"UiMaskEdit", 160, 25, 70, 25},
+                  {"UiProgressBar", 160, 20, 80, 16},
+                  {"UiSlider", 160, 25, 80, 20},
+                  {"UiBreadcrumbs", 190, 25, 100, 25},
+                  {"UiSliderEdit", 190, 25, 100, 25},
+                  {"UiScrollBar", 160, 18, 80, 16},
+                  {"UiTable", 240, 140, 120, 70},
+                  {"UiDoc", 240, 140, 120, 70},
+                  {"UiTree", 220, 140, 100, 70},
+                  {"UiList", 220, 140, 100, 70},
+                  {"UiBezierCurveEditor", 260, 180, 140, 90},
+                  {"UiBezierCurveField", 220, 100, 120, 60},
+                  {"UiDropdown", 140, 25, 80, 25},
+                  {"UiMenu", 180, 120, 100, 60},
+                  {"UiColorPicker", 480, 360, 320, 240},
+
+                  {"UiCompositeSlider", 220, 56, 120, 44},
+                  {"UiCompositeToggle", 180, 56, 100, 44},
+                  {"UiCompositeColor", 220, 56, 120, 44},
+                  {"UiCompositeDropdown", 220, 56, 120, 44},
+                  {"UiCompositeLabel", 180, 50, 100, 40},
+                  {"UiCompositeEdit", 220, 56, 120, 44},
+
+                  {"UppLabel", 100, 25, 40, 20},
+                  {"UppButton", 80, 25, 50, 25},
+                  {"UppOption", 110, 25, 60, 25},
+                  {"UppEditString", 160, 25, 70, 25},
+                  {"UppEditInt", 90, 25, 60, 25},
+                  {"UppEditDouble", 100, 25, 60, 25},
+                  {"UppLineEdit", 190, 90, 100, 50},
+                  {"UppDropList", 140, 25, 80, 25},
+                  {"UppArrayCtrl", 240, 140, 120, 70},
+                  {"UppTreeCtrl", 220, 140, 100, 70},
+                  {"UppTabCtrl", 300, 180, 140, 90},
+                  {"UppProgressIndicator", 160, 20, 80, 16},
+                  {"UppSliderCtrl", 160, 25, 80, 20},
+                  {"UppColorPusher", 100, 25, 50, 25},
+                  {"UppParentCtrl", 280, 160, 80, 60},
+                  {"UppStaticRect", 160, 80, 40, 30},
+                  {"UppSplitter", 360, 200, 120, 80},
+                  {"UppHScrollBar", 160, 18, 80, 16},
+                  {"UppVScrollBar", 18, 160, 16, 80},
+              };
+
+              for(const Entry& profile : profiles)
+                  if(type == profile.type)
+                      return MakeSizeProfile(profile.width, profile.height,
+                                             profile.min_width, profile.min_height);
+
+              const Size natural(max(1, fallback.cx), max(1, fallback.cy));
+              return MakeSizeProfile(
+                  natural.cx, natural.cy,
+                  min(natural.cx, max(10, natural.cx / 3)),
+                  min(natural.cy, max(10, natural.cy / 3)));
+          }
+
+          '''
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerBuiltins.cpp',
+              'namespace Upp {\n\nstatic UiDesignerControlSpec MakeSpec(',
+              'namespace Upp {\n\n' + profile_code +
+              'static UiDesignerControlSpec MakeSpec(')
+
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerBuiltins.cpp',
+              '    spec.default_size = size;\n',
+              '    const UiDesignerSizeProfile sizing = ResolveSizeProfile(type, size);\n'
+              '    spec.default_size = sizing.natural;\n'
+              '    spec.minimum_size = sizing.minimum;\n')
+
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerBuiltins.cpp',
+              '    spec.default_size = Size(80, 24);\n',
+              '    spec.default_size = Size(80, 24);\n'
+              '    spec.minimum_size = Size(1, 1);\n')
+
+          old_sizes = '''    const struct { const char *id; const char *label; } sizes[] = {
+              {"fixed_width", "Fixed width"}, {"fixed_height", "Fixed height"},
+              {"min_width", "Min width"}, {"min_height", "Min height"},
+              {"max_width", "Max width"}, {"max_height", "Max height"},
+          };
+          for(const auto& field : sizes) {
+              UiDesignerPropertySpec property = UiDesignerNumberProperty(
+                  field.id, field.label, 0, 0, 10000, 1,
+                  PropertyEditorKind::Integer);
+              property.group = "Layout";
+              property.domain = PropertyEditorDomain::Layout;
+              property.impact = PropertyImpactLocalLayout |
+                                PropertyImpactAncestorLayout | PropertyImpactCode;
+              spec.properties.Add(property);
+              spec.defaults.Set(field.id, 0);
+          }
+          '''
+          new_sizes = '''    const struct {
+              const char *id;
+              const char *label;
+              int default_value;
+              int minimum_value;
+          } sizes[] = {
+              {"fixed_width", "Fixed width", max(1, spec.default_size.cx), 1},
+              {"fixed_height", "Fixed height", max(1, spec.default_size.cy), 1},
+              {"min_width", "Min width", max(1, spec.minimum_size.cx), 1},
+              {"min_height", "Min height", max(1, spec.minimum_size.cy), 1},
+              {"max_width", "Max width", 0, 0},
+              {"max_height", "Max height", 0, 0},
+          };
+          for(const auto& field : sizes) {
+              UiDesignerPropertySpec property = UiDesignerNumberProperty(
+                  field.id, field.label, field.default_value,
+                  field.minimum_value, 10000, 1,
+                  PropertyEditorKind::Integer);
+              property.group = "Layout";
+              property.domain = PropertyEditorDomain::Layout;
+              property.impact = PropertyImpactLocalLayout |
+                                PropertyImpactAncestorLayout | PropertyImpactCode;
+              spec.properties.Add(property);
+              spec.defaults.Set(field.id, field.default_value);
+          }
+          '''
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerCatalog.cpp',
+              old_sizes, new_sizes)
+
+          migration = r'''bool UiDesignerCatalog::ApplySizingDefaults(
+              UiDesignerDocument& document) const
+          {
+              static const char *fields[] = {
+                  "fixed_width", "fixed_height", "min_width", "min_height"
+              };
+              bool changed = false;
+              const int count = document.GetNodes().GetCount();
+              for(int i = 0; i < count; i++) {
+                  const UiDesignerNodeId node_id = document.GetNodes()[i].id;
+                  if(node_id == document.GetRootId())
+                      continue;
+                  UiDesignerNode *node = document.Find(node_id);
+                  const UiDesignerControlSpec *spec = node ? Find(node->type) : nullptr;
+                  if(!node || !spec || spec->IsSemanticItem())
+                      continue;
+                  for(const char *field : fields) {
+                      const int q = spec->defaults.Find(field);
+                      const int fallback = q >= 0
+                          ? (int)spec->defaults.GetValue(q) : 0;
+                      if((int)node->GetProperty(field, 0) <= 0 && fallback > 0) {
+                          node->SetProperty(field, fallback);
+                          changed = true;
+                      }
+                  }
+              }
+              return changed;
+          }
+
+          '''
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerCatalog.cpp',
+              'bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,\n',
+              migration +
+              'bool UiDesignerCatalog::ValidateDocument(const UiDesignerDocument& document,\n')
+
+          validation = r'''        if(!spec.IsSemanticItem()) {
+              if(spec.default_size.cx <= 0 || spec.default_size.cy <= 0) {
+                  error = spec.type_id + " has a non-positive natural size";
+                  return false;
+              }
+              if(spec.minimum_size.cx <= 0 || spec.minimum_size.cy <= 0) {
+                  error = spec.type_id + " has a non-positive minimum size";
+                  return false;
+              }
+              if(spec.minimum_size.cx > spec.default_size.cx ||
+                 spec.minimum_size.cy > spec.default_size.cy) {
+                  error = spec.type_id + " minimum size exceeds its natural size";
+                  return false;
+              }
+              const char *required_sizes[] = {
+                  "fixed_width", "fixed_height", "min_width", "min_height",
+                  "max_width", "max_height"
+              };
+              for(const char *field : required_sizes)
+                  if(!spec.FindProperty(field) || spec.defaults.Find(field) < 0) {
+                      error = spec.type_id + " is missing common sizing field " + field;
+                      return false;
+                  }
+          }
+          '''
+          replace_once(
+              'Utilities/UiDesigner/Catalog/UiDesignerCatalog.cpp',
+              '        ids.Add(spec.type_id);\n        if(spec.preview_adapter_id.IsEmpty()) {\n',
+              '        ids.Add(spec.type_id);\n' + validation +
+              '        if(spec.preview_adapter_id.IsEmpty()) {\n')
+
+          replace_once(
+              'Utilities/UiDesigner/Services/UiDesignerSession.cpp',
+              '    if(!commands_.ReplaceDocument(loaded, "Load document")) {\n',
+              '    catalog_.ApplySizingDefaults(loaded);\n\n'
+              '    if(!commands_.ReplaceDocument(loaded, "Load document")) {\n')
+
+          tests = r'''    auto DefaultSizeValue = [](const UiDesignerControlSpec& spec,
+                                     const char *field) {
+              const int q = spec.defaults.Find(field);
+              return q >= 0 ? (int)spec.defaults.GetValue(q) : -1;
+          };
+          for(const UiDesignerControlSpec& spec : catalog.GetControls()) {
+              if(spec.IsSemanticItem())
+                  continue;
+              Check(spec.default_size.cx > 0 && spec.default_size.cy > 0,
+                    spec.type_id + " has a visible natural size");
+              Check(spec.minimum_size.cx > 0 && spec.minimum_size.cy > 0 &&
+                        spec.minimum_size.cx <= spec.default_size.cx &&
+                        spec.minimum_size.cy <= spec.default_size.cy,
+                    spec.type_id + " has a usable minimum size");
+              Check(DefaultSizeValue(spec, "fixed_width") == spec.default_size.cx &&
+                        DefaultSizeValue(spec, "fixed_height") == spec.default_size.cy,
+                    spec.type_id + " Fixed mode starts from its natural size");
+              Check(DefaultSizeValue(spec, "min_width") == spec.minimum_size.cx &&
+                        DefaultSizeValue(spec, "min_height") == spec.minimum_size.cy,
+                    spec.type_id + " minimum fields use its visible minimum");
+              Check(DefaultSizeValue(spec, "max_width") == 0 &&
+                        DefaultSizeValue(spec, "max_height") == 0,
+                    spec.type_id + " keeps zero only for unbounded maximums");
+              const UiDesignerPropertySpec *fixed_width = spec.FindProperty("fixed_width");
+              const UiDesignerPropertySpec *fixed_height = spec.FindProperty("fixed_height");
+              const UiDesignerPropertySpec *min_width = spec.FindProperty("min_width");
+              const UiDesignerPropertySpec *min_height = spec.FindProperty("min_height");
+              Check(fixed_width && fixed_height && min_width && min_height &&
+                        (int)fixed_width->minimum == 1 &&
+                        (int)fixed_height->minimum == 1 &&
+                        (int)min_width->minimum == 1 &&
+                        (int)min_height->minimum == 1,
+                    spec.type_id + " cannot author zero fixed/minimum dimensions");
+          }
+
+          auto CheckSizeProfile = [&](const char *type, Size natural, Size minimum) {
+              const UiDesignerControlSpec *spec = catalog.Find(type);
+              Check(spec && spec->default_size == natural &&
+                        spec->minimum_size == minimum,
+                    String(type) + " has its expected sizing profile");
+          };
+          CheckSizeProfile("UiButton", Size(80, 25), Size(50, 25));
+          CheckSizeProfile("UiToolButton", Size(25, 25), Size(25, 25));
+          CheckSizeProfile("UiLabel", Size(100, 25), Size(40, 20));
+          CheckSizeProfile("UiSlider", Size(160, 25), Size(80, 20));
+          CheckSizeProfile("UiMultiEdit", Size(190, 90), Size(100, 50));
+          CheckSizeProfile("UiColorPicker", Size(480, 360), Size(320, 240));
+          CheckSizeProfile("UiGroupPanel", Size(280, 160), Size(100, 70));
+          CheckSizeProfile("UppVScrollBar", Size(18, 160), Size(16, 80));
+
+          UiDesignerDocument legacy_sizing_document;
+          legacy_sizing_document.NewDocument();
+          UiDesignerCommandService legacy_sizing_commands(legacy_sizing_document);
+          const UiDesignerControlSpec *legacy_button_spec = catalog.Find("UiButton");
+          const UiDesignerNodeId legacy_button = legacy_sizing_commands.AddNode(
+              "UiButton", "legacy_button", legacy_sizing_document.GetRootId(),
+              legacy_button_spec ? legacy_button_spec->node_flags : UiDesignerNodeNone,
+              legacy_button_spec ? legacy_button_spec->defaults : ValueMap(),
+              "Add legacy button");
+          UiDesignerNode *legacy_button_node =
+              legacy_sizing_document.Find(legacy_button);
+          if(legacy_button_node) {
+              legacy_button_node->SetProperty("fixed_width", 0);
+              legacy_button_node->SetProperty("fixed_height", 0);
+              legacy_button_node->SetProperty("min_width", 0);
+              legacy_button_node->SetProperty("min_height", 0);
+          }
+          Check(catalog.ApplySizingDefaults(legacy_sizing_document),
+                "legacy zero sizing values are upgraded");
+          legacy_button_node = legacy_sizing_document.Find(legacy_button);
+          Check(legacy_button_node &&
+                    (int)legacy_button_node->GetProperty("fixed_width", 0) == 80 &&
+                    (int)legacy_button_node->GetProperty("fixed_height", 0) == 25 &&
+                    (int)legacy_button_node->GetProperty("min_width", 0) == 50 &&
+                    (int)legacy_button_node->GetProperty("min_height", 0) == 25 &&
+                    (int)legacy_button_node->GetProperty("max_width", 0) == 0 &&
+                    (int)legacy_button_node->GetProperty("max_height", 0) == 0,
+                "legacy button receives the canonical profile without bounding maximums");
+          Check(!catalog.ApplySizingDefaults(legacy_sizing_document),
+                "legacy sizing upgrade is idempotent");
+
+          '''
+          replace_once(
+              'Utilities/UiDesigner/Tests/main.cpp',
+              '    Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");\n\n',
+              '    Check(catalog.GetPresets().GetCount() >= 3, "preset catalog");\n\n' +
+              tests)
+
+          Path('.github/workflows/control-size-profiles.yml').unlink()
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit sizing profiles
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner gives every control a visible sizing profile" -m "Use each catalog control's natural size for Fixed width and height, and define a smaller explicit usable minimum for layout constraints. Keep zero exclusively for unbounded maximum dimensions." -m "Cover native, composite and stock U++ controls, upgrade legacy zero sizing fields on load, validate future catalog entries, and add exhaustive profile regression checks."
+          git push origin HEAD:assistant/control-size-profiles
