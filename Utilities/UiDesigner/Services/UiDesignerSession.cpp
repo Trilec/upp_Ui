@@ -302,6 +302,8 @@ bool UiDesignerSession::Load(const String& path, String& error)
     else if(!UiDesignerDocumentFromValue(parsed, loaded, error))
         return false;
 
+    catalog_.ApplySizingDefaults(loaded);
+
     if(!commands_.ReplaceDocument(loaded, "Load document")) {
         error = commands_.GetLastError();
         return false;

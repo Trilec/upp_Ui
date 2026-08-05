@@ -236,6 +236,7 @@ struct UiDesignerControlSpec : Moveable<UiDesignerControlSpec> {
     dword node_flags = UiDesignerNodeNone;
     dword capabilities = UiDesignerCapabilityRuntimeCtrl;
     Size default_size = Size(160, 32);
+    Size minimum_size = Size(10, 10);
 
     Vector<UiDesignerPropertySpec> properties;
     Vector<UiDesignerEventSpec> events;
@@ -300,6 +301,7 @@ public:
                    int index, String& reason) const;
     bool ValidateDocument(const UiDesignerDocument& document,
                           String& error) const;
+    bool ApplySizingDefaults(UiDesignerDocument& document) const;
     bool Validate(String& error) const;
 
 private:
