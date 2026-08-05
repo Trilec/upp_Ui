@@ -188,7 +188,10 @@ void PropertyEditor::ToggleOverride(int display_index)
     if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return;
     PropertyEditorItem& item = (*model_)[row.model_index];
-    if(!item.overrideable || item.read_only)
+    // read_only/value_editable describe the value editor, not the independent
+    // authored-override action. Inherited numeric rows such as Radius must be
+    // able to activate before their value editor becomes writable.
+    if(!item.overrideable)
         return;
     WhenOverride(item.id, !item.override_active);
 }
@@ -209,10 +212,6 @@ void PropertyEditor::LeftDown(Point p, dword)
         ToggleOverride(row);
         return;
     }
-    // Inherited values are not editable yet, but clicking their row should
-    // still provide the same activation path as clicking the action circle.
-    // This is especially important for compact numeric rows whose editor is
-    // only created after the local override exists.
     if(item.overrideable && !item.override_active) {
         ToggleOverride(row);
         return;
