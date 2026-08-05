@@ -127,10 +127,11 @@ bool UiDesignerHierarchyModel::ValidateSubtree(
         error = Format("Hierarchy projection is missing node %lld", (int64)id);
         return false;
     }
-    if(seen.FindAdd(id) >= 0) {
+    if(seen.Find(id) >= 0) {
         error = Format("Hierarchy projection duplicates node %lld", (int64)id);
         return false;
     }
+    seen.Add(id);
     if(model_.GetParent(tree).id != parent.id) {
         error = Format("Hierarchy projection parent mismatch for %lld", (int64)id);
         return false;
