@@ -18,6 +18,16 @@ jobs:
           fetch-depth: 0
       - name: Apply migration
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/uidesigner-presets-legacy-rc.py')
+          s = p.read_text()
+          old = "pattern = re.compile(r'(?:\\s*catalog\\.RegisterPreset\\(UiDesignerPreset\\{.*?\\}\\);)+', re.S)\nbuiltins, count = pattern.subn(preset_block.rstrip(), builtins, count=1)"
+          new = "pattern = re.compile(r'static void RegisterPresets\\(UiDesignerCatalog& catalog\\)\\n\\{.*?\\n\\}', re.S)\nreplacement = 'static void RegisterPresets(UiDesignerCatalog& catalog)\\n{\\n' + preset_block.rstrip() + '\\n}'\nbuiltins, count = pattern.subn(replacement, builtins, count=1)"
+          if old not in s:
+              raise SystemExit('preset migration pattern not found')
+          p.write_text(s.replace(old, new))
+          PY
           python3 .github/uidesigner-presets-legacy-rc.py
           git diff --check
           grep -q 'InsertPreset' Utilities/UiDesigner/Services/UiDesignerSession.cpp
