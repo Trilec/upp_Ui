@@ -26,6 +26,30 @@ struct UiDesignerDropPlan : Moveable<UiDesignerDropPlan> {
     String label;
     String reason;
     bool valid = false;
+
+    UiDesignerDropPlan() = default;
+    UiDesignerDropPlan(const UiDesignerDropPlan& source) { operator=(source); }
+
+    UiDesignerDropPlan& operator=(const UiDesignerDropPlan& source)
+    {
+        if(this == &source)
+            return *this;
+        operation = source.operation;
+        type_id = source.type_id;
+        nodes = clone(source.nodes);
+        parent = source.parent;
+        index = source.index;
+        grid_row = source.grid_row;
+        grid_column = source.grid_column;
+        canvas_position = source.canvas_position;
+        has_canvas_position = source.has_canvas_position;
+        add_defaults = clone(source.add_defaults);
+        property_updates = clone(source.property_updates);
+        label = source.label;
+        reason = source.reason;
+        valid = source.valid;
+        return *this;
+    }
 };
 
 class UiDesignerDropService {

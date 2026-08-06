@@ -1,8 +1,8 @@
-                if(!IsNull(items_[i].value.color) && selected_.Find(i) < 0)
+                if(!IsNull(items_[i].value.color) && FindIndex(selected_, i) < 0)
                     selected_.Add(i);
         }
         else if(toggle) {
-            int found = selected_.Find(index);
+            int found = FindIndex(selected_, index);
             if(found >= 0)
                 selected_.Remove(found);
             else
@@ -15,7 +15,7 @@
             anchor_index_ = index;
         }
         Sort(selected_);
-        active_index_ = selected_.Find(index) >= 0 ? index
+        active_index_ = FindIndex(selected_, index) >= 0 ? index
                       : selected_.IsEmpty() ? -1 : selected_[0];
         drag_selecting_ = true;
         SyncTiles();
@@ -36,7 +36,7 @@
     {
         if(!drag_selecting_ || !(flags & K_MOUSELEFT) || index < 0 || index >= items_.GetCount())
             return;
-        if(IsNull(items_[index].value.color) || selected_.Find(index) >= 0)
+        if(IsNull(items_[index].value.color) || FindIndex(selected_, index) >= 0)
             return;
         selected_.Add(index);
         Sort(selected_);
@@ -110,7 +110,7 @@
 
     Event<int, UiColorPicker::SlotValue> WhenActivate;
     Event<int, UiColorPicker::SlotValue> WhenSelection;
-    Event<int, Vector<UiColorPicker::SlotValue>> WhenDropGroup;
+    Event<int, const Vector<UiColorPicker::SlotValue>&> WhenDropGroup;
 
     virtual void Paint(Draw& draw) override
     {
@@ -123,7 +123,7 @@ private:
     void SyncTiles()
     {
         for(int i = 0; i < tiles_.GetCount(); i++)
-            tiles_[i]->SetDisplay(items_[i], selected_.Find(i) >= 0, i == active_index_, compact_);
+            tiles_[i]->SetDisplay(items_[i], FindIndex(selected_, i) >= 0, i == active_index_, compact_);
         RefreshLayout();
         Refresh();
     }

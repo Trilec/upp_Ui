@@ -94,7 +94,7 @@ private:
                 draw.DrawEllipse(marker, passive_items_[i].value.color, DPI(1), White());
                 if(active)
                     draw.DrawEllipse(marker.Inflated(DPI(3)), Null, DPI(2), SColorHighlight());
-                else if(passive_selected_.Find(i) >= 0)
+                else if(FindIndex(passive_selected_, i) >= 0)
                     draw.DrawEllipse(marker.Inflated(DPI(2)), Null, DPI(1), SColorHighlight());
             }
         }

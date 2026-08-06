@@ -76,7 +76,7 @@ void UiColorPicker::Impl::WireEvents()
     stash_flow_.WhenActivate = [=](int, SlotValue value) {
         CommitSlotValue(active_slot_, value.color, value.alpha, true);
     };
-    stash_flow_.WhenDropGroup = [=](int target, Vector<SlotValue> values) { HandleStashDrop(target, values); };
+    stash_flow_.WhenDropGroup = [=](int target, const Vector<SlotValue>& values) { HandleStashDrop(target, values); };
     stash_mode_drop_.WhenSelectData = [=](const Value& data) {
         if(!IsNull(data)) {
             stash_drop_mode_ = (StashDropMode)minmax((int)data, (int)STASH_REPLACE, (int)STASH_MULTIPLY);

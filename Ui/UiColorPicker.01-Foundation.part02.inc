@@ -146,10 +146,10 @@ public:
     {
         selected_.Clear();
         for(int index : indices)
-            if(index >= 0 && index < items_.GetCount() && selected_.Find(index) < 0)
+            if(index >= 0 && index < items_.GetCount() && FindIndex(selected_, index) < 0)
                 selected_.Add(index);
         Sort(selected_);
-        active_index_ = active >= 0 && selected_.Find(active) >= 0
+        active_index_ = active >= 0 && FindIndex(selected_, active) >= 0
                       ? active
                       : selected_.IsEmpty() ? -1 : selected_[0];
         anchor_index_ = active_index_;
@@ -170,7 +170,7 @@ public:
 
     virtual Vector<UiColorPicker::SlotValue> GetPaletteDragValues() const override
     {
-        if(drag_origin_ >= 0 && selected_.Find(drag_origin_) < 0 && drag_origin_ < items_.GetCount()) {
+        if(drag_origin_ >= 0 && FindIndex(selected_, drag_origin_) < 0 && drag_origin_ < items_.GetCount()) {
             Vector<UiColorPicker::SlotValue> one;
             one.Add(items_[drag_origin_].value);
             return one;
