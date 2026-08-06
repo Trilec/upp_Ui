@@ -398,10 +398,11 @@ static bool RestoreExplicitChildOrder(const ValueArray& nodes,
         Index<int64> seen;
         for(int i = 0; i < children.GetCount(); ++i) {
             const int64 old_child = children[i];
-            if(seen.FindAdd(old_child) >= 0) {
+            if(seen.Find(old_child) >= 0) {
                 error = "Parent contains duplicate child " + AsString(old_child);
                 return false;
             }
+            seen.Add(old_child);
             const int child_q = id_map.Find(old_child);
             const int declared_q = declared_parent.Find(old_child);
             if(child_q < 0 || declared_q < 0 || declared_parent[declared_q] != old_parent) {

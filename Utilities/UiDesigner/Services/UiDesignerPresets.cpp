@@ -38,7 +38,15 @@ public:
 
     UiDesignerPresetBuilder& Text(UiDesignerNodeId id, const String& value)
     {
-        return P(id, "text", value).P(id, "title", value);
+        UiDesignerNode *node = document_.Find(id);
+        const UiDesignerControlSpec *spec = node ? catalog_.Find(node->type) : nullptr;
+        if(node && spec) {
+            if(spec->FindProperty("text"))
+                node->properties.Set("text", value);
+            if(spec->FindProperty("title"))
+                node->properties.Set("title", value);
+        }
+        return *this;
     }
 
     UiDesignerPresetBuilder& Size(UiDesignerNodeId id, const char *w,
@@ -92,7 +100,8 @@ static UiDesignerNodeId BuildHolyGrail(UiDesignerPresetBuilder& b,
     b.Size(grid, "Expand", "Expand").P(grid, "columns", 2).P(grid, "gap", 8);
     for(int i = 1; i <= 4; i++) {
         UiDesignerNodeId card = b.Add("UiTitleCard", Format("story_%d", i), grid);
-        b.Text(card, Format("Story %d", i)).Size(card, "Expand", "Fixed", 0, 72);
+        b.Text(card, Format("Story %d", i)).Size(card, "Expand", "Fixed", 0, 72)
+         .P(card, "grid_row", (i - 1) / 2).P(card, "grid_column", (i - 1) % 2);
     }
     UiDesignerNodeId rail = b.Add("UiGroupPanel", "widgets", body);
     b.Text(rail, "Widgets").Size(rail, "Fixed", "Expand", 200, 0)
@@ -119,7 +128,8 @@ static UiDesignerNodeId BuildMagazine(UiDesignerPresetBuilder& b,
     b.Size(stories, "Expand", "Expand").P(stories, "columns", 2).P(stories, "gap", 8);
     for(int i = 1; i <= 4; i++) {
         UiDesignerNodeId card = b.Add("UiTitleCard", Format("magazine_story_%d", i), stories);
-        b.Text(card, Format("Story %d", i)).Size(card, "Expand", "Fixed", 0, 80);
+        b.Text(card, Format("Story %d", i)).Size(card, "Expand", "Fixed", 0, 80)
+         .P(card, "grid_row", (i - 1) / 2).P(card, "grid_column", (i - 1) % 2);
     }
     UiDesignerNodeId rail = b.Add("UiGroupPanel", "side_notes", body);
     b.Text(rail, "Side notes").Size(rail, "Fixed", "Expand", 210, 0)
@@ -161,7 +171,8 @@ static UiDesignerNodeId BuildCardGrid(UiDesignerPresetBuilder& b,
     for(int i = 1; i <= 6; i++) {
         UiDesignerNodeId card = b.Add("UiTitleCard", Format("card_%d", i), root);
         b.Text(card, Format("Card %d", i)).Size(card, "Expand", "Fixed", 0, 96)
-         .P(card, "subtitle", "Reusable summary content");
+         .P(card, "subtitle", "Reusable summary content")
+         .P(card, "grid_row", (i - 1) / 3).P(card, "grid_column", (i - 1) % 3);
     }
     return root;
 }
