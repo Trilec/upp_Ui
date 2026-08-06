@@ -1,0 +1,35 @@
+name: UiDesigner box sizing parity correction
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/uidesigner-box-parity-fix.py
+      - .github/workflows/uidesigner-box-parity-fix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply box sizing parity correction
+        run: |
+          python3 .github/uidesigner-box-parity-fix.py
+          git diff --check
+          grep -n 'dialog_actions, "wrap", "Flow"' Utilities/UiDesigner/Services/UiDesignerSession.cpp
+          grep -n 'UiBoxLayout::ItemRef item = box->Add(child)' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp
+          grep -n 'const UiDesignerNode& parent_node' Utilities/UiDesigner/CodeGen/UiDesignerCodeGen.cpp
+          grep -n 'Generated dialog preserves the expanding semantic spacer' Utilities/UiDesigner/RegressionTests/main.cpp
+      - name: Commit and publish correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner keeps BoxLayout preview and generated sizing in parity"
+          git push origin main
