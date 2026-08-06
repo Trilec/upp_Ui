@@ -765,6 +765,16 @@ static UiDesignerApplyResult ApplyRuntime(
         else return UiDesignerApplyResult::Rejected;
         return UiDesignerApplyResult::AppliedAncestorLayout;
     }
+    if(property == "wrap") {
+        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
+            const String mode = AsString(value);
+            const UiBoxWrap wrap = mode == "Flow" ? UiBoxWrap::Flow
+                : mode == "Snap" ? UiBoxWrap::Snap : UiBoxWrap::None;
+            box->SetWrap(wrap);
+            return UiDesignerApplyResult::AppliedAncestorLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
     if(property == "debug_layout") {
         const bool on = (bool)value;
         if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
@@ -2437,6 +2447,19 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
                 const bool horizontal = AsString(value) == "H";
                 box->SetDirection(horizontal ? UiDirection::H : UiDirection::V);
+                stats_.ancestor_layouts++;
+                stats_.live_applies++;
+                Layout();
+                Refresh();
+                return UiDesignerApplyResult::AppliedAncestorLayout;
+            }
+        }
+        else if(property == "wrap") {
+            if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
+                const String mode = AsString(value);
+                const UiBoxWrap wrap = mode == "Flow" ? UiBoxWrap::Flow
+                    : mode == "Snap" ? UiBoxWrap::Snap : UiBoxWrap::None;
+                box->SetWrap(wrap);
                 stats_.ancestor_layouts++;
                 stats_.live_applies++;
                 Layout();

@@ -414,7 +414,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
     UiDesignerNodeId legacy_root_layout = 0;
     while(!pending.IsEmpty()) {
         bool progressed = false;
-        for(int p = pending.GetCount() - 1; p >= 0; p--) {
+        // Add children in source order. AddNodeWithId appends to the parent's
+        // child vector, so walking pending backwards inverted legacy layouts.
+        for(int p = 0; p < pending.GetCount(); p++) {
             ValueMap n = nodes[pending[p]];
             const int64 old_id = UiDesignerMapValue(n, "id", 0);
             if(old_id <= 0 || id_map.Find(old_id) >= 0) {
@@ -494,6 +496,10 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
                 UiDesignerMapValue(n, "actions", ValueArray()));
             pending.Remove(p);
             progressed = true;
+            // Restart from the first unresolved source node after removal.
+            // This preserves sibling order even when children precede a
+            // not-yet-resolved parent in the flat legacy array.
+            break;
         }
         if(!progressed) {
             error = "Document contains a missing or cyclic parent reference";

@@ -580,6 +580,9 @@ void UiDesignerCodeGenerator::EmitSetup(
         const String direction = Property("direction", "V");
         out << "\t" << member << ".SetDirection(UiDirection::"
             << (direction == "H" ? "H" : "V") << ");\n";
+        const String wrap = Property("wrap", "None");
+        if(wrap == "Flow" || wrap == "Snap")
+            out << "\t" << member << ".SetWrap(UiBoxWrap::" << wrap << ");\n";
     }
     if(spec.runtime_kind == UiDesignerRuntimeKind::UiGridLayout)
         out << "\t" << member << ".SetGridSize("

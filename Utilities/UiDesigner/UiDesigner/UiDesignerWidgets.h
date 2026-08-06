@@ -193,9 +193,10 @@ public:
     void TrackCatalogDrop(const String& type_id, Point screen);
     bool FinishCatalogDrop(const String& type_id, Point screen);
     void CancelCatalogDrop();
+    virtual void CancelMode() override;
 
-    bool IsNodeDragPollArmed() const { return false; }
-    int GetNodeDragPollArmCount() const { return 0; }
+    bool IsNodeDragPollArmed() const { return tree_.IsManualDragPollArmed(); }
+    int GetNodeDragPollArmCount() const { return tree_.GetManualDragPollArmCount(); }
     bool HasDropTarget() const { return header_drop_ || tree_.GetDropInfo().valid; }
 
     Rect GetHeaderRect() const;
@@ -222,8 +223,40 @@ public:
 private:
     class HierarchyTree : public UiTree {
     public:
+        ~HierarchyTree();
+
         Event<> WhenDelete;
+        Event<const Vector<UiTreeNodeRef>&, UiTree::DropInfo> WhenManualDrag;
+        Event<const Vector<UiTreeNodeRef>&, UiTree::DropInfo> WhenManualDrop;
+        Event<> WhenManualCancel;
+
+        bool IsManualDragPollArmed() const { return drag_poll_armed_; }
+        int GetManualDragPollArmCount() const { return drag_poll_arm_count_; }
+
+        virtual void LeftDown(Point p, dword flags) override;
+        virtual void LeftUp(Point p, dword flags) override;
+        virtual void LeftDrag(Point p, dword flags) override;
+        virtual void MouseMove(Point p, dword flags) override;
+        virtual Image CursorImage(Point p, dword flags) override;
+        virtual void CancelMode() override;
         virtual bool Key(dword key, int count) override;
+
+    private:
+        void UpdateManualDrag();
+        void PollManualDrag();
+        void ResetManualDrag(bool notify_cancel);
+        void ReleaseManualCapture();
+        void ArmManualDragPoll();
+
+        Vector<UiTreeNodeRef> drag_nodes_;
+        Point drag_start_screen_;
+        bool dragging_ = false;
+        TimeCallback drag_poll_;
+        bool drag_poll_armed_ = false;
+        int drag_poll_arm_count_ = 0;
+        bool resetting_manual_drag_ = false;
+        bool cancelling_manual_drag_ = false;
+        bool releasing_manual_capture_ = false;
     };
 
     void SyncSelectionFromDesigner();

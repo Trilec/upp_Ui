@@ -36,6 +36,21 @@ static String LegacySizingJson()
     })JSON";
 }
 
+static String LegacySiblingOrderJson()
+{
+    return R"JSON({
+      "format":"upp-ui-designer",
+      "virtual_size":{"cx":512,"cy":250},
+      "nodes":[
+        {"id":1,"parent":0,"type":"Window","name":"Window","properties":{}},
+        {"id":2,"parent":1,"type":"BoxLayout","name":"column","properties":{}},
+        {"id":3,"parent":2,"type":"Label","name":"heading","properties":{}},
+        {"id":4,"parent":2,"type":"Panel","name":"content","properties":{}},
+        {"id":5,"parent":2,"type":"Label","name":"footer","properties":{}}
+      ]
+    })JSON";
+}
+
 CONSOLE_APP_MAIN
 {
     PropertyEditorModel metadata_model;
@@ -314,6 +329,16 @@ CONSOLE_APP_MAIN
               migrated_button->properties.Find("h_sizing") < 0 &&
               migrated_button->properties.Find("v_sizing") < 0,
           "Legacy common-control sizing aliases are removed after migration");
+
+    UiDesignerDocument ordered_legacy;
+    Check(UiDesignerDeserialize(LegacySiblingOrderJson(), ordered_legacy, error),
+          "Legacy sibling-order fixture loads: " + error);
+    const UiDesignerNode *ordered_column = ordered_legacy.Find(2);
+    Check(ordered_column && ordered_column->children.GetCount() == 3 &&
+              ordered_legacy.Find(ordered_column->children[0])->name == "heading" &&
+              ordered_legacy.Find(ordered_column->children[1])->name == "content" &&
+              ordered_legacy.Find(ordered_column->children[2])->name == "footer",
+          "Legacy import preserves source sibling order from heading to footer");
 
     UiDesignerCodeView code_view;
     code_view.SetRect(0, 0, 404, 260);

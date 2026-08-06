@@ -30,6 +30,10 @@ static UiTree::Style UiDesignerHierarchyTreeStyle()
 
 bool UiDesignerHierarchyView::HierarchyTree::Key(dword key, int count)
 {
+    if((key & ~(K_SHIFT | K_CTRL | K_ALT)) == K_ESCAPE) {
+        CancelMode();
+        return true;
+    }
     if(key == K_DELETE) {
         if(WhenDelete)
             WhenDelete();
@@ -38,13 +42,155 @@ bool UiDesignerHierarchyView::HierarchyTree::Key(dword key, int count)
     return UiTree::Key(key, count);
 }
 
+UiDesignerHierarchyView::HierarchyTree::~HierarchyTree()
+{
+    ResetManualDrag(false);
+}
+
+void UiDesignerHierarchyView::HierarchyTree::LeftDown(Point p, dword flags)
+{
+    ResetManualDrag(false);
+    const UiTreeNodeRef pressed = GetNodeAt(p);
+    const bool accessory = p.x >= GetSize().cx - DPI(56);
+    UiTree::LeftDown(p, flags);
+
+    if(!pressed.IsValid() || accessory)
+        return;
+    drag_nodes_ = GetSelection();
+    if(drag_nodes_.IsEmpty())
+        return;
+    drag_start_screen_ = GetMousePos();
+    SetCapture();
+    ArmManualDragPoll();
+}
+
+void UiDesignerHierarchyView::HierarchyTree::LeftUp(Point p, dword flags)
+{
+    const bool was_dragging = dragging_;
+    const Vector<UiTreeNodeRef> nodes = clone(drag_nodes_);
+    UiTree::DropInfo target;
+    if(was_dragging && GetScreenRect().Contains(GetMousePos())) {
+        TrackDropTarget(GetMousePos() - GetScreenRect().TopLeft());
+        target = GetDropInfo();
+    }
+
+    ResetManualDrag(false);
+    ReleaseManualCapture();
+
+    if(was_dragging && target.valid && WhenManualDrop)
+        WhenManualDrop(nodes, target);
+    else if(was_dragging && WhenManualCancel)
+        WhenManualCancel();
+    else
+        UiTree::LeftUp(p, flags);
+}
+
+void UiDesignerHierarchyView::HierarchyTree::LeftDrag(Point, dword)
+{
+    UpdateManualDrag();
+}
+
+void UiDesignerHierarchyView::HierarchyTree::MouseMove(Point p, dword flags)
+{
+    if(!drag_nodes_.IsEmpty()) {
+        UpdateManualDrag();
+        return;
+    }
+    UiTree::MouseMove(p, flags);
+}
+
+Image UiDesignerHierarchyView::HierarchyTree::CursorImage(Point p, dword flags)
+{
+    return dragging_ ? Image::SizeAll() : UiTree::CursorImage(p, flags);
+}
+
+void UiDesignerHierarchyView::HierarchyTree::CancelMode()
+{
+    if(cancelling_manual_drag_)
+        return;
+    cancelling_manual_drag_ = true;
+    ResetManualDrag(true);
+    ReleaseManualCapture();
+    cancelling_manual_drag_ = false;
+    UiTree::CancelMode();
+}
+
+void UiDesignerHierarchyView::HierarchyTree::UpdateManualDrag()
+{
+    if(drag_nodes_.IsEmpty())
+        return;
+    if(!GetMouseLeft()) {
+        ResetManualDrag(true);
+        ReleaseManualCapture();
+        return;
+    }
+
+    const Point screen = GetMousePos();
+    if(!dragging_ && Length(screen - drag_start_screen_) < DPI(5))
+        return;
+    dragging_ = true;
+
+    if(GetScreenRect().Contains(screen)) {
+        TrackDropTarget(screen - GetScreenRect().TopLeft());
+        if(WhenManualDrag)
+            WhenManualDrag(drag_nodes_, GetDropInfo());
+    }
+    else
+        ClearTrackedDropTarget();
+}
+
+void UiDesignerHierarchyView::HierarchyTree::PollManualDrag()
+{
+    drag_poll_armed_ = false;
+    UpdateManualDrag();
+    if(!drag_nodes_.IsEmpty())
+        ArmManualDragPoll();
+}
+
+void UiDesignerHierarchyView::HierarchyTree::ResetManualDrag(bool notify_cancel)
+{
+    if(resetting_manual_drag_)
+        return;
+    resetting_manual_drag_ = true;
+
+    const bool active = !drag_nodes_.IsEmpty() || dragging_;
+    drag_poll_.Kill();
+    drag_poll_armed_ = false;
+    drag_nodes_.Clear();
+    dragging_ = false;
+    ClearTrackedDropTarget();
+    if(active && notify_cancel && WhenManualCancel)
+        WhenManualCancel();
+
+    resetting_manual_drag_ = false;
+}
+
+void UiDesignerHierarchyView::HierarchyTree::ReleaseManualCapture()
+{
+    if(releasing_manual_capture_)
+        return;
+    releasing_manual_capture_ = true;
+    if(HasCapture())
+        ReleaseCapture();
+    releasing_manual_capture_ = false;
+}
+
+void UiDesignerHierarchyView::HierarchyTree::ArmManualDragPoll()
+{
+    if(drag_poll_armed_ || drag_nodes_.IsEmpty())
+        return;
+    drag_poll_armed_ = true;
+    drag_poll_arm_count_++;
+    drag_poll_.KillSet(16, [=] { PollManualDrag(); });
+}
+
 UiDesignerHierarchyView::UiDesignerHierarchyView()
 {
     Add(tree_);
     tree_.SetSelectionMode(UITREESEL_MULTI)
          .SetRootVisible(false)
          .EnableInternalMutation(false)
-         .EnableDragDrop(true)
+         .EnableDragDrop(false)
          .EnableRenameOnDblClick(true)
          .ShowConnectorLines(false)
          .ShowMetadataMarker(false)
@@ -62,26 +208,47 @@ UiDesignerHierarchyView::UiDesignerHierarchyView()
         if(column == 1 || column == 2)
             CycleSizingMode(id, column == 2);
     };
-    tree_.WhenMoveRequest = [=](UiTreeMoveRequest& request) {
-        request.handled = true;
-        request.accept = false;
+    const auto ExecuteHierarchyMove = [=](const Vector<UiTreeNodeRef>& refs,
+                                          UiTree::DropInfo target) {
         if(!PlanDrop || !ExecuteDrop)
             return;
         Vector<UiDesignerNodeId> nodes;
-        for(const UiTreeNodeRef& node : request.nodes) {
+        for(const UiTreeNodeRef& node : refs) {
             const UiDesignerNodeId id = model_.FindDesignerNode(node);
             if(id)
                 nodes.Add(id);
         }
-        UiDesignerNodeId parent = model_.FindDesignerNode(request.new_parent);
+        UiDesignerNodeId parent = model_.FindDesignerNode(target.parent);
         if(!parent && document_)
             parent = document_->GetRootId();
-        UiDesignerDropPlan plan = PlanDrop(nodes, parent, request.insert_pos);
+        UiDesignerDropPlan plan = PlanDrop(nodes, parent, target.insert_pos);
         String error;
-        request.accept = plan.valid && ExecuteDrop(plan, error);
+        const bool ok = plan.valid && ExecuteDrop(plan, error);
         if(WhenDropStatus)
-            WhenDropStatus(request.accept ? "Move completed"
-                                           : (error.IsEmpty() ? plan.reason : error));
+            WhenDropStatus(ok ? "Move completed"
+                              : (error.IsEmpty() ? plan.reason : error));
+    };
+    tree_.WhenManualDrag = [=](const Vector<UiTreeNodeRef>& refs,
+                               UiTree::DropInfo target) {
+        if(!PlanDrop)
+            return;
+        Vector<UiDesignerNodeId> nodes;
+        for(const UiTreeNodeRef& node : refs) {
+            const UiDesignerNodeId id = model_.FindDesignerNode(node);
+            if(id)
+                nodes.Add(id);
+        }
+        UiDesignerNodeId parent = model_.FindDesignerNode(target.parent);
+        if(!parent && document_)
+            parent = document_->GetRootId();
+        const UiDesignerDropPlan plan = PlanDrop(nodes, parent, target.insert_pos);
+        if(WhenDropStatus)
+            WhenDropStatus(plan.valid ? plan.label : plan.reason);
+    };
+    tree_.WhenManualDrop = ExecuteHierarchyMove;
+    tree_.WhenManualCancel = [=] {
+        if(WhenDropStatus)
+            WhenDropStatus("Move cancelled");
     };
     tree_.WhenRename = [=](UiTreeNodeRef node, const String& name) {
         const UiDesignerNodeId id = model_.FindDesignerNode(node);
@@ -97,6 +264,13 @@ UiDesignerHierarchyView::UiDesignerHierarchyView()
 UiDesignerHierarchyView::~UiDesignerHierarchyView()
 {
     tree_.ClearTrackedDropTarget();
+}
+
+void UiDesignerHierarchyView::CancelMode()
+{
+    tree_.CancelMode();
+    CancelCatalogDrop();
+    ParentCtrl::CancelMode();
 }
 
 void UiDesignerHierarchyView::SetDocument(const UiDesignerDocument *document)

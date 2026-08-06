@@ -986,6 +986,11 @@ static void RegisterNative(UiDesignerCatalog& catalog)
             {{"H", "Horizontal"}, {"V", "Vertical"}});
         s.properties.Add(direction);
         s.defaults.Set("direction", "V");
+        UiDesignerPropertySpec wrap = ChoiceProperty(
+            "wrap", "Wrap", "Layout", "None",
+            {{"None", "None"}, {"Flow", "Flow"}, {"Snap", "Snap"}});
+        s.properties.Add(wrap);
+        s.defaults.Set("wrap", "None");
         catalog.Register(pick(s));
     }
     {
