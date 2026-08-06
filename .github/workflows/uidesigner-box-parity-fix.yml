@@ -22,7 +22,7 @@ jobs:
         run: |
           python3 .github/uidesigner-box-parity-fix.py
           git diff --check
-          grep -n 'dialog_actions, "wrap", "Flow"' Utilities/UiDesigner/Services/UiDesignerSession.cpp
+          grep -n 'SetLayout(actions, "wrap", "Flow")' Utilities/UiDesigner/Services/UiDesignerSession.cpp
           grep -n 'UiBoxLayout::ItemRef item = box->Add(child)' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp
           grep -n 'const UiDesignerNode& parent_node' Utilities/UiDesigner/CodeGen/UiDesignerCodeGen.cpp
           grep -n 'Generated dialog preserves the expanding semantic spacer' Utilities/UiDesigner/RegressionTests/main.cpp
