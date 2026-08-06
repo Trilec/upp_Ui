@@ -1,0 +1,33 @@
+name: UiDesigner preset and legacy migration
+
+on:
+  push:
+    branches: [ agent/uidesigner-presets-legacy-rc ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uidesigner-presets-legacy-rc
+          fetch-depth: 0
+      - name: Apply migration
+        run: |
+          python3 .github/uidesigner-presets-legacy-rc.py
+          git diff --check
+          grep -q 'InsertPreset' Utilities/UiDesigner/Services/UiDesignerSession.cpp
+          grep -q 'HolyGrail' Utilities/UiDesigner/Services/UiDesignerPresets.cpp
+          grep -q 'explicit-children' Utilities/UiDesigner/Core/UiDesignerSerialization.cpp
+      - name: Publish clean source commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner restores composable presets and legacy order"
+          git push origin HEAD:main
+          git push origin --delete agent/uidesigner-presets-legacy-rc
