@@ -1,0 +1,32 @@
+name: UiDesigner transparent spacer correction
+
+on:
+  push:
+    branches: [ agent/uidesigner-transparent-spacer ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uidesigner-transparent-spacer
+          fetch-depth: 0
+      - name: Apply and verify source correction
+        run: |
+          python3 .github/uidesigner-transparent-spacer-fix.py
+          git diff --check
+          grep -n 'Semantic spacers have no runtime face' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp
+          ! grep -A12 -n 'void UiDesignerPreviewCanvas::PaintSemantic' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp | grep 'w.DrawRect(r, Blend'
+      - name: Publish clean source commit to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner keeps semantic spacers visually transparent"
+          git push origin HEAD:main
+          git push origin --delete agent/uidesigner-transparent-spacer
