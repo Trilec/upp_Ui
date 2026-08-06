@@ -12,20 +12,22 @@
     =============
 
     Purpose
-    - Professional multi-slot colour picker with spectrum, palette, harmony
-      generation, image extraction, drag-and-drop, and screen sampling.
+    - Compact four-page colour workspace for precise colour editing, curated
+      palette browsing, deterministic palette generation, and image extraction.
 
     Architecture
-    - Three permanent navigation buttons drive a headless UiStack.
-    - Slot controls and the OK/Cancel footer live outside the stack and therefore
-      never move or disappear when pages change.
-    - All user colour changes converge through one committed model path.
+    - Color, Palettes, Generator, and Image are permanent UiStack pages.
+    - Caller-facing slots, shared User Stash, readout, OK, and Cancel remain
+      outside the page stack.
+    - Page composition uses Ui controls and Ui layouts. Custom rendering is
+      limited to the spectrum, colour wheels, swatch faces, and image canvas.
+    - Deterministic palette/image algorithms are implemented outside Paint().
     - GUI thread only.
 
     Changelog
-    - 2026-07: four-mode stack refactor, persistent footer and slots, full
-       colour-expression editing, native internal drag-and-drop, corrected
-       palette registry, harmony/image generation, and eyedropper.
+    - 2026-08: Palette Lab migration; Image promoted to a page, shared 28-cell
+      stash, multi-selection/group transfer, deterministic 2-12 swatch generator,
+      bounded image proxy analysis, and compatibility-preserving public API.
 */
 
 #include <Ui/Ui.h>
@@ -54,24 +56,28 @@ public:
         StyledMetrics metrics;
         StyledSkin    skin;
 
-        int navigation_height = DPI(58);
-        int footer_height = DPI(48);
+        int navigation_height = DPI(34);
+        int stash_height = DPI(78);
+        int footer_height = DPI(42);
         int slot_size = DPI(26);
         int slot_gap = DPI(4);
-        int page_gap = DPI(10);
-        int right_panel_width = DPI(350);
-        int section_gap = DPI(8);
-        int readout_row_height = DPI(28);
-        int channel_row_height = DPI(28);
-        int button_height = DPI(30);
+        int page_gap = DPI(6);
+        int right_panel_width = DPI(350); // compatibility metric
+        int section_gap = DPI(6);
+        int readout_row_height = DPI(28); // compatibility metric
+        int channel_row_height = DPI(28); // compatibility metric
+        int button_height = DPI(24);
+        int wheel_minimum = DPI(190);
+        int swatch_minimum = DPI(26);
 
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
               % navigation_height % footer_height
-              % slot_size % slot_gap
-              % page_gap % right_panel_width % section_gap
-              % readout_row_height % channel_row_height % button_height;
+              % slot_size % slot_gap % page_gap % right_panel_width
+              % section_gap % readout_row_height % channel_row_height
+              % button_height
+              % stash_height % wheel_minimum % swatch_minimum;
         }
     };
 
@@ -79,6 +85,7 @@ public:
         PAGE_COLOR = 0,
         PAGE_PALETTES,
         PAGE_GENERATOR,
+        PAGE_IMAGE,
         PAGE_COUNT
     };
 
@@ -115,7 +122,43 @@ public:
         HARMONY_COMPOUND,
         HARMONY_SHADES,
         HARMONY_MONOCHROMATIC,
-        HARMONY_IMAGE_EXTRACT
+        HARMONY_IMAGE_EXTRACT // legacy persisted value; Image is now a page
+    };
+
+    enum DistributionMode : byte {
+        DISTRIBUTION_BALANCED = 0,
+        DISTRIBUTION_DOMINANT,
+        DISTRIBUTION_ACCENT_POP,
+        DISTRIBUTION_TONAL_RAMP,
+        DISTRIBUTION_FREE_FORM,
+        DISTRIBUTION_COUNT
+    };
+
+    enum MediumMode : byte {
+        MEDIUM_UI = 0,
+        MEDIUM_WEB,
+        MEDIUM_PRINT,
+        MEDIUM_PAINTING,
+        MEDIUM_IMAGE_VFX,
+        MEDIUM_COUNT
+    };
+
+    enum ImageAnalysisMode : byte {
+        IMAGE_REPRESENTATIVE = 0,
+        IMAGE_INTERFACE,
+        IMAGE_ACCENT_FINDER,
+        IMAGE_NATURE_SCENE,
+        IMAGE_PAINT_MATERIAL,
+        IMAGE_MANUAL_POINTS,
+        IMAGE_ANALYSIS_COUNT
+    };
+
+    enum ImageCoverageMode : byte {
+        COVERAGE_AREA_WEIGHTED = 0,
+        COVERAGE_BALANCED,
+        COVERAGE_BORDER_AWARE,
+        COVERAGE_DISTINCTIVE,
+        COVERAGE_COUNT
     };
 
     enum StashDropMode : byte {
@@ -143,16 +186,16 @@ public:
     void           OnStyleChanged();
 
     UiColorPicker& SetPageMode(PageMode mode);
-    PageMode       GetPageMode() const { return page_mode_; }
+    PageMode       GetPageMode() const;
 
     UiColorPicker& SetChannelMode(ChannelMode mode);
-    ChannelMode    GetChannelMode() const { return channel_mode_; }
+    ChannelMode    GetChannelMode() const;
 
     UiColorPicker& SetSlotCount(int n);
-    int            GetSlotCount() const { return slot_count_; }
+    int            GetSlotCount() const;
 
     UiColorPicker& SetActiveSlot(int i);
-    int            GetActiveSlot() const { return active_slot_; }
+    int            GetActiveSlot() const;
 
     UiColorPicker& SetSlotColor(int i, Color c, bool fire = true);
     Color          GetSlotColor(int i) const;
@@ -165,36 +208,49 @@ public:
     Vector<SlotValue> GetSlots() const;
 
     UiColorPicker& SetColor(Color c, bool fire = true);
-    Color          GetColor() const { return GetSlotColor(active_slot_); }
+    Color          GetColor() const;
     UiColorPicker& SetAlpha(int alpha, bool fire = true);
-    int            GetAlpha() const { return GetSlotAlpha(active_slot_); }
+    int            GetAlpha() const;
 
     UiColorPicker& SetSlotLabel(int i, const String& s);
     String         GetSlotLabel(int i) const;
 
     UiColorPicker& SetAlphaEnabled(bool on = true);
-    bool           IsAlphaEnabled() const { return alpha_enabled_; }
+    bool           IsAlphaEnabled() const;
 
     UiColorPicker& SetSpectrumMode(SpectrumMode mode);
-    SpectrumMode   GetSpectrumMode() const { return spectrum_mode_; }
+    SpectrumMode   GetSpectrumMode() const;
 
     UiColorPicker& SetHarmonyMode(HarmonyMode mode);
-    HarmonyMode    GetHarmonyMode() const { return harmony_mode_; }
+    HarmonyMode    GetHarmonyMode() const;
+
+    UiColorPicker& SetDistributionMode(DistributionMode mode);
+    DistributionMode GetDistributionMode() const;
+
+    UiColorPicker& SetMediumMode(MediumMode mode);
+    MediumMode     GetMediumMode() const;
+
+    UiColorPicker& SetGeneratorCount(int count);
+    int            GetGeneratorCount() const;
+    Vector<SlotValue> GetGeneratedPalette() const;
 
     UiColorPicker& SetGeneratorImage(const Image& image);
-    const Image&   GetGeneratorImage() const { return generator_image_; }
+    const Image&   GetGeneratorImage() const;
     UiColorPicker& ExtractGeneratorPalette(int count = 12);
+    Vector<SlotValue> GetImagePalette() const;
 
     UiColorPicker& AddUserSwatch(Color c);
     UiColorPicker& AddUserSwatch(Color c, int alpha);
+    UiColorPicker& AddUserSwatches(const Vector<SlotValue>& values, bool transactional = true);
     UiColorPicker& ClearUserSwatches();
     UiColorPicker& ClearRecentSwatches();
 
     int            GetUserSwatchCount() const;
     int            GetRecentSwatchCount() const;
+    Vector<SlotValue> GetUserSwatches() const;
 
     UiColorPicker& EnableSessionPersistence(bool on = true);
-    bool           IsSessionPersistenceEnabled() const { return session_persistence_; }
+    bool           IsSessionPersistenceEnabled() const;
     static void    ClearSharedSession();
 
     bool           IsScreenEyedropperAvailable() const;
@@ -223,228 +279,27 @@ public:
     virtual Image  CursorImage(Point p, dword flags) override;
     virtual void   CancelMode() override;
 
-    Event<>        WhenAction;
-    Event<>        WhenChanging;
-    Event<>        WhenAccept;
-    Event<>        WhenCancel;
-    Event<int>     WhenSlotChanged;
+    Event<>         WhenAction;
+    Event<>         WhenChanging;
+    Event<>         WhenAccept;
+    Event<>         WhenCancel;
+    Event<int>      WhenSlotChanged;
     Event<PageMode> WhenPageChanged;
     Event<ChannelMode> WhenChannelModeChanged;
 
 private:
-    struct SlotData : Moveable<SlotData> {
-        Color  color = Black();
-        int    alpha = 255;
-        String label;
-
-        SlotValue Export(bool alpha_enabled = true) const
-        {
-            SlotValue out;
-            out.color = color;
-            out.alpha = alpha_enabled ? alpha : 255;
-            out.label = label;
-            return out;
-        }
-    };
-
-    class ColorField;
-    class SwatchGrid;
-    class ColorSlotButton;
-    class ChannelGroup;
-    class ReadoutRow;
-    class ImagePreview;
-    class HarmonyWheel;
+    class Impl;
 
     Style&         StyleEdit();
     void           InvalidateStyleCache();
     void           SyncThemeStyle();
     const Style&   GetEffectiveStyle() const;
 
-    void           BuildChildTree();
-    void           ConfigureControls();
-    void           WireEvents();
-
-    void           LoadSharedSession();
-    void           SaveSharedSession(bool include_slots);
-    void           HandleAccept();
-    void           HandleCancel();
-
-    void           SyncAllFromActiveSlot();
-    void           SyncChannelGroups();
-    void           SyncReadouts();
-    void           SyncSlotButtons();
-    void           SyncSpectrumMode();
-    void           SyncPageButtons();
-    void           SyncChannelButtons();
-    void           SyncThemeToChildren();
-
-    void           CommitColor(Color color, bool final_commit);
-    void           CommitAlpha(int alpha, bool final_commit);
-    void           CommitSlotValue(int slot, Color color, int alpha, bool final_commit);
-    void           FinishLiveGesture();
-    void           PushRecentColor(Color color, int alpha);
-
-    void           HandlePrimarySlot(int index);
-    void           HandlePreviousSlot(int index);
-    void           HandleColorDrop(int slot, const SlotValue& value);
-    bool           TryApplyColorText(const String& text, bool final_commit);
-    bool           TryApplyReadoutText(int readout, const String& text, bool final_commit);
-
-    void           HandleChannelValue(ChannelMode mode, int row, double value, bool final_commit);
-    void           RefreshChannelModeValues(ChannelMode mode);
-    void           UpdateAlphaAvailability();
-
-    void           PopulatePaletteSelectors();
-    void           SetPaletteIndex(int index);
-    void           RefreshPaletteGrid();
-    void           HandlePalettePick(int index, const SlotValue& value);
-    void           HandleStashPick(int index, const SlotValue& value);
-    void           HandlePaletteDropToStash(int index, const SlotValue& value);
-    void           RefreshUserStash();
-    void           SaveSelectedPaletteToStash();
-    void           UseSelectedPaletteColor();
-    void           UseSelectedStashColor();
-
-    void           RefreshGeneratorPalette();
-    void           SetGeneratorMode(int mode);
-    void           HandleGeneratorPick(int index, const SlotValue& value);
-    void           LoadGeneratorImage();
-    void           SaveGeneratedToStash();
-    void           UseGeneratedColor();
-    void           SavePaletteJson();
-    void           LoadPaletteJson();
-    void           SyncFooterReadout(const SlotValue& value);
-
-    void           StartEyedropper();
-    void           FinishEyedropperState(bool commit);
-    void           StopEyedropper(bool commit);
-    void           SampleEyedropper(bool final_commit);
-
-private:
     Style          style_;
     mutable Style  themed_style_;
     mutable uint64 theme_revision_ = 0;
-    uint64         children_theme_revision_ = 0;
-    bool           children_style_dirty_ = true;
     bool           has_custom_style_ = false;
-
-    bool           syncing_controls_ = false;
-    bool           session_persistence_ = true;
-    bool           accepted_ = false;
-    bool           live_gesture_ = false;
-    int            live_slot_ = -1;
-    bool           eyedropper_active_ = false;
-    bool           eyedropper_dragging_ = false;
-    bool           stopping_eyedropper_ = false;
-    bool           finishing_eyedropper_ = false;
-    dword          live_callback_ms_ = 0;
-
-    int            slot_count_ = 4;
-    int            active_slot_ = 0;
-    bool           alpha_enabled_ = true;
-    PageMode       page_mode_ = PAGE_COLOR;
-    SpectrumMode   spectrum_mode_ = SPECTRUM_HUE_STRIP;
-    ChannelMode    channel_mode_ = CHANNEL_RGB_FLOAT;
-    HarmonyMode    harmony_mode_ = HARMONY_TRIAD;
-    int            remembered_hue_ = 0;
-
-    int            palette_category_ = 0;
-    int            palette_index_ = 0;
-    int            selected_palette_index_ = -1;
-    int            selected_stash_index_ = -1;
-    int            selected_generated_index_ = -1;
-    int            generated_base_count_ = 0;
-    StashDropMode  stash_drop_mode_ = STASH_MIX;
-
-    Vector<SlotData> slots_;
-    Vector<SlotData> opening_slots_;
-    Vector<SlotData> previous_slots_;
-    Vector<SlotData> recent_swatches_;
-    Vector<SlotData> user_swatches_;
-    Vector<SlotData> generated_swatches_;
-    SlotData         live_origin_;
-    SlotValue        selected_palette_value_;
-    SlotValue        selected_stash_value_;
-    SlotValue        selected_generated_value_;
-    SlotValue        footer_value_;
-
-    Image            generator_image_;
-    Color            generator_base_color_ = Color(0, 120, 212);
-    int              generator_mode_ = 2;
-
-    UiBoxLayout      main_root_ { UiBoxLayout::Direction::V };
-    UiBoxLayout      navigation_bar_ { UiBoxLayout::Direction::H };
-    UiBoxLayout      footer_bar_ { UiBoxLayout::Direction::H };
-    Ctrl             navigation_spacer_;
-    UiButton         page_button_[PAGE_COUNT];
-    UiLineEdit       footer_hex_;
-    UiLineEdit       footer_detail_;
-    UiButton         accept_button_;
-    UiButton         cancel_button_;
-
-    One<ColorSlotButton> current_slot_button_;
-    ParentCtrl       slot_grid_host_;
-    One<ColorSlotButton> primary_slot_button_[4];
-    One<ColorSlotButton> previous_slot_button_[4];
-
-    UiStack          page_stack_;
-    ParentCtrl       color_page_;
-    ParentCtrl       palette_page_;
-    ParentCtrl       generator_page_;
-
-    One<ColorField>  color_field_;
-    UiDropdown       spectrum_mode_drop_;
-    UiToolButton     eyedropper_button_;
-    UiLabel          hue_axis_label_;
-    UiLabel          gain_axis_label_;
-    UiSlider         hue_axis_slider_ { UiDirection::H };
-    UiSlider         gain_axis_slider_ { UiDirection::H };
-    UiLineEdit       hue_axis_edit_;
-    UiLineEdit       gain_axis_edit_;
-
-    UiButton         channel_button_[CHANNEL_COUNT];
-    UiDropdown       channel_mode_drop_;
-    UiToggle         alpha_toggle_;
-    UiLabel          alpha_toggle_label_;
-    UiStack          channel_stack_;
-    One<ChannelGroup> channel_group_[CHANNEL_COUNT];
-
-    One<ReadoutRow>  readout_hsv_;
-    One<ReadoutRow>  readout_hex_;
-    One<ReadoutRow>  readout_hsl_;
-    One<ReadoutRow>  readout_rgb_float_;
-    One<ReadoutRow>  readout_cmyk_;
-    One<ReadoutRow>  readout_rgb_int_;
-
-    One<SwatchGrid>  recent_grid_;
-    UiDropdown       palette_category_drop_;
-    UiDropdown       palette_drop_;
-    UiLabel          palette_badge_;
-    One<SwatchGrid>  palette_grid_;
-    UiLabel          stash_title_;
-    One<SwatchGrid>  stash_grid_;
-    UiDropdown       stash_drop_mode_drop_;
-    UiButton         palette_export_button_;
-    UiButton         palette_import_button_;
-    UiButton         stash_clear_button_;
-
-    UiDropdown       harmony_drop_;
-    UiButton         generator_mode_button_[3];
-    UiButton         generator_refresh_button_;
-    UiButton         generator_load_image_button_;
-    UiButton         generator_clear_samples_button_;
-    UiLabel          generator_gain_label_;
-    UiSlider         generator_gain_slider_ { UiDirection::H };
-    UiLineEdit       generator_gain_edit_;
-    UiLabel          generator_count_label_;
-    UiSlider         generator_count_slider_ { UiDirection::H };
-    UiLineEdit       generator_count_edit_;
-    UiButton         generator_use_button_;
-    UiButton         generator_save_button_;
-    One<ImagePreview> generator_image_preview_;
-    One<HarmonyWheel> generator_wheel_;
-    One<SwatchGrid>  generator_grid_;
-    UiLabel          generator_hint_;
+    One<Impl>      impl_;
 };
 
 }
