@@ -4,7 +4,9 @@ on:
   push:
     branches: [ main ]
     paths:
-      - .github/uidesigner-focused-acceptance.py.gz.b64
+      - .github/uidesigner-focused-acceptance.part00
+      - .github/uidesigner-focused-acceptance.part01
+      - .github/uidesigner-focused-acceptance.part02
       - .github/workflows/uidesigner-focused-acceptance.yml
   workflow_dispatch:
 
@@ -21,13 +23,19 @@ jobs:
       - name: Apply focused acceptance correction
         shell: bash
         run: |
-          base64 -d .github/uidesigner-focused-acceptance.py.gz.b64 | gzip -d > /tmp/fix.py
+          cat .github/uidesigner-focused-acceptance.part00 \
+              .github/uidesigner-focused-acceptance.part01 \
+              .github/uidesigner-focused-acceptance.part02 \
+            | base64 -d | gzip -d > /tmp/fix.py
           python3 /tmp/fix.py
           git diff --check
           ! grep -n 'h_sizing\|v_sizing' Utilities/UiDesigner/Services/UiDesignerSession.cpp | grep dialog_action_spacer
           grep -n 'CycleSizingMode(id, height' Utilities/UiDesigner/UiDesigner/UiDesignerWindow.cpp
           grep -n 'property == "direction" || property == "wrap"' Utilities/UiDesigner/Preview/UiDesignerPreview.cpp
           rm -f .github/uidesigner-focused-acceptance.py.gz.b64
+          rm -f .github/uidesigner-focused-acceptance.part00
+          rm -f .github/uidesigner-focused-acceptance.part01
+          rm -f .github/uidesigner-focused-acceptance.part02
           rm -f .github/workflows/uidesigner-focused-acceptance.yml
       - name: Commit and publish correction
         shell: bash
