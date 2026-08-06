@@ -1,5 +1,18 @@
 # SymbolPicker Changelog
 
+## 0.3.4 - Captured gesture stability
+
+- Added one explicit captured gesture tracker shared by library and collection tiles.
+- Intentional capture release no longer reports cancellation before completion.
+- Terminal results carry stable source identity and release screen position.
+- Added deterministic lifecycle smoke coverage, including 1,000 mixed cycles.
+- Added a mouse-transparent drag preview and multi-selection count.
+- Collection selection now updates tiles in place instead of destroying the active tile.
+- Filtered collection reorder now uses underlying collection item indexes.
+- Removed per-gesture tooltip registration churn; tile tooltips remain disabled.
+- Separated normal result/selection status from Debug-only timing and gesture evidence.
+- Suppressed broad model refresh for Bin-only additions.
+
 ## 0.4.6
 
 - replaced the collection-only JSON stub with project-level `.uppicons.json` I/O

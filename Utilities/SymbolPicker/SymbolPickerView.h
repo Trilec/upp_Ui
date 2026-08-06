@@ -6,6 +6,7 @@
 #include "SymbolPickerCommands.h"
 #include "SymbolPickerExport.h"
 #include "SymbolPickerIconImageCache.h"
+#include "SymbolPickerGesture.h"
 
 #include <Ui/Ui.h>
 
@@ -28,6 +29,21 @@ private:
 	Color       color_ = Null;
 };
 
+class SymbolPickerDragPreview : public ParentCtrl {
+public:
+    typedef SymbolPickerDragPreview CLASSNAME;
+
+    SymbolPickerDragPreview();
+    void SetPreview(const Image& image, int count);
+
+    virtual void Paint(Draw& w) override;
+    virtual Size GetMinSize() const override;
+
+private:
+    Image image_;
+    int count_ = 1;
+};
+
 class SymbolPickerIconTile : public ParentCtrl {
 public:
 	typedef SymbolPickerIconTile CLASSNAME;
@@ -36,6 +52,7 @@ public:
 
 	void SetEntry(const SymbolPickerIconEntry& entry);
 	void SetPreviewImage(const Image& image);
+	const Image& GetPreviewImage() const { return preview_; }
 	const SymbolPickerIconEntry& GetEntry() const { return entry_; }
 	String GetCatalogId() const;
 	String GetSourceId() const;
@@ -46,7 +63,7 @@ public:
 	Event<> WhenActivated;
 	Event<> WhenDragStart;
 	Event<Point> WhenDragMove;
-	Event<bool> WhenDragFinished;
+	Event<SymbolPickerGestureResult> WhenDragFinished;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;
@@ -68,12 +85,10 @@ private:
 	Label meta_;
 	Image preview_;
 	String tooltip_text_;
-	bool  tooltip_enabled_ = true;
+	bool  tooltip_enabled_ = false;
 	bool  hovered_ = false;
 	bool  selected_ = false;
-	bool  pressed_ = false;
-	bool  dragging_ = false;
-	Point press_point_;
+	SymbolPickerGestureTracker gesture_;
 };
 
 class SymbolPickerCollectionTile : public ParentCtrl {
@@ -84,6 +99,7 @@ public:
 
 	void SetItem(const SymbolPickerIconRef& item, int index);
 	void SetPreviewImage(const Image& image);
+	const Image& GetPreviewImage() const { return preview_; }
 	int GetItemIndex() const { return item_index_; }
 	void SetSelected(bool selected);
 	void SetTooltipEnabled(bool enabled);
@@ -102,19 +118,17 @@ public:
 	Event<dword> WhenSelected;
 	Event<> WhenDragStart;
 	Event<Point> WhenDragMove;
-	Event<bool> WhenDragFinished;
+	Event<SymbolPickerGestureResult> WhenDragFinished;
 
 private:
 	Label title_;
 	Label meta_;
 	Image preview_;
 	String tooltip_text_;
-	bool  tooltip_enabled_ = true;
+	bool  tooltip_enabled_ = false;
 	bool  hovered_ = false;
 	bool  selected_ = false;
-	bool  pressed_ = false;
-	bool  dragging_ = false;
-	Point press_point_;
+	SymbolPickerGestureTracker gesture_;
 	bool  unresolved_ = false;
 	int   item_index_ = -1;
 };
@@ -193,14 +207,19 @@ private:
 	void NormalizeCollectionSelectionAfterModelChange();
 	bool RemoveSelectedCollectionItems();
 	void SetDragInteractionActive(bool active);
+	void ShowDragPreview(const Image& image, int count, Point screen);
+	void MoveDragPreview(Point screen);
+	void HideDragPreview();
 	void HandleLibraryGestureMove(Point screen);
-	void HandleLibraryGestureRelease();
+	void HandleLibraryGestureRelease(const SymbolPickerGestureResult& result);
 	void HandleCollectionGestureMove(Point screen);
-	void HandleCollectionGestureRelease();
+	void HandleCollectionGestureRelease(const SymbolPickerGestureResult& result);
 	int GetCollectionDropInsertIndex(Point p) const;
 	String MakeCollectionAlias(const SymbolPickerIconEntry& entry) const;
 	void SelectLibraryCatalogId(const String& catalog_id);
 	void UpdateLibraryTileSelection();
+	void UpdateCollectionTileSelection();
+	void UpdateLibraryStatus();
 
 	UiBoxLayout main_box_ { UiDirection::V };
 	UiBoxLayout top_heading_layout_ { UiDirection::H };
@@ -250,6 +269,7 @@ private:
 	UiLineEdit  collections_filter_edit_;
 	SymbolPickerDropScrollPanel collections_scroll_panel_;
 	UiLabel     collections_empty_label_;
+	SymbolPickerDragPreview drag_preview_;
 
 	UiBoxLayout category_content_layout_ { UiDirection::H };
 	UiBoxLayout library_content_layout_ { UiDirection::H };
@@ -266,8 +286,9 @@ private:
 	bool            drag_interaction_active_ = false;
 	bool            pending_model_refresh_ = false;
 	bool            suppress_model_refresh_ = false;
-	String          active_library_drag_id_;
-	int             active_collection_drag_index_ = -1;
+	int             library_visible_count_ = 0;
+	int             library_total_count_ = 0;
+	bool            library_result_limited_ = false;
 
 	virtual bool Key(dword key, int count) override;
 

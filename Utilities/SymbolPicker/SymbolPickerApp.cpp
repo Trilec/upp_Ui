@@ -7,6 +7,8 @@ static const bool kEnableLocalDemoData = false;
 
 bool SymbolPickerApp::Init(String& error)
 {
+	if(!RunSymbolPickerGestureSmokeTests(error))
+		return false;
 	if(!RunSymbolPickerCommandSmokeTests(error))
 		return false;
 	if(!RunSymbolPickerCatalogSmokeTests(error))

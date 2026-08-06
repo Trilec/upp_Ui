@@ -30,6 +30,8 @@ file
 	SymbolPickerUppExport.cpp,
 	SymbolPickerImlExport.h,
 	SymbolPickerImlExport.cpp,
+	SymbolPickerGesture.h,
+	SymbolPickerGesture.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
 	SymbolPickerApp.h,
