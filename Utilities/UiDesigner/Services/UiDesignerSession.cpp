@@ -221,7 +221,7 @@ void UiDesignerSession::ApplyPresetDialog()
     const UiDesignerNodeId actions = Add(*box, "dialog_actions", column,
                                          "Add dialog actions");
     SetLayout(actions, "direction", "H");
-    SetLayout(actions, "wrap", "None");
+    SetLayout(actions, "wrap", "Flow");
     SetLayout(actions, "gap", 8);
     SetLayout(actions, "inset", 0);
     SetLayout(actions, "width_mode", "Expand");

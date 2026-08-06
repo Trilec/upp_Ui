@@ -1750,7 +1750,8 @@ static void ConfigureBoxSpacer(UiBoxLayout& box,
             horizontal ? "width_mode" : "height_mode",
             node.GetProperty(horizontal ? "h_sizing" : "v_sizing", "Fit"));
         const String cross_mode = node.GetProperty(
-            horizontal ? "v_sizing" : "h_sizing", "Auto");
+            horizontal ? "height_mode" : "width_mode",
+            node.GetProperty(horizontal ? "v_sizing" : "h_sizing", "Fit"));
         const int fixed_main = node.GetProperty(
             horizontal ? "fixed_width" : "fixed_height", 0);
         const int fixed_cross = node.GetProperty(
@@ -1914,7 +1915,48 @@ static void AttachRuntimeChild(Ctrl& parent, Ctrl& child,
     }
     else if(auto *box = dynamic_cast<UiBoxLayout *>(&parent)) {
         layout_item_index = box->GetItemCount();
-        box->Add(child);
+        UiBoxLayout::ItemRef item = box->Add(child);
+        const bool horizontal = box->GetDirection() == UiDirection::H;
+        const Size natural = max(child.GetMinSize(), Size(1, 1));
+        const UiDesignerBoxSizing sizing = UiDesignerResolveBoxSizing(
+            node, horizontal,
+            horizontal ? natural.cx : natural.cy,
+            horizontal ? natural.cy : natural.cx);
+
+        if(sizing.main.mode == "Expand")
+            item.Expand(max(1, sizing.weight));
+        else if(sizing.main.mode == "Fixed")
+            item.Fixed(max(1, sizing.main.fixed > 0
+                              ? sizing.main.fixed : sizing.main.natural));
+        else
+            item.Fit();
+
+        const int main_fixed = max(1, sizing.main.fixed > 0
+                                      ? sizing.main.fixed : sizing.main.natural);
+        const int main_min = sizing.main.mode == "Fixed"
+            ? main_fixed : sizing.main.min;
+        const int main_max = sizing.main.mode == "Fixed" ? main_fixed
+            : (sizing.main.max > 0 ? max(sizing.main.max, main_min) : INT_MAX);
+        item.MinMaxMain(main_min, main_max);
+
+        if(sizing.cross.mode == "Expand") {
+            const int cross_min = sizing.cross.min;
+            const int cross_max = sizing.cross.max > 0
+                ? max(sizing.cross.max, cross_min) : INT_MAX;
+            item.MinMaxCross(cross_min, cross_max)
+                .AlignSelf(UiCrossAlign::Stretch);
+        }
+        else {
+            const int extent = sizing.cross.mode == "Fixed"
+                ? max(1, sizing.cross.fixed > 0
+                         ? sizing.cross.fixed : sizing.cross.natural)
+                : sizing.cross.min;
+            const int cross_max = sizing.cross.mode == "Fixed" ? extent
+                : (sizing.cross.max > 0
+                   ? max(sizing.cross.max, extent) : INT_MAX);
+            item.MinMaxCross(extent, cross_max)
+                .AlignSelf(UiDesignerResolveBoxAlign(sizing.cross_align));
+        }
     }
     else if(auto *grid = dynamic_cast<UiGridLayout *>(&parent)) {
         layout_item_index = grid->GetItemCount();

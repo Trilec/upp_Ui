@@ -813,9 +813,11 @@ void UiDesignerCodeGenerator::EmitSpacer(
         if(!is_break) {
             const bool horizontal = (String)parent.GetProperty("direction", "V") == "H";
             const String main_mode = spacer.GetProperty(
-                horizontal ? "h_sizing" : "v_sizing", "Auto");
+                horizontal ? "width_mode" : "height_mode",
+                spacer.GetProperty(horizontal ? "h_sizing" : "v_sizing", "Fit"));
             const String cross_mode = spacer.GetProperty(
-                horizontal ? "v_sizing" : "h_sizing", "Auto");
+                horizontal ? "height_mode" : "width_mode",
+                spacer.GetProperty(horizontal ? "v_sizing" : "h_sizing", "Fit"));
             const int fixed_main = spacer.GetProperty(
                 horizontal ? "fixed_width" : "fixed_height", 0);
             const int fixed_cross = spacer.GetProperty(
@@ -901,6 +903,7 @@ struct UiDesignerChildAttachContext {
     String& out;
     const String& parent;
     const String& member;
+    const UiDesignerNode& parent_node;
     const UiDesignerNode& child;
     const String& title;
 };
@@ -923,7 +926,59 @@ static void AttachAdd(UiDesignerChildAttachContext& c)
 
 static void AttachBox(UiDesignerChildAttachContext& c)
 {
-    c.out << "\t" << c.parent << ".Add(" << c.member << ").Fit();\n";
+    const bool horizontal =
+        AsString(c.parent_node.GetProperty("direction", "V")) == "H";
+    const String main_mode = AsString(c.child.GetProperty(
+        horizontal ? "width_mode" : "height_mode", "Fit"));
+    const String cross_mode = AsString(c.child.GetProperty(
+        horizontal ? "height_mode" : "width_mode", "Fit"));
+    const int fixed_main = max(0, (int)c.child.GetProperty(
+        horizontal ? "fixed_width" : "fixed_height", 0));
+    const int fixed_cross = max(0, (int)c.child.GetProperty(
+        horizontal ? "fixed_height" : "fixed_width", 0));
+    const int min_main = max(0, (int)c.child.GetProperty(
+        horizontal ? "min_width" : "min_height", 0));
+    const int max_main = max(0, (int)c.child.GetProperty(
+        horizontal ? "max_width" : "max_height", 0));
+    const int min_cross = max(0, (int)c.child.GetProperty(
+        horizontal ? "min_height" : "min_width", 0));
+    const int max_cross = max(0, (int)c.child.GetProperty(
+        horizontal ? "max_height" : "max_width", 0));
+    const String cross_align = AsString(c.child.GetProperty(
+        horizontal ? "cell_align_y" : "cell_align_x", "Center"));
+    const int weight = max(1, (int)(double)c.child.GetProperty("weight", 1.0));
+
+    String chain = c.parent + ".Add(" + c.member + ")";
+    if(main_mode == "Expand")
+        chain << ".Expand(" << weight << ")";
+    else if(main_mode == "Fixed" && fixed_main > 0)
+        chain << ".Fixed(DPI(" << fixed_main << "))";
+    else
+        chain << ".Fit()";
+
+    if(main_mode == "Fixed" && fixed_main > 0)
+        chain << ".MinMaxMain(DPI(" << fixed_main << "), DPI("
+              << fixed_main << "))";
+    else if(min_main || max_main)
+        chain << ".MinMaxMain(DPI(" << min_main << "), "
+              << (max_main ? "DPI(" + AsString(max_main) + ")" : "INT_MAX")
+              << ")";
+
+    if(cross_mode == "Fixed" && fixed_cross > 0)
+        chain << ".MinMaxCross(DPI(" << fixed_cross << "), DPI("
+              << fixed_cross << "))";
+    else if(min_cross || max_cross)
+        chain << ".MinMaxCross(DPI(" << min_cross << "), "
+              << (max_cross ? "DPI(" + AsString(max_cross) + ")" : "INT_MAX")
+              << ")";
+
+    if(cross_mode == "Expand" || cross_align == "Stretch" ||
+       cross_align == "Fill")
+        chain << ".AlignSelf(UiCrossAlign::Stretch)";
+    else
+        chain << ".AlignSelf(" << BoxAlignExpr(cross_align) << ")";
+
+    c.out << "\t" << chain << ";\n";
 }
 
 static void AttachGrid(UiDesignerChildAttachContext& c)
@@ -1150,7 +1205,8 @@ void UiDesignerCodeGenerator::EmitChildren(
         }
 
         if(adapter) {
-            UiDesignerChildAttachContext context{out, parent, member, *child, title};
+            UiDesignerChildAttachContext context{
+                out, parent, member, node, *child, title};
             adapter->emit(context);
         }
         else

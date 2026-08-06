@@ -81,6 +81,53 @@ CONSOLE_APP_MAIN
               metadata_model.GetGroupSubtitle("Identity").IsEmpty(),
           "Clearing a present subtitle emits one metadata event");
 
+    UiDesignerSession dialog_session;
+    dialog_session.NewDocument("dialog");
+    const UiDesignerDocument& dialog_document = dialog_session.Document();
+    const UiDesignerNode *dialog_actions = nullptr;
+    for(const UiDesignerNode& candidate : dialog_document.GetNodes())
+        if(candidate.name == "dialog_actions") {
+            dialog_actions = &candidate;
+            break;
+        }
+    Check(dialog_actions &&
+              AsString(dialog_actions->GetProperty("direction", "")) == "H" &&
+              AsString(dialog_actions->GetProperty("wrap", "")) == "Flow",
+          "Dialog actions author horizontal Flow layout before any Inspector toggle");
+    if(dialog_actions) {
+        Check(dialog_actions->children.GetCount() == 3,
+              "Dialog actions retain Spacer, Cancel and OK source order");
+        if(dialog_actions->children.GetCount() == 3) {
+            const UiDesignerNode *spacer_node =
+                dialog_document.Find(dialog_actions->children[0]);
+            const UiDesignerNode *cancel_node =
+                dialog_document.Find(dialog_actions->children[1]);
+            const UiDesignerNode *ok_node =
+                dialog_document.Find(dialog_actions->children[2]);
+            Check(spacer_node && spacer_node->type == "Spacer" &&
+                      AsString(spacer_node->GetProperty("width_mode", "")) == "Expand",
+                  "Dialog action spacer expands on the horizontal main axis");
+            Check(cancel_node && ok_node &&
+                      AsString(cancel_node->GetProperty("width_mode", "")) == "Fixed" &&
+                      AsString(ok_node->GetProperty("width_mode", "")) == "Fixed" &&
+                      (int)cancel_node->GetProperty("fixed_width", 0) == 88 &&
+                      (int)ok_node->GetProperty("fixed_width", 0) == 88,
+                  "Dialog buttons retain fixed widths");
+        }
+    }
+    UiDesignerGeneratedProject dialog_generated =
+        UiDesignerCodeGenerator(dialog_session.Catalog()).Generate(
+            dialog_document, "DialogParityWindow");
+    Check(dialog_generated.source.Find("dialog_column_n2.Add(dialog_content_n4).Expand(1)") >= 0,
+          "Generated dialog content expands instead of defaulting to Fit");
+    Check(dialog_generated.source.Find("dialog_column_n2.Add(dialog_actions_n5).Fixed(DPI(40))") >= 0,
+          "Generated dialog action row uses its fixed main-axis height");
+    Check(dialog_generated.source.Find("dialog_actions_n5.AddSpacer().Expand(1)") >= 0,
+          "Generated dialog preserves the expanding semantic spacer");
+    Check(dialog_generated.source.Find("dialog_actions_n5.Add(cancel_button_n7).Fixed(DPI(88))") >= 0 &&
+              dialog_generated.source.Find("dialog_actions_n5.Add(ok_button_n8).Fixed(DPI(88))") >= 0,
+          "Generated dialog buttons use their authored fixed widths");
+
     UiDesignerSession session;
     session.NewDocument("blank");
     const UiDesignerNodeId button = session.AddControl("UiButton");
