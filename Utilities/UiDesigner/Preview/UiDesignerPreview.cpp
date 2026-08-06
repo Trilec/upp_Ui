@@ -3065,18 +3065,14 @@ void UiDesignerPreviewCanvas::PaintSemantic(
     Rect r = GetNodeRect(node.id);
     if(r.IsEmpty())
         return;
-    const bool selected = selection_ && selection_->Contains(node.id);
-    const Color frame = selected ? accent_ : Blend(SColorText(), SColorPaper(), 150);
-    w.DrawRect(r, Blend(SColorPaper(), frame, 235));
-    w.DrawRect(r.left, r.top, r.Width(), 1, frame);
-    w.DrawRect(r.left, r.bottom - 1, r.Width(), 1, frame);
-    w.DrawRect(r.left, r.top, 1, r.Height(), frame);
-    w.DrawRect(r.right - 1, r.top, 1, r.Height(), frame);
-    const String label = node.GetProperty("layout_break", false) ? "Break" : "Spacer";
-    w.DrawText(r.left + DPI(5), r.top + DPI(3), label, StdFont().Height(DPI(11)), frame);
+    // Semantic spacers have no runtime face, frame or label. The Designer's
+    // geometry/selection layer already supplies the orange or blue outline;
+    // painting another filled semantic surface here misrepresents generated
+    // output and obscures the optional authored separator line.
     if(node.GetProperty("line_enabled", false)) {
+        const Color fallback = Blend(SColorText(), SColorPaper(), 150);
         const Color line = node.GetProperty("line_color_enabled", false)
-            ? (Color)node.GetProperty("line_color", frame) : frame;
+            ? (Color)node.GetProperty("line_color", fallback) : fallback;
         const int thickness = max(1, (int)node.GetProperty("line_thickness", 1));
         const int inset = max(0, (int)node.GetProperty("line_inset", 0));
         const String orientation = node.GetProperty("line_orientation", "Horizontal");
