@@ -737,7 +737,8 @@ bool UiDesignerSession::CycleSizingMode(UiDesignerNodeId node_id,
 
     const String property = height ? "height_mode" : "width_mode";
     const UiDesignerControlSpec *spec = catalog_.Find(node->type);
-    if(!spec || !spec->FindProperty(property)) {
+    if((node->flags & UiDesignerNodeSemanticItem) ||
+       !spec || !spec->FindProperty(property)) {
         error = "Selected control does not support " + property;
         return false;
     }
