@@ -647,7 +647,10 @@ bool UiDesignerInteractionOverlay::FinishCatalogDrag(const String& type_id, Poin
     }
     String error;
     UiDesignerNodeId created = 0;
-    const bool ok = owner_->session_.ExecuteDrop(resolved_drop_.plan, &created, error);
+    const bool ok = type_id.StartsWith("preset:")
+        ? owner_->session_.InsertPreset(type_id.Mid(7), resolved_drop_.region.owner,
+                                       resolved_drop_.insertion_index, &created, error)
+        : owner_->session_.ExecuteDrop(resolved_drop_.plan, &created, error);
     if(ok)
         SetDragStatus(resolved_drop_.label + " completed");
     else
@@ -832,9 +835,25 @@ void UiDesignerInteractionOverlay::UpdateDropPlan(const String& type_id, Point s
         Point position = region->rect.CenterPoint();
         if(target_geometry && target_node->id != document.GetRootId())
             position -= target_geometry->rect.TopLeft();
-        resolved_drop_.plan = owner_->session_.PlanAddControl(
-            type_id, region->owner, position, true,
-            region->insertion_index, region->grid_row, region->grid_column);
+        String planned_type = type_id;
+        if(type_id.StartsWith("preset:")) {
+            UiDesignerDocument fragment;
+            UiDesignerNodeId root_id = 0;
+            String preset_error;
+            if(UiDesignerPresetLibrary::Build(type_id.Mid(7), owner_->session_.Catalog(),
+                                              fragment, root_id, preset_error)) {
+                const UiDesignerNode *root_node = fragment.Find(root_id);
+                if(root_node)
+                    planned_type = root_node->type;
+            }
+            else
+                resolved_drop_.reason = preset_error;
+        }
+        resolved_drop_.plan = resolved_drop_.reason.IsEmpty()
+            ? owner_->session_.PlanAddControl(
+                planned_type, region->owner, position, true,
+                region->insertion_index, region->grid_row, region->grid_column)
+            : UiDesignerDropPlan();
         resolved_drop_.valid = resolved_drop_.plan.valid;
         resolved_drop_.reason = resolved_drop_.plan.reason;
         if(resolved_drop_.valid) {

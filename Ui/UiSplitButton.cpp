@@ -230,6 +230,13 @@ UiSplitButton& UiSplitButton::SetPopupItemHeight(int height)
 
 void UiSplitButton::OpenPopupInternal()
 {
+    if(popup_open_ || !IsEnabled())
+        return;
+
+    // Dynamic menus rebuild their rows from WhenOpen. Fire that preparation
+    // callback before popup_open_ is set so ClearItems() cannot close the popup
+    // that is still being prepared.
+    WhenOpen();
     if(popup_open_ || items_.IsEmpty() || !IsEnabled())
         return;
 
@@ -240,7 +247,6 @@ void UiSplitButton::OpenPopupInternal()
     hot_item_ = -1;
     UpdatePopupPosition();
     popup_.PopUp(this, true, true, false);
-    WhenOpen();
     Refresh();
 }
 

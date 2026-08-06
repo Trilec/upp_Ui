@@ -183,9 +183,9 @@ void UiDesignerCatalogList::Activate(int index)
 void UiDesignerCatalogList::LeftDown(Point p, dword)
 {
     pressed_ = selected_ = RowAt(p);
-    drag_type_ = pressed_ >= 0 && !presets_ ? ItemId(pressed_) : String();
+    drag_type_ = pressed_ >= 0 ? ItemId(pressed_) : String();
     drag_start_ = GetMousePos();
-    drag_armed_ = pressed_ >= 0 && !presets_ && !drag_type_.IsEmpty();
+    drag_armed_ = pressed_ >= 0 && !drag_type_.IsEmpty();
     dragging_ = false;
     if(drag_armed_ && !HasCapture())
         SetCapture();
@@ -220,7 +220,7 @@ void UiDesignerCatalogList::LeftDouble(Point p, dword)
 
 void UiDesignerCatalogList::LeftDrag(Point, dword)
 {
-    if(pressed_ < 0 || pressed_ >= Count() || presets_)
+    if(pressed_ < 0 || pressed_ >= Count())
         return;
     if(!drag_armed_ && !drag_type_.IsEmpty()) {
         drag_armed_ = true;

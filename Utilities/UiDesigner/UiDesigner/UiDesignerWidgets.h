@@ -210,6 +210,7 @@ public:
     Function<UiDesignerDropPlan(const String&, UiDesignerNodeId, int)> PlanCatalogDrop;
     Function<bool(UiDesignerNodeId)> IsContentHost;
     Function<bool(const UiDesignerDropPlan&, String&)> ExecuteDrop;
+    Function<bool(const String&, UiDesignerNodeId, int, String&)> ExecutePresetDrop;
     Function<bool(UiDesignerNodeId, bool)> CycleSizingMode;
     Function<bool(UiDesignerNodeId, const String&)> RenameNode;
 
@@ -271,6 +272,8 @@ private:
     bool syncing_selection_ = false;
     bool header_drop_ = false;
     UiDesignerDropPlan header_plan_;
+    UiDesignerNodeId catalog_drop_parent_ = 0;
+    int catalog_drop_index_ = -1;
 };
 
 class UiDesignerCodeView : public ParentCtrl {

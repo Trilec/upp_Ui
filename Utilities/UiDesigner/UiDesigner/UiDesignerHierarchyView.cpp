@@ -435,7 +435,9 @@ void UiDesignerHierarchyView::UpdateCatalogDrop(const String& type_id, Point scr
     Point local = screen - GetScreenRect().TopLeft();
     if(GetHeaderRect().Contains(local)) {
         header_drop_ = true;
-        header_plan_ = PlanCatalogDrop(type_id, document_->GetRootId(), -1);
+        catalog_drop_parent_ = document_->GetRootId();
+        catalog_drop_index_ = -1;
+        header_plan_ = PlanCatalogDrop(type_id, catalog_drop_parent_, catalog_drop_index_);
         tree_.ClearTrackedDropTarget();
     }
     else {
@@ -445,6 +447,8 @@ void UiDesignerHierarchyView::UpdateCatalogDrop(const String& type_id, Point scr
         UiDesignerNodeId parent = model_.FindDesignerNode(info.parent);
         if(!parent)
             parent = document_->GetRootId();
+        catalog_drop_parent_ = parent;
+        catalog_drop_index_ = info.insert_pos;
         header_plan_ = info.valid
                      ? PlanCatalogDrop(type_id, parent, info.insert_pos)
                      : UiDesignerDropPlan();
@@ -463,13 +467,24 @@ bool UiDesignerHierarchyView::FinishCatalogDrop(const String& type_id, Point scr
 {
     UpdateCatalogDrop(type_id, screen);
     UiDesignerDropPlan plan = header_plan_;
+    const UiDesignerNodeId parent = catalog_drop_parent_;
+    const int index = catalog_drop_index_;
     CancelCatalogDrop();
-    if(!plan.valid || !ExecuteDrop)
-        return false;
     String error;
-    const bool ok = ExecuteDrop(plan, error);
+    bool ok = false;
+    if(type_id.StartsWith("preset:")) {
+        if(!plan.valid || !ExecutePresetDrop)
+            return false;
+        ok = ExecutePresetDrop(type_id.Mid(7), parent, index, error);
+    }
+    else {
+        if(!plan.valid || !ExecuteDrop)
+            return false;
+        ok = ExecuteDrop(plan, error);
+    }
     if(WhenDropStatus)
-        WhenDropStatus(ok ? "Control added" : error);
+        WhenDropStatus(ok ? (type_id.StartsWith("preset:") ? "Preset inserted" : "Control added")
+                          : error);
     return ok;
 }
 
@@ -477,6 +492,8 @@ void UiDesignerHierarchyView::CancelCatalogDrop()
 {
     header_drop_ = false;
     header_plan_ = UiDesignerDropPlan();
+    catalog_drop_parent_ = 0;
+    catalog_drop_index_ = -1;
     tree_.ClearTrackedDropTarget();
     Refresh();
 }

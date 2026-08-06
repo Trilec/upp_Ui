@@ -645,6 +645,24 @@ void UiDesignerWindow::ConnectServices()
     };
     hierarchy_.PlanCatalogDrop = [=](const String& type,
                                      UiDesignerNodeId parent, int index) {
+        if(type.StartsWith("preset:")) {
+            UiDesignerDocument fragment;
+            UiDesignerNodeId root = 0;
+            String error;
+            if(!UiDesignerPresetLibrary::Build(type.Mid(7), session_.Catalog(),
+                                               fragment, root, error)) {
+                UiDesignerDropPlan invalid;
+                invalid.reason = error;
+                return invalid;
+            }
+            const UiDesignerNode *node = fragment.Find(root);
+            if(!node) {
+                UiDesignerDropPlan invalid;
+                invalid.reason = "Preset root is unavailable";
+                return invalid;
+            }
+            return session_.Drops().PlanAdd(node->type, parent, Point(), false, index);
+        }
         return session_.Drops().PlanAdd(type, parent, Point(), false, index);
     };
     hierarchy_.IsContentHost = [=](UiDesignerNodeId node) {
@@ -653,6 +671,12 @@ void UiDesignerWindow::ConnectServices()
     hierarchy_.ExecuteDrop = [=](const UiDesignerDropPlan& plan, String& error) {
         UiDesignerNodeId created = 0;
         return session_.ExecuteDrop(plan, &created, error);
+    };
+    hierarchy_.ExecutePresetDrop = [=](const String& preset,
+                                       UiDesignerNodeId parent, int index,
+                                       String& error) {
+        UiDesignerNodeId created = 0;
+        return session_.InsertPreset(preset, parent, index, &created, error);
     };
     hierarchy_.CycleSizingMode = [=](UiDesignerNodeId id, bool height) {
         String error;
@@ -1315,15 +1339,12 @@ void UiDesignerWindow::ToggleDarkMode()
 void UiDesignerWindow::ActivateToolbox(const String& id)
 {
     if(id.StartsWith("preset:")) {
-        const String preset_id = id.Mid(7);
-        const UiDesignerPreset* preset = session_.Catalog().FindPreset(preset_id);
-        const bool has_document_content = session_.Document().GetCount() > 1;
-        if((session_.Commands().IsDirty() || has_document_content) &&
-           !PromptYesNo("Replace the current design with " +
-                        (preset ? preset->display_name : preset_id) + "?\n\n"
-                        "The current document will be replaced."))
-            return;
-        session_.NewDocument(preset_id);
+        String error;
+        UiDesignerNodeId created = 0;
+        if(!session_.InsertPreset(id.Mid(7), 0, -1, &created, error))
+            RefreshStatus(error);
+        else
+            RefreshStatus("Preset inserted");
         return;
     }
     RefreshStatus("Selected " + id + ". Drag it onto the Window to add it.");
