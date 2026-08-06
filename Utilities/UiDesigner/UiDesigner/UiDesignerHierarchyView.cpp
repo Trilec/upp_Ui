@@ -482,9 +482,12 @@ bool UiDesignerHierarchyView::FinishCatalogDrop(const String& type_id, Point scr
             return false;
         ok = ExecuteDrop(plan, error);
     }
-    if(WhenDropStatus)
-        WhenDropStatus(ok ? (type_id.StartsWith("preset:") ? "Preset inserted" : "Control added")
-                          : error);
+    if(WhenDropStatus) {
+        const String status = ok
+            ? String(type_id.StartsWith("preset:") ? "Preset inserted" : "Control added")
+            : error;
+        WhenDropStatus(status);
+    }
     return ok;
 }
 
