@@ -126,6 +126,23 @@ static SymbolPickerProject MakeRleProject(const SymbolPickerIconEntry* entry)
 	return project;
 }
 
+static String NormalizeLineEndings(const String& text)
+{
+	String normalized;
+	normalized.Reserve(text.GetCount());
+	for(int i = 0; i < text.GetCount(); ++i) {
+		char c = text[i];
+		if(c == '\r') {
+			if(i + 1 < text.GetCount() && text[i + 1] == '\n')
+				++i;
+			normalized.Cat('\n');
+		}
+		else
+			normalized.Cat(c);
+	}
+	return normalized;
+}
+
 static bool VerifyTextFile(const String& path, const String& expected, String& error)
 {
 	String actual = LoadFile(path);
@@ -133,8 +150,8 @@ static bool VerifyTextFile(const String& path, const String& expected, String& e
 		error = Format("Missing committed fixture '%s'.", path);
 		return false;
 	}
-	if(actual != expected) {
-		error = Format("Fixture '%s' does not match the generated builder output.", path);
+	if(NormalizeLineEndings(actual) != NormalizeLineEndings(expected)) {
+		error = Format("Fixture '%s' does not match the generated builder output after line-ending normalization.", path);
 		return false;
 	}
 	return true;
