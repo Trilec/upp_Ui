@@ -1,0 +1,31 @@
+name: UiDesigner semantic sizing guard
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/uidesigner-semantic-sizing-guard.py
+      - .github/workflows/uidesigner-semantic-sizing-guard.yml
+
+permissions:
+  contents: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply semantic sizing guard
+        run: |
+          python3 .github/uidesigner-semantic-sizing-guard.py
+          git diff --check
+          grep -n 'UiDesignerNodeSemanticItem' Utilities/UiDesigner/Services/UiDesignerSession.cpp
+      - name: Commit and publish guard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner keeps semantic sizing actions inert"
+          git push origin main
