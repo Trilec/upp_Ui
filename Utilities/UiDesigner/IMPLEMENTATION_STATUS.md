@@ -66,7 +66,7 @@ The final branch still requires the real Windows host to run `RunSupervisorValid
 - Drag hover is transient and never mutates the document.
 - Behavior bindings are declarative and transport-neutral; custom code lives in named user-owned handlers.
 - `.generated.*` files are replaceable; user `.h/.cpp` files are preserved.
-- Application version remains `v1.0.0-rc1` until the validation report is accepted.
+- Application version is `v1.0.1-RC1` for the current release-candidate validation pass.
 
 ## Validation entry point
 

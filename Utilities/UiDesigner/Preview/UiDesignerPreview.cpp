@@ -1302,7 +1302,15 @@ static UiDesignerApplyResult ApplyRuntime(
         ctrl.Refresh();
         return UiDesignerApplyResult::AppliedPaint;
     }
-    if(property == "rows" || property == "columns" || property == "direction")
+    if(property == "direction") {
+        if(auto *box = dynamic_cast<UiBoxLayout *>(&ctrl)) {
+            box->SetDirection(AsString(value) == "H"
+                ? UiDirection::H : UiDirection::V);
+            return UiDesignerApplyResult::AppliedAncestorLayout;
+        }
+        return UiDesignerApplyResult::Rejected;
+    }
+    if(property == "rows" || property == "columns")
         return UiDesignerApplyResult::RequiresSubtreeRebuild;
     if(property == "x" || property == "y" || property == "width" || property == "height" ||
        property.StartsWith("minimum_") || property.StartsWith("maximum_") ||

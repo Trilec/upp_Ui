@@ -85,48 +85,178 @@ CONSOLE_APP_MAIN
     dialog_session.NewDocument("dialog");
     const UiDesignerDocument& dialog_document = dialog_session.Document();
     const UiDesignerNode *dialog_actions = nullptr;
+    const UiDesignerNode *dialog_spacer = nullptr;
+    const UiDesignerNode *dialog_cancel = nullptr;
+    const UiDesignerNode *dialog_ok = nullptr;
     for(const UiDesignerNode& candidate : dialog_document.GetNodes())
-        if(candidate.name == "dialog_actions") {
+        if(candidate.name == "dialog_actions")
             dialog_actions = &candidate;
-            break;
-        }
+    if(dialog_actions && dialog_actions->children.GetCount() == 3) {
+        dialog_spacer = dialog_document.Find(dialog_actions->children[0]);
+        dialog_cancel = dialog_document.Find(dialog_actions->children[1]);
+        dialog_ok = dialog_document.Find(dialog_actions->children[2]);
+    }
+    Check(dialog_actions && dialog_spacer && dialog_cancel && dialog_ok,
+          "Fresh Dialog preset creates a complete action row");
     Check(dialog_actions &&
               AsString(dialog_actions->GetProperty("direction", "")) == "H" &&
-              AsString(dialog_actions->GetProperty("wrap", "")) == "Flow",
-          "Dialog actions author horizontal Flow layout before any Inspector toggle");
-    if(dialog_actions) {
-        Check(dialog_actions->children.GetCount() == 3,
-              "Dialog actions retain Spacer, Cancel and OK source order");
-        if(dialog_actions->children.GetCount() == 3) {
-            const UiDesignerNode *spacer_node =
-                dialog_document.Find(dialog_actions->children[0]);
-            const UiDesignerNode *cancel_node =
-                dialog_document.Find(dialog_actions->children[1]);
-            const UiDesignerNode *ok_node =
-                dialog_document.Find(dialog_actions->children[2]);
-            Check(spacer_node && spacer_node->type == "Spacer" &&
-                      AsString(spacer_node->GetProperty("width_mode", "")) == "Expand",
-                  "Dialog action spacer expands on the horizontal main axis");
-            Check(cancel_node && ok_node &&
-                      AsString(cancel_node->GetProperty("width_mode", "")) == "Fixed" &&
-                      AsString(ok_node->GetProperty("width_mode", "")) == "Fixed" &&
-                      (int)cancel_node->GetProperty("fixed_width", 0) == 88 &&
-                      (int)ok_node->GetProperty("fixed_width", 0) == 88,
-                  "Dialog buttons retain fixed widths");
-        }
+              AsString(dialog_actions->GetProperty("wrap", "")) == "Flow" &&
+              (int)dialog_actions->GetProperty("gap", -1) == 8,
+          "Dialog actions author Horizontal Flow before any Inspector toggle");
+    Check(dialog_spacer && dialog_cancel && dialog_ok &&
+              dialog_spacer->name == "dialog_action_spacer" &&
+              dialog_cancel->name == "cancel_button" &&
+              dialog_ok->name == "ok_button",
+          "Dialog action source order is Spacer, Cancel, OK");
+    Check(dialog_spacer &&
+              AsString(dialog_spacer->GetProperty("width_mode", "")) == "Expand" &&
+              AsString(dialog_spacer->GetProperty("height_mode", "")) == "Fit" &&
+              dialog_cancel && dialog_ok &&
+              AsString(dialog_cancel->GetProperty("width_mode", "")) == "Fixed" &&
+              AsString(dialog_ok->GetProperty("width_mode", "")) == "Fixed" &&
+              (int)dialog_cancel->GetProperty("fixed_width", 0) == 88 &&
+              (int)dialog_ok->GetProperty("fixed_width", 0) == 88 &&
+              (int)dialog_cancel->GetProperty("fixed_height", 0) == 32 &&
+              (int)dialog_ok->GetProperty("fixed_height", 0) == 32,
+          "Dialog spacer expands while both buttons retain fixed dimensions");
+
+    UiDesignerPreviewCanvas dialog_preview;
+    dialog_preview.SetRect(0, 0, 512, 250);
+    dialog_session.AttachProjection(&dialog_preview);
+    dialog_preview.Layout();
+    const UiDesignerNodeId actions_id = dialog_actions ? dialog_actions->id : 0;
+    UiBoxLayout *runtime_actions = actions_id
+        ? dynamic_cast<UiBoxLayout *>(dialog_preview.FindRuntime(actions_id))
+        : nullptr;
+    Check(runtime_actions &&
+              runtime_actions->GetDirection() == UiDirection::H &&
+              runtime_actions->GetWrapMode() == UiBoxWrap::Flow,
+          "Fresh preview applies the authored Horizontal Flow state");
+    Check(runtime_actions && runtime_actions->GetItemCount() == 3,
+          "Fresh preview creates exactly three action descriptors");
+    if(runtime_actions && runtime_actions->GetItemCount() == 3) {
+        const Rect spacer_rect = runtime_actions->GetItemRect(0);
+        const Rect cancel_rect = runtime_actions->GetItemRect(1);
+        const Rect ok_rect = runtime_actions->GetItemRect(2);
+        Check(!spacer_rect.IsEmpty() && !cancel_rect.IsEmpty() && !ok_rect.IsEmpty() &&
+                  spacer_rect.right <= cancel_rect.left &&
+                  cancel_rect.right <= ok_rect.left &&
+                  cancel_rect.top == ok_rect.top &&
+                  cancel_rect.bottom == ok_rect.bottom,
+              "Fresh preview lays Spacer, Cancel and OK on one horizontal row");
+        Check(runtime_actions->IsItemVisible(1) && runtime_actions->IsItemVisible(2),
+              "Fresh preview keeps both dialog buttons visible");
     }
+
+    dialog_preview.ResetStats();
+    Check(actions_id && dialog_session.Commands().SetProperty(
+              actions_id, "direction", "V",
+              UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+              "Test vertical direction"),
+          "Dialog action direction changes to Vertical");
+    runtime_actions = actions_id
+        ? dynamic_cast<UiBoxLayout *>(dialog_preview.FindRuntime(actions_id))
+        : nullptr;
+    Check(runtime_actions && runtime_actions->GetDirection() == UiDirection::V &&
+              dialog_preview.GetStats().subtree_rebuilds == 1,
+          "Vertical direction rebuilds once and reaches the runtime layout");
+    dialog_preview.ResetStats();
+    Check(dialog_session.Commands().SetProperty(
+              actions_id, "direction", "H",
+              UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+              "Test horizontal direction"),
+          "Dialog action direction changes back to Horizontal");
+    runtime_actions = dynamic_cast<UiBoxLayout *>(dialog_preview.FindRuntime(actions_id));
+    Check(runtime_actions && runtime_actions->GetDirection() == UiDirection::H &&
+              dialog_preview.GetStats().subtree_rebuilds == 1,
+          "Horizontal direction rebuilds once and reaches the runtime layout");
+    dialog_preview.ResetStats();
+    Check(dialog_session.Commands().SetProperty(
+              actions_id, "wrap", "None",
+              UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+              "Test no wrapping"),
+          "Dialog action wrapping changes to None");
+    runtime_actions = dynamic_cast<UiBoxLayout *>(dialog_preview.FindRuntime(actions_id));
+    Check(runtime_actions && runtime_actions->GetWrapMode() == UiBoxWrap::None &&
+              dialog_preview.GetStats().subtree_rebuilds == 1,
+          "Wrap=None rebuilds once and reaches the runtime layout");
+    dialog_preview.ResetStats();
+    Check(dialog_session.Commands().SetProperty(
+              actions_id, "wrap", "Flow",
+              UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+              "Test flow wrapping"),
+          "Dialog action wrapping changes back to Flow");
+    runtime_actions = dynamic_cast<UiBoxLayout *>(dialog_preview.FindRuntime(actions_id));
+    Check(runtime_actions && runtime_actions->GetWrapMode() == UiBoxWrap::Flow &&
+              dialog_preview.GetStats().subtree_rebuilds == 1,
+          "Wrap=Flow rebuilds once and reaches the runtime layout");
+
     UiDesignerGeneratedProject dialog_generated =
         UiDesignerCodeGenerator(dialog_session.Catalog()).Generate(
             dialog_document, "DialogParityWindow");
-    Check(dialog_generated.source.Find("dialog_column_n2.Add(dialog_content_n4).Expand(1)") >= 0,
-          "Generated dialog content expands instead of defaulting to Fit");
-    Check(dialog_generated.source.Find("dialog_column_n2.Add(dialog_actions_n5).Fixed(DPI(40))") >= 0,
-          "Generated dialog action row uses its fixed main-axis height");
-    Check(dialog_generated.source.Find("dialog_actions_n5.AddSpacer().Expand(1)") >= 0,
-          "Generated dialog preserves the expanding semantic spacer");
-    Check(dialog_generated.source.Find("dialog_actions_n5.Add(cancel_button_n7).Fixed(DPI(88))") >= 0 &&
+    Check(dialog_generated.source.Find("dialog_actions_n5.SetDirection(UiDirection::H)") >= 0 &&
+              dialog_generated.source.Find("dialog_actions_n5.SetWrap(UiBoxWrap::Flow)") >= 0,
+          "Generated Dialog preserves Horizontal Flow container state");
+    Check(dialog_generated.source.Find("dialog_column_n2.Add(dialog_content_n4).Expand(1)") >= 0 &&
+              dialog_generated.source.Find("dialog_column_n2.Add(dialog_actions_n5).Fixed(DPI(40))") >= 0,
+          "Generated Dialog preserves content expansion and fixed action height");
+    Check(dialog_generated.source.Find("dialog_actions_n5.AddSpacer().Expand(1)") >= 0 &&
+              dialog_generated.source.Find("dialog_actions_n5.Add(cancel_button_n7).Fixed(DPI(88))") >= 0 &&
               dialog_generated.source.Find("dialog_actions_n5.Add(ok_button_n8).Fixed(DPI(88))") >= 0,
-          "Generated dialog buttons use their authored fixed widths");
+          "Generated Dialog preserves spacer and fixed button widths");
+
+    UiTree column_tree;
+    UiTree::Style column_style = UiTree::StyleDefault();
+    column_style.metrics.face_enabled = false;
+    column_style.metrics.frame_enabled = false;
+    column_style.metrics.content_margin = Rect(0, 0, 0, 0);
+    column_style.h_padding = 0;
+    column_style.accessory_gap = 0;
+    column_style.row_height = DPI(30);
+    column_tree.SetCustomStyle(column_style);
+    column_tree.SetRect(0, 0, DPI(300), DPI(120));
+    UiTreeModel column_model;
+    auto AddColumnRow = [&](const String& text, int data) {
+        UiModelItem item(text, data);
+        item.columns.Add(UiModelColumn("Type"));
+        item.columns.Add(UiModelColumn("W"));
+        item.columns.Add(UiModelColumn("H"));
+        return column_model.AddChild(column_model.Root(), item);
+    };
+    const UiTreeNodeRef first_column_row = AddColumnRow("First", 1);
+    AddColumnRow("Second", 2);
+    const UiTreeNodeRef third_column_row = AddColumnRow("Third", 3);
+    Vector<int> column_widths;
+    column_widths << DPI(94) << DPI(24) << DPI(24);
+    column_tree.SetModel(column_model);
+    column_tree.SetRootVisible(false);
+    column_tree.SetSelectionMode(UITREESEL_MULTI);
+    column_tree.SetColumnWidths(column_widths);
+    column_tree.SelectNode(first_column_row);
+    int column_selection_events = 0;
+    UiTreeNodeRef acted_column_node{-1};
+    int acted_column = -1;
+    column_tree.WhenSelection = [&] { column_selection_events++; };
+    column_tree.WhenColumnAction = [&](UiTreeNodeRef node, int column) {
+        acted_column_node = node;
+        acted_column = column;
+    };
+    int third_row_y = -1;
+    for(int y = 0; y < column_tree.GetSize().cy && third_row_y < 0; y++)
+        if(column_tree.GetNodeAt(Point(1, y)).id == third_column_row.id)
+            third_row_y = y;
+    Check(third_row_y >= 0, "UiTree column fixture locates the third visible row");
+    if(third_row_y >= 0) {
+        const Point column_click(column_tree.GetSize().cx - DPI(8), third_row_y);
+        column_tree.LeftDown(column_click, 0);
+        column_tree.LeftUp(column_click, 0);
+    }
+    const Vector<UiTreeNodeRef> column_selection = column_tree.GetSelection();
+    Check(acted_column_node.id == third_column_row.id && acted_column == 2,
+          "UiTree column action reports the exact clicked row and column");
+    Check(column_selection_events == 0 && column_selection.GetCount() == 1 &&
+              column_selection[0].id == first_column_row.id,
+          "UiTree column action preserves the existing row selection");
 
     UiDesignerSession session;
     session.NewDocument("blank");
@@ -214,64 +344,6 @@ CONSOLE_APP_MAIN
               sizing_session.Document().Find(sizing_section)->GetProperty(
                   "width_mode", "Fit") == section_before,
           "Unsupported semantic hierarchy rows remain inert");
-
-    UiDesignerSession dialog_session;
-    dialog_session.NewDocument("dialog");
-    const UiDesignerDocument& dialog_document = dialog_session.Document();
-    const UiDesignerNode *dialog_actions = nullptr;
-    for(const UiDesignerNode& candidate : dialog_document.GetNodes())
-        if(candidate.name == "dialog_actions")
-            dialog_actions = &candidate;
-    Check(dialog_actions && dialog_actions->children.GetCount() == 3,
-          "Fresh Dialog preset creates one three-item action row");
-    if(dialog_actions && dialog_actions->children.GetCount() == 3) {
-        const UiDesignerNode *dialog_spacer = dialog_document.Find(dialog_actions->children[0]);
-        const UiDesignerNode *dialog_cancel = dialog_document.Find(dialog_actions->children[1]);
-        const UiDesignerNode *dialog_ok = dialog_document.Find(dialog_actions->children[2]);
-        Check(dialog_spacer && dialog_cancel && dialog_ok &&
-                  dialog_spacer->name == "dialog_action_spacer" &&
-                  dialog_cancel->name == "cancel_button" &&
-                  dialog_ok->name == "ok_button",
-              "Dialog action source order is Spacer, Cancel, OK");
-        Check(dialog_actions->GetProperty("direction", "") == "H" &&
-                  dialog_actions->GetProperty("wrap", "") == "None" &&
-                  (int)dialog_actions->GetProperty("gap", -1) == 8,
-              "Dialog action row starts horizontal, non-wrapping, and deterministic");
-        Check(dialog_spacer->GetProperty("width_mode", "") == "Expand" &&
-                  dialog_spacer->GetProperty("height_mode", "") == "Fit" &&
-                  dialog_cancel->GetProperty("width_mode", "") == "Fixed" &&
-                  (int)dialog_cancel->GetProperty("fixed_width", 0) == 88 &&
-                  dialog_ok->GetProperty("width_mode", "") == "Fixed" &&
-                  (int)dialog_ok->GetProperty("fixed_width", 0) == 88,
-              "Dialog spacer expands while both buttons retain fixed width");
-        Check(dialog_cancel->GetProperty("height_mode", "") == "Fixed" &&
-                  (int)dialog_cancel->GetProperty("fixed_height", 0) == 32 &&
-                  dialog_ok->GetProperty("height_mode", "") == "Fixed" &&
-                  (int)dialog_ok->GetProperty("fixed_height", 0) == 32,
-              "Dialog button heights are deterministic");
-    }
-
-    UiDesignerPreviewCanvas preview;
-    dialog_session.AttachProjection(&preview);
-    preview.ResetStats();
-    const UiDesignerNodeId actions_id = dialog_actions ? dialog_actions->id : 0;
-    if(actions_id) {
-        Check(dialog_session.Commands().SetProperty(
-                  actions_id, "direction", "V",
-                  UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
-                  "Test direction rebuild"),
-              "Dialog action direction change commits");
-        Check(preview.GetStats().subtree_rebuilds == 1,
-              "Direction change rebuilds the affected BoxLayout subtree exactly once");
-        preview.ResetStats();
-        Check(dialog_session.Commands().SetProperty(
-                  actions_id, "wrap", "Flow",
-                  UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
-                  "Test wrap rebuild"),
-              "Dialog action wrap change commits");
-        Check(preview.GetStats().subtree_rebuilds == 1,
-              "Wrap change rebuilds the affected BoxLayout subtree exactly once");
-    }
 
     hierarchy.PlanCatalogDrop = [&](const String& type,
                                     UiDesignerNodeId parent, int index) {

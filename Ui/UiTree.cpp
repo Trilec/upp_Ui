@@ -1435,6 +1435,17 @@ void UiTree::LeftDown(Point p, dword flags)
             return;
         }
 
+        if(column_hit >= 0) {
+            // A column action must preserve row selection and must run before
+            // any callback can rebuild the bound model. Do not touch local
+            // model references after invoking the external action.
+            pressed_ = false;
+            Refresh();
+            if(WhenColumnAction)
+                WhenColumnAction(node, column_hit);
+            return;
+        }
+
         bool shift = (flags & K_SHIFT) != 0;
         bool ctrl = (flags & K_CTRL) != 0;
         SetCursor(node);
@@ -1448,10 +1459,7 @@ void UiTree::LeftDown(Point p, dword flags)
         else
             SelectSingle(node);
 
-        if(column_hit >= 0 && WhenColumnAction)
-            WhenColumnAction(node, column_hit);
-
-        if(dnd_enabled_ && !toggle_hit && column_hit < 0) {
+        if(dnd_enabled_ && !toggle_hit) {
             drag_id_ = node.id;
             SetCapture();
         }
