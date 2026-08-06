@@ -37,6 +37,7 @@ public:
 private:
     friend class UiDesignerInteractionOverlay;
     void BuildHeader();
+    void RefreshLoadMenu();
     void BuildDesigner();
     void BuildTheme();
     void ConnectServices();

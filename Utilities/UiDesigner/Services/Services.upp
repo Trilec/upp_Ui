@@ -18,6 +18,8 @@ file
     UiDesignerDrop.cpp,
     UiDesignerExport.h,
     UiDesignerExport.cpp,
+    UiDesignerPresets.h,
+    UiDesignerPresets.cpp,
     UiDesignerSession.h,
     UiDesignerSession.cpp,
     UiDesignerSessionExtensions.cpp,

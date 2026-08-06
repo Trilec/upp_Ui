@@ -26,9 +26,39 @@ UiDesignerSession::UiDesignerSession()
     : commands_(document_)
 {
     RegisterUiDesignerBuiltins(catalog_);
+    LoadRecentPaths();
     theme_.BuildPropertyModel(theme_model_);
     WireEvents();
     NewDocument("blank");
+}
+
+void UiDesignerSession::LoadRecentPaths()
+{
+    recent_paths_.Clear();
+    Value parsed = ParseJSON(LoadFile(ConfigFile("uidesigner-recent.json")));
+    if(!parsed.Is<ValueArray>())
+        return;
+    for(const Value& item : (ValueArray)parsed) {
+        const String path = item;
+        if(!path.IsEmpty() && FileExists(path) && recent_paths_.GetCount() < 10)
+            recent_paths_.Add(path);
+    }
+}
+
+void UiDesignerSession::AddRecentPath(const String& path)
+{
+    if(path.IsEmpty())
+        return;
+    for(int i = recent_paths_.GetCount() - 1; i >= 0; --i)
+        if(recent_paths_[i] == path)
+            recent_paths_.Remove(i);
+    recent_paths_.Insert(0, path);
+    while(recent_paths_.GetCount() > 10)
+        recent_paths_.Drop();
+    ValueArray encoded;
+    for(const String& item : recent_paths_)
+        encoded.Add(item);
+    SaveFile(ConfigFile("uidesigner-recent.json"), AsJSON(encoded, true));
 }
 
 void UiDesignerSession::WireEvents()
@@ -331,6 +361,7 @@ bool UiDesignerSession::Load(const String& path, String& error)
         theme_.Replace(loaded_theme, true);
 
     current_path_ = path;
+    AddRecentPath(path);
     state_.selection.Clear();
     overlay_.Clear();
     if(projection_)
@@ -348,7 +379,7 @@ bool UiDesignerSession::Save(const String& path, String& error)
 {
     ValueMap project;
     project.Set("format", "upp-ui-designer-project");
-    project.Set("schema", 1);
+    project.Set("schema", 2);
     project.Set("document", UiDesignerDocumentToValue(document_));
     project.Set("theme", theme_.Get().ToValue());
     if(!SaveFile(path, AsJSON(project, true))) {
@@ -356,6 +387,7 @@ bool UiDesignerSession::Save(const String& path, String& error)
         return false;
     }
     current_path_ = path;
+    AddRecentPath(path);
     commands_.MarkSaved();
     theme_.MarkSaved();
     WhenStatus("Saved " + GetFileName(path));
@@ -378,7 +410,7 @@ bool UiDesignerSession::Export(const String& folder,
     }
     ValueMap source_project;
     source_project.Set("format", "upp-ui-designer-project");
-    source_project.Set("schema", 1);
+    source_project.Set("schema", 2);
     source_project.Set("document", UiDesignerDocumentToValue(document_));
     source_project.Set("theme", theme_.Get().ToValue());
     if(!SaveFile(AppendFileName(folder, "uidesigner-project.json"),
@@ -387,6 +419,117 @@ bool UiDesignerSession::Export(const String& folder,
         return false;
     }
     WhenStatus("Exported " + class_name);
+    error.Clear();
+    return true;
+}
+
+static String UniquePresetName(const UiDesignerDocument& document,
+                               const String& base)
+{
+    String candidate = base;
+    int suffix = 2;
+    for(;;) {
+        bool exists = false;
+        for(const UiDesignerNode& node : document.GetNodes())
+            if(node.name == candidate) {
+                exists = true;
+                break;
+            }
+        if(!exists)
+            return candidate;
+        candidate = base + "_" + AsString(suffix++);
+    }
+}
+
+bool UiDesignerSession::InsertPreset(const String& preset_id,
+                                     UiDesignerNodeId target, int index,
+                                     UiDesignerNodeId *created, String& error)
+{
+    if(!catalog_.FindPreset(preset_id)) {
+        error = "Unknown preset " + preset_id;
+        return false;
+    }
+    if(!target)
+        target = ResolveInsertParent();
+    const UiDesignerNode *target_node = document_.Find(target);
+    const UiDesignerControlSpec *target_spec = target_node
+        ? catalog_.Find(target_node->type) : nullptr;
+    if(!target_node || !target_spec ||
+       (target_spec->content_host == UiDesignerContentHostKind::None &&
+        !HasUiDesignerCapability(target_spec->capabilities,
+                                 UiDesignerCapabilityContainer))) {
+        error = "Select a container or layout before inserting a preset";
+        return false;
+    }
+
+    UiDesignerDocument fragment;
+    UiDesignerNodeId fragment_root = 0;
+    if(!UiDesignerPresetLibrary::Build(preset_id, catalog_, fragment,
+                                       fragment_root, error))
+        return false;
+    const UiDesignerNode *fragment_node = fragment.Find(fragment_root);
+    if(!fragment_node)
+        return false;
+    String reason;
+    if(!catalog_.CanInsert(document_, fragment_node->type, target, index, reason)) {
+        error = reason;
+        return false;
+    }
+
+    UiDesignerDocument updated;
+    if(!UiDesignerDeserialize(UiDesignerSerialize(document_, false), updated, error))
+        return false;
+    VectorMap<UiDesignerNodeId, UiDesignerNodeId> id_map;
+    Function<UiDesignerNodeId(UiDesignerNodeId, UiDesignerNodeId, int)> clone_node;
+    clone_node = [&](UiDesignerNodeId source_id, UiDesignerNodeId parent,
+                     int insert_index) -> UiDesignerNodeId {
+        const UiDesignerNode *source = fragment.Find(source_id);
+        if(!source)
+            return 0;
+        const String name = UniquePresetName(updated, source->name);
+        UiDesignerNodeId destination = updated.AddNode(
+            source->type, name, parent, source->flags, insert_index);
+        UiDesignerNode *copy = updated.Find(destination);
+        if(!copy)
+            return 0;
+        copy->properties = source->properties;
+        copy->data = source->data;
+        copy->theme_overrides = source->theme_overrides;
+        copy->theme_override_saved = source->theme_override_saved;
+        id_map.Add(source_id, destination);
+        for(int i = 0; i < source->children.GetCount(); ++i)
+            if(!clone_node(source->children[i], destination, i))
+                return 0;
+        return destination;
+    };
+
+    UiDesignerNodeId inserted = clone_node(fragment_root, target, index);
+    if(!inserted) {
+        error = "Unable to clone preset subtree";
+        return false;
+    }
+    for(int i = 0; i < id_map.GetCount(); ++i) {
+        const UiDesignerNode *source = fragment.Find(id_map.GetKey(i));
+        UiDesignerNode *destination = updated.Find(id_map[i]);
+        if(!source || !destination)
+            continue;
+        destination->actions = clone(source->actions);
+        for(UiDesignerActionBinding& action : destination->actions)
+            if(action.target) {
+                const int q = id_map.Find(action.target);
+                action.target = q >= 0 ? id_map[q] : 0;
+            }
+    }
+    if(!catalog_.ValidateDocument(updated, error))
+        return false;
+    if(!commands_.ReplaceDocument(updated, "Insert preset " + preset_id)) {
+        error = commands_.GetLastError();
+        return false;
+    }
+    Select(inserted);
+    if(created)
+        *created = inserted;
+    WhenStatus("Inserted preset " + preset_id);
     error.Clear();
     return true;
 }

@@ -75,3 +75,11 @@ powershell -ExecutionPolicy Bypass -File Utilities/UiDesigner/RunSupervisorValid
 ```
 
 After that automated sequence passes, perform the interactive audit described in the supervisor handoff task.
+
+
+## Preset and persistence contract
+
+- Load owns whole-document starters: Blank form, Three-pane form and Dialog form.
+- Presets are composable command-backed fragments and can be inserted into compatible selected hosts.
+- The current project format remains the canonical wrapper because it stores document and theme together; document schema 4 makes explicit child arrays authoritative.
+- Legacy imports validate and restore explicit per-parent child order rather than relying on flat node-array order.

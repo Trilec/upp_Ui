@@ -1545,15 +1545,15 @@ static void RegisterInternalSemanticItems(UiDesignerCatalog& catalog)
 
 static void RegisterPresets(UiDesignerCatalog& catalog)
 {
-    catalog.RegisterPreset({"blank", "Blank Form",
-                            "A clean window with one root layout.",
-                            "presets"});
-    catalog.RegisterPreset({"three_pane", "Three Pane",
-                            "Toolbox, canvas and Inspector columns.",
-                            "layouts"});
-    catalog.RegisterPreset({"dialog", "Dialog",
-                            "A compact dialog with heading, content and actions.",
-                            "inspector"});
+
+    catalog.RegisterPreset({"HolyGrail", "Holy Grail", "Header, three-column body, and footer", "ICON_DESIGN_DASHBOARD_EDIT_48"});
+    catalog.RegisterPreset({"Magazine", "Magazine", "Editorial hero, stories, and side rail", "ICON_DESIGN_DESCRIPTION_48"});
+    catalog.RegisterPreset({"SPA", "SPA", "Single-page application workspace shell", "ICON_DESIGN_DESKTOP_MAC_48"});
+    catalog.RegisterPreset({"CardGrid", "Card Grid", "Responsive reusable card collection", "ICON_DESIGN_GRID_VIEW_48"});
+    catalog.RegisterPreset({"SplitScreen", "Split Screen", "Two equal working surfaces", "ICON_DESIGN_SPLIT_SCENE_48"});
+    catalog.RegisterPreset({"FPattern", "F Pattern", "Reading-led content hierarchy", "ICON_DESIGN_VIEW_STREAM_48"});
+    catalog.RegisterPreset({"HeaderWithActions", "Header with Actions", "Page title and compact action cluster", "ICON_DESIGN_TITLE_48"});
+    catalog.RegisterPreset({"DesignerWorkbench", "Designer Workbench", "Catalog, preview, inspector, and status shell", "ICON_DESIGN_DASHBOARD_CUSTOMIZE_48"});
 }
 
 void RegisterUiDesignerBuiltins(UiDesignerCatalog& catalog)

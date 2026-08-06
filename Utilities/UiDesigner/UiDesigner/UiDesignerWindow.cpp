@@ -230,6 +230,28 @@ void UiDesignerWindow::UpdateDecorationsButton()
         : ICON_ACTION_OUTLINED_VISIBILITY_OFF_48());
 }
 
+void UiDesignerWindow::RefreshLoadMenu()
+{
+    load_.ClearItems();
+    load_.Add("Open…", "open");
+    load_.AddSeparator();
+    load_.Add("Blank form", "blank")
+         .Add("Three-pane form", "three_pane")
+         .Add("Dialog form", "dialog");
+    load_.AddSeparator();
+    const Vector<String>& recent = session_.GetRecentPaths();
+    if(recent.IsEmpty())
+        load_.AddGroupHeader("No recent files");
+    else {
+        load_.AddGroupHeader("Recent files");
+        for(const String& path : recent) {
+            const int item = load_.GetCount();
+            load_.Add(GetFileName(path), "recent:" + path);
+            load_.SetItemDescription(item, path);
+        }
+    }
+}
+
 void UiDesignerWindow::BuildHeader()
 {
     header_surface_.SetCustomStyle(UiDesignerSurfaceStyle());
@@ -258,17 +280,21 @@ void UiDesignerWindow::BuildHeader()
     };
 
     load_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-    load_.SetText("Load").SetSplitWidth(DPI(30));
-    load_.Add("Open", "open").Add("New blank", "blank")
-         .Add("New three pane", "three_pane")
-         .Add("New settings", "settings");
+    load_.SetText("Load").SetSplitWidth(DPI(30)).SetPopupMinWidth(DPI(260));
+    RefreshLoadMenu();
+    load_.WhenOpen = [=] { RefreshLoadMenu(); };
     load_.WhenAction = [=] { LoadDocument(); };
     load_.WhenSelect = [=](int, const Value& value) {
         const String action = value;
         if(action == "open") LoadDocument();
         else if(action == "blank") session_.NewDocument("blank");
-        else if(action == "settings") session_.NewDocument("settings");
-        else session_.NewDocument("three_pane");
+        else if(action == "dialog") session_.NewDocument("dialog");
+        else if(action == "three_pane") session_.NewDocument("three_pane");
+        else if(action.StartsWith("recent:")) {
+            String error;
+            if(!session_.Load(action.Mid(7), error))
+                RefreshStatus(error);
+        }
     };
 
     export_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
@@ -543,7 +569,24 @@ void UiDesignerWindow::BuildDesigner()
         };
         list.WhenToolCancel = [=] { CancelCatalogDrag(); };
     };
-    wire_list(presets_list_); wire_list(layouts_list_);
+    presets_list_.WhenActivate = [=](const String& id) {
+        String error;
+        UiDesignerNodeId created = 0;
+        if(!session_.InsertPreset(id, 0, -1, &created, error))
+            RefreshStatus(error);
+    };
+    presets_list_.WhenFilter = [=](const String& query) {
+        session_.State().toolbox_filter = query;
+    };
+    presets_list_.WhenToolDrop = [=](const String& id, Point) {
+        String error;
+        UiDesignerNodeId created = 0;
+        if(!session_.InsertPreset(id, session_.State().selection.primary,
+                                  -1, &created, error))
+            RefreshStatus(error);
+    };
+    presets_list_.WhenToolCancel = [=] { CancelCatalogDrag(); };
+    wire_list(layouts_list_);
     wire_list(containers_list_); wire_list(controls_list_);
     wire_list(composites_list_); wire_list(upp_controls_list_);
 }

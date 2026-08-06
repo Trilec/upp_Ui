@@ -176,7 +176,8 @@ Value UiDesignerDocumentToValue(const UiDesignerDocument& document)
 {
     ValueMap out;
     out.Set("format", "upp-ui-designer-next");
-    out.Set("schema", 3);
+    out.Set("schema", 4);
+    out.Set("ordering", "explicit-children");
     out.Set("document_id", document.GetDocumentId());
     out.Set("revision", (int64)document.GetRevision());
 
@@ -372,6 +373,51 @@ static void NormalizeThemeOverrides(ValueMap& theme_overrides)
             theme_overrides.Remove(i);
 }
 
+static bool RestoreExplicitChildOrder(const ValueArray& nodes,
+                                      const VectorMap<int64, int64>& id_map,
+                                      UiDesignerDocument& loaded,
+                                      String& error)
+{
+    VectorMap<int64, int64> declared_parent;
+    for(const Value& item : nodes) {
+        if(!item.Is<ValueMap>())
+            continue;
+        ValueMap encoded = item;
+        const int64 id = UiDesignerMapValue(encoded, "id", 0);
+        declared_parent.GetAdd(id) = UiDesignerMapValue(encoded, "parent", 0);
+    }
+    for(const Value& item : nodes) {
+        if(!item.Is<ValueMap>())
+            continue;
+        ValueMap encoded = item;
+        const int64 old_parent = UiDesignerMapValue(encoded, "id", 0);
+        const int parent_q = id_map.Find(old_parent);
+        if(parent_q < 0)
+            continue;
+        ValueArray children = UiDesignerMapValue(encoded, "children", ValueArray());
+        Index<int64> seen;
+        for(int i = 0; i < children.GetCount(); ++i) {
+            const int64 old_child = children[i];
+            if(seen.FindAdd(old_child) >= 0) {
+                error = "Parent contains duplicate child " + AsString(old_child);
+                return false;
+            }
+            const int child_q = id_map.Find(old_child);
+            const int declared_q = declared_parent.Find(old_child);
+            if(child_q < 0 || declared_q < 0 || declared_parent[declared_q] != old_parent) {
+                error = "Explicit child order disagrees with parent for " +
+                        AsString(old_child);
+                return false;
+            }
+            if(!loaded.MoveNode(id_map[child_q], id_map[parent_q], i)) {
+                error = "Unable to restore child order for " + AsString(old_parent);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 static bool LoadNodes(const ValueArray& nodes, bool legacy,
                       UiDesignerDocument& loaded, String& error)
 {
@@ -506,6 +552,9 @@ static bool LoadNodes(const ValueArray& nodes, bool legacy,
             return false;
         }
     }
+
+    if(!RestoreExplicitChildOrder(nodes, id_map, loaded, error))
+        return false;
 
     for(int i = 0; i < pending_actions.GetCount(); i++) {
         UiDesignerNode* node = loaded.Find(pending_actions.GetKey(i));

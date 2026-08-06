@@ -7,6 +7,7 @@
 #include <Utilities/UiDesigner/ThemeCore/UiDesignerTheme.h>
 #include "UiDesignerProjection.h"
 #include "UiDesignerDrop.h"
+#include "UiDesignerPresets.h"
 
 namespace Upp {
 
@@ -81,6 +82,9 @@ public:
         int grid_row = -1, int grid_column = -1) const;
     bool ExecuteDrop(const UiDesignerDropPlan& plan,
                      UiDesignerNodeId *created, String& error);
+    bool InsertPreset(const String& preset_id, UiDesignerNodeId target,
+                      int index, UiDesignerNodeId *created, String& error);
+    const Vector<String>& GetRecentPaths() const { return recent_paths_; }
 
     UiDesignerNodeId AddControl(const String& type_id,
                                 UiDesignerNodeId parent = 0);
@@ -138,6 +142,8 @@ private:
     void ApplyPresetBlank();
     void ApplyPresetThreePane();
     void ApplyPresetDialog();
+    void LoadRecentPaths();
+    void AddRecentPath(const String& path);
     UiDesignerNodeId ResolveInsertParent() const;
     Value ResolvePropertyValue(const UiDesignerNode& node,
                                const UiDesignerPropertySpec& property) const;
@@ -168,6 +174,7 @@ private:
     PropertyEditorModel theme_model_;
 
     String current_path_;
+    Vector<String> recent_paths_;
     uint64 editor_generation_ = 0;
     String active_behavior_event_;
 };

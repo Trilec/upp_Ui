@@ -6,6 +6,7 @@
 #include "UiDesignerDrop.h"
 #include "UiDesignerExport.h"
 #include "UiDesignerSession.h"
+#include "UiDesignerPresets.h"
 #include "UiDesignerAutomation.h"
 
 #endif

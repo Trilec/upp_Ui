@@ -258,6 +258,41 @@ CONSOLE_APP_MAIN
               column_selection[0].id == first_column_row.id,
           "UiTree column action preserves the existing row selection");
 
+    Check(dialog_session.Catalog().GetPresets().GetCount() == 8,
+          "Preset catalogue exposes the eight composable layout fragments");
+    UiDesignerSession preset_session;
+    preset_session.NewDocument("blank");
+    UiDesignerNodeId inserted_preset = 0;
+    String preset_error;
+    Check(preset_session.InsertPreset("HolyGrail",
+              preset_session.Document().GetRootId(), -1,
+              &inserted_preset, preset_error),
+          "Holy Grail inserts into the current document: " + preset_error);
+    Check(inserted_preset != 0 && preset_session.Document().GetCount() > 8,
+          "Inserted preset creates one ordinary nested node subtree");
+    Check(preset_session.Undo() && preset_session.Document().GetCount() == 1 &&
+              preset_session.Redo() && preset_session.Document().Find(inserted_preset),
+          "Preset insertion is one undoable and redoable command transaction");
+
+    const String explicit_order_json = R"JSON({
+      "format":"upp-ui-designer",
+      "virtual_size":{"cx":512,"cy":250},
+      "nodes":[
+        {"id":1,"parent":0,"type":"Window","name":"Window","children":[2],"properties":{}},
+        {"id":2,"parent":1,"type":"BoxLayout","name":"row","children":[4,3],"properties":{"direction":{"type":"string","value":"H"}}},
+        {"id":3,"parent":2,"type":"Label","name":"second","children":[],"properties":{}},
+        {"id":4,"parent":2,"type":"Label","name":"first","children":[],"properties":{}}
+      ]
+    })JSON";
+    UiDesignerDocument ordered_legacy;
+    Check(UiDesignerDeserialize(explicit_order_json, ordered_legacy, preset_error),
+          "Legacy fixture with explicit child order loads: " + preset_error);
+    const UiDesignerNode *ordered_parent = ordered_legacy.Find(2);
+    Check(ordered_parent && ordered_parent->children.GetCount() == 2 &&
+              ordered_legacy.Find(ordered_parent->children[0])->name == "first" &&
+              ordered_legacy.Find(ordered_parent->children[1])->name == "second",
+          "Legacy import treats each parent children array as authoritative");
+
     UiDesignerSession session;
     session.NewDocument("blank");
     const UiDesignerNodeId button = session.AddControl("UiButton");

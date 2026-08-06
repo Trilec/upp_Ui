@@ -29,7 +29,7 @@ Value UiDesignerExportService::BuildProjectValue(
 
     ValueMap project;
     project.Set("format", "upp-ui-designer-project");
-    project.Set("schema", 1);
+    project.Set("schema", 2);
     project.Set("document", UiDesignerDocumentToValue(document));
     project.Set("theme", theme.Get().ToValue());
     project.Set("generation", options);
