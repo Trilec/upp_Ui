@@ -32,23 +32,32 @@ static bool HasVisiblePixels(const Image& img)
 	return false;
 }
 
-static const SymbolPickerIconEntry* PickRenderableIcon(const SymbolPickerCatalog& catalog, int pixel_size, Color tint, const String& exclude_catalog_id = String())
+static const SymbolPickerIconEntry* RequireRenderableFixtureIcon(const SymbolPickerCatalog& catalog,
+                                                                 const char* catalog_id,
+                                                                 int pixel_size,
+                                                                 Color tint,
+                                                                 String& error)
 {
-	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
-	if(icons.IsEmpty())
+	const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(catalog_id);
+	if(!entry) {
+		error = Format("Required fixture catalog_id '%s' is missing.", catalog_id);
 		return nullptr;
-	for(const SymbolPickerIconEntry& entry : icons) {
-		if(!entry.available)
-			continue;
-		if(!exclude_catalog_id.IsEmpty() && entry.catalog_id == exclude_catalog_id)
-			continue;
-		String error;
-		Image img = RenderSymbolPickerIconImage(entry, pixel_size, tint, &error);
-		if(img.IsEmpty() || !HasVisiblePixels(img))
-			continue;
-		return &entry;
 	}
-	return nullptr;
+	if(!entry->available) {
+		error = Format("Required fixture catalog_id '%s' is unavailable.", catalog_id);
+		return nullptr;
+	}
+
+	String render_error;
+	Image img = RenderSymbolPickerIconImage(*entry, pixel_size, tint, &render_error);
+	if(img.IsEmpty() || !HasVisiblePixels(img)) {
+		error = Format("Required fixture catalog_id '%s' is not renderable%s%s.",
+		               catalog_id,
+		               render_error.IsEmpty() ? "" : ": ",
+		               render_error);
+		return nullptr;
+	}
+	return entry;
 }
 
 static SymbolPickerProject MakeRawProject(const SymbolPickerIconEntry* entry)
@@ -139,14 +148,15 @@ static bool BuildFixtures(const String& output_folder, bool verify, String& erro
 		return false;
 	}
 
-	const SymbolPickerIconEntry* raw_entry = PickRenderableIcon(catalog, 24, Null);
-	if(!raw_entry) {
-		error = "Could not select a visible RAW fixture entry.";
+	const SymbolPickerIconEntry* raw_entry =
+		RequireRenderableFixtureIcon(catalog, "action/camera_enhance/outlined", 24, Null, error);
+	if(!raw_entry)
 		return false;
-	}
-	const SymbolPickerIconEntry* rle_entry = PickRenderableIcon(catalog, 24, Color(32, 64, 128), raw_entry->catalog_id);
+
+	const SymbolPickerIconEntry* rle_entry =
+		RequireRenderableFixtureIcon(catalog, "action/generating_tokens/outlined", 24, Color(32, 64, 128), error);
 	if(!rle_entry)
-		rle_entry = raw_entry;
+		return false;
 
 	Cout() << "RAW catalog_id: " << raw_entry->catalog_id << '\n';
 	Cout() << "RLE catalog_id: " << rle_entry->catalog_id << '\n';
