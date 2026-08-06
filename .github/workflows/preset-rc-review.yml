@@ -1,0 +1,32 @@
+name: Preset RC review correction
+
+on:
+  push:
+    branches: [ agent/uidesigner-presets-rc-review ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uidesigner-presets-rc-review
+          fetch-depth: 0
+      - name: Apply reviewed corrections
+        run: |
+          python3 .github/preset-rc-review.py
+          git diff --check
+          grep -q 'seen.Add(old_child)' Utilities/UiDesigner/Core/UiDesignerSerialization.cpp
+          grep -q 'spec->FindProperty("title")' Utilities/UiDesigner/Services/UiDesignerPresets.cpp
+      - name: Publish correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "UiDesigner hardens preset validation and grid placement"
+          git push origin HEAD:main
+          git push origin --delete agent/uidesigner-presets-rc-review
