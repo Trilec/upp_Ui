@@ -2443,28 +2443,17 @@ UiDesignerApplyResult UiDesignerPreviewCanvas::ApplyProperty(
             RebuildDocument();
     }
     else if(instances_[q].control) {
-        if(property == "direction") {
-            if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
-                const bool horizontal = AsString(value) == "H";
-                box->SetDirection(horizontal ? UiDirection::H : UiDirection::V);
-                stats_.ancestor_layouts++;
+        if(property == "direction" || property == "wrap") {
+            if(dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
+                // Direction and wrapping change how every child descriptor is
+                // interpreted. Rebuild this one layout subtree from the
+                // authoritative document/overlay instead of retaining item
+                // state created for the previous axis or wrapping mode.
                 stats_.live_applies++;
-                Layout();
+                if(!RebuildSubtree(node_id))
+                    RebuildDocument();
                 Refresh();
-                return UiDesignerApplyResult::AppliedAncestorLayout;
-            }
-        }
-        else if(property == "wrap") {
-            if(auto *box = dynamic_cast<UiBoxLayout *>(instances_[q].control.Get())) {
-                const String mode = AsString(value);
-                const UiBoxWrap wrap = mode == "Flow" ? UiBoxWrap::Flow
-                    : mode == "Snap" ? UiBoxWrap::Snap : UiBoxWrap::None;
-                box->SetWrap(wrap);
-                stats_.ancestor_layouts++;
-                stats_.live_applies++;
-                Layout();
-                Refresh();
-                return UiDesignerApplyResult::AppliedAncestorLayout;
+                return UiDesignerApplyResult::RequiresSubtreeRebuild;
             }
         }
         else if(property == "rows" || property == "columns") {

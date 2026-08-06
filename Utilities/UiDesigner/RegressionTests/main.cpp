@@ -131,6 +131,101 @@ CONSOLE_APP_MAIN
     Check(sizing_requests == 2 && sizing_node == button && requested_height,
           "Hierarchy H icon routes one height-mode request");
 
+    UiDesignerSession sizing_session;
+    sizing_session.NewDocument("blank");
+    const UiDesignerNodeId sizing_label = sizing_session.AddControl("UiLabel");
+    const UiDesignerNodeId sizing_box = sizing_session.AddControl("UiBoxLayout");
+    sizing_session.Select(sizing_box);
+    const uint64 sizing_selection_revision = sizing_session.State().selection.revision;
+    String sizing_error;
+    Check(sizing_session.CycleSizingMode(sizing_label, false, sizing_error),
+          "Unselected Label width mode cycles by exact node identity: " + sizing_error);
+    Check(sizing_session.Document().Find(sizing_label)->GetProperty("width_mode", "Fit") == "Fixed" &&
+              sizing_session.Document().Find(sizing_box)->GetProperty("width_mode", "Fit") == "Fit",
+          "Hierarchy sizing mutates the clicked Label and not the selected BoxLayout");
+    Check(sizing_session.State().selection.primary == sizing_box &&
+              sizing_session.State().selection.revision == sizing_selection_revision,
+          "Exact-node sizing preserves designer selection");
+    Check(sizing_session.CycleSizingMode(sizing_label, false, sizing_error) &&
+              sizing_session.Document().Find(sizing_label)->GetProperty("width_mode", "Fit") == "Expand" &&
+              sizing_session.CycleSizingMode(sizing_label, false, sizing_error) &&
+              sizing_session.Document().Find(sizing_label)->GetProperty("width_mode", "Fit") == "Fit",
+          "Repeated sizing cycles Fit to Fixed to Expand to Fit");
+    Check(sizing_session.Undo() &&
+              sizing_session.Document().Find(sizing_label)->GetProperty("width_mode", "Fit") == "Expand" &&
+              sizing_session.Redo() &&
+              sizing_session.Document().Find(sizing_label)->GetProperty("width_mode", "Fit") == "Fit",
+          "Exact-node sizing remains undoable and redoable");
+
+    const UiDesignerNodeId sizing_accordion = sizing_session.AddControl(
+        "UiAccordion", sizing_session.Document().GetRootId());
+    const UiDesignerNodeId sizing_section = sizing_session.Commands().AddAccordionSection(
+        sizing_accordion, "Section");
+    const String section_before = sizing_session.Document().Find(sizing_section)->GetProperty(
+        "width_mode", "Fit");
+    Check(!sizing_session.CycleSizingMode(sizing_section, false, sizing_error) &&
+              sizing_session.Document().Find(sizing_section)->GetProperty(
+                  "width_mode", "Fit") == section_before,
+          "Unsupported semantic hierarchy rows remain inert");
+
+    UiDesignerSession dialog_session;
+    dialog_session.NewDocument("dialog");
+    const UiDesignerDocument& dialog_document = dialog_session.Document();
+    const UiDesignerNode *dialog_actions = nullptr;
+    for(const UiDesignerNode& candidate : dialog_document.GetNodes())
+        if(candidate.name == "dialog_actions")
+            dialog_actions = &candidate;
+    Check(dialog_actions && dialog_actions->children.GetCount() == 3,
+          "Fresh Dialog preset creates one three-item action row");
+    if(dialog_actions && dialog_actions->children.GetCount() == 3) {
+        const UiDesignerNode *dialog_spacer = dialog_document.Find(dialog_actions->children[0]);
+        const UiDesignerNode *dialog_cancel = dialog_document.Find(dialog_actions->children[1]);
+        const UiDesignerNode *dialog_ok = dialog_document.Find(dialog_actions->children[2]);
+        Check(dialog_spacer && dialog_cancel && dialog_ok &&
+                  dialog_spacer->name == "dialog_action_spacer" &&
+                  dialog_cancel->name == "cancel_button" &&
+                  dialog_ok->name == "ok_button",
+              "Dialog action source order is Spacer, Cancel, OK");
+        Check(dialog_actions->GetProperty("direction", "") == "H" &&
+                  dialog_actions->GetProperty("wrap", "") == "None" &&
+                  (int)dialog_actions->GetProperty("gap", -1) == 8,
+              "Dialog action row starts horizontal, non-wrapping, and deterministic");
+        Check(dialog_spacer->GetProperty("width_mode", "") == "Expand" &&
+                  dialog_spacer->GetProperty("height_mode", "") == "Fit" &&
+                  dialog_cancel->GetProperty("width_mode", "") == "Fixed" &&
+                  (int)dialog_cancel->GetProperty("fixed_width", 0) == 88 &&
+                  dialog_ok->GetProperty("width_mode", "") == "Fixed" &&
+                  (int)dialog_ok->GetProperty("fixed_width", 0) == 88,
+              "Dialog spacer expands while both buttons retain fixed width");
+        Check(dialog_cancel->GetProperty("height_mode", "") == "Fixed" &&
+                  (int)dialog_cancel->GetProperty("fixed_height", 0) == 32 &&
+                  dialog_ok->GetProperty("height_mode", "") == "Fixed" &&
+                  (int)dialog_ok->GetProperty("fixed_height", 0) == 32,
+              "Dialog button heights are deterministic");
+    }
+
+    UiDesignerPreviewCanvas preview;
+    dialog_session.AttachProjection(&preview);
+    preview.ResetStats();
+    const UiDesignerNodeId actions_id = dialog_actions ? dialog_actions->id : 0;
+    if(actions_id) {
+        Check(dialog_session.Commands().SetProperty(
+                  actions_id, "direction", "V",
+                  UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+                  "Test direction rebuild"),
+              "Dialog action direction change commits");
+        Check(preview.GetStats().subtree_rebuilds == 1,
+              "Direction change rebuilds the affected BoxLayout subtree exactly once");
+        preview.ResetStats();
+        Check(dialog_session.Commands().SetProperty(
+                  actions_id, "wrap", "Flow",
+                  UiDesignerImpactLocalLayout | UiDesignerImpactAncestorLayout,
+                  "Test wrap rebuild"),
+              "Dialog action wrap change commits");
+        Check(preview.GetStats().subtree_rebuilds == 1,
+              "Wrap change rebuilds the affected BoxLayout subtree exactly once");
+    }
+
     hierarchy.PlanCatalogDrop = [&](const String& type,
                                     UiDesignerNodeId parent, int index) {
         return session.PlanAddControl(type, parent, Point(0, 0), false, index);

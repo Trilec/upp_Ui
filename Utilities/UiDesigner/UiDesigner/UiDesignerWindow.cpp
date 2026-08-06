@@ -612,15 +612,8 @@ void UiDesignerWindow::ConnectServices()
         return session_.ExecuteDrop(plan, &created, error);
     };
     hierarchy_.CycleSizingMode = [=](UiDesignerNodeId id, bool height) {
-        const UiDesignerNode *node = session_.Document().Find(id);
-        if(!node)
-            return false;
-        const String property = height ? "height_mode" : "width_mode";
-        const String current = node->GetProperty(property, "Fit");
-        const String next = current == "Fit" ? "Fixed"
-                            : current == "Fixed" ? "Expand" : "Fit";
         String error;
-        if(!session_.CommitProperty(property, next, error)) {
+        if(!session_.CycleSizingMode(id, height, error)) {
             RefreshStatus(error);
             return false;
         }

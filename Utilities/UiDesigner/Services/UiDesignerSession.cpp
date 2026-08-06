@@ -183,6 +183,9 @@ void UiDesignerSession::ApplyPresetDialog()
     const UiDesignerNodeId column = Add(*box, "dialog_column", root,
                                         "Add dialog layout");
     SetLayout(column, "direction", "V");
+    SetLayout(column, "wrap", "None");
+    SetLayout(column, "gap", 8);
+    SetLayout(column, "inset", 0);
     SetLayout(column, "x", 16);
     SetLayout(column, "y", 16);
     SetLayout(column, "width", 468);
@@ -201,6 +204,8 @@ void UiDesignerSession::ApplyPresetDialog()
     SetLayout(heading, "width_mode", "Expand");
     SetLayout(heading, "height_mode", "Fixed");
     SetLayout(heading, "fixed_height", 44);
+    SetLayout(heading, "cell_align_x", "Stretch");
+    SetLayout(heading, "cell_align_y", "Center");
 
     const UiDesignerNodeId placeholder = Add(*label, "dialog_content", column,
                                              "Add dialog content placeholder");
@@ -210,18 +215,26 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactCode);
     SetLayout(placeholder, "width_mode", "Expand");
     SetLayout(placeholder, "height_mode", "Expand");
+    SetLayout(placeholder, "cell_align_x", "Stretch");
+    SetLayout(placeholder, "cell_align_y", "Stretch");
 
     const UiDesignerNodeId actions = Add(*box, "dialog_actions", column,
                                          "Add dialog actions");
     SetLayout(actions, "direction", "H");
+    SetLayout(actions, "wrap", "None");
+    SetLayout(actions, "gap", 8);
+    SetLayout(actions, "inset", 0);
     SetLayout(actions, "width_mode", "Expand");
     SetLayout(actions, "height_mode", "Fixed");
     SetLayout(actions, "fixed_height", 40);
+    SetLayout(actions, "cell_align_x", "Stretch");
+    SetLayout(actions, "cell_align_y", "Center");
 
     const UiDesignerNodeId action_spacer = Add(*spacer, "dialog_action_spacer",
                                                actions, "Add action spacer");
-    SetLayout(action_spacer, "h_sizing", "Fill");
-    SetLayout(action_spacer, "v_sizing", "Fill");
+    SetLayout(action_spacer, "width_mode", "Expand");
+    SetLayout(action_spacer, "height_mode", "Fit");
+    SetLayout(action_spacer, "cell_align_y", "Center");
 
     const UiDesignerNodeId cancel = Add(*button, "cancel_button", actions,
                                         "Add Cancel button");
@@ -231,6 +244,9 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactCode);
     SetLayout(cancel, "width_mode", "Fixed");
     SetLayout(cancel, "fixed_width", 88);
+    SetLayout(cancel, "height_mode", "Fixed");
+    SetLayout(cancel, "fixed_height", 32);
+    SetLayout(cancel, "cell_align_y", "Center");
 
     const UiDesignerNodeId ok = Add(*button, "ok_button", actions,
                                     "Add OK button");
@@ -242,6 +258,9 @@ void UiDesignerSession::ApplyPresetDialog()
                           UiDesignerImpactPaint | UiDesignerImpactCode);
     SetLayout(ok, "width_mode", "Fixed");
     SetLayout(ok, "fixed_width", 88);
+    SetLayout(ok, "height_mode", "Fixed");
+    SetLayout(ok, "fixed_height", 32);
+    SetLayout(ok, "cell_align_y", "Center");
 }
 
 void UiDesignerSession::NewDocument(const String& preset)
@@ -704,6 +723,40 @@ void UiDesignerSession::SyncInspectorValues(const UiDesignerChangeSet& changes)
             }
         }
     }
+}
+
+bool UiDesignerSession::CycleSizingMode(UiDesignerNodeId node_id,
+                                               bool height,
+                                               String& error)
+{
+    const UiDesignerNode *node = document_.Find(node_id);
+    if(!node) {
+        error = "Sizing target no longer exists";
+        return false;
+    }
+
+    const String property = height ? "height_mode" : "width_mode";
+    const UiDesignerControlSpec *spec = catalog_.Find(node->type);
+    if(!spec || !spec->FindProperty(property)) {
+        error = "Selected control does not support " + property;
+        return false;
+    }
+
+    const String current = AsString(node->GetProperty(property, "Fit"));
+    const String next = current == "Fit" ? "Fixed"
+                      : current == "Fixed" ? "Expand" : "Fit";
+    const UiDesignerChangeImpact impact =
+        UiDesignerImpactLocalLayout |
+        UiDesignerImpactAncestorLayout |
+        UiDesignerImpactCode;
+    if(!commands_.SetProperty(node_id, property, next, impact,
+                              height ? "Change height mode"
+                                     : "Change width mode")) {
+        error = commands_.GetLastError();
+        return false;
+    }
+    error.Clear();
+    return true;
 }
 
 bool UiDesignerSession::ResetProperty(

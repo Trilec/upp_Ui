@@ -100,6 +100,7 @@ public:
                          String& error);
     bool CommitProperty(const String& property, const Value& value,
                         String& error);
+    bool CycleSizingMode(UiDesignerNodeId node, bool height, String& error);
     bool ResetProperty(const String& property, String& error);
     void CancelPreview();
 
