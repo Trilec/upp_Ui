@@ -700,7 +700,7 @@ void SymbolPickerView::BuildTopHeading()
 	heading_card_.ShowCardLine(false);
 	version_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
 	version_label_.SetMinSize(Size(DPI(76), DPI(24)));
-	version_label_.SetText("v0.3.6");
+	version_label_.SetText("v0.3.7");
 	version_label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 	version_label_.SetContentGap(DPI(4));
 	version_label_.SetIconScaleToContent(true);
@@ -741,17 +741,103 @@ void SymbolPickerView::BuildTopHeading()
 	top_heading_layout_.Add(exit_button_).Fixed(DPI(68)).MinMain(DPI(68)).AlignSelf(UiBoxLayout::Align::Center);
 
 	dark_theme_tool_.WhenAction = [=] {
+		const bool dark = UiTheme::GetMode() != UiThemeMode::Dark;
+		UiTheme::Set(dark ? UiThemeMode::Dark : UiThemeMode::Light);
 		Ctrl::SwapDarkLight();
+
+		UiTitleCard::Style hstyle = UiTheme::ResolveTitleCard(UiRole::Accent);
+		hstyle.metrics.face_enabled = false;
+		hstyle.metrics.frame_enabled = false;
+		hstyle.metrics.radius = 0;
+		hstyle.card_line_side = UiAlign::RIGHT;
+		hstyle.card_line_thickness = DPI(2);
+		hstyle.card_line_gap = DPI(9);
+		heading_card_.SetCustomStyle(hstyle);
+		version_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
+		category_card_.SetCustomStyle(MakeSectionCardStyle(UiRole::Accent, SansSerifZ(12).Bold(), SansSerifZ(10)));
+		library_card_.SetCustomStyle(MakeSectionCardStyle(UiRole::Accent, SansSerifZ(12).Bold(), SansSerifZ(10)));
+		collections_card_.SetCustomStyle(MakeSectionCardStyle(UiRole::Accent, SansSerifZ(12).Bold(), SansSerifZ(10), Color(0xE2, 0x8D, 0x00)));
+
+		dark_theme_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		help_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		setup_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+		categories_filter_icon_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		library_refresh_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		collections_selector_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Accent));
+		new_collection_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		remove_collection_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Accent));
+		save_and_save_as_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+		load_and_history_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
+		export_and_type_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
+		output_pixel_size_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
+		output_export_type_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
+		copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+		remove_selected_collection_items_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+		clear_collection_tool_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+		collections_filter_icon_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+		UiLabel::Style empty_style = UiTheme::ResolveLabel(UiRole::Subtle);
+		empty_style.font = SansSerifZ(11);
+		collections_empty_label_.SetCustomStyle(empty_style);
+
+		UiPanel::Style panel_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
+		UiScrollPanel::Style scroll_style = UiTheme::ResolveScrollPanel();
+		if(dark) {
+			const Color surface = Color(58, 58, 58);
+			const Color frame = Color(76, 76, 76);
+			panel_style.metrics.face_enabled = true;
+			panel_style.metrics.frame_enabled = true;
+			panel_style.transparent = false;
+			scroll_style.metrics.face_enabled = true;
+			scroll_style.metrics.frame_enabled = true;
+			scroll_style.transparent = false;
+			for(int i = 0; i < 4; ++i) {
+				panel_style.palette.face[i] = UiFill::Solid(surface);
+				panel_style.palette.frame[i] = frame;
+				scroll_style.palette.face[i] = UiFill::Solid(surface);
+				scroll_style.palette.frame[i] = frame;
+			}
+		}
+		categories_panel_.SetCustomStyle(panel_style);
+		library_panel_.SetCustomStyle(panel_style);
+		collections_panel_.SetCustomStyle(panel_style);
+		category_scroll_panel_.SetCustomStyle(scroll_style);
+		library_scroll_panel_.SetCustomStyle(scroll_style);
+		collections_scroll_panel_.SetCustomStyle(scroll_style);
+
+		const Color accent_icon = dark ? White() : Color(0, 120, 212);
+		const Color alert_icon = dark ? White() : Color(220, 38, 38);
+		dark_theme_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(accent_icon);
+		help_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(accent_icon);
+		setup_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(accent_icon);
+		categories_filter_icon_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(dark ? White() : SColorText());
+		library_refresh_button_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(dark ? White() : SColorText());
+		new_collection_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(accent_icon);
+		remove_collection_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(accent_icon);
+		copy_button_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(alert_icon);
+		remove_selected_collection_items_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(alert_icon);
+		clear_collection_tool_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(alert_icon);
+		collections_filter_icon_.SetIconRenderMode(UiIconRenderMode::MonoTint).SetIconColor(dark ? White() : SColorText());
+
+		image_cache_.Clear();
 		RefreshFromModel();
 		Refresh();
 	};
 	help_tool_.WhenAction = [=] {
-		PromptOK("SymbolPicker\n\n"
-		         "Browse or filter the Library, then drag icons into the active Collection.\n"
-		         "Ctrl-click selects multiple icons; Shift-click selects a visible range in Library or Collections.\n"
-		         "Icons already present in a Collection are skipped on drop.\n"
-		         "Delete removes the selection; Clear removes every icon from the active Collection.\n"
-		         "Projects save as .uppicons.json. RAW/RLE exports are .h files. IML can export alone or as an IML + header library pair.");
+		PromptOK("[*+140 SymbolPicker]&"
+		         "[+90 Build and maintain reusable icon collections and U++ image libraries from the generated symbol catalogue.]&"
+		         "&[* Browse the library]&"
+		         "Choose a category or select [* All] to browse the complete catalogue. Use the style, tint and Filter controls to narrow what you see.&"
+		         "&[* Select symbols]&"
+		         "Click one symbol for a single selection. [* Ctrl-click] adds or removes individual symbols. [* Shift-click] selects a visible range, and [* Ctrl+Shift] adds a range to the current selection.&"
+		         "&[* Build collections]&"
+		         "Create a blank collection with [+]. Drag one symbol or a multi-selection into the active collection. Existing symbols are skipped instead of duplicated. Use Delete, Clear and drag reordering to maintain the collection.&"
+		         "&[* Save and load]&"
+		         "Save the working project as [*.uppicons.json] and load it again later. Projects keep the collections, ordering and stable catalogue identities used to rebuild exports.&"
+		         "&[* Export]&"
+		         "Export Image calls, Icon IDs, C++ snippets, PNG or SVG files, U++ RAW/RLE headers, a standalone IML, or a paired [* IML + Header Library].&"
+		         "&[* Main purpose]&"
+		         "The paired library export is intended to help maintain reusable U++ image libraries such as [* UiIcons.iml] with their generated [* UiIcons.h] wrappers, catalogue entries and categories.");
 	};
 	setup_tool_.WhenAction = [=] {
 		PromptOK("SymbolPicker setup options are not required for the current workflow.");
@@ -826,7 +912,7 @@ void SymbolPickerView::BuildLibraryPanel()
 {
 	library_panel_.Add(library_base_layout_.SizePos());
 	library_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
-	library_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
+	library_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	library_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
 
 	library_card_.SetMinSize(Size(DPI(180), DPI(45)));
@@ -870,7 +956,11 @@ void SymbolPickerView::BuildLibraryPanel()
 
 	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	library_header_layout_.Add(library_card_).Fit().MinMain(DPI(180)).MinCross(DPI(45)).AlignSelf(UiBoxLayout::Align::Start);
-	library_header_layout_.Add(library_action_cluster_).Expand(1).MinMain(DPI(320)).AlignSelf(UiBoxLayout::Align::Stretch);
+	{
+		auto spacer = library_header_layout_.AddSpacer(1);
+		spacer.Expand(1).MinMain(DPI(8)).MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
+	}
+	library_header_layout_.Add(library_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	library_action_cluster_.Add(library_style_selector_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
 	library_action_cluster_.Add(library_tint_ctrl_).Fit().MinMain(DPI(96)).AlignSelf(UiBoxLayout::Align::Center);
 	{
@@ -879,7 +969,7 @@ void SymbolPickerView::BuildLibraryPanel()
 		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
 	}
 	library_action_cluster_.Add(library_refresh_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
-	library_action_cluster_.Add(library_filter_edit_).Expand(1).MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
+	library_action_cluster_.Add(library_filter_edit_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	library_base_layout_.Add(library_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 
 	library_style_selector_.WhenAction = [=] {
@@ -914,7 +1004,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 {
 	collections_panel_.Add(collections_base_layout_.SizePos());
 	collections_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
-	collections_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
+	collections_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	collections_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
 
 	collections_card_.SetMinSize(Size(DPI(180), DPI(45)));
@@ -1017,7 +1107,11 @@ void SymbolPickerView::BuildCollectionsPanel()
 
 	collections_base_layout_.Add(collections_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_header_layout_.Add(collections_card_).Fit().MinMain(DPI(180)).MinCross(DPI(45)).AlignSelf(UiBoxLayout::Align::Start);
-	collections_header_layout_.Add(collections_action_cluster_).Expand(1).MinMain(DPI(420)).AlignSelf(UiBoxLayout::Align::Stretch);
+	{
+		auto spacer = collections_header_layout_.AddSpacer(1);
+		spacer.Expand(1).MinMain(DPI(8)).MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
+	}
+	collections_header_layout_.Add(collections_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(collections_selector_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(new_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(remove_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
@@ -1040,7 +1134,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
 	}
 	collections_action_cluster_.Add(collections_filter_icon_).Fit().AlignSelf(UiBoxLayout::Align::Center);
-	collections_action_cluster_.Add(collections_filter_edit_).Expand(1).MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_action_cluster_.Add(collections_filter_edit_).Fit().MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_base_layout_.Add(collections_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_scroll_panel_.WhenBackgroundLeftDown = [=](dword) {
 		ClearCollectionSelection();
@@ -1255,12 +1349,13 @@ void SymbolPickerView::RebuildLibraryTiles()
 	Vector<int> rows = catalog_->Filter(model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
 	bool limited_all = model_->GetCurrentCategory() == "All" && TrimBoth(model_->GetFilterText()).IsEmpty() && rows.GetCount() > kLibraryAllInitialLimit;
 	int visible_count = limited_all ? min(rows.GetCount(), kLibraryAllInitialLimit) : rows.GetCount();
+	Color preview_tint = UiTheme::GetMode() == UiThemeMode::Dark ? White() : model_->GetTintColor();
 	for(int i = 0; i < visible_count; ++i) {
 		int row = rows[i];
 		const SymbolPickerIconEntry& entry = catalog_->GetIcons()[row];
 		SymbolPickerIconTile& tile = library_tiles_.Add(new SymbolPickerIconTile());
 		tile.SetEntry(entry);
-		Image preview_image = image_cache_.GetImage(entry, DPI(kLibraryTilePreviewPx), model_->GetTintColor());
+		Image preview_image = image_cache_.GetImage(entry, DPI(kLibraryTilePreviewPx), preview_tint);
 		tile.SetPreviewImage(preview_image);
 		library_content_layout_.Add(tile).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 
@@ -1327,6 +1422,7 @@ void SymbolPickerView::RebuildCollectionTiles()
 		return;
 	}
 	const String filter = collections_filter_edit_.GetTextUtf8();
+	const bool dark = UiTheme::GetMode() == UiThemeMode::Dark;
 
 	for(int i = 0; i < collection->items.GetCount(); ++i) {
 		const SymbolPickerIconRef& item = collection->items[i];
@@ -1345,7 +1441,7 @@ void SymbolPickerView::RebuildCollectionTiles()
 		if(catalog_) {
 			const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(item.catalog_id);
 			if(entry)
-				preview_image = image_cache_.GetImage(*entry, DPI(kCollectionTilePreviewPx), item.tint);
+				preview_image = image_cache_.GetImage(*entry, DPI(kCollectionTilePreviewPx), dark ? White() : item.tint);
 		}
 		row.SetPreviewImage(preview_image);
 		row.SetSelected(IsCollectionItemSelected(i));
@@ -1496,9 +1592,9 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 
 void SymbolPickerView::ShowExportComplete(const String& file_name, const String& folder, const String& detail) const
 {
-	String message = "Export complete.\n\nFile: " + file_name + "\nPath: " + folder;
+	String message = "[*+110 " + DeQtf(file_name) + "]&[+85 " + DeQtf(folder) + "]";
 	if(!detail.IsEmpty())
-		message << "\n" << detail;
+		message << "&[+80 " << DeQtf(detail) << "]";
 	PromptOK(message);
 }
 
@@ -1596,16 +1692,16 @@ bool SymbolPickerView::ExportCurrentImlLibrary(SymbolPickerExportScope scope)
 		Exclamation(Format("Could not write library header:\n%s", header_path));
 		return false;
 	}
-	String detail = "File: " + GetFileName(iml_path) + "\nPath: " + GetFileFolder(iml_path);
+	String detail;
 	if(!warnings.IsEmpty()) {
 		String warnings_path = AppendFileName(GetFileFolder(header_path), "_export_warnings.txt");
 		String warning_text;
 		for(const String& warning : warnings)
 			warning_text << warning << '\n';
 		if(SaveFile(warnings_path, warning_text))
-			detail << Format("\nWarnings: %d (see %s)", warnings.GetCount(), GetFileName(warnings_path));
+			detail = Format("Warnings: %d (see %s)", warnings.GetCount(), GetFileName(warnings_path));
 	}
-	ShowExportComplete(GetFileName(header_path), GetFileFolder(header_path), detail);
+	ShowExportComplete(GetFileName(header_path) + " + " + GetFileName(iml_path), GetFileFolder(header_path), detail);
 	return true;
 }
 
@@ -1630,7 +1726,7 @@ bool SymbolPickerView::ExportCurrentSvgFiles(SymbolPickerExportScope scope)
 		Exclamation(Format("SVG export finished with issues.\nWritten: %d\nSkipped: %d\nPath: %s", written, skipped, output_folder));
 		return false;
 	}
-	String detail = Format("Written: %d\nSkipped: %d", written, skipped);
+	String detail = Format("Written: %d | Skipped: %d", written, skipped);
 	ShowExportComplete(Format("%d SVG file%s", written, written == 1 ? "" : "s"), output_folder, detail);
 	return true;
 }
@@ -1656,7 +1752,7 @@ bool SymbolPickerView::ExportCurrentPngFiles(SymbolPickerExportScope scope)
 		Exclamation(Format("PNG export finished with issues.\nWritten: %d\nSkipped: %d\nPath: %s", written, skipped, output_folder));
 		return false;
 	}
-	String detail = Format("Written: %d\nSkipped: %d", written, skipped);
+	String detail = Format("Written: %d | Skipped: %d", written, skipped);
 	ShowExportComplete(Format("%d PNG file%s", written, written == 1 ? "" : "s"), output_folder, detail);
 	return true;
 }
