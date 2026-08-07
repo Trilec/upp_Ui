@@ -22,7 +22,7 @@ void UiColorPicker::Impl::Layout()
     {
         UiBoxLayout::PauseScope pause(root_, false);
         root_.ItemAt(0).Fixed(owner_.GetStyle().navigation_height);
-        root_.ItemAt(2).Fixed(owner_.GetStyle().stash_height);
+        root_.ItemAt(2).Fixed(max(owner_.GetStyle().stash_height, DPI(94)));
         root_.ItemAt(3).Fixed(owner_.GetStyle().footer_height);
     }
     Rect body = UiStyledInnerRect(owner_.GetSize(), owner_.GetStyle().metrics, owner_.GetStyle().skin);
