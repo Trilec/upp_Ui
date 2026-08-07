@@ -233,7 +233,7 @@ public:
 
     virtual Size GetMinSize() const override
     {
-        return compact_ ? Size(DPI(20), DPI(18)) : Size(DPI(28), DPI(28));
+        return Size(DPI(26), DPI(26));
     }
 
     virtual void Paint(Draw& draw) override
