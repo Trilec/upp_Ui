@@ -101,8 +101,7 @@ public:
                 One<SwatchTile_>& tile = tiles_.Add();
                 tile.Create();
                 tile->Configure(*this, i);
-                Add(*tile).Fit().MinMaxWidth(compact_ ? DPI(18) : DPI(28), INT_MAX)
-                          .MinMaxHeight(compact_ ? DPI(18) : DPI(28), INT_MAX);
+                Add(*tile).Fixed(DPI(26)).MinMaxHeight(DPI(26), DPI(26));
             }
         }
         selected_.Clear();
