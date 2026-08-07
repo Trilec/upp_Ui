@@ -1,5 +1,15 @@
 # SymbolPicker Changelog
 
+## 0.3.5 - Collection and export acceptance repairs
+
+- Reject Library-to-Collection duplicate drops while allowing partial grouped drops and reporting skipped duplicates.
+- Keep logical collection selection synchronized after Delete so repeated deletion chains correctly.
+- Added Shift range selection, active-collection removal, blank-and-active collection creation, and a one-command Clear collection action.
+- Hardened `.uppicons.json` Save As handling and added explicit default extensions/file filters for U++ header and IML exports.
+- Clarified that U++ IML export is a single `.iml` payload; warning sidecars remain conditional on actual export warnings.
+- Wired the light/dark toggle through U++ runtime skin switching and made custom tile/drop colors theme-responsive.
+- Replaced the inert Help action with concise in-app workflow guidance.
+
 ## 0.3.4 - Captured gesture stability
 
 - Added one explicit captured gesture tracker shared by library and collection tiles.
