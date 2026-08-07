@@ -92,34 +92,43 @@ static String SafeAliasPart(const String& text)
 	return out;
 }
 
-static String EnsureProjectExtension(String path)
+static String StripProjectSuffixes(String path)
 {
-	const int ext_len = (int)strlen(kProjectExtension);
 	String lower = ToLower(path);
-	String doubled = String(kProjectExtension) + kProjectExtension;
-	while(lower.EndsWith(doubled)) {
-		path.Trim(path.GetCount() - ext_len);
+	if(lower.EndsWith(".json")) {
+		path.Trim(path.GetCount() - 5);
 		lower = ToLower(path);
 	}
-	if(!lower.EndsWith(kProjectExtension))
-		path << kProjectExtension;
+	while(lower.EndsWith(".uppicons")) {
+		path.Trim(path.GetCount() - 9);
+		lower = ToLower(path);
+	}
 	return path;
+}
+
+static String EnsureProjectExtension(String path)
+{
+	return StripProjectSuffixes(path) + kProjectExtension;
 }
 
 static String StripProjectExtension(String name)
 {
-	const int ext_len = (int)strlen(kProjectExtension);
-	while(ToLower(name).EndsWith(kProjectExtension))
-		name.Trim(name.GetCount() - ext_len);
-	return name;
+	return StripProjectSuffixes(name);
 }
 
-static bool CollectionHasCatalogId(const SymbolPickerCollection& collection, const String& catalog_id)
+static String EnsureFileExtension(String path, const String& ext)
 {
-	for(const SymbolPickerIconRef& item : collection.items)
-		if(item.catalog_id == catalog_id)
-			return true;
-	return false;
+	if(!ToLower(path).EndsWith(ToLower(ext)))
+		path << ext;
+	return path;
+}
+
+static String PreferredDialogDir(const String& current_path)
+{
+	String dir = current_path.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current_path);
+	if(!DirectoryExists(dir))
+		dir = GetCurrentDirectory();
+	return dir;
 }
 
 static String MakeExportScopeName(const SymbolPickerProject& project, SymbolPickerExportScope scope)
@@ -144,6 +153,7 @@ static String MakeExportTypeName(SymbolPickerExportType type)
 	case SymbolPickerExportType::UppRawHeader: return "raw";
 	case SymbolPickerExportType::UppRleHeader: return "rle";
 	case SymbolPickerExportType::UppIml: return "iml";
+	case SymbolPickerExportType::UppImlLibrary: return "iml_library";
 	case SymbolPickerExportType::PngFiles: return "png";
 	case SymbolPickerExportType::SvgFiles: return "svg";
 	case SymbolPickerExportType::IconId: return "icon_id";
@@ -690,7 +700,7 @@ void SymbolPickerView::BuildTopHeading()
 	heading_card_.ShowCardLine(false);
 	version_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent));
 	version_label_.SetMinSize(Size(DPI(76), DPI(24)));
-	version_label_.SetText("v0.3.5");
+	version_label_.SetText("v0.3.6");
 	version_label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 	version_label_.SetContentGap(DPI(4));
 	version_label_.SetIconScaleToContent(true);
@@ -738,10 +748,10 @@ void SymbolPickerView::BuildTopHeading()
 	help_tool_.WhenAction = [=] {
 		PromptOK("SymbolPicker\n\n"
 		         "Browse or filter the Library, then drag icons into the active Collection.\n"
-		         "Ctrl-click selects multiple icons; Shift-click selects a collection range.\n"
+		         "Ctrl-click selects multiple icons; Shift-click selects a visible range in Library or Collections.\n"
 		         "Icons already present in a Collection are skipped on drop.\n"
 		         "Delete removes the selection; Clear removes every icon from the active Collection.\n"
-		         "Projects save as .uppicons.json. RAW/RLE exports are .h files; IML export is one .iml file.");
+		         "Projects save as .uppicons.json. RAW/RLE exports are .h files. IML can export alone or as an IML + header library pair.");
 	};
 	setup_tool_.WhenAction = [=] {
 		PromptOK("SymbolPicker setup options are not required for the current workflow.");
@@ -816,7 +826,7 @@ void SymbolPickerView::BuildLibraryPanel()
 {
 	library_panel_.Add(library_base_layout_.SizePos());
 	library_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
-	library_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	library_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
 	library_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
 
 	library_card_.SetMinSize(Size(DPI(180), DPI(45)));
@@ -860,11 +870,7 @@ void SymbolPickerView::BuildLibraryPanel()
 
 	library_base_layout_.Add(library_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	library_header_layout_.Add(library_card_).Fit().MinMain(DPI(180)).MinCross(DPI(45)).AlignSelf(UiBoxLayout::Align::Start);
-	{
-		auto spacer = library_header_layout_.AddSpacer(1);
-		spacer.Expand(1).MinMain(DPI(8)).MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
-	}
-	library_header_layout_.Add(library_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	library_header_layout_.Add(library_action_cluster_).Expand(1).MinMain(DPI(320)).AlignSelf(UiBoxLayout::Align::Stretch);
 	library_action_cluster_.Add(library_style_selector_).Fit().MinMain(DPI(110)).AlignSelf(UiBoxLayout::Align::Stretch);
 	library_action_cluster_.Add(library_tint_ctrl_).Fit().MinMain(DPI(96)).AlignSelf(UiBoxLayout::Align::Center);
 	{
@@ -873,7 +879,7 @@ void SymbolPickerView::BuildLibraryPanel()
 		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
 	}
 	library_action_cluster_.Add(library_refresh_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
-	library_action_cluster_.Add(library_filter_edit_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
+	library_action_cluster_.Add(library_filter_edit_).Expand(1).MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	library_base_layout_.Add(library_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 
 	library_style_selector_.WhenAction = [=] {
@@ -908,7 +914,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 {
 	collections_panel_.Add(collections_base_layout_.SizePos());
 	collections_base_layout_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(8));
-	collections_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	collections_header_layout_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
 	collections_action_cluster_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true);
 
 	collections_card_.SetMinSize(Size(DPI(180), DPI(45)));
@@ -965,7 +971,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.Add("512 px", 512);
 	output_pixel_size_.SelectByData(48);
 	output_export_type_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Alert));
-	output_export_type_.SetSizeMin(DPI(130), 0);
+	output_export_type_.SetSizeMin(DPI(180), 0);
 	output_export_type_.UseInternalModel().Clear()
 		.Add("Image Call", (int)SymbolPickerExportType::ImageCall)
 		.Add("Icon Id", (int)SymbolPickerExportType::IconId)
@@ -974,7 +980,8 @@ void SymbolPickerView::BuildCollectionsPanel()
 		.Add("SVG Files", (int)SymbolPickerExportType::SvgFiles)
 		.Add("U++ RAW Header", (int)SymbolPickerExportType::UppRawHeader)
 		.Add("U++ RLE Header", (int)SymbolPickerExportType::UppRleHeader)
-		.Add("U++ IML", (int)SymbolPickerExportType::UppIml);
+		.Add("U++ IML", (int)SymbolPickerExportType::UppIml)
+		.Add("U++ IML + Header Library", (int)SymbolPickerExportType::UppImlLibrary);
 	output_export_type_.Select(0);
 	copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
 	copy_button_.SetText("").SetContentInset(DPI(4)).SetContentGap(DPI(4));
@@ -1010,11 +1017,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 
 	collections_base_layout_.Add(collections_header_layout_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_header_layout_.Add(collections_card_).Fit().MinMain(DPI(180)).MinCross(DPI(45)).AlignSelf(UiBoxLayout::Align::Start);
-	{
-		auto spacer = collections_header_layout_.AddSpacer(1);
-		spacer.Expand(1).MinMain(DPI(8)).MinCross(DPI(10)).AlignSelf(UiBoxLayout::Align::Stretch);
-	}
-	collections_header_layout_.Add(collections_action_cluster_).Fit().AlignSelf(UiBoxLayout::Align::Center);
+	collections_header_layout_.Add(collections_action_cluster_).Expand(1).MinMain(DPI(420)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(collections_selector_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(new_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(remove_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
@@ -1027,7 +1030,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 	}
 	collections_action_cluster_.Add(export_and_type_button_).Fixed(DPI(80)).MinMain(DPI(30)).AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(output_pixel_size_).Fixed(DPI(80)).MinMain(DPI(30)).AlignSelf(UiBoxLayout::Align::Stretch);
-	collections_action_cluster_.Add(output_export_type_).Fit().MinMain(DPI(130)).AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_action_cluster_.Add(output_export_type_).Fit().MinMain(DPI(180)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_action_cluster_.Add(remove_selected_collection_items_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(clear_collection_tool_).Fit().AlignSelf(UiBoxLayout::Align::Center);
 	collections_action_cluster_.Add(copy_button_).Fit().AlignSelf(UiBoxLayout::Align::Center);
@@ -1037,7 +1040,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 		spacer.LineEnabled(true).LineOrientation(UiSpacerLineOrientation::Vertical).LineAlign(UiCrossAlign::Center).LineThickness(DPI(2)).LineColorEnabled(true).LineColor(Color(18, 130, 227));
 	}
 	collections_action_cluster_.Add(collections_filter_icon_).Fit().AlignSelf(UiBoxLayout::Align::Center);
-	collections_action_cluster_.Add(collections_filter_edit_).Fit().MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
+	collections_action_cluster_.Add(collections_filter_edit_).Expand(1).MinMain(DPI(160)).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_base_layout_.Add(collections_scroll_panel_).Expand(1).AlignSelf(UiBoxLayout::Align::Stretch);
 	collections_scroll_panel_.WhenBackgroundLeftDown = [=](dword) {
 		ClearCollectionSelection();
@@ -1105,38 +1108,18 @@ void SymbolPickerView::BuildCollectionsPanel()
 		if(model_ && commands_)
 			commands_->Execute(MakeSymbolPickerSetExportTypeCommand((SymbolPickerExportType)(IsNumber(~output_export_type_) ? (int)~output_export_type_ : (int)SymbolPickerExportType::ImageCall)), *model_);
 	};
-	save_and_save_as_button_.WhenAction = [=] {
-		SaveProject(false);
-	};
+	save_and_save_as_button_.WhenAction = [=] { SaveProject(false); };
 	save_and_save_as_button_.WhenSelect = [=](int, const Value& data) {
-		String cmd = AsString(data);
-		if(cmd == "save_as")
-			SaveProject(true);
-		else
-			SaveProject(false);
+		SaveProject(AsString(data) == "save_as");
 	};
-	load_and_history_button_.WhenAction = [=] {
-		LoadProject();
-	};
-	load_and_history_button_.WhenSelect = [=](int, const Value&) {
-		LoadProject();
-	};
-	export_and_type_button_.WhenAction = [=] {
-		ExportCurrentText(SymbolPickerExportScope::ActiveCollection);
-	};
+	load_and_history_button_.WhenAction = [=] { LoadProject(); };
+	load_and_history_button_.WhenSelect = [=](int, const Value&) { LoadProject(); };
+	export_and_type_button_.WhenAction = [=] { ExportCurrentText(SymbolPickerExportScope::ActiveCollection); };
 	export_and_type_button_.WhenSelect = [=](int, const Value& data) {
-		String cmd = AsString(data);
-		if(cmd == "all")
-			ExportCurrentText(SymbolPickerExportScope::AllCollections);
-		else
-			ExportCurrentText(SymbolPickerExportScope::ActiveCollection);
+		ExportCurrentText(AsString(data) == "all" ? SymbolPickerExportScope::AllCollections : SymbolPickerExportScope::ActiveCollection);
 	};
-	copy_button_.WhenAction = [=] {
-		CopyCurrentExportToClipboard();
-	};
-	remove_selected_collection_items_tool_.WhenAction = [=] {
-		RemoveSelectedCollectionItems();
-	};
+	copy_button_.WhenAction = [=] { CopyCurrentExportToClipboard(); };
+	remove_selected_collection_items_tool_.WhenAction = [=] { RemoveSelectedCollectionItems(); };
 	clear_collection_tool_.WhenAction = [=] {
 		if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0)
 			return;
@@ -1149,9 +1132,7 @@ void SymbolPickerView::BuildCollectionsPanel()
 			RefreshCollectionItems();
 		}
 	};
-	collections_filter_edit_.WhenAction = [=] {
-		RebuildCollectionTiles();
-	};
+	collections_filter_edit_.WhenAction = [=] { RebuildCollectionTiles(); };
 	collections_filter_icon_.WhenAction = [=] {
 		collections_filter_edit_.SetTextUtf8("");
 		RebuildCollectionTiles();
@@ -1250,9 +1231,7 @@ void SymbolPickerView::RebuildCategoryButtons()
 			continue;
 		UiButton& button = category_buttons_.Add(new UiButton());
 		button.SetCustomStyle(selected_category == category.id ? selected_style : hover_style)
-			.SetText(button_text)
-			.SetContentInset(DPI(4))
-			.SetContentGap(DPI(6));
+			.SetText(button_text).SetContentInset(DPI(4)).SetContentGap(DPI(6));
 		category_content_layout_.Add(button).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 		String category_id = category.id;
 		button.WhenAction = [=] {
@@ -1287,10 +1266,14 @@ void SymbolPickerView::RebuildLibraryTiles()
 
 		String catalog_id = entry.catalog_id;
 		tile.WhenSelected = [=](dword keyflags) {
-			if(keyflags & K_CTRL)
+			if(keyflags & K_SHIFT)
+				SelectLibraryRange(catalog_id, (keyflags & K_CTRL) != 0);
+			else if(keyflags & K_CTRL)
 				ToggleLibrarySelection(catalog_id);
-			else if(IsLibrarySelected(catalog_id))
+			else if(IsLibrarySelected(catalog_id)) {
+				library_selection_anchor_id_ = catalog_id;
 				SelectLibraryCatalogId(catalog_id);
+			}
 			else
 				SetLibrarySelectionOne(catalog_id);
 		};
@@ -1353,11 +1336,7 @@ void SymbolPickerView::RebuildCollectionTiles()
 			if(filter_entry)
 				display_name = filter_entry->display_name;
 		}
-		String filter_text = Format("%s\n%s\n%s\n%s",
-			item.alias,
-			item.catalog_id,
-			item.source_id,
-			display_name);
+		String filter_text = Format("%s\n%s\n%s\n%s", item.alias, item.catalog_id, item.source_id, display_name);
 		if(!MatchFilterText(filter_text, filter))
 			continue;
 		SymbolPickerCollectionTile& row = collection_tiles_.Add(new SymbolPickerCollectionTile());
@@ -1432,6 +1411,7 @@ String SymbolPickerView::MakeExportDefaultExtension() const
 	case SymbolPickerExportType::CppSnippet: return ".cpp";
 	case SymbolPickerExportType::UppRawHeader:
 	case SymbolPickerExportType::UppRleHeader:
+	case SymbolPickerExportType::UppImlLibrary:
 		return ".h";
 	case SymbolPickerExportType::UppIml:
 		return ".iml";
@@ -1451,18 +1431,11 @@ String SymbolPickerView::MakeExportDefaultName(SymbolPickerExportScope scope) co
 		return "symbolpicker_export";
 	String base = MakeExportScopeName(model_->ExportProject(), scope);
 	switch(model_->GetExportType()) {
-	case SymbolPickerExportType::UppRawHeader:
-		base << "_raw";
-		break;
-	case SymbolPickerExportType::UppRleHeader:
-		base << "_rle";
-		break;
-	case SymbolPickerExportType::UppIml:
-		base << "_iml";
-		break;
-	default:
-		base << '_' << MakeExportTypeName(model_->GetExportType());
-		break;
+	case SymbolPickerExportType::UppRawHeader: base << "_raw"; break;
+	case SymbolPickerExportType::UppRleHeader: base << "_rle"; break;
+	case SymbolPickerExportType::UppIml: base << "_iml"; break;
+	case SymbolPickerExportType::UppImlLibrary: return "UiIcons";
+	default: base << '_' << MakeExportTypeName(model_->GetExportType()); break;
 	}
 	return base;
 }
@@ -1474,38 +1447,23 @@ String SymbolPickerView::BuildExportText(SymbolPickerExportScope scope, Vector<S
 
 	SymbolPickerProject project = model_->ExportProject();
 	project.default_size = model_->GetExportSize();
-
 	Vector<String> local_warnings;
 	Vector<String>& warn = warnings ? *warnings : local_warnings;
 	String text;
 
 	switch(model_->GetExportType()) {
-	case SymbolPickerExportType::IconId:
-		text = BuildIconIdExport(project, *catalog_, scope, &warn);
-		break;
-	case SymbolPickerExportType::CppSnippet:
-		text = BuildCppSnippetExport(project, *catalog_, scope, &warn);
-		break;
-	case SymbolPickerExportType::UppRawHeader:
-		text = BuildSymbolPickerUppRawHeader(project, *catalog_, scope, &warn);
-		break;
-	case SymbolPickerExportType::UppRleHeader:
-		text = BuildSymbolPickerUppRleHeader(project, *catalog_, scope, &warn);
-		break;
-	case SymbolPickerExportType::UppIml:
-		text = BuildSymbolPickerUppIml(project, *catalog_, scope, &warn);
-		break;
+	case SymbolPickerExportType::IconId: text = BuildIconIdExport(project, *catalog_, scope, &warn); break;
+	case SymbolPickerExportType::CppSnippet: text = BuildCppSnippetExport(project, *catalog_, scope, &warn); break;
+	case SymbolPickerExportType::UppRawHeader: text = BuildSymbolPickerUppRawHeader(project, *catalog_, scope, &warn); break;
+	case SymbolPickerExportType::UppRleHeader: text = BuildSymbolPickerUppRleHeader(project, *catalog_, scope, &warn); break;
+	case SymbolPickerExportType::UppIml: text = BuildSymbolPickerUppIml(project, *catalog_, scope, &warn); break;
+	case SymbolPickerExportType::UppImlLibrary:
 	case SymbolPickerExportType::PngFiles:
 	case SymbolPickerExportType::SvgFiles:
 		return String();
 	case SymbolPickerExportType::ImageCall:
-	default:
-		text = BuildImageCallExport(project, *catalog_, scope, &warn);
-		break;
+	default: text = BuildImageCallExport(project, *catalog_, scope, &warn); break;
 	}
-
-	if(text.IsEmpty())
-		return String();
 	return text;
 }
 
@@ -1515,12 +1473,9 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
-	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles) {
-		PromptOK("SVG file export uses Export.");
-		return false;
-	}
-	if(model_->GetExportType() == SymbolPickerExportType::PngFiles) {
-		PromptOK("PNG file export uses Export.");
+	if(model_->GetExportType() == SymbolPickerExportType::SvgFiles || model_->GetExportType() == SymbolPickerExportType::PngFiles
+	|| model_->GetExportType() == SymbolPickerExportType::UppImlLibrary) {
+		PromptOK("This export type writes files and uses Export.");
 		return false;
 	}
 	const SymbolPickerCollection* collection = model_->GetActiveCollection();
@@ -1528,7 +1483,6 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 		PromptOK("No items in the active collection.");
 		return false;
 	}
-
 	Vector<String> warnings;
 	String text = BuildExportText(SymbolPickerExportScope::ActiveCollection, &warnings);
 	if(text.IsEmpty()) {
@@ -1538,6 +1492,14 @@ bool SymbolPickerView::CopyCurrentExportToClipboard()
 	WriteClipboardText(text);
 	PromptOK("Export text copied to clipboard.");
 	return true;
+}
+
+void SymbolPickerView::ShowExportComplete(const String& file_name, const String& folder, const String& detail) const
+{
+	String message = "Export complete.\n\nFile: " + file_name + "\nPath: " + folder;
+	if(!detail.IsEmpty())
+		message << "\n" << detail;
+	PromptOK(message);
 }
 
 bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
@@ -1550,13 +1512,13 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 		return ExportCurrentSvgFiles(scope);
 	if(model_->GetExportType() == SymbolPickerExportType::PngFiles)
 		return ExportCurrentPngFiles(scope);
+	if(model_->GetExportType() == SymbolPickerExportType::UppImlLibrary)
+		return ExportCurrentImlLibrary(scope);
 
 	Vector<String> warnings;
 	String text = BuildExportText(scope, &warnings);
 	if(text.IsEmpty()) {
-		PromptOK(scope == SymbolPickerExportScope::AllCollections
-			? "No exportable items in all collections."
-			: "No exportable items in the active collection.");
+		PromptOK(scope == SymbolPickerExportScope::AllCollections ? "No exportable items in all collections." : "No exportable items in the active collection.");
 		return false;
 	}
 
@@ -1565,37 +1527,26 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 	String type_name = "Text file";
 	String type_filter = "*.txt";
 	switch(model_->GetExportType()) {
-	case SymbolPickerExportType::CppSnippet:
-		type_name = "C++ source";
-		type_filter = "*.cpp";
-		break;
+	case SymbolPickerExportType::CppSnippet: type_name = "C++ source"; type_filter = "*.cpp"; break;
 	case SymbolPickerExportType::UppRawHeader:
-	case SymbolPickerExportType::UppRleHeader:
-		type_name = "U++ header";
-		type_filter = "*.h";
-		break;
-	case SymbolPickerExportType::UppIml:
-		type_name = "U++ IML";
-		type_filter = "*.iml";
-		break;
-	default:
-		break;
+	case SymbolPickerExportType::UppRleHeader: type_name = "U++ header"; type_filter = "*.h"; break;
+	case SymbolPickerExportType::UppIml: type_name = "U++ IML"; type_filter = "*.iml"; break;
+	default: break;
 	}
 	fs.Type(type_name, type_filter);
 	fs.DefaultExt(ext.Mid(1));
-	String current = model_->GetProjectFilePath();
-	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
-	fs.PreSelect(MakeExportDefaultName(scope) + ext);
+	String dir = PreferredDialogDir(model_->GetProjectFilePath());
+	fs.ActiveDir(dir);
+	fs.PreSelect(AppendFileName(dir, MakeExportDefaultName(scope) + ext));
 	if(!fs.ExecuteSaveAs(BuildProjectDialogTitle("Export")))
 		return false;
 
-	String path = ~fs;
-	if(!ToLower(path).EndsWith(ToLower(ext)))
-		path << ext;
+	String path = EnsureFileExtension(~fs, ext);
 	if(!SaveFile(path, text)) {
 		Exclamation(Format("Could not write export file:\n%s", path));
 		return false;
 	}
+	String detail;
 	if(!warnings.IsEmpty()) {
 		String warnings_path = AppendFileName(GetFileFolder(path), "_export_warnings.txt");
 		String warning_text;
@@ -1603,11 +1554,58 @@ bool SymbolPickerView::ExportCurrentText(SymbolPickerExportScope scope)
 			warning_text << warning << '\n';
 		if(!SaveFile(warnings_path, warning_text))
 			Exclamation(Format("Could not write warnings file:\n%s", warnings_path));
+		else
+			detail = Format("Warnings: %d (see %s)", warnings.GetCount(), GetFileName(warnings_path));
 	}
-	if(model_->GetExportType() == SymbolPickerExportType::UppIml)
-		PromptOK(Format("Exported U++ IML file:\n%s", path));
-	else
-		PromptOK(Format("Exported text:\n%s", path));
+	ShowExportComplete(GetFileName(path), GetFileFolder(path), detail);
+	return true;
+}
+
+bool SymbolPickerView::ExportCurrentImlLibrary(SymbolPickerExportScope scope)
+{
+	if(!model_ || !catalog_) {
+		Exclamation("SymbolPicker is not fully wired.");
+		return false;
+	}
+	FileSel fs;
+	fs.Type("U++ IML library header", "*.h");
+	fs.DefaultExt("h");
+	String dir = PreferredDialogDir(model_->GetProjectFilePath());
+	fs.ActiveDir(dir);
+	fs.PreSelect(AppendFileName(dir, MakeExportDefaultName(scope) + ".h"));
+	if(!fs.ExecuteSaveAs(BuildProjectDialogTitle("Export IML Library")))
+		return false;
+
+	String header_path = EnsureFileExtension(~fs, ".h");
+	String base = GetFileTitle(header_path);
+	String iml_path = AppendFileName(GetFileFolder(header_path), base + ".iml");
+	SymbolPickerProject project = model_->ExportProject();
+	project.default_size = model_->GetExportSize();
+	Vector<String> warnings;
+	String iml_text, header_text;
+	if(!BuildSymbolPickerUppImlLibrary(project, *catalog_, scope, GetFileName(iml_path), iml_text, header_text, &warnings)) {
+		PromptOK("No exportable items for the IML library.");
+		return false;
+	}
+	if(!SaveFile(iml_path, iml_text)) {
+		Exclamation(Format("Could not write IML file:\n%s", iml_path));
+		return false;
+	}
+	if(!SaveFile(header_path, header_text)) {
+		FileDelete(iml_path);
+		Exclamation(Format("Could not write library header:\n%s", header_path));
+		return false;
+	}
+	String detail = "File: " + GetFileName(iml_path) + "\nPath: " + GetFileFolder(iml_path);
+	if(!warnings.IsEmpty()) {
+		String warnings_path = AppendFileName(GetFileFolder(header_path), "_export_warnings.txt");
+		String warning_text;
+		for(const String& warning : warnings)
+			warning_text << warning << '\n';
+		if(SaveFile(warnings_path, warning_text))
+			detail << Format("\nWarnings: %d (see %s)", warnings.GetCount(), GetFileName(warnings_path));
+	}
+	ShowExportComplete(GetFileName(header_path), GetFileFolder(header_path), detail);
 	return true;
 }
 
@@ -1617,32 +1615,23 @@ bool SymbolPickerView::ExportCurrentSvgFiles(SymbolPickerExportScope scope)
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
-
 	FileSel fs;
 	fs.Type("Folder", ".*");
-	String current = model_->GetProjectFilePath();
-	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	String dir = PreferredDialogDir(model_->GetProjectFilePath());
+	fs.ActiveDir(dir);
 	if(!fs.ExecuteSelectDir(BuildProjectDialogTitle(scope == SymbolPickerExportScope::AllCollections ? "Export All SVG" : "Export SVG")))
 		return false;
-
 	String output_folder = ~fs;
 	Vector<String> warnings;
-	int written = 0;
-	int skipped = 0;
+	int written = 0, skipped = 0;
 	SymbolPickerProject project = model_->ExportProject();
 	project.default_size = model_->GetExportSize();
 	if(!ExportSymbolPickerSvgFiles(project, *catalog_, scope, output_folder, &warnings, &written, &skipped)) {
-		String message = Format("SVG export finished with issues.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder);
-		if(!warnings.IsEmpty()) {
-			message << "\nWarnings: " << warnings.GetCount();
-			Exclamation(message);
-		}
-		else
-			Exclamation(message);
+		Exclamation(Format("SVG export finished with issues.\nWritten: %d\nSkipped: %d\nPath: %s", written, skipped, output_folder));
 		return false;
 	}
-
-	PromptOK(Format("SVG export finished.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder));
+	String detail = Format("Written: %d\nSkipped: %d", written, skipped);
+	ShowExportComplete(Format("%d SVG file%s", written, written == 1 ? "" : "s"), output_folder, detail);
 	return true;
 }
 
@@ -1652,32 +1641,23 @@ bool SymbolPickerView::ExportCurrentPngFiles(SymbolPickerExportScope scope)
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
-
 	FileSel fs;
 	fs.Type("Folder", ".*");
-	String current = model_->GetProjectFilePath();
-	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	String dir = PreferredDialogDir(model_->GetProjectFilePath());
+	fs.ActiveDir(dir);
 	if(!fs.ExecuteSelectDir(BuildProjectDialogTitle(scope == SymbolPickerExportScope::AllCollections ? "Export All PNG" : "Export PNG")))
 		return false;
-
 	String output_folder = ~fs;
 	Vector<String> warnings;
-	int written = 0;
-	int skipped = 0;
+	int written = 0, skipped = 0;
 	SymbolPickerProject project = model_->ExportProject();
 	project.default_size = model_->GetExportSize();
 	if(!ExportSymbolPickerPngFiles(project, *catalog_, scope, output_folder, &warnings, &written, &skipped)) {
-		String message = Format("PNG export finished with issues.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder);
-		if(!warnings.IsEmpty()) {
-			message << "\nWarnings: " << warnings.GetCount();
-			Exclamation(message);
-		}
-		else
-			Exclamation(message);
+		Exclamation(Format("PNG export finished with issues.\nWritten: %d\nSkipped: %d\nPath: %s", written, skipped, output_folder));
 		return false;
 	}
-
-	PromptOK(Format("PNG export finished.\nWritten: %d\nSkipped: %d\nFolder: %s", written, skipped, output_folder));
+	String detail = Format("Written: %d\nSkipped: %d", written, skipped);
+	ShowExportComplete(Format("%d PNG file%s", written, written == 1 ? "" : "s"), output_folder, detail);
 	return true;
 }
 
@@ -1691,7 +1671,6 @@ void SymbolPickerView::ValidateLoadedProject(SymbolPickerProject& project) const
 		project.active_collection_index = 0;
 		return;
 	}
-
 	for(auto& collection : project.collections) {
 		collection.file_path = project.file_path;
 		collection.dirty = false;
@@ -1700,7 +1679,6 @@ void SymbolPickerView::ValidateLoadedProject(SymbolPickerProject& project) const
 			item.unresolved = entry == nullptr;
 		}
 	}
-
 	if(project.active_collection_index < 0 || project.active_collection_index >= project.collections.GetCount())
 		project.active_collection_index = 0;
 }
@@ -1711,17 +1689,17 @@ bool SymbolPickerView::SaveProject(bool save_as)
 		Exclamation("No SymbolPicker model is attached.");
 		return false;
 	}
-
 	String path = model_->GetProjectFilePath();
 	if(save_as || path.IsEmpty()) {
 		FileSel fs;
 		fs.Type("SymbolPicker project", "*.uppicons.json");
 		fs.DefaultExt("uppicons.json");
-		fs.ActiveDir(path.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(path));
+		String dir = PreferredDialogDir(path);
+		fs.ActiveDir(dir);
 		String base_name = model_->GetProjectName();
 		if(base_name.IsEmpty())
 			base_name = "symbolpicker_project";
-		fs.PreSelect(StripProjectExtension(base_name));
+		fs.PreSelect(AppendFileName(dir, StripProjectExtension(base_name)));
 		if(!fs.ExecuteSaveAs(BuildProjectDialogTitle("Save")))
 			return false;
 		path = EnsureProjectExtension(~fs);
@@ -1735,13 +1713,11 @@ bool SymbolPickerView::SaveProject(bool save_as)
 	project.file_path = path;
 	for(auto& collection : project.collections)
 		collection.file_path = path;
-
 	String error;
 	if(!SaveSymbolPickerProjectJson(project, path, error)) {
 		Exclamation(error);
 		return false;
 	}
-
 	model_->SetProjectFilePath(path);
 	if(model_->GetProjectName().IsEmpty())
 		model_->SetProjectName(project.project_name);
@@ -1756,14 +1732,12 @@ bool SymbolPickerView::LoadProject()
 		Exclamation("SymbolPicker is not fully wired.");
 		return false;
 	}
-
 	FileSel fs;
 	fs.Type("SymbolPicker project", "*.uppicons.json");
 	String current = model_->GetProjectFilePath();
-	fs.ActiveDir(current.IsEmpty() ? GetCurrentDirectory() : GetFileFolder(current));
+	fs.ActiveDir(PreferredDialogDir(current));
 	if(!fs.ExecuteOpen(BuildProjectDialogTitle("Load")))
 		return false;
-
 	SymbolPickerProject project;
 	String error;
 	String path = ~fs;
@@ -1771,7 +1745,6 @@ bool SymbolPickerView::LoadProject()
 		Exclamation(error);
 		return false;
 	}
-
 	if(project.project_name.IsEmpty())
 		project.project_name = GetFileTitle(path);
 	project.file_path = path;
@@ -1819,20 +1792,17 @@ void SymbolPickerView::HandleLibraryGestureRelease(const SymbolPickerGestureResu
 		ids.Add(result.catalog_id);
 	if(ids.IsEmpty())
 		return;
-
 	Index<String> present;
 	const SymbolPickerCollection* active = model_->GetActiveCollection();
 	if(active)
 		for(const SymbolPickerIconRef& item : active->items)
 			if(!item.catalog_id.IsEmpty())
 				present.FindAdd(item.catalog_id);
-
 	if(ids.GetCount() > 1)
 		commands_->BeginGroup("Add icons to collection");
 	const int count_before = active ? active->items.GetCount() : 0;
 	suppress_model_refresh_ = true;
-	int added = 0;
-	int duplicates = 0;
+	int added = 0, duplicates = 0;
 	for(const String& id : ids) {
 		if(present.Find(id) >= 0) {
 			++duplicates;
@@ -1858,11 +1828,9 @@ void SymbolPickerView::HandleLibraryGestureRelease(const SymbolPickerGestureResu
 	RefreshCollections();
 	RefreshCollectionItems();
 	if(duplicates > 0) {
-		String status;
-		if(added > 0)
-			status = Format("%d added | %d duplicate%s skipped", added, duplicates, duplicates == 1 ? "" : "s");
-		else
-			status = Format("%d duplicate%s skipped", duplicates, duplicates == 1 ? "" : "s");
+		String status = added > 0
+			? Format("%d added | %d duplicate%s skipped", added, duplicates, duplicates == 1 ? "" : "s")
+			: Format("%d duplicate%s skipped", duplicates, duplicates == 1 ? "" : "s");
 		library_card_.SetSubTitle(status);
 	}
 	collections_scroll_panel_.SetDropState(added ? SymbolPickerDropScrollPanel::DROP_ACCEPTED : SymbolPickerDropScrollPanel::DROP_REJECTED);
@@ -1945,6 +1913,7 @@ void SymbolPickerView::SetLibrarySelectionOne(const String& catalog_id)
 	selected_library_catalog_ids_.Clear();
 	if(!catalog_id.IsEmpty())
 		selected_library_catalog_ids_.FindAdd(catalog_id);
+	library_selection_anchor_id_ = catalog_id;
 	SelectLibraryCatalogId(catalog_id);
 }
 
@@ -1957,7 +1926,7 @@ void SymbolPickerView::ToggleLibrarySelection(const String& catalog_id)
 		selected_library_catalog_ids_.Remove(q);
 	else
 		selected_library_catalog_ids_.Add(catalog_id);
-
+	library_selection_anchor_id_ = catalog_id;
 	if(selected_library_catalog_ids_.IsEmpty())
 		selected_library_catalog_id_.Clear();
 	else
@@ -1966,10 +1935,40 @@ void SymbolPickerView::ToggleLibrarySelection(const String& catalog_id)
 	UpdateLibraryStatus();
 }
 
+void SymbolPickerView::SelectLibraryRange(const String& catalog_id, bool additive)
+{
+	if(catalog_id.IsEmpty())
+		return;
+	if(library_selection_anchor_id_.IsEmpty()) {
+		SetLibrarySelectionOne(catalog_id);
+		return;
+	}
+	int anchor = -1, target = -1;
+	for(int i = 0; i < library_tiles_.GetCount(); ++i) {
+		String id = library_tiles_[i].GetCatalogId();
+		if(id == library_selection_anchor_id_)
+			anchor = i;
+		if(id == catalog_id)
+			target = i;
+	}
+	if(anchor < 0 || target < 0) {
+		SetLibrarySelectionOne(catalog_id);
+		return;
+	}
+	if(!additive)
+		selected_library_catalog_ids_.Clear();
+	for(int i = min(anchor, target); i <= max(anchor, target); ++i)
+		selected_library_catalog_ids_.FindAdd(library_tiles_[i].GetCatalogId());
+	selected_library_catalog_id_ = catalog_id;
+	UpdateLibraryTileSelection();
+	UpdateLibraryStatus();
+}
+
 void SymbolPickerView::ClearLibrarySelection()
 {
 	selected_library_catalog_ids_.Clear();
 	selected_library_catalog_id_.Clear();
+	library_selection_anchor_id_.Clear();
 	UpdateLibraryTileSelection();
 	UpdateLibraryStatus();
 }
@@ -2028,15 +2027,11 @@ void SymbolPickerView::SelectCollectionRange(int item_index, bool additive)
 		SetCollectionSelectionOne(item_index);
 		return;
 	}
-
-	int anchor_visible = -1;
-	int target_visible = -1;
+	int anchor_visible = -1, target_visible = -1;
 	for(int i = 0; i < collection_tiles_.GetCount(); ++i) {
 		int underlying = collection_tiles_[i].GetItemIndex();
-		if(underlying == collection_selection_anchor_)
-			anchor_visible = i;
-		if(underlying == item_index)
-			target_visible = i;
+		if(underlying == collection_selection_anchor_) anchor_visible = i;
+		if(underlying == item_index) target_visible = i;
 	}
 	if(anchor_visible < 0 || target_visible < 0) {
 		SetCollectionSelectionOne(item_index);
@@ -2044,9 +2039,7 @@ void SymbolPickerView::SelectCollectionRange(int item_index, bool additive)
 	}
 	if(!additive)
 		selected_collection_item_indexes_.Clear();
-	int first = min(anchor_visible, target_visible);
-	int last = max(anchor_visible, target_visible);
-	for(int i = first; i <= last; ++i)
+	for(int i = min(anchor_visible, target_visible); i <= max(anchor_visible, target_visible); ++i)
 		selected_collection_item_indexes_.FindAdd(collection_tiles_[i].GetItemIndex());
 	UpdateCollectionTileSelection();
 }
@@ -2075,10 +2068,9 @@ void SymbolPickerView::NormalizeCollectionSelectionAfterModelChange()
 		collection_selection_anchor_ = -1;
 		return;
 	}
-	for(int i = selected_collection_item_indexes_.GetCount() - 1; i >= 0; --i) {
+	for(int i = selected_collection_item_indexes_.GetCount() - 1; i >= 0; --i)
 		if(selected_collection_item_indexes_[i] < 0 || selected_collection_item_indexes_[i] >= active->items.GetCount())
 			selected_collection_item_indexes_.Remove(i);
-	}
 	if(collection_selection_anchor_ < 0 || collection_selection_anchor_ >= active->items.GetCount())
 		collection_selection_anchor_ = selected_collection_item_indexes_.IsEmpty() ? -1 : selected_collection_item_indexes_[0];
 }
@@ -2087,7 +2079,6 @@ bool SymbolPickerView::RemoveSelectedCollectionItems()
 {
 	if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0 || selected_collection_item_indexes_.IsEmpty())
 		return false;
-
 	Vector<int> indexes;
 	int next_index = INT_MAX;
 	for(int i = 0; i < selected_collection_item_indexes_.GetCount(); ++i) {
@@ -2095,7 +2086,6 @@ bool SymbolPickerView::RemoveSelectedCollectionItems()
 		next_index = min(next_index, selected_collection_item_indexes_[i]);
 	}
 	Sort(indexes, StdGreater<int>());
-
 	if(indexes.GetCount() > 1)
 		commands_->BeginGroup("Remove icons from collection");
 	suppress_model_refresh_ = true;
@@ -2105,7 +2095,6 @@ bool SymbolPickerView::RemoveSelectedCollectionItems()
 	suppress_model_refresh_ = false;
 	if(indexes.GetCount() > 1)
 		commands_->EndGroup();
-
 	selected_collection_item_indexes_.Clear();
 	collection_selection_anchor_ = -1;
 	const SymbolPickerCollection* active = model_->GetActiveCollection();
@@ -2161,21 +2150,17 @@ void SymbolPickerView::HideDragPreview()
 
 String SymbolPickerView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
 {
-	String alias = "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(SymbolPickerViewIconStyleText(entry.style));
-	return alias;
+	return "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(SymbolPickerViewIconStyleText(entry.style));
 }
 
 void SymbolPickerView::RefreshFromModel()
 {
-	if(!model_)
-		return;
-	if(suppress_model_refresh_)
+	if(!model_ || suppress_model_refresh_)
 		return;
 	if(drag_interaction_active_) {
 		pending_model_refresh_ = true;
 		return;
 	}
-
 	sync_view_state_ = true;
 	library_style_selector_ <<= (int)model_->GetIconStyle();
 	library_filter_edit_.SetTextUtf8(model_->GetFilterText());
@@ -2183,19 +2168,13 @@ void SymbolPickerView::RefreshFromModel()
 	output_pixel_size_ <<= model_->GetExportSize();
 	output_export_type_ <<= (int)model_->GetExportType();
 	sync_view_state_ = false;
-
 	RefreshCategories();
 	RefreshLibrary();
 	RefreshCollections();
 	NormalizeCollectionSelectionAfterModelChange();
 	RefreshCollectionItems();
-
 	const SymbolPickerCollection* active = model_->GetActiveCollection();
-	if(active)
-		collections_card_.SetSubTitle(Format("%s | %d items", active->name, active->items.GetCount()));
-	else
-		collections_card_.SetSubTitle("Manage saved icon sets.");
-
+	collections_card_.SetSubTitle(active ? Format("%s | %d items", active->name, active->items.GetCount()) : String("Manage saved icon sets."));
 	if(catalog_ && !selected_library_catalog_id_.IsEmpty() && !catalog_->FindByCatalogId(selected_library_catalog_id_))
 		ClearLibrarySelection();
 	else if(selected_library_catalog_ids_.IsEmpty() && !selected_library_catalog_id_.IsEmpty())
