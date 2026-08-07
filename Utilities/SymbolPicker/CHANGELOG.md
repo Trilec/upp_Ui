@@ -1,5 +1,14 @@
 # SymbolPicker Changelog
 
+## 0.3.7 - Theme, header flow, help, and export feedback polish
+
+- Restored the intended same-row Library and Collections header composition with the original expanding spacer and natural-width filters while retaining Flow wrapping inside the action clusters.
+- Synchronized the SymbolPicker dark toggle with `UiThemeMode` as well as the U++ skin so explicitly resolved `Ui` control styles now switch to their real dark equivalents.
+- Added medium-dark section/scroll surfaces in dark mode and white Library/Collection icon previews without changing stored/export tint values.
+- Re-resolve custom header, collection, dropdown, tool-button, and empty-state styles when switching appearance; key tool icons also use high-contrast dark-mode tinting.
+- Improved successful export feedback so the exported filename/result is prominent above a smaller path line, with optional warning/detail text below.
+- Expanded Help into a structured workflow guide covering categories, selection, collections, project save/load, export formats, and the paired U++ IML + header library workflow.
+
 ## 0.3.6 - Selection, layout, and U++ library export refinements
 
 - Added Library Shift range selection and Ctrl+Shift additive visible-range selection to match Collections.
