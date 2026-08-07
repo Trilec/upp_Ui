@@ -7,15 +7,85 @@ public:
         SetGap(DPI(1));
         Add(label_).Fixed(DPI(13));
         Add(drop_).Expand(1);
+        Add(slider_row_).Expand(1);
         label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        slider_row_.SetGap(DPI(4));
+        slider_row_.Add(slider_).Expand(1);
+        slider_row_.Add(slider_value_).Fixed(DPI(28));
+        slider_value_.SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
+        slider_.SetTrackSize(Size(DPI(72), DPI(5)))
+               .SetThumbSize(Size(DPI(14), DPI(18)));
+        slider_row_.Hide();
+        slider_.WhenChanging = [=] { SliderChanged(); };
+        slider_.WhenAction = [=] { SliderChanged(); };
     }
 
-    LabeledDrop_& SetLabel(const String& text) { label_.SetText(text); return *this; }
+    LabeledDrop_& SetLabel(const String& text)
+    {
+        label_.SetText(text);
+        // Base-swatch count is intentionally a live 2..12 slider.  The hidden
+        // dropdown remains the state/event adapter so persistence and existing
+        // picker wiring keep one authority for the count value.
+        if(text == "Base swatches")
+            UseSliderRange(2, 12, 6);
+        return *this;
+    }
+
+    LabeledDrop_& UseSliderRange(int minimum, int maximum, int value)
+    {
+        slider_mode_ = true;
+        slider_min_ = minimum;
+        slider_max_ = max(minimum, maximum);
+        slider_syncing_ = true;
+        slider_.SetRange(slider_min_, slider_max_).SetStep(1).SetValue(minmax(value, slider_min_, slider_max_));
+        slider_value_.SetText(AsString(minmax(value, slider_min_, slider_max_)));
+        slider_syncing_ = false;
+        drop_.Hide();
+        slider_row_.Show();
+        RefreshLayout();
+        return *this;
+    }
+
     UiDropdown& Drop() { return drop_; }
 
+    virtual void Layout() override
+    {
+        if(slider_mode_) {
+            Value data = drop_.GetData();
+            if(!IsNull(data)) {
+                int value = minmax((int)data, slider_min_, slider_max_);
+                if(int(slider_.GetValue() + 0.5) != value) {
+                    slider_syncing_ = true;
+                    slider_.SetValue(value);
+                    slider_value_.SetText(AsString(value));
+                    slider_syncing_ = false;
+                }
+            }
+        }
+        UiBoxLayout::Layout();
+    }
+
 private:
+    void SliderChanged()
+    {
+        if(slider_syncing_)
+            return;
+        int value = minmax(int(slider_.GetValue() + 0.5), slider_min_, slider_max_);
+        slider_value_.SetText(AsString(value));
+        drop_.SetDataSilently(value);
+        if(drop_.WhenSelectData)
+            drop_.WhenSelectData(Value(value));
+    }
+
     UiLabel label_;
     UiDropdown drop_;
+    UiBoxLayout slider_row_ { UiDirection::H };
+    UiSlider slider_ { UiDirection::H };
+    UiLabel slider_value_;
+    int slider_min_ = 0;
+    int slider_max_ = 100;
+    bool slider_mode_ = false;
+    bool slider_syncing_ = false;
 };
 
 class SliderRow_ : public UiBoxLayout {
@@ -31,7 +101,7 @@ public:
         Add(edit_).Fixed(DPI(48));
         label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         edit_.SetTextAlign(UiAlign::RIGHT);
-        slider_.SetTrackSize(Size(DPI(4096), DPI(5)))
+        slider_.SetTrackSize(Size(DPI(120), DPI(5)))
                .SetThumbSize(Size(DPI(14), DPI(18)));
         slider_.WhenChanging = [=] {
             if(syncing_)
@@ -120,7 +190,7 @@ public:
         Add(edit_).Fixed(DPI(70));
         label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         edit_.SetTextAlign(UiAlign::RIGHT);
-        slider_.SetTrackSize(Size(DPI(4096), DPI(5)))
+        slider_.SetTrackSize(Size(DPI(120), DPI(5)))
                .SetThumbSize(Size(DPI(14), DPI(18)));
         slider_.WhenChanging = [=] { SliderChanged(false); };
         slider_.WhenAction = [=] { SliderChanged(true); };
