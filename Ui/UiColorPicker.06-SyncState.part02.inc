@@ -112,10 +112,12 @@ UiColorPicker& UiColorPicker::Impl::SetPageMode(PageMode mode)
         mode = PAGE_COLOR;
     if(page_mode_ == mode) {
         SyncPage();
+        Layout();
         return owner_;
     }
     page_mode_ = mode;
     SyncPage();
+    Layout();
     SaveSession(false);
     if(owner_.WhenPageChanged)
         owner_.WhenPageChanged(page_mode_);
@@ -218,7 +220,3 @@ UiColorPicker& UiColorPicker::Impl::SetAlphaEnabled(bool enabled)
     SaveSession(false);
     return owner_;
 }
-
-UiColorPicker& UiColorPicker::Impl::SetSpectrumMode(SpectrumMode mode)
-{
-    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_HSV_WHEEL)
