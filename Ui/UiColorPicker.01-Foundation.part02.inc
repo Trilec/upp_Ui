@@ -63,7 +63,7 @@ public:
     {
         SetWrap(UiBoxWrap::Snap)
             .SetWrapAutoResize(true)
-            .SetWrapRowsExpand(true)
+            .SetWrapRowsExpand(false)
             .SetGap(DPI(3))
             .SetInset(DPI(1));
         WantFocus();
@@ -101,8 +101,8 @@ public:
                 One<SwatchTile_>& tile = tiles_.Add();
                 tile.Create();
                 tile->Configure(*this, i);
-                Add(*tile).Expand(1).MinMaxWidth(compact_ ? DPI(18) : DPI(28), INT_MAX)
-                           .MinMaxHeight(compact_ ? DPI(18) : DPI(28), INT_MAX);
+                Add(*tile).Fit().MinMaxWidth(compact_ ? DPI(18) : DPI(28), INT_MAX)
+                          .MinMaxHeight(compact_ ? DPI(18) : DPI(28), INT_MAX);
             }
         }
         selected_.Clear();
