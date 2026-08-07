@@ -84,6 +84,7 @@
     int drag_seed_ = -1;
     int drag_manual_ = -1;
     bool show_mask_ = false;
+    bool drop_hot_ = false;
     bool panning_ = false;
     Point pan_anchor_;
     Point pan_;
