@@ -14,6 +14,7 @@ enum class SymbolPickerExportType : byte {
 	UppRawHeader,
 	UppRleHeader,
 	UppIml,
+	UppImlLibrary,
 };
 
 enum class SymbolPickerIconStyle : byte {
