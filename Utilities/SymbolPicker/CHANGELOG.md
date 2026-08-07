@@ -1,5 +1,12 @@
 # SymbolPicker Changelog
 
+## 0.3.8 - Responsive section header sizing
+
+- Added width-aware SymbolPicker section-header sizing so wrapped Library/Collections action rows reserve their measured Flow height instead of being clipped by a one-line outer header.
+- Kept the title cards and action clusters on the same outer header row; only the inner action clusters wrap.
+- Restored the compact Library Categories heading height and reduced the heading-to-category-flow gap so category buttons sit directly under the title/subtitle again.
+- Kept the responsive sizing local to SymbolPicker rather than changing shared `UiBoxLayout` behavior.
+
 ## 0.3.7 - Theme, header flow, help, and export feedback polish
 
 - Restored the intended same-row Library and Collections header composition with the original expanding spacer and natural-width filters while retaining Flow wrapping inside the action clusters.
