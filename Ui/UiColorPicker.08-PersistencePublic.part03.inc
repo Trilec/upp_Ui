@@ -83,7 +83,9 @@ void UiColorPicker::Layout()
 
 Size UiColorPicker::GetMinSize() const
 {
-    return Size(DPI(620), DPI(430));
+    // RC2 baseline: all four pages, the two-row User Stash and footer remain
+    // fully visible without relying on child controls painting beyond bounds.
+    return Size(DPI(700), DPI(500));
 }
 
 void UiColorPicker::SetData(const Value& value)
@@ -131,6 +133,13 @@ void UiColorPicker::MouseMove(Point, dword)
 
 bool UiColorPicker::Key(dword key, int count)
 {
+    if(impl_ && impl_->GetPageMode() == PAGE_IMAGE && key == K_CTRL_V && IsClipboardAvailableImage()) {
+        Image pasted = ReadClipboardImage();
+        if(!pasted.IsEmpty()) {
+            impl_->SetGeneratorImage(pasted);
+            return true;
+        }
+    }
     if(impl_ && impl_->Key(key, count))
         return true;
     return Ctrl::Key(key, count);
