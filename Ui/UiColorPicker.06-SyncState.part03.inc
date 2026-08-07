@@ -60,6 +60,17 @@ UiColorPicker& UiColorPicker::Impl::SetGeneratorImage(const Image& image)
     manual_points_.Clear();
     image_stale_ = !image_.IsEmpty();
     image_canvas_->SetImage(image_);
+    for(int i = 0; i < 2; i++) {
+        if(!image_settings_.exclusion[i].enabled || image_.IsEmpty())
+            continue;
+        if(!image_settings_.exclusion[i].placed)
+            image_settings_.exclusion[i].position = i == 0 ? Pointf(0.33, 0.50) : Pointf(0.67, 0.50);
+        image_settings_.exclusion[i].placed = true;
+        image_settings_.exclusion[i].color = SampleImage_(image_, image_settings_.exclusion[i].position, 3);
+        exclusion_toggle_[i].SetOn(true);
+        exclusion_button_[i].SetIcon(MakeAlphaSwatchImage_(image_settings_.exclusion[i].color, 255, Size(DPI(24), DPI(18))));
+    }
+    image_canvas_->SetSeeds(image_settings_.exclusion);
     EnsureManualPoints();
     RefreshImageDisplay(false);
     SetPageMode(PAGE_IMAGE);
