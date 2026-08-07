@@ -147,7 +147,7 @@ void UiColorPicker::Impl::BuildTree()
     page_stack_.AddPage(image_page_, "image");
 
     stash_section_.SetGap(DPI(2)).SetInset(Rect(DPI(6), DPI(2), DPI(6), DPI(2)));
-    stash_section_.Add(stash_header_).Fixed(DPI(22));
+    stash_section_.Add(stash_header_).Fixed(DPI(30));
     stash_section_.Add(stash_flow_).Expand(1);
     stash_header_.SetGap(DPI(4));
     stash_header_.Add(stash_title_).Fixed(DPI(74));
@@ -158,7 +158,7 @@ void UiColorPicker::Impl::BuildTree()
     stash_header_.Add(stash_import_).Fixed(DPI(72));
     stash_header_.Add(stash_clear_).Fixed(DPI(52));
 
-    footer_.SetGap(DPI(6)).SetInset(Rect(DPI(6), DPI(6), DPI(6), DPI(6)));
+    footer_.SetGap(DPI(6)).SetInset(Rect(DPI(6), DPI(4), DPI(6), DPI(4)));
     footer_.Add(footer_hex_).Fixed(DPI(116));
     footer_.Add(footer_detail_).Expand(1);
     footer_.Add(accept_button_).Fixed(DPI(96));
@@ -172,7 +172,7 @@ void UiColorPicker::Impl::BuildTree()
 
 void UiColorPicker::Impl::BuildColorPage()
 {
-    color_page_.SetGap(DPI(5)).SetInset(DPI(5));
+    color_page_.SetGap(DPI(4)).SetInset(DPI(5));
     color_page_.Add(color_columns_).Expand(1);
     color_columns_.SetGap(DPI(7));
     color_columns_.Add(color_left_).Expand(6).MinWidth(DPI(250));
@@ -180,18 +180,18 @@ void UiColorPicker::Impl::BuildColorPage()
 
     color_field_.Create();
     color_left_.SetGap(DPI(4));
-    color_left_.Add(spectrum_field_).Fixed(DPI(39));
-    color_left_.Add(*color_field_).Expand(1);
+    color_left_.Add(spectrum_field_).Fixed(DPI(44));
+    color_left_.Add(*color_field_).Expand(1).MinMaxMain(DPI(170), DPI(220));
 
-    color_right_.SetGap(DPI(4));
-    color_right_.Add(color_mode_row_).Fixed(DPI(25));
+    color_right_.SetGap(DPI(3));
+    color_right_.Add(color_mode_row_).Fixed(DPI(28));
     color_mode_row_.SetGap(DPI(4));
     color_mode_row_.Add(channel_drop_).Expand(1);
     color_mode_row_.Add(eyedropper_button_).Fixed(DPI(26));
     color_mode_row_.Add(alpha_label_).Fixed(DPI(34));
     color_mode_row_.Add(alpha_toggle_).Fixed(DPI(42));
 
-    color_right_.Add(channel_rows_).Fixed(DPI(108));
+    color_right_.Add(channel_rows_).Fixed(DPI(104));
     channel_rows_.SetGap(DPI(2));
     for(int i = 0; i < 5; i++) {
         numeric_row_[i].Create();
@@ -199,15 +199,15 @@ void UiColorPicker::Impl::BuildColorPage()
     }
     hue_row_.Create();
     value_row_.Create();
-    color_right_.Add(*hue_row_).Fixed(DPI(25));
-    color_right_.Add(*value_row_).Fixed(DPI(25));
+    color_right_.Add(*hue_row_).Fixed(DPI(24));
+    color_right_.Add(*value_row_).Fixed(DPI(24));
 
-    color_right_.Add(readout_stack_).Expand(1);
+    color_right_.Add(readout_stack_).Fixed(DPI(96));
     readout_stack_.SetGap(DPI(3));
     for(int row = 0; row < 3; row++) {
         readout_pair_[row].Create(UiDirection::H);
         readout_pair_[row]->SetGap(DPI(4));
-        readout_stack_.Add(*readout_pair_[row]).Expand(1);
+        readout_stack_.Add(*readout_pair_[row]).Fixed(DPI(30));
         for(int column = 0; column < 2; column++) {
             int index = row * 2 + column;
             readout_[index].Create();
