@@ -191,12 +191,15 @@ private:
 	String MakeExportDefaultExtension() const;
 	bool CopyCurrentExportToClipboard();
 	bool ExportCurrentText(SymbolPickerExportScope scope);
+	bool ExportCurrentImlLibrary(SymbolPickerExportScope scope);
 	bool ExportCurrentSvgFiles(SymbolPickerExportScope scope);
 	bool ExportCurrentPngFiles(SymbolPickerExportScope scope);
+	void ShowExportComplete(const String& file_name, const String& folder, const String& detail = String()) const;
 	String BuildProjectDialogTitle(const char* verb) const;
 	void ValidateLoadedProject(SymbolPickerProject& project) const;
 	void SetLibrarySelectionOne(const String& catalog_id);
 	void ToggleLibrarySelection(const String& catalog_id);
+	void SelectLibraryRange(const String& catalog_id, bool additive);
 	void ClearLibrarySelection();
 	bool IsLibrarySelected(const String& catalog_id) const;
 	Vector<String> GetSelectedLibraryCatalogIdsForDrag(const String& primary_catalog_id) const;
@@ -283,6 +286,7 @@ private:
 	Array<SymbolPickerCollectionTile> collection_tiles_;
 	String          selected_library_catalog_id_;
 	Index<String>   selected_library_catalog_ids_;
+	String          library_selection_anchor_id_;
 	Index<int>      selected_collection_item_indexes_;
 	int             collection_selection_anchor_ = -1;
 	bool            sync_view_state_ = false;
