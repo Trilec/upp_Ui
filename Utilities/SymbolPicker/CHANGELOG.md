@@ -1,5 +1,16 @@
 # SymbolPicker Changelog
 
+## 0.3.6 - Selection, layout, and U++ library export refinements
+
+- Added Library Shift range selection and Ctrl+Shift additive visible-range selection to match Collections.
+- Canonicalized project Save As suffixes so `.uppicons`, `.json`, repeated `.uppicons`, and case variants resolve to exactly one `.uppicons.json` suffix.
+- Preselect save/export dialogs with a complete valid path instead of a filename at a virtual disk-selection location.
+- Made Library and Collections header/action layouts wrap with auto-resize so filter fields remain visible at narrower window widths.
+- Standardized successful export feedback around `Export complete`, with filename and path shown separately.
+- Added `U++ IML + Header Library`, producing a sibling `.iml` + `.h` pair from one deterministic emission pass.
+- Generated IML library headers expose icon wrappers, category/catalog metadata, and an opt-in one-translation-unit `iml_source.h` implementation switch.
+- Extended IML startup smoke coverage over paired IML/header generation and its U++ integration contract.
+
 ## 0.3.5 - Collection and export acceptance repairs
 
 - Reject Library-to-Collection duplicate drops while allowing partial grouped drops and reporting skipped duplicates.
