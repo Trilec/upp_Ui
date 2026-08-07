@@ -175,6 +175,7 @@ private:
 	void BuildCategoriesPanel();
 	void BuildLibraryPanel();
 	void BuildCollectionsPanel();
+	void UpdateResponsiveHeaderHeights();
 	void RefreshCollections();
 	void RefreshCollectionItems();
 	void RefreshCategories();
@@ -296,7 +297,11 @@ private:
 	int             library_visible_count_ = 0;
 	int             library_total_count_ = 0;
 	bool            library_result_limited_ = false;
+	int             library_header_min_height_ = -1;
+	int             collections_header_min_height_ = -1;
+	bool            responsive_layout_initialized_ = false;
 
+	virtual void Layout() override;
 	virtual bool Key(dword key, int count) override;
 
 	SymbolPickerModel* model_ = nullptr;
