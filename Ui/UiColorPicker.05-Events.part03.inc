@@ -117,7 +117,15 @@
         int index = i;
         exclusion_button_[i].WhenAction = [=] { image_canvas_->ArmSeed(index); };
         exclusion_toggle_[i].WhenAction = [=] {
-            image_settings_.exclusion[index].enabled = exclusion_toggle_[index].IsOn();
+            bool enabled = exclusion_toggle_[index].IsOn();
+            image_settings_.exclusion[index].enabled = enabled;
+            if(enabled && !image_.IsEmpty()) {
+                if(!image_settings_.exclusion[index].placed)
+                    image_settings_.exclusion[index].position = index == 0 ? Pointf(0.33, 0.50) : Pointf(0.67, 0.50);
+                image_settings_.exclusion[index].placed = true;
+                image_settings_.exclusion[index].color = SampleImage_(image_, image_settings_.exclusion[index].position, 3);
+                exclusion_button_[index].SetIcon(MakeAlphaSwatchImage_(image_settings_.exclusion[index].color, 255, Size(DPI(24), DPI(18))));
+            }
             image_canvas_->SetSeeds(image_settings_.exclusion);
             MarkImageStale();
         };
