@@ -5,9 +5,9 @@ public:
         : UiBoxLayout(UiDirection::V)
     {
         SetGap(DPI(1));
-        Add(label_).Fixed(DPI(13));
+        Add(label_).Fixed(DPI(12));
         Add(drop_).Expand(1);
-        Add(slider_row_).Expand(1);
+        Add(slider_row_).Fixed(0);
         label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         slider_row_.SetGap(DPI(4));
         slider_row_.Add(slider_).Expand(1);
@@ -15,7 +15,6 @@ public:
         slider_value_.SetAlign(UiAlign::RIGHT, UiAlign::CENTER);
         slider_.SetTrackSize(Size(DPI(72), DPI(5)))
                .SetThumbSize(Size(DPI(14), DPI(18)));
-        slider_row_.Hide();
         slider_.WhenChanging = [=] { SliderChanged(); };
         slider_.WhenAction = [=] { SliderChanged(); };
     }
@@ -40,8 +39,8 @@ public:
         slider_.SetRange(slider_min_, slider_max_).SetStep(1).SetValue(minmax(value, slider_min_, slider_max_));
         slider_value_.SetText(AsString(minmax(value, slider_min_, slider_max_)));
         slider_syncing_ = false;
-        drop_.Hide();
-        slider_row_.Show();
+        ItemAt(1).Fixed(0);
+        ItemAt(2).Expand(1);
         RefreshLayout();
         return *this;
     }
@@ -61,8 +60,12 @@ public:
                     slider_syncing_ = false;
                 }
             }
+            int slider_width = max(DPI(52), GetSize().cx - DPI(28) - DPI(4));
+            slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
         }
         UiBoxLayout::Layout();
+        if(slider_mode_)
+            slider_row_.Layout();
     }
 
 private:
@@ -96,7 +99,7 @@ public:
         : UiBoxLayout(UiDirection::H)
     {
         SetGap(DPI(4));
-        Add(label_).Fixed(DPI(92));
+        Add(label_).Fixed(DPI(78));
         Add(slider_).Expand(1);
         Add(edit_).Fixed(DPI(48));
         label_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
@@ -147,6 +150,13 @@ public:
     CommitLineEdit_& Edit() { return edit_; }
 
     Event<int, bool> WhenValue;
+
+    virtual void Layout() override
+    {
+        int slider_width = max(DPI(52), GetSize().cx - DPI(78) - DPI(48) - DPI(8));
+        slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
+        UiBoxLayout::Layout();
+    }
 
 private:
     void SyncEdit(int value)
@@ -239,6 +249,13 @@ public:
     }
 
     Event<double, bool> WhenValue;
+
+    virtual void Layout() override
+    {
+        int slider_width = max(DPI(52), GetSize().cx - DPI(28) - DPI(70) - DPI(8));
+        slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
+        UiBoxLayout::Layout();
+    }
 
 private:
     void SliderChanged(bool final_commit)
