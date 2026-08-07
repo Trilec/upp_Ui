@@ -202,6 +202,7 @@ private:
 	Vector<String> GetSelectedLibraryCatalogIdsForDrag(const String& primary_catalog_id) const;
 	void SetCollectionSelectionOne(int item_index);
 	void ToggleCollectionSelection(int item_index);
+	void SelectCollectionRange(int item_index, bool additive);
 	void ClearCollectionSelection();
 	bool IsCollectionItemSelected(int item_index) const;
 	void NormalizeCollectionSelectionAfterModelChange();
@@ -265,6 +266,7 @@ private:
 	UiDropdown  output_export_type_;
 	UiToolButton copy_button_;
 	UiToolButton remove_selected_collection_items_tool_;
+	UiToolButton clear_collection_tool_;
 	UiToolButton collections_filter_icon_;
 	UiLineEdit  collections_filter_edit_;
 	SymbolPickerDropScrollPanel collections_scroll_panel_;
@@ -282,6 +284,7 @@ private:
 	String          selected_library_catalog_id_;
 	Index<String>   selected_library_catalog_ids_;
 	Index<int>      selected_collection_item_indexes_;
+	int             collection_selection_anchor_ = -1;
 	bool            sync_view_state_ = false;
 	bool            drag_interaction_active_ = false;
 	bool            pending_model_refresh_ = false;
