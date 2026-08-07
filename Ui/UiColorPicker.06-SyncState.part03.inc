@@ -1,3 +1,6 @@
+UiColorPicker& UiColorPicker::Impl::SetSpectrumMode(SpectrumMode mode)
+{
+    if(mode < SPECTRUM_HSV_RECT || mode > SPECTRUM_HSV_WHEEL)
         mode = SPECTRUM_HUE_STRIP;
     spectrum_mode_ = mode;
     spectrum_field_.Drop().SetDataSilently((int)mode);
