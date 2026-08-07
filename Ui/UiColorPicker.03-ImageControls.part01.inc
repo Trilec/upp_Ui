@@ -10,6 +10,7 @@ public:
         image_ = image;
         zoom_ = 1.0;
         pan_ = Point(0, 0);
+        drop_hot_ = false;
         Refresh();
     }
 
@@ -57,6 +58,8 @@ public:
 
     int GetZoomPercent() const { return int(zoom_ * 100.0 + 0.5); }
 
+    Event<> WhenLoadRequest;
+    Event<Image> WhenImageDrop;
     Event<int, Pointf> WhenSeedPlaced;
     Event<int, Pointf, bool> WhenSeedMoved;
     Event<int, Pointf, bool> WhenManualMoved;
@@ -69,12 +72,14 @@ public:
         draw.DrawRect(rect, SurfaceColor_());
         DrawFrame_(draw, rect, FrameColor_());
         if(image_.IsEmpty()) {
-            String text = "Load an image";
+            String text = "Click, drop or paste an image";
             Font font = SansSerif().Height(DPI(11));
             Size size = GetTextSize(text, font);
             draw.DrawText(rect.left + (rect.GetWidth() - size.cx) / 2,
                           rect.top + (rect.GetHeight() - size.cy) / 2,
                           text, font, SColorDisabled());
+            if(drop_hot_)
+                DrawFrame_(draw, rect.Deflated(DPI(2)), SColorHighlight(), DPI(2));
             return;
         }
         Rect image_rect = ImageRect();
@@ -88,12 +93,18 @@ public:
         draw.End();
         if(armed_seed_ >= 0)
             DrawFrame_(draw, rect.Deflated(DPI(2)), SColorHighlight(), DPI(2));
+        else if(drop_hot_)
+            DrawFrame_(draw, rect.Deflated(DPI(2)), SColorHighlight(), DPI(2));
     }
 
     virtual void LeftDown(Point point, dword) override
     {
-        if(image_.IsEmpty())
+        SetFocus();
+        if(image_.IsEmpty()) {
+            if(WhenLoadRequest)
+                WhenLoadRequest();
             return;
+        }
         Rect image_rect = ImageRect();
         if(!image_rect.Contains(point))
             return;
@@ -157,6 +168,51 @@ public:
     {
         if(zdelta)
             ZoomBy(zdelta > 0 ? 1.15 : 1.0 / 1.15);
+    }
+
+    virtual void DragEnter() override
+    {
+        drop_hot_ = true;
+        Refresh();
+    }
+
+    virtual void DragAndDrop(Point, PasteClip& clip) override
+    {
+        if(IsAvailableImage(clip)) {
+            AcceptImage(clip);
+            clip.SetAction(DND_COPY);
+            if(clip.IsPaste()) {
+                Image dropped = GetImage(clip);
+                if(!dropped.IsEmpty() && WhenImageDrop)
+                    WhenImageDrop(dropped);
+                drop_hot_ = false;
+                Refresh();
+            }
+            return;
+        }
+        if(IsAvailableFiles(clip)) {
+            AcceptFiles(clip);
+            if(clip.IsPaste()) {
+                Vector<String> files = GetFiles(clip);
+                if(!files.IsEmpty()) {
+                    Image dropped = StreamRaster::LoadFileAny(files[0]);
+                    if(!dropped.IsEmpty() && WhenImageDrop)
+                        WhenImageDrop(dropped);
+                }
+                drop_hot_ = false;
+                Refresh();
+            }
+            return;
+        }
+        clip.Reject();
+        drop_hot_ = false;
+        Refresh();
+    }
+
+    virtual void DragLeave() override
+    {
+        drop_hot_ = false;
+        Refresh();
     }
 
 private:
