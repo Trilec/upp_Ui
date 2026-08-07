@@ -34,6 +34,7 @@ file
 	SymbolPickerGesture.cpp,
 	SymbolPickerView.h,
 	SymbolPickerView.cpp,
+	SymbolPickerResponsiveLayout.cpp,
 	SymbolPickerApp.h,
 	SymbolPickerApp.cpp,
 	Generated/icons_action.h,
