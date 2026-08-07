@@ -63,6 +63,11 @@
         }
     };
     image_load_button_.WhenAction = [=] { LoadImage(); };
+    image_canvas_->WhenLoadRequest = [=] { LoadImage(); };
+    image_canvas_->WhenImageDrop = [=](Image image) {
+        if(!image.IsEmpty())
+            SetGeneratorImage(image);
+    };
     image_analyze_button_.WhenAction = [=] { AnalyzeCurrentImage(false); };
     image_fit_button_.WhenAction = [=] { image_canvas_->Fit(); image_zoom_label_.SetText("100%"); };
     image_zoom_out_.WhenAction = [=] { image_canvas_->ZoomBy(1.0 / 1.2); image_zoom_label_.SetText(Format("%d%%", image_canvas_->GetZoomPercent())); };
