@@ -146,10 +146,12 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	if(base.IsEmpty() || base == "_")
 		base = "SYMBOLS";
 	String image_class = base + "Img";
+	String implementation_macro = base + "_IML_IMPLEMENTATION";
 	String catalog_type = base + "CatalogEntry";
 	String catalog_fn = "Get" + base + "Catalog";
 	String categories_fn = "Get" + base + "Categories";
 	String guard = "_SYMBOLPICKER_GENERATED_" + base + "_h_";
+	String quoted_iml = "\"" + EscapeCppString(GetFileName(iml_file_name)) + "\"";
 
 	Index<String> categories;
 	for(const SymbolPickerImlEmission& emission : emissions)
@@ -159,8 +161,14 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	out << "#ifndef " << guard << "\n#define " << guard << "\n\n";
 	out << "#include <CtrlCore/CtrlCore.h>\n\nnamespace Upp {\n\n";
 	out << "#define IMAGECLASS " << image_class << "\n";
-	out << "#define IMAGEFILE \"" << EscapeCppString(GetFileName(iml_file_name)) << "\"\n";
+	out << "#define IMAGEFILE " << quoted_iml << "\n";
 	out << "#include <Draw/iml_header.h>\n\n";
+	out << "// Define " << implementation_macro << " in exactly one .cpp before including this header.\n";
+	out << "#ifdef " << implementation_macro << "\n";
+	out << "#define IMAGECLASS " << image_class << "\n";
+	out << "#define IMAGEFILE " << quoted_iml << "\n";
+	out << "#include <Draw/iml_source.h>\n";
+	out << "#endif\n\n";
 	for(const SymbolPickerImlEmission& emission : emissions)
 		out << "inline Image " << emission.token << "() { return " << image_class << "::" << emission.token << "(); }\n";
 	out << "\nstruct " << catalog_type << " {\n"
@@ -275,6 +283,8 @@ bool RunSymbolPickerImlExportSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	}
 	if(library_iml != first || library_header.Find("#define IMAGECLASS UIICONSImg") < 0
 	|| library_header.Find("#define IMAGEFILE \"UiIcons.iml\"") < 0
+	|| library_header.Find("UIICONS_IML_IMPLEMENTATION") < 0
+	|| library_header.Find("#include <Draw/iml_source.h>") < 0
 	|| library_header.Find("CatalogEntry") < 0
 	|| library_header.Find("Categories") < 0
 	|| library_header.Find("inline Image ICON_IML_SMOKE_ICON()") < 0) {
