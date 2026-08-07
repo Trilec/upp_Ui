@@ -5,14 +5,14 @@
 
 void UiColorPicker::Impl::BuildPalettesPage()
 {
-    palettes_page_.SetGap(DPI(5)).SetInset(DPI(5));
-    palettes_page_.Add(palettes_top_).Fixed(DPI(39));
+    palettes_page_.SetGap(DPI(4)).SetInset(DPI(5));
+    palettes_page_.Add(palettes_top_).Fixed(DPI(44));
     palettes_page_.Add(palettes_body_).Expand(1);
-    palettes_page_.Add(palette_actions_).Fixed(DPI(27));
+    palettes_page_.Add(palette_actions_).Fixed(DPI(30));
 
     palettes_top_.SetGap(DPI(6));
     palettes_top_.Add(palette_field_).Expand(1);
-    palettes_top_.Add(palette_badge_).Fixed(DPI(130));
+    palettes_top_.Add(palette_badge_).Fixed(DPI(120));
 
     palette_wheel_.Create();
     palettes_body_.SetGap(DPI(6));
@@ -23,14 +23,13 @@ void UiColorPicker::Impl::BuildPalettesPage()
 
     palette_actions_.SetGap(DPI(5));
     palette_actions_.Add(palette_summary_).Expand(1);
-    palette_actions_.Add(palette_add_selected_).Fixed(DPI(94));
     palette_actions_.Add(palette_add_all_).Fixed(DPI(72));
 }
 
 void UiColorPicker::Impl::BuildGeneratorPage()
 {
-    generator_page_.SetGap(DPI(5)).SetInset(DPI(5));
-    generator_page_.Add(generator_top_).Fixed(DPI(39));
+    generator_page_.SetGap(DPI(4)).SetInset(DPI(5));
+    generator_page_.Add(generator_top_).Fixed(DPI(44));
     generator_page_.Add(generator_body_).Expand(1);
 
     generator_top_.SetGap(DPI(5));
@@ -44,16 +43,16 @@ void UiColorPicker::Impl::BuildGeneratorPage()
     generator_body_.Add(*generator_wheel_).Expand(5).MinWidth(DPI(220));
     generator_body_.Add(generator_right_).Expand(6).MinWidth(DPI(330));
 
-    generator_right_.SetGap(DPI(4));
-    generator_right_.Add(generator_flow_).Fixed(DPI(102));
-    generator_right_.Add(free_angles_row_).Fixed(DPI(25));
+    generator_right_.SetGap(DPI(3));
+    generator_right_.Add(generator_flow_).Fixed(DPI(60));
+    generator_right_.Add(free_angles_row_).Fixed(DPI(26));
     generator_gain_row_.Create();
     generator_saturation_row_.Create();
     family_gain_row_.Create();
-    generator_right_.Add(*generator_gain_row_).Fixed(DPI(25));
-    generator_right_.Add(*generator_saturation_row_).Fixed(DPI(25));
-    generator_right_.Add(*family_gain_row_).Fixed(DPI(25));
-    generator_right_.Add(generator_actions_).Fixed(DPI(27));
+    generator_right_.Add(*generator_gain_row_).Fixed(DPI(24));
+    generator_right_.Add(*generator_saturation_row_).Fixed(DPI(24));
+    generator_right_.Add(*family_gain_row_).Fixed(DPI(24));
+    generator_right_.Add(generator_actions_).Fixed(DPI(30));
 
     free_angles_row_.SetGap(DPI(4));
     free_angles_row_.Add(free_angles_label_).Fixed(DPI(70));
@@ -63,16 +62,15 @@ void UiColorPicker::Impl::BuildGeneratorPage()
 
     generator_actions_.SetGap(DPI(5));
     generator_actions_.AddSpacer(1);
-    generator_actions_.Add(generator_add_selected_).Fixed(DPI(104));
     generator_actions_.Add(generator_add_all_).Fixed(DPI(76));
 }
 
 void UiColorPicker::Impl::BuildImagePage()
 {
-    image_page_.SetGap(DPI(5)).SetInset(DPI(5));
-    image_page_.Add(image_top_).Fixed(DPI(39));
+    image_page_.SetGap(DPI(4)).SetInset(DPI(5));
+    image_page_.Add(image_top_).Fixed(DPI(44));
     image_page_.Add(image_body_).Expand(1);
-    image_page_.Add(image_status_).Fixed(DPI(19));
+    image_page_.Add(image_status_).Fixed(DPI(18));
 
     image_top_.SetGap(DPI(5));
     image_top_.Add(image_analysis_field_).Expand(3);
@@ -87,7 +85,7 @@ void UiColorPicker::Impl::BuildImagePage()
 
     image_left_.SetGap(DPI(4));
     image_left_.Add(*image_canvas_).Expand(1);
-    image_left_.Add(image_navigation_).Fixed(DPI(27));
+    image_left_.Add(image_navigation_).Fixed(DPI(30));
     image_navigation_.SetGap(DPI(4));
     image_navigation_.Add(image_load_button_).Fixed(DPI(76));
     image_navigation_.Add(image_analyze_button_).Fixed(DPI(92));
@@ -98,18 +96,18 @@ void UiColorPicker::Impl::BuildImagePage()
     image_navigation_.Add(image_zoom_in_).Fixed(DPI(27));
 
     image_right_.SetGap(DPI(3));
-    image_right_.Add(image_flow_).Fixed(DPI(76));
+    image_right_.Add(image_flow_).Fixed(DPI(60));
     image_gain_row_.Create();
     image_saturation_row_.Create();
     hero_gain_row_.Create();
     tolerance_row_.Create();
     image_right_.Add(*image_gain_row_).Fixed(DPI(24));
     image_right_.Add(*image_saturation_row_).Fixed(DPI(24));
-    image_right_.Add(hero_row_).Fixed(DPI(24));
+    image_right_.Add(hero_row_).Fixed(DPI(28));
     image_right_.Add(*hero_gain_row_).Fixed(DPI(24));
-    image_right_.Add(exclusion_row_).Fixed(DPI(26));
+    image_right_.Add(exclusion_row_).Fixed(DPI(28));
     image_right_.Add(*tolerance_row_).Fixed(DPI(24));
-    image_right_.Add(image_actions_).Fixed(DPI(27));
+    image_right_.Add(image_actions_).Fixed(DPI(30));
 
     hero_row_.SetGap(DPI(4));
     hero_row_.Add(hero_label_).Expand(1);
