@@ -18,6 +18,20 @@ static bool HasVisiblePixels(const Image& img)
 	return false;
 }
 
+static bool IsPremultiplied(const Image& img)
+{
+	Size sz = img.GetSize();
+	for(int y = 0; y < sz.cy; ++y) {
+		const RGBA* row = img[y];
+		for(int x = 0; x < sz.cx; ++x) {
+			const RGBA& p = row[x];
+			if(p.r > p.a || p.g > p.a || p.b > p.a)
+				return false;
+		}
+	}
+	return true;
+}
+
 GUI_APP_MAIN
 {
 	Image raw = ICON_SMOKE_RAW_SAVE();
@@ -32,6 +46,10 @@ GUI_APP_MAIN
 	}
 	if(!HasVisiblePixels(raw) || !HasVisiblePixels(rle)) {
 		Exclamation("Smoke headers returned fully transparent images.");
+		return;
+	}
+	if(!IsPremultiplied(raw) || !IsPremultiplied(rle)) {
+		Exclamation("Smoke headers returned non-premultiplied RGBA.");
 		return;
 	}
 }
