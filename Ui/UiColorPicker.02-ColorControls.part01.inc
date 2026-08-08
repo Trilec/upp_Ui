@@ -1,4 +1,22 @@
 
+class PickerSlider_ : public UiSlider {
+public:
+    PickerSlider_(UiDirection direction = UiDirection::H)
+        : UiSlider(direction)
+    {
+    }
+
+    virtual Size GetMinSize() const override
+    {
+        Size size = UiSlider::GetMinSize();
+        if(GetDirection() == UiDirection::H)
+            size.cx = DPI(50);
+        else
+            size.cy = DPI(50);
+        return size;
+    }
+};
+
 class LabeledDrop_ : public UiBoxLayout {
 public:
     LabeledDrop_()
@@ -61,7 +79,7 @@ public:
                 }
             }
             int slider_width = max(DPI(52), GetSize().cx - DPI(28) - DPI(4));
-            slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
+            slider_.SetTrackSize(Size(slider_width, DPI(5)));
         }
         UiBoxLayout::Layout();
         if(slider_mode_)
@@ -83,7 +101,7 @@ private:
     UiLabel label_;
     UiDropdown drop_;
     UiBoxLayout slider_row_ { UiDirection::H };
-    UiSlider slider_ { UiDirection::H };
+    PickerSlider_ slider_ { UiDirection::H };
     UiLabel slider_value_;
     int slider_min_ = 0;
     int slider_max_ = 100;
@@ -154,7 +172,7 @@ public:
     virtual void Layout() override
     {
         int slider_width = max(DPI(52), GetSize().cx - DPI(78) - DPI(48) - DPI(8));
-        slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
+        slider_.SetTrackSize(Size(slider_width, DPI(5)));
         UiBoxLayout::Layout();
     }
 
@@ -180,7 +198,7 @@ private:
     }
 
     UiLabel label_;
-    UiSlider slider_ { UiDirection::H };
+    PickerSlider_ slider_ { UiDirection::H };
     CommitLineEdit_ edit_;
     int minimum_ = 0;
     int maximum_ = 100;
@@ -253,7 +271,7 @@ public:
     virtual void Layout() override
     {
         int slider_width = max(DPI(52), GetSize().cx - DPI(28) - DPI(70) - DPI(8));
-        slider_.SetTrackSize(Size(max(DPI(20), slider_width - DPI(32)), DPI(5)));
+        slider_.SetTrackSize(Size(slider_width, DPI(5)));
         UiBoxLayout::Layout();
     }
 
@@ -280,7 +298,7 @@ private:
     }
 
     UiLabel label_;
-    UiSlider slider_ { UiDirection::H };
+    PickerSlider_ slider_ { UiDirection::H };
     CommitLineEdit_ edit_;
     double minimum_ = 0.0;
     double maximum_ = 1.0;
