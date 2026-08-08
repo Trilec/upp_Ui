@@ -79,6 +79,8 @@ file
 	UiProgressBar.cpp,
 	UiSlider.h,
 	UiSlider.cpp,
+	UiRangeSlider.h,
+	UiRangeSlider.cpp,
 	Composites/UiCompositeSlider.h,
 	Composites/UiCompositeSlider.cpp,
 	Composites/UiCompositeToggle.h,
