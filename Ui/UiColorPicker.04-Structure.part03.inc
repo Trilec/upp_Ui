@@ -43,8 +43,8 @@ void UiColorPicker::Impl::BuildGeneratorPage()
     generator_body_.Add(*generator_wheel_).Expand(5).MinWidth(DPI(220));
     generator_body_.Add(generator_right_).Expand(6).MinWidth(DPI(330));
 
-    generator_right_.SetGap(DPI(3));
-    generator_right_.Add(generator_flow_).Fixed(DPI(60));
+    generator_right_.SetGap(DPI(2));
+    generator_right_.Add(generator_flow_).Fixed(DPI(32));
     generator_right_.Add(free_angles_row_).Fixed(DPI(26));
     generator_gain_row_.Create();
     generator_saturation_row_.Create();
@@ -52,7 +52,7 @@ void UiColorPicker::Impl::BuildGeneratorPage()
     generator_right_.Add(*generator_gain_row_).Fixed(DPI(24));
     generator_right_.Add(*generator_saturation_row_).Fixed(DPI(24));
     generator_right_.Add(*family_gain_row_).Fixed(DPI(24));
-    generator_right_.Add(generator_actions_).Fixed(DPI(30));
+    generator_right_.Add(generator_actions_).Fixed(DPI(28));
 
     free_angles_row_.SetGap(DPI(4));
     free_angles_row_.Add(free_angles_label_).Fixed(DPI(70));
@@ -95,8 +95,8 @@ void UiColorPicker::Impl::BuildImagePage()
     image_navigation_.Add(image_zoom_label_).Fixed(DPI(48));
     image_navigation_.Add(image_zoom_in_).Fixed(DPI(27));
 
-    image_right_.SetGap(DPI(3));
-    image_right_.Add(image_flow_).Fixed(DPI(60));
+    image_right_.SetGap(DPI(2));
+    image_right_.Add(image_flow_).Fixed(DPI(32));
     image_gain_row_.Create();
     image_saturation_row_.Create();
     hero_gain_row_.Create();
@@ -107,7 +107,7 @@ void UiColorPicker::Impl::BuildImagePage()
     image_right_.Add(*hero_gain_row_).Fixed(DPI(24));
     image_right_.Add(exclusion_row_).Fixed(DPI(28));
     image_right_.Add(*tolerance_row_).Fixed(DPI(24));
-    image_right_.Add(image_actions_).Fixed(DPI(30));
+    image_right_.Add(image_actions_).Fixed(DPI(28));
 
     hero_row_.SetGap(DPI(4));
     hero_row_.Add(hero_label_).Expand(1);
