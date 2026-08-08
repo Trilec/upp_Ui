@@ -163,7 +163,7 @@ void UiMatrixSelector::AddCell(const char* short_label, const char* label, const
 {
     Cell& c = cells_.Add();
     c.short_label = short_label ? short_label : "";
-    c.label = label ? label : c.short_label;
+    c.label = label ? String(label) : c.short_label;
     c.value = value;
     c.glyph = glyph;
     c.visible = visible;
