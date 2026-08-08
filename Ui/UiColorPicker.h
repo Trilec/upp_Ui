@@ -57,7 +57,7 @@ public:
         StyledSkin    skin;
 
         int navigation_height = DPI(34);
-        int stash_height = DPI(78);
+        int stash_height = DPI(92);
         int footer_height = DPI(42);
         int slot_size = DPI(26);
         int slot_gap = DPI(4);
