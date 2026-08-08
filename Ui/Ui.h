@@ -74,6 +74,7 @@
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
+#include <Ui/UiMatrixSelector.h>
 #include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/Composites/UiCompositeToggle.h>
 #include <Ui/Composites/UiCompositeColor.h>
