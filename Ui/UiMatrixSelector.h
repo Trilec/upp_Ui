@@ -22,13 +22,16 @@
       matrix geometry, hit testing, glyphs, readout, and optional relationship
       overlays directly.
     - Keep common uses controlled through presets while allowing labels, values,
-      icons, and a custom quad path to be overridden when an application needs it.
+      icons, pair selection, and custom quad paths to be overridden when an
+      application needs them.
 
     Thread context
     - GUI thread only.
 
     Changelog
     - 2026-08: initial Position9, Compass8, Region5, and DramaticaQuad presets.
+    - 2026-08: added ordered two-cell relationship selection with automatic
+      horizontal/vertical/diagonal and Dramatica relationship classification.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -70,6 +73,25 @@ enum class UiMatrixOverlay : byte {
     CustomPath,         // Caller-supplied ordered cell indexes.
 };
 
+enum class UiMatrixSelectionMode : byte {
+    SingleCell,
+    Pair,
+};
+
+enum class UiMatrixPairOrientation : byte {
+    None,
+    Horizontal,
+    Vertical,
+    Diagonal,
+};
+
+enum class UiMatrixRelationship : byte {
+    None,
+    Dynamic,            // Dramatica diagonal pair.
+    Companion,          // Dramatica horizontal pair.
+    Dependent,          // Dramatica vertical pair.
+};
+
 class UiMatrixSelector : public Ctrl {
 public:
     typedef UiMatrixSelector CLASSNAME;
@@ -108,6 +130,7 @@ public:
         int glyph_inset = DPI(9);
         int icon_inset = DPI(7);
         int overlay_width = DPI(2);
+        int pair_arrow_size = DPI(7);
         Color overlay_color = Null;
 
         void Serialize(Stream& s)
@@ -118,7 +141,8 @@ public:
               % readout_palette % readout_metrics % readout_skin
               % cell_font % readout_font
               % cell_gap % readout_gap % readout_width
-              % glyph_inset % icon_inset % overlay_width % overlay_color;
+              % glyph_inset % icon_inset % overlay_width % pair_arrow_size
+              % overlay_color;
         }
     };
 
@@ -142,6 +166,23 @@ public:
     UiMatrixOverlay GetOverlay() const { return overlay_; }
     UiMatrixSelector& SetCustomPath(const Vector<int>& indices);
     const Vector<int>& GetCustomPath() const { return custom_path_; }
+
+    UiMatrixSelector& SetSelectionMode(UiMatrixSelectionMode mode);
+    UiMatrixSelectionMode GetSelectionMode() const { return selection_mode_; }
+    bool IsPairSelection() const { return selection_mode_ == UiMatrixSelectionMode::Pair; }
+
+    UiMatrixSelector& SetPair(int first, int second, bool fire_action = false);
+    UiMatrixSelector& ClearPair();
+    int GetPairStartIndex() const { return pair_first_; }
+    int GetPairEndIndex() const { return pair_second_; }
+    bool HasPairStart() const { return pair_first_ >= 0; }
+    bool HasCompletePair() const { return pair_first_ >= 0 && pair_second_ >= 0; }
+    UiMatrixPairOrientation GetPairOrientation() const;
+    UiMatrixRelationship GetDramaticaRelationship() const;
+    String GetPairOrientationName() const;
+    String GetRelationshipName() const;
+    String GetPairDirectionLabel() const;
+    String GetReadoutText() const;
 
     UiMatrixSelector& ShowReadout(bool on = true);
     bool IsReadoutShown() const { return show_readout_; }
@@ -167,6 +208,7 @@ public:
     UiMatrixSelector& SetReadoutFont(const Font& font);
 
     UiMatrixSelector& SetOverlayWidth(int px);
+    UiMatrixSelector& SetPairArrowSize(int px);
     UiMatrixSelector& SetOverlayColor(Color color);
 
     int GetRows() const { return rows_; }
@@ -222,12 +264,18 @@ private:
                  UiMatrixGlyph glyph = UiMatrixGlyph::None,
                  bool visible = true, bool enabled = true);
 
+    bool IsSelectableCell(int index) const;
+    bool IsCellSelectedVisual(int index) const;
+    int FindCellByValue(const Value& value) const;
     int FindNextEnabled(int from, int dx, int dy) const;
+    void ActivateIndex(int index);
     void SetHover(int index);
     void DrawCellContent(Draw& w, const Rect& r, const Cell& cell,
                          const StyledPalette& palette, StyledState state) const;
     void DrawGlyphAA(Draw& w, const Rect& r, UiMatrixGlyph glyph, Color color) const;
     void DrawOverlayAA(Draw& w, const Rect& matrix) const;
+    void DrawPairAA(Draw& w, const Rect& matrix) const;
+    void DrawReadout(Draw& w, const Rect& rect, StyledState state) const;
     Vector<int> ResolveOverlayPath() const;
 
 private:
@@ -242,6 +290,7 @@ private:
 
     UiMatrixPreset preset_ = UiMatrixPreset::Position9;
     UiMatrixOverlay overlay_ = UiMatrixOverlay::None;
+    UiMatrixSelectionMode selection_mode_ = UiMatrixSelectionMode::SingleCell;
     Vector<int> custom_path_;
     Vector<Cell> cells_;
     int rows_ = 3;
@@ -249,6 +298,8 @@ private:
 
     bool show_readout_ = true;
     int selected_ = -1;
+    int pair_first_ = -1;
+    int pair_second_ = -1;
     int hover_ = -1;
     int pressed_ = -1;
     Size user_min_size_ = Size(0, 0);

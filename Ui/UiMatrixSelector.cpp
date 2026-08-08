@@ -23,6 +23,15 @@ static Color MatrixOverlayColor_(const UiMatrixSelector::Style& s)
     return IsNull(c) ? SColorHighlight() : c;
 }
 
+static String MatrixCellCompactLabel_(const UiMatrixSelector::Cell& cell)
+{
+    if(!cell.short_label.IsEmpty())
+        return cell.short_label;
+    if(!cell.label.IsEmpty())
+        return cell.label;
+    return AsString(cell.value);
+}
+
 const UiMatrixSelector::Style& UiMatrixSelector::StyleDefault()
 {
     static Style s;
@@ -77,6 +86,7 @@ UiMatrixSelector::Style UiMatrixSelector::ResolveThemeStyle() const
     out.glyph_inset = DPI(9);
     out.icon_inset = DPI(7);
     out.overlay_width = DPI(2);
+    out.pair_arrow_size = DPI(7);
     out.overlay_color = Null;
     return out;
 }
@@ -176,6 +186,7 @@ void UiMatrixSelector::LoadPreset(UiMatrixPreset preset)
     cells_.Clear();
     custom_path_.Clear();
     overlay_ = UiMatrixOverlay::None;
+    pair_first_ = pair_second_ = -1;
     selected_ = hover_ = pressed_ = -1;
 
     switch(preset) {
@@ -228,7 +239,9 @@ void UiMatrixSelector::LoadPreset(UiMatrixPreset preset)
         AddCell("C", "Lower left", "c");
         AddCell("D", "Lower right", "d");
         selected_ = 0;
-        overlay_ = UiMatrixOverlay::DynamicPairs;
+        overlay_ = selection_mode_ == UiMatrixSelectionMode::Pair
+                 ? UiMatrixOverlay::None
+                 : UiMatrixOverlay::DynamicPairs;
         break;
     }
 
@@ -256,6 +269,149 @@ UiMatrixSelector& UiMatrixSelector::SetCustomPath(const Vector<int>& indices)
     overlay_ = UiMatrixOverlay::CustomPath;
     Refresh();
     return *this;
+}
+
+UiMatrixSelector& UiMatrixSelector::SetSelectionMode(UiMatrixSelectionMode mode)
+{
+    if(selection_mode_ == mode)
+        return *this;
+    selection_mode_ = mode;
+    if(selection_mode_ == UiMatrixSelectionMode::Pair)
+        overlay_ = UiMatrixOverlay::None;
+    pair_first_ = pair_second_ = -1;
+    if(!IsSelectableCell(selected_))
+        selected_ = -1;
+    Refresh();
+    return *this;
+}
+
+bool UiMatrixSelector::IsSelectableCell(int index) const
+{
+    return index >= 0 && index < cells_.GetCount()
+        && cells_[index].visible && cells_[index].enabled;
+}
+
+int UiMatrixSelector::FindCellByValue(const Value& value) const
+{
+    for(int i = 0; i < cells_.GetCount(); i++)
+        if(IsSelectableCell(i) && cells_[i].value == value)
+            return i;
+    return -1;
+}
+
+UiMatrixSelector& UiMatrixSelector::SetPair(int first, int second, bool fire_action)
+{
+    if(!IsSelectableCell(first))
+        return *this;
+    if(second >= 0 && (!IsSelectableCell(second) || second == first))
+        return *this;
+
+    if(selection_mode_ != UiMatrixSelectionMode::Pair) {
+        selection_mode_ = UiMatrixSelectionMode::Pair;
+        overlay_ = UiMatrixOverlay::None;
+    }
+    bool changed = pair_first_ != first || pair_second_ != second;
+    pair_first_ = first;
+    pair_second_ = second;
+    selected_ = second >= 0 ? second : first;
+    Refresh();
+
+    if(fire_action && changed) {
+        if(WhenChanging)
+            WhenChanging();
+        if(pair_second_ >= 0 && WhenAction)
+            WhenAction();
+    }
+    return *this;
+}
+
+UiMatrixSelector& UiMatrixSelector::ClearPair()
+{
+    if(pair_first_ >= 0 || pair_second_ >= 0) {
+        pair_first_ = pair_second_ = -1;
+        Refresh();
+    }
+    return *this;
+}
+
+UiMatrixPairOrientation UiMatrixSelector::GetPairOrientation() const
+{
+    if(!HasCompletePair() || cols_ <= 0)
+        return UiMatrixPairOrientation::None;
+    int r0 = pair_first_ / cols_;
+    int c0 = pair_first_ % cols_;
+    int r1 = pair_second_ / cols_;
+    int c1 = pair_second_ % cols_;
+    if(r0 == r1 && c0 != c1)
+        return UiMatrixPairOrientation::Horizontal;
+    if(c0 == c1 && r0 != r1)
+        return UiMatrixPairOrientation::Vertical;
+    if(r0 != r1 && c0 != c1)
+        return UiMatrixPairOrientation::Diagonal;
+    return UiMatrixPairOrientation::None;
+}
+
+UiMatrixRelationship UiMatrixSelector::GetDramaticaRelationship() const
+{
+    if(preset_ != UiMatrixPreset::DramaticaQuad || !HasCompletePair())
+        return UiMatrixRelationship::None;
+    switch(GetPairOrientation()) {
+    case UiMatrixPairOrientation::Diagonal:   return UiMatrixRelationship::Dynamic;
+    case UiMatrixPairOrientation::Horizontal: return UiMatrixRelationship::Companion;
+    case UiMatrixPairOrientation::Vertical:   return UiMatrixRelationship::Dependent;
+    default:                                  return UiMatrixRelationship::None;
+    }
+}
+
+String UiMatrixSelector::GetPairOrientationName() const
+{
+    switch(GetPairOrientation()) {
+    case UiMatrixPairOrientation::Horizontal: return "Horizontal";
+    case UiMatrixPairOrientation::Vertical:   return "Vertical";
+    case UiMatrixPairOrientation::Diagonal:   return "Diagonal";
+    default:                                  return String();
+    }
+}
+
+String UiMatrixSelector::GetRelationshipName() const
+{
+    switch(GetDramaticaRelationship()) {
+    case UiMatrixRelationship::Dynamic:   return "Dynamic";
+    case UiMatrixRelationship::Companion: return "Companion";
+    case UiMatrixRelationship::Dependent: return "Dependent";
+    default:                              return String();
+    }
+}
+
+String UiMatrixSelector::GetPairDirectionLabel() const
+{
+    if(!HasPairStart())
+        return String();
+    String from = cells_[pair_first_].label;
+    if(!HasCompletePair())
+        return from + " -> ...";
+    return from + " -> " + cells_[pair_second_].label;
+}
+
+String UiMatrixSelector::GetReadoutText() const
+{
+    if(selection_mode_ != UiMatrixSelectionMode::Pair)
+        return GetSelectedLabel();
+    if(!HasPairStart())
+        return "Choose first point";
+    if(!HasCompletePair())
+        return "From " + cells_[pair_first_].label + " - choose second point";
+
+    String relation = GetRelationshipName();
+    String orientation = GetPairOrientationName();
+    String out;
+    if(!relation.IsEmpty())
+        out << relation << " / ";
+    out << orientation;
+    String direction = GetPairDirectionLabel();
+    if(!direction.IsEmpty())
+        out << " - " << direction;
+    return out;
 }
 
 UiMatrixSelector& UiMatrixSelector::ShowReadout(bool on)
@@ -400,6 +556,13 @@ UiMatrixSelector& UiMatrixSelector::SetOverlayWidth(int px)
     return *this;
 }
 
+UiMatrixSelector& UiMatrixSelector::SetPairArrowSize(int px)
+{
+    StyleEdit().pair_arrow_size = max(2, px);
+    Refresh();
+    return *this;
+}
+
 UiMatrixSelector& UiMatrixSelector::SetOverlayColor(Color color)
 {
     StyleEdit().overlay_color = color;
@@ -460,6 +623,10 @@ UiMatrixSelector& UiMatrixSelector::EnableCell(int index, bool on)
         cells_[index].enabled = on;
         if(!on && selected_ == index)
             selected_ = -1;
+        if(!on && pair_first_ == index)
+            pair_first_ = pair_second_ = -1;
+        else if(!on && pair_second_ == index)
+            pair_second_ = -1;
         Refresh();
     }
     return *this;
@@ -471,6 +638,10 @@ UiMatrixSelector& UiMatrixSelector::ShowCell(int index, bool on)
         cells_[index].visible = on;
         if(!on && selected_ == index)
             selected_ = -1;
+        if(!on && pair_first_ == index)
+            pair_first_ = pair_second_ = -1;
+        else if(!on && pair_second_ == index)
+            pair_second_ = -1;
         Refresh();
     }
     return *this;
@@ -478,7 +649,7 @@ UiMatrixSelector& UiMatrixSelector::ShowCell(int index, bool on)
 
 UiMatrixSelector& UiMatrixSelector::SelectIndex(int index, bool fire_action)
 {
-    if(index < 0 || index >= cells_.GetCount() || !cells_[index].visible || !cells_[index].enabled)
+    if(!IsSelectableCell(index))
         return *this;
     if(selected_ == index)
         return *this;
@@ -500,15 +671,43 @@ String UiMatrixSelector::GetSelectedLabel() const
 
 void UiMatrixSelector::SetData(const Value& v)
 {
-    for(int i = 0; i < cells_.GetCount(); i++)
-        if(cells_[i].visible && cells_[i].enabled && cells_[i].value == v) {
-            SelectIndex(i, false);
+    if(selection_mode_ == UiMatrixSelectionMode::Pair) {
+        if(v.Is<ValueArray>()) {
+            ValueArray values = v;
+            if(values.GetCount() == 0) {
+                ClearPair();
+                return;
+            }
+            int first = FindCellByValue(values[0]);
+            if(first < 0)
+                return;
+            int second = values.GetCount() >= 2 ? FindCellByValue(values[1]) : -1;
+            if(values.GetCount() >= 2 && second < 0)
+                return;
+            SetPair(first, second, false);
             return;
         }
+        int first = FindCellByValue(v);
+        if(first >= 0)
+            SetPair(first, -1, false);
+        return;
+    }
+
+    int index = FindCellByValue(v);
+    if(index >= 0)
+        SelectIndex(index, false);
 }
 
 Value UiMatrixSelector::GetData() const
 {
+    if(selection_mode_ == UiMatrixSelectionMode::Pair) {
+        ValueArray values;
+        if(pair_first_ >= 0 && pair_first_ < cells_.GetCount())
+            values.Add(cells_[pair_first_].value);
+        if(pair_second_ >= 0 && pair_second_ < cells_.GetCount())
+            values.Add(cells_[pair_second_].value);
+        return values;
+    }
     return selected_ >= 0 && selected_ < cells_.GetCount() ? cells_[selected_].value : Value();
 }
 
@@ -551,7 +750,7 @@ Rect UiMatrixSelector::GetReadoutRect() const
     Rect matrix = GetMatrixRect();
     int left = matrix.right + s.readout_gap;
     int width = min(max(0, s.readout_width), max(0, inner.right - left));
-    int h = min(inner.GetHeight(), max(DPI(36), matrix.GetHeight() / 3));
+    int h = min(inner.GetHeight(), max(DPI(42), matrix.GetHeight() / 3));
     int y = inner.top + (inner.GetHeight() - h) / 2;
     return RectC(left, y, width, h);
 }
@@ -582,9 +781,16 @@ Rect UiMatrixSelector::GetCellRect(int index) const
 int UiMatrixSelector::HitTest(Point p) const
 {
     for(int i = 0; i < cells_.GetCount(); i++)
-        if(cells_[i].visible && cells_[i].enabled && GetCellRect(i).Contains(p))
+        if(IsSelectableCell(i) && GetCellRect(i).Contains(p))
             return i;
     return -1;
+}
+
+bool UiMatrixSelector::IsCellSelectedVisual(int index) const
+{
+    if(selection_mode_ == UiMatrixSelectionMode::Pair)
+        return index == pair_first_ || index == pair_second_;
+    return index == selected_;
 }
 
 void UiMatrixSelector::SetHover(int index)
@@ -698,10 +904,10 @@ Vector<int> UiMatrixSelector::ResolveOverlayPath() const
         return path;
 
     switch(overlay_) {
-    case UiMatrixOverlay::PathU: path << 0 << 2 << 3 << 1; break;
-    case UiMatrixOverlay::PathZ: path << 0 << 1 << 2 << 3; break;
+    case UiMatrixOverlay::PathU:         path << 0 << 2 << 3 << 1; break;
+    case UiMatrixOverlay::PathZ:         path << 0 << 1 << 2 << 3; break;
     case UiMatrixOverlay::PathButterfly: path << 0 << 3 << 1 << 2; break;
-    case UiMatrixOverlay::CustomPath: path <<= custom_path_; break;
+    case UiMatrixOverlay::CustomPath:    path <<= custom_path_; break;
     default: break;
     }
     return path;
@@ -769,6 +975,102 @@ void UiMatrixSelector::DrawOverlayAA(Draw& w, const Rect& matrix) const
     w.DrawImage(matrix.left, matrix.top, ib);
 }
 
+void UiMatrixSelector::DrawPairAA(Draw& w, const Rect& matrix) const
+{
+    if(selection_mode_ != UiMatrixSelectionMode::Pair || !HasCompletePair() || matrix.IsEmpty())
+        return;
+
+    Rect a = GetCellRect(pair_first_);
+    Rect b = GetCellRect(pair_second_);
+    if(a.IsEmpty() || b.IsEmpty())
+        return;
+
+    const Style& s = GetStyle();
+    Color color = MatrixOverlayColor_(s);
+    ImageBuffer ib(matrix.GetSize());
+    BufferPainter p(ib, MODE_ANTIALIASED);
+    p.Clear(RGBAZero());
+
+    Pointf c0(a.CenterPoint().x - matrix.left, a.CenterPoint().y - matrix.top);
+    Pointf c1(b.CenterPoint().x - matrix.left, b.CenterPoint().y - matrix.top);
+    double dx = c1.x - c0.x;
+    double dy = c1.y - c0.y;
+    double len = sqrt(dx * dx + dy * dy);
+    if(len <= 0)
+        return;
+    dx /= len;
+    dy /= len;
+    double px = -dy;
+    double py = dx;
+
+    double endpoint_inset = max(4.0, min(min(a.GetWidth(), a.GetHeight()), min(b.GetWidth(), b.GetHeight())) * 0.18);
+    Pointf start(c0.x + dx * endpoint_inset, c0.y + dy * endpoint_inset);
+    Pointf end(c1.x - dx * endpoint_inset, c1.y - dy * endpoint_inset);
+
+    p.Begin();
+    p.Move(start);
+    p.Line(end);
+    p.Stroke(max(1, s.overlay_width), color);
+    p.End();
+
+    double head = max(3, s.pair_arrow_size);
+    double wing = head * 0.62;
+    p.Begin();
+    p.Move(end);
+    p.Line(end.x - dx * head + px * wing, end.y - dy * head + py * wing);
+    p.Line(end.x - dx * head - px * wing, end.y - dy * head - py * wing);
+    p.Close();
+    p.Fill(color);
+    p.End();
+
+    w.DrawImage(matrix.left, matrix.top, ib);
+}
+
+void UiMatrixSelector::DrawReadout(Draw& w, const Rect& rect, StyledState state) const
+{
+    if(rect.IsEmpty())
+        return;
+    const Style& s = GetStyle();
+    UiPaintStyledBackground(w, rect, s.readout_palette, s.readout_metrics, s.readout_skin, state, false);
+    Color ink = MatrixInk_(s.readout_palette, state);
+    Font font = s.readout_font;
+    int line_h = max(1, font.GetHeight());
+
+    Vector<String> lines;
+    if(selection_mode_ != UiMatrixSelectionMode::Pair) {
+        String text = GetSelectedLabel();
+        lines.Add(text.IsEmpty() ? String("None") : text);
+    }
+    else if(!HasPairStart()) {
+        lines.Add("Choose first");
+    }
+    else if(!HasCompletePair()) {
+        lines.Add("From " + MatrixCellCompactLabel_(cells_[pair_first_]));
+        lines.Add("Choose second");
+    }
+    else {
+        String relationship = GetRelationshipName();
+        String orientation = GetPairOrientationName();
+        if(!relationship.IsEmpty())
+            lines.Add(relationship);
+        if(!orientation.IsEmpty())
+            lines.Add(orientation);
+        lines.Add(MatrixCellCompactLabel_(cells_[pair_first_]) + " -> "
+                  + MatrixCellCompactLabel_(cells_[pair_second_]));
+    }
+
+    int gap = DPI(2);
+    int total_h = lines.GetCount() * line_h + max(0, lines.GetCount() - 1) * gap;
+    int y = rect.top + max(0, (rect.GetHeight() - total_h) / 2);
+    Rect content = rect.Deflated(DPI(5), DPI(2));
+    for(const String& line : lines) {
+        Size ts = GetTextSize(line, font);
+        int x = content.left + max(0, (content.GetWidth() - ts.cx) / 2);
+        DrawTextEllipsis(w, x, y, max(0, content.right - x), line, "...", font, ink);
+        y += line_h + gap;
+    }
+}
+
 void UiMatrixSelector::Paint(Draw& w)
 {
     const Style& s = GetStyle();
@@ -785,11 +1087,12 @@ void UiMatrixSelector::Paint(Draw& w)
                           : pressed_ == i ? ST_PRESSED
                           : hover_ == i ? ST_HOT
                           : ST_NORMAL;
-        const StyledPalette& palette = selected_ == i ? s.selected_palette : s.cell_palette;
+        const StyledPalette& palette = IsCellSelectedVisual(i) ? s.selected_palette : s.cell_palette;
         UiPaintStyledBackground(w, GetCellRect(i), palette, s.cell_metrics, s.cell_skin, state, false);
     }
 
     DrawOverlayAA(w, GetMatrixRect());
+    DrawPairAA(w, GetMatrixRect());
 
     for(int i = 0; i < cells_.GetCount(); i++) {
         const Cell& cell = cells_[i];
@@ -799,23 +1102,52 @@ void UiMatrixSelector::Paint(Draw& w)
                           : pressed_ == i ? ST_PRESSED
                           : hover_ == i ? ST_HOT
                           : ST_NORMAL;
-        const StyledPalette& palette = selected_ == i ? s.selected_palette : s.cell_palette;
+        const StyledPalette& palette = IsCellSelectedVisual(i) ? s.selected_palette : s.cell_palette;
         DrawCellContent(w, GetCellRect(i), cell, palette, state);
     }
 
-    Rect readout = GetReadoutRect();
-    if(show_readout_ && !readout.IsEmpty()) {
-        UiPaintStyledBackground(w, readout, s.readout_palette, s.readout_metrics, s.readout_skin, base, false);
-        String text = GetSelectedLabel();
-        if(text.IsEmpty())
-            text = "None";
-        Size ts = GetTextSize(text, s.readout_font);
-        Color ink = MatrixInk_(s.readout_palette, base);
-        w.DrawText(readout.left + (readout.GetWidth() - ts.cx) / 2,
-                   readout.top + (readout.GetHeight() - ts.cy) / 2,
-                   text, s.readout_font, ink);
+    if(show_readout_)
+        DrawReadout(w, GetReadoutRect(), base);
+}
+
+void UiMatrixSelector::ActivateIndex(int index)
+{
+    if(!IsSelectableCell(index))
+        return;
+
+    if(selection_mode_ == UiMatrixSelectionMode::SingleCell) {
+        bool changed = selected_ != index;
+        selected_ = index;
+        Refresh();
+        if(changed && WhenChanging)
+            WhenChanging();
+        if(WhenAction)
+            WhenAction();
+        return;
     }
 
+    selected_ = index;
+    if(pair_first_ < 0 || pair_second_ >= 0) {
+        bool changed = pair_first_ != index || pair_second_ >= 0;
+        pair_first_ = index;
+        pair_second_ = -1;
+        Refresh();
+        if(changed && WhenChanging)
+            WhenChanging();
+        return;
+    }
+
+    if(index == pair_first_) {
+        Refresh();
+        return;
+    }
+
+    pair_second_ = index;
+    Refresh();
+    if(WhenChanging)
+        WhenChanging();
+    if(WhenAction)
+        WhenAction();
 }
 
 void UiMatrixSelector::LeftDown(Point p, dword)
@@ -838,15 +1170,9 @@ void UiMatrixSelector::LeftUp(Point p, dword)
         ReleaseCapture();
     int hit = HitTest(p);
     SetHover(hit);
-    if(was >= 0 && hit == was) {
-        bool changed = selected_ != hit;
-        selected_ = hit;
-        Refresh();
-        if(changed && WhenChanging)
-            WhenChanging();
-        if(WhenAction)
-            WhenAction();
-    }
+    if(was >= 0 && hit == was)
+        ActivateIndex(hit);
+    Refresh();
 }
 
 void UiMatrixSelector::MouseMove(Point p, dword)
@@ -872,7 +1198,7 @@ int UiMatrixSelector::FindNextEnabled(int from, int dx, int dy) const
         if(row < 0 || row >= rows_ || col < 0 || col >= cols_)
             return from;
         int i = row * cols_ + col;
-        if(i >= 0 && i < cells_.GetCount() && cells_[i].visible && cells_[i].enabled)
+        if(IsSelectableCell(i))
             return i;
     }
     return from;
@@ -880,22 +1206,25 @@ int UiMatrixSelector::FindNextEnabled(int from, int dx, int dy) const
 
 bool UiMatrixSelector::Key(dword key, int)
 {
+    if(key == K_SPACE || key == K_ENTER) {
+        if(IsSelectableCell(selected_)) {
+            ActivateIndex(selected_);
+            return true;
+        }
+        return false;
+    }
+
     int next = selected_;
     if(key == K_LEFT) next = FindNextEnabled(selected_, -1, 0);
     else if(key == K_RIGHT) next = FindNextEnabled(selected_, 1, 0);
     else if(key == K_UP) next = FindNextEnabled(selected_, 0, -1);
     else if(key == K_DOWN) next = FindNextEnabled(selected_, 0, 1);
-    else if(key == K_SPACE || key == K_ENTER) {
-        if(selected_ >= 0 && WhenAction)
-            WhenAction();
-        return selected_ >= 0;
-    }
     else
         return false;
 
     if(next >= 0 && next != selected_) {
         selected_ = next;
-        if(WhenChanging)
+        if(selection_mode_ == UiMatrixSelectionMode::SingleCell && WhenChanging)
             WhenChanging();
         Refresh();
     }
