@@ -83,9 +83,9 @@ void UiColorPicker::Layout()
 
 Size UiColorPicker::GetMinSize() const
 {
-    // RC2 baseline: all four pages, the two-row User Stash and footer remain
-    // fully visible without relying on child controls painting beyond bounds.
-    return Size(DPI(700), DPI(500));
+    // Responsive RC2 minimum: compact page rows fit the Designer's normal
+    // 720x520 outer dialog while the two-row User Stash remains fully visible.
+    return Size(DPI(640), DPI(460));
 }
 
 void UiColorPicker::SetData(const Value& value)
