@@ -12,26 +12,37 @@
     ================
 
     Purpose
-    - Compact styled matrix selector for spatial, directional, regional, and
-      quad-based choices.
+    - Compact styled matrix selector for position, direction, region, and
+      ordered two-cell choices.
 
     Intent
     - Stay lightweight: one Ctrl, no child buttons/layouts, and no parallel
       drawing system.
-    - Reuse the shared Ui palette/metrics/skin primitives while owning the tiny
-      matrix geometry, hit testing, glyphs, readout, and optional relationship
-      overlays directly.
-    - Keep common uses controlled through presets while allowing labels, values,
-      icons, pair selection, and custom quad paths to be overridden when an
-      application needs them.
+    - Reuse shared Ui palette/metrics/skin primitives while owning the small
+      matrix geometry, hit testing, glyphs, readout, pair arrow, and default
+      indication directly.
+    - Keep common uses controlled through presets while allowing labels,
+      semantic values, and icons to be replaced by the application.
+
+    Removed relationship/pattern experiments — reference only
+    - Dynamic: Dramatica diagonal relationship between opposite quad cells.
+    - Companion: Dramatica horizontal relationship between adjacent quad cells.
+    - Dependent: Dramatica vertical relationship between adjacent quad cells.
+    - U path: ordered four-cell traversal 0 -> 2 -> 3 -> 1, visually forming a U.
+    - Z path: ordered four-cell traversal 0 -> 1 -> 2 -> 3, visually forming a Z.
+    - Butterfly path: ordered crossing traversal 0 -> 3 -> 1 -> 2.
+    - CustomPath: caller-supplied ordered quad traversal rendered as one path.
+      These were removed from UiMatrixSelector so the control remains generic;
+      they may inform a future relationship/pattern-specific control.
 
     Thread context
     - GUI thread only.
 
     Changelog
-    - 2026-08: initial Position9, Compass8, Region5, and DramaticaQuad presets.
-    - 2026-08: added ordered two-cell relationship selection with automatic
-      horizontal/vertical/diagonal and Dramatica relationship classification.
+    - 2026-08: initial Position9, Compass8, Region5, and quad presets.
+    - 2026-08: added ordered two-cell selection with direction-preserving arrow.
+    - 2026-08: renamed the generic quad preset to QuadPair, removed Dramatica-
+      specific pattern API, and added role-derived default-cell indication.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -46,7 +57,7 @@ enum class UiMatrixPreset : byte {
     Position9,
     Compass8,
     Region5,
-    DramaticaQuad,
+    QuadPair,
 };
 
 enum class UiMatrixGlyph : byte {
@@ -62,17 +73,6 @@ enum class UiMatrixGlyph : byte {
     Dot,
 };
 
-enum class UiMatrixOverlay : byte {
-    None,
-    DynamicPairs,      // Dramatica quad diagonals.
-    CompanionPairs,    // Dramatica quad horizontals.
-    DependentPairs,    // Dramatica quad verticals.
-    PathU,              // Ordered quad traversal rendered as a U.
-    PathZ,              // Ordered quad traversal rendered as a Z.
-    PathButterfly,      // Crossing/butterfly ordered traversal.
-    CustomPath,         // Caller-supplied ordered cell indexes.
-};
-
 enum class UiMatrixSelectionMode : byte {
     SingleCell,
     Pair,
@@ -83,13 +83,6 @@ enum class UiMatrixPairOrientation : byte {
     Horizontal,
     Vertical,
     Diagonal,
-};
-
-enum class UiMatrixRelationship : byte {
-    None,
-    Dynamic,            // Dramatica diagonal pair.
-    Companion,          // Dramatica horizontal pair.
-    Dependent,          // Dramatica vertical pair.
 };
 
 class UiMatrixSelector : public Ctrl {
@@ -129,9 +122,12 @@ public:
         int readout_width = DPI(104);
         int glyph_inset = DPI(9);
         int icon_inset = DPI(7);
-        int overlay_width = DPI(2);
+        int pair_line_width = DPI(2);
         int pair_arrow_size = DPI(7);
-        Color overlay_color = Null;
+        int default_dash = DPI(4);
+        int default_dash_gap = DPI(3);
+        int default_frame_width = DPI(1);
+        Color pair_color = Null;
 
         void Serialize(Stream& s)
         {
@@ -141,8 +137,10 @@ public:
               % readout_palette % readout_metrics % readout_skin
               % cell_font % readout_font
               % cell_gap % readout_gap % readout_width
-              % glyph_inset % icon_inset % overlay_width % pair_arrow_size
-              % overlay_color;
+              % glyph_inset % icon_inset
+              % pair_line_width % pair_arrow_size
+              % default_dash % default_dash_gap % default_frame_width
+              % pair_color;
         }
     };
 
@@ -162,11 +160,6 @@ public:
     UiMatrixSelector& SetPreset(UiMatrixPreset preset);
     UiMatrixPreset GetPreset() const { return preset_; }
 
-    UiMatrixSelector& SetOverlay(UiMatrixOverlay overlay);
-    UiMatrixOverlay GetOverlay() const { return overlay_; }
-    UiMatrixSelector& SetCustomPath(const Vector<int>& indices);
-    const Vector<int>& GetCustomPath() const { return custom_path_; }
-
     UiMatrixSelector& SetSelectionMode(UiMatrixSelectionMode mode);
     UiMatrixSelectionMode GetSelectionMode() const { return selection_mode_; }
     bool IsPairSelection() const { return selection_mode_ == UiMatrixSelectionMode::Pair; }
@@ -178,11 +171,17 @@ public:
     bool HasPairStart() const { return pair_first_ >= 0; }
     bool HasCompletePair() const { return pair_first_ >= 0 && pair_second_ >= 0; }
     UiMatrixPairOrientation GetPairOrientation() const;
-    UiMatrixRelationship GetDramaticaRelationship() const;
     String GetPairOrientationName() const;
-    String GetRelationshipName() const;
     String GetPairDirectionLabel() const;
     String GetReadoutText() const;
+
+    UiMatrixSelector& SetDefault(int index);
+    UiMatrixSelector& ClearDefault();
+    int GetDefaultIndex() const { return default_index_; }
+    bool HasDefault() const { return default_index_ >= 0; }
+    UiMatrixSelector& ShowDefault(bool on = true);
+    bool IsDefaultShown() const { return show_default_; }
+    bool IsDefaultSelected() const;
 
     UiMatrixSelector& ShowReadout(bool on = true);
     bool IsReadoutShown() const { return show_readout_; }
@@ -207,9 +206,11 @@ public:
     UiMatrixSelector& ShowReadoutFrame(bool on = true);
     UiMatrixSelector& SetReadoutFont(const Font& font);
 
-    UiMatrixSelector& SetOverlayWidth(int px);
+    UiMatrixSelector& SetPairLineWidth(int px);
     UiMatrixSelector& SetPairArrowSize(int px);
-    UiMatrixSelector& SetOverlayColor(Color color);
+    UiMatrixSelector& SetPairColor(Color color);
+    UiMatrixSelector& SetDefaultDash(int dash, int gap);
+    UiMatrixSelector& SetDefaultFrameWidth(int px);
 
     int GetRows() const { return rows_; }
     int GetColumns() const { return cols_; }
@@ -273,10 +274,9 @@ private:
     void DrawCellContent(Draw& w, const Rect& r, const Cell& cell,
                          const StyledPalette& palette, StyledState state) const;
     void DrawGlyphAA(Draw& w, const Rect& r, UiMatrixGlyph glyph, Color color) const;
-    void DrawOverlayAA(Draw& w, const Rect& matrix) const;
     void DrawPairAA(Draw& w, const Rect& matrix) const;
+    void DrawDefaultFrame(Draw& w) const;
     void DrawReadout(Draw& w, const Rect& rect, StyledState state) const;
-    Vector<int> ResolveOverlayPath() const;
 
 private:
     mutable Style themed_style_;
@@ -289,15 +289,15 @@ private:
     UiRole readout_role_;
 
     UiMatrixPreset preset_ = UiMatrixPreset::Position9;
-    UiMatrixOverlay overlay_ = UiMatrixOverlay::None;
     UiMatrixSelectionMode selection_mode_ = UiMatrixSelectionMode::SingleCell;
-    Vector<int> custom_path_;
     Vector<Cell> cells_;
     int rows_ = 3;
     int cols_ = 3;
 
     bool show_readout_ = true;
+    bool show_default_ = true;
     int selected_ = -1;
+    int default_index_ = -1;
     int pair_first_ = -1;
     int pair_second_ = -1;
     int hover_ = -1;
