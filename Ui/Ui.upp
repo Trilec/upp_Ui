@@ -85,6 +85,8 @@ file
 	UiMatrixSelector.cpp,
 	UiColorMatrix.h,
 	UiColorMatrix.cpp,
+	UiDateTime.h,
+	UiDateTime.cpp,
 	Composites/UiCompositeSlider.h,
 	Composites/UiCompositeSlider.cpp,
 	Composites/UiCompositeToggle.h,
