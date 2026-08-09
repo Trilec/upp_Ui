@@ -52,7 +52,7 @@ void UiColorPicker::Impl::WireEvents()
         page_button_[i].WhenAction = [=] { SetPageMode((PageMode)index); };
     }
     current_preview_.WhenAction = [=] { SetPageMode(PAGE_COLOR); };
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         int index = i;
         primary_slot_[i].WhenAction = [=] { SetActiveSlot(index); };
         previous_slot_[i].WhenAction = [=] {

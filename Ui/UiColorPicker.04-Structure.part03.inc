@@ -140,7 +140,7 @@ void UiColorPicker::Impl::ConfigureControls()
     current_preview_.SetText("")
                     .SetContentInset(0)
                     .SetIconRenderMode(UiIconRenderMode::PreserveColor);
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         primary_slot_[i].SetText("")
                         .SetCheckable(true)
                         .SetContentInset(0)

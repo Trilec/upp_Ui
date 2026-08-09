@@ -20,7 +20,7 @@ void UiColorPicker::Impl::LoadSession()
         return;
     }
     if(!session.slots.IsEmpty()) {
-        slot_count_ = min(4, session.slots.GetCount());
+        slot_count_ = min(8, session.slots.GetCount());
         for(int i = 0; i < slot_count_; i++)
             slots_[i] = session.slots[i];
     }

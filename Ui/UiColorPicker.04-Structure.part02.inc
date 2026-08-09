@@ -75,14 +75,16 @@
 UiColorPicker::Impl::Impl(UiColorPicker& owner)
     : owner_(owner)
 {
-    slots_.SetCount(4);
-    previous_.SetCount(4);
-    opening_.SetCount(4);
-    const Color defaults[4] = {
+    slots_.SetCount(8);
+    previous_.SetCount(8);
+    opening_.SetCount(8);
+    const Color defaults[8] = {
         Color(0, 120, 212), Color(255, 204, 0),
-        Color(52, 199, 89), Color(255, 59, 48)
+        Color(52, 199, 89), Color(255, 59, 48),
+        Color(175, 82, 222), Color(90, 200, 250),
+        Color(255, 149, 0), Color(100, 210, 255)
     };
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         slots_[i].color = defaults[i];
         slots_[i].alpha = 255;
         slots_[i].label = Format("C%d", i + 1);
@@ -133,7 +135,7 @@ void UiColorPicker::Impl::BuildTree()
         navigation_.Add(page_button_[i]).Fixed(DPI(76));
     navigation_.AddSpacer(1);
     navigation_.Add(current_preview_).Fixed(DPI(42));
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         slot_column_[i].Create(UiDirection::V);
         slot_column_[i]->SetGap(DPI(1));
         slot_column_[i]->Add(primary_slot_[i]).Expand(1);

@@ -83,6 +83,8 @@ file
 	UiRangeSlider.cpp,
 	UiMatrixSelector.h,
 	UiMatrixSelector.cpp,
+	UiColorMatrix.h,
+	UiColorMatrix.cpp,
 	Composites/UiCompositeSlider.h,
 	Composites/UiCompositeSlider.cpp,
 	Composites/UiCompositeToggle.h,

@@ -96,8 +96,8 @@ void UiColorPicker::SetData(const Value& value)
     }
     if(value.Is<ValueArray>()) {
         ValueArray array = value;
-        SetSlotCount(min(4, array.GetCount()));
-        for(int i = 0; i < array.GetCount() && i < 4; i++)
+        SetSlotCount(min(8, array.GetCount()));
+        for(int i = 0; i < array.GetCount() && i < 8; i++)
             if(array[i].Is<Color>())
                 SetSlotColor(i, (Color)array[i], false);
     }

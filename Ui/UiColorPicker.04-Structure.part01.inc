@@ -168,9 +168,9 @@ private:
     UiBoxLayout navigation_ { UiDirection::H };
     UiButton page_button_[PAGE_COUNT];
     UiToolButton current_preview_;
-    One<UiBoxLayout> slot_column_[4];
-    UiToolButton primary_slot_[4];
-    UiToolButton previous_slot_[4];
+    One<UiBoxLayout> slot_column_[8];
+    UiToolButton primary_slot_[8];
+    UiToolButton previous_slot_[8];
 
     UiStack page_stack_;
     UiBoxLayout color_page_ { UiDirection::V };

@@ -144,7 +144,7 @@ UiColorPicker& UiColorPicker::Impl::SetChannelMode(ChannelMode mode)
 
 UiColorPicker& UiColorPicker::Impl::SetSlotCount(int count)
 {
-    count = minmax(count, 1, 4);
+    count = minmax(count, 1, 8);
     if(slot_count_ == count)
         return owner_;
     slot_count_ = count;

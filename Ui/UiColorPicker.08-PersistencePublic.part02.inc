@@ -8,7 +8,7 @@
     swatch_style.metrics.content_margin = Rect(0, 0, 0, 0);
     swatch_style.metrics.radius = DPI(3);
     current_preview_.SetCustomStyle(swatch_style);
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         primary_slot_[i].SetCustomStyle(swatch_style);
         previous_slot_[i].SetCustomStyle(swatch_style);
     }

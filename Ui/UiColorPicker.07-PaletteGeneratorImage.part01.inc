@@ -77,7 +77,7 @@ void UiColorPicker::Impl::SyncSlots()
     current_preview_.SetIcon(MakeAlphaSwatchImage_(active.color, active.alpha, Size(DPI(34), DPI(20)), alpha_enabled_));
     current_preview_.SetIconSize(DPI(34), DPI(20));
     current_preview_.Tip(Format("Current: %s", FormatHex8(active.color, active.alpha)));
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 8; i++) {
         bool visible = i < slot_count_;
         slot_column_[i]->Show(visible);
         if(!visible)

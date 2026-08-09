@@ -28,6 +28,7 @@
     - 2026-03: documented as the public umbrella surface for release cleanup.
     - 2026-05: composite property-row controls moved under Ui/Composites while
       remaining available through this umbrella include.
+    - 2026-08: added UiColorMatrix as the reusable multi-colour field.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -75,6 +76,7 @@
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
 #include <Ui/UiMatrixSelector.h>
+#include <Ui/UiColorMatrix.h>
 #include <Ui/Composites/UiCompositeSlider.h>
 #include <Ui/Composites/UiCompositeToggle.h>
 #include <Ui/Composites/UiCompositeColor.h>
