@@ -32,9 +32,10 @@ public:
     UiRangeSliderBuilder()
         : BuilderWindowBase("UiRangeSliderDemo",
                             "U++ UiRangeSlider Builder",
-                            "Inspect a two-handle interval selector using the standard UiSlider theme and one shared thumb style.")
+                            "Inspect a two-handle interval selector and its direct-entry UiRangeSliderEdit composition, using the standard UiSlider theme.")
     {
         Preview().Add(range_);
+        Preview().Add(range_edit_);
 
         AddStateRow(StateBox(), state_domain_row_, state_domain_label_, state_domain_value_, "Domain");
         AddStateRow(StateBox(), state_values_row_, state_values_label_, state_values_value_, "Selection");
@@ -99,8 +100,10 @@ public:
         tick_count_row_.WhenChanging = ticks_apply;
         tick_count_row_.WhenAction = ticks_apply;
 
-        range_.WhenChanging = [=] { SyncFromControl(); };
-        range_.WhenAction = [=] { SyncFromControl(); };
+        range_.WhenChanging = [=] { SyncFromSlider(); };
+        range_.WhenAction = [=] { SyncFromSlider(); };
+        range_edit_.WhenChanging = [=] { SyncFromEdit(); };
+        range_edit_.WhenAction = [=] { SyncFromEdit(); };
 
         FinishInit();
         RefreshFromConfig();
@@ -116,16 +119,26 @@ protected:
     {
         Rect c = Preview().GetCanvasRect();
         if(cfg_.orientation == 0) {
-            int w = max(DPI(260), c.GetWidth() - DPI(100));
+            int w = max(DPI(280), c.GetWidth() - DPI(60));
+            int mid = c.CenterPoint().y;
+            int block = DPI(78) + DPI(14) + DPI(46);
+            int top = mid - block / 2;
             range_.SetRect(c.left + (c.GetWidth() - w) / 2,
-                           c.CenterPoint().y - DPI(42),
-                           w, DPI(84));
+                           top,
+                           w, DPI(78));
+            range_edit_.SetRect(c.left + (c.GetWidth() - w) / 2,
+                                top + DPI(78) + DPI(14),
+                                w, DPI(46));
         }
         else {
-            int h = max(DPI(260), c.GetHeight() - DPI(100));
-            range_.SetRect(c.CenterPoint().x - DPI(42),
-                           c.top + (c.GetHeight() - h) / 2,
-                           DPI(84), h);
+            int h = max(DPI(300), c.GetHeight() - DPI(100));
+            int mid = c.CenterPoint().y;
+            int top = mid - h / 2;
+            int slider_w = DPI(84);
+            int edit_w = max(DPI(260), c.GetWidth() - DPI(120));
+            int left = c.left + (c.GetWidth() - (slider_w + DPI(24) + edit_w)) / 2;
+            range_.SetRect(left, top, slider_w, h);
+            range_edit_.SetRect(left + slider_w + DPI(24), top, edit_w, h);
         }
     }
 
@@ -138,6 +151,13 @@ private:
               .SetStep(cfg_.step)
               .SetStartEnd(cfg_.lower, cfg_.upper)
               .SetTicks(cfg_.ticks, cfg_.major_ticks, 0);
+
+        range_edit_.SetDirection(cfg_.orientation == 0 ? UiDirection::H : UiDirection::V)
+                   .SetRange(0, 100)
+                   .SetStep(cfg_.step)
+                   .SetFieldWidth(DPI(92))
+                   .SetGap(DPI(14))
+                   .SetStartEnd(cfg_.lower, cfg_.upper);
 
         cfg_.lower = (int)range_.GetLowerValue();
         cfg_.upper = (int)range_.GetUpperValue();
@@ -159,14 +179,36 @@ private:
         Preview().Refresh();
     }
 
-    void SyncFromControl()
+    void SyncFromSlider()
     {
+        if(syncing_)
+            return;
         cfg_.lower = (int)range_.GetLowerValue();
         cfg_.upper = (int)range_.GetUpperValue();
+        PushConfig();
+    }
+
+    void SyncFromEdit()
+    {
+        if(syncing_)
+            return;
+        cfg_.lower = (int)range_edit_.GetLowerValue();
+        cfg_.upper = (int)range_edit_.GetUpperValue();
+        PushConfig();
+    }
+
+    void PushConfig()
+    {
+        if(syncing_)
+            return;
+        syncing_ = true;
+        range_.SetStartEnd(cfg_.lower, cfg_.upper);
+        range_edit_.SetStartEnd(cfg_.lower, cfg_.upper);
         lower_row_.Slider().SetValue(cfg_.lower);
         upper_row_.Slider().SetValue(cfg_.upper);
         lower_row_.SetValueText(AsString(cfg_.lower));
         upper_row_.SetValueText(AsString(cfg_.upper));
+        syncing_ = false;
         SyncStateAndCode();
     }
 
@@ -200,7 +242,9 @@ private:
     }
 
     RangeSliderConfig cfg_;
+    bool syncing_ = false;
     UiRangeSlider range_;
+    UiRangeSliderEdit range_edit_;
 
     UiBoxLayout state_domain_row_ { UiDirection::H };
     UiLabel state_domain_label_;

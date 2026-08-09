@@ -5,8 +5,6 @@
 // These are intentionally outside the Ui package: production code should use
 // primitive Ui controls, UiSliderEdit, UiColorMatrix, and PropertyEditor.
 
-﻿#ifndef _Ui_DemoSliderRow_h_
-
 /*
     Author
     - C Edwards (dodobar)
