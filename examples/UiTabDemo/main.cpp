@@ -218,11 +218,11 @@ protected:
 
 private:
     struct EnumOption { const char* label; int value; };
-    void AddColorRow(UiBoxLayout& t, UiCompositeColor& r, const char* n) { r.SetLabel(n).SetColorCount(1).ShowValue(false); t.Add(r).Fit(); }
+    void AddColorRow(UiBoxLayout& t, DemoColorRow& r, const char* n) { r.SetLabel(n).SetColorCount(1).ShowValue(false); t.Add(r).Fit(); }
     void PopulateDropdown(UiDropdown& d, const EnumOption* o, int n){ d.UseInternalModel(); d.Clear(); for(int i=0;i<n;i++) d.Add(o[i].label,o[i].value);}    
-    void InitColorRow(UiCompositeColor& r, Color c){ r.SetColor(0,c); }
-    void InitSlider(UiCompositeSlider& r, int value, int lo, int hi){ r.Slider().SetRange(lo,hi).SetStep(1).SetValue(value); }
-    void WireSlider(UiCompositeSlider& r, int& field)
+    void InitColorRow(DemoColorRow& r, Color c){ r.SetColor(0,c); }
+    void InitSlider(DemoSliderRow& r, int value, int lo, int hi){ r.Slider().SetRange(lo,hi).SetStep(1).SetValue(value); }
+    void WireSlider(DemoSliderRow& r, int& field)
     {
         auto apply = [this, &r, &field] {
             field = (int)r.Slider().GetValue();
@@ -231,8 +231,8 @@ private:
         r.WhenChanging = apply;
         r.WhenAction = apply;
     }
-    void WireToggle(UiCompositeToggle& r, bool& field){ r.Toggle().WhenAction = [this, &r, &field] { field = r.Toggle().IsOn(); RefreshFromConfig(); }; }
-    void WireColor(UiCompositeColor& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetColor(0); RefreshFromConfig(); }; }
+    void WireToggle(DemoToggleRow& r, bool& field){ r.Toggle().WhenAction = [this, &r, &field] { field = r.Toggle().IsOn(); RefreshFromConfig(); }; }
+    void WireColor(DemoColorRow& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetColor(0); RefreshFromConfig(); }; }
 
     UiTab::Style BuildStyle() const
     {
@@ -328,9 +328,9 @@ private:
     UiBoxLayout visual_row_box_ { UiBoxLayout::Direction::H }, placement_row_box_ { UiBoxLayout::Direction::H }, span_row_box_ { UiBoxLayout::Direction::H };
     UiLabel visual_label_, placement_label_, span_label_;
     UiDropdown visual_drop_, placement_drop_, span_drop_;
-    UiCompositeSlider tab_extent_row_, item_spacing_row_, body_gap_row_, padding_x_row_, padding_y_row_, inset_x_row_, inset_y_row_, content_gap_row_, icon_size_row_, affordance_gap_row_, min_main_row_, indicator_thickness_row_, active_frame_width_row_, tab_radius_row_, open_radius_row_;
-    UiCompositeToggle fill_tabs_row_, active_body_face_row_, close_buttons_row_, drag_handles_row_, drag_reorder_row_;
-    UiCompositeColor body_face_row_, body_frame_row_, body_text_row_, tab_face_row_, tab_frame_row_, tab_text_row_;
+    DemoSliderRow tab_extent_row_, item_spacing_row_, body_gap_row_, padding_x_row_, padding_y_row_, inset_x_row_, inset_y_row_, content_gap_row_, icon_size_row_, affordance_gap_row_, min_main_row_, indicator_thickness_row_, active_frame_width_row_, tab_radius_row_, open_radius_row_;
+    DemoToggleRow fill_tabs_row_, active_body_face_row_, close_buttons_row_, drag_handles_row_, drag_reorder_row_;
+    DemoColorRow body_face_row_, body_frame_row_, body_text_row_, tab_face_row_, tab_frame_row_, tab_text_row_;
 };
 
 }

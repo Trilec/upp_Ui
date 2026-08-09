@@ -205,8 +205,8 @@ private:
     UiBoxLayout case_row_ { UiBoxLayout::Direction::H };
     UiLabel case_label_;
     UiDropdown case_drop_;
-    UiCompositeEdit sample_row_;
-    UiCompositeToggle live_validation_row_, success_flash_row_;
+    DemoEditRow sample_row_;
+    DemoToggleRow live_validation_row_, success_flash_row_;
 };
 
 }

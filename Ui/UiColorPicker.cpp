@@ -1,8 +1,0 @@
-#include "UiColorPicker.01-Foundation.inc"
-#include "UiColorPicker.02-ColorControls.inc"
-#include "UiColorPicker.03-ImageControls.inc"
-#include "UiColorPicker.04-Structure.inc"
-#include "UiColorPicker.05-Events.inc"
-#include "UiColorPicker.06-SyncState.inc"
-#include "UiColorPicker.07-PaletteGeneratorImage.inc"
-#include "UiColorPicker.08-PersistencePublic.inc"

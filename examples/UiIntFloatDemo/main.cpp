@@ -206,8 +206,8 @@ private:
     UiBoxLayout state_int_row_ { UiBoxLayout::Direction::H }, state_float_row_ { UiBoxLayout::Direction::H }, state_range_row_ { UiBoxLayout::Direction::H }, state_spin_row_ { UiBoxLayout::Direction::H };
     UiLabel state_int_label_, state_int_value_, state_float_label_, state_float_value_, state_range_label_, state_range_value_, state_spin_label_, state_spin_value_;
 
-    UiCompositeSlider int_value_row_, int_min_row_, int_max_row_, int_step_row_, float_value_row_, float_step_row_, float_precision_row_;
-    UiCompositeToggle int_spin_row_, int_loop_row_, float_spin_row_;
+    DemoSliderRow int_value_row_, int_min_row_, int_max_row_, int_step_row_, float_value_row_, float_step_row_, float_precision_row_;
+    DemoToggleRow int_spin_row_, int_loop_row_, float_spin_row_;
 };
 
 }

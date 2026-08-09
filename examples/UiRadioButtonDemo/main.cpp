@@ -169,12 +169,12 @@ protected:
 
 private:
     struct EnumOption { const char* label; int value; };
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
-    void InitColorRow(UiCompositeColor& row, Color c) { row.SetColor(0, c); }
+    void InitColorRow(DemoColorRow& row, Color c) { row.SetColor(0, c); }
     void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
     {
         drop.UseInternalModel();
@@ -259,9 +259,9 @@ private:
     UiBoxLayout visual_row_box_ { UiBoxLayout::Direction::H }, side_row_box_ { UiBoxLayout::Direction::H };
     UiLabel visual_label_, side_label_;
     UiDropdown visual_drop_, side_drop_;
-    UiCompositeSlider indicator_size_row_, indicator_gap_row_, indicator_radius_row_, body_radius_row_, body_frame_width_row_;
-    UiCompositeToggle body_face_row_, body_frame_row_, enabled_row_;
-    UiCompositeColor text_row_, body_face_color_row_, body_frame_color_row_, indicator_face_row_, indicator_frame_row_;
+    DemoSliderRow indicator_size_row_, indicator_gap_row_, indicator_radius_row_, body_radius_row_, body_frame_width_row_;
+    DemoToggleRow body_face_row_, body_frame_row_, enabled_row_;
+    DemoColorRow text_row_, body_face_color_row_, body_frame_color_row_, indicator_face_row_, indicator_frame_row_;
 };
 
 }

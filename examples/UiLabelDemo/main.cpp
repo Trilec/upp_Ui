@@ -226,7 +226,7 @@ protected:
 private:
     struct EnumOption { const char* label; int value; };
 
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
@@ -475,9 +475,9 @@ private:
     UiLabel text_label_, align_h_label_, align_v_label_, icon_side_label_, span_text_label_;
     UiLineEdit text_edit_, span_text_edit_;
     UiDropdown align_h_drop_, align_v_drop_, icon_side_drop_;
-    UiCompositeSlider gap_row_, icon_size_row_, margin_x_row_, margin_y_row_, radius_row_, frame_width_row_;
-    UiCompositeToggle rich_mode_row_, face_row_, frame_row_, selectable_row_, underline_row_, icon_row_, span_bold_row_, span_italic_row_, span_underline_row_, span_color_enabled_row_;
-    UiCompositeColor span_color_row_;
+    DemoSliderRow gap_row_, icon_size_row_, margin_x_row_, margin_y_row_, radius_row_, frame_width_row_;
+    DemoToggleRow rich_mode_row_, face_row_, frame_row_, selectable_row_, underline_row_, icon_row_, span_bold_row_, span_italic_row_, span_underline_row_, span_color_enabled_row_;
+    DemoColorRow span_color_row_;
     UiButton add_span_button_, update_span_button_, newline_button_, delete_span_button_, clear_spans_button_;
     ArrayCtrl span_list_;
 };

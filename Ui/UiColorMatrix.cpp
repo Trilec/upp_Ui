@@ -1,5 +1,5 @@
 #include <Ui/UiColorMatrix.h>
-#include <Ui/UiColorPicker.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDraw.h>
 

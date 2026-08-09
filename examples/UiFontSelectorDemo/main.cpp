@@ -932,8 +932,8 @@ private:
     UiListModel state_model_;
     UiBoxLayout property_box_ { UiDirection::V };
 
-    UiCompositeSlider size_row_;
-    UiCompositeToggle bold_row_, underline_row_;
+    DemoSliderRow size_row_;
+    DemoToggleRow bold_row_, underline_row_;
     UiBoxLayout text_row_ { UiDirection::H };
     UiLabel text_label_;
     UiMultiEdit text_edit_;

@@ -220,8 +220,8 @@ private:
     UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_rows_row_ { UiBoxLayout::Direction::H }, state_cols_row_ { UiBoxLayout::Direction::H }, state_cell_row_ { UiBoxLayout::Direction::H };
     UiLabel state_theme_label_, state_theme_value_, state_rows_label_, state_rows_value_, state_cols_label_, state_cols_value_, state_cell_label_, state_cell_value_;
 
-    UiCompositeSlider row_height_row_, header_height_row_, width_row_;
-    UiCompositeToggle row_headers_row_, col_headers_row_, grid_row_, sort_row_;
+    DemoSliderRow row_height_row_, header_height_row_, width_row_;
+    DemoToggleRow row_headers_row_, col_headers_row_, grid_row_, sort_row_;
     UiBoxLayout action_row_ { UiBoxLayout::Direction::H };
     UiButton copy_button2_, mutate_button_;
 };

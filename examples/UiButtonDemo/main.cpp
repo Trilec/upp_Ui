@@ -505,20 +505,20 @@ public:
     }
 
 private:
-    void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
+    void AddSliderRow(UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial)
     {
         row.SetLabel(name).SetValueText(initial).SetValueSelectable(false);
         row.SetValueWidth(DPI(80));
         target.Add(row).Fit();
     }
 
-    void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
+    void AddToggleRow(UiBoxLayout& target, DemoToggleRow& row, const char* name)
     {
         row.SetLabel(name).ShowValue(false);
         target.Add(row).Fit();
     }
 
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
@@ -912,7 +912,7 @@ private:
     UiBoxLayout content_box_ { UiDirection::V };
     UiBoxLayout appearance_box_ { UiDirection::V };
     UiBoxLayout shadow_box_ { UiDirection::V };
-    UiCompositeSlider min_width_row_, min_height_row_, radius_row_, frame_width_row_, padding_x_row_, padding_y_row_, icon_gap_row_, icon_width_row_, icon_height_row_;
+    DemoSliderRow min_width_row_, min_height_row_, radius_row_, frame_width_row_, padding_x_row_, padding_y_row_, icon_gap_row_, icon_width_row_, icon_height_row_;
     UiBoxLayout icon_layout_row_box_ { UiDirection::H };
     UiLabel icon_layout_label_;
     UiDropdown icon_layout_drop_;
@@ -932,13 +932,13 @@ private:
     UiBoxLayout icon_mode_row_box_ { UiDirection::H };
     UiLabel icon_mode_label_;
     UiDropdown icon_mode_drop_;
-    UiCompositeToggle enabled_row_, checkable_row_, checked_row_, underline_row_;
-    UiCompositeSlider underline_width_row_, underline_offset_row_;
-    UiCompositeToggle fill_row_, frame_row_;
-    UiCompositeColor face_color_row_, frame_color_row_, text_color_row_, icon_color_row_;
-    UiCompositeToggle shadow_row_;
-    UiCompositeColor shadow_color_row_;
-    UiCompositeSlider shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
+    DemoToggleRow enabled_row_, checkable_row_, checked_row_, underline_row_;
+    DemoSliderRow underline_width_row_, underline_offset_row_;
+    DemoToggleRow fill_row_, frame_row_;
+    DemoColorRow face_color_row_, frame_color_row_, text_color_row_, icon_color_row_;
+    DemoToggleRow shadow_row_;
+    DemoColorRow shadow_color_row_;
+    DemoSliderRow shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
     UiBezierCurveField shadow_curve_field_;
     UiBoxLayout shadow_curve_preset_row_box_ { UiDirection::H };
     UiLabel shadow_curve_preset_label_;

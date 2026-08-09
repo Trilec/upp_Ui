@@ -1,6 +1,6 @@
 #include <Core/Core.h>
 #include <Draw/Draw.h>
-#include <Ui/UiColorPickerPaletteLab.h>
+#include <Ui/ColorPicker/UiColorPickerPaletteLab.h>
 
 using namespace Upp;
 using namespace Upp::UiColorPickerPaletteLab;

@@ -1,7 +1,7 @@
 #include "PropertyValueEditors.h"
 
 #include <cmath>
-#include <Ui/UiColorPicker.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Ui/UiSliderEdit.h>

@@ -2,6 +2,7 @@
 #define _examples_BuilderDemoSupport_h_
 
 #include <Ui/Ui.h>
+#include "DemoPropertyRows.h"
 
 namespace BuilderDemoSupport {
 using namespace Upp;
@@ -544,14 +545,14 @@ inline void AddEditRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label
     target.Add(row_box).Fit();
 }
 
-inline void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
+inline void AddSliderRow(UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial)
 {
     row.SetLabel(name).SetValueText(initial).SetValueSelectable(false);
     row.SetValueWidth(DPI(80));
     target.Add(row).Fit();
 }
 
-inline void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
+inline void AddToggleRow(UiBoxLayout& target, DemoToggleRow& row, const char* name)
 {
     row.SetLabel(name).ShowValue(false);
     target.Add(row).Fit();

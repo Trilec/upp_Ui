@@ -195,16 +195,16 @@ protected:
 
 private:
     struct EnumOption { const char* label; int value; };
-    void AddColorRow(UiBoxLayout& t, UiCompositeColor& r, const char* n) { r.SetLabel(n).SetColorCount(1).ShowValue(false); t.Add(r).Fit(); }
+    void AddColorRow(UiBoxLayout& t, DemoColorRow& r, const char* n) { r.SetLabel(n).SetColorCount(1).ShowValue(false); t.Add(r).Fit(); }
     void PopulateDropdown(UiDropdown& d, const EnumOption* o, int n){ d.UseInternalModel(); d.Clear(); for(int i=0;i<n;i++) d.Add(o[i].label,o[i].value);}    
-    void InitColorRow(UiCompositeColor& r, Color c){ r.SetColor(0,c); }
-    void InitSlider(UiCompositeSlider& r, int value, int lo, int hi){ r.Slider().SetRange(lo,hi).SetStep(1).SetValue(value); }
-    void ApplySliderStyle(const UiLabel::Style& body, const UiLabel::Style& value){ Vector<UiCompositeSlider*> rows = { &row_height_row_, &bar_height_row_, &icon_size_row_, &check_size_row_, &arrow_size_row_, &left_padding_row_, &right_padding_row_, &content_gap_row_, &item_spacing_row_, &right_gap_row_, &popup_padding_row_, &popup_min_width_row_, &popup_max_height_row_, &submenu_overlap_row_ }; for(auto* r : rows) r->SetLabelStyle(body).SetValueStyle(value); }
-    void ApplyToggleStyle(const UiLabel::Style& body){ Vector<UiCompositeToggle*> rows = { &show_icons_row_, &show_checks_row_, &show_descriptions_row_, &show_shortcuts_row_, &show_separators_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
-    void ApplyColorStyle(const UiLabel::Style& body){ Vector<UiCompositeColor*> rows = { &popup_bg_row_, &bar_bg_row_, &separator_row_, &item_ink_row_, &disabled_ink_row_, &right_ink_row_, &hot_bg_row_, &hot_frame_row_, &pressed_bg_row_, &pressed_frame_row_, &active_bar_bg_row_, &check_color_row_, &arrow_color_row_, &shadow_color_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
-    void WireSlider(UiCompositeSlider& r, int& field){ r.WhenAction = [this, &r, &field] { field = (int)r.Slider().GetValue(); RefreshFromConfig(); }; }
-    void WireToggle(UiCompositeToggle& r, bool& field){ r.Toggle().WhenAction = [this, &r, &field] { field = r.Toggle().IsOn(); RefreshFromConfig(); }; }
-    void WireColor(UiCompositeColor& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetColor(0); RefreshFromConfig(); }; }
+    void InitColorRow(DemoColorRow& r, Color c){ r.SetColor(0,c); }
+    void InitSlider(DemoSliderRow& r, int value, int lo, int hi){ r.Slider().SetRange(lo,hi).SetStep(1).SetValue(value); }
+    void ApplySliderStyle(const UiLabel::Style& body, const UiLabel::Style& value){ Vector<DemoSliderRow*> rows = { &row_height_row_, &bar_height_row_, &icon_size_row_, &check_size_row_, &arrow_size_row_, &left_padding_row_, &right_padding_row_, &content_gap_row_, &item_spacing_row_, &right_gap_row_, &popup_padding_row_, &popup_min_width_row_, &popup_max_height_row_, &submenu_overlap_row_ }; for(auto* r : rows) r->SetLabelStyle(body).SetValueStyle(value); }
+    void ApplyToggleStyle(const UiLabel::Style& body){ Vector<DemoToggleRow*> rows = { &show_icons_row_, &show_checks_row_, &show_descriptions_row_, &show_shortcuts_row_, &show_separators_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
+    void ApplyColorStyle(const UiLabel::Style& body){ Vector<DemoColorRow*> rows = { &popup_bg_row_, &bar_bg_row_, &separator_row_, &item_ink_row_, &disabled_ink_row_, &right_ink_row_, &hot_bg_row_, &hot_frame_row_, &pressed_bg_row_, &pressed_frame_row_, &active_bar_bg_row_, &check_color_row_, &arrow_color_row_, &shadow_color_row_ }; for(auto* r : rows) r->SetLabelStyle(body); }
+    void WireSlider(DemoSliderRow& r, int& field){ r.WhenAction = [this, &r, &field] { field = (int)r.Slider().GetValue(); RefreshFromConfig(); }; }
+    void WireToggle(DemoToggleRow& r, bool& field){ r.Toggle().WhenAction = [this, &r, &field] { field = r.Toggle().IsOn(); RefreshFromConfig(); }; }
+    void WireColor(DemoColorRow& r, Color& field){ r.WhenAction = [this, &r, &field] { field = r.GetColor(0); RefreshFromConfig(); }; }
 
     String IconNameFor(const Image& icon) const
     {
@@ -412,9 +412,9 @@ private:
     UiLabel state_theme_label_, state_theme_value_, state_dataset_label_, state_dataset_value_, state_items_label_, state_items_value_, state_action_label_, state_action_value_, state_request_label_, state_request_value_;
     UiBoxLayout dataset_row_box_ { UiBoxLayout::Direction::H };
     UiLabel dataset_label_; UiDropdown dataset_drop_;
-    UiCompositeSlider row_height_row_, bar_height_row_, icon_size_row_, check_size_row_, arrow_size_row_, left_padding_row_, right_padding_row_, content_gap_row_, item_spacing_row_, right_gap_row_, popup_padding_row_, popup_min_width_row_, popup_max_height_row_, submenu_overlap_row_;
-    UiCompositeToggle show_icons_row_, show_checks_row_, show_descriptions_row_, show_shortcuts_row_, show_separators_row_;
-    UiCompositeColor popup_bg_row_, bar_bg_row_, separator_row_, item_ink_row_, disabled_ink_row_, right_ink_row_, hot_bg_row_, hot_frame_row_, pressed_bg_row_, pressed_frame_row_, active_bar_bg_row_, check_color_row_, arrow_color_row_, shadow_color_row_;
+    DemoSliderRow row_height_row_, bar_height_row_, icon_size_row_, check_size_row_, arrow_size_row_, left_padding_row_, right_padding_row_, content_gap_row_, item_spacing_row_, right_gap_row_, popup_padding_row_, popup_min_width_row_, popup_max_height_row_, submenu_overlap_row_;
+    DemoToggleRow show_icons_row_, show_checks_row_, show_descriptions_row_, show_shortcuts_row_, show_separators_row_;
+    DemoColorRow popup_bg_row_, bar_bg_row_, separator_row_, item_ink_row_, disabled_ink_row_, right_ink_row_, hot_bg_row_, hot_frame_row_, pressed_bg_row_, pressed_frame_row_, active_bar_bg_row_, check_color_row_, arrow_color_row_, shadow_color_row_;
 };
 
 }

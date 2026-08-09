@@ -745,9 +745,9 @@ private:
     UiListModel& ActiveModel();
     const UiListModel& ActiveModel() const;
 
-    void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial);
-    void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name);
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name);
+    void AddSliderRow(UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial);
+    void AddToggleRow(UiBoxLayout& target, DemoToggleRow& row, const char* name);
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name);
     void AddDropdownRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiDropdown& drop, const char* name);
     void AddEditRow(UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiLineEdit& edit, const char* name);
     void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count);
@@ -798,9 +798,9 @@ private:
     UiLineEdit item_text_edit_, item_desc_edit_, item_right_edit_;
     UiBoxLayout data_actions_row_ { UiBoxLayout::Direction::H };
     UiButton new_item_button_, save_item_button_, delete_item_button_;
-    UiCompositeToggle item_checked_row_;
+    DemoToggleRow item_checked_row_;
 
-    UiCompositeSlider min_width_row_, min_height_row_, radius_row_, frame_width_row_, margin_x_row_, margin_y_row_,
+    DemoSliderRow min_width_row_, min_height_row_, radius_row_, frame_width_row_, margin_x_row_, margin_y_row_,
                       content_gap_row_, indicator_size_row_, popup_item_height_row_, item_spacing_row_, popup_max_items_row_,
                       popup_max_height_row_, popup_space_row_, popup_frame_width_row_, popup_radius_row_,
                       shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
@@ -814,10 +814,10 @@ private:
                popup_check_unchecked_icon_drop_, shadow_curve_preset_drop_, align_h_drop_, align_v_drop_;
     UiBoxLayout align_h_row_box_ { UiBoxLayout::Direction::H }, align_v_row_box_ { UiBoxLayout::Direction::H };
     UiLabel align_h_label_, align_v_label_;
-    UiCompositeToggle enabled_row_, multi_select_row_, show_indicator_row_, popup_scrollbar_row_,
+    DemoToggleRow enabled_row_, multi_select_row_, show_indicator_row_, popup_scrollbar_row_,
                       selection_badge_row_, check_icons_row_, use_drag_row_, drag_handle_row_,
                       popup_marker_row_, popup_auto_close_row_, popup_pinned_row_, popup_use_main_skin_row_, shadow_row_;
-    UiCompositeColor face_color_row_, frame_color_row_, text_color_row_, icon_color_row_,
+    DemoColorRow face_color_row_, frame_color_row_, text_color_row_, icon_color_row_,
                      popup_background_row_, popup_frame_color_row_, shadow_color_row_;
     UiBezierCurveField shadow_curve_field_;
 };
@@ -978,20 +978,20 @@ void UiDropdownDemoWindow::BuildShell()
     code_panel_.Code().SetSelectable(true);
 }
 
-void UiDropdownDemoWindow::AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
+void UiDropdownDemoWindow::AddSliderRow(UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial)
 {
     row.SetLabel(name).SetValueText(initial).SetValueSelectable(false);
     row.SetValueWidth(DPI(80));
     target.Add(row).Fit();
 }
 
-void UiDropdownDemoWindow::AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
+void UiDropdownDemoWindow::AddToggleRow(UiBoxLayout& target, DemoToggleRow& row, const char* name)
 {
     row.SetLabel(name).ShowValue(false);
     target.Add(row).Fit();
 }
 
-void UiDropdownDemoWindow::AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+void UiDropdownDemoWindow::AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
 {
     row.SetLabel(name).SetColorCount(1).ShowValue(false);
     target.Add(row).Fit();

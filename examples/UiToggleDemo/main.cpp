@@ -948,40 +948,40 @@ private:
     UiBoxLayout appearance_box_ { UiDirection::V };
     UiBoxLayout shadow_box_ { UiDirection::V };
 
-    UiCompositeSlider track_width_row_;
-    UiCompositeSlider track_height_row_;
+    DemoSliderRow track_width_row_;
+    DemoSliderRow track_height_row_;
     UiBoxLayout direction_row_box_ { UiDirection::H };
     UiLabel direction_label_;
     UiDropdown direction_drop_;
-    UiCompositeToggle on_row_;
-    UiCompositeToggle enabled_row_;
+    DemoToggleRow on_row_;
+    DemoToggleRow enabled_row_;
 
-    UiCompositeSlider thumb_width_row_;
-    UiCompositeSlider thumb_height_row_;
-    UiCompositeSlider track_radius_row_;
-    UiCompositeSlider thumb_radius_row_;
-    UiCompositeSlider thumb_inset_row_;
-    UiCompositeToggle track_fill_row_;
-    UiCompositeToggle track_frame_row_;
-    UiCompositeSlider track_frame_width_row_;
-    UiCompositeColor track_fill_color_row_;
-    UiCompositeColor track_frame_color_row_;
-    UiCompositeToggle thumb_fill_row_;
-    UiCompositeToggle thumb_frame_row_;
-    UiCompositeSlider thumb_frame_width_row_;
-    UiCompositeColor thumb_fill_color_row_;
-    UiCompositeColor thumb_frame_color_row_;
+    DemoSliderRow thumb_width_row_;
+    DemoSliderRow thumb_height_row_;
+    DemoSliderRow track_radius_row_;
+    DemoSliderRow thumb_radius_row_;
+    DemoSliderRow thumb_inset_row_;
+    DemoToggleRow track_fill_row_;
+    DemoToggleRow track_frame_row_;
+    DemoSliderRow track_frame_width_row_;
+    DemoColorRow track_fill_color_row_;
+    DemoColorRow track_frame_color_row_;
+    DemoToggleRow thumb_fill_row_;
+    DemoToggleRow thumb_frame_row_;
+    DemoSliderRow thumb_frame_width_row_;
+    DemoColorRow thumb_fill_color_row_;
+    DemoColorRow thumb_frame_color_row_;
 
-    UiCompositeToggle shadow_toggle_row_;
-    UiCompositeColor shadow_color_row_;
-    UiCompositeSlider shadow_distance_row_;
-    UiCompositeSlider shadow_offset_x_row_;
-    UiCompositeSlider shadow_offset_y_row_;
+    DemoToggleRow shadow_toggle_row_;
+    DemoColorRow shadow_color_row_;
+    DemoSliderRow shadow_distance_row_;
+    DemoSliderRow shadow_offset_x_row_;
+    DemoSliderRow shadow_offset_y_row_;
     UiBoxLayout shadow_curve_preset_row_box_ { UiDirection::H };
     UiLabel shadow_curve_preset_label_;
     UiDropdown shadow_curve_preset_drop_;
     UiBezierCurveField shadow_curve_field_;
-    UiCompositeSlider shadow_alpha_row_;
+    DemoSliderRow shadow_alpha_row_;
 };
 
 }

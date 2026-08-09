@@ -186,8 +186,8 @@ private:
     UiBoxLayout state_mode_row_ { UiBoxLayout::Direction::H }, state_rows_row_ { UiBoxLayout::Direction::H }, state_width_row_ { UiBoxLayout::Direction::H };
     UiLabel state_mode_label_, state_mode_value_, state_rows_label_, state_rows_value_, state_width_label_, state_width_value_;
 
-    UiCompositeSlider rows_row_, content_width_row_;
-    UiCompositeToggle auto_panel_row_, vertical_panel_row_, horizontal_panel_row_, none_panel_row_;
+    DemoSliderRow rows_row_, content_width_row_;
+    DemoToggleRow auto_panel_row_, vertical_panel_row_, horizontal_panel_row_, none_panel_row_;
 };
 
 }

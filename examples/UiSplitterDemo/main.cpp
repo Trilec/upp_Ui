@@ -213,7 +213,7 @@ protected:
     }
 
 private:
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
@@ -245,17 +245,17 @@ private:
             drop.Add(options[i].label, options[i].value);
     }
 
-    void InitSlider(UiCompositeSlider& row, int value, int lo, int hi)
+    void InitSlider(DemoSliderRow& row, int value, int lo, int hi)
     {
         row.Slider().SetRange(lo, hi).SetStep(1).SetValue(value);
     }
 
-    void InitColor(UiCompositeColor& row, Color c)
+    void InitColor(DemoColorRow& row, Color c)
     {
         row.SetColor(0, c);
     }
 
-    void WireSlider(UiCompositeSlider& row, int& field)
+    void WireSlider(DemoSliderRow& row, int& field)
     {
         auto apply = [this, &row, &field] {
             field = (int)row.Slider().GetValue();
@@ -275,7 +275,7 @@ private:
         position_row_.WhenAction = apply;
     }
 
-    void WireToggle(UiCompositeToggle& row, bool& field)
+    void WireToggle(DemoToggleRow& row, bool& field)
     {
         row.Toggle().WhenAction = [this, &row, &field] {
             field = row.Toggle().IsOn();
@@ -283,7 +283,7 @@ private:
         };
     }
 
-    void WireColor(UiCompositeColor& row, Color& field)
+    void WireColor(DemoColorRow& row, Color& field)
     {
         row.WhenAction = [this, &row, &field] {
             field = row.GetColor(0);
@@ -471,9 +471,9 @@ private:
     UiBoxLayout orientation_row_ { UiDirection::H };
     UiLabel orientation_label_;
     UiDropdown orientation_drop_;
-    UiCompositeSlider position_row_, min_a_row_, min_b_row_, hit_width_row_, track_thickness_row_, track_inset_row_, thumb_width_row_, thumb_height_row_, thumb_inset_row_, thumb_radius_row_, thumb_frame_width_row_, grip_count_row_, grip_dot_row_, grip_gap_row_;
-    UiCompositeToggle thumb_face_row_, thumb_frame_row_, show_grip_row_;
-    UiCompositeColor track_color_row_, thumb_face_color_row_, thumb_frame_color_row_, thumb_ink_color_row_, pane_a_color_row_, pane_b_color_row_;
+    DemoSliderRow position_row_, min_a_row_, min_b_row_, hit_width_row_, track_thickness_row_, track_inset_row_, thumb_width_row_, thumb_height_row_, thumb_inset_row_, thumb_radius_row_, thumb_frame_width_row_, grip_count_row_, grip_dot_row_, grip_gap_row_;
+    DemoToggleRow thumb_face_row_, thumb_frame_row_, show_grip_row_;
+    DemoColorRow track_color_row_, thumb_face_color_row_, thumb_frame_color_row_, thumb_ink_color_row_, pane_a_color_row_, pane_b_color_row_;
 };
 
 }

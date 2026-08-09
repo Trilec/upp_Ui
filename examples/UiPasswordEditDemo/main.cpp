@@ -190,8 +190,8 @@ private:
     UiLabel text_label_, placeholder_label_, mask_label_;
     UiLineEdit text_edit_, placeholder_edit_;
     UiDropdown mask_drop_;
-    UiCompositeSlider radius_row_, frame_width_row_;
-    UiCompositeToggle enabled_row_, readonly_row_, visibility_row_, plain_row_;
+    DemoSliderRow radius_row_, frame_width_row_;
+    DemoToggleRow enabled_row_, readonly_row_, visibility_row_, plain_row_;
 };
 
 }

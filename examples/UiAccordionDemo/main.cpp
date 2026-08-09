@@ -298,11 +298,11 @@ private:
     UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_open_row_ { UiBoxLayout::Direction::H }, state_chevron_row_ { UiBoxLayout::Direction::H }, state_drag_row_ { UiBoxLayout::Direction::H };
     UiLabel state_theme_label_, state_theme_value_, state_open_label_, state_open_value_, state_chevron_label_, state_chevron_value_, state_drag_label_, state_drag_value_;
 
-    UiCompositeSlider header_row_, gap_row_, chevron_size_row_, chevron_gap_row_, radius_row_;
+    DemoSliderRow header_row_, gap_row_, chevron_size_row_, chevron_gap_row_, radius_row_;
     UiBoxLayout side_row_box_ { UiBoxLayout::Direction::H }, drag_side_row_box_ { UiBoxLayout::Direction::H }, drag_glyph_row_box_ { UiBoxLayout::Direction::H }, action_row_ { UiBoxLayout::Direction::H };
     UiLabel side_label_, drag_side_label_, drag_glyph_label_;
     UiDropdown side_drop_, drag_side_drop_, drag_glyph_drop_;
-    UiCompositeToggle single_row_, enforce_row_, chevron_row_, animation_row_, drag_row_, drag_handle_row_;
+    DemoToggleRow single_row_, enforce_row_, chevron_row_, animation_row_, drag_row_, drag_handle_row_;
     UiButton open_all_btn_, close_all_btn_;
 };
 

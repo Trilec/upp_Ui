@@ -15,8 +15,8 @@
 */
 #include "../BuilderDemoSupport.h"
 #include <Ui/UiBreadcrumbs.h>
-#include <Ui/Composites/UiCompositeDropdown.h>
-#include <Ui/Composites/UiCompositeLabel.h>
+#include <Ui/Composites/DemoDropdownRow.h>
+#include <Ui/Composites/DemoLabelRow.h>
 
 using namespace Upp;
 using namespace BuilderDemoSupport;
@@ -150,19 +150,19 @@ public:
     }
 
 private:
-    void AddStateValue(UiBoxLayout& target, UiCompositeLabel& row, const char *name)
+    void AddStateValue(UiBoxLayout& target, DemoLabelRow& row, const char *name)
     {
         row.SetLabel(name).SetValueRole(UiRole::Accent);
         target.Add(row).Fit();
     }
 
-    void AddDropdownComposite(UiBoxLayout& target, UiCompositeDropdown& row, const char *name)
+    void AddDropdownComposite(UiBoxLayout& target, DemoDropdownRow& row, const char *name)
     {
         row.SetLabel(name).SetDropdownRole(UiRole::Accent);
         target.Add(row).Fit();
     }
 
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char *name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char *name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
@@ -247,9 +247,9 @@ private:
         current_underline_row_.Toggle().WhenAction = [=] { cfg_.current_underline = current_underline_row_.Toggle().IsOn(); RefreshFromConfig(); };
         face_row_.Toggle().WhenAction = [=] { cfg_.face = face_row_.Toggle().IsOn(); RefreshFromConfig(); };
         frame_row_.Toggle().WhenAction = [=] { cfg_.frame = frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        auto bind_slider = [&](UiCompositeSlider& row, int& value) {
+        auto bind_slider = [&](DemoSliderRow& row, int& value) {
             int *target = &value;
-            UiCompositeSlider *ctrl = &row;
+            DemoSliderRow *ctrl = &row;
             row.WhenAction = [=] { *target = (int)ctrl->Slider().GetValue(); RefreshFromConfig(); };
         };
         bind_slider(margin_x_row_, cfg_.margin_x);
@@ -451,7 +451,7 @@ private:
         Refresh();
     }
 
-    void SyncSlider(UiCompositeSlider& row, int value, const char *suffix)
+    void SyncSlider(DemoSliderRow& row, int value, const char *suffix)
     {
         row.Slider().SetValue(value);
         row.SetValueText(AsString(value) + suffix);
@@ -515,12 +515,12 @@ private:
     Vector<int> history_;
     int history_pos_ = -1;
 
-    UiCompositeLabel state_current_row_, state_items_row_, state_icon_row_;
+    DemoLabelRow state_current_row_, state_items_row_, state_icon_row_;
 
-    UiCompositeDropdown path_row_, current_row_, divider_row_, divider_icon_row_, path_icon_side_row_, text_role_row_, current_role_row_, font_face_row_;
-    UiCompositeToggle show_path_icon_row_, trim_on_select_row_, text_bold_row_, current_bold_row_, current_underline_row_, face_row_, frame_row_;
-    UiCompositeSlider margin_x_row_, margin_y_row_, radius_row_, frame_width_row_, divider_gap_row_, content_gap_row_, icon_size_row_, text_font_size_row_, current_font_size_row_, underline_width_row_;
-    UiCompositeColor face_color_row_, frame_color_row_, underline_color_row_;
+    DemoDropdownRow path_row_, current_row_, divider_row_, divider_icon_row_, path_icon_side_row_, text_role_row_, current_role_row_, font_face_row_;
+    DemoToggleRow show_path_icon_row_, trim_on_select_row_, text_bold_row_, current_bold_row_, current_underline_row_, face_row_, frame_row_;
+    DemoSliderRow margin_x_row_, margin_y_row_, radius_row_, frame_width_row_, divider_gap_row_, content_gap_row_, icon_size_row_, text_font_size_row_, current_font_size_row_, underline_width_row_;
+    DemoColorRow face_color_row_, frame_color_row_, underline_color_row_;
 };
 
 }

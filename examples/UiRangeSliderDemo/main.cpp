@@ -218,11 +218,11 @@ private:
     UiBoxLayout orientation_row_ { UiDirection::H };
     UiLabel orientation_label_;
     UiDropdown orientation_drop_;
-    UiCompositeSlider lower_row_;
-    UiCompositeSlider upper_row_;
-    UiCompositeSlider step_row_;
-    UiCompositeToggle ticks_row_;
-    UiCompositeSlider tick_count_row_;
+    DemoSliderRow lower_row_;
+    DemoSliderRow upper_row_;
+    DemoSliderRow step_row_;
+    DemoToggleRow ticks_row_;
+    DemoSliderRow tick_count_row_;
 };
 
 }

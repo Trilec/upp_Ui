@@ -155,16 +155,16 @@ protected:
     }
 
 private:
-    void BindSlider(UiCompositeSlider& row, int& value)
+    void BindSlider(DemoSliderRow& row, int& value)
     {
-        UiCompositeSlider* c = &row; int* target = &value;
+        DemoSliderRow* c = &row; int* target = &value;
         auto apply = [=] { *target = (int)c->Slider().GetValue(); RefreshFromConfig(); };
         row.WhenChanging = apply; row.WhenAction = apply;
     }
 
-    void BindToggle(UiCompositeToggle& row, bool& value)
+    void BindToggle(DemoToggleRow& row, bool& value)
     {
-        UiCompositeToggle* c = &row; bool* target = &value;
+        DemoToggleRow* c = &row; bool* target = &value;
         row.Toggle().SetOn(value);
         row.Toggle().WhenAction = [=] { *target = c->Toggle().IsOn(); RefreshFromConfig(); };
     }
@@ -284,11 +284,11 @@ private:
 
     UiBoxLayout preset_row_{UiDirection::H}; UiLabel preset_label_; UiDropdown preset_drop_;
     UiBoxLayout mode_row_{UiDirection::H}; UiLabel mode_label_; UiDropdown mode_drop_;
-    UiCompositeSlider width_row_, height_row_, gap_row_, cell_radius_row_, outer_radius_row_, glyph_inset_row_;
-    UiCompositeSlider pair_width_row_, pair_arrow_row_, font_size_row_, readout_gap_row_, readout_width_row_;
-    UiCompositeSlider default_index_row_, default_dash_row_, default_gap_row_;
-    UiCompositeToggle default_marker_row_, readout_row_, cell_face_row_, cell_frame_row_;
-    UiCompositeToggle readout_face_row_, readout_frame_row_, surface_row_, frame_row_, shadow_row_;
+    DemoSliderRow width_row_, height_row_, gap_row_, cell_radius_row_, outer_radius_row_, glyph_inset_row_;
+    DemoSliderRow pair_width_row_, pair_arrow_row_, font_size_row_, readout_gap_row_, readout_width_row_;
+    DemoSliderRow default_index_row_, default_dash_row_, default_gap_row_;
+    DemoToggleRow default_marker_row_, readout_row_, cell_face_row_, cell_frame_row_;
+    DemoToggleRow readout_face_row_, readout_frame_row_, surface_row_, frame_row_, shadow_row_;
 };
 
 }

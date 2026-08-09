@@ -297,8 +297,8 @@ private:
     UiLabel title_label_, subtitle_label_, copy_label2_, side_label_, title_line_length_label_, card_line_length_label_;
     UiLineEdit title_edit_, subtitle_edit_, copy_edit_;
     UiDropdown side_drop_, title_line_length_drop_, card_line_length_drop_;
-    UiCompositeSlider share_row_, size_row_, radius_row_, title_line_thickness_row_, card_line_thickness_row_;
-    UiCompositeToggle title_line_row_, card_line_row_, hover_row_, selectable_row_;
+    DemoSliderRow share_row_, size_row_, radius_row_, title_line_thickness_row_, card_line_thickness_row_;
+    DemoToggleRow title_line_row_, card_line_row_, hover_row_, selectable_row_;
 };
 
 }

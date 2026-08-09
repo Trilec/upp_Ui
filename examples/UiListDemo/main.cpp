@@ -575,10 +575,10 @@ private:
     UiDropdown item_icon_drop_;
     UiBoxLayout data_actions_row_ { UiBoxLayout::Direction::H };
     UiButton new_item_button_, save_item_button_, delete_item_button_;
-    UiCompositeToggle item_checkable_row_, item_checked_row_;
+    DemoToggleRow item_checkable_row_, item_checked_row_;
 
     UiBoxLayout behavior_box_ { UiBoxLayout::Direction::V };
-    UiCompositeToggle use_drag_row_, show_drag_handle_row_, rename_row_, multi_select_row_, show_icons_row_, show_checks_row_, show_metadata_row_, show_row_separator_row_, row_state_frame_row_, right_text_as_badge_row_;
+    DemoToggleRow use_drag_row_, show_drag_handle_row_, rename_row_, multi_select_row_, show_icons_row_, show_checks_row_, show_metadata_row_, show_row_separator_row_, row_state_frame_row_, right_text_as_badge_row_;
     UiBoxLayout role_row_box_ { UiBoxLayout::Direction::H };
     UiLabel role_label_;
     UiDropdown role_drop_;
@@ -588,15 +588,15 @@ private:
     UiBoxLayout font_face_row_box_ { UiBoxLayout::Direction::H };
     UiLabel font_face_label_;
     UiDropdown font_face_drop_;
-    UiCompositeSlider font_size_row_, row_height_row_, icon_size_row_, item_spacing_row_, check_size_row_, drag_size_row_, radius_row_, margin_x_row_, margin_y_row_, label_gap_row_, right_gap_row_, drag_gap_row_;
-    UiCompositeToggle face_enabled_row_, frame_enabled_row_, shadow_enabled_row_;
-    UiCompositeSlider frame_width_row_, shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
-    UiCompositeColor ink_color_row_, muted_ink_color_row_, disabled_ink_color_row_;
-    UiCompositeColor hot_face_color_row_, hot_frame_color_row_, hot_ink_color_row_;
-    UiCompositeColor selected_face_color_row_, selected_frame_color_row_, selected_ink_color_row_, separator_color_row_;
-    UiCompositeColor check_frame_color_row_, check_fill_color_row_, metadata_color_row_, drag_marker_color_row_;
-    UiCompositeColor badge_face_color_row_, badge_frame_color_row_, badge_ink_color_row_;
-    UiCompositeColor face_color_row_, frame_color_row_, shadow_color_row_;
+    DemoSliderRow font_size_row_, row_height_row_, icon_size_row_, item_spacing_row_, check_size_row_, drag_size_row_, radius_row_, margin_x_row_, margin_y_row_, label_gap_row_, right_gap_row_, drag_gap_row_;
+    DemoToggleRow face_enabled_row_, frame_enabled_row_, shadow_enabled_row_;
+    DemoSliderRow frame_width_row_, shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
+    DemoColorRow ink_color_row_, muted_ink_color_row_, disabled_ink_color_row_;
+    DemoColorRow hot_face_color_row_, hot_frame_color_row_, hot_ink_color_row_;
+    DemoColorRow selected_face_color_row_, selected_frame_color_row_, selected_ink_color_row_, separator_color_row_;
+    DemoColorRow check_frame_color_row_, check_fill_color_row_, metadata_color_row_, drag_marker_color_row_;
+    DemoColorRow badge_face_color_row_, badge_frame_color_row_, badge_ink_color_row_;
+    DemoColorRow face_color_row_, frame_color_row_, shadow_color_row_;
     UiBoxLayout shadow_curve_row_box_ { UiBoxLayout::Direction::H };
     UiLabel shadow_curve_label_;
     UiDropdown shadow_curve_drop_;
@@ -729,15 +729,15 @@ void UiListDemoWindow::BuildRows()
         label.SetText(name).SetCustomStyle(prop_label).NoWantFocus();
         target.Add(row_box).Fit();
     };
-    auto add_slider = [&](UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial) {
+    auto add_slider = [&](UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial) {
         row.SetLabel(name).SetValueText(initial).SetValueSelectable(false);
         target.Add(row).Fit();
     };
-    auto add_toggle = [&](UiBoxLayout& target, UiCompositeToggle& row, const char* name) {
+    auto add_toggle = [&](UiBoxLayout& target, DemoToggleRow& row, const char* name) {
         row.SetLabel(name).ShowValue(false);
         target.Add(row).Fit();
     };
-    auto add_color = [&](UiBoxLayout& target, UiCompositeColor& row, const char* name) {
+    auto add_color = [&](UiBoxLayout& target, DemoColorRow& row, const char* name) {
         row.SetLabel(name).SetValueSelectable(false).SetColorCount(1);
         target.Add(row).Fit();
     };
@@ -838,7 +838,7 @@ void UiListDemoWindow::InitControls()
     };
     repop_icon_drop();
 
-    auto bind_slider = [&](UiCompositeSlider& row, int& value, int minv, int maxv) {
+    auto bind_slider = [&](DemoSliderRow& row, int& value, int minv, int maxv) {
         row.Slider().SetRange(minv, maxv).SetStep(1).SetValue(value);
         row.WhenAction = [&]() {
             value = (int)row.Slider().GetValue();
@@ -846,14 +846,14 @@ void UiListDemoWindow::InitControls()
             RefreshFromConfig();
         };
     };
-    auto bind_color = [&](UiCompositeColor& row, Color& value) {
+    auto bind_color = [&](DemoColorRow& row, Color& value) {
         row.WhenAction = [&]() {
             value = row.GetColor(0);
             row.SetValueText(ColorDisplay(value));
             RefreshFromConfig();
         };
     };
-    auto bind_color2 = [&](UiCompositeColor& row, Color& a, Color& b, const char *label_a, const char *label_b) {
+    auto bind_color2 = [&](DemoColorRow& row, Color& a, Color& b, const char *label_a, const char *label_b) {
         row.SetColorCount(2).SetValueWidth(DPI(112))
            .SetColorLabel(0, label_a).SetColorLabel(1, label_b).SetSeparatorBefore(1, true);
         row.WhenAction = [&]() {
@@ -863,7 +863,7 @@ void UiListDemoWindow::InitControls()
             RefreshFromConfig();
         };
     };
-    auto bind_color3 = [&](UiCompositeColor& row, Color& a, Color& b, Color& c,
+    auto bind_color3 = [&](DemoColorRow& row, Color& a, Color& b, Color& c,
                             const char *label_a, const char *label_b, const char *label_c) {
         row.SetColorCount(3).SetValueWidth(DPI(132))
            .SetColorLabel(0, label_a).SetColorLabel(1, label_b).SetColorLabel(2, label_c)
@@ -1371,16 +1371,16 @@ void UiListDemoWindow::RefreshFromConfig()
     drag_side_drop_.SelectByData((int)drag_side_);
     shadow_curve_drop_.SelectByData((int)shadow_preset_);
     shadow_curve_field_.SetCurve(shadow_curve_);
-    auto sync_color = [](UiCompositeColor& row, Color value) {
+    auto sync_color = [](DemoColorRow& row, Color value) {
         row.SetColor(0, value);
         row.SetValueText(ColorDisplay(value));
     };
-    auto sync_color2 = [](UiCompositeColor& row, Color a, Color b) {
+    auto sync_color2 = [](DemoColorRow& row, Color a, Color b) {
         row.SetColor(0, a);
         row.SetColor(1, b);
         row.SetValueText(ColorDisplay(a) + " / " + ColorDisplay(b));
     };
-    auto sync_color3 = [](UiCompositeColor& row, Color a, Color b, Color c) {
+    auto sync_color3 = [](DemoColorRow& row, Color a, Color b, Color c) {
         row.SetColor(0, a);
         row.SetColor(1, b);
         row.SetColor(2, c);

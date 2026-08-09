@@ -26,8 +26,6 @@
 
     Changelog
     - 2026-03: documented as the public umbrella surface for release cleanup.
-    - 2026-05: composite property-row controls moved under Ui/Composites while
-      remaining available through this umbrella include.
     - 2026-08: added UiColorMatrix as the reusable multi-colour field.
     - 2026-08: added UiDateTime for date, time and combined local values.
 */
@@ -79,12 +77,6 @@
 #include <Ui/UiMatrixSelector.h>
 #include <Ui/UiColorMatrix.h>
 #include <Ui/UiDateTime.h>
-#include <Ui/Composites/UiCompositeSlider.h>
-#include <Ui/Composites/UiCompositeToggle.h>
-#include <Ui/Composites/UiCompositeColor.h>
-#include <Ui/Composites/UiCompositeDropdown.h>
-#include <Ui/Composites/UiCompositeLabel.h>
-#include <Ui/Composites/UiCompositeEdit.h>
 #include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>

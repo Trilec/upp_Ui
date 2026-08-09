@@ -73,6 +73,8 @@ These concepts apply to every `Ui*` control and are documented once here.
   `ShadowLinear`, `ShadowGamma`). Shadow margins are included in
   `UiStyledOuterSizeFromContent`.
 
+> **Retired transitional API:** the former `UiComposite*` property-row family has been removed from the production library. Use primitive `Ui` controls, `UiSliderEdit`, `UiColorMatrix`, and `PropertyEditor` composition instead.
+
 ---
 
 ## UiMatrixSelector
@@ -315,7 +317,3 @@ surfaces.
 
 ### UiMatrixSelector / UiRangeSlider
 See the detailed sections above.
-
-### UiComposites (UiCompositeSlider, UiCompositeToggle, UiCompositeColor,
-UiCompositeDropdown, UiCompositeLabel, UiCompositeEdit)
-Composed label + control rows used heavily in builder demos and inspector rows.

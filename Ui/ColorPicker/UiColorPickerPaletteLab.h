@@ -1,7 +1,7 @@
 #ifndef _Ui_UiColorPickerPaletteLab_h_
 #define _Ui_UiColorPickerPaletteLab_h_
 
-#include <Ui/UiColorPicker.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 
 namespace Upp {
 namespace UiColorPickerPaletteLab {

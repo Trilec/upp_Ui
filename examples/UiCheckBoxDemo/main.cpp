@@ -616,7 +616,7 @@ public:
         body_frame_enabled_row_.Toggle().WhenAction = [=] { body_frame_enabled_ = body_frame_enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
         indicator_face_enabled_row_.Toggle().WhenAction = [=] { indicator_face_enabled_ = indicator_face_enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
         indicator_frame_enabled_row_.Toggle().WhenAction = [=] { indicator_frame_enabled_ = indicator_frame_enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        auto bind_live_slider = [=](UiCompositeSlider& row, int& value, int minv, int maxv) {
+        auto bind_live_slider = [=](DemoSliderRow& row, int& value, int minv, int maxv) {
             row.Slider().SetRange(minv, maxv).SetStep(1);
             row.Slider().WhenAction = [=, &row, &value] { value = int(row.Slider().GetValue()); RefreshFromConfig(); };
             row.Slider().WhenChanging = [=, &row, &value] { value = int(row.Slider().GetValue()); RefreshFromConfig(); };
@@ -862,9 +862,9 @@ private:
     UiLineEdit text_edit_;
     UiListModel icon_model_;
     UiDropdown visual_drop_, state_drop_, side_drop_, checked_icon_drop_, tri_state_icon_drop_;
-    UiCompositeToggle tristate_row_, enabled_row_, body_face_enabled_row_, body_frame_enabled_row_, indicator_face_enabled_row_, indicator_frame_enabled_row_;
-    UiCompositeSlider size_row_, gap_row_, radius_row_, mark_row_, body_radius_row_, body_frame_width_row_, indicator_frame_width_row_;
-    UiCompositeColor text_color_row_, face_color_row_, frame_color_row_, indicator_face_color_row_, indicator_frame_color_row_, mark_color_row_;
+    DemoToggleRow tristate_row_, enabled_row_, body_face_enabled_row_, body_frame_enabled_row_, indicator_face_enabled_row_, indicator_frame_enabled_row_;
+    DemoSliderRow size_row_, gap_row_, radius_row_, mark_row_, body_radius_row_, body_frame_width_row_, indicator_frame_width_row_;
+    DemoColorRow text_color_row_, face_color_row_, frame_color_row_, indicator_face_color_row_, indicator_frame_color_row_, mark_color_row_;
 };
 
 }

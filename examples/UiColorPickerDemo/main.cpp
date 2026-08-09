@@ -17,7 +17,7 @@
 */
 
 #include "../BuilderDemoSupport.h"
-#include <Ui/UiColorPicker.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 
 using namespace Upp;
 using namespace BuilderDemoSupport;
@@ -299,7 +299,7 @@ private:
 
     UiBoxLayout action_row_ { UiBoxLayout::Direction::H };
     UiButton open_button_prop_, reset_button_;
-    UiCompositeToggle alpha_row_;
+    DemoToggleRow alpha_row_;
 };
 
 }

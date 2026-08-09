@@ -1,6 +1,6 @@
 #include <Core/Core.h>
 #include <Ui/Ui.h>
-#include <Ui/UiColorPicker.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 
 using namespace Upp;
 

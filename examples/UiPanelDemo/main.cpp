@@ -1204,7 +1204,7 @@ public:
 
 private:
     // Slider rows are the base property-row pattern used throughout the demo.
-    void AddSliderRow(UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial)
+    void AddSliderRow(UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial)
     {
         row.SetLabel(name)
            .SetValueText(initial)
@@ -1216,7 +1216,7 @@ private:
         target.Add(row).Fit();
     }
 
-    void AddToggleRow(UiBoxLayout& target, UiCompositeToggle& row, const char* name)
+    void AddToggleRow(UiBoxLayout& target, DemoToggleRow& row, const char* name)
     {
         row.SetLabel(name)
            .SetLabelWidth(DPI(82))
@@ -1235,7 +1235,7 @@ private:
         row.Add(drop).Expand(1).MinHeight(DPI(24));
     }
 
-    void InitColorButton(UiCompositeColor& row)
+    void InitColorButton(DemoColorRow& row)
     {
         row.LabelCtrl().NoWantFocus();
         row.ValueCtrl().NoWantFocus();
@@ -1243,7 +1243,7 @@ private:
             row.ColorCtrl(i).NoWantFocus();
     }
 
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name)
            .SetLabelWidth(DPI(102))
@@ -1512,12 +1512,12 @@ private:
     UiBoxLayout shadow_box_ { UiDirection::V };
     UiBezierCurveField shadow_curve_field_;
 
-    UiCompositeSlider width_row_, height_row_, radius_row_, border_row_;
-    UiCompositeToggle enabled_row_, frame_row_, face_row_, shadow_row_;
+    DemoSliderRow width_row_, height_row_, radius_row_, border_row_;
+    DemoToggleRow enabled_row_, frame_row_, face_row_, shadow_row_;
     UiBoxLayout gradient_row_ { UiDirection::H };
-    UiCompositeColor gradient_colors_row_, face_color_row_, frame_color_row_, shadow_color_row_;
+    DemoColorRow gradient_colors_row_, face_color_row_, frame_color_row_, shadow_color_row_;
     UiBoxLayout shadow_curve_preset_row_ { UiDirection::H };
-    UiCompositeSlider shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
+    DemoSliderRow shadow_distance_row_, shadow_offset_x_row_, shadow_offset_y_row_, shadow_alpha_row_;
 
     UiLabel gradient_label_;
     UiLabel shadow_curve_preset_label_;

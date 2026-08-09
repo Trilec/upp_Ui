@@ -389,16 +389,16 @@ private:
     UiButton new_child_button_, new_sibling_button_, save_item_button_, delete_item_button_;
 
     UiBoxLayout behavior_box_ { UiBoxLayout::Direction::V };
-    UiCompositeToggle use_drag_row_, rename_row_, multi_select_row_, show_icons_row_, show_metadata_row_, connector_lines_row_, root_visible_row_;
+    DemoToggleRow use_drag_row_, rename_row_, multi_select_row_, show_icons_row_, show_metadata_row_, connector_lines_row_, root_visible_row_;
 
     UiBoxLayout layout_box_ { UiBoxLayout::Direction::V };
-    UiCompositeSlider row_height_row_, item_spacing_row_, icon_size_row_, glyph_size_row_, indent_row_, radius_row_, margin_x_row_, margin_y_row_, content_gap_row_, metadata_size_row_, metadata_gap_row_;
+    DemoSliderRow row_height_row_, item_spacing_row_, icon_size_row_, glyph_size_row_, indent_row_, radius_row_, margin_x_row_, margin_y_row_, content_gap_row_, metadata_size_row_, metadata_gap_row_;
     UiBoxLayout glyph_style_row_box_ { UiBoxLayout::Direction::H };
     UiLabel glyph_style_label_;
     UiDropdown glyph_style_drop_;
 
     UiBoxLayout appearance_box_ { UiBoxLayout::Direction::V };
-    UiCompositeColor text_color_row_, glyph_color_row_, line_color_row_, selected_face_row_, selected_frame_row_;
+    DemoColorRow text_color_row_, glyph_color_row_, line_color_row_, selected_face_row_, selected_frame_row_;
     String last_move_request_;
 };
 
@@ -546,15 +546,15 @@ void UiTreeDemoWindow::BuildRows()
         label.SetText(name).NoWantFocus();
         target.Add(row_box).Fit();
     };
-    auto add_slider = [&](UiBoxLayout& target, UiCompositeSlider& row, const char* name, const char* initial) {
+    auto add_slider = [&](UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial) {
         row.SetLabel(name).SetValueText(initial).SetValueSelectable(false).SetValueWidth(DPI(80));
         target.Add(row).Fit();
     };
-    auto add_toggle = [&](UiBoxLayout& target, UiCompositeToggle& row, const char* name) {
+    auto add_toggle = [&](UiBoxLayout& target, DemoToggleRow& row, const char* name) {
         row.SetLabel(name).ShowValue(false);
         target.Add(row).Fit();
     };
-    auto add_color = [&](UiBoxLayout& target, UiCompositeColor& row, const char* name) {
+    auto add_color = [&](UiBoxLayout& target, DemoColorRow& row, const char* name) {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     };
@@ -615,7 +615,7 @@ void UiTreeDemoWindow::InitControls()
     icon_model.AddRange(icon_list_model_.GetAll());
     item_icon_drop_.Select(0);
 
-    auto bind_slider = [&](UiCompositeSlider& row, int& value, int minv, int maxv) {
+    auto bind_slider = [&](DemoSliderRow& row, int& value, int minv, int maxv) {
         row.Slider().SetRange(minv, maxv).SetStep(1).SetValue(value);
         row.WhenAction = [&]() {
             value = (int)row.Slider().GetValue();

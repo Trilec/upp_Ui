@@ -214,13 +214,13 @@ protected:
 private:
     struct EnumOption { const char* label; int value; };
 
-    void AddColorRow(UiBoxLayout& target, UiCompositeColor& row, const char* name)
+    void AddColorRow(UiBoxLayout& target, DemoColorRow& row, const char* name)
     {
         row.SetLabel(name).SetColorCount(1).ShowValue(false);
         target.Add(row).Fit();
     }
 
-    void InitColorRow(UiCompositeColor& row, Color c)
+    void InitColorRow(DemoColorRow& row, Color c)
     {
         row.SetColor(0, c);
     }
@@ -340,9 +340,9 @@ private:
     UiLabel preset_label_, placeholder_label_, align_label_;
     UiDropdown preset_drop_, align_drop_;
     UiLineEdit placeholder_edit_;
-    UiCompositeSlider radius_row_, frame_width_row_, margin_x_row_, margin_y_row_, caret_width_row_, font_px_row_, tab_size_row_;
-    UiCompositeToggle read_only_row_, accepts_tabs_row_, accepts_drop_row_, overwrite_row_, show_tabs_row_, show_spaces_row_, show_line_endings_row_, show_readonly_bg_row_, left_icon_row_, right_action_row_;
-    UiCompositeColor face_row_, frame_row_, text_row_, placeholder_ink_row_, selection_row_, selection_ink_row_, caret_row_;
+    DemoSliderRow radius_row_, frame_width_row_, margin_x_row_, margin_y_row_, caret_width_row_, font_px_row_, tab_size_row_;
+    DemoToggleRow read_only_row_, accepts_tabs_row_, accepts_drop_row_, overwrite_row_, show_tabs_row_, show_spaces_row_, show_line_endings_row_, show_readonly_bg_row_, left_icon_row_, right_action_row_;
+    DemoColorRow face_row_, frame_row_, text_row_, placeholder_ink_row_, selection_row_, selection_ink_row_, caret_row_;
 };
 
 }
