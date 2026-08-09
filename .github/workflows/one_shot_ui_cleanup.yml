@@ -22,6 +22,15 @@ jobs:
           python-version: '3.x'
       - name: Restructure Ui sources
         run: python tools/one_shot_ui_cleanup.py
+      - name: Normalize generated text endings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['docs/01_UI_CONTROLS_GUIDE.md']:
+              p = Path(name)
+              text = p.read_text(encoding='utf-8').rstrip('\n') + '\n'
+              p.write_text(text, encoding='utf-8', newline='\n')
+          PY
       - name: Check diff hygiene
         run: git diff --check
       - name: Commit generated cleanup
