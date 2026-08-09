@@ -23,6 +23,7 @@ struct RangeSliderConfig {
     int step = 1;
     bool ticks = true;
     int major_ticks = 11;
+    int field_gap = 14;
 };
 
 class UiRangeSliderBuilder : public BuilderWindowBase {
@@ -48,6 +49,7 @@ public:
         AddSliderRow(PropsBox(), step_row_, "Step", "1");
         AddToggleRow(PropsBox(), ticks_row_, "Ticks");
         AddSliderRow(PropsBox(), tick_count_row_, "Major Ticks", "11");
+        AddSliderRow(PropsBox(), field_gap_row_, "Field Gap", "14");
 
         orientation_drop_.UseInternalModel();
         orientation_drop_.Clear();
@@ -58,6 +60,7 @@ public:
         upper_row_.Slider().SetRange(0, 100).SetStep(1).SetValue(cfg_.upper);
         step_row_.Slider().SetRange(1, 10).SetStep(1).SetValue(cfg_.step);
         tick_count_row_.Slider().SetRange(2, 21).SetStep(1).SetValue(cfg_.major_ticks);
+        field_gap_row_.Slider().SetRange(2, 40).SetStep(1).SetValue(cfg_.field_gap);
         ticks_row_.Toggle().SetOn(cfg_.ticks);
 
         orientation_drop_.WhenSelect = [=](int) {
@@ -99,6 +102,13 @@ public:
         };
         tick_count_row_.WhenChanging = ticks_apply;
         tick_count_row_.WhenAction = ticks_apply;
+
+        auto field_gap_apply = [=] {
+            cfg_.field_gap = (int)field_gap_row_.Slider().GetValue();
+            RefreshFromConfig();
+        };
+        field_gap_row_.WhenChanging = field_gap_apply;
+        field_gap_row_.WhenAction = field_gap_apply;
 
         range_.WhenChanging = [=] { SyncFromSlider(); };
         range_.WhenAction = [=] { SyncFromSlider(); };
@@ -156,7 +166,7 @@ private:
                    .SetRange(0, 100)
                    .SetStep(cfg_.step)
                    .SetFieldWidth(DPI(92))
-                   .SetGap(DPI(14))
+                   .SetGap(DPI(cfg_.field_gap))
                    .SetStartEnd(cfg_.lower, cfg_.upper);
 
         cfg_.lower = (int)range_.GetLowerValue();
@@ -168,11 +178,13 @@ private:
         step_row_.Slider().SetValue(cfg_.step);
         ticks_row_.Toggle().SetOn(cfg_.ticks);
         tick_count_row_.Slider().SetValue(cfg_.major_ticks);
+        field_gap_row_.Slider().SetValue(cfg_.field_gap);
 
         lower_row_.SetValueText(AsString(cfg_.lower));
         upper_row_.SetValueText(AsString(cfg_.upper));
         step_row_.SetValueText(AsString(cfg_.step));
         tick_count_row_.SetValueText(AsString(cfg_.major_ticks));
+        field_gap_row_.SetValueText(AsString(cfg_.field_gap));
 
         SyncStateAndCode();
         LayoutPreviewContent();
@@ -267,6 +279,7 @@ private:
     DemoSliderRow step_row_;
     DemoToggleRow ticks_row_;
     DemoSliderRow tick_count_row_;
+    DemoSliderRow field_gap_row_;
 };
 
 }

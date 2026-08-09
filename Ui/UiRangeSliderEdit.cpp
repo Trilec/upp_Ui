@@ -143,14 +143,14 @@ void UiRangeSliderEdit::Layout()
         slider_.SetRect(left, r.top, max(0, right - left), r.GetHeight());
     }
     else {
-        int fh = max(DPI(28), max(lf.cy, uf.cy));
-        int available = max(0, r.GetHeight() - 2 * gap_);
-        fh = min(fh, available / 2);
-        upper_field_.SetRect(r.left, r.top, r.GetWidth(), fh);
-        lower_field_.SetRect(r.left, r.bottom - fh, r.GetWidth(), fh);
-        int top = r.top + fh + gap_;
-        int bottom = r.bottom - fh - gap_;
-        slider_.SetRect(r.left, top, r.GetWidth(), max(0, bottom - top));
+        int fw = min(max(field_w_, max(lf.cx, uf.cx)), max(0, r.GetWidth()));
+        int fh = max(DPI(26), max(lf.cy, uf.cy));
+        int col_w = max(fw, min(slider_.GetMinSize().cx, max(0, r.GetWidth())));
+        int x = r.left + (r.GetWidth() - col_w) / 2;
+        int middle = max(DPI(20), max(0, r.GetHeight() - 2 * fh - 2 * gap_));
+        upper_field_.SetRect(x, r.top, col_w, fh);
+        lower_field_.SetRect(x, r.bottom - fh, col_w, fh);
+        slider_.SetRect(x, r.top + fh + gap_, col_w, middle);
     }
 }
 
