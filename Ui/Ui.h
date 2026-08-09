@@ -28,6 +28,7 @@
     - 2026-03: documented as the public umbrella surface for release cleanup.
     - 2026-08: added UiColorMatrix as the reusable multi-colour field.
     - 2026-08: added UiDateTime for date, time and combined local values.
+    - 2026-08: moved UiColorPicker into its dedicated ColorPicker component.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -77,6 +78,7 @@
 #include <Ui/UiMatrixSelector.h>
 #include <Ui/UiColorMatrix.h>
 #include <Ui/UiDateTime.h>
+#include <Ui/ColorPicker/UiColorPicker.h>
 #include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>
