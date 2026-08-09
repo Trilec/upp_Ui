@@ -1,10 +1,10 @@
 # Getting Started (U++ Ui)
 
-This repo is an experimental, style-first UI layer for Ultimate++.
+This repository is a style-first UI layer for Ultimate++.
 
 The goal is to implement modern `Ui*` controls that:
 
-- can live alongside CtrlLib controls (no forced migration)
+- live alongside CtrlLib controls (no forced migration)
 - share a consistent styling surface (palette/metrics/skin)
 - share a consistent content layout model (icon + text blocks, per-block margins)
 - expose optional animation hooks without requiring subclassing
@@ -15,6 +15,14 @@ The goal is to implement modern `Ui*` controls that:
 - `Ui/UiButton.h` + `Ui/UiButton.cpp` (baseline for state handling + animation hooks)
 - `Ui/UiStyle.h` (the styling model and reusable layout primitives)
 - `Ui/UiDraw.h` (shared drawing helpers, 9-slice, blur utilities)
+
+Read the canonical guides first:
+
+- `docs/00_UPP_CODING_GUIDE.md`
+- `docs/01_UI_CONTROLS_GUIDE.md`
+- `docs/02_UI_THEME_GUIDE.md`
+- `docs/03_UI_MODEL_GUIDE.md`
+- `docs/04_UI_DEMO_GUIDE.md`
 
 ## Running demos in TheIDE
 
@@ -42,13 +50,11 @@ Example (Windows):
 Notes:
 
 - The first argument is the assembly: a comma-separated list of nests.
-- `Ui` depends on `Painter` and `Animation` (see `Ui/Ui.upp`).
+- `Ui` depends on `Painter` and `Animation` (see `Ui/Ui.upp`); `Animation` is the
+  external `upp_animation` package, not a vendored copy.
 - For local development, use this repo's `GitHubOut.var`; it includes the
   external animation nest and writes build intermediates to
-  `E:/apps/github/upp_Ui/build`. Avoid using `E:/upp-18468/build` for this repo,
-  as shared or locked object files there can cause permission errors.
-
-Note: `Animation/` in this repo is a vendored copy of the animation/easing package from `E:\apps\github\upp_animation`.
+  `E:/apps/github/upp_Ui/build`.
 
 ## Conventions (important)
 
@@ -60,6 +66,5 @@ Note: `Animation/` in this repo is a vendored copy of the animation/easing packa
 
 ## Next steps
 
-See `CHECKLIST.md` for the per-control plan and current blockers.
-
-See `UPP_GUIDES/README.md` for deeper architecture, theme, review, UiDoc, tree, and data-model guidance.
+Read the guide set in `docs/` for deeper architecture, theme, model, and demo
+guidance.

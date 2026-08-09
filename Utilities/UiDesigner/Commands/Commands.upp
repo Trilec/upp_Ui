@@ -1,9 +1,0 @@
-description "UiDesigner atomic command and undo service";
-
-uses
-    Utilities/UiDesigner/Core;
-
-file
-    UiDesignerCommands.h,
-    UiDesignerCommands.cpp,
-    README.md;

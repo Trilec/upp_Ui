@@ -1,23 +1,23 @@
+# Generated / build output
 *.svg
 *.exe
+/build
+/out
+/designs
+/examples/OLD
+
+# Local helper scripts and scratch
 scripts/*
 *.ps1
-/designs
-/build
-run_uidoc_regression.cmd
-/GitHubOut
-/examples/OLD
-/out
-/Utilities/DesignerRunTests
-!/Utilities/DesignerRunTests/
-!/Utilities/DesignerRunTests/**
-/Utilities/UiGeneratedCodeSmoke
-/examples/UiChoiceRunTests
-*CHECKLIST*
-/UPP_GUIDES/archive
-UPP_GUIDES/Plan*
-UPP_GUIDES/Agent*
-UPP_GUIDES/UiBoxLayout_Flow_Groups_Design.md
-UPP_GUIDES/UiGroupPanel_Design.md
-/Utilities/SymbolPicker/OLD_CODE
-/Utilities/Designer.old
+*.log
+
+# IDE / editor state
+*.swp
+*.bak
+.cache/
+
+# Debug artifacts
+*.pdb
+*.ilk
+*.o
+*.obj

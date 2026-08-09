@@ -19,7 +19,7 @@
     - Rectangles are exact runtime pixel coordinates relative to this control.
     - Children may overlap; insertion order remains the stacking order.
     - Snapping, DPI conversion, anchoring, and proportional placement belong to
-      callers such as UiDesigner, not to this runtime layout.
+      hosting editors/tools, not to this runtime layout.
 
     Thread context
     - GUI thread only.
