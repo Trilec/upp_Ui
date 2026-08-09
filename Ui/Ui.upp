@@ -81,6 +81,8 @@ file
 	UiSlider.cpp,
 	UiRangeSlider.h,
 	UiRangeSlider.cpp,
+	UiRangeSliderEdit.h,
+	UiRangeSliderEdit.cpp,
 	UiMatrixSelector.h,
 	UiMatrixSelector.cpp,
 	UiColorMatrix.h,
