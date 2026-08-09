@@ -33,12 +33,17 @@ public:
 
         root_.Add(options_).Fixed(DPI(34));
         options_.SetGap(DPI(12));
-        options_.Add(editable_toggle_).Fixed(DPI(120));
-        options_.Add(copy_toggle_).Fixed(DPI(105));
-        options_.Add(paste_toggle_).Fixed(DPI(105));
-        options_.Add(seconds_toggle_).Fixed(DPI(120));
+        options_.Add(editable_label_).Fixed(DPI(72));
+        options_.Add(editable_toggle_).Fixed(DPI(48));
+        options_.Add(copy_label_).Fixed(DPI(52));
+        options_.Add(copy_toggle_).Fixed(DPI(48));
+        options_.Add(paste_label_).Fixed(DPI(56));
+        options_.Add(paste_toggle_).Fixed(DPI(48));
+        options_.Add(seconds_label_).Fixed(DPI(72));
+        options_.Add(seconds_toggle_).Fixed(DPI(48));
         options_.AddSpacer(1);
-        options_.Add(dark_toggle_).Fixed(DPI(95));
+        options_.Add(dark_label_).Fixed(DPI(44));
+        options_.Add(dark_toggle_).Fixed(DPI(48));
 
         root_.Add(status_).Fixed(DPI(32));
 
@@ -52,11 +57,16 @@ public:
                      .SetPresentation(true)
                      .SetValue(sample);
 
-        editable_toggle_.SetText("Editable").SetOn(true);
-        copy_toggle_.SetText("Copy").SetOn(true);
-        paste_toggle_.SetText("Paste").SetOn(true);
-        seconds_toggle_.SetText("Seconds").SetOn(false);
-        dark_toggle_.SetText("Dark").SetOn(false);
+        editable_label_.SetText("Editable");
+        editable_toggle_.SetOn(true);
+        copy_label_.SetText("Copy");
+        copy_toggle_.SetOn(true);
+        paste_label_.SetText("Paste");
+        paste_toggle_.SetOn(true);
+        seconds_label_.SetText("Seconds");
+        seconds_toggle_.SetOn(false);
+        dark_label_.SetText("Dark");
+        dark_toggle_.SetOn(false);
         status_.SetText("Edit the fields or use their picker buttons. Presentation remains selectable and read-only.");
 
         editable_toggle_.WhenAction = [=] {
@@ -149,6 +159,11 @@ private:
     UiToggle paste_toggle_;
     UiToggle seconds_toggle_;
     UiToggle dark_toggle_;
+    UiLabel editable_label_;
+    UiLabel copy_label_;
+    UiLabel paste_label_;
+    UiLabel seconds_label_;
+    UiLabel dark_label_;
     UiLabel status_;
 };
 

@@ -31,7 +31,8 @@
       copy/paste policy, and calendar/clock popup selection.
 */
 
-#include <CtrlLib/DateTimeCtrl.h>
+#include <CtrlCore/CtrlCore.h>
+#include <CtrlLib/CtrlLib.h>
 #include <Ui/UiLineEdit.h>
 #include <Ui/UiToolButton.h>
 #include <Ui/UiTheme.h>

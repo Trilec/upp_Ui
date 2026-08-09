@@ -110,6 +110,8 @@ static void TestEvents(TestCtx& t)
 {
     t.Section("Event contract");
     UiDateTime c;
+    c.SetFormatStyle(UiDateTimeFormatStyle::Iso).DateMode();
+    c.SetValue(Time(2026, 8, 8));
     int changing = 0;
     int action = 0;
     int invalid = 0;
@@ -117,7 +119,6 @@ static void TestEvents(TestCtx& t)
     c.WhenAction = [&] { action++; };
     c.WhenInvalid = [&](String) { invalid++; };
 
-    c.SetFormatStyle(UiDateTimeFormatStyle::Iso).DateMode();
     c.CommitText("2026-08-09", true);
     t.Expect(changing == 1 && action == 1, "committed value fires change and action");
     t.Expect(!c.CommitText("2026-99-99", true) && invalid == 1,

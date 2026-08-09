@@ -427,7 +427,7 @@ UiDateTime& UiDateTime::ClearRange()
 
 UiDateTime& UiDateTime::SetFirstDayOfWeek(int day)
 {
-    first_day_ = minmax(day, SUNDAY, SATURDAY);
+    first_day_ = minmax(day, (int)SUNDAY, (int)SATURDAY);
     date_popup_.FirstDay(first_day_);
     datetime_popup_.calendar.FirstDay(first_day_);
     return *this;
