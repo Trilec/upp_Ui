@@ -3,21 +3,24 @@ Theme roles and overrides
 Theme roles are semantic. They are not the same thing as explicit appearance
 overrides.
 
-The current V1 role set is:
+The common role set is:
 
 - Standard
 - Subtle
 - Accent
 - Alert
 
-Roles select the theme surface and ink defaults.
-Theme overrides are opt-in and are used when a control must intentionally
-deviate from the role-resolved look.
+Roles select theme-resolved surface, frame, ink, icon, and state defaults.
+Explicit custom styles are opt-in and are appropriate only when a control must
+intentionally deviate from that role-resolved look.
 
-For surface-capable controls:
+For surface-capable controls, `StyledMetrics` and `StyledPalette` provide the
+normal face/frame/radius/shadow/state contract. Disabling a face or frame removes
+that surface effect; a custom style should still use those same shared primitives
+rather than introduce an unrelated paint model.
 
-- Fill and Frame toggles are final on/off states when overrides are active
-- fill color, frame color, radius, and shadow are explicit override fields
-- turning Fill or Frame off should remove that surface effect in preview and codegen
+Layout-only controls should remain concerned with geometry rather than appearance.
+Runtime theme changes must invalidate/re-resolve theme-derived control styles while
+leaving explicit custom styles under caller ownership.
 
-Layout-only controls do not expose theme overrides.
+See `docs/02_UI_THEME_GUIDE.md` for the detailed current contract.
