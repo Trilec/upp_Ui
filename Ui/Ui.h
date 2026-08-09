@@ -78,7 +78,7 @@
 #include <Ui/UiMatrixSelector.h>
 #include <Ui/UiColorMatrix.h>
 #include <Ui/UiDateTime.h>
-#include <Ui/ColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPicker/UiColorPicker.h>
 #include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>

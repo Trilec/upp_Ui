@@ -1,4 +1,4 @@
-#include <Ui/ColorPicker/UiColorPickerPaletteLab.h>
+#include <Ui/UiColorPicker/UiColorPickerPaletteLab.h>
 
 #include <cmath>
 #include <cstdlib>

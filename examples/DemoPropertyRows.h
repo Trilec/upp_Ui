@@ -1097,7 +1097,7 @@ void DemoToggleRow::SyncValueVisibility()
 
 }
 
-#include <Ui/ColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPicker/UiColorPicker.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {

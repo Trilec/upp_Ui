@@ -17,7 +17,7 @@
 */
 
 #include "../BuilderDemoSupport.h"
-#include <Ui/ColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPicker/UiColorPicker.h>
 
 using namespace Upp;
 using namespace BuilderDemoSupport;

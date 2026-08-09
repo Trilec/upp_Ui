@@ -113,9 +113,9 @@ file
 	UiDropdown.cpp,
 	UiMenu.h,
 	UiMenu.cpp,
-	ColorPicker/UiColorPicker.h,
-	ColorPicker/UiColorPicker.cpp,
-	ColorPicker/UiColorPickerPaletteLab.h,
-	ColorPicker/UiColorPickerPaletteLab.cpp,
+	UiColorPicker/UiColorPicker.h,
+	UiColorPicker/UiColorPicker.cpp,
+	UiColorPicker/UiColorPickerPaletteLab.h,
+	UiColorPicker/UiColorPickerPaletteLab.cpp,
 	src.tpp,
 	srcdoc.tpp;

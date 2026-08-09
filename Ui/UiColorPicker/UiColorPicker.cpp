@@ -1,5 +1,5 @@
-#include <Ui/ColorPicker/UiColorPicker.h>
-#include <Ui/ColorPicker/UiColorPickerPaletteLab.h>
+#include <Ui/UiColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPicker/UiColorPickerPaletteLab.h>
 
 #include <cmath>
 

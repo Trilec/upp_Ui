@@ -1,6 +1,6 @@
 #include "PropertyValueEditors.h"
 
-#include <Ui/ColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPicker/UiColorPicker.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
 

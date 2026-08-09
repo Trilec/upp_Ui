@@ -489,7 +489,7 @@ Model-backed controls with request-first mutation (`WhenReorderRequest`,
 (`UiDoc::AnnotationLane`) for comments/metadata.
 
 ### UiColorPicker / UiColorPickerPaletteLab
-Large multi-slot colour editor now contained under `Ui/ColorPicker/`. It supports
+Large multi-slot colour editor now contained under `Ui/UiColorPicker/`. It supports
 one through eight active slots, alpha, multiple colour models/readouts, palette
 library/generation, image analysis, user stash/session state, and screen picking.
 `UiColorPickerPaletteLab` contains the reusable colour conversion, palette,
