@@ -15,14 +15,16 @@
     - Compact, styled multi-colour field for one to eight related colours.
 
     Intent
-    - Replace the useful colour-swatch portion of the old UiCompositeColor
-      without carrying forward the generic composite/property-row layer.
+    - Provide a first-class multi-colour value control rather than a generic
+      property-row/composite abstraction.
     - Treat the swatches as one contiguous value: activating any swatch opens
       one UiColorPicker containing the complete colour set.
     - Fit the swatches to the available rectangle and wrap automatically when
       a single row would make the cells too small.
     - Use the normal Ui theme/style primitives for the surrounding surface,
       frames, radius, and shadows. The swatch face itself is always its colour.
+    - Keep the current public capacity aligned with UiColorPicker's eight-slot
+      editing contract; the layout algorithm itself is not hard-coded to one row.
 
     Thread context
     - GUI thread only.
