@@ -73,7 +73,9 @@ These concepts apply to every `Ui*` control and are documented once here.
   `ShadowLinear`, `ShadowGamma`). Shadow margins are included in
   `UiStyledOuterSizeFromContent`.
 
-> **Retired transitional API:** the former `UiComposite*` property-row family has been removed from the production library. Use primitive `Ui` controls, `UiSliderEdit`, `UiColorMatrix`, and `PropertyEditor` composition instead.
+> **Retired transitional API:** the former `UiComposite*` property-row family has
+> been removed from the production library. Use primitive `Ui` controls,
+> `UiSliderEdit`, `UiColorMatrix`, and `PropertyEditor` composition instead.
 
 ---
 
@@ -161,9 +163,93 @@ recommended/fallback cell is visible without being selected.
   and reports orientation (`Horizontal`/`Vertical`/`Diagonal`).
 - The control is fully theme-role driven (`SetRole`) so it follows light/dark
   and preset changes without hard-coded colours.
-- Former Dramatica relationship/pattern APIs (Dynamic, Companion, Dependent,
-  U/Z/Butterfly paths) were deliberately removed to keep the control generic;
-  do not reintroduce them.
+- Former domain-specific relationship/pattern APIs were deliberately removed to
+  keep the control generic; specialised domain visualisers should be separate
+  controls rather than expanding this API.
+
+---
+
+## UiColorMatrix
+
+Styled multi-colour value field for editing a small related set of colours as one
+contiguous control. The current public capacity is one through eight colours,
+matching `UiColorPicker`'s current multi-slot editing contract.
+
+### Purpose and appropriate usage
+
+Use `UiColorMatrix` when a property is naturally a colour set rather than a
+single colour: a four-colour theme group, a compact palette, paired colours, or
+similar small sets. It is a first-class control, not a generic property-row
+wrapper.
+
+```cpp
+UiColorMatrix colors;
+colors.SetColorCount(4)
+      .SetColor(0, Color(40, 120, 230))
+      .SetColor(1, Color(240, 190, 45))
+      .SetColor(2, Color(45, 180, 105))
+      .SetColor(3, Color(215, 70, 80));
+```
+
+`SetColors(const Vector<Color>&)` replaces the current set in one operation.
+`GetColors()` returns the typed vector. `SetColorLabel` supplies per-slot labels
+used by the picker.
+
+### Contiguous editing and picker behaviour
+
+Activating any swatch makes it current and opens **one** `UiColorPicker` loaded
+with the entire colour set. The active swatch becomes the picker's active slot.
+Live picker changes update the matrix through `WhenChanging`; accepting commits
+the complete set and fires `WhenAction`; cancelling restores the complete opening
+set.
+
+`EnablePicker(false)` makes the field selection-only. `SetPickerTitle()` controls
+the modal picker title and `EditColors()` opens it programmatically.
+
+### Adaptive layout and wrapping
+
+The matrix does not assume a single horizontal strip. `ResolveGrid()` evaluates
+possible column counts against the actual inner width and height, chooses the
+largest square swatch size that fits, and uses the arrangement with least empty
+cells as the tie-breaker. This means a constrained control can wrap two, four,
+or eight swatches onto additional rows rather than clipping them.
+
+`GetSlotRect(index)` exposes the settled geometry and `HitTest(point)` uses the
+same rectangles for interaction.
+
+### Styling
+
+Swatch **faces are always the actual colours**. Surrounding visuals use the
+normal Ui style primitives:
+
+- `SetSlotGap(int)` — gap between swatches;
+- `SetSlotRadius(int)` — rounded swatch corners;
+- `SetSlotFrameWidth(int)` / `ShowSlotFrame(bool)` — standard frame contract;
+- `SetSlotShadow(bool)` — standard `StyledShadow` on each swatch;
+- `SetSurfaceRadius(int)`, `ShowSurface(bool)`, `ShowSurfaceFrame(bool)`,
+  `SetSurfaceShadow(bool)` — containing surface treatment;
+- `SetMinimumSlotSize(int)` / `SetMaximumSlotSize(int)` — adaptive-grid bounds;
+- `SetRole(UiRole)` / `SetActiveRole(UiRole)` — semantic theme roles.
+
+Default theme resolution uses `UiPanel` styling for the surrounding surface and
+`UiButton` styling for slot/active frame state, so light/dark and theme revisions
+follow the rest of the library. A custom `Style` can override the same shared
+`StyledPalette`, `StyledMetrics`, and `StyledSkin` values without introducing a
+special painting system.
+
+### Value/model and interaction contract
+
+- `SetData(Color)` / `GetData()` use a scalar `Color` when the matrix has one
+  value.
+- Multi-colour data uses `ValueArray` of `Color` values.
+- Arrow keys move the active swatch according to the settled grid.
+- Enter/Space opens the picker.
+- `WhenSelect(int)` reports active-slot changes; `WhenChanging` is live colour
+  editing; `WhenAction` is committed colour-set editing.
+
+The current eight-colour maximum is deliberately aligned with the picker. If the
+picker's slot contract grows later, the capacity can be widened without changing
+the adaptive layout model.
 
 ---
 
@@ -248,6 +334,101 @@ selected interval.
 
 ---
 
+## UiDateTime
+
+Styled local date/time field that can represent a date, a time, or a combined
+local date-time while keeping one authoritative U++ `Time` value.
+
+### Modes and formatting
+
+```cpp
+UiDateTime field;
+field.DateMode();                         // date only
+field.TimeMode();                         // time only
+field.DateTimeMode();                     // combined
+field.SetFormatStyle(UiDateTimeFormatStyle::Locale); // or Iso
+field.SetClockFormat(UiClockFormat::Locale);         // or Hour12 / Hour24
+field.ShowSeconds(true);
+```
+
+Locale presentation uses U++ language information; ISO mode uses deterministic
+ISO-style date/time formatting. `SetLanguage(int)` or `SetLanguage(const char*)`
+selects the language context. `SetFirstDayOfWeek()` configures calendar layout.
+
+The V1 value is deliberately **local/naive time**. Time-zone conversion and
+instant/offset semantics belong outside this control.
+
+### Editable and presentation modes
+
+`SetEditable(true)` provides text editing and the picker button.
+`SetPresentation(true)` makes the value read-only and hides the picker button.
+Presentation styling is intentionally chromeless by default; callers can opt
+back into a framed read-only surface with `ShowPresentationFrame(true)`.
+
+### Picker behaviour
+
+The picker follows the active mode:
+
+- Date → themed U++ `Calendar`;
+- Time → themed U++ `Clock`;
+- DateTime → combined `CalendarClock`.
+
+Picked values update the same authoritative `Time`. There is no second popup
+model. The calendar/clock surfaces are restyled from the active Ui theme so they
+remain visually coherent in light and dark modes.
+
+### Clipboard policy
+
+Copy and paste are independently controllable:
+
+```cpp
+field.AllowCopy(true);
+field.AllowPaste(false);
+field.CopyValueToClipboard();
+field.PasteValueFromClipboard();
+```
+
+Keyboard copy/paste/cut paths honour the same policy. Paste additionally requires
+editable mode. This allows a presentation field to remain selectable/copyable
+without silently becoming editable.
+
+### Validation, nulls, and ranges
+
+- `AllowNull(bool)` / `ClearValue()` govern empty values.
+- `SetRange(Time minimum, Time maximum)` and `SetDateRange(Date, Date)` constrain
+  accepted values; `ClearRange()` removes bounds.
+- `CommitText()` parses and validates the complete edit; invalid input restores
+  the formatted stored value and fires `WhenInvalid(String)` rather than
+  corrupting state.
+- Date, time, and date-time parsing all verify real calendar/time ranges.
+
+Typing is intentionally permissive rather than governed by a rigid input mask;
+commit-time parsing provides the authoritative validation so locale, ISO, 12/24
+hour entry, and pasted values remain practical.
+
+### Data and events
+
+`SetValue(Time)` / `GetValue()` are the canonical typed API. Convenience methods
+include `SetDate`, `GetDate`, `SetTime`, `SetNow`, and `SetToday`.
+`SetData`/`GetData` integrate with U++ data binding.
+
+`WhenChanging` reports a valid live value change; `WhenAction` reports a committed
+change; `WhenInvalid` reports rejected text; `WhenOpenPicker` reports picker
+activation.
+
+### Styling
+
+`UiDateTime::Style` contains the editable edit style, presentation edit style,
+picker-button style, and minimum/button metrics. Theme defaults resolve through
+`UiTheme::ResolveEdit` and `ResolveToolButton`; explicit custom styles remain
+caller-owned.
+
+Known V1 rule: `ShowSeconds()` is part of the public contract and must be honoured
+consistently by all formatting paths. Locale-specific presentation should be
+validated whenever language/time-format behaviour is changed.
+
+---
+
 ## Other substantial controls (quick reference)
 
 All entries below follow the common concepts above; read the matching header for
@@ -308,12 +489,15 @@ Model-backed controls with request-first mutation (`WhenReorderRequest`,
 (`UiDoc::AnnotationLane`) for comments/metadata.
 
 ### UiColorPicker / UiColorPickerPaletteLab
-Color picker with palette generation, swatch library, and current/previous slot
-previews; the PaletteLab extends it for palette experimentation.
+Large multi-slot colour editor now contained under `Ui/ColorPicker/`. It supports
+one through eight active slots, alpha, multiple colour models/readouts, palette
+library/generation, image analysis, user stash/session state, and screen picking.
+`UiColorPickerPaletteLab` contains the reusable colour conversion, palette,
+generator, and image-analysis support for that component.
 
 ### UiBezierCurveEditor / UiBezierCurveField
 Curve editing controls used by the PropertyEditor curve property and custom
 surfaces.
 
-### UiMatrixSelector / UiRangeSlider
+### UiMatrixSelector / UiColorMatrix / UiRangeSlider / UiDateTime
 See the detailed sections above.
