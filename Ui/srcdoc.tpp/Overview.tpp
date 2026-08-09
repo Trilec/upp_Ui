@@ -1,26 +1,24 @@
 Overview
 
-Ui is a V1 control library built around a small set of public concepts:
+Ui is a reusable U++ control library built around a small set of public concepts:
 
 - controls expose a stable runtime API
-- layout is handled by BoxLayout and GridLayout
+- layout is handled by UiBoxLayout, UiGridLayout, and the other Ui layout hosts
 - surface styling is semantic through roles and explicit overrides
-- the Designer emits theme-first code and only writes overrides when requested
-- icons are catalog-driven and should stay source-neutral
+- model-backed controls keep one authoritative value/model contract
+- icons are catalog-driven and stay source-neutral at the control boundary
+- larger components such as ColorPicker live in focused subdirectories while remaining part of the Ui package
 
-This topic group is intentionally short. It is the orientation layer for the
-package, not the full reference manual.
+This Topic++ group is intentionally short. It is the orientation layer for the
+package; the canonical detailed references live in the repository `docs/00` through
+`docs/04` guide set.
 
 Topic++ note:
 - `srcdoc.tpp` and `src.tpp` are registered in the package file (`Ui.upp`)
 - TheIDE uses those package entries to show the Topic++ groups
-- use `srcdoc.tpp` for package docs and `src.tpp` for code-reference topics
-- the IDE menu action writes that registration into the `.upp` file for you
+- use `srcdoc.tpp` for compact package orientation and `src.tpp` for code-reference topics
 
 See also:
 - Layout sizing model
 - Theme roles and overrides
-- Designer workflow
-- Code generation contract
 - Icons and catalog
-- V1 migration notes
