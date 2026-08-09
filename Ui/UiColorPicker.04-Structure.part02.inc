@@ -132,15 +132,15 @@ void UiColorPicker::Impl::BuildTree()
 
     navigation_.SetGap(DPI(4)).SetInset(Rect(DPI(5), DPI(2), DPI(5), DPI(2)));
     for(int i = 0; i < PAGE_COUNT; i++)
-        navigation_.Add(page_button_[i]).Fixed(DPI(76));
+        navigation_.Add(page_button_[i]).Fixed(DPI(66));
     navigation_.AddSpacer(1);
-    navigation_.Add(current_preview_).Fixed(DPI(42));
+    navigation_.Add(current_preview_).Fixed(DPI(38));
     for(int i = 0; i < 8; i++) {
         slot_column_[i].Create(UiDirection::V);
         slot_column_[i]->SetGap(DPI(1));
         slot_column_[i]->Add(primary_slot_[i]).Expand(1);
         slot_column_[i]->Add(previous_slot_[i]).Fixed(DPI(7));
-        navigation_.Add(*slot_column_[i]).Fixed(DPI(38));
+        navigation_.Add(*slot_column_[i]).Fixed(DPI(34));
     }
 
     page_stack_.AddPage(color_page_, "color");
