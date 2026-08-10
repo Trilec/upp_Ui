@@ -186,6 +186,144 @@ static void TestLargeSparseDocument(TestCtx& t)
     t.Expect(ar.positions.edits.GetCount() == 32, "batch reports every position edit");
 }
 
+
+static void TestBlocksAndRoundTrip(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), WString("INT. LAB - DAY\nA short line.\n"));
+
+    ValueMap block_meta;
+    block_meta.Add("screenplay.scene_number", "12A");
+    String bid = doc.AddBlock(UiDocRange(0, 14), "screenplay.scene", 0, block_meta);
+    t.Expect(!bid.IsEmpty(), "sparse block added");
+    t.Expect(doc.GetBlocks().GetCount() == 1, "ordinary paragraphs need no block record");
+
+    ValueMap comment_payload;
+    comment_payload.Add("text", "Check continuity");
+    ValueMap comment_meta;
+    comment_meta.Add("agent.source", "continuity-agent");
+    String aid = doc.AddAnnotation(UiDocRange(15, 27), "review.comment", comment_payload, comment_meta);
+    t.Expect(!aid.IsEmpty(), "round-trip annotation added");
+
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "roundtrip-image";
+    resource.bytes = String("\0PNG\1binary", 11);
+    resource.mime = "image/png";
+    resource.original_name = "frame.png";
+    resource.width = 320;
+    resource.height = 180;
+    resource.meta.Add("production.asset_id", 77);
+    String rkey = doc.AddResource(resource, true);
+    t.Expect(!rkey.IsEmpty(), "round-trip resource added");
+
+    ValueMap image_payload;
+    image_payload.Add("resource_key", rkey);
+    ValueMap image_layout;
+    image_layout.Add("align", "center");
+    ValueMap image_meta;
+    image_meta.Add("vfx.shot_id", "sh010");
+    String eid = doc.AddEmbed(doc.GetLength(), "image", image_payload, image_layout, image_meta);
+    t.Expect(!eid.IsEmpty(), "round-trip embed added");
+    t.Expect(doc.SetAnchor("scene.12A", 0), "round-trip anchor added");
+    doc.SetMeta("project.name", "UiDoc v2");
+
+    String json = doc.ToJson(true);
+    Value parsed = ParseJSON(json);
+    t.Expect(!parsed.IsError() && IsValueMap(parsed) && (int)((ValueMap)parsed)["version"] == 2,
+             "native snapshot identifies v2");
+
+    UiDocCore loaded;
+    String error;
+    t.Expect(loaded.FromJson(json, &error), "native snapshot reloads: " + error);
+    t.Expect(loaded.GetText() == doc.GetText(), "text round-trips");
+    t.Expect(loaded.GetBlocks().GetCount() == 1 && loaded.GetBlocks()[0].role == "screenplay.scene",
+             "block role round-trips");
+    t.Expect(AsString(loaded.GetBlocks()[0].meta["screenplay.scene_number"]) == "12A",
+             "block metadata round-trips");
+    t.Expect(loaded.GetAnnotations().GetCount() == 1 &&
+             AsString(loaded.GetAnnotations()[0].meta["agent.source"]) == "continuity-agent",
+             "annotation metadata round-trips");
+    UiDocResource loaded_resource;
+    t.Expect(loaded.GetResource(rkey, loaded_resource), "resource round-trips");
+    t.Expect(loaded_resource.bytes == resource.bytes, "binary resource bytes round-trip");
+    t.Expect(loaded.GetEmbeds().GetCount() == 1 &&
+             AsString(loaded.GetEmbeds()[0].meta["vfx.shot_id"]) == "sh010",
+             "embed metadata round-trips");
+    int anchor = -1;
+    t.Expect(loaded.ResolveAnchor("scene.12A", anchor) && anchor == 0, "anchor round-trips");
+    t.Expect(AsString(loaded.GetMeta("project.name")) == "UiDoc v2", "document metadata round-trips");
+}
+
+static void TestNoHistoryRollback(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), WString("abcdef"));
+
+    UiDocCoreTransaction tx;
+    tx.add_to_history = false;
+    UiDocCoreChange first;
+    first.type = UiDocCoreChange::ReplaceText;
+    first.range = UiDocRange(0, 1);
+    first.text = "A";
+    tx.changes.Add(pick(first));
+
+    UiDocCoreChange bad;
+    bad.type = UiDocCoreChange::RemoveEmbed;
+    bad.embed_id = "missing";
+    tx.changes.Add(pick(bad));
+
+    UiDocApplyResult result = doc.Apply(tx);
+    t.Expect(!result.ok, "no-history invalid batch refused");
+    t.Expect(doc.GetTextUtf8() == "abcdef", "no-history batch still rolls back atomically");
+}
+
+static void TestMissingResourceValidation(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), WString("table"));
+    UiDocResource r;
+    r.resource_type = "image";
+    r.content_hash = "nested-image";
+    r.bytes = "data";
+    String key = doc.AddResource(r, true);
+
+    ValueMap image_run;
+    image_run.Add("type", "image");
+    image_run.Add("resource_key", key);
+    ValueArray cell_runs;
+    cell_runs.Add(image_run);
+    ValueArray row;
+    row.Add(cell_runs);
+    ValueArray rows;
+    rows.Add(row);
+    ValueMap table;
+    table.Add("cell_runs", rows);
+    String eid = doc.AddEmbed(0, "table", table);
+    t.Expect(!eid.IsEmpty(), "nested table resource reference added");
+    t.Expect(!doc.RemoveResource(key), "nested resource reference prevents removal");
+
+    String json = doc.ToJson(false);
+    String needle = Base64Encode(StoreAsString(table));
+    ValueMap broken_table = clone(table);
+    ValueArray broken_rows = broken_table["cell_runs"];
+    ValueArray broken_row = broken_rows[0];
+    ValueArray broken_runs = broken_row[0];
+    ValueMap broken_image = broken_runs[0];
+    broken_image.GetAdd("resource_key") = "missing-key";
+    broken_runs.Set(0, broken_image);
+    broken_row.Set(0, broken_runs);
+    broken_rows.Set(0, broken_row);
+    broken_table.GetAdd("cell_runs") = broken_rows;
+    String broken = json;
+    broken.Replace(needle, Base64Encode(StoreAsString(broken_table)));
+
+    UiDocCore loaded;
+    String error;
+    t.Expect(!loaded.FromJson(broken, &error), "snapshot with missing nested resource refused");
+    t.Expect(error.Find("missing resource") >= 0, "missing resource error is explicit");
+}
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
@@ -196,6 +334,9 @@ CONSOLE_APP_MAIN
     TestResourceAndEmbed(t);
     TestUndoRedo(t);
     TestLargeSparseDocument(t);
+    TestBlocksAndRoundTrip(t);
+    TestNoHistoryRollback(t);
+    TestMissingResourceValidation(t);
 
     Cout() << "SUMMARY passed=" << (t.checks - t.fails)
            << " failed=" << t.fails
