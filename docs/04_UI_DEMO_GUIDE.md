@@ -1,142 +1,410 @@
-# 04 — Ui Demo Guide
+````markdown
+# 04 — Ui Demo Guide 
 
-Intended demo architecture for `upp_Ui`. This guide defines the target; the
-first full implementation will be a new **Label demo** used as the reference
-implementation. Do not convert every existing demo to this structure yet.
+This guide defines the intended demo architecture for `upp_Ui`.
+
+The current **UiLabelDemo** is the canonical reference implementation. It is the
+de facto baseline for future full control demos and should be consulted before
+creating or substantially redesigning another demo.
+
+The goal is to make every full demo:
+
+- visually consistent with the wider Ui ecosystem;
+- useful for exploring the real public API of the control;
+- useful as readable example source code;
+- powered by the production `PropertyEditor`;
+- self-contained and easy for both humans and agents to understand.
 
 ## Direction
 
-Future Ui demos share a visual **language** with the new UiDesigner — without
-depending on UiDesigner itself. Each demo is a self-contained U++ package.
+Future Ui demos share a visual **language** with UiDesigner without depending on
+UiDesigner itself.
 
-> There is **no** mandatory shared `DemoBase`/`DemoFramework` application
-> dependency. Small duplicated shell/setup code is preferable to hiding basic
-> application construction behind a large shared demo framework. Sharing normal
-> production `Ui`/`PropertyEditor` controls is expected; sharing a special demo
-> application framework is not.
+Each demo remains its own U++ package and uses the normal reusable `Ui` and
+`PropertyEditor` infrastructure.
+
+> There is **no** mandatory shared `DemoBase` or `DemoFramework` application
+> layer. Small amounts of repeated shell/setup code are preferable to hiding the
+> construction of a demo behind another framework.
+
+The important commonality is the **pattern**, not inheritance from a shared demo
+application.
+
+## Canonical reference
+
+`examples/UiLabelDemo` establishes the current baseline for:
+
+- package structure;
+- header and application actions;
+- preview/property-area proportions;
+- Inspector / Theme Overrides / Code navigation;
+- `UiStack` page switching;
+- production `PropertyEditor` integration;
+- model-driven preview updates;
+- explicit inherited versus local style overrides;
+- generated U++ example code;
+- source naming and organisation.
+
+When implementing another full demo, begin by studying `UiLabelDemo` and adapt
+its structure to the needs of the new control rather than inventing another
+parallel demo architecture.
+
+The result should look and feel familiar while remaining specific to the control
+being demonstrated.
 
 ## General structure
 
-Each full control demo broadly contains:
+A full control demo broadly contains three areas.
 
 ### 1. Top header
 
-A `UiTitleCard` identifying the demonstrated control:
+Use a `UiTitleCard` to identify the demonstrated control.
 
-- **Title**: the control name (e.g. `UiLabel`).
-- **Subtitle**: a short explanation of what the control is for.
+Typical content:
 
-Same clean visual concept as the new UiDesigner. At the opposite/top action
-area provide a small consistent set of application actions:
+- **Title** — the control name, e.g. `UiLabel`;
+- **Subtitle** — a short description of the control's purpose;
+- optional control/icon identity.
 
+At the opposite side provide a small, consistent set of application actions:
+
+- **Light/Dark theme**
 - **Help**
-- **Light/Dark theme toggle**
 - **Exit**
 
-These feel related to the Designer's top-level controls without requiring a
-shared Designer implementation.
+These should remain compact and unobtrusive. The visual language can resemble
+UiDesigner, but the implementation belongs entirely to the demo and reusable Ui
+controls.
 
 ### 2. Main preview
 
-A generous central preview area. The demonstrated control must have enough room
-to genuinely inspect:
+Provide a generous live preview using the **real control being demonstrated**.
 
-- sizing
-- states
-- text/content
-- interaction
-- alignment
-- wrapping
-- icons
-- visual styling
-- orientation
-- control-specific behaviour
+The preview should have enough room to inspect meaningful aspects of the
+control, including where appropriate:
 
-Do not make the preview tiny to fit more inspector controls. The preview is the
-actual live result of the current settings.
+- size and geometry;
+- text and content;
+- enabled/disabled behaviour;
+- hover/pressed/focus states;
+- selection;
+- alignment;
+- orientation;
+- wrapping;
+- icons/media;
+- ranges and values;
+- interaction;
+- visual styling;
+- control-specific behaviour.
 
-> This is **not** a mini visual designer. There is no generic canvas-selection
-> system, and the user normally does not select arbitrary children in the
-> preview. If the demonstrated control naturally has selectable items, those
-> normal control interactions remain available.
+Do not shrink the preview merely to expose more properties.
+
+The preview is the primary visual result of the current PropertyEditor state.
+
+> This is not a miniature UiDesigner. There is no generic canvas selection
+> system. If the demonstrated control naturally contains selectable or
+> interactive items, those normal control interactions remain available.
 
 ### 3. Right-hand property area
 
-Use the `PropertyEditor` / `PropertyEditorCore` approach. The right-hand side
-follows the same broad conceptual language as the new UiDesigner but only
-exposes what is meaningful to demonstrating one control.
-
-Conceptual areas:
+The right side follows the same conceptual language as UiDesigner:
 
 1. **Inspector**
 2. **Theme Overrides**
 3. **Code**
 
-#### Inspector
+Use compact `UiToolButton` actions at the top to select the current page and a
+`UiStack` underneath to display the selected content.
 
-Expose essentially every useful public feature of the demonstrated control API
-that can reasonably be changed interactively. Examples (depending on control):
+Only one page should normally be active at a time.
 
-- text/value
-- enabled
-- visible where useful
-- size
-- alignment
-- orientation
-- wrapping
-- ranges
-- steps
-- icons
-- selection
-- behavioural flags
-- control-specific options
+---
 
-Changing a property immediately updates the preview. The purpose is executable
-API exploration: a developer should understand what the control can do by
-manipulating the inspector.
+## Inspector
 
-#### Theme Overrides
+The Inspector represents the **normal public API and behaviour** of the
+demonstrated control.
 
-Expose relevant visual/theme properties supported by the control, reflecting the
-style/theme concepts in `02_UI_THEME_GUIDE.md`. Where practical, demonstrate the
-difference between:
+Expose as much useful functionality as can reasonably be changed interactively.
 
-- inherited/current theme appearance;
-- explicit local override.
+Depending on the control, this can include:
 
-Do not invent styling capabilities the control does not support.
+- content and values;
+- semantic roles;
+- text size;
+- enabled/read-only/selectable state;
+- alignment;
+- direction and orientation;
+- dimensions;
+- ranges;
+- steps;
+- icons and media;
+- selection;
+- wrapping;
+- behavioural options;
+- control-specific features.
 
-#### Code
+The intention is that someone unfamiliar with the control can explore the
+Inspector and quickly understand what the public control is capable of.
 
-Provide a useful representation of the U++ code corresponding to the
-demonstrated configuration. The exact implementation will be defined with the
-first new Label demo. The intent: a developer can configure the control visually
-and understand how the equivalent public API would be expressed in code.
+Inspector properties should normally map clearly to real public control APIs.
+Avoid maintaining a second demo-only interpretation of the control.
 
-### PropertyEditor integration
+### Choose the right property presentation
 
-Inspector and Theme Overrides are constructed through the same `PropertyEditor`
-family the library provides. The demo therefore also acts as a practical
-demonstration of PropertyEditor integration — see
-`05_UI_PROPERTY_EDITOR_GUIDE.md`.
+Do not default every value to a text field or dropdown.
+
+Use the most expressive PropertyEditor adapter available.
+
+For example:
+
+- spatial side/direction/position → `UiMatrixSelector` adapter;
+- bounded numeric value → numeric field or slider-capable editor;
+- range → range adapter;
+- colour → colour editor;
+- ordered colour set → colour palette/matrix editor;
+- icon → icon adapter;
+- font → font adapter;
+- image → provider-backed image adapter;
+- curve → curve or Bézier adapter;
+- compound values → expandable inline editor where appropriate.
+
+Where a matrix communicates the value more clearly than a dropdown, prefer the
+matrix.
+
+The current `Cardinal4` matrix use in `UiLabelDemo` is a good example: choosing
+Top/Right/Bottom/Left visually is clearer than reading those four entries from a
+generic dropdown.
+
+---
+
+## Theme Overrides
+
+Theme Overrides represents the **actual styling API supported by the control**.
+
+The user should be able to distinguish between:
+
+- appearance inherited from the current theme/role;
+- an explicit local style override.
+
+Inactive override properties remain inherited. Activating an override applies
+the local authored value.
+
+Expose only style capabilities that genuinely exist on the demonstrated control.
+
+Depending on the control this may include:
+
+- normal/hot/pressed/disabled palette values;
+- face/fill;
+- frame colours and width;
+- radius;
+- ink;
+- icon ink;
+- typography;
+- content margins;
+- focus treatment;
+- shadow;
+- highlight;
+- skins/images;
+- control-specific style metrics.
+
+Do not create a generic collection of styling options merely because
+PropertyEditor can display them.
+
+The Overrides page should document the real style contract of the control.
+
+---
+
+## PropertyEditor usage
+
+Full demos should use the production `PropertyEditor` and
+`PropertyEditorCore` rather than hand-built property rows.
+
+Use PropertyEditor to its full practical potential.
+
+The demo should be a useful example of both:
+
+1. the demonstrated Ui control; and
+2. real-world PropertyEditor integration.
+
+### Models are authoritative
+
+Prefer the pattern established by `UiLabelDemo`:
+
+- PropertyEditor models contain the authored property state;
+- the live preview reads that state;
+- generated code reads that same state;
+- style override activation is represented explicitly;
+- avoid parallel configuration structures that can drift apart.
+
+For simple controls this may remain very small. More complex controls may need
+separate Inspector and Override models, as `UiLabelDemo` does.
+
+### Use first-class adapters
+
+Where appropriate use the PropertyEditor helpers/adapters for:
+
+- Matrix
+- Range
+- Adjustable Range
+- Color
+- Color Palette
+- Fill Recipe
+- Icon
+- Font
+- Image
+- Curve
+- Bézier Curve
+- Numeric slider/text editing
+- expandable compound values
+
+Refer to `05_UI_PROPERTY_EDITOR_GUIDE.md` for the complete current PropertyEditor
+contract.
+
+### Keep domain-specific behaviour outside PropertyEditor
+
+PropertyEditor provides reusable schema, presentation and editing behaviour.
+
+The demo remains responsible for:
+
+- interpreting the values for the control;
+- applying them to the preview;
+- generating useful example code;
+- application-specific resource providers;
+- any demo-specific help.
+
+Do not add demo-specific meaning back into the generic PropertyEditor packages.
+
+---
+
+## Code
+
+The Code page shows useful U++ source corresponding to the current configuration.
+
+`UiLabelDemo` is the current reference for this behaviour.
+
+The generated code should:
+
+- use the real public control API;
+- reflect current Inspector values;
+- include active local overrides where relevant;
+- omit unnecessary demo infrastructure;
+- be readable;
+- be suitable for selecting/copying as a practical starting point.
+
+The generated code does not need to reproduce the demo application itself. Its
+purpose is to show how the configured control would be constructed and styled in
+ordinary U++ application code.
+
+Where no explicit style overrides are active, prefer concise role/theme-based
+code rather than emitting every resolved style field.
+
+---
+
+## Source structure and readability
+
+A demo is documentation in executable form.
+
+Its source therefore needs to remain easy to navigate.
+
+Prefer clear, descriptive methods such as:
+
+```cpp
+BuildHeader();
+BuildPreview();
+BuildRightRail();
+BuildInspectorModel();
+BuildOverrideModel();
+ConfigureEditors();
+ConnectEvents();
+ApplyProjection();
+ApplyTheme();
+UpdateGeneratedCode();
+````
+
+The exact names depend on the control, but the source should reveal the demo's
+structure without requiring a reader to reverse-engineer it.
+
+For a substantial demo, a small package split such as:
+
+```text
+UiControlDemo/
+    UiControlDemo.h
+    UiControlDemo.cpp
+    main.cpp
+    UiControlDemo.upp
+```
+
+is preferable to an excessively large `main.cpp`.
+
+Do not fragment a small demo unnecessarily.
+
+### Documentation inside the source
+
+Provide a concise header comment explaining:
+
+* what the demo demonstrates;
+* its main structure;
+* how PropertyEditor state relates to the preview;
+* any important non-obvious architectural decision.
+
+Add comments where they clarify intent or unusual behaviour.
+
+Do not comment every straightforward assignment.
+
+The source should be approachable to:
+
+* a developer learning the control;
+* a developer learning PropertyEditor;
+* an agent using the demo as an implementation reference.
+
+---
 
 ## Self-contained packages
 
-Despite sharing this visual language:
+Despite sharing a common design language:
 
-- Each demo remains understandable by opening its own package.
-- No mandatory common demo framework.
-- Small duplicated shell/setup code is preferable to a large shared demo
-  framework.
+* each demo should remain understandable by opening its own package;
+* there is no mandatory shared demo application framework;
+* demos must not depend on UiDesigner;
+* normal reusable `Ui` and `PropertyEditor` packages should be shared;
+* a small amount of repeated shell construction is acceptable.
 
-## Reference implementation
+Avoid creating abstractions solely to eliminate harmless duplication between
+demo applications.
 
-The first canonical implementation of this structure is the future **Label
-demo**. Do not attempt to guess all details now; implement the target clearly and
-let the Label implementation refine this guide afterward.
+If several demos eventually reveal a genuinely reusable **production control**
+or PropertyEditor capability, that may belong in the library. A convenience that
+only hides demo construction usually does not.
 
-## Current state
+---
 
-Existing demos are retained as-is for this cleanup. They compile and act as a
-manual regression suite. The migration to the structure above happens after the
-Label reference implementation is accepted.
+## Migration of existing demos
+
+`UiLabelDemo` is now the accepted starting baseline for the new demo generation.
+
+Existing demos do not need to be converted all at once.
+
+Migrate them incrementally, using `UiLabelDemo` as the reference and adjusting
+the Inspector, Overrides and preview to suit each control.
+
+For each migration:
+
+1. inspect the complete public API of the control;
+2. identify the meaningful Inspector properties;
+3. identify its real style/override surface;
+4. choose the best available PropertyEditor adapters;
+5. provide a generous live preview;
+6. generate useful corresponding code;
+7. keep the package self-contained and readable;
+8. compile and visually validate it before using it as the basis for another
+   migration.
+
+The objective is consistency without forcing every control into an identical
+property schema.
+
+`UiLabelDemo` establishes the **architecture and interaction language**. Each
+control determines the actual content.
+
+```
+```
