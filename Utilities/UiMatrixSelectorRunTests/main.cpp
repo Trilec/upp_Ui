@@ -35,6 +35,20 @@ static void TestPresets(TestCtx& t)
     t.Expect(s.GetRows() == 2 && s.GetColumns() == 2 && s.GetCellCount() == 4, "QuadPair is 2x2");
     t.Expect(s.IsPairSelection(), "QuadPair defaults to pair selection mode");
     t.Expect(!s.HasPairStart() && !s.HasCompletePair(), "QuadPair starts without pair endpoints");
+
+    s.SetPreset(UiMatrixPreset::Cardinal4);
+    t.Expect(s.GetRows() == 3 && s.GetColumns() == 3 && s.GetCellCount() == 9,
+             "Cardinal4 retains directional 3x3 geometry");
+    t.Expect(s.GetData() == Value("top") && s.GetSelectedIndex() == 1,
+             "Cardinal4 defaults to top");
+    t.Expect(!s.GetCell(0).visible && !s.GetCell(4).visible &&
+             !s.GetCell(8).visible,
+             "Cardinal4 hides diagonals and centre");
+    t.Expect(s.GetCell(1).glyph == UiMatrixGlyph::ArrowN &&
+             s.GetCell(3).glyph == UiMatrixGlyph::ArrowW &&
+             s.GetCell(5).glyph == UiMatrixGlyph::ArrowE &&
+             s.GetCell(7).glyph == UiMatrixGlyph::ArrowS,
+             "Cardinal4 exposes four directional glyphs");
 }
 
 static void TestSelectionAndData(TestCtx& t)
@@ -195,6 +209,7 @@ static void TestStyle(TestCtx& t)
     s.SetCellGap(DPI(5)).SetCellRadius(DPI(8)).SetOuterRadius(DPI(10))
      .SetGlyphInset(DPI(6)).SetIconInset(DPI(5)).SetPairLineWidth(DPI(4))
      .SetPairArrowSize(DPI(9)).SetDefaultDash(DPI(5), DPI(2)).SetDefaultFrameWidth(DPI(2))
+     .SetSelectedFrameExtra(DPI(3))
      .SetCellFont(SansSerifZ(12)).SetReadoutFont(SansSerifZ(13))
      .SetReadoutRadius(DPI(7)).SetReadoutGap(DPI(12)).SetReadoutWidth(DPI(120))
      .ShowCellFace(false).ShowCellFrame(false)
@@ -209,6 +224,7 @@ static void TestStyle(TestCtx& t)
     t.Expect(st.glyph_inset == DPI(6) && st.icon_inset == DPI(5), "glyph/icon inset styleable");
     t.Expect(st.pair_line_width == DPI(4) && st.pair_arrow_size == DPI(9), "pair line and arrow styleable");
     t.Expect(st.default_dash == DPI(5) && st.default_dash_gap == DPI(2) && st.default_frame_width == DPI(2), "default dash styleable");
+    t.Expect(st.selected_frame_extra == DPI(3), "selected frame emphasis styleable");
     t.Expect(st.readout_gap == DPI(12) && st.readout_width == DPI(120), "readout geometry styleable");
     s.ClearCustomStyle();
     t.Expect(!s.HasCustomStyle(), "ClearCustomStyle restores theme style");

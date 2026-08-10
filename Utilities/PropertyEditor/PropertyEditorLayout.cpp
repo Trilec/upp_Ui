@@ -74,12 +74,13 @@ void PropertyEditor::Layout()
     Rect r = GetClientArea();
     if(style_.show_filter) {
         filter_.Show();
-        int pad = min(style_.cell_padding, DPI(4));
-        filter_.SetRect(r.left + pad,
-                        r.top + pad,
-                        max(0, r.GetWidth() - 2 * pad),
-                        max(DPI(18), style_.filter_height - 2 * pad));
-        r.top += style_.filter_height;
+        const int horizontal_pad = min(style_.cell_padding, DPI(4));
+        const int vertical_pad = DPI(1);
+        filter_.SetRect(r.left + horizontal_pad,
+                        r.top + vertical_pad,
+                        max(0, r.GetWidth() - 2 * horizontal_pad),
+                        max(DPI(18), style_.filter_height - 2 * vertical_pad));
+        r.top += style_.filter_height + max(0, style_.filter_gap);
     }
     else
         filter_.Hide();
@@ -116,6 +117,7 @@ void PropertyEditor::Paint(Draw& w)
     if(viewport_.IsEmpty())
         return;
 
+    w.Clip(viewport_);
     int top = viewport_.top - scroll_.GetPos();
     for(int i = 0; i < rows_.GetCount(); i++) {
         const DisplayRow& row = rows_[i];
@@ -135,11 +137,13 @@ void PropertyEditor::Paint(Draw& w)
         w.DrawLine(x, viewport_.top, x, viewport_.bottom,
                    DPI(2), SColorHighlight());
     }
+    w.End();
 }
 
 Size PropertyEditor::GetMinSize() const
 {
-    int cy = style_.show_filter ? style_.filter_height : 0;
+    int cy = style_.show_filter
+           ? style_.filter_height + max(0, style_.filter_gap) : 0;
     cy += style_.group_height + 4 * style_.row_height;
     int label = label_mode_ == PropertyEditorLabelMode::Auto
               ? cached_auto_label_width_ : style_.label_width;

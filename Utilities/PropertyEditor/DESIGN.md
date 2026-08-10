@@ -46,7 +46,8 @@ Designer, or resource-picker applications.
 
 ## Rows and virtualization
 
-- Filter remains fixed above the scrolling viewport and updates live.
+- Filter remains fixed above the scrolling viewport, updates live, and uses the
+  style's explicit `filter_gap` so it cannot visually collide with the first row.
 - Nested group collapse state is retained while a filter temporarily reveals
   matching descendants.
 - Label sizing supports Auto, Fixed and Ratio, with a draggable divider and

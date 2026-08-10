@@ -241,10 +241,13 @@ CONSOLE_APP_MAIN
     PropertyEditorStyle style = editor.GetStyle();
     t.Expect(style.action_icons.size == DPI(16),
              "compact PropertyEditor action icons default to 16 pixels");
+    t.Expect(style.filter_gap == DPI(10),
+             "filter and property viewport have an explicit ten-pixel gap");
     t.Expect(!style.reset_icon.IsEmpty() && !style.action_icons.expand.IsEmpty() &&
              !style.action_icons.collapse.IsEmpty() && !style.action_icons.dialog.IsEmpty() &&
-             !style.action_icons.browse.IsEmpty(),
-             "reset, expansion, dialog and browse imagery are style-configurable");
+             !style.action_icons.browse.IsEmpty() &&
+             !style.action_icons.numeric_slider.IsEmpty(),
+             "reset, expansion, dialog, browse and slider imagery are style-configurable");
     style.group_font = StdFont().Bold().Height(15);
     style.action_icons.size = DPI(15);
     style.label_font = StdFont().Height(13);
@@ -257,6 +260,13 @@ CONSOLE_APP_MAIN
     t.Expect(editor.GetStyle().label_font.GetHeight() == 13 &&
              editor.GetStyle().value_font.GetHeight() == 13,
              "label and value fonts are style-configurable");
+
+    PropertyActionLabel action_label;
+    int summary_actions = 0;
+    action_label.WhenAction = [&] { summary_actions++; };
+    action_label.LeftDown(Point(1, 1), 0);
+    t.Expect(summary_actions == 1,
+             "expandable summary labels activate directly on mouse click");
 
     editor.SetGroupAction("Appearance", "Reset");
     t.Expect(editor.GetGroupAction("Appearance") == "Reset",
@@ -288,6 +298,18 @@ CONSOLE_APP_MAIN
     editor.Layout();
     t.Expect(editor.GetStyle().filter_height >= DPI(36),
              "default filter has unclipped 36px geometry");
+    PropertyEditorStyle no_filter = editor.GetStyle();
+    no_filter.show_filter = false;
+    editor.SetStyle(no_filter);
+    const int without_filter = editor.GetMinSize().cy;
+    no_filter.show_filter = true;
+    editor.SetStyle(no_filter);
+    const int expected_filtered_height = max(DPI(180),
+        no_filter.filter_height + no_filter.filter_gap +
+        no_filter.group_height + 4 * no_filter.row_height);
+    t.Expect(without_filter == DPI(180) &&
+             editor.GetMinSize().cy == expected_filtered_height,
+             "minimum geometry reserves filter height and viewport gap above its floor");
     t.Expect(editor.GetInlineEditorCount() < 20,
              "one-thousand-row model keeps inline editor count viewport-bounded");
     for(int pass = 0; pass < 25; pass++) {

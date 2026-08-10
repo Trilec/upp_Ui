@@ -6,11 +6,20 @@
 
 namespace Upp {
 
+class PropertyActionLabel : public UiLabel {
+public:
+    typedef PropertyActionLabel CLASSNAME;
+
+    void LeftDown(Point p, dword keyflags) override;
+    bool Key(dword key, int count) override;
+};
+
 struct PropertyEditorActionIcons {
     Image expand;
     Image collapse;
     Image dialog;
     Image browse;
+    Image numeric_slider;
     int size = DPI(16);
 };
 

@@ -43,6 +43,8 @@
     - 2026-08: added ordered two-cell selection with direction-preserving arrow.
     - 2026-08: renamed the generic quad preset to QuadPair, removed Dramatica-
       specific pattern API, and added role-derived default-cell indication.
+    - 2026-08: added Cardinal4 for top/right/bottom/left choices without a
+      selectable centre or diagonal cells.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -58,6 +60,7 @@ enum class UiMatrixPreset : byte {
     Compass8,
     Region5,
     QuadPair,
+    Cardinal4,
 };
 
 enum class UiMatrixGlyph : byte {
@@ -127,6 +130,7 @@ public:
         int default_dash = DPI(4);
         int default_dash_gap = DPI(3);
         int default_frame_width = DPI(1);
+        int selected_frame_extra = DPI(1);
         Color pair_color = Null;
 
         void Serialize(Stream& s)
@@ -140,6 +144,7 @@ public:
               % glyph_inset % icon_inset
               % pair_line_width % pair_arrow_size
               % default_dash % default_dash_gap % default_frame_width
+              % selected_frame_extra
               % pair_color;
         }
     };
@@ -211,6 +216,7 @@ public:
     UiMatrixSelector& SetPairColor(Color color);
     UiMatrixSelector& SetDefaultDash(int dash, int gap);
     UiMatrixSelector& SetDefaultFrameWidth(int px);
+    UiMatrixSelector& SetSelectedFrameExtra(int px);
 
     int GetRows() const { return rows_; }
     int GetColumns() const { return cols_; }

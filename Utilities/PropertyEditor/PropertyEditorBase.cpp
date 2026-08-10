@@ -31,6 +31,7 @@ static PropertyEditorStyle PeMakeStyle(Color background,
     style.action_icons.collapse = ICON_DESIGN_UNFOLD_LESS_48();
     style.action_icons.dialog = ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
     style.action_icons.browse = ICON_DESIGN_PENDING_48();
+    style.action_icons.numeric_slider = ICON_DESIGN_SLIDERS_48();
     style.action_icons.size = DPI(16);
     style.group_font = StdFont().Bold();
     style.group_subtitle_font = StdFont();

@@ -8,6 +8,43 @@ documents.
 
 These concepts apply to every `Ui*` control and are documented once here.
 
+### Agent and demo naming convention
+
+New library, application, integration, and demo code should make the control
+type or responsibility visible in the variable name. Prefer a short semantic
+prefix followed by a descriptive name, for example `tc_header`,
+`box_header_actions`, `pnl_preview`, and `pe_model_inspector`. Do not use
+ambiguous names such as `header_`, `surface_`, or `model_` when the object type
+is known. New code should prefer the prefix form without a trailing member
+underscore; existing library code is not required to be renamed solely to
+satisfy this convention.
+
+Use these standard prefixes:
+
+| Object or role | Prefix | Example |
+| --- | --- | --- |
+| `UiTitleCard` | `tc_` | `tc_header` |
+| `UiBoxLayout` | `box_` | `box_header_actions` |
+| `UiStack` | `stk_` | `stk_right_pages` |
+| `UiButton` / `UiToolButton` | `btn_` | `btn_copy_code` |
+| `UiLabel` | `lbl_` | `lbl_preview_caption` |
+| `UiPanel` | `pnl_` | `pnl_preview` |
+| `PropertyEditor` | `pe_` | `pe_inspector` |
+| `PropertyEditorModel` | `pe_model_` | `pe_model_override` |
+| editable control | `edit_` | `edit_generated_code` |
+| `String` | `str_` | `str_generated_code` |
+| `Image` | `img_` | `img_preview` |
+| `Value` | `val_` | `val_icon` |
+| theme/context object | `ctx_` | `ctx_theme` |
+
+The prefix identifies the declared type or responsibility; the remainder
+should describe the control's purpose. Use a more specific prefix when a
+control is not obvious from context, but do not invent a new prefix when one
+in this table is suitable. This convention applies to new controls,
+application code, examples, demos, and integration surfaces so both human
+readers and future agents can understand ownership without tracing every
+declaration first.
+
 ### Sizing and DPI
 
 - Sizing vocabulary: **Fit** (natural/minimum), **Fixed** (exact requested),
@@ -95,11 +132,19 @@ glyphs, readout, pair arrow, and default indication.
 ### Dimensional/configuration API
 
 ```cpp
-enum class UiMatrixPreset { Position9, Compass8, Region5, QuadPair };
+enum class UiMatrixPreset { Position9, Compass8, Region5, QuadPair, Cardinal4 };
 UiMatrixSelector m;
 m.SetPreset(UiMatrixPreset::Position9);      // loads the cell grid
 m.SetSelectionMode(UiMatrixSelectionMode::SingleCell); // or Pair
 int rows = m.GetRows();                       // 3 for Position9
+
+// Four-way choices such as icon placement use Cardinal4. Its diagonals and
+// centre are not selectable, so invalid values cannot be authored.
+m.SetPreset(UiMatrixPreset::Cardinal4);
+
+// The suggested/default marker follows the rounded cell frame. Selection is
+// one pixel stronger by default and can be tuned independently.
+m.SetSelectedFrameExtra(DPI(1));
 int cols = m.GetColumns();
 int n = m.GetCellCount();
 ```

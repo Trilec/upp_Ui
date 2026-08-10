@@ -86,6 +86,7 @@ UiMatrixSelector::Style UiMatrixSelector::ResolveThemeStyle() const
     out.default_dash = DPI(4);
     out.default_dash_gap = DPI(3);
     out.default_frame_width = DPI(1);
+    out.selected_frame_extra = DPI(1);
     out.pair_color = Null;
     return out;
 }
@@ -236,6 +237,21 @@ void UiMatrixSelector::LoadPreset(UiMatrixPreset preset)
         AddCell("D", "Lower right", "d");
         selection_mode_ = UiMatrixSelectionMode::Pair;
         selected_ = 0;
+        break;
+
+    case UiMatrixPreset::Cardinal4:
+        rows_ = cols_ = 3;
+        AddCell("", "", Null, UiMatrixGlyph::None, false, false);
+        AddCell("", "Top", "top", UiMatrixGlyph::ArrowN);
+        AddCell("", "", Null, UiMatrixGlyph::None, false, false);
+        AddCell("", "Left", "left", UiMatrixGlyph::ArrowW);
+        AddCell("", "", Null, UiMatrixGlyph::None, false, false);
+        AddCell("", "Right", "right", UiMatrixGlyph::ArrowE);
+        AddCell("", "", Null, UiMatrixGlyph::None, false, false);
+        AddCell("", "Bottom", "bottom", UiMatrixGlyph::ArrowS);
+        AddCell("", "", Null, UiMatrixGlyph::None, false, false);
+        selection_mode_ = UiMatrixSelectionMode::SingleCell;
+        selected_ = 1;
         break;
     }
 
@@ -477,6 +493,10 @@ UiMatrixSelector& UiMatrixSelector::SetDefaultFrameWidth(int px)
 {
     StyleEdit().default_frame_width = max(1, px); Refresh(); return *this;
 }
+UiMatrixSelector& UiMatrixSelector::SetSelectedFrameExtra(int px)
+{
+    StyleEdit().selected_frame_extra = max(0, px); Refresh(); return *this;
+}
 
 UiMatrixSelector& UiMatrixSelector::SetCell(int index, const String& short_label,
                                             const String& label, const Value& value)
@@ -670,7 +690,9 @@ void UiMatrixSelector::DrawGlyphAA(Draw& w, const Rect& r, UiMatrixGlyph glyph, 
     BufferPainter p(ib, MODE_ANTIALIASED);
     p.Clear(RGBAZero());
     double cx = r.GetWidth() / 2.0, cy = r.GetHeight() / 2.0;
-    double radius = max(2.0, min(r.GetWidth(), r.GetHeight()) * 0.23);
+    const int extent = min(r.GetWidth(), r.GetHeight());
+    const bool compact = extent <= DPI(18);
+    double radius = max(2.0, extent * (compact ? 0.46 : 0.28));
     if(glyph == UiMatrixGlyph::Dot) {
         p.Begin(); p.Circle(cx, cy, max(1.5, radius * 0.22)); p.Fill(color); p.End();
         w.DrawImage(r.left, r.top, ib); return;
@@ -694,6 +716,16 @@ void UiMatrixSelector::DrawGlyphAA(Draw& w, const Rect& r, UiMatrixGlyph glyph, 
     double sx = cx - dx * radius * 0.72, sy = cy - dy * radius * 0.72;
     double ex = cx + dx * radius, ey = cy + dy * radius;
     double head = radius * 0.48, wing = radius * 0.42;
+    if(compact) {
+        double bx = cx - dx * radius * 0.62;
+        double by = cy - dy * radius * 0.62;
+        p.Begin(); p.Move(ex, ey);
+        p.Line(bx + px * radius * 0.68, by + py * radius * 0.68);
+        p.Line(bx - px * radius * 0.68, by - py * radius * 0.68);
+        p.Close(); p.Fill(color); p.End();
+        w.DrawImage(r.left, r.top, ib);
+        return;
+    }
     p.Begin(); p.Move(sx, sy); p.Line(ex, ey); p.Stroke(max(1.4, radius * 0.16), color); p.End();
     p.Begin(); p.Move(ex, ey);
     p.Line(ex - dx * head + px * wing, ey - dy * head + py * wing);
@@ -720,8 +752,11 @@ void UiMatrixSelector::DrawCellContent(Draw& w, const Rect& r, const Cell& cell,
             w.DrawImage(Rect(at, target), cell.icon);
         }
     }
-    else if(cell.glyph != UiMatrixGlyph::None)
-        DrawGlyphAA(w, content.Deflated(s.glyph_inset), cell.glyph, ink);
+    else if(cell.glyph != UiMatrixGlyph::None) {
+        const int minimum_glyph = DPI(18);
+        const int max_inset = max(0, (min(content.GetWidth(), content.GetHeight()) - minimum_glyph) / 2);
+        DrawGlyphAA(w, content.Deflated(min(s.glyph_inset, max_inset)), cell.glyph, ink);
+    }
     if(!has_visual && !cell.short_label.IsEmpty()) {
         Size ts = GetTextSize(cell.short_label, s.cell_font);
         w.DrawText(r.left + (r.GetWidth() - ts.cx) / 2,
@@ -768,16 +803,20 @@ void UiMatrixSelector::DrawDefaultFrame(Draw& w) const
     Color color = MatrixAccentColor_(s);
     int dash = max(1, s.default_dash), gap = max(1, s.default_dash_gap);
     int fw = max(1, s.default_frame_width);
-    for(int x = r.left; x < r.right; x += dash + gap) {
-        int n = min(dash, r.right - x);
-        w.DrawRect(x, r.top, n, fw, color);
-        w.DrawRect(x, r.bottom - fw, n, fw, color);
-    }
-    for(int y = r.top; y < r.bottom; y += dash + gap) {
-        int n = min(dash, r.bottom - y);
-        w.DrawRect(r.left, y, fw, n, color);
-        w.DrawRect(r.right - fw, y, fw, n, color);
-    }
+    ImageBuffer ib(r.GetSize());
+    BufferPainter p(ib, MODE_ANTIALIASED);
+    p.Clear(RGBAZero());
+    const double half = fw * 0.5;
+    const double width = max(1.0, double(r.GetWidth() - fw));
+    const double height = max(1.0, double(r.GetHeight() - fw));
+    const double radius = min<double>(max(0, s.cell_metrics.radius - fw),
+                                      min(width, height) * 0.5);
+    p.Begin();
+    p.RoundedRectangle(half, half, width, height, radius);
+    p.Dash(Format("%d,%d", dash, gap), 0.0);
+    p.Stroke(fw, color);
+    p.End();
+    w.DrawImage(r.left, r.top, ib);
 }
 
 void UiMatrixSelector::DrawReadout(Draw& w, const Rect& rect, StyledState state) const
@@ -826,8 +865,12 @@ void UiMatrixSelector::Paint(Draw& w)
         if(!cell.visible) continue;
         StyledState state = !IsEnabled() || !IsShowEnabled() || !cell.enabled ? ST_DISABLED
                           : pressed_ == i ? ST_PRESSED : hover_ == i ? ST_HOT : ST_NORMAL;
-        const StyledPalette& palette = IsCellSelectedVisual(i) ? s.selected_palette : s.cell_palette;
-        UiPaintStyledBackground(w, GetCellRect(i), palette, s.cell_metrics, s.cell_skin, state, false);
+        const bool selected = IsCellSelectedVisual(i);
+        const StyledPalette& palette = selected ? s.selected_palette : s.cell_palette;
+        StyledMetrics metrics = s.cell_metrics;
+        if(selected && metrics.frame_enabled)
+            metrics.frame_width += max(0, s.selected_frame_extra);
+        UiPaintStyledBackground(w, GetCellRect(i), palette, metrics, s.cell_skin, state, false);
     }
     DrawDefaultFrame(w);
     DrawPairAA(w, GetMatrixRect());

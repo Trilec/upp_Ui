@@ -31,6 +31,7 @@ static UiMatrixPreset PeMatrixPreset(const String& name)
     if(name == "Compass8") return UiMatrixPreset::Compass8;
     if(name == "Region5") return UiMatrixPreset::Region5;
     if(name == "QuadPair") return UiMatrixPreset::QuadPair;
+    if(name == "Cardinal4") return UiMatrixPreset::Cardinal4;
     return UiMatrixPreset::Position9;
 }
 
@@ -232,7 +233,13 @@ private:
 
     void SyncReadout(bool mixed = false)
     {
-        readout_.SetText(mixed ? "<multiple values>" : AsString(matrix_.GetData()));
+        if(mixed) {
+            readout_.SetText("<multiple values>");
+            return;
+        }
+        readout_.SetText(matrix_.IsPairSelection()
+                         ? matrix_.GetReadoutText()
+                         : matrix_.GetSelectedLabel());
     }
 
     void UpdateVisible()
@@ -283,7 +290,7 @@ private:
     }
 
     UiMatrixSelector matrix_;
-    UiLabel readout_;
+    PropertyActionLabel readout_;
     UiToolButton expand_, dialog_;
     String variant_;
     bool expanded_ = false;

@@ -10,27 +10,22 @@
 
 namespace Upp {
 
-class PropertyActionLabel : public UiLabel {
-public:
-    typedef PropertyActionLabel CLASSNAME;
-
-    void LeftDown(Point, dword) override
-    {
-        if(IsEnabled()) {
-            SetFocus();
-            WhenAction();
-        }
+void PropertyActionLabel::LeftDown(Point, dword)
+{
+    if(IsEnabled()) {
+        SetFocus();
+        WhenAction();
     }
+}
 
-    bool Key(dword key, int count) override
-    {
-        if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
-            WhenAction();
-            return true;
-        }
-        return UiLabel::Key(key, count);
+bool PropertyActionLabel::Key(dword key, int count)
+{
+    if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
+        WhenAction();
+        return true;
     }
-};
+    return UiLabel::Key(key, count);
+}
 
 void PropertyValueEditor::FocusEditor()
 {
@@ -383,7 +378,11 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.SetText("")
+               .SetIcon(ICON_DESIGN_SLIDERS_48())
+               .SetIconSize(DPI(16), DPI(16))
+               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+               .SetContentInset(DPI(1));
         toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
@@ -475,6 +474,13 @@ public:
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        if(!action_icons_.numeric_slider.IsEmpty())
+            toggle_.SetIcon(action_icons_.numeric_slider);
+        toggle_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
     void UpdateVisible()
     {
         edit_.Show(!slider_mode_);
@@ -561,7 +567,11 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.SetText("")
+               .SetIcon(ICON_DESIGN_SLIDERS_48())
+               .SetIconSize(DPI(16), DPI(16))
+               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+               .SetContentInset(DPI(1));
         toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
@@ -653,6 +663,13 @@ public:
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        if(!action_icons_.numeric_slider.IsEmpty())
+            toggle_.SetIcon(action_icons_.numeric_slider);
+        toggle_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
     void UpdateVisible()
     {
         edit_.Show(!slider_mode_);
