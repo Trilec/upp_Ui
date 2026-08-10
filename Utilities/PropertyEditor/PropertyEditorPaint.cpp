@@ -23,29 +23,41 @@ static String PeFormatMultilineSummaryPaint(const Value& value)
     return first;
 }
 
-void PropertyEditor::DrawGroupRow(Draw& w, int,
+void PropertyEditor::DrawGroupRow(Draw& w, int display_index,
                                   const DisplayRow& row, const Rect& r)
 {
     w.DrawRect(r, style_.group_background);
     const int padding = style_.cell_padding;
+    const int indent = row.group_depth * style_.indent_width;
     const String mark = IsGroupOpen(row.group_id) ? "-" : "+";
-    const Font title_font = StdFont().Bold();
+    const Font& title_font = style_.group_font;
     const int title_y = r.top + (r.GetHeight() - title_font.GetHeight()) / 2;
-    const int marker_x = r.left + padding;
+    const int marker_x = r.left + padding + indent;
     const int title_left = marker_x + DPI(16);
-    const int title_right = title_left + GetTextSize(row.group_id, title_font).cx;
+    const String title = row.group_label.IsEmpty() ? row.group_id : row.group_label;
+    const int title_right = title_left + GetTextSize(title, title_font).cx;
 
     w.DrawText(marker_x, title_y, mark, title_font, style_.group_ink);
-    w.DrawText(title_left, title_y, row.group_id,
-               title_font, style_.group_ink);
+    w.DrawText(title_left, title_y, title, title_font, style_.group_ink);
 
     int right = r.right - padding;
+    String action = GetGroupAction(row.group_id);
+    if(!action.IsEmpty()) {
+        Rect ar = GetGroupActionRect(display_index);
+        int ay = ar.top + (ar.GetHeight() - style_.group_subtitle_font.GetHeight()) / 2;
+        w.DrawText(ar.left + DPI(8), ay, action,
+                   style_.group_subtitle_font, style_.group_ink);
+        right = ar.left - DPI(4);
+    }
+
     if(style_.show_group_summaries && model_) {
         int total = 0;
         int local = 0;
+        String prefix = row.group_id + "/";
         for(int i = 0; i < model_->GetCount(); i++) {
             const PropertyEditorItem& item = (*model_)[i];
-            if(!item.overrideable || item.group != row.group_id)
+            if(!item.overrideable ||
+               !(item.group == row.group_id || item.group.StartsWith(prefix)))
                 continue;
             total++;
             if(item.override_active)
@@ -53,29 +65,30 @@ void PropertyEditor::DrawGroupRow(Draw& w, int,
         }
         if(total > 0) {
             const String summary = Format("%d of %d local", local, total);
-            const int summary_width = GetTextSize(summary, StdFont()).cx;
-            w.DrawText(right - summary_width, title_y, summary,
-                       StdFont(), style_.inherited_ink);
-            right -= summary_width + DPI(10);
+            const int summary_width = GetTextSize(summary, style_.group_subtitle_font).cx;
+            if(right - summary_width > title_right + DPI(12)) {
+                w.DrawText(right - summary_width,
+                           r.top + (r.GetHeight() - style_.group_subtitle_font.GetHeight()) / 2,
+                           summary, style_.group_subtitle_font, style_.inherited_ink);
+                right -= summary_width + DPI(10);
+            }
         }
     }
 
     if(model_) {
         const String subtitle = model_->GetGroupSubtitle(row.group_id);
         if(!subtitle.IsEmpty()) {
-            Font subtitle_font = StdFont();
-            subtitle_font.Height(max(1, subtitle_font.GetHeight() - DPI(2)));
             const int subtitle_left = title_right + DPI(14);
             const int available = max(0, right - subtitle_left);
             if(available >= DPI(32)) {
                 const int text_width = min(available,
-                    GetTextSize(subtitle, subtitle_font).cx);
+                    GetTextSize(subtitle, style_.group_subtitle_font).cx);
                 const int subtitle_x = right - text_width;
                 const int subtitle_y = r.top +
-                    (r.GetHeight() - subtitle_font.GetHeight()) / 2;
+                    (r.GetHeight() - style_.group_subtitle_font.GetHeight()) / 2;
                 DrawTextEllipsis(w, subtitle_x, subtitle_y,
-                                 text_width, subtitle, "...", subtitle_font,
-                                 style_.inherited_ink);
+                                 text_width, subtitle, "...",
+                                 style_.group_subtitle_font, style_.inherited_ink);
             }
         }
     }
@@ -102,16 +115,19 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
     int label_cx = GetLabelColumnWidth(r);
     int divider_x = r.left + label_cx;
     Color label_ink = item.enabled ? style_.label_ink : style_.disabled_ink;
-    Font font = StdFont();
-    int text_y = r.top + (r.GetHeight() - font.GetHeight()) / 2;
+    const Font& font = style_.label_font;
+    int text_y = r.top + (min(style_.row_height, r.GetHeight()) - font.GetHeight()) / 2;
 
     int indent = max(0, item.indent) * style_.indent_width;
     w.DrawText(r.left + style_.cell_padding + indent,
                text_y, item.label, font, label_ink);
 
     Rect value_rect = GetValueRect(display_index);
-    if(!FindInlineEditor(display_index) &&
-       (display_index != active_display_row_ || !active_editor_))
+    bool has_inline = FindInlineEditor(display_index) != nullptr;
+    bool has_active = display_index == active_display_row_ && active_editor_;
+    if(item.kind == PropertyEditorKind::Color && has_inline)
+        DrawValueSummary(w, item, value_rect);
+    else if(!has_inline && !has_active)
         DrawValueSummary(w, item, value_rect);
 
     if(item.resettable && !item.overrideable) {
@@ -159,8 +175,9 @@ void PropertyEditor::DrawValueSummary(Draw& w,
                                       const PropertyEditorItem& item,
                                       Rect value_rect) const
 {
-    Font font = StdFont();
-    int y = value_rect.top + (value_rect.GetHeight() - font.GetHeight()) / 2;
+    const Font& font = style_.value_font;
+    int line_h = min(style_.row_height, value_rect.GetHeight());
+    int y = value_rect.top + (line_h - font.GetHeight()) / 2;
     Color ink = item.enabled ? style_.value_ink : style_.disabled_ink;
     if(item.mixed)
         ink = style_.mixed_ink;
@@ -168,10 +185,9 @@ void PropertyEditor::DrawValueSummary(Draw& w,
         ink = style_.inherited_ink;
 
     const auto DrawSwatch = [&](int x, Color color) {
-        const int diameter = min(DPI(16),
-                                 max(0, value_rect.GetHeight() - DPI(8)));
+        const int diameter = min(DPI(16), max(0, line_h - DPI(8)));
         Rect dot = RectC(x,
-            value_rect.top + (value_rect.GetHeight() - diameter) / 2,
+            value_rect.top + (line_h - diameter) / 2,
             diameter, diameter);
         if(diameter > 0)
             w.DrawEllipse(dot, color, 1, style_.frame);
@@ -180,7 +196,10 @@ void PropertyEditor::DrawValueSummary(Draw& w,
 
     if(item.kind == PropertyEditorKind::Color &&
        !item.mixed && item.value.GetType() == COLOR_V) {
-        DrawSwatch(value_rect.left, Color(item.value));
+        Color color = Color(item.value);
+        int d = DrawSwatch(value_rect.left, color);
+        String hex = Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB());
+        w.DrawText(value_rect.left + d + DPI(7), y, hex, font, ink);
         return;
     }
 
@@ -208,6 +227,8 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
         return "<multiple values>";
     switch(item.kind) {
     case PropertyEditorKind::Boolean:
+        if(item.boolean_presentation == PropertyBooleanPresentation::TrueFalse)
+            return (bool)item.value ? "True" : "False";
         return (bool)item.value ? "On" : "Off";
     case PropertyEditorKind::Choice:
         for(const PropertyEditorChoice& choice : item.choices)
@@ -215,7 +236,11 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
                 return choice.label;
         return AsString(item.value);
     case PropertyEditorKind::Color:
-        return item.value.GetType() == COLOR_V ? String() : "<none>";
+        if(item.value.GetType() == COLOR_V) {
+            Color c = Color(item.value);
+            return Format("#%02X%02X%02X", c.GetR(), c.GetG(), c.GetB());
+        }
+        return "<none>";
     case PropertyEditorKind::FillRecipe:
         if(item.value.Is<ValueMap>()) {
             ValueMap recipe = item.value;
@@ -290,4 +315,4 @@ void PropertyEditor::ModelGroupMetadataChanged(PropertyEditorModel *source)
     Refresh();
 }
 
-}
+} // namespace Upp
