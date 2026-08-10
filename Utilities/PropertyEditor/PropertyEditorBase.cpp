@@ -3,9 +3,6 @@
 
 namespace Upp {
 
-One<PropertyValueEditor> CreatePropertyLiveFillRecipeEditor();
-One<PropertyValueEditor> CreatePropertyLiveNumericIntEditor();
-
 static PropertyEditorStyle PeMakeStyle(Color background,
                                        Color row_odd,
                                        Color row_even,
@@ -30,32 +27,13 @@ static PropertyEditorStyle PeMakeStyle(Color background,
     style.error_ink = Color(190, 48, 48);
     style.divider = Blend(background, text, 40);
     style.reset_icon = ICON_DESIGN_ARROW_CIRCLE_LEFT_48();
+    style.group_font = StdFont().Bold();
+    style.group_subtitle_font = StdFont();
+    style.group_subtitle_font.Height(max(1, style.group_subtitle_font.GetHeight() - DPI(2)));
+    style.label_font = StdFont();
+    style.value_font = StdFont();
+    style.filter_font = StdFont();
     return style;
-}
-
-static String PeFormatMultilineSummary(const Value& value)
-{
-    String s = AsString(value);
-    s.Replace("\r", "");
-    int line_count = 1;
-    for(int i = 0; i < s.GetCount(); i++)
-        if(s[i] == '\n')
-            line_count++;
-    String first = s;
-    int nl = first.Find('\n');
-    if(nl >= 0)
-        first = first.Left(nl);
-    first = TrimBoth(first);
-    if(first.IsEmpty())
-        first = "<empty>";
-    if(line_count > 1)
-        return Format("%s (%d lines)", first, line_count);
-    return first;
-}
-
-static Color PeFillColor(const UiFill& fill, Color fallback)
-{
-    return fill.IsSolid() ? fill.color : fallback;
 }
 
 PropertyEditorStyle PropertyEditorStyle::System()
@@ -65,13 +43,13 @@ PropertyEditorStyle PropertyEditorStyle::System()
     UiLabel::Style subtle = UiTheme::ResolveLabel(UiRole::Subtle);
 
     return PeMakeStyle(
-        PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
-        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
-              PeFillColor(panel.palette.face[ST_HOT], SColorFace()), 42),
-        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
-              PeFillColor(panel.palette.face[ST_PRESSED], SColorFace()), 72),
-        Blend(PeFillColor(panel.palette.face[ST_NORMAL], SColorPaper()),
-              PeFillColor(panel.palette.face[ST_DISABLED], SColorFace()), 48),
+        panel.palette.face[ST_NORMAL].IsSolid() ? panel.palette.face[ST_NORMAL].color : SColorPaper(),
+        Blend(panel.palette.face[ST_NORMAL].IsSolid() ? panel.palette.face[ST_NORMAL].color : SColorPaper(),
+              panel.palette.face[ST_HOT].IsSolid() ? panel.palette.face[ST_HOT].color : SColorFace(), 42),
+        Blend(panel.palette.face[ST_NORMAL].IsSolid() ? panel.palette.face[ST_NORMAL].color : SColorPaper(),
+              panel.palette.face[ST_PRESSED].IsSolid() ? panel.palette.face[ST_PRESSED].color : SColorFace(), 72),
+        Blend(panel.palette.face[ST_NORMAL].IsSolid() ? panel.palette.face[ST_NORMAL].color : SColorPaper(),
+              panel.palette.face[ST_DISABLED].IsSolid() ? panel.palette.face[ST_DISABLED].color : SColorFace(), 48),
         label.palette.ink[ST_NORMAL],
         subtle.palette.ink[ST_DISABLED]);
 }
@@ -102,15 +80,17 @@ PropertyEditor::PropertyEditor()
 {
     WantFocus();
     style_ = PropertyEditorStyle::System();
+    RegisterPropertyEditorV1Editors(PropertyEditorFactory::Global());
 
     Add(filter_);
     Add(scroll_);
 
     filter_.SetPlaceholder("Filter properties...");
-    filter_.WhenAction = [=] { RebuildRows(); };
+    filter_.WhenChange = [=] { RebuildRows(); };
 
     scroll_.EnableAutoHide();
     scroll_.WhenScroll = [=] {
+        RebuildInlineEditors();
         LayoutActiveEditor();
         LayoutInlineEditors();
         Refresh();
@@ -130,6 +110,7 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
 
     ClearInlineEditors();
     DeactivateEditor();
+    EndTransaction();
     model_ = model;
     selected_display_row_ = -1;
     hover_display_row_ = -1;
@@ -157,6 +138,8 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
 void PropertyEditor::SetFactory(PropertyEditorFactory *factory)
 {
     factory_ = factory;
+    if(factory_)
+        RegisterPropertyEditorV1Editors(*factory_);
     RebuildRows();
 }
 
@@ -168,10 +151,6 @@ PropertyEditorFactory& PropertyEditor::GetFactory() const
 One<PropertyValueEditor> PropertyEditor::CreateEditor(
     const PropertyEditorItem& item) const
 {
-    if(item.kind == PropertyEditorKind::FillRecipe)
-        return CreatePropertyLiveFillRecipeEditor();
-    if(item.kind == PropertyEditorKind::NumericInt)
-        return CreatePropertyLiveNumericIntEditor();
     return GetFactory().Create(item);
 }
 
@@ -246,6 +225,31 @@ bool PropertyEditor::IsGroupOpen(const String& group) const
     return q < 0 ? true : group_open_[q];
 }
 
+void PropertyEditor::SetGroupAction(const String& group, const String& text)
+{
+    int q = group_actions_.Find(group);
+    if(text.IsEmpty()) {
+        if(q >= 0)
+            group_actions_.Remove(q);
+    }
+    else if(q < 0)
+        group_actions_.Add(group, text);
+    else
+        group_actions_[q] = text;
+    Refresh();
+}
+
+String PropertyEditor::GetGroupAction(const String& group) const
+{
+    int q = group_actions_.Find(group);
+    return q >= 0 ? group_actions_[q] : String();
+}
+
+void PropertyEditor::ClearGroupAction(const String& group)
+{
+    SetGroupAction(group, String());
+}
+
 void PropertyEditor::RefreshModel()
 {
     RebuildRows();
@@ -260,9 +264,9 @@ void PropertyEditor::RefreshValue(const String& property_id)
     if(display >= 0) {
         const PropertyEditorItem& item = (*model_)[rows_[display].model_index];
         PropertyValueEditor *editor = FindInlineEditor(display);
-        if((editor != nullptr) != UsesInlineEditor(item)) {
-            RebuildRows();
-            return;
+        if((editor != nullptr) != (UsesInlineEditor(item) && IsDisplayRowNearViewport(display))) {
+            RebuildInlineEditors();
+            editor = FindInlineEditor(display);
         }
         if(editor) {
             syncing_editor_ = true;
@@ -326,5 +330,4 @@ const PropertyEditorItem* PropertyEditor::GetSelectedProperty() const
     return &(*model_)[row.model_index];
 }
 
-
-}
+} // namespace Upp
