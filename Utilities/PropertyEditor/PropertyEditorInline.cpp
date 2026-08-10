@@ -55,10 +55,10 @@ void PropertyEditor::LayoutInlineEditors()
 
 bool PropertyEditor::UsesInlineEditor(const PropertyEditorItem& item) const
 {
-    return (item.kind == PropertyEditorKind::FillRecipe ||
-            item.kind == PropertyEditorKind::Boolean ||
-            item.kind == PropertyEditorKind::Color ||
-            item.inline_editor) &&
+    bool boolean_check = item.kind == PropertyEditorKind::Boolean &&
+                         item.boolean_presentation == PropertyBooleanPresentation::Check;
+    return (item.kind == PropertyEditorKind::FillRecipe || boolean_check ||
+            item.kind == PropertyEditorKind::Color || item.inline_editor) &&
            item.value_editable && item.enabled && !item.read_only;
 }
 
