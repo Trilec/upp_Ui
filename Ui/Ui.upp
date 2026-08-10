@@ -101,6 +101,8 @@ file
 	UiQuadSplitter.cpp,
 	UiTable.h,
 	UiTable.cpp,
+	UiDocCore.h,
+	UiDocCore.cpp,
 	UiDoc.h,
 	UiDoc.cpp,
 	UiTree.h,
