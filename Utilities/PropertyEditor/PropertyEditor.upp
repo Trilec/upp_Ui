@@ -8,8 +8,8 @@ uses
 file
 	PropertyValueEditors.h,
 	PropertyValueEditors.cpp,
+	PropertyV1Editors.cpp,
 	PropertyEditor.h,
-	PropertyAdvancedEditors.cpp,
 	PropertyEditorBase.cpp,
 	PropertyEditorLayout.cpp,
 	PropertyEditorInline.cpp,
