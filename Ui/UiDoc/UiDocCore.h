@@ -28,101 +28,103 @@ struct UiDocRange : Moveable<UiDocRange> {
     int to   = 0;
 
     UiDocRange() {}
-    UiDocRange(int from, int to) : from(from), to(to) {}
+    UiDocRange(int a, int b) : from(a), to(b) {}
 
-    int  GetLength() const { return max(0, to - from); }
-    bool IsEmpty() const { return to <= from; }
-    bool Contains(int pos) const { return from <= pos && pos < to; }
+    void Normalize() { if(from > to) Swap(from, to); }
+    bool IsEmpty() const { return from == to; }
+    int  GetLength() const { return abs(to - from); }
 };
 
 struct UiDocTextStyle : Moveable<UiDocTextStyle> {
     enum Mark : byte {
-        BOLD      = 1 << 0,
-        ITALIC    = 1 << 1,
-        UNDERLINE = 1 << 2,
-        STRIKE    = 1 << 3,
+        BOLD      = 1,
+        ITALIC    = 2,
+        UNDERLINE = 4,
+        STRIKE    = 8
     };
 
-    byte flags = 0;
-    Color ink = Null;
+    byte   flags = 0;
+    Color  ink = Null;
     String font_face;
-    int font_height = 0;
-    int size_delta = 0;
-    int leading_delta = 0;
-    int tracking_delta = 0;
+    int    font_height = 0;
+    int    size_delta = 0;
+    int    leading_delta = 0;
+    int    tracking_delta = 0;
+
+    bool IsDefault() const {
+        return flags == 0 && IsNull(ink) && font_face.IsEmpty() && font_height == 0 &&
+               size_delta == 0 && leading_delta == 0 && tracking_delta == 0;
+    }
 };
 
 struct UiDocStyleRun : Moveable<UiDocStyleRun> {
-    UiDocRange range;
+    int from = 0;
+    int to = 0;
     UiDocTextStyle style;
 };
 
 struct UiDocBlock : Moveable<UiDocBlock> {
-    String id;
+    String     id;
     UiDocRange range;
-    String role = "paragraph";
-    int indent = 0;
-    ValueMap metadata;
+    String     role;
+    int        indent = 0;
+    ValueMap   meta;
 };
 
 struct UiDocAnnotation : Moveable<UiDocAnnotation> {
-    String id;
-    String type;
+    String     id;
     UiDocRange range;
-    ValueMap payload;
-    ValueMap metadata;
-    bool resolved = false;
+    String     type;
+    ValueMap   payload;
+    ValueMap   meta;
+    bool       expanded = true;
+    bool       printable = true;
+    bool       resolved = false;
 };
 
 struct UiDocResource : Moveable<UiDocResource> {
-    String key;
-    String resource_type;
-    String mime;
-    String bytes;
-    String sha256;
-    int width = 0;
-    int height = 0;
-    ValueMap metadata;
+    String   key;
+    String   resource_type;
+    String   content_hash;
+    String   bytes;
+    String   mime;
+    String   original_name;
+    int      width = 0;
+    int      height = 0;
+    ValueMap meta;
 };
 
 struct UiDocEmbedBlock : Moveable<UiDocEmbedBlock> {
-    String id;
-    String type;
+    String     id;
+    String     type;
     UiDocRange range;
-    ValueMap payload;
-    ValueMap layout;
-    ValueMap metadata;
-};
-
-struct UiDocAnchor : Moveable<UiDocAnchor> {
-    String id;
-    int pos = 0;
-    ValueMap metadata;
+    ValueMap   payload;
+    ValueMap   layout;
+    ValueMap   meta;
 };
 
 struct UiDocInlineRun : Moveable<UiDocInlineRun> {
-    String type = "text"; // text, image, custom
+    String type = "text";
     WString text;
     UiDocTextStyle style;
     String resource_key;
     int width = 0;
     int height = 0;
     ValueMap payload;
-    ValueMap metadata;
+    ValueMap meta;
 };
 
 struct UiDocTableCell : Moveable<UiDocTableCell> {
-    String id;
     Vector<UiDocInlineRun> runs;
     ValueMap format;
-    ValueMap metadata;
+    ValueMap meta;
+
+    WString GetPlainText() const;
 };
 
 struct UiDocTableRow : Moveable<UiDocTableRow> {
-    String id;
     Vector<UiDocTableCell> cells;
-    ValueMap format;
-    ValueMap metadata;
+    ValueMap meta;
 };
 
 struct UiDocTable : Moveable<UiDocTable> {
@@ -130,20 +132,82 @@ struct UiDocTable : Moveable<UiDocTable> {
     int header_rows = 0;
     Vector<UiDocTableRow> rows;
     ValueMap format;
-    ValueMap metadata;
+    ValueMap meta;
+
+    bool IsEmpty() const { return columns <= 0 || rows.IsEmpty(); }
 };
 
-struct UiDocPositionEdit : Moveable<UiDocPositionEdit> {
-    int from = 0;
-    int old_length = 0;
-    int new_length = 0;
+struct UiDocPositionMapEntry : Moveable<UiDocPositionMapEntry> {
+    int at = 0;
+    int old_len = 0;
+    int new_len = 0;
 };
 
-struct UiDocPositionMap : Moveable<UiDocPositionMap> {
-    Vector<UiDocPositionEdit> edits;
+struct UiDocPositionMap {
+    enum Bias : byte { Left, Right };
+    Vector<UiDocPositionMapEntry> edits;
 
-    int Map(int pos, bool affinity_after = true) const;
-    UiDocRange Map(UiDocRange range) const;
+    void Clear() { edits.Clear(); }
+    bool IsEmpty() const { return edits.IsEmpty(); }
+    int Map(int pos, Bias bias) const;
+};
+
+struct UiDocCoreChange : Moveable<UiDocCoreChange> {
+    enum Type : byte {
+        ReplaceText,
+        SetStyle,
+        SetMark,
+        AddBlock,
+        RemoveBlock,
+        UpdateBlock,
+        AddAnnotation,
+        RemoveAnnotation,
+        UpdateAnnotation,
+        SetAnnotationFlags,
+        AddResource,
+        RemoveResource,
+        AddEmbed,
+        RemoveEmbed,
+        UpdateEmbed,
+        SetDocumentMeta,
+        SetAnchor,
+        RemoveAnchor
+    } type = ReplaceText;
+
+    UiDocRange range;
+    WString text;
+    UiDocTextStyle style;
+    dword style_mask = 0;
+    byte mark = 0;
+    bool enabled = false;
+
+    UiDocBlock block;
+    String block_id;
+
+    UiDocAnnotation annotation;
+    String annotation_id;
+    ValueMap values;
+    bool expanded = true;
+    bool printable = true;
+    bool resolved = false;
+    dword flag_mask = 0;
+
+    UiDocResource resource;
+    String resource_key;
+
+    UiDocEmbedBlock embed;
+    String embed_id;
+
+    String key;
+    Value value;
+    int pos = 0;
+};
+
+struct UiDocCoreTransaction : Moveable<UiDocCoreTransaction> {
+    Vector<UiDocCoreChange> changes;
+    String label;
+    uint64 base_revision = 0;
+    bool add_to_history = true;
 };
 
 struct UiDocApplyResult : Moveable<UiDocApplyResult> {
@@ -155,75 +219,34 @@ struct UiDocApplyResult : Moveable<UiDocApplyResult> {
     String error;
 };
 
-struct UiDocChange : Moveable<UiDocChange> {
-    enum Type : byte {
-        REPLACE_TEXT,
-        SET_STYLE,
-        SET_BLOCK,
-        REMOVE_BLOCK,
-        ADD_ANNOTATION,
-        UPDATE_ANNOTATION,
-        REMOVE_ANNOTATION,
-        ADD_RESOURCE,
-        REMOVE_RESOURCE,
-        INSERT_EMBED,
-        UPDATE_EMBED,
-        REMOVE_EMBED,
-        SET_DOCUMENT_METADATA,
-        SET_ANCHOR,
-        REMOVE_ANCHOR,
-    };
-
-    Type type = REPLACE_TEXT;
-    UiDocRange range;
-    WString text;
-    UiDocTextStyle style;
-    dword style_mask = 0;
-    UiDocBlock block;
-    UiDocAnnotation annotation;
-    UiDocResource resource;
-    UiDocEmbedBlock embed;
-    UiDocAnchor anchor;
-    String id;
-    String key;
-    Value value;
-    ValueMap values;
-};
-
-struct UiDocTransaction : Moveable<UiDocTransaction> {
-    Vector<UiDocChange> changes;
-    bool add_to_history = true;
-    uint64 base_revision = 0; // 0 = accept current revision
-    String source;
-};
-
 class UiDocCore {
 public:
     enum StyleMask : dword {
-        STYLE_FLAGS          = 1 << 0,
-        STYLE_INK            = 1 << 1,
-        STYLE_FONT_FACE      = 1 << 2,
-        STYLE_FONT_HEIGHT    = 1 << 3,
-        STYLE_SIZE_DELTA     = 1 << 4,
-        STYLE_LEADING_DELTA  = 1 << 5,
-        STYLE_TRACKING_DELTA = 1 << 6,
-        STYLE_ALL            = 0x7f,
+        STYLE_FLAGS          = 1u << 0,
+        STYLE_INK            = 1u << 1,
+        STYLE_FONT_FACE      = 1u << 2,
+        STYLE_FONT_HEIGHT    = 1u << 3,
+        STYLE_SIZE_DELTA     = 1u << 4,
+        STYLE_LEADING_DELTA  = 1u << 5,
+        STYLE_TRACKING_DELTA = 1u << 6,
+        STYLE_ALL            = 0x7fu
+    };
+
+    enum AnnotationFlagMask : dword {
+        ANNOT_EXPANDED  = 1u << 0,
+        ANNOT_PRINTABLE = 1u << 1,
+        ANNOT_RESOLVED  = 1u << 2
     };
 
 private:
-    WString text_;
-    Vector<UiDocStyleRun> styles_;
-    Vector<UiDocBlock> blocks_;
-    Vector<UiDocAnnotation> annotations_;
-    Vector<UiDocResource> resources_;
-    Vector<UiDocEmbedBlock> embeds_;
-    Vector<UiDocAnchor> anchors_;
-    ValueMap metadata_;
+    struct HistoryStep : Moveable<HistoryStep> {
+        enum Kind : byte {
+            Text, Styles, Blocks, Annotations, Resources, Embeds, Meta, Anchors
+        } kind = Text;
 
-    struct HistoryItem : Moveable<HistoryItem> {
+        int at = 0;
         WString before_text;
         WString after_text;
-        UiDocRange text_range;
         Vector<UiDocStyleRun> before_styles;
         Vector<UiDocStyleRun> after_styles;
         Vector<UiDocBlock> before_blocks;
@@ -234,141 +257,141 @@ private:
         Vector<UiDocResource> after_resources;
         Vector<UiDocEmbedBlock> before_embeds;
         Vector<UiDocEmbedBlock> after_embeds;
-        Vector<UiDocAnchor> before_anchors;
-        Vector<UiDocAnchor> after_anchors;
-        ValueMap before_metadata;
-        ValueMap after_metadata;
+        VectorMap<String, int> before_anchors;
+        VectorMap<String, int> after_anchors;
+        ValueMap before_meta;
+        ValueMap after_meta;
     };
 
-    Vector<HistoryItem> undo_;
-    Vector<HistoryItem> redo_;
-    int history_limit_ = 256;
-    uint64 revision_ = 1;
-    int next_annotation_id_ = 1;
-    int next_embed_id_ = 1;
-    int next_block_id_ = 1;
-    int next_anchor_id_ = 1;
+    struct HistoryRecord : Moveable<HistoryRecord> {
+        Vector<HistoryStep> steps;
+    };
 
+    WString text_;
+    Vector<UiDocStyleRun> styles_;
+    Vector<UiDocBlock> blocks_;
+    Vector<UiDocAnnotation> annotations_;
+    Vector<UiDocResource> resources_;
+    Vector<UiDocEmbedBlock> embeds_;
+    VectorMap<String, int> anchors_;
+    ValueMap meta_;
+
+    Vector<HistoryRecord> undo_;
+    Vector<HistoryRecord> redo_;
+    int history_limit_ = 128;
+    uint64 revision_ = 0;
+    int next_block_id_ = 1;
+    int next_annotation_id_ = 1;
+    int next_resource_id_ = 1;
+    int next_embed_id_ = 1;
+
+    int ClampPos(int pos) const;
     UiDocRange NormalizeRange(UiDocRange range) const;
+    void ApplyHistoryStep(const HistoryStep& step, bool before);
+    void ApplyHistoryRecord(const HistoryRecord& record, bool before);
+    void Touch();
+    void RebuildIds();
     void NormalizeStyles();
-    void NormalizeBlocks();
-    void RemapRanges(const UiDocPositionMap& map);
-    void RebuildIdAllocators();
-    bool Validate(String *error = nullptr) const;
-    bool ApplyOne(const UiDocChange& change, UiDocApplyResult& result);
-    void TouchRevision();
-    void PushHistory(HistoryItem&& item);
-    HistoryItem CaptureState() const;
-    void RestoreState(const HistoryItem& item, bool after);
+    void ReplaceStyleRange(UiDocRange range, const UiDocTextStyle& style, dword mask);
+    void ReplaceMarkRange(UiDocRange range, byte mark, bool enabled);
+    void MapRanges(const UiDocPositionMap& map);
     int FindBlock(const String& id) const;
     int FindAnnotation(const String& id) const;
     int FindResource(const String& key) const;
     int FindEmbed(const String& id) const;
-    int FindAnchor(const String& id) const;
-    bool IsResourceReferenced(const String& key) const;
+    bool ApplyOne(const UiDocCoreChange& change, UiDocApplyResult& result, HistoryStep& history);
 
 public:
-    Event<const UiDocApplyResult&> WhenChange;
-
     UiDocCore();
 
     void Clear();
+    bool Validate(String* error = nullptr) const;
 
     uint64 GetRevision() const { return revision_; }
-    const WString& GetText() const { return text_; }
     int GetLength() const { return text_.GetCount(); }
-    WString GetText(UiDocRange range) const;
+    const WString& GetText() const { return text_; }
+    String GetTextUtf8() const { return ToUtf8(text_); }
+    WString GetSlice(UiDocRange range) const;
 
-    const Vector<UiDocStyleRun>& GetStyleRuns() const { return styles_; }
+    void SetHistoryLimit(int count);
+    int GetHistoryLimit() const { return history_limit_; }
+
+    const Vector<UiDocStyleRun>& GetStyles() const { return styles_; }
     const Vector<UiDocBlock>& GetBlocks() const { return blocks_; }
     const Vector<UiDocAnnotation>& GetAnnotations() const { return annotations_; }
     const Vector<UiDocResource>& GetResources() const { return resources_; }
     const Vector<UiDocEmbedBlock>& GetEmbeds() const { return embeds_; }
-    const Vector<UiDocAnchor>& GetAnchors() const { return anchors_; }
-    const ValueMap& GetMetadata() const { return metadata_; }
+    const ValueMap& GetMeta() const { return meta_; }
 
-    Vector<UiDocStyleRun> QueryStyles(UiDocRange range) const;
-    Vector<UiDocBlock> QueryBlocks(const UiDocRange *range = nullptr, const String& role = String()) const;
-    Vector<UiDocAnnotation> QueryAnnotations(const UiDocRange *range = nullptr,
-                                             const String& type = String(),
-                                             int resolved = -1) const;
-    Vector<UiDocEmbedBlock> QueryEmbeds(const UiDocRange *range = nullptr,
-                                        const String& type = String()) const;
+    Value GetMeta(const String& key) const;
+    bool SetMeta(const String& key, const Value& value);
+    bool RemoveMeta(const String& key);
 
-    bool GetBlock(const String& id, UiDocBlock& out) const;
-    bool GetAnnotation(const String& id, UiDocAnnotation& out) const;
-    bool GetResource(const String& key, UiDocResource& out) const;
-    bool GetEmbed(const String& id, UiDocEmbedBlock& out) const;
-    bool GetAnchor(const String& id, UiDocAnchor& out) const;
-
-    UiDocApplyResult Apply(const UiDocTransaction& tx);
-    bool CanUndo() const { return !undo_.IsEmpty(); }
-    bool CanRedo() const { return !redo_.IsEmpty(); }
-    bool Undo(UiDocApplyResult *result = nullptr);
-    bool Redo(UiDocApplyResult *result = nullptr);
-    void ClearHistory();
-    void SetHistoryLimit(int count);
-    int GetHistoryLimit() const { return history_limit_; }
-
+    UiDocApplyResult Apply(const UiDocCoreTransaction& tx);
     UiDocApplyResult Replace(UiDocRange range, const WString& text, uint64 base_revision = 0);
     UiDocApplyResult SetStyle(UiDocRange range, const UiDocTextStyle& style,
                               dword mask = STYLE_ALL, uint64 base_revision = 0);
-    UiDocApplyResult SetMark(UiDocRange range, UiDocTextStyle::Mark mark, bool on,
+    UiDocApplyResult SetMark(UiDocRange range, UiDocTextStyle::Mark mark, bool enabled,
                              uint64 base_revision = 0);
     UiDocApplyResult SetInk(UiDocRange range, Color ink, uint64 base_revision = 0);
     UiDocApplyResult SetFont(UiDocRange range, const String& face, int height = -1,
                              uint64 base_revision = 0);
-    UiDocApplyResult SetBlock(UiDocRange range, const String& role,
-                              const ValueMap& metadata = ValueMap(), int indent = 0,
-                              uint64 base_revision = 0);
-    bool SetBlockMetadata(const String& id, const ValueMap& values);
+
+    String AddBlock(UiDocRange range, const String& role = String(), int indent = 0,
+                    const ValueMap& meta = ValueMap());
+    bool UpdateBlock(const UiDocBlock& block);
     bool RemoveBlock(const String& id);
+    Vector<UiDocBlock> QueryBlocks(const UiDocRange* range = nullptr,
+                                   const String& role = String()) const;
 
-    String AddAnnotation(const String& type, UiDocRange range,
+    String AddAnnotation(UiDocRange range, const String& type,
                          const ValueMap& payload = ValueMap(),
-                         const ValueMap& metadata = ValueMap());
-    bool UpdateAnnotation(const String& id, const ValueMap& payload,
-                          const ValueMap& metadata = ValueMap(), int resolved = -1);
+                         const ValueMap& meta = ValueMap());
     bool RemoveAnnotation(const String& id);
+    bool UpdateAnnotation(const String& id, const ValueMap& values);
+    bool SetAnnotationFlags(const String& id, dword mask,
+                            bool expanded, bool printable, bool resolved);
+    Vector<UiDocAnnotation> QueryAnnotations(const UiDocRange* range = nullptr,
+                                             const String& type = String()) const;
 
-    String AddResource(const String& resource_type, const String& mime, const String& bytes,
-                       int width = 0, int height = 0,
-                       const ValueMap& metadata = ValueMap());
-    bool SetResourceMetadata(const String& key, const ValueMap& values);
-    bool RemoveResource(const String& key, bool refuse_if_referenced = true);
+    String AddResource(const UiDocResource& resource, bool dedupe = true);
+    bool RemoveResource(const String& key);
+    bool GetResource(const String& key, UiDocResource& out) const;
 
-    String InsertEmbed(int pos, const String& type, const ValueMap& payload = ValueMap(),
-                       const ValueMap& layout = ValueMap(),
-                       const ValueMap& metadata = ValueMap());
-    bool UpdateEmbed(const String& id, const ValueMap& payload,
-                     const ValueMap& layout = ValueMap(),
-                     const ValueMap& metadata = ValueMap());
+    String AddEmbed(int pos, const String& type,
+                    const ValueMap& payload = ValueMap(),
+                    const ValueMap& layout = ValueMap(),
+                    const ValueMap& meta = ValueMap());
     bool RemoveEmbed(const String& id);
+    bool UpdateEmbed(const UiDocEmbedBlock& embed);
+    Vector<UiDocEmbedBlock> QueryEmbeds(const UiDocRange* range = nullptr,
+                                        const String& type = String()) const;
 
-    String InsertTable(int pos, int columns, int rows, int header_rows = 0,
-                       const ValueMap& metadata = ValueMap());
-    bool GetTable(const String& embed_id, UiDocTable& table) const;
+    String InsertTable(int pos, int columns = 3, int rows = 3, int header_rows = 1,
+                       const ValueMap& meta = ValueMap());
+    bool GetTable(const String& embed_id, UiDocTable& out) const;
     bool SetTable(const String& embed_id, const UiDocTable& table);
     bool SetTableCell(const String& embed_id, int row, int column, const UiDocTableCell& cell);
-    bool SetTableCellText(const String& embed_id, int row, int column, const WString& text,
-                          const UiDocTextStyle& style = UiDocTextStyle());
     bool InsertTableRow(const String& embed_id, int row);
     bool RemoveTableRow(const String& embed_id, int row);
     bool InsertTableColumn(const String& embed_id, int column);
     bool RemoveTableColumn(const String& embed_id, int column);
 
-    void SetMetadata(const String& key, const Value& value);
-    Value GetMetadata(const String& key) const;
-    bool RemoveMetadata(const String& key);
-
-    String SetAnchor(int pos, const String& id = String(),
-                     const ValueMap& metadata = ValueMap());
+    bool SetAnchor(const String& id, int pos);
     bool RemoveAnchor(const String& id);
+    bool ResolveAnchor(const String& id, int& pos) const;
 
-    String ToJson() const;
-    bool FromJson(const String& json, String *error = nullptr);
-    bool Save(const String& path, String *error = nullptr) const;
-    bool Load(const String& path, String *error = nullptr);
+    String ToJson(bool pretty = false) const;
+    bool FromJson(const String& data, String* error = nullptr);
+    bool Save(const String& path, String* error = nullptr) const;
+    bool Load(const String& path, String* error = nullptr);
+
+    bool Undo();
+    bool Redo();
+    bool CanUndo() const { return !undo_.IsEmpty(); }
+    bool CanRedo() const { return !redo_.IsEmpty(); }
+
+    Event<const UiDocApplyResult&> WhenChange;
 };
 
 }
