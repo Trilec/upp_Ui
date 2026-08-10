@@ -149,6 +149,50 @@ static void TestResourcesAndEmbeds(TestCtx& t)
     t.Expect(doc.RemoveResource(key), "unreferenced resource removed");
 }
 
+static void TestTypedTables(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), WString("table anchor"));
+
+    String table_id = doc.InsertTable(5, 3, 3, 1);
+    t.Expect(!table_id.IsEmpty(), "typed table inserted");
+
+    UiDocTable table;
+    t.Expect(doc.GetTable(table_id, table), "typed table read back");
+    t.Expect(table.columns == 3 && table.rows.GetCount() == 3 && table.header_rows == 1,
+             "table shape retained");
+
+    UiDocTableCell cell;
+    UiDocInlineRun text;
+    text.type = "text";
+    text.text = WString("Shot 210");
+    text.style.flags = UiDocTextStyle::BOLD;
+    cell.runs.Add(pick(text));
+    t.Expect(doc.SetTableCell(table_id, 1, 1, cell), "rich table cell updated");
+
+    UiDocTable after;
+    t.Expect(doc.GetTable(table_id, after), "updated table read back");
+    t.Expect(after.rows[1].cells[1].GetPlainText() == WString("Shot 210"), "table cell text retained");
+    t.Expect((after.rows[1].cells[1].runs[0].style.flags & UiDocTextStyle::BOLD) != 0,
+             "table cell rich style retained");
+
+    t.Expect(doc.InsertTableRow(table_id, 2), "table row inserted");
+    t.Expect(doc.InsertTableColumn(table_id, 1), "table column inserted");
+    t.Expect(doc.GetTable(table_id, after) && after.rows.GetCount() == 4 && after.columns == 4,
+             "table structural edits retained");
+    t.Expect(doc.RemoveTableRow(table_id, 2), "table row removed");
+    t.Expect(doc.RemoveTableColumn(table_id, 1), "table column removed");
+    t.Expect(doc.GetTable(table_id, after) && after.rows.GetCount() == 3 && after.columns == 3,
+             "table returns to original shape");
+
+    const Vector<UiDocEmbedBlock>& embeds = doc.GetEmbeds();
+    bool canonical = false;
+    for(const UiDocEmbedBlock& embed : embeds)
+        if(embed.id == table_id)
+            canonical = embed.payload.Find("rows") >= 0 && embed.payload.Find("cells") < 0;
+    t.Expect(canonical, "table has one canonical run-based payload");
+}
+
 static void TestUndoRedoAndValidation(TestCtx& t)
 {
     UiDocCore doc;
@@ -212,6 +256,7 @@ CONSOLE_APP_MAIN
     TestSemanticBlocks(t);
     TestAnnotationsAndMetadata(t);
     TestResourcesAndEmbeds(t);
+    TestTypedTables(t);
     TestUndoRedoAndValidation(t);
     TestLargeSparseDocument(t);
 

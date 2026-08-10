@@ -103,6 +103,40 @@ struct UiDocEmbedBlock : Moveable<UiDocEmbedBlock> {
     ValueMap   meta;
 };
 
+struct UiDocInlineRun : Moveable<UiDocInlineRun> {
+    String type = "text";
+    WString text;
+    UiDocTextStyle style;
+    String resource_key;
+    int width = 0;
+    int height = 0;
+    ValueMap payload;
+    ValueMap meta;
+};
+
+struct UiDocTableCell : Moveable<UiDocTableCell> {
+    Vector<UiDocInlineRun> runs;
+    ValueMap format;
+    ValueMap meta;
+
+    WString GetPlainText() const;
+};
+
+struct UiDocTableRow : Moveable<UiDocTableRow> {
+    Vector<UiDocTableCell> cells;
+    ValueMap meta;
+};
+
+struct UiDocTable : Moveable<UiDocTable> {
+    int columns = 0;
+    int header_rows = 0;
+    Vector<UiDocTableRow> rows;
+    ValueMap format;
+    ValueMap meta;
+
+    bool IsEmpty() const { return columns <= 0 || rows.IsEmpty(); }
+};
+
 struct UiDocPositionMapEntry : Moveable<UiDocPositionMapEntry> {
     int at = 0;
     int old_len = 0;
@@ -332,6 +366,16 @@ public:
     bool UpdateEmbed(const UiDocEmbedBlock& embed);
     Vector<UiDocEmbedBlock> QueryEmbeds(const UiDocRange* range = nullptr,
                                         const String& type = String()) const;
+
+    String InsertTable(int pos, int columns = 3, int rows = 3, int header_rows = 1,
+                       const ValueMap& meta = ValueMap());
+    bool GetTable(const String& embed_id, UiDocTable& out) const;
+    bool SetTable(const String& embed_id, const UiDocTable& table);
+    bool SetTableCell(const String& embed_id, int row, int column, const UiDocTableCell& cell);
+    bool InsertTableRow(const String& embed_id, int row);
+    bool RemoveTableRow(const String& embed_id, int row);
+    bool InsertTableColumn(const String& embed_id, int column);
+    bool RemoveTableColumn(const String& embed_id, int column);
 
     bool SetAnchor(const String& id, int pos);
     bool RemoveAnchor(const String& id);
