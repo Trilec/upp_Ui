@@ -300,7 +300,7 @@ public:
     UiDocApplyResult SetMark(UiDocRange range, UiDocTextStyle::Mark mark, bool enabled,
                              uint64 base_revision = 0);
     UiDocApplyResult SetInk(UiDocRange range, Color ink, uint64 base_revision = 0);
-    UiDocApplyResult SetFont(UiDocRange range, const String& face, int height = 0,
+    UiDocApplyResult SetFont(UiDocRange range, const String& face, int height = -1,
                              uint64 base_revision = 0);
 
     String AddBlock(UiDocRange range, const String& role = String(), int indent = 0,
