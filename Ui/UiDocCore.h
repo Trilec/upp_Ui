@@ -230,16 +230,30 @@ public:
     };
 
 private:
-    struct Snapshot : Moveable<Snapshot> {
-        WString text;
-        Vector<UiDocStyleRun> styles;
-        Vector<UiDocBlockMeta> blocks;
-        Vector<UiDocAnnotation> annotations;
-        Vector<UiDocResource> resources;
-        Vector<UiDocEmbedBlock> embeds;
-        VectorMap<String, int> anchors;
-        ValueMap meta;
-        uint64 revision = 0;
+    struct HistoryStep : Moveable<HistoryStep> {
+        enum Kind : byte {
+            Text, Styles, Annotations, Resources, Embeds, Meta, Anchors
+        } kind = Text;
+
+        int at = 0;
+        WString before_text;
+        WString after_text;
+        Vector<UiDocStyleRun> before_styles;
+        Vector<UiDocStyleRun> after_styles;
+        Vector<UiDocAnnotation> before_annotations;
+        Vector<UiDocAnnotation> after_annotations;
+        Vector<UiDocResource> before_resources;
+        Vector<UiDocResource> after_resources;
+        Vector<UiDocEmbedBlock> before_embeds;
+        Vector<UiDocEmbedBlock> after_embeds;
+        VectorMap<String, int> before_anchors;
+        VectorMap<String, int> after_anchors;
+        ValueMap before_meta;
+        ValueMap after_meta;
+    };
+
+    struct HistoryRecord : Moveable<HistoryRecord> {
+        Vector<HistoryStep> steps;
     };
 
     WString                 text_;
@@ -251,19 +265,18 @@ private:
     VectorMap<String, int>  anchors_;
     ValueMap                meta_;
 
-    Vector<Snapshot> undo_;
-    Vector<Snapshot> redo_;
-    int              history_limit_ = 128;
-    uint64           revision_ = 1;
-    int              next_annotation_id_ = 1;
-    int              next_resource_id_ = 1;
-    int              next_embed_id_ = 1;
+    Vector<HistoryRecord> undo_;
+    Vector<HistoryRecord> redo_;
+    int                   history_limit_ = 128;
+    uint64                revision_ = 1;
+    int                   next_annotation_id_ = 1;
+    int                   next_resource_id_ = 1;
+    int                   next_embed_id_ = 1;
 
     int ClampPos(int pos) const;
     UiDocRange NormalizeRange(UiDocRange r) const;
-    Snapshot MakeSnapshot() const;
-    void RestoreSnapshot(const Snapshot& s, bool bump_revision);
-    void PushUndo();
+    void ApplyHistoryStep(const HistoryStep& step, bool before);
+    void ApplyHistoryRecord(const HistoryRecord& record, bool before);
     void Touch();
     void NormalizeStyles();
     void ReplaceStyleRange(UiDocRange range, const UiDocStyleRun& style, dword mask);
@@ -271,7 +284,7 @@ private:
     int FindAnnotation(const String& id) const;
     int FindResource(const String& key) const;
     int FindEmbed(const String& id) const;
-    bool ApplyOne(const UiDocCoreChange& change, UiDocApplyResult& result);
+    bool ApplyOne(const UiDocCoreChange& change, UiDocApplyResult& result, HistoryStep* history);
 
 public:
     UiDocCore();
