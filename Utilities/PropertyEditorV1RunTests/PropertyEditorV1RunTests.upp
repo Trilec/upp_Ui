@@ -1,0 +1,14 @@
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui,
+    Utilities/PropertyEditorCore,
+    Utilities/PropertyEditor;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "CONSOLE";
