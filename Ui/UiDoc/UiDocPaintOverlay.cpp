@@ -151,7 +151,7 @@ void UiDoc::PaintCaret(Draw& w)
 void UiDoc::Paint(Draw& w)
 {
     EnsureLayout();
-    int state = IsEnabled() ? (HasFocus() ? ST_HOT : ST_NORMAL) : ST_DISABLED;
+    StyledState state = IsEnabled() ? (HasFocus() ? ST_HOT : ST_NORMAL) : ST_DISABLED;
     UiPaintFaceFrameDash(w, Rect(Point(0, 0), GetSize()), style_.palette, style_.metrics, state);
 
     if(!page_rect_.IsEmpty()) {
