@@ -252,6 +252,8 @@ private:
 
     String transaction_property_id_;
     Value transaction_original_value_;
+    bool transaction_original_mixed_ = false;
+    bool transaction_original_inherited_ = false;
     bool transaction_active_ = false;
 };
 
