@@ -1,0 +1,320 @@
+#include "UiDoc.h"
+
+namespace Upp {
+
+namespace {
+
+bool SameInlineStyle(const UiDocTextStyle& a, const UiDocTextStyle& b)
+{
+    return a.flags == b.flags && a.ink == b.ink && a.font_face == b.font_face &&
+           a.font_height == b.font_height && a.size_delta == b.size_delta &&
+           a.leading_delta == b.leading_delta && a.tracking_delta == b.tracking_delta;
+}
+
+int CellUnits(const UiDocTableCell& cell)
+{
+    int units = 0;
+    for(const UiDocInlineRun& run : cell.runs) {
+        if(run.type == "text")
+            units += run.text.GetCount();
+        else if(run.type == "image")
+            units++;
+    }
+    return units;
+}
+
+void NormalizeCellRuns(UiDocTableCell& cell)
+{
+    Vector<UiDocInlineRun> out;
+    for(UiDocInlineRun run : cell.runs) {
+        if(run.type == "text" && run.text.IsEmpty())
+            continue;
+        if(!out.IsEmpty() && run.type == "text" && out.Top().type == "text" &&
+           SameInlineStyle(run.style, out.Top().style) && run.meta.GetCount() == 0 &&
+           run.payload.GetCount() == 0 && out.Top().meta.GetCount() == 0 && out.Top().payload.GetCount() == 0) {
+            out.Top().text << run.text;
+            continue;
+        }
+        out.Add(pick(run));
+    }
+    cell.runs = pick(out);
+}
+
+bool InsertCellText(UiDocTableCell& cell, int pos, const WString& text)
+{
+    pos = clamp(pos, 0, CellUnits(cell));
+    int at = 0;
+    Vector<UiDocInlineRun> out;
+    bool inserted = false;
+
+    for(const UiDocInlineRun& source : cell.runs) {
+        UiDocInlineRun run = clone(source);
+        int units = run.type == "text" ? run.text.GetCount() : (run.type == "image" ? 1 : 0);
+        if(!inserted && pos <= at + units) {
+            if(run.type == "text") {
+                int off = clamp(pos - at, 0, run.text.GetCount());
+                WString left = run.text.Left(off);
+                WString right = run.text.Mid(off);
+                if(!left.IsEmpty()) {
+                    UiDocInlineRun l = clone(run);
+                    l.text = left;
+                    out.Add(pick(l));
+                }
+                UiDocInlineRun middle;
+                middle.type = "text";
+                middle.text = text;
+                middle.style = run.style;
+                if(!middle.text.IsEmpty())
+                    out.Add(pick(middle));
+                if(!right.IsEmpty()) {
+                    UiDocInlineRun r = clone(run);
+                    r.text = right;
+                    out.Add(pick(r));
+                }
+            }
+            else {
+                if(pos == at) {
+                    UiDocInlineRun middle;
+                    middle.type = "text";
+                    middle.text = text;
+                    if(!middle.text.IsEmpty())
+                        out.Add(pick(middle));
+                    out.Add(pick(run));
+                }
+                else {
+                    out.Add(pick(run));
+                    UiDocInlineRun middle;
+                    middle.type = "text";
+                    middle.text = text;
+                    if(!middle.text.IsEmpty())
+                        out.Add(pick(middle));
+                }
+            }
+            inserted = true;
+        }
+        else
+            out.Add(pick(run));
+        at += units;
+    }
+
+    if(!inserted && !text.IsEmpty()) {
+        UiDocInlineRun run;
+        run.type = "text";
+        run.text = text;
+        out.Add(pick(run));
+    }
+    cell.runs = pick(out);
+    NormalizeCellRuns(cell);
+    return true;
+}
+
+bool DeleteCellUnit(UiDocTableCell& cell, int pos)
+{
+    int total = CellUnits(cell);
+    if(pos < 0 || pos >= total)
+        return false;
+
+    int at = 0;
+    for(int i = 0; i < cell.runs.GetCount(); i++) {
+        UiDocInlineRun& run = cell.runs[i];
+        int units = run.type == "text" ? run.text.GetCount() : (run.type == "image" ? 1 : 0);
+        if(pos < at + units) {
+            if(run.type == "text")
+                run.text.Remove(pos - at, 1);
+            else
+                cell.runs.Remove(i);
+            NormalizeCellRuns(cell);
+            return true;
+        }
+        at += units;
+    }
+    return false;
+}
+
+}
+
+void UiDoc::ScrollCaretIntoView()
+{
+    if(page_rect_.IsEmpty())
+        return;
+    EnsureLayout();
+    Rect caret = CaretRectInternal();
+    int margin = DPI(12);
+    if(caret.top < page_rect_.top + margin)
+        scroll_y_ = max(0, scroll_y_ - (page_rect_.top + margin - caret.top));
+    else if(caret.bottom > page_rect_.bottom - margin)
+        scroll_y_ += caret.bottom - (page_rect_.bottom - margin);
+    int max_scroll = max(0, DocumentHeight() - page_rect_.GetHeight());
+    scroll_y_ = clamp(scroll_y_, 0, max_scroll);
+    sb_.Set(scroll_y_);
+}
+
+bool UiDoc::DeleteSelection()
+{
+    UiDocRange range = SelectionRange();
+    if(range.IsEmpty())
+        return false;
+    UiDocApplyResult result = core_.Replace(range, WString());
+    if(!result.ok)
+        return false;
+    anchor_pos_ = caret_pos_ = range.from;
+    WhenSelection();
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::InsertText(const WString& text)
+{
+    if(!active_table_id_.IsEmpty())
+        return EditActiveTableCell(text);
+
+    UiDocRange range = SelectionRange();
+    int from = range.from;
+    UiDocCoreTransaction tx;
+    tx.label = "Type";
+
+    UiDocCoreChange replace;
+    replace.type = UiDocCoreChange::ReplaceText;
+    replace.range = range;
+    replace.text = text;
+    tx.changes.Add(pick(replace));
+
+    if(!text.IsEmpty() && !typing_style_.IsDefault()) {
+        UiDocCoreChange style;
+        style.type = UiDocCoreChange::SetStyle;
+        style.range = UiDocRange(from, from + text.GetCount());
+        style.style = typing_style_;
+        style.style_mask = UiDocCore::STYLE_ALL;
+        tx.changes.Add(pick(style));
+    }
+
+    UiDocApplyResult result = core_.Apply(tx);
+    if(!result.ok)
+        return false;
+    anchor_pos_ = caret_pos_ = ClampPos(from + text.GetCount());
+    preferred_x_ = -1;
+    WhenSelection();
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::DeleteBackward()
+{
+    if(!active_table_id_.IsEmpty())
+        return DeleteActiveTableCell(false);
+    if(DeleteSelection())
+        return true;
+    if(caret_pos_ <= 0)
+        return false;
+    int from = caret_pos_ - 1;
+    if(!core_.Replace(UiDocRange(from, caret_pos_), WString()).ok)
+        return false;
+    anchor_pos_ = caret_pos_ = from;
+    WhenSelection();
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::DeleteForward()
+{
+    if(!active_table_id_.IsEmpty())
+        return DeleteActiveTableCell(true);
+    if(DeleteSelection())
+        return true;
+    if(caret_pos_ >= core_.GetLength())
+        return false;
+    if(!core_.Replace(UiDocRange(caret_pos_, caret_pos_ + 1), WString()).ok)
+        return false;
+    anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
+    WhenSelection();
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::MoveWord(int direction, bool keep_selection)
+{
+    const WString& text = core_.GetText();
+    int pos = caret_pos_;
+    if(direction < 0) {
+        if(pos <= 0)
+            return false;
+        pos--;
+        while(pos > 0 && IsSpace((int)text[pos])) pos--;
+        bool word = IsWordChar(text[pos]);
+        while(pos > 0 && IsWordChar(text[pos - 1]) == word && !IsSpace((int)text[pos - 1])) pos--;
+    }
+    else {
+        if(pos >= text.GetCount())
+            return false;
+        bool word = IsWordChar(text[pos]);
+        while(pos < text.GetCount() && IsWordChar(text[pos]) == word && !IsSpace((int)text[pos])) pos++;
+        while(pos < text.GetCount() && IsSpace((int)text[pos])) pos++;
+    }
+    MoveCaret(pos, keep_selection);
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::MoveVertical(int direction, bool keep_selection)
+{
+    Point current = DocumentPointAtPos(caret_pos_);
+    if(preferred_x_ < 0)
+        preferred_x_ = current.x;
+    int target_y = current.y + direction * max(DPI(14), BaseFont().GetHeight() + style_.line_gap);
+    int next = PosAtDocumentPoint(Point(preferred_x_, target_y));
+    if(next == caret_pos_ && direction < 0)
+        next = max(0, caret_pos_ - 1);
+    else if(next == caret_pos_ && direction > 0)
+        next = min(core_.GetLength(), caret_pos_ + 1);
+    int keep_x = preferred_x_;
+    MoveCaret(next, keep_selection);
+    preferred_x_ = keep_x;
+    ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::EditActiveTableCell(const WString& text, bool)
+{
+    UiDocTable table;
+    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+       active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
+       active_table_column_ < 0 || active_table_column_ >= table.columns)
+        return false;
+
+    UiDocTableCell cell = clone(table.rows[active_table_row_].cells[active_table_column_]);
+    int pos = clamp(active_table_pos_, 0, CellUnits(cell));
+    if(!InsertCellText(cell, pos, text))
+        return false;
+    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+        return false;
+    active_table_pos_ = pos + text.GetCount();
+    Refresh();
+    return true;
+}
+
+bool UiDoc::DeleteActiveTableCell(bool forward)
+{
+    UiDocTable table;
+    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+       active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
+       active_table_column_ < 0 || active_table_column_ >= table.columns)
+        return false;
+
+    UiDocTableCell cell = clone(table.rows[active_table_row_].cells[active_table_column_]);
+    int total = CellUnits(cell);
+    int pos = clamp(active_table_pos_, 0, total);
+    int remove_at = forward ? pos : pos - 1;
+    if(remove_at < 0 || remove_at >= total)
+        return false;
+    if(!DeleteCellUnit(cell, remove_at))
+        return false;
+    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+        return false;
+    if(!forward)
+        active_table_pos_ = max(0, pos - 1);
+    Refresh();
+    return true;
+}
+
+
+}
