@@ -17,80 +17,95 @@ struct TestCtx {
     }
 };
 
-static bool HasAnnotation(const UiDocCore& doc, const String& id, UiDocAnnotation& out)
+static bool FindAnnotation(const UiDocCore& doc, const String& id, UiDocAnnotation& out)
 {
-    Vector<UiDocAnnotation> aa = doc.QueryAnnotations();
-    for(const UiDocAnnotation& a : aa) {
-        if(a.id == id) {
-            out = a;
+    for(const UiDocAnnotation& annotation : doc.GetAnnotations()) {
+        if(annotation.id == id) {
+            out = annotation;
             return true;
         }
     }
     return false;
 }
 
-static void TestTextAndRevision(TestCtx& t)
+static void TestTextRevisionAndAtomicity(TestCtx& t)
 {
     UiDocCore doc;
     uint64 r0 = doc.GetRevision();
-    UiDocApplyResult a = doc.Replace(UiDocRange(0, 0), WString("alpha beta"));
-    t.Expect(a.ok, "initial replace succeeds");
-    t.Expect(doc.GetTextUtf8() == "alpha beta", "text stored");
+    UiDocApplyResult load = doc.Replace(UiDocRange(0, 0), WString("alpha beta"));
+    t.Expect(load.ok, "initial replace succeeds");
+    t.Expect(doc.GetTextUtf8() == "alpha beta", "UTF-8 text stored");
     t.Expect(doc.GetRevision() > r0, "revision advances");
 
     UiDocApplyResult stale = doc.Replace(UiDocRange(0, 5), WString("ALPHA"), r0);
     t.Expect(!stale.ok, "stale revision refused");
-    t.Expect(doc.GetTextUtf8() == "alpha beta", "stale write leaves text unchanged");
-}
-
-static void TestAtomicBatchRollback(TestCtx& t)
-{
-    UiDocCore doc;
-    doc.Replace(UiDocRange(0, 0), WString("abcdef"));
+    t.Expect(doc.GetTextUtf8() == "alpha beta", "stale write is non-mutating");
 
     UiDocCoreTransaction tx;
+    tx.add_to_history = false;
     UiDocCoreChange first;
     first.type = UiDocCoreChange::ReplaceText;
     first.range = UiDocRange(0, 1);
     first.text = "A";
     tx.changes.Add(pick(first));
-
     UiDocCoreChange bad;
     bad.type = UiDocCoreChange::RemoveAnnotation;
     bad.annotation_id = "missing";
     tx.changes.Add(pick(bad));
-
-    UiDocApplyResult r = doc.Apply(tx);
-    t.Expect(!r.ok, "invalid batch refused");
-    t.Expect(doc.GetTextUtf8() == "abcdef", "failed batch rolls text back");
+    UiDocApplyResult refused = doc.Apply(tx);
+    t.Expect(!refused.ok, "invalid history-disabled batch refused");
+    t.Expect(doc.GetTextUtf8() == "alpha beta", "history-disabled batch rolls back atomically");
 }
 
-static void TestSparseStyleMapping(TestCtx& t)
+static void TestSparseStyles(TestCtx& t)
 {
     UiDocCore doc;
     doc.Replace(UiDocRange(0, 0), WString("0123456789abcdefghij"));
 
-    UiDocStyleRun st;
-    st.flags = UiDocStyleRun::BOLD;
-    st.font_face = "Arial";
-    st.font_height = 18;
-    t.Expect(doc.SetStyle(UiDocRange(10, 15), st,
-                          UiDocCore::STYLE_FLAGS | UiDocCore::STYLE_FONT_FACE | UiDocCore::STYLE_FONT_HEIGHT).ok,
-             "sparse style set");
-    t.Expect(doc.GetStyles().GetCount() == 1, "single styled range stays one run");
+    UiDocTextStyle style;
+    style.font_face = "Arial";
+    style.font_height = 18;
+    t.Expect(doc.SetStyle(UiDocRange(10, 15), style,
+                          UiDocCore::STYLE_FONT_FACE | UiDocCore::STYLE_FONT_HEIGHT).ok,
+             "font style set");
+    t.Expect(doc.SetMark(UiDocRange(10, 15), UiDocTextStyle::BOLD, true).ok,
+             "bold mark set explicitly");
+    t.Expect(doc.GetStyles().GetCount() == 1, "compatible formatting remains one sparse run");
+    t.Expect((doc.GetStyles()[0].style.flags & UiDocTextStyle::BOLD) != 0, "bold retained");
+
+    t.Expect(doc.SetMark(UiDocRange(12, 13), UiDocTextStyle::ITALIC, true).ok,
+             "independent mark creates split only where needed");
+    t.Expect(doc.GetStyles().GetCount() == 3, "single-character style difference creates three sparse runs");
 
     doc.Replace(UiDocRange(0, 0), WString("XX"));
-    const Vector<UiDocStyleRun>& rr = doc.GetStyles();
-    t.Expect(rr.GetCount() == 1, "insert does not expand style representation");
-    t.Expect(rr[0].from == 12 && rr[0].to == 17, "style range remaps after insert");
+    t.Expect(doc.GetStyles()[0].from == 12, "style range remaps after insert");
+    t.Expect(doc.GetStyles().GetCount() == 3, "text insert does not expand style representation per character");
 }
 
-static void TestAnnotationsAndMeta(TestCtx& t)
+static void TestSemanticBlocks(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), WString("INT. ROOM - DAY\nAlex\nHello.\n"));
+
+    ValueMap scene_meta;
+    scene_meta.Add("production.scene_id", "S17");
+    String scene = doc.AddBlock(UiDocRange(0, 15), "screenplay.scene", 0, scene_meta);
+    String dialogue = doc.AddBlock(UiDocRange(20, 26), "screenplay.dialogue");
+    t.Expect(!scene.IsEmpty() && !dialogue.IsEmpty(), "semantic blocks added");
+    t.Expect(doc.QueryBlocks(nullptr, "screenplay.scene").GetCount() == 1, "block role query works");
+
+    doc.Replace(UiDocRange(0, 0), WString("REV A\n"));
+    Vector<UiDocBlock> scenes = doc.QueryBlocks(nullptr, "screenplay.scene");
+    t.Expect(scenes.GetCount() == 1 && scenes[0].range.from == 6, "block range remaps after insert");
+    t.Expect(AsString(scenes[0].meta["production.scene_id"]) == "S17", "block metadata preserved");
+}
+
+static void TestAnnotationsAndMetadata(TestCtx& t)
 {
     UiDocCore doc;
     doc.Replace(UiDocRange(0, 0), WString("zero alpha beta"));
-    doc.SetMeta("project.id", "P-17");
-    t.Expect(AsString(doc.GetMeta("project.id")) == "P-17", "document metadata stored");
+    t.Expect(doc.SetMeta("project.id", "P-17"), "document metadata set");
+    t.Expect(AsString(doc.GetMeta("project.id")) == "P-17", "document metadata retained");
 
     ValueMap payload;
     payload.Add("text", "review this");
@@ -100,48 +115,53 @@ static void TestAnnotationsAndMeta(TestCtx& t)
     t.Expect(!id.IsEmpty(), "annotation id generated");
 
     doc.Replace(UiDocRange(0, 0), WString("XX "));
-    UiDocAnnotation a;
-    t.Expect(HasAnnotation(doc, id, a), "annotation survives edit");
-    t.Expect(a.range.from == 8 && a.range.to == 13, "annotation range remaps");
-    t.Expect(AsString(a.meta["agent.source"]) == "test", "annotation metadata preserved");
+    UiDocAnnotation annotation;
+    t.Expect(FindAnnotation(doc, id, annotation), "annotation survives edit");
+    t.Expect(annotation.range.from == 8 && annotation.range.to == 13, "annotation range remaps");
+    t.Expect(AsString(annotation.meta["agent.source"]) == "test", "annotation metadata preserved");
 }
 
-static void TestResourceAndEmbed(TestCtx& t)
+static void TestResourcesAndEmbeds(TestCtx& t)
 {
     UiDocCore doc;
     doc.Replace(UiDocRange(0, 0), WString("image"));
 
-    UiDocResource r;
-    r.resource_type = "image";
-    r.content_hash = "hash-1";
-    r.bytes = "bytes";
-    r.mime = "image/png";
-    r.original_name = "sample.png";
-    r.width = 64;
-    r.height = 32;
-    String key = doc.AddResource(r, true);
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "hash-1";
+    resource.bytes = "bytes";
+    resource.mime = "image/png";
+    resource.original_name = "sample.png";
+    resource.width = 64;
+    resource.height = 32;
+    String key = doc.AddResource(resource, true);
     t.Expect(!key.IsEmpty(), "resource added");
-    t.Expect(doc.AddResource(r, true) == key, "resource dedupe returns existing key");
+    t.Expect(doc.AddResource(resource, true) == key, "resource dedupe returns existing key");
 
-    ValueMap p;
-    p.Add("resource_key", key);
-    String eid = doc.AddEmbed(2, "image", p);
-    t.Expect(!eid.IsEmpty(), "embed added");
-    t.Expect(!doc.RemoveResource(key), "referenced resource cannot be removed");
-    t.Expect(doc.RemoveEmbed(eid), "embed removed");
+    ValueMap nested;
+    nested.Add("resource_key", key);
+    ValueMap payload;
+    payload.Add("image", nested);
+    String id = doc.AddEmbed(2, "image", payload);
+    t.Expect(!id.IsEmpty(), "embed added");
+    t.Expect(!doc.RemoveResource(key), "nested referenced resource cannot be removed");
+    t.Expect(doc.RemoveEmbed(id), "embed removed");
     t.Expect(doc.RemoveResource(key), "unreferenced resource removed");
 }
 
-static void TestUndoRedo(TestCtx& t)
+static void TestUndoRedoAndValidation(TestCtx& t)
 {
     UiDocCore doc;
     doc.Replace(UiDocRange(0, 0), WString("alpha"));
     doc.Replace(UiDocRange(5, 5), WString(" beta"));
     t.Expect(doc.GetTextUtf8() == "alpha beta", "edit result before undo");
     t.Expect(doc.Undo(), "undo succeeds");
-    t.Expect(doc.GetTextUtf8() == "alpha", "undo restores replaced range only");
+    t.Expect(doc.GetTextUtf8() == "alpha", "undo restores text");
     t.Expect(doc.Redo(), "redo succeeds");
-    t.Expect(doc.GetTextUtf8() == "alpha beta", "redo reapplies edit");
+    t.Expect(doc.GetTextUtf8() == "alpha beta", "redo reapplies text");
+    String error;
+    t.Expect(doc.Validate(&error), "core validates after undo/redo");
+    t.Expect(error.IsEmpty(), "successful validation returns no error");
 }
 
 static void TestLargeSparseDocument(TestCtx& t)
@@ -153,48 +173,46 @@ static void TestLargeSparseDocument(TestCtx& t)
     UiDocCore doc;
     UiDocCoreTransaction load;
     load.add_to_history = false;
-    UiDocCoreChange c;
-    c.type = UiDocCoreChange::ReplaceText;
-    c.range = UiDocRange(0, 0);
-    c.text = text.ToWString();
-    load.changes.Add(pick(c));
+    UiDocCoreChange change;
+    change.type = UiDocCoreChange::ReplaceText;
+    change.range = UiDocRange(0, 0);
+    change.text = text.ToWString();
+    load.changes.Add(pick(change));
     t.Expect(doc.Apply(load).ok, "100k-line document loads");
     t.Expect(doc.GetLength() > 2000000, "large text length retained");
 
-    UiDocStyleRun st;
-    st.flags = UiDocStyleRun::ITALIC;
     for(int i = 0; i < 64; i++) {
         int at = (doc.GetLength() / 65) * (i + 1);
-        doc.SetStyle(UiDocRange(at, min(doc.GetLength(), at + 8)), st, UiDocCore::STYLE_FLAGS);
+        doc.SetMark(UiDocRange(at, min(doc.GetLength(), at + 8)), UiDocTextStyle::ITALIC, true);
     }
-    t.Expect(doc.GetStyles().GetCount() <= 64, "large document styling remains sparse");
+    t.Expect(doc.GetStyles().GetCount() <= 64, "large document formatting remains sparse");
 
-    uint64 rev = doc.GetRevision();
     UiDocCoreTransaction edits;
-    edits.base_revision = rev;
+    edits.base_revision = doc.GetRevision();
     edits.add_to_history = false;
     for(int i = 0; i < 32; i++) {
-        UiDocCoreChange e;
-        e.type = UiDocCoreChange::ReplaceText;
+        UiDocCoreChange edit;
+        edit.type = UiDocCoreChange::ReplaceText;
         int at = min(doc.GetLength(), i * 997);
-        e.range = UiDocRange(at, at);
-        e.text = "X";
-        edits.changes.Add(pick(e));
+        edit.range = UiDocRange(at, at);
+        edit.text = "X";
+        edits.changes.Add(pick(edit));
     }
-    UiDocApplyResult ar = doc.Apply(edits);
-    t.Expect(ar.ok, "batched agent-style edits succeed");
-    t.Expect(ar.positions.edits.GetCount() == 32, "batch reports every position edit");
+    UiDocApplyResult result = doc.Apply(edits);
+    t.Expect(result.ok, "batched agent-style edits succeed");
+    t.Expect(result.positions.edits.GetCount() == 32, "batch reports every position edit");
+    t.Expect(doc.Validate(), "large document remains structurally valid");
 }
 
 CONSOLE_APP_MAIN
 {
     TestCtx t;
-    TestTextAndRevision(t);
-    TestAtomicBatchRollback(t);
-    TestSparseStyleMapping(t);
-    TestAnnotationsAndMeta(t);
-    TestResourceAndEmbed(t);
-    TestUndoRedo(t);
+    TestTextRevisionAndAtomicity(t);
+    TestSparseStyles(t);
+    TestSemanticBlocks(t);
+    TestAnnotationsAndMetadata(t);
+    TestResourcesAndEmbeds(t);
+    TestUndoRedoAndValidation(t);
     TestLargeSparseDocument(t);
 
     Cout() << "SUMMARY passed=" << (t.checks - t.fails)

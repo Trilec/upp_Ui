@@ -103,6 +103,8 @@ file
 	UiTable.cpp,
 	UiDocCore.h,
 	UiDocCore.cpp,
+	UiDocCoreApply.cpp,
+	UiDocCoreApi.cpp,
 	UiDoc.h,
 	UiDoc.cpp,
 	UiTree.h,
