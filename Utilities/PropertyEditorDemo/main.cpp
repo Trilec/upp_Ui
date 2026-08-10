@@ -2,286 +2,152 @@
 
 using namespace Upp;
 
-class PropertyEditorDemoCustomEditor : public PropertyValueEditor {
-public:
-    typedef PropertyEditorDemoCustomEditor CLASSNAME;
-
-    PropertyEditorDemoCustomEditor()
-    {
-        Add(edit_.SizePos());
-        edit_.WhenAction = [=] {
-            if(!syncing_) {
-                WhenPreview(edit_.GetData());
-                WhenCommit(edit_.GetData());
-            }
-        };
-    }
-
-    virtual void Configure(const PropertyEditorItem& item) override
-    {
-        edit_.Enable(item.enabled && !item.read_only);
-    }
-
-    virtual void SetEditorValue(const Value& value, bool mixed) override
-    {
-        syncing_ = true;
-        edit_.SetData(mixed ? Value(String()) : value);
-        syncing_ = false;
-    }
-
-    virtual Value GetEditorValue() const override
-    {
-        return edit_.GetData();
-    }
-
-    virtual void FocusEditor() override
-    {
-        edit_.SetFocus();
-        edit_.SetSelection();
-    }
-
-private:
-    UiLineEdit edit_;
-    bool syncing_ = false;
-};
-
-class PropertyEditorDemoPreview : public Ctrl {
-public:
-    void SetModel(PropertyEditorModel *model)
-    {
-        model_ = model;
-        Refresh();
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Size sz = GetSize();
-        w.DrawRect(sz, SColorPaper());
-
-        if(!model_)
-            return;
-
-        String title = ValueOf("title", "PropertyEditor utility");
-        bool enabled = (bool)ValueOf("enabled", true);
-        Color color = Color(ValueOf("color", Color(58, 124, 214)));
-        double opacity = (double)ValueOf("opacity", 1.0);
-        Vector<double> position = PropertyEditorReadVector(ValueOf("position", PropertyEditorMakeVector(0.5, 0.5)), 2);
-        Vector<double> scale = PropertyEditorReadVector(ValueOf("scale", PropertyEditorMakeVector(1.0, 1.0, 1.0)), 3);
-
-        Color paper = Blend(SColorPaper(), color, (int)minmax(opacity * 180.0, 0.0, 180.0));
-        Rect r = RectC(DPI(26), DPI(54), max(DPI(80), sz.cx - DPI(52)), max(DPI(80), sz.cy - DPI(92)));
-        w.DrawRect(r, paper);
-        DrawFrame(w, r, enabled ? color : SColorDisabled());
-
-        Font title_font = SansSerifZ(18).Bold();
-        w.DrawText(DPI(24), DPI(18), title, title_font, enabled ? SColorText() : SColorDisabled());
-
-        String info = Format("Position %.2f, %.2f    Scale %.2f, %.2f, %.2f",
-                             position[0], position[1], scale[0], scale[1], scale[2]);
-        w.DrawText(DPI(24), r.bottom + DPI(14), info, StdFont(), SColorText());
-    }
-
-private:
-    Value ValueOf(const String& id, const Value& fallback) const
-    {
-        const PropertyEditorItem *item = model_ ? model_->Find(id) : nullptr;
-        return item ? item->value : fallback;
-    }
-
-    PropertyEditorModel *model_ = nullptr;
-};
-
 class PropertyEditorDemo : public TopWindow {
 public:
     typedef PropertyEditorDemo CLASSNAME;
 
     PropertyEditorDemo()
     {
-        Title("PropertyEditor utility demo");
+        Title("PropertyEditor v1 demo");
         Sizeable().Zoomable();
-        SetRect(0, 0, DPI(980), DPI(680));
+        SetRect(0, 0, DPI(1120), DPI(760));
+        SetMinSize(Size(DPI(760), DPI(520)));
+
+        PropertyEditorFactory::Global().RegisterPicker("demo-image", [](Value& value, Ctrl*) {
+            value = "selected-image.png";
+            return true;
+        });
 
         BuildModel();
-
         Add(editor_);
-        Add(preview_);
         Add(status_);
-        Add(system_);
-        Add(light_);
-        Add(dark_);
-        Add(expand_);
-        Add(collapse_);
+        Add(system_); Add(light_); Add(dark_);
+        Add(auto_label_); Add(fixed_label_); Add(ratio_label_);
+        Add(expand_); Add(collapse_);
 
         editor_.SetModel(&model_);
-        preview_.SetModel(&model_);
+        editor_.SetGroupAction("Appearance", "Reset");
 
         system_.SetText("Ui theme");
         light_.SetText("Light");
         dark_.SetText("Dark");
-        expand_.SetText("Expand all");
-        collapse_.SetText("Collapse all");
+        auto_label_.SetText("Auto labels");
+        fixed_label_.SetText("Fixed 132");
+        ratio_label_.SetText("Ratio 42%");
+        expand_.SetText("Expand");
+        collapse_.SetText("Collapse");
         status_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
-        system_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-        light_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-        dark_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-        expand_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Accent));
-        collapse_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
 
         system_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::FollowUiTheme); };
         light_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::Light); };
         dark_.WhenAction = [=] { editor_.SetPaletteMode(PropertyEditorPaletteMode::Dark); };
+        auto_label_.WhenAction = [=] { editor_.SetLabelAuto(); };
+        fixed_label_.WhenAction = [=] { editor_.SetLabelWidth(DPI(132)); };
+        ratio_label_.WhenAction = [=] { editor_.SetLabelRatio(42); };
         expand_.WhenAction = [=] { editor_.ExpandAll(); };
         collapse_.WhenAction = [=] { editor_.CollapseAll(); };
 
-        model_.WhenPreview = [=](String id, Value value) {
-            preview_.Refresh();
-            status_.SetText("Preview  " + id + " = " + AsString(value));
-        };
-        model_.WhenCommit = [=](String id, Value value) {
-            preview_.Refresh();
-            status_.SetText("Committed  " + id + " = " + AsString(value));
-        };
-        model_.WhenReset = [=](String id) {
-            preview_.Refresh();
-            status_.SetText("Reset  " + id);
-        };
-        editor_.WhenHelp = [=](String text) {
-            if(!text.IsEmpty())
-                status_.SetText(text);
+        editor_.WhenBeginEdit = [=](String id, Value) { status_.SetText("Begin  " + id); };
+        editor_.WhenPreview = [=](String id, Value v) { status_.SetText("Preview  " + id + " = " + AsString(v)); };
+        editor_.WhenCommit = [=](String id, Value v) { status_.SetText("Commit  " + id + " = " + AsString(v)); };
+        editor_.WhenCancel = [=](String id, Value) { status_.SetText("Cancelled  " + id); };
+        editor_.WhenUndoRequest = [=](String id) { status_.SetText("Undo requested for " + id); };
+        editor_.WhenHelp = [=](String help) { if(!help.IsEmpty()) status_.SetText(help); };
+        editor_.WhenGroupAction = [=](String group) {
+            if(group == "Appearance") {
+                String error;
+                model_.Reset("accent", &error);
+                model_.Reset("opacity", &error);
+                status_.SetText("Reset Appearance defaults");
+            }
         };
 
-        status_.SetText("Select a property. Continuous controls preview while editing and commit when finished.");
+        status_.SetText("V1: type in Filter, drag the label divider, double-click it for Auto, or press Esc while editing.");
     }
 
-    virtual void Layout() override
+    void Layout() override
     {
         Rect r = GetSize();
-        int pad = DPI(8);
-        int top_h = DPI(32);
-        int status_h = DPI(28);
-        int button_w = DPI(88);
-        int gap = DPI(5);
+        const int pad = DPI(10), gap = DPI(5), h = DPI(30), status_h = DPI(26);
+        UiLayoutCursor top(RectC(pad, pad, max(0, r.GetWidth() - 2 * pad), h));
+        top.SetGapX(gap);
+        system_.SetRect(top.TakeIncrX(DPI(82)));
+        light_.SetRect(top.TakeIncrX(DPI(64)));
+        dark_.SetRect(top.TakeIncrX(DPI(64)));
+        auto_label_.SetRect(top.TakeIncrX(DPI(92)));
+        fixed_label_.SetRect(top.TakeIncrX(DPI(88)));
+        ratio_label_.SetRect(top.TakeIncrX(DPI(88)));
+        expand_.SetRect(top.TakeIncrX(DPI(70)));
+        collapse_.SetRect(top.TakeIncrX(DPI(76)));
 
-        int x = pad;
-        system_.SetRect(x, pad, button_w, top_h);
-        x += button_w + gap;
-        light_.SetRect(x, pad, button_w, top_h);
-        x += button_w + gap;
-        dark_.SetRect(x, pad, button_w, top_h);
-        x += button_w + DPI(18);
-        expand_.SetRect(x, pad, button_w + DPI(14), top_h);
-        x += button_w + DPI(14) + gap;
-        collapse_.SetRect(x, pad, button_w + DPI(14), top_h);
-
-        int body_top = pad + top_h + pad;
+        int body_top = pad + h + pad;
         int body_bottom = r.bottom - pad - status_h - pad;
-        int editor_cx = min(DPI(440), max(DPI(330), r.GetWidth() * 45 / 100));
-
-        editor_.SetRect(pad, body_top, editor_cx, max(0, body_bottom - body_top));
-        preview_.SetRect(pad + editor_cx + pad, body_top,
-                         max(0, r.GetWidth() - editor_cx - 3 * pad),
-                         max(0, body_bottom - body_top));
-        status_.SetRect(pad, r.bottom - pad - status_h,
-                        max(0, r.GetWidth() - 2 * pad), status_h);
+        editor_.SetRect(pad, body_top, max(0, r.GetWidth() - 2 * pad), max(0, body_bottom - body_top));
+        status_.SetRect(pad, r.bottom - pad - status_h, max(0, r.GetWidth() - 2 * pad), status_h);
     }
 
 private:
     void BuildModel()
     {
-        PropertyEditorFactory::Global().RegisterCustom(
-            "demo-custom",
-            [] { return One<PropertyValueEditor>(new PropertyEditorDemoCustomEditor); });
+        model_.AddText("title", "Title", "PropertyEditor v1", "Content")
+              .SetDefault("Untitled").SetHelp("Standard one-line string editor.");
+        model_.AddMultiline("notes", "Notes", "Line one\nLine two", "Content")
+              .SetRowSpan(2).SetHelp("Explicit two-line row span.");
+        model_.AddBoolean("visible", "Visible", true, "Content")
+              .SetBooleanPresentation(PropertyBooleanPresentation::Check);
+        model_.AddBoolean("enabled", "Enabled", true, "Content")
+              .SetBooleanPresentation(PropertyBooleanPresentation::OnOff)
+              .SetHelp("Text Boolean: click the row to toggle On/Off directly.");
+        model_.AddBoolean("cache", "Use cache", false, "Content")
+              .SetBooleanPresentation(PropertyBooleanPresentation::TrueFalse);
 
-        model_.AddText("title", "Title", "PropertyEditor utility", "General")
-              .SetDefault("Untitled")
-              .SetHelp("A normal string property.")
-              .SetDomain(PropertyEditorDomain::Content)
-              .SetImpact(PropertyImpactControlState | PropertyImpactPaint);
+        model_.AddColor("accent", "Accent colour", Color(214, 60, 55), "Appearance/Colour")
+              .SetDefault(Color(214, 60, 55))
+              .SetHelp("Active colour rows open on the swatch in one click and retain #RRGGBB beside it.");
+        model_.AddSlider("opacity", "Opacity", 0.82, 0.0, 1.0, 0.01, "Appearance/Surface")
+              .SetDefault(1.0);
+        model_.AddNumericInt("radius", "Corner Radius", 12, 0, 64, 1, "Appearance/Border")
+              .SetUnit("px");
+        model_.AddChoice("border", "Border Style", 1, "Appearance/Border")
+              .AddChoice(0, "None").AddChoice(1, "Solid").AddChoice(2, "Dashed");
 
-        model_.AddMultiline("notes", "Notes", "Line 1\nLine 2", "General")
-              .SetHelp("Multiline text uses a larger editor.");
+        AddPropertyRange(model_, "range", "Allowed Range", 20, 80, 0, 100, 1, "Layout/Sizing")
+            .SetHelp("UiRangeSliderEdit in one property line: fixed fields, explicit gaps, expanding track.");
+        AddPropertyMatrix(model_, "anchor", "Anchor", "center", "Position9", "Layout/Position")
+            .SetDefault("center").SetHelp("Two-line UiMatrixSelector property row.");
+        AddPropertyMatrix(model_, "direction", "Direction", "east", "Compass8", "Layout/Position")
+            .SetHelp("Compass preset uses the same matrix adapter.");
 
-        model_.AddBoolean("enabled", "Enabled", true, "General")
-              .SetHelp("A discrete Boolean editor.")
-              .SetImpact(PropertyImpactControlState | PropertyImpactPaint);
-
-        model_.AddInteger("count", "Count", 8, "General")
-              .SetRange(0, 100, 1)
-              .SetDefault(8)
-              .SetHelp("Integer parsing, range clamping and reset.");
-
-        model_.AddChoice("mode", "Mode", 1, "General")
-              .AddChoice(0, "Minimal")
-              .AddChoice(1, "Balanced")
-              .AddChoice(2, "Detailed")
-              .SetHelp("Choice values are keys; labels are presentation.");
-
-        model_.AddSliderInt("steps", "Steps", 4, 0, 10, 2, "General")
-              .SetHelp("Integer slider snaps to its step.");
-
-        model_.AddColor("color", "Accent colour", Color(58, 124, 214), "Appearance")
-              .SetDefault(Color(58, 124, 214))
-              .SetHelp("Uses the standard U++ colour pusher.")
-              .SetDomain(PropertyEditorDomain::Appearance)
-              .SetImpact(PropertyImpactPaint);
-
-        model_.AddSlider("opacity", "Opacity", 0.82, 0.0, 1.0, 0.01, "Appearance")
-              .SetDefault(1.0)
-              .SetHelp("Slider previews continuously and commits on release.")
-              .SetImpact(PropertyImpactPaint);
-
-        model_.AddDouble("radius", "Radius", 12.0, "Appearance")
-              .SetRange(0.0, 100.0, 0.5)
-              .SetUnit("px")
-              .SetHelp("Double property with units.");
-
-        model_.AddVector2("position", "Position", 0.5, 0.5, "Transform")
-              .SetHelp("Two-component numeric editor.")
-              .SetImpact(PropertyImpactLocalLayout | PropertyImpactPaint);
-
-        model_.AddVector3("scale", "Scale", 1.0, 1.0, 1.0, "Transform")
-              .SetHelp("Three-component numeric editor.")
-              .SetImpact(PropertyImpactLocalLayout);
+        AddPropertyIcon(model_, "icon", "Icon", "ICON_DESIGN_HOME_48", "Resources")
+            .SetHelp("Icon choices come directly from the Ui icon catalog.");
+        String face = Font::GetFaceCount() ? Font::GetFaceName(0) : String();
+        AddPropertyFont(model_, "font", "Font Face", face, "Resources")
+            .SetHelp("Font faces are enumerated lazily by the visual editor.");
+        AddPropertyImage(model_, "image", "Image", "hero.png", "demo-image", "Resources")
+            .SetHelp("Image selection is provider-driven; PropertyEditor has no SymbolPicker dependency.");
 
         Vector<Pointf> curve;
-        curve.Add(Pointf(0.0, 0.0));
-        curve.Add(Pointf(0.25, 0.08));
-        curve.Add(Pointf(0.72, 0.88));
-        curve.Add(Pointf(1.0, 1.0));
-        model_.AddCurve("curve", "Response curve",
-                        PropertyEditorMakeCurve(curve), "Advanced")
-              .SetHelp("Interactive normalized curve editor.");
+        curve.Add(Pointf(0, 0)); curve.Add(Pointf(.35, .15)); curve.Add(Pointf(1, 1));
+        model_.AddCurve("curve", "Response Curve", PropertyEditorMakeCurve(curve), "Advanced")
+              .SetRowSpan(3);
+        model_.AddVector3("vector", "Vector", 1, 2, 3, "Advanced").SetRowSpan(2);
+        model_.AddReadOnly("runtime", "Runtime", "Ready", "Advanced");
 
-        model_.AddReadOnly("runtime", "Runtime status", "Ready", "Advanced")
-              .SetHelp("Read-only values use the same row model.");
+        for(int i = 0; i < 24; i++)
+            model_.AddBoolean("stress" + AsString(i), "Stress Flag " + AsString(i), i & 1, "Stress")
+                  .SetBooleanPresentation(PropertyBooleanPresentation::Check);
 
-        PropertyEditorItem& custom =
-            model_.Add("custom", "Custom", PropertyEditorKind::Custom, "demo", "Advanced");
-        custom.custom_editor = "demo-custom";
-        custom.SetHelp("Registered custom editor instance.");
-
-        PropertyEditorItem& mixed =
-            model_.AddDouble("mixed-example", "Mixed value", 0.5, "Advanced");
-        mixed.SetMixed().SetHelp("Demonstrates the mixed-value presentation used by multi-selection.");
-
-        PropertyEditorItem& inherited =
-            model_.AddText("inherited-example", "Inherited value", "Default", "Advanced");
-        inherited.SetInherited().SetDefault("Default")
-                 .SetHelp("Demonstrates inherited/reset presentation.");
-
+        model_.SetGroupSubtitle("Appearance", "nested groups + Reset action");
+        model_.SetGroupSubtitle("Layout", "range + matrix");
         model_.StructureChanged();
     }
 
     PropertyEditorModel model_;
     PropertyEditor editor_;
-    PropertyEditorDemoPreview preview_;
-
     UiLabel status_;
-    UiButton system_;
-    UiButton light_;
-    UiButton dark_;
-    UiButton expand_;
-    UiButton collapse_;
+    UiButton system_, light_, dark_;
+    UiButton auto_label_, fixed_label_, ratio_label_;
+    UiButton expand_, collapse_;
 };
 
 GUI_APP_MAIN
