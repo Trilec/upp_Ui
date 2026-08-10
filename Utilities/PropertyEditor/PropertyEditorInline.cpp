@@ -1,5 +1,4 @@
 #include "PropertyEditor.h"
-#include <Ui/UiIcons.h>
 
 namespace Upp {
 
@@ -56,13 +55,21 @@ void PropertyEditor::LayoutInlineEditors()
 
 bool PropertyEditor::UsesInlineEditor(const PropertyEditorItem& item) const
 {
-    // FillRecipe retains its established direct row interaction. Any other
-    // built-in or custom editor can opt into the same stable-row presentation
-    // through PropertyEditorItem::SetInlineEditor(). Hosting changes only the
-    // presentation; preview, commit, validation and reset use the normal path.
     return (item.kind == PropertyEditorKind::FillRecipe ||
-            item.kind == PropertyEditorKind::Boolean || item.inline_editor) &&
+            item.kind == PropertyEditorKind::Boolean ||
+            item.kind == PropertyEditorKind::Color ||
+            item.inline_editor) &&
            item.value_editable && item.enabled && !item.read_only;
+}
+
+bool PropertyEditor::IsDisplayRowNearViewport(int display_index) const
+{
+    if(display_index < 0 || display_index >= rows_.GetCount() || viewport_.IsEmpty())
+        return false;
+    Rect r = GetRowRect(display_index);
+    int overscan = max(DPI(4), style_.row_height);
+    return r.bottom >= viewport_.top - overscan &&
+           r.top <= viewport_.bottom + overscan;
 }
 
 PropertyValueEditor* PropertyEditor::FindInlineEditor(int display_index)
@@ -81,8 +88,7 @@ const PropertyValueEditor* PropertyEditor::FindInlineEditor(int display_index) c
     return nullptr;
 }
 
-PropertyValueEditor* PropertyEditor::FindInlineEditor(
-    const String& property_id)
+PropertyValueEditor* PropertyEditor::FindInlineEditor(const String& property_id)
 {
     for(InlineEditorSlot& slot : inline_editors_)
         if(slot.property_id == property_id && slot.editor)
@@ -105,16 +111,38 @@ void PropertyEditor::ClearInlineEditors()
 
 void PropertyEditor::RebuildInlineEditors()
 {
-    if(!model_)
+    if(!model_ || viewport_.IsEmpty()) {
+        ClearInlineEditors();
         return;
+    }
+
+    for(int i = inline_editors_.GetCount() - 1; i >= 0; i--) {
+        InlineEditorSlot& slot = inline_editors_[i];
+        bool keep = slot.display_row >= 0 && slot.display_row < rows_.GetCount() &&
+                    IsDisplayRowNearViewport(slot.display_row);
+        if(keep) {
+            const DisplayRow& row = rows_[slot.display_row];
+            keep = !row.group && row.model_index >= 0 &&
+                   UsesInlineEditor((*model_)[row.model_index]) &&
+                   (*model_)[row.model_index].id == slot.property_id;
+        }
+        if(!keep) {
+            if(slot.editor) {
+                slot.editor->WhenPreview.Clear();
+                slot.editor->WhenCommit.Clear();
+                slot.editor->Remove();
+            }
+            inline_editors_.Remove(i);
+        }
+    }
 
     Ptr<PropertyEditor> self = this;
     for(int display = 0; display < rows_.GetCount(); display++) {
         const DisplayRow& row = rows_[display];
-        if(row.group || row.model_index < 0)
+        if(row.group || row.model_index < 0 || !IsDisplayRowNearViewport(display))
             continue;
         const PropertyEditorItem& item = (*model_)[row.model_index];
-        if(!UsesInlineEditor(item))
+        if(!UsesInlineEditor(item) || FindInlineEditor(display))
             continue;
 
         InlineEditorSlot& slot = inline_editors_.Add();
@@ -155,6 +183,7 @@ void PropertyEditor::ApplyInlineEditorPreview(const String& property_id,
     if(!item || !editor)
         return;
 
+    BeginTransaction(property_id);
     String error;
     applying_editor_preview_ = true;
     inline_preview_property_id_ = property_id;
@@ -185,6 +214,7 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
     if(!item || !editor)
         return;
 
+    BeginTransaction(property_id);
     String error;
     if(model_->Commit(property_id, value, &error)) {
         syncing_editor_ = true;
@@ -194,6 +224,7 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
         dispatching_editor_callback_ = true;
         WhenCommit(property_id, item->value);
         dispatching_editor_callback_ = false;
+        EndTransaction();
     }
     else {
         syncing_editor_ = true;
@@ -204,4 +235,4 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
     Refresh();
 }
 
-}
+} // namespace Upp
