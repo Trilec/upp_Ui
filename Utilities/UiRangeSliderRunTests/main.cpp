@@ -159,6 +159,32 @@ static void TestStyleAndSizing(TestCtx& t)
     t.Expect(vertical.cy > vertical.cx, "vertical natural size is taller than wide");
 }
 
+static void TestAllocatedTrackExpansion(TestCtx& t)
+{
+    t.Section("Allocated track expansion");
+
+    UiRangeSlider s;
+    s.SetDirection(UiDirection::H);
+    s.SetRect(0, 0, 220, 50);
+    Rect narrow = s.GetTrackRect();
+    s.SetRect(0, 0, 520, 50);
+    Rect wide = s.GetTrackRect();
+    t.Expect(wide.GetWidth() > narrow.GetWidth() + 250,
+             "horizontal painted track expands with allocated width");
+    t.Expect(wide.left < 40 && 520 - wide.right < 40,
+             "horizontal painted track stays close to allocated edges");
+
+    s.SetDirection(UiDirection::V);
+    s.SetRect(0, 0, 50, 220);
+    Rect short_track = s.GetTrackRect();
+    s.SetRect(0, 0, 50, 520);
+    Rect tall_track = s.GetTrackRect();
+    t.Expect(tall_track.GetHeight() > short_track.GetHeight() + 250,
+             "vertical painted track expands with allocated height");
+    t.Expect(tall_track.top < 40 && 520 - tall_track.bottom < 40,
+             "vertical painted track stays close to allocated edges");
+}
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
@@ -167,6 +193,7 @@ CONSOLE_APP_MAIN
     TestDataBinding(t);
     TestInteractionContract(t);
     TestStyleAndSizing(t);
+    TestAllocatedTrackExpansion(t);
 
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << "\n";
     SetExitCode(t.fails ? 1 : 0);
