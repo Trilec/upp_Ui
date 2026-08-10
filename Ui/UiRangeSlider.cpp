@@ -310,21 +310,22 @@ Rect UiRangeSlider::GetTrackRect() const
     if(outer.IsEmpty())
         return outer;
 
-    int track_major = max(DPI(20), style.track_size.cx);
+    // track_size.cx is the preferred/natural major-axis length used by
+    // GetMinSize(); once a parent allocates more room, the painted track uses
+    // the full available major axis. This is important for composition controls
+    // such as UiRangeSliderEdit where the fields remain fixed and the slider is
+    // expected to consume the remainder.
     int track_cross = max(1, style.track_size.cy);
+    int pad = max(DPI(8), track_cross * 2 + DPI(2));
     if(dir_ == UiDirection::H) {
-        int pad = max(DPI(8), track_cross * 2 + DPI(2));
-        int width = min(max(0, outer.GetWidth() - 2 * pad), track_major);
-        int x = outer.left + (outer.GetWidth() - width) / 2;
+        int width = max(0, outer.GetWidth() - 2 * pad);
         int y = outer.CenterPoint().y - track_cross / 2;
-        return RectC(x, y, width, track_cross);
+        return RectC(outer.left + pad, y, width, track_cross);
     }
 
-    int pad = max(DPI(8), track_cross * 2 + DPI(2));
-    int height = min(max(0, outer.GetHeight() - 2 * pad), track_major);
+    int height = max(0, outer.GetHeight() - 2 * pad);
     int x = outer.CenterPoint().x - track_cross / 2;
-    int y = outer.top + (outer.GetHeight() - height) / 2;
-    return RectC(x, y, track_cross, height);
+    return RectC(x, outer.top + pad, track_cross, height);
 }
 
 int UiRangeSlider::ValueToPos(double v) const
