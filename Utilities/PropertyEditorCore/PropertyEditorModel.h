@@ -37,6 +37,12 @@ enum class PropertyEditorKind : byte {
     Custom,
 };
 
+enum class PropertyBooleanPresentation : byte {
+    Check = 0,
+    OnOff,
+    TrueFalse,
+};
+
 enum class PropertyEditorDomain : byte {
     General = 0,
     Content,
@@ -97,9 +103,15 @@ struct PropertyEditorItem {
     String unit;
     String custom_editor;
 
+    // Optional semantic information consumed by visual editor adapters. Core
+    // deliberately treats these as opaque strings and never depends on Ui.
+    String editor_variant;
+    String picker_provider;
+
     PropertyEditorKind   kind = PropertyEditorKind::Text;
     PropertyEditorDomain domain = PropertyEditorDomain::General;
     PropertyEditorImpact impact = PropertyImpactNone;
+    PropertyBooleanPresentation boolean_presentation = PropertyBooleanPresentation::Check;
 
     Value value;
     Value default_value;
@@ -123,6 +135,7 @@ struct PropertyEditorItem {
     bool override_active = false;
 
     int indent = 0;
+    int row_span = 0; // 0 = visual editor default, otherwise line-count multiple.
     int color_count = 1;
     int decimals = 3;
     int sort_order = 0;
@@ -151,6 +164,26 @@ struct PropertyEditorItem {
     PropertyEditorItem& SetInlineEditor(bool on = true)
     {
         inline_editor = on;
+        return *this;
+    }
+    PropertyEditorItem& SetRowSpan(int lines)
+    {
+        row_span = max(0, lines);
+        return *this;
+    }
+    PropertyEditorItem& SetBooleanPresentation(PropertyBooleanPresentation presentation)
+    {
+        boolean_presentation = presentation;
+        return *this;
+    }
+    PropertyEditorItem& SetEditorVariant(const String& variant)
+    {
+        editor_variant = variant;
+        return *this;
+    }
+    PropertyEditorItem& SetPickerProvider(const String& provider)
+    {
+        picker_provider = provider;
         return *this;
     }
 };
