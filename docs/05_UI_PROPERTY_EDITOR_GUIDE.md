@@ -85,6 +85,16 @@ optional right-side group summary without creating a fake property.
 - Multiline, Matrix, Curve, and Image can remain compact, expand in place, or
   open a dialog according to adapter capability.
 
+`Curve` has two explicit value contracts. The default contract is an ordered
+`ValueArray` of `[x, y]` point pairs for editable linear curves. Setting
+`editor_variant` to `bezier` selects a fixed cubic contract stored as exactly
+four scalars `[x1, y1, x2, y2]`. Use `AddBezierCurve`,
+`PropertyEditorMakeBezierCurve`, and `PropertyEditorNormalizeBezierCurve` for
+that form. The visual package reuses `UiBezierCurveEditor`; Core remains
+headless and does not duplicate curve drawing or interaction code. X is
+constrained to normalized time, while Y may overshoot for easing curves. Set
+the item's minimum and maximum when its output domain is bounded.
+
 ## First-class control adapters
 
 Range, Adjustable Range, Matrix, Icon, Font, and Image use stable Custom adapter

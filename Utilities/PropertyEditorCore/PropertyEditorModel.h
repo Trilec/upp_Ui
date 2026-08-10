@@ -245,6 +245,9 @@ public:
                                    const String& group = String());
     PropertyEditorItem& AddCurve(const String& id, const String& label,
                                  const Value& curve, const String& group = String());
+    PropertyEditorItem& AddBezierCurve(const String& id, const String& label,
+                                       const Value& control_points,
+                                       const String& group = String());
     PropertyEditorItem& AddReadOnly(const String& id, const String& label,
                                     const Value& value, const String& group = String());
 
@@ -305,6 +308,9 @@ Value PropertyEditorMakeCurve(const Vector<Pointf>& points);
 Vector<Pointf> PropertyEditorReadCurve(const Value& value);
 Value PropertyEditorNormalizeCurve(const Value& value);
 String PropertyEditorFormatCurve(const Value& value);
+Value PropertyEditorMakeBezierCurve(double x1, double y1, double x2, double y2);
+Value PropertyEditorNormalizeBezierCurve(const Value& value);
+String PropertyEditorFormatBezierCurve(const Value& value);
 
 bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
                                   const Value& candidate,

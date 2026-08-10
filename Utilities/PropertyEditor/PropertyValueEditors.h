@@ -176,6 +176,9 @@ private:
 };
 
 bool EditPropertyCurve(Value& value, Ctrl *owner = nullptr);
+bool EditPropertyBezierCurve(Value& value, Ctrl *owner = nullptr,
+                             double y_minimum = -1.0,
+                             double y_maximum = 2.0);
 
 }
 

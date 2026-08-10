@@ -76,6 +76,19 @@ UiBezierCurveEditor& UiBezierCurveEditor::SetFlipVertical(bool on)
     return *this;
 }
 
+UiBezierCurveEditor& UiBezierCurveEditor::SetYRange(double minimum,
+                                                     double maximum)
+{
+    if(maximum <= minimum)
+        maximum = minimum + 1.0;
+    if(y_minimum_ == minimum && y_maximum_ == maximum)
+        return *this;
+    y_minimum_ = minimum;
+    y_maximum_ = maximum;
+    Refresh();
+    return *this;
+}
+
 UiBezierCurveEditor& UiBezierCurveEditor::SetEditable(bool on)
 {
     if(editable_ == on)
@@ -134,7 +147,9 @@ Value UiBezierCurveEditor::GetData() const
 Pointf UiBezierCurveEditor::ToScreen(const Pointf& p, const Rect& plot) const
 {
     double x = style_.invert_x ? (1.0 - p.x) : p.x;
-    double y = style_.invert_y ? (1.0 - p.y) : p.y;
+    double y = (p.y - y_minimum_) / (y_maximum_ - y_minimum_);
+    if(style_.invert_y)
+        y = 1.0 - y;
     return Pointf(plot.left + x * (plot.GetWidth() - 1),
                   plot.bottom - 1 - y * (plot.GetHeight() - 1));
 }
@@ -149,7 +164,9 @@ Pointf UiBezierCurveEditor::ToNorm(Point p, const Rect& plot) const
         x = 1.0 - x;
     if(style_.invert_y)
         y = 1.0 - y;
-    return Pointf(minmax(x, 0.0, 1.0), minmax(y, 0.0, 1.0));
+    return Pointf(minmax(x, 0.0, 1.0),
+                  y_minimum_ + minmax(y, 0.0, 1.0) *
+                  (y_maximum_ - y_minimum_));
 }
 
 UiBezierCurveEditor::Handle UiBezierCurveEditor::HitTest(Point p, const Rect& plot) const
@@ -189,8 +206,9 @@ void UiBezierCurveEditor::Paint(Draw& w)
     Rect plot = r.Deflated(style_.inset, style_.inset);
     if(plot.GetWidth() >= 8 && plot.GetHeight() >= 8) {
         p.Begin();
-        p.Move(plot.left, plot.bottom - 0.5);
-        p.Line(plot.right, plot.bottom - 0.5);
+        Pointf y_axis = ToScreen(Pointf(0.0, 0.0), plot);
+        p.Move(plot.left, y_axis.y);
+        p.Line(plot.right, y_axis.y);
         p.Stroke(1.0, style_.axis);
         p.End();
 

@@ -245,7 +245,9 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
     case PropertyEditorKind::Vector3:
         return PropertyEditorFormatVector(item.value, 3, item.decimals);
     case PropertyEditorKind::Curve:
-        return PropertyEditorFormatCurve(item.value);
+        return item.editor_variant == "bezier"
+            ? PropertyEditorFormatBezierCurve(item.value)
+            : PropertyEditorFormatCurve(item.value);
     case PropertyEditorKind::Integer:
     case PropertyEditorKind::SliderInt:
     case PropertyEditorKind::NumericInt:

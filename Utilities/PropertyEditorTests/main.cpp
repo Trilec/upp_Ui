@@ -90,6 +90,28 @@ CONSOLE_APP_MAIN
     curve_points.Add(Pointf(0.0, 0.0));
     curve_points.Add(Pointf(0.5, 0.25));
     model.AddCurve("curve", "Curve", PropertyEditorMakeCurve(curve_points), "Advanced");
+    PropertyEditorItem& bezier = model.AddBezierCurve(
+        "bezier", "Bezier", PropertyEditorMakeBezierCurve(-0.2, 0.25, 0.8, 1.4),
+        "Advanced");
+    Check(bezier.kind == PropertyEditorKind::Curve &&
+              bezier.editor_variant == "bezier" && bezier.expanded_row_span == 4,
+          "Bezier curve uses the shared semantic Curve editor variant");
+    ValueArray normalized_bezier = bezier.value;
+    Check(normalized_bezier.GetCount() == 4 &&
+              (double)normalized_bezier[0] == 0.0 &&
+              (double)normalized_bezier[1] == 0.25 &&
+              (double)normalized_bezier[2] == 0.8 &&
+              (double)normalized_bezier[3] == 1.4,
+          "Bezier curve constrains time while preserving easing overshoot");
+    Value bounded_bezier;
+    String bounded_error;
+    bezier.SetRange(-1.0, 1.0, 0.01);
+    Check(PropertyEditorNormalizeValue(bezier, bezier.value,
+                                       bounded_bezier, bounded_error) &&
+              (double)ValueArray(bounded_bezier)[3] == 1.0,
+          "Bezier properties can explicitly bound their output axis");
+    Check(PropertyEditorFormatBezierCurve(bezier.value).StartsWith("cubic-bezier("),
+          "Bezier curve has a stable compact summary");
 
     PropertyEditorFactory::Global().RegisterCustom(
         "test-custom",
@@ -120,7 +142,7 @@ CONSOLE_APP_MAIN
     Check(model.GetGroupSubtitle("Transform").IsEmpty(),
           "ClearGroupSubtitles removes stale metadata");
 
-    Check(model.GetCount() == 10, "model item count");
+    Check(model.GetCount() == 11, "model item count");
     Check(model.Find("count") != nullptr, "find property");
     Check(model.Find("notes") != nullptr, "find multiline property");
     Check(model.FindIndex("missing") < 0, "missing property");
