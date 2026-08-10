@@ -19,6 +19,8 @@
     - Keep UiRangeSlider as the single authoritative interval model.
     - Reuse UiFloatEdit for direct entry and the child controls' existing theme
       contracts instead of introducing another style family.
+    - Keep field extents fixed while the slider consumes all remaining major-axis
+      space inside the configured inset and explicit gaps.
 
     Thread context
     - GUI thread only.
@@ -30,6 +32,7 @@
 
     Changelog
     - 2026-08: initial range-slider/direct-entry composition.
+    - 2026-08: added inset-aware fixed-field/expanding-slider layout contract.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -66,7 +69,11 @@ public:
     UiDirection GetDirection() const { return slider_.GetDirection(); }
 
     UiRangeSliderEdit& SetFieldWidth(int px);
+    int GetFieldWidth() const { return field_w_; }
     UiRangeSliderEdit& SetGap(int px);
+    int GetGap() const { return gap_; }
+    UiRangeSliderEdit& SetInset(int px);
+    int GetInset() const { return inset_; }
     UiRangeSliderEdit& SetPrecision(int decimals);
 
     virtual void SetData(const Value& value) override;
@@ -102,6 +109,7 @@ private:
 
     int field_w_ = DPI(78);
     int gap_ = DPI(6);
+    int inset_ = 0;
     int precision_ = 3;
     bool syncing_ = false;
     bool field_dirty_ = false;
