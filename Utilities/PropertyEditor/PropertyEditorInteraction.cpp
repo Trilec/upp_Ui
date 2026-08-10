@@ -70,6 +70,12 @@ bool PropertyEditor::CancelTransaction()
     return true;
 }
 
+static bool PeIsTextBoolean(const PropertyEditorItem& item)
+{
+    return item.kind == PropertyEditorKind::Boolean &&
+           item.boolean_presentation != PropertyBooleanPresentation::Check;
+}
+
 void PropertyEditor::ActivateRow(int display_index)
 {
     if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
@@ -78,6 +84,18 @@ void PropertyEditor::ActivateRow(int display_index)
     if(row.group || row.model_index < 0)
         return;
     const PropertyEditorItem& item = (*model_)[row.model_index];
+
+    if(PeIsTextBoolean(item) && item.enabled && item.value_editable && !item.read_only) {
+        BeginTransaction(item.id);
+        String error;
+        bool next = !(bool)item.value;
+        if(model_->Commit(item.id, next, &error)) {
+            WhenCommit(item.id, model_->Find(item.id)->value);
+            EndTransaction();
+            RefreshValue(item.id);
+        }
+        return;
+    }
 
     if(PropertyValueEditor *editor = FindInlineEditor(display_index)) {
         if(active_editor_)
