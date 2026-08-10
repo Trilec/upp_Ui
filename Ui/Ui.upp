@@ -103,7 +103,6 @@ file
 	UiTable.cpp,
 	UiDocCore.h,
 	UiDocCore.cpp,
-	UiDocCoreJson.cpp,
 	UiDoc.h,
 	UiDoc.cpp,
 	UiTree.h,
