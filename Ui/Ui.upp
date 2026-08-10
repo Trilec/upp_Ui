@@ -106,6 +106,7 @@ file
 	UiDocCoreApply.cpp,
 	UiDocCoreApi.cpp,
 	UiDocCoreTable.cpp,
+	UiDocCoreJson.cpp,
 	UiDoc.h,
 	UiDoc.cpp,
 	UiTree.h,

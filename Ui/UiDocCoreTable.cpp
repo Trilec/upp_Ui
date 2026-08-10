@@ -222,6 +222,20 @@ bool PayloadToTable(const ValueMap& payload, UiDocTable& table)
     return true;
 }
 
+bool TableResourcesValid(const UiDocTable& table, const UiDocCore& doc)
+{
+    for(const UiDocTableRow& row : table.rows)
+        for(const UiDocTableCell& cell : row.cells)
+            for(const UiDocInlineRun& run : cell.runs) {
+                if(run.type != "image")
+                    continue;
+                UiDocResource resource;
+                if(run.resource_key.IsEmpty() || !doc.GetResource(run.resource_key, resource))
+                    return false;
+            }
+    return true;
+}
+
 } // namespace
 
 WString UiDocTableCell::GetPlainText() const
@@ -255,7 +269,9 @@ bool UiDocCore::GetTable(const String& embed_id, UiDocTable& out) const
     int q = FindEmbed(embed_id);
     if(q < 0 || embeds_[q].type != "table")
         return false;
-    return PayloadToTable(embeds_[q].payload, out);
+    if(!PayloadToTable(embeds_[q].payload, out))
+        return false;
+    return TableResourcesValid(out, *this);
 }
 
 bool UiDocCore::SetTable(const String& embed_id, const UiDocTable& table)
@@ -292,7 +308,7 @@ bool UiDocCore::SetTable(const String& embed_id, const UiDocTable& table)
         }
         normalized.rows.Add(pick(row));
     }
-    if(!NormalizeTable(normalized))
+    if(!NormalizeTable(normalized) || !TableResourcesValid(normalized, *this))
         return false;
 
     UiDocEmbedBlock embed = embeds_[q];

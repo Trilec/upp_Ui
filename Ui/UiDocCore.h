@@ -279,7 +279,7 @@ private:
     Vector<HistoryRecord> undo_;
     Vector<HistoryRecord> redo_;
     int history_limit_ = 128;
-    uint64 revision_ = 1;
+    uint64 revision_ = 0;
     int next_block_id_ = 1;
     int next_annotation_id_ = 1;
     int next_resource_id_ = 1;
@@ -380,6 +380,11 @@ public:
     bool SetAnchor(const String& id, int pos);
     bool RemoveAnchor(const String& id);
     bool ResolveAnchor(const String& id, int& pos) const;
+
+    String ToJson(bool pretty = false) const;
+    bool FromJson(const String& data, String* error = nullptr);
+    bool Save(const String& path, String* error = nullptr) const;
+    bool Load(const String& path, String* error = nullptr);
 
     bool Undo();
     bool Redo();

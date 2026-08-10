@@ -32,6 +32,37 @@ static void UiDocMapRange(UiDocRange& range, const UiDocPositionMap& map)
     }
 }
 
+static bool UiDocResourceRefsValid(const Value& value, const Vector<UiDocResource>& resources)
+{
+    if(value.Is<ValueMap>()) {
+        ValueMap map = value;
+        for(int i = 0; i < map.GetCount(); i++) {
+            String key = AsString(map.GetKey(i));
+            Value child = map.GetValue(i);
+            if(key == "resource_key") {
+                String resource_key = AsString(child);
+                bool found = false;
+                for(const UiDocResource& resource : resources)
+                    if(resource.key == resource_key) {
+                        found = true;
+                        break;
+                    }
+                if(!found)
+                    return false;
+            }
+            if(!UiDocResourceRefsValid(child, resources))
+                return false;
+        }
+    }
+    else if(value.Is<ValueArray>()) {
+        ValueArray array = value;
+        for(int i = 0; i < array.GetCount(); i++)
+            if(!UiDocResourceRefsValid(array[i], resources))
+                return false;
+    }
+    return true;
+}
+
 static int UiDocNumericSuffix(const String& id, const char *prefix)
 {
     String p(prefix);
@@ -171,8 +202,8 @@ void UiDocCore::Clear()
     meta_.Clear();
     undo_.Clear();
     redo_.Clear();
-    revision_ = 1;
     RebuildIds();
+    Touch();
 }
 
 bool UiDocCore::Validate(String* error) const
@@ -230,6 +261,27 @@ bool UiDocCore::Validate(String* error) const
         for(int j = i + 1; j < embeds_.GetCount(); j++)
             if(embeds_[j].id == embed.id)
                 return Fail("duplicate embed id");
+    }
+
+    if(!UiDocResourceRefsValid(meta_, resources_))
+        return Fail("dangling document resource reference");
+    for(const UiDocBlock& block : blocks_)
+        if(!UiDocResourceRefsValid(block.meta, resources_))
+            return Fail("dangling block resource reference");
+    for(const UiDocAnnotation& annotation : annotations_)
+        if(!UiDocResourceRefsValid(annotation.payload, resources_) ||
+           !UiDocResourceRefsValid(annotation.meta, resources_))
+            return Fail("dangling annotation resource reference");
+    for(const UiDocEmbedBlock& embed : embeds_) {
+        if(!UiDocResourceRefsValid(embed.payload, resources_) ||
+           !UiDocResourceRefsValid(embed.layout, resources_) ||
+           !UiDocResourceRefsValid(embed.meta, resources_))
+            return Fail("dangling embed resource reference");
+        if(embed.type == "table") {
+            UiDocTable table;
+            if(!GetTable(embed.id, table))
+                return Fail("invalid table payload");
+        }
     }
 
     for(int i = 0; i < anchors_.GetCount(); i++)

@@ -55,6 +55,10 @@ static void TestTextRevisionAndAtomicity(TestCtx& t)
     UiDocApplyResult refused = doc.Apply(tx);
     t.Expect(!refused.ok, "invalid history-disabled batch refused");
     t.Expect(doc.GetTextUtf8() == "alpha beta", "history-disabled batch rolls back atomically");
+
+    uint64 before_clear = doc.GetRevision();
+    doc.Clear();
+    t.Expect(doc.GetRevision() > before_clear, "clear advances revision");
 }
 
 static void TestSparseStyles(TestCtx& t)
@@ -208,6 +212,81 @@ static void TestUndoRedoAndValidation(TestCtx& t)
     t.Expect(error.IsEmpty(), "successful validation returns no error");
 }
 
+static void TestPersistence(TestCtx& t)
+{
+    UiDocCore doc;
+    doc.Replace(UiDocRange(0, 0), ToUnicode("Kia ora - cafe", CHARSET_UTF8));
+    doc.SetMark(UiDocRange(0, 3), UiDocTextStyle::BOLD, true);
+    doc.SetInk(UiDocRange(4, 7), Color(12, 34, 56));
+
+    ValueMap doc_meta;
+    doc_meta.Add("review.color", Color(90, 80, 70));
+    t.Expect(doc.SetMeta("app.meta", doc_meta), "typed document metadata set");
+
+    ValueMap block_meta;
+    block_meta.Add("scene", 17);
+    String block_id = doc.AddBlock(UiDocRange(0, 7), "screenplay.scene", 0, block_meta);
+    t.Expect(!block_id.IsEmpty(), "persisted block added");
+
+    ValueMap note;
+    note.Add("text", "note");
+    String ann_id = doc.AddAnnotation(UiDocRange(4, 7), "review.comment", note);
+    t.Expect(!ann_id.IsEmpty(), "persisted annotation added");
+
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "persist-hash";
+    resource.bytes = String("A\0B", 3);
+    resource.mime = "image/png";
+    String key = doc.AddResource(resource);
+    t.Expect(!key.IsEmpty(), "persisted resource added");
+
+    String table_id = doc.InsertTable(3, 2, 2, 1);
+    UiDocTableCell cell;
+    UiDocInlineRun image;
+    image.type = "image";
+    image.resource_key = key;
+    image.width = 32;
+    image.height = 18;
+    cell.runs.Add(pick(image));
+    t.Expect(doc.SetTableCell(table_id, 1, 1, cell), "persisted table image set");
+    t.Expect(doc.SetAnchor("selection.start", 4), "persisted anchor set");
+
+    String json = doc.ToJson(true);
+    t.Expect(!json.IsEmpty(), "native JSON produced");
+
+    UiDocCore loaded;
+    String error;
+    t.Expect(loaded.FromJson(json, &error), "native JSON round-trips");
+    t.Expect(error.IsEmpty(), "round-trip has no parse error");
+    t.Expect(loaded.GetText() == doc.GetText(), "round-trip text matches");
+    t.Expect(loaded.GetStyles().GetCount() == doc.GetStyles().GetCount(), "round-trip sparse styles match");
+    t.Expect(loaded.QueryBlocks(nullptr, "screenplay.scene").GetCount() == 1, "round-trip block role matches");
+    t.Expect(loaded.QueryAnnotations(nullptr, "review.comment").GetCount() == 1, "round-trip annotation matches");
+    UiDocResource loaded_resource;
+    t.Expect(loaded.GetResource(key, loaded_resource) && loaded_resource.bytes.GetCount() == 3,
+             "round-trip binary resource matches");
+    UiDocTable loaded_table;
+    t.Expect(loaded.GetTable(table_id, loaded_table), "round-trip typed table matches");
+    t.Expect(loaded_table.rows[1].cells[1].runs[0].resource_key == key,
+             "round-trip table resource reference matches");
+    int anchor = -1;
+    t.Expect(loaded.ResolveAnchor("selection.start", anchor) && anchor == 4,
+             "round-trip anchor matches");
+    ValueMap loaded_meta = loaded.GetMeta("app.meta");
+    t.Expect((Color)loaded_meta["review.color"] == Color(90, 80, 70),
+             "round-trip arbitrary Value metadata matches");
+    t.Expect(loaded.Validate(), "round-trip core validates");
+
+    Value broken_value = ParseJSON(json);
+    ValueMap broken_root = broken_value;
+    broken_root.GetAdd("version") = 999;
+    String broken = AsJSON(broken_root, true);
+    String before = loaded.GetTextUtf8();
+    t.Expect(!loaded.FromJson(broken, &error), "unsupported native version refused");
+    t.Expect(loaded.GetTextUtf8() == before, "failed load is atomic");
+}
+
 static void TestLargeSparseDocument(TestCtx& t)
 {
     String text;
@@ -258,6 +337,7 @@ CONSOLE_APP_MAIN
     TestResourcesAndEmbeds(t);
     TestTypedTables(t);
     TestUndoRedoAndValidation(t);
+    TestPersistence(t);
     TestLargeSparseDocument(t);
 
     Cout() << "SUMMARY passed=" << (t.checks - t.fails)
