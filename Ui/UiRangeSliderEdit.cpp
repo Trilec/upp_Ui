@@ -103,6 +103,13 @@ UiRangeSliderEdit& UiRangeSliderEdit::SetGap(int px)
     return *this;
 }
 
+UiRangeSliderEdit& UiRangeSliderEdit::SetInset(int px)
+{
+    inset_ = max(0, px);
+    RefreshLayout();
+    return *this;
+}
+
 UiRangeSliderEdit& UiRangeSliderEdit::SetPrecision(int decimals)
 {
     precision_ = max(0, decimals);
@@ -128,7 +135,14 @@ Value UiRangeSliderEdit::GetData() const
 
 void UiRangeSliderEdit::Layout()
 {
-    Rect r = GetSize();
+    Rect r = Rect(GetSize()).Deflated(inset_);
+    if(r.IsEmpty()) {
+        slider_.SetRect(0, 0, 0, 0);
+        lower_field_.SetRect(0, 0, 0, 0);
+        upper_field_.SetRect(0, 0, 0, 0);
+        return;
+    }
+
     Size lf = lower_field_.GetMinSize();
     Size uf = upper_field_.GetMinSize();
 
@@ -147,10 +161,13 @@ void UiRangeSliderEdit::Layout()
         int fh = max(DPI(26), max(lf.cy, uf.cy));
         int col_w = max(fw, min(slider_.GetMinSize().cx, max(0, r.GetWidth())));
         int x = r.left + (r.GetWidth() - col_w) / 2;
-        int middle = max(DPI(20), max(0, r.GetHeight() - 2 * fh - 2 * gap_));
+        int available = max(0, r.GetHeight() - 2 * gap_);
+        fh = min(fh, available / 2);
+        int top = r.top + fh + gap_;
+        int bottom = r.bottom - fh - gap_;
         upper_field_.SetRect(x, r.top, col_w, fh);
         lower_field_.SetRect(x, r.bottom - fh, col_w, fh);
-        slider_.SetRect(x, r.top + fh + gap_, col_w, middle);
+        slider_.SetRect(x, top, col_w, max(0, bottom - top));
     }
 }
 
@@ -164,8 +181,10 @@ Size UiRangeSliderEdit::GetMinSize() const
         natural = Size(s.cx + 2 * max(field_w_, max(lf.cx, uf.cx)) + 2 * gap_,
                        max(s.cy, max(lf.cy, uf.cy)));
     else
-        natural = Size(max(s.cx, max(lf.cx, uf.cx)),
+        natural = Size(max(s.cx, max(field_w_, max(lf.cx, uf.cx))),
                        s.cy + lf.cy + uf.cy + 2 * gap_);
+    natural.cx += 2 * inset_;
+    natural.cy += 2 * inset_;
     return Size(max(natural.cx, user_min_size_.cx),
                 max(natural.cy, user_min_size_.cy));
 }
