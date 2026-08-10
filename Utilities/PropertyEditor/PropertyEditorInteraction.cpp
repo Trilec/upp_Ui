@@ -1,5 +1,4 @@
 #include "PropertyEditor.h"
-#include <Ui/UiIcons.h>
 
 namespace Upp {
 
@@ -10,16 +9,65 @@ void PropertyEditor::EnsureSelectedVisible()
     const DisplayRow& row = rows_[selected_display_row_];
     int page = max(1, viewport_.GetHeight());
     int pos = scroll_.GetPos();
-    int min_pos = row.y;
-    int max_pos = max(0, row.y + row.cy - page);
-    if(pos < min_pos)
-        pos = min_pos;
-    if(pos > max_pos)
-        pos = max_pos;
+    if(row.y < pos)
+        pos = row.y;
+    else if(row.y + row.cy > pos + page)
+        pos = max(0, row.y + row.cy - page);
     scroll_.SetPos(pos);
+    RebuildInlineEditors();
     LayoutActiveEditor();
     LayoutInlineEditors();
     Refresh();
+}
+
+void PropertyEditor::BeginTransaction(const String& property_id)
+{
+    if(!model_ || property_id.IsEmpty())
+        return;
+    if(transaction_active_ && transaction_property_id_ == property_id)
+        return;
+    EndTransaction();
+    PropertyEditorItem *item = model_->Find(property_id);
+    if(!item)
+        return;
+    transaction_property_id_ = property_id;
+    transaction_original_value_ = item->value;
+    transaction_original_mixed_ = item->mixed;
+    transaction_original_inherited_ = item->inherited;
+    transaction_active_ = true;
+    WhenBeginEdit(property_id, item->value);
+}
+
+void PropertyEditor::EndTransaction()
+{
+    transaction_property_id_.Clear();
+    transaction_original_value_ = Value();
+    transaction_original_mixed_ = false;
+    transaction_original_inherited_ = false;
+    transaction_active_ = false;
+}
+
+bool PropertyEditor::CancelTransaction()
+{
+    if(!transaction_active_ || !model_)
+        return false;
+    String id = transaction_property_id_;
+    PropertyEditorItem *item = model_->Find(id);
+    if(!item) {
+        EndTransaction();
+        return false;
+    }
+
+    item->value = transaction_original_value_;
+    item->mixed = transaction_original_mixed_;
+    item->inherited = transaction_original_inherited_;
+    item->validation_error.Clear();
+    Value restored = item->value;
+    model_->ValueChanged(id);
+    EndTransaction();
+    RefreshValue(id);
+    WhenCancel(id, restored);
+    return true;
 }
 
 void PropertyEditor::ActivateRow(int display_index)
@@ -32,8 +80,11 @@ void PropertyEditor::ActivateRow(int display_index)
     const PropertyEditorItem& item = (*model_)[row.model_index];
 
     if(PropertyValueEditor *editor = FindInlineEditor(display_index)) {
+        if(active_editor_)
+            CommitActiveEditor();
         DeactivateEditor();
         selected_display_row_ = display_index;
+        BeginTransaction(item.id);
         editor->FocusEditor();
         WhenSelection(item.id);
         if(!item.help.IsEmpty())
@@ -53,6 +104,8 @@ void PropertyEditor::ActivateRow(int display_index)
         return;
     }
 
+    if(active_editor_)
+        CommitActiveEditor();
     DeactivateEditor();
     selected_display_row_ = display_index;
     active_display_row_ = display_index;
@@ -65,6 +118,7 @@ void PropertyEditor::ActivateRow(int display_index)
         return;
     }
 
+    BeginTransaction(item.id);
     Add(*active_editor_);
     Ptr<PropertyEditor> self = this;
     active_editor_->WhenPreview = [self](Value value) {
@@ -119,6 +173,7 @@ void PropertyEditor::ApplyEditorPreview(const Value& value)
     if(!item)
         return;
 
+    BeginTransaction(item->id);
     String error;
     applying_editor_preview_ = true;
     const bool applied = model_->Preview(item->id, value, &error);
@@ -147,6 +202,7 @@ void PropertyEditor::ApplyEditorCommit(const Value& value)
     if(!item)
         return;
 
+    BeginTransaction(item->id);
     String error;
     if(model_->Commit(item->id, value, &error)) {
         syncing_editor_ = true;
@@ -156,6 +212,7 @@ void PropertyEditor::ApplyEditorCommit(const Value& value)
         dispatching_editor_callback_ = true;
         WhenCommit(item->id, item->value);
         dispatching_editor_callback_ = false;
+        EndTransaction();
         Refresh();
     }
     else {
@@ -175,6 +232,7 @@ void PropertyEditor::ResetSelected()
     String id = selected->id;
     String error;
     if(model_->Reset(id, &error)) {
+        EndTransaction();
         RefreshValue(id);
         WhenReset(id);
     }
@@ -188,9 +246,6 @@ void PropertyEditor::ToggleOverride(int display_index)
     if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return;
     PropertyEditorItem& item = (*model_)[row.model_index];
-    // read_only/value_editable describe the value editor, not the independent
-    // authored-override action. Inherited numeric rows such as Radius must be
-    // able to activate before their value editor becomes writable.
     if(!item.overrideable)
         return;
     WhenOverride(item.id, !item.override_active);
@@ -198,10 +253,21 @@ void PropertyEditor::ToggleOverride(int display_index)
 
 void PropertyEditor::LeftDown(Point p, dword)
 {
+    if(GetLabelDividerRect().Contains(p)) {
+        dragging_label_divider_ = true;
+        SetCapture();
+        return;
+    }
+
     int row = FindDisplayRow(p);
     if(row < 0)
         return;
     if(rows_[row].group) {
+        Rect action = GetGroupActionRect(row);
+        if(!action.IsEmpty() && action.Contains(p)) {
+            WhenGroupAction(rows_[row].group_id);
+            return;
+        }
         SetGroupOpen(rows_[row].group_id, !IsGroupOpen(rows_[row].group_id));
         return;
     }
@@ -225,13 +291,36 @@ void PropertyEditor::LeftDown(Point p, dword)
 
 void PropertyEditor::LeftDouble(Point p, dword keyflags)
 {
+    if(GetLabelDividerRect().Contains(p)) {
+        SetLabelAuto();
+        return;
+    }
     LeftDown(p, keyflags);
     if(active_editor_)
         active_editor_->FocusEditor();
 }
 
+void PropertyEditor::LeftUp(Point, dword)
+{
+    if(!dragging_label_divider_)
+        return;
+    dragging_label_divider_ = false;
+    if(HasCapture())
+        ReleaseCapture();
+}
+
 void PropertyEditor::MouseMove(Point p, dword)
 {
+    if(dragging_label_divider_) {
+        int width = p.x - viewport_.left;
+        label_mode_ = PropertyEditorLabelMode::Fixed;
+        style_.label_width = clamp(width, style_.label_min_width, style_.label_max_width);
+        LayoutActiveEditor();
+        RebuildInlineEditors();
+        Refresh();
+        return;
+    }
+
     int row = FindDisplayRow(p);
     if(row == hover_display_row_)
         return;
@@ -241,7 +330,8 @@ void PropertyEditor::MouseMove(Point p, dword)
 
 void PropertyEditor::MouseLeave()
 {
-    hover_display_row_ = -1;
+    if(!dragging_label_divider_)
+        hover_display_row_ = -1;
     Refresh();
 }
 
@@ -251,6 +341,7 @@ void PropertyEditor::MouseWheel(Point p, int zdelta, dword)
         int step = max(1, style_.row_height);
         int pos = scroll_.GetPos() + (zdelta > 0 ? -step : step);
         scroll_.SetPos(pos);
+        RebuildInlineEditors();
         LayoutActiveEditor();
         LayoutInlineEditors();
         Refresh();
@@ -259,9 +350,22 @@ void PropertyEditor::MouseWheel(Point p, int zdelta, dword)
 
 bool PropertyEditor::Key(dword key, int count)
 {
+    if(key == K_ESCAPE) {
+        if(CancelTransaction()) {
+            DeactivateEditor();
+            return true;
+        }
+    }
+
+    if(key == K_CTRL_Z) {
+        String id = GetSelectedPropertyId();
+        if(!id.IsEmpty())
+            WhenUndoRequest(id);
+        return true;
+    }
+
     if(key == K_UP || key == K_DOWN) {
-        int next = FindNextPropertyRow(selected_display_row_,
-                                       key == K_UP ? -1 : 1);
+        int next = FindNextPropertyRow(selected_display_row_, key == K_UP ? -1 : 1);
         if(next >= 0) {
             selected_display_row_ = next;
             EnsureSelectedVisible();
@@ -291,21 +395,13 @@ bool PropertyEditor::Key(dword key, int count)
         return true;
     }
 
-    if(key == K_LEFT && selected_display_row_ >= 0) {
-        int i = selected_display_row_;
-        while(i >= 0 && !rows_[i].group)
-            --i;
-        if(i >= 0)
-            SetGroupOpen(rows_[i].group_id, false);
-        return true;
-    }
-
-    if(key == K_RIGHT && selected_display_row_ >= 0) {
-        int i = selected_display_row_;
-        while(i >= 0 && !rows_[i].group)
-            --i;
-        if(i >= 0)
-            SetGroupOpen(rows_[i].group_id, true);
+    if((key == K_LEFT || key == K_RIGHT) && selected_display_row_ >= 0 && model_) {
+        const DisplayRow& row = rows_[selected_display_row_];
+        if(!row.group && row.model_index >= 0) {
+            String group = (*model_)[row.model_index].group;
+            if(!group.IsEmpty())
+                SetGroupOpen(group, key == K_RIGHT);
+        }
         return true;
     }
 
@@ -318,13 +414,15 @@ void PropertyEditor::ChildGotFocus()
     for(InlineEditorSlot& slot : inline_editors_) {
         if(!slot.editor || !slot.editor->HasFocusDeep())
             continue;
+        if(active_editor_)
+            CommitActiveEditor();
         DeactivateEditor();
         selected_display_row_ = slot.display_row;
-        if(model_ && slot.display_row >= 0 &&
-           slot.display_row < rows_.GetCount()) {
+        if(model_ && slot.display_row >= 0 && slot.display_row < rows_.GetCount()) {
             const DisplayRow& row = rows_[slot.display_row];
             if(!row.group && row.model_index >= 0) {
                 const PropertyEditorItem& item = (*model_)[row.model_index];
+                BeginTransaction(item.id);
                 WhenSelection(item.id);
                 if(!item.help.IsEmpty())
                     WhenHelp(item.help);
@@ -337,5 +435,4 @@ void PropertyEditor::ChildGotFocus()
         selected_display_row_ = active_display_row_;
 }
 
-
-}
+} // namespace Upp
