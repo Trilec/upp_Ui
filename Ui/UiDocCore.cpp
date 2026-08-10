@@ -192,6 +192,9 @@ void UiDocCore::RebuildIds()
 
 void UiDocCore::Clear()
 {
+    int old_length = text_.GetCount();
+    uint64 before = revision_;
+
     text_.Clear();
     styles_.Clear();
     blocks_.Clear();
@@ -204,6 +207,13 @@ void UiDocCore::Clear()
     redo_.Clear();
     RebuildIds();
     Touch();
+
+    UiDocApplyResult result;
+    result.ok = true;
+    result.revision_before = before;
+    result.revision_after = revision_;
+    result.changed_range = UiDocRange(0, old_length);
+    WhenChange(result);
 }
 
 bool UiDocCore::Validate(String* error) const

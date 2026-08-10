@@ -56,9 +56,15 @@ static void TestTextRevisionAndAtomicity(TestCtx& t)
     t.Expect(!refused.ok, "invalid history-disabled batch refused");
     t.Expect(doc.GetTextUtf8() == "alpha beta", "history-disabled batch rolls back atomically");
 
+    int clear_events = 0;
+    doc.WhenChange = [&](const UiDocApplyResult& result) {
+        if(result.ok)
+            clear_events++;
+    };
     uint64 before_clear = doc.GetRevision();
     doc.Clear();
     t.Expect(doc.GetRevision() > before_clear, "clear advances revision");
+    t.Expect(clear_events == 1, "clear emits one model change event");
 }
 
 static void TestSparseStyles(TestCtx& t)
