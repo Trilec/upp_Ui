@@ -42,42 +42,51 @@ UiDocRange UiDocCore::NormalizeRange(UiDocRange r) const
     return r;
 }
 
-UiDocCore::Snapshot UiDocCore::MakeSnapshot() const
+void UiDocCore::ApplyHistoryStep(const HistoryStep& s, bool before)
 {
-    Snapshot s;
-    s.text = text_;
-    s.styles <<= styles_;
-    s.blocks <<= blocks_;
-    s.annotations <<= annotations_;
-    s.resources <<= resources_;
-    s.embeds <<= embeds_;
-    s.anchors <<= anchors_;
-    s.meta = clone(meta_);
-    s.revision = revision_;
-    return s;
+    switch(s.kind) {
+    case HistoryStep::Text: {
+        const WString& remove = before ? s.after_text : s.before_text;
+        const WString& insert = before ? s.before_text : s.after_text;
+        text_.Remove(s.at, remove.GetCount());
+        text_.Insert(s.at, insert);
+        styles_ <<= (before ? s.before_styles : s.after_styles);
+        annotations_ <<= (before ? s.before_annotations : s.after_annotations);
+        embeds_ <<= (before ? s.before_embeds : s.after_embeds);
+        anchors_ <<= (before ? s.before_anchors : s.after_anchors);
+        break;
+    }
+    case HistoryStep::Styles:
+        styles_ <<= (before ? s.before_styles : s.after_styles);
+        break;
+    case HistoryStep::Annotations:
+        annotations_ <<= (before ? s.before_annotations : s.after_annotations);
+        break;
+    case HistoryStep::Resources:
+        resources_ <<= (before ? s.before_resources : s.after_resources);
+        break;
+    case HistoryStep::Embeds:
+        embeds_ <<= (before ? s.before_embeds : s.after_embeds);
+        break;
+    case HistoryStep::Meta:
+        meta_ = clone(before ? s.before_meta : s.after_meta);
+        break;
+    case HistoryStep::Anchors:
+        anchors_ <<= (before ? s.before_anchors : s.after_anchors);
+        break;
+    }
 }
 
-void UiDocCore::RestoreSnapshot(const Snapshot& s, bool bump_revision)
+void UiDocCore::ApplyHistoryRecord(const HistoryRecord& record, bool before)
 {
-    text_ = s.text;
-    styles_ <<= s.styles;
-    blocks_ <<= s.blocks;
-    annotations_ <<= s.annotations;
-    resources_ <<= s.resources;
-    embeds_ <<= s.embeds;
-    anchors_ <<= s.anchors;
-    meta_ = clone(s.meta);
-    revision_ = bump_revision ? max(revision_ + 1, s.revision + 1) : s.revision;
-}
-
-void UiDocCore::PushUndo()
-{
-    if(history_limit_ <= 0)
-        return;
-    undo_.Add(MakeSnapshot());
-    while(undo_.GetCount() > history_limit_)
-        undo_.Remove(0);
-    redo_.Clear();
+    if(before) {
+        for(int i = record.steps.GetCount() - 1; i >= 0; --i)
+            ApplyHistoryStep(record.steps[i], true);
+    }
+    else {
+        for(const HistoryStep& step : record.steps)
+            ApplyHistoryStep(step, false);
+    }
 }
 
 void UiDocCore::Touch()
@@ -131,31 +140,26 @@ void UiDocCore::SetMeta(const String& key, const Value& value)
 {
     if(key.IsEmpty())
         return;
-    uint64 before = revision_;
-    PushUndo();
-    meta_.GetAdd(key) = value;
-    Touch();
-    UiDocApplyResult r;
-    r.ok = true;
-    r.revision_before = before;
-    r.revision_after = revision_;
-    WhenChange(r);
+    UiDocCoreChange c;
+    c.type = UiDocCoreChange::SetDocumentMeta;
+    c.key = key;
+    c.value = value;
+    UiDocCoreTransaction tx;
+    tx.changes.Add(pick(c));
+    Apply(tx);
 }
 
 void UiDocCore::RemoveMeta(const String& key)
 {
-    int q = meta_.Find(key);
-    if(q < 0)
+    if(meta_.Find(key) < 0)
         return;
-    uint64 before = revision_;
-    PushUndo();
-    meta_.Remove(q);
-    Touch();
-    UiDocApplyResult r;
-    r.ok = true;
-    r.revision_before = before;
-    r.revision_after = revision_;
-    WhenChange(r);
+    UiDocCoreChange c;
+    c.type = UiDocCoreChange::SetDocumentMeta;
+    c.key = key;
+    c.value = Null;
+    UiDocCoreTransaction tx;
+    tx.changes.Add(pick(c));
+    Apply(tx);
 }
 
 void UiDocCore::NormalizeStyles()
@@ -289,15 +293,25 @@ int UiDocCore::FindEmbed(const String& id) const
     return -1;
 }
 
-bool UiDocCore::ApplyOne(const UiDocCoreChange& c, UiDocApplyResult& result)
+bool UiDocCore::ApplyOne(const UiDocCoreChange& c, UiDocApplyResult& result, HistoryStep* h)
 {
     switch(c.type) {
     case UiDocCoreChange::ReplaceText: {
         UiDocRange r = NormalizeRange(c.range);
         int old_len = r.to - r.from;
+        if(h) {
+            h->kind = HistoryStep::Text;
+            h->at = r.from;
+            h->before_text = text_.Mid(r.from, old_len);
+            h->after_text = c.text;
+            h->before_styles <<= styles_;
+            h->before_annotations <<= annotations_;
+            h->before_embeds <<= embeds_;
+            h->before_anchors <<= anchors_;
+        }
+
         text_.Remove(r.from, old_len);
         text_.Insert(r.from, c.text);
-
         UiDocPositionMap local_map;
         UiDocPositionMapEntry& e = local_map.edits.Add();
         e.at = r.from;
@@ -305,6 +319,13 @@ bool UiDocCore::ApplyOne(const UiDocCoreChange& c, UiDocApplyResult& result)
         e.new_len = c.text.GetCount();
         MapRanges(local_map);
         result.positions.edits.Append(local_map.edits);
+
+        if(h) {
+            h->after_styles <<= styles_;
+            h->after_annotations <<= annotations_;
+            h->after_embeds <<= embeds_;
+            h->after_anchors <<= anchors_;
+        }
 
         UiDocRange changed(r.from, r.from + max(old_len, c.text.GetCount()));
         if(result.changed_range.IsEmpty())
@@ -317,97 +338,125 @@ bool UiDocCore::ApplyOne(const UiDocCoreChange& c, UiDocApplyResult& result)
     }
 
     case UiDocCoreChange::SetStyle:
+        if(h) {
+            h->kind = HistoryStep::Styles;
+            h->before_styles <<= styles_;
+        }
         ReplaceStyleRange(c.range, c.style, c.style_mask ? c.style_mask : STYLE_ALL);
+        if(h)
+            h->after_styles <<= styles_;
         return true;
 
-    case UiDocCoreChange::AddAnnotation: {
-        UiDocAnnotation a = c.annotation;
-        a.range = NormalizeRange(a.range);
-        if(a.id.IsEmpty())
-            a.id = Format("ann_%d", next_annotation_id_++);
-        if(FindAnnotation(a.id) >= 0)
-            return false;
-        annotations_.Add(pick(a));
-        return true;
-    }
-
-    case UiDocCoreChange::RemoveAnnotation: {
-        int q = FindAnnotation(c.annotation_id);
-        if(q < 0)
-            return false;
-        annotations_.Remove(q);
-        return true;
-    }
-
-    case UiDocCoreChange::UpdateAnnotation: {
-        int q = FindAnnotation(c.annotation_id);
-        if(q < 0)
-            return false;
-        UiDocMergeMap(annotations_[q].payload, c.values);
-        return true;
-    }
-
+    case UiDocCoreChange::AddAnnotation:
+    case UiDocCoreChange::RemoveAnnotation:
+    case UiDocCoreChange::UpdateAnnotation:
     case UiDocCoreChange::SetAnnotationFlags: {
-        int q = FindAnnotation(c.annotation_id);
-        if(q < 0)
-            return false;
-        if(c.flag_mask & ANNOT_EXPANDED)  annotations_[q].expanded = c.expanded;
-        if(c.flag_mask & ANNOT_PRINTABLE) annotations_[q].printable = c.printable;
-        if(c.flag_mask & ANNOT_RESOLVED)  annotations_[q].resolved = c.resolved;
-        return true;
+        if(h) {
+            h->kind = HistoryStep::Annotations;
+            h->before_annotations <<= annotations_;
+        }
+        bool ok = true;
+        if(c.type == UiDocCoreChange::AddAnnotation) {
+            UiDocAnnotation a = c.annotation;
+            a.range = NormalizeRange(a.range);
+            if(a.id.IsEmpty())
+                a.id = Format("ann_%d", next_annotation_id_++);
+            if(FindAnnotation(a.id) >= 0)
+                ok = false;
+            else
+                annotations_.Add(pick(a));
+        }
+        else {
+            int q = FindAnnotation(c.annotation_id);
+            if(q < 0)
+                ok = false;
+            else if(c.type == UiDocCoreChange::RemoveAnnotation)
+                annotations_.Remove(q);
+            else if(c.type == UiDocCoreChange::UpdateAnnotation)
+                UiDocMergeMap(annotations_[q].payload, c.values);
+            else {
+                if(c.flag_mask & ANNOT_EXPANDED)  annotations_[q].expanded = c.expanded;
+                if(c.flag_mask & ANNOT_PRINTABLE) annotations_[q].printable = c.printable;
+                if(c.flag_mask & ANNOT_RESOLVED)  annotations_[q].resolved = c.resolved;
+            }
+        }
+        if(ok && h)
+            h->after_annotations <<= annotations_;
+        return ok;
     }
 
-    case UiDocCoreChange::AddResource: {
-        UiDocResource r = c.resource;
-        if(r.key.IsEmpty())
-            r.key = Format("res_%d", next_resource_id_++);
-        if(FindResource(r.key) >= 0)
-            return false;
-        resources_.Add(pick(r));
-        return true;
-    }
-
+    case UiDocCoreChange::AddResource:
     case UiDocCoreChange::RemoveResource: {
-        int q = FindResource(c.resource_key);
-        if(q < 0)
-            return false;
-        for(const UiDocEmbedBlock& e : embeds_)
-            if(e.payload.Find("resource_key") >= 0 && AsString(e.payload["resource_key"]) == c.resource_key)
-                return false;
-        resources_.Remove(q);
-        return true;
+        if(h) {
+            h->kind = HistoryStep::Resources;
+            h->before_resources <<= resources_;
+        }
+        bool ok = true;
+        if(c.type == UiDocCoreChange::AddResource) {
+            UiDocResource r = c.resource;
+            if(r.key.IsEmpty())
+                r.key = Format("res_%d", next_resource_id_++);
+            if(FindResource(r.key) >= 0)
+                ok = false;
+            else
+                resources_.Add(pick(r));
+        }
+        else {
+            int q = FindResource(c.resource_key);
+            if(q < 0)
+                ok = false;
+            else {
+                for(const UiDocEmbedBlock& e : embeds_)
+                    if(e.payload.Find("resource_key") >= 0 && AsString(e.payload["resource_key"]) == c.resource_key)
+                        ok = false;
+                if(ok)
+                    resources_.Remove(q);
+            }
+        }
+        if(ok && h)
+            h->after_resources <<= resources_;
+        return ok;
     }
 
-    case UiDocCoreChange::AddEmbed: {
-        UiDocEmbedBlock e = c.embed;
-        e.range = NormalizeRange(e.range);
-        if(e.embed_id.IsEmpty())
-            e.embed_id = Format("embed_%d", next_embed_id_++);
-        if(FindEmbed(e.embed_id) >= 0)
-            return false;
-        embeds_.Add(pick(e));
-        return true;
-    }
-
-    case UiDocCoreChange::RemoveEmbed: {
-        int q = FindEmbed(c.embed_id);
-        if(q < 0)
-            return false;
-        embeds_.Remove(q);
-        return true;
-    }
-
+    case UiDocCoreChange::AddEmbed:
+    case UiDocCoreChange::RemoveEmbed:
     case UiDocCoreChange::UpdateEmbed: {
-        int q = FindEmbed(c.embed_id);
-        if(q < 0)
-            return false;
-        UiDocMergeMap(embeds_[q].payload, c.values);
-        return true;
+        if(h) {
+            h->kind = HistoryStep::Embeds;
+            h->before_embeds <<= embeds_;
+        }
+        bool ok = true;
+        if(c.type == UiDocCoreChange::AddEmbed) {
+            UiDocEmbedBlock e = c.embed;
+            e.range = NormalizeRange(e.range);
+            if(e.embed_id.IsEmpty())
+                e.embed_id = Format("embed_%d", next_embed_id_++);
+            if(FindEmbed(e.embed_id) >= 0)
+                ok = false;
+            else
+                embeds_.Add(pick(e));
+        }
+        else {
+            int q = FindEmbed(c.embed_id);
+            if(q < 0)
+                ok = false;
+            else if(c.type == UiDocCoreChange::RemoveEmbed)
+                embeds_.Remove(q);
+            else
+                UiDocMergeMap(embeds_[q].payload, c.values);
+        }
+        if(ok && h)
+            h->after_embeds <<= embeds_;
+        return ok;
     }
 
     case UiDocCoreChange::SetDocumentMeta:
         if(c.key.IsEmpty())
             return false;
+        if(h) {
+            h->kind = HistoryStep::Meta;
+            h->before_meta = clone(meta_);
+        }
         if(IsNull(c.value)) {
             int q = meta_.Find(c.key);
             if(q >= 0)
@@ -415,21 +464,30 @@ bool UiDocCore::ApplyOne(const UiDocCoreChange& c, UiDocApplyResult& result)
         }
         else
             meta_.GetAdd(c.key) = c.value;
+        if(h)
+            h->after_meta = clone(meta_);
         return true;
 
     case UiDocCoreChange::SetAnchor:
-        if(c.key.IsEmpty())
-            return false;
-        anchors_.GetAdd(c.key) = ClampPos(c.pos);
+    case UiDocCoreChange::RemoveAnchor:
+        if(h) {
+            h->kind = HistoryStep::Anchors;
+            h->before_anchors <<= anchors_;
+        }
+        if(c.type == UiDocCoreChange::SetAnchor) {
+            if(c.key.IsEmpty())
+                return false;
+            anchors_.GetAdd(c.key) = ClampPos(c.pos);
+        }
+        else {
+            int q = anchors_.Find(c.key);
+            if(q < 0)
+                return false;
+            anchors_.Remove(q);
+        }
+        if(h)
+            h->after_anchors <<= anchors_;
         return true;
-
-    case UiDocCoreChange::RemoveAnchor: {
-        int q = anchors_.Find(c.key);
-        if(q < 0)
-            return false;
-        anchors_.Remove(q);
-        return true;
-    }
     }
     return false;
 }
@@ -451,19 +509,24 @@ UiDocApplyResult UiDocCore::Apply(const UiDocCoreTransaction& tx)
         return result;
     }
 
-    Snapshot before = MakeSnapshot();
-    if(tx.add_to_history)
-        PushUndo();
-
+    HistoryRecord record;
     for(const UiDocCoreChange& c : tx.changes) {
-        if(!ApplyOne(c, result)) {
-            RestoreSnapshot(before, false);
-            if(tx.add_to_history && !undo_.IsEmpty())
-                undo_.Drop();
+        HistoryStep* step = tx.add_to_history && history_limit_ > 0 ? &record.steps.Add() : nullptr;
+        if(!ApplyOne(c, result, step)) {
+            if(step)
+                record.steps.Drop();
+            ApplyHistoryRecord(record, true);
             result.positions.Clear();
             result.error = "transaction refused";
             return result;
         }
+    }
+
+    if(tx.add_to_history && history_limit_ > 0 && !record.steps.IsEmpty()) {
+        undo_.Add(pick(record));
+        while(undo_.GetCount() > history_limit_)
+            undo_.Remove(0);
+        redo_.Clear();
     }
 
     Touch();
@@ -691,11 +754,11 @@ bool UiDocCore::Undo()
     if(undo_.IsEmpty())
         return false;
     uint64 before = revision_;
-    Snapshot current = MakeSnapshot();
-    Snapshot previous = pick(undo_.Top());
+    HistoryRecord record = pick(undo_.Top());
     undo_.Drop();
-    redo_.Add(pick(current));
-    RestoreSnapshot(previous, true);
+    ApplyHistoryRecord(record, true);
+    redo_.Add(pick(record));
+    Touch();
     UiDocApplyResult r;
     r.ok = true;
     r.revision_before = before;
@@ -709,11 +772,11 @@ bool UiDocCore::Redo()
     if(redo_.IsEmpty())
         return false;
     uint64 before = revision_;
-    Snapshot current = MakeSnapshot();
-    Snapshot next = pick(redo_.Top());
+    HistoryRecord record = pick(redo_.Top());
     redo_.Drop();
-    undo_.Add(pick(current));
-    RestoreSnapshot(next, true);
+    ApplyHistoryRecord(record, false);
+    undo_.Add(pick(record));
+    Touch();
     UiDocApplyResult r;
     r.ok = true;
     r.revision_before = before;
