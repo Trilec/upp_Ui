@@ -2,75 +2,83 @@
 
 Branch: `document-redesign`
 
-## Recovery point
+## Current recovery point
 
-Last verified build-relevant Core checkpoint before staged editor sources:
-`c27f02ad41592f20ab1f781470b798c6413f5c8b` — `UiDoc v2: notify views when core clears`
+Current compile-active branch head before Windows validation:
+`45beb38d0bf7921055c0a88bf6896b033c1a55eb` — `UiDoc v2: fix styled paint state type`
 
-Current staged editor-source branch head when this note was introduced:
-`057cb4aa49041dcfd15730ec814745d26597fafa` — `UiDoc v2: checkpoint editor commands`
+The v2 package switch is active. `Ui/Ui.upp` now builds the implementation under `Ui/UiDoc/`; the old root implementation `.cpp` files are no longer package members. Root `UiDoc.h` and `UiDocCore.h` are only small forwarding include points into the subsystem.
 
-The commits after `c27f02a` currently add source-only editor units that are not yet members of `Ui/Ui.upp`; therefore the active package still builds the V1 `Ui/UiDoc.cpp`/`Ui/UiDoc.h` while v2 is assembled.
+If a timeout occurs, fetch `document-redesign`, confirm the current remote HEAD, read this file, and continue from the latest published commit rather than from chat memory or an old scratch copy.
 
-## Authoritative v2 Core already published
+## Authoritative v2 model
 
 - concrete non-visual `UiDocCore`
-- sparse text style runs
-- semantic sparse blocks
-- arbitrary document/block/annotation/resource/embed metadata
-- deterministic revisioned transactions and position mapping
+- sparse text style runs; no permanent per-character style mirror
+- sparse semantic blocks and arbitrary structural metadata
+- deterministic revisioned transactions and position maps
 - sparse undo/redo history
 - comments/annotations, resources, anchors and generic embeds
-- canonical typed rich table model
-- versioned native `.uidoc` persistence
-- monotonic revision and model-change notifications
-- headless Core test package including a 100,000-line sparse-style case
+- canonical typed rich table model with text/image/custom inline runs
+- versioned native `.uidoc` persistence of logical state only
+- monotonic revisions and model-change notifications
+- headless Core tests including a 100,000-line sparse-style scenario
 
-## Final source organisation decision
+## Current subsystem layout
 
-UiDoc is a subsystem and will live under `Ui/UiDoc/`, similar to `Ui/UiColorPicker/`.
+All active UiDoc implementation is under `Ui/UiDoc/`.
 
-Do not keep the temporary highly granular editor split as the final architecture. Consolidate to approximately:
-
+Core currently keeps meaningful implementation boundaries:
 - `UiDocCore.h`
-- `UiDocCore.cpp` — core state, transactions, API and typed table operations
-- `UiDocCoreJson.cpp` — native persistence only
+- `UiDocCore.cpp`
+- `UiDocCoreApply.cpp`
+- `UiDocCoreApi.cpp`
+- `UiDocCoreTable.cpp`
+- `UiDocCoreJson.cpp`
+
+Editor currently uses timeout-safe implementation slices:
 - `UiDoc.h`
-- `UiDoc.cpp` — Ctrl lifecycle, Core facade, editing/search/clipboard/commands
-- `UiDocLayout.cpp` — paragraph, table/image layout, viewport geometry and hit testing
-- `UiDocPaint.cpp` — document, embeds, selections, comments/gutters/caret painting
-- `UiDocInput.cpp` — keyboard/mouse/navigation/table-cell interaction
+- `UiDoc.cpp`
+- `UiDocLayout.cpp`
+- `UiDocParagraphLayout.cpp`
+- `UiDocGeometry.cpp`
+- `UiDocPaint.cpp`
+- `UiDocPaintOverlay.cpp`
+- `UiDocInput.cpp`
+- `UiDocInteraction.cpp`
+- `UiDocCommands.cpp`
 
-This split is by real responsibility, not by file-size target. Avoid additional public classes or hierarchy unless a real second consumer requires one.
+The folder keeps these contained. After the first clean compile/runtime pass, consolidate the editor to fewer physical files where it remains natural: Layout + ParagraphLayout + Geometry, Paint + PaintOverlay, and Input + Interaction. Do not risk large transport-truncated blobs merely to reduce file count before validation.
 
-## Staged source already published but not package-active
+## Static corrections already made
 
-Temporary root-level checkpoint files:
-- `Ui/UiDocParagraphLayout.cpp`
-- `Ui/UiDocGeometry.cpp`
-- `Ui/UiDocCommands.cpp`
-
-These are recovery checkpoints only. Their reviewed logic should be folded into the consolidated `Ui/UiDoc/` files and the temporary root-level files deleted when the v2 package switch is made.
+- moved the authoritative Core and editor under `Ui/UiDoc/`
+- kept `<Ui/UiDoc.h>` and `<Ui/UiDocCore.h>` as stable forwarding includes
+- removed V1 implementation files from active package membership
+- corrected a split-TU table-cell helper dependency in `UiDocInteraction.cpp`
+- corrected `UiDoc::Paint()` to pass `StyledState` to `UiPaintFaceFrameDash`
+- verified the UiTheme `ResolveDoc()` contract only depends on `UiDoc::StyleDefault()`, palette and font; v2 preserves that style vocabulary
+- declaration/definition and brace/parenthesis structural scans are clean; overloaded `SetSelection` is the only intentional duplicate method name
 
 ## Next exact steps
 
-1. Reconstruct the latest branch files from GitHub before every edit.
-2. Consolidate the local v2 editor implementation into the eight-file `Ui/UiDoc/` layout above.
-3. Move the published Core implementation into that folder without changing its logical contract.
-4. Update includes in `Ui/Ui.h`, `Ui/UiTheme.h`, tests/demo and package membership.
-5. Atomically switch `Ui/Ui.upp` from V1 root `UiDoc.*` to the new folder and remove temporary/root V1 UiDoc sources from package membership.
-6. Statically inspect declarations/definitions, package membership, include direction and full diff.
-7. Publish the editor switch promptly before compile work.
-8. Then compile/fix with Windows validator help; never weaken Core/model tests.
-9. After the editor is coherent, redesign `examples/UiDocDemo` into the Word-like application showcase with real `.uidoc` New/Open/Save/Save As, Home/Insert/Review/View surfaces and representative rich content.
-10. Remove this status file before merge unless it is deliberately converted into permanent maintainer documentation.
+1. Windows programmer pulls/checks out `document-redesign` at the exact current validation SHA and compiles `Ui` first.
+2. Compile/run `Utilities/UiDocCoreTest` without weakening tests.
+3. Report the first compiler errors exactly, including file, line and diagnostic; stop if `Ui` does not build.
+4. Apply source corrections on this branch, publish, update this status file, and repeat until the library/Core test are clean.
+5. Add/update focused v2 editor/model tests after the control compiles.
+6. Redesign `examples/UiDocDemo` into the Word-like application showcase with real `.uidoc` New/Open/Save/Save As, Home/Insert/Review/View surfaces and representative rich content.
+7. Perform scale/interaction validation and only then consolidate the remaining editor implementation slices.
+8. Remove obsolete root V1 `.cpp` files and temporary root checkpoint sources before merge.
+9. Remove this status file before merge unless deliberately retained as maintainer documentation.
 
-## Important constraints
+## Constraints
 
 - Remote GitHub branch is source of truth.
-- Reconstruct exact touched files locally; no blind whole-file edits against remembered content.
+- Reconstruct exact touched files locally; do not edit remembered/stale copies.
 - Publish small recoverable checkpoints because transport timeouts are frequent.
-- No V1 backward-compatibility requirement for UiDoc API/document format.
-- Keep public concepts small: `UiDocCore` + `UiDoc`; use composition, not a deep inheritance hierarchy.
+- No V1 API/document-format compatibility requirement.
+- Keep public concepts small: `UiDocCore` + `UiDoc`; composition, not deep inheritance.
 - Core owns logical document meaning; UiDoc owns U++ pixel layout, input and painting.
-- Agent/MCP support comes through deterministic Core query/mutation/revision APIs, not MCP code inside the control.
+- Agent/MCP support uses deterministic Core query/mutation/revision APIs; MCP itself stays outside the control.
+- Do not choose a rope/piece-tree text store until measured large-document workloads prove the current store is the bottleneck.
