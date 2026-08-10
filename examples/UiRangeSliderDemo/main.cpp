@@ -23,7 +23,9 @@ struct RangeSliderConfig {
     int step = 1;
     bool ticks = true;
     int major_ticks = 11;
-    int field_gap = 14;
+    int field_width = 72;
+    int field_gap = 8;
+    int inset = 4;
 };
 
 class UiRangeSliderBuilder : public BuilderWindowBase {
@@ -49,7 +51,9 @@ public:
         AddSliderRow(PropsBox(), step_row_, "Step", "1");
         AddToggleRow(PropsBox(), ticks_row_, "Ticks");
         AddSliderRow(PropsBox(), tick_count_row_, "Major Ticks", "11");
-        AddSliderRow(PropsBox(), field_gap_row_, "Field Gap", "14");
+        AddSliderRow(PropsBox(), field_width_row_, "Field Width", "72");
+        AddSliderRow(PropsBox(), field_gap_row_, "Field Gap", "8");
+        AddSliderRow(PropsBox(), inset_row_, "Inset", "4");
 
         orientation_drop_.UseInternalModel();
         orientation_drop_.Clear();
@@ -60,7 +64,9 @@ public:
         upper_row_.Slider().SetRange(0, 100).SetStep(1).SetValue(cfg_.upper);
         step_row_.Slider().SetRange(1, 10).SetStep(1).SetValue(cfg_.step);
         tick_count_row_.Slider().SetRange(2, 21).SetStep(1).SetValue(cfg_.major_ticks);
-        field_gap_row_.Slider().SetRange(2, 40).SetStep(1).SetValue(cfg_.field_gap);
+        field_width_row_.Slider().SetRange(48, 120).SetStep(2).SetValue(cfg_.field_width);
+        field_gap_row_.Slider().SetRange(0, 32).SetStep(1).SetValue(cfg_.field_gap);
+        inset_row_.Slider().SetRange(0, 24).SetStep(1).SetValue(cfg_.inset);
         ticks_row_.Toggle().SetOn(cfg_.ticks);
 
         orientation_drop_.WhenSelect = [=](int) {
@@ -103,12 +109,26 @@ public:
         tick_count_row_.WhenChanging = ticks_apply;
         tick_count_row_.WhenAction = ticks_apply;
 
+        auto field_width_apply = [=] {
+            cfg_.field_width = (int)field_width_row_.Slider().GetValue();
+            RefreshFromConfig();
+        };
+        field_width_row_.WhenChanging = field_width_apply;
+        field_width_row_.WhenAction = field_width_apply;
+
         auto field_gap_apply = [=] {
             cfg_.field_gap = (int)field_gap_row_.Slider().GetValue();
             RefreshFromConfig();
         };
         field_gap_row_.WhenChanging = field_gap_apply;
         field_gap_row_.WhenAction = field_gap_apply;
+
+        auto inset_apply = [=] {
+            cfg_.inset = (int)inset_row_.Slider().GetValue();
+            RefreshFromConfig();
+        };
+        inset_row_.WhenChanging = inset_apply;
+        inset_row_.WhenAction = inset_apply;
 
         range_.WhenChanging = [=] { SyncFromSlider(); };
         range_.WhenAction = [=] { SyncFromSlider(); };
@@ -129,7 +149,7 @@ protected:
     {
         Rect c = Preview().GetCanvasRect();
         if(cfg_.orientation == 0) {
-            int w = max(DPI(280), c.GetWidth() - DPI(60));
+            int w = max(DPI(360), c.GetWidth() - DPI(60));
             int mid = c.CenterPoint().y;
             int block = DPI(78) + DPI(14) + DPI(46);
             int top = mid - block / 2;
@@ -141,11 +161,11 @@ protected:
                                 w, DPI(46));
         }
         else {
-            int h = max(DPI(300), c.GetHeight() - DPI(100));
+            int h = max(DPI(340), c.GetHeight() - DPI(90));
             int mid = c.CenterPoint().y;
             int top = mid - h / 2;
             int slider_w = DPI(84);
-            int edit_w = max(DPI(260), c.GetWidth() - DPI(120));
+            int edit_w = max(DPI(170), min(DPI(220), c.GetWidth() / 3));
             int left = c.left + (c.GetWidth() - (slider_w + DPI(24) + edit_w)) / 2;
             range_.SetRect(left, top, slider_w, h);
             range_edit_.SetRect(left + slider_w + DPI(24), top, edit_w, h);
@@ -165,8 +185,9 @@ private:
         range_edit_.SetDirection(cfg_.orientation == 0 ? UiDirection::H : UiDirection::V)
                    .SetRange(0, 100)
                    .SetStep(cfg_.step)
-                   .SetFieldWidth(DPI(92))
+                   .SetFieldWidth(DPI(cfg_.field_width))
                    .SetGap(DPI(cfg_.field_gap))
+                   .SetInset(DPI(cfg_.inset))
                    .SetStartEnd(cfg_.lower, cfg_.upper);
 
         cfg_.lower = (int)range_.GetLowerValue();
@@ -178,13 +199,17 @@ private:
         step_row_.Slider().SetValue(cfg_.step);
         ticks_row_.Toggle().SetOn(cfg_.ticks);
         tick_count_row_.Slider().SetValue(cfg_.major_ticks);
+        field_width_row_.Slider().SetValue(cfg_.field_width);
         field_gap_row_.Slider().SetValue(cfg_.field_gap);
+        inset_row_.Slider().SetValue(cfg_.inset);
 
         lower_row_.SetValueText(AsString(cfg_.lower));
         upper_row_.SetValueText(AsString(cfg_.upper));
         step_row_.SetValueText(AsString(cfg_.step));
         tick_count_row_.SetValueText(AsString(cfg_.major_ticks));
+        field_width_row_.SetValueText(AsString(cfg_.field_width));
         field_gap_row_.SetValueText(AsString(cfg_.field_gap));
+        inset_row_.SetValueText(AsString(cfg_.inset));
 
         SyncStateAndCode();
         LayoutPreviewContent();
@@ -236,12 +261,14 @@ private:
     String BuildUsageCode() const
     {
         String code;
-        code << "UiRangeSlider range;\n";
+        code << "UiRangeSliderEdit range;\n";
         code << "range.SetDirection(UiDirection::" << (cfg_.orientation == 0 ? "H" : "V") << ")\n";
         code << "     .SetRange(0, 100)\n";
         code << "     .SetStep(" << cfg_.step << ")\n";
-        code << "     .SetStartEnd(" << cfg_.lower << ", " << cfg_.upper << ")\n";
-        code << "     .SetTicks(" << (cfg_.ticks ? "true" : "false") << ", " << cfg_.major_ticks << ", 0);\n\n";
+        code << "     .SetFieldWidth(DPI(" << cfg_.field_width << "))\n";
+        code << "     .SetGap(DPI(" << cfg_.field_gap << "))\n";
+        code << "     .SetInset(DPI(" << cfg_.inset << "))\n";
+        code << "     .SetStartEnd(" << cfg_.lower << ", " << cfg_.upper << ");\n\n";
         code << "range.WhenChanging = [&] {\n";
         code << "    double start = range.GetStart();\n";
         code << "    double end = range.GetEnd();\n";
@@ -279,7 +306,9 @@ private:
     DemoSliderRow step_row_;
     DemoToggleRow ticks_row_;
     DemoSliderRow tick_count_row_;
+    DemoSliderRow field_width_row_;
     DemoSliderRow field_gap_row_;
+    DemoSliderRow inset_row_;
 };
 
 }
