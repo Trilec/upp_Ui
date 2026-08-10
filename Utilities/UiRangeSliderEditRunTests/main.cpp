@@ -100,15 +100,37 @@ CONSOLE_APP_MAIN
              "vertical layout places upper field above slider and lower field below");
 
     edit.SetDirection(UiDirection::H);
-    edit.SetRect(0, 0, 520, 60);
+    edit.SetFieldWidth(DPI(72)).SetGap(DPI(8)).SetInset(DPI(5));
+    edit.SetRect(0, 0, 620, 60);
     edit.Layout();
     Rect left = edit.LowerField().GetRect();
     Rect right = edit.UpperField().GetRect();
     slider = edit.Slider().GetRect();
-    t.Expect(left.right < slider.left && slider.right < right.left,
-             "horizontal layout places lower and upper fields on opposite sides");
+    t.Expect(left.right + DPI(8) == slider.left && slider.right + DPI(8) == right.left,
+             "horizontal layout uses exactly the configured gap around the expanding slider");
+    t.Expect(left.left == DPI(5) && right.right == 620 - DPI(5),
+             "inset bounds the complete field/slider composition");
+    t.Expect(slider.GetWidth() == 620 - 2 * DPI(5) - 2 * left.GetWidth() - 2 * DPI(8),
+             "slider receives all remaining horizontal space after fixed fields and gaps");
+    Rect painted = edit.Slider().GetTrackRect();
+    t.Expect(painted.GetWidth() > slider.GetWidth() - DPI(50),
+             "painted range track expands across the allocated slider rectangle");
 
-    edit.SetPrecision(2).SetFieldWidth(DPI(90)).SetGap(DPI(8));
+    edit.SetDirection(UiDirection::V);
+    edit.SetRect(0, 0, 120, 420);
+    edit.Layout();
+    upper = edit.UpperField().GetRect();
+    lower = edit.LowerField().GetRect();
+    slider = edit.Slider().GetRect();
+    t.Expect(upper.bottom + DPI(8) == slider.top && slider.bottom + DPI(8) == lower.top,
+             "vertical layout uses exactly the configured gap around the expanding slider");
+    painted = edit.Slider().GetTrackRect();
+    t.Expect(painted.GetHeight() > slider.GetHeight() - DPI(50),
+             "painted range track expands across the allocated vertical slider rectangle");
+
+    edit.SetPrecision(2);
+    t.Expect(edit.GetFieldWidth() == DPI(72) && edit.GetGap() == DPI(8) && edit.GetInset() == DPI(5),
+             "field width, gap, and inset remain queryable composition settings");
     t.Expect(&edit.Slider() != nullptr && &edit.LowerField() != nullptr &&
              &edit.UpperField() != nullptr,
              "child controls remain available for normal Ui styling and configuration");
