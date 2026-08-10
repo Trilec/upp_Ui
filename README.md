@@ -34,6 +34,8 @@ The canonical, portable documentation set lives in `docs/`:
 - `docs/02_UI_THEME_GUIDE.md` — theme and style system
 - `docs/03_UI_MODEL_GUIDE.md` — model-driven architecture and PropertyEditor
 - `docs/04_UI_DEMO_GUIDE.md` — the intended demo structure
+- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — complete PropertyEditor integration,
+  adapters, transactions, providers, layout, and performance contract
 
 Start with `00_UPP_CODING_GUIDE.md`, then read the controls guide before
 touching any control or demo.

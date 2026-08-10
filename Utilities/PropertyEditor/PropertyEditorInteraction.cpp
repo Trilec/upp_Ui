@@ -97,6 +97,15 @@ void PropertyEditor::ActivateRow(int display_index)
         return;
     }
 
+    if(item.expanded_row_span > 1 && !IsPropertyExpanded(item.id)) {
+        selected_display_row_ = display_index;
+        SetPropertyExpanded(item.id, true);
+        WhenSelection(item.id);
+        if(!item.help.IsEmpty())
+            WhenHelp(item.help);
+        return;
+    }
+
     if(PropertyValueEditor *editor = FindInlineEditor(display_index)) {
         if(active_editor_)
             CommitActiveEditor();
@@ -147,9 +156,20 @@ void PropertyEditor::ActivateRow(int display_index)
         if(self)
             self->ApplyEditorCommit(value);
     };
+    const String property_id = item.id;
+    active_editor_->WhenToggleExpanded = [self, property_id] {
+        if(!self)
+            return;
+        Upp::PostCallback([self, property_id] {
+            if(self)
+                self->SetPropertyExpanded(property_id,
+                                          !self->IsPropertyExpanded(property_id));
+        });
+    };
 
     syncing_editor_ = true;
     active_editor_->Configure(item);
+    active_editor_->SetExpanded(IsPropertyExpanded(item.id));
     active_editor_->SetEditorValue(item.value, item.mixed);
     syncing_editor_ = false;
 
@@ -170,6 +190,7 @@ void PropertyEditor::DeactivateEditor()
     active_property_id_.Clear();
     active_editor_->WhenPreview.Clear();
     active_editor_->WhenCommit.Clear();
+    active_editor_->WhenToggleExpanded.Clear();
     active_editor_->Remove();
     active_editor_.Clear();
     tearing_down_editor_ = false;
@@ -339,6 +360,12 @@ void PropertyEditor::MouseMove(Point p, dword)
         return;
     }
 
+    bool divider = GetLabelDividerRect().Contains(p);
+    if(divider != hover_label_divider_) {
+        hover_label_divider_ = divider;
+        Refresh();
+    }
+
     int row = FindDisplayRow(p);
     if(row == hover_display_row_)
         return;
@@ -348,9 +375,16 @@ void PropertyEditor::MouseMove(Point p, dword)
 
 void PropertyEditor::MouseLeave()
 {
+    hover_label_divider_ = false;
     if(!dragging_label_divider_)
         hover_display_row_ = -1;
     Refresh();
+}
+
+Image PropertyEditor::CursorImage(Point p, dword)
+{
+    return dragging_label_divider_ || GetLabelDividerRect().Contains(p)
+         ? Image::SizeHorz() : Image::Arrow();
 }
 
 void PropertyEditor::MouseWheel(Point p, int zdelta, dword)

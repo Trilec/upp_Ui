@@ -129,6 +129,12 @@ void PropertyEditor::Paint(Draw& w)
         else if(model_ && row.model_index >= 0)
             DrawPropertyRow(w, i, row, (*model_)[row.model_index], rr);
     }
+
+    if((hover_label_divider_ || dragging_label_divider_) && !viewport_.IsEmpty()) {
+        int x = viewport_.left + GetLabelColumnWidth(viewport_);
+        w.DrawLine(x, viewport_.top, x, viewport_.bottom,
+                   DPI(2), SColorHighlight());
+    }
 }
 
 Size PropertyEditor::GetMinSize() const
@@ -271,12 +277,10 @@ bool PropertyEditor::MatchesFilter(const PropertyEditorItem& item) const
 
 int PropertyEditor::ResolveRowSpan(const PropertyEditorItem& item) const
 {
+    if(item.expanded_row_span > 1 && IsPropertyExpanded(item.id))
+        return clamp(item.expanded_row_span, 2, 8);
     if(item.row_span > 0)
         return clamp(item.row_span, 1, 8);
-    if(item.kind == PropertyEditorKind::Multiline)
-        return 3;
-    if(item.kind == PropertyEditorKind::Vector2 || item.kind == PropertyEditorKind::Vector3)
-        return 2;
     return 1;
 }
 
@@ -288,7 +292,7 @@ void PropertyEditor::RecomputeAutoLabelWidth()
             if(row.group || row.model_index < 0)
                 continue;
             const PropertyEditorItem& item = (*model_)[row.model_index];
-            int indent = max(0, item.indent) * style_.indent_width;
+            int indent = max(0, row.group_depth + item.indent) * style_.indent_width;
             width = max(width, GetTextSize(item.label, style_.label_font).cx +
                                2 * style_.cell_padding + indent + DPI(4));
         }
@@ -305,6 +309,25 @@ void PropertyEditor::RebuildRows()
 
     if(model_) {
         Vector<String> previous_chain;
+        VectorMap<String, int> override_local;
+        VectorMap<String, int> override_total;
+        for(int i = 0; i < model_->GetCount(); i++) {
+            const PropertyEditorItem& item = (*model_)[i];
+            if(!item.overrideable)
+                continue;
+            for(const String& path : PeGroupChain(item.group)) {
+                int q = override_total.Find(path);
+                if(q < 0) {
+                    override_total.Add(path, 1);
+                    override_local.Add(path, item.override_active ? 1 : 0);
+                }
+                else {
+                    override_total[q]++;
+                    if(item.override_active)
+                        override_local[q]++;
+                }
+            }
+        }
         int ordinal = 0;
         bool filtering = !TrimBoth(GetFilter()).IsEmpty();
 
@@ -331,6 +354,11 @@ void PropertyEditor::RebuildRows()
                     group.group_id = path;
                     group.group_label = PeGroupLeaf(path);
                     group.group_depth = depth;
+                    int summary = override_total.Find(path);
+                    if(summary >= 0) {
+                        group.override_total = override_total[summary];
+                        group.override_local = override_local[summary];
+                    }
                     group.y = content_height_;
                     group.cy = style_.group_height;
                     content_height_ += group.cy;

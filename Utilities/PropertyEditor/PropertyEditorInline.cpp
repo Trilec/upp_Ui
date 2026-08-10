@@ -103,6 +103,7 @@ void PropertyEditor::ClearInlineEditors()
             continue;
         slot.editor->WhenPreview.Clear();
         slot.editor->WhenCommit.Clear();
+        slot.editor->WhenToggleExpanded.Clear();
         slot.editor->Remove();
         slot.editor.Clear();
     }
@@ -130,6 +131,7 @@ void PropertyEditor::RebuildInlineEditors()
             if(slot.editor) {
                 slot.editor->WhenPreview.Clear();
                 slot.editor->WhenCommit.Clear();
+                slot.editor->WhenToggleExpanded.Clear();
                 slot.editor->Remove();
             }
             inline_editors_.Remove(i);
@@ -164,9 +166,19 @@ void PropertyEditor::RebuildInlineEditors()
             if(self)
                 self->ApplyInlineEditorCommit(property_id, value);
         };
+        slot.editor->WhenToggleExpanded = [self, property_id] {
+            if(!self)
+                return;
+            Upp::PostCallback([self, property_id] {
+                if(self)
+                    self->SetPropertyExpanded(property_id,
+                                              !self->IsPropertyExpanded(property_id));
+            });
+        };
 
         syncing_editor_ = true;
         slot.editor->Configure(item);
+        slot.editor->SetExpanded(IsPropertyExpanded(property_id));
         slot.editor->SetEditorValue(item.value, item.mixed);
         syncing_editor_ = false;
     }

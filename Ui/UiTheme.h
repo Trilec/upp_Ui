@@ -1406,7 +1406,6 @@ inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
     s.metrics.focus_enabled = false;
     s.title_font = SansSerifZ(11).Bold();
     s.subtitle_font = SansSerifZ(9);
-    s.side_title_font = SansSerifZ(9);
     s.header_mode = UiGroupPanel::Inside;
     s.header_inset = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
     s.inset = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
@@ -1455,7 +1454,6 @@ inline void TuneMinimalGroupPanel(UiGroupPanel::Style& s, UiThemeMode mode, UiRo
     s.transparent = false;
     s.title_font = SansSerifZ(11).Bold();
     s.subtitle_font = SansSerifZ(9);
-    s.side_title_font = SansSerifZ(9);
     s.separator_thickness = DPI(1);
 
     Color face;
@@ -1552,7 +1550,6 @@ inline void TuneMinimalGroupPanel(UiGroupPanel::Style& s, UiThemeMode mode, UiRo
 
     s.title_color = title;
     s.subtitle_color = subtitle;
-    s.side_title_color = subtitle;
 
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = s.metrics.face_enabled ? UiFill::Solid(face) : UiFill::None();

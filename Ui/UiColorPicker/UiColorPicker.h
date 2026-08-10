@@ -25,6 +25,9 @@
     - GUI thread only.
 
     Changelog
+    - 2026-08: made caller-authored slot counts immediately authoritative and
+      added grouped palette drag transfer between generated/static/image
+      swatches, the User Stash, and primary slots.
     - 2026-08: Palette Lab migration; Image promoted to a page, shared 28-cell
       stash, multi-selection/group transfer, deterministic 2-12 swatch generator,
       bounded image proxy analysis, and compatibility-preserving public API.

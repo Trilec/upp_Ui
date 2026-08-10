@@ -73,21 +73,65 @@ void UiFloatEdit::SetValue(double v)
 
 double UiFloatEdit::GetValue() const
 {
-    String s = GetText().ToString();
-    if(s.IsEmpty()) return not_null_ ? min_val_ : Null;
-    return ScanDouble(s);
+    double value;
+    return TryGetValue(value) ? value : not_null_ ? min_val_ : Null;
+}
+
+bool UiFloatEdit::TryGetValue(double& value) const
+{
+    const String text = TrimBoth(GetText().ToString());
+    if(text.IsEmpty())
+        return false;
+
+    int i = 0;
+    if(text[i] == '+' || text[i] == '-')
+        i++;
+    bool mantissa_digit = false;
+    bool decimal = false;
+    for(; i < text.GetCount() && text[i] != 'e' && text[i] != 'E'; i++) {
+        if(IsDigit(text[i]))
+            mantissa_digit = true;
+        else if(text[i] == '.' && !decimal)
+            decimal = true;
+        else
+            return false;
+    }
+    if(!mantissa_digit)
+        return false;
+    if(i < text.GetCount()) {
+        i++;
+        if(i < text.GetCount() && (text[i] == '+' || text[i] == '-'))
+            i++;
+        const int exponent_start = i;
+        while(i < text.GetCount() && IsDigit(text[i]))
+            i++;
+        if(i == exponent_start || i != text.GetCount())
+            return false;
+    }
+
+    value = ScanDouble(text);
+    return !IsNull(value) && std::isfinite(value);
+}
+
+bool UiFloatEdit::IsInputComplete() const
+{
+    double value;
+    return TryGetValue(value);
 }
 
 void UiFloatEdit::CheckValue()
 {
     if(internal_change_) return;
-    
-    double v = GetValue();
-    if(IsNull(v)) {
+
+    if(TrimBoth(GetText().ToString()).IsEmpty()) {
         if(not_null_) SetValue(min_val_);
         return;
     }
-    
+
+    double v;
+    if(!TryGetValue(v))
+        return;
+
     if(v < min_val_) SetValue(min_val_);
     if(v > max_val_) SetValue(max_val_);
     
@@ -131,10 +175,14 @@ void UiFloatEdit::SetData(const Value& v)
 #ifdef _DEBUG
     RLOG(Format("UiFloatEdit::SetData type=%s value=%s", v.GetTypeName(), StdFormat(v)));
 #endif
-    if(v.Is<double>()) SetValue(v);
+    if(IsNull(v)) Clear();
+    else if(v.Is<double>()) SetValue(v);
     else if(v.Is<int>()) SetValue((double)(int)v);
-    else if(!IsNull(v)) SetValue(ScanDouble(v.ToString()));
-    else SetValue(Null);
+    else {
+        String text = v.ToString();
+        if(text.IsEmpty()) Clear();
+        else SetValue(ScanDouble(text));
+    }
 }
 
 Value UiFloatEdit::GetData() const
@@ -157,7 +205,8 @@ bool UiFloatEdit::Key(dword key, int count)
     
     // Manual Filtering
     if(key >= 32 && key < 65536) {
-        if(!IsDigit(key) && key != '.' && key != '-' && key != 'e' && key != 'E') 
+        if(!IsDigit(key) && key != '.' && key != '-' && key != '+' &&
+           key != 'e' && key != 'E')
             return true;
     }
     

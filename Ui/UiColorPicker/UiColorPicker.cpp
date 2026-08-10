@@ -200,6 +200,54 @@ public:
     virtual Vector<UiColorPicker::SlotValue> GetPaletteDragValues() const = 0;
 };
 
+class PaletteDropButton_ : public UiToolButton {
+public:
+    Event<const Vector<UiColorPicker::SlotValue>&> WhenDropValues;
+
+    void DragEnter() override
+    {
+        drop_hot_ = true;
+        Refresh();
+    }
+
+    void DragAndDrop(Point, PasteClip& clip) override
+    {
+        if(!IsAvailableInternal<PaletteDragSource_>(clip, "uicolor-palette-group")) {
+            clip.Reject();
+            drop_hot_ = false;
+            Refresh();
+            return;
+        }
+        AcceptInternal<PaletteDragSource_>(clip, "uicolor-palette-group");
+        clip.SetAction(DND_COPY);
+        if(clip.IsPaste()) {
+            const PaletteDragSource_ *source =
+                GetInternalPtr<PaletteDragSource_>(clip, "uicolor-palette-group");
+            if(source && WhenDropValues)
+                WhenDropValues(source->GetPaletteDragValues());
+        }
+        drop_hot_ = false;
+        Refresh();
+    }
+
+    void DragLeave() override
+    {
+        drop_hot_ = false;
+        Refresh();
+    }
+
+    void Paint(Draw& draw) override
+    {
+        UiToolButton::Paint(draw);
+        if(drop_hot_)
+            DrawFrame_(draw, Rect(Point(0, 0), GetSize()).Deflated(DPI(1)),
+                       SColorHighlight(), DPI(2));
+    }
+
+private:
+    bool drop_hot_ = false;
+};
+
 class SwatchFlow_;
 
 class SwatchTile_ : public UiToolButton {
@@ -233,19 +281,34 @@ public:
 
     virtual Size GetMinSize() const override
     {
-        return Size(DPI(26), DPI(26));
+        return Size(DPI(28), DPI(28));
     }
 
     virtual void Paint(Draw& draw) override
     {
-        UiToolButton::Paint(draw);
         Rect rect(Point(0, 0), GetSize());
-        Rect swatch = rect.Deflated(compact_ ? DPI(2) : DPI(3));
-        DrawAlphaSwatch_(draw, swatch, display_.value.color, display_.value.alpha);
-        Color frame = active_ ? SColorHighlight()
-                    : selected_ ? Blend(SColorHighlight(), SColorPaper(), 65)
-                                : FrameColor_();
-        DrawFrame_(draw, rect.Deflated(DPI(1)), frame, active_ ? DPI(2) : DPI(1));
+        Rect swatch = rect.Deflated(DPI(2));
+        if(IsNull(display_.value.color)) {
+            Color ink = Blend(SColorShadow(), SColorPaper(), 65);
+            const int dash = DPI(3);
+            for(int x = swatch.left; x < swatch.right; x += dash * 2) {
+                draw.DrawRect(x, swatch.top, min(dash, swatch.right - x), 1, ink);
+                draw.DrawRect(x, swatch.bottom - 1, min(dash, swatch.right - x), 1, ink);
+            }
+            for(int y = swatch.top; y < swatch.bottom; y += dash * 2) {
+                draw.DrawRect(swatch.left, y, 1, min(dash, swatch.bottom - y), ink);
+                draw.DrawRect(swatch.right - 1, y, 1, min(dash, swatch.bottom - y), ink);
+            }
+        }
+        else
+            DrawAlphaSwatch_(draw, swatch, display_.value.color, display_.value.alpha);
+        if(selected_ || active_) {
+            Color frame = active_ ? SColorHighlight()
+                                  : Blend(SColorHighlight(), SColorPaper(), 45);
+            DrawFrame_(draw, rect, frame, DPI(1));
+            DrawFrame_(draw, rect.Deflated(DPI(1)), frame, DPI(1));
+            DrawFrame_(draw, rect.Deflated(DPI(2)), frame, DPI(1));
+        }
         if(display_.hero_number > 0 && !compact_) {
             int diameter = DPI(15);
             Rect badge = RectC(swatch.left + DPI(2), swatch.top + DPI(2), diameter, diameter);
@@ -328,6 +391,11 @@ public:
         accept_drop_ = on;
     }
 
+    void AllowEmptySelection(bool on = true)
+    {
+        allow_empty_selection_ = on;
+    }
+
     void SetItems(const Vector<DisplaySwatch_>& items, bool preserve_selection = false)
     {
         Vector<int> old_selected = clone(selected_);
@@ -341,7 +409,7 @@ public:
                 One<SwatchTile_>& tile = tiles_.Add();
                 tile.Create();
                 tile->Configure(*this, i);
-                Add(*tile).Fixed(DPI(26)).MinMaxHeight(DPI(26), DPI(26));
+                Add(*tile).Fixed(DPI(28)).MinMaxHeight(DPI(28), DPI(28));
             }
         }
         selected_.Clear();
@@ -431,9 +499,11 @@ public:
 
     void HandleTileDown(int index, dword flags)
     {
-        if(index < 0 || index >= items_.GetCount() || IsNull(items_[index].value.color))
+        if(index < 0 || index >= items_.GetCount() ||
+           (IsNull(items_[index].value.color) && !allow_empty_selection_))
             return;
         SetFocus();
+        const bool was_selected = FindIndex(selected_, index) >= 0;
         bool range = (flags & K_SHIFT) && anchor_index_ >= 0;
         bool toggle = (flags & K_CTRL) != 0;
         if(range) {
@@ -442,7 +512,8 @@ public:
             int first = min(anchor_index_, index);
             int last = max(anchor_index_, index);
             for(int i = first; i <= last; i++)
-                if(!IsNull(items_[i].value.color) && FindIndex(selected_, i) < 0)
+                if((allow_empty_selection_ || !IsNull(items_[i].value.color)) &&
+                   FindIndex(selected_, i) < 0)
                     selected_.Add(i);
         }
         else if(toggle) {
@@ -453,7 +524,7 @@ public:
                 selected_.Add(index);
             anchor_index_ = index;
         }
-        else {
+        else if(!was_selected || selected_.GetCount() <= 1) {
             selected_.Clear();
             selected_.Add(index);
             anchor_index_ = index;
@@ -461,7 +532,11 @@ public:
         Sort(selected_);
         active_index_ = FindIndex(selected_, index) >= 0 ? index
                       : selected_.IsEmpty() ? -1 : selected_[0];
-        drag_selecting_ = true;
+        drag_origin_ = index;
+        drag_ready_ = was_selected;
+        drag_selecting_ = !drag_ready_;
+        pending_single_ = was_selected && selected_.GetCount() > 1 &&
+                          !range && !toggle ? index : -1;
         SyncTiles();
         FireSelection();
     }
@@ -480,7 +555,8 @@ public:
     {
         if(!drag_selecting_ || !(flags & K_MOUSELEFT) || index < 0 || index >= items_.GetCount())
             return;
-        if(IsNull(items_[index].value.color) || FindIndex(selected_, index) >= 0)
+        if((IsNull(items_[index].value.color) && !allow_empty_selection_) ||
+           FindIndex(selected_, index) >= 0)
             return;
         selected_.Add(index);
         Sort(selected_);
@@ -489,16 +565,35 @@ public:
         FireSelection();
     }
 
-    void EndPointerSelection()
+    void HandlePointerMove(const SwatchTile_& source, Point point, dword flags)
     {
+        const Point screen = source.GetScreenRect().TopLeft() + point;
+        const Point local = screen - GetScreenRect().TopLeft();
+        for(int i = 0; i < tiles_.GetCount(); i++)
+            if(tiles_[i]->GetRect().Contains(local)) {
+                HandleTileMove(i, flags);
+                return;
+            }
+    }
+
+    void EndPointerSelection(int index)
+    {
+        if(pending_single_ == index) {
+            SetSelectedIndex(index);
+            FireSelection();
+        }
+        pending_single_ = -1;
+        drag_ready_ = false;
         drag_selecting_ = false;
     }
 
     void BeginTileDrag(int index)
     {
-        if(index < 0 || index >= items_.GetCount() || IsNull(items_[index].value.color))
+        if(!drag_ready_ || index < 0 || index >= items_.GetCount() ||
+           IsNull(items_[index].value.color))
             return;
-        drag_origin_ = index;
+        pending_single_ = -1;
+        drag_selecting_ = false;
         Vector<UiColorPicker::SlotValue> values = GetPaletteDragValues();
         if(values.IsEmpty())
             return;
@@ -515,6 +610,7 @@ public:
                                             Size(DPI(34), DPI(34)), true),
                       DND_COPY);
         drag_origin_ = -1;
+        drag_ready_ = false;
     }
 
     void HandleDragEnter()
@@ -584,11 +680,14 @@ private:
     int active_index_ = -1;
     int anchor_index_ = -1;
     int drag_origin_ = -1;
+    int pending_single_ = -1;
     int columns_ = 6;
     bool compact_ = false;
     bool accept_drop_ = false;
     bool drop_hot_ = false;
     bool drag_selecting_ = false;
+    bool drag_ready_ = false;
+    bool allow_empty_selection_ = false;
 };
 
 void SwatchTile_::LeftDown(Point point, dword flags)
@@ -601,7 +700,7 @@ void SwatchTile_::LeftDown(Point point, dword flags)
 void SwatchTile_::LeftUp(Point point, dword flags)
 {
     if(owner_)
-        owner_->EndPointerSelection();
+        owner_->EndPointerSelection(index_);
     UiToolButton::LeftUp(point, flags);
 }
 
@@ -620,7 +719,7 @@ void SwatchTile_::LeftDrag(Point, dword)
 void SwatchTile_::MouseMove(Point point, dword flags)
 {
     if(owner_)
-        owner_->HandleTileMove(index_, flags);
+        owner_->HandlePointerMove(*this, point, flags);
     UiToolButton::MouseMove(point, flags);
 }
 
@@ -2022,7 +2121,7 @@ private:
     UiButton page_button_[PAGE_COUNT];
     UiToolButton current_preview_;
     One<UiBoxLayout> slot_column_[8];
-    UiToolButton primary_slot_[8];
+    PaletteDropButton_ primary_slot_[8];
     UiToolButton previous_slot_[8];
 
     UiStack page_stack_;
@@ -2442,8 +2541,9 @@ void UiColorPicker::Impl::ConfigureControls()
     stash_import_.SetText("Import");
     stash_clear_.SetText("Clear");
     stash_flow_.SetCompact(true);
-    stash_flow_.SetSnapColumns(14);
+    stash_flow_.SetSnapColumns(20);
     stash_flow_.EnableDropTarget(true);
+    stash_flow_.AllowEmptySelection(true);
 
     accept_button_.SetText("OK");
     cancel_button_.SetText("Cancel");
@@ -2637,6 +2737,26 @@ void UiColorPicker::Impl::WireEvents()
     for(int i = 0; i < 8; i++) {
         int index = i;
         primary_slot_[i].WhenAction = [=] { SetActiveSlot(index); };
+        primary_slot_[i].WhenDropValues = [=](const Vector<SlotValue>& values) {
+            if(index >= slot_count_ || values.IsEmpty())
+                return;
+            FinishLiveGesture();
+            const int count = min(values.GetCount(), slot_count_ - index);
+            for(int n = 0; n < count; n++) {
+                const int target = index + n;
+                previous_[target] = slots_[target];
+                slots_[target].color = values[n].color;
+                slots_[target].alpha = values[n].alpha;
+                PushRecent(values[n].color, values[n].alpha);
+            }
+            active_slot_ = index;
+            SyncAll();
+            SaveSession(true);
+            if(owner_.WhenSlotChanged)
+                owner_.WhenSlotChanged(index);
+            if(owner_.WhenAction)
+                owner_.WhenAction();
+        };
         previous_slot_[i].WhenAction = [=] {
             if(index >= slot_count_)
                 return;
@@ -3363,11 +3483,17 @@ UiColorPicker& UiColorPicker::Impl::SetChannelMode(ChannelMode mode)
 UiColorPicker& UiColorPicker::Impl::SetSlotCount(int count)
 {
     count = minmax(count, 1, 8);
-    if(slot_count_ == count)
+    if(slot_count_ == count) {
+        SyncSlots();
+        root_.RefreshLayout();
+        owner_.RefreshLayout();
         return owner_;
+    }
     slot_count_ = count;
     active_slot_ = min(active_slot_, slot_count_ - 1);
     SyncAll();
+    root_.RefreshLayout();
+    owner_.RefreshLayout();
     SaveSession(true);
     return owner_;
 }
@@ -3534,7 +3660,7 @@ UiColorPicker& UiColorPicker::Impl::AddUserSwatches(const Vector<SlotValue>& val
         return owner_;
     Vector<SlotValue> destination = clone(stash_);
     int rejected = 0;
-    bool accepted = AddUniqueTransactional(destination, values, 28, false, &rejected);
+    bool accepted = AddUniqueTransactional(destination, values, 40, false, &rejected);
     if(!accepted && transactional) {
         Exclamation(Format("The User Stash has insufficient space for this %d-colour transfer.", values.GetCount()));
         return owner_;
@@ -3543,7 +3669,7 @@ UiColorPicker& UiColorPicker::Impl::AddUserSwatches(const Vector<SlotValue>& val
         for(const SlotValue& value : values) {
             Vector<SlotValue> one;
             one.Add(value);
-            if(!AddUniqueTransactional(destination, one, 28, false, nullptr))
+            if(!AddUniqueTransactional(destination, one, 40, false, nullptr))
                 break;
         }
     }
@@ -3665,6 +3791,7 @@ void UiColorPicker::Impl::SyncSlots()
     current_preview_.Tip(Format("Current: %s", FormatHex8(active.color, active.alpha)));
     for(int i = 0; i < 8; i++) {
         bool visible = i < slot_count_;
+        navigation_.ItemAt(6 + i).Fixed(visible ? DPI(34) : 0);
         slot_column_[i]->Show(visible);
         if(!visible)
             continue;
@@ -3833,8 +3960,8 @@ void UiColorPicker::Impl::PushRecent(Color color, int alpha)
 void UiColorPicker::Impl::RefreshStash()
 {
     Vector<DisplaySwatch_> display;
-    display.SetCount(28);
-    for(int i = 0; i < 28; i++) {
+    display.SetCount(40);
+    for(int i = 0; i < 40; i++) {
         if(i < stash_.GetCount())
             display[i].value = stash_[i];
         else {
@@ -3850,33 +3977,40 @@ void UiColorPicker::Impl::HandleStashDrop(int target, const Vector<SlotValue>& v
 {
     if(values.IsEmpty())
         return;
-    if(values.GetCount() == 1 && target >= 0 && target < stash_.GetCount()) {
-        const SlotValue& source = values[0];
-        SlotValue& destination = stash_[target];
+    const int start = minmax(target, 0, stash_.GetCount());
+    const int count = min(values.GetCount(), 40 - start);
+    if(count <= 0)
+        return;
+    auto combine = [&](int a, int b) {
+        switch(stash_drop_mode_) {
+        case STASH_ADD: return ClampByte_(a + b);
+        case STASH_SUBTRACT: return ClampByte_(a - b);
+        case STASH_MULTIPLY: return ClampByte_(a * b / 255);
+        case STASH_MIX: return (a + b + 1) / 2;
+        default: return b;
+        }
+    };
+    for(int i = 0; i < count; i++) {
+        const int destination_index = start + i;
+        const SlotValue& source = values[i];
+        if(destination_index >= stash_.GetCount()) {
+            stash_.Add(source);
+            continue;
+        }
+        SlotValue& destination = stash_[destination_index];
         if(stash_drop_mode_ == STASH_REPLACE)
             destination = source;
         else {
-            auto combine = [&](int a, int b) {
-                switch(stash_drop_mode_) {
-                case STASH_ADD: return ClampByte_(a + b);
-                case STASH_SUBTRACT: return ClampByte_(a - b);
-                case STASH_MULTIPLY: return ClampByte_(a * b / 255);
-                case STASH_MIX: return (a + b + 1) / 2;
-                default: return b;
-                }
-            };
             destination.color = Color(combine(destination.color.GetR(), source.color.GetR()),
                                       combine(destination.color.GetG(), source.color.GetG()),
                                       combine(destination.color.GetB(), source.color.GetB()));
             destination.alpha = source.alpha;
         }
-        RefreshStash();
-        stash_flow_.SetSelectedIndex(target);
-        SyncFooter(stash_[target]);
-        SaveSession(false);
-        return;
     }
-    AddUserSwatches(values, true);
+    RefreshStash();
+    stash_flow_.SetSelectedIndex(start);
+    SyncFooter(stash_[start]);
+    SaveSession(false);
 }
 
 void UiColorPicker::Impl::AddActiveSelection()
@@ -4168,7 +4302,7 @@ void UiColorPicker::Impl::LoadSession()
     recent_ = clone(session.recent);
     stash_.Clear();
     for(const SlotValue& value : session.stash)
-        if(stash_.GetCount() < 28 && !IsNull(value.color))
+        if(stash_.GetCount() < 40 && !IsNull(value.color))
             stash_.Add(value);
     active_slot_ = minmax(session.active_slot, 0, slot_count_ - 1);
     alpha_enabled_ = session.alpha_enabled;

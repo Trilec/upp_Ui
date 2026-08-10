@@ -37,6 +37,7 @@ struct PropertyEditorStyle {
     Color error_ink;
     Color divider;
     Image reset_icon;
+    PropertyEditorActionIcons action_icons;
 
     Font group_font = StdFont().Bold();
     Font group_subtitle_font = StdFont();
@@ -47,7 +48,7 @@ struct PropertyEditorStyle {
     int frame_width = 1;
     int row_height = DPI(28);
     int group_height = DPI(30);
-    int filter_height = DPI(26);
+    int filter_height = DPI(36);
     int cell_padding = DPI(6);
     int label_width = DPI(150);
     int label_ratio = 40;
@@ -99,6 +100,8 @@ public:
     void SetGroupAction(const String& group, const String& text);
     String GetGroupAction(const String& group) const;
     void ClearGroupAction(const String& group);
+    void SetPropertyExpanded(const String& property_id, bool expanded = true);
+    bool IsPropertyExpanded(const String& property_id) const;
 
     void RefreshModel();
     void RefreshValue(const String& property_id);
@@ -127,6 +130,7 @@ public:
     virtual void LeftUp(Point p, dword keyflags) override;
     virtual void MouseMove(Point p, dword keyflags) override;
     virtual void MouseLeave() override;
+    virtual Image CursorImage(Point p, dword keyflags) override;
     virtual void MouseWheel(Point p, int zdelta, dword keyflags) override;
     virtual bool Key(dword key, int count) override;
     virtual void ChildGotFocus() override;
@@ -152,6 +156,8 @@ private:
         int y = 0;
         int cy = 0;
         int property_ordinal = 0;
+        int override_local = 0;
+        int override_total = 0;
     };
 
     struct InlineEditorSlot {
@@ -226,6 +232,7 @@ private:
     Array<DisplayRow> rows_;
     VectorMap<String, bool> group_open_;
     VectorMap<String, String> group_actions_;
+    VectorMap<String, bool> property_expanded_;
 
     UiLineEdit filter_;
     UiScrollBar scroll_ { UiDirection::V };
@@ -240,6 +247,7 @@ private:
     int content_height_ = 0;
     int cached_auto_label_width_ = DPI(120);
     bool dragging_label_divider_ = false;
+    bool hover_label_divider_ = false;
     bool syncing_editor_ = false;
     bool tearing_down_editor_ = false;
     bool applying_editor_preview_ = false;

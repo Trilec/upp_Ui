@@ -4,6 +4,10 @@ Model-driven architecture for `upp_Ui`, represented by `PropertyEditorCore`,
 `PropertyEditor`, and the model-backed controls (`UiList`, `UiTree`, `UiMenu`,
 `UiDropdown`, `UiTable`, and data-presenting controls).
 
+For the complete PropertyEditor schema, factory, adapter, transaction,
+resource-provider, layout, and performance contracts, continue with
+`05_UI_PROPERTY_EDITOR_GUIDE.md`.
+
 ## Model/view separation
 
 - The **control owns interaction**: hit testing, keyboard/pointer input, drag

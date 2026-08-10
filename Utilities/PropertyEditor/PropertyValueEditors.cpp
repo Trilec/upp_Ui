@@ -6,12 +6,46 @@
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiTheme.h>
+#include <Ui/UiToolButton.h>
 
 namespace Upp {
+
+class PropertyActionLabel : public UiLabel {
+public:
+    typedef PropertyActionLabel CLASSNAME;
+
+    void LeftDown(Point, dword) override
+    {
+        if(IsEnabled()) {
+            SetFocus();
+            WhenAction();
+        }
+    }
+
+    bool Key(dword key, int count) override
+    {
+        if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
+            WhenAction();
+            return true;
+        }
+        return UiLabel::Key(key, count);
+    }
+};
 
 void PropertyValueEditor::FocusEditor()
 {
     SetFocus();
+}
+
+static void ConfigurePropertyAction(UiToolButton& button, const Image& icon,
+                                    const char *tip)
+{
+    button.SetIcon(icon)
+          .SetIconSize(DPI(16), DPI(16))
+          .SetIconRenderMode(UiIconRenderMode::MonoTint)
+          .SetContentInset(DPI(3))
+          .SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    button.Tip(tip);
 }
 
 template <class T>
@@ -32,9 +66,17 @@ public:
 
     Event<> WhenCommit;
 
+    void SetCommitBaseline(const Value& value)
+    {
+        last_commit_ = value;
+        has_last_commit_ = true;
+    }
+
 private:
     void EmitCommit()
     {
+        if(!CanCommit())
+            return;
         Value v = T::GetData();
         if(!has_last_commit_ || v != last_commit_) {
             last_commit_ = v;
@@ -43,6 +85,10 @@ private:
         }
     }
 
+protected:
+    virtual bool CanCommit() const { return true; }
+
+private:
     Value last_commit_;
     bool has_last_commit_ = false;
 };
@@ -50,7 +96,13 @@ private:
 using PropertyCommitEdit = PropertyCommitEditCtrl<UiLineEdit>;
 using PropertyCommitMultiEdit = PropertyCommitEditCtrl<UiMultiEdit>;
 using PropertyCommitIntEdit = PropertyCommitEditCtrl<UiIntEdit>;
-using PropertyCommitFloatEdit = PropertyCommitEditCtrl<UiFloatEdit>;
+class PropertyCommitFloatEdit : public PropertyCommitEditCtrl<UiFloatEdit> {
+protected:
+    bool CanCommit() const override
+    {
+        return GetText().IsEmpty() || IsInputComplete();
+    }
+};
 
 class PropertyTextValueEditor : public PropertyValueEditor {
 public:
@@ -79,6 +131,7 @@ public:
     {
         syncing_ = true;
         edit_.SetData(mixed ? Value(String()) : Value(AsString(value)));
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -102,28 +155,54 @@ class PropertyMultilineValueEditor : public PropertyValueEditor {
 public:
     PropertyMultilineValueEditor()
     {
-        Add(edit_.SizePos());
+        Add(summary_);
+        Add(expand_);
+        Add(dialog_);
+        Add(edit_);
+        summary_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        summary_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
+        ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
+                                "Expand or collapse multiline editor");
+        ConfigurePropertyAction(dialog_, ICON_DESIGN_BOTTOM_PANEL_OPEN_48(),
+                                "Open multiline editor dialog");
+        expand_.WhenAction = [=] { WhenToggleExpanded(); };
+        summary_.WhenAction = [=] {
+            if(!expanded_)
+                WhenToggleExpanded();
+        };
+        dialog_.WhenAction = [=] { OpenDialog(); };
         edit_.WhenChange = [=] {
-            if(!syncing_)
+            if(!syncing_) {
+                SyncSummary();
                 WhenPreview(edit_.GetData());
+            }
         };
         edit_.WhenCommit = [=] {
-            if(!syncing_)
+            if(!syncing_) {
+                SyncSummary();
                 WhenCommit(edit_.GetData());
+            }
         };
+        edit_.Hide();
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        edit_.Enable(item.enabled && !item.read_only);
-        Enable(item.enabled && !item.read_only);
+        enabled_ = item.enabled && !item.read_only;
+        edit_.Enable(enabled_);
+        dialog_.Enable(enabled_);
+        expand_.Enable(item.expanded_row_span > 1 && enabled_);
+        Enable(enabled_);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         syncing_ = true;
         edit_.SetData(mixed ? Value(String()) : Value(AsString(value)));
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
+        mixed_ = mixed;
+        SyncSummary();
     }
 
     virtual Value GetEditorValue() const override
@@ -133,11 +212,114 @@ public:
 
     virtual void FocusEditor() override
     {
-        edit_.SetFocus();
+        expanded_ ? edit_.SetFocus() : dialog_.SetFocus();
+    }
+
+    void SetExpanded(bool expanded) override
+    {
+        expanded_ = expanded;
+        ActionIconsChanged();
+        edit_.Show(expanded_);
+        Layout();
+    }
+
+    void Layout() override
+    {
+        const int row = min(DPI(28), GetSize().cy);
+        const int action = min(DPI(28), row);
+        if(expanded_) {
+            const int rail = min(action, GetSize().cx);
+            const int rail_x = max(0, GetSize().cx - rail);
+            summary_.Hide();
+            edit_.SetRect(0, 0, max(0, rail_x - DPI(3)), GetSize().cy);
+            expand_.SetRect(rail_x, 0, rail, min(action, GetSize().cy));
+            dialog_.SetRect(rail_x, min(action + DPI(2), GetSize().cy), rail,
+                            min(action, max(0, GetSize().cy - action - DPI(2))));
+        }
+        else {
+            const int dialog_x = max(0, GetSize().cx - action);
+            const int expand_x = max(0, dialog_x - action - DPI(2));
+            summary_.Show();
+            summary_.SetRect(0, 0, max(0, expand_x - DPI(4)), row);
+            expand_.SetRect(expand_x, 0, action, row);
+            dialog_.SetRect(dialog_x, 0, action, row);
+            edit_.SetRect(0, 0, 0, 0);
+        }
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        const Image icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
+        if(!icon.IsEmpty())
+            expand_.SetIcon(icon);
+        expand_.SetIconSize(action_icons_.size, action_icons_.size);
+        if(!action_icons_.dialog.IsEmpty())
+            dialog_.SetIcon(action_icons_.dialog);
+        dialog_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
+    void SyncSummary()
+    {
+        if(mixed_) {
+            summary_.SetText("<multiple values>");
+            return;
+        }
+        String text = AsString(edit_.GetData());
+        text.Replace("\r", "");
+        int nl = text.Find('\n');
+        if(nl >= 0)
+            text = text.Left(nl) + "...";
+        summary_.SetText(text.IsEmpty() ? "<empty>" : text);
+    }
+
+    void OpenDialog()
+    {
+        if(!enabled_)
+            return;
+        class MultiDialog : public TopWindow {
+        public:
+            UiMultiEdit edit;
+            UiButton ok, cancel;
+            MultiDialog()
+            {
+                Title("Multiline editor"); Sizeable().Zoomable();
+                SetRect(0, 0, DPI(560), DPI(380));
+                Add(edit); Add(ok); Add(cancel);
+                ok.SetText("OK"); cancel.SetText("Cancel");
+                ok.WhenAction = [=] { AcceptBreak(IDOK); };
+                cancel.WhenAction = [=] { RejectBreak(IDCANCEL); };
+            }
+            void Layout() override
+            {
+                Rect r = GetSize();
+                const int pad = DPI(10), h = DPI(30), gap = DPI(6), w = DPI(82);
+                edit.SetRect(pad, pad, max(0, r.GetWidth() - 2 * pad),
+                             max(0, r.GetHeight() - 3 * pad - h));
+                cancel.SetRect(r.right - pad - w, r.bottom - pad - h, w, h);
+                ok.SetRect(r.right - pad - 2 * w - gap, r.bottom - pad - h, w, h);
+            }
+        } dlg;
+        dlg.edit.SetData(edit_.GetData());
+        dlg.CenterOwner();
+        if(dlg.Run() == IDOK) {
+            syncing_ = true;
+            edit_.SetData(dlg.edit.GetData());
+            edit_.SetCommitBaseline(edit_.GetData());
+            syncing_ = false;
+            mixed_ = false;
+            SyncSummary();
+            WhenPreview(edit_.GetData());
+            WhenCommit(edit_.GetData());
+        }
+    }
+
     PropertyCommitMultiEdit edit_;
+    PropertyActionLabel summary_;
+    UiToolButton expand_, dialog_;
+    bool expanded_ = false;
+    bool enabled_ = true;
+    bool mixed_ = false;
     bool syncing_ = false;
 };
 
@@ -176,6 +358,7 @@ public:
             edit_.SetData(String());
         else
             edit_.SetValue((int)value);
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -199,9 +382,9 @@ public:
         Add(slider_);
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
-        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(20), DPI(20))
-               .SetContentInset(DPI(1));
+        slider_.ExpandTrack();
+        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;
@@ -263,6 +446,7 @@ public:
             edit_.SetValue((int)value);
             slider_.SetValue((int)value);
         }
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -317,11 +501,11 @@ public:
         Add(edit_.SizePos());
         edit_.SetTextAlign(UiAlign::RIGHT);
         edit_.WhenChange = [=] {
-            if(!syncing_)
+            if(!syncing_ && edit_.IsInputComplete())
                 WhenPreview(edit_.GetData());
         };
         edit_.WhenCommit = [=] {
-            if(!syncing_)
+            if(!syncing_ && edit_.IsInputComplete())
                 WhenCommit(edit_.GetData());
         };
     }
@@ -347,6 +531,7 @@ public:
             edit_.SetData(String());
         else
             edit_.SetValue((double)value);
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -375,9 +560,9 @@ public:
         Add(slider_);
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
-        toggle_.SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(20), DPI(20))
-               .SetContentInset(DPI(1));
+        slider_.ExpandTrack();
+        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;
@@ -396,11 +581,11 @@ public:
                 WhenCommit(edit_.GetData());
         };
         edit_.WhenChange = [=] {
-            if(!syncing_)
+            if(!syncing_ && edit_.IsInputComplete())
                 WhenPreview(edit_.GetData());
         };
         edit_.WhenCommit = [=] {
-            if(!syncing_)
+            if(!syncing_ && edit_.IsInputComplete())
                 WhenCommit(edit_.GetData());
         };
     }
@@ -443,6 +628,7 @@ public:
             edit_.SetValue(v);
             slider_.SetValue(v);
         }
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -620,17 +806,17 @@ public:
     void Paint(Draw& w) override
     {
         const Size size = GetSize();
-        const int diameter = min(DPI(16), max(0, min(size.cx, size.cy) - DPI(4)));
-        if(diameter <= 0)
+        const int side = min(DPI(19), max(0, min(size.cx, size.cy) - DPI(2)));
+        if(side <= 0)
             return;
-        const Rect dot = RectC((size.cx - diameter) / 2,
-                               (size.cy - diameter) / 2,
-                               diameter, diameter);
+        const Rect swatch = RectC((size.cx - side) / 2,
+                                  (size.cy - side) / 2,
+                                  side, side);
         Color fill = mixed_ ? SColorDisabled() : color_;
         if(!IsEnabled())
             fill = Blend(fill, SColorFace(), 110);
-        w.DrawEllipse(dot, fill, 1,
-                      HasFocus() ? SColorHighlight() : SColorShadow());
+        w.DrawRect(swatch, fill);
+        DrawFrame(w, swatch, HasFocus() ? SColorHighlight() : SColorShadow());
     }
 
     void LeftDown(Point, dword) override
@@ -660,7 +846,11 @@ public:
     PropertyColorValueEditor()
     {
         Add(swatch_);
+        Add(hex_);
+        hex_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        hex_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
         swatch_.WhenAction = [=] { OpenColorDialog(); };
+        hex_.WhenAction = [=] { OpenColorDialog(); };
     }
 
     void Configure(const PropertyEditorItem& item) override
@@ -672,7 +862,7 @@ public:
     {
         mixed_ = mixed;
         value_ = mixed || IsNull(value) ? Value(Color(128, 128, 128)) : value;
-        swatch_.SetColor(Color(value_), mixed_);
+        SetDisplay(Color(value_), mixed_);
     }
 
     Value GetEditorValue() const override
@@ -687,10 +877,20 @@ public:
 
     void Layout() override
     {
-        swatch_.SetRect(0, 0, min(DPI(28), GetSize().cx), GetSize().cy);
+        const int swatch_width = min(DPI(28), GetSize().cx);
+        swatch_.SetRect(0, 0, swatch_width, GetSize().cy);
+        hex_.SetRect(min(GetSize().cx, swatch_width + DPI(7)), 0,
+                     max(0, GetSize().cx - swatch_width - DPI(7)), GetSize().cy);
     }
 
 private:
+    void SetDisplay(Color color, bool mixed = false)
+    {
+        swatch_.SetColor(color, mixed);
+        hex_.SetText(mixed ? "<multiple values>"
+                           : Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB()));
+    }
+
     void OpenColorDialog()
     {
         const Color original = Color(value_);
@@ -709,12 +909,16 @@ private:
             }
         } dlg;
 
-        dlg.picker.SetColor(original);
-        dlg.picker.WhenChanging = [&] {
+        dlg.picker.SetSlotCount(1);
+        dlg.picker.SetSlotColor(0, original, false);
+        dlg.picker.SetActiveSlot(0);
+        const auto preview_color = [&] {
             chosen = dlg.picker.GetColor();
-            swatch_.SetColor(chosen);
+            SetDisplay(chosen);
             WhenPreview(chosen);
         };
+        dlg.picker.WhenChanging = preview_color;
+        dlg.picker.WhenAction = preview_color;
         dlg.picker.WhenAccept = [&] {
             chosen = dlg.picker.GetColor();
             accepted = true;
@@ -729,16 +933,17 @@ private:
         if(dlg.Run() == IDOK && accepted) {
             value_ = chosen;
             mixed_ = false;
-            swatch_.SetColor(chosen);
+            SetDisplay(chosen);
             WhenCommit(value_);
         }
         else {
-            swatch_.SetColor(original, mixed_);
+            SetDisplay(original, mixed_);
             WhenPreview(original);
         }
     }
 
     PropertyColorSwatchCtrl swatch_;
+    UiLabel hex_;
     Value value_ = Color(128, 128, 128);
     bool mixed_ = false;
 };
@@ -748,9 +953,15 @@ public:
     PropertyFilePathValueEditor()
     {
         Add(edit_);
+        Add(detail_);
+        Add(expand_);
         Add(browse_);
-        browse_.SetText("...");
-        browse_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
+                                "Expand or collapse the complete path");
+        ConfigurePropertyAction(browse_, ICON_DESIGN_PENDING_48(), "Choose file");
+        detail_.SetReadOnly();
+        detail_.Hide();
+        expand_.WhenAction = [=] { WhenToggleExpanded(); };
         browse_.WhenAction = [=] { Browse(); };
         edit_.WhenChange = [=] {
             if(!syncing_)
@@ -767,6 +978,8 @@ public:
         const bool enabled = item.enabled && !item.read_only;
         edit_.Enable(enabled);
         browse_.Enable(enabled);
+        expand_.Show(item.expanded_row_span > 1);
+        expand_.Enable(item.expanded_row_span > 1 && enabled);
         edit_.SetPlaceholder(item.mixed ? "<multiple values>" :
                              item.inherited ? "<inherited>" : "");
     }
@@ -775,6 +988,8 @@ public:
     {
         syncing_ = true;
         edit_.SetData(mixed ? Value(String()) : Value(AsString(value)));
+        edit_.SetCommitBaseline(edit_.GetData());
+        detail_.SetData(edit_.GetData());
         syncing_ = false;
     }
 
@@ -792,12 +1007,51 @@ public:
     virtual void Layout() override
     {
         const int gap = DPI(4);
-        const int button_width = DPI(30);
-        edit_.SetRect(0, 0, max(0, GetSize().cx - button_width - gap), GetSize().cy);
-        browse_.SetRect(max(0, GetSize().cx - button_width), 0, button_width, GetSize().cy);
+        const int action = min(DPI(28), GetSize().cy);
+        const int browse_x = max(0, GetSize().cx - action);
+        const int expand_x = max(0, browse_x - (expand_.IsShown() ? action + gap : 0));
+        if(expanded_) {
+            edit_.Hide();
+            detail_.Show();
+            detail_.SetRect(0, 0, max(0, expand_x - gap), GetSize().cy);
+            expand_.SetRect(expand_x, 0, action, min(action, GetSize().cy));
+            browse_.SetRect(browse_x, 0, action, min(action, GetSize().cy));
+        }
+        else {
+            detail_.Hide();
+            edit_.Show();
+            edit_.SetRect(0, 0, max(0, expand_x - gap), GetSize().cy);
+            expand_.SetRect(expand_x, 0, expand_.IsShown() ? action : 0, min(action, GetSize().cy));
+            browse_.SetRect(browse_x, 0, action, min(action, GetSize().cy));
+        }
+    }
+
+    void SetExpanded(bool expanded) override
+    {
+        expanded_ = expanded;
+        ActionIconsChanged();
+        Layout();
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        if(action_icons_.browse.IsEmpty()) {
+            browse_.ClearIcon();
+            browse_.SetText("...");
+        }
+        else {
+            browse_.SetText(String());
+            browse_.SetIcon(action_icons_.browse);
+            browse_.SetIconSize(action_icons_.size, action_icons_.size);
+            browse_.SetIconRenderMode(UiIconRenderMode::MonoTint);
+        }
+        const Image expand_icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
+        if(!expand_icon.IsEmpty())
+            expand_.SetIcon(expand_icon);
+        expand_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
     void Browse()
     {
         const String selected = UiOsFileDialog::SelectOpenFile("Select file", String(), this);
@@ -805,21 +1059,24 @@ private:
             return;
         syncing_ = true;
         edit_.SetData(selected);
+        detail_.SetData(selected);
         syncing_ = false;
         WhenPreview(selected);
         WhenCommit(selected);
     }
 
     PropertyCommitEdit edit_;
-    UiButton browse_;
+    UiMultiEdit detail_;
+    UiToolButton expand_, browse_;
     bool syncing_ = false;
+    bool expanded_ = false;
 };
 
 class PropertyColorPaletteValueEditor : public PropertyValueEditor {
 public:
     PropertyColorPaletteValueEditor()
     {
-        for(int i = 0; i < 4; i++) {
+        for(int i = 0; i < 8; i++) {
             Add(swatches_[i]);
             const int index = i;
             swatches_[i].WhenAction = [=] { OpenColorDialog(index); };
@@ -828,9 +1085,9 @@ public:
 
     void Configure(const PropertyEditorItem& item) override
     {
-        count_ = clamp(item.color_count, 1, 4);
+        count_ = clamp(item.color_count, 1, 8);
         enabled_ = item.enabled && !item.read_only;
-        for(int i = 0; i < 4; i++) {
+        for(int i = 0; i < 8; i++) {
             swatches_[i].Show(i < count_);
             swatches_[i].Enable(enabled_ && i < count_);
         }
@@ -867,7 +1124,7 @@ public:
 
     void Layout() override
     {
-        const int diameter = min(DPI(20), max(DPI(14), GetSize().cy));
+        const int diameter = min(DPI(21), max(DPI(15), GetSize().cy));
         const int gap = DPI(3);
         for(int i = 0; i < count_; i++)
             swatches_[i].SetRect(i * (diameter + gap), 0,
@@ -886,7 +1143,6 @@ private:
         if(index < 0 || index >= count_ || mixed_)
             return;
         ValueArray original = value_;
-        Color chosen = Color(value_[index]);
         bool accepted = false;
 
         class ColorDialog : public TopWindow {
@@ -901,16 +1157,23 @@ private:
             }
         } dlg;
 
-        dlg.picker.SetColor(chosen);
-        dlg.picker.WhenChanging = [&] {
-            chosen = dlg.picker.GetColor();
-            value_.At(index) = chosen;
+        dlg.picker.SetSlotCount(count_);
+        for(int i = 0; i < count_; i++)
+            dlg.picker.SetSlotColor(i, Color(value_[i]), false);
+        dlg.picker.SetActiveSlot(index);
+        const auto sync_all_slots = [&] {
+            for(int i = 0; i < count_; i++)
+                value_.At(i) = dlg.picker.GetSlotColor(i);
+        };
+        const auto preview_palette = [&] {
+            sync_all_slots();
             UpdateSwatches();
             WhenPreview(value_);
         };
+        dlg.picker.WhenChanging = preview_palette;
+        dlg.picker.WhenAction = preview_palette;
         dlg.picker.WhenAccept = [&] {
-            chosen = dlg.picker.GetColor();
-            value_.At(index) = chosen;
+            sync_all_slots();
             accepted = true;
             dlg.AcceptBreak(IDOK);
         };
@@ -931,7 +1194,7 @@ private:
         }
     }
 
-    PropertyColorSwatchCtrl swatches_[4];
+    PropertyColorSwatchCtrl swatches_[8];
     ValueArray value_;
     int count_ = 1;
     bool enabled_ = true;
@@ -943,6 +1206,10 @@ public:
     PropertyFillRecipeValueEditor()
     {
         Add(mode_);
+        Add(hex_);
+        hex_.SetReadOnly();
+        hex_.SetTextAlign(UiAlign::LEFT);
+        hex_.SetCustomStyle(UiTheme::ResolveEdit(UiRole::Subtle));
         mode_.SetCustomStyle(UiTheme::ResolveDropdown());
         mode_.Add(UiDropdown::Item("None", "None", true));
         mode_.Add(UiDropdown::Item("Solid", "Solid", true));
@@ -1011,12 +1278,14 @@ public:
         const String mode = RecipeText("mode", "None");
         const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
         const int gap = DPI(3);
-        const int swatch_width = min(DPI(18), max(DPI(14), GetSize().cy - DPI(4)));
+        const int swatch_width = min(DPI(21), max(DPI(17), GetSize().cy - DPI(2)));
         const int swatch_total = count > 0
             ? count * swatch_width + (count - 1) * gap : 0;
         const int inter_gap = count > 0 ? DPI(4) : 0;
-        const int mode_width = min(DPI(88),
-            max(DPI(64), GetSize().cx - swatch_total - inter_gap));
+        const int hex_width = mode == "Solid" ? min(DPI(82), max(0, GetSize().cx / 3)) : 0;
+        const int hex_gap = hex_width ? DPI(4) : 0;
+        const int mode_width = min(DPI(88), max(DPI(64),
+            GetSize().cx - swatch_total - inter_gap - hex_width - hex_gap));
         mode_.SetRect(0, 0, max(0, min(mode_width, GetSize().cx)), GetSize().cy);
         int x = min(GetSize().cx, mode_width + inter_gap);
         for(int i = 0; i < 4; i++) {
@@ -1026,6 +1295,8 @@ public:
             else
                 swatches_[i].SetRect(0, 0, 0, 0);
         }
+        const int hex_x = x + swatch_total + hex_gap;
+        hex_.SetRect(hex_x, 0, max(0, min(hex_width, GetSize().cx - hex_x)), GetSize().cy);
     }
 
 private:
@@ -1059,6 +1330,9 @@ private:
             const String key = mode == "Solid" ? "solid" : Key(i);
             swatches_[i].SetColor(RecipeColor(key, Color(128, 128, 128)), mixed_);
         }
+        const Color solid = RecipeColor("solid", Color(128, 128, 128));
+        hex_.SetTextUtf8(Format("#%02X%02X%02X", solid.GetR(), solid.GetG(), solid.GetB()));
+        hex_.Show(mode == "Solid");
         Layout();
     }
 
@@ -1068,9 +1342,7 @@ private:
         const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
         if(!enabled_ || mixed_ || index < 0 || index >= count)
             return;
-        const String key = mode == "Solid" ? "solid" : Key(index);
         ValueMap original = recipe_;
-        Color chosen = RecipeColor(key, Color(128, 128, 128));
         bool accepted = false;
 
         class ColorDialog : public TopWindow {
@@ -1085,14 +1357,28 @@ private:
             }
         } dlg;
 
-        dlg.picker.SetColor(chosen);
-        dlg.picker.WhenChanging = [&] {
-            recipe_.Set(key, dlg.picker.GetColor());
+        dlg.picker.SetSlotCount(count);
+        for(int i = 0; i < count; i++) {
+            const String slot_key = mode == "Solid" ? "solid" : Key(i);
+            dlg.picker.SetSlotColor(i,
+                RecipeColor(slot_key, Color(128, 128, 128)), false);
+        }
+        dlg.picker.SetActiveSlot(index);
+        const auto sync_all_slots = [&] {
+            for(int i = 0; i < count; i++) {
+                const String slot_key = mode == "Solid" ? "solid" : Key(i);
+                recipe_.Set(slot_key, dlg.picker.GetSlotColor(i));
+            }
+        };
+        const auto preview_recipe = [&] {
+            sync_all_slots();
             UpdateVisible();
             WhenPreview(recipe_);
         };
+        dlg.picker.WhenChanging = preview_recipe;
+        dlg.picker.WhenAction = preview_recipe;
         dlg.picker.WhenAccept = [&] {
-            recipe_.Set(key, dlg.picker.GetColor());
+            sync_all_slots();
             accepted = true;
             dlg.AcceptBreak(IDOK);
         };
@@ -1108,6 +1394,7 @@ private:
     }
 
     UiDropdown mode_;
+    UiLineEdit hex_;
     PropertyColorSwatchCtrl swatches_[4];
     ValueMap recipe_;
     bool enabled_ = true;
@@ -1122,6 +1409,7 @@ public:
         Add(slider_);
         Add(edit_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
+        slider_.ExpandTrack();
         slider_.WhenChanging = [=] {
             if(syncing_)
                 return;
@@ -1177,6 +1465,7 @@ public:
             edit_.SetValue(v);
             slider_.SetValue(v);
         }
+        edit_.SetCommitBaseline(edit_.GetData());
         syncing_ = false;
     }
 
@@ -1213,6 +1502,8 @@ public:
     {
         Add(edit_.SizePos());
         edit_.Slider().SetCustomStyle(UiTheme::ResolveSlider());
+        edit_.Slider().ExpandTrack();
+        edit_.SetFieldWidth(DPI(62)).SetGap(DPI(4));
         edit_.WhenChanging = [=] {
             if(!syncing_)
                 WhenPreview(edit_.GetData());
@@ -1273,6 +1564,10 @@ public:
     explicit PropertyVectorValueEditor(int count)
         : count_(count)
     {
+        Add(expand_);
+        ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
+                                "Expand or collapse vector components");
+        expand_.WhenAction = [=] { WhenToggleExpanded(); };
         for(int i = 0; i < count_; i++) {
             PropertyCommitFloatEdit& edit = edits_.Add();
             UiLabel& label = labels_.Add();
@@ -1283,11 +1578,11 @@ public:
             label.SetText(i == 0 ? "X" : i == 1 ? "Y" : "Z");
             edit.SetTextAlign(UiAlign::RIGHT);
             edit.WhenChange = [=] {
-                if(!syncing_)
+                if(!syncing_ && AllInputsComplete())
                     WhenPreview(GetEditorValue());
             };
             edit.WhenCommit = [=] {
-                if(!syncing_)
+                if(!syncing_ && AllInputsComplete())
                     WhenCommit(GetEditorValue());
             };
         }
@@ -1296,6 +1591,8 @@ public:
     virtual void Configure(const PropertyEditorItem& item) override
     {
         decimals_ = max(0, item.decimals);
+        expand_.Show(item.expanded_row_span > 1);
+        expand_.Enable(item.expanded_row_span > 1 && item.enabled && !item.read_only);
         for(UiLabel& label : labels_)
             label.Show();
         for(PropertyCommitFloatEdit& edit : edits_) {
@@ -1311,6 +1608,8 @@ public:
         Vector<double> v = PropertyEditorReadVector(value, count_);
         for(int i = 0; i < edits_.GetCount(); i++)
             edits_[i].SetData(mixed ? Value(String()) : Value(v[i]));
+        for(PropertyCommitFloatEdit& edit : edits_)
+            edit.SetCommitBaseline(edit.GetData());
         syncing_ = false;
     }
 
@@ -1325,16 +1624,40 @@ public:
     virtual void Layout() override
     {
         Size sz = GetSize();
-        int gap = DPI(4);
-        int label_h = DPI(14);
-        int cell = max(1, (sz.cx - gap * (count_ - 1)) / count_);
+        const int gap = DPI(4);
+        const int label_cx = DPI(14);
+        const int action = expand_.IsShown() ? min(DPI(28), sz.cy) : 0;
+        const int content_cx = max(0, sz.cx - action - (action ? DPI(3) : 0));
+        if(expanded_) {
+            const int row = max(1, sz.cy / count_);
+            for(int i = 0; i < edits_.GetCount(); i++) {
+                const int y = i * row;
+                const int cy = i + 1 == edits_.GetCount() ? sz.cy - y : row;
+                labels_[i].SetRect(0, y, min(label_cx, content_cx), cy);
+                edits_[i].SetRect(min(label_cx, content_cx), y,
+                                  max(0, content_cx - label_cx), cy);
+            }
+            expand_.SetRect(content_cx + DPI(3), 0, action, min(action, sz.cy));
+            return;
+        }
+        const int columns = 4;
+        int cell = max(1, (content_cx - gap * (columns - 1)) / columns);
         int x = 0;
         for(int i = 0; i < edits_.GetCount(); i++) {
-            int cx = i + 1 == edits_.GetCount() ? sz.cx - x : cell;
-            labels_[i].SetRect(x, 0, max(0, cx), label_h);
-            edits_[i].SetRect(x, label_h + DPI(2), max(0, cx), max(0, sz.cy - label_h - DPI(2)));
+            int cx = min(cell, max(0, content_cx - x));
+            labels_[i].SetRect(x, 0, min(label_cx, cx), sz.cy);
+            edits_[i].SetRect(x + min(label_cx, cx), 0,
+                              max(0, cx - label_cx), sz.cy);
             x += cell + gap;
         }
+        expand_.SetRect(content_cx + DPI(3), 0, action, min(action, sz.cy));
+    }
+
+    void SetExpanded(bool expanded) override
+    {
+        expanded_ = expanded;
+        ActionIconsChanged();
+        Layout();
     }
 
     virtual void FocusEditor() override
@@ -1346,11 +1669,29 @@ public:
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        const Image icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
+        if(!icon.IsEmpty())
+            expand_.SetIcon(icon);
+        expand_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
+    bool AllInputsComplete() const
+    {
+        for(const PropertyCommitFloatEdit& edit : edits_)
+            if(!edit.IsInputComplete())
+                return false;
+        return true;
+    }
+
     Array<PropertyCommitFloatEdit> edits_;
     Array<UiLabel> labels_;
+    UiToolButton expand_;
     int count_ = 2;
     int decimals_ = 3;
     bool syncing_ = false;
+    bool expanded_ = false;
 };
 
 class PropertyReadOnlyValueEditor : public PropertyValueEditor {
@@ -1464,30 +1805,55 @@ public:
     PropertyCurveValueEditor()
     {
         Add(summary_);
-        Add(button_);
+        Add(expand_);
+        Add(dialog_);
+        Add(canvas_);
         summary_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         summary_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
-        button_.SetText("Edit...");
-        button_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
-        button_.WhenAction = [=] {
+        ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
+                                "Expand or collapse inline curve");
+        ConfigurePropertyAction(dialog_, ICON_DESIGN_BOTTOM_PANEL_OPEN_48(),
+                                "Open curve editor dialog");
+        expand_.WhenAction = [=] { WhenToggleExpanded(); };
+        summary_.WhenAction = [=] {
+            if(!expanded_)
+                WhenToggleExpanded();
+        };
+        dialog_.WhenAction = [=] {
             Value edited = value_;
             if(EditPropertyCurve(edited, this)) {
                 value_ = edited;
+                canvas_.SetCurve(value_);
                 summary_.SetText(PropertyEditorFormatCurve(value_));
                 WhenPreview(value_);
                 WhenCommit(value_);
             }
         };
+        canvas_.WhenCurvePreview = [=](Value value) {
+            value_ = value;
+            summary_.SetText(PropertyEditorFormatCurve(value_));
+            WhenPreview(value_);
+        };
+        canvas_.WhenCurveCommit = [=](Value value) {
+            value_ = value;
+            summary_.SetText(PropertyEditorFormatCurve(value_));
+            WhenCommit(value_);
+        };
+        canvas_.Hide();
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
-        button_.Enable(item.enabled && !item.read_only);
+        enabled_ = item.enabled && !item.read_only;
+        expand_.Enable(item.expanded_row_span > 1);
+        dialog_.Enable(enabled_);
+        canvas_.Enable(enabled_);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         value_ = PropertyEditorNormalizeCurve(value);
+        canvas_.SetCurve(value_);
         summary_.SetText(mixed ? "<multiple curves>" : PropertyEditorFormatCurve(value_));
     }
 
@@ -1499,20 +1865,58 @@ public:
     virtual void Layout() override
     {
         Size sz = GetSize();
-        int button_cx = min(DPI(76), max(DPI(54), sz.cx / 3));
-        summary_.SetRect(0, 0, max(0, sz.cx - button_cx - DPI(4)), sz.cy);
-        button_.SetRect(max(0, sz.cx - button_cx), 0, button_cx, sz.cy);
+        const int row = min(DPI(28), sz.cy);
+        const int action = min(DPI(28), row);
+        if(expanded_) {
+            const int rail_x = max(0, sz.cx - action);
+            summary_.Hide();
+            canvas_.SetRect(0, 0, max(0, rail_x - DPI(3)), sz.cy);
+            expand_.SetRect(rail_x, 0, action, min(action, sz.cy));
+            dialog_.SetRect(rail_x, min(action + DPI(2), sz.cy), action,
+                            min(action, max(0, sz.cy - action - DPI(2))));
+        }
+        else {
+            const int dialog_x = max(0, sz.cx - action);
+            const int expand_x = max(0, dialog_x - action - DPI(2));
+            summary_.Show();
+            summary_.SetRect(0, 0, max(0, expand_x - DPI(4)), row);
+            expand_.SetRect(expand_x, 0, action, row);
+            dialog_.SetRect(dialog_x, 0, action, row);
+            canvas_.SetRect(0, 0, 0, 0);
+        }
+    }
+
+    void SetExpanded(bool expanded) override
+    {
+        expanded_ = expanded;
+        ActionIconsChanged();
+        canvas_.Show(expanded_);
+        Layout();
     }
 
     virtual void FocusEditor() override
     {
-        button_.SetFocus();
+        expanded_ ? canvas_.SetFocus() : expand_.SetFocus();
     }
 
 private:
-    UiLabel summary_;
-    UiButton button_;
+    void ActionIconsChanged() override
+    {
+        const Image icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
+        if(!icon.IsEmpty())
+            expand_.SetIcon(icon);
+        expand_.SetIconSize(action_icons_.size, action_icons_.size);
+        if(!action_icons_.dialog.IsEmpty())
+            dialog_.SetIcon(action_icons_.dialog);
+        dialog_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
+    PropertyActionLabel summary_;
+    UiToolButton expand_, dialog_;
+    PropertyCurveCanvas canvas_;
     Value value_;
+    bool expanded_ = false;
+    bool enabled_ = true;
 };
 
 PropertyEditorFactory& PropertyEditorFactory::Global()
@@ -1604,8 +2008,9 @@ PropertyCurveCanvas::PropertyCurveCanvas()
 
 void PropertyCurveCanvas::SetCurve(const Value& value)
 {
+    const int previous = selected_;
     points_ = PropertyEditorReadCurve(PropertyEditorNormalizeCurve(value));
-    selected_ = points_.IsEmpty() ? -1 : 0;
+    selected_ = points_.IsEmpty() ? -1 : minmax(previous, 0, points_.GetCount() - 1);
     dragging_ = -1;
     Refresh();
 }
@@ -1682,6 +2087,18 @@ int PropertyCurveCanvas::HitPoint(Point p) const
     return best;
 }
 
+static double PropertyCurveSegmentDistance_(Point p, Point a, Point b)
+{
+    const Pointf ab(b.x - a.x, b.y - a.y);
+    const Pointf ap(p.x - a.x, p.y - a.y);
+    const double length2 = ab.x * ab.x + ab.y * ab.y;
+    const double t = length2 > 0.0
+        ? minmax((ap.x * ab.x + ap.y * ab.y) / length2, 0.0, 1.0) : 0.0;
+    const double dx = p.x - (a.x + t * ab.x);
+    const double dy = p.y - (a.y + t * ab.y);
+    return sqrt(dx * dx + dy * dy);
+}
+
 void PropertyCurveCanvas::Normalize()
 {
     Value normalized = PropertyEditorNormalizeCurve(PropertyEditorMakeCurve(points_));
@@ -1734,6 +2151,17 @@ void PropertyCurveCanvas::Paint(Draw& w)
         w.DrawEllipse(RectC(p.x - radius, p.y - radius, 2 * radius + 1, 2 * radius + 1),
                       fill, 1, ink);
     }
+    if(dragging_ >= 0 && dragging_ < points_.GetCount()) {
+        const Point p = CurveToClient(points_[dragging_]);
+        const String text = Format("x %.4f  y %.4f", points_[dragging_].x, points_[dragging_].y);
+        const Font font = SansSerif().Height(DPI(10));
+        const Size ts = GetTextSize(text, font);
+        Rect badge = RectC(minmax(p.x + DPI(8), r.left, max(r.left, r.right - ts.cx - DPI(10))),
+                           max(r.top, p.y - ts.cy - DPI(10)), ts.cx + DPI(8), ts.cy + DPI(4));
+        w.DrawRect(badge, SColorPaper());
+        DrawFrame(w, badge, SColorShadow());
+        w.DrawText(badge.left + DPI(4), badge.top + DPI(2), text, font, SColorText());
+    }
 }
 
 void PropertyCurveCanvas::LeftDown(Point p, dword)
@@ -1741,6 +2169,12 @@ void PropertyCurveCanvas::LeftDown(Point p, dword)
     SetFocus();
     int hit = HitPoint(p);
     if(hit < 0) {
+        double nearest = 1e9;
+        for(int i = 1; i < points_.GetCount(); i++)
+            nearest = min(nearest, PropertyCurveSegmentDistance_(p,
+                          CurveToClient(points_[i - 1]), CurveToClient(points_[i])));
+        if(nearest > DPI(9))
+            return;
         points_.Add(ClientToCurve(p));
         Normalize();
         hit = HitPoint(p);
@@ -1786,6 +2220,25 @@ bool PropertyCurveCanvas::Key(dword key, int count)
 {
     if(key == K_DELETE || key == K_BACKSPACE) {
         DeleteSelected();
+        return true;
+    }
+    if(selected_ >= 0 && selected_ < points_.GetCount() &&
+       (key == K_LEFT || key == K_RIGHT || key == K_UP || key == K_DOWN)) {
+        Pointf next = points_[selected_];
+        const double step = 0.01 * max(1, count);
+        if(key == K_LEFT) next.x -= step;
+        if(key == K_RIGHT) next.x += step;
+        if(key == K_UP) next.y += step;
+        if(key == K_DOWN) next.y -= step;
+        if(selected_ == 0) next.x = 0.0;
+        if(selected_ == points_.GetCount() - 1) next.x = 1.0;
+        next.x = minmax(next.x, 0.0, 1.0);
+        next.y = minmax(next.y, 0.0, 1.0);
+        points_[selected_] = next;
+        Normalize();
+        Refresh();
+        EmitPreview();
+        EmitCommit();
         return true;
     }
     return Ctrl::Key(key, count);

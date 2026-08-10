@@ -26,7 +26,10 @@ static String PeFormatMultilineSummaryPaint(const Value& value)
 void PropertyEditor::DrawGroupRow(Draw& w, int display_index,
                                   const DisplayRow& row, const Rect& r)
 {
-    w.DrawRect(r, style_.group_background);
+    const Color group_background = row.group_depth > 0
+        ? LtColor(style_.group_background, 10)
+        : style_.group_background;
+    w.DrawRect(r, group_background);
     const int padding = style_.cell_padding;
     const int indent = row.group_depth * style_.indent_width;
     const String mark = IsGroupOpen(row.group_id) ? "-" : "+";
@@ -50,21 +53,9 @@ void PropertyEditor::DrawGroupRow(Draw& w, int display_index,
         right = ar.left - DPI(4);
     }
 
-    if(style_.show_group_summaries && model_) {
-        int total = 0;
-        int local = 0;
-        String prefix = row.group_id + "/";
-        for(int i = 0; i < model_->GetCount(); i++) {
-            const PropertyEditorItem& item = (*model_)[i];
-            if(!item.overrideable ||
-               !(item.group == row.group_id || item.group.StartsWith(prefix)))
-                continue;
-            total++;
-            if(item.override_active)
-                local++;
-        }
-        if(total > 0) {
-            const String summary = Format("%d of %d local", local, total);
+    if(style_.show_group_summaries && row.override_total > 0) {
+            const String summary = Format("%d of %d local",
+                                          row.override_local, row.override_total);
             const int summary_width = GetTextSize(summary, style_.group_subtitle_font).cx;
             if(right - summary_width > title_right + DPI(12)) {
                 w.DrawText(right - summary_width,
@@ -72,7 +63,6 @@ void PropertyEditor::DrawGroupRow(Draw& w, int display_index,
                            summary, style_.group_subtitle_font, style_.inherited_ink);
                 right -= summary_width + DPI(10);
             }
-        }
     }
 
     if(model_) {
@@ -115,19 +105,17 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
     int label_cx = GetLabelColumnWidth(r);
     int divider_x = r.left + label_cx;
     Color label_ink = item.enabled ? style_.label_ink : style_.disabled_ink;
-    const Font& font = style_.label_font;
+    Font font = style_.label_font;
     int text_y = r.top + (min(style_.row_height, r.GetHeight()) - font.GetHeight()) / 2;
 
-    int indent = max(0, item.indent) * style_.indent_width;
+    int indent = max(0, row.group_depth + item.indent) * style_.indent_width;
     w.DrawText(r.left + style_.cell_padding + indent,
                text_y, item.label, font, label_ink);
 
     Rect value_rect = GetValueRect(display_index);
     bool has_inline = FindInlineEditor(display_index) != nullptr;
     bool has_active = display_index == active_display_row_ && active_editor_;
-    if(item.kind == PropertyEditorKind::Color && has_inline)
-        DrawValueSummary(w, item, value_rect);
-    else if(!has_inline && !has_active)
+    if(!has_inline && !has_active)
         DrawValueSummary(w, item, value_rect);
 
     if(item.resettable && !item.overrideable) {
@@ -185,13 +173,15 @@ void PropertyEditor::DrawValueSummary(Draw& w,
         ink = style_.inherited_ink;
 
     const auto DrawSwatch = [&](int x, Color color) {
-        const int diameter = min(DPI(16), max(0, line_h - DPI(8)));
-        Rect dot = RectC(x,
-            value_rect.top + (line_h - diameter) / 2,
-            diameter, diameter);
-        if(diameter > 0)
-            w.DrawEllipse(dot, color, 1, style_.frame);
-        return diameter;
+        const int side = min(DPI(19), max(0, line_h - DPI(5)));
+        Rect swatch = RectC(x,
+            value_rect.top + (line_h - side) / 2,
+            side, side);
+        if(side > 0) {
+            w.DrawRect(swatch, color);
+            DrawFrame(w, swatch, style_.frame);
+        }
+        return side;
     };
 
     if(item.kind == PropertyEditorKind::Color &&
@@ -207,7 +197,7 @@ void PropertyEditor::DrawValueSummary(Draw& w,
        !item.mixed && item.value.Is<ValueArray>()) {
         ValueArray colors = item.value;
         int x = value_rect.left;
-        const int count = min(4, colors.GetCount());
+        const int count = min(8, colors.GetCount());
         for(int i = 0; i < count; i++) {
             Color color = colors[i].Is<Color>()
                 ? Color(colors[i]) : Color(128, 128, 128);

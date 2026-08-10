@@ -122,6 +122,9 @@ public:
     UiSlider& SetTicks(bool on = true, int major_ticks = 10, int minor_per_major = 0);
     UiSlider& SetTickSide(UiAlign side);
     UiSlider& SetTrackSize(Size sz);
+    UiSlider& ExpandTrack(bool on = true) { expand_track_ = on; RefreshLayout(); Refresh(); return *this; }
+    bool      IsTrackExpanded() const { return expand_track_; }
+    Rect      GetTrackGeometry() const { return GetTrackRect(); }
     UiSlider& SetThumbSize(Size sz);
 
     virtual void  SetData(const Value& v) override;
@@ -183,6 +186,7 @@ private:
     double step_ = 1.0;
 
     bool dragging_ = false;
+    bool expand_track_ = false;
     int  drag_offset_ = 0;
     double drag_start_value_ = 0.0;
 

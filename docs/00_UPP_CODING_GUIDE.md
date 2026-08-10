@@ -146,7 +146,8 @@ repository, and it is intended to be copyable into another U++ project.
 1. `00_UPP_CODING_GUIDE.md` (this guide);
 2. `01_UI_CONTROLS_GUIDE.md` — the control catalogue;
 3. `02_UI_THEME_GUIDE.md` — theme and style system;
-4. `03_UI_MODEL_GUIDE.md` — model-driven architecture and PropertyEditor;
-5. `04_UI_DEMO_GUIDE.md` — the demo structure.
+4. `03_UI_MODEL_GUIDE.md` — model-driven control architecture;
+5. `04_UI_DEMO_GUIDE.md` — the demo structure;
+6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and extension.
 
 When this guide and an older document conflict, current code and this guide win.

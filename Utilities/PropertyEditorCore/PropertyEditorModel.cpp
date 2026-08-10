@@ -342,7 +342,7 @@ PropertyEditorItem& PropertyEditorModel::AddColor(const String& id,
 
 PropertyEditorItem& PropertyEditorItem::SetColorCount(int count)
 {
-    color_count = clamp(count, 1, 4);
+    color_count = clamp(count, 1, 8);
     return *this;
 }
 
@@ -779,7 +779,16 @@ Value PropertyEditorNormalizeCurve(const Value& value)
 String PropertyEditorFormatCurve(const Value& value)
 {
     Vector<Pointf> points = PropertyEditorReadCurve(PropertyEditorNormalizeCurve(value));
-    return Format("%d point%s", points.GetCount(), points.GetCount() == 1 ? "" : "s");
+    String out = Format("%d point%s [", points.GetCount(), points.GetCount() == 1 ? "" : "s");
+    const int shown = min(points.GetCount(), 2);
+    for(int i = 0; i < shown; i++) {
+        if(i)
+            out << ", ";
+        out << Format("(%.4f, %.4f)", points[i].x, points[i].y);
+    }
+    if(points.GetCount() > shown)
+        out << ", ...";
+    return out << ']';
 }
 
 bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,

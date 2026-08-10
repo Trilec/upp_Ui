@@ -43,7 +43,9 @@ public:
 
     enum class Handle {
         Lower,
-        Upper
+        Upper,
+        LowerBound,
+        UpperBound
     };
 
     static const Style& StyleDefault();
@@ -71,6 +73,11 @@ public:
     UiRangeSlider& SetStep(double step);
 
     UiRangeSlider& SetValues(double lower, double upper);
+    UiRangeSlider& EnableAdjustableBounds(bool on = true);
+    bool HasAdjustableBounds() const { return adjustable_bounds_; }
+    UiRangeSlider& SetBounds(double lower, double upper);
+    double GetLowerBound() const { return bound_lower_; }
+    double GetUpperBound() const { return bound_upper_; }
     UiRangeSlider& SetLowerValue(double v);
     UiRangeSlider& SetUpperValue(double v);
 
@@ -90,6 +97,8 @@ public:
     Handle GetActiveHandle() const { return active_handle_; }
 
     UiRangeSlider& SetTicks(bool on = true, int major_ticks = 10, int minor_per_major = 0);
+    UiRangeSlider& ShowEndpointMarkers(bool on = true);
+    bool AreEndpointMarkersShown() const { return show_endpoint_markers_; }
     UiRangeSlider& SetTickSide(UiAlign side);
     UiRangeSlider& SetTrackSize(Size sz);
     UiRangeSlider& SetThumbSize(Size sz);
@@ -141,7 +150,9 @@ private:
     Handle PickHandle(Point p) const;
 
     bool SetValuesInternal(double lower, double upper, bool fire_action, bool fire_changing);
+    bool SetBoundsInternal(double lower, double upper, bool fire_action, bool fire_changing);
     bool SetHandleValueInternal(Handle handle, double value, bool fire_action, bool fire_changing);
+    double GetHandleValue(Handle handle) const;
 
 private:
     Style style_;
@@ -154,13 +165,19 @@ private:
     double max_ = 100.0;
     double lower_ = 0.0;
     double upper_ = 100.0;
+    double bound_lower_ = 0.0;
+    double bound_upper_ = 100.0;
     double step_ = 1.0;
 
     Handle active_handle_ = Handle::Lower;
     bool dragging_ = false;
+    bool adjustable_bounds_ = false;
+    bool show_endpoint_markers_ = true;
     int drag_offset_ = 0;
     double drag_start_lower_ = 0.0;
     double drag_start_upper_ = 100.0;
+    double drag_start_bound_lower_ = 0.0;
+    double drag_start_bound_upper_ = 100.0;
 
     Size user_min_size_ = Size(0, 0);
 };

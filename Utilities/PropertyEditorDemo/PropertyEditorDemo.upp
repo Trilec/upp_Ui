@@ -3,7 +3,10 @@ uses
     Draw,
     CtrlCore,
     CtrlLib,
-    Utilities/PropertyEditor;
+    Utilities/PropertyEditor,
+    plugin/png,
+    plugin/jpg,
+    plugin/bmp;
 
 file
     main.cpp;

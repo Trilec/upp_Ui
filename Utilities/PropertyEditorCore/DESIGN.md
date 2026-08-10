@@ -12,7 +12,8 @@ The property browser is useful beyond the Ui Designer:
 - application preferences
 - MCP-driven headless inspection and editing
 
-The package therefore depends on ordinary U++ controls and a generic `Value` model, not on Designer-specific nodes.
+The package therefore depends only on Core and Draw and exposes a generic
+`Value` model. It does not depend on controls or Designer-specific nodes.
 
 ## Patterns adopted
 
@@ -22,15 +23,18 @@ Mature property systems separate the property definition and value manager from 
 
 ### Editor factory
 
-Editor creation is centralized. Built-in editor kinds use a switch inside the factory, while applications can register custom editor IDs.
+Editor creation is centralized in the visual `PropertyEditor` package. Core
+only defines semantic kinds and opaque adapter/provider identifiers.
 
 ### Categories and folding
 
 Groups are model data. The browser renders category headers and remembers their open state. Categories are not permanent nested windows.
 
-### Active-editor virtualization
+### Virtualization metadata
 
-Only the currently edited property owns a live child editor control. Other rows are painted summaries. This avoids creating and destroying dozens or hundreds of composite controls during every selection change.
+Core provides `inline_editor` and `row_span` metadata without constructing any
+controls. The visual package virtualizes rich inline editors to its viewport
+and paints summaries for unmounted rows.
 
 ### Preview versus commit
 
@@ -47,7 +51,7 @@ The property browser does not own the application document, undo stack, selectio
 - Godot's inspector uses property editor plugins, categories, folding, revert state, validation and a changing/final distinction.
 - U++ LayDes has a useful property factory pattern, but its historical one-control-per-property approach is not used here because the Designer needs stable and inexpensive selection changes.
 
-## Future-compatible boundaries
+## Current extensible boundaries
 
 The current API deliberately leaves room for:
 
@@ -58,7 +62,8 @@ The current API deliberately leaves room for:
 - `SliderInt` and `SliderDouble` are the range-aware numeric editors. They
   provide both slider manipulation and direct numeric entry; callers should
   use them when a bounded value benefits from visual adjustment.
-- font, image, icon and resource editors;
+- font, image, icon and resource editors are supplied by visual adapters and
+  provider callbacks;
 - quaternion and matrix editors;
 - nested object/sub-inspector properties;
 - keyframe and animation indicators;

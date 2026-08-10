@@ -136,6 +136,7 @@ struct PropertyEditorItem {
 
     int indent = 0;
     int row_span = 0; // 0 = visual editor default, otherwise line-count multiple.
+    int expanded_row_span = 0; // 0 = compact-only; otherwise view-controlled expansion.
     int color_count = 1;
     int decimals = 3;
     int sort_order = 0;
@@ -166,9 +167,19 @@ struct PropertyEditorItem {
         inline_editor = on;
         return *this;
     }
+    PropertyEditorItem& SetIndent(int levels)
+    {
+        indent = max(0, levels);
+        return *this;
+    }
     PropertyEditorItem& SetRowSpan(int lines)
     {
         row_span = max(0, lines);
+        return *this;
+    }
+    PropertyEditorItem& SetExpandedRowSpan(int rows = 3)
+    {
+        expanded_row_span = clamp(rows, 2, 8);
         return *this;
     }
     PropertyEditorItem& SetBooleanPresentation(PropertyBooleanPresentation presentation)

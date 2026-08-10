@@ -2,7 +2,7 @@
 
 `Utilities/PropertyEditorCore` is the headless property model used by the reusable PropertyEditor visual package.
 
-Version: **1.0.0-rc1**
+Version: **1.0.0**
 
 ## Package layout
 
@@ -19,7 +19,8 @@ Version: **1.0.0-rc1**
 ## Model contract
 
 - `PropertyEditorModel` stores property items, value revisions, and structure revisions.
-- `PropertyEditorItem` carries visibility, enablement, read-only, default, range, and validation metadata.
+- `PropertyEditorItem` carries visibility, enablement, read-only, default,
+  range, validation, row-span and semantic editor metadata.
 - `PropertyEditorChoice` stores choice value, label, and optional icon data.
 
 ## Value conventions
@@ -32,3 +33,7 @@ Version: **1.0.0-rc1**
 ## Integration boundary
 
 The package does not paint rows, create editors, or write application state directly. Visual packages and host applications decide how model events map to previews, commits, undo, runtime controls, or MCP commands.
+
+Fields such as `custom_editor`, `editor_variant`, and `picker_provider` are
+opaque identifiers. Core stores them without depending on the concrete editor,
+matrix, slider, picker, Designer, or SymbolPicker implementations.

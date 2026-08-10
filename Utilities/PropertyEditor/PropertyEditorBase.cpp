@@ -27,6 +27,11 @@ static PropertyEditorStyle PeMakeStyle(Color background,
     style.error_ink = Color(190, 48, 48);
     style.divider = Blend(background, text, 40);
     style.reset_icon = ICON_DESIGN_ARROW_CIRCLE_LEFT_48();
+    style.action_icons.expand = ICON_DESIGN_UNFOLD_MORE_48();
+    style.action_icons.collapse = ICON_DESIGN_UNFOLD_LESS_48();
+    style.action_icons.dialog = ICON_DESIGN_BOTTOM_PANEL_OPEN_48();
+    style.action_icons.browse = ICON_DESIGN_PENDING_48();
+    style.action_icons.size = DPI(16);
     style.group_font = StdFont().Bold();
     style.group_subtitle_font = StdFont();
     style.group_subtitle_font.Height(max(1, style.group_subtitle_font.GetHeight() - DPI(2)));
@@ -112,6 +117,7 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
     DeactivateEditor();
     EndTransaction();
     model_ = model;
+    property_expanded_.Clear();
     selected_display_row_ = -1;
     hover_display_row_ = -1;
 
@@ -151,7 +157,10 @@ PropertyEditorFactory& PropertyEditor::GetFactory() const
 One<PropertyValueEditor> PropertyEditor::CreateEditor(
     const PropertyEditorItem& item) const
 {
-    return GetFactory().Create(item);
+    One<PropertyValueEditor> editor = GetFactory().Create(item);
+    if(editor)
+        editor->SetActionIcons(style_.action_icons);
+    return editor;
 }
 
 void PropertyEditor::SetStyle(const PropertyEditorStyle& style)
@@ -192,7 +201,7 @@ void PropertyEditor::SetFilter(const String& text)
 
 String PropertyEditor::GetFilter() const
 {
-    return AsString(filter_.GetData());
+    return filter_.GetTextUtf8();
 }
 
 void PropertyEditor::ExpandAll()
@@ -248,6 +257,27 @@ String PropertyEditor::GetGroupAction(const String& group) const
 void PropertyEditor::ClearGroupAction(const String& group)
 {
     SetGroupAction(group, String());
+}
+
+void PropertyEditor::SetPropertyExpanded(const String& property_id, bool expanded)
+{
+    if(!model_)
+        return;
+    const PropertyEditorItem *item = model_->Find(property_id);
+    if(!item || item->expanded_row_span <= 1)
+        return;
+    int q = property_expanded_.Find(property_id);
+    if(q < 0)
+        property_expanded_.Add(property_id, expanded);
+    else
+        property_expanded_[q] = expanded;
+    RebuildRows();
+}
+
+bool PropertyEditor::IsPropertyExpanded(const String& property_id) const
+{
+    int q = property_expanded_.Find(property_id);
+    return q >= 0 && property_expanded_[q];
 }
 
 void PropertyEditor::RefreshModel()

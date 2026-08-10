@@ -185,6 +185,12 @@ UiRangeSlider& UiRangeSlider::SetRange(double mn, double mx)
         Swap(mx, mn);
     min_ = mn;
     max_ = mx;
+    if(!adjustable_bounds_) {
+        bound_lower_ = min_;
+        bound_upper_ = max_;
+    }
+    else
+        SetBoundsInternal(bound_lower_, bound_upper_, false, false);
     SetValuesInternal(lower_, upper_, false, false);
     return *this;
 }
@@ -231,6 +237,39 @@ UiRangeSlider& UiRangeSlider::SetTicks(bool on, int major_ticks, int minor_per_m
     style.minor_ticks_per_major = max(0, minor_per_major);
     RefreshLayout();
     Refresh();
+    return *this;
+}
+
+UiRangeSlider& UiRangeSlider::EnableAdjustableBounds(bool on)
+{
+    if(adjustable_bounds_ != on) {
+        adjustable_bounds_ = on;
+        if(on) {
+            bound_lower_ = min_;
+            bound_upper_ = max_;
+        }
+        else {
+            bound_lower_ = min_;
+            bound_upper_ = max_;
+        }
+        SetValuesInternal(lower_, upper_, false, false);
+        Refresh();
+    }
+    return *this;
+}
+
+UiRangeSlider& UiRangeSlider::SetBounds(double lower, double upper)
+{
+    SetBoundsInternal(lower, upper, false, false);
+    return *this;
+}
+
+UiRangeSlider& UiRangeSlider::ShowEndpointMarkers(bool on)
+{
+    if(show_endpoint_markers_ != on) {
+        show_endpoint_markers_ = on;
+        Refresh();
+    }
     return *this;
 }
 
@@ -366,8 +405,11 @@ Rect UiRangeSlider::GetThumbRect(Handle handle) const
 {
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
-    Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
-    int pos = ValueToPos(handle == Handle::Lower ? lower_ : upper_);
+    const bool bound = handle == Handle::LowerBound || handle == Handle::UpperBound;
+    Size thumb = bound ? Size(max(DPI(9), style.thumb_size.cx / 2),
+                              max(DPI(9), style.thumb_size.cy / 2))
+                       : Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    int pos = ValueToPos(GetHandleValue(handle));
 
     if(dir_ == UiDirection::H)
         return RectC(tr.left + pos - thumb.cx / 2,
@@ -381,26 +423,35 @@ Rect UiRangeSlider::GetThumbRect(Handle handle) const
 
 UiRangeSlider::Handle UiRangeSlider::PickHandle(Point p) const
 {
-    Rect lower = GetThumbRect(Handle::Lower);
-    Rect upper = GetThumbRect(Handle::Upper);
-    bool in_lower = lower.Contains(p);
-    bool in_upper = upper.Contains(p);
-
-    if(in_lower && in_upper)
-        return active_handle_ == Handle::Lower ? Handle::Upper : Handle::Lower;
-    if(in_lower)
-        return Handle::Lower;
-    if(in_upper)
-        return Handle::Upper;
-
+    Handle handles[] = { Handle::Lower, Handle::Upper, Handle::LowerBound, Handle::UpperBound };
     int pointer = dir_ == UiDirection::H ? p.x : p.y;
-    int lp = dir_ == UiDirection::H ? lower.CenterPoint().x : lower.CenterPoint().y;
-    int up = dir_ == UiDirection::H ? upper.CenterPoint().x : upper.CenterPoint().y;
-    int dl = abs(pointer - lp);
-    int du = abs(pointer - up);
-    if(dl == du)
-        return active_handle_;
-    return dl < du ? Handle::Lower : Handle::Upper;
+    Handle best = active_handle_;
+    int best_distance = INT_MAX;
+    for(Handle handle : handles) {
+        if(!adjustable_bounds_ && (handle == Handle::LowerBound || handle == Handle::UpperBound))
+            continue;
+        Rect thumb = GetThumbRect(handle);
+        int center = dir_ == UiDirection::H ? thumb.CenterPoint().x : thumb.CenterPoint().y;
+        int distance = abs(pointer - center);
+        if(thumb.Contains(p) && handle == active_handle_)
+            return handle;
+        if(distance < best_distance) {
+            best_distance = distance;
+            best = handle;
+        }
+    }
+    return best;
+}
+
+double UiRangeSlider::GetHandleValue(Handle handle) const
+{
+    switch(handle) {
+    case Handle::Lower: return lower_;
+    case Handle::Upper: return upper_;
+    case Handle::LowerBound: return bound_lower_;
+    case Handle::UpperBound: return bound_upper_;
+    }
+    return lower_;
 }
 
 bool UiRangeSlider::SetValuesInternal(double lower, double upper, bool fire_action, bool fire_changing)
@@ -409,6 +460,10 @@ bool UiRangeSlider::SetValuesInternal(double lower, double upper, bool fire_acti
     double nu = NormalizeValue(upper);
     if(nl > nu)
         Swap(nl, nu);
+    if(adjustable_bounds_) {
+        nl = minmax(nl, bound_lower_, bound_upper_);
+        nu = minmax(nu, bound_lower_, bound_upper_);
+    }
 
     if(std::fabs(nl - lower_) < 1e-12 && std::fabs(nu - upper_) < 1e-12)
         return false;
@@ -423,19 +478,53 @@ bool UiRangeSlider::SetValuesInternal(double lower, double upper, bool fire_acti
     return true;
 }
 
+bool UiRangeSlider::SetBoundsInternal(double lower, double upper, bool fire_action, bool fire_changing)
+{
+    double nl = NormalizeValue(lower);
+    double nu = NormalizeValue(upper);
+    if(nl > nu)
+        Swap(nl, nu);
+    if(std::fabs(nl - bound_lower_) < 1e-12 && std::fabs(nu - bound_upper_) < 1e-12)
+        return false;
+    bound_lower_ = nl;
+    bound_upper_ = nu;
+    lower_ = minmax(lower_, bound_lower_, bound_upper_);
+    upper_ = minmax(upper_, bound_lower_, bound_upper_);
+    if(lower_ > upper_)
+        lower_ = upper_;
+    Refresh();
+    if(fire_changing && WhenChanging) WhenChanging();
+    if(fire_action && WhenAction) WhenAction();
+    return true;
+}
+
 bool UiRangeSlider::SetHandleValueInternal(Handle handle, double value, bool fire_action, bool fire_changing)
 {
     double nv = NormalizeValue(value);
-    if(handle == Handle::Lower)
-        nv = min(nv, upper_);
-    else
-        nv = max(nv, lower_);
-
-    double& target = handle == Handle::Lower ? lower_ : upper_;
-    if(std::fabs(nv - target) < 1e-12)
+    double *target = nullptr;
+    switch(handle) {
+    case Handle::Lower:
+        nv = minmax(nv, adjustable_bounds_ ? bound_lower_ : min_, upper_);
+        target = &lower_;
+        break;
+    case Handle::Upper:
+        nv = minmax(nv, lower_, adjustable_bounds_ ? bound_upper_ : max_);
+        target = &upper_;
+        break;
+    case Handle::LowerBound:
+        if(!adjustable_bounds_) return false;
+        nv = min(nv, lower_);
+        target = &bound_lower_;
+        break;
+    case Handle::UpperBound:
+        if(!adjustable_bounds_) return false;
+        nv = max(nv, upper_);
+        target = &bound_upper_;
+        break;
+    }
+    if(!target || std::fabs(nv - *target) < 1e-12)
         return false;
-
-    target = nv;
+    *target = nv;
     Refresh();
     if(fire_changing && WhenChanging)
         WhenChanging();
@@ -484,6 +573,38 @@ void UiRangeSlider::Paint(Draw& w)
     }
     if(!selected.IsEmpty())
         UiPaintFaceFrameDash(w, selected, selected_palette, selected_metrics, base_state);
+
+    if(show_endpoint_markers_) {
+        const int radius = DPI(3);
+        const Color marker = disabled ? SColorDisabled() : SColorShadow();
+        const Point center = track.CenterPoint();
+        Point first = dir_ == UiDirection::H ? Point(track.left, center.y)
+                                             : Point(center.x, track.top);
+        Point last = dir_ == UiDirection::H ? Point(track.right - 1, center.y)
+                                            : Point(center.x, track.bottom - 1);
+        for(Point p : { first, last }) {
+            Rect dot = RectC(p.x - radius, p.y - radius, radius * 2 + 1, radius * 2 + 1);
+            UiDrawCachedRaster(w, dot, UiGetCachedAACircleImage(dot.GetSize(), marker));
+        }
+    }
+
+    if(adjustable_bounds_) {
+        const Color ring = disabled ? SColorDisabled() : SColorShadow();
+        for(Handle handle : { Handle::LowerBound, Handle::UpperBound }) {
+            Rect thumb = GetThumbRect(handle);
+            const Point center = thumb.CenterPoint();
+            const int radius = max(DPI(4), min(thumb.GetWidth(), thumb.GetHeight()) / 2);
+            Rect outer = RectC(center.x - radius, center.y - radius,
+                               radius * 2 + 1, radius * 2 + 1);
+            UiDrawCachedRaster(w, outer, UiGetCachedAACircleImage(outer.GetSize(), ring));
+            Rect inner = outer.Deflated(DPI(2));
+            if(!inner.IsEmpty())
+                UiDrawCachedRaster(w, inner,
+                                   UiGetCachedAACircleImage(inner.GetSize(), SColorPaper()));
+            Rect dot = RectC(center.x - DPI(2), center.y - DPI(2), DPI(5), DPI(5));
+            UiDrawCachedRaster(w, dot, UiGetCachedAACircleImage(dot.GetSize(), ring));
+        }
+    }
 
     UiAlign tick_side = UiRangeSliderNormalizeTickSide_(dir_, style.tick_side);
     if(style.show_ticks && style.major_ticks > 1) {
@@ -559,6 +680,8 @@ void UiRangeSlider::LeftDown(Point p, dword)
     Rect thumb = GetThumbRect(active_handle_);
     drag_start_lower_ = lower_;
     drag_start_upper_ = upper_;
+    drag_start_bound_lower_ = bound_lower_;
+    drag_start_bound_upper_ = bound_upper_;
     dragging_ = true;
     drag_offset_ = thumb.Contains(p)
                  ? (dir_ == UiDirection::H
@@ -585,7 +708,9 @@ void UiRangeSlider::LeftUp(Point, dword)
         ReleaseCapture();
 
     bool changed = std::fabs(lower_ - drag_start_lower_) >= 1e-12
-                || std::fabs(upper_ - drag_start_upper_) >= 1e-12;
+                || std::fabs(upper_ - drag_start_upper_) >= 1e-12
+                || std::fabs(bound_lower_ - drag_start_bound_lower_) >= 1e-12
+                || std::fabs(bound_upper_ - drag_start_bound_upper_) >= 1e-12;
     Ptr<UiRangeSlider> self = this;
     if(changed && WhenAction)
         WhenAction();
@@ -611,7 +736,7 @@ void UiRangeSlider::MouseWheel(Point, int zdelta, dword)
         return;
 
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
-    double value = active_handle_ == Handle::Lower ? lower_ : upper_;
+    double value = GetHandleValue(active_handle_);
     if(zdelta > 0)
         SetHandleValueInternal(active_handle_, value + d, true, true);
     else if(zdelta < 0)
@@ -624,7 +749,7 @@ bool UiRangeSlider::Key(dword key, int)
         return false;
 
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
-    double value = active_handle_ == Handle::Lower ? lower_ : upper_;
+    double value = GetHandleValue(active_handle_);
 
     if(dir_ == UiDirection::H) {
         if(key == K_LEFT)  { SetHandleValueInternal(active_handle_, value - d, true, true); return true; }

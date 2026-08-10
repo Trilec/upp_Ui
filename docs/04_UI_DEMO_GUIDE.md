@@ -117,7 +117,8 @@ and understand how the equivalent public API would be expressed in code.
 
 Inspector and Theme Overrides are constructed through the same `PropertyEditor`
 family the library provides. The demo therefore also acts as a practical
-demonstration of PropertyEditor integration — see `03_UI_MODEL_GUIDE.md`.
+demonstration of PropertyEditor integration — see
+`05_UI_PROPERTY_EDITOR_GUIDE.md`.
 
 ## Self-contained packages
 

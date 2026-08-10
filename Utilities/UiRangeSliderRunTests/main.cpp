@@ -132,12 +132,42 @@ static void TestInteractionContract(TestCtx& t)
     t.Expect(changing == 0 && actions == 0, "blocked movement emits no value events");
 }
 
+static void TestAdjustableBounds(TestCtx& t)
+{
+    t.Section("Adjustable bounds");
+
+    UiRangeSlider s;
+    t.Expect(!s.HasAdjustableBounds(), "adjustable bounds are opt-in");
+    s.SetRange(0, 1000).EnableAdjustableBounds().SetBounds(50, 900).SetValues(250, 680);
+    t.Expect(s.HasAdjustableBounds(), "adjustable bounds can be enabled without changing default instances");
+    t.Expect(Near(s.GetLowerBound(), 50) && Near(s.GetUpperBound(), 900),
+             "inner bounds are independent from the hard domain");
+    t.Expect(Near(s.GetLowerValue(), 250) && Near(s.GetUpperValue(), 680),
+             "selection remains independent inside adjustable bounds");
+
+    s.SetActiveHandle(UiRangeSlider::Handle::LowerBound);
+    s.Key(K_RIGHT, 1);
+    t.Expect(Near(s.GetLowerBound(), 51), "keyboard interaction moves the lower bound handle");
+    s.SetActiveHandle(UiRangeSlider::Handle::UpperBound);
+    s.Key(K_LEFT, 1);
+    t.Expect(Near(s.GetUpperBound(), 899), "keyboard interaction moves the upper bound handle");
+
+    s.SetBounds(400, 600);
+    t.Expect(Near(s.GetLowerValue(), 400) && Near(s.GetUpperValue(), 600),
+             "contracting bounds clamps the selected interval");
+}
+
 static void TestStyleAndSizing(TestCtx& t)
 {
     t.Section("Style and sizing");
 
     UiRangeSlider s;
     t.Expect(!s.HasCustomStyle(), "range slider starts theme-driven");
+    t.Expect(s.AreEndpointMarkersShown(), "range endpoints are visible by default");
+    s.ShowEndpointMarkers(false);
+    t.Expect(!s.AreEndpointMarkersShown(), "endpoint marker visibility is configurable");
+    s.ShowEndpointMarkers();
+    t.Expect(s.AreEndpointMarkersShown(), "endpoint markers can be restored fluently");
 
     UiRangeSlider::Style style = UiTheme::ResolveSlider();
     s.SetCustomStyle(style);
@@ -192,6 +222,7 @@ CONSOLE_APP_MAIN
     TestStepAndAliases(t);
     TestDataBinding(t);
     TestInteractionContract(t);
+    TestAdjustableBounds(t);
     TestStyleAndSizing(t);
     TestAllocatedTrackExpansion(t);
 

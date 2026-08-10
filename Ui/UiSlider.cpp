@@ -280,13 +280,15 @@ Rect UiSlider::GetTrackRect() const
     Size track = Size(max(DPI(20), style.track_size.cx), max(1, style.track_size.cy));
     if(dir_ == UiDirection::H) {
         int pad = max(DPI(8), track.cy * 2 + DPI(2));
-        int width = min(max(0, outer.GetWidth() - 2 * pad), track.cx);
+        int available = max(0, outer.GetWidth() - 2 * pad);
+        int width = expand_track_ ? available : min(available, track.cx);
         int x = outer.left + (outer.GetWidth() - width) / 2;
         int y = outer.CenterPoint().y - track.cy / 2;
         return RectC(x, y, width, track.cy);
     }
     int pad = max(DPI(8), track.cx * 2 + DPI(2));
-    int height = min(max(0, outer.GetHeight() - 2 * pad), track.cy);
+    int available = max(0, outer.GetHeight() - 2 * pad);
+    int height = expand_track_ ? available : min(available, track.cy);
     int x = outer.CenterPoint().x - track.cx / 2;
     int y = outer.top + (outer.GetHeight() - height) / 2;
     return RectC(x, y, track.cx, height);

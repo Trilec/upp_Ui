@@ -92,6 +92,17 @@ public:
         UiBoxLayout& view_group = setup_group(view_group_panel_, view_group_, "View");
         UiBoxLayout& checks_group = setup_group(checks_group_panel_, checks_group_, "Checks");
 
+        format_header_.SetDirection(UiDirection::H)
+                      .SetGap(DPI(2), 0)
+                      .SetInset(0)
+                      .SetAlignItems(UiCrossAlign::Center);
+        format_header_help_.SetText("?");
+        format_header_more_.SetText("...");
+        format_header_.Add(format_header_help_).Fixed(DPI(24));
+        format_header_.Add(format_header_more_).Fixed(DPI(28));
+        format_group_panel_.SetHeaderContent(format_header_)
+                           .SetHeaderContentAlign(UiAlign::RIGHT, UiAlign::CENTER);
+
         inspector_title_.SetText("Inspector");
         find_status_ = "Find: idle";
         inspector_state_.SetReadOnly();
@@ -1259,6 +1270,9 @@ private:
     UiGroupPanel find_group_panel_;
     UiGroupPanel view_group_panel_;
     UiGroupPanel checks_group_panel_;
+    UiBoxLayout  format_header_;
+    UiButton     format_header_help_;
+    UiButton     format_header_more_;
     UiBoxLayout  format_group_;
     UiBoxLayout  structure_group_;
     UiBoxLayout  table_group_;

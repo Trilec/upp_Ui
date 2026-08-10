@@ -6,16 +6,21 @@ namespace Upp {
 
 void UiGroupPanel::Style::Serialize(Stream& s)
 {
+    // Keep the retired SideTitle fields in their original stream positions.
+    // They are consumed for compatibility but never affect live styling.
+    Font legacy_side_title_font = SansSerifZ(9);
+    Color legacy_side_title_color;
+    int legacy_side_title_gap = DPI(8);
     int hp = (int)header_placement;
     int ha = (int)title_align_h;
     int va = (int)title_align_v;
     int hm = (int)header_mode;
     s % palette % metrics % skin
-      % title_font % subtitle_font % side_title_font
-      % title_color % subtitle_color % side_title_color
+      % title_font % subtitle_font % legacy_side_title_font
+      % title_color % subtitle_color % legacy_side_title_color
       % hp % ha % va % hm
       % inset % header_inset % header_gap % icon_size % icon_gap
-      % title_subtitle_gap % side_title_gap % separator_thickness
+      % title_subtitle_gap % legacy_side_title_gap % separator_thickness
       % line_enabled % header_band_enabled % transparent;
     header_placement = (UiAlign)hp;
     title_align_h = (UiAlign)ha;
@@ -105,11 +110,32 @@ void UiGroupPanel::OnStyleChanged()
 
 UiGroupPanel& UiGroupPanel::SetTitle(const String& s) { title_ = s; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetSubTitle(const String& s) { subtitle_ = s; RefreshLayout(); Refresh(); return *this; }
-UiGroupPanel& UiGroupPanel::SetSideTitle(const String& s) { side_title_ = s; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetIcon(const Image& img) { icon_ = img; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::ClearIcon() { icon_ = Image(); RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetHeaderPlacement(UiAlign side) { if(side == UiAlign::TOP || side == UiAlign::BOTTOM || side == UiAlign::LEFT || side == UiAlign::RIGHT) StyleEdit().header_placement = side; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetHeaderMode(HeaderMode mode) { StyleEdit().header_mode = mode; RefreshLayout(); Refresh(); return *this; }
+UiGroupPanel& UiGroupPanel::SetTitleAlign(UiAlign horizontal, UiAlign vertical)
+{
+    if(horizontal == UiAlign::LEFT || horizontal == UiAlign::CENTER || horizontal == UiAlign::RIGHT)
+        StyleEdit().title_align_h = horizontal;
+    if(vertical == UiAlign::TOP || vertical == UiAlign::CENTER || vertical == UiAlign::BOTTOM)
+        StyleEdit().title_align_v = vertical;
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiGroupPanel& UiGroupPanel::SetHeaderContentAlign(UiAlign horizontal, UiAlign vertical)
+{
+    if(horizontal == UiAlign::DEFAULT || horizontal == UiAlign::LEFT ||
+       horizontal == UiAlign::CENTER || horizontal == UiAlign::RIGHT)
+        header_content_align_h_ = horizontal;
+    if(vertical == UiAlign::DEFAULT || vertical == UiAlign::TOP ||
+       vertical == UiAlign::CENTER || vertical == UiAlign::BOTTOM)
+        header_content_align_v_ = vertical;
+    RefreshLayout();
+    return *this;
+}
 UiGroupPanel& UiGroupPanel::SetLine(bool on) { StyleEdit().line_enabled = on; Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetHeaderBand(bool on) { StyleEdit().header_band_enabled = on; Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetInset(const Rect& r) { StyleEdit().inset = UiNonNegativeThickness(r); RefreshLayout(); Refresh(); return *this; }
@@ -118,7 +144,6 @@ UiGroupPanel& UiGroupPanel::SetIconSize(int px) { StyleEdit().icon_size = max(0,
 UiGroupPanel& UiGroupPanel::SetLineThickness(int px) { StyleEdit().separator_thickness = max(1, px); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetTitleFont(Font f) { StyleEdit().title_font = f; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetSubTitleFont(Font f) { StyleEdit().subtitle_font = f; RefreshLayout(); Refresh(); return *this; }
-UiGroupPanel& UiGroupPanel::SetSideTitleFont(Font f) { StyleEdit().side_title_font = f; RefreshLayout(); Refresh(); return *this; }
 UiGroupPanel& UiGroupPanel::SetTitleSubTitleGap(int px) { StyleEdit().title_subtitle_gap = max(0, px); RefreshLayout(); Refresh(); return *this; }
 
 UiGroupPanel& UiGroupPanel::SetContent(Ctrl& ctrl)
@@ -126,6 +151,15 @@ UiGroupPanel& UiGroupPanel::SetContent(Ctrl& ctrl)
     if(content_ == &ctrl)
         return *this;
 
+    if(header_content_ == &ctrl) {
+        if(content_)
+            content_->Remove();
+        header_content_ = nullptr;
+        content_ = &ctrl;
+        RefreshLayout();
+        Refresh();
+        return *this;
+    }
     if(content_)
         content_->Remove();
     content_ = &ctrl;
@@ -144,18 +178,94 @@ UiGroupPanel& UiGroupPanel::ClearContent()
     return *this;
 }
 
-Size UiGroupPanel::GetHeaderSize() const
+UiGroupPanel& UiGroupPanel::SetHeaderContent(Ctrl& ctrl)
+{
+    if(header_content_ == &ctrl)
+        return *this;
+
+    if(content_ == &ctrl) {
+        if(header_content_)
+            header_content_->Remove();
+        content_ = nullptr;
+        header_content_ = &ctrl;
+        RefreshLayout();
+        Refresh();
+        return *this;
+    }
+    if(header_content_)
+        header_content_->Remove();
+    header_content_ = &ctrl;
+    Add(ctrl);
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiGroupPanel& UiGroupPanel::ClearHeaderContent()
+{
+    if(header_content_)
+        header_content_->Remove();
+    return *this;
+}
+
+static Rect UiGroupPanelClampRect(Rect r)
+{
+    r.right = max(r.left, r.right);
+    r.bottom = max(r.top, r.bottom);
+    return r;
+}
+
+static int UiGroupPanelAlignedOffset(int available, int size, UiAlign align)
+{
+    if(align == UiAlign::RIGHT || align == UiAlign::BOTTOM)
+        return max(0, available - size);
+    if(align == UiAlign::CENTER)
+        return max(0, (available - size) / 2);
+    return 0;
+}
+
+Size UiGroupPanel::GetTitleNaturalSize() const
 {
     const Style& s = GetEffectiveStyle();
     Size title_sz = title_.IsEmpty() ? Size(0, 0) : GetTextSize(title_, s.title_font);
     Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : GetTextSize(subtitle_, s.subtitle_font);
-    Size trail_sz = side_title_.IsEmpty() ? Size(0, 0) : GetTextSize(side_title_, s.side_title_font);
     int text_w = max(title_sz.cx, sub_sz.cx);
     int text_h = title_sz.cy + (title_sz.cy && sub_sz.cy ? s.title_subtitle_gap : 0) + sub_sz.cy;
-    int icon_w = IsNull(icon_) || s.icon_size <= 0 ? 0 : s.icon_size + s.icon_gap;
-    int trailing_w = trail_sz.cx ? trail_sz.cx + s.side_title_gap : 0;
-    int w = s.header_inset.left + s.header_inset.right + icon_w + text_w + trailing_w;
-    int h = s.header_inset.top + s.header_inset.bottom + max(max(text_h, trail_sz.cy), IsNull(icon_) ? 0 : s.icon_size);
+    int icon_size = !IsNull(icon_) && s.icon_size > 0 ? s.icon_size : 0;
+    int icon_w = icon_size ? icon_size + (text_w ? s.icon_gap : 0) : 0;
+    return Size(icon_w + text_w, max(text_h, icon_size));
+}
+
+Size UiGroupPanel::GetHeaderContentNaturalSize() const
+{
+    return header_content_ ? UiMeasureLayout(*header_content_).min : Size(0, 0);
+}
+
+Size UiGroupPanel::GetHeaderSize() const
+{
+    const Style& s = GetEffectiveStyle();
+    Size title = GetTitleNaturalSize();
+    Size child = GetHeaderContentNaturalSize();
+    bool have_title = title.cx > 0 && title.cy > 0;
+    bool have_child = child.cx > 0 && child.cy > 0;
+    int gap = have_title && have_child ? s.header_gap : 0;
+    bool horizontal = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;
+    int w;
+    int h;
+    if(horizontal) {
+        int primary = title.cx + gap + child.cx;
+        if(have_title && have_child && s.title_align_h == UiAlign::CENTER)
+            primary = title.cx + 2 * (gap + child.cx);
+        w = s.header_inset.left + s.header_inset.right + primary;
+        h = s.header_inset.top + s.header_inset.bottom + max(title.cy, child.cy);
+    }
+    else {
+        int primary = title.cy + gap + child.cy;
+        if(have_title && have_child && s.title_align_v == UiAlign::CENTER)
+            primary = title.cy + 2 * (gap + child.cy);
+        w = s.header_inset.left + s.header_inset.right + max(title.cx, child.cx);
+        h = s.header_inset.top + s.header_inset.bottom + primary;
+    }
     return Size(max(DPI(24), w), max(DPI(24), h));
 }
 
@@ -163,7 +273,8 @@ Rect UiGroupPanel::GetFrameRect(const Rect& face) const
 {
     const Style& s = GetEffectiveStyle();
     Size hs = GetHeaderSize();
-    Rect frame = face.Deflated(s.inset.left, s.inset.top, s.inset.right, s.inset.bottom);
+    Rect frame = UiGroupPanelClampRect(face.Deflated(s.inset.left, s.inset.top,
+                                                    s.inset.right, s.inset.bottom));
     if(s.header_mode == Outside) {
         switch(s.header_placement) {
         case UiAlign::BOTTOM: frame.bottom = max(frame.top, face.bottom - hs.cy - s.header_gap); break;
@@ -189,13 +300,14 @@ Rect UiGroupPanel::GetHeaderRect(const Rect& face) const
 {
     const Style& s = GetEffectiveStyle();
     Size hs = GetHeaderSize();
-    Rect area = face.Deflated(s.inset.left, s.inset.top, s.inset.right, s.inset.bottom);
+    Rect area = UiGroupPanelClampRect(face.Deflated(s.inset.left, s.inset.top,
+                                                   s.inset.right, s.inset.bottom));
     switch(s.header_placement) {
-    case UiAlign::BOTTOM: return Rect(area.left, area.bottom - hs.cy, area.right, area.bottom);
-    case UiAlign::LEFT:   return Rect(area.left, area.top, area.left + hs.cx, area.bottom);
-    case UiAlign::RIGHT:  return Rect(area.right - hs.cx, area.top, area.right, area.bottom);
+    case UiAlign::BOTTOM: return Rect(area.left, max(area.top, area.bottom - hs.cy), area.right, area.bottom);
+    case UiAlign::LEFT:   return Rect(area.left, area.top, min(area.right, area.left + hs.cx), area.bottom);
+    case UiAlign::RIGHT:  return Rect(max(area.left, area.right - hs.cx), area.top, area.right, area.bottom);
     case UiAlign::TOP:
-    default:              return Rect(area.left, area.top, area.right, area.top + hs.cy);
+    default:              return Rect(area.left, area.top, area.right, min(area.bottom, area.top + hs.cy));
     }
 }
 
@@ -214,25 +326,58 @@ Rect UiGroupPanel::GetBodyRect(const Rect& face) const
         default:              body.top = max(body.top, header.bottom + s.header_gap); break;
         }
     }
-    return body;
+    return UiGroupPanelClampRect(body);
 }
 
-Rect UiGroupPanel::GetTitleBlockRect(const Rect& header, Size block) const
+UiGroupPanel::HeaderLayout UiGroupPanel::ResolveHeaderLayout(const Rect& face) const
 {
     const Style& s = GetEffectiveStyle();
-    int x = header.left + s.header_inset.left;
-    int y = header.top + s.header_inset.top;
-    int avail_w = max(0, header.GetWidth() - s.header_inset.left - s.header_inset.right);
-    int avail_h = max(0, header.GetHeight() - s.header_inset.top - s.header_inset.bottom);
-    if(s.title_align_h == UiAlign::CENTER)
-        x += max(0, (avail_w - block.cx) / 2);
-    else if(s.title_align_h == UiAlign::RIGHT)
-        x += max(0, avail_w - block.cx);
-    if(s.title_align_v == UiAlign::CENTER)
-        y += max(0, (avail_h - block.cy) / 2);
-    else if(s.title_align_v == UiAlign::BOTTOM)
-        y += max(0, avail_h - block.cy);
-    return RectC(x, y, min(block.cx, avail_w), min(block.cy, avail_h));
+    HeaderLayout out;
+    out.header = GetHeaderRect(face);
+    Rect inner = UiGroupPanelClampRect(out.header.Deflated(s.header_inset.left, s.header_inset.top,
+                                                           s.header_inset.right, s.header_inset.bottom));
+    Size title = GetTitleNaturalSize();
+    title.cx = min(title.cx, inner.GetWidth());
+    title.cy = min(title.cy, inner.GetHeight());
+    int tx = inner.left + UiGroupPanelAlignedOffset(inner.GetWidth(), title.cx, s.title_align_h);
+    int ty = inner.top + UiGroupPanelAlignedOffset(inner.GetHeight(), title.cy, s.title_align_v);
+    out.title = RectC(tx, ty, title.cx, title.cy);
+
+    bool horizontal = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;
+    bool have_title = !out.title.IsEmpty();
+    int gap = have_title && header_content_ ? s.header_gap : 0;
+    out.content_region = inner;
+    if(horizontal && have_title) {
+        if(s.title_align_h == UiAlign::RIGHT)
+            out.content_region.right = max(inner.left, out.title.left - gap);
+        else
+            out.content_region.left = min(inner.right, out.title.right + gap);
+    }
+    else if(!horizontal && have_title) {
+        if(s.title_align_v == UiAlign::BOTTOM)
+            out.content_region.bottom = max(inner.top, out.title.top - gap);
+        else
+            out.content_region.top = min(inner.bottom, out.title.bottom + gap);
+    }
+    out.content_region = UiGroupPanelClampRect(out.content_region);
+
+    if(header_content_) {
+        Size child = GetHeaderContentNaturalSize();
+        child.cx = min(max(0, child.cx), out.content_region.GetWidth());
+        child.cy = min(max(0, child.cy), out.content_region.GetHeight());
+        UiAlign ah = header_content_align_h_;
+        UiAlign av = header_content_align_v_;
+        if(ah == UiAlign::DEFAULT)
+            ah = horizontal ? (s.title_align_h == UiAlign::RIGHT ? UiAlign::LEFT : UiAlign::RIGHT)
+                            : UiAlign::CENTER;
+        if(av == UiAlign::DEFAULT)
+            av = horizontal ? UiAlign::CENTER
+                            : (s.title_align_v == UiAlign::BOTTOM ? UiAlign::TOP : UiAlign::BOTTOM);
+        int x = out.content_region.left + UiGroupPanelAlignedOffset(out.content_region.GetWidth(), child.cx, ah);
+        int y = out.content_region.top + UiGroupPanelAlignedOffset(out.content_region.GetHeight(), child.cy, av);
+        out.content = RectC(x, y, child.cx, child.cy);
+    }
+    return out;
 }
 
 void UiGroupPanel::Layout()
@@ -240,12 +385,20 @@ void UiGroupPanel::Layout()
     Rect face = UiStyledFaceRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
     if(content_)
         content_->SetRect(GetBodyRect(face));
+    if(header_content_)
+        header_content_->SetRect(ResolveHeaderLayout(face).content);
 }
 
 Rect UiGroupPanel::GetBodyRect() const
 {
     Rect face = UiStyledFaceRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
     return GetBodyRect(face);
+}
+
+Rect UiGroupPanel::GetHeaderContentRect() const
+{
+    Rect face = UiStyledFaceRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    return ResolveHeaderLayout(face).content_region;
 }
 
 Size UiGroupPanel::GetMinSize() const
@@ -261,48 +414,37 @@ Size UiGroupPanel::GetMinSize() const
     return UiStyledOuterSizeFromContent(content, s.metrics, s.skin);
 }
 
-void UiGroupPanel::PaintHeader(Draw& w, const Rect& header, StyledState st) const
+void UiGroupPanel::PaintHeader(Draw& w, const HeaderLayout& layout, StyledState st) const
 {
     const Style& s = GetEffectiveStyle();
     Size title_sz = title_.IsEmpty() ? Size(0, 0) : GetTextSize(title_, s.title_font);
     Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : GetTextSize(subtitle_, s.subtitle_font);
-    Size trail_sz = side_title_.IsEmpty() ? Size(0, 0) : GetTextSize(side_title_, s.side_title_font);
-    int text_w = max(title_sz.cx, sub_sz.cx);
     int text_h = title_sz.cy + (title_sz.cy && sub_sz.cy ? s.title_subtitle_gap : 0) + sub_sz.cy;
-    int icon_w = IsNull(icon_) || s.icon_size <= 0 ? 0 : s.icon_size + s.icon_gap;
-    int trailing_w = trail_sz.cx ? trail_sz.cx + s.side_title_gap : 0;
-    int available_w = max(0, header.GetWidth() - s.header_inset.left - s.header_inset.right);
-    int block_w = side_title_.IsEmpty() ? icon_w + text_w : available_w;
-    Rect block = GetTitleBlockRect(header, Size(block_w, max(max(text_h, trail_sz.cy), IsNull(icon_) ? 0 : s.icon_size)));
+    Rect block = layout.title;
+    if(block.IsEmpty())
+        return;
+    w.Clip(block);
     int x = block.left;
     if(!IsNull(icon_) && s.icon_size > 0) {
-        Rect ir = RectC(x, block.top + max(0, (block.GetHeight() - s.icon_size) / 2), s.icon_size, s.icon_size);
+        int icon_size = min(s.icon_size, min(block.GetWidth(), block.GetHeight()));
+        Rect ir = RectC(x, block.top + max(0, (block.GetHeight() - icon_size) / 2), icon_size, icon_size);
         UiPaintStyledIcon(w, ir, icon_, true, true, UiIconRenderMode::MonoTint, s.palette.icon[st], IsEnabled());
-        x += s.icon_size + s.icon_gap;
+        x += icon_size + (text_h ? s.icon_gap : 0);
     }
     Color title_c = IsNull(s.title_color) ? s.palette.ink[st] : s.title_color;
     Color sub_c = IsNull(s.subtitle_color) ? Blend(s.palette.ink[st], SColorPaper(), 80) : s.subtitle_color;
-    Color trail_c = IsNull(s.side_title_color) ? sub_c : s.side_title_color;
     int ty = block.top + max(0, (block.GetHeight() - text_h) / 2);
-    int subtitle_y = ty + (title_.IsEmpty() ? 0 : title_sz.cy + (subtitle_.IsEmpty() ? 0 : s.title_subtitle_gap));
-    int side_y = subtitle_.IsEmpty() ? ty : subtitle_y;
-    int side_x = block.right - trail_sz.cx;
-    if(s.title_align_h == UiAlign::RIGHT) {
-        side_x = block.left;
-        if(!side_title_.IsEmpty())
-            x = max(x, block.left + trail_sz.cx + s.side_title_gap);
-    }
     if(!title_.IsEmpty()) {
         w.DrawText(x, ty, title_, s.title_font, title_c);
         ty += title_sz.cy + (subtitle_.IsEmpty() ? 0 : s.title_subtitle_gap);
     }
     if(!subtitle_.IsEmpty())
         w.DrawText(x, ty, subtitle_, s.subtitle_font, sub_c);
-    if(!side_title_.IsEmpty())
-        w.DrawText(side_x, side_y, side_title_, s.side_title_font, trail_c);
+    w.End();
 }
 
-void UiGroupPanel::PaintGroupFrame(Draw& w, const Rect& frame_rect, const Rect& title_block, StyledState st) const
+void UiGroupPanel::PaintGroupFrame(Draw& w, const Rect& frame_rect,
+                                   const HeaderLayout& header, StyledState st) const
 {
     const Style& s = GetEffectiveStyle();
     if(frame_rect.IsEmpty())
@@ -310,21 +452,92 @@ void UiGroupPanel::PaintGroupFrame(Draw& w, const Rect& frame_rect, const Rect& 
 
     StyledMetrics metrics = s.metrics;
     metrics.content_margin = Rect(0, 0, 0, 0);
-    UiPaintFaceFrameDash(w, frame_rect, s.palette, metrics, st);
+    StyledMetrics face_metrics = metrics;
+    face_metrics.frame_enabled = false;
+    UiPaintFaceFrameDash(w, frame_rect, s.palette, face_metrics, st);
 
-    if(!s.metrics.frame_enabled)
+    if(!metrics.frame_enabled || metrics.frame_width <= 0 || IsNull(s.palette.frame[st]))
         return;
 
-    int fw = max(1, metrics.frame_width);
-    bool cut = s.header_mode == Center;
-    if(cut && s.header_placement == UiAlign::TOP) {
-        int gap_l = max(frame_rect.left, title_block.left - DPI(4));
-        int gap_r = min(frame_rect.right, title_block.right + DPI(4));
-        Color erase = SColorFace();
-        if(s.metrics.face_enabled && s.palette.face[st].IsSolid())
-            erase = s.palette.face[st].color;
-        w.DrawRect(gap_l, frame_rect.top, max(0, gap_r - gap_l), fw, erase);
+    StyledMetrics frame_metrics = metrics;
+    frame_metrics.face_enabled = false;
+    if(s.header_mode != Center) {
+        UiPaintFaceFrameDash(w, frame_rect, s.palette, frame_metrics, st);
+        return;
     }
+
+    bool horizontal = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;
+    int begin = horizontal ? frame_rect.left : frame_rect.top;
+    int end = horizontal ? frame_rect.right : frame_rect.bottom;
+    int gap_begin[2];
+    int gap_end[2];
+    int gap_count = 0;
+    auto AddGap = [&](const Rect& occupied) {
+        if(occupied.IsEmpty())
+            return;
+        int a = horizontal ? occupied.left : occupied.top;
+        int b = horizontal ? occupied.right : occupied.bottom;
+        a = max(begin, a - DPI(4));
+        b = min(end, b + DPI(4));
+        if(a < b && gap_count < 2) {
+            gap_begin[gap_count] = a;
+            gap_end[gap_count] = b;
+            gap_count++;
+        }
+    };
+    AddGap(header.title);
+    AddGap(header.content);
+    if(gap_count == 0) {
+        UiPaintFaceFrameDash(w, frame_rect, s.palette, frame_metrics, st);
+        return;
+    }
+    if(gap_count == 2 && gap_begin[1] < gap_begin[0]) {
+        Swap(gap_begin[0], gap_begin[1]);
+        Swap(gap_end[0], gap_end[1]);
+    }
+    if(gap_count == 2 && gap_begin[1] <= gap_end[0]) {
+        gap_end[0] = max(gap_end[0], gap_end[1]);
+        gap_count = 1;
+    }
+
+    int depth = max(1, metrics.frame_width) + max(0, metrics.radius) + DPI(2);
+    Rect remainder = frame_rect;
+    switch(s.header_placement) {
+    case UiAlign::BOTTOM: remainder.bottom = max(remainder.top, remainder.bottom - depth); break;
+    case UiAlign::LEFT:   remainder.left = min(remainder.right, remainder.left + depth); break;
+    case UiAlign::RIGHT:  remainder.right = max(remainder.left, remainder.right - depth); break;
+    case UiAlign::TOP:
+    default:              remainder.top = min(remainder.bottom, remainder.top + depth); break;
+    }
+    if(!remainder.IsEmpty()) {
+        w.Clip(remainder);
+        UiPaintFaceFrameDash(w, frame_rect, s.palette, frame_metrics, st);
+        w.End();
+    }
+
+    auto PaintEdgeSegment = [&](int a, int b) {
+        if(a >= b)
+            return;
+        Rect clip;
+        switch(s.header_placement) {
+        case UiAlign::BOTTOM: clip = Rect(a, max(frame_rect.top, frame_rect.bottom - depth), b, frame_rect.bottom); break;
+        case UiAlign::LEFT:   clip = Rect(frame_rect.left, a, min(frame_rect.right, frame_rect.left + depth), b); break;
+        case UiAlign::RIGHT:  clip = Rect(max(frame_rect.left, frame_rect.right - depth), a, frame_rect.right, b); break;
+        case UiAlign::TOP:
+        default:              clip = Rect(a, frame_rect.top, b, min(frame_rect.bottom, frame_rect.top + depth)); break;
+        }
+        if(clip.IsEmpty())
+            return;
+        w.Clip(clip);
+        UiPaintFaceFrameDash(w, frame_rect, s.palette, frame_metrics, st);
+        w.End();
+    };
+    int cursor = begin;
+    for(int i = 0; i < gap_count; i++) {
+        PaintEdgeSegment(cursor, gap_begin[i]);
+        cursor = gap_end[i];
+    }
+    PaintEdgeSegment(cursor, end);
 }
 
 void UiGroupPanel::Paint(Draw& w)
@@ -336,28 +549,45 @@ void UiGroupPanel::Paint(Draw& w)
     StyledState st = IsEnabled() ? ST_NORMAL : ST_DISABLED;
     Rect face = UiStyledFaceRect(outer, s.metrics, s.skin);
     Rect frame_rect = GetFrameRect(face);
-    Rect header = GetHeaderRect(face);
-    Rect title_block = GetTitleBlockRect(header, GetHeaderSize());
+    HeaderLayout header = ResolveHeaderLayout(face);
 
     Color frame = s.palette.frame[st];
     int th = max(1, s.separator_thickness);
-    PaintGroupFrame(w, frame_rect, title_block, st);
+    PaintGroupFrame(w, frame_rect, header, st);
     if(s.line_enabled) {
         if(s.header_placement == UiAlign::LEFT)
-            w.DrawRect(header.right - th, header.top, th, header.GetHeight(), frame);
+            w.DrawRect(header.header.right - th, header.header.top, th, header.header.GetHeight(), frame);
         else if(s.header_placement == UiAlign::RIGHT)
-            w.DrawRect(header.left, header.top, th, header.GetHeight(), frame);
+            w.DrawRect(header.header.left, header.header.top, th, header.header.GetHeight(), frame);
         else if(s.header_placement == UiAlign::BOTTOM)
-            w.DrawRect(header.left, header.top, header.GetWidth(), th, frame);
+            w.DrawRect(header.header.left, header.header.top, header.header.GetWidth(), th, frame);
         else
-            w.DrawRect(header.left, header.bottom - th, header.GetWidth(), th, frame);
+            w.DrawRect(header.header.left, header.header.bottom - th, header.header.GetWidth(), th, frame);
     }
     if(s.header_band_enabled) {
         if(s.palette.face[ST_HOT].IsSolid())
-            w.DrawRect(header, s.palette.face[ST_HOT].color);
+            w.DrawRect(header.header, s.palette.face[ST_HOT].color);
     }
 
     PaintHeader(w, header, st);
+}
+
+void UiGroupPanel::ChildRemoved(Ctrl *child)
+{
+    Ctrl::ChildRemoved(child);
+    bool changed = false;
+    if(child == content_) {
+        content_ = nullptr;
+        changed = true;
+    }
+    if(child == header_content_) {
+        header_content_ = nullptr;
+        changed = true;
+    }
+    if(changed) {
+        RefreshLayout();
+        Refresh();
+    }
 }
 
 } // namespace Upp

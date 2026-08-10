@@ -53,6 +53,8 @@ public:
     
     void          SetValue(double v);
     double        GetValue() const;
+    bool          TryGetValue(double& value) const;
+    bool          IsInputComplete() const;
 
     UiFloatEdit&  SetSizeMin(Size sz)        { SetMinSize(sz); return *this; }
     UiFloatEdit&  SetSizeMin(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }

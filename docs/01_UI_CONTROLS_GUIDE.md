@@ -25,10 +25,11 @@ These concepts apply to every `Ui*` control and are documented once here.
 - `UiAbsoluteLayout` — exact local child rectangles, no auto reflow.
 - `UiSplitter` / `UiQuadSplitter` — fixed pane-count containers.
 - `UiStack`, `UiTab`, accordion section bodies — page/body hosts.
-- Hosts (`UiPanel`, `UiGroupPanel`, `UiScrollPanel`, `UiTitleCard`) normally
-  accept zero or one direct child; put a layout inside if more items are needed.
-  A second direct content root must be rejected or deliberately wrapped, never
-  silently overlapped.
+- Host slots accept zero or one direct root; put a layout inside a slot if more
+  items are needed. `UiPanel`, `UiScrollPanel`, and `UiTitleCard` have one such
+  content slot. `UiGroupPanel` has two distinct single-root slots, header content
+  and body content. A second root in either slot must be rejected or deliberately
+  wrapped, never silently overlapped.
 
 ### Theme/style roles and state
 
@@ -332,6 +333,57 @@ selected interval.
 - Reuses the standard slider theme, so dark mode and preset changes apply
   consistently to both handles and the selected track.
 
+### Adjustable bounds and endpoint markers
+
+`EnableAdjustableBounds()` adds a second ordered pair inside the hard domain.
+The four authoritative values are lower bound, lower selection, upper
+selection, and upper bound. `SetBounds`, `GetLowerBound`, and `GetUpperBound`
+edit that inner domain without changing the hard `SetRange` limits. Bound
+handles remain independently draggable and keyboard accessible through
+`Handle::LowerBound` and `Handle::UpperBound`.
+
+`ShowEndpointMarkers(bool)` controls the small start/end domain markers. They
+are visible by default so a light track still has legible limits.
+
+### UiRangeSliderEdit
+
+`UiRangeSliderEdit` composes the authoritative `UiRangeSlider` with fixed-width
+lower/upper `UiFloatEdit` fields. The slider expands into all remaining space;
+`SetFieldWidth`, `SetGap`, and `SetInset` control only the composition geometry.
+It preserves the same two-element `ValueArray`, `WhenChanging`, and
+`WhenAction` contract as `UiRangeSlider`. Use `Slider()` when the composition
+must enable adjustable bounds or tune endpoint markers.
+
+---
+
+## UiFloatEdit
+
+Typed floating-point entry built on `UiBaseEdit`. It accepts ordinary decimal
+and scientific notation, including signed exponents such as `-1.25e+6`.
+
+```cpp
+UiFloatEdit value;
+value.MinMax(-1000.0, 1000.0)
+     .Step(0.25)
+     .Precision(3)
+     .ShowSpin(true);
+value.SetValue(12.5);
+```
+
+- `Min`, `Max`, and `MinMax` clamp committed values.
+- `Step` drives spin buttons, Up/Down keys, and the mouse wheel.
+- `Precision` controls normalized display formatting after commit/focus loss.
+- `TryGetValue(double&)` and `IsInputComplete()` distinguish incomplete or
+  invalid text from a valid finite value without forcing a destructive rewrite.
+- `NotNull` controls whether an empty value is permitted.
+- `SetData` accepts numeric values and numeric text; `GetData` returns the typed
+  floating-point value or Null when empty values are allowed.
+
+The editor permits temporarily incomplete text while typing and normalizes only
+complete values. This is important for exponent entry and PropertyEditor
+transactions: validation must not treat a partial mantissa or exponent as a
+committed number.
+
 ---
 
 ## UiDateTime
@@ -429,6 +481,63 @@ validated whenever language/time-format behaviour is changed.
 
 ---
 
+## UiGroupPanel
+
+Framed titled section with two explicit single-root slots:
+
+```cpp
+UiGroupPanel group;
+UiBoxLayout header_actions;
+UiGridLayout body;
+
+group.SetTitle("Account")
+     .SetSubTitle("Identity and access")
+     .SetHeaderContent(header_actions)
+     .SetContent(body)
+     .SetTitleAlign(UiAlign::LEFT, UiAlign::CENTER)
+     .SetHeaderContentAlign(UiAlign::RIGHT, UiAlign::CENTER);
+```
+
+`SetHeaderContent` owns the optional header accessory relationship and
+`SetContent` owns the body relationship. Each accepts exactly one root `Ctrl`;
+put a box/grid/absolute layout in the relevant slot when multiple controls are
+needed. Replacing or clearing one slot does not affect the other. Moving the same
+control between slots is supported, and external child removal clears the stored
+slot pointer through `ChildRemoved`.
+
+### Header geometry
+
+`SetHeaderPlacement` supports Top, Bottom, Left, and Right.
+`SetHeaderMode` supports Outside, Center, and Inside. The built-in identity block
+contains icon, title, and subtitle. Header content uses the available region on
+the opposite side of that block:
+
+- a Left/Top title places content in the trailing Right/Bottom region;
+- a Right/Bottom title places content in the leading Left/Top region;
+- a centered title retains the centre and content uses the trailing remainder.
+
+`GetHeaderContentRect()` returns that authoritative prospective region even when
+the slot is empty. An attached child normally keeps its measured minimum size;
+`SetHeaderContentAlign` positions it within the region. `GetBodyRect()` remains
+the authoritative body rectangle.
+
+`GetMinSize()` includes the title identity, header child, configured gaps and
+insets, body minimum, and styled surface geometry. Forced undersize layouts
+clamp without negative rectangles or title/header-child overlap.
+
+### Frame and style behavior
+
+In Center mode the styled frame is segmented around both occupied header
+rectangles for every placement; the implementation does not draw a line beneath
+the title or header child. Header children retain their own styles.
+
+The retired text-only `SideTitle` API is replaced by ordinary header content.
+Legacy SideTitle style fields are still consumed in their historical stream
+positions solely to preserve serialized style compatibility; they no longer
+affect runtime measurement, painting, or theme resolution.
+
+---
+
 ## Other substantial controls (quick reference)
 
 All entries below follow the common concepts above; read the matching header for
@@ -449,12 +558,13 @@ action plus a dropdown.
 
 ### UiTitleCard
 Structured title/subtitle/media header surface. `SetTitle`, `SetSubTitle`,
-`SetMedia`, single-content host with header + content area.
+`SetMedia`, and one adjacent content-cell root through `SetContentCell`. It is
+an information/header composition rather than a framed two-slot section.
 
 ### UiPanel / UiGroupPanel / UiScrollPanel
-`UiPanel`: styled single-child host (no flow layout). `UiGroupPanel`: titled
-single-content host with header modes and `UiRole` styling. `UiScrollPanel`:
-bounded viewport with one scrollable content child.
+`UiPanel`: styled single-child host (no flow layout). `UiGroupPanel`: framed
+two-slot titled section described above. `UiScrollPanel`: bounded viewport with
+one scrollable content child.
 
 ### UiBaseEdit family (UiLineEdit, UiIntEdit, UiFloatEdit, UiPasswordEdit,
 UiMultiEdit, UiMaskEdit)
@@ -492,6 +602,12 @@ Model-backed controls with request-first mutation (`WhenReorderRequest`,
 Large multi-slot colour editor now contained under `Ui/UiColorPicker/`. It supports
 one through eight active slots, alpha, multiple colour models/readouts, palette
 library/generation, image analysis, user stash/session state, and screen picking.
+`SetSlotCount`, `SetActiveSlot`, `SetSlot`, and `GetSlots` are the authoritative
+ordered-slot API; a one-colour caller must request one slot rather than relying
+on a later refresh. `WhenChanging` previews, `WhenAction` commits edits,
+`WhenAccept` accepts the dialog, and `WhenCancel` restores the opening values.
+Generated, static, image, stash, and primary swatches share multi-selection and
+ordered drag transfer, so moving a palette preserves slot order.
 `UiColorPickerPaletteLab` contains the reusable colour conversion, palette,
 generator, and image-analysis support for that component.
 

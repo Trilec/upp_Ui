@@ -6,6 +6,14 @@
 
 namespace Upp {
 
+struct PropertyEditorActionIcons {
+    Image expand;
+    Image collapse;
+    Image dialog;
+    Image browse;
+    int size = DPI(16);
+};
+
 class PropertyValueEditor : public ParentCtrl {
 public:
     typedef PropertyValueEditor CLASSNAME;
@@ -16,13 +24,25 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) = 0;
     virtual Value GetEditorValue() const = 0;
     virtual void FocusEditor();
+    virtual void SetExpanded(bool) {}
+    virtual void SetActionIcons(const PropertyEditorActionIcons& icons)
+    {
+        action_icons_ = icons;
+        ActionIconsChanged();
+    }
 
     Event<Value> WhenPreview;
     Event<Value> WhenCommit;
+    Event<> WhenToggleExpanded;
+
+protected:
+    virtual void ActionIconsChanged() {}
+    PropertyEditorActionIcons action_icons_;
 };
 
 typedef Function<One<PropertyValueEditor>()> PropertyValueEditorCreator;
 typedef Function<bool(Value& value, Ctrl *owner)> PropertyValuePicker;
+typedef Function<Image(const Value& value)> PropertyValueThumbnailProvider;
 
 class PropertyEditorFactory {
 public:
@@ -51,16 +71,36 @@ public:
         int q = pickers_.Find(id);
         return q >= 0 && pickers_[q] ? pickers_[q](value, owner) : false;
     }
+    void RegisterThumbnailProvider(const String& id,
+                                   PropertyValueThumbnailProvider provider)
+    {
+        int q = thumbnails_.Find(id);
+        if(q < 0)
+            thumbnails_.Add(id, pick(provider));
+        else
+            thumbnails_[q] = pick(provider);
+    }
+    bool HasThumbnailProvider(const String& id) const
+    {
+        return thumbnails_.Find(id) >= 0;
+    }
+    Image ResolveThumbnail(const String& id, const Value& value) const
+    {
+        int q = thumbnails_.Find(id);
+        return q >= 0 && thumbnails_[q] ? thumbnails_[q](value) : Image();
+    }
 
 private:
     VectorMap<String, PropertyValueEditorCreator> custom_;
     VectorMap<String, PropertyValuePicker> pickers_;
+    VectorMap<String, PropertyValueThumbnailProvider> thumbnails_;
 };
 
 // Stable visual-package adapter ids. They intentionally use Custom in the
 // headless Core model, keeping Ui controls and picker implementations out of
 // PropertyEditorCore while providing first-class reusable PropertyEditor APIs.
 const char *PropertyEditorRangeDoubleId();
+const char *PropertyEditorAdjustableRangeId();
 const char *PropertyEditorMatrixId();
 const char *PropertyEditorIconId();
 const char *PropertyEditorFontId();
@@ -73,6 +113,13 @@ PropertyEditorItem& AddPropertyRange(PropertyEditorModel& model,
                                      double minimum, double maximum,
                                      double step = 0.0,
                                      const String& group = String());
+PropertyEditorItem& AddPropertyAdjustableRange(PropertyEditorModel& model,
+                                               const String& id, const String& label,
+                                               double hard_minimum, double bound_lower,
+                                               double lower, double upper,
+                                               double bound_upper, double hard_maximum,
+                                               double step = 0.0,
+                                               const String& group = String());
 PropertyEditorItem& AddPropertyMatrix(PropertyEditorModel& model,
                                       const String& id, const String& label,
                                       const Value& value,

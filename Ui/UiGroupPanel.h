@@ -15,7 +15,9 @@
     - Public header for the UiGroupPanel component.
 
     Intent
-    - Define the runtime API, style contract, and integration points used by the rest of the Ui package.
+    - Provide one framed identity/header surface with one optional header-content
+      root and one optional body-content root. Each slot remains single-child;
+      callers place a layout in a slot when they need multiple controls.
 
     Thread context
     - GUI thread only.
@@ -50,10 +52,8 @@ public:
 
         Font title_font = SansSerifZ(10).Bold();
         Font subtitle_font = SansSerifZ(9);
-        Font side_title_font = SansSerifZ(9);
         Color title_color;
         Color subtitle_color;
-        Color side_title_color;
 
         UiAlign header_placement = UiAlign::TOP;
         UiAlign title_align_h = UiAlign::LEFT;
@@ -66,7 +66,6 @@ public:
         int icon_size = DPI(16);
         int icon_gap = DPI(5);
         int title_subtitle_gap = DPI(1);
-        int side_title_gap = DPI(8);
         int separator_thickness = DPI(1);
         bool line_enabled = false;
         bool header_band_enabled = false;
@@ -91,11 +90,12 @@ public:
 
     UiGroupPanel& SetTitle(const String& s);
     UiGroupPanel& SetSubTitle(const String& s);
-    UiGroupPanel& SetSideTitle(const String& s);
     UiGroupPanel& SetIcon(const Image& img);
     UiGroupPanel& ClearIcon();
     UiGroupPanel& SetHeaderPlacement(UiAlign side);
     UiGroupPanel& SetHeaderMode(HeaderMode mode);
+    UiGroupPanel& SetTitleAlign(UiAlign horizontal, UiAlign vertical);
+    UiGroupPanel& SetHeaderContentAlign(UiAlign horizontal, UiAlign vertical);
     UiGroupPanel& SetLine(bool on = true);
     UiGroupPanel& SetHeaderBand(bool on = true);
     UiGroupPanel& SetInset(const Rect& r);
@@ -104,30 +104,45 @@ public:
     UiGroupPanel& SetLineThickness(int px);
     UiGroupPanel& SetTitleFont(Font f);
     UiGroupPanel& SetSubTitleFont(Font f);
-    UiGroupPanel& SetSideTitleFont(Font f);
     UiGroupPanel& SetTitleSubTitleGap(int px);
 
     UiGroupPanel& SetContent(Ctrl& ctrl);
     UiGroupPanel& ClearContent();
     Ctrl* GetContent() const { return content_; }
+    UiGroupPanel& SetHeaderContent(Ctrl& ctrl);
+    UiGroupPanel& ClearHeaderContent();
+    Ctrl* GetHeaderContent() const { return header_content_; }
     Rect GetBodyRect() const;
+    // Meaningful while empty: this is the authoritative prospective slot used
+    // to align an attached header child.
+    Rect GetHeaderContentRect() const;
 
     Size GetMinSize() const override;
     void Layout() override;
     void Paint(Draw& w) override;
+    void ChildRemoved(Ctrl *child) override;
 
 private:
+    struct HeaderLayout {
+        Rect header;
+        Rect title;
+        Rect content_region;
+        Rect content;
+    };
+
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
+    Size GetTitleNaturalSize() const;
+    Size GetHeaderContentNaturalSize() const;
     Size GetHeaderSize() const;
     Rect GetFrameRect(const Rect& face) const;
     Rect GetHeaderRect(const Rect& face) const;
     Rect GetBodyRect(const Rect& face) const;
-    Rect GetTitleBlockRect(const Rect& header, Size title_block) const;
-    void PaintHeader(Draw& w, const Rect& header, StyledState st) const;
-    void PaintGroupFrame(Draw& w, const Rect& frame, const Rect& title_block, StyledState st) const;
+    HeaderLayout ResolveHeaderLayout(const Rect& face) const;
+    void PaintHeader(Draw& w, const HeaderLayout& layout, StyledState st) const;
+    void PaintGroupFrame(Draw& w, const Rect& frame, const HeaderLayout& header, StyledState st) const;
 
     Style style_;
     mutable Style themed_style_;
@@ -135,9 +150,11 @@ private:
     bool has_custom_style_ = false;
     String title_;
     String subtitle_;
-    String side_title_;
     Image icon_;
     Ctrl* content_ = nullptr;
+    Ctrl* header_content_ = nullptr;
+    UiAlign header_content_align_h_ = UiAlign::DEFAULT;
+    UiAlign header_content_align_v_ = UiAlign::CENTER;
 };
 
 } // namespace Upp

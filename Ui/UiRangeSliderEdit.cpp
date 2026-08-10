@@ -1,4 +1,5 @@
 #include <Ui/UiRangeSliderEdit.h>
+#include <Ui/UiTheme.h>
 
 namespace Upp {
 
@@ -9,6 +10,12 @@ UiRangeSliderEdit::UiRangeSliderEdit()
     Add(upper_field_);
 
     slider_.SetStep(1).SetRange(0, 100).SetValues(25, 75);
+    UiBaseEdit::Style field_style = UiTheme::ResolveEdit(UiRole::Standard);
+    field_style.metrics.content_margin = Rect(DPI(4), DPI(3), DPI(4), DPI(3));
+    lower_field_.SetCustomStyle(field_style).SetTextAlign(UiAlign::RIGHT);
+    upper_field_.SetCustomStyle(field_style).SetTextAlign(UiAlign::RIGHT);
+    lower_field_.ShowSpin(false);
+    upper_field_.ShowSpin(false);
     lower_field_.Step(1).Precision(precision_).MinMax(0, 100).SetValue(25);
     upper_field_.Step(1).Precision(precision_).MinMax(0, 100).SetValue(75);
 
