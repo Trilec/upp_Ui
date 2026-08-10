@@ -102,6 +102,12 @@ public:
     UiRangeSlider& SetSizeFixed(Size sz) { return SetSizeMin(sz); }
     UiRangeSlider& SetSizeFixed(int cx, int cy) { return SetSizeMin(Size(cx, cy)); }
 
+    // Geometry inspection is intentionally public: layout/composition controls can
+    // verify the actual painted track without reaching into implementation state.
+    // track_size.cx remains the natural/preferred major-axis size; the allocated
+    // control rectangle determines the actual major-axis track length.
+    Rect GetTrackRect() const;
+
     Event<> WhenAction;
     Event<> WhenChanging;
 
@@ -128,7 +134,6 @@ private:
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
 
-    Rect GetTrackRect() const;
     Rect GetThumbRect(Handle handle) const;
     int ValueToPos(double v) const;
     double PosToValue(int pos) const;
