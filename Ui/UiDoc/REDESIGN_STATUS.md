@@ -4,51 +4,62 @@ Branch: `document-redesign`
 
 ## Current recovery point
 
-Latest source-correction checkpoint after `UIDOC-V2-W1`:
-`1c9098a23896f60538dfcb7b4a2f7b4453aa795a` — `UiDoc v2: avoid copying annotation vector during paint`
+Current branch checkpoint before editor/model validation:
+`18fc3ac17ec137ae7adebe9d402a0c2ce7a6a897` — `UiDoc v2: replace stale model tests with facade coverage`
 
-Current `main` included by the earlier synchronization merge:
+Accepted Core baseline immediately before that checkpoint:
+`06f5f61eb49195f1980c4d1907a582d99dee3afe` — `UiDoc v2: fix semantic range remapping on pure insertion`
+
+Current `main` contained by `document-redesign`:
 `382c913e19c3ac06e3daa412361f52305c5ea75e` — `Update 04_UI_DEMO_GUIDE.md`
 
-`document-redesign` contains all of that `main` state plus the UiDoc v2 work. Keep syncing `main -> document-redesign` as unrelated UI work lands; do not merge the redesign back to `main` until the v2 library/editor compile and focused tests are clean.
+`main` has not advanced since the previous synchronization. `document-redesign` contains that complete main state plus all current UiDoc v2 work. Do not merge the redesign back to main until editor/model validation, demo work and cleanup are complete.
 
-The v2 package switch is active. `Ui/Ui.upp` now builds the implementation under `Ui/UiDoc/`; the old root implementation `.cpp` files are no longer package members. Root `UiDoc.h` and `UiDocCore.h` are only small forwarding include points into the subsystem.
+If a timeout occurs, fetch `document-redesign`, confirm the remote HEAD, read this file, and continue from the latest published commit rather than an old scratch copy.
 
-If a timeout occurs, fetch `document-redesign`, confirm the current remote HEAD, read this file, and continue from the latest published commit rather than from chat memory or an old scratch copy.
+## Accepted Windows Core validation
 
-## UIDOC-V2-W1 result
+`UIDOC-V2-W3` passed at:
+`06f5f61eb49195f1980c4d1907a582d99dee3afe`
 
-Validation base:
-`dc1dbc13901222cb8a37a94c601756c839c4b84d`
+Windows results:
+- Debug build PASS
+- Debug run PASS: 84 passed / 0 failed / 84 total
+- Release build PASS
+- Release run PASS: 84 passed / 0 failed / 84 total
+- 100,000-line sparse-document case PASS in both configurations
+- `git diff --check` clean
+- worktree clean after validation
 
-Result: FAIL at the first Windows Debug compile of `Utilities/UiDocCoreTest` while compiling its `Ui` dependency. No runtime tests were reached and Gary made no source changes.
+The accepted W3 correction gives non-empty semantic ranges explicit pure-insertion boundary behaviour without changing `UiDocPositionMap::Map()` globally:
+- insertion at or before `range.from` shifts both boundaries;
+- insertion strictly inside expands `range.to`;
+- insertion at or after `range.to` leaves the range unchanged;
+- replacements keep the existing Left/Right mapping;
+- empty point ranges remain Right-biased.
 
-The first compiler diagnostics exposed three independent source-boundary issues, all corrected on `document-redesign`:
+The W3 commit also renamed duplicate anonymous-namespace helpers so BLITZ repacking does not collide.
 
-- `e23a92695047ce62c18e72e78de582a253a7369b` — changed revision mismatch formatting from ambiguous `unsigned long long` arguments to U++ `int64`-compatible formatting.
-- `de812f9c08cf608384e6d2f746e5ba33d480cd6b` — replaced generic/by-value copying of rich table `Moveable` structures in editor input with the same explicit deep-copy pattern already used by `UiDocCoreTable.cpp`.
-- `1c9098a23896f60538dfcb7b4a2f7b4453aa795a` — changed `PaintText()` to hold Core annotations by const reference instead of copying the U++ `Vector`.
-
-The W1-to-correction comparison changes only `UiDocCoreApply.cpp`, `UiDocInput.cpp`, and `UiDocPaint.cpp`. Next action is another Windows Debug compile; do not broaden the task until the active `Ui` package compiles.
-
-## Authoritative v2 model
+## Current v2 model
 
 - concrete non-visual `UiDocCore`
+- `UiDoc : Ctrl` owns/composes Core rather than inheriting from it
 - sparse text style runs; no permanent per-character style mirror
 - sparse semantic blocks and arbitrary structural metadata
 - deterministic revisioned transactions and position maps
-- sparse undo/redo history
+- undo/redo history with configurable bound
 - comments/annotations, resources, anchors and generic embeds
-- canonical typed rich table model with text/image/custom inline runs
-- versioned native `.uidoc` persistence of logical state only
-- monotonic revisions and model-change notifications
-- headless Core tests including a 100,000-line sparse-style scenario
+- one canonical typed rich-table representation with text/image/custom inline runs
+- versioned `.uidoc` logical snapshot; no caret/scroll/layout cache/history persisted
+- viewport-driven paragraph layout and glyph-width caching in UiDoc
+- command registry for editor/application actions
+- agent/MCP integration remains outside the control and uses deterministic Core APIs
 
-## Current subsystem layout
+## Active subsystem layout
 
-All active UiDoc implementation is under `Ui/UiDoc/`.
+All compile-active implementation is under `Ui/UiDoc/`.
 
-Core currently keeps meaningful implementation boundaries:
+Core:
 - `UiDocCore.h`
 - `UiDocCore.cpp`
 - `UiDocCoreApply.cpp`
@@ -56,7 +67,7 @@ Core currently keeps meaningful implementation boundaries:
 - `UiDocCoreTable.cpp`
 - `UiDocCoreJson.cpp`
 
-Editor currently uses timeout-safe implementation slices:
+Editor:
 - `UiDoc.h`
 - `UiDoc.cpp`
 - `UiDocLayout.cpp`
@@ -68,60 +79,54 @@ Editor currently uses timeout-safe implementation slices:
 - `UiDocInteraction.cpp`
 - `UiDocCommands.cpp`
 
-The folder keeps these contained. After the first clean compile/runtime pass, consolidate the editor to fewer physical files where it remains natural: Layout + ParagraphLayout + Geometry, Paint + PaintOverlay, and Input + Interaction. Do not risk large transport-truncated blobs merely to reduce file count before validation.
+Root `<Ui/UiDoc.h>` and `<Ui/UiDocCore.h>` remain small forwarding include points. Old root V1 implementation `.cpp` files are not package members and are to be removed during final cleanup.
 
-## Static corrections already made
+## Editor/model test checkpoint
 
-- moved the authoritative Core and editor under `Ui/UiDoc/`
-- kept `<Ui/UiDoc.h>` and `<Ui/UiDocCore.h>` as stable forwarding includes
-- removed V1 implementation files from active package membership
-- corrected a split-TU table-cell helper dependency in `UiDocInteraction.cpp`
-- corrected `UiDoc::Paint()` to pass `StyledState` to `UiPaintFaceFrameDash`
-- verified the UiTheme `ResolveDoc()` contract only depends on `UiDoc::StyleDefault()`, palette and font; v2 preserves that style vocabulary
-- declaration/definition and brace/parenthesis structural scans are clean; overloaded `SetSelection` is the only intentional duplicate method name
-- W1 revision formatting now uses an unambiguous U++ `Value` type
-- W1 table editor copying now follows the authoritative explicit Core deep-copy pattern
-- W1 annotation painting no longer copies Core's move-only `Vector`
+`Utilities/UiDocModelTest` has now been deliberately rewritten for v2 at:
+`18fc3ac17ec137ae7adebe9d402a0c2ce7a6a897`
 
-## Windows validation without changing the main working tree
+The old ~51 KB / 45-case suite was dominated by V1-only contracts such as:
+- `UiDocChange` / `UiDocTransaction`
+- old block record/list APIs
+- separate resource/embed table serializers
+- pipe-markup table assumptions
+- duplicated `cells` + `cell_runs` representations
+- retired image/embed command vocabulary
 
-Prefer a temporary Git worktree or scratch clone so the primary local checkout remains on `main`.
+The replacement is ~25 KB with 17 focused cases covering the current public UiDoc facade and its composition with UiDocCore:
+- text, selection and keyboard editing
+- Core-to-view position remapping and event order
+- selection and caret typing styles
+- semantic block role/indent commands
+- comments lifecycle and range remapping
+- annotation-lane/gutter view state
+- resource-backed image embeds and alignment history
+- canonical typed rich tables and image runs
+- search/find/replace
+- builtin and application command routing/state
+- insert commands
+- Ctrl data binding and NewDocument reset
+- style history-limit propagation
+- logical snapshot round-trip through the owned Core
+- viewport position/point geometry
 
-Example worktree flow from the existing repository:
-
-```text
-git fetch origin
-git worktree add ..\upp_Ui_uidoc_validate origin/document-redesign
-cd ..\upp_Ui_uidoc_validate
-git rev-parse HEAD
-```
-
-Build/test only in that worktree. Remove it afterwards with:
-
-```text
-cd <original-repository>
-git worktree remove ..\upp_Ui_uidoc_validate
-```
+The Core suite remains authoritative for Core internals, persistence detail, transaction atomicity and large-document scale. The model suite is intentionally about the control boundary and editor behaviour.
 
 ## Next exact steps
 
-1. Windows programmer validates the exact latest `document-redesign` SHA in a separate worktree/scratch clone; the main working tree stays on `main`.
-2. Compile `Ui` first through `Utilities/UiDocCoreTest`; if `Ui` fails, report the first meaningful compiler cluster and stop.
-3. If Debug builds, run `UiDocCoreTest` without weakening tests; only after Debug passes continue to Release.
-4. Apply any source corrections on this branch, publish, update this status file, and repeat until the library/Core test are clean.
-5. Add/update focused v2 editor/model tests after the control compiles.
-6. Redesign `examples/UiDocDemo` into the Word-like application showcase with real `.uidoc` New/Open/Save/Save As, Home/Insert/Review/View surfaces and representative rich content.
-7. Perform scale/interaction validation and only then consolidate the remaining editor implementation slices.
-8. Remove obsolete root V1 `.cpp` files and temporary root checkpoint sources before merge.
-9. Remove this status file before merge unless deliberately retained as maintainer documentation.
+1. Windows programmer validates exact latest `document-redesign` HEAD by building/running `Utilities/UiDocModelTest` in Debug first.
+2. If Debug compile or run fails, report the first meaningful compiler/runtime/assertion clusters and stop without weakening tests.
+3. If Debug passes, repeat `UiDocModelTest` in Release.
+4. Re-run `Utilities/UiDocCoreTest` once as a regression guard after any editor/model corrections.
+5. After both suites are clean, redesign `examples/UiDocDemo` into the Word-like showcase with real New/Open/Save/Save As and Home/Insert/Review/View surfaces.
+6. After demo validation, consolidate editor implementation slices where natural, remove obsolete root V1 source, run final Debug/Release acceptance, then prepare merge to main.
 
 ## Constraints
 
 - Remote GitHub branch is source of truth.
-- Reconstruct exact touched files locally; do not edit remembered/stale copies.
 - Publish small recoverable checkpoints because transport timeouts are frequent.
 - No V1 API/document-format compatibility requirement.
-- Keep public concepts small: `UiDocCore` + `UiDoc`; composition, not deep inheritance.
-- Core owns logical document meaning; UiDoc owns U++ pixel layout, input and painting.
-- Agent/MCP support uses deterministic Core query/mutation/revision APIs; MCP itself stays outside the control.
-- Do not choose a rope/piece-tree text store until measured large-document workloads prove the current store is the bottleneck.
+- Keep public concepts small: `UiDocCore` + `UiDoc`.
+- Core owns logical document meaning; UiDoc owns pixel layout, input, selection and painting.
+- Do not choose a rope/piece-tree text store until measured workloads prove the current store is the bottleneck.
