@@ -11,21 +11,21 @@ struct TestCtx {
     int case_fail = 0;
     int case_fail_mark = 0;
 
-    void Expect(bool cond, const String& msg)
+    void Expect(bool condition, const String& message)
     {
         checks++;
-        if(!cond) {
+        if(!condition) {
             fails++;
-            Cout() << "    [FAIL] " << msg << "\n";
+            Cout() << "    [FAIL] " << message << '\n';
         }
     }
 
-    void BeginCase(const String& name, const String& desc)
+    void BeginCase(const String& name, const String& description)
     {
         cases++;
         case_fail_mark = fails;
-        Cout() << "\n[CASE " << Format("%02d", cases) << "] " << name << "\n";
-        Cout() << "  " << desc << "\n";
+        Cout() << "\n[CASE " << Format("%02d", cases) << "] " << name << '\n';
+        Cout() << "  " << description << '\n';
     }
 
     void EndCase()
@@ -41,1319 +41,536 @@ struct TestCtx {
     }
 };
 
-static bool FindAnn(const UiDoc& doc, const String& id, UiDocAnnotation& out)
+static UiDocTextStyle StyleAt(const UiDoc& doc, int pos)
 {
-    Vector<UiDocAnnotation> aa = doc.QueryAnnotations();
-    for(const UiDocAnnotation& a : aa) {
-        if(a.id == id) {
-            out = a;
-            return true;
-        }
+    for(const UiDocStyleRun& run : doc.Core().GetStyles())
+        if(run.from <= pos && pos < run.to)
+            return run.style;
+    return UiDocTextStyle();
+}
+
+static const UiDocEmbedBlock* FindEmbed(const UiDoc& doc, const String& id)
+{
+    for(const UiDocEmbedBlock& embed : doc.Core().GetEmbeds())
+        if(embed.id == id)
+            return &embed;
+    return nullptr;
+}
+
+static void Case01_TextSelectionKeyboard(TestCtx& t)
+{
+    t.BeginCase("Text, Selection, Keyboard", "Uses the UiDoc facade for text, selection, typing and deletion.");
+    UiDoc doc;
+    doc.SetText("abc");
+    t.Expect(doc.GetText() == "abc", "SetText/GetText round-trip");
+    t.Expect(doc.GetLength() == 3, "length follows core text");
+
+    doc.SetSelection(UiDocRange(3, 3));
+    t.Expect(doc.Key('X', 1), "printable key handled");
+    t.Expect(doc.GetText() == "abcX", "typing inserts at caret");
+    UiDocSelection selection = doc.GetSelection();
+    t.Expect(selection.anchor == 4 && selection.caret == 4, "typing advances collapsed selection");
+
+    t.Expect(doc.Key(K_BACKSPACE, 1), "backspace handled");
+    t.Expect(doc.GetText() == "abc", "backspace removes inserted character");
+
+    doc.SelectAll();
+    selection = doc.GetSelection();
+    t.Expect(selection.anchor == 0 && selection.caret == 3, "SelectAll covers document");
+    t.EndCase();
+}
+
+static void Case02_CoreMappingAndEvents(TestCtx& t)
+{
+    t.BeginCase("Core Mapping Into View", "Direct Core edits remap UiDoc selection and emit mapped-before-change events.");
+    UiDoc doc;
+    doc.SetText("zero alpha beta");
+    doc.SetSelection(UiDocRange(5, 10));
+
+    String events;
+    doc.WhenMapped = [&](const UiDocPositionMap&) { events << 'M'; };
+    doc.WhenChange = [&] { events << 'C'; };
+
+    UiDocApplyResult result = doc.Core().Replace(UiDocRange(0, 0), WString("XX "));
+    t.Expect(result.ok, "direct Core edit succeeds");
+    UiDocSelection selection = doc.GetSelection();
+    t.Expect(selection.anchor == 8 && selection.caret == 13, "selection remaps through Core position map");
+    t.Expect(events == "MC", "WhenMapped precedes WhenChange");
+    t.EndCase();
+}
+
+static void Case03_SelectionFormatting(TestCtx& t)
+{
+    t.BeginCase("Selection Formatting", "Applies marks, ink, font, leading and tracking through UiDoc.");
+    UiDoc doc;
+    doc.SetText("abcd");
+    doc.SetSelection(UiDocRange(1, 3));
+
+    doc.SetBold(true);
+    doc.SetItalic(true);
+    doc.SetUnderline(true);
+    doc.SetStrikeout(true);
+    doc.SetSelectionInk(Color(20, 40, 80));
+    doc.SetSelectionFont("Arial", 18);
+    doc.AdjustSelectionSize(2);
+    doc.AdjustSelectionLeading(3);
+    doc.AdjustSelectionTracking(1);
+
+    UiDocTextStyle style = StyleAt(doc, 1);
+    t.Expect((style.flags & UiDocTextStyle::BOLD) != 0, "bold stored in Core style run");
+    t.Expect((style.flags & UiDocTextStyle::ITALIC) != 0, "italic stored in Core style run");
+    t.Expect((style.flags & UiDocTextStyle::UNDERLINE) != 0, "underline stored in Core style run");
+    t.Expect((style.flags & UiDocTextStyle::STRIKE) != 0, "strike stored in Core style run");
+    t.Expect(style.ink == Color(20, 40, 80), "ink stored");
+    t.Expect(style.font_face == "Arial" && style.font_height == 18, "font face and height stored");
+    t.Expect(style.size_delta == 2, "size delta stored");
+    t.Expect(style.leading_delta == 3, "leading delta stored");
+    t.Expect(style.tracking_delta == 1, "tracking delta stored");
+    t.Expect(doc.CanUndo(), "formatting contributes to history");
+    t.EndCase();
+}
+
+static void Case04_TypingStyle(TestCtx& t)
+{
+    t.BeginCase("Collapsed Typing Style", "Formatting at a caret applies to subsequently typed text without a parallel text model.");
+    UiDoc doc;
+    doc.SetText("ab");
+    doc.SetSelection(UiDocRange(1, 1));
+    doc.SetBold(true);
+    doc.SetSelectionInk(Color(110, 50, 20));
+
+    t.Expect(doc.Key('X', 1), "typing with caret style handled");
+    t.Expect(doc.GetText() == "aXb", "typed character inserted");
+    UiDocTextStyle style = StyleAt(doc, 1);
+    t.Expect((style.flags & UiDocTextStyle::BOLD) != 0, "typed character inherits bold");
+    t.Expect(style.ink == Color(110, 50, 20), "typed character inherits ink");
+    t.EndCase();
+}
+
+static void Case05_BlockRoleAndIndent(TestCtx& t)
+{
+    t.BeginCase("Semantic Block Facade", "Applies screenplay role and indent to a paragraph using sparse Core blocks.");
+    UiDoc doc;
+    doc.SetText("INT. ROOM\nAction line\n");
+    doc.SetSelection(UiDocRange(0, 0));
+
+    t.Expect(doc.ExecuteCommand("block.screenplay.scene"), "screenplay role command executes");
+    doc.SetBlockIndent(2);
+
+    Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(nullptr, "screenplay.scene");
+    t.Expect(blocks.GetCount() == 1, "one screenplay scene block stored");
+    if(!blocks.IsEmpty()) {
+        t.Expect(blocks[0].range.from == 0 && blocks[0].range.to == 9, "role covers first paragraph only");
+        t.Expect(blocks[0].indent == 2, "paragraph indent stored on semantic block");
     }
-    return false;
-}
-
-static void InitDoc(UiDoc& d)
-{
-    UiDoc::Style st = d.GetStyle();
-    st.history_limit = 5000;
-    d.SetCustomStyle(st);
-}
-
-static void Case01_AddUndoRedo(TestCtx& t)
-{
-    t.BeginCase("Annotation Add/Undo/Redo", "Adds a note annotation and verifies undo/redo lifecycle.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("zero alpha beta");
-    ValueMap p; p.Add("text", "hello");
-    String id = d.AddAnnotation(UiDocRange(5, 10), "note", p);
-    t.Expect(!id.IsEmpty(), "id generated");
-    t.Expect(d.QueryAnnotations(nullptr, "note").GetCount() == 1, "annotation added");
-    t.Expect(d.Undo(), "undo works");
-    t.Expect(d.QueryAnnotations(nullptr, "note").IsEmpty(), "annotation removed after undo");
-    t.Expect(d.Redo(), "redo works");
-    t.Expect(d.QueryAnnotations(nullptr, "note").GetCount() == 1, "annotation restored after redo");
+    t.Expect(doc.GetBlockRole() == "screenplay.scene", "caret resolves active block role");
+    t.Expect(doc.QueryCommandState("block.screenplay.scene").active, "block command state reports active role");
     t.EndCase();
 }
 
-static void Case02_UpdateUndoRedo(TestCtx& t)
+static void Case06_CommentsLifecycleAndRemap(TestCtx& t)
 {
-    t.BeginCase("Annotation Payload Update", "Updates comment text and verifies undo/redo payload restoration.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("zero alpha beta");
-    ValueMap p; p.Add("text", "first");
-    String id = d.AddAnnotation(UiDocRange(5, 10), "note", p);
-    ValueMap u; u.Add("text", "edited");
-    t.Expect(d.UpdateAnnotation(id, u), "update returns true");
-    UiDocAnnotation a;
-    t.Expect(FindAnn(d, id, a), "annotation exists");
-    t.Expect(a.payload.Find("text") >= 0 && AsString(a.payload["text"]) == "edited", "updated text present");
-    t.Expect(d.Undo(), "undo update");
-    t.Expect(FindAnn(d, id, a), "annotation exists after undo");
-    t.Expect(AsString(a.payload["text"]) == "first", "text restored");
-    t.Expect(d.Redo(), "redo update");
-    t.Expect(FindAnn(d, id, a), "annotation exists after redo");
-    t.Expect(AsString(a.payload["text"]) == "edited", "text re-applied");
-    t.EndCase();
-}
+    t.BeginCase("Comments Lifecycle", "Adds, updates, resolves, remaps, removes and restores a review comment.");
+    UiDoc doc;
+    doc.SetText("zero alpha beta");
+    doc.SetSelection(UiDocRange(5, 10));
 
-static void Case03_FlagsExpanded(TestCtx& t)
-{
-    t.BeginCase("Expanded Flag", "Toggles expanded flag and validates undo/redo.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha");
-    String id = d.AddAnnotation(UiDocRange(0, 5), "note", ValueMap());
-    UiDocAnnotation a;
-    t.Expect(d.SetAnnotationExpanded(id, false), "set expanded false");
-    t.Expect(FindAnn(d, id, a) && !a.expanded, "expanded false stored");
-    t.Expect(d.Undo(), "undo expanded");
-    t.Expect(FindAnn(d, id, a) && a.expanded, "expanded restored true");
-    t.Expect(d.Redo(), "redo expanded");
-    t.Expect(FindAnn(d, id, a) && !a.expanded, "expanded false again");
-    t.EndCase();
-}
+    ValueMap meta;
+    meta.Add("agent.source", "model-test");
+    String id = doc.AddComment("review this", meta);
+    t.Expect(!id.IsEmpty(), "comment id generated");
+    t.Expect(doc.UpdateComment(id, "updated review"), "comment text update succeeds");
+    t.Expect(doc.ResolveComment(id, true), "comment resolves");
 
-static void Case04_FlagsPrintableResolved(TestCtx& t)
-{
-    t.BeginCase("Printable/Resolved Flags", "Sets printable/resolved flags and checks persisted values.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha");
-    String id = d.AddAnnotation(UiDocRange(0, 5), "note", ValueMap());
-    UiDocAnnotation a;
-    t.Expect(d.SetAnnotationPrintable(id, false), "set printable false");
-    t.Expect(d.SetAnnotationResolved(id, true), "set resolved true");
-    t.Expect(FindAnn(d, id, a), "annotation found");
-    t.Expect(!a.printable, "printable false");
-    t.Expect(a.resolved, "resolved true");
-    t.EndCase();
-}
-
-static void Case05_RemoveUndoRedo(TestCtx& t)
-{
-    t.BeginCase("Annotation Remove/Undo/Redo", "Removes annotation and checks inverse history path.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha");
-    String id = d.AddAnnotation(UiDocRange(0, 5), "note", ValueMap());
-    t.Expect(d.RemoveAnnotation(id), "remove returns true");
-    t.Expect(d.QueryAnnotations(nullptr, "note").IsEmpty(), "annotation removed");
-    t.Expect(d.Undo(), "undo remove");
-    t.Expect(d.QueryAnnotations(nullptr, "note").GetCount() == 1, "annotation restored");
-    t.Expect(d.Redo(), "redo remove");
-    t.Expect(d.QueryAnnotations(nullptr, "note").IsEmpty(), "annotation removed again");
-    t.EndCase();
-}
-
-static void Case06_RemapInsertBefore(TestCtx& t)
-{
-    t.BeginCase("Annotation Remap On Insert", "Inserts text before anchor and verifies mapped range.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("zero alpha beta");
-    String id = d.AddAnnotation(UiDocRange(5, 10), "note", ValueMap());
-    d.Replace(UiDocRange(0, 0), WString("XX "));
-    UiDocAnnotation a;
-    t.Expect(FindAnn(d, id, a), "annotation found");
-    t.Expect(a.range.from == 8 && a.range.to == 13, "range shifted by +3");
-    t.EndCase();
-}
-
-static void Case07_RemapDeleteOverlap(TestCtx& t)
-{
-    t.BeginCase("Annotation Remap On Delete", "Deletes overlapping text and verifies collapsed mapping.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("zero alpha beta");
-    String id = d.AddAnnotation(UiDocRange(5, 10), "note", ValueMap());
-    d.Replace(UiDocRange(6, 9), WString());
-    UiDocAnnotation a;
-    t.Expect(FindAnn(d, id, a), "annotation found");
-    t.Expect(a.range.from == 5 && a.range.to == 7, "range shrinks after inner delete");
-    t.EndCase();
-}
-
-static void Case08_MultiOverlapQuery(TestCtx& t)
-{
-    t.BeginCase("Multiple Overlap Query", "Adds overlapping annotations and queries intersection at caret range.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("abcdefghi");
-    d.AddAnnotation(UiDocRange(1, 5), "note", ValueMap());
-    d.AddAnnotation(UiDocRange(3, 8), "note", ValueMap());
-    UiDocRange r(4, 4);
-    Vector<UiDocAnnotation> q = d.QueryAnnotations(&r, "note");
-    t.Expect(q.GetCount() == 2, "both overlapping annotations returned");
-    t.EndCase();
-}
-
-static void Case09_SelectionRevealModel(TestCtx& t)
-{
-    t.BeginCase("Selection Reveal Model", "Validates selection-to-annotation intersection at two caret positions.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("first second third");
-    String a = d.AddAnnotation(UiDocRange(0, 5), "note", ValueMap());
-    String b = d.AddAnnotation(UiDocRange(12, 17), "note", ValueMap());
-    d.SetSelection(UiDocRange(1, 1));
-    UiDocRange r1(d.GetSelection().caret, d.GetSelection().caret + 1);
-    Vector<UiDocAnnotation> q1 = d.QueryAnnotations(&r1, "note");
-    bool has_a = false;
-    for(const UiDocAnnotation& x : q1) if(x.id == a) has_a = true;
-    t.Expect(has_a, "first caret reveals first annotation");
-    d.SetSelection(UiDocRange(13, 13));
-    UiDocRange r2(d.GetSelection().caret, d.GetSelection().caret + 1);
-    Vector<UiDocAnnotation> q2 = d.QueryAnnotations(&r2, "note");
-    bool has_b = false;
-    for(const UiDocAnnotation& x : q2) if(x.id == b) has_b = true;
-    t.Expect(has_b, "second caret reveals second annotation");
-    t.EndCase();
-}
-
-static void Case10_InsertDeleteReplaceCore(TestCtx& t)
-{
-    t.BeginCase("Core Text Replace", "Checks insert/delete/replace through Replace() API.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("abc");
-    d.Replace(UiDocRange(1, 1), WString("Z"));
-    t.Expect(d.GetText() == "aZbc", "insert at pos 1");
-    d.Replace(UiDocRange(2, 3), WString());
-    t.Expect(d.GetText() == "aZc", "delete one char");
-    d.Replace(UiDocRange(0, 3), WString("hello"));
-    t.Expect(d.GetText() == "hello", "replace full range");
-    t.EndCase();
-}
-
-static void Case11_UndoRedoLinear(TestCtx& t)
-{
-    t.BeginCase("Undo/Redo Linear", "Verifies deterministic linear undo/redo state sequence.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("x");
-    d.Replace(UiDocRange(1, 1), WString("1"));
-    d.Replace(UiDocRange(2, 2), WString("2"));
-    d.Replace(UiDocRange(3, 3), WString("3"));
-    t.Expect(d.GetText() == "x123", "final state");
-    t.Expect(d.Undo(), "undo #1"); t.Expect(d.GetText() == "x12", "state x12");
-    t.Expect(d.Undo(), "undo #2"); t.Expect(d.GetText() == "x1", "state x1");
-    t.Expect(d.Undo(), "undo #3"); t.Expect(d.GetText() == "x", "state x");
-    t.Expect(d.Redo(), "redo #1"); t.Expect(d.GetText() == "x1", "state x1 again");
-    t.Expect(d.Redo(), "redo #2"); t.Expect(d.GetText() == "x12", "state x12 again");
-    t.Expect(d.Redo(), "redo #3"); t.Expect(d.GetText() == "x123", "state x123 again");
-    t.EndCase();
-}
-
-static void Case12_BoldStyleUndo(TestCtx& t)
-{
-    t.BeginCase("Style Bold Undo", "Applies bold on range and verifies style-run undo/redo.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("abcd");
-    d.SetSelection(UiDocRange(0, 2));
-    d.ToggleBold();
-    Vector<UiDocStyleRun> s1 = d.GetStyleRuns();
-    bool has_bold = false;
-    for(const UiDocStyleRun& r : s1)
-        if(r.from < 2 && r.to > 0 && (r.flags & 1))
-            has_bold = true;
-    t.Expect(has_bold, "bold set on selection");
-    t.Expect(d.Undo(), "undo bold");
-    Vector<UiDocStyleRun> s2 = d.GetStyleRuns();
-    bool any_bold = false;
-    for(const UiDocStyleRun& r : s2)
-        if(r.flags & 1)
-            any_bold = true;
-    t.Expect(!any_bold, "bold cleared after undo");
-    t.EndCase();
-}
-
-static void Case13_LeadingTracking(TestCtx& t)
-{
-    t.BeginCase("Localized Leading/Tracking", "Applies per-selection spacing and verifies non-zero deltas.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("abcd");
-    d.SetSelection(UiDocRange(1, 3));
-    d.IncreaseSelectionLeading();
-    d.IncreaseSelectionTracking();
-    Vector<UiDocStyleRun> s = d.GetStyleRuns();
-    bool lead = false, track = false;
-    for(const UiDocStyleRun& r : s) {
-        if(r.from < 3 && r.to > 1) {
-            if(r.leading_delta > 0) lead = true;
-            if(r.tracking_delta > 0) track = true;
-        }
-    }
-    t.Expect(lead, "leading delta applied");
-    t.Expect(track, "tracking delta applied");
-    t.EndCase();
-}
-
-static void Case14_MarginAdjust(TestCtx& t)
-{
-    t.BeginCase("Paragraph Margin Adjust", "Applies indent/outdent and checks line margin steps.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("a\nb\nc");
-    d.SetSelection(UiDocRange(0, 3));
-    d.IndentSelection(2);
-    t.Expect(d.GetParagraphMarginSteps(0) >= 2, "line 1 margin increased");
-    d.OutdentSelection(1);
-    t.Expect(d.GetParagraphMarginSteps(0) >= 1, "line 1 margin reduced but retained");
-    t.EndCase();
-}
-
-static void Case15_BlockMetaHeading(TestCtx& t)
-{
-    t.BeginCase("Block Meta Heading", "Sets heading block type and validates block record type.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("line1\nline2");
-    d.SetSelection(UiDocRange(0, 5));
-    d.SetBlockType(UiDoc::BLOCK_HEADING1);
-    Vector<UiDocBlockRecord> b = d.GetBlocks();
-    t.Expect(!b.IsEmpty() && b[0].block_type == (int)UiDoc::BLOCK_HEADING1, "line 1 is heading1");
-    t.EndCase();
-}
-
-static void Case16_ListModes(TestCtx& t)
-{
-    t.BeginCase("List Mode Toggle", "Toggles bullet/numbered list and checks mode state.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("x");
-    d.ToggleBulletList();
-    t.Expect(d.IsBulletMode(), "bullet mode enabled");
-    d.ToggleNumberedList();
-    t.Expect(d.IsNumberedMode(), "numbered mode enabled");
-    t.EndCase();
-}
-
-static void Case17_TableOps(TestCtx& t)
-{
-    t.BeginCase("Table Ops", "Creates table and performs row/column add/remove commands.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("table\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(3, 3);
-    String tt = d.GetText();
-    int p = tt.Find("|");
-    if(p >= 0)
-        d.SetSelection(UiDocRange(p, p));
-    t.Expect(d.AddTableRowBelow(), "add table row below");
-    t.Expect(d.RemoveTableRow(), "remove table row");
-    t.Expect(d.AddTableColumnRight(), "add table col right");
-    t.Expect(d.RemoveTableColumn(), "remove table col");
-    t.EndCase();
-}
-
-static void Case18_FindGlob(TestCtx& t)
-{
-    t.BeginCase("Search Glob", "Runs wildcard search and verifies match count and navigation.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha\nbeta\nalps\n");
-    d.SetSearchQuery("alp*");
-    t.Expect(d.GetSearchMatchCount() >= 2, "glob finds alpha/alps");
-    t.Expect(d.FindNext(), "find next works");
-    t.Expect(d.FindPrev(), "find prev works");
-    t.EndCase();
-}
-
-static void Case19_PositionMapAvailable(TestCtx& t)
-{
-    t.BeginCase("Position Map Emission", "Checks last position map records edits after replace.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("abc");
-    d.Replace(UiDocRange(1, 2), WString("XYZ"));
-    t.Expect(d.GetLastPositionMap().edits.GetCount() > 0, "last map contains edits");
-    t.EndCase();
-}
-
-static void Case20_AnnotationStress(TestCtx& t)
-{
-    t.BeginCase("Annotation Stress", "Performs random add/update/remove/remap loops to stress metadata handling.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("0123456789abcdefghijklmnopqrstuvwxyz");
-    Vector<String> ids;
-    SeedRandom(9901);
-    for(int i = 0; i < 200; i++) {
-        int op = Random(4);
-        if(op == 0 || ids.IsEmpty()) {
-            int a = Random(max(1, d.GetLength() - 1));
-            int b = a + 1 + Random(4);
-            if(b > d.GetLength())
-                b = d.GetLength();
-            String id = d.AddAnnotation(UiDocRange(a, b), "note", ValueMap());
-            if(!id.IsEmpty())
-                ids.Add(id);
-        }
-        else if(op == 1) {
-            int k = Random(ids.GetCount());
-            ValueMap u; u.Add("n", i);
-            d.UpdateAnnotation(ids[k], u);
-        }
-        else if(op == 2) {
-            int k = Random(ids.GetCount());
-            d.RemoveAnnotation(ids[k]);
-            ids.Remove(k);
-        }
-        else {
-            int at = Random(d.GetLength() + 1);
-            d.Replace(UiDocRange(at, at), WString("x"));
-        }
-    }
-    t.Expect(true, "stress loop completed without crash");
-    t.EndCase();
-}
-
-static void Case21_TextStressUndoRedo(TestCtx& t)
-{
-    t.BeginCase("Text Stress + Undo/Redo", "Runs randomized text mutations and full undo/redo mirror validation.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("");
-    String mirror;
-    Vector<String> states;
-    states.Add(mirror);
-
-    SeedRandom(4242);
-    for(int i = 0; i < 250; i++) {
-        int op = Random(3);
-        if(op == 0 || mirror.IsEmpty()) {
-            int at = mirror.IsEmpty() ? 0 : Random(mirror.GetCount() + 1);
-            String add = Format("x%d", i % 10);
-            d.Replace(UiDocRange(at, at), add.ToWString());
-            mirror.Insert(at, add);
-        }
-        else if(op == 1) {
-            int at = Random(mirror.GetCount());
-            d.Replace(UiDocRange(at, at + 1), WString());
-            mirror.Remove(at, 1);
-        }
-        else {
-            int from = Random(mirror.GetCount());
-            int to = from + 1 + Random(3);
-            if(to > mirror.GetCount())
-                to = mirror.GetCount();
-            String repl = Format("R%d", i % 7);
-            d.Replace(UiDocRange(from, to), repl.ToWString());
-            mirror.Remove(from, to - from);
-            mirror.Insert(from, repl);
-        }
-        states.Add(mirror);
+    doc.Core().Replace(UiDocRange(0, 0), WString("XX "));
+    Vector<UiDocAnnotation> comments = doc.GetComments();
+    t.Expect(comments.GetCount() == 1, "comment remains after text remap");
+    if(!comments.IsEmpty()) {
+        t.Expect(comments[0].range.from == 8 && comments[0].range.to == 13, "comment range shifts with insertion before it");
+        t.Expect(AsString(comments[0].payload["text"]) == "updated review", "updated comment text retained");
+        t.Expect(AsString(comments[0].meta["agent.source"]) == "model-test", "comment metadata retained");
+        t.Expect(comments[0].resolved, "resolved state retained");
     }
 
-    for(int i = states.GetCount() - 2; i >= 0; i--) {
-        t.Expect(d.Undo(), Format("undo available step %d", i));
-        t.Expect(d.GetText() == states[i], Format("undo mirror step %d", i));
+    t.Expect(doc.RemoveComment(id), "comment removal succeeds");
+    t.Expect(doc.GetComments().IsEmpty(), "comment removed");
+    t.Expect(doc.Undo(), "undo restores removed comment");
+    t.Expect(doc.GetComments().GetCount() == 1, "comment restored by undo");
+    t.EndCase();
+}
+
+static void Case07_AnnotationLaneViewState(TestCtx& t)
+{
+    t.BeginCase("Annotation Lane View State", "Configures view-only annotation lane and gutter settings outside UiDocCore.");
+    UiDoc doc;
+    doc.ClearAnnotationLanes();
+
+    UiDoc::AnnotationLane lane;
+    lane.id = "vfx";
+    lane.label = "VFX";
+    lane.annotation_types.Add("vfx.note");
+    lane.color = Color(10, 120, 160);
+    lane.side = UiDoc::LANE_LEFT;
+    doc.AddAnnotationLane(lane);
+    doc.SetAnnotationLaneVisible("vfx", false);
+    doc.SetAnnotationLaneColor("vfx", Color(30, 90, 140));
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+    doc.ShowLineNumbers(true);
+    doc.ShowMetadataMarkers(false);
+
+    Vector<UiDoc::AnnotationLane> lanes = doc.GetAnnotationLanes();
+    t.Expect(lanes.GetCount() == 1, "custom lane is the only lane after clear");
+    if(!lanes.IsEmpty()) {
+        t.Expect(lanes[0].id == "vfx" && lanes[0].label == "VFX", "lane identity retained");
+        t.Expect(!lanes[0].visible, "lane visibility updated");
+        t.Expect(lanes[0].color == Color(30, 90, 140), "lane color updated");
     }
-    for(int i = 1; i < states.GetCount(); i++) {
-        t.Expect(d.Redo(), Format("redo available step %d", i));
-        t.Expect(d.GetText() == states[i], Format("redo mirror step %d", i));
+    t.Expect(doc.GetGutterSide() == UiDoc::GUTTER_LEFT, "gutter side is view state");
+    t.Expect(doc.IsLineNumbersShown(), "line numbers enabled");
+    t.Expect(!doc.IsMetadataMarkersShown(), "metadata markers disabled");
+    t.EndCase();
+}
+
+static void Case08_ResourceImageLifecycle(TestCtx& t)
+{
+    t.BeginCase("Resource + Image Embed", "Inserts an image by Core resource key and validates alignment/history without duplicating bytes.");
+    UiDoc doc;
+    doc.SetText("image\n");
+    doc.SetSelection(UiDocRange(2, 2));
+
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "image-hash-1";
+    resource.bytes = "not-decoded-in-model-test";
+    resource.mime = "image/png";
+    resource.original_name = "sample.png";
+    resource.width = 32;
+    resource.height = 16;
+    String key = doc.AddResource(resource, false);
+    t.Expect(!key.IsEmpty(), "resource added through UiDoc facade");
+
+    String embed_id = doc.InsertImage(key, 40, 20, "left");
+    t.Expect(!embed_id.IsEmpty(), "image embed inserted");
+    const UiDocEmbedBlock* embed = FindEmbed(doc, embed_id);
+    t.Expect(embed && embed->type == "image", "image embed stored in Core");
+    if(embed) {
+        t.Expect(AsString(embed->payload["resource_key"]) == key, "embed references resource key only");
+        t.Expect((int)embed->payload["width"] == 40 && (int)embed->payload["height"] == 20, "requested image dimensions stored");
+        t.Expect(AsString(embed->layout["align"]) == "left", "initial alignment stored in layout map");
+    }
+
+    t.Expect(doc.SetImageAlign(embed_id, "center"), "alignment update succeeds");
+    embed = FindEmbed(doc, embed_id);
+    t.Expect(embed && AsString(embed->layout["align"]) == "center", "alignment updated to center");
+    t.Expect(doc.Undo(), "undo image alignment");
+    embed = FindEmbed(doc, embed_id);
+    t.Expect(embed && AsString(embed->layout["align"]) == "left", "undo restores left alignment");
+    t.Expect(doc.Redo(), "redo image alignment");
+
+    t.Expect(doc.RemoveEmbed(embed_id), "image embed removal succeeds");
+    t.Expect(FindEmbed(doc, embed_id) == nullptr, "embed removed while resource remains");
+    UiDocResource stored;
+    t.Expect(doc.Core().GetResource(key, stored), "resource still exists after embed removal");
+    t.Expect(doc.Undo(), "undo restores removed image embed");
+    t.Expect(FindEmbed(doc, embed_id) != nullptr, "image embed restored");
+    t.EndCase();
+}
+
+static void Case09_CanonicalRichTable(TestCtx& t)
+{
+    t.BeginCase("Canonical Rich Table", "Exercises typed rows/cells/runs and public row/column mutation APIs.");
+    UiDoc doc;
+    doc.SetText("table\n");
+    doc.SetSelection(UiDocRange(0, 0));
+
+    String id = doc.InsertTable(2, 2, 1);
+    t.Expect(!id.IsEmpty(), "table embed id generated");
+
+    UiDocTable table;
+    t.Expect(doc.GetTable(id, table), "typed table can be queried");
+    t.Expect(table.columns == 2 && table.rows.GetCount() == 2 && table.header_rows == 1, "initial table dimensions correct");
+
+    UiDocInlineRun run;
+    run.type = "text";
+    run.text = WString("Name");
+    run.style.flags = UiDocTextStyle::BOLD;
+    table.rows[0].cells[0].runs.Add(pick(run));
+    t.Expect(doc.SetTable(id, table), "rich table update succeeds");
+
+    UiDocTable updated;
+    t.Expect(doc.GetTable(id, updated), "updated table can be queried");
+    if(!updated.rows.IsEmpty() && !updated.rows[0].cells.IsEmpty()) {
+        const UiDocTableCell& cell = updated.rows[0].cells[0];
+        t.Expect(cell.GetPlainText() == WString("Name"), "canonical runs produce expected plain text");
+        t.Expect(cell.runs.GetCount() == 1 && (cell.runs[0].style.flags & UiDocTextStyle::BOLD), "inline text style retained");
+    }
+
+    t.Expect(doc.AddTableRow(id, 2), "row insertion succeeds");
+    t.Expect(doc.AddTableColumn(id, 2), "column insertion succeeds");
+    UiDocTable expanded;
+    t.Expect(doc.GetTable(id, expanded) && expanded.rows.GetCount() == 3 && expanded.columns == 3, "table expands to 3x3");
+
+    t.Expect(doc.Undo(), "undo column insertion");
+    UiDocTable after_column_undo;
+    t.Expect(doc.GetTable(id, after_column_undo) && after_column_undo.columns == 2 && after_column_undo.rows.GetCount() == 3, "column undo restores 2 columns");
+    t.Expect(doc.Undo(), "undo row insertion");
+    UiDocTable after_row_undo;
+    t.Expect(doc.GetTable(id, after_row_undo) && after_row_undo.rows.GetCount() == 2, "row undo restores 2 rows");
+    t.EndCase();
+}
+
+static void Case10_TableImageRun(TestCtx& t)
+{
+    t.BeginCase("Table Image Run", "Stores an inline image run between text runs using the canonical typed table representation.");
+    UiDoc doc;
+    doc.SetText("\n");
+    String table_id = doc.InsertTable(1, 1, 0);
+
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "cell-image-hash";
+    resource.bytes = "cell-image-bytes";
+    resource.mime = "image/png";
+    resource.width = 8;
+    resource.height = 8;
+    String key = doc.AddResource(resource, false);
+    t.Expect(!key.IsEmpty(), "cell image resource added");
+
+    UiDocTable table;
+    t.Expect(doc.GetTable(table_id, table), "table available for rich cell edit");
+    if(!table.rows.IsEmpty() && !table.rows[0].cells.IsEmpty()) {
+        UiDocInlineRun before;
+        before.type = "text";
+        before.text = WString("A");
+        table.rows[0].cells[0].runs.Add(pick(before));
+
+        UiDocInlineRun image;
+        image.type = "image";
+        image.resource_key = key;
+        image.width = 8;
+        image.height = 8;
+        table.rows[0].cells[0].runs.Add(pick(image));
+
+        UiDocInlineRun after;
+        after.type = "text";
+        after.text = WString("B");
+        table.rows[0].cells[0].runs.Add(pick(after));
+    }
+    t.Expect(doc.SetTable(table_id, table), "table accepts resource-backed image run");
+
+    UiDocTable result;
+    t.Expect(doc.GetTable(table_id, result), "rich table remains valid");
+    if(!result.rows.IsEmpty() && !result.rows[0].cells.IsEmpty()) {
+        const UiDocTableCell& cell = result.rows[0].cells[0];
+        t.Expect(cell.runs.GetCount() == 3, "text/image/text remain three canonical runs");
+        t.Expect(cell.GetPlainText() == WString("AB"), "plain text excludes image unit");
+        if(cell.runs.GetCount() == 3)
+            t.Expect(cell.runs[1].type == "image" && cell.runs[1].resource_key == key, "middle run references image resource");
     }
     t.EndCase();
 }
 
-static void Case22_AllocationChurn(TestCtx& t)
+static void Case11_SearchReplace(TestCtx& t)
 {
-    t.BeginCase("Allocation Churn", "Repeatedly loads large text buffers and random replacements to stress allocation/deallocation.");
-    UiDoc d;
-    InitDoc(d);
-    String base;
-    for(int i = 0; i < 20000; i++)
-        base.Cat((char)('a' + (i % 26)));
+    t.BeginCase("Search + Replace", "Tests case-insensitive/whole-word search, navigation, current replace and atomic replace-all.");
+    UiDoc doc;
+    doc.SetText("alpha ALPHA alphabet alpha");
+    doc.SetSearchQuery("alpha");
+    t.Expect(doc.GetSearchMatchCount() == 4, "default case-insensitive substring search finds four matches");
 
-    for(int round = 0; round < 12; round++) {
-        d.SetText(base);
-        for(int i = 0; i < 120; i++) {
-            int n = d.GetLength();
-            int a = Random(max(1, n));
-            int b = a + Random(30);
-            if(b > n)
-                b = n;
-            d.Replace(UiDocRange(a, b), WString("XYZ"));
-        }
-    }
-    t.Expect(d.GetLength() > 0, "document survives churn");
+    doc.SetSearchWholeWord(true);
+    t.Expect(doc.GetSearchMatchCount() == 3, "whole-word mode excludes alphabet");
+    t.Expect(doc.FindNext(), "FindNext selects a match");
+    UiDocSelection selection = doc.GetSelection();
+    t.Expect(abs(selection.caret - selection.anchor) == 5, "search navigation selects exact match range");
+
+    t.Expect(doc.ReplaceCurrentSearch(WString("X")), "replace current match succeeds");
+    t.Expect(doc.GetSearchMatchCount() == 2, "search recomputes after current replacement");
+    int replaced = doc.ReplaceAllSearch(WString("Y"));
+    t.Expect(replaced == 2, "replace-all reports remaining whole-word matches");
+    t.Expect(doc.GetSearchMatchCount() == 0, "no whole-word matches remain");
+    t.Expect(doc.GetText().Find("alphabet") >= 0, "non-whole-word alphabet text remains untouched");
     t.EndCase();
 }
 
-static void Case23_EventOrderPerTx(TestCtx& t)
+static void Case12_CommandRoutingAndState(TestCtx& t)
 {
-    t.BeginCase("Event Order Per Transaction", "Validates one mapped event per tx and ordering mapped->selection->change.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha");
+    t.BeginCase("Command Routing", "Exercises builtin command state plus a registered application command.");
+    UiDoc doc;
+    doc.SetText("abc");
+    doc.SetSelection(UiDocRange(1, 2));
 
-    String seq;
-    int mapped_count = 0;
-    d.WhenMapped = [&](const UiDocPositionMap&) { seq << "M"; mapped_count++; };
-    d.WhenSelection = [&] { seq << "S"; };
-    d.WhenChange = [&] { seq << "C"; };
+    UiDocCommandState before = doc.QueryCommandState("format.bold");
+    t.Expect(before.enabled && !before.active, "bold command initially enabled/inactive");
+    t.Expect(doc.ExecuteCommand("format.bold"), "builtin bold command executes");
+    t.Expect(doc.QueryCommandState("format.bold").active, "bold command becomes active");
+    t.Expect(doc.QueryCommandState("edit.undo").enabled, "undo command state tracks Core history");
+    t.Expect(doc.ExecuteCommand("edit.undo"), "undo command executes through registry");
+    t.Expect(!doc.QueryCommandState("format.bold").active, "undo clears active bold state");
 
-    UiDocTransaction tx;
-    tx.add_to_history = true;
-    UiDocChange rep;
-    rep.type = UiDocChange::REPLACE_TEXT;
-    rep.range = UiDocRange(0, 0);
-    rep.text = WString("Z");
-    tx.changes.Add(pick(rep));
-    UiDocChange sel;
-    sel.type = UiDocChange::SET_SELECTION;
-    sel.selection.anchor = 1;
-    sel.selection.caret = 1;
-    tx.changes.Add(pick(sel));
-
-    t.Expect(d.Dispatch(tx), "dispatch returns true");
-    t.Expect(mapped_count == 1, "exactly one mapped event");
-    t.Expect(seq.Find("M") >= 0 && seq.Find("S") >= 0 && seq.Find("C") >= 0, "all events emitted");
-    t.Expect(seq.Find("M") < seq.Find("S") && seq.Find("S") < seq.Find("C"), "event order is M->S->C");
+    doc.RegisterCommand("test.append", [](UiDoc& d, const Value& value) {
+        d.Replace(UiDocRange(d.GetLength(), d.GetLength()), ToUnicode(AsString(value), CHARSET_UTF8));
+        return true;
+    });
+    t.Expect(doc.QueryCommandState("test.append").enabled, "registered command is discoverable/enabled");
+    t.Expect(doc.ExecuteCommand("test.append", String("!")), "registered command executes");
+    t.Expect(doc.GetText() == "abc!", "registered command mutates through public facade");
+    t.Expect(!doc.ExecuteCommand("missing.command"), "unknown command refused deterministically");
     t.EndCase();
 }
 
-static void Case24_ResourceAddDedupe(TestCtx& t)
+static void Case13_InsertCommands(TestCtx& t)
 {
-    t.BeginCase("Resource Add + Dedupe", "Adds resources from bytes and verifies key reuse for identical payload.");
-    UiDoc d;
-    InitDoc(d);
+    t.BeginCase("Insert Commands", "Uses generic command routing for table, horizontal rule and page break embeds.");
+    UiDoc doc;
+    doc.SetText("abc");
+    doc.SetSelection(UiDocRange(1, 1));
 
-    String bytes;
-    bytes.Cat('\x89');
-    bytes.Cat("PNG");
-    bytes.Cat('\r');
-    bytes.Cat('\n');
-    bytes.Cat('\x1A');
-    bytes.Cat('\n');
-    bytes << "payload-123";
-
-    String k1 = d.AddResource("image", bytes, "image/png", "demo.png", 32, 16, true);
-    String k2 = d.AddResource("image", bytes, "image/png", "demo_copy.png", 32, 16, true);
-    t.Expect(!k1.IsEmpty(), "first add returns key");
-    t.Expect(k1 == k2, "dedupe returns same key");
-    t.Expect(d.GetResources().GetCount() == 1, "resource table has one entry");
-
-    UiDocResource r;
-    t.Expect(d.GetResource(k1, r), "query by key succeeds");
-    t.Expect(r.bytes == bytes, "stored bytes match");
-    t.Expect(r.resource_type == "image", "resource type persisted");
+    ValueArray table_args;
+    table_args.Add(2);
+    table_args.Add(1);
+    table_args.Add(0);
+    t.Expect(doc.ExecuteCommand("insert.table", table_args), "insert.table command succeeds");
+    t.Expect(doc.Core().QueryEmbeds(nullptr, "table").GetCount() == 1, "table embed created");
+    t.Expect(doc.ExecuteCommand("insert.hr"), "insert.hr command succeeds");
+    t.Expect(doc.ExecuteCommand("insert.page_break"), "insert.page_break command succeeds");
+    t.Expect(doc.Core().QueryEmbeds(nullptr, "hr").GetCount() == 1, "horizontal rule embed created");
+    t.Expect(doc.Core().QueryEmbeds(nullptr, "page_break").GetCount() == 1, "page break embed created");
     t.EndCase();
 }
 
-static void Case25_ResourceRoundTrip(TestCtx& t)
+static void Case14_NewDocumentAndData(TestCtx& t)
 {
-    t.BeginCase("Resource Serialize/Parse", "Serializes resource table and parses into new document preserving bytes.");
-    UiDoc d1;
-    InitDoc(d1);
+    t.BeginCase("New Document + Data", "Verifies Ctrl data binding and that NewDocument clears model/view state together.");
+    UiDoc doc;
+    doc.SetData(String("hello"));
+    t.Expect(AsString(doc.GetData()) == "hello", "SetData/GetData use UTF-8 document text");
+    doc.SetSelection(UiDocRange(0, 5));
+    doc.AddComment("temporary");
+    doc.SetSearchQuery("hello");
+    t.Expect(doc.CanUndo(), "document has history before reset");
 
-    String b1("abc123");
-    String b2;
-    b2.Cat('\0');
-    b2.Cat('\1');
-    b2.Cat('\2');
-    b2.Cat("bin");
-
-    String k1 = d1.AddResource("image", b1, "image/png", "a.png", 10, 11, false);
-    String k2 = d1.AddResource("binary", b2, "application/octet-stream", "raw.bin", 0, 0, false);
-    t.Expect(!k1.IsEmpty() && !k2.IsEmpty(), "two resources added");
-
-    String blob = d1.SerializeResourceTable();
-    t.Expect(!blob.IsEmpty(), "serialized blob non-empty");
-
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseResourceTable(blob), "parse succeeds");
-    t.Expect(d2.GetResources().GetCount() == 2, "parsed resource count matches");
-
-    UiDocResource r1, r2;
-    t.Expect(d2.GetResource(k1, r1), "resource #1 available after parse");
-    t.Expect(d2.GetResource(k2, r2), "resource #2 available after parse");
-    t.Expect(r1.bytes == b1, "resource #1 bytes preserved");
-    t.Expect(r2.bytes == b2, "resource #2 bytes preserved");
+    doc.NewDocument();
+    t.Expect(doc.GetText().IsEmpty() && doc.GetLength() == 0, "NewDocument clears text");
+    UiDocSelection selection = doc.GetSelection();
+    t.Expect(selection.anchor == 0 && selection.caret == 0, "NewDocument resets selection");
+    t.Expect(doc.GetSearchQuery().IsEmpty() && doc.GetSearchMatchCount() == 0, "NewDocument clears search state");
+    t.Expect(doc.GetComments().IsEmpty(), "NewDocument clears annotations through Core");
+    t.Expect(!doc.CanUndo() && !doc.CanRedo(), "NewDocument clears history");
     t.EndCase();
 }
 
-static void Case26_EmbedHrUndoRedo(TestCtx& t)
+static void Case15_StyleHistoryLimit(TestCtx& t)
 {
-    t.BeginCase("Embed HR Undo/Redo", "Inserts HR embed block and validates undo/redo lifecycle.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("alpha");
+    t.BeginCase("Style History Limit", "SetCustomStyle propagates history_limit into UiDocCore.");
+    UiDoc doc;
+    UiDoc::Style style = doc.GetStyle();
+    style.history_limit = 2;
+    doc.SetCustomStyle(style);
+    t.Expect(doc.Core().GetHistoryLimit() == 2, "custom style updates Core history limit");
 
-    String id = d.InsertEmbed(2, "hr");
-    t.Expect(!id.IsEmpty(), "insert hr returns embed id");
-    t.Expect(d.QueryEmbeds(nullptr, "hr").GetCount() == 1, "hr embed exists");
-
-    t.Expect(d.Undo(), "undo embed insert");
-    t.Expect(d.QueryEmbeds(nullptr, "hr").IsEmpty(), "hr embed removed after undo");
-
-    t.Expect(d.Redo(), "redo embed insert");
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "hr");
-    t.Expect(ee.GetCount() == 1, "hr embed restored after redo");
-    t.Expect(ee[0].embed_id == id, "embed id stable after redo");
+    doc.SetText("a");
+    doc.Replace(UiDocRange(1, 1), WString("b"));
+    doc.Replace(UiDocRange(2, 2), WString("c"));
+    doc.Replace(UiDocRange(3, 3), WString("d"));
+    t.Expect(doc.GetText() == "abcd", "three edits applied");
+    t.Expect(doc.Undo() && doc.GetText() == "abc", "latest edit undo available");
+    t.Expect(doc.Undo() && doc.GetText() == "ab", "second retained edit undo available");
+    t.Expect(!doc.Undo(), "history older than configured limit discarded");
     t.EndCase();
 }
 
-static void Case27_EmbedRoundTrip(TestCtx& t)
+static void Case16_SnapshotComposition(TestCtx& t)
 {
-    t.BeginCase("Embed Serialize/Parse", "Serializes embed table and parses back preserving payload/layout and ids.");
-    UiDoc d1;
-    InitDoc(d1);
-    d1.SetText("embed");
+    t.BeginCase("Core Snapshot Through UiDoc", "Round-trips the complete logical model through the Core owned by two UiDoc instances.");
+    UiDoc source;
+    source.SetText("Scene\nAction\n");
+    source.SetSelection(UiDocRange(0, 5));
+    source.SetBold(true);
+    source.SetBlockRole("screenplay.scene");
+    source.AddComment("snapshot comment");
 
-    ValueMap payload;
-    payload.Add("label", "hr-demo");
-    ValueMap layout;
-    layout.Add("width", 120);
-    layout.Add("align", "center");
+    UiDocResource resource;
+    resource.resource_type = "image";
+    resource.content_hash = "snapshot-image";
+    resource.bytes = "snapshot-bytes";
+    resource.mime = "image/png";
+    resource.width = 4;
+    resource.height = 4;
+    String key = source.AddResource(resource, false);
+    source.SetSelection(UiDocRange(source.GetLength(), source.GetLength()));
+    String image_id = source.InsertImage(key, 4, 4, "right");
+    t.Expect(!image_id.IsEmpty(), "snapshot source contains image embed");
 
-    String id = d1.InsertEmbed(1, "hr", payload, layout);
-    t.Expect(!id.IsEmpty(), "embed inserted");
+    String json = source.Core().ToJson();
+    t.Expect(!json.IsEmpty(), "logical snapshot serialized");
 
-    String blob = d1.SerializeEmbedTable();
-    t.Expect(!blob.IsEmpty(), "embed table serialized");
-
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseEmbedTable(blob), "embed table parse succeeds");
-
-    Vector<UiDocEmbedBlock> ee = d2.QueryEmbeds(nullptr, "hr");
-    t.Expect(ee.GetCount() == 1, "one hr embed after parse");
-    if(!ee.IsEmpty()) {
-        t.Expect(ee[0].embed_id == id, "embed id preserved");
-        t.Expect(ee[0].payload.Find("label") >= 0 && AsString(ee[0].payload["label"]) == "hr-demo", "payload preserved");
-        t.Expect(ee[0].layout_hints.Find("width") >= 0 && (int)ee[0].layout_hints["width"] == 120, "layout preserved");
-    }
+    UiDoc restored;
+    String error;
+    t.Expect(restored.Core().FromJson(json, &error), String("snapshot restored: ") + error);
+    t.Expect(restored.GetText() == source.GetText(), "restored UiDoc sees Core text");
+    t.Expect(restored.Core().GetStyles().GetCount() == source.Core().GetStyles().GetCount(), "style runs restored");
+    t.Expect(restored.Core().GetBlocks().GetCount() == source.Core().GetBlocks().GetCount(), "semantic blocks restored");
+    t.Expect(restored.GetComments().GetCount() == 1, "comments restored");
+    t.Expect(restored.Core().GetResources().GetCount() == 1, "resource table restored");
+    t.Expect(restored.Core().GetEmbeds().GetCount() == 1, "embed table restored");
     t.EndCase();
 }
 
-static void Case28_TableEmbedOnInsert(TestCtx& t)
+static void Case17_LayoutGeometry(TestCtx& t)
 {
-    t.BeginCase("Table Embed On Insert", "InsertTable should create embed_type=table payload without injecting pipe markup text.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("start\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 2);
+    t.BeginCase("Viewport Geometry", "Builds paragraph layout and verifies public position/point mapping stays bounded and monotonic.");
+    UiDoc doc;
+    doc.SetRect(0, 0, 640, 480);
+    doc.SetText("alpha beta\ngamma delta\n");
+    doc.Layout();
 
-    t.Expect(d.GetText().Find("|") < 0, "table insert keeps doc text pipe-free");
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "one table embed exists");
-    if(!ee.IsEmpty()) {
-        const ValueMap& p = ee[0].payload;
-        t.Expect(p.Find("table_id") >= 0, "table_id present");
-        t.Expect(p.Find("rows") >= 0 && (int)p["rows"] == 2, "rows stored in embed payload");
-        t.Expect(p.Find("cols") >= 0 && (int)p["cols"] == 2, "cols stored");
-        t.Expect(p.Find("cells") >= 0 && p["cells"].Is<ValueArray>(), "cells array present");
-    }
-    t.EndCase();
-}
-
-static void Case29_TableEmbedStructureUpdates(TestCtx& t)
-{
-    t.BeginCase("Table Embed Structure Updates", "Row/column add-remove should update table embed payload shape without pipe-markup drift.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 2);
-
-    Vector<UiDocEmbedBlock> e0 = d.QueryEmbeds(nullptr, "table");
-    t.Expect(!e0.IsEmpty(), "table embed exists before ops");
-    if(e0.IsEmpty()) {
-        t.EndCase();
-        return;
+    int previous = -1;
+    for(int pos = 0; pos <= doc.GetLength(); pos += max(1, doc.GetLength() / 6)) {
+        Point point = doc.PointAtPos(pos);
+        int back = doc.PosAtPoint(point);
+        t.Expect(back >= 0 && back <= doc.GetLength(), "round-trip position remains in document bounds");
+        t.Expect(back >= previous, "round-trip positions are monotonic across document");
+        previous = back;
     }
 
-    t.Expect(d.AddTableColumnRight(), "add column");
-    t.Expect(d.AddTableRowBelow(), "add row");
-    t.Expect(d.GetText().Find("|") < 0, "row/col add keeps doc text pipe-free");
-
-    Vector<UiDocEmbedBlock> e1 = d.QueryEmbeds(nullptr, "table");
-    t.Expect(e1.GetCount() == 1, "single table embed retained");
-    if(!e1.IsEmpty()) {
-        const ValueMap& p1 = e1[0].payload;
-        t.Expect((int)p1["cols"] == 3, "embed cols updated to 3");
-        t.Expect((int)p1["rows"] == 3, "embed rows increased");
-    }
-
-    t.Expect(d.RemoveTableColumn(), "remove column");
-    t.Expect(d.RemoveTableRow(), "remove row");
-    t.Expect(d.GetText().Find("|") < 0, "row/col remove keeps doc text pipe-free");
-    Vector<UiDocEmbedBlock> e2 = d.QueryEmbeds(nullptr, "table");
-    t.Expect(e2.GetCount() == 1, "table embed still present");
-    if(!e2.IsEmpty()) {
-        const ValueMap& p2 = e2[0].payload;
-        t.Expect((int)p2["cols"] == 2, "embed cols returned to 2");
-        t.Expect((int)p2["rows"] == 2, "embed rows valid after remove");
-    }
+    Rect caret = doc.GetCaretRect();
+    t.Expect(caret.GetHeight() > 0, "caret geometry has positive height after layout");
     t.EndCase();
 }
-
-static void Case30_TableEmbedRoundTrip(TestCtx& t)
-{
-    t.BeginCase("Table Embed RoundTrip", "Serialize/parse embed table preserves table payload semantics.");
-    UiDoc d1;
-    InitDoc(d1);
-    d1.SetText("\n");
-    d1.SetSelection(UiDocRange(0, 0));
-    d1.InsertTable(3, 1);
-
-    Vector<UiDocEmbedBlock> e1 = d1.QueryEmbeds(nullptr, "table");
-    t.Expect(e1.GetCount() == 1, "source has table embed");
-    String blob = d1.SerializeEmbedTable();
-    t.Expect(!blob.IsEmpty(), "embed table serialized");
-
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseEmbedTable(blob), "embed parse works");
-    Vector<UiDocEmbedBlock> e2 = d2.QueryEmbeds(nullptr, "table");
-    t.Expect(e2.GetCount() == 1, "parsed has table embed");
-    if(!e2.IsEmpty()) {
-        t.Expect((int)e2[0].payload["cols"] == 3, "parsed cols preserved");
-        t.Expect((int)e2[0].payload["rows"] == 1, "parsed rows preserved");
-    }
-    t.EndCase();
-}
-
-static void Case31_TableCellEditSyncsEmbed(TestCtx& t)
-{
-    t.BeginCase("Table Cell Edit Sync", "Typing inside table cell updates embed payload cell text (embed remains truth).");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 1);
-
-    d.Key('N', 1);
-    d.Key('a', 1);
-    d.Key('m', 1);
-    d.Key('e', 1);
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "table embed exists");
-    if(!ee.IsEmpty()) {
-        ValueMap p = ee[0].payload;
-        t.Expect(p.Find("cells") >= 0 && p["cells"].Is<ValueArray>(), "cells in payload");
-        ValueArray cells = p["cells"];
-        t.Expect(cells.GetCount() >= 1 && cells[0].Is<ValueArray>(), "header row array");
-        if(cells.GetCount() >= 1 && cells[0].Is<ValueArray>()) {
-            ValueArray header = cells[0];
-            t.Expect(header.GetCount() >= 1, "header col exists");
-            if(header.GetCount() >= 1) {
-                String v = AsString(header[0]);
-                t.Expect(v.StartsWith("Name"), "embed cell value updated from typing");
-            }
-        }
-    }
-    t.Expect(d.GetText().Find("|") < 0, "cell typing does not inject pipe markup text");
-    t.EndCase();
-}
-
-static void Case32_TableStylePayload(TestCtx& t)
-{
-    t.BeginCase("TableStyle Payload", "Setting table style updates embed payload and survives embed-table round-trip.");
-    UiDoc d1;
-    InitDoc(d1);
-    d1.SetText("\n");
-    d1.SetSelection(UiDocRange(0, 0));
-    d1.InsertTable(2, 1);
-
-    ValueMap req;
-    req.Add("size_delta", 4);
-    req.Add("ink_rgb", 0x3366CC);
-    t.Expect(d1.ExecuteCommand("table.style.set", req), "table.style.set command works");
-
-    Vector<UiDocEmbedBlock> ee = d1.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "table embed exists");
-    if(!ee.IsEmpty()) {
-        ValueMap pld = ee[0].payload;
-        t.Expect(pld.Find("table_style") >= 0 && pld["table_style"].Is<ValueMap>(), "table_style exists");
-        if(pld.Find("table_style") >= 0 && pld["table_style"].Is<ValueMap>()) {
-            ValueMap ts = pld["table_style"];
-            t.Expect((int)ts["size_delta"] == 4, "size_delta stored");
-            t.Expect((int)ts["ink_rgb"] == 0x3366CC, "ink_rgb stored");
-        }
-    }
-
-    String blob = d1.SerializeEmbedTable();
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseEmbedTable(blob), "parse embed table");
-    Vector<UiDocEmbedBlock> ee2 = d2.QueryEmbeds(nullptr, "table");
-    t.Expect(ee2.GetCount() == 1, "table embed after parse");
-    if(!ee2.IsEmpty()) {
-        ValueMap ts = ee2[0].payload["table_style"];
-        t.Expect((int)ts["size_delta"] == 4, "size_delta roundtrip");
-        t.Expect((int)ts["ink_rgb"] == 0x3366CC, "ink_rgb roundtrip");
-    }
-    t.EndCase();
-}
-
-static void Case33_TableStyleTypingInherit(TestCtx& t)
-{
-    t.BeginCase("TableStyle Typing Inherit", "Typing in table cell preserves table style payload and updates target cell text.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 1);
-
-    ValueMap req;
-    req.Add("size_delta", 3);
-    req.Add("ink_rgb", 0xCC5522);
-    t.Expect(d.ExecuteCommand("table.style.set", req), "set table style before typing");
-
-    d.Key(K_TAB, 1);
-
-    d.Key('T', 1);
-    d.Key('i', 1);
-    d.Key('t', 1);
-    d.Key('l', 1);
-    d.Key('e', 1);
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "table embed exists");
-    if(!ee.IsEmpty()) {
-        ValueMap pld = ee[0].payload;
-        t.Expect(pld.Find("table_style") >= 0 && pld["table_style"].Is<ValueMap>(), "table_style present after typing");
-        if(pld.Find("table_style") >= 0 && pld["table_style"].Is<ValueMap>()) {
-            ValueMap ts = pld["table_style"];
-            t.Expect((int)ts["size_delta"] == 3, "size_delta kept after typing");
-            t.Expect((int)ts["ink_rgb"] == 0xCC5522, "ink_rgb kept after typing");
-        }
-        ValueArray cells = pld["cells"];
-        if(cells.GetCount() >= 1 && cells[0].Is<ValueArray>()) {
-            ValueArray header = cells[0];
-            t.Expect(header.GetCount() >= 2, "second header cell exists");
-            if(header.GetCount() >= 2) {
-                String v = AsString(header[1]);
-                t.Expect(v.StartsWith("Title"), "typed text applied to second cell");
-            }
-        }
-    }
-    t.Expect(d.GetText().Find("|") < 0, "table typing keeps doc text pipe-free");
-    t.EndCase();
-}
-
-static String MakeTinyPng()
-{
-    ImageBuffer ib(Size(2, 2));
-    for(int y = 0; y < 2; y++)
-        for(int x = 0; x < 2; x++)
-            ib[x][y] = RGBA{(byte)(x ? 255 : 30), (byte)(y ? 200 : 40), 120, 255};
-    Image img = ib;
-    return PNGEncoder().SaveString(img);
-}
-
-static void Case34_ImageEmbedUndoKeepsResource(TestCtx& t)
-{
-    t.BeginCase("Image Embed Undo Keeps Resource", "Insert image embed by resource_key; undo removes embed while resource table remains.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("img\n");
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    t.Expect(!key.IsEmpty(), "image resource key created");
-
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 0);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "embed.image.insert command succeeds");
-    t.Expect(d.QueryEmbeds(nullptr, "image").GetCount() == 1, "image embed exists");
-
-    t.Expect(d.Undo(), "undo image embed insert");
-    t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "image embed removed after undo");
-    UiDocResource r;
-    t.Expect(d.GetResource(key, r), "resource still exists after undo embed");
-
-    t.Expect(d.Redo(), "redo image embed insert");
-    t.Expect(d.QueryEmbeds(nullptr, "image").GetCount() == 1, "image embed restored after redo");
-    t.EndCase();
-}
-
-static void Case35_ImageEmbedRoundTrip(TestCtx& t)
-{
-    t.BeginCase("Image Embed RoundTrip", "Resource table + embed table round-trip preserves resource bytes and image reference.");
-    UiDoc d1;
-    InitDoc(d1);
-    d1.SetText("img\n");
-
-    String png = MakeTinyPng();
-    String key = d1.AddResource("image", png, "image/png", "tiny.png", 2, 2, false);
-    t.Expect(!key.IsEmpty(), "resource key created");
-
-    ValueMap payload;
-    payload.Add("resource_key", key);
-    payload.Add("width", 2);
-    payload.Add("height", 2);
-    String eid = d1.InsertEmbed(1, "image", payload);
-    t.Expect(!eid.IsEmpty(), "image embed inserted");
-
-    String res_blob = d1.SerializeResourceTable();
-    String emb_blob = d1.SerializeEmbedTable();
-
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseResourceTable(res_blob), "resource parse ok");
-    t.Expect(d2.ParseEmbedTable(emb_blob), "embed parse ok");
-
-    UiDocResource rr;
-    t.Expect(d2.GetResource(key, rr), "resource exists after parse");
-    t.Expect(rr.bytes == png, "resource bytes preserved");
-
-    Vector<UiDocEmbedBlock> ee = d2.QueryEmbeds(nullptr, "image");
-    t.Expect(ee.GetCount() == 1, "image embed exists after parse");
-    if(!ee.IsEmpty())
-        t.Expect(AsString(ee[0].payload["resource_key"]) == key, "embed references same resource key");
-    t.EndCase();
-}
-
-static void Case36_SvgEmbedUndoRedo(TestCtx& t)
-{
-    t.BeginCase("SVG Embed Undo/Redo", "Insert SVG embed and validate undo/redo lifecycle.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("svg\n");
-
-    ValueMap add;
-    add.Add("svg_xml", "<svg width='10' height='10'><rect width='10' height='10'/></svg>");
-    add.Add("pos", 1);
-    add.Add("width", 10);
-    add.Add("height", 10);
-    t.Expect(d.ExecuteCommand("embed.svg.insert", add), "embed.svg.insert succeeds");
-    t.Expect(d.QueryEmbeds(nullptr, "svg").GetCount() == 1, "svg embed exists");
-
-    t.Expect(d.Undo(), "undo svg embed insert");
-    t.Expect(d.QueryEmbeds(nullptr, "svg").IsEmpty(), "svg embed removed after undo");
-
-    t.Expect(d.Redo(), "redo svg embed insert");
-    t.Expect(d.QueryEmbeds(nullptr, "svg").GetCount() == 1, "svg embed restored after redo");
-    t.EndCase();
-}
-
-static void Case37_SvgEmbedRoundTrip(TestCtx& t)
-{
-    t.BeginCase("SVG Embed RoundTrip", "Embed table serialize/parse preserves svg payload losslessly.");
-    UiDoc d1;
-    InitDoc(d1);
-    d1.SetText("\n");
-    String src = "<svg xmlns='http://www.w3.org/2000/svg'><path d='M1 1 L9 9'/></svg>";
-    ValueMap payload;
-    payload.Add("svg_xml", src);
-    payload.Add("width", 64);
-    payload.Add("height", 20);
-    String id = d1.InsertEmbed(0, "svg", payload);
-    t.Expect(!id.IsEmpty(), "svg embed inserted");
-
-    String emb_blob = d1.SerializeEmbedTable();
-    UiDoc d2;
-    InitDoc(d2);
-    t.Expect(d2.ParseEmbedTable(emb_blob), "parse embed table");
-
-    Vector<UiDocEmbedBlock> ee = d2.QueryEmbeds(nullptr, "svg");
-    t.Expect(ee.GetCount() == 1, "svg embed after parse");
-    if(!ee.IsEmpty()) {
-        t.Expect(AsString(ee[0].payload["svg_xml"]) == src, "svg xml preserved exactly");
-        t.Expect((int)ee[0].payload["width"] == 64, "svg width preserved");
-        t.Expect((int)ee[0].payload["height"] == 20, "svg height preserved");
-    }
-    t.EndCase();
-}
-
-static void Case38_TableOpsKeepActiveContext(TestCtx& t)
-{
-    t.BeginCase("Table Active Context", "Table row/col commands should target active embed even when caret moves outside table range.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("outside");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 2);
-
-    d.SetSelection(UiDocRange(d.GetLength(), d.GetLength()));
-    t.Expect(d.ExecuteCommand("table.row.add"), "row add works with caret outside table");
-    t.Expect(d.ExecuteCommand("table.col.add"), "col add works with caret outside table");
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "single table embed retained");
-    if(!ee.IsEmpty()) {
-        ValueMap p = ee[0].payload;
-        t.Expect((int)p["rows"] == 3, "rows updated via active table context");
-        t.Expect((int)p["cols"] == 3, "cols updated via active table context");
-    }
-    t.Expect(d.GetText().Find("|") < 0, "active-context ops do not inject pipe markup text");
-    t.EndCase();
-}
-
-static void Case39_TableCellImageRun(TestCtx& t)
-{
-    t.BeginCase("Table Cell Image Run", "Insert image run into active cell and verify payload + undo/redo.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(2, 2);
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    t.Expect(!key.IsEmpty(), "resource key created");
-
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("width", 24);
-    add.Add("height", 20);
-    t.Expect(d.ExecuteCommand("table.cell.image.insert", add), "insert image run command succeeds");
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "table embed exists");
-    if(!ee.IsEmpty()) {
-        ValueMap p = ee[0].payload;
-        t.Expect(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>(), "cell_runs present");
-        if(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>()) {
-            ValueArray rows = p["cell_runs"];
-            t.Expect(rows.GetCount() >= 1 && rows[0].Is<ValueArray>(), "rows in cell_runs");
-            if(rows.GetCount() >= 1 && rows[0].Is<ValueArray>()) {
-                ValueArray row0 = rows[0];
-                t.Expect(row0.GetCount() >= 1 && row0[0].Is<ValueArray>(), "cell run list exists");
-                if(row0.GetCount() >= 1 && row0[0].Is<ValueArray>()) {
-                    ValueArray runs = row0[0];
-                    bool has_image = false;
-                    for(int i = 0; i < runs.GetCount(); i++) {
-                        if(!runs[i].Is<ValueMap>())
-                            continue;
-                        ValueMap rm = runs[i];
-                        if(rm.Find("type") >= 0 && AsString(rm["type"]) == "image") {
-                            has_image = (rm.Find("resource_key") >= 0 && AsString(rm["resource_key"]) == key);
-                            break;
-                        }
-                    }
-                    t.Expect(has_image, "image run present in active cell");
-                }
-            }
-        }
-    }
-
-    t.Expect(d.Undo(), "undo image run insert");
-    Vector<UiDocEmbedBlock> eu = d.QueryEmbeds(nullptr, "table");
-    t.Expect(eu.GetCount() == 1, "table remains after undo");
-    if(!eu.IsEmpty() && eu[0].payload.Find("cell_runs") >= 0 && eu[0].payload["cell_runs"].Is<ValueArray>()) {
-        ValueArray rows = eu[0].payload["cell_runs"];
-        bool has_image = false;
-        if(rows.GetCount() > 0 && rows[0].Is<ValueArray>()) {
-            ValueArray row0 = rows[0];
-            if(row0.GetCount() > 0 && row0[0].Is<ValueArray>()) {
-                ValueArray runs = row0[0];
-                for(int i = 0; i < runs.GetCount(); i++) {
-                    if(runs[i].Is<ValueMap>() && ((ValueMap)runs[i]).Find("type") >= 0 && AsString(((ValueMap)runs[i])["type"]) == "image")
-                        has_image = true;
-                }
-            }
-        }
-        t.Expect(!has_image, "image run removed on undo");
-    }
-
-    t.Expect(d.Redo(), "redo image run insert");
-    Vector<UiDocEmbedBlock> er = d.QueryEmbeds(nullptr, "table");
-    t.Expect(er.GetCount() == 1, "table remains after redo");
-    t.EndCase();
-}
-
-static void Case40_BlockImageAlignAndDelete(TestCtx& t)
-{
-    t.BeginCase("Block Image Align/Delete", "Block image embed supports alignment payload update and delete via caret key.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("p\n");
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    t.Expect(!key.IsEmpty(), "resource key created");
-
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 0);
-    add.Add("display_mode", "block");
-    add.Add("align", "left");
-    add.Add("width", 24);
-    add.Add("height", 24);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert block image");
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "image");
-    t.Expect(ee.GetCount() == 1, "one image embed exists");
-    if(!ee.IsEmpty()) {
-        t.Expect(AsString(ee[0].payload["display_mode"]) == "block", "display mode is block");
-        t.Expect(AsString(ee[0].payload["align"]) == "left", "default align left");
-        d.SetSelection(UiDocRange(ee[0].range.from, ee[0].range.from));
-        t.Expect(d.ExecuteCommand("embed.image.align.set", "center"), "set center align");
-        Vector<UiDocEmbedBlock> e2 = d.QueryEmbeds(nullptr, "image");
-        t.Expect(!e2.IsEmpty() && AsString(e2[0].payload["align"]) == "center", "align updated to center");
-        t.Expect(d.Undo(), "undo align change");
-        Vector<UiDocEmbedBlock> e3 = d.QueryEmbeds(nullptr, "image");
-        t.Expect(!e3.IsEmpty() && AsString(e3[0].payload["align"]) == "left", "align undo restored left");
-        t.Expect(d.Redo(), "redo align change");
-        Vector<UiDocEmbedBlock> e4 = d.QueryEmbeds(nullptr, "image");
-        t.Expect(!e4.IsEmpty() && AsString(e4[0].payload["align"]) == "center", "align redo restored center");
-        t.Expect(d.Key(K_DELETE, 1), "delete key handled at image caret");
-        t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "image deleted by key");
-    }
-    t.EndCase();
-}
-
-static void Case41_TableInlineImageBetweenText(TestCtx& t)
-{
-    t.BeginCase("Table Inline Image Between Text", "Cell supports TextRun+ImageRun+TextRun around caret insertion.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("\n");
-    d.SetSelection(UiDocRange(0, 0));
-    d.InsertTable(1, 1);
-
-    d.Key('A', 1);
-    d.Key('B', 1);
-    d.Key(K_LEFT, 1);
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("width", 18);
-    add.Add("height", 18);
-    t.Expect(d.ExecuteCommand("table.cell.image.insert", add), "insert image at caret in cell");
-    d.Key('X', 1);
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "table");
-    t.Expect(ee.GetCount() == 1, "table exists");
-    if(!ee.IsEmpty()) {
-        ValueMap p = ee[0].payload;
-        t.Expect(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>(), "cell_runs present");
-        if(p.Find("cell_runs") >= 0 && p["cell_runs"].Is<ValueArray>()) {
-            ValueArray rows = p["cell_runs"];
-            if(rows.GetCount() >= 1 && rows[0].Is<ValueArray>()) {
-                ValueArray row0 = rows[0];
-                if(row0.GetCount() >= 1 && row0[0].Is<ValueArray>()) {
-                    ValueArray runs = row0[0];
-                    int img_ix = -1;
-                    for(int i = 0; i < runs.GetCount(); i++) {
-                        if(runs[i].Is<ValueMap>() && ((ValueMap)runs[i]).Find("type") >= 0 && AsString(((ValueMap)runs[i])["type"]) == "image")
-                            img_ix = i;
-                    }
-                    t.Expect(img_ix >= 0, "image run exists in cell runs");
-                    bool before = false, after = false;
-                    for(int i = 0; i < runs.GetCount(); i++) {
-                        if(!runs[i].Is<ValueMap>())
-                            continue;
-                        ValueMap rm = runs[i];
-                        if(rm.Find("type") < 0 || AsString(rm["type"]) != "text")
-                            continue;
-                        String txt = (rm.Find("text") >= 0 ? AsString(rm["text"]) : String());
-                        if(i < img_ix && !txt.IsEmpty())
-                            before = true;
-                        if(i > img_ix && !txt.IsEmpty())
-                            after = true;
-                    }
-                    t.Expect(before, "text appears before image run");
-                    t.Expect(after, "text appears after image run");
-                }
-            }
-        }
-        ValueArray cells = p["cells"];
-        if(cells.GetCount() >= 1 && cells[0].Is<ValueArray>()) {
-            ValueArray row0 = cells[0];
-            if(row0.GetCount() >= 1)
-                t.Expect(AsString(row0[0]) == "AXB", "flattened cell text preserves before/after typing around image");
-        }
-    }
-    t.EndCase();
-}
-
-static void Case42_ParagraphInlineImage(TestCtx& t)
-{
-    t.BeginCase("Paragraph Inline Image", "Inline paragraph image insert keeps surrounding text and supports delete at caret.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("AB");
-    d.SetSelection(UiDocRange(1, 1));
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 1);
-    add.Add("display_mode", "inline");
-    add.Add("width", 16);
-    add.Add("height", 16);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "inline image embed inserted");
-
-    Vector<UiDocEmbedBlock> ee = d.QueryEmbeds(nullptr, "image");
-    t.Expect(ee.GetCount() == 1, "one inline image embed exists");
-    if(!ee.IsEmpty()) {
-        t.Expect(AsString(ee[0].payload["display_mode"]) == "inline", "display_mode inline stored");
-        t.Expect(d.GetText() == "AB", "text remains around inline image");
-        d.SetSelection(UiDocRange(1, 1));
-        t.Expect(d.Key(K_DELETE, 1), "delete key handled at inline image position");
-        t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image deleted at caret");
-        t.Expect(d.GetText() == "AB", "text preserved after inline image delete");
-    }
-    t.EndCase();
-}
-
-static void Case43_InlineImageKeyNavigation(TestCtx& t)
-{
-    t.BeginCase("Inline Image Key Nav", "Arrow navigation selects inline image as a unit and delete removes it.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("AB");
-    d.SetSelection(UiDocRange(1, 1));
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 1);
-    add.Add("display_mode", "inline");
-    add.Add("width", 16);
-    add.Add("height", 16);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert inline image");
-
-    t.Expect(d.Key(K_RIGHT, 1), "right key selects/steps over inline image");
-    t.Expect(d.Key(K_RIGHT, 1), "second right steps to next text position");
-    t.Expect(d.GetSelection().caret == 2, "caret reached text position after image");
-    t.Expect(d.Key(K_LEFT, 1), "left key selects inline image from right side");
-    t.Expect(d.Key(K_DELETE, 1), "delete removes selected inline image");
-    t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image removed");
-    t.Expect(d.GetText() == "AB", "text remains stable after image navigation/delete");
-    t.EndCase();
-}
-
-static void Case44_SelectionDeletesInlineImage(TestCtx& t)
-{
-    t.BeginCase("Selection Deletes Inline Image", "Deleting a text selection crossing inline image removes both text and image embed.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("AB");
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 1);
-    add.Add("display_mode", "inline");
-    add.Add("width", 16);
-    add.Add("height", 16);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "inline image inserted");
-    t.Expect(d.QueryEmbeds(nullptr, "image").GetCount() == 1, "image exists before selection delete");
-
-    d.SetSelection(UiDocRange(0, 2));
-    t.Expect(d.Key(K_DELETE, 1), "delete selection key handled");
-    t.Expect(d.GetText().IsEmpty(), "selected text removed");
-    t.Expect(d.QueryEmbeds(nullptr, "image").IsEmpty(), "inline image removed with selection");
-    t.EndCase();
-}
-
-static void Case45_ParagraphInlinePosRoundTrip(TestCtx& t)
-{
-    t.BeginCase("Paragraph Inline Pos RoundTrip", "PointAtPos/PosAtPoint round-trip stays stable near inline images.");
-    UiDoc d;
-    InitDoc(d);
-    d.SetText("ABCD");
-
-    String png = MakeTinyPng();
-    String key = d.AddResource("image", png, "image/png", "tiny.png", 2, 2, true);
-    ValueMap add;
-    add.Add("resource_key", key);
-    add.Add("pos", 2);
-    add.Add("display_mode", "inline");
-    add.Add("width", 16);
-    add.Add("height", 16);
-    t.Expect(d.ExecuteCommand("embed.image.insert", add), "insert inline image in paragraph");
-
-    int prev = -1;
-    for(int pos = 0; pos <= d.GetLength(); pos++) {
-        Point pt = d.PointAtPos(pos);
-        int back = d.PosAtPoint(pt);
-        t.Expect(back >= 0 && back <= d.GetLength(), String().Cat() << "mapped pos in bounds=" << pos);
-        t.Expect(back >= prev, String().Cat() << "round-trip monotonic pos=" << pos);
-        prev = back;
-
-        Point nearp = pt;
-        nearp.x += 2;
-        int near_back = d.PosAtPoint(nearp);
-        t.Expect(near_back >= back, String().Cat() << "near-map nondecreasing pos=" << pos);
-    }
-
-    t.EndCase();
-}
-
 
 CONSOLE_APP_MAIN
 {
     TestCtx t;
-    Cout() << "UiDoc model regression suite\n";
-    Cout() << "Coverage: annotations/remap, resources, generic embeds (HR+image+svg), table-embed structure/style/edit sync, text/style ops, search, allocation churn.\n";
+    Cout() << "UiDoc v2 editor/model regression suite\n";
+    Cout() << "Coverage: UiDoc facade + UiDocCore composition, selection mapping, formatting, semantic blocks, comments, view lanes, resources/images, canonical tables, search, commands, history, snapshots and viewport geometry.\n";
 
-    Case01_AddUndoRedo(t);
-    Case02_UpdateUndoRedo(t);
-    Case03_FlagsExpanded(t);
-    Case04_FlagsPrintableResolved(t);
-    Case05_RemoveUndoRedo(t);
-    Case06_RemapInsertBefore(t);
-    Case07_RemapDeleteOverlap(t);
-    Case08_MultiOverlapQuery(t);
-    Case09_SelectionRevealModel(t);
-    Case10_InsertDeleteReplaceCore(t);
-    Case11_UndoRedoLinear(t);
-    Case12_BoldStyleUndo(t);
-    Case13_LeadingTracking(t);
-    Case14_MarginAdjust(t);
-    Case15_BlockMetaHeading(t);
-    Case16_ListModes(t);
-    Case17_TableOps(t);
-    Case18_FindGlob(t);
-    Case19_PositionMapAvailable(t);
-    Case20_AnnotationStress(t);
-    Case21_TextStressUndoRedo(t);
-    Case22_AllocationChurn(t);
-    Case23_EventOrderPerTx(t);
-    Case24_ResourceAddDedupe(t);
-    Case25_ResourceRoundTrip(t);
-    Case26_EmbedHrUndoRedo(t);
-    Case27_EmbedRoundTrip(t);
-    Case28_TableEmbedOnInsert(t);
-    Case29_TableEmbedStructureUpdates(t);
-    Case30_TableEmbedRoundTrip(t);
-    Case31_TableCellEditSyncsEmbed(t);
-    Case32_TableStylePayload(t);
-    Case33_TableStyleTypingInherit(t);
-    Case34_ImageEmbedUndoKeepsResource(t);
-    Case35_ImageEmbedRoundTrip(t);
-    Case36_SvgEmbedUndoRedo(t);
-    Case37_SvgEmbedRoundTrip(t);
-    Case38_TableOpsKeepActiveContext(t);
-    Case39_TableCellImageRun(t);
-    Case40_BlockImageAlignAndDelete(t);
-    Case41_TableInlineImageBetweenText(t);
-    Case42_ParagraphInlineImage(t);
-    Case43_InlineImageKeyNavigation(t);
-    Case44_SelectionDeletesInlineImage(t);
-    Case45_ParagraphInlinePosRoundTrip(t);
+    Case01_TextSelectionKeyboard(t);
+    Case02_CoreMappingAndEvents(t);
+    Case03_SelectionFormatting(t);
+    Case04_TypingStyle(t);
+    Case05_BlockRoleAndIndent(t);
+    Case06_CommentsLifecycleAndRemap(t);
+    Case07_AnnotationLaneViewState(t);
+    Case08_ResourceImageLifecycle(t);
+    Case09_CanonicalRichTable(t);
+    Case10_TableImageRun(t);
+    Case11_SearchReplace(t);
+    Case12_CommandRoutingAndState(t);
+    Case13_InsertCommands(t);
+    Case14_NewDocumentAndData(t);
+    Case15_StyleHistoryLimit(t);
+    Case16_SnapshotComposition(t);
+    Case17_LayoutGeometry(t);
 
     Cout() << "\n=== Summary ===\n";
-    Cout() << "Cases : " << t.cases << "\n";
-    Cout() << "CaseP : " << t.case_pass << "\n";
-    Cout() << "CaseF : " << t.case_fail << "\n";
-    Cout() << "Checks: " << t.checks << "\n";
-    Cout() << "Fails : " << t.fails << "\n";
-    Cout() << "Result: " << (t.fails == 0 ? "PASS" : "FAIL") << "\n";
-    Cout() << Format("UIDOC_TEST_SUMMARY result=%s cases=%d pass=%d fail=%d checks=%d failed_checks=%d\n",
-                     t.fails == 0 ? "PASS" : "FAIL", t.cases, t.case_pass, t.case_fail, t.checks, t.fails);
-
+    Cout() << "Cases : " << t.cases << '\n';
+    Cout() << "CaseP : " << t.case_pass << '\n';
+    Cout() << "CaseF : " << t.case_fail << '\n';
+    Cout() << "Checks: " << t.checks << '\n';
+    Cout() << "Fails : " << t.fails << '\n';
+    Cout() << "Result: " << (t.fails == 0 ? "PASS" : "FAIL") << '\n';
+    Cout() << Format("UIDOC_MODEL_SUMMARY cases=%d case_pass=%d case_fail=%d checks=%d failed=%d\n",
+                     t.cases, t.case_pass, t.case_fail, t.checks, t.fails);
     SetExitCode(t.fails == 0 ? 0 : 1);
 }
