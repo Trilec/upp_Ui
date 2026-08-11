@@ -110,6 +110,40 @@ static void TestSemanticBlocks(TestCtx& t)
     t.Expect(AsString(scenes[0].meta["production.scene_id"]) == "S17", "block metadata preserved");
 }
 
+static void TestSemanticRangeBoundaries(TestCtx& t)
+{
+    // insert exactly at block start -> whole block shifts
+    {
+        UiDocCore doc;
+        doc.Replace(UiDocRange(0, 0), WString("abcdef"));
+        doc.AddBlock(UiDocRange(2, 5), "screenplay.scene");
+        doc.Replace(UiDocRange(0, 0), WString("XX"));
+        Vector<UiDocBlock> blocks = doc.QueryBlocks(nullptr, "screenplay.scene");
+        t.Expect(blocks.GetCount() == 1 && blocks[0].range.from == 4 && blocks[0].range.to == 7,
+                 "insert at block start shifts both boundaries");
+    }
+    // insert inside block -> block expands
+    {
+        UiDocCore doc;
+        doc.Replace(UiDocRange(0, 0), WString("abcdef"));
+        doc.AddBlock(UiDocRange(2, 5), "screenplay.scene");
+        doc.Replace(UiDocRange(3, 3), WString("YY"));
+        Vector<UiDocBlock> blocks = doc.QueryBlocks(nullptr, "screenplay.scene");
+        t.Expect(blocks.GetCount() == 1 && blocks[0].range.from == 2 && blocks[0].range.to == 7,
+                 "insert inside block expands block end");
+    }
+    // insert exactly at block end -> block does not expand
+    {
+        UiDocCore doc;
+        doc.Replace(UiDocRange(0, 0), WString("abcdef"));
+        doc.AddBlock(UiDocRange(2, 5), "screenplay.scene");
+        doc.Replace(UiDocRange(5, 5), WString("ZZ"));
+        Vector<UiDocBlock> blocks = doc.QueryBlocks(nullptr, "screenplay.scene");
+        t.Expect(blocks.GetCount() == 1 && blocks[0].range.from == 2 && blocks[0].range.to == 5,
+                 "insert at block end leaves block unchanged");
+    }
+}
+
 static void TestAnnotationsAndMetadata(TestCtx& t)
 {
     UiDocCore doc;
@@ -339,6 +373,7 @@ CONSOLE_APP_MAIN
     TestTextRevisionAndAtomicity(t);
     TestSparseStyles(t);
     TestSemanticBlocks(t);
+    TestSemanticRangeBoundaries(t);
     TestAnnotationsAndMetadata(t);
     TestResourcesAndEmbeds(t);
     TestTypedTables(t);

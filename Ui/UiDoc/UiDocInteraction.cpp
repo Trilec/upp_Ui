@@ -4,7 +4,7 @@ namespace Upp {
 
 namespace {
 
-int CellUnits(const UiDocTableCell& cell)
+int InteractionCellUnits(const UiDocTableCell& cell)
 {
     int units = 0;
     for(const UiDocInlineRun& run : cell.runs) {
@@ -127,7 +127,7 @@ bool UiDoc::Key(dword key, int count)
         UiDocTable table;
         if(core_.GetTable(active_table_id_, table)) {
             const UiDocTableCell& cell = table.rows[active_table_row_].cells[active_table_column_];
-            int units = CellUnits(cell);
+            int units = InteractionCellUnits(cell);
             switch(base) {
             case K_LEFT:
                 active_table_pos_ = max(0, active_table_pos_ - 1); Refresh(); return true;
@@ -135,11 +135,11 @@ bool UiDoc::Key(dword key, int count)
                 active_table_pos_ = min(units, active_table_pos_ + 1); Refresh(); return true;
             case K_UP:
                 if(active_table_row_ > 0) active_table_row_--;
-                active_table_pos_ = min(active_table_pos_, CellUnits(table.rows[active_table_row_].cells[active_table_column_]));
+                active_table_pos_ = min(active_table_pos_, InteractionCellUnits(table.rows[active_table_row_].cells[active_table_column_]));
                 Refresh(); return true;
             case K_DOWN:
                 if(active_table_row_ + 1 < table.rows.GetCount()) active_table_row_++;
-                active_table_pos_ = min(active_table_pos_, CellUnits(table.rows[active_table_row_].cells[active_table_column_]));
+                active_table_pos_ = min(active_table_pos_, InteractionCellUnits(table.rows[active_table_row_].cells[active_table_column_]));
                 Refresh(); return true;
             case K_TAB:
                 if(shift) {
@@ -150,7 +150,7 @@ bool UiDoc::Key(dword key, int count)
                     if(active_table_column_ + 1 < table.columns) active_table_column_++;
                     else if(active_table_row_ + 1 < table.rows.GetCount()) { active_table_row_++; active_table_column_ = 0; }
                 }
-                active_table_pos_ = min(active_table_pos_, CellUnits(table.rows[active_table_row_].cells[active_table_column_]));
+                active_table_pos_ = min(active_table_pos_, InteractionCellUnits(table.rows[active_table_row_].cells[active_table_column_]));
                 Refresh(); return true;
             case K_BACKSPACE: return DeleteActiveTableCell(false);
             case K_DELETE: return DeleteActiveTableCell(true);

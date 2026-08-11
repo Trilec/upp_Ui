@@ -4,7 +4,7 @@ namespace Upp {
 
 namespace {
 
-int BlockIndentAt(const UiDocCore& core, int pos)
+int ParagraphBlockIndentAt(const UiDocCore& core, int pos)
 {
     UiDocRange probe(pos, pos);
     Vector<UiDocBlock> blocks = core.QueryBlocks(&probe);
@@ -34,7 +34,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
     const WString& text = core_.GetText();
     int from = paragraph.from;
     int to = paragraph.to;
-    int indent_px = BlockIndentAt(core_, from) * max(DPI(4), style_.margin_step * DPI(1));
+    int indent_px = ParagraphBlockIndentAt(core_, from) * max(DPI(4), style_.margin_step * DPI(1));
     int available = max(DPI(40), width - indent_px);
     String role = BlockRoleAt(from);
 

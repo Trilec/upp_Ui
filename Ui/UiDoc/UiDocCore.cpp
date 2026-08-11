@@ -25,11 +25,41 @@ static void UiDocMapRange(UiDocRange& range, const UiDocPositionMap& map)
     if(range.IsEmpty()) {
         int pos = map.Map(range.from, UiDocPositionMap::Right);
         range.from = range.to = pos;
+        return;
     }
-    else {
-        range.from = map.Map(range.from, UiDocPositionMap::Left);
-        range.to = map.Map(range.to, UiDocPositionMap::Right);
+
+    int from = range.from;
+    int to = range.to;
+    for(const UiDocPositionMapEntry& e : map.edits) {
+        if(e.old_len == 0) {
+            // Pure insertion. An insertion at or before range.from is treated
+            // as before the range and shifts both boundaries; an insertion
+            // strictly inside expands range.to; an insertion at or after
+            // range.to is treated as after the range and leaves it unchanged.
+            if(e.at <= from) {
+                from += e.new_len;
+                to += e.new_len;
+            }
+            else if(e.at < to)
+                to += e.new_len;
+        }
+        else {
+            // Replacement: keep the existing Left/Right mapping so a semantic
+            // range overlapping a replacement maps onto the replacement
+            // content rather than inverting or excluding it.
+            int old_to = e.at + e.old_len;
+            if(from >= e.at && from <= old_to)
+                from = e.at;
+            else if(from > old_to)
+                from += e.new_len - e.old_len;
+            if(to >= e.at && to <= old_to)
+                to = e.at + e.new_len;
+            else if(to > old_to)
+                to += e.new_len - e.old_len;
+        }
     }
+    range.from = from;
+    range.to = to;
 }
 
 static bool UiDocResourceRefsValid(const Value& value, const Vector<UiDocResource>& resources)
