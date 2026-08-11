@@ -168,22 +168,6 @@ Rect UiDoc::CaretRectInternal() const
     Font caret_font = ResolveFont(caret_style, BlockRoleAt(sample_pos));
     int height = max(DPI(14), caret_font.GetHeight() + style_.line_gap + max(0, caret_style.leading_delta));
 
-    int index = FindParagraphAtPos(caret_pos_);
-    if(index >= 0 && index < paragraphs_.GetCount()) {
-        LayoutParagraph(index, ContentWidth());
-        const ParagraphCache& paragraph = paragraphs_[index];
-        for(int i = 0; i < paragraph.lines.GetCount(); i++) {
-            const VisualLine& line = paragraph.lines[i];
-            bool last = i + 1 == paragraph.lines.GetCount();
-            if(caret_pos_ >= line.from &&
-               (caret_pos_ < line.to || (last && caret_pos_ <= line.to))) {
-                // Keep the caret tied to the local text/typing metrics rather
-                // than inheriting a taller neighbouring run on the same line.
-                height = min(line.height, height);
-                break;
-            }
-        }
-    }
     return RectC(point.x, point.y, max(1, style_.caret_width), height);
 }
 
