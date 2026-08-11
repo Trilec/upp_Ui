@@ -68,7 +68,10 @@ int UiDoc::PosAtDocumentPoint(Point point) const
     if(paragraphs_.IsEmpty())
         return 0;
 
-    int y = point.y - page_rect_.top + scroll_y_ - style_.page_padding;
+    // paragraph.top already includes page_padding. Keep hit testing in the
+    // same document-space Y coordinates used by painting instead of removing
+    // page_padding a second time here.
+    int y = point.y - page_rect_.top + scroll_y_;
     int index = FindParagraphAtY(y);
     index = minmax(index, 0, paragraphs_.GetCount() - 1);
     const ParagraphCache& paragraph = paragraphs_[index];
@@ -79,14 +82,8 @@ int UiDoc::PosAtDocumentPoint(Point point) const
 
     for(const EmbedVisual& embed : paragraph.embeds) {
         Rect r = embed.rect.Offseted(page_rect_.left + style_.page_padding,
-                                     page_rect_.top + style_.page_padding + paragraph.top - scroll_y_);
+                                     page_rect_.top + paragraph.top - scroll_y_);
         if(r.Contains(point)) {
-            if(embed.type == "table") {
-                String table_id;
-                int row = -1, column = -1, cell_pos = 0;
-                if(HitTestTable(point, table_id, row, column, cell_pos))
-                    return core_.GetEmbeds()[core_.QueryEmbeds(nullptr, "table").IsEmpty() ? 0 : 0].range.from;
-            }
             for(const UiDocEmbedBlock& model : core_.GetEmbeds())
                 if(model.id == embed.embed_id)
                     return model.range.from;
@@ -131,11 +128,17 @@ Point UiDoc::DocumentPointAtPos(int pos) const
 
     int local_x = 0;
     int local_y = 0;
-    for(const VisualLine& line : paragraph.lines) {
+    for(int i = 0; i < paragraph.lines.GetCount(); i++) {
+        const VisualLine& line = paragraph.lines[i];
         local_y = line.y;
         if(pos < line.from)
             break;
-        if(pos <= line.to) {
+
+        // A wrapped line's end position is also the next line's start. Prefer
+        // the next line at that shared boundary; only the final visual line
+        // owns its terminal position.
+        bool last = i + 1 == paragraph.lines.GetCount();
+        if(pos < line.to || (last && pos <= line.to)) {
             if(line.glyphs.IsEmpty())
                 local_x = 0;
             else {
@@ -151,20 +154,32 @@ Point UiDoc::DocumentPointAtPos(int pos) const
         }
     }
     return Point(page_rect_.left + style_.page_padding + local_x,
-                 page_rect_.top + style_.page_padding + paragraph.top + local_y - scroll_y_);
+                 page_rect_.top + paragraph.top + local_y - scroll_y_);
 }
 
 Rect UiDoc::CaretRectInternal() const
 {
     Point point = DocumentPointAtPos(caret_pos_);
-    int height = max(DPI(14), BaseFont().GetHeight() + style_.line_gap);
+
+    int sample_pos = caret_pos_;
+    if(sample_pos >= core_.GetLength() && sample_pos > 0)
+        sample_pos--;
+    UiDocTextStyle caret_style = typing_style_.IsDefault() ? StyleAt(sample_pos) : typing_style_;
+    Font caret_font = ResolveFont(caret_style, BlockRoleAt(sample_pos));
+    int height = max(DPI(14), caret_font.GetHeight() + style_.line_gap + max(0, caret_style.leading_delta));
+
     int index = FindParagraphAtPos(caret_pos_);
     if(index >= 0 && index < paragraphs_.GetCount()) {
         LayoutParagraph(index, ContentWidth());
         const ParagraphCache& paragraph = paragraphs_[index];
-        for(const VisualLine& line : paragraph.lines) {
-            if(caret_pos_ >= line.from && caret_pos_ <= line.to) {
-                height = line.height;
+        for(int i = 0; i < paragraph.lines.GetCount(); i++) {
+            const VisualLine& line = paragraph.lines[i];
+            bool last = i + 1 == paragraph.lines.GetCount();
+            if(caret_pos_ >= line.from &&
+               (caret_pos_ < line.to || (last && caret_pos_ <= line.to))) {
+                // Keep the caret tied to the local text/typing metrics rather
+                // than inheriting a taller neighbouring run on the same line.
+                height = min(line.height, height);
                 break;
             }
         }
@@ -207,7 +222,7 @@ bool UiDoc::HitTestTable(Point point, String& table_id, int& row, int& column, i
             const TableVisual& table = embed.table;
             for(int i = 0; i < table.cells.GetCount(); i++) {
                 Rect cell = table.cells[i].Offseted(page_rect_.left + style_.page_padding,
-                                                    page_rect_.top + style_.page_padding + paragraph.top - scroll_y_);
+                                                    page_rect_.top + paragraph.top - scroll_y_);
                 if(!cell.Contains(point))
                     continue;
                 table_id = table.embed_id;
@@ -256,7 +271,7 @@ bool UiDoc::HitTestEmbed(Point point, String& embed_id) const
             continue;
         for(const EmbedVisual& embed : paragraph.embeds) {
             Rect rect = embed.rect.Offseted(page_rect_.left + style_.page_padding,
-                                            page_rect_.top + style_.page_padding + paragraph.top - scroll_y_);
+                                            page_rect_.top + paragraph.top - scroll_y_);
             if(rect.Contains(point)) {
                 embed_id = embed.embed_id;
                 return true;
