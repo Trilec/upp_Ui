@@ -297,9 +297,9 @@ UiDocApplyResult UiDocCore::Apply(const UiDocCoreTransaction& tx)
     result.revision_after = revision_;
 
     if(tx.base_revision && tx.base_revision != revision_) {
-        result.error = Format("revision mismatch: expected %llu, current %llu",
-                              (unsigned long long)tx.base_revision,
-                              (unsigned long long)revision_);
+        result.error = Format("revision mismatch: expected %lld, current %lld",
+                              (int64)tx.base_revision,
+                              (int64)revision_);
         return result;
     }
     if(tx.changes.IsEmpty()) {
