@@ -126,7 +126,7 @@ bool UiDoc::Key(dword key, int count)
     if(!active_table_id_.IsEmpty()) {
         UiDocTable table;
         if(core_.GetTable(active_table_id_, table)) {
-            UiDocTableCell cell = clone(table.rows[active_table_row_].cells[active_table_column_]);
+            const UiDocTableCell& cell = table.rows[active_table_row_].cells[active_table_column_];
             int units = CellUnits(cell);
             switch(base) {
             case K_LEFT:

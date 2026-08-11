@@ -285,17 +285,4 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
     return false;
 }
 
-void UiDoc::ScrollCaretIntoView()
-{
-    Rect caret = CaretRectInternal();
-    int top = page_rect_.top + style_.page_padding;
-    int bottom = page_rect_.bottom - style_.page_padding;
-    if(caret.top < top)
-        scroll_y_ = max(0, scroll_y_ - (top - caret.top));
-    else if(caret.bottom > bottom)
-        scroll_y_ += caret.bottom - bottom;
-    SyncScrollBar();
-    Refresh();
-}
-
 }
