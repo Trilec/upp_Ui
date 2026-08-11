@@ -11,6 +11,32 @@ bool SameInlineStyle(const UiDocTextStyle& a, const UiDocTextStyle& b)
            a.leading_delta == b.leading_delta && a.tracking_delta == b.tracking_delta;
 }
 
+UiDocInlineRun CopyInlineRun(const UiDocInlineRun& source)
+{
+    UiDocInlineRun out;
+    out.type = source.type;
+    out.text = source.text;
+    out.style = source.style;
+    out.resource_key = source.resource_key;
+    out.width = source.width;
+    out.height = source.height;
+    out.payload = clone(source.payload);
+    out.meta = clone(source.meta);
+    return out;
+}
+
+UiDocTableCell CopyTableCell(const UiDocTableCell& source)
+{
+    UiDocTableCell out;
+    out.format = clone(source.format);
+    out.meta = clone(source.meta);
+    for(const UiDocInlineRun& source_run : source.runs) {
+        UiDocInlineRun run = CopyInlineRun(source_run);
+        out.runs.Add(pick(run));
+    }
+    return out;
+}
+
 int CellUnits(const UiDocTableCell& cell)
 {
     int units = 0;
@@ -26,7 +52,8 @@ int CellUnits(const UiDocTableCell& cell)
 void NormalizeCellRuns(UiDocTableCell& cell)
 {
     Vector<UiDocInlineRun> out;
-    for(UiDocInlineRun run : cell.runs) {
+    for(const UiDocInlineRun& source : cell.runs) {
+        UiDocInlineRun run = CopyInlineRun(source);
         if(run.type == "text" && run.text.IsEmpty())
             continue;
         if(!out.IsEmpty() && run.type == "text" && out.Top().type == "text" &&
@@ -48,7 +75,7 @@ bool InsertCellText(UiDocTableCell& cell, int pos, const WString& text)
     bool inserted = false;
 
     for(const UiDocInlineRun& source : cell.runs) {
-        UiDocInlineRun run = clone(source);
+        UiDocInlineRun run = CopyInlineRun(source);
         int units = run.type == "text" ? run.text.GetCount() : (run.type == "image" ? 1 : 0);
         if(!inserted && pos <= at + units) {
             if(run.type == "text") {
@@ -56,7 +83,7 @@ bool InsertCellText(UiDocTableCell& cell, int pos, const WString& text)
                 WString left = run.text.Left(off);
                 WString right = run.text.Mid(off);
                 if(!left.IsEmpty()) {
-                    UiDocInlineRun l = clone(run);
+                    UiDocInlineRun l = CopyInlineRun(run);
                     l.text = left;
                     out.Add(pick(l));
                 }
@@ -67,7 +94,7 @@ bool InsertCellText(UiDocTableCell& cell, int pos, const WString& text)
                 if(!middle.text.IsEmpty())
                     out.Add(pick(middle));
                 if(!right.IsEmpty()) {
-                    UiDocInlineRun r = clone(run);
+                    UiDocInlineRun r = CopyInlineRun(run);
                     r.text = right;
                     out.Add(pick(r));
                 }
@@ -281,7 +308,7 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool)
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
 
-    UiDocTableCell cell = clone(table.rows[active_table_row_].cells[active_table_column_]);
+    UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
     int pos = clamp(active_table_pos_, 0, CellUnits(cell));
     if(!InsertCellText(cell, pos, text))
         return false;
@@ -300,7 +327,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
 
-    UiDocTableCell cell = clone(table.rows[active_table_row_].cells[active_table_column_]);
+    UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
     int total = CellUnits(cell);
     int pos = clamp(active_table_pos_, 0, total);
     int remove_at = forward ? pos : pos - 1;
