@@ -4,8 +4,13 @@ Branch: `document-redesign`
 
 ## Current recovery point
 
-Current compile-active branch head before Windows validation:
-`45beb38d0bf7921055c0a88bf6896b033c1a55eb` — `UiDoc v2: fix styled paint state type`
+Current synchronized branch head before Windows validation:
+`b2d0972ca42cb58b789d273ad77d05ba89f74d70` — `Merge main into document-redesign`
+
+Current `main` included by that merge:
+`382c913e19c3ac06e3daa412361f52305c5ea75e` — `Update 04_UI_DEMO_GUIDE.md`
+
+`document-redesign` contains all of current `main` plus the UiDoc v2 work. Keep syncing `main -> document-redesign` as unrelated UI work lands; do not merge the redesign back to `main` until the v2 library/editor compile and focused tests are clean.
 
 The v2 package switch is active. `Ui/Ui.upp` now builds the implementation under `Ui/UiDoc/`; the old root implementation `.cpp` files are no longer package members. Root `UiDoc.h` and `UiDocCore.h` are only small forwarding include points into the subsystem.
 
@@ -60,10 +65,30 @@ The folder keeps these contained. After the first clean compile/runtime pass, co
 - verified the UiTheme `ResolveDoc()` contract only depends on `UiDoc::StyleDefault()`, palette and font; v2 preserves that style vocabulary
 - declaration/definition and brace/parenthesis structural scans are clean; overloaded `SetSelection` is the only intentional duplicate method name
 
+## Windows validation without changing the main working tree
+
+Prefer a temporary Git worktree or scratch clone so the primary local checkout remains on `main`.
+
+Example worktree flow from the existing repository:
+
+```text
+git fetch origin
+git worktree add ..\upp_Ui_uidoc_validate origin/document-redesign
+cd ..\upp_Ui_uidoc_validate
+git rev-parse HEAD
+```
+
+Build/test only in that worktree. Remove it afterwards with:
+
+```text
+cd <original-repository>
+git worktree remove ..\upp_Ui_uidoc_validate
+```
+
 ## Next exact steps
 
-1. Windows programmer pulls/checks out `document-redesign` at the exact current validation SHA and compiles `Ui` first.
-2. Compile/run `Utilities/UiDocCoreTest` without weakening tests.
+1. Windows programmer validates the exact latest `document-redesign` SHA in a separate worktree/scratch clone; the main working tree stays on `main`.
+2. Compile `Ui` first, then compile/run `Utilities/UiDocCoreTest` without weakening tests.
 3. Report the first compiler errors exactly, including file, line and diagnostic; stop if `Ui` does not build.
 4. Apply source corrections on this branch, publish, update this status file, and repeat until the library/Core test are clean.
 5. Add/update focused v2 editor/model tests after the control compiles.
