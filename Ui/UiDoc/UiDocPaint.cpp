@@ -54,7 +54,7 @@ void UiDoc::PaintText(Draw& w)
 {
     EnsureLayout();
     UiDocRange selection = SelectionRange();
-    Vector<UiDocAnnotation> annotations = core_.GetAnnotations();
+    const Vector<UiDocAnnotation>& annotations = core_.GetAnnotations();
     int origin_x = page_rect_.left + style_.page_padding;
     int viewport_top = page_rect_.top;
     int viewport_bottom = page_rect_.bottom;
