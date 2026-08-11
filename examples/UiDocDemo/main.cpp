@@ -429,7 +429,8 @@ private:
 
         drop_style.UseInternalModel();
         drop_style.SetPlaceholderText("More styles")
-                  .SetPopupMaxItems(12);
+                  .SetPopupMaxItems(12)
+                  .SetSizeMin(DPI(156), DPI(28));
         drop_style.Add("Normal", String("paragraph"));
         drop_style.Add("Heading 1", String("heading.1"));
         drop_style.Add("Heading 2", String("heading.2"));
@@ -447,7 +448,7 @@ private:
         drop_style.SetDataSilently(String("paragraph"));
 
         box_styles.Add(box_style_buttons).Fit();
-        box_styles.Add(drop_style).Fixed(DPI(156));
+        box_styles.Add(drop_style).Fit();
 
         SetupRibbonGroup(gp_editing, box_editing, "Editing", UiDirection::V);
         box_find_row.SetDirection(UiDirection::H)
@@ -751,7 +752,8 @@ private:
         };
         drop_size.WhenSelect = [=](int) {
             int size = (int)drop_size.GetSelectedData();
-            doc_editor.SetSelectionFont(String(), DPI(size));
+            String face = drop_font.HasSelection() ? AsString(drop_font.GetSelectedData()) : String();
+            doc_editor.SetSelectionFont(face, DPI(size));
             doc_editor.SetFocus();
         };
         btn_size_up.WhenAction = [=] { RunCommand("format.size_up", Value(), "Increase font size"); };
