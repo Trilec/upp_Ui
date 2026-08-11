@@ -203,8 +203,13 @@ UiGroupPanel& UiGroupPanel::SetHeaderContent(Ctrl& ctrl)
 
 UiGroupPanel& UiGroupPanel::ClearHeaderContent()
 {
-    if(header_content_)
-        header_content_->Remove();
+    if(header_content_) {
+        Ctrl *child = header_content_;
+        header_content_ = nullptr;
+        child->Remove();
+        RefreshLayout();
+        Refresh();
+    }
     return *this;
 }
 
@@ -337,32 +342,70 @@ UiGroupPanel::HeaderLayout UiGroupPanel::ResolveHeaderLayout(const Rect& face) c
     Rect inner = UiGroupPanelClampRect(out.header.Deflated(s.header_inset.left, s.header_inset.top,
                                                            s.header_inset.right, s.header_inset.bottom));
     Size title = GetTitleNaturalSize();
-    title.cx = min(title.cx, inner.GetWidth());
-    title.cy = min(title.cy, inner.GetHeight());
-    int tx = inner.left + UiGroupPanelAlignedOffset(inner.GetWidth(), title.cx, s.title_align_h);
-    int ty = inner.top + UiGroupPanelAlignedOffset(inner.GetHeight(), title.cy, s.title_align_v);
+    Size child = GetHeaderContentNaturalSize();
+    bool horizontal = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;
+    bool have_title = title.cx > 0 && title.cy > 0;
+    bool have_child = header_content_ && child.cx > 0 && child.cy > 0;
+    int gap = have_title && have_child ? s.header_gap : 0;
+
+    Rect title_region = inner;
+    out.content_region = inner;
+
+    // Reserve the attached content root first. This guarantees that a long
+    // title or subtitle is clipped inside its own region instead of consuming
+    // the action/content slot that callers explicitly attached.
+    if(have_child) {
+        if(horizontal) {
+            int child_w = min(max(0, child.cx), inner.GetWidth());
+            if(s.title_align_h == UiAlign::RIGHT) {
+                out.content_region.right = min(inner.right, inner.left + child_w);
+                title_region.left = min(inner.right, out.content_region.right + gap);
+            }
+            else {
+                out.content_region.left = max(inner.left, inner.right - child_w);
+                title_region.right = max(inner.left, out.content_region.left - gap);
+            }
+        }
+        else {
+            int child_h = min(max(0, child.cy), inner.GetHeight());
+            if(s.title_align_v == UiAlign::BOTTOM) {
+                out.content_region.bottom = min(inner.bottom, inner.top + child_h);
+                title_region.top = min(inner.bottom, out.content_region.bottom + gap);
+            }
+            else {
+                out.content_region.top = max(inner.top, inner.bottom - child_h);
+                title_region.bottom = max(inner.top, out.content_region.top - gap);
+            }
+        }
+    }
+
+    title_region = UiGroupPanelClampRect(title_region);
+    title.cx = min(max(0, title.cx), title_region.GetWidth());
+    title.cy = min(max(0, title.cy), title_region.GetHeight());
+    int tx = title_region.left + UiGroupPanelAlignedOffset(title_region.GetWidth(), title.cx, s.title_align_h);
+    int ty = title_region.top + UiGroupPanelAlignedOffset(title_region.GetHeight(), title.cy, s.title_align_v);
     out.title = RectC(tx, ty, title.cx, title.cy);
 
-    bool horizontal = s.header_placement == UiAlign::TOP || s.header_placement == UiAlign::BOTTOM;
-    bool have_title = !out.title.IsEmpty();
-    int gap = have_title && header_content_ ? s.header_gap : 0;
-    out.content_region = inner;
-    if(horizontal && have_title) {
-        if(s.title_align_h == UiAlign::RIGHT)
-            out.content_region.right = max(inner.left, out.title.left - gap);
-        else
-            out.content_region.left = min(inner.right, out.title.right + gap);
-    }
-    else if(!horizontal && have_title) {
-        if(s.title_align_v == UiAlign::BOTTOM)
-            out.content_region.bottom = max(inner.top, out.title.top - gap);
-        else
-            out.content_region.top = min(inner.bottom, out.title.bottom + gap);
+    // Preserve the prospective header-content slot contract when no child is
+    // attached: the remaining region follows the title as before.
+    if(!have_child) {
+        out.content_region = inner;
+        if(horizontal && have_title) {
+            if(s.title_align_h == UiAlign::RIGHT)
+                out.content_region.right = max(inner.left, out.title.left - s.header_gap);
+            else
+                out.content_region.left = min(inner.right, out.title.right + s.header_gap);
+        }
+        else if(!horizontal && have_title) {
+            if(s.title_align_v == UiAlign::BOTTOM)
+                out.content_region.bottom = max(inner.top, out.title.top - s.header_gap);
+            else
+                out.content_region.top = min(inner.bottom, out.title.bottom + s.header_gap);
+        }
     }
     out.content_region = UiGroupPanelClampRect(out.content_region);
 
     if(header_content_) {
-        Size child = GetHeaderContentNaturalSize();
         child.cx = min(max(0, child.cx), out.content_region.GetWidth());
         child.cy = min(max(0, child.cy), out.content_region.GetHeight());
         UiAlign ah = header_content_align_h_;
