@@ -887,6 +887,30 @@ void UiTitleCard::Paint(Draw& w)
             }
         }
 
+        if(!split && style.card_line && style.card_line_length != NONE &&
+           (style.card_line_side == UiAlign::TOP || style.card_line_side == UiAlign::BOTTOM)) {
+            int len = max(0, content.GetWidth());
+            if(style.card_line_length == SMALL)
+                len = min(len, DPI(40));
+            else if(style.card_line_length == MEDIUM)
+                len = min(len, content.GetWidth() * 60 / 100);
+            else
+                len = max(0, len - DPI(8));
+
+            if(len > 0) {
+                Color lc = style.card_line_color_enabled && !IsNull(style.card_line_color)
+                               ? style.card_line_color
+                               : Blend(ink, SColorShadow(), 80);
+                int th = max(1, style.card_line_thickness);
+                int gap = max(0, style.card_line_gap);
+                int x = content.left + max(0, (content.GetWidth() - len) / 2);
+                int y = style.card_line_side == UiAlign::TOP
+                      ? content.top + gap
+                      : content.bottom - gap - th;
+                DrawLine(w, x, y, len, lc, th, style.card_line_style);
+            }
+        }
+
         if(WhenPaintForeground)
             WhenPaintForeground(w, outer, style.palette, style.metrics, style.skin, st, has_focus);
         else if(style.metrics.focus_enabled)

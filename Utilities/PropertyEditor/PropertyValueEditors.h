@@ -6,11 +6,20 @@
 
 namespace Upp {
 
+class PropertyActionLabel : public UiLabel {
+public:
+    typedef PropertyActionLabel CLASSNAME;
+
+    void LeftDown(Point p, dword keyflags) override;
+    bool Key(dword key, int count) override;
+};
+
 struct PropertyEditorActionIcons {
     Image expand;
     Image collapse;
     Image dialog;
     Image browse;
+    Image numeric_slider;
     int size = DPI(16);
 };
 
@@ -176,6 +185,9 @@ private:
 };
 
 bool EditPropertyCurve(Value& value, Ctrl *owner = nullptr);
+bool EditPropertyBezierCurve(Value& value, Ctrl *owner = nullptr,
+                             double y_minimum = -1.0,
+                             double y_maximum = 2.0);
 
 }
 

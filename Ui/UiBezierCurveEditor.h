@@ -70,10 +70,13 @@ public:
     const ShadowCurve&   GetCurve() const { return curve_; }
     UiBezierCurveEditor& SetFlipHorizontal(bool on = true);
     UiBezierCurveEditor& SetFlipVertical(bool on = true);
+    UiBezierCurveEditor& SetYRange(double minimum, double maximum);
     UiBezierCurveEditor& SetEditable(bool on = true);
     bool                 IsEditable() const { return editable_; }
     bool                 IsFlipHorizontal() const { return style_.invert_x; }
     bool                 IsFlipVertical() const { return style_.invert_y; }
+    double               GetYMinimum() const { return y_minimum_; }
+    double               GetYMaximum() const { return y_maximum_; }
 
     UiBezierCurveEditor& SetSelectedHandle(Handle h);
     Handle               GetSelectedHandle() const { return selected_; }
@@ -105,6 +108,8 @@ private:
     Handle      selected_ = HANDLE_NONE;
     bool        dragging_ = false;
     bool        editable_ = true;
+    double      y_minimum_ = 0.0;
+    double      y_maximum_ = 1.0;
 };
 
 }

@@ -3,9 +3,12 @@ uses
 	Draw,
 	CtrlCore,
 	CtrlLib,
-	Ui;
+	Ui,
+	Utilities/PropertyEditor;
 
 file
+	UiLabelDemo.h,
+	UiLabelDemo.cpp,
 	main.cpp;
 
 mainconfig

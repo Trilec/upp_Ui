@@ -407,6 +407,19 @@ PropertyEditorItem& PropertyEditorModel::AddCurve(const String& id,
                PropertyEditorNormalizeCurve(curve), group);
 }
 
+PropertyEditorItem& PropertyEditorModel::AddBezierCurve(
+    const String& id, const String& label, const Value& control_points,
+    const String& group)
+{
+    PropertyEditorItem& item = Add(id, label, PropertyEditorKind::Curve,
+        PropertyEditorNormalizeBezierCurve(control_points), group);
+    item.editor_variant = "bezier";
+    item.inline_editor = true;
+    item.row_span = 1;
+    item.expanded_row_span = 4;
+    return item;
+}
+
 PropertyEditorItem& PropertyEditorModel::AddReadOnly(const String& id,
                                                      const String& label,
                                                      const Value& value,
@@ -791,6 +804,35 @@ String PropertyEditorFormatCurve(const Value& value)
     return out << ']';
 }
 
+Value PropertyEditorMakeBezierCurve(double x1, double y1, double x2, double y2)
+{
+    ValueArray out;
+    out.Add(x1); out.Add(y1); out.Add(x2); out.Add(y2);
+    return out;
+}
+
+Value PropertyEditorNormalizeBezierCurve(const Value& value)
+{
+    ValueArray in;
+    if(value.Is<ValueArray>())
+        in = value;
+    if(in.GetCount() < 4 || !IsNumber(in[0]) || !IsNumber(in[1]) ||
+       !IsNumber(in[2]) || !IsNumber(in[3]))
+        return PropertyEditorMakeBezierCurve(0.0, 0.0, 1.0, 1.0);
+    return PropertyEditorMakeBezierCurve(
+        PeClamp((double)in[0], 0.0, 1.0),
+        (double)in[1],
+        PeClamp((double)in[2], 0.0, 1.0),
+        (double)in[3]);
+}
+
+String PropertyEditorFormatBezierCurve(const Value& value)
+{
+    ValueArray v = PropertyEditorNormalizeBezierCurve(value);
+    return Format("cubic-bezier(%.4f, %.4f, %.4f, %.4f)",
+                  (double)v[0], (double)v[1], (double)v[2], (double)v[3]);
+}
+
 bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
                                   const Value& candidate,
                                   Value& normalized,
@@ -925,7 +967,18 @@ bool PropertyEditorNormalizeValue(const PropertyEditorItem& item,
     }
 
     case PropertyEditorKind::Curve:
-        normalized = PropertyEditorNormalizeCurve(candidate);
+        normalized = item.editor_variant == "bezier"
+            ? PropertyEditorNormalizeBezierCurve(candidate)
+            : PropertyEditorNormalizeCurve(candidate);
+        if(item.editor_variant == "bezier" &&
+           !IsNull(item.minimum) && !IsNull(item.maximum)) {
+            ValueArray points = normalized;
+            const double minimum = (double)item.minimum;
+            const double maximum = (double)item.maximum;
+            points.Set(1, PeClamp((double)points[1], minimum, maximum));
+            points.Set(3, PeClamp((double)points[3], minimum, maximum));
+            normalized = points;
+        }
         break;
 
     case PropertyEditorKind::ReadOnly:

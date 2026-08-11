@@ -10,27 +10,22 @@
 
 namespace Upp {
 
-class PropertyActionLabel : public UiLabel {
-public:
-    typedef PropertyActionLabel CLASSNAME;
-
-    void LeftDown(Point, dword) override
-    {
-        if(IsEnabled()) {
-            SetFocus();
-            WhenAction();
-        }
+void PropertyActionLabel::LeftDown(Point, dword)
+{
+    if(IsEnabled()) {
+        SetFocus();
+        WhenAction();
     }
+}
 
-    bool Key(dword key, int count) override
-    {
-        if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
-            WhenAction();
-            return true;
-        }
-        return UiLabel::Key(key, count);
+bool PropertyActionLabel::Key(dword key, int count)
+{
+    if(IsEnabled() && (key == K_ENTER || key == K_SPACE)) {
+        WhenAction();
+        return true;
     }
-};
+    return UiLabel::Key(key, count);
+}
 
 void PropertyValueEditor::FocusEditor()
 {
@@ -383,7 +378,11 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.SetText("")
+               .SetIcon(ICON_DESIGN_SLIDERS_48())
+               .SetIconSize(DPI(16), DPI(16))
+               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+               .SetContentInset(DPI(1));
         toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
@@ -475,6 +474,13 @@ public:
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        if(!action_icons_.numeric_slider.IsEmpty())
+            toggle_.SetIcon(action_icons_.numeric_slider);
+        toggle_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
     void UpdateVisible()
     {
         edit_.Show(!slider_mode_);
@@ -561,7 +567,11 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("12").SetContentInset(DPI(1));
+        toggle_.SetText("")
+               .SetIcon(ICON_DESIGN_SLIDERS_48())
+               .SetIconSize(DPI(16), DPI(16))
+               .SetIconRenderMode(UiIconRenderMode::MonoTint)
+               .SetContentInset(DPI(1));
         toggle_.Tip("Switch between numeric entry and slider");
         toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
         toggle_.WhenAction = [=] {
@@ -653,6 +663,13 @@ public:
     }
 
 private:
+    void ActionIconsChanged() override
+    {
+        if(!action_icons_.numeric_slider.IsEmpty())
+            toggle_.SetIcon(action_icons_.numeric_slider);
+        toggle_.SetIconSize(action_icons_.size, action_icons_.size);
+    }
+
     void UpdateVisible()
     {
         edit_.Show(!slider_mode_);
@@ -1808,6 +1825,7 @@ public:
         Add(expand_);
         Add(dialog_);
         Add(canvas_);
+        Add(bezier_canvas_);
         summary_.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
         summary_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
         ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
@@ -1821,10 +1839,13 @@ public:
         };
         dialog_.WhenAction = [=] {
             Value edited = value_;
-            if(EditPropertyCurve(edited, this)) {
+            const bool accepted = bezier_mode_
+                ? EditPropertyBezierCurve(edited, this, y_minimum_, y_maximum_)
+                : EditPropertyCurve(edited, this);
+            if(accepted) {
                 value_ = edited;
-                canvas_.SetCurve(value_);
-                summary_.SetText(PropertyEditorFormatCurve(value_));
+                SetCanvases();
+                SetSummary();
                 WhenPreview(value_);
                 WhenCommit(value_);
             }
@@ -1839,22 +1860,39 @@ public:
             summary_.SetText(PropertyEditorFormatCurve(value_));
             WhenCommit(value_);
         };
+        bezier_canvas_.WhenChanging = [=] {
+            value_ = bezier_canvas_.GetData();
+            SetSummary();
+            WhenPreview(value_);
+        };
+        bezier_canvas_.WhenAction = [=] {
+            value_ = bezier_canvas_.GetData();
+            SetSummary();
+            WhenCommit(value_);
+        };
         canvas_.Hide();
+        bezier_canvas_.Hide();
     }
 
     virtual void Configure(const PropertyEditorItem& item) override
     {
+        bezier_mode_ = item.editor_variant == "bezier";
+        y_minimum_ = !IsNull(item.minimum) ? (double)item.minimum : -1.0;
+        y_maximum_ = !IsNull(item.maximum) ? (double)item.maximum : 2.0;
+        bezier_canvas_.SetYRange(y_minimum_, y_maximum_);
         enabled_ = item.enabled && !item.read_only;
         expand_.Enable(item.expanded_row_span > 1);
         dialog_.Enable(enabled_);
         canvas_.Enable(enabled_);
+        bezier_canvas_.Enable(enabled_);
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
-        value_ = PropertyEditorNormalizeCurve(value);
-        canvas_.SetCurve(value_);
-        summary_.SetText(mixed ? "<multiple curves>" : PropertyEditorFormatCurve(value_));
+        value_ = bezier_mode_ ? PropertyEditorNormalizeBezierCurve(value)
+                              : PropertyEditorNormalizeCurve(value);
+        SetCanvases();
+        summary_.SetText(mixed ? "<multiple curves>" : FormatSummary());
     }
 
     virtual Value GetEditorValue() const override
@@ -1870,7 +1908,9 @@ public:
         if(expanded_) {
             const int rail_x = max(0, sz.cx - action);
             summary_.Hide();
-            canvas_.SetRect(0, 0, max(0, rail_x - DPI(3)), sz.cy);
+            Ctrl& active = bezier_mode_ ? static_cast<Ctrl&>(bezier_canvas_)
+                                        : static_cast<Ctrl&>(canvas_);
+            active.SetRect(0, 0, max(0, rail_x - DPI(3)), sz.cy);
             expand_.SetRect(rail_x, 0, action, min(action, sz.cy));
             dialog_.SetRect(rail_x, min(action + DPI(2), sz.cy), action,
                             min(action, max(0, sz.cy - action - DPI(2))));
@@ -1883,6 +1923,7 @@ public:
             expand_.SetRect(expand_x, 0, action, row);
             dialog_.SetRect(dialog_x, 0, action, row);
             canvas_.SetRect(0, 0, 0, 0);
+            bezier_canvas_.SetRect(0, 0, 0, 0);
         }
     }
 
@@ -1890,16 +1931,38 @@ public:
     {
         expanded_ = expanded;
         ActionIconsChanged();
-        canvas_.Show(expanded_);
+        canvas_.Show(expanded_ && !bezier_mode_);
+        bezier_canvas_.Show(expanded_ && bezier_mode_);
         Layout();
     }
 
     virtual void FocusEditor() override
     {
-        expanded_ ? canvas_.SetFocus() : expand_.SetFocus();
+        if(!expanded_)
+            expand_.SetFocus();
+        else if(bezier_mode_)
+            bezier_canvas_.SetFocus();
+        else
+            canvas_.SetFocus();
     }
 
 private:
+    String FormatSummary() const
+    {
+        return bezier_mode_ ? PropertyEditorFormatBezierCurve(value_)
+                            : PropertyEditorFormatCurve(value_);
+    }
+
+    void SetSummary() { summary_.SetText(FormatSummary()); }
+
+    void SetCanvases()
+    {
+        if(bezier_mode_)
+            bezier_canvas_.SetData(value_);
+        else
+            canvas_.SetCurve(value_);
+    }
+
     void ActionIconsChanged() override
     {
         const Image icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
@@ -1914,9 +1977,13 @@ private:
     PropertyActionLabel summary_;
     UiToolButton expand_, dialog_;
     PropertyCurveCanvas canvas_;
+    UiBezierCurveEditor bezier_canvas_;
     Value value_;
     bool expanded_ = false;
     bool enabled_ = true;
+    bool bezier_mode_ = false;
+    double y_minimum_ = -1.0;
+    double y_maximum_ = 2.0;
 };
 
 PropertyEditorFactory& PropertyEditorFactory::Global()
@@ -2258,6 +2325,37 @@ bool EditPropertyCurve(Value& value, Ctrl *owner)
         if(dlg.Run() != IDOK)
             return false;
     value = PropertyEditorNormalizeCurve(dlg.GetCurve());
+    return true;
+}
+
+bool EditPropertyBezierCurve(Value& value, Ctrl *owner,
+                             double y_minimum, double y_maximum)
+{
+    struct Dialog : TopWindow {
+        UiBezierCurveEditor editor;
+        UiButton ok, cancel;
+
+        Dialog()
+        {
+            Title("Bezier curve editor").Sizeable().Zoomable();
+            SetRect(0, 0, DPI(520), DPI(380));
+            Add(editor.HSizePos(DPI(12), DPI(12)).VSizePos(DPI(12), DPI(52)));
+            Add(ok.RightPos(DPI(112), DPI(96)).BottomPos(DPI(12), DPI(30)));
+            Add(cancel.RightPos(DPI(12), DPI(92)).BottomPos(DPI(12), DPI(30)));
+            ok.SetText("OK");
+            cancel.SetText("Cancel");
+            ok.WhenAction = [=] { AcceptBreak(IDOK); };
+            cancel.WhenAction = [=] { RejectBreak(IDCANCEL); };
+        }
+    } dlg;
+
+    dlg.editor.SetYRange(y_minimum, y_maximum)
+              .SetData(PropertyEditorNormalizeBezierCurve(value));
+    if(owner)
+        dlg.CenterOwner();
+    if(dlg.Run() != IDOK)
+        return false;
+    value = PropertyEditorNormalizeBezierCurve(dlg.editor.GetData());
     return true;
 }
 

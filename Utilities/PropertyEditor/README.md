@@ -136,14 +136,17 @@ expanded/collapsed state belongs to the PropertyEditor view and is controlled
 with `SetPropertyExpanded(id, expanded)`. Matrix, Curve, Image and Multiline
 adapters use this contract to remain one row by default, expand in place when
 requested, and retain a separate dialog action where a larger editor is useful.
-Activating a compact expandable row opens it directly. Expanded mode gives the
+Clicking or keyboard-activating a compact expandable summary opens it directly.
+Expanded mode gives the
 editor the complete value rectangle and keeps compact tool actions in a narrow
 right-hand rail instead of repeating the compact summary above the editor.
 Vector2 and Vector3 can use the same contract to stack components when a narrow
 Inspector cannot present all values clearly.
 
 `PropertyEditorStyle::action_icons` centrally controls the expand, collapse,
-dialog and browse images and their common compact size. `reset_icon` remains
+dialog, browse, and numeric-slider images and their common compact size.
+`filter_gap` reserves separation between the fixed filter and row viewport.
+`reset_icon` remains
 separate because Reset is a row-state action rather than an editor action.
 Nested group rows derive a restrained 10% lighter background from
 `group_background`; applications do not need to maintain a second heading

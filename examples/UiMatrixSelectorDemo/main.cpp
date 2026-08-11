@@ -49,7 +49,7 @@ public:
     UiMatrixSelectorBuilder()
         : BuilderWindowBase("UiMatrixSelectorDemo",
                             "U++ UiMatrixSelector Builder",
-                            "Position, compass, region, generic ordered quad pair, and suggested-default indication.",
+                            "Position, compass, cardinal, region, generic ordered quad pair, and suggested-default indication.",
                             1280, 900)
     {
         Preview().Add(matrix_);
@@ -92,6 +92,7 @@ public:
         preset_drop_.Add("Compass 8", 1);
         preset_drop_.Add("Side / Center 5", 2);
         preset_drop_.Add("Quad Pair", 3);
+        preset_drop_.Add("Cardinal 4", 4);
 
         mode_drop_.UseInternalModel();
         mode_drop_.Clear();
@@ -116,7 +117,7 @@ public:
         preset_drop_.WhenSelect = [=](int) {
             cfg_.preset = (int)preset_drop_.GetSelectedData();
             cfg_.mode = cfg_.preset == 3 ? 1 : 0;
-            cfg_.default_index = cfg_.preset == 3 ? 0 : 4;
+            cfg_.default_index = cfg_.preset == 3 ? 0 : cfg_.preset == 4 ? 1 : 4;
             RefreshFromConfig();
         };
         mode_drop_.WhenSelect = [=](int) { cfg_.mode = (int)mode_drop_.GetSelectedData(); RefreshFromConfig(); };
@@ -175,6 +176,7 @@ private:
         case 1: return UiMatrixPreset::Compass8;
         case 2: return UiMatrixPreset::Region5;
         case 3: return UiMatrixPreset::QuadPair;
+        case 4: return UiMatrixPreset::Cardinal4;
         default: return UiMatrixPreset::Position9;
         }
     }
@@ -259,10 +261,10 @@ private:
 
     String BuildUsageCode() const
     {
-        static const char* presets[] = { "Position9", "Compass8", "Region5", "QuadPair" };
+        static const char* presets[] = { "Position9", "Compass8", "Region5", "QuadPair", "Cardinal4" };
         String code;
         code << "UiMatrixSelector selector;\n";
-        code << "selector.SetPreset(UiMatrixPreset::" << presets[clamp(cfg_.preset, 0, 3)] << ")\n";
+        code << "selector.SetPreset(UiMatrixPreset::" << presets[clamp(cfg_.preset, 0, 4)] << ")\n";
         code << "        .SetSelectionMode(UiMatrixSelectionMode::" << (cfg_.mode ? "Pair" : "SingleCell") << ")\n";
         code << "        .SetDefault(" << cfg_.default_index << ")\n";
         code << "        .ShowDefault(" << (cfg_.default_marker ? "true" : "false") << ")\n";

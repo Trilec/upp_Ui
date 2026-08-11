@@ -26,6 +26,13 @@ return application-defined resource values. Optional thumbnail callbacks map a
 value to an `Image` for compact presentation. Providers keep project browsers,
 file loading and SymbolPicker outside this package.
 
+Curve editors use `PropertyEditorItem::editor_variant` to select compatible
+value contracts. The default polyline contract stores point pairs. The
+`bezier` contract stores four cubic control values and the visual factory hosts
+`UiBezierCurveEditor`, preserving the compact animation/easing representation
+without adding a second curve renderer. X is normalized to `[0, 1]`; Y may
+overshoot unless the property supplies explicit minimum and maximum bounds.
+
 ## Boundaries
 
 - `PropertyEditorCore` owns the schema, normalization, validation, and revision tracking;
@@ -39,7 +46,8 @@ Designer, or resource-picker applications.
 
 ## Rows and virtualization
 
-- Filter remains fixed above the scrolling viewport and updates live.
+- Filter remains fixed above the scrolling viewport, updates live, and uses the
+  style's explicit `filter_gap` so it cannot visually collide with the first row.
 - Nested group collapse state is retained while a filter temporarily reveals
   matching descendants.
 - Label sizing supports Auto, Fixed and Ratio, with a draggable divider and

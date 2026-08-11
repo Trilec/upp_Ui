@@ -4,6 +4,14 @@ Canonical integration guide for `Utilities/PropertyEditorCore` and
 `Utilities/PropertyEditor`. PropertyEditor is a reusable package in `upp_Ui`;
 it is not owned by UiDesigner and must not depend on Designer or SymbolPicker.
 
+For naming in PropertyEditor implementation, application code, demos, and host
+integration, follow the shared control-prefix convention in
+`01_UI_CONTROLS_GUIDE.md`. In particular, use
+`pe_` for visual editors, `pe_model_` for their models, `btn_` for actions,
+and `edit_` for editable text controls. This keeps the type and ownership
+visible to readers and to agents inspecting a demo without renaming existing
+library members.
+
 ## Architecture
 
 - `PropertyEditorCore` is headless and depends only on Core and Draw. It owns
@@ -85,6 +93,16 @@ optional right-side group summary without creating a fake property.
 - Multiline, Matrix, Curve, and Image can remain compact, expand in place, or
   open a dialog according to adapter capability.
 
+`Curve` has two explicit value contracts. The default contract is an ordered
+`ValueArray` of `[x, y]` point pairs for editable linear curves. Setting
+`editor_variant` to `bezier` selects a fixed cubic contract stored as exactly
+four scalars `[x1, y1, x2, y2]`. Use `AddBezierCurve`,
+`PropertyEditorMakeBezierCurve`, and `PropertyEditorNormalizeBezierCurve` for
+that form. The visual package reuses `UiBezierCurveEditor`; Core remains
+headless and does not duplicate curve drawing or interaction code. X is
+constrained to normalized time, while Y may overshoot for easing curves. Set
+the item's minimum and maximum when its output domain is bounded.
+
 ## First-class control adapters
 
 Range, Adjustable Range, Matrix, Icon, Font, and Image use stable Custom adapter
@@ -97,6 +115,9 @@ AddPropertyRange(model, "range", "Allowed range", 20, 80, 0, 100, 1,
 AddPropertyAdjustableRange(model, "window", "Window",
                            0, 100, 250, 680, 900, 1000, 1, "Layout");
 AddPropertyMatrix(model, "anchor", "Anchor", value, "Position9", "Layout");
+
+// Exact top/right/bottom/left selection without a centre or diagonals.
+AddPropertyMatrix(model, "icon_side", "Icon side", "top", "Cardinal4", "Layout");
 AddPropertyIcon(model, "icon", "Icon", "ICON_DESIGN_HOME_48", "Resources");
 AddPropertyFont(model, "font", "Font", "Arial", "Resources");
 AddPropertyImage(model, "image", "Image", path, "project-image", "Resources");
@@ -179,9 +200,10 @@ editor creation. Actual responsiveness should also be smoke-tested in Release.
 ## Styling and interaction
 
 `PropertyEditorStyle` controls palette, fonts, row/group/filter dimensions,
-indent width, action slots, label constraints, Reset icon, and compact action
-icons. `SetPaletteMode` supports FollowUiTheme, Light, and Dark. Group headings
-derive nested depth styling from the main group background.
+the explicit `filter_gap` before the scrolling viewport, indent width, action
+slots, label constraints, Reset icon, and compact action icons. `SetPaletteMode`
+supports FollowUiTheme, Light, and Dark. Group headings derive nested depth
+styling from the main group background.
 
 `SetLabelAuto`, `SetLabelWidth`, and `SetLabelRatio` configure label geometry.
 `SetPropertyExpanded` controls temporary rich-row expansion by stable property
