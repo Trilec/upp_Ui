@@ -227,6 +227,34 @@ bool UiDoc::InsertText(const WString& text)
 
     UiDocRange range = SelectionRange();
     int from = range.from;
+
+    bool extend_empty_block = false;
+    UiDocBlock empty_block;
+    if(range.IsEmpty() && !text.IsEmpty() && text.Find('\n') < 0) {
+        const WString& before = core_.GetText();
+        int paragraph_from = from;
+        int paragraph_to = from;
+        while(paragraph_from > 0 && before[paragraph_from - 1] != '\n')
+            --paragraph_from;
+        while(paragraph_to < before.GetCount() && before[paragraph_to] != '\n')
+            ++paragraph_to;
+        if(paragraph_from == paragraph_to) {
+            UiDocRange point(paragraph_from, paragraph_to);
+            for(const UiDocBlock& block : core_.QueryBlocks(&point)) {
+                if(block.range.from == paragraph_from && block.range.to == paragraph_to &&
+                   (!block.role.IsEmpty() || block.indent > 0)) {
+                    empty_block.id = block.id;
+                    empty_block.range = block.range;
+                    empty_block.role = block.role;
+                    empty_block.indent = block.indent;
+                    empty_block.meta = clone(block.meta);
+                    extend_empty_block = true;
+                    break;
+                }
+            }
+        }
+    }
+
     UiDocCoreTransaction tx;
     tx.label = "Type";
 
@@ -243,6 +271,18 @@ bool UiDoc::InsertText(const WString& text)
         style.style = typing_style_;
         style.style_mask = UiDocCore::STYLE_ALL;
         tx.changes.Add(pick(style));
+    }
+
+    if(extend_empty_block) {
+        UiDocCoreChange block;
+        block.type = UiDocCoreChange::UpdateBlock;
+        block.block_id = empty_block.id;
+        block.block.id = empty_block.id;
+        block.block.range = UiDocRange(from, from + text.GetCount());
+        block.block.role = empty_block.role;
+        block.block.indent = empty_block.indent;
+        block.block.meta = clone(empty_block.meta);
+        tx.changes.Add(pick(block));
     }
 
     UiDocApplyResult result = core_.Apply(tx);
