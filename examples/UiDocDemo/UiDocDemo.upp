@@ -3,6 +3,8 @@ uses
 	Draw,
 	CtrlCore,
 	CtrlLib,
+	plugin/png,
+	plugin/jpg,
 	Ui;
 
 file
