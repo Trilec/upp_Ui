@@ -14,6 +14,20 @@ int ParagraphBlockIndentAt(const UiDocCore& core, int pos)
     return indent;
 }
 
+bool IsInlineImageLayout(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
+const UiDocEmbedBlock* InlineImageAt(const UiDocCore& core, int pos)
+{
+    for(const UiDocEmbedBlock& embed : core.GetEmbeds())
+        if(IsInlineImageLayout(embed) && embed.range.from == pos && embed.range.to == pos + 1)
+            return &embed;
+    return nullptr;
+}
+
 }
 
 void UiDoc::LayoutParagraph(int index, int width) const
@@ -74,6 +88,40 @@ void UiDoc::LayoutParagraph(int index, int width) const
     };
 
     for(int pos = from; pos < to; pos++) {
+        const UiDocEmbedBlock* inline_image = text[pos] == (wchar)0xfffc ? InlineImageAt(core_, pos) : nullptr;
+        if(inline_image) {
+            UiDocResource resource;
+            int image_width = inline_image->payload.Find("width") >= 0 ? (int)inline_image->payload["width"] : 0;
+            int image_height = inline_image->payload.Find("height") >= 0 ? (int)inline_image->payload["height"] : 0;
+            if(inline_image->payload.Find("resource_key") >= 0 &&
+               core_.GetResource(AsString(inline_image->payload["resource_key"]), resource)) {
+                if(image_width <= 0) image_width = resource.width;
+                if(image_height <= 0) image_height = resource.height;
+            }
+            image_width = max(DPI(16), image_width > 0 ? image_width : DPI(96));
+            image_height = max(DPI(16), image_height > 0 ? image_height : DPI(64));
+            if(image_width > available) {
+                image_height = max(DPI(16), image_height * available / max(1, image_width));
+                image_width = available;
+            }
+
+            if(x > text_left && x + image_width > text_left + available)
+                EndLine();
+
+            VisualGlyph glyph;
+            glyph.pos = pos;
+            glyph.x = x;
+            glyph.width = image_width;
+            glyph.font = BaseFont();
+            glyph.ink = ResolveInk(UiDocTextStyle());
+            glyph.ch = (wchar)0xfffc;
+            current.glyphs.Add(pick(glyph));
+            current.to = pos + 1;
+            current.height = max(current.height, image_height);
+            x += image_width;
+            continue;
+        }
+
         UiDocTextStyle text_style = StyleAt(pos);
         Font font = ResolveFont(text_style, role);
         int glyph_width = MeasureGlyph(text[pos], font) + text_style.tracking_delta;
@@ -110,6 +158,8 @@ void UiDoc::LayoutParagraph(int index, int width) const
         if(embed.range.from < from || embed.range.from > to)
             continue;
         if(embed.type != "table" && embed.type != "image" && embed.type != "hr" && embed.type != "page_break")
+            continue;
+        if(IsInlineImageLayout(embed))
             continue;
 
         EmbedVisual visual;
