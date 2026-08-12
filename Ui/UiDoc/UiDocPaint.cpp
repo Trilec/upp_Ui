@@ -20,6 +20,16 @@ bool AnyRangeContains(const Vector<UiDocRange>& ranges, int pos)
     return false;
 }
 
+int PaintBlockIndentAt(const UiDocCore& core, int pos)
+{
+    UiDocRange probe(pos, pos);
+    Vector<UiDocBlock> blocks = core.QueryBlocks(&probe);
+    int indent = 0;
+    for(const UiDocBlock& block : blocks)
+        indent = max(indent, block.indent);
+    return indent;
+}
+
 Color LaneColorFor(const Vector<UiDoc::AnnotationLane>& lanes, const UiDocAnnotation& annotation, Color fallback)
 {
     for(const UiDoc::AnnotationLane& lane : lanes) {
@@ -59,12 +69,43 @@ void UiDoc::PaintText(Draw& w)
     int viewport_top = page_rect_.top;
     int viewport_bottom = page_rect_.bottom;
 
-    for(const ParagraphCache& paragraph : paragraphs_) {
+    for(int paragraph_index = 0; paragraph_index < paragraphs_.GetCount(); paragraph_index++) {
+        const ParagraphCache& paragraph = paragraphs_[paragraph_index];
         int paragraph_y = page_rect_.top + paragraph.top - scroll_y_;
         if(paragraph_y > viewport_bottom)
             break;
         if(paragraph_y + paragraph.height < viewport_top)
             continue;
+
+        String role = BlockRoleAt(paragraph.from);
+        int indent_px = PaintBlockIndentAt(core_, paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
+
+        if(role == "list.bullet" || role == "list.numbered") {
+            String marker;
+            if(role == "list.bullet")
+                marker = "•";
+            else {
+                int ordinal = 1;
+                for(int q = paragraph_index - 1; q >= 0; q--) {
+                    if(BlockRoleAt(paragraphs_[q].from) != "list.numbered")
+                        break;
+                    ordinal++;
+                }
+                marker = AsString(ordinal) + ".";
+            }
+            Font marker_font = SansSerifZ(DPI(10));
+            if(role == "list.bullet")
+                marker_font.Bold();
+            int marker_x = origin_x + indent_px + DPI(4);
+            int marker_y = paragraph_y + max(0, (paragraph.lines.IsEmpty() ? marker_font.GetHeight()
+                                                               : paragraph.lines[0].height) - marker_font.GetHeight()) / 2;
+            w.DrawText(marker_x, marker_y, marker, marker_font, style_.palette.ink[ST_NORMAL]);
+        }
+        else if(role == "quote") {
+            int x = origin_x + indent_px + DPI(6);
+            int h = max(DPI(14), paragraph.height - style_.paragraph_gap);
+            w.DrawRect(x, paragraph_y, DPI(2), h, Blend(style_.page_frame, style_.palette.ink[ST_NORMAL], 120));
+        }
 
         for(const VisualLine& line : paragraph.lines) {
             int y = paragraph_y + line.y;
@@ -109,25 +150,23 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
     if(!core_.GetTable(visual.embed_id, table))
         return;
 
-    int paragraph_index = FindParagraphAtPos(0);
     int paragraph_top = 0;
     for(int i = 0; i < paragraphs_.GetCount(); i++) {
         bool found = false;
         for(const EmbedVisual& candidate : paragraphs_[i].embeds)
             if(candidate.embed_id == visual.embed_id) {
                 paragraph_top = paragraphs_[i].top;
-                paragraph_index = i;
                 found = true;
                 break;
             }
         if(found)
             break;
     }
-    (void)paragraph_index;
 
     int origin_x = page_rect_.left + style_.page_padding;
     int origin_y = page_rect_.top + paragraph_top - scroll_y_;
     Color grid = IsNull(style_.table_grid) ? SColorShadow() : style_.table_grid;
+    UiDocRange table_selection = TableSelectionRange();
 
     for(int i = 0; i < visual.table.cells.GetCount(); i++) {
         int row = i / max(1, visual.table.columns);
@@ -135,7 +174,8 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
         if(row >= table.rows.GetCount() || column >= table.columns)
             continue;
 
-        Rect rc = visual.table.cells[i].Offseted(origin_x, origin_y);
+        const TableCellVisual& cell_visual = visual.table.cells[i];
+        Rect rc = cell_visual.rect.Offseted(origin_x, origin_y);
         if(rc.bottom < page_rect_.top || rc.top > page_rect_.bottom)
             continue;
 
@@ -146,7 +186,9 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
         w.DrawRect(rc.left, rc.top, 1, rc.GetHeight(), grid);
         w.DrawRect(rc.right - 1, rc.top, 1, rc.GetHeight(), grid);
 
-        if(active_table_id_ == visual.embed_id && active_table_row_ == row && active_table_column_ == column) {
+        bool active_cell = active_table_id_ == visual.embed_id &&
+                           active_table_row_ == row && active_table_column_ == column;
+        if(active_cell) {
             Color focus = SColorHighlight();
             w.DrawRect(rc.left + 1, rc.top + 1, max(0, rc.GetWidth() - 2), 1, focus);
             w.DrawRect(rc.left + 1, rc.bottom - 2, max(0, rc.GetWidth() - 2), 1, focus);
@@ -154,57 +196,32 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
             w.DrawRect(rc.right - 2, rc.top + 1, 1, max(0, rc.GetHeight() - 2), focus);
         }
 
-        const UiDocTableCell& cell = table.rows[row].cells[column];
-        int x = rc.left + style_.table_cell_padding;
-        int y = rc.top + style_.table_cell_padding;
-        int inner_right = rc.right - style_.table_cell_padding;
-        int line_height = BaseFont().GetHeight() + style_.line_gap;
+        for(const TableUnitVisual& unit : cell_visual.units) {
+            Rect ur = unit.rect.Offseted(origin_x, origin_y);
+            if(active_cell && RangeContains(table_selection, unit.pos))
+                w.DrawRect(ur, style_.selection_fill);
 
-        for(const UiDocInlineRun& run : cell.runs) {
-            if(run.type == "image") {
+            if(unit.image) {
                 UiDocResource resource;
-                if(core_.GetResource(run.resource_key, resource)) {
+                if(core_.GetResource(unit.resource_key, resource)) {
                     Image image = StreamRaster::LoadStringAny(resource.bytes);
-                    if(!image.IsEmpty()) {
-                        int iw = run.width > 0 ? run.width : image.GetWidth();
-                        int ih = run.height > 0 ? run.height : image.GetHeight();
-                        iw = min(iw, max(DPI(8), inner_right - x));
-                        if(x + iw > inner_right) {
-                            x = rc.left + style_.table_cell_padding;
-                            y += line_height;
-                        }
-                        w.DrawImage(x, y, iw, ih, image);
-                        x += iw + DPI(2);
-                        line_height = max(line_height, ih);
-                    }
+                    if(!image.IsEmpty())
+                        w.DrawImage(ur.left, ur.top, ur.GetWidth(), ur.GetHeight(), image);
                 }
                 continue;
             }
-            if(run.type != "text")
-                continue;
 
-            Font font = ResolveFont(run.style);
-            Color ink = ResolveInk(run.style);
-            line_height = max(line_height, font.GetHeight() + style_.line_gap + max(0, run.style.leading_delta));
-            for(int k = 0; k < run.text.GetCount(); k++) {
-                wchar ch = run.text[k];
-                if(ch == '\n') {
-                    x = rc.left + style_.table_cell_padding;
-                    y += line_height;
-                    line_height = font.GetHeight() + style_.line_gap;
-                    continue;
-                }
-                int cw = max(1, MeasureGlyph(ch, font) + run.style.tracking_delta);
-                if(x > rc.left + style_.table_cell_padding && x + cw > inner_right) {
-                    x = rc.left + style_.table_cell_padding;
-                    y += line_height;
-                    line_height = font.GetHeight() + style_.line_gap;
-                }
-                WString one;
-                one.Cat(ch);
-                w.DrawText(x, y, ToUtf8(one), font, ink);
-                x += cw;
-            }
+            if(unit.ch == '\n')
+                continue;
+            WString one;
+            one.Cat(unit.ch);
+            w.DrawText(ur.left, ur.top, ToUtf8(one), unit.font, unit.ink);
+        }
+
+        if(active_cell && HasFocus() && !HasTableSelection() && !cell_visual.carets.IsEmpty()) {
+            int pos = clamp(active_table_pos_, 0, cell_visual.carets.GetCount() - 1);
+            Rect caret = cell_visual.carets[pos].Offseted(origin_x, origin_y);
+            w.DrawRect(caret, style_.caret_ink);
         }
     }
 }
@@ -247,6 +264,5 @@ void UiDoc::PaintImage(Draw& w, const EmbedVisual& visual)
         w.DrawRect(rc.right - 1, rc.top, 1, rc.GetHeight(), focus);
     }
 }
-
 
 }
