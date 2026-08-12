@@ -2,6 +2,32 @@
 
 namespace Upp {
 
+namespace {
+
+int GeometryParagraphIndentAt(const UiDocCore& core, int pos)
+{
+    UiDocRange probe(pos, pos);
+    int indent = 0;
+    for(const UiDocBlock& block : core.QueryBlocks(&probe))
+        indent = max(indent, block.indent);
+    return indent;
+}
+
+int GeometryRoleIndent(const String& role)
+{
+    if(role == "list.bullet" || role == "list.numbered" || role == "quote")
+        return DPI(24);
+    if(role == "screenplay.character")
+        return DPI(120);
+    if(role == "screenplay.dialogue")
+        return DPI(72);
+    if(role == "screenplay.transition")
+        return DPI(150);
+    return 0;
+}
+
+}
+
 void UiDoc::EnsureLayout() const
 {
     if(paragraph_index_dirty_)
@@ -133,8 +159,11 @@ Point UiDoc::DocumentPointAtPos(int pos) const
 
         bool last = i + 1 == paragraph.lines.GetCount();
         if(pos < line.to || (last && pos <= line.to)) {
-            if(line.glyphs.IsEmpty())
-                local_x = 0;
+            if(line.glyphs.IsEmpty()) {
+                String role = BlockRoleAt(paragraph.from);
+                int indent_px = GeometryParagraphIndentAt(core_, paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
+                local_x = indent_px + GeometryRoleIndent(role);
+            }
             else {
                 local_x = line.glyphs.Top().x + line.glyphs.Top().width;
                 for(const VisualGlyph& glyph : line.glyphs) {
