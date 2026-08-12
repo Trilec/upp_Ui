@@ -262,7 +262,7 @@ void UiDoc::RegisterBuiltinCommands()
         String key = AsString(map["resource_key"]);
         int width = map.Find("width") >= 0 ? (int)map["width"] : 0;
         int height = map.Find("height") >= 0 ? (int)map["height"] : 0;
-        String align = map.Find("align") >= 0 ? AsString(map["align"]) : String("left");
+        String align = map.Find("align") >= 0 ? AsString(map["align"]) : String("inline");
         return !doc.InsertImage(key, width, height, align).IsEmpty();
     });
 
@@ -287,6 +287,9 @@ void UiDoc::RegisterBuiltinCommands()
         return !doc.active_table_id_.IsEmpty() && doc.Core().RemoveTableColumn(doc.active_table_id_, doc.active_table_column_);
     });
 
+    RegisterCommand("image.align.inline", [](UiDoc& doc, const Value&) {
+        return !doc.active_embed_id_.IsEmpty() && doc.SetImageAlign(doc.active_embed_id_, "inline");
+    });
     RegisterCommand("image.align.left", [](UiDoc& doc, const Value&) {
         return !doc.active_embed_id_.IsEmpty() && doc.SetImageAlign(doc.active_embed_id_, "left");
     });
@@ -302,10 +305,7 @@ void UiDoc::RegisterBuiltinCommands()
             id = doc.active_table_id_;
         if(id.IsEmpty())
             return false;
-        bool ok = doc.Core().RemoveEmbed(id);
-        if(ok)
-            doc.ClearActiveObject();
-        return ok;
+        return doc.RemoveEmbed(id);
     });
 
     RegisterCommand("search.next", [](UiDoc& doc, const Value&) { return doc.FindNext(); });
