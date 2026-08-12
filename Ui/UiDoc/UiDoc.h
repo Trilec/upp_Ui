@@ -222,6 +222,12 @@ private:
     bool table_drag_selecting_ = false;
     String active_embed_id_;
 
+    bool image_dragging_ = false;
+    bool image_resizing_ = false;
+    bool image_drag_moved_ = false;
+    Point image_drag_start_;
+    Size image_resize_start_size_;
+
     VectorMap<String, Function<bool(UiDoc&, const Value&)> > commands_;
 
     int ClampPos(int pos) const;
@@ -282,6 +288,7 @@ private:
     bool MoveVertical(int direction, bool keep_selection);
 
     bool EditActiveTableCell(const WString& text, bool replace_selection = false);
+    bool InsertActiveTableImage(const String& resource_key, int width, int height);
     bool DeleteActiveTableCell(bool forward);
     void ClearActiveObject();
     void ScrollCaretIntoView();
@@ -350,9 +357,9 @@ public:
     String AddResource(const UiDocResource& resource, bool dedupe = true) { return core_.AddResource(resource, dedupe); }
     bool RemoveResource(const String& key) { return core_.RemoveResource(key); }
     String InsertImage(const String& resource_key, int width = 0, int height = 0,
-                       const String& align = "left");
+                       const String& align = "inline");
     bool SetImageAlign(const String& embed_id, const String& align);
-    bool RemoveEmbed(const String& id) { return core_.RemoveEmbed(id); }
+    bool RemoveEmbed(const String& id);
 
     String InsertTable(int columns = 3, int rows = 3, int header_rows = 1);
     bool GetTable(const String& id, UiDocTable& table) const { return core_.GetTable(id, table); }
