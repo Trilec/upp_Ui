@@ -75,7 +75,10 @@ static void TestWrappedLineBoundary(GeometryTestCtx& t)
     doc.SetText(text);
     doc.Layout();
 
-    int available = DPI(220) - 2 * padding;
+    // UiDoc owns a vertical scrollbar frame. Ctrl::GetSize() is therefore the
+    // framed client width that LayoutParagraph()/ContentWidth() actually see;
+    // using the outer SetRect width would compute a later, false wrap boundary.
+    int available = doc.GetSize().cx - 2 * padding;
     int x = 0;
     int wrap_pos = -1;
     for(int i = 0; i < text.GetCount(); i++) {
