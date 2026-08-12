@@ -265,9 +265,7 @@ private:
         box_header_actions.Add(btn_open).Fixed(DPI(30));
         box_header_actions.Add(btn_save).Fixed(DPI(30));
         box_header_actions.Add(btn_save_as).Fixed(DPI(30));
-        box_header_actions.Add(btn_undo).Fixed(DPI(30));
-        box_header_actions.Add(btn_redo).Fixed(DPI(30));
-        box_header_actions.AddSpacer(DPI(10))
+        box_header_actions.AddSpacer().Fixed(DPI(10))
                           .LineEnabled()
                           .LineOrientation(UiSpacerLineOrientation::Vertical)
                           .LineAlign(UiCrossAlign::Center)
@@ -276,6 +274,13 @@ private:
         box_header_actions.Add(btn_nav_insert).Fixed(DPI(58));
         box_header_actions.Add(btn_nav_review).Fixed(DPI(64));
         box_header_actions.Add(btn_nav_view).Fixed(DPI(54));
+        box_header_actions.AddSpacer().Fixed(DPI(8))
+                          .LineEnabled()
+                          .LineOrientation(UiSpacerLineOrientation::Vertical)
+                          .LineAlign(UiCrossAlign::Center)
+                          .LineInset(DPI(4));
+        box_header_actions.Add(btn_undo).Fixed(DPI(30));
+        box_header_actions.Add(btn_redo).Fixed(DPI(30));
 
         tc_app.SetTitle("UiDoc")
               .SetSubTitle("Rich document editor")
@@ -690,8 +695,8 @@ private:
         btn_numbering.WhenAction = [=] { ApplyBlockRole("list.numbered"); };
         btn_quote.WhenAction = [=] { ApplyBlockRole("quote"); };
         btn_code.WhenAction = [=] { ApplyBlockRole("code"); };
-        btn_indent.WhenAction = [=] { ChangeIndent(+1); };
-        btn_outdent.WhenAction = [=] { ChangeIndent(-1); };
+        btn_indent.WhenAction = [=] { RunCommand("block.indent.more", Value(), "Increase indent"); };
+        btn_outdent.WhenAction = [=] { RunCommand("block.indent.less", Value(), "Decrease indent"); };
 
         btn_normal.WhenAction = [=] { ApplyBlockRole("paragraph"); };
         btn_heading1.WhenAction = [=] { ApplyBlockRole("heading.1"); };
@@ -892,24 +897,6 @@ private:
         drop_style.SetDataSilently(role);
         SetStatus(ok ? "Applied " + role : "Unable to apply " + role);
         RefreshDocumentUi();
-        doc_editor.SetFocus();
-    }
-
-    int CurrentBlockIndent() const
-    {
-        UiDocSelection selection = doc_editor.GetSelection();
-        UiDocRange probe(selection.caret, selection.caret);
-        int indent = 0;
-        for(const UiDocBlock& block : doc_editor.Core().QueryBlocks(&probe))
-            indent = max(indent, block.indent);
-        return indent;
-    }
-
-    void ChangeIndent(int delta)
-    {
-        int next = max(0, CurrentBlockIndent() + delta);
-        doc_editor.SetBlockIndent(next);
-        SetStatus(Format("Indent %d", next));
         doc_editor.SetFocus();
     }
 
