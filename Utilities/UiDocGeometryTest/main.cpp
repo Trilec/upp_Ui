@@ -75,9 +75,6 @@ static void TestWrappedLineBoundary(GeometryTestCtx& t)
     doc.SetText(text);
     doc.Layout();
 
-    // UiDoc owns a vertical scrollbar frame. Ctrl::GetSize() is therefore the
-    // framed client width that LayoutParagraph()/ContentWidth() actually see;
-    // using the outer SetRect width would compute a later, false wrap boundary.
     int available = doc.GetSize().cx - 2 * padding;
     int x = 0;
     int wrap_pos = -1;
@@ -127,15 +124,17 @@ static void TestTablePaintedRowHit(GeometryTestCtx& t)
 
     Font font = style.font;
     int text_line_height = max(DPI(14), font.GetHeight() + style.line_gap);
-    int cell_line_height = max(DPI(14), font.GetHeight());
-    int row_height = max(max(DPI(20), font.GetHeight() + 2 * style.table_cell_padding),
-                         2 * style.table_cell_padding + 2 * cell_line_height);
+    int cell_line_height = max(DPI(14), font.GetHeight() + style.line_gap);
+    int row_height = max(DPI(20), cell_line_height + 2 * style.table_cell_padding);
 
     int click_x = padding + DPI(8);
     int table_top = padding + text_line_height;
     int click_y = table_top + row_height + row_height / 2;
 
     doc.LeftDown(Point(click_x, click_y), 0);
+    Rect table_caret = doc.GetCaretRect();
+    t.Expect(table_caret.top >= table_top + row_height,
+             "visible table caret follows the clicked second row");
     t.Expect(doc.Key('X', 1), "typing into clicked table cell is handled");
 
     UiDocTable table;
