@@ -68,9 +68,6 @@ int UiDoc::PosAtDocumentPoint(Point point) const
     if(paragraphs_.IsEmpty())
         return 0;
 
-    // paragraph.top already includes page_padding. Keep hit testing in the
-    // same document-space Y coordinates used by painting instead of removing
-    // page_padding a second time here.
     int y = point.y - page_rect_.top + scroll_y_;
     int index = FindParagraphAtY(y);
     index = minmax(index, 0, paragraphs_.GetCount() - 1);
@@ -134,9 +131,6 @@ Point UiDoc::DocumentPointAtPos(int pos) const
         if(pos < line.from)
             break;
 
-        // A wrapped line's end position is also the next line's start. Prefer
-        // the next line at that shared boundary; only the final visual line
-        // owns its terminal position.
         bool last = i + 1 == paragraph.lines.GetCount();
         if(pos < line.to || (last && pos <= line.to)) {
             if(line.glyphs.IsEmpty())
@@ -171,6 +165,32 @@ Rect UiDoc::CaretRectInternal() const
     return RectC(point.x, point.y, max(1, style_.caret_width), height);
 }
 
+Rect UiDoc::TableCaretRectInternal() const
+{
+    EnsureLayout();
+    if(active_table_id_.IsEmpty())
+        return CaretRectInternal();
+
+    for(const ParagraphCache& paragraph : paragraphs_) {
+        if(!paragraph.valid)
+            continue;
+        for(const EmbedVisual& embed : paragraph.embeds) {
+            if(embed.type != "table" || embed.table.embed_id != active_table_id_)
+                continue;
+            int i = active_table_row_ * max(1, embed.table.columns) + active_table_column_;
+            if(i < 0 || i >= embed.table.cells.GetCount())
+                return CaretRectInternal();
+            const TableCellVisual& cell = embed.table.cells[i];
+            if(cell.carets.IsEmpty())
+                return CaretRectInternal();
+            int pos = clamp(active_table_pos_, 0, cell.carets.GetCount() - 1);
+            return cell.carets[pos].Offseted(page_rect_.left + style_.page_padding,
+                                             page_rect_.top + paragraph.top - scroll_y_);
+        }
+    }
+    return CaretRectInternal();
+}
+
 int UiDoc::PosAtPoint(Point point) const
 {
     String table_id;
@@ -200,45 +220,33 @@ bool UiDoc::HitTestTable(Point point, String& table_id, int& row, int& column, i
         const ParagraphCache& paragraph = paragraphs_[p];
         if(!paragraph.valid)
             continue;
+        int ox = page_rect_.left + style_.page_padding;
+        int oy = page_rect_.top + paragraph.top - scroll_y_;
         for(const EmbedVisual& embed : paragraph.embeds) {
             if(embed.type != "table")
                 continue;
             const TableVisual& table = embed.table;
             for(int i = 0; i < table.cells.GetCount(); i++) {
-                Rect cell = table.cells[i].Offseted(page_rect_.left + style_.page_padding,
-                                                    page_rect_.top + paragraph.top - scroll_y_);
+                const TableCellVisual& cell_visual = table.cells[i];
+                Rect cell = cell_visual.rect.Offseted(ox, oy);
                 if(!cell.Contains(point))
                     continue;
+
                 table_id = table.embed_id;
                 row = i / max(1, table.columns);
                 column = i % max(1, table.columns);
                 cell_pos = 0;
-                UiDocTable model;
-                if(core_.GetTable(table_id, model) && row < model.rows.GetCount() && column < model.columns) {
-                    int x = point.x - cell.left - style_.table_cell_padding;
-                    int at = 0;
-                    for(const UiDocInlineRun& run : model.rows[row].cells[column].runs) {
-                        if(run.type == "image") {
-                            int width = max(DPI(10), run.width);
-                            if(x < width / 2) break;
-                            x -= width;
-                            at++;
-                            continue;
-                        }
-                        if(run.type != "text")
-                            continue;
-                        Font font = ResolveFont(run.style);
-                        for(int k = 0; k < run.text.GetCount(); k++) {
-                            int w = MeasureGlyph(run.text[k], font) + run.style.tracking_delta;
-                            if(x < w / 2) {
-                                cell_pos = at;
-                                return true;
-                            }
-                            x -= max(1, w);
-                            at++;
-                        }
+
+                int best_distance = INT_MAX;
+                for(int pos = 0; pos < cell_visual.carets.GetCount(); pos++) {
+                    Rect caret = cell_visual.carets[pos].Offseted(ox, oy);
+                    int dx = point.x - caret.left;
+                    int dy = point.y - caret.CenterPoint().y;
+                    int distance = dx * dx + 16 * dy * dy;
+                    if(distance < best_distance) {
+                        best_distance = distance;
+                        cell_pos = pos;
                     }
-                    cell_pos = at;
                 }
                 return true;
             }
