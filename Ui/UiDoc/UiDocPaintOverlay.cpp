@@ -140,7 +140,7 @@ void UiDoc::PaintGutter(Draw& w)
 
 void UiDoc::PaintCaret(Draw& w)
 {
-    if(!HasFocus() || HasSelection() || !active_table_id_.IsEmpty())
+    if(!HasFocus() || HasSelection() || !active_table_id_.IsEmpty() || !active_embed_id_.IsEmpty())
         return;
     Rect caret = CaretRectInternal();
     if(caret.bottom < page_rect_.top || caret.top > page_rect_.bottom)
