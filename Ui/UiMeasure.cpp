@@ -2,6 +2,7 @@
 #include <Ui/UiBoxLayout.h>
 #include <Ui/UiGridLayout.h>
 #include <Ui/UiPanel.h>
+#include <Ui/UiStack.h>
 #include <Ui/UiTab.h>
 #include <Ui/UiTree.h>
 
@@ -18,9 +19,6 @@ Size MeasureUiTabForWidth(const UiTab& tab, int total_width)
 	const UiTab::Style& style = tab.GetStyle();
 	int width = max(1, total_width);
 
-	// UiTab::Layout() first converts the outer rect to styled content, then
-	// gives the active page the pane width. Mirror that geometry here so a
-	// parent Fit item can ask how tall a wrapped active page is at this width.
 	Rect probe = UiStyledInnerRect(RectC(0, 0, width, DPI(4096)), style.metrics, style.skin);
 	int content_width = max(1, probe.GetWidth());
 	int extent = max(DPI(24), style.tab_extent);
@@ -34,6 +32,19 @@ Size MeasureUiTabForWidth(const UiTab& tab, int total_width)
 	int content_height = horizontal ? extent + body_gap + page_height : page_height;
 	Size outer = UiStyledOuterSizeFromContent(Size(content_width, content_height), style.metrics, style.skin);
 	return Size(width, max(0, outer.cy));
+}
+
+Size MeasureUiStackForWidth(const UiStack& stack, int total_width)
+{
+	int active = stack.GetActivePage();
+	const Ctrl* page = stack.FindPage(active);
+	if(!page)
+		return stack.GetMinSize();
+
+	int width = max(1, total_width);
+	UiLayoutMeasureResult measure = UiMeasureLayout(*page, { width });
+	int height = measure.width_dependent ? measure.measured.cy : measure.min.cy;
+	return Size(width, max(0, height));
 }
 
 }
@@ -75,6 +86,20 @@ UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& 
 		int measure_w = spec.available_width >= 0 ? max(0, spec.available_width) : out.preferred.cx;
 		out.measured = panel->MeasureSizeForWidth(measure_w);
 		out.width_dependent = panel->HasWidthDependentContent();
+		return out;
+	}
+
+	if(const UiStack* stack = dynamic_cast<const UiStack*>(&c)) {
+		int active = stack->GetActivePage();
+		const Ctrl* page_ctrl = stack->FindPage(active);
+		if(page_ctrl) {
+			UiLayoutMeasureResult page = UiMeasureLayout(*page_ctrl);
+			out.width_dependent = page.width_dependent;
+			if(spec.available_width >= 0)
+				out.measured = MeasureUiStackForWidth(*stack, spec.available_width);
+			else if(out.width_dependent)
+				out.measured = MeasureUiStackForWidth(*stack, max(1, out.preferred.cx));
+		}
 		return out;
 	}
 
