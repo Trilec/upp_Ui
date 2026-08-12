@@ -15,6 +15,19 @@ bool StyleMarkAt(const UiDocTextStyle& style, UiDocTextStyle::Mark mark)
     return (style.flags & (byte)mark) != 0;
 }
 
+bool IsInlineImageEmbed(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
+bool RangesOverlap(UiDocRange a, UiDocRange b)
+{
+    a.Normalize();
+    b.Normalize();
+    return a.from < b.to && b.from < a.to;
+}
+
 }
 
 const UiDoc::Style& UiDoc::StyleDefault()
@@ -260,8 +273,7 @@ void UiDoc::NewDocument()
     core_.Clear();
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
-    active_table_id_.Clear();
-    active_embed_id_.Clear();
+    ClearActiveObject();
     search_query_.Clear();
     search_matches_.Clear();
     search_match_index_ = -1;
@@ -281,6 +293,7 @@ bool UiDoc::Load(const String& path, String* error)
         return false;
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
+    ClearActiveObject();
     scroll_y_ = 0;
     sb_.Set(0);
     WhenSelection();
@@ -300,6 +313,7 @@ void UiDoc::SetText(const String& text)
     core_.Apply(tx);
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
+    ClearActiveObject();
     WhenSelection();
 }
 
@@ -316,6 +330,14 @@ Value UiDoc::GetData() const
 void UiDoc::Replace(UiDocRange range, const WString& text)
 {
     range = NormalizeRange(range);
+    Vector<String> inline_images;
+    if(!range.IsEmpty())
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(IsInlineImageEmbed(embed) && RangesOverlap(range, embed.range))
+                inline_images.Add(embed.id);
+    for(const String& id : inline_images)
+        core_.RemoveEmbed(id);
+
     UiDocApplyResult result = core_.Replace(range, text);
     if(result.ok) {
         int pos = ClampPos(range.from + text.GetCount());
@@ -560,13 +582,66 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
     UiDocResource resource;
     if(!core_.GetResource(resource_key, resource))
         return String();
+
+    width = width > 0 ? width : resource.width;
+    height = height > 0 ? height : resource.height;
+    width = max(DPI(16), width > 0 ? width : DPI(160));
+    height = max(DPI(16), height > 0 ? height : DPI(100));
+
+    if(!active_table_id_.IsEmpty())
+        return InsertActiveTableImage(resource_key, width, height) ? active_table_id_ : String();
+
     ValueMap payload;
     payload.Add("resource_key", resource_key);
-    payload.Add("width", width > 0 ? width : resource.width);
-    payload.Add("height", height > 0 ? height : resource.height);
+    payload.Add("width", width);
+    payload.Add("height", height);
     ValueMap layout;
+
+    if(align == "inline" || align.IsEmpty()) {
+        int at = ClampPos(caret_pos_);
+        WString marker;
+        marker.Cat((wchar)0xfffc);
+        UiDocApplyResult inserted = core_.Replace(UiDocRange(at, at), marker);
+        if(!inserted.ok)
+            return String();
+
+        layout.Add("mode", "inline");
+        layout.Add("align", "inline");
+        String id = core_.AddEmbed(at, "image", payload, layout);
+        if(id.IsEmpty()) {
+            core_.Replace(UiDocRange(at, at + 1), WString());
+            return String();
+        }
+
+        for(const UiDocEmbedBlock& current : core_.GetEmbeds()) {
+            if(current.id != id)
+                continue;
+            UiDocEmbedBlock next = current;
+            next.range = UiDocRange(at, at + 1);
+            if(!core_.UpdateEmbed(next)) {
+                core_.RemoveEmbed(id);
+                core_.Replace(UiDocRange(at, at + 1), WString());
+                return String();
+            }
+            break;
+        }
+
+        anchor_pos_ = caret_pos_ = ClampPos(at + 1);
+        active_embed_id_ = id;
+        WhenSelection();
+        Refresh();
+        return id;
+    }
+
+    layout.Add("mode", "block");
     layout.Add("align", align);
-    return core_.AddEmbed(caret_pos_, "image", payload, layout);
+    String id = core_.AddEmbed(caret_pos_, "image", payload, layout);
+    if(!id.IsEmpty()) {
+        ClearActiveObject();
+        active_embed_id_ = id;
+        Refresh();
+    }
+    return id;
 }
 
 bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
@@ -574,11 +649,71 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
     for(const UiDocEmbedBlock& current : core_.GetEmbeds()) {
         if(current.id != embed_id || current.type != "image")
             continue;
+
         UiDocEmbedBlock next = current;
+        bool was_inline = IsInlineImageEmbed(current);
+        bool make_inline = align == "inline";
+
+        if(was_inline && !make_inline && !current.range.IsEmpty()) {
+            UiDocRange marker = current.range;
+            if(!core_.Replace(marker, WString()).ok)
+                return false;
+            for(const UiDocEmbedBlock& mapped : core_.GetEmbeds())
+                if(mapped.id == embed_id) {
+                    next = mapped;
+                    break;
+                }
+        }
+        else if(!was_inline && make_inline) {
+            int at = current.range.from;
+            WString marker;
+            marker.Cat((wchar)0xfffc);
+            if(!core_.Replace(UiDocRange(at, at), marker).ok)
+                return false;
+            for(const UiDocEmbedBlock& mapped : core_.GetEmbeds())
+                if(mapped.id == embed_id) {
+                    next = mapped;
+                    break;
+                }
+            next.range = UiDocRange(at, at + 1);
+        }
+
+        next.layout.GetAdd("mode") = make_inline ? Value("inline") : Value("block");
         next.layout.GetAdd("align") = align;
-        return core_.UpdateEmbed(next);
+        bool ok = core_.UpdateEmbed(next);
+        if(ok) {
+            active_embed_id_ = embed_id;
+            Refresh();
+        }
+        return ok;
     }
     return false;
+}
+
+bool UiDoc::RemoveEmbed(const String& id)
+{
+    UiDocEmbedBlock found;
+    bool have = false;
+    for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        if(embed.id == id) {
+            found = embed;
+            have = true;
+            break;
+        }
+    if(!have)
+        return false;
+
+    UiDocRange marker = found.range;
+    bool inline_image = IsInlineImageEmbed(found) && !marker.IsEmpty();
+    if(!core_.RemoveEmbed(id))
+        return false;
+    if(inline_image && !core_.Replace(marker, WString()).ok)
+        return false;
+
+    if(active_embed_id_ == id)
+        ClearActiveObject();
+    Refresh();
+    return true;
 }
 
 String UiDoc::InsertTable(int columns, int rows, int header_rows)
@@ -791,6 +926,7 @@ bool UiDoc::Undo()
     if(!core_.Undo())
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
+    ClearActiveObject();
     WhenSelection();
     return true;
 }
@@ -800,6 +936,7 @@ bool UiDoc::Redo()
     if(!core_.Redo())
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
+    ClearActiveObject();
     WhenSelection();
     return true;
 }
@@ -828,8 +965,14 @@ void UiDoc::ClearActiveObject()
 {
     active_table_id_.Clear();
     active_table_row_ = active_table_column_ = -1;
-    active_table_pos_ = 0;
+    active_table_anchor_pos_ = active_table_pos_ = 0;
+    table_drag_selecting_ = false;
     active_embed_id_.Clear();
+    image_dragging_ = false;
+    image_resizing_ = false;
+    image_drag_moved_ = false;
+    image_drag_start_ = Point(0, 0);
+    image_resize_start_size_ = Size(0, 0);
 }
 
 Size UiDoc::GetMinSize() const
