@@ -289,7 +289,7 @@ private:
               .SetCardLineSide(UiAlign::BOTTOM);
 
         box_root.Add(tc_app).Fit();
-        box_root.Add(tab_ribbon).Fixed(DPI(176));
+        box_root.Add(tab_ribbon).Fit();
         box_root.Add(pnl_workspace).Expand(1);
         box_root.Add(pnl_status).Fixed(DPI(30));
     }
@@ -330,7 +330,7 @@ private:
         box_clipboard.Add(btn_copy).Fixed(DPI(54));
         box_clipboard.Add(btn_paste).Fixed(DPI(58));
 
-        SetupRibbonGroup(gp_font, box_font, "Font", UiDirection::V);
+        SetupRibbonGroup(gp_font, box_font, "Font", UiDirection::H);
         box_font_selectors.SetDirection(UiDirection::H)
                           .SetGap(DPI(4))
                           .SetInset(0)
@@ -387,7 +387,7 @@ private:
         box_font.Add(box_font_selectors).Fit();
         box_font.Add(box_font_marks).Fit();
 
-        SetupRibbonGroup(gp_paragraph, box_paragraph, "Paragraph", UiDirection::V);
+        SetupRibbonGroup(gp_paragraph, box_paragraph, "Paragraph", UiDirection::H);
         box_paragraph_top.SetDirection(UiDirection::H)
                          .SetGap(DPI(3))
                          .SetInset(0)
@@ -413,7 +413,7 @@ private:
         box_paragraph.Add(box_paragraph_top).Fit();
         box_paragraph.Add(box_paragraph_bottom).Fit();
 
-        SetupRibbonGroup(gp_styles, box_styles, "Styles", UiDirection::V);
+        SetupRibbonGroup(gp_styles, box_styles, "Styles", UiDirection::H);
         box_style_buttons.SetDirection(UiDirection::H)
                          .SetGap(DPI(3))
                          .SetInset(0)
@@ -450,7 +450,7 @@ private:
         box_styles.Add(box_style_buttons).Fit();
         box_styles.Add(drop_style).Fit();
 
-        SetupRibbonGroup(gp_editing, box_editing, "Editing", UiDirection::V);
+        SetupRibbonGroup(gp_editing, box_editing, "Editing", UiDirection::H);
         box_find_row.SetDirection(UiDirection::H)
                     .SetGap(DPI(3))
                     .SetInset(0)
@@ -497,7 +497,7 @@ private:
         box_pages.Add(btn_page_break).Fixed(DPI(96));
         box_pages.Add(btn_rule).Fixed(DPI(66));
 
-        SetupRibbonGroup(gp_table, box_table, "Table", UiDirection::V);
+        SetupRibbonGroup(gp_table, box_table, "Table", UiDirection::H);
         box_table_top.SetDirection(UiDirection::H).SetGap(DPI(3)).SetInset(0);
         box_table_bottom.SetDirection(UiDirection::H).SetGap(DPI(3)).SetInset(0);
 
@@ -517,7 +517,7 @@ private:
         box_table.Add(box_table_top).Fit();
         box_table.Add(box_table_bottom).Fit();
 
-        SetupRibbonGroup(gp_picture, box_picture, "Pictures", UiDirection::V);
+        SetupRibbonGroup(gp_picture, box_picture, "Pictures", UiDirection::H);
         box_picture_top.SetDirection(UiDirection::H).SetGap(DPI(3)).SetInset(0);
         box_picture_bottom.SetDirection(UiDirection::H).SetGap(DPI(3)).SetInset(0);
 
