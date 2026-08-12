@@ -26,6 +26,30 @@ int GeometryRoleIndent(const String& role)
     return 0;
 }
 
+bool IsInlineImageGeometry(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
+const UiDocEmbedBlock* GeometryInlineImageAt(const UiDocCore& core, int pos)
+{
+    for(const UiDocEmbedBlock& embed : core.GetEmbeds())
+        if(IsInlineImageGeometry(embed) && embed.range.from == pos && embed.range.to == pos + 1)
+            return &embed;
+    return nullptr;
+}
+
+int GeometryInlineImageHeight(const UiDocCore& core, const UiDocEmbedBlock& embed)
+{
+    int height = embed.payload.Find("height") >= 0 ? (int)embed.payload["height"] : 0;
+    UiDocResource resource;
+    if(height <= 0 && embed.payload.Find("resource_key") >= 0 &&
+       core.GetResource(AsString(embed.payload["resource_key"]), resource))
+        height = resource.height;
+    return max(DPI(16), height > 0 ? height : DPI(64));
+}
+
 }
 
 void UiDoc::EnsureLayout() const
@@ -287,12 +311,32 @@ bool UiDoc::HitTestTable(Point point, String& table_id, int& row, int& column, i
 bool UiDoc::HitTestEmbed(Point point, String& embed_id) const
 {
     EnsureLayout();
+    int origin_x = page_rect_.left + style_.page_padding;
+
     for(const ParagraphCache& paragraph : paragraphs_) {
         if(!paragraph.valid)
             continue;
+        int paragraph_y = page_rect_.top + paragraph.top - scroll_y_;
+
+        for(const VisualLine& line : paragraph.lines) {
+            int y = paragraph_y + line.y;
+            for(const VisualGlyph& glyph : line.glyphs) {
+                if(glyph.ch != (wchar)0xfffc)
+                    continue;
+                const UiDocEmbedBlock* image = GeometryInlineImageAt(core_, glyph.pos);
+                if(!image)
+                    continue;
+                Rect rect = RectC(origin_x + glyph.x, y, glyph.width,
+                                  min(line.height, GeometryInlineImageHeight(core_, *image)));
+                if(rect.Contains(point)) {
+                    embed_id = image->id;
+                    return true;
+                }
+            }
+        }
+
         for(const EmbedVisual& embed : paragraph.embeds) {
-            Rect rect = embed.rect.Offseted(page_rect_.left + style_.page_padding,
-                                            page_rect_.top + paragraph.top - scroll_y_);
+            Rect rect = embed.rect.Offseted(origin_x, paragraph_y);
             if(rect.Contains(point)) {
                 embed_id = embed.embed_id;
                 return true;
