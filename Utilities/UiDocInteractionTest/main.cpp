@@ -85,19 +85,27 @@ static void TestParagraphCommands(TestCtx& t)
 static void TestListContinuation(TestCtx& t)
 {
     UiDoc doc;
+    const int padding = DPI(24);
+    doc.SetCustomStyle(TestStyle(padding));
+    doc.SetRect(0, 0, DPI(460), DPI(300));
     doc.SetText("item");
     doc.SetSelection(UiDocRange(4, 4));
     t.Expect(doc.ExecuteCommand("block.list.numbered"),
              "numbered list role applies at caret paragraph");
     t.Expect(doc.Key(K_ENTER, 1), "Enter handled in numbered item");
+    doc.Layout();
     t.Expect(doc.GetText() == "item\n",
              "Enter creates the next list paragraph without literal marker text");
     t.Expect(doc.GetBlockRole() == "list.numbered",
              "new empty paragraph continues numbered-list semantics");
+    t.Expect(doc.GetCaretRect().left > padding,
+             "empty continued list caret sits after the list marker region");
 
     t.Expect(doc.Key('N', 1), "typing in continued list item is handled");
     t.Expect(doc.GetText() == "item\nN",
              "continued list item receives typed text");
+    t.Expect(ExactRole(doc, 5, 6) == "list.numbered",
+             "first typed character grows the empty list block over the new item");
     t.Expect(doc.Key(K_ENTER, 1), "Enter creates another continued list item");
     t.Expect(doc.GetBlockRole() == "list.numbered",
              "third paragraph continues numbered-list semantics");
