@@ -172,6 +172,7 @@ private:
     UiGroupPanel gp_picture;
     UiBoxLayout box_picture;
     UiButton btn_insert_picture;
+    UiButton btn_image_inline;
     UiButton btn_image_left;
     UiButton btn_image_center;
     UiButton btn_image_right;
@@ -476,11 +477,13 @@ private:
 
         SetupRibbonGroup(gp_picture, box_picture, "Pictures", UiDirection::H);
         ConfigureRibbonButton(btn_insert_picture, "Picture", ICON_DESIGN_IMAGE_48());
+        ConfigureTextButton(btn_image_inline, "Inline");
         ConfigureTextButton(btn_image_left, "Left");
         ConfigureTextButton(btn_image_center, "Center");
         ConfigureTextButton(btn_image_right, "Right");
         ConfigureIconButton(btn_remove_picture, ICON_DESIGN_DELETE_48(), "Remove selected image");
         box_picture.Add(btn_insert_picture).Fixed(DPI(78));
+        box_picture.Add(btn_image_inline).Fixed(DPI(48));
         box_picture.Add(btn_image_left).Fixed(DPI(42));
         box_picture.Add(btn_image_center).Fixed(DPI(52));
         box_picture.Add(btn_image_right).Fixed(DPI(44));
@@ -742,6 +745,7 @@ private:
         btn_remove_embed.WhenAction = [=] { RunCommand("embed.remove", Value(), "Remove selected table/embed"); };
 
         btn_insert_picture.WhenAction = [=] { InsertPicture(); };
+        btn_image_inline.WhenAction = [=] { RunCommand("image.align.inline", Value(), "Place image inline"); };
         btn_image_left.WhenAction = [=] { RunCommand("image.align.left", Value(), "Align image left"); };
         btn_image_center.WhenAction = [=] { RunCommand("image.align.center", Value(), "Align image center"); };
         btn_image_right.WhenAction = [=] { RunCommand("image.align.right", Value(), "Align image right"); };
@@ -815,6 +819,9 @@ private:
             "Code example\n"
             "UiDocCore core;\n"
             "\n"
+            "Inline picture example\n"
+            "A picture can sit here  while text continues on the same line.\n"
+            "\n"
             "Review note\n"
             "Comments stay attached to logical ranges as text changes around them. "
             "Use Review to open the comments pane and edit the live note.\n"
@@ -837,8 +844,38 @@ private:
         ApplyRoleToFragment("Keep the document model deterministic while the editor remains familiar to use.", "quote");
         ApplyRoleToFragment("Code example", "heading.2");
         ApplyRoleToFragment("UiDocCore core;", "code");
+        ApplyRoleToFragment("Inline picture example", "heading.2");
         ApplyRoleToFragment("Review note", "heading.2");
         ApplyRoleToFragment("Feature matrix", "heading.2");
+
+        String current_text = doc_editor.GetText();
+        const String comment_phrase = "familiar compact workspace";
+        int comment_at = current_text.Find(comment_phrase);
+        if(comment_at >= 0) {
+            doc_editor.SetSelection(UiDocRange(comment_at, comment_at + comment_phrase.GetCount()));
+            ValueMap meta; meta.Add("author", "UiDocDemo");
+            active_comment_id = doc_editor.AddComment(
+                "This is a live UiDoc range annotation. Edit or resolve it from the Review pane.", meta);
+        }
+
+        const String picture_prefix = "A picture can sit here ";
+        int picture_at = doc_editor.GetText().Find(picture_prefix);
+        if(picture_at >= 0) {
+            UiDocResource sample;
+            sample.resource_type = "image";
+            sample.bytes = Base64Decode("iVBORw0KGgoAAAANSUhEUgAAAGAAAAA2CAIAAAC3LQuFAAABjUlEQVR42u2bMY7CMBBFNyOKrTnAVjR7m1RbUCJxgy2QCBVLxw2QEBUFFbeh2YoDUG+5haUoCiEa28PgjP9vUBLH8rz8HzuJKMrF4Q16LAKCfo3cz245BYuW5psjHISIARAAAdAgZrF7XW9/WYH4GL/DQYgYAAEQAJmZxTj6/P1qbl4mJwDqRtPcaQwTSdFhHrUPiFO/JUYkTscYI8xicoB8TWHDRHAQAAGQHUDrc2UZkO8SudXe0RkcI9IxTpPLsBhRjCk4LTtxtJClHF5vB3EY9dMRr+qp4Q2JWD8jd5TpkciqFMIbeA+6TE73mOqdXgMNrkonvFEvzDqtFDA+d8qq/JFiuj5X/N70ZrHIq8c8V7aZHiCRAXGsoTwkSodOf1dh9oy/JdFrY8XsM36yew2gp66J69WNTnjlASk8MaSw2qZEYpXs6wRK0DiaT87CgIZOJ6AQMh+rSEaUlXEC6qJs6TCTMcoWTavS3Wzr56B86DjN999+DnpENDfhuxgAARAAAVDCKvCfVTgoSv+7hrmr01TOPQAAAABJRU5ErkJggg==");
+            sample.mime = "image/png";
+            sample.original_name = "uidoc-inline-sample.png";
+            sample.width = 96;
+            sample.height = 54;
+            sample.meta.Add("source", "UiDocDemo built-in fixture");
+            String key = doc_editor.AddResource(sample, false);
+            if(!key.IsEmpty()) {
+                int at = picture_at + picture_prefix.GetCount();
+                doc_editor.SetSelection(UiDocRange(at, at));
+                doc_editor.InsertImage(key, DPI(96), DPI(54), "inline");
+            }
+        }
 
         doc_editor.SetSelection(UiDocRange(doc_editor.GetLength(), doc_editor.GetLength()));
         String table_id = doc_editor.InsertTable(3, 4, 1);
@@ -857,16 +894,6 @@ private:
             SetTableCellText(table, 3, 1, "Typed embeds/resources");
             SetTableCellText(table, 3, 2, "Insert ribbon");
             doc_editor.SetTable(table_id, table);
-        }
-
-        String current_text = doc_editor.GetText();
-        const String comment_phrase = "familiar compact workspace";
-        int comment_at = current_text.Find(comment_phrase);
-        if(comment_at >= 0) {
-            doc_editor.SetSelection(UiDocRange(comment_at, comment_at + comment_phrase.GetCount()));
-            ValueMap meta; meta.Add("author", "UiDocDemo");
-            active_comment_id = doc_editor.AddComment(
-                "This is a live UiDoc range annotation. Edit or resolve it from the Review pane.", meta);
         }
 
         doc_editor.SetSelection(UiDocRange(0, 0));
@@ -993,7 +1020,7 @@ private:
     void InsertPicture()
     {
         FileSel fs;
-        fs.Type("Image files", "*.png *.jpg *.jpeg");
+        fs.Type("PNG and JPEG images", "*.png *.jpg *.jpeg");
         if(!fs.ExecuteOpen()) return;
         String path = ~fs;
         String bytes = LoadFile(path);
@@ -1014,7 +1041,7 @@ private:
         resource.meta.Add("source", "UiDocDemo file picker");
 
         String key = doc_editor.AddResource(resource, false);
-        if(key.IsEmpty() || doc_editor.InsertImage(key, width, height, "center").IsEmpty()) {
+        if(key.IsEmpty() || doc_editor.InsertImage(key, width, height, "inline").IsEmpty()) {
             SetStatus("Unable to insert image"); return;
         }
         SetStatus("Inserted " + GetFileName(path));
