@@ -60,6 +60,38 @@ bool ApplyParagraphRole(UiDoc& doc, const String& role)
     return changed || !paragraphs.IsEmpty();
 }
 
+bool AdjustParagraphIndent(UiDoc& doc, int delta)
+{
+    Vector<UiDocRange> paragraphs = CommandParagraphRanges(doc);
+    bool changed = false;
+
+    for(const UiDocRange& paragraph : paragraphs) {
+        Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(&paragraph);
+        UiDocBlock exact;
+        bool found_exact = false;
+        for(const UiDocBlock& block : blocks) {
+            if(block.range.from == paragraph.from && block.range.to == paragraph.to) {
+                exact = block;
+                found_exact = true;
+                break;
+            }
+        }
+
+        int current = found_exact ? exact.indent : 0;
+        int next = max(0, current + delta);
+        if(found_exact) {
+            if(exact.indent != next) {
+                exact.indent = next;
+                changed = doc.Core().UpdateBlock(exact) || changed;
+            }
+        }
+        else if(next > 0)
+            changed = !doc.Core().AddBlock(paragraph, String(), next).IsEmpty() || changed;
+    }
+
+    return changed || !paragraphs.IsEmpty();
+}
+
 }
 
 void UiDoc::RegisterCommand(const String& id, Function<bool(UiDoc&, const Value&)> command)
@@ -185,6 +217,12 @@ void UiDoc::RegisterBuiltinCommands()
             return ApplyParagraphRole(doc, role_value);
         });
     }
+    RegisterCommand("block.indent.more", [](UiDoc& doc, const Value&) {
+        return AdjustParagraphIndent(doc, +1);
+    });
+    RegisterCommand("block.indent.less", [](UiDoc& doc, const Value&) {
+        return AdjustParagraphIndent(doc, -1);
+    });
 
     RegisterCommand("comment.add", [](UiDoc& doc, const Value& value) {
         String id = doc.AddComment(AsString(value));
