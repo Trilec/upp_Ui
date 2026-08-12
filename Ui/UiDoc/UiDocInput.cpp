@@ -135,6 +135,64 @@ bool InsertCellText(UiDocTableCell& cell, int pos, const WString& text)
     return true;
 }
 
+bool InsertCellImage(UiDocTableCell& cell, int pos, const String& resource_key, int width, int height)
+{
+    pos = clamp(pos, 0, CellUnits(cell));
+    int at = 0;
+    Vector<UiDocInlineRun> out;
+    bool inserted = false;
+
+    auto AddImage = [&]() {
+        UiDocInlineRun image;
+        image.type = "image";
+        image.resource_key = resource_key;
+        image.width = width;
+        image.height = height;
+        out.Add(pick(image));
+    };
+
+    for(const UiDocInlineRun& source : cell.runs) {
+        UiDocInlineRun run = CopyInlineRun(source);
+        int units = run.type == "text" ? run.text.GetCount() : (run.type == "image" ? 1 : 0);
+        if(!inserted && pos <= at + units) {
+            if(run.type == "text") {
+                int off = clamp(pos - at, 0, run.text.GetCount());
+                WString left = run.text.Left(off);
+                WString right = run.text.Mid(off);
+                if(!left.IsEmpty()) {
+                    UiDocInlineRun l = CopyInlineRun(run);
+                    l.text = left;
+                    out.Add(pick(l));
+                }
+                AddImage();
+                if(!right.IsEmpty()) {
+                    UiDocInlineRun r = CopyInlineRun(run);
+                    r.text = right;
+                    out.Add(pick(r));
+                }
+            }
+            else if(pos == at) {
+                AddImage();
+                out.Add(pick(run));
+            }
+            else {
+                out.Add(pick(run));
+                AddImage();
+            }
+            inserted = true;
+        }
+        else
+            out.Add(pick(run));
+        at += units;
+    }
+
+    if(!inserted)
+        AddImage();
+    cell.runs = pick(out);
+    NormalizeCellRuns(cell);
+    return true;
+}
+
 bool DeleteCellUnit(UiDocTableCell& cell, int pos)
 {
     int total = CellUnits(cell);
@@ -181,6 +239,31 @@ int BlockIndentAt(const UiDocCore& core, int pos)
     return indent;
 }
 
+bool IsInlineImageInput(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
+bool RangesOverlapInput(UiDocRange a, UiDocRange b)
+{
+    a.Normalize();
+    b.Normalize();
+    return a.from < b.to && b.from < a.to;
+}
+
+void RemoveInlineImagesInRange(UiDocCore& core, UiDocRange range)
+{
+    if(range.IsEmpty())
+        return;
+    Vector<String> ids;
+    for(const UiDocEmbedBlock& embed : core.GetEmbeds())
+        if(IsInlineImageInput(embed) && RangesOverlapInput(range, embed.range))
+            ids.Add(embed.id);
+    for(const String& id : ids)
+        core.RemoveEmbed(id);
+}
+
 }
 
 UiDocRange UiDoc::TableSelectionRange() const
@@ -211,6 +294,7 @@ bool UiDoc::DeleteSelection()
     UiDocRange range = SelectionRange();
     if(range.IsEmpty())
         return false;
+    RemoveInlineImagesInRange(core_, range);
     UiDocApplyResult result = core_.Replace(range, WString());
     if(!result.ok)
         return false;
@@ -227,6 +311,7 @@ bool UiDoc::InsertText(const WString& text)
 
     UiDocRange range = SelectionRange();
     int from = range.from;
+    RemoveInlineImagesInRange(core_, range);
 
     bool extend_empty_block = false;
     UiDocBlock empty_block;
@@ -290,6 +375,8 @@ bool UiDoc::InsertText(const WString& text)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(from + text.GetCount());
     preferred_x_ = -1;
+    if(!active_embed_id_.IsEmpty())
+        active_embed_id_.Clear();
     WhenSelection();
     ScrollCaretIntoView();
     return true;
@@ -342,12 +429,16 @@ bool UiDoc::DeleteBackward()
 {
     if(!active_table_id_.IsEmpty())
         return DeleteActiveTableCell(false);
+    if(!active_embed_id_.IsEmpty())
+        return RemoveEmbed(active_embed_id_);
     if(DeleteSelection())
         return true;
     if(caret_pos_ <= 0)
         return false;
     int from = caret_pos_ - 1;
-    if(!core_.Replace(UiDocRange(from, caret_pos_), WString()).ok)
+    UiDocRange range(from, caret_pos_);
+    RemoveInlineImagesInRange(core_, range);
+    if(!core_.Replace(range, WString()).ok)
         return false;
     anchor_pos_ = caret_pos_ = from;
     WhenSelection();
@@ -359,11 +450,15 @@ bool UiDoc::DeleteForward()
 {
     if(!active_table_id_.IsEmpty())
         return DeleteActiveTableCell(true);
+    if(!active_embed_id_.IsEmpty())
+        return RemoveEmbed(active_embed_id_);
     if(DeleteSelection())
         return true;
     if(caret_pos_ >= core_.GetLength())
         return false;
-    if(!core_.Replace(UiDocRange(caret_pos_, caret_pos_ + 1), WString()).ok)
+    UiDocRange range(caret_pos_, caret_pos_ + 1);
+    RemoveInlineImagesInRange(core_, range);
+    if(!core_.Replace(range, WString()).ok)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     WhenSelection();
@@ -487,6 +582,33 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
         return false;
     active_table_pos_ = pos + text.GetCount();
     active_table_anchor_pos_ = active_table_pos_;
+    WhenSelection();
+    ScrollCaretIntoView();
+    Refresh();
+    return true;
+}
+
+bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int height)
+{
+    UiDocTable table;
+    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+       active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
+       active_table_column_ < 0 || active_table_column_ >= table.columns)
+        return false;
+
+    UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
+    int pos = clamp(active_table_pos_, 0, CellUnits(cell));
+    UiDocRange selected = TableSelectionRange();
+    if(!selected.IsEmpty()) {
+        if(!DeleteCellRange(cell, selected))
+            return false;
+        pos = selected.from;
+    }
+    if(!InsertCellImage(cell, pos, resource_key, width, height))
+        return false;
+    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+        return false;
+    active_table_anchor_pos_ = active_table_pos_ = pos + 1;
     WhenSelection();
     ScrollCaretIntoView();
     Refresh();
