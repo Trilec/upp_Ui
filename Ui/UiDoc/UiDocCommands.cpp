@@ -2,6 +2,66 @@
 
 namespace Upp {
 
+namespace {
+
+Vector<UiDocRange> CommandParagraphRanges(const UiDoc& doc)
+{
+    Vector<UiDocRange> out;
+    const WString& text = doc.Core().GetText();
+    UiDocSelection selection = doc.GetSelection();
+    int from = min(selection.anchor, selection.caret);
+    int to = max(selection.anchor, selection.caret);
+    from = clamp(from, 0, text.GetCount());
+    to = clamp(to, 0, text.GetCount());
+
+    while(from > 0 && text[from - 1] != '\n')
+        --from;
+
+    int end_probe = to;
+    if(end_probe > from && end_probe > 0 && text[end_probe - 1] == '\n')
+        --end_probe;
+
+    int at = from;
+    while(at <= end_probe) {
+        int line_to = at;
+        while(line_to < text.GetCount() && text[line_to] != '\n')
+            ++line_to;
+        out.Add(UiDocRange(at, line_to));
+        if(line_to >= text.GetCount() || line_to >= end_probe)
+            break;
+        at = line_to + 1;
+    }
+
+    if(out.IsEmpty())
+        out.Add(UiDocRange(from, from));
+    return out;
+}
+
+bool ApplyParagraphRole(UiDoc& doc, const String& role)
+{
+    Vector<UiDocRange> paragraphs = CommandParagraphRanges(doc);
+    bool changed = false;
+
+    for(const UiDocRange& paragraph : paragraphs) {
+        Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(&paragraph);
+        bool found_exact = false;
+        for(UiDocBlock block : blocks) {
+            if(block.range.from == paragraph.from && block.range.to == paragraph.to) {
+                found_exact = true;
+                if(block.role != role) {
+                    block.role = role;
+                    changed = doc.Core().UpdateBlock(block) || changed;
+                }
+            }
+        }
+        if(!found_exact)
+            changed = !doc.Core().AddBlock(paragraph, role).IsEmpty() || changed;
+    }
+    return changed || !paragraphs.IsEmpty();
+}
+
+}
+
 void UiDoc::RegisterCommand(const String& id, Function<bool(UiDoc&, const Value&)> command)
 {
     if(id.IsEmpty())
@@ -91,7 +151,8 @@ void UiDoc::RegisterBuiltinCommands()
     });
 
     RegisterCommand("text.upper", [](UiDoc& doc, const Value&) {
-        UiDocRange range = doc.SelectionRange();
+        UiDocSelection selection = doc.GetSelection();
+        UiDocRange range(min(selection.anchor, selection.caret), max(selection.anchor, selection.caret));
         if(range.IsEmpty())
             return false;
         WString text = doc.Core().GetSlice(range);
@@ -101,7 +162,8 @@ void UiDoc::RegisterBuiltinCommands()
         return true;
     });
     RegisterCommand("text.lower", [](UiDoc& doc, const Value&) {
-        UiDocRange range = doc.SelectionRange();
+        UiDocSelection selection = doc.GetSelection();
+        UiDocRange range(min(selection.anchor, selection.caret), max(selection.anchor, selection.caret));
         if(range.IsEmpty())
             return false;
         WString text = doc.Core().GetSlice(range);
@@ -120,8 +182,7 @@ void UiDoc::RegisterBuiltinCommands()
         String id = String("block.") + role;
         String role_value = role;
         RegisterCommand(id, [role_value](UiDoc& doc, const Value&) {
-            doc.SetBlockRole(role_value);
-            return true;
+            return ApplyParagraphRole(doc, role_value);
         });
     }
 
