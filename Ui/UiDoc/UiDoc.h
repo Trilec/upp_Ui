@@ -92,7 +92,7 @@ public:
 
         Font font = StdFont();
         int tab_size = 4;
-        int margin_step = 4;
+        int margin_step = 24;
         int line_gap = 2;
         int paragraph_gap = 2;
         int caret_width = 1;
@@ -138,12 +138,28 @@ private:
         Vector<VisualGlyph> glyphs;
     };
 
+    struct TableUnitVisual : Moveable<TableUnitVisual> {
+        int pos = 0;
+        Rect rect;
+        Font font;
+        Color ink = Null;
+        wchar ch = 0;
+        String resource_key;
+        bool image = false;
+    };
+
+    struct TableCellVisual : Moveable<TableCellVisual> {
+        Rect rect;
+        Vector<TableUnitVisual> units;
+        Vector<Rect> carets;
+    };
+
     struct TableVisual : Moveable<TableVisual> {
         String embed_id;
         Rect rect;
         int rows = 0;
         int columns = 0;
-        Vector<Rect> cells;
+        Vector<TableCellVisual> cells;
         Vector<int> row_heights;
     };
 
@@ -201,7 +217,9 @@ private:
     String active_table_id_;
     int active_table_row_ = -1;
     int active_table_column_ = -1;
+    int active_table_anchor_pos_ = 0;
     int active_table_pos_ = 0;
+    bool table_drag_selecting_ = false;
     String active_embed_id_;
 
     VectorMap<String, Function<bool(UiDoc&, const Value&)> > commands_;
@@ -209,7 +227,9 @@ private:
     int ClampPos(int pos) const;
     UiDocRange NormalizeRange(UiDocRange range) const;
     UiDocRange SelectionRange() const;
+    UiDocRange TableSelectionRange() const;
     bool HasSelection() const { return anchor_pos_ != caret_pos_; }
+    bool HasTableSelection() const { return active_table_anchor_pos_ != active_table_pos_; }
     void MoveCaret(int pos, bool keep_selection = false);
     void MapViewState(const UiDocPositionMap& map);
     void OnCoreChange(const UiDocApplyResult& result);
@@ -238,6 +258,7 @@ private:
     int PosAtDocumentPoint(Point p) const;
     Point DocumentPointAtPos(int pos) const;
     Rect CaretRectInternal() const;
+    Rect TableCaretRectInternal() const;
     bool HitTestTable(Point p, String& table_id, int& row, int& column, int& cell_pos) const;
     bool HitTestEmbed(Point p, String& embed_id) const;
     bool HitTestAnnotation(Point p, String& annotation_id) const;
@@ -254,6 +275,7 @@ private:
     bool IsWordChar(wchar ch) const;
     bool DeleteSelection();
     bool InsertText(const WString& text);
+    bool InsertParagraphBreak();
     bool DeleteBackward();
     bool DeleteForward();
     bool MoveWord(int direction, bool keep_selection);
@@ -379,7 +401,7 @@ public:
     void Copy() const;
     void Paste();
 
-    Rect GetCaretRect() const { return CaretRectInternal(); }
+    Rect GetCaretRect() const { return active_table_id_.IsEmpty() ? CaretRectInternal() : TableCaretRectInternal(); }
     int PosAtPoint(Point point) const;
     Point PointAtPos(int pos) const;
 
