@@ -197,11 +197,44 @@ void UiDoc::LeftUp(Point p, dword)
                 else {
                     int target = PosAtDocumentPoint(p);
                     int old_at = source.range.from;
-                    if(target != old_at && target != source.range.to && RemoveEmbed(id)) {
+                    if(target != old_at && target != source.range.to) {
                         if(target > old_at)
                             target--;
-                        anchor_pos_ = caret_pos_ = ClampPos(target);
-                        InsertImage(key, width, height, "inline");
+                        target = clamp(target, 0, max(0, core_.GetLength() - 1));
+
+                        UiDocCoreTransaction tx;
+                        tx.label = "Move image";
+
+                        UiDocCoreChange remove;
+                        remove.type = UiDocCoreChange::RemoveEmbed;
+                        remove.embed_id = id;
+                        tx.changes.Add(pick(remove));
+
+                        UiDocCoreChange erase;
+                        erase.type = UiDocCoreChange::ReplaceText;
+                        erase.range = source.range;
+                        tx.changes.Add(pick(erase));
+
+                        WString marker;
+                        marker.Cat((wchar)0xfffc);
+                        UiDocCoreChange insert;
+                        insert.type = UiDocCoreChange::ReplaceText;
+                        insert.range = UiDocRange(target, target);
+                        insert.text = marker;
+                        tx.changes.Add(pick(insert));
+
+                        UiDocEmbedBlock moved = source;
+                        moved.range = UiDocRange(target, target + 1);
+                        UiDocCoreChange add;
+                        add.type = UiDocCoreChange::AddEmbed;
+                        add.embed = moved;
+                        tx.changes.Add(pick(add));
+
+                        if(core_.Apply(tx).ok) {
+                            anchor_pos_ = caret_pos_ = ClampPos(target + 1);
+                            active_embed_id_ = id;
+                            WhenSelection();
+                        }
                     }
                 }
             }
