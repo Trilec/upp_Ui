@@ -252,16 +252,17 @@ bool RangesOverlapInput(UiDocRange a, UiDocRange b)
     return a.from < b.to && b.from < a.to;
 }
 
-void RemoveInlineImagesInRange(UiDocCore& core, UiDocRange range)
+void AppendInlineImageRemovals(UiDocCoreTransaction& tx, const UiDocCore& core, UiDocRange range)
 {
     if(range.IsEmpty())
         return;
-    Vector<String> ids;
     for(const UiDocEmbedBlock& embed : core.GetEmbeds())
-        if(IsInlineImageInput(embed) && RangesOverlapInput(range, embed.range))
-            ids.Add(embed.id);
-    for(const String& id : ids)
-        core.RemoveEmbed(id);
+        if(IsInlineImageInput(embed) && RangesOverlapInput(range, embed.range)) {
+            UiDocCoreChange remove;
+            remove.type = UiDocCoreChange::RemoveEmbed;
+            remove.embed_id = embed.id;
+            tx.changes.Add(pick(remove));
+        }
 }
 
 }
@@ -294,8 +295,16 @@ bool UiDoc::DeleteSelection()
     UiDocRange range = SelectionRange();
     if(range.IsEmpty())
         return false;
-    RemoveInlineImagesInRange(core_, range);
-    UiDocApplyResult result = core_.Replace(range, WString());
+
+    UiDocCoreTransaction tx;
+    tx.label = "Delete";
+    AppendInlineImageRemovals(tx, core_, range);
+    UiDocCoreChange replace;
+    replace.type = UiDocCoreChange::ReplaceText;
+    replace.range = range;
+    tx.changes.Add(pick(replace));
+
+    UiDocApplyResult result = core_.Apply(tx);
     if(!result.ok)
         return false;
     anchor_pos_ = caret_pos_ = range.from;
@@ -311,7 +320,6 @@ bool UiDoc::InsertText(const WString& text)
 
     UiDocRange range = SelectionRange();
     int from = range.from;
-    RemoveInlineImagesInRange(core_, range);
 
     bool extend_empty_block = false;
     UiDocBlock empty_block;
@@ -342,6 +350,7 @@ bool UiDoc::InsertText(const WString& text)
 
     UiDocCoreTransaction tx;
     tx.label = "Type";
+    AppendInlineImageRemovals(tx, core_, range);
 
     UiDocCoreChange replace;
     replace.type = UiDocCoreChange::ReplaceText;
@@ -435,11 +444,19 @@ bool UiDoc::DeleteBackward()
         return true;
     if(caret_pos_ <= 0)
         return false;
+
     int from = caret_pos_ - 1;
     UiDocRange range(from, caret_pos_);
-    RemoveInlineImagesInRange(core_, range);
-    if(!core_.Replace(range, WString()).ok)
+    UiDocCoreTransaction tx;
+    tx.label = "Backspace";
+    AppendInlineImageRemovals(tx, core_, range);
+    UiDocCoreChange replace;
+    replace.type = UiDocCoreChange::ReplaceText;
+    replace.range = range;
+    tx.changes.Add(pick(replace));
+    if(!core_.Apply(tx).ok)
         return false;
+
     anchor_pos_ = caret_pos_ = from;
     WhenSelection();
     ScrollCaretIntoView();
@@ -456,10 +473,18 @@ bool UiDoc::DeleteForward()
         return true;
     if(caret_pos_ >= core_.GetLength())
         return false;
+
     UiDocRange range(caret_pos_, caret_pos_ + 1);
-    RemoveInlineImagesInRange(core_, range);
-    if(!core_.Replace(range, WString()).ok)
+    UiDocCoreTransaction tx;
+    tx.label = "Delete";
+    AppendInlineImageRemovals(tx, core_, range);
+    UiDocCoreChange replace;
+    replace.type = UiDocCoreChange::ReplaceText;
+    replace.range = range;
+    tx.changes.Add(pick(replace));
+    if(!core_.Apply(tx).ok)
         return false;
+
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     WhenSelection();
     ScrollCaretIntoView();
