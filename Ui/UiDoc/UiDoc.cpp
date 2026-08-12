@@ -28,6 +28,21 @@ bool RangesOverlap(UiDocRange a, UiDocRange b)
     return a.from < b.to && b.from < a.to;
 }
 
+String NextInlineImageId(const UiDocCore& core)
+{
+    for(int serial = 1;; serial++) {
+        String id = Format("inline_image_%d", serial);
+        bool used = false;
+        for(const UiDocEmbedBlock& embed : core.GetEmbeds())
+            if(embed.id == id) {
+                used = true;
+                break;
+            }
+        if(!used)
+            return id;
+    }
+}
+
 }
 
 const UiDoc::Style& UiDoc::StyleDefault()
@@ -330,15 +345,25 @@ Value UiDoc::GetData() const
 void UiDoc::Replace(UiDocRange range, const WString& text)
 {
     range = NormalizeRange(range);
-    Vector<String> inline_images;
+    UiDocCoreTransaction tx;
+    tx.label = "Replace";
+
     if(!range.IsEmpty())
         for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
-            if(IsInlineImageEmbed(embed) && RangesOverlap(range, embed.range))
-                inline_images.Add(embed.id);
-    for(const String& id : inline_images)
-        core_.RemoveEmbed(id);
+            if(IsInlineImageEmbed(embed) && RangesOverlap(range, embed.range)) {
+                UiDocCoreChange remove;
+                remove.type = UiDocCoreChange::RemoveEmbed;
+                remove.embed_id = embed.id;
+                tx.changes.Add(pick(remove));
+            }
 
-    UiDocApplyResult result = core_.Replace(range, text);
+    UiDocCoreChange replace;
+    replace.type = UiDocCoreChange::ReplaceText;
+    replace.range = range;
+    replace.text = text;
+    tx.changes.Add(pick(replace));
+
+    UiDocApplyResult result = core_.Apply(tx);
     if(result.ok) {
         int pos = ClampPos(range.from + text.GetCount());
         anchor_pos_ = caret_pos_ = pos;
@@ -599,32 +624,32 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
 
     if(align == "inline" || align.IsEmpty()) {
         int at = ClampPos(caret_pos_);
+        String id = NextInlineImageId(core_);
         WString marker;
         marker.Cat((wchar)0xfffc);
-        UiDocApplyResult inserted = core_.Replace(UiDocRange(at, at), marker);
-        if(!inserted.ok)
-            return String();
-
         layout.Add("mode", "inline");
         layout.Add("align", "inline");
-        String id = core_.AddEmbed(at, "image", payload, layout);
-        if(id.IsEmpty()) {
-            core_.Replace(UiDocRange(at, at + 1), WString());
-            return String();
-        }
 
-        for(const UiDocEmbedBlock& current : core_.GetEmbeds()) {
-            if(current.id != id)
-                continue;
-            UiDocEmbedBlock next = current;
-            next.range = UiDocRange(at, at + 1);
-            if(!core_.UpdateEmbed(next)) {
-                core_.RemoveEmbed(id);
-                core_.Replace(UiDocRange(at, at + 1), WString());
-                return String();
-            }
-            break;
-        }
+        UiDocCoreTransaction tx;
+        tx.label = "Insert image";
+
+        UiDocCoreChange replace;
+        replace.type = UiDocCoreChange::ReplaceText;
+        replace.range = UiDocRange(at, at);
+        replace.text = marker;
+        tx.changes.Add(pick(replace));
+
+        UiDocCoreChange add;
+        add.type = UiDocCoreChange::AddEmbed;
+        add.embed.id = id;
+        add.embed.type = "image";
+        add.embed.range = UiDocRange(at, at + 1);
+        add.embed.payload = clone(payload);
+        add.embed.layout = clone(layout);
+        tx.changes.Add(pick(add));
+
+        if(!core_.Apply(tx).ok)
+            return String();
 
         anchor_pos_ = caret_pos_ = ClampPos(at + 1);
         active_embed_id_ = id;
@@ -650,37 +675,42 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
         if(current.id != embed_id || current.type != "image")
             continue;
 
-        UiDocEmbedBlock next = current;
         bool was_inline = IsInlineImageEmbed(current);
         bool make_inline = align == "inline";
+        UiDocEmbedBlock next = current;
+        next.layout.GetAdd("mode") = make_inline ? Value("inline") : Value("block");
+        next.layout.GetAdd("align") = align;
+
+        UiDocCoreTransaction tx;
+        tx.label = "Image layout";
 
         if(was_inline && !make_inline && !current.range.IsEmpty()) {
-            UiDocRange marker = current.range;
-            if(!core_.Replace(marker, WString()).ok)
-                return false;
-            for(const UiDocEmbedBlock& mapped : core_.GetEmbeds())
-                if(mapped.id == embed_id) {
-                    next = mapped;
-                    break;
-                }
+            int at = current.range.from;
+            UiDocCoreChange replace;
+            replace.type = UiDocCoreChange::ReplaceText;
+            replace.range = current.range;
+            tx.changes.Add(pick(replace));
+            next.range = UiDocRange(at, at);
         }
         else if(!was_inline && make_inline) {
             int at = current.range.from;
             WString marker;
             marker.Cat((wchar)0xfffc);
-            if(!core_.Replace(UiDocRange(at, at), marker).ok)
-                return false;
-            for(const UiDocEmbedBlock& mapped : core_.GetEmbeds())
-                if(mapped.id == embed_id) {
-                    next = mapped;
-                    break;
-                }
+            UiDocCoreChange replace;
+            replace.type = UiDocCoreChange::ReplaceText;
+            replace.range = UiDocRange(at, at);
+            replace.text = marker;
+            tx.changes.Add(pick(replace));
             next.range = UiDocRange(at, at + 1);
         }
 
-        next.layout.GetAdd("mode") = make_inline ? Value("inline") : Value("block");
-        next.layout.GetAdd("align") = align;
-        bool ok = core_.UpdateEmbed(next);
+        UiDocCoreChange update;
+        update.type = UiDocCoreChange::UpdateEmbed;
+        update.embed_id = embed_id;
+        update.embed = next;
+        tx.changes.Add(pick(update));
+
+        bool ok = core_.Apply(tx).ok;
         if(ok) {
             active_embed_id_ = embed_id;
             Refresh();
@@ -692,25 +722,41 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
 
 bool UiDoc::RemoveEmbed(const String& id)
 {
-    UiDocEmbedBlock found;
-    bool have = false;
+    const UiDocEmbedBlock* found = nullptr;
     for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
         if(embed.id == id) {
-            found = embed;
-            have = true;
+            found = &embed;
             break;
         }
-    if(!have)
+    if(!found)
         return false;
 
-    UiDocRange marker = found.range;
-    bool inline_image = IsInlineImageEmbed(found) && !marker.IsEmpty();
-    if(!core_.RemoveEmbed(id))
-        return false;
-    if(inline_image && !core_.Replace(marker, WString()).ok)
-        return false;
+    UiDocRange marker = found->range;
+    bool inline_image = IsInlineImageEmbed(*found) && !marker.IsEmpty();
+    bool ok = false;
 
-    if(active_embed_id_ == id)
+    if(inline_image) {
+        UiDocCoreTransaction tx;
+        tx.label = "Remove image";
+
+        UiDocCoreChange remove;
+        remove.type = UiDocCoreChange::RemoveEmbed;
+        remove.embed_id = id;
+        tx.changes.Add(pick(remove));
+
+        UiDocCoreChange replace;
+        replace.type = UiDocCoreChange::ReplaceText;
+        replace.range = marker;
+        tx.changes.Add(pick(replace));
+
+        ok = core_.Apply(tx).ok;
+    }
+    else
+        ok = core_.RemoveEmbed(id);
+
+    if(!ok)
+        return false;
+    if(active_embed_id_ == id || active_table_id_ == id)
         ClearActiveObject();
     Refresh();
     return true;
