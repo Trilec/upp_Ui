@@ -30,6 +30,42 @@ int PaintBlockIndentAt(const UiDocCore& core, int pos)
     return indent;
 }
 
+bool IsInlineImagePaint(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
+const UiDocEmbedBlock* PaintInlineImageAt(const UiDocCore& core, int pos)
+{
+    for(const UiDocEmbedBlock& embed : core.GetEmbeds())
+        if(IsInlineImagePaint(embed) && embed.range.from == pos && embed.range.to == pos + 1)
+            return &embed;
+    return nullptr;
+}
+
+void PaintImageSelection(Draw& w, const Rect& rc, Color focus)
+{
+    w.DrawRect(rc.left, rc.top, rc.GetWidth(), 1, focus);
+    w.DrawRect(rc.left, rc.bottom - 1, rc.GetWidth(), 1, focus);
+    w.DrawRect(rc.left, rc.top, 1, rc.GetHeight(), focus);
+    w.DrawRect(rc.right - 1, rc.top, 1, rc.GetHeight(), focus);
+
+    int handle = DPI(6);
+    const Point corners[] = {
+        Point(rc.left, rc.top), Point(rc.right, rc.top),
+        Point(rc.left, rc.bottom), Point(rc.right, rc.bottom)
+    };
+    for(const Point& corner : corners) {
+        Rect h = RectC(corner.x - handle / 2, corner.y - handle / 2, handle, handle);
+        w.DrawRect(h, SColorPaper());
+        w.DrawRect(h.left, h.top, h.GetWidth(), 1, focus);
+        w.DrawRect(h.left, h.bottom - 1, h.GetWidth(), 1, focus);
+        w.DrawRect(h.left, h.top, 1, h.GetHeight(), focus);
+        w.DrawRect(h.right - 1, h.top, 1, h.GetHeight(), focus);
+    }
+}
+
 Color LaneColorFor(const Vector<UiDoc::AnnotationLane>& lanes, const UiDocAnnotation& annotation, Color fallback)
 {
     for(const UiDoc::AnnotationLane& lane : lanes) {
@@ -124,6 +160,40 @@ void UiDoc::PaintText(Draw& w)
                         annotated = true;
                         break;
                     }
+                }
+
+                const UiDocEmbedBlock* inline_image = glyph.ch == (wchar)0xfffc ? PaintInlineImageAt(core_, glyph.pos) : nullptr;
+                if(inline_image) {
+                    String key = inline_image->payload.Find("resource_key") >= 0 ? AsString(inline_image->payload["resource_key"]) : String();
+                    UiDocResource resource;
+                    int source_width = inline_image->payload.Find("width") >= 0 ? (int)inline_image->payload["width"] : glyph.width;
+                    int image_height = inline_image->payload.Find("height") >= 0 ? (int)inline_image->payload["height"] : 0;
+                    if(core_.GetResource(key, resource)) {
+                        if(source_width <= 0) source_width = resource.width;
+                        if(image_height <= 0) image_height = resource.height;
+                    }
+                    source_width = max(1, source_width);
+                    image_height = max(DPI(16), image_height > 0 ? image_height : DPI(64));
+                    if(glyph.width < source_width)
+                        image_height = max(DPI(16), image_height * glyph.width / source_width);
+                    image_height = min(line.height, image_height);
+                    Rect image_rect = RectC(x, y, glyph.width, image_height);
+
+                    if(selected)
+                        w.DrawRect(cell, style_.selection_fill);
+
+                    Image image = core_.GetResource(key, resource) ? StreamRaster::LoadStringAny(resource.bytes) : Image();
+                    if(!image.IsEmpty())
+                        w.DrawImage(image_rect.left, image_rect.top, image_rect.GetWidth(), image_rect.GetHeight(), image);
+                    else {
+                        w.DrawRect(image_rect, Blend(style_.page_face, style_.page_frame, 12));
+                        w.DrawRect(image_rect.left, image_rect.top, image_rect.GetWidth(), 1, style_.page_frame);
+                        w.DrawRect(image_rect.left, image_rect.bottom - 1, image_rect.GetWidth(), 1, style_.page_frame);
+                    }
+
+                    if(active_embed_id_ == inline_image->id)
+                        PaintImageSelection(w, image_rect, SColorHighlight());
+                    continue;
                 }
 
                 if(selected)
