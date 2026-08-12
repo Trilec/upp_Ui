@@ -1372,8 +1372,10 @@ private:
     static void SetupRibbonPage(UiBoxLayout& page)
     {
         page.SetDirection(UiDirection::H)
-            .SetGap(DPI(6))
+            .SetGap(DPI(2))
             .SetInset(Rect(DPI(8), DPI(5), DPI(8), DPI(6)))
+            .SetWrap(UiBoxWrap::Flow)
+            .SetWrapAutoResize(true)
             .SetAlignItems(UiCrossAlign::Start);
     }
 
@@ -1382,13 +1384,13 @@ private:
     {
         panel.SetTitle(title)
              .SetHeaderMode(UiGroupPanel::Inside)
-             .SetInset(Rect(DPI(7), DPI(4), DPI(7), DPI(6)))
-             .SetHeaderInset(Rect(DPI(7), DPI(3), DPI(7), DPI(2)))
+             .SetInset(Rect(DPI(6), DPI(3), DPI(6), DPI(4)))
+             .SetHeaderInset(Rect(DPI(6), DPI(2), DPI(6), DPI(1)))
              .SetTitleFont(SansSerifZ(DPI(9)))
              .SetLine(true);
 
         body.SetDirection(direction)
-            .SetGap(DPI(4))
+            .SetGap(DPI(3))
             .SetInset(0)
             .SetAlignItems(UiCrossAlign::Center);
         panel.SetContent(body);
@@ -1397,7 +1399,7 @@ private:
     static void ConfigureTextButton(UiButton& button, const String& text)
     {
         button.SetText(text)
-              .SetContentInset(DPI(4))
+              .SetContentInset(DPI(2))
               .SetContentGap(DPI(3));
     }
 
@@ -1407,9 +1409,9 @@ private:
         button.SetText("")
               .SetIcon(icon)
               .SetIconSide(UiAlign::CENTER)
-              .SetIconSize(DPI(17), DPI(17))
+              .SetIconSize(DPI(15), DPI(15))
               .SetIconRenderMode(UiIconRenderMode::MonoTint)
-              .SetContentInset(DPI(4));
+              .SetContentInset(DPI(2));
         button.Tip(tip);
     }
 
@@ -1417,12 +1419,12 @@ private:
                                       const Image& icon = Image())
     {
         button.SetText(text)
-              .SetContentInset(DPI(4))
+              .SetContentInset(DPI(2))
               .SetContentGap(DPI(4));
         if(!icon.IsEmpty())
             button.SetIcon(icon)
                   .SetIconSide(UiAlign::LEFT)
-                  .SetIconSize(DPI(16), DPI(16))
+                  .SetIconSize(DPI(14), DPI(14))
                   .SetIconRenderMode(UiIconRenderMode::MonoTint);
     }
 };
