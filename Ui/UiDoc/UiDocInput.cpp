@@ -158,6 +158,36 @@ bool DeleteCellUnit(UiDocTableCell& cell, int pos)
     return false;
 }
 
+bool DeleteCellRange(UiDocTableCell& cell, UiDocRange range)
+{
+    range.Normalize();
+    range.from = clamp(range.from, 0, CellUnits(cell));
+    range.to = clamp(range.to, 0, CellUnits(cell));
+    if(range.IsEmpty())
+        return false;
+    for(int pos = range.to - 1; pos >= range.from; pos--)
+        if(!DeleteCellUnit(cell, pos))
+            return false;
+    return true;
+}
+
+int BlockIndentAt(const UiDocCore& core, int pos)
+{
+    UiDocRange probe(pos, pos);
+    Vector<UiDocBlock> blocks = core.QueryBlocks(&probe);
+    int indent = 0;
+    for(const UiDocBlock& block : blocks)
+        indent = max(indent, block.indent);
+    return indent;
+}
+
+}
+
+UiDocRange UiDoc::TableSelectionRange() const
+{
+    UiDocRange range(active_table_anchor_pos_, active_table_pos_);
+    range.Normalize();
+    return range;
 }
 
 void UiDoc::ScrollCaretIntoView()
@@ -165,7 +195,7 @@ void UiDoc::ScrollCaretIntoView()
     if(page_rect_.IsEmpty())
         return;
     EnsureLayout();
-    Rect caret = CaretRectInternal();
+    Rect caret = active_table_id_.IsEmpty() ? CaretRectInternal() : TableCaretRectInternal();
     int margin = DPI(12);
     if(caret.top < page_rect_.top + margin)
         scroll_y_ = max(0, scroll_y_ - (page_rect_.top + margin - caret.top));
@@ -193,7 +223,7 @@ bool UiDoc::DeleteSelection()
 bool UiDoc::InsertText(const WString& text)
 {
     if(!active_table_id_.IsEmpty())
-        return EditActiveTableCell(text);
+        return EditActiveTableCell(text, true);
 
     UiDocRange range = SelectionRange();
     int from = range.from;
@@ -222,6 +252,49 @@ bool UiDoc::InsertText(const WString& text)
     preferred_x_ = -1;
     WhenSelection();
     ScrollCaretIntoView();
+    return true;
+}
+
+bool UiDoc::InsertParagraphBreak()
+{
+    if(!active_table_id_.IsEmpty())
+        return EditActiveTableCell(WString("\n"), true);
+
+    int sample = ClampPos(caret_pos_);
+    String role = BlockRoleAt(sample);
+    int indent = BlockIndentAt(core_, sample);
+
+    const WString& text = core_.GetText();
+    int from = sample;
+    int to = sample;
+    while(from > 0 && text[from - 1] != '\n')
+        --from;
+    while(to < text.GetCount() && text[to] != '\n')
+        ++to;
+
+    bool list_role = role == "list.bullet" || role == "list.numbered";
+    if(list_role) {
+        WString paragraph = core_.GetSlice(UiDocRange(from, to));
+        bool empty = true;
+        for(int i = 0; i < paragraph.GetCount(); i++)
+            if(!IsSpace((int)paragraph[i])) {
+                empty = false;
+                break;
+            }
+        if(empty) {
+            SetBlockRole("paragraph");
+            SetBlockIndent(0);
+            return true;
+        }
+    }
+
+    if(!InsertText(WString("\n")))
+        return false;
+
+    if(list_role) {
+        SetBlockRole(role);
+        SetBlockIndent(indent);
+    }
     return true;
 }
 
@@ -284,15 +357,67 @@ bool UiDoc::MoveWord(int direction, bool keep_selection)
 
 bool UiDoc::MoveVertical(int direction, bool keep_selection)
 {
+    EnsureLayout();
+    if(paragraphs_.IsEmpty() || direction == 0)
+        return false;
+
+    int paragraph_index = FindParagraphAtPos(caret_pos_);
+    paragraph_index = clamp(paragraph_index, 0, paragraphs_.GetCount() - 1);
+    LayoutParagraph(paragraph_index, ContentWidth());
+    const ParagraphCache& current_paragraph = paragraphs_[paragraph_index];
+    if(current_paragraph.lines.IsEmpty())
+        return false;
+
+    int line_index = current_paragraph.lines.GetCount() - 1;
+    for(int i = 0; i < current_paragraph.lines.GetCount(); i++) {
+        const VisualLine& line = current_paragraph.lines[i];
+        bool last = i + 1 == current_paragraph.lines.GetCount();
+        if(caret_pos_ < line.to || (last && caret_pos_ <= line.to)) {
+            line_index = i;
+            break;
+        }
+    }
+
     Point current = DocumentPointAtPos(caret_pos_);
     if(preferred_x_ < 0)
         preferred_x_ = current.x;
-    int target_y = current.y + direction * max(DPI(14), BaseFont().GetHeight() + style_.line_gap);
-    int next = PosAtDocumentPoint(Point(preferred_x_, target_y));
-    if(next == caret_pos_ && direction < 0)
-        next = max(0, caret_pos_ - 1);
-    else if(next == caret_pos_ && direction > 0)
-        next = min(core_.GetLength(), caret_pos_ + 1);
+
+    int target_paragraph = paragraph_index;
+    int target_line = line_index + direction;
+    if(target_line < 0) {
+        if(target_paragraph <= 0)
+            return false;
+        target_paragraph--;
+        LayoutParagraph(target_paragraph, ContentWidth());
+        target_line = max(0, paragraphs_[target_paragraph].lines.GetCount() - 1);
+    }
+    else if(target_line >= current_paragraph.lines.GetCount()) {
+        if(target_paragraph + 1 >= paragraphs_.GetCount())
+            return false;
+        target_paragraph++;
+        LayoutParagraph(target_paragraph, ContentWidth());
+        target_line = 0;
+    }
+
+    const ParagraphCache& target_paragraph_cache = paragraphs_[target_paragraph];
+    if(target_paragraph_cache.lines.IsEmpty())
+        return false;
+    target_line = clamp(target_line, 0, target_paragraph_cache.lines.GetCount() - 1);
+    const VisualLine& line = target_paragraph_cache.lines[target_line];
+
+    int local_x = preferred_x_ - page_rect_.left - style_.page_padding;
+    int next = line.to;
+    if(line.glyphs.IsEmpty())
+        next = line.from;
+    else {
+        for(const VisualGlyph& glyph : line.glyphs) {
+            if(local_x < glyph.x + glyph.width / 2) {
+                next = glyph.pos;
+                break;
+            }
+        }
+    }
+
     int keep_x = preferred_x_;
     MoveCaret(next, keep_selection);
     preferred_x_ = keep_x;
@@ -300,7 +425,7 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
     return true;
 }
 
-bool UiDoc::EditActiveTableCell(const WString& text, bool)
+bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
 {
     UiDocTable table;
     if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
@@ -310,11 +435,20 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool)
 
     UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
     int pos = clamp(active_table_pos_, 0, CellUnits(cell));
+    UiDocRange selected = TableSelectionRange();
+    if(replace_selection && !selected.IsEmpty()) {
+        if(!DeleteCellRange(cell, selected))
+            return false;
+        pos = selected.from;
+    }
     if(!InsertCellText(cell, pos, text))
         return false;
     if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     active_table_pos_ = pos + text.GetCount();
+    active_table_anchor_pos_ = active_table_pos_;
+    WhenSelection();
+    ScrollCaretIntoView();
     Refresh();
     return true;
 }
@@ -328,6 +462,19 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
         return false;
 
     UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
+    UiDocRange selected = TableSelectionRange();
+    if(!selected.IsEmpty()) {
+        if(!DeleteCellRange(cell, selected))
+            return false;
+        if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+            return false;
+        active_table_anchor_pos_ = active_table_pos_ = selected.from;
+        WhenSelection();
+        ScrollCaretIntoView();
+        Refresh();
+        return true;
+    }
+
     int total = CellUnits(cell);
     int pos = clamp(active_table_pos_, 0, total);
     int remove_at = forward ? pos : pos - 1;
@@ -339,9 +486,11 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
         return false;
     if(!forward)
         active_table_pos_ = max(0, pos - 1);
+    active_table_anchor_pos_ = active_table_pos_;
+    WhenSelection();
+    ScrollCaretIntoView();
     Refresh();
     return true;
 }
-
 
 }
