@@ -39,6 +39,12 @@ bool InteractionCellCharAt(const UiDocTableCell& cell, int pos, wchar& ch)
     return false;
 }
 
+bool InteractionInlineImage(const UiDocEmbedBlock& embed)
+{
+    return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
+           AsString(embed.layout["mode"]) == "inline";
+}
+
 }
 
 void UiDoc::LeftDown(Point p, dword keyflags)
@@ -49,6 +55,32 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     if(HitTestAnnotation(p, annotation_id)) {
         WhenAnnotation(annotation_id);
         return;
+    }
+
+    if(!active_embed_id_.IsEmpty()) {
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds()) {
+            if(embed.id != active_embed_id_ || !InteractionInlineImage(embed))
+                continue;
+            Point top_left = DocumentPointAtPos(embed.range.from);
+            int width = embed.payload.Find("width") >= 0 ? (int)embed.payload["width"] : DPI(96);
+            int height = embed.payload.Find("height") >= 0 ? (int)embed.payload["height"] : DPI(64);
+            width = max(DPI(16), min(ContentWidth(), width));
+            height = max(DPI(16), height);
+            Rect rc = RectC(top_left.x, top_left.y, width, height);
+            int handle = DPI(10);
+            Rect resize = RectC(rc.right - handle / 2, rc.bottom - handle / 2, handle, handle);
+            if(resize.Contains(p)) {
+                image_resizing_ = true;
+                image_dragging_ = false;
+                image_drag_moved_ = false;
+                image_drag_start_ = p;
+                image_resize_start_size_ = Size(width, height);
+                drag_selecting_ = false;
+                table_drag_selecting_ = false;
+                return;
+            }
+            break;
+        }
     }
 
     String table_id;
@@ -63,6 +95,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
             active_table_anchor_pos_ = cell_pos;
         active_table_pos_ = cell_pos;
         active_embed_id_.Clear();
+        image_dragging_ = image_resizing_ = image_drag_moved_ = false;
         table_drag_selecting_ = true;
         drag_selecting_ = false;
         preferred_x_ = -1;
@@ -81,6 +114,17 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     if(HitTestEmbed(p, embed_id)) {
         ClearActiveObject();
         active_embed_id_ = embed_id;
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(embed.id == embed_id) {
+                if(InteractionInlineImage(embed)) {
+                    anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
+                    image_dragging_ = true;
+                    image_drag_start_ = p;
+                    image_drag_moved_ = false;
+                }
+                break;
+            }
+        WhenSelection();
         Refresh();
         return;
     }
@@ -97,14 +141,93 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     Refresh();
 }
 
-void UiDoc::LeftUp(Point, dword)
+void UiDoc::LeftUp(Point p, dword)
 {
+    if(image_resizing_ && !active_embed_id_.IsEmpty()) {
+        String id = active_embed_id_;
+        int dx = p.x - image_drag_start_.x;
+        int next_width = max(DPI(24), image_resize_start_size_.cx + dx);
+        int next_height = max(DPI(16), image_resize_start_size_.cy * next_width /
+                                        max(1, image_resize_start_size_.cx));
+        for(const UiDocEmbedBlock& current : core_.GetEmbeds())
+            if(current.id == id && InteractionInlineImage(current)) {
+                UiDocEmbedBlock next = current;
+                next.payload.GetAdd("width") = next_width;
+                next.payload.GetAdd("height") = next_height;
+                core_.UpdateEmbed(next);
+                break;
+            }
+        image_resizing_ = false;
+        image_dragging_ = false;
+        image_drag_moved_ = false;
+        Refresh();
+        return;
+    }
+
+    if(image_dragging_ && !active_embed_id_.IsEmpty()) {
+        String id = active_embed_id_;
+        image_dragging_ = false;
+
+        if(image_drag_moved_) {
+            UiDocEmbedBlock source;
+            bool found = false;
+            for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+                if(embed.id == id && InteractionInlineImage(embed)) {
+                    source = embed;
+                    found = true;
+                    break;
+                }
+
+            if(found) {
+                String key = source.payload.Find("resource_key") >= 0 ? AsString(source.payload["resource_key"]) : String();
+                int width = source.payload.Find("width") >= 0 ? (int)source.payload["width"] : DPI(96);
+                int height = source.payload.Find("height") >= 0 ? (int)source.payload["height"] : DPI(64);
+
+                String table_id;
+                int row = -1, column = -1, cell_pos = 0;
+                if(HitTestTable(p, table_id, row, column, cell_pos)) {
+                    if(RemoveEmbed(id)) {
+                        active_table_id_ = table_id;
+                        active_table_row_ = row;
+                        active_table_column_ = column;
+                        active_table_anchor_pos_ = active_table_pos_ = cell_pos;
+                        InsertActiveTableImage(key, width, height);
+                    }
+                }
+                else {
+                    int target = PosAtDocumentPoint(p);
+                    int old_at = source.range.from;
+                    if(target != old_at && target != source.range.to && RemoveEmbed(id)) {
+                        if(target > old_at)
+                            target--;
+                        anchor_pos_ = caret_pos_ = ClampPos(target);
+                        InsertImage(key, width, height, "inline");
+                    }
+                }
+            }
+        }
+        image_drag_moved_ = false;
+        drag_selecting_ = false;
+        table_drag_selecting_ = false;
+        Refresh();
+        return;
+    }
+
     drag_selecting_ = false;
     table_drag_selecting_ = false;
 }
 
 void UiDoc::MouseMove(Point p, dword)
 {
+    if(image_resizing_)
+        return;
+
+    if(image_dragging_) {
+        if(abs(p.x - image_drag_start_.x) >= DPI(4) || abs(p.y - image_drag_start_.y) >= DPI(4))
+            image_drag_moved_ = true;
+        return;
+    }
+
     if(table_drag_selecting_ && !active_table_id_.IsEmpty()) {
         String table_id;
         int row = -1, column = -1, cell_pos = 0;
@@ -128,6 +251,20 @@ void UiDoc::MouseMove(Point p, dword)
 
 void UiDoc::LeftDouble(Point p, dword)
 {
+    String embed_id;
+    if(HitTestEmbed(p, embed_id)) {
+        ClearActiveObject();
+        active_embed_id_ = embed_id;
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(embed.id == embed_id && InteractionInlineImage(embed)) {
+                anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
+                break;
+            }
+        WhenSelection();
+        Refresh();
+        return;
+    }
+
     String table_id;
     int row = -1, column = -1, cell_pos = 0;
     if(HitTestTable(p, table_id, row, column, cell_pos)) {
@@ -224,6 +361,32 @@ bool UiDoc::Key(dword key, int count)
     default: break;
     }
 
+    if(!active_embed_id_.IsEmpty()) {
+        UiDocEmbedBlock image;
+        bool inline_image = false;
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(embed.id == active_embed_id_) {
+                image = embed;
+                inline_image = InteractionInlineImage(embed);
+                break;
+            }
+
+        if(base == K_BACKSPACE || base == K_DELETE)
+            return RemoveEmbed(active_embed_id_);
+        if(inline_image && base == K_LEFT) {
+            int pos = image.range.from;
+            ClearActiveObject();
+            anchor_pos_ = caret_pos_ = ClampPos(pos);
+            WhenSelection(); Refresh(); return true;
+        }
+        if(inline_image && base == K_RIGHT) {
+            int pos = image.range.to;
+            ClearActiveObject();
+            anchor_pos_ = caret_pos_ = ClampPos(pos);
+            WhenSelection(); Refresh(); return true;
+        }
+    }
+
     if(!active_table_id_.IsEmpty()) {
         UiDocTable table;
         if(core_.GetTable(active_table_id_, table) &&
@@ -308,7 +471,7 @@ bool UiDoc::Key(dword key, int count)
             int from = caret_pos_;
             caret_pos_ = anchor_pos_ = old;
             if(from < old) {
-                core_.Replace(UiDocRange(from, old), WString());
+                Replace(UiDocRange(from, old), WString());
                 anchor_pos_ = caret_pos_ = from;
                 WhenSelection();
                 return true;
@@ -348,6 +511,8 @@ bool UiDoc::Key(dword key, int count)
     }
 
     if(!ctrl && !alt && base >= 32 && base < 0x110000) {
+        if(!active_embed_id_.IsEmpty())
+            ClearActiveObject();
         WString text;
         for(int i = 0; i < max(1, count); i++)
             text.Cat((wchar)base);
