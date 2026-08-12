@@ -85,12 +85,28 @@ static void TestInlineInsertionAndDelete(ImageTestCtx& t)
     t.Expect(after.y == before.y, "text position after inline image stays on the same visual line when space permits");
     t.Expect(after.x - before.x >= DPI(70), "inline image contributes its painted width to caret geometry");
 
+    t.Expect(doc.Undo(), "one Undo reverses an inline image insertion");
+    t.Expect(FindEmbed(doc, id) == nullptr && doc.GetText() == "before after",
+             "insertion Undo removes both embed and object marker");
+    t.Expect(doc.Redo(), "one Redo restores an inline image insertion");
+    t.Expect(FindEmbed(doc, id) != nullptr && doc.GetTextW()[at] == (wchar)0xfffc,
+             "insertion Redo restores both embed and object marker");
+
+    doc.Layout();
+    before = doc.PointAtPos(at);
+    after = doc.PointAtPos(at + 1);
     Point click(before.x + max(1, (after.x - before.x) / 2), before.y + DPI(12));
     doc.LeftDown(click, 0);
     doc.LeftUp(click, 0);
     t.Expect(doc.Key(K_DELETE, 1), "Delete removes a selected inline image");
     t.Expect(FindEmbed(doc, id) == nullptr, "selected inline image embed is removed");
     t.Expect(doc.GetText() == "before after", "selected inline image marker is removed with the image");
+    t.Expect(doc.Undo(), "one Undo restores a deleted inline image");
+    t.Expect(FindEmbed(doc, id) != nullptr && doc.GetTextW()[at] == (wchar)0xfffc,
+             "delete Undo restores both image and marker");
+    t.Expect(doc.Redo(), "one Redo removes the inline image again");
+    t.Expect(FindEmbed(doc, id) == nullptr && doc.GetText() == "before after",
+             "delete Redo removes both image and marker again");
 }
 
 static void TestResizeAndReposition(ImageTestCtx& t)
@@ -118,6 +134,14 @@ static void TestResizeAndReposition(ImageTestCtx& t)
     t.Expect(rh > DPI(40), "corner resize increases inline image height");
     t.Expect(rw > 0 && abs(rh * DPI(80) - rw * DPI(40)) <= max(DPI(80), rw) * 2,
              "corner resize preserves the image aspect ratio approximately");
+    t.Expect(doc.Undo(), "resize is one undoable image edit");
+    resized = FindEmbed(doc, id);
+    t.Expect(resized && (int)resized->payload["width"] == DPI(80) && (int)resized->payload["height"] == DPI(40),
+             "resize Undo restores original dimensions");
+    t.Expect(doc.Redo(), "resize Redo succeeds");
+    resized = FindEmbed(doc, id);
+    t.Expect(resized && (int)resized->payload["width"] > DPI(80),
+             "resize Redo restores enlarged dimensions");
 
     doc.Layout();
     left = doc.PointAtPos(4);
@@ -132,6 +156,12 @@ static void TestResizeAndReposition(ImageTestCtx& t)
              "dragging an inline image moves its logical marker to the drop position");
     t.Expect(doc.Core().GetEmbeds().GetCount() == 1 && doc.Core().GetEmbeds()[0].range.from == 0,
              "dragging an inline image moves its embed anchor with the marker");
+    t.Expect(doc.Undo(), "body image reposition is one undoable edit");
+    t.Expect(doc.GetTextW()[4] == (wchar)0xfffc && doc.Core().GetEmbeds()[0].range.from == 4,
+             "reposition Undo restores the prior inline location");
+    t.Expect(doc.Redo(), "body image reposition Redo succeeds");
+    t.Expect(doc.GetTextW()[0] == (wchar)0xfffc && doc.Core().GetEmbeds()[0].range.from == 0,
+             "reposition Redo restores the new inline location");
 }
 
 static void TestInlineBlockConversion(ImageTestCtx& t)
@@ -151,8 +181,16 @@ static void TestInlineBlockConversion(ImageTestCtx& t)
     t.Expect(block && block->layout.Find("mode") >= 0 && AsString(block->layout["mode"]) == "block",
              "center command records block image mode");
     t.Expect(doc.GetText() == "left right", "converting to block image removes the inline marker");
+    t.Expect(doc.Undo(), "inline-to-block conversion is one undoable edit");
+    const UiDocEmbedBlock* inline_undo = FindEmbed(doc, id);
+    t.Expect(inline_undo && inline_undo->range.GetLength() == 1 && doc.GetTextW()[inline_undo->range.from] == (wchar)0xfffc,
+             "layout Undo restores both inline marker and embed range");
+    t.Expect(doc.Redo(), "inline-to-block conversion Redo succeeds");
+    block = FindEmbed(doc, id);
+    t.Expect(block && block->range.IsEmpty() && doc.GetText() == "left right",
+             "layout Redo restores block mode without a marker");
 
-    t.Expect(doc.ExecuteCommand("image.align.inline"), "selected block image converts back to inline mode");
+    t.Expect(doc.SetImageAlign(id, "inline"), "selected block image converts back to inline mode");
     const UiDocEmbedBlock* inline_again = FindEmbed(doc, id);
     t.Expect(inline_again && inline_again->range.GetLength() == 1,
              "restored inline image owns one logical text unit");
