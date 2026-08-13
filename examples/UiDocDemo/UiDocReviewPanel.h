@@ -77,6 +77,7 @@ public:
             normalized = normalized.Mid(9);
         if(normalized.IsEmpty())
             normalized = "note";
+        EnsureMetadataTypeOption(normalized);
         metadata_type_.SetDataSilently(normalized);
     }
 
@@ -89,6 +90,56 @@ public:
     void ShowMetadataTab()
     {
         tabs_.SetActiveTab(1);
+        RefreshPanel();
+    }
+
+    void AddCommentAtCurrent()
+    {
+        if(!doc_)
+            return;
+        String id = doc_->AddComment("Review comment");
+        if(id.IsEmpty()) {
+            WhenStatus("Unable to add comment");
+            return;
+        }
+        active_comment_id_ = id;
+        active_metadata_id_.Clear();
+        tabs_.SetActiveTab(0);
+        doc_->RevealAnnotation(id, true);
+        WhenStatus("Comment added - edit it in Review");
+        RefreshPanel();
+    }
+
+    void AddMetadataAtCurrent(const String& requested_type)
+    {
+        if(!doc_)
+            return;
+        String type = requested_type;
+        if(type.StartsWith("metadata."))
+            type = type.Mid(9);
+        if(type.IsEmpty())
+            type = "note";
+        SelectMetadataType(type);
+
+        String label = ToUpper(type.Left(1)) + type.Mid(1);
+        ValueMap payload;
+        payload.Add("source", "UiDocDemo quick add");
+        int at = CurrentParagraphStart();
+        String id = doc_->AddMetadata(UiDocRange(at, at), type,
+                                      label + " reference",
+                                      "Non-printing reference metadata anchored to this paragraph.",
+                                      payload);
+        if(id.IsEmpty()) {
+            WhenStatus("Unable to add metadata");
+            return;
+        }
+        active_metadata_id_ = id;
+        active_comment_id_.Clear();
+        tabs_.SetActiveTab(1);
+        doc_->ShowMetadata(true);
+        doc_->SetMetadataExpanded(id, true);
+        doc_->RevealAnnotation(id, false);
+        WhenStatus("Metadata added - edit it in Review");
         RefreshPanel();
     }
 
@@ -408,7 +459,9 @@ private:
             return;
         }
 
-        metadata_type_.SetDataSilently(MetadataTypeName(*active));
+        String type = MetadataTypeName(*active);
+        EnsureMetadataTypeOption(type);
+        metadata_type_.SetDataSilently(type);
         metadata_title_.SetTextUtf8(MetadataTitle(*active));
         metadata_body_.SetTextUtf8(MetadataBody(*active));
         metadata_payload_.SetTextUtf8(PayloadJson(*active));
@@ -424,8 +477,8 @@ private:
     {
         if(!doc_ || id.IsEmpty())
             return nullptr;
-        for(const UiDocAnnotation& item : doc_->GetComments())
-            if(item.id == id)
+        for(const UiDocAnnotation& item : doc_->Core().GetAnnotations())
+            if(item.id == id && (item.type == "comment" || item.type == "review.comment"))
                 return &item;
         return nullptr;
     }
@@ -460,6 +513,15 @@ private:
         return type.IsEmpty() ? String("note") : type;
     }
 
+    void EnsureMetadataTypeOption(const String& type)
+    {
+        for(int i = 0; i < metadata_type_.GetCount(); i++)
+            if(AsString(metadata_type_.GetItemData(i)) == type)
+                return;
+        String label = ToUpper(type.Left(1)) + type.Mid(1);
+        metadata_type_.Add(label, type);
+    }
+
     static ValueMap UserPayload(const UiDocAnnotation& metadata)
     {
         ValueMap payload = clone(metadata.payload);
@@ -488,7 +550,8 @@ private:
             WhenStatus("Payload must be a JSON object");
             return false;
         }
-        out = clone((ValueMap)parsed);
+        ValueMap parsed_map = parsed;
+        out = clone(parsed_map);
         return true;
     }
 
@@ -625,7 +688,7 @@ private:
         ValueMap payload;
         if(!ParsePayload(payload))
             return;
-        String type = metadata_type_.HasSelection() ? AsString(metadata_type_.GetSelectedData()) : String("note");
+        String type = metadata_type_.HasSelection() ? AsString(metadata_type_.GetSelectedData()) : MetadataTypeName(*FindMetadata(active_metadata_id_));
         String title = TrimBoth(metadata_title_.GetTextUtf8());
         String body = metadata_body_.GetTextUtf8();
         if(!doc_->UpdateMetadata(active_metadata_id_, type, title, body, payload)) {
