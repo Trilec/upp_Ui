@@ -226,6 +226,7 @@ private:
     bool image_resizing_ = false;
     bool image_drag_moved_ = false;
     Point image_drag_start_;
+    Point image_interaction_current_;
     Size image_resize_start_size_;
 
     VectorMap<String, Function<bool(UiDoc&, const Value&)> > commands_;
@@ -266,6 +267,7 @@ private:
     Rect CaretRectInternal() const;
     Rect TableCaretRectInternal() const;
     bool HitTestTable(Point p, String& table_id, int& row, int& column, int& cell_pos) const;
+    bool HitTestTableImage(Point p, String& table_id, int& row, int& column, int& unit_pos) const;
     bool HitTestEmbed(Point p, String& embed_id) const;
     bool HitTestAnnotation(Point p, String& annotation_id) const;
 
