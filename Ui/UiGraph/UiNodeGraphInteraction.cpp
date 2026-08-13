@@ -162,7 +162,10 @@ void UiNodeGraph::BeginPan(Point p)
     interaction_ = InteractionMode::Pan;
     press_point_ = last_point_ = p;
     pan_at_press_ = pan_;
-    SetCapture();
+
+    // U++ mouse capture is defined for left/right button interactions only.
+    // Middle-button panning therefore remains an in-view interaction and is
+    // terminated on MiddleUp or MouseLeave rather than taking Ctrl capture.
 }
 
 void UiNodeGraph::UpdatePan(Point p)
@@ -182,8 +185,6 @@ void UiNodeGraph::EndPan()
 {
     if(interaction_ == InteractionMode::Pan)
         interaction_ = InteractionMode::None;
-    if(HasCapture())
-        ReleaseCapture();
 }
 
 void UiNodeGraph::BeginMarquee(Point p)
@@ -349,6 +350,10 @@ void UiNodeGraph::MouseMove(Point p, dword)
 
 void UiNodeGraph::MouseLeave()
 {
+    if(interaction_ == InteractionMode::Pan) {
+        EndPan();
+        return;
+    }
     if(interaction_ == InteractionMode::None &&
        (hot_node_.IsValid() || hot_edge_.IsValid() || hot_port_.IsValid())) {
         hot_node_ = UiGraphNodeRef();
