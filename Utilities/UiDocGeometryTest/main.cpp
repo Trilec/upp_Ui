@@ -28,6 +28,14 @@ static UiDoc::Style GeometryStyle(int padding)
     return style;
 }
 
+static const UiDocAnnotation* FindMetadata(const UiDoc& doc, const String& id)
+{
+    for(const UiDocAnnotation& annotation : doc.Core().GetAnnotations())
+        if(annotation.id == id && annotation.type.StartsWith("metadata."))
+            return &annotation;
+    return nullptr;
+}
+
 static void TestPagePaddingAndDelete(GeometryTestCtx& t)
 {
     UiDoc doc;
@@ -214,6 +222,87 @@ static void TestGutterReservationAndMarkerHit(GeometryTestCtx& t)
              "removing the last visible marker releases the gutter client width");
 }
 
+static void TestExpandedMetadataEditRefresh(GeometryTestCtx& t)
+{
+    UiDoc doc;
+    UiDoc::Style style = GeometryStyle(DPI(18));
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(440), DPI(320));
+    doc.SetText("anchor paragraph\nnext paragraph");
+    doc.ShowMetadata(true);
+    doc.Layout();
+
+    int second = String("anchor paragraph\n").GetCount();
+    int baseline_y = doc.PointAtPos(second).y;
+    String id = doc.AddMetadata(UiDocRange(0, 0), "guidance", "Short title", "Short body.");
+    t.Expect(!id.IsEmpty(), "expanded-refresh fixture metadata is created");
+    t.Expect(doc.SetMetadataExpanded(id, true), "expanded-refresh fixture opens its card");
+    doc.Layout();
+    int short_y = doc.PointAtPos(second).y;
+    t.Expect(short_y > baseline_y + DPI(12),
+             "expanded-refresh fixture card reserves visible document height");
+
+    ValueMap payload;
+    payload.Add("source", "refresh regression");
+    String long_body =
+        "This edited reference body is deliberately much longer than the original so it wraps across several lines. "
+        "The expanded metadata card must rebuild from the current payload immediately after UpdateMetadata returns.";
+    t.Expect(doc.UpdateMetadata(id, "guidance", "Updated visible title", long_body, payload),
+             "typed metadata update succeeds while the card is expanded");
+
+    const UiDocAnnotation* updated = FindMetadata(doc, id);
+    t.Expect(updated && updated->expanded &&
+                       AsString(updated->payload["title"]) == "Updated visible title" &&
+                       AsString(updated->payload["text"]) == long_body,
+             "expanded metadata keeps current title/body and expanded state after edit");
+    t.Expect(doc.PointAtPos(second).y > short_y + DPI(12),
+             "expanded metadata edit immediately remeasures the visible reference card");
+}
+
+static void TestMetadataGutterToggle(GeometryTestCtx& t)
+{
+    UiDoc doc;
+    UiDoc::Style style = GeometryStyle(DPI(18));
+    style.gutter_width = DPI(28);
+    style.annotation_marker_size = DPI(10);
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(460), DPI(260));
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+    doc.SetText("metadata anchor\nnext paragraph");
+    doc.ShowMetadata(true);
+
+    String id = doc.AddMetadata(UiDocRange(0, 0), "note", "Toggle reference", "Toggle body");
+    t.Expect(!id.IsEmpty(), "gutter-toggle fixture metadata is created");
+    doc.Layout();
+
+    String clicked_id;
+    int click_count = 0;
+    doc.WhenAnnotation = [&](const String& clicked) {
+        clicked_id = clicked;
+        click_count++;
+    };
+
+    Point anchor = doc.PointAtPos(0);
+    int gutter = max(DPI(12), style.gutter_width);
+    int marker = max(DPI(7), style.annotation_marker_size);
+    int marker_x = (gutter - marker) / 2 + marker / 2;
+    int marker_y = anchor.y + max(0, (style.font.GetHeight() - marker) / 2) + marker / 2;
+
+    doc.LeftDown(Point(marker_x, marker_y), 0);
+    t.Expect(clicked_id == id && click_count == 1,
+             "metadata gutter click still reports the clicked annotation id");
+    const UiDocAnnotation* opened = FindMetadata(doc, id);
+    t.Expect(opened && opened->expanded,
+             "first metadata gutter click expands its reference card");
+
+    doc.LeftDown(Point(marker_x, marker_y), 0);
+    t.Expect(clicked_id == id && click_count == 2,
+             "second metadata gutter click still reports the same annotation id");
+    const UiDocAnnotation* closed = FindMetadata(doc, id);
+    t.Expect(closed && !closed->expanded,
+             "second metadata gutter click collapses its reference card");
+}
+
 CONSOLE_APP_MAIN
 {
     GeometryTestCtx t;
@@ -223,6 +312,8 @@ CONSOLE_APP_MAIN
     TestWrappedLineBoundary(t);
     TestTablePaintedRowHit(t);
     TestGutterReservationAndMarkerHit(t);
+    TestExpandedMetadataEditRefresh(t);
+    TestMetadataGutterToggle(t);
 
     Cout() << Format("UIDOC_GEOMETRY_SUMMARY checks=%d failed=%d\n", t.checks, t.fails);
     SetExitCode(t.fails == 0 ? 0 : 1);
