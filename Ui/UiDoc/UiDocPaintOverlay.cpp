@@ -44,6 +44,22 @@ void PaintOverlayMarkerShapeAA(Draw& w, const Rect& marker,
     UiDrawCachedRaster(w, marker, image);
 }
 
+void PaintOverlayCountBadge(Draw& w, const Rect& marker, int count, Color color)
+{
+    if(count <= 1)
+        return;
+    int side = DPI(9);
+    Rect badge = RectC(marker.right - side / 2, marker.top - side / 2, side, side);
+    Image face = UiGetCachedAACircleImage(badge.GetSize(), color);
+    UiDrawCachedRaster(w, badge, face);
+    String label = count > 9 ? String("9+") : AsString(count);
+    Font font = SansSerifZ(DPI(6)).Bold();
+    Size ts = GetTextSize(label, font);
+    w.DrawText(badge.left + (badge.GetWidth() - ts.cx) / 2,
+               badge.top + (badge.GetHeight() - ts.cy) / 2,
+               label, font, White());
+}
+
 }
 
 void UiDoc::PaintEmbeds(Draw& w)
@@ -96,8 +112,9 @@ void UiDoc::PaintAnnotations(Draw& w)
         const AnnotationLane* lane = ResolveAnnotationLane(annotation);
         Color color = lane ? lane->color : style_.marker_annotation;
         if(from.y == to.y && annotation.range.from != annotation.range.to) {
+            int thickness = annotation.id == active_annotation_id_ ? DPI(3) : DPI(1);
             int y = from.y + BaseFont().GetHeight() + 1;
-            w.DrawRect(min(from.x, to.x), y, max(1, abs(to.x - from.x)), 1, color);
+            w.DrawRect(min(from.x, to.x), y, max(1, abs(to.x - from.x)), thickness, color);
         }
     }
 }
@@ -136,6 +153,7 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
     const AnnotationLane* lane = ResolveAnnotationLane(*annotation);
     Color accent = lane ? lane->color : style_.marker_annotation;
     Color face = Blend(style_.page_face, accent, 10);
+    bool active = annotation->id == active_annotation_id_;
 
     Size size = rc.GetSize();
     ImageBuffer ib(size);
@@ -146,11 +164,12 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
         p.Begin();
         p.RoundedRectangle(0.5, 0.5, max(1, size.cx - 1), max(1, size.cy - 1), DPI(4));
         p.Fill(face);
-        p.Stroke(1.0, Blend(accent, style_.page_frame, 30));
+        p.Stroke(active ? 2.0 : 1.0, active ? accent : Blend(accent, style_.page_frame, 30));
         p.End();
     }
     w.DrawImage(rc.left, rc.top, ib);
-    w.DrawRect(rc.left, rc.top + DPI(4), DPI(2), max(1, rc.GetHeight() - DPI(8)), accent);
+    int accent_width = active ? DPI(3) : DPI(2);
+    w.DrawRect(rc.left, rc.top + DPI(4), accent_width, max(1, rc.GetHeight() - DPI(8)), accent);
 
     int pad = DPI(7);
     int icon_size = DPI(12);
@@ -229,25 +248,68 @@ void UiDoc::PaintGutter(Draw& w)
         }
     }
 
-    if(have_markers) {
-        for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
-            if(annotation.resolved)
+    if(!have_markers)
+        return;
+
+    Index<int> painted_anchors;
+    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+        if(annotation.resolved)
+            continue;
+        if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
+            continue;
+        if(!ResolveAnnotationLane(annotation))
+            continue;
+        if(painted_anchors.Find(annotation.range.from) >= 0)
+            continue;
+        painted_anchors.Add(annotation.range.from);
+
+        Vector<const UiDocAnnotation*> group;
+        for(const UiDocAnnotation& candidate : core_.GetAnnotations()) {
+            if(candidate.range.from != annotation.range.from || candidate.resolved)
                 continue;
-            if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
+            if(UiDocIsMetadataAnnotation(candidate) && !show_metadata_markers_)
                 continue;
-            const AnnotationLane* lane = ResolveAnnotationLane(annotation);
-            if(!lane)
-                continue;
-            Point p = DocumentPointAtPos(annotation.range.from);
-            int size = max(DPI(7), style_.annotation_marker_size);
-            Rect marker = RectC(area.left + (area.GetWidth() - size) / 2,
-                                p.y + max(0, (BaseFont().GetHeight() - size) / 2), size, size);
-            if(!lane->icon.IsEmpty())
-                UiPaintStyledIcon(w, marker, lane->icon, true, true,
-                                  UiIconRenderMode::MonoTint, lane->color, true);
-            else
-                PaintOverlayMarkerShapeAA(w, marker, lane->shape, lane->color);
+            if(ResolveAnnotationLane(candidate))
+                group.Add(&candidate);
         }
+        if(group.IsEmpty())
+            continue;
+
+        const UiDocAnnotation* shown = group[0];
+        for(const UiDocAnnotation* candidate : group)
+            if(candidate->id == active_annotation_id_) {
+                shown = candidate;
+                break;
+            }
+        const AnnotationLane* lane = ResolveAnnotationLane(*shown);
+        if(!lane)
+            continue;
+
+        Point p = DocumentPointAtPos(annotation.range.from);
+        int size = max(DPI(7), style_.annotation_marker_size);
+        Rect marker = RectC(area.left + (area.GetWidth() - size) / 2,
+                            p.y + max(0, (BaseFont().GetHeight() - size) / 2), size, size);
+        bool active = shown->id == active_annotation_id_;
+
+        if(active) {
+            int cy = marker.CenterPoint().y;
+            if(gutter_side_ == GUTTER_LEFT)
+                w.DrawRect(marker.right, cy - DPI(1), max(1, page_rect_.left - marker.right), DPI(3), lane->color);
+            else
+                w.DrawRect(page_rect_.right, cy - DPI(1), max(1, marker.left - page_rect_.right), DPI(3), lane->color);
+            Rect focus = marker.Inflated(DPI(2));
+            StyledMetrics metrics;
+            metrics.radius = lane->shape == MARKER_CIRCLE ? focus.GetHeight() / 2 : DPI(3);
+            UiPaintFocusShape(w, focus, metrics, ST_HOT, lane->color, 0, 0, 255, 0, 2.0);
+        }
+
+        if(!lane->icon.IsEmpty())
+            UiPaintStyledIcon(w, marker, lane->icon, true, true,
+                              UiIconRenderMode::MonoTint, lane->color, true);
+        else
+            PaintOverlayMarkerShapeAA(w, marker, lane->shape, lane->color);
+
+        PaintOverlayCountBadge(w, marker, group.GetCount(), lane->color);
     }
 }
 
