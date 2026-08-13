@@ -60,6 +60,12 @@ void SetTableCellText(UiDocTable& table, int row, int column,
     cell.runs.Add(pick(run));
 }
 
+String MetadataTitle(const UiDocAnnotation& annotation)
+{
+    int q = annotation.payload.Find("title");
+    return q >= 0 ? AsString(annotation.payload[q]) : String("Metadata");
+}
+
 }
 
 class UiDocDemoWindow : public TopWindow {
@@ -178,6 +184,11 @@ private:
     UiButton btn_image_right;
     UiButton btn_remove_picture;
 
+    UiGroupPanel gp_metadata;
+    UiBoxLayout box_metadata;
+    UiButton btn_add_metadata;
+    UiButton btn_remove_metadata;
+
     UiGroupPanel gp_review_comments;
     UiBoxLayout box_review_comments;
     UiButton btn_new_comment;
@@ -233,6 +244,7 @@ private:
 
     String current_path;
     String active_comment_id;
+    String active_metadata_id;
     String status_message;
     bool dirty = false;
     bool suppress_dirty = false;
@@ -489,9 +501,16 @@ private:
         box_picture.Add(btn_image_right).Fixed(DPI(44));
         box_picture.Add(btn_remove_picture).Fixed(DPI(30));
 
+        SetupRibbonGroup(gp_metadata, box_metadata, "Metadata", UiDirection::H);
+        ConfigureRibbonButton(btn_add_metadata, "Add note", ICON_EDITOR_NOTES_48());
+        ConfigureIconButton(btn_remove_metadata, ICON_DESIGN_DELETE_48(), "Remove active metadata reference");
+        box_metadata.Add(btn_add_metadata).Fixed(DPI(82));
+        box_metadata.Add(btn_remove_metadata).Fixed(DPI(30));
+
         box_insert.Add(gp_pages).Fit();
         box_insert.Add(gp_table).Fit();
         box_insert.Add(gp_picture).Fit();
+        box_insert.Add(gp_metadata).Fit();
     }
 
     void BuildReviewRibbon()
@@ -521,15 +540,15 @@ private:
 
     void BuildViewRibbon()
     {
-        SetupRibbonGroup(gp_view_gutter, box_view_gutter, "Document markers", UiDirection::H);
+        SetupRibbonGroup(gp_view_gutter, box_view_gutter, "Document references", UiDirection::H);
         ConfigureTextButton(btn_line_numbers, "Line numbers");
-        ConfigureTextButton(btn_metadata_markers, "Markers");
+        ConfigureTextButton(btn_metadata_markers, "Metadata");
         ConfigureTextButton(btn_gutter_side, "Gutter right");
         btn_line_numbers.SetCheckable();
         btn_metadata_markers.SetCheckable();
         btn_metadata_markers.SetChecked(true);
         box_view_gutter.Add(btn_line_numbers).Fixed(DPI(86));
-        box_view_gutter.Add(btn_metadata_markers).Fixed(DPI(66));
+        box_view_gutter.Add(btn_metadata_markers).Fixed(DPI(70));
         box_view_gutter.Add(btn_gutter_side).Fixed(DPI(82));
 
         SetupRibbonGroup(gp_view_workspace, box_view_workspace, "Workspace", UiDirection::H);
@@ -592,6 +611,10 @@ private:
         doc_style.metrics.frame_width = DPI(1);
         doc_style.metrics.radius = DPI(1);
         doc_editor.SetCustomStyle(doc_style);
+
+        doc_editor.ConfigureMetadataType("guidance", ICON_EDITOR_NOTES_48(), Color(55, 126, 201));
+        doc_editor.ConfigureMetadataType("structure", ICON_DESIGN_ACCOUNT_TREE_48(), Color(70, 145, 103));
+        doc_editor.ConfigureMetadataType("note", ICON_DESIGN_DESCRIPTION_48(), Color(132, 92, 184));
 
         BuildCommentsPane();
         box_workspace.Add(box_document_frame).Expand(1);
@@ -751,6 +774,9 @@ private:
         btn_image_right.WhenAction = [=] { RunCommand("image.align.right", Value(), "Align image right"); };
         btn_remove_picture.WhenAction = [=] { RunCommand("embed.remove", Value(), "Remove selected image"); };
 
+        btn_add_metadata.WhenAction = [=] { AddMetadataAtCaret(); };
+        btn_remove_metadata.WhenAction = [=] { RemoveActiveMetadata(); };
+
         btn_new_comment.WhenAction = [=] { AddCommentFromPane(); };
         btn_comments_pane.WhenAction = [=] { SetCommentsVisible(btn_comments_pane.IsChecked()); };
         btn_resolve_comment.WhenAction = [=] { ResolveActiveComment(); };
@@ -760,7 +786,7 @@ private:
             doc_editor.ShowLineNumbers(btn_line_numbers.IsChecked()); RefreshDocumentUi(); doc_editor.SetFocus();
         };
         btn_metadata_markers.WhenAction = [=] {
-            doc_editor.ShowMetadataMarkers(btn_metadata_markers.IsChecked()); RefreshDocumentUi(); doc_editor.SetFocus();
+            doc_editor.ShowMetadata(btn_metadata_markers.IsChecked()); RefreshDocumentUi(); doc_editor.SetFocus();
         };
         btn_gutter_side.WhenAction = [=] {
             UiDoc::GutterSide side = doc_editor.GetGutterSide() == UiDoc::GUTTER_LEFT ? UiDoc::GUTTER_RIGHT : UiDoc::GUTTER_LEFT;
@@ -787,6 +813,20 @@ private:
         doc_editor.WhenSelection = [=] { RefreshDocumentUi(); };
         doc_editor.WhenSearch = [=](const String&) { RefreshDocumentUi(); };
         doc_editor.WhenAnnotation = [=](const String& id) {
+            for(const UiDocAnnotation& metadata : doc_editor.GetMetadata()) {
+                if(metadata.id != id)
+                    continue;
+                active_metadata_id = id;
+                bool expanding = !metadata.expanded;
+                suppress_dirty = true;
+                doc_editor.SetMetadataExpanded(id, expanding);
+                suppress_dirty = false;
+                SetStatus(String(expanding ? "Expanded metadata - " : "Collapsed metadata - ") + MetadataTitle(metadata));
+                RefreshDocumentUi();
+                doc_editor.SetFocus();
+                return;
+            }
+
             active_comment_id = id;
             SetCommentsVisible(true);
             SwitchRibbon(2);
@@ -811,6 +851,7 @@ private:
             "Rich text marks, fonts and local size changes\n"
             "Semantic headings, lists, quotes and code blocks\n"
             "Typed rich tables and resource-backed images\n"
+            "Anchored hidden metadata with expandable reference cards\n"
             "Range comments, search, replace and native .uidoc persistence\n"
             "\n"
             "Design principle\n"
@@ -839,6 +880,7 @@ private:
         ApplyRoleToFragment("Rich text marks, fonts and local size changes", "list.bullet");
         ApplyRoleToFragment("Semantic headings, lists, quotes and code blocks", "list.bullet");
         ApplyRoleToFragment("Typed rich tables and resource-backed images", "list.bullet");
+        ApplyRoleToFragment("Anchored hidden metadata with expandable reference cards", "list.bullet");
         ApplyRoleToFragment("Range comments, search, replace and native .uidoc persistence", "list.bullet");
         ApplyRoleToFragment("Design principle", "heading.2");
         ApplyRoleToFragment("Keep the document model deterministic while the editor remains familiar to use.", "quote");
@@ -856,6 +898,35 @@ private:
             ValueMap meta; meta.Add("author", "UiDocDemo");
             active_comment_id = doc_editor.AddComment(
                 "This is a live UiDoc range annotation. Edit or resolve it from the Review pane.", meta);
+        }
+
+        int guidance_at = current_text.Find("Executive summary");
+        if(guidance_at >= 0) {
+            ValueMap payload;
+            payload.Add("source", "UiDocDemo presentation context");
+            active_metadata_id = doc_editor.AddMetadata(
+                UiDocRange(guidance_at, guidance_at),
+                "guidance",
+                "Presentation guidance",
+                "Use this section to establish the project purpose and keep stakeholder-facing language concise. "
+                "This reference is embedded metadata, is not printable document text, and can be supplied by an application or agent.",
+                payload);
+            if(!active_metadata_id.IsEmpty())
+                doc_editor.SetMetadataExpanded(active_metadata_id, true);
+        }
+
+        int structure_at = current_text.Find("Design principle");
+        if(structure_at >= 0) {
+            ValueMap payload;
+            payload.Add("source", "UiDocDemo structural context");
+            payload.Add("example", "Treatment, Dramatica, research or agent context can use the same primitive");
+            doc_editor.AddMetadata(
+                UiDocRange(structure_at, structure_at),
+                "structure",
+                "Background context",
+                "Higher-level tools can attach structured treatment, story, research, asset or AI context here without putting it in the printable document. "
+                "The compact green gutter icon opens this reference when needed.",
+                payload);
         }
 
         const String picture_prefix = "A picture can sit here ";
@@ -878,7 +949,7 @@ private:
         }
 
         doc_editor.SetSelection(UiDocRange(doc_editor.GetLength(), doc_editor.GetLength()));
-        String table_id = doc_editor.InsertTable(3, 4, 1);
+        String table_id = doc_editor.InsertTable(3, 5, 1);
         UiDocTable table;
         if(!table_id.IsEmpty() && doc_editor.GetTable(table_id, table)) {
             SetTableCellText(table, 0, 0, "Capability", true);
@@ -890,12 +961,16 @@ private:
             SetTableCellText(table, 2, 0, "Comments");
             SetTableCellText(table, 2, 1, "Range annotations");
             SetTableCellText(table, 2, 2, "Review pane");
-            SetTableCellText(table, 3, 0, "Tables & images");
-            SetTableCellText(table, 3, 1, "Typed embeds/resources");
-            SetTableCellText(table, 3, 2, "Insert ribbon");
+            SetTableCellText(table, 3, 0, "Metadata");
+            SetTableCellText(table, 3, 1, "Anchored annotations");
+            SetTableCellText(table, 3, 2, "Gutter references");
+            SetTableCellText(table, 4, 0, "Tables & images");
+            SetTableCellText(table, 4, 1, "Typed embeds/resources");
+            SetTableCellText(table, 4, 2, "Insert ribbon");
             doc_editor.SetTable(table_id, table);
         }
 
+        doc_editor.ShowMetadata(true);
         doc_editor.SetSelection(UiDocRange(0, 0));
         doc_editor.SetSearchQuery(String());
         edit_find.Clear();
@@ -903,7 +978,7 @@ private:
         current_path.Clear();
         dirty = false;
         suppress_dirty = false;
-        status_message = "Welcome document";
+        status_message = "Welcome document - click a tinted gutter metadata icon to expand or collapse its reference";
         RefreshDocumentUi();
         doc_editor.SetFocus();
     }
@@ -962,6 +1037,7 @@ private:
         doc_editor.NewDocument();
         current_path.Clear();
         active_comment_id.Clear();
+        active_metadata_id.Clear();
         dirty = false;
         suppress_dirty = false;
         status_message = "New document";
@@ -982,6 +1058,7 @@ private:
         if(!ok) { SetStatus(error.IsEmpty() ? String("Unable to open document") : error); return; }
         current_path = path;
         active_comment_id.Clear();
+        active_metadata_id.Clear();
         dirty = false;
         status_message = "Opened " + GetFileName(path);
         RefreshDocumentUi();
@@ -1045,6 +1122,65 @@ private:
             SetStatus("Unable to insert image"); return;
         }
         SetStatus("Inserted " + GetFileName(path));
+        doc_editor.SetFocus();
+    }
+
+    void AddMetadataAtCaret()
+    {
+        UiDocSelection selection = doc_editor.GetSelection();
+        int at = clamp(selection.caret, 0, doc_editor.GetLength());
+        const WString& text = doc_editor.GetTextW();
+        while(at > 0 && text[at - 1] != '\n')
+            --at;
+
+        ValueMap payload;
+        payload.Add("source", "UiDocDemo user-created reference");
+        String id = doc_editor.AddMetadata(
+            UiDocRange(at, at),
+            "note",
+            "Reference note",
+            "This is anchored metadata for the current paragraph. Applications can replace this payload with treatment, research, story, asset or agent context while keeping it out of the printable document.",
+            payload);
+        if(id.IsEmpty()) {
+            SetStatus("Unable to add metadata");
+            return;
+        }
+
+        active_metadata_id = id;
+        doc_editor.ShowMetadata(true);
+        suppress_dirty = true;
+        doc_editor.SetMetadataExpanded(id, true);
+        suppress_dirty = false;
+        SetStatus("Metadata added - click its purple gutter icon to collapse or expand it");
+        RefreshDocumentUi();
+        doc_editor.SetFocus();
+    }
+
+    void RemoveActiveMetadata()
+    {
+        String id = active_metadata_id;
+        if(id.IsEmpty()) {
+            UiDocSelection selection = doc_editor.GetSelection();
+            int at = clamp(selection.caret, 0, doc_editor.GetLength());
+            const WString& text = doc_editor.GetTextW();
+            int from = at;
+            int to = at;
+            while(from > 0 && text[from - 1] != '\n') --from;
+            while(to < text.GetCount() && text[to] != '\n') ++to;
+            UiDocRange paragraph(from, to);
+            Vector<UiDocAnnotation> hit = doc_editor.GetMetadata(&paragraph);
+            if(!hit.IsEmpty())
+                id = hit[0].id;
+        }
+
+        if(id.IsEmpty() || !doc_editor.RemoveMetadata(id)) {
+            SetStatus("No metadata reference selected at this paragraph");
+            return;
+        }
+
+        active_metadata_id.Clear();
+        SetStatus("Metadata removed");
+        RefreshDocumentUi();
         doc_editor.SetFocus();
     }
 
@@ -1139,7 +1275,8 @@ private:
         btn_ignore_case.SetChecked(doc_editor.IsSearchIgnoreCase());
         btn_whole_word.SetChecked(doc_editor.IsSearchWholeWord());
         btn_line_numbers.SetChecked(doc_editor.IsLineNumbersShown());
-        btn_metadata_markers.SetChecked(doc_editor.IsMetadataMarkersShown());
+        btn_metadata_markers.SetChecked(doc_editor.IsMetadataShown());
+        btn_remove_metadata.Enable(!active_metadata_id.IsEmpty() || !doc_editor.GetMetadata().IsEmpty());
         btn_gutter_side.SetText(doc_editor.GetGutterSide() == UiDoc::GUTTER_LEFT ? "Gutter left" : "Gutter right");
         String role = doc_editor.GetBlockRole();
         if(role.IsEmpty()) role = "paragraph";
@@ -1203,11 +1340,12 @@ private:
         UiDocRange selection = OrderedSelection(doc_editor);
         int words = CountWords(doc_editor.GetTextW());
         int comments = doc_editor.GetComments().GetCount();
+        int metadata = doc_editor.GetMetadata().GetCount();
         lbl_status_left.SetText(status_message.IsEmpty() ? String("Ready") : status_message);
         lbl_status_center.SetText(Format("%d word%s | %d characters | selection %d", words, words == 1 ? "" : "s", doc_editor.GetLength(), selection.GetLength()));
-        lbl_status_right.SetText(Format("Revision %s | %d comment%s | %d match%s",
+        lbl_status_right.SetText(Format("Revision %s | %d comment%s | %d metadata | %d match%s",
                                        AsString((int64)doc_editor.Core().GetRevision()), comments, comments == 1 ? "" : "s",
-                                       doc_editor.GetSearchMatchCount(), doc_editor.GetSearchMatchCount() == 1 ? "" : "es"));
+                                       metadata, doc_editor.GetSearchMatchCount(), doc_editor.GetSearchMatchCount() == 1 ? "" : "es"));
     }
 
     void SetStatus(const String& message)
