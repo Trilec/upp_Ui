@@ -1,4 +1,5 @@
 #include "UiDoc.h"
+#include "UiDocMetadataPrivate.h"
 
 namespace Upp {
 
@@ -107,7 +108,18 @@ void UiDoc::Layout()
     int frame = max(0, style_.metrics.frame_width);
     face.Deflate(frame);
 
-    if(show_line_numbers_ || show_metadata_markers_) {
+    bool have_markers = false;
+    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+        if(annotation.resolved)
+            continue;
+        if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
+            continue;
+        if(ResolveAnnotationLane(annotation)) {
+            have_markers = true;
+            break;
+        }
+    }
+    if(show_line_numbers_ || have_markers) {
         int gutter = max(DPI(12), style_.gutter_width);
         if(gutter_side_ == GUTTER_LEFT)
             face.left += gutter;
@@ -404,8 +416,6 @@ bool UiDoc::HitTestEmbed(Point point, String& embed_id) const
 
 bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
 {
-    if(!show_metadata_markers_)
-        return false;
     EnsureLayout();
 
     int gutter = max(DPI(12), style_.gutter_width);
@@ -416,6 +426,10 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
 
     for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
         if(annotation.resolved)
+            continue;
+        if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
+            continue;
+        if(!ResolveAnnotationLane(annotation))
             continue;
         Point anchor = DocumentPointAtPos(annotation.range.from);
         int x = area.left + (area.GetWidth() - marker) / 2;
