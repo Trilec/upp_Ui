@@ -85,6 +85,8 @@ static void TestMetadataLifecycle(MetadataTestCtx& t)
     t.Expect(annotation && AsString(annotation->payload["title"]) == "Updated guidance" &&
                         AsString(annotation->payload["text"]) == "Updated reference body.",
              "metadata update changes the canonical payload");
+    t.Expect(annotation && AsString(annotation->payload["source"]) == "agent",
+             "legacy title/body metadata update preserves existing arbitrary payload fields");
 
     Vector<UiDocAnnotation> metadata = doc.GetMetadata();
     t.Expect(metadata.GetCount() == 1 && metadata[0].id == id,
