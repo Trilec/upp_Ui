@@ -8,7 +8,7 @@ namespace Upp {
 namespace {
 
 template <class T>
-void SerializeEnum(Stream& s, T& value)
+void NodeGraphSerializeEnum(Stream& s, T& value)
 {
     byte b = (byte)value;
     s % b;
@@ -495,9 +495,9 @@ void UiGraphEdgeStyle::Serialize(Stream& s)
 {
     for(int i = 0; i < 4; i++)
         s % color[i] % label_ink[i] % width[i];
-    SerializeEnum(s, route);
-    SerializeEnum(s, line_style);
-    SerializeEnum(s, arrow);
+    NodeGraphSerializeEnum(s, route);
+    NodeGraphSerializeEnum(s, line_style);
+    NodeGraphSerializeEnum(s, arrow);
     s % label_font % bezier_tension % orthogonal_lead % orthogonal_radius
       % dash_length % dash_gap % arrow_size % interaction_width
       % draw_label_background % label_background;

@@ -240,6 +240,29 @@ struct UiGraphNode : Moveable<UiGraphNode> {
     Vector<UiGraphPort> ports;
     Value data;
 
+    UiGraphNode() {}
+    UiGraphNode(const UiGraphNode& src)
+        : ref(src.ref), title(src.title), subtitle(src.subtitle), description(src.description),
+          style_class(src.style_class), shape(src.shape), role(src.role), custom_shape(src.custom_shape),
+          icon(src.icon), icon_size(src.icon_size), icon_render_mode(src.icon_render_mode),
+          position(src.position), size(src.size), corner_radius(src.corner_radius), z_order(src.z_order),
+          enabled(src.enabled), visible(src.visible), selectable(src.selectable), movable(src.movable),
+          collapsed(src.collapsed), ports(clone(src.ports)), data(src.data)
+    {
+    }
+    UiGraphNode& operator=(const UiGraphNode& src)
+    {
+        if(this != &src) {
+            ref = src.ref; title = src.title; subtitle = src.subtitle; description = src.description;
+            style_class = src.style_class; shape = src.shape; role = src.role; custom_shape = src.custom_shape;
+            icon = src.icon; icon_size = src.icon_size; icon_render_mode = src.icon_render_mode;
+            position = src.position; size = src.size; corner_radius = src.corner_radius; z_order = src.z_order;
+            enabled = src.enabled; visible = src.visible; selectable = src.selectable; movable = src.movable;
+            collapsed = src.collapsed; ports = clone(src.ports); data = src.data;
+        }
+        return *this;
+    }
+
     int FindPort(const String& id) const;
     const UiGraphPort* FindPortPtr(const String& id) const;
     UiGraphPort* FindPortPtr(const String& id);
@@ -263,6 +286,27 @@ struct UiGraphEdge : Moveable<UiGraphEdge> {
     Vector<Pointf> waypoints;
     Value data;
 
+    UiGraphEdge() {}
+    UiGraphEdge(const UiGraphEdge& src)
+        : ref(src.ref), source(src.source), target(src.target),
+          title(src.title), description(src.description), style_class(src.style_class),
+          route(src.route), arrow(src.arrow), stroke(src.stroke),
+          directed(src.directed), enabled(src.enabled), visible(src.visible), selectable(src.selectable),
+          waypoints(clone(src.waypoints)), data(src.data)
+    {
+    }
+    UiGraphEdge& operator=(const UiGraphEdge& src)
+    {
+        if(this != &src) {
+            ref = src.ref; source = src.source; target = src.target;
+            title = src.title; description = src.description; style_class = src.style_class;
+            route = src.route; arrow = src.arrow; stroke = src.stroke;
+            directed = src.directed; enabled = src.enabled; visible = src.visible; selectable = src.selectable;
+            waypoints = clone(src.waypoints); data = src.data;
+        }
+        return *this;
+    }
+
     void Serialize(Stream& s);
 };
 
@@ -278,6 +322,21 @@ struct UiGraphConnectionDecision : Moveable<UiGraphConnectionDecision> {
     UiGraphConnectionAction action = UiGraphConnectionAction::Reject;
     String message;
     Vector<UiGraphEdgeRef> edges_to_replace;
+
+    UiGraphConnectionDecision() {}
+    UiGraphConnectionDecision(const UiGraphConnectionDecision& src)
+        : action(src.action), message(src.message), edges_to_replace(clone(src.edges_to_replace))
+    {
+    }
+    UiGraphConnectionDecision& operator=(const UiGraphConnectionDecision& src)
+    {
+        if(this != &src) {
+            action = src.action;
+            message = src.message;
+            edges_to_replace = clone(src.edges_to_replace);
+        }
+        return *this;
+    }
 
     bool IsAllowed() const { return action != UiGraphConnectionAction::Reject; }
 };

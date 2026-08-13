@@ -402,8 +402,8 @@ static void RunScaleTests(TestCtx& t)
 
     int accepted = 0;
     for(int i = 0; i < 2000; i++) {
-        int a = (i * 37) % node_count;
-        int b = (i * 91 + 17) % node_count;
+        int a = i % node_count;
+        int b = (a + 1 + (i / node_count) * 500) % node_count;
         if(a == b)
             b = (b + 1) % node_count;
         UiGraphEdgeRef edge = model.Connect(UiGraphPortRef{nodes[a], "out"},
