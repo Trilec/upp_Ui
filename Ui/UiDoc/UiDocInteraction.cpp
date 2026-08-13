@@ -284,20 +284,6 @@ void UiDoc::MouseMove(Point p, dword)
 
 void UiDoc::LeftDouble(Point p, dword)
 {
-    String embed_id;
-    if(HitTestEmbed(p, embed_id)) {
-        ClearActiveObject();
-        active_embed_id_ = embed_id;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
-            if(embed.id == embed_id && InteractionInlineImage(embed)) {
-                anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
-                break;
-            }
-        WhenSelection();
-        Refresh();
-        return;
-    }
-
     String table_id;
     int row = -1, column = -1, cell_pos = 0;
     if(HitTestTable(p, table_id, row, column, cell_pos)) {
@@ -344,6 +330,20 @@ void UiDoc::LeftDouble(Point p, dword)
 
         active_table_anchor_pos_ = from;
         active_table_pos_ = to;
+        WhenSelection();
+        Refresh();
+        return;
+    }
+
+    String embed_id;
+    if(HitTestEmbed(p, embed_id)) {
+        ClearActiveObject();
+        active_embed_id_ = embed_id;
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(embed.id == embed_id && InteractionInlineImage(embed)) {
+                anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
+                break;
+            }
         WhenSelection();
         Refresh();
         return;
