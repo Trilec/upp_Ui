@@ -53,6 +53,14 @@ UiDocAnnotation UiDocMetadataCopy(const UiDocAnnotation& source)
     return out;
 }
 
+ValueMap UiDocMetadataMergedPayload(const ValueMap& existing, const ValueMap& changes)
+{
+    ValueMap merged = clone(existing);
+    for(int i = 0; i < changes.GetCount(); i++)
+        merged.GetAdd(changes.GetKey(i)) = clone(changes[i]);
+    return merged;
+}
+
 }
 
 const UiDoc::AnnotationLane* UiDoc::ResolveAnnotationLane(const UiDocAnnotation& annotation) const
@@ -103,9 +111,10 @@ bool UiDoc::UpdateMetadata(const String& id, const String& title, const String& 
                            const ValueMap& payload)
 {
     const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
-    return annotation && UiDocIsMetadataAnnotation(*annotation)
-         ? UpdateMetadata(id, annotation->type, title, text, payload)
-         : false;
+    if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
+        return false;
+    ValueMap merged = UiDocMetadataMergedPayload(annotation->payload, payload);
+    return UpdateMetadata(id, annotation->type, title, text, merged);
 }
 
 bool UiDoc::UpdateMetadata(const String& id, const String& type,
