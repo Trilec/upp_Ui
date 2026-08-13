@@ -34,6 +34,7 @@ static void TestPagePaddingAndDelete(GeometryTestCtx& t)
     const int padding = DPI(40);
     UiDoc::Style style = GeometryStyle(padding);
     doc.SetCustomStyle(style);
+    doc.ShowMetadataMarkers(false);
     doc.SetRect(0, 0, DPI(640), DPI(480));
     doc.SetText("first\nDeleteY\nthird\n");
     doc.Layout();
@@ -69,6 +70,7 @@ static void TestWrappedLineBoundary(GeometryTestCtx& t)
     const int padding = DPI(20);
     UiDoc::Style style = GeometryStyle(padding);
     doc.SetCustomStyle(style);
+    doc.ShowMetadataMarkers(false);
     doc.SetRect(0, 0, DPI(220), DPI(300));
 
     String text = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -115,6 +117,7 @@ static void TestTablePaintedRowHit(GeometryTestCtx& t)
     const int padding = DPI(40);
     UiDoc::Style style = GeometryStyle(padding);
     doc.SetCustomStyle(style);
+    doc.ShowMetadataMarkers(false);
     doc.SetRect(0, 0, DPI(640), DPI(480));
     doc.SetText("anchor");
     doc.SetSelection(UiDocRange(doc.GetLength(), doc.GetLength()));
