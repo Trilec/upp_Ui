@@ -1,4 +1,5 @@
 #include "UiDoc.h"
+#include "UiDocMetadataPrivate.h"
 
 namespace Upp {
 
@@ -370,6 +371,26 @@ void UiDoc::LayoutParagraph(int index, int width) const
 
         embed_y = visual.rect.bottom + style_.embed_gap;
         paragraph.embeds.Add(pick(visual));
+    }
+
+    if(show_metadata_markers_) {
+        int side_inset = min(DPI(8), max(0, available / 8));
+        int card_width = max(DPI(40), available - 2 * side_inset);
+        for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+            if(!UiDocIsMetadataAnnotation(annotation) || annotation.resolved || !annotation.expanded)
+                continue;
+            int anchor = annotation.range.from;
+            if(anchor < from || anchor > to)
+                continue;
+
+            EmbedVisual visual;
+            visual.embed_id = annotation.id;
+            visual.type = "metadata";
+            visual.rect = RectC(text_left + side_inset, embed_y, card_width,
+                                UiDocMetadataCardHeight(annotation, card_width));
+            embed_y = visual.rect.bottom + style_.embed_gap;
+            paragraph.embeds.Add(pick(visual));
+        }
     }
 
     paragraph.height = max(1, embed_y + style_.paragraph_gap);
