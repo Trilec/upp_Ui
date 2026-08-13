@@ -203,6 +203,7 @@ private:
     bool show_line_numbers_ = false;
     bool show_metadata_markers_ = true;
     String active_annotation_id_;
+    bool suppress_change_event_ = false;
 
     ScrollBar sb_;
     int scroll_y_ = 0;
