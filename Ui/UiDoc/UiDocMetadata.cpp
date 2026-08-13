@@ -39,6 +39,20 @@ bool UiDocMetadataRangesTouch(UiDocRange a, UiDocRange b)
     return a.from < b.to && b.from < a.to;
 }
 
+UiDocAnnotation UiDocMetadataCopy(const UiDocAnnotation& source)
+{
+    UiDocAnnotation out;
+    out.id = source.id;
+    out.range = source.range;
+    out.type = source.type;
+    out.payload = clone(source.payload);
+    out.meta = clone(source.meta);
+    out.expanded = source.expanded;
+    out.printable = source.printable;
+    out.resolved = source.resolved;
+    return out;
+}
+
 }
 
 const UiDoc::AnnotationLane* UiDoc::ResolveAnnotationLane(const UiDocAnnotation& annotation) const
@@ -89,13 +103,38 @@ bool UiDoc::UpdateMetadata(const String& id, const String& title, const String& 
                            const ValueMap& payload)
 {
     const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    return annotation && UiDocIsMetadataAnnotation(*annotation)
+         ? UpdateMetadata(id, annotation->type, title, text, payload)
+         : false;
+}
+
+bool UiDoc::UpdateMetadata(const String& id, const String& type,
+                           const String& title, const String& text,
+                           const ValueMap& payload)
+{
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
 
-    ValueMap values = clone(payload);
-    values.GetAdd("title") = title;
-    values.GetAdd("text") = text;
-    return core_.UpdateAnnotation(id, values);
+    UiDocAnnotation replacement = UiDocMetadataCopy(*annotation);
+    replacement.type = UiDocNormalizeMetadataType(type);
+    replacement.payload = clone(payload);
+    replacement.payload.GetAdd("title") = title;
+    replacement.payload.GetAdd("text") = text;
+
+    UiDocCoreChange remove;
+    remove.type = UiDocCoreChange::RemoveAnnotation;
+    remove.annotation_id = id;
+
+    UiDocCoreChange add;
+    add.type = UiDocCoreChange::AddAnnotation;
+    add.annotation = pick(replacement);
+
+    UiDocCoreTransaction tx;
+    tx.label = "Update metadata";
+    tx.changes.Add(pick(remove));
+    tx.changes.Add(pick(add));
+    return core_.Apply(tx).ok;
 }
 
 bool UiDoc::RemoveMetadata(const String& id)
@@ -160,6 +199,41 @@ UiDoc& UiDoc::ConfigureMetadataType(const String& type, const Image& icon, Color
     lane.shape = MARKER_SQUARE;
     lane.side = LANE_AUTO;
     return AddAnnotationLane(lane);
+}
+
+void UiDoc::SetActiveAnnotation(const String& id)
+{
+    if(id.IsEmpty()) {
+        if(!active_annotation_id_.IsEmpty()) {
+            active_annotation_id_.Clear();
+            Refresh();
+        }
+        return;
+    }
+
+    if(!UiDocMetadataById(core_, id))
+        return;
+    if(active_annotation_id_ != id) {
+        active_annotation_id_ = id;
+        Refresh();
+    }
+}
+
+bool UiDoc::RevealAnnotation(const String& id, bool select_range)
+{
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    if(!annotation)
+        return false;
+
+    UiDocRange range = annotation->range;
+    SetActiveAnnotation(id);
+    if(select_range && !range.IsEmpty())
+        SetSelection(range);
+    else
+        SetSelection(UiDocRange(range.from, range.from));
+    ScrollCaretIntoView();
+    Refresh();
+    return true;
 }
 
 }
