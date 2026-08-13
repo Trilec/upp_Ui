@@ -229,7 +229,7 @@ bool DeleteCellRange(UiDocTableCell& cell, UiDocRange range)
     return true;
 }
 
-int BlockIndentAt(const UiDocCore& core, int pos)
+int InputBlockIndentAt(const UiDocCore& core, int pos)
 {
     UiDocRange probe(pos, pos);
     Vector<UiDocBlock> blocks = core.QueryBlocks(&probe);
@@ -398,7 +398,7 @@ bool UiDoc::InsertParagraphBreak()
 
     int sample = ClampPos(caret_pos_);
     String role = BlockRoleAt(sample);
-    int indent = BlockIndentAt(core_, sample);
+    int indent = InputBlockIndentAt(core_, sample);
 
     const WString& text = core_.GetText();
     int from = sample;
