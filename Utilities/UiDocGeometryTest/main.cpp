@@ -147,6 +147,61 @@ static void TestTablePaintedRowHit(GeometryTestCtx& t)
     }
 }
 
+static void TestGutterReservationAndMarkerHit(GeometryTestCtx& t)
+{
+    UiDoc doc;
+    const int padding = DPI(20);
+    UiDoc::Style style = GeometryStyle(padding);
+    style.gutter_width = DPI(20);
+    style.annotation_marker_size = DPI(8);
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(480), DPI(240));
+    doc.SetText("alpha\nbeta\n");
+
+    doc.ShowLineNumbers(false);
+    doc.ShowMetadataMarkers(false);
+    doc.Layout();
+    Point without_gutter = doc.PointAtPos(0);
+
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+    doc.ShowLineNumbers(true);
+    doc.Layout();
+    Point left_gutter = doc.PointAtPos(0);
+    int gutter = max(DPI(12), style.gutter_width);
+    t.Expect(abs((left_gutter.x - without_gutter.x) - gutter) <= 1,
+             "left gutter reserves visible client width before document content");
+
+    doc.SetGutterSide(UiDoc::GUTTER_RIGHT);
+    doc.Layout();
+    Point right_gutter = doc.PointAtPos(0);
+    t.Expect(abs(right_gutter.x - without_gutter.x) <= 1,
+             "right gutter reserves client width without shifting the document left edge");
+
+    doc.SetSelection(UiDocRange(0, 5));
+    String annotation_id = doc.AddComment("geometry marker");
+    t.Expect(!annotation_id.IsEmpty(), "gutter fixture annotation added");
+
+    doc.ShowLineNumbers(false);
+    doc.ShowMetadataMarkers(true);
+    doc.Layout();
+    String clicked_id;
+    doc.WhenAnnotation = [&](const String& id) { clicked_id = id; };
+
+    Point anchor = doc.PointAtPos(0);
+    int marker = max(DPI(6), style.annotation_marker_size);
+    int marker_x = doc.GetSize().cx - gutter + (gutter - marker) / 2 + marker / 2;
+    int marker_y = anchor.y + max(0, (style.font.GetHeight() - marker) / 2) + marker / 2;
+    doc.LeftDown(Point(marker_x, marker_y), 0);
+    t.Expect(clicked_id == annotation_id,
+             "annotation marker hit-test uses the same reserved gutter lane as painting");
+
+    doc.ShowMetadataMarkers(false);
+    doc.Layout();
+    Point restored = doc.PointAtPos(0);
+    t.Expect(abs(restored.x - without_gutter.x) <= 1,
+             "disabling gutter features restores the full document client width");
+}
+
 CONSOLE_APP_MAIN
 {
     GeometryTestCtx t;
@@ -155,6 +210,7 @@ CONSOLE_APP_MAIN
     TestPagePaddingAndDelete(t);
     TestWrappedLineBoundary(t);
     TestTablePaintedRowHit(t);
+    TestGutterReservationAndMarkerHit(t);
 
     Cout() << Format("UIDOC_GEOMETRY_SUMMARY checks=%d failed=%d\n", t.checks, t.fails);
     SetExitCode(t.fails == 0 ? 0 : 1);
