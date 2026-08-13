@@ -4,18 +4,18 @@
 
     Purpose
     - Polished application-style showcase for UiDoc v2.
-    - Demonstrates the real UiDoc/UiDocCore public surface in a familiar,
-      compact document workspace.
+    - Demonstrates familiar document editing plus generic review metadata.
 
     Design
     - UiTitleCard provides application identity plus compact file/navigation actions.
-    - UiStack switches Home / Insert / Review / View ribbon pages without a second tab row.
-    - UiGroupPanel and UiBoxLayout compose responsive ribbon groups and workspace.
-    - UiDoc remains the real editor; no parallel document model is maintained.
+    - UiStack switches Home / Insert / View ribbon pages without a second tab row.
+    - UiDoc remains the authoritative editor/document surface.
+    - UiDocReviewPanel is an optional companion for comments and metadata editing.
 */
 
 #include <Ui/Ui.h>
 #include <Ui/UiIcons.h>
+#include "UiDocReviewPanel.h"
 
 using namespace Upp;
 
@@ -60,10 +60,12 @@ void SetTableCellText(UiDocTable& table, int row, int column,
     cell.runs.Add(pick(run));
 }
 
-String MetadataTitle(const UiDocAnnotation& annotation)
+String MetadataTypeName(const UiDocAnnotation& metadata)
 {
-    int q = annotation.payload.Find("title");
-    return q >= 0 ? AsString(annotation.payload[q]) : String("Metadata");
+    String type = metadata.type;
+    if(type.StartsWith("metadata."))
+        type = type.Mid(9);
+    return type.IsEmpty() ? String("note") : type;
 }
 
 }
@@ -79,7 +81,6 @@ public:
         SetRect(0, 0, DPI(1380), DPI(900));
 
         Add(box_root.SizePos());
-
         BuildApplicationShell();
         BuildRibbon();
         BuildWorkspace();
@@ -100,13 +101,11 @@ private:
     UiButton btn_redo;
     UiButton btn_nav_home;
     UiButton btn_nav_insert;
-    UiButton btn_nav_review;
     UiButton btn_nav_view;
 
     UiStack stack_ribbon;
     UiBoxLayout box_home;
     UiBoxLayout box_insert;
-    UiBoxLayout box_review;
     UiBoxLayout box_view;
 
     UiGroupPanel gp_clipboard;
@@ -184,23 +183,12 @@ private:
     UiButton btn_image_right;
     UiButton btn_remove_picture;
 
-    UiGroupPanel gp_metadata;
-    UiBoxLayout box_metadata;
+    UiGroupPanel gp_references;
+    UiBoxLayout box_references;
+    UiDropdown drop_metadata_type;
     UiButton btn_add_metadata;
-    UiButton btn_remove_metadata;
-
-    UiGroupPanel gp_review_comments;
-    UiBoxLayout box_review_comments;
-    UiButton btn_new_comment;
-    UiButton btn_comments_pane;
-    UiButton btn_resolve_comment;
-    UiButton btn_delete_comment;
-
-    UiGroupPanel gp_review_info;
-    UiBoxLayout box_review_info;
-    UiLabel lbl_review_model;
-    UiLabel lbl_review_storage;
-    UiLabel lbl_review_revision;
+    UiButton btn_add_comment;
+    UiButton btn_review_panel;
 
     UiGroupPanel gp_view_gutter;
     UiBoxLayout box_view_gutter;
@@ -210,7 +198,7 @@ private:
 
     UiGroupPanel gp_view_workspace;
     UiBoxLayout box_view_workspace;
-    UiButton btn_comments_pane_view;
+    UiButton btn_review_panel_view;
     UiButton btn_home_page;
     UiButton btn_select_all;
 
@@ -223,18 +211,7 @@ private:
     UiBoxLayout box_workspace;
     UiBoxLayout box_document_frame;
     UiDoc doc_editor;
-
-    UiGroupPanel gp_comments;
-    UiBoxLayout box_comments;
-    UiButton btn_close_comments;
-    UiLabel lbl_comment_count;
-    UiLabel lbl_comment_context;
-    UiLineEdit edit_comment;
-    UiBoxLayout box_comment_actions;
-    UiButton btn_comment_new;
-    UiButton btn_comment_update;
-    UiButton btn_comment_resolve;
-    UiButton btn_comment_delete;
+    UiDocReviewPanel review_panel;
 
     UiPanel pnl_status;
     UiBoxLayout box_status;
@@ -243,19 +220,15 @@ private:
     UiLabel lbl_status_right;
 
     String current_path;
-    String active_comment_id;
-    String active_metadata_id;
     String status_message;
     bool dirty = false;
     bool suppress_dirty = false;
-    bool comments_visible = false;
+    bool review_visible = false;
 
 private:
     void BuildApplicationShell()
     {
-        box_root.SetDirection(UiDirection::V)
-                .SetGap(0)
-                .SetInset(0);
+        box_root.SetDirection(UiDirection::V).SetGap(0).SetInset(0);
 
         box_header_actions.SetDirection(UiDirection::H)
                           .SetGap(DPI(3))
@@ -268,10 +241,8 @@ private:
         ConfigureHeaderIconButton(btn_save_as, ICON_DESIGN_PUBLISH_48(), "Save document as");
         ConfigureHeaderIconButton(btn_undo, ICON_NAVIGATION_OUTLINED_ARROW_LEFT_48(), "Undo");
         ConfigureHeaderIconButton(btn_redo, ICON_NAVIGATION_OUTLINED_ARROW_RIGHT_48(), "Redo");
-
         ConfigureNavButton(btn_nav_home, "Home");
         ConfigureNavButton(btn_nav_insert, "Insert");
-        ConfigureNavButton(btn_nav_review, "Review");
         ConfigureNavButton(btn_nav_view, "View");
 
         box_header_actions.Add(btn_new).Fixed(DPI(30));
@@ -285,7 +256,6 @@ private:
                           .LineInset(DPI(4));
         box_header_actions.Add(btn_nav_home).Fixed(DPI(58));
         box_header_actions.Add(btn_nav_insert).Fixed(DPI(58));
-        box_header_actions.Add(btn_nav_review).Fixed(DPI(64));
         box_header_actions.Add(btn_nav_view).Fixed(DPI(54));
         box_header_actions.AddSpacer().Fixed(DPI(8))
                           .LineEnabled()
@@ -320,17 +290,12 @@ private:
     {
         SetupRibbonPage(box_home);
         SetupRibbonPage(box_insert);
-        SetupRibbonPage(box_review);
         SetupRibbonPage(box_view);
-
         BuildHomeRibbon();
         BuildInsertRibbon();
-        BuildReviewRibbon();
         BuildViewRibbon();
-
         stack_ribbon.AddPage(box_home, "home");
         stack_ribbon.AddPage(box_insert, "insert");
-        stack_ribbon.AddPage(box_review, "review");
         stack_ribbon.AddPage(box_view, "view");
         SwitchRibbon(0);
     }
@@ -348,7 +313,6 @@ private:
         SetupRibbonGroup(gp_font, box_font, "Font", UiDirection::H);
         box_font_selectors.SetDirection(UiDirection::H).SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         box_font_marks.SetDirection(UiDirection::H).SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-
         drop_font.UseInternalModel();
         drop_font.SetPlaceholderText("Font").SetPopupMaxItems(8);
         drop_font.Add("Segoe UI", String("Segoe UI"));
@@ -357,14 +321,12 @@ private:
         drop_font.Add("Courier New", String("Courier New"));
         drop_font.Add("Consolas", String("Consolas"));
         drop_font.SelectByData(String("Segoe UI"));
-
         drop_size.UseInternalModel();
         drop_size.SetPlaceholderText("Size").SetPopupMaxItems(8);
         const int sizes[] = { 9, 10, 11, 12, 14, 18, 24, 32 };
         for(int size : sizes)
             drop_size.Add(AsString(size), size);
         drop_size.SelectByData(11);
-
         ConfigureIconButton(btn_size_up, ICON_CONTENT_OUTLINED_ADD_48(), "Increase font size");
         ConfigureIconButton(btn_size_down, ICON_DESIGN_TEXT_DECREASE_48(), "Decrease font size");
         ConfigureIconButton(btn_bold, ICON_EDITOR_FORMAT_BOLD_48(), "Bold");
@@ -373,12 +335,10 @@ private:
         ConfigureIconButton(btn_strike, ICON_EDITOR_FORMAT_STRIKETHROUGH_48(), "Strikeout");
         ConfigureIconButton(btn_upper, ICON_DESIGN_UPPERCASE_48(), "Uppercase");
         ConfigureIconButton(btn_lower, ICON_DESIGN_LOWERCASE_48(), "Lowercase");
-
         btn_bold.SetCheckable();
         btn_italic.SetCheckable();
         btn_underline.SetCheckable();
         btn_strike.SetCheckable();
-
         box_font_selectors.Add(drop_font).Fixed(DPI(104));
         box_font_selectors.Add(drop_size).Fixed(DPI(48));
         box_font_selectors.Add(btn_size_up).Fixed(DPI(28));
@@ -416,11 +376,8 @@ private:
         box_style_buttons.Add(btn_normal).Fixed(DPI(54));
         box_style_buttons.Add(btn_heading1).Fixed(DPI(30));
         box_style_buttons.Add(btn_heading2).Fixed(DPI(30));
-
         drop_style.UseInternalModel();
-        drop_style.SetPlaceholderText("More styles")
-                  .SetPopupMaxItems(8)
-                  .SetSizeMin(DPI(118), DPI(26));
+        drop_style.SetPlaceholderText("More styles").SetPopupMaxItems(8).SetSizeMin(DPI(118), DPI(26));
         drop_style.Add("Normal", String("paragraph"));
         drop_style.Add("Heading 1", String("heading.1"));
         drop_style.Add("Heading 2", String("heading.2"));
@@ -488,54 +445,39 @@ private:
         box_table.Add(btn_remove_embed).Fixed(DPI(52));
 
         SetupRibbonGroup(gp_picture, box_picture, "Pictures", UiDirection::H);
-        ConfigureRibbonButton(btn_insert_picture, "Picture", ICON_DESIGN_IMAGE_48());
+        ConfigureIconButton(btn_insert_picture, ICON_DESIGN_IMAGE_48(), "Insert picture");
         ConfigureTextButton(btn_image_inline, "Inline");
         ConfigureTextButton(btn_image_left, "Left");
         ConfigureTextButton(btn_image_center, "Center");
         ConfigureTextButton(btn_image_right, "Right");
         ConfigureIconButton(btn_remove_picture, ICON_DESIGN_DELETE_48(), "Remove selected image");
-        box_picture.Add(btn_insert_picture).Fixed(DPI(78));
+        box_picture.Add(btn_insert_picture).Fixed(DPI(34));
         box_picture.Add(btn_image_inline).Fixed(DPI(48));
         box_picture.Add(btn_image_left).Fixed(DPI(42));
         box_picture.Add(btn_image_center).Fixed(DPI(52));
         box_picture.Add(btn_image_right).Fixed(DPI(44));
         box_picture.Add(btn_remove_picture).Fixed(DPI(30));
 
-        SetupRibbonGroup(gp_metadata, box_metadata, "Metadata", UiDirection::H);
-        ConfigureRibbonButton(btn_add_metadata, "Add note", ICON_EDITOR_NOTES_48());
-        ConfigureIconButton(btn_remove_metadata, ICON_DESIGN_DELETE_48(), "Remove active metadata reference");
-        box_metadata.Add(btn_add_metadata).Fixed(DPI(82));
-        box_metadata.Add(btn_remove_metadata).Fixed(DPI(30));
+        SetupRibbonGroup(gp_references, box_references, "Comments & metadata", UiDirection::H);
+        drop_metadata_type.UseInternalModel();
+        drop_metadata_type.SetPlaceholderText("Metadata type").SetPopupMaxItems(5).SetSizeMin(DPI(92), DPI(26));
+        drop_metadata_type.Add("Note", String("note"));
+        drop_metadata_type.Add("Guidance", String("guidance"));
+        drop_metadata_type.Add("Structure", String("structure"));
+        drop_metadata_type.SetDataSilently(String("note"));
+        ConfigureIconButton(btn_add_metadata, ICON_EDITOR_NOTES_48(), "Add metadata at current paragraph");
+        ConfigureIconButton(btn_add_comment, ICON_DESIGN_COMMENT_48(), "Add comment for current selection");
+        ConfigureTextButton(btn_review_panel, "Review");
+        btn_review_panel.SetCheckable();
+        box_references.Add(drop_metadata_type).Fixed(DPI(98));
+        box_references.Add(btn_add_metadata).Fixed(DPI(30));
+        box_references.Add(btn_add_comment).Fixed(DPI(30));
+        box_references.Add(btn_review_panel).Fixed(DPI(56));
 
         box_insert.Add(gp_pages).Fit();
         box_insert.Add(gp_table).Fit();
         box_insert.Add(gp_picture).Fit();
-        box_insert.Add(gp_metadata).Fit();
-    }
-
-    void BuildReviewRibbon()
-    {
-        SetupRibbonGroup(gp_review_comments, box_review_comments, "Comments", UiDirection::H);
-        ConfigureRibbonButton(btn_new_comment, "New Comment", ICON_DESIGN_COMMENT_48());
-        ConfigureTextButton(btn_comments_pane, "Comments");
-        ConfigureTextButton(btn_resolve_comment, "Resolve");
-        ConfigureIconButton(btn_delete_comment, ICON_DESIGN_DELETE_48(), "Delete active comment");
-        btn_comments_pane.SetCheckable();
-        box_review_comments.Add(btn_new_comment).Fixed(DPI(96));
-        box_review_comments.Add(btn_comments_pane).Fixed(DPI(78));
-        box_review_comments.Add(btn_resolve_comment).Fixed(DPI(60));
-        box_review_comments.Add(btn_delete_comment).Fixed(DPI(30));
-
-        SetupRibbonGroup(gp_review_info, box_review_info, "Document model", UiDirection::H);
-        lbl_review_model.SetText("Revisioned UiDocCore");
-        lbl_review_storage.SetText("Native .uidoc JSON");
-        lbl_review_revision.SetText("Revision 0");
-        box_review_info.Add(lbl_review_model).Fit();
-        box_review_info.Add(lbl_review_storage).Fit();
-        box_review_info.Add(lbl_review_revision).Fit();
-
-        box_review.Add(gp_review_comments).Fit();
-        box_review.Add(gp_review_info).Fit();
+        box_insert.Add(gp_references).Fit();
     }
 
     void BuildViewRibbon()
@@ -552,11 +494,11 @@ private:
         box_view_gutter.Add(btn_gutter_side).Fixed(DPI(82));
 
         SetupRibbonGroup(gp_view_workspace, box_view_workspace, "Workspace", UiDirection::H);
-        ConfigureTextButton(btn_comments_pane_view, "Comments");
+        ConfigureTextButton(btn_review_panel_view, "Review");
         ConfigureTextButton(btn_home_page, "Home");
         ConfigureTextButton(btn_select_all, "Select all");
-        btn_comments_pane_view.SetCheckable();
-        box_view_workspace.Add(btn_comments_pane_view).Fixed(DPI(70));
+        btn_review_panel_view.SetCheckable();
+        box_view_workspace.Add(btn_review_panel_view).Fixed(DPI(58));
         box_view_workspace.Add(btn_home_page).Fixed(DPI(50));
         box_view_workspace.Add(btn_select_all).Fixed(DPI(66));
 
@@ -580,12 +522,11 @@ private:
         }
         workspace_style.metrics.frame_enabled = false;
         pnl_workspace.SetCustomStyle(workspace_style);
-
         pnl_workspace.Add(box_workspace.SizePos());
+
         box_workspace.SetDirection(UiDirection::H)
                      .SetGap(DPI(12))
                      .SetInset(Rect(DPI(12), DPI(10), DPI(12), DPI(10)));
-
         box_document_frame.SetDirection(UiDirection::H).SetGap(0).SetInset(0);
         box_document_frame.AddSpacer(1);
         box_document_frame.Add(doc_editor).Expand(8).MinMaxWidth(DPI(680), DPI(920));
@@ -594,8 +535,8 @@ private:
         UiDoc::Style doc_style = doc_editor.GetStyle();
         doc_style.font = SansSerifZ(DPI(11));
         doc_style.page_padding = DPI(42);
-        doc_style.gutter_width = DPI(24);
-        doc_style.annotation_marker_size = DPI(8);
+        doc_style.gutter_width = DPI(28);
+        doc_style.annotation_marker_size = DPI(10);
         doc_style.selection_fill = Color(190, 218, 255);
         doc_style.search_fill = Color(255, 236, 158);
         doc_style.annotation_fill = Color(255, 235, 190);
@@ -611,50 +552,14 @@ private:
         doc_style.metrics.frame_width = DPI(1);
         doc_style.metrics.radius = DPI(1);
         doc_editor.SetCustomStyle(doc_style);
-
         doc_editor.ConfigureMetadataType("guidance", ICON_EDITOR_NOTES_48(), Color(55, 126, 201));
         doc_editor.ConfigureMetadataType("structure", ICON_DESIGN_ACCOUNT_TREE_48(), Color(70, 145, 103));
         doc_editor.ConfigureMetadataType("note", ICON_DESIGN_DESCRIPTION_48(), Color(132, 92, 184));
 
-        BuildCommentsPane();
+        review_panel.Bind(doc_editor);
         box_workspace.Add(box_document_frame).Expand(1);
-        box_workspace.Add(gp_comments).Fixed(DPI(306));
-        SetCommentsVisible(false);
-    }
-
-    void BuildCommentsPane()
-    {
-        ConfigureIconButton(btn_close_comments, ICON_NAVIGATION_CLOSE_SMALL_48(), "Close comments pane");
-        gp_comments.SetTitle("Comments")
-                   .SetSubTitle("Review annotations")
-                   .SetHeaderMode(UiGroupPanel::Inside)
-                   .SetHeaderContent(btn_close_comments)
-                   .SetHeaderContentAlign(UiAlign::RIGHT, UiAlign::CENTER)
-                   .SetInset(Rect(DPI(10), DPI(8), DPI(10), DPI(10)))
-                   .SetHeaderInset(Rect(DPI(10), DPI(5), DPI(8), DPI(5)))
-                   .SetLine(true);
-
-        box_comments.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(0);
-        lbl_comment_count.SetText("No comments");
-        lbl_comment_context.SetText("Select text and add a review comment.");
-        edit_comment.SetPlaceholder("Write a comment...");
-
-        box_comment_actions.SetDirection(UiDirection::H).SetGap(DPI(4)).SetInset(0);
-        ConfigureTextButton(btn_comment_new, "New");
-        ConfigureTextButton(btn_comment_update, "Update");
-        ConfigureTextButton(btn_comment_resolve, "Resolve");
-        ConfigureTextButton(btn_comment_delete, "Delete");
-        box_comment_actions.Add(btn_comment_new).Fixed(DPI(54));
-        box_comment_actions.Add(btn_comment_update).Fixed(DPI(62));
-        box_comment_actions.Add(btn_comment_resolve).Fixed(DPI(62));
-        box_comment_actions.Add(btn_comment_delete).Fixed(DPI(58));
-
-        box_comments.Add(lbl_comment_count).Fit();
-        box_comments.Add(lbl_comment_context).Fit();
-        box_comments.Add(edit_comment).Fit();
-        box_comments.Add(box_comment_actions).Fit();
-        box_comments.AddSpacer(1);
-        gp_comments.SetContent(box_comments);
+        box_workspace.Add(review_panel).Fixed(DPI(338));
+        SetReviewVisible(false);
     }
 
     void BuildStatusBar()
@@ -667,7 +572,6 @@ private:
         status_style.metrics.frame_enabled = true;
         status_style.metrics.frame_width = DPI(1);
         pnl_status.SetCustomStyle(status_style);
-
         pnl_status.Add(box_status.SizePos());
         box_status.SetDirection(UiDirection::H)
                   .SetGap(DPI(12))
@@ -691,13 +595,11 @@ private:
         btn_redo.WhenAction = [=] { RunCommand("edit.redo", Value(), "Redo"); };
         btn_nav_home.WhenAction = [=] { SwitchRibbon(0); };
         btn_nav_insert.WhenAction = [=] { SwitchRibbon(1); };
-        btn_nav_review.WhenAction = [=] { SwitchRibbon(2); };
-        btn_nav_view.WhenAction = [=] { SwitchRibbon(3); };
+        btn_nav_view.WhenAction = [=] { SwitchRibbon(2); };
 
         btn_cut.WhenAction = [=] { doc_editor.Cut(); doc_editor.SetFocus(); };
         btn_copy.WhenAction = [=] { doc_editor.Copy(); doc_editor.SetFocus(); };
         btn_paste.WhenAction = [=] { doc_editor.Paste(); doc_editor.SetFocus(); };
-
         drop_font.WhenSelect = [=](int) {
             doc_editor.SetSelectionFont(AsString(drop_font.GetSelectedData()));
             doc_editor.SetFocus();
@@ -723,7 +625,6 @@ private:
         btn_code.WhenAction = [=] { ApplyBlockRole("code"); };
         btn_indent.WhenAction = [=] { RunCommand("block.indent.more", Value(), "Increase indent"); };
         btn_outdent.WhenAction = [=] { RunCommand("block.indent.less", Value(), "Decrease indent"); };
-
         btn_normal.WhenAction = [=] { ApplyBlockRole("paragraph"); };
         btn_heading1.WhenAction = [=] { ApplyBlockRole("heading.1"); };
         btn_heading2.WhenAction = [=] { ApplyBlockRole("heading.2"); };
@@ -766,7 +667,6 @@ private:
         btn_column_add.WhenAction = [=] { RunCommand("table.column.add", Value(), "Add table column"); };
         btn_column_remove.WhenAction = [=] { RunCommand("table.column.remove", Value(), "Remove table column"); };
         btn_remove_embed.WhenAction = [=] { RunCommand("embed.remove", Value(), "Remove selected table/embed"); };
-
         btn_insert_picture.WhenAction = [=] { InsertPicture(); };
         btn_image_inline.WhenAction = [=] { RunCommand("image.align.inline", Value(), "Place image inline"); };
         btn_image_left.WhenAction = [=] { RunCommand("image.align.left", Value(), "Align image left"); };
@@ -774,13 +674,23 @@ private:
         btn_image_right.WhenAction = [=] { RunCommand("image.align.right", Value(), "Align image right"); };
         btn_remove_picture.WhenAction = [=] { RunCommand("embed.remove", Value(), "Remove selected image"); };
 
-        btn_add_metadata.WhenAction = [=] { AddMetadataAtCaret(); };
-        btn_remove_metadata.WhenAction = [=] { RemoveActiveMetadata(); };
-
-        btn_new_comment.WhenAction = [=] { AddCommentFromPane(); };
-        btn_comments_pane.WhenAction = [=] { SetCommentsVisible(btn_comments_pane.IsChecked()); };
-        btn_resolve_comment.WhenAction = [=] { ResolveActiveComment(); };
-        btn_delete_comment.WhenAction = [=] { DeleteActiveComment(); };
+        drop_metadata_type.WhenSelect = [=](int) {
+            review_panel.SelectMetadataType(AsString(drop_metadata_type.GetSelectedData()));
+        };
+        btn_add_metadata.WhenAction = [=] {
+            SetReviewVisible(true);
+            review_panel.ShowMetadataTab();
+            String type = drop_metadata_type.HasSelection() ? AsString(drop_metadata_type.GetSelectedData()) : String("note");
+            review_panel.AddMetadataAtCurrent(type);
+            doc_editor.SetFocus();
+        };
+        btn_add_comment.WhenAction = [=] {
+            SetReviewVisible(true);
+            review_panel.ShowCommentsTab();
+            review_panel.AddCommentAtCurrent();
+            doc_editor.SetFocus();
+        };
+        btn_review_panel.WhenAction = [=] { SetReviewVisible(btn_review_panel.IsChecked()); };
 
         btn_line_numbers.WhenAction = [=] {
             doc_editor.ShowLineNumbers(btn_line_numbers.IsChecked()); RefreshDocumentUi(); doc_editor.SetFocus();
@@ -792,45 +702,25 @@ private:
             UiDoc::GutterSide side = doc_editor.GetGutterSide() == UiDoc::GUTTER_LEFT ? UiDoc::GUTTER_RIGHT : UiDoc::GUTTER_LEFT;
             doc_editor.SetGutterSide(side); RefreshDocumentUi(); doc_editor.SetFocus();
         };
-        btn_comments_pane_view.WhenAction = [=] { SetCommentsVisible(btn_comments_pane_view.IsChecked()); };
+        btn_review_panel_view.WhenAction = [=] { SetReviewVisible(btn_review_panel_view.IsChecked()); };
         btn_home_page.WhenAction = [=] { SwitchRibbon(0); doc_editor.SetFocus(); };
         btn_select_all.WhenAction = [=] { doc_editor.SelectAll(); doc_editor.SetFocus(); };
 
-        btn_close_comments.WhenAction = [=] { SetCommentsVisible(false); };
-        btn_comment_new.WhenAction = [=] { AddCommentFromPane(); };
-        btn_comment_update.WhenAction = [=] { UpdateActiveComment(); };
-        btn_comment_resolve.WhenAction = [=] { ResolveActiveComment(); };
-        btn_comment_delete.WhenAction = [=] { DeleteActiveComment(); };
-        edit_comment.WhenAction = [=] {
-            if(active_comment_id.IsEmpty()) AddCommentFromPane();
-            else UpdateActiveComment();
-        };
+        review_panel.WhenClosePanel = [=] { SetReviewVisible(false); };
+        review_panel.WhenStatus = [=](const String& status) { SetStatus(status); };
 
         doc_editor.WhenChange = [=] {
             if(!suppress_dirty) dirty = true;
+            review_panel.RefreshPanel();
             RefreshDocumentUi();
         };
         doc_editor.WhenSelection = [=] { RefreshDocumentUi(); };
         doc_editor.WhenSearch = [=](const String&) { RefreshDocumentUi(); };
         doc_editor.WhenAnnotation = [=](const String& id) {
-            for(const UiDocAnnotation& metadata : doc_editor.GetMetadata()) {
-                if(metadata.id != id)
-                    continue;
-                active_metadata_id = id;
-                bool expanding = !metadata.expanded;
-                suppress_dirty = true;
-                doc_editor.SetMetadataExpanded(id, expanding);
-                suppress_dirty = false;
-                SetStatus(String(expanding ? "Expanded metadata - " : "Collapsed metadata - ") + MetadataTitle(metadata));
-                RefreshDocumentUi();
-                doc_editor.SetFocus();
-                return;
-            }
-
-            active_comment_id = id;
-            SetCommentsVisible(true);
-            SwitchRibbon(2);
-            RefreshComments();
+            SetReviewVisible(true);
+            review_panel.ActivateAnnotation(id);
+            SyncInsertMetadataTypeFromActive();
+            RefreshDocumentUi();
         };
     }
 
@@ -864,15 +754,14 @@ private:
             "A picture can sit here  while text continues on the same line.\n"
             "\n"
             "Review note\n"
-            "Comments stay attached to logical ranges as text changes around them. "
-            "Use Review to open the comments pane and edit the live note.\n"
+            "Comments and metadata can be selected from the gutter or Review panel. "
+            "They remain separate from printable document content.\n"
             "\n"
             "Feature matrix\n";
 
         doc_editor.SetText(text);
         doc_editor.Core().SetMeta("demo.document_type", "UiDoc v2 showcase");
         doc_editor.Core().SetMeta("demo.workflow", "interactive rich document");
-
         ApplyRoleToFragment("Project Aurora", "heading.1");
         ApplyRoleToFragment("UiDoc v2 sample document", "heading.3");
         ApplyRoleToFragment("Executive summary", "heading.2");
@@ -896,23 +785,19 @@ private:
         if(comment_at >= 0) {
             doc_editor.SetSelection(UiDocRange(comment_at, comment_at + comment_phrase.GetCount()));
             ValueMap meta; meta.Add("author", "UiDocDemo");
-            active_comment_id = doc_editor.AddComment(
-                "This is a live UiDoc range annotation. Edit or resolve it from the Review pane.", meta);
+            doc_editor.AddComment("This is a live review comment. Select it from the gutter or Review panel.", meta);
         }
 
         int guidance_at = current_text.Find("Executive summary");
         if(guidance_at >= 0) {
             ValueMap payload;
             payload.Add("source", "UiDocDemo presentation context");
-            active_metadata_id = doc_editor.AddMetadata(
-                UiDocRange(guidance_at, guidance_at),
-                "guidance",
-                "Presentation guidance",
+            String id = doc_editor.AddMetadata(
+                UiDocRange(guidance_at, guidance_at), "guidance", "Presentation guidance",
                 "Use this section to establish the project purpose and keep stakeholder-facing language concise. "
-                "This reference is embedded metadata, is not printable document text, and can be supplied by an application or agent.",
-                payload);
-            if(!active_metadata_id.IsEmpty())
-                doc_editor.SetMetadataExpanded(active_metadata_id, true);
+                "This reference is embedded metadata, is not printable document text, and can be supplied by an application or agent.", payload);
+            if(!id.IsEmpty())
+                doc_editor.SetMetadataExpanded(id, true);
         }
 
         int structure_at = current_text.Find("Design principle");
@@ -921,12 +806,9 @@ private:
             payload.Add("source", "UiDocDemo structural context");
             payload.Add("example", "Treatment, Dramatica, research or agent context can use the same primitive");
             doc_editor.AddMetadata(
-                UiDocRange(structure_at, structure_at),
-                "structure",
-                "Background context",
+                UiDocRange(structure_at, structure_at), "structure", "Background context",
                 "Higher-level tools can attach structured treatment, story, research, asset or AI context here without putting it in the printable document. "
-                "The compact green gutter icon opens this reference when needed.",
-                payload);
+                "The compact green gutter icon opens this reference when needed.", payload);
         }
 
         const String picture_prefix = "A picture can sit here ";
@@ -960,10 +842,10 @@ private:
             SetTableCellText(table, 1, 2, "Home ribbon");
             SetTableCellText(table, 2, 0, "Comments");
             SetTableCellText(table, 2, 1, "Range annotations");
-            SetTableCellText(table, 2, 2, "Review pane");
+            SetTableCellText(table, 2, 2, "Review panel");
             SetTableCellText(table, 3, 0, "Metadata");
             SetTableCellText(table, 3, 1, "Anchored annotations");
-            SetTableCellText(table, 3, 2, "Gutter references");
+            SetTableCellText(table, 3, 2, "Review panel");
             SetTableCellText(table, 4, 0, "Tables & images");
             SetTableCellText(table, 4, 1, "Typed embeds/resources");
             SetTableCellText(table, 4, 2, "Insert ribbon");
@@ -971,6 +853,7 @@ private:
         }
 
         doc_editor.ShowMetadata(true);
+        doc_editor.SetActiveAnnotation(String());
         doc_editor.SetSelection(UiDocRange(0, 0));
         doc_editor.SetSearchQuery(String());
         edit_find.Clear();
@@ -978,7 +861,8 @@ private:
         current_path.Clear();
         dirty = false;
         suppress_dirty = false;
-        status_message = "Welcome document - click a tinted gutter metadata icon to expand or collapse its reference";
+        status_message = "Welcome document - gutter references open in the Review panel";
+        review_panel.RefreshPanel();
         RefreshDocumentUi();
         doc_editor.SetFocus();
     }
@@ -1013,12 +897,11 @@ private:
 
     void SwitchRibbon(int page)
     {
-        page = clamp(page, 0, 3);
+        page = clamp(page, 0, 2);
         stack_ribbon.SetActivePage(page);
         btn_nav_home.SetChecked(page == 0);
         btn_nav_insert.SetChecked(page == 1);
-        btn_nav_review.SetChecked(page == 2);
-        btn_nav_view.SetChecked(page == 3);
+        btn_nav_view.SetChecked(page == 2);
         box_root.RefreshLayout();
     }
 
@@ -1035,12 +918,12 @@ private:
     {
         suppress_dirty = true;
         doc_editor.NewDocument();
+        doc_editor.SetActiveAnnotation(String());
         current_path.Clear();
-        active_comment_id.Clear();
-        active_metadata_id.Clear();
         dirty = false;
         suppress_dirty = false;
         status_message = "New document";
+        review_panel.RefreshPanel();
         RefreshDocumentUi();
         doc_editor.SetFocus();
     }
@@ -1056,11 +939,11 @@ private:
         bool ok = doc_editor.Load(path, &error);
         suppress_dirty = false;
         if(!ok) { SetStatus(error.IsEmpty() ? String("Unable to open document") : error); return; }
+        doc_editor.SetActiveAnnotation(String());
         current_path = path;
-        active_comment_id.Clear();
-        active_metadata_id.Clear();
         dirty = false;
         status_message = "Opened " + GetFileName(path);
+        review_panel.RefreshPanel();
         RefreshDocumentUi();
         doc_editor.SetFocus();
     }
@@ -1103,7 +986,6 @@ private:
         String bytes = LoadFile(path);
         Image image = StreamRaster::LoadFileAny(path);
         if(bytes.IsEmpty() || image.IsEmpty()) { SetStatus("Unable to load image"); return; }
-
         Size native = image.GetSize();
         int width = min(DPI(320), max(DPI(48), native.cx));
         int height = native.cx > 0 ? max(DPI(32), native.cy * width / native.cx) : DPI(96);
@@ -1116,7 +998,6 @@ private:
         String ext = ToLower(GetFileExt(path));
         resource.mime = (ext == ".jpg" || ext == ".jpeg") ? "image/jpeg" : "image/png";
         resource.meta.Add("source", "UiDocDemo file picker");
-
         String key = doc_editor.AddResource(resource, false);
         if(key.IsEmpty() || doc_editor.InsertImage(key, width, height, "inline").IsEmpty()) {
             SetStatus("Unable to insert image"); return;
@@ -1125,126 +1006,45 @@ private:
         doc_editor.SetFocus();
     }
 
-    void AddMetadataAtCaret()
+    void SetReviewVisible(bool visible)
     {
-        UiDocSelection selection = doc_editor.GetSelection();
-        int at = clamp(selection.caret, 0, doc_editor.GetLength());
-        const WString& text = doc_editor.GetTextW();
-        while(at > 0 && text[at - 1] != '\n')
-            --at;
-
-        ValueMap payload;
-        payload.Add("source", "UiDocDemo user-created reference");
-        String id = doc_editor.AddMetadata(
-            UiDocRange(at, at),
-            "note",
-            "Reference note",
-            "This is anchored metadata for the current paragraph. Applications can replace this payload with treatment, research, story, asset or agent context while keeping it out of the printable document.",
-            payload);
-        if(id.IsEmpty()) {
-            SetStatus("Unable to add metadata");
-            return;
-        }
-
-        active_metadata_id = id;
-        doc_editor.ShowMetadata(true);
-        suppress_dirty = true;
-        doc_editor.SetMetadataExpanded(id, true);
-        suppress_dirty = false;
-        SetStatus("Metadata added - click its purple gutter icon to collapse or expand it");
-        RefreshDocumentUi();
-        doc_editor.SetFocus();
-    }
-
-    void RemoveActiveMetadata()
-    {
-        String id = active_metadata_id;
-        if(id.IsEmpty()) {
-            UiDocSelection selection = doc_editor.GetSelection();
-            int at = clamp(selection.caret, 0, doc_editor.GetLength());
-            const WString& text = doc_editor.GetTextW();
-            int from = at;
-            int to = at;
-            while(from > 0 && text[from - 1] != '\n') --from;
-            while(to < text.GetCount() && text[to] != '\n') ++to;
-            UiDocRange paragraph(from, to);
-            Vector<UiDocAnnotation> hit = doc_editor.GetMetadata(&paragraph);
-            if(!hit.IsEmpty())
-                id = hit[0].id;
-        }
-
-        if(id.IsEmpty() || !doc_editor.RemoveMetadata(id)) {
-            SetStatus("No metadata reference selected at this paragraph");
-            return;
-        }
-
-        active_metadata_id.Clear();
-        SetStatus("Metadata removed");
-        RefreshDocumentUi();
-        doc_editor.SetFocus();
-    }
-
-    void AddCommentFromPane()
-    {
-        String text = TrimBoth(edit_comment.GetTextUtf8());
-        if(text.IsEmpty()) text = "Review comment";
-        String id = doc_editor.AddComment(text);
-        if(id.IsEmpty()) { SetStatus("Unable to add comment"); return; }
-        active_comment_id = id;
-        SetCommentsVisible(true);
-        SetStatus("Comment added");
-        RefreshComments();
-        doc_editor.SetFocus();
-    }
-
-    void UpdateActiveComment()
-    {
-        if(active_comment_id.IsEmpty()) { SetStatus("No active comment"); return; }
-        String text = TrimBoth(edit_comment.GetTextUtf8());
-        if(text.IsEmpty()) { SetStatus("Comment text is empty"); return; }
-        if(!doc_editor.UpdateComment(active_comment_id, text)) { SetStatus("Unable to update comment"); return; }
-        SetStatus("Comment updated");
-        RefreshComments();
-        doc_editor.SetFocus();
-    }
-
-    void ResolveActiveComment()
-    {
-        if(active_comment_id.IsEmpty() || !doc_editor.ResolveComment(active_comment_id, true)) {
-            SetStatus("No active comment to resolve"); return;
-        }
-        SetStatus("Comment resolved");
-        RefreshComments();
-        doc_editor.SetFocus();
-    }
-
-    void DeleteActiveComment()
-    {
-        if(active_comment_id.IsEmpty() || !doc_editor.RemoveComment(active_comment_id)) {
-            SetStatus("No active comment to delete"); return;
-        }
-        active_comment_id.Clear();
-        SetStatus("Comment deleted");
-        RefreshComments();
-        doc_editor.SetFocus();
-    }
-
-    void SetCommentsVisible(bool visible)
-    {
-        comments_visible = visible;
-        gp_comments.Show(visible);
-        btn_comments_pane.SetChecked(visible);
-        btn_comments_pane_view.SetChecked(visible);
+        review_visible = visible;
+        review_panel.Show(visible);
+        btn_review_panel.SetChecked(visible);
+        btn_review_panel_view.SetChecked(visible);
         box_workspace.RefreshLayout();
         box_root.RefreshLayout();
-        RefreshComments();
+        if(visible)
+            review_panel.RefreshPanel();
+    }
+
+    void SyncInsertMetadataTypeFromActive()
+    {
+        String active = doc_editor.GetActiveAnnotation();
+        if(active.IsEmpty())
+            return;
+        for(const UiDocAnnotation& metadata : doc_editor.GetMetadata()) {
+            if(metadata.id != active)
+                continue;
+            String type = MetadataTypeName(metadata);
+            bool found = false;
+            for(int i = 0; i < drop_metadata_type.GetCount(); i++)
+                if(AsString(drop_metadata_type.GetItemData(i)) == type) {
+                    found = true;
+                    break;
+                }
+            if(!found)
+                drop_metadata_type.Add(ToUpper(type.Left(1)) + type.Mid(1), type);
+            drop_metadata_type.SetDataSilently(type);
+            review_panel.SelectMetadataType(type);
+            return;
+        }
     }
 
     void RefreshDocumentUi()
     {
         RefreshTitle();
         RefreshRibbonState();
-        RefreshComments();
         RefreshStatus();
     }
 
@@ -1276,63 +1076,13 @@ private:
         btn_whole_word.SetChecked(doc_editor.IsSearchWholeWord());
         btn_line_numbers.SetChecked(doc_editor.IsLineNumbersShown());
         btn_metadata_markers.SetChecked(doc_editor.IsMetadataShown());
-        btn_remove_metadata.Enable(!active_metadata_id.IsEmpty() || !doc_editor.GetMetadata().IsEmpty());
+        btn_review_panel.SetChecked(review_visible);
+        btn_review_panel_view.SetChecked(review_visible);
         btn_gutter_side.SetText(doc_editor.GetGutterSide() == UiDoc::GUTTER_LEFT ? "Gutter left" : "Gutter right");
         String role = doc_editor.GetBlockRole();
         if(role.IsEmpty()) role = "paragraph";
         drop_style.SetDataSilently(role);
-        lbl_review_revision.SetText("Revision " + AsString((int64)doc_editor.Core().GetRevision()));
-    }
-
-    void RefreshComments()
-    {
-        Vector<UiDocAnnotation> comments = doc_editor.GetComments();
-        int open_count = 0;
-        for(const UiDocAnnotation& comment : comments)
-            if(!comment.resolved) open_count++;
-        lbl_comment_count.SetText(Format("%d comment%s - %d open", comments.GetCount(), comments.GetCount() == 1 ? "" : "s", open_count));
-
-        String selection_comment;
-        UiDocRange selection = OrderedSelection(doc_editor);
-        if(selection.IsEmpty()) {
-            int at = min(doc_editor.GetLength(), selection.from);
-            UiDocRange probe(at, min(doc_editor.GetLength(), at + 1));
-            Vector<UiDocAnnotation> hit = doc_editor.GetComments(&probe);
-            if(!hit.IsEmpty()) selection_comment = hit[0].id;
-        }
-        else {
-            Vector<UiDocAnnotation> hit = doc_editor.GetComments(&selection);
-            if(!hit.IsEmpty()) selection_comment = hit[0].id;
-        }
-        if(!selection_comment.IsEmpty()) active_comment_id = selection_comment;
-
-        const UiDocAnnotation* active = nullptr;
-        for(const UiDocAnnotation& comment : comments)
-            if(comment.id == active_comment_id) { active = &comment; break; }
-        if(!active)
-            for(const UiDocAnnotation& comment : comments)
-                if(!comment.resolved) { active_comment_id = comment.id; active = &comment; break; }
-
-        if(active) {
-            String text = active->payload.Find("text") >= 0 ? AsString(active->payload["text"]) : String();
-            edit_comment.SetTextUtf8(text);
-            lbl_comment_context.SetText(Format("%s | characters %d-%d", active->resolved ? "Resolved" : "Open", active->range.from, active->range.to));
-            btn_comment_update.Enable(true);
-            btn_comment_resolve.Enable(!active->resolved);
-            btn_comment_delete.Enable(true);
-            btn_resolve_comment.Enable(!active->resolved);
-            btn_delete_comment.Enable(true);
-        }
-        else {
-            active_comment_id.Clear();
-            if(!edit_comment.HasFocus()) edit_comment.Clear();
-            lbl_comment_context.SetText("Select text and add a review comment.");
-            btn_comment_update.Enable(false);
-            btn_comment_resolve.Enable(false);
-            btn_comment_delete.Enable(false);
-            btn_resolve_comment.Enable(false);
-            btn_delete_comment.Enable(false);
-        }
+        SyncInsertMetadataTypeFromActive();
     }
 
     void RefreshStatus()
@@ -1342,10 +1092,12 @@ private:
         int comments = doc_editor.GetComments().GetCount();
         int metadata = doc_editor.GetMetadata().GetCount();
         lbl_status_left.SetText(status_message.IsEmpty() ? String("Ready") : status_message);
-        lbl_status_center.SetText(Format("%d word%s | %d characters | selection %d", words, words == 1 ? "" : "s", doc_editor.GetLength(), selection.GetLength()));
+        lbl_status_center.SetText(Format("%d word%s | %d characters | selection %d",
+                                        words, words == 1 ? "" : "s", doc_editor.GetLength(), selection.GetLength()));
         lbl_status_right.SetText(Format("Revision %s | %d comment%s | %d metadata | %d match%s",
-                                       AsString((int64)doc_editor.Core().GetRevision()), comments, comments == 1 ? "" : "s",
-                                       metadata, doc_editor.GetSearchMatchCount(), doc_editor.GetSearchMatchCount() == 1 ? "" : "es"));
+                                       AsString((int64)doc_editor.Core().GetRevision()),
+                                       comments, comments == 1 ? "" : "s", metadata,
+                                       doc_editor.GetSearchMatchCount(), doc_editor.GetSearchMatchCount() == 1 ? "" : "es"));
     }
 
     void SetStatus(const String& message)
@@ -1420,9 +1172,7 @@ private:
         style.palette.face[ST_PRESSED] = UiFill::Solid(SColorHighlight());
         style.palette.frame[ST_PRESSED] = SColorHighlight();
         style.palette.ink[ST_PRESSED] = White();
-        button.SetText(text)
-              .SetCheckable()
-              .SetCustomStyle(style);
+        button.SetText(text).SetCheckable().SetCustomStyle(style);
     }
 };
 
