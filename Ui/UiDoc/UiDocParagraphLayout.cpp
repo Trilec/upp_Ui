@@ -196,7 +196,10 @@ void UiDoc::LayoutParagraph(int index, int width) const
                         if(run.type == "image") {
                             int h = run.height > 0 ? run.height : base.GetHeight();
                             int w = run.width > 0 ? run.width : h;
-                            w = min(w, cell_inner_width);
+                            if(w > cell_inner_width) {
+                                h = max(DPI(8), h * cell_inner_width / max(1, w));
+                                w = cell_inner_width;
+                            }
                             if(line_width > 0 && line_width + w > cell_inner_width) {
                                 body_height += line_height;
                                 line_width = 0;
@@ -273,7 +276,11 @@ void UiDoc::LayoutParagraph(int index, int width) const
                         if(run.type == "image") {
                             int ih = run.height > 0 ? run.height : base.GetHeight();
                             int iw = run.width > 0 ? run.width : ih;
-                            iw = min(iw, max(DPI(8), inner_right - start_x));
+                            int max_width = max(DPI(8), inner_right - start_x);
+                            if(iw > max_width) {
+                                ih = max(DPI(8), ih * max_width / max(1, iw));
+                                iw = max_width;
+                            }
                             if(cx > start_x && cx + iw > inner_right) {
                                 cy += line_height;
                                 cx = start_x;
