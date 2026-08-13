@@ -8,6 +8,7 @@ uses
 	Ui;
 
 file
+	UiDocReviewPanel.h,
 	main.cpp;
 
 mainconfig
