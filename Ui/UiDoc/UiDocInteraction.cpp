@@ -53,6 +53,16 @@ void UiDoc::LeftDown(Point p, dword keyflags)
 
     String annotation_id;
     if(HitTestAnnotation(p, annotation_id)) {
+        bool toggle_metadata = false;
+        bool next_expanded = false;
+        for(const UiDocAnnotation& annotation : core_.GetAnnotations())
+            if(annotation.id == annotation_id && annotation.type.StartsWith("metadata.")) {
+                toggle_metadata = true;
+                next_expanded = !annotation.expanded;
+                break;
+            }
+        if(toggle_metadata)
+            SetMetadataExpanded(annotation_id, next_expanded);
         WhenAnnotation(annotation_id);
         return;
     }
