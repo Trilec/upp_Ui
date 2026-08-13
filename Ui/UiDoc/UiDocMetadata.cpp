@@ -143,7 +143,17 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
     tx.label = "Update metadata";
     tx.changes.Add(pick(remove));
     tx.changes.Add(pick(add));
-    return core_.Apply(tx).ok;
+    if(!core_.Apply(tx).ok)
+        return false;
+
+    // Core change observers run synchronously. Rebuild once more after they
+    // return so an expanded card cannot retain pre-edit geometry or paint data.
+    InvalidateAllLayout();
+    EnsureLayout();
+    SyncScrollBar();
+    RefreshLayout();
+    Refresh();
+    return true;
 }
 
 bool UiDoc::RemoveMetadata(const String& id)
