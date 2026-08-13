@@ -66,6 +66,22 @@ void PaintImageSelection(Draw& w, const Rect& rc, Color focus)
     }
 }
 
+void PaintImageGestureOutline(Draw& w, const Rect& rc, Color color)
+{
+    const int dash = max(2, DPI(4));
+    const int gap = max(2, DPI(3));
+    for(int x = rc.left; x < rc.right; x += dash + gap) {
+        int n = min(dash, rc.right - x);
+        w.DrawRect(x, rc.top, n, 1, color);
+        w.DrawRect(x, rc.bottom - 1, n, 1, color);
+    }
+    for(int y = rc.top; y < rc.bottom; y += dash + gap) {
+        int n = min(dash, rc.bottom - y);
+        w.DrawRect(rc.left, y, 1, n, color);
+        w.DrawRect(rc.right - 1, y, 1, n, color);
+    }
+}
+
 Color LaneColorFor(const Vector<UiDoc::AnnotationLane>& lanes, const UiDocAnnotation& annotation, Color fallback)
 {
     for(const UiDoc::AnnotationLane& lane : lanes) {
@@ -191,8 +207,21 @@ void UiDoc::PaintText(Draw& w)
                         w.DrawRect(image_rect.left, image_rect.bottom - 1, image_rect.GetWidth(), 1, style_.page_frame);
                     }
 
-                    if(active_embed_id_ == inline_image->id)
+                    if(active_embed_id_ == inline_image->id) {
                         PaintImageSelection(w, image_rect, SColorHighlight());
+                        if(image_resizing_) {
+                            int dx = image_interaction_current_.x - image_drag_start_.x;
+                            int next_width = max(DPI(24), image_resize_start_size_.cx + dx);
+                            int next_height = max(DPI(16), image_resize_start_size_.cy * next_width /
+                                                            max(1, image_resize_start_size_.cx));
+                            PaintImageGestureOutline(w, RectC(image_rect.left, image_rect.top, next_width, next_height),
+                                                     SColorHighlight());
+                        }
+                        else if(image_dragging_ && image_drag_moved_) {
+                            Point delta = image_interaction_current_ - image_drag_start_;
+                            PaintImageGestureOutline(w, image_rect.Offseted(delta.x, delta.y), SColorHighlight());
+                        }
+                    }
                     continue;
                 }
 
@@ -268,7 +297,8 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
 
         for(const TableUnitVisual& unit : cell_visual.units) {
             Rect ur = unit.rect.Offseted(origin_x, origin_y);
-            if(active_cell && RangeContains(table_selection, unit.pos))
+            bool unit_selected = active_cell && RangeContains(table_selection, unit.pos);
+            if(unit_selected)
                 w.DrawRect(ur, style_.selection_fill);
 
             if(unit.image) {
@@ -278,6 +308,8 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
                     if(!image.IsEmpty())
                         w.DrawImage(ur.left, ur.top, ur.GetWidth(), ur.GetHeight(), image);
                 }
+                if(unit_selected)
+                    PaintImageSelection(w, ur, SColorHighlight());
                 continue;
             }
 
