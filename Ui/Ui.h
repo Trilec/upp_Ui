@@ -30,6 +30,7 @@
     - 2026-08: added UiDateTime for date, time and combined local values.
     - 2026-08: moved UiColorPicker into its dedicated ColorPicker component.
     - 2026-08: added UiRangeSliderEdit for range plus direct numeric entry.
+    - 2026-08: exposed the reusable UiGraphModel / UiNodeGraph subsystem.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -41,6 +42,7 @@
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiGraph/UiGraph.h>
 #include <Ui/UiLayoutCursor.h>
 #include <Ui/UiMeasure.h>
 #include <Ui/UiAbsoluteLayout.h>

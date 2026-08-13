@@ -168,6 +168,7 @@ UiTreeNodeRef UiTreeModel::GetParent(UiTreeNodeRef node) const
         return UiTreeNodeRef{-1};
     return UiTreeNodeRef{nodes_[node.id].parent};
 }
+
 int UiTreeModel::GetChildIndex(UiTreeNodeRef node) const
 {
     if(!IsValid(node) || node.id == root_id_)
@@ -333,156 +334,6 @@ void UiTreeModel::ImportList(UiTreeNodeRef parent, const UiListModel& list)
         AddChild(parent, list.Get(i));
 }
 
-int UiGraphModel::AddNode(const UiModelItem& it)
-{
-    int id = nodes_.GetCount();
-    nodes_.Add();
-    nodes_.Top().alive = true;
-    nodes_.Top().item = it;
-    Notify(UI_MODEL_INSERT, id, 1);
-    return id;
-}
-
-int UiGraphModel::AddNode(const String& text, const Value& data, bool enabled)
-{
-    return AddNode(UiModelItem(text, data, enabled));
-}
-
-bool UiGraphModel::IsValidNode(int id) const
-{
-    return id >= 0 && id < nodes_.GetCount() && nodes_[id].alive;
-}
-
-bool UiGraphModel::RemoveNode(int id)
-{
-    if(!IsValidNode(id))
-        return false;
-    nodes_[id].alive = false;
-    nodes_[id].item = UiModelItem();
-
-    for(int i = edges_.GetCount() - 1; i >= 0; i--) {
-        if(edges_[i].from == id || edges_[i].to == id)
-            edges_.Remove(i);
-    }
-    Notify(UI_MODEL_ERASE, id, 1);
-    return true;
-}
-
-const UiModelItem& UiGraphModel::GetNode(int id) const
-{
-    ASSERT(IsValidNode(id));
-    return nodes_[id].item;
-}
-
-UiModelItem& UiGraphModel::GetNode(int id)
-{
-    ASSERT(IsValidNode(id));
-    return nodes_[id].item;
-}
-
-int UiGraphModel::GetNodeCount() const
-{
-    int n = 0;
-    for(const GraphNode& x : nodes_)
-        if(x.alive)
-            n++;
-    return n;
-}
-
-int UiGraphModel::AddEdge(int from, int to, const Value& data, bool directed)
-{
-    if(!IsValidNode(from) || !IsValidNode(to))
-        return -1;
-    UiGraphEdge& e = edges_.Add();
-    e.from = from;
-    e.to = to;
-    e.data = data;
-    e.directed = directed;
-    int idx = edges_.GetCount() - 1;
-    Notify(UI_MODEL_INSERT, idx, 1);
-    return idx;
-}
-
-bool UiGraphModel::RemoveEdge(int index)
-{
-    if(index < 0 || index >= edges_.GetCount())
-        return false;
-    edges_.Remove(index);
-    Notify(UI_MODEL_ERASE, index, 1);
-    return true;
-}
-
-const UiGraphEdge& UiGraphModel::GetEdge(int index) const
-{
-    ASSERT(index >= 0 && index < edges_.GetCount());
-    return edges_[index];
-}
-
-Vector<int> UiGraphModel::GetOutgoingEdges(int from) const
-{
-    Vector<int> out;
-    if(!IsValidNode(from))
-        return out;
-    for(int i = 0; i < edges_.GetCount(); i++) {
-        if(edges_[i].from == from)
-            out.Add(i);
-        else if(!edges_[i].directed && edges_[i].to == from)
-            out.Add(i);
-    }
-    return out;
-}
-
-Vector<int> UiGraphModel::GetIncomingEdges(int to) const
-{
-    Vector<int> out;
-    if(!IsValidNode(to))
-        return out;
-    for(int i = 0; i < edges_.GetCount(); i++) {
-        if(edges_[i].to == to)
-            out.Add(i);
-        else if(!edges_[i].directed && edges_[i].from == to)
-            out.Add(i);
-    }
-    return out;
-}
-
-void UiGraphModel::Clear()
-{
-    nodes_.Clear();
-    edges_.Clear();
-    Notify(UI_MODEL_CLEAR);
-}
-
-UiGraphModel UiGraphModel::FromTree(const UiTreeModel& tree, UiTreeNodeRef root)
-{
-    UiGraphModel g;
-    if(!tree.IsValid(root))
-        return g;
-
-    Vector<UiTreeNodeRef> q;
-    Vector<int> parent_idx;
-    q.Add(root);
-    parent_idx.Add(-1);
-
-    while(!q.IsEmpty()) {
-        UiTreeNodeRef n = q[0];
-        int pidx = parent_idx[0];
-        q.Remove(0);
-        parent_idx.Remove(0);
-
-        int idx = g.AddNode(tree.Get(n));
-        if(pidx >= 0)
-            g.AddEdge(pidx, idx, Value(), true);
-
-        for(int i = 0; i < tree.GetChildCount(n); i++) {
-            q.Add(tree.GetChild(n, i));
-            parent_idx.Add(idx);
-        }
-    }
-
-    return g;
-}
-
 UiTableModel::UiTableModel()
 {
 }
@@ -522,7 +373,8 @@ void UiTableModel::SetRowCount(int rows)
     for(int r = old_rows; r < rows; r++)
         cells_[r].SetCount(cols);
     row_headers_.SetCount(rows);
-    Notify(rows > old_rows ? UI_MODEL_INSERT : UI_MODEL_ERASE, min(rows, old_rows), abs(rows - old_rows), UITABLE_ROW_AXIS);
+    Notify(rows > old_rows ? UI_MODEL_INSERT : UI_MODEL_ERASE,
+           min(rows, old_rows), abs(rows - old_rows), UITABLE_ROW_AXIS);
 }
 
 void UiTableModel::SetColumnCount(int cols)
@@ -535,7 +387,8 @@ void UiTableModel::SetColumnCount(int cols)
     for(int r = 0; r < cells_.GetCount(); r++)
         cells_[r].SetCount(cols);
     column_headers_.SetCount(cols);
-    Notify(cols > old_cols ? UI_MODEL_INSERT : UI_MODEL_ERASE, min(cols, old_cols), abs(cols - old_cols), UITABLE_COLUMN_AXIS);
+    Notify(cols > old_cols ? UI_MODEL_INSERT : UI_MODEL_ERASE,
+           min(cols, old_cols), abs(cols - old_cols), UITABLE_COLUMN_AXIS);
 }
 
 void UiTableModel::Clear()
@@ -637,7 +490,7 @@ bool UiTableModel::IsCellEditable(int row, int col) const
 const UiTableHeader& UiTableModel::GetHeader(UiTableAxis axis, int index) const
 {
     ASSERT(index >= 0);
-    const Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    const Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
     ASSERT(index < headers.GetCount());
     return headers[index];
 }
@@ -645,14 +498,14 @@ const UiTableHeader& UiTableModel::GetHeader(UiTableAxis axis, int index) const
 UiTableHeader& UiTableModel::GetHeader(UiTableAxis axis, int index)
 {
     ASSERT(index >= 0);
-    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
     ASSERT(index < headers.GetCount());
     return headers[index];
 }
 
 bool UiTableModel::SetHeader(UiTableAxis axis, int index, const UiTableHeader& header)
 {
-    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
     if(index < 0 || index >= headers.GetCount())
         return false;
     headers[index] = header;
@@ -662,7 +515,7 @@ bool UiTableModel::SetHeader(UiTableAxis axis, int index, const UiTableHeader& h
 
 Value UiTableModel::GetHeaderValue(UiTableAxis axis, int index) const
 {
-    const Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    const Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
     if(index < 0 || index >= headers.GetCount())
         return Value();
     return !IsNull(headers[index].data) ? headers[index].data : Value(headers[index].text);
@@ -670,7 +523,7 @@ Value UiTableModel::GetHeaderValue(UiTableAxis axis, int index) const
 
 bool UiTableModel::SetHeaderValue(UiTableAxis axis, int index, const Value& value)
 {
-    Vector<UiTableHeader>& headers = (axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_);
+    Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
     if(index < 0 || index >= headers.GetCount())
         return false;
     headers[index].data = value;
@@ -851,7 +704,7 @@ bool UiMenuModel::Move(UiMenuNodeRef node, UiMenuNodeRef new_parent, int pos)
     old_children.Remove(old_pos);
 
     Vector<int>& dst = nodes_[new_parent.id].children;
-    pos = (pos < 0) ? dst.GetCount() : min(max(pos, 0), dst.GetCount());
+    pos = pos < 0 ? dst.GetCount() : min(max(pos, 0), dst.GetCount());
     dst.Insert(pos, node.id);
     nodes_[node.id].parent = new_parent.id;
     Notify(UI_MODEL_MOVE, old_parent, new_parent.id, node.id);

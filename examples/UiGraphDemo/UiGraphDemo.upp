@@ -1,0 +1,8 @@
+description "Interactive UiGraph roles, icons, attached controls, routing and editing demo";
+
+uses
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;

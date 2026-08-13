@@ -165,40 +165,6 @@ static void RunTreeTests(TestCtx& t)
     t.Expect(tree.GetChildCount(root) == seed.GetCount(), "Import list creates tree children");
 }
 
-static void RunGraphTests(TestCtx& t)
-{
-    t.Section("UiGraphModel");
-
-    UiGraphModel g;
-    for(int i = 0; i < 220; i++)
-        g.AddNode(Format("N%d", i), i);
-    t.Expect(g.GetNodeCount() == 220, "Graph node count after add");
-
-    SeedRandom(2026);
-    for(int i = 0; i < 420; i++) {
-        int a = Random(220);
-        int b = Random(220);
-        g.AddEdge(a, b, i, true);
-    }
-    t.Expect(g.GetEdgeCount() == 420, "Graph edge count after add");
-
-    for(int i = 0; i < 30; i++)
-        g.RemoveNode(i * 3);
-
-    t.Expect(g.GetNodeCount() == 190, "Graph node count after removals");
-    t.Expect(g.GetEdgeCount() >= 0, "Graph edge count is non-negative");
-
-    Vector<int> out = g.GetOutgoingEdges(50);
-    for(int ei : out) {
-        const UiGraphEdge& e = g.GetEdge(ei);
-        t.Expect(e.from == 50 || (!e.directed && e.to == 50), "Outgoing edge query correctness");
-    }
-
-    g.Clear();
-    t.Expect(g.GetNodeCount() == 0, "Graph clear nodes");
-    t.Expect(g.GetEdgeCount() == 0, "Graph clear edges");
-}
-
 static void RunInteropTests(TestCtx& t)
 {
     t.Section("Interop");
@@ -214,10 +180,6 @@ static void RunInteropTests(TestCtx& t)
     t.Expect(back.GetCount() == list.GetCount(), "List->Tree->List count match");
     for(int i = 0; i < min(back.GetCount(), list.GetCount()); i++)
         t.Expect(back.Get(i).text == list.Get(i).text, Format("Interop row %d text match", i));
-
-    UiGraphModel g = UiGraphModel::FromTree(tree, tree.Root());
-    t.Expect(g.GetNodeCount() == tree.GetNodeCount(), "Tree->Graph node count match");
-    t.Expect(g.GetEdgeCount() == max(0, g.GetNodeCount() - 1), "Tree->Graph edge count is n-1");
 }
 
 static void RunTableTests(TestCtx& t)
@@ -588,7 +550,6 @@ CONSOLE_APP_MAIN
     Cout() << "UiDataModels test bed starting...\n";
     RunListTests(t);
     RunTreeTests(t);
-    RunGraphTests(t);
     RunInteropTests(t);
     RunTableTests(t);
     RunMenuTests(t);
