@@ -135,11 +135,51 @@ static void TestMetadataLifecycle(MetadataTestCtx& t)
     t.Expect(FindMetadata(doc, id) == nullptr, "removed metadata leaves no annotation record");
 }
 
+static void TestMetadataVisibilityKeepsComments(MetadataTestCtx& t)
+{
+    UiDoc doc;
+    UiDoc::Style style = doc.GetStyle();
+    style.metrics.frame_enabled = false;
+    style.metrics.frame_width = 0;
+    style.page_padding = DPI(20);
+    style.gutter_width = DPI(24);
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(520), DPI(260));
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+    doc.SetText("commented paragraph\nnext paragraph");
+
+    doc.SetSelection(UiDocRange(0, 9));
+    String comment = doc.AddComment("Review comment");
+    String metadata = doc.AddMetadata(UiDocRange(0, 0), "note", "Reference", "Hidden independently.");
+    t.Expect(!comment.IsEmpty() && !metadata.IsEmpty(),
+             "comment and metadata annotations can coexist on one paragraph");
+
+    doc.ShowMetadata(true);
+    doc.Layout();
+    int x_with_metadata = doc.PointAtPos(0).x;
+
+    doc.ShowMetadata(false);
+    doc.Layout();
+    int x_comment_only = doc.PointAtPos(0).x;
+    t.Expect(x_comment_only == x_with_metadata,
+             "hiding metadata keeps the gutter reserved for a visible comment marker");
+
+    t.Expect(doc.RemoveComment(comment), "comment can be removed independently of metadata");
+    doc.Layout();
+    int x_without_visible_markers = doc.PointAtPos(0).x;
+    t.Expect(x_without_visible_markers < x_comment_only,
+             "the gutter disappears only after no visible marker type remains");
+
+    t.Expect(doc.GetMetadata().GetCount() == 1,
+             "hiding/removing comments does not alter stored metadata");
+}
+
 CONSOLE_APP_MAIN
 {
     MetadataTestCtx t;
     Cout() << "UiDoc metadata regression suite\n";
     TestMetadataLifecycle(t);
+    TestMetadataVisibilityKeepsComments(t);
     Cout() << Format("UIDOC_METADATA_SUMMARY checks=%d failed=%d\n", t.checks, t.fails);
     SetExitCode(t.fails == 0 ? 0 : 1);
 }
