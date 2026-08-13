@@ -57,6 +57,14 @@ static int CountCellImages(const UiDocTableCell& cell)
     return count;
 }
 
+static const UiDocInlineRun* FirstCellImage(const UiDocTableCell& cell)
+{
+    for(const UiDocInlineRun& run : cell.runs)
+        if(run.type == "image")
+            return &run;
+    return nullptr;
+}
+
 static void TestInlineInsertionAndDelete(ImageTestCtx& t)
 {
     UiDoc doc;
@@ -84,6 +92,13 @@ static void TestInlineInsertionAndDelete(ImageTestCtx& t)
     Point after = doc.PointAtPos(at + 1);
     t.Expect(after.y == before.y, "text position after inline image stays on the same visual line when space permits");
     t.Expect(after.x - before.x >= DPI(70), "inline image contributes its painted width to caret geometry");
+
+    doc.SetSelection(UiDocRange(at, at));
+    t.Expect(doc.GetCaretRect().GetHeight() >= DPI(40),
+             "caret immediately before an inline image spans the tall visual line");
+    doc.SetSelection(UiDocRange(at + 1, at + 1));
+    t.Expect(doc.GetCaretRect().GetHeight() >= DPI(40),
+             "caret immediately after an inline image spans the tall visual line");
 
     t.Expect(doc.Undo(), "one Undo reverses an inline image insertion");
     t.Expect(FindEmbed(doc, id) == nullptr && doc.GetText() == "before after",
@@ -227,9 +242,115 @@ static void TestTableImageInsertion(ImageTestCtx& t)
     t.Expect(doc.GetTable(table_id, table), "table remains queryable after image insertion");
     t.Expect(table.rows.GetCount() >= 1 && table.columns >= 1 && CountCellImages(table.rows[0].cells[0]) == 1,
              "active table cell contains one canonical image inline run");
+
+    doc.Layout();
+    Point image_point(padding + style.table_cell_padding + DPI(8),
+                      padding + line_height + style.table_cell_padding + DPI(8));
+    doc.LeftDown(image_point, 0);
+    doc.LeftUp(image_point, 0);
+    t.Expect(doc.Key(K_DELETE, 1), "Delete removes a directly clicked table-cell image selection");
+    t.Expect(doc.GetTable(table_id, table) && CountCellImages(table.rows[0].cells[0]) == 0,
+             "direct table-image selection deletes only the canonical image unit");
+    t.Expect(doc.Undo() && doc.GetTable(table_id, table) && CountCellImages(table.rows[0].cells[0]) == 1,
+             "one Undo restores a directly deleted table image");
+
+    doc.Layout();
+    Point after_image(padding + style.table_cell_padding + DPI(34),
+                      padding + line_height + style.table_cell_padding + DPI(10));
+    doc.LeftDown(after_image, 0);
+    doc.LeftUp(after_image, 0);
     t.Expect(doc.Key(K_BACKSPACE, 1), "Backspace deletes the image unit immediately before the table caret");
     t.Expect(doc.GetTable(table_id, table) && CountCellImages(table.rows[0].cells[0]) == 0,
-             "table image deletion removes the canonical image run");
+             "table image Backspace removes the canonical image run");
+}
+
+static void TestBodyImageDropIntoTable(ImageTestCtx& t)
+{
+    UiDoc doc;
+    const int padding = DPI(24);
+    UiDoc::Style style = ImageStyle(padding);
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(720), DPI(420));
+    doc.SetText("source\n");
+    String key = doc.AddResource(MakeImageResource(), false);
+    doc.SetSelection(UiDocRange(0, 0));
+    String image_id = doc.InsertImage(key, DPI(80), DPI(40), "inline");
+    t.Expect(!image_id.IsEmpty(), "body-to-table fixture image inserted");
+
+    doc.SetSelection(UiDocRange(doc.GetLength(), doc.GetLength()));
+    String table_id = doc.InsertTable(1, 1, 0);
+    t.Expect(!table_id.IsEmpty(), "body-to-table fixture table inserted");
+    doc.Layout();
+
+    int table_pos = doc.GetLength();
+    Point table_anchor = doc.PointAtPos(table_pos);
+    int line_height = max(DPI(14), style.font.GetHeight() + style.line_gap);
+    int row_height = max(DPI(20), line_height + 2 * style.table_cell_padding);
+    Point target(padding + DPI(10), table_anchor.y + line_height + row_height / 2);
+
+    Point left = doc.PointAtPos(0);
+    Point right = doc.PointAtPos(1);
+    Point source(left.x + max(1, right.x - left.x) / 2, left.y + DPI(10));
+    doc.LeftDown(source, 0);
+    doc.MouseMove(target, 0);
+    doc.LeftUp(target, 0);
+
+    UiDocTable table;
+    t.Expect(doc.GetTable(table_id, table) && CountCellImages(table.rows[0].cells[0]) == 1,
+             "dragging a body image into a table creates one canonical cell image run");
+    const UiDocInlineRun* run = table.rows.IsEmpty() || table.rows[0].cells.IsEmpty()
+                              ? nullptr : FirstCellImage(table.rows[0].cells[0]);
+    t.Expect(run && run->width == DPI(80) && run->height == DPI(40),
+             "body-to-table drop preserves the image's canonical width and height");
+    t.Expect(run && run->width == 2 * run->height,
+             "body-to-table drop preserves the image aspect ratio");
+    t.Expect(doc.GetTextW().Find((wchar)0xfffc) < 0,
+             "body-to-table drop leaves no orphan object marker in body text");
+}
+
+static void TestTableImageDeletePreservesViewport(ImageTestCtx& t)
+{
+    UiDoc doc;
+    const int padding = DPI(24);
+    UiDoc::Style style = ImageStyle(padding);
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(640), DPI(180));
+
+    String text;
+    for(int i = 0; i < 50; i++)
+        text << Format("line %02d\n", i);
+    doc.SetText(text);
+    String key = doc.AddResource(MakeImageResource(), false);
+    doc.SetSelection(UiDocRange(doc.GetLength(), doc.GetLength()));
+    String table_id = doc.InsertTable(1, 1, 0);
+    t.Expect(!table_id.IsEmpty(), "scrolled table fixture inserted");
+    doc.Layout();
+
+    int table_pos = doc.GetLength();
+    int initial_y = doc.PointAtPos(table_pos).y;
+    for(int i = 0; i < 120 && doc.PointAtPos(table_pos).y > DPI(90); i++)
+        doc.MouseWheel(Point(0, 0), -120, 0);
+    int scrolled_y = doc.PointAtPos(table_pos).y;
+    t.Expect(scrolled_y < initial_y - DPI(100), "fixture scrolls deeply enough to expose viewport-reset regressions");
+
+    int line_height = max(DPI(14), style.font.GetHeight() + style.line_gap);
+    int row_height = max(DPI(20), line_height + 2 * style.table_cell_padding);
+    Point cell_point(padding + DPI(10), scrolled_y + line_height + row_height / 2);
+    doc.LeftDown(cell_point, 0);
+    doc.LeftUp(cell_point, 0);
+    t.Expect(!doc.InsertImage(key, DPI(80), DPI(40), "inline").IsEmpty(),
+             "scrolled fixture inserts an image into the active table cell");
+    doc.Layout();
+
+    int before_delete = doc.PointAtPos(table_pos).y;
+    Point image_point(padding + style.table_cell_padding + DPI(12),
+                      before_delete + line_height + style.table_cell_padding + DPI(12));
+    doc.LeftDown(image_point, 0);
+    doc.LeftUp(image_point, 0);
+    t.Expect(doc.Key(K_DELETE, 1), "selected table image deletes while deeply scrolled");
+    int after_delete = doc.PointAtPos(table_pos).y;
+    t.Expect(abs(after_delete - before_delete) <= DPI(2),
+             "deleting an in-cell image preserves the current document viewport");
 }
 
 static void TestRoundTrip(ImageTestCtx& t)
@@ -267,6 +388,8 @@ CONSOLE_APP_MAIN
     TestResizeAndReposition(t);
     TestInlineBlockConversion(t);
     TestTableImageInsertion(t);
+    TestBodyImageDropIntoTable(t);
+    TestTableImageDeletePreservesViewport(t);
     TestRoundTrip(t);
 
     Cout() << Format("UIDOC_IMAGE_SUMMARY checks=%d failed=%d\n", t.checks, t.fails);
