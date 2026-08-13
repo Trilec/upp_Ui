@@ -31,6 +31,7 @@
     - 2026-08: moved UiColorPicker into its dedicated ColorPicker component.
     - 2026-08: added UiRangeSliderEdit for range plus direct numeric entry.
     - 2026-08: exposed the reusable UiGraphModel / UiNodeGraph subsystem.
+    - 2026-08: added UiGallery and shared high-scale model-view geometry helpers.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -42,6 +43,7 @@
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiModelView.h>
 #include <Ui/UiGraph/UiGraph.h>
 #include <Ui/UiLayoutCursor.h>
 #include <Ui/UiMeasure.h>
@@ -92,5 +94,6 @@
 #include <Ui/UiDoc.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
+#include <Ui/UiGallery.h>
 
 #endif
