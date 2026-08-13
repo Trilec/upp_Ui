@@ -1,0 +1,11 @@
+description "UiGraph model, routing and style tests";
+
+uses
+	Core,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "CONSOLE";
