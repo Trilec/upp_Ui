@@ -137,6 +137,8 @@ int UiDoc::PosAtDocumentPoint(Point point) const
     int local_x = point.x - page_rect_.left - style_.page_padding;
 
     for(const EmbedVisual& embed : paragraph.embeds) {
+        if(embed.type == "metadata")
+            continue;
         Rect r = embed.rect.Offseted(page_rect_.left + style_.page_padding,
                                      page_rect_.top + paragraph.top - scroll_y_);
         if(r.Contains(point)) {
@@ -388,6 +390,8 @@ bool UiDoc::HitTestEmbed(Point point, String& embed_id) const
         }
 
         for(const EmbedVisual& embed : paragraph.embeds) {
+            if(embed.type == "metadata")
+                continue;
             Rect rect = embed.rect.Offseted(origin_x, paragraph_y);
             if(rect.Contains(point)) {
                 embed_id = embed.embed_id;
@@ -405,12 +409,14 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
     EnsureLayout();
 
     int gutter = max(DPI(12), style_.gutter_width);
-    int marker = max(DPI(6), style_.annotation_marker_size);
+    int marker = max(DPI(7), style_.annotation_marker_size);
     Rect area = gutter_side_ == GUTTER_LEFT
               ? RectC(page_rect_.left - gutter, page_rect_.top, gutter, page_rect_.GetHeight())
               : RectC(page_rect_.right, page_rect_.top, gutter, page_rect_.GetHeight());
 
     for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+        if(annotation.resolved)
+            continue;
         Point anchor = DocumentPointAtPos(annotation.range.from);
         int x = area.left + (area.GetWidth() - marker) / 2;
         int y = anchor.y + max(0, (BaseFont().GetHeight() - marker) / 2);
