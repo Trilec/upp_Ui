@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiList_h_
+#ifndef _Ui_UiList_h_
 #define _Ui_UiList_h_
 
 /*
@@ -16,6 +16,8 @@
     Intent
     - Keep list rows lightweight and model-driven while exposing a stable
       control-level selection contract through SetData()/GetData().
+    - Keep ordinary viewport work proportional to visible rows rather than the
+      total model size, including direct jumps and drag insertion on large models.
     - Single-selection uses one scalar Value token.
     - Multi-selection uses a ValueArray of selection tokens.
     - Tokens resolve to UiModelItem.data when present, otherwise to the row index.
@@ -32,6 +34,8 @@
       selection event naming for release cleanup.
     - 2026-04: added control-owned drag reorder with explicit drag handle,
       side placement, and insertion marker support.
+    - 2026-08: hardened uniform-row viewport traversal and drag insertion for
+      hundred-thousand-item model workloads.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -39,6 +43,7 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiModelView.h>
 
 namespace Upp {
 
@@ -184,6 +189,9 @@ public:
     void ScrollTo(int index);
     void ScrollToSelection();
 
+    UiVisibleRange GetVisibleRange(int overscan_rows = 0) const;
+    int GetLastPaintItemCount() const { return last_paint_item_count_; }
+
     virtual void Paint(Draw& w) override;
     virtual void Layout() override;
     virtual Size GetMinSize() const override;
@@ -211,6 +219,7 @@ private:
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
     void BindModel(UiListModel& model);
+    void HandleModelChange(const UiModelChange& change);
     void SyncModel();
     void ClampScroll();
     Rect GetViewportRect() const;
@@ -246,6 +255,7 @@ private:
     int  HitTestDrag(Point p) const;
     void BeginRowDrag(int row, Point start_screen);
     void ContinueRowDrag(Point p_screen);
+    int  ComputeDragInsertBefore(int local_y) const;
     void EndRowDrag(bool cancel);
     void MoveRowTo(int from, int before);
     void UpdateDragMarker();
@@ -288,10 +298,10 @@ private:
     InlineEditor inline_editor_;
     bool editing_ = false;
     int editing_index_ = -1;
+
+    mutable int last_paint_item_count_ = 0;
 };
 
-}
+} // namespace Upp
 
 #endif
-
-
