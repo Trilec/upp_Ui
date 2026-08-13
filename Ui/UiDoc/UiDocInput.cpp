@@ -648,6 +648,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
 
+    const int preserved_scroll = scroll_y_;
     UiDocTableCell cell = CopyTableCell(table.rows[active_table_row_].cells[active_table_column_]);
     UiDocRange selected = TableSelectionRange();
     if(!selected.IsEmpty()) {
@@ -655,6 +656,8 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
             return false;
         if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
             return false;
+        scroll_y_ = preserved_scroll;
+        sb_.Set(scroll_y_);
         active_table_anchor_pos_ = active_table_pos_ = selected.from;
         WhenSelection();
         ScrollCaretIntoView();
@@ -671,6 +674,8 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
         return false;
     if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
+    scroll_y_ = preserved_scroll;
+    sb_.Set(scroll_y_);
     if(!forward)
         active_table_pos_ = max(0, pos - 1);
     active_table_anchor_pos_ = active_table_pos_;
