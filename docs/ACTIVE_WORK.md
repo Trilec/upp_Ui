@@ -1,21 +1,25 @@
 # ACTIVE WORK
 
-BASE: `2e50e0d5dea52a866c0dff1d8fbc4a77fb5032c0` (`origin/main` at task start)
+BASE: `91d431637a6619b503e548f297375a252cbb8603` — Gary's completed Windows compile/test baseline on `main`.
 
-TASK: `UI-GRAPH-BUILD-R1` — migrate and reconcile the staged reusable `UiGraphModel` / `UiNodeGraph` implementation from `Trilec/upp_agentflow` into the `Ui` package.
+TASK: `UI-GRAPH-BUILD-R1` — final Windows/runtime acceptance of the reusable `UiGraphModel` / `UiNodeGraph` implementation now integrated into the `Ui` package.
 
-STAGING: `Trilec/upp_agentflow@76c217d743b7b9f79b4c9e921fe86e7cb7b1f1a7`
+STAGING REFERENCE: `Trilec/upp_agentflow@76c217d743b7b9f79b4c9e921fe86e7cb7b1f1a7`
 
-PROMOTION BASE: `9f268c971398e8ae17c2a6a3f4e6dbd339fb4c53` (`main` immediately before UiGraph promotion)
+PROMOTION: `4e837325b3ea6cff39d218bf8ee2bc60aa52a81a` merged UiGraph onto current `main`; the obsolete `UiGraphBuild` branch has since been deleted locally and remotely.
 
-MERGE: `4e837325b3ea6cff39d218bf8ee2bc60aa52a81a` — `UiGraphBuild` merged into current `main` through PR #13 after rebuilding the merge tree from current `main` and overlaying only UiGraph-owned paths.
+WINDOWS FIX BASELINE: `91d431637a6619b503e548f297375a252cbb8603` fixed the first Windows compile issues: U++ container copyability, BLITZ helper-name collision, and the deterministic large-model test fixture.
 
-TOUCHED: `Ui/UiGraph/`, `Ui/Ui.h`, `Ui/Ui.upp`, `Ui/UiDataModels.h`, `Ui/UiDataModels.cpp`, `Utilities/UiDataModelsTest/main.cpp`, `Utilities/UiGraphTest/`, `examples/UiGraphDemo/`, `docs/ACTIVE_WORK.md`.
+PAN FIX: `05f871e341af528d932a5f92350d93536e1addb1` removes unsupported Ctrl mouse capture from middle-button panning and terminates an in-view pan on `MiddleUp` or `MouseLeave`.
 
-STATUS: PUBLISHED TO MAIN — implementation and static integration complete; Windows U++/CLANGx64 compile, tests and demo smoke validation remain.
+TOUCHED FOR CURRENT RETEST: `Ui/UiGraph/UiNodeGraphInteraction.cpp`, `docs/ACTIVE_WORK.md`.
 
-PUBLISHED: `main` is now the authoritative acceptance branch. `UiGraphBuild` is retained only as implementation history/reference.
+VALIDATED AT `91d4316`: `UiGraphTest` Debug 90/90; Release 90/90; `UiDataModelsTest` Debug 7535 checks / 0 fails; `UiGraphDemo` Debug builds and launches; `git diff --check` passed; working tree clean.
 
-VALIDATION: Static repository/API/dependency review completed. Concurrent UiDoc history is preserved unchanged in the final merge tree. No Windows compile/runtime result has been claimed.
+OPEN RUNTIME ITEM: Gary reproduced an apparent crash while middle-button panning. The pan implementation was taking `Ctrl::SetCapture()` from `MiddleDown`, although U++ documents capture for left/right mouse interactions only. That unsupported capture path is removed in `05f871e3` and requires Windows runtime confirmation.
 
-NEXT ACTION: Gary tests the exact current `main` HEAD on Windows: build/run `Utilities/UiGraphTest`, build/run `Utilities/UiDataModelsTest`, build `examples/UiGraphDemo`, smoke-test the graph interactions, and report only small mechanical compiler fixes rather than redesigning graph architecture.
+SECONDARY UX ITEM: first auto-fit appears visually too large in the demo. Do not mix this polish into the pan-stability fix; revisit after the pan retest passes.
+
+STATUS: PUBLISHED TO MAIN — compile/test baseline passed; focused Windows pan retest pending.
+
+NEXT ACTION: Gary pulls current `main`, rebuilds `UiGraphDemo`, repeatedly tests middle-button pan including crossing attached controls and leaving/re-entering the graph area, confirms no crash/capture residue, reruns `UiGraphTest`, and reports exact results. If pan is stable, close runtime acceptance and then consider the initial-fit scale as a separate polish task.
