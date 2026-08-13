@@ -117,6 +117,8 @@ file
 	UiDoc.h,
 	UiDoc/UiDoc.h,
 	UiDoc/UiDoc.cpp,
+	UiDoc/UiDocMetadataPrivate.h,
+	UiDoc/UiDocMetadata.cpp,
 	UiDoc/UiDocLayout.cpp,
 	UiDoc/UiDocParagraphLayout.cpp,
 	UiDoc/UiDocGeometry.cpp,

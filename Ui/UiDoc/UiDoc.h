@@ -247,6 +247,7 @@ private:
     UiDocTextStyle StyleAt(int pos) const;
     String BlockRoleAt(int pos) const;
     int MeasureGlyph(wchar ch, const Font& font) const;
+    const AnnotationLane* ResolveAnnotationLane(const UiDocAnnotation& annotation) const;
 
     void InvalidateAllLayout();
     void InvalidateChangedRange(UiDocRange range);
@@ -278,6 +279,7 @@ private:
     void PaintCaret(Draw& w);
     void PaintTable(Draw& w, const EmbedVisual& visual);
     void PaintImage(Draw& w, const EmbedVisual& visual);
+    void PaintMetadataReference(Draw& w, const EmbedVisual& visual);
 
     void RecomputeSearch();
     bool IsWordChar(wchar ch) const;
@@ -356,6 +358,18 @@ public:
     bool RemoveComment(const String& id);
     Vector<UiDocAnnotation> GetComments(UiDocRange* range = nullptr) const;
 
+    String AddMetadata(UiDocRange anchor, const String& type,
+                       const String& title, const String& text,
+                       const ValueMap& payload = ValueMap(),
+                       const ValueMap& meta = ValueMap());
+    bool UpdateMetadata(const String& id, const String& title, const String& text,
+                        const ValueMap& payload = ValueMap());
+    bool RemoveMetadata(const String& id);
+    bool SetMetadataExpanded(const String& id, bool expanded);
+    bool ToggleMetadataExpanded(const String& id);
+    Vector<UiDocAnnotation> GetMetadata(UiDocRange* range = nullptr) const;
+    UiDoc& ConfigureMetadataType(const String& type, const Image& icon, Color tint = Null);
+
     String AddResource(const UiDocResource& resource, bool dedupe = true) { return core_.AddResource(resource, dedupe); }
     bool RemoveResource(const String& key) { return core_.RemoveResource(key); }
     String InsertImage(const String& resource_key, int width = 0, int height = 0,
@@ -396,6 +410,8 @@ public:
     bool IsLineNumbersShown() const { return show_line_numbers_; }
     void ShowMetadataMarkers(bool show);
     bool IsMetadataMarkersShown() const { return show_metadata_markers_; }
+    void ShowMetadata(bool show) { ShowMetadataMarkers(show); }
+    bool IsMetadataShown() const { return IsMetadataMarkersShown(); }
 
     void RegisterCommand(const String& id, Function<bool(UiDoc&, const Value&)> command);
     bool ExecuteCommand(const String& id, const Value& args = Value());
