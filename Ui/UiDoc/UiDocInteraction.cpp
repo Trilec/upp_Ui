@@ -74,13 +74,38 @@ void UiDoc::LeftDown(Point p, dword keyflags)
                 image_dragging_ = false;
                 image_drag_moved_ = false;
                 image_drag_start_ = p;
+                image_interaction_current_ = p;
                 image_resize_start_size_ = Size(width, height);
                 drag_selecting_ = false;
                 table_drag_selecting_ = false;
+                Refresh();
                 return;
             }
             break;
         }
+    }
+
+    String table_image_id;
+    int table_image_row = -1, table_image_column = -1, table_image_pos = 0;
+    if(HitTestTableImage(p, table_image_id, table_image_row, table_image_column, table_image_pos)) {
+        active_table_id_ = table_image_id;
+        active_table_row_ = table_image_row;
+        active_table_column_ = table_image_column;
+        active_table_anchor_pos_ = table_image_pos;
+        active_table_pos_ = table_image_pos + 1;
+        active_embed_id_.Clear();
+        image_dragging_ = image_resizing_ = image_drag_moved_ = false;
+        table_drag_selecting_ = false;
+        drag_selecting_ = false;
+        preferred_x_ = -1;
+        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            if(embed.id == table_image_id) {
+                anchor_pos_ = caret_pos_ = ClampPos(embed.range.from);
+                break;
+            }
+        WhenSelection();
+        Refresh();
+        return;
     }
 
     String table_id;
@@ -120,6 +145,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
                     anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
                     image_dragging_ = true;
                     image_drag_start_ = p;
+                    image_interaction_current_ = p;
                     image_drag_moved_ = false;
                 }
                 break;
@@ -160,6 +186,7 @@ void UiDoc::LeftUp(Point p, dword)
         image_resizing_ = false;
         image_dragging_ = false;
         image_drag_moved_ = false;
+        image_interaction_current_ = Point(0, 0);
         Refresh();
         return;
     }
@@ -240,6 +267,7 @@ void UiDoc::LeftUp(Point p, dword)
             }
         }
         image_drag_moved_ = false;
+        image_interaction_current_ = Point(0, 0);
         drag_selecting_ = false;
         table_drag_selecting_ = false;
         Refresh();
@@ -252,12 +280,17 @@ void UiDoc::LeftUp(Point p, dword)
 
 void UiDoc::MouseMove(Point p, dword)
 {
-    if(image_resizing_)
+    if(image_resizing_) {
+        image_interaction_current_ = p;
+        Refresh();
         return;
+    }
 
     if(image_dragging_) {
+        image_interaction_current_ = p;
         if(abs(p.x - image_drag_start_.x) >= DPI(4) || abs(p.y - image_drag_start_.y) >= DPI(4))
             image_drag_moved_ = true;
+        Refresh();
         return;
     }
 
