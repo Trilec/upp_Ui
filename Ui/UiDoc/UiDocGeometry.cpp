@@ -215,6 +215,20 @@ Rect UiDoc::CaretRectInternal() const
     Font caret_font = ResolveFont(caret_style, BlockRoleAt(sample_pos));
     int height = max(DPI(14), caret_font.GetHeight() + style_.line_gap + max(0, caret_style.leading_delta));
 
+    int index = FindParagraphAtPos(caret_pos_);
+    if(index >= 0 && index < paragraphs_.GetCount()) {
+        LayoutParagraph(index, ContentWidth());
+        const ParagraphCache& paragraph = paragraphs_[index];
+        for(int i = 0; i < paragraph.lines.GetCount(); i++) {
+            const VisualLine& line = paragraph.lines[i];
+            bool last = i + 1 == paragraph.lines.GetCount();
+            if(caret_pos_ < line.to || (last && caret_pos_ <= line.to)) {
+                height = max(height, line.height);
+                break;
+            }
+        }
+    }
+
     return RectC(point.x, point.y, max(1, style_.caret_width), height);
 }
 
@@ -302,6 +316,35 @@ bool UiDoc::HitTestTable(Point point, String& table_id, int& row, int& column, i
                     }
                 }
                 return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool UiDoc::HitTestTableImage(Point point, String& table_id, int& row, int& column, int& unit_pos) const
+{
+    EnsureLayout();
+    for(const ParagraphCache& paragraph : paragraphs_) {
+        if(!paragraph.valid)
+            continue;
+        int ox = page_rect_.left + style_.page_padding;
+        int oy = page_rect_.top + paragraph.top - scroll_y_;
+        for(const EmbedVisual& embed : paragraph.embeds) {
+            if(embed.type != "table")
+                continue;
+            const TableVisual& table = embed.table;
+            for(int i = 0; i < table.cells.GetCount(); i++) {
+                const TableCellVisual& cell = table.cells[i];
+                for(const TableUnitVisual& unit : cell.units) {
+                    if(!unit.image || !unit.rect.Offseted(ox, oy).Contains(point))
+                        continue;
+                    table_id = table.embed_id;
+                    row = i / max(1, table.columns);
+                    column = i % max(1, table.columns);
+                    unit_pos = unit.pos;
+                    return true;
+                }
             }
         }
     }
