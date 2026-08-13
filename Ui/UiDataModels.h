@@ -11,7 +11,7 @@
     ============
 
     Purpose
-    - Shared lightweight list, tree, and graph data models for Ui controls.
+    - Shared lightweight list, tree, table, and menu data models for Ui controls.
 
     Intent
     - Keep model ownership and change notification explicit so controls can bind
@@ -22,7 +22,8 @@
 
     Usage
     - Use UiListModel and UiTreeModel as the canonical item sources for list,
-      tree, and dropdown-style controls.
+      tree, and dropdown-style controls. UiGraphModel lives in Ui/UiGraph and
+      reuses UiDataModelBase without duplicating this lightweight model layer.
 
     Changelog
     - 2026-03: documented as public shared model infrastructure.
@@ -30,6 +31,8 @@
       icon_render_mode so model-backed controls share one icon policy vocabulary.
     - 2026-04: normalized list-model move semantics so reorder operations may
       target the end position (`to == GetCount()`).
+    - 2026-08: moved the expanded UiGraphModel into Ui/UiGraph and removed the
+      original integer-ID placeholder model.
 */
 
 #include <Core/Core.h>
@@ -254,46 +257,6 @@ private:
     int root_id_ = -1;
 };
 
-struct UiGraphEdge : Moveable<UiGraphEdge> {
-    int from = -1;
-    int to = -1;
-    Value data;
-    bool directed = true;
-};
-
-class UiGraphModel : public UiDataModelBase {
-public:
-    int AddNode(const UiModelItem& it);
-    int AddNode(const String& text, const Value& data = Value(), bool enabled = true);
-    bool RemoveNode(int id);
-    bool IsValidNode(int id) const;
-
-    const UiModelItem& GetNode(int id) const;
-    UiModelItem& GetNode(int id);
-    int GetNodeCount() const;
-
-    int AddEdge(int from, int to, const Value& data = Value(), bool directed = true);
-    bool RemoveEdge(int index);
-    const UiGraphEdge& GetEdge(int index) const;
-    int GetEdgeCount() const { return edges_.GetCount(); }
-
-    Vector<int> GetOutgoingEdges(int from) const;
-    Vector<int> GetIncomingEdges(int to) const;
-
-    void Clear();
-
-    static UiGraphModel FromTree(const UiTreeModel& tree, UiTreeNodeRef root);
-
-private:
-    struct GraphNode : Moveable<GraphNode> {
-        UiModelItem item;
-        bool alive = false;
-    };
-
-    Vector<GraphNode> nodes_;
-    Vector<UiGraphEdge> edges_;
-};
-
 enum UiTableAxis : byte {
     UITABLE_ROW_AXIS = 0,
     UITABLE_COLUMN_AXIS,
@@ -476,4 +439,3 @@ private:
 }
 
 #endif
-
