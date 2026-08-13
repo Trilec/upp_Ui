@@ -202,6 +202,7 @@ private:
     GutterSide gutter_side_ = GUTTER_RIGHT;
     bool show_line_numbers_ = false;
     bool show_metadata_markers_ = true;
+    String active_annotation_id_;
 
     ScrollBar sb_;
     int scroll_y_ = 0;
@@ -364,6 +365,9 @@ public:
                        const ValueMap& meta = ValueMap());
     bool UpdateMetadata(const String& id, const String& title, const String& text,
                         const ValueMap& payload = ValueMap());
+    bool UpdateMetadata(const String& id, const String& type,
+                        const String& title, const String& text,
+                        const ValueMap& payload);
     bool RemoveMetadata(const String& id);
     bool SetMetadataExpanded(const String& id, bool expanded);
     bool ToggleMetadataExpanded(const String& id);
@@ -404,6 +408,9 @@ public:
     UiDoc& SetAnnotationLaneColor(const String& id, Color color);
     UiDoc& SetAnnotationLaneIcon(const String& id, const Image& icon);
     Vector<AnnotationLane> GetAnnotationLanes() const { return clone(annotation_lanes_); }
+    void SetActiveAnnotation(const String& id);
+    const String& GetActiveAnnotation() const { return active_annotation_id_; }
+    bool RevealAnnotation(const String& id, bool select_range = true);
     void SetGutterSide(GutterSide side);
     GutterSide GetGutterSide() const { return gutter_side_; }
     void ShowLineNumbers(bool show);
