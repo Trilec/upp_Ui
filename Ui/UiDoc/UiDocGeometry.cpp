@@ -106,6 +106,15 @@ void UiDoc::Layout()
     Rect face(Point(0, 0), size);
     int frame = max(0, style_.metrics.frame_width);
     face.Deflate(frame);
+
+    if(show_line_numbers_ || show_metadata_markers_) {
+        int gutter = max(DPI(12), style_.gutter_width);
+        if(gutter_side_ == GUTTER_LEFT)
+            face.left += gutter;
+        else
+            face.right -= gutter;
+    }
+
     page_rect_ = face;
     InvalidateAllLayout();
     EnsureLayout();
@@ -394,12 +403,18 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
     if(!show_metadata_markers_)
         return false;
     EnsureLayout();
+
+    int gutter = max(DPI(12), style_.gutter_width);
     int marker = max(DPI(6), style_.annotation_marker_size);
+    Rect area = gutter_side_ == GUTTER_LEFT
+              ? RectC(page_rect_.left - gutter, page_rect_.top, gutter, page_rect_.GetHeight())
+              : RectC(page_rect_.right, page_rect_.top, gutter, page_rect_.GetHeight());
+
     for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
         Point anchor = DocumentPointAtPos(annotation.range.from);
-        int x = gutter_side_ == GUTTER_LEFT ? page_rect_.left + DPI(3)
-                                            : page_rect_.right - marker - DPI(3);
-        Rect rect = RectC(x, anchor.y, marker, marker);
+        int x = area.left + (area.GetWidth() - marker) / 2;
+        int y = anchor.y + max(0, (BaseFont().GetHeight() - marker) / 2);
+        Rect rect = RectC(x, y, marker, marker);
         if(rect.Contains(point)) {
             annotation_id = annotation.id;
             return true;
