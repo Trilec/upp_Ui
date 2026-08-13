@@ -174,12 +174,99 @@ static void TestMetadataVisibilityKeepsComments(MetadataTestCtx& t)
              "hiding/removing comments does not alter stored metadata");
 }
 
+static void TestMetadataEditAndReviewSelection(MetadataTestCtx& t)
+{
+    UiDoc doc;
+    UiDoc::Style style = doc.GetStyle();
+    style.metrics.frame_enabled = false;
+    style.metrics.frame_width = 0;
+    style.page_padding = DPI(16);
+    style.gutter_width = DPI(28);
+    style.annotation_marker_size = DPI(10);
+    style.font = SansSerifZ(DPI(11));
+    doc.SetCustomStyle(style);
+    doc.SetRect(0, 0, DPI(520), DPI(180));
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+
+    String text;
+    for(int i = 0; i < 20; i++)
+        text << Format("paragraph %d\n", i);
+    doc.SetText(text);
+    int anchor = text.Find("paragraph 14");
+
+    ValueMap original;
+    original.Add("source", "treatment");
+    original.Add("obsolete", true);
+    String first = doc.AddMetadata(UiDocRange(anchor, anchor), "guidance",
+                                   "Original", "Original body", original);
+    ValueMap second_payload;
+    second_payload.Add("source", "dramatica");
+    String second = doc.AddMetadata(UiDocRange(anchor, anchor), "structure",
+                                    "Structure", "Second reference", second_payload);
+    doc.SetSelection(UiDocRange(anchor, anchor));
+    String comment = doc.AddComment("Same-anchor review comment");
+    t.Expect(!first.IsEmpty() && !second.IsEmpty() && !comment.IsEmpty(),
+             "multiple metadata and a comment can share one document anchor");
+
+    ValueMap replacement;
+    replacement.Add("chapter", 3);
+    t.Expect(doc.UpdateMetadata(first, "note", "Edited title", "Edited body", replacement),
+             "metadata editor can change type, title, body and payload in one operation");
+    const UiDocAnnotation* edited = FindMetadata(doc, first);
+    t.Expect(edited && edited->id == first && edited->range.from == anchor && edited->range.to == anchor,
+             "full metadata update preserves stable id and anchor");
+    t.Expect(edited && edited->type == "metadata.note" &&
+                       AsString(edited->payload["title"]) == "Edited title" &&
+                       AsString(edited->payload["text"]) == "Edited body" &&
+                       (int)edited->payload["chapter"] == 3,
+             "full metadata update stores the new type and edited fields");
+    t.Expect(edited && edited->payload.Find("obsolete") < 0 && edited->payload.Find("source") < 0,
+             "full metadata update replaces rather than silently merges arbitrary payload fields");
+
+    t.Expect(doc.Undo(), "one Undo reverses the full metadata editor update");
+    const UiDocAnnotation* restored = FindMetadata(doc, first);
+    t.Expect(restored && restored->type == "metadata.guidance" &&
+                         AsString(restored->payload["title"]) == "Original" &&
+                         AsString(restored->payload["source"]) == "treatment" &&
+                         (bool)restored->payload["obsolete"],
+             "Undo restores prior type, fields and arbitrary payload together");
+
+    t.Expect(doc.RevealAnnotation(second, false), "review item can reveal its anchored annotation");
+    t.Expect(doc.GetActiveAnnotation() == second && doc.GetSelection().caret == anchor,
+             "revealed review item becomes active and moves the caret to its anchor");
+    Point shown = doc.PointAtPos(anchor);
+    t.Expect(shown.y >= 0 && shown.y < doc.GetSize().cy,
+             "revealing a distant review item scrolls its anchor into the visible viewport");
+
+    doc.Layout();
+    Vector<String> clicked;
+    doc.WhenAnnotation = [&](const String& id) {
+        clicked.Add(id);
+        doc.SetActiveAnnotation(id);
+    };
+    Point anchor_point = doc.PointAtPos(anchor);
+    int marker = max(DPI(7), style.annotation_marker_size);
+    int click_x = max(DPI(12), style.gutter_width) / 2;
+    int click_y = anchor_point.y + max(0, (style.font.GetHeight() - marker) / 2) + marker / 2;
+    for(int i = 0; i < 3; i++)
+        doc.LeftDown(Point(click_x, click_y), 0);
+
+    Index<String> unique;
+    for(const String& id : clicked)
+        unique.FindAdd(id);
+    t.Expect(clicked.GetCount() == 3 && unique.GetCount() == 3,
+             "repeated clicks on a stacked gutter marker cycle through every same-anchor reference");
+    t.Expect(unique.Find(first) >= 0 && unique.Find(second) >= 0 && unique.Find(comment) >= 0,
+             "stacked gutter cycling exposes both metadata records and the comment individually");
+}
+
 CONSOLE_APP_MAIN
 {
     MetadataTestCtx t;
     Cout() << "UiDoc metadata regression suite\n";
     TestMetadataLifecycle(t);
     TestMetadataVisibilityKeepsComments(t);
+    TestMetadataEditAndReviewSelection(t);
     Cout() << Format("UIDOC_METADATA_SUMMARY checks=%d failed=%d\n", t.checks, t.fails);
     SetExitCode(t.fails == 0 ? 0 : 1);
 }
