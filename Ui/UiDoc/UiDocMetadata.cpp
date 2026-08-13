@@ -5,7 +5,7 @@ namespace Upp {
 
 namespace {
 
-String MetadataNextId(const UiDocCore& core)
+String UiDocMetadataNextId(const UiDocCore& core)
 {
     for(int serial = 1;; serial++) {
         String id = Format("metadata_%d", serial);
@@ -20,7 +20,7 @@ String MetadataNextId(const UiDocCore& core)
     }
 }
 
-const UiDocAnnotation* MetadataById(const UiDocCore& core, const String& id)
+const UiDocAnnotation* UiDocMetadataById(const UiDocCore& core, const String& id)
 {
     for(const UiDocAnnotation& annotation : core.GetAnnotations())
         if(annotation.id == id)
@@ -28,7 +28,7 @@ const UiDocAnnotation* MetadataById(const UiDocCore& core, const String& id)
     return nullptr;
 }
 
-bool MetadataRangesTouch(UiDocRange a, UiDocRange b)
+bool UiDocMetadataRangesTouch(UiDocRange a, UiDocRange b)
 {
     a.Normalize();
     b.Normalize();
@@ -63,7 +63,7 @@ String UiDoc::AddMetadata(UiDocRange anchor, const String& type,
     anchor = NormalizeRange(anchor);
 
     UiDocAnnotation annotation;
-    annotation.id = MetadataNextId(core_);
+    annotation.id = UiDocMetadataNextId(core_);
     annotation.range = anchor;
     annotation.type = UiDocNormalizeMetadataType(type);
     annotation.payload = clone(payload);
@@ -88,7 +88,7 @@ String UiDoc::AddMetadata(UiDocRange anchor, const String& type,
 bool UiDoc::UpdateMetadata(const String& id, const String& title, const String& text,
                            const ValueMap& payload)
 {
-    const UiDocAnnotation* annotation = MetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
 
@@ -100,13 +100,13 @@ bool UiDoc::UpdateMetadata(const String& id, const String& title, const String& 
 
 bool UiDoc::RemoveMetadata(const String& id)
 {
-    const UiDocAnnotation* annotation = MetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
     return annotation && UiDocIsMetadataAnnotation(*annotation) && core_.RemoveAnnotation(id);
 }
 
 bool UiDoc::SetMetadataExpanded(const String& id, bool expanded)
 {
-    const UiDocAnnotation* annotation = MetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
 
@@ -125,7 +125,7 @@ bool UiDoc::SetMetadataExpanded(const String& id, bool expanded)
 
 bool UiDoc::ToggleMetadataExpanded(const String& id)
 {
-    const UiDocAnnotation* annotation = MetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
     return annotation && UiDocIsMetadataAnnotation(*annotation)
          ? SetMetadataExpanded(id, !annotation->expanded)
          : false;
@@ -141,7 +141,7 @@ Vector<UiDocAnnotation> UiDoc::GetMetadata(UiDocRange* range) const
     for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
         if(!UiDocIsMetadataAnnotation(annotation))
             continue;
-        if(range && !MetadataRangesTouch(annotation.range, query))
+        if(range && !UiDocMetadataRangesTouch(annotation.range, query))
             continue;
         out.Add(annotation);
     }

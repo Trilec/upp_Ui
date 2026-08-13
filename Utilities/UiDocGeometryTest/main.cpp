@@ -191,18 +191,27 @@ static void TestGutterReservationAndMarkerHit(GeometryTestCtx& t)
     doc.WhenAnnotation = [&](const String& id) { clicked_id = id; };
 
     Point anchor = doc.PointAtPos(0);
-    int marker = max(DPI(6), style.annotation_marker_size);
+    int marker = max(DPI(7), style.annotation_marker_size);
     int marker_x = doc.GetSize().cx - gutter + (gutter - marker) / 2 + marker / 2;
     int marker_y = anchor.y + max(0, (style.font.GetHeight() - marker) / 2) + marker / 2;
     doc.LeftDown(Point(marker_x, marker_y), 0);
     t.Expect(clicked_id == annotation_id,
              "annotation marker hit-test uses the same reserved gutter lane as painting");
 
+    doc.SetGutterSide(UiDoc::GUTTER_LEFT);
+    doc.Layout();
+    Point comment_gutter = doc.PointAtPos(0);
     doc.ShowMetadataMarkers(false);
+    doc.Layout();
+    Point metadata_hidden = doc.PointAtPos(0);
+    t.Expect(abs(metadata_hidden.x - comment_gutter.x) <= 1,
+             "hiding metadata markers keeps the gutter while a comment marker remains visible");
+
+    t.Expect(doc.RemoveComment(annotation_id), "comment fixture removes independently of metadata visibility");
     doc.Layout();
     Point restored = doc.PointAtPos(0);
     t.Expect(abs(restored.x - without_gutter.x) <= 1,
-             "disabling gutter features restores the full document client width");
+             "removing the last visible marker releases the gutter client width");
 }
 
 CONSOLE_APP_MAIN
