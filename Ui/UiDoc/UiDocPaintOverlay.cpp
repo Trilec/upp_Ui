@@ -12,28 +12,36 @@ void PaintOverlayMarkerShapeAA(Draw& w, const Rect& marker,
         return;
 
     Size size = marker.GetSize();
-    ImageBuffer ib(size);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
+    UiRasterCachePolicy policy = UiRasterPolicyIcon("uidoc/metadata-marker");
+    UiRasterCacheKeyBuilder key("uidoc/metadata-marker");
+    key.Add((int)shape).Add(color).Add(size);
+    Image image = UiGetCachedRasterImage(policy, key, size, [=](Size qsz) {
+        ImageBuffer ib(qsz);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
 
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    double inset = 0.5;
-    double width = max(1.0, (double)size.cx - 1.0);
-    double height = max(1.0, (double)size.cy - 1.0);
-    p.Begin();
-    if(shape == UiDoc::MARKER_TRIANGLE) {
-        p.Move(size.cx * 0.5, inset);
-        p.Line(size.cx - inset, size.cy - inset);
-        p.Line(inset, size.cy - inset);
-        p.Close();
-    }
-    else {
-        double radius = shape == UiDoc::MARKER_CIRCLE ? min(width, height) * 0.5 : min(DPI(2), size.cx / 3);
-        p.RoundedRectangle(inset, inset, width, height, radius);
-    }
-    p.Fill(color);
-    p.End();
-    w.DrawImage(marker.left, marker.top, ib);
+        BufferPainter p(ib, MODE_ANTIALIASED);
+        double inset = 0.5;
+        double width = max(1.0, (double)qsz.cx - 1.0);
+        double height = max(1.0, (double)qsz.cy - 1.0);
+        p.Begin();
+        if(shape == UiDoc::MARKER_TRIANGLE) {
+            p.Move(qsz.cx * 0.5, inset);
+            p.Line(qsz.cx - inset, qsz.cy - inset);
+            p.Line(inset, qsz.cy - inset);
+            p.Close();
+        }
+        else {
+            double radius = shape == UiDoc::MARKER_CIRCLE
+                          ? min(width, height) * 0.5
+                          : min((double)DPI(2), qsz.cx / 3.0);
+            p.RoundedRectangle(inset, inset, width, height, radius);
+        }
+        p.Fill(color);
+        p.End();
+        return Image(ib);
+    });
+    UiDrawCachedRaster(w, marker, image);
 }
 
 }
@@ -185,8 +193,20 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
 
 void UiDoc::PaintGutter(Draw& w)
 {
-    if(!show_line_numbers_ && !show_metadata_markers_)
+    bool have_markers = false;
+    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+        if(annotation.resolved)
+            continue;
+        if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
+            continue;
+        if(ResolveAnnotationLane(annotation)) {
+            have_markers = true;
+            break;
+        }
+    }
+    if(!show_line_numbers_ && !have_markers)
         return;
+
     int gutter = max(DPI(12), style_.gutter_width);
     Rect area = gutter_side_ == GUTTER_LEFT
               ? RectC(page_rect_.left - gutter, page_rect_.top, gutter, page_rect_.GetHeight())
@@ -209,9 +229,11 @@ void UiDoc::PaintGutter(Draw& w)
         }
     }
 
-    if(show_metadata_markers_) {
+    if(have_markers) {
         for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
             if(annotation.resolved)
+                continue;
+            if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
                 continue;
             const AnnotationLane* lane = ResolveAnnotationLane(annotation);
             if(!lane)
