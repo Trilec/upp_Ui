@@ -424,6 +424,7 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
               ? RectC(page_rect_.left - gutter, page_rect_.top, gutter, page_rect_.GetHeight())
               : RectC(page_rect_.right, page_rect_.top, gutter, page_rect_.GetHeight());
 
+    Index<int> visited;
     for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
         if(annotation.resolved)
             continue;
@@ -431,14 +432,37 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
             continue;
         if(!ResolveAnnotationLane(annotation))
             continue;
+        if(visited.Find(annotation.range.from) >= 0)
+            continue;
+        visited.Add(annotation.range.from);
+
+        Vector<const UiDocAnnotation*> group;
+        for(const UiDocAnnotation& candidate : core_.GetAnnotations()) {
+            if(candidate.range.from != annotation.range.from || candidate.resolved)
+                continue;
+            if(UiDocIsMetadataAnnotation(candidate) && !show_metadata_markers_)
+                continue;
+            if(ResolveAnnotationLane(candidate))
+                group.Add(&candidate);
+        }
+        if(group.IsEmpty())
+            continue;
+
         Point anchor = DocumentPointAtPos(annotation.range.from);
         int x = area.left + (area.GetWidth() - marker) / 2;
         int y = anchor.y + max(0, (BaseFont().GetHeight() - marker) / 2);
         Rect rect = RectC(x, y, marker, marker);
-        if(rect.Contains(point)) {
-            annotation_id = annotation.id;
-            return true;
-        }
+        if(!rect.Contains(point))
+            continue;
+
+        int selected = 0;
+        for(int i = 0; i < group.GetCount(); i++)
+            if(group[i]->id == active_annotation_id_) {
+                selected = (i + 1) % group.GetCount();
+                break;
+            }
+        annotation_id = group[selected]->id;
+        return true;
     }
     return false;
 }
