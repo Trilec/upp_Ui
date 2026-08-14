@@ -158,6 +158,7 @@ file
 	UiBezierCurveField.cpp,
 	UiDropdown.h,
 	UiDropdown.cpp,
+	UiDropdownPopup.cpp,
 	UiMenu.h,
 	UiMenu.cpp,
 	UiColorPicker/UiColorPicker.h,
