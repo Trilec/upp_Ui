@@ -21,13 +21,13 @@ public:
         actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(0)
                 .SetAlignItems(UiCrossAlign::Center);
         status_.SetText("Preparing model...");
-        first_.SetText("First");
-        last_.SetText("Last");
+        btn_first_.SetText("First");
+        btn_last_.SetText("Last");
         smaller_.SetText("Smaller tiles");
         larger_.SetText("Larger tiles");
         actions_.Add(status_).Expand(1);
-        actions_.Add(first_).Fixed(DPI(64));
-        actions_.Add(last_).Fixed(DPI(64));
+        actions_.Add(btn_first_).Fixed(DPI(64));
+        actions_.Add(btn_last_).Fixed(DPI(64));
         actions_.Add(smaller_).Fixed(DPI(104));
         actions_.Add(larger_).Fixed(DPI(104));
         header_.SetContent(actions_);
@@ -52,8 +52,8 @@ private:
     UiGroupPanel header_;
     UiBoxLayout actions_;
     UiLabel status_;
-    UiButton first_;
-    UiButton last_;
+    UiButton btn_first_;
+    UiButton btn_last_;
     UiButton smaller_;
     UiButton larger_;
     UiGallery gallery_;
@@ -78,8 +78,8 @@ private:
 
     void Wire()
     {
-        first_.WhenAction = [=] { gallery_.SetCursor(0); UpdateStatus(); };
-        last_.WhenAction = [=] { gallery_.SetCursor(model_.GetCount() - 1); UpdateStatus(); };
+        btn_first_.WhenAction = [=] { gallery_.SetCursor(0); UpdateStatus(); };
+        btn_last_.WhenAction = [=] { gallery_.SetCursor(model_.GetCount() - 1); UpdateStatus(); };
         smaller_.WhenAction = [=] {
             Size s = gallery_.GetItemSize();
             gallery_.SetItemSize(Size(max(DPI(52), s.cx - DPI(10)),
