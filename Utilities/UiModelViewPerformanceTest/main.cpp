@@ -266,6 +266,86 @@ void TestGalleryScale(TestCtx& t, UiListModel& model)
              "last logical item remains reachable after zoom and fluid column recomputation");
 }
 
+void TestTableScale(TestCtx& t)
+{
+    t.Section("UiTable deep rows + bounded renderer pool");
+
+    UiTableModel model;
+    model.SetSize(100000, 2);
+    model.SetHeader(UITABLE_COLUMN_AXIS, 0, UiTableHeader("Name"));
+    model.SetHeader(UITABLE_COLUMN_AXIS, 1, UiTableHeader("Value"));
+    UiTableCell tail;
+    tail.value = "tail";
+    tail.display = "row 100000";
+    model.SetCell(99999, 1, tail);
+
+    UiTable table;
+    table.SetModel(model);
+    table.SetRect(0, 0, 720, 480);
+    table.Layout();
+    t.Expect(table.GetLiveCellRenderCount() > 0 && table.GetLiveCellRenderCount() < 100,
+             "UiTable allocates only viewport/overscan cell renderers for 100,000 rows");
+    table.Layout();
+    t.Expect(table.GetLastRenderLayoutCount() == 0,
+             "unchanged UiTable layout reuses prepared cell/header geometry");
+
+    table.ScrollToCell(99999, 1);
+    UiVisibleRange rows = table.GetVisibleRowRange();
+    t.Expect(rows.Contains(99999) && rows.GetCount() < 30,
+             "UiTable jumps directly to row 99,999 with a viewport-sized row range");
+    t.Expect(table.GetLiveCellRenderCount() < 100,
+             "deep UiTable vertical scrolling rebinds rather than accumulating renderers");
+
+    ImageDraw draw(720, 480);
+    draw.DrawRect(0, 0, 720, 480, White());
+    int layouts_before_paint = table.GetLastRenderLayoutCount();
+    table.Paint(draw);
+    t.Expect(table.GetLastPaintCellCount() < 60
+             && table.GetLastRenderLayoutCount() == layouts_before_paint,
+             "UiTable Paint visits only the visible cell intersection and never lays out renderers");
+
+    int geometry_builds = table.GetColumnGeometryBuildCount();
+    tail.display = "updated tail";
+    model.SetCell(99999, 1, tail);
+    t.Expect(table.GetColumnGeometryBuildCount() == geometry_builds
+             && table.GetLastRenderLayoutCount() <= 1,
+             "single visible Table cell update skips column-geometry rebuild and relayouts at most one cell");
+
+    t.Section("UiTable retained variable-width columns");
+    UiTableModel wide_model;
+    wide_model.SetSize(4, 2000);
+    UiTable wide;
+    wide.SetModel(wide_model);
+    wide.SetRect(0, 0, 760, 320);
+    wide.Layout();
+    wide.SetActiveCell(3, 1999);
+    UiVisibleRange cols = wide.GetVisibleColumnRange();
+    t.Expect(cols.Contains(1999) && cols.GetCount() < 20,
+             "UiTable retained column offsets reach column 1,999 without prefix painting");
+    t.Expect(wide.GetLiveCellRenderCount() < 200,
+             "2,000 logical columns still keep a viewport-bounded cell renderer pool");
+
+    ImageDraw wide_draw(760, 320);
+    wide_draw.DrawRect(0, 0, 760, 320, White());
+    layouts_before_paint = wide.GetLastRenderLayoutCount();
+    wide.Paint(wide_draw);
+    t.Expect(wide.GetLastPaintCellCount() < 100
+             && wide.GetLastRenderLayoutCount() == layouts_before_paint,
+             "deep horizontal Table Paint remains visible-intersection bounded");
+
+    geometry_builds = wide.GetColumnGeometryBuildCount();
+    wide.SetColumnWidth(1000, DPI(180));
+    t.Expect(wide.GetColumnGeometryBuildCount() == geometry_builds + 1,
+             "one column resize rebuilds retained prefix geometry exactly once");
+
+    UiItemRenderImage image_render;
+    wide.SetColumnCellRender(1999, image_render);
+    wide.ScrollToCell(3, 1999);
+    t.Expect(wide.GetVisibleColumnRange().Contains(1999)
+             && wide.GetLiveCellRenderCount() < 200,
+             "per-column renderer override preserves deep reachability and bounded pooling");
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
@@ -278,6 +358,7 @@ CONSOLE_APP_MAIN
     TestModelBulkChange(t, model);
     TestListScale(t, model);
     TestGalleryScale(t, model);
+    TestTableScale(t);
 
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
