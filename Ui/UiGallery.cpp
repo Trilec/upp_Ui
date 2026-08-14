@@ -1,6 +1,7 @@
 #include <Ui/UiGallery.h>
 #include <Ui/UiGridLayout.h>
 #include <Ui/UiList.h>
+#include <Ui/UiPanel.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -91,20 +92,31 @@ void UiGallery::SyncThemeStyle()
         return;
 
     UiList::Style list = UiTheme::ResolveList();
+    UiPanel::Style panel = UiTheme::ResolvePanel();
     themed_style_ = StyleDefault();
     themed_style_.palette = list.palette;
     themed_style_.metrics = list.metrics;
+
+    // List's Minimal Standard role intentionally permits transparent rows. A
+    // Gallery, however, owns a complete viewport surface and must not fall back
+    // to the platform paper color when the current theme is Dark. Preserve any
+    // explicit List face/image, but resolve NONE faces from the theme's Surface
+    // panel role so the Gallery remains theme-aware without hardcoded dark RGBs.
+    for(int i = 0; i < 4; i++)
+        if(themed_style_.palette.face[i].IsNone() && panel.palette.face[i].IsSolid())
+            themed_style_.palette.face[i] = panel.palette.face[i];
+
     // Gallery owns one viewport surface rather than a List row skin. Keeping the
-    // theme palette while dropping row/nine-slice skin avoids stale light image
-    // surfaces when switching to Dark mode.
+    // theme palette while dropping row/nine-slice skin avoids stale raster
+    // surfaces when switching theme modes.
     themed_style_.skin = StyledSkin();
     themed_style_.metrics.content_margin = Rect(0, 0, 0, 0);
     themed_style_.metrics.radius = 0;
     themed_style_.metrics.face_enabled = true;
 
-    Color surface = SColorPaper();
-    if(themed_style_.palette.face[ST_NORMAL].IsSolid())
-        surface = themed_style_.palette.face[ST_NORMAL].color;
+    Color surface = themed_style_.palette.face[ST_NORMAL].IsSolid()
+                  ? themed_style_.palette.face[ST_NORMAL].color
+                  : SColorPaper();
     Color selected = list.selected_face;
     if(IsNull(selected))
         selected = surface;
