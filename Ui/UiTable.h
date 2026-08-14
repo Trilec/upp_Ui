@@ -164,7 +164,6 @@ public:
     UiTableModel& GetModel() { return *model_; }
     const UiTableModel& GetModel() const { return *model_; }
 
-    // Presentation slots. Defaults are theme-aware UiItemRenderBasic instances.
     UiTable& SetCellRender(const UiItemRender& render);
     UiTable& SetHeaderRender(const UiItemRender& render);
     UiTable& SetRowHeaderRender(const UiItemRender& render);
@@ -258,6 +257,11 @@ private:
         int index = -1;
     };
 
+    struct ColumnCellRenderOverride {
+        int column = -1;
+        One<UiItemRender> render;
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
@@ -334,7 +338,7 @@ private:
     bool custom_cell_render_ = false;
     bool custom_header_render_ = false;
     bool custom_row_header_render_ = false;
-    VectorMap<int, One<UiItemRender>> column_cell_renders_;
+    Array<ColumnCellRenderOverride> column_cell_renders_;
     Array<CellRenderSlot> cell_render_pool_;
     Array<HeaderRenderSlot> column_header_render_pool_;
     Array<HeaderRenderSlot> row_header_render_pool_;
