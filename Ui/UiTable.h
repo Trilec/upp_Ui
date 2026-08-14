@@ -24,6 +24,11 @@
 
     Thread context
     - GUI thread only.
+
+    Model ownership
+    - Model() always returns the model currently driving the Table. The Table
+      owns an internal model by default; SetModel(...) switches to an external
+      model and UseInternalModel() switches back without copying either model.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -158,8 +163,15 @@ public:
 
     UiTable& SetModel(UiTableModel& model);
     UiTable& UseInternalModel();
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiTableModel& Model() { return *model_; }
+    const UiTableModel& Model() const { return *model_; }
+    UiTable& ClearModel() { Model().Clear(); return *this; }
+
     UiTable& EnableInternalMutation(bool on = true);
     bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiTableModel& GetInternalModel() { return internal_model_; }
     UiTableModel& GetModel() { return *model_; }
     const UiTableModel& GetModel() const { return *model_; }
