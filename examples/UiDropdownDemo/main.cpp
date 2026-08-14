@@ -15,6 +15,7 @@
 */
 #include <Ui/Ui.h>
 #include <cmath>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
 
@@ -1630,7 +1631,6 @@ void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
     }
 
     dd.UseInternalModel();
-    dd.RefreshFromModel();
     dd.SetMultiSelect(config_.multi_select);
     UiListModel& model = dd.GetInternalModel();
     int first_selectable = -1;
