@@ -1,91 +1,90 @@
 # ACTIVE WORK
 
-TASK: `UI-GALLERY-CORRECTIVE + R2D-WINDOWS-VALIDATION`.
+TASK: `UI-MODEL-API-CONVERGENCE + THEME-AUDIT`.
 
-Remote GitHub is authoritative. Fetch live `main` before further work and never force-update it.
+Remote GitHub is authoritative. Never force-update `main`.
 
-BASELINE MERGE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merged R2C demo fix plus R2D implementation checkpoint.
+BASE: `a7db124e03e474491fee0691614e52be6e92bffa` — R2D final Windows-validated demo cleanup. All R1/R2A/R2B/R2C/R2D and Gallery corrective acceptance is closed at this baseline.
 
-## ACCEPTED BASELINE
+## OBJECTIVE
 
-R2C Tree + Table is Windows accepted:
-- Ui Debug source compile: PASS.
-- `UiModelViewPerformanceTest`: Debug **52/0**, Release **52/0**.
-- `UiTreeScaleTest`: Debug **11/0**, Release **11/0**.
-- Tree and Table focused smoke: PASS; no freeze/crash.
+Simplify the programmer-facing model contract without introducing Qt-style duplicate widget/model families.
 
-## GALLERY CORRECTIVE — WINDOWS ACCEPTED
+Every genuine model-backed control must expose the same ownership vocabulary:
 
-Gary validated exact source/recovery HEAD `e2a98d4be4d998e70f27bea5d01ec6bbade415e4` on Windows/U++ CLANGx64:
-- Ui Debug: **0 compile errors, 0 warnings**, 83 files.
-- `UiGalleryRegressionTest` Debug: **11/0**.
-- `UiGalleryRegressionTest` Release: **11/0**.
-- the former Dark viewport invariant now passes.
-- Light -> Dark -> Light changed header, Gallery surface and margins to genuinely dark values and back without stale light surfaces.
-- repeated marquee drag/release, Escape, edge autoscroll and long drags: no capture recursion, stack overflow or crash.
-- Dark selection/marquee frames remain visible and content stays legible.
-- +/- and Ctrl+wheel zoom both update the status, remain sensibly anchored, and compact vertical image-tile text steps down in bounded discrete sizes; 100% returns to normal text size.
-- First/Last, deep scrolling and 10,000-item interaction remained responsive/stable.
+```cpp
+ModelType& Model();
+const ModelType& Model() const;
+Control& SetModel(ModelType& model);
+Control& UseInternalModel();
+bool IsUsingInternalModel() const;
+Control& ClearModel();
+```
 
-Relevant published corrective checkpoints remain:
-- `250e62cb...` — transparent List-derived Gallery face resolves through theme Panel Surface role.
-- `393113ad...` — demo root/header remain theme-live.
-- `3be0fdef...` + `fef9cd6f...` — cached layout-resolved image-render fonts and bounded vertical tile font ladder.
+Semantics:
+- every model-backed control owns an internal model from construction;
+- `Model()` always means the model currently driving the control;
+- without `SetModel(...)`, `Model()` is the internal model;
+- after `SetModel(external)`, `Model()` is exactly that external object;
+- switching models never copies or clears either model;
+- inactive internal data is retained and can be restored with `UseInternalModel()`;
+- `ClearModel()` clears the currently active model only and never switches ownership;
+- model mutation notifications remain the sole synchronization authority; no mirror/refresh API returns.
 
-GALLERY STATUS: **WINDOWS ACCEPTED.**
+## AUDIT — TRUE MODEL VIEWS
 
-## R2D DROPDOWN + MENU
+These already use one internal model plus one active non-owning model pointer and should converge on the contract above:
+- `UiList` -> `UiListModel`
+- `UiGallery` -> `UiListModel`
+- `UiTree` -> `UiTreeModel`
+- `UiTable` -> `UiTableModel`
+- `UiDropdown` -> `UiListModel`
+- `UiMenu` -> `UiMenuModel`
+- `UiNodeGraph` -> `UiGraphModel`
 
-Substantive architecture checkpoint: `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
+All seven model types already provide `Clear()`. Existing `bound_models_` callback registration is retained: callbacks from inactive models are ignored unless the observed model is the current `model_`. Switching is O(1) ownership selection plus each view's legitimate selection/projection/geometry reset; it introduces no record copy or renderer-per-item allocation.
 
-Architecture:
-- Dropdown uses one authoritative `UiListModel`; no parallel item mirror/sync state.
-- collapsed/popup Dropdown content uses bounded prepared `UiItemRender` instances.
-- Menu keeps authoritative `UiMenuModel` semantics and uses shared rendering for ordinary popup content while retaining check/radio/submenu/command/session/menu-bar behavior.
-- `UiDropdownMenuRenderTest` target remains Debug/Release **11/0** each.
+## AUDIT — DELIBERATE NON-MODEL CONTROLS
 
-Windows already confirmed the earlier three `UiDropdownPopup.cpp` type-name errors were fixed by `1a69143bb317e7325b1160c9f747b1ffa3f38f10`; Ui Debug compiled cleanly at `e2a98d4...`.
+Do not manufacture model classes for these:
+- `UiAccordion`: composite container; section bodies own real child Ctrls and section/open state is container structure.
+- `UiMatrixSelector`: tiny preset/value selector with a bounded fixed cell set.
+- `UiColorMatrix`: one compact 1-8-colour value/editor.
 
-### R2D renderer-test stop report
+These are not duplicate "widget versions" of model controls. Adding model objects would increase API complexity without providing shared data/view scale value.
 
-At exact HEAD `e2a98d4be4d998e70f27bea5d01ec6bbade415e4`:
-- `UiDropdownMenuRenderTest` Debug: **11 checks, 1 fail**.
-- Release: **11 checks, 1 fail**.
-- sole failing assertion: `Dropdown renderer prototype can be replaced without changing model state`.
-- the other ten R2D checks passed.
-- Dropdown/Menu demo smoke was correctly deferred.
+## CLEANUP QUESTIONS / FINDINGS
 
-Review showed no production Dropdown/model-state defect. The original test incorrectly combined its semantic invariant with this scheduling assertion:
+- Public `GetInternalModel()` / `GetModel()` spelling is implementation-oriented. Migrate repository callers to `Model()` and remove those accessors rather than carrying compatibility clutter.
+- `UiTable` currently seeds its internal model with a hidden 12 x 6 sample grid in the control constructor. Audit callers/tests before removing this; under the new contract a default model view should normally start with an empty model and demos should own demo data.
+- Dropdown convenience `Add/Remove/SetItem...` methods operate directly on the active model and do not create duplicate state. They may remain as ergonomic control helpers unless audit finds a second authority.
 
-`GetLastRenderLayoutCount() == 1` after `SetItemRender(image); drop.Layout();`
+## THEME AUDIT
 
-`SetItemRender()` calls `RefreshLayout()`. A live U++ control may service that requested renderer layout before the following explicit `Layout()` call. That later no-op call can therefore correctly report zero new layouts. Forcing production code to lay out twice would weaken the renderer reuse contract merely to satisfy test scheduling.
+The Gallery corrective established an important rule: row/item presentation may be transparent, but a standalone model view must still have a coherent theme-aware viewport/surface.
 
-Published correction:
-- `ffc0ddb4402dcd7331ca2be3a60c631ea946d9de` — removes the caller-visible layout-turn assumption and verifies the durable invariants instead: exactly one collapsed renderer, custom renderer style survives cloning, selected row/text remain unchanged, and authoritative model content remains unchanged.
-- `dc355d98a612cac878c6da7d38b910a302dc1eaf` — records the layout/scheduling rule in `08_UI_MODEL_RENDERING_R2D.md`.
+Audit Light/Dark propagation for:
+- List standalone viewport versus transparent Minimal rows;
+- Tree surface/rows;
+- Table explicit table/header/selection colours;
+- Dropdown collapsed/popup surfaces;
+- Menu bar/popup/domain chrome;
+- NodeGraph canvas/node/edge styles;
+- Accordion/MatrixSelector/ColorMatrix theme-live styles despite their non-model status.
 
-Production `UiDropdown` code was intentionally not changed.
+Avoid hard-coded "dark mode fixes" where a semantic theme role can provide the surface. Also audit style-mutating setup calls that accidentally freeze a theme snapshot into custom style.
 
-R2D STATUS: **TEST FALSE-NEGATIVE CORRECTED — WINDOWS REVALIDATION REQUIRED.**
+## VALIDATION PLAN
 
-## LOCAL HYGIENE NOTE
+Add focused deterministic model-binding tests covering all seven true model views:
+- default internal ownership;
+- `Model()` identity and mutation;
+- external `SetModel` identity;
+- mutation through `Model()` updates the external object;
+- `ClearModel()` clears only the active model;
+- `UseInternalModel()` restores retained internal data;
+- switching never mirrors/copies data.
 
-Gary reported one pre-existing local-only working-tree change:
-`examples/UiGalleryDemo/UiGalleryDemo.upp` had a blank line at EOF, causing `git diff --check` to fail.
+Retain existing high-scale acceptance (`UiModelViewPerformanceTest` 52/0, `UiTreeScaleTest` 11/0) and add theme regressions only where the audit identifies real standalone surface defects.
 
-This change was not published and is unrelated to the source correction. Before final hygiene validation, revert that local file to remote `main` unless it contains intentional local work.
-
-Gary may continue to repair tiny obvious mechanical build issues locally and record the commit. Stop only for substantive rendering, model ownership, interaction, state, lifecycle, performance or architecture defects.
-
-## NEXT ACTION
-
-1. Fetch/pull live `main`; record exact HEAD.
-2. Remove/revert the stray local-only `UiGalleryDemo.upp` blank-line change so final hygiene is meaningful.
-3. Rebuild only if needed after pulling; previous Ui Debug source build at the Gallery gate was clean.
-4. Re-run `UiDropdownMenuRenderTest` Debug and Release: expected **11/0** each.
-5. If that gate passes, run `UiDropdownDemo` Release smoke: popup open/close, scrolling, selection, multi-check, reorder where enabled, Light/Dark; no freeze/crash.
-6. Run `UiMenuDemo` Release smoke: popup/submenus, check/radio, keyboard navigation, activation, Light/Dark; no freeze/crash.
-7. Finish with `git diff --check` and clean `git status --short`.
-
-Do not rerun the already accepted Gallery runtime stress unless a new shared-renderer change unexpectedly touches Gallery behavior.
+STATUS: **AUDIT IN PROGRESS — IMPLEMENTATION NOT YET COMPLETE.**
