@@ -102,6 +102,11 @@ void TestLazyPlaceholderLookup(TestCtx& t)
 
     t.Expect(tree.GetVisibleRowIndex(lazy) == 0 && tree.GetVisibleRowIndex(sibling) == 2,
              "lazy loading placeholder is not indexed as the node and later sibling keeps its exact projection row");
+
+    tree.MarkNodeChildrenLoaded(lazy, true);
+    tree.Layout();
+    t.Expect(!tree.IsNodeLoading(lazy) && tree.GetVisibleRowIndex(sibling) == 1,
+             "zero-child lazy completion clears its placeholder during the same projection rebuild");
 }
 
 } // namespace
