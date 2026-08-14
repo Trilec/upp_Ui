@@ -42,12 +42,14 @@ R2C TREE — PUBLISHED:
 - `83a870069f77debd7b32f24b93da9f2a15c70f13` — existing selection/keyboard/rename/lazy/DnD behavior reconnected to direct lookup.
 - `ce82e4cde7aa7a583cf29c5ef2dd7c65ee8d8f59` — package integrates split Tree sources.
 - `dacf857f41e6bf676bdf85bc604226a4ffa9b1f7` + `34a52481e5b32701a4bc397b7dc93e0f527cdcf7` — exact node-id → projection-row map made placeholder-safe; lazy placeholder rows are visible but never overwrite/shift the real node lookup.
-- `91993687f87614d60e59c9eec4680ee38d178baa` + `ef336e3a2ab2cca1e678c1c316083e76fde042bd` — focused `UiTreeScaleTest` package and deterministic 100,000-node acceptance.
+- `91993687f87614d60e59c9eec4680ee38d178baa` + `ef336e3a2ab2cca1e678c1c316083e76fde042bd` — focused `UiTreeScaleTest` package and initial deterministic 100,000-node acceptance.
+- `4cf7f6e4cb38f01140f09f7e911fef34169233ca` + `5aefaf5561e5c891751c1eb825ab3e90d31d2792` — lazy completion clears loading before projection rebuild; zero-child completion regression is covered deterministically.
 
 R2C TREE — BEHAVIOUR:
 - structural/expansion changes may rebuild the retained `visible_rows_` projection;
 - ordinary scrolling and Paint derive the first visible projection row arithmetically instead of scanning from row zero;
 - node-id → exact visible-row lookup is rebuilt with the projection and used by ScrollTo, selection ranges, drag ordering/drop targets, accessories and transient editor placement;
+- lazy placeholder rows are excluded from the id map, and a zero-child lazy completion removes the placeholder during the same model-notification rebuild;
 - primary row content and each visible data column are separate prepared `UiItemRender` surfaces for one logical Tree node;
 - renderer count remains bounded by visible/overscan rows and visible columns;
 - `SetColumnRender(...)` supports column-specific presentation;
@@ -56,12 +58,12 @@ R2C TREE — BEHAVIOUR:
 
 DETERMINISTIC R2C TARGETS:
 - `Utilities/UiModelViewPerformanceTest`: prior 39 + **11 Table checks = 50 checks total**. Expected Windows Debug and Release result: `Checks: 50, Fails: 0`.
-- `Utilities/UiTreeScaleTest`: **10 checks**. Expected Windows Debug and Release result: `Checks: 10, Fails: 0`.
+- `Utilities/UiTreeScaleTest`: **11 checks**. Expected Windows Debug and Release result: `Checks: 11, Fails: 0`.
 - Table coverage includes 100,000 rows, row 99,999 direct reach, bounded pools/Paint, narrow cell update without prefix rebuild, 2,000 columns, deep horizontal bounded Paint, one-resize/one-prefix rebuild, and per-column override.
-- Tree coverage includes a flat 100,000-node projection, exact final-node row lookup, bounded pools/Paint, final-node direct scroll, model-change lookup correctness, per-column override, and lazy-placeholder-safe row mapping.
+- Tree coverage includes a flat 100,000-node projection, exact final-node row lookup, bounded pools/Paint, final-node direct scroll, model-change lookup correctness, per-column override, lazy-placeholder-safe row mapping, and zero-child lazy completion cleanup.
 
 R2C STATIC REVIEW:
-- compare `63f4a649...` → `9113b052...`: ahead 25, behind 0 at review point; touched files are limited to item-render adapters, Table, Tree, tests, `Ui.upp`, scale docs and this recovery log. No UiDoc or Graph source is in the R2C diff.
+- compare `63f4a649...` → `0c6b63287e4a76750cbaf6afda4c7673cde91b77`: **ahead 29, behind 0**; touched files are limited to item-render adapters, Table, Tree, tests, `Ui.upp`, scale docs and this recovery log. No UiDoc or Graph source is in the R2C diff.
 - `Ui.upp` contains `UiItemRenderData.cpp`, all four split Table sources and all three split Tree sources.
 - current Table API/source contains no `WhenPaintCell` or `WhenPaintHeader` competing renderer authority.
 - current Tree source contains no `UiFindVisibleRowIndex`; direct lookup replaces repeated projection scans.
@@ -71,11 +73,13 @@ R2C STATIC REVIEW:
 - no Windows/U++ compile/runtime result is claimed from this implementation environment.
 
 DOCUMENTATION:
-- `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md` updated at `9113b052ecbeb38ca407c939a3bf95efc5b2c3ae` to document implemented R2C Table/Tree geometry, renderer pools, ownership boundaries and deterministic acceptance.
+- `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md` is current through `0c6b63287e4a76750cbaf6afda4c7673cde91b77` and documents implemented R2C Table/Tree geometry, renderer pools, lazy lifecycle, ownership boundaries and deterministic acceptance.
 - `docs/07_UI_MODEL_RENDERING_PLAN.md` remains the architectural authority; R2C implements its Tree/Table stage without introducing a second layout/render authority.
+
+RECOVERY CHECKPOINT: `0c6b63287e4a76750cbaf6afda4c7673cde91b77` contains all substantive R2C source, test and public-documentation work. This `ACTIVE_WORK` commit only records the exact continuation/validation state.
 
 TOUCHED R2C SLICE: `Ui/UiItemRender.h`, `Ui/UiItemRenderData.cpp`, `Ui/UiTable.*`, `Ui/UiTableModelView.cpp`, `Ui/UiTableRender.cpp`, `Ui/UiTablePaint.cpp`, `Ui/UiTableInteraction.cpp`, `Ui/UiTree.*`, `Ui/UiTreeModelView.cpp`, `Ui/UiTreeRender.cpp`, `Ui/UiTreeInteraction.cpp`, `Ui/Ui.upp`, `Utilities/UiModelViewPerformanceTest/main.cpp`, `Utilities/UiTreeScaleTest/*`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`, `docs/ACTIVE_WORK.md`.
 
 STATUS: **R2C TREE + TABLE IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
 
-NEXT ACTION: fetch/verify exact final remote `main`; incorporate Gary's R2A/R2B result if it appears. Then Windows-validate combined R2C: Ui Debug compile, `UiModelViewPerformanceTest` Debug/Release 50/0, `UiTreeScaleTest` Debug/Release 10/0, plus focused Table/Tree interaction/theme smoke. Only tiny mechanical compile fixes are Gary scope; substantive model/render/view issues return to implementation.
+NEXT ACTION: fetch/verify exact final remote `main`; incorporate Gary's R2A/R2B result if it appears. Then Windows-validate combined R2C: Ui Debug compile, `UiModelViewPerformanceTest` Debug/Release 50/0, `UiTreeScaleTest` Debug/Release 11/0, plus focused Table/Tree interaction/theme smoke. Only tiny mechanical compile fixes are Gary scope; substantive model/render/view issues return to implementation.
