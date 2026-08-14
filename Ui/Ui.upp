@@ -135,6 +135,7 @@ file
 	UiList.h,
 	UiList.cpp,
 	UiListModelView.cpp,
+	UiListRender.cpp,
 	UiListPaint.cpp,
 	UiListInteraction.cpp,
 	UiGallery.h,
