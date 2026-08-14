@@ -25,10 +25,13 @@ void UiList::HandleModelChange(const UiModelChange& change)
     SyncModel();
 
     if(change.kind == UI_MODEL_UPDATE) {
-        UiVisibleRange visible = GetVisibleRange();
         int start = max(0, change.a);
         int count = max(1, change.b);
         int end = start + count - 1;
+        InvalidateItemRenderData(start, end);
+        PrepareItemRenders();
+
+        UiVisibleRange visible = GetVisibleRange();
         if(!visible.IsEmpty() && end >= visible.first && start <= visible.last) {
             int a = max(start, visible.first);
             int b = min(end, visible.last);
@@ -40,6 +43,7 @@ void UiList::HandleModelChange(const UiModelChange& change)
         return;
     }
 
+    InvalidateItemRenderData();
     RefreshLayout();
     Refresh();
 }
