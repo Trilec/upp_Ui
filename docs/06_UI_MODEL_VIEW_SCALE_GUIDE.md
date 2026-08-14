@@ -76,6 +76,14 @@ records enter the useful range, and retain their models as the sole semantic
 authority. Renderer prototypes can be replaced without changing the view's
 selection, hierarchy, scrolling, editing or topology rules.
 
+`UiItemRenderImage` treats vertical Gallery presentation as a genuinely scalable
+tile presentation. Theme-provided text fonts are resolved during renderer
+`Layout()` and can step down through a small bounded ladder when the allocated tile
+becomes compact. Horizontal List presentation keeps the normal theme fonts, and an
+explicit custom title font from model data is not silently rescaled. The resolved
+fonts are cached with the item geometry so `Paint()` never performs font sizing or
+layout work.
+
 ## UiGallery
 
 `UiGallery` is a fluid, wrapping visual item view backed by `UiListModel`.
@@ -117,10 +125,23 @@ release call. `CancelMode()` never calls `ReleaseCapture()`. This is required on
 Win32/U++ because capture release can synchronously re-enter `CancelMode()`; a
 release from inside that callback would recurse until stack overflow.
 
-The theme-driven Gallery viewport uses the current List palette/metrics but not a
-List row/nine-slice skin. Gallery is one viewport surface, so retaining a row skin
-can leave a stale light raster when switching to Dark mode. Custom Gallery styles
-may still provide their own explicit skin.
+The theme-driven Gallery viewport derives row/content palette information from the
+current List role but is itself a complete visual surface. The Minimal List role
+may intentionally resolve its normal row face to `UiFill::None()` so a List can
+blend into an owning surface. Gallery must not convert that intentional
+transparency into platform `SColorPaper()`; when its List-derived face is `NONE`,
+Gallery resolves that face through the current theme's Panel/Surface role. This
+preserves lightweight embedded List semantics while giving a standalone Gallery a
+real dark viewport in Dark mode. Gallery also drops List row/nine-slice skin for
+its viewport so a stale light raster cannot survive a theme switch. Custom Gallery
+styles may still provide an explicit skin/fill.
+
+Theme-aware demos and hosts must also distinguish **content setters** from
+**style-mutating setters**. Calling a setter that enters `StyleEdit()` can
+legitimately create a local custom style and therefore freeze the currently
+resolved theme snapshot. The Gallery showcase keeps its `UiGroupPanel` header on
+its theme-driven style and places transparent layout regions on a theme-aware
+`UiPanel` surface; it does not hardcode a separate dark-demo palette.
 
 Variable-height/masonry layout is intentionally outside the current high-scale
 contract. If added later it must declare its retained geometry/cache cost rather
@@ -244,8 +265,10 @@ and Release with `Fails: 0`. It covers:
 capture/theme/presentation behavior. It contains **11 checks** covering bounded
 renderers, explicit selection/marquee frames, semantic zoom notification,
 Dark-mode viewport styling, Paint-without-relayout and passive `CancelMode()` when
-no Gallery marquee is active. Windows Debug/Release execution remains pending for
-this corrective suite.
+no Gallery marquee is active. At checkpoint `d78f161...`, Windows Debug and Release
+both reached 10/11: the sole failure proved that a transparent Minimal List face
+was not resolving to a concrete dark Gallery surface. The Panel/Surface fallback
+was subsequently corrected and now requires Windows revalidation.
 
 These tests verify geometry, renderer-pool bounds, renderer-layout counts and paint
 visit counts rather than fragile elapsed-time thresholds. Windows Debug/Release
