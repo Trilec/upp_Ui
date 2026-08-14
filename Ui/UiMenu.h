@@ -17,6 +17,11 @@
 
     Thread context
     - GUI thread only.
+
+    Model ownership
+    - Model() always returns the model currently driving the Menu. The control
+      owns an internal UiMenuModel by default; SetModel(...) switches to an
+      external model and UseInternalModel() switches back without copying.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -108,8 +113,15 @@ public:
 
     UiMenu& SetModel(UiMenuModel& model);
     UiMenu& UseInternalModel();
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiMenuModel& Model() { return *model_; }
+    const UiMenuModel& Model() const { return *model_; }
+    UiMenu& ClearModel() { Model().Clear(); return *this; }
+
     UiMenu& EnableInternalMutation(bool on = true);
     bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiMenuModel& GetInternalModel() { return internal_model_; }
     UiMenuModel& GetModel() { return *model_; }
     const UiMenuModel& GetModel() const { return *model_; }
