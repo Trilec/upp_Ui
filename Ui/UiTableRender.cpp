@@ -32,7 +32,7 @@ One<UiItemRender> MakeTableBasicRender(const UiTable::Style& table, bool header,
 
     Color ink = header ? table.header_ink : table.cell_ink;
     for(int i = 0; i < 4; i++) {
-        style.palette.face[i] = UiFill();
+        style.palette.face[i] = UiFill::None();
         style.palette.frame[i] = Null;
         style.palette.ink[i] = ink;
         style.palette.icon[i] = ink;
@@ -100,11 +100,18 @@ UiTable& UiTable::SetColumnCellRender(int col, const UiItemRender& render)
 {
     if(col < 0)
         return *this;
-    int q = column_cell_renders_.Find(col);
-    if(q < 0)
-        column_cell_renders_.Add(col, render.Clone());
-    else
-        column_cell_renders_[q] = render.Clone();
+    for(int i = 0; i < column_cell_renders_.GetCount(); i++) {
+        if(column_cell_renders_[i].column == col) {
+            column_cell_renders_[i].render = render.Clone();
+            ResetRenderPools();
+            RefreshLayout();
+            Refresh();
+            return *this;
+        }
+    }
+    ColumnCellRenderOverride& item = column_cell_renders_.Add();
+    item.column = col;
+    item.render = render.Clone();
     ResetRenderPools();
     RefreshLayout();
     Refresh();
@@ -113,13 +120,14 @@ UiTable& UiTable::SetColumnCellRender(int col, const UiItemRender& render)
 
 UiTable& UiTable::ClearColumnCellRender(int col)
 {
-    int q = column_cell_renders_.Find(col);
-    if(q >= 0) {
-        column_cell_renders_.Remove(q);
-        ResetRenderPools();
-        RefreshLayout();
-        Refresh();
-    }
+    for(int i = column_cell_renders_.GetCount() - 1; i >= 0; i--)
+        if(column_cell_renders_[i].column == col) {
+            column_cell_renders_.Remove(i);
+            ResetRenderPools();
+            RefreshLayout();
+            Refresh();
+            break;
+        }
     return *this;
 }
 
@@ -143,9 +151,9 @@ const UiItemRender& UiTable::GetRowHeaderRender() const
 
 const UiItemRender& UiTable::ResolveCellRender(int col) const
 {
-    int q = column_cell_renders_.Find(col);
-    if(q >= 0 && column_cell_renders_[q])
-        return *column_cell_renders_[q];
+    for(int i = 0; i < column_cell_renders_.GetCount(); i++)
+        if(column_cell_renders_[i].column == col && column_cell_renders_[i].render)
+            return *column_cell_renders_[i].render;
     return GetCellRender();
 }
 
