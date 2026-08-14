@@ -190,6 +190,7 @@ private:
         btn_theme_.WhenAction = [=] { ToggleTheme(); UpdateStatus(); };
         list_.WhenSelection = [=] { UpdateStatus(); };
         gallery_.WhenSelection = [=] { UpdateStatus(); };
+        gallery_.WhenZoom = [=](double) { UpdateStatus(); };
         gallery_.WhenVisibleRange = [=](int, int) { UpdateStatus(); };
     }
 
