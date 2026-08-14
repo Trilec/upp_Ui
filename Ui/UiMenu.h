@@ -1,12 +1,7 @@
-﻿#ifndef _Ui_UiMenu_h_
+#ifndef _Ui_UiMenu_h_
 #define _Ui_UiMenu_h_
 
 /*
-    Author
-    - C Edwards (dodobar)
-
-    License
-    - Apache License 2.0, matching this repository's LICENSE file.
     UiMenu
     ======
 
@@ -14,23 +9,14 @@
     - Styled, model-driven menu and menu-bar control backed by UiMenuModel.
 
     Intent
-    - Keep command/menu structure in the model while the control owns only
-      popup stack, hot-item, anchor, and transient open-state behavior.
-    - Render popup rows directly and share one menu core for popup and top-bar
-      usage.
+    - Keep command/menu structure in UiMenuModel.
+    - Reuse UiItemRender for ordinary popup icon/title/description/right-content
+      composition while Menu retains check/radio/submenu/command chrome.
+    - Keep popup renderer instances bounded to visible popup rows and prepare
+      their geometry outside Paint().
 
     Thread context
     - GUI thread only.
-
-    Usage
-    - Bind an external model with SetModel(...) or populate GetInternalModel().
-    - Use SetMenuBarMode(true) for an embedded top bar or PopUp(...) for popup
-      menu usage.
-
-    Changelog
-    - 2026-03: introduced as the first-pass Ui menu foundation.
-    - 2026-03-31: fixed a Win32 submenu first-row paint artifact by buffering
-      radio glyph rendering before compositing popup rows.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -38,6 +24,7 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
 
 namespace Upp {
 
@@ -127,6 +114,12 @@ public:
     UiMenuModel& GetModel() { return *model_; }
     const UiMenuModel& GetModel() const { return *model_; }
 
+    UiMenu& SetItemRender(const UiItemRender& render);
+    const UiItemRender& GetItemRender() const;
+    int GetLiveItemRenderCount() const;
+    int GetLastRenderLayoutCount() const;
+    int GetLastPaintItemCount() const;
+
     UiMenu& SetMenuBarMode(bool on = true);
     bool IsMenuBarMode() const { return menu_bar_mode_; }
 
@@ -156,6 +149,11 @@ private:
     public:
         typedef PopupLevel CLASSNAME;
 
+        struct RenderSlot {
+            One<UiItemRender> render;
+            int index = -1;
+        };
+
         PopupLevel();
 
         void Init(UiMenu* owner, int level);
@@ -166,6 +164,7 @@ private:
         int GetItemCount() const;
         bool IsOverRow(Point p) const;
         Rect GetRowRect(int index) const;
+        Rect GetContentRect(int index) const;
         int HitTestRow(Point p) const;
         int GetVisibleStart() const;
         int GetVisibleCount() const;
@@ -173,6 +172,12 @@ private:
         void EnsureVisible(int index);
         void SyncScrollBar();
         void SyncWindowRegion();
+        void ResetRenderPool();
+        void PrepareItemRenders();
+        const UiItemRender* FindPreparedRender(int index) const;
+        int GetLiveItemRenderCount() const { return render_pool_.GetCount(); }
+        int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
+        int GetLastPaintItemCount() const { return last_paint_item_count_; }
 
         virtual void Paint(Draw& w) override;
         virtual void Layout() override;
@@ -190,6 +195,11 @@ private:
         int hot_index_ = -1;
         int pressed_index_ = -1;
         VScrollBar vscroll_;
+        Array<RenderSlot> render_pool_;
+        int prepared_first_ = -1;
+        int prepared_last_ = -1;
+        int last_render_layout_count_ = 0;
+        mutable int last_paint_item_count_ = 0;
     };
 
     Style& StyleEdit();
@@ -198,6 +208,15 @@ private:
     void SyncModel();
     void BindModel(UiMenuModel& model);
     void OnBoundModelChange(UiMenuModel* observed, const UiModelChange& change);
+
+    void ConfigureDefaultItemRender();
+    void EnsureItemRender();
+    void ResetItemRenderPools();
+    UiItemRenderData MakeMenuRenderData(UiMenuNodeRef node, const UiMenuItem& item) const;
+    Rect GetPopupContentRect(const Rect& row, UiMenuNodeRef node, const UiMenuItem& item) const;
+    void PaintPopupRowChrome(Draw& w, const Rect& row, UiMenuNodeRef node,
+                             const UiMenuItem& item, bool hot, bool pressed) const;
+
     void BeginSession();
     void EndSession(bool notify_close = true);
     void ScheduleSessionVerify();
@@ -223,7 +242,8 @@ private:
     bool IsSelectable(const UiMenuItem& item, UiMenuNodeRef node) const;
     bool HasSubMenu(UiMenuNodeRef node) const;
     void PaintTopBar(Draw& w) const;
-    void PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node, const UiMenuItem& item, bool hot, bool pressed, bool top_bar) const;
+    void PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node,
+                      const UiMenuItem& item, bool hot, bool pressed, bool top_bar) const;
     UiMenuNodeRef GetChildNode(UiMenuNodeRef parent, int index) const;
     void OnPopupDeactivate(int level);
     bool IsMenuCtrl(const Ctrl* ctrl) const;
@@ -239,8 +259,9 @@ private:
     Vector<UiMenuModel*> bound_models_;
     mutable int model_revision_ = -1;
 
-    // UiMenu has one control-relative timer. U++ timer ids are byte offsets
-    // within the Ctrl object, so the default slot is the valid stable choice.
+    One<UiItemRender> item_render_;
+    bool custom_item_render_ = false;
+
     static const int VERIFY_SESSION_CB = 0;
 
     bool menu_bar_mode_ = false;
@@ -263,4 +284,3 @@ private:
 }
 
 #endif
-

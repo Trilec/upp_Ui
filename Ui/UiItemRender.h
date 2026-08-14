@@ -11,7 +11,7 @@
     Intent
     - Keep semantic data independent of view geometry and live Ctrl count.
     - Reuse the same presentation objects for List rows, Gallery tiles, Tree/Table
-      cells and headers, and later Graph node content.
+      cells and headers, Dropdown/Menu rows, and later Graph node content.
     - Keep renderer layout prepared outside Paint(); Paint and HitTest consume
       only cached geometry for the currently bound visible surface.
 
@@ -99,6 +99,7 @@ UiItemRenderData UiMakeItemRenderData(const UiModelItem& item);
 UiItemRenderData UiMakeItemRenderData(const UiModelColumn& column, bool enabled = true);
 UiItemRenderData UiMakeItemRenderData(const UiTableCell& cell, const String& display);
 UiItemRenderData UiMakeItemRenderData(const UiTableHeader& header, const String& display);
+UiItemRenderData UiMakeItemRenderData(const UiMenuItem& item, const String& right_text = String());
 
 struct UiItemRenderStyle : Moveable<UiItemRenderStyle> {
     StyledPalette palette;
