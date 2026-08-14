@@ -141,6 +141,7 @@ file
 	UiGallery.h,
 	UiGallery.cpp,
 	UiGalleryModel.cpp,
+	UiGalleryRender.cpp,
 	UiGalleryPaint.cpp,
 	UiGalleryInteraction.cpp,
 	UiBezierCurveEditor.h,
