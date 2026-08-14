@@ -1,8 +1,10 @@
 # ACTIVE WORK
 
-CURRENT REMOTE BASE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merge of Gary's R2C demo-fix commit `1743fcbe4aee8d257015194910a9a6efc47c2726` with the published R2D checkpoint `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
+CURRENT REMOTE HEAD: `1a69143bb317e7325b1160c9f747b1ffa3f38f10` — Gallery corrective/R2D validation continuation checkpoint. Parent `f69fd6c1fb3259db9dd9a72e1e750ff3c0edd954` is the exact Windows stop-report HEAD; `1a69143...` is the published three-line Dropdown compile fix.
 
-CURRENT TASK: `UI-GALLERY-CORRECTIVE + R2C-ACCEPTANCE-RECONCILIATION`.
+CURRENT BASELINE MERGE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merge of Gary's R2C demo-fix commit `1743fcbe4aee8d257015194910a9a6efc47c2726` with the published R2D checkpoint `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
+
+CURRENT TASK: `UI-GALLERY-CORRECTIVE + R2D-WINDOWS-VALIDATION`.
 
 Remote GitHub is authoritative. Never force-update `main`.
 
@@ -60,6 +62,42 @@ Implemented state:
 - `Utilities/UiDropdownMenuRenderTest`: expected Windows Debug/Release **Checks: 11, Fails: 0**; still pending platform execution.
 - public implementation note: `docs/08_UI_MODEL_RENDERING_R2D.md`.
 
+### R2D Windows stop report and compile fix
+
+Gary started the combined Gallery corrective + R2D validation at exact published HEAD `f69fd6c1fb3259db9dd9a72e1e750ff3c0edd954`, with a clean working tree and no local work at risk.
+
+The Ui package stopped with exactly three compile errors in `Ui/UiDropdownPopup.cpp`:
+
+```text
+UiDropdownPopup.cpp:336:11: error: must use 'struct' tag to refer to type 'Style' in this scope
+UiDropdownPopup.cpp:383:11: error: must use 'struct' tag to refer to type 'Style' in this scope
+UiDropdownPopup.cpp:478:11: error: must use 'struct' tag to refer to type 'Style' in this scope
+```
+
+Root cause was confirmed rather than guessed: `UiDropdown::PopupWindow` derives from `TopWindow`, whose non-type member `TopWindow& Style(dword)` hides the unqualified nested `UiDropdown::Style` type name inside `PopupWindow` member-function scope on Windows/Clang.
+
+Published fix: `1a69143bb317e7325b1160c9f747b1ffa3f38f10` — **`UiDropdownPopup qualifies nested style in TopWindow scope`**.
+
+The commit changes exactly three lines and nothing else:
+
+```cpp
+const UiDropdown::Style& style = owner->GetEffectiveStyle();
+```
+
+in:
+- `UiDropdown::PopupWindow::SyncScrollBarState()`
+- `UiDropdown::PopupWindow::GetItemContentRect()`
+- `UiDropdown::PopupWindow::Paint()`
+
+The ordinary unqualified `const Style&` inside `UiDropdown` members remains unchanged because it is not in `TopWindow` scope. GitHub commit review confirms the published diff is exactly the three intended qualifications.
+
+Gary correctly stopped before running any blocked tests/demos. At the stop-report HEAD:
+- `git diff --check`: PASS.
+- `git status --short`: clean.
+- no local commits/source edits/pushes.
+
+R2D validation status: **COMPILE BLOCKER FIX PUBLISHED — WINDOWS REVALIDATION REQUIRED.**
+
 ## GALLERY CORRECTIVE — PUBLISHED SOURCE
 
 The Gallery defects found during R2A/R2B Windows acceptance have now been corrected in source on top of merged `main`.
@@ -106,21 +144,27 @@ Already accepted:
 - `UiModelViewPerformanceTest`: Debug **52/0**, Release **52/0**.
 - `UiTreeScaleTest`: Debug **11/0**, Release **11/0**.
 
-Pending Windows execution:
+Pending Windows execution after `1a69143...`:
+- Ui Debug source compile must clear the previous three Dropdown errors.
 - `UiGalleryRegressionTest`: expected Debug/Release **Checks: 11, Fails: 0**.
 - `UiDropdownMenuRenderTest`: expected Debug/Release **Checks: 11, Fails: 0**.
 
 ## CURRENT TOUCHED CORRECTIVE SLICE
 
-`Ui/UiGallery.h`, `Ui/UiGallery.cpp`, `Ui/UiGalleryPaint.cpp`, `Ui/UiGalleryInteraction.cpp`, `examples/UiGalleryDemo/main.cpp`, `Utilities/UiGalleryRegressionTest/*`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`, `docs/ACTIVE_WORK.md`.
+Gallery: `Ui/UiGallery.h`, `Ui/UiGallery.cpp`, `Ui/UiGalleryPaint.cpp`, `Ui/UiGalleryInteraction.cpp`, `examples/UiGalleryDemo/main.cpp`, `Utilities/UiGalleryRegressionTest/*`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`.
 
-The Gallery source/test slice from merge base `a4f81014617dd758893e7cfc105a8a1f4ff24130` through `1c6f0729f2dd2ca74b18d19f7a584d66586f252a` was ahead-only (9 commits, 0 behind) and touched no unrelated control implementation. Subsequent documentation commits only record this accepted/corrective state.
+R2D Windows compile fix: `Ui/UiDropdownPopup.cpp` only, exactly three type qualifications.
+
+Recovery state: `docs/ACTIVE_WORK.md`.
 
 ## NEXT ACTION
 
-Windows validate the Gallery correction at final remote `main`:
-1. Ui Debug source compile.
-2. `UiGalleryRegressionTest` Debug and Release: 11/0 each.
-3. `UiGalleryDemo` Release build/run: marquee drag/release/Escape/capture-loss must never stack-overflow; selected tiles and marquee frame must remain clearly visible; marquee fill must not wash over tile content; Dark mode must give a genuinely dark Gallery surface; Ctrl+wheel zoom must update the displayed zoom percentage and retain a sensible pointer anchor.
-4. R2D Dropdown/Menu Windows validation can be performed in the same sweep using `UiDropdownMenuRenderTest` 11/0 and the existing Dropdown/Menu demos.
-5. Apply the one-line `UiListDemo` `BuilderDemoSupport.h` include when doing that demo's next Windows build, unless a safe narrow-edit publication path has already done so.
+Resume Windows validation at exact final remote `main` (currently `1a69143bb317e7325b1160c9f747b1ffa3f38f10` before this ACTIVE_WORK checkpoint):
+1. Refresh/fetch and record the exact new final HEAD after this documentation commit.
+2. Re-run Ui Debug source compile first. The three `UiDropdownPopup.cpp` `Style` errors must be gone. Stop on the first new substantive compile/runtime failure.
+3. Run `UiGalleryRegressionTest` Debug and Release: 11/0 each.
+4. Build/run `UiGalleryDemo` Release: marquee drag/release/Escape/capture-loss must never stack-overflow; selected tiles and marquee frame must remain clearly visible; marquee fill must not wash over tile content; Dark mode must give a genuinely dark Gallery surface; Ctrl+wheel zoom must update the displayed zoom percentage and retain a sensible pointer anchor.
+5. Run `UiDropdownMenuRenderTest` Debug and Release: 11/0 each.
+6. Build/run `UiDropdownDemo` and `UiMenuDemo` Release for popup scrolling/selection/multi-check/drag reorder and Menu check/radio/submenu/keyboard/theme behavior.
+7. `git diff --check` and final clean status.
+8. Apply the one-line `UiListDemo` `BuilderDemoSupport.h` include only when that demo is next deliberately built/touched; it is not a blocker for this resumed validation.
