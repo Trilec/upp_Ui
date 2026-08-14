@@ -4,46 +4,61 @@ BASE: `a0b07fad20c034dd5096335af591a971f9857f0a` — verified live `main` at R2D
 
 TASK: `UI-MODEL-RENDERING-R2D` — converge Dropdown and Menu on the shared model/render architecture.
 
-AUTHORITATIVE PLAN: `docs/07_UI_MODEL_RENDERING_PLAN.md`. Remote GitHub is authoritative. No compatibility/shim requirement; preserve one model authority and one presentation authority. Never force-update `main`.
+AUTHORITATIVE ARCHITECTURE: `docs/07_UI_MODEL_RENDERING_PLAN.md`. R2D implementation contract: `docs/08_UI_MODEL_RENDERING_R2D.md`. Remote GitHub is authoritative. Never force-update `main`.
 
-PUBLISHED FOUNDATION:
-- R2A: `UiItemRenderData`, non-Ctrl `UiItemRender`, Basic/Image, dirty-gated prepared layout, theme/style integration.
-- R2B: List + Gallery bounded renderer pools, shared 10k demo, Gallery zoom/marquee, 100k deterministic scale acceptance.
-- R2C substantive checkpoint: `0c6b63287e4a76750cbaf6afda4c7673cde91b77`; recovery log: `a0b07fad20c034dd5096335af591a971f9857f0a`. Table has direct 100k-row/variable-column geometry plus cell/header renderer pools. Tree has direct visible-row lookup, bounded primary/column renderer pools and 100k-node acceptance.
+PRIOR WINDOWS EVIDENCE:
+- Gary tested R2A/R2B at `63f4a6498fca55b47489871e60ab90a2cda4865b`: Ui Debug source compile PASS, 0 warnings/errors; `UiModelViewPerformanceTest` Debug/Release **41/41 PASS**; Gallery demo Release builds/launches.
+- R2C adds 11 Table checks, so current combined `UiModelViewPerformanceTest` target is **52 checks**, not the stale 50 previously recorded. `UiTreeScaleTest` remains **11 checks**.
+- Gary's R2A/R2B Gallery acceptance found a real separate defect: `UiGallery::CancelMode()` calls `ReleaseCapture()` during capture teardown, causing recursive `CancelMode -> ReleaseCapture -> CancelMode` and Win32 stack overflow. Gallery dark-surface, marquee visibility/selection-frame and zoom-text issues are also still open. R2D does not claim those fixed.
 
-WINDOWS EVIDENCE RECEIVED:
-- Gary tested R2A/R2B at `63f4a6498fca55b47489871e60ab90a2cda4865b`: Ui Debug source compile PASS, 0 warnings/errors; `UiModelViewPerformanceTest` Debug/Release **41/41 PASS**; `UiGalleryDemo` Release builds/launches.
-- Therefore the combined R2C `UiModelViewPerformanceTest` target is **52 checks**, not the stale 50 previously recorded: 41 accepted pre-Table checks + 11 Table checks. `UiTreeScaleTest` target remains **11 checks**.
-- Gallery acceptance also found a real R2B defect outside R2D scope: `UiGallery::CancelMode()` recursively calls `ReleaseCapture()` during capture teardown, producing Win32 stack overflow. Gallery dark-theme/marquee visibility/zoom-text issues are separately recorded in chat and must be corrected before final renderer-family closure.
+R2D DROPDOWN — PUBLISHED:
+- `7bdd240a678778f8f4170e84de14e1b4dfa3e9c9` — R2D recovery/audit start.
+- `8a3198c21f4bdccd4c091d29168e7a66867f1118` — new direct-model/render public contract.
+- `caa283ef2bf2125465bbcda68ca38e24640f1f11` — removes parallel `Vector<Item>` mirror and model conversion/sync authority; direct `UiListModel` operations plus collapsed shared renderer.
+- `96cc9414d4e868a26c8563135c41371e6d92e83c` — bounded visible popup renderer pool, popup geometry/renderer preparation outside Paint, direct-model popup selection/check/drag behavior.
+- `d9b38fc61c7511e00e6e3f1de74ff20e2c155223` — package includes `UiDropdownPopup.cpp`.
+- `ed5feccd6bcac39ef21979ce2a7dab4277b4737c` — `UiDropdown::Item` retained only as a direct `using Item = UiModelItem` spelling so existing demo/PropertyEditor source remains source-compatible without a second object type or state. Primary API/documentation uses `UiModelItem`.
 
-R2D AUDIT AT BASE:
-- `UiDropdown` binds `UiListModel` but also mirrors every row into `Vector<UiDropdown::Item> items_`, with `ToModelItem`, `FromModelItem`, `SyncItemsFromModel`, mutable `GetItem()` and a competing `WhenPaintItem` popup paint authority. This violates one-authoritative-state and shared-renderer goals.
-- Dropdown popup already paints only visible rows, but row content layout/paint is one-off and `PopupWindow::Paint()` calls scrollbar-state synchronization. R2D should make popup geometry/render preparation happen outside Paint.
-- `UiMenuModel` is already authoritative and domain-specific. `UiMenu` still manually lays out icon/text/description/right content for each row. Check/radio/shortcut/submenu/command semantics correctly remain Menu-owned.
-- Existing external `UiDropdown::Item` callers are limited to `examples/UiDropdownDemo` and PropertyEditor sources and can be migrated directly to `UiModelItem`; no compatibility alias is required.
+R2D DROPDOWN — RESULT:
+- `UiListModel` is the sole item-state authority for internal and external models.
+- No `items_`, `SyncItemsFromModel`, `ToModelItem`, `FromModelItem` or `RefreshFromModel` mirror path remains.
+- No competing Dropdown item-paint callback remains; `SetItemRender(const UiItemRender&)` is the item-presentation extension point.
+- collapsed face uses one prepared renderer instance; popup keeps only visible-row renderer instances.
+- default renderer is content-only `UiItemRenderBasic` configured from Dropdown style/theme.
+- Dropdown retains popup surface, group/separator, selection/check marker, badge, indicator, typeahead, drag handle/reorder and popup lifetime semantics.
+- popup scrollbar/visible geometry and renderer layout are prepared from Layout/scroll/model/style paths, not from popup Paint.
 
-R2D TARGET — DROPDOWN:
-- remove `UiDropdown::Item` and `items_` mirror entirely;
-- make `UiListModel` the sole row authority for both internal and external models;
-- expose/add/mutate `UiModelItem` directly through explicit model-backed APIs; remove mutable direct item references and `RefreshFromModel` mirror semantics;
-- replace popup `WhenPaintItem` authority with `SetItemRender(const UiItemRender&)` and a bounded visible popup renderer pool;
-- default popup renderer is theme-aware `UiItemRenderBasic` configured for Dropdown row content; Dropdown retains selection/check markers, group/separator, drag handle/reorder, popup chrome and scroll semantics;
-- collapsed face may reuse prepared renderer content where it simplifies icon/text presentation, while Dropdown keeps indicator and multi-select badge chrome;
-- renderer layout/scrollbar geometry must be prepared outside Paint.
+R2D MENU — PUBLISHED:
+- `f0c2bc683cbaa3a8dadeef32eba073c44d84c7a3` + `58df0ac8ffa23c98cdf0e178feec97ddcd85ea4a` — shared `UiMenuItem` -> `UiItemRenderData` adapter contract/implementation.
+- `972cbf349feb0fd550448460c1df8f1334f3bd29` — Menu popup shared-render public/pool contract.
+- `03bfb16474ba2be459857e69e550091f96ceba1f` — popup ordinary content uses bounded prepared shared renderers while Menu keeps domain chrome and command/session behavior.
 
-R2D TARGET — MENU:
-- add `UiMakeItemRenderData(const UiMenuItem&, ...)` shared adapter;
-- add default/custom Menu content renderer slot(s), using bounded popup renderer instances and prepared geometry outside Paint;
-- renderer handles ordinary icon/title/description/right-content composition;
-- Menu keeps check/radio glyphs, submenu arrow, separator, shortcut/command interaction, popup stack, hot/pressed backgrounds and bar/session semantics;
-- model remains `UiMenuModel`; do not force Menu into `UiListModel` or `UiModelItem` inheritance.
+R2D MENU — RESULT:
+- `UiMenuModel` remains the authoritative domain model; Menu is not forced into `UiListModel` or `UiModelItem` inheritance.
+- renderer handles popup icon/title/optional description/shortcut-or-right text/default-item emphasis.
+- Menu retains check/radio glyphs, submenu arrow, separator, hot/pressed popup chrome, top menu bar, command activation/request-first mutation, popup stack/session/focus semantics.
+- each open popup level owns only a visible-row renderer pool; a closed menu allocates no per-model renderer objects.
+- popup Paint consumes prepared renderer geometry and does not prepare renderer layout.
 
-IMPLEMENTATION RHYTHM:
-1. Dropdown model-authority/public API migration + caller migration; publish and verify.
-2. Dropdown popup renderer pool/lifecycle + deterministic tests; publish and verify.
-3. Menu shared render adapter/pool + tests; publish and verify.
-4. Update model-render docs and this recovery log; static diff/package review; Windows validation handoff.
+R2D TEST/DOC CHECKPOINTS:
+- `fe9ff5771da5ee4b061952dd70105ccd8ded56b5` + `e01d14be4c1149b208ab032ff2783af882c06e61` — focused `Utilities/UiDropdownMenuRenderTest` package and initial 11-check contract test.
+- `b67553ebd2d7bf30a48931effab2eac965fdc95d` — test made RTTI-independent while preserving 11 checks.
+- `01d3dc82c5a86fcf4a251fc6bcdd8e9dd0ee3e4a` — public R2D implementation documentation.
 
-STATUS: **R2D IN PROGRESS — DROPDOWN FIRST.**
+DETERMINISTIC TARGETS AFTER R2D:
+- `Utilities/UiModelViewPerformanceTest`: **52 checks**, expected `Checks: 52, Fails: 0` Debug/Release.
+- `Utilities/UiTreeScaleTest`: **11 checks**, expected `Checks: 11, Fails: 0` Debug/Release.
+- `Utilities/UiDropdownMenuRenderTest`: **11 checks**, expected `Checks: 11, Fails: 0` Debug/Release.
 
-NEXT: rewrite `UiDropdown` around direct `UiListModel`, migrate current `UiDropdown::Item` callers to `UiModelItem`, then publish the first recoverable R2D checkpoint before Menu changes.
+R2D STATIC REVIEW:
+- compare R2C base `a0b07fad...` -> substantive R2D doc checkpoint `01d3dc82...`: R2D is ahead-only; touched slice is limited to Dropdown/Menu, shared item-render adapter, `Ui.upp`, focused tests and R2D docs/recovery state.
+- `Ui.upp` includes `UiDropdownPopup.cpp`.
+- Dropdown mirror/helper searches return no `items_`, `SyncItemsFromModel`, `ToModelItem`, `FromModelItem`, `RefreshFromModel` or Dropdown `WhenPaintItem` authority.
+- renderer pool ownership uses `Array` + `One<UiItemRender>`; no renderer per logical item is stored.
+- no Windows/U++ compile/runtime result is claimed for R2C/R2D from this implementation environment.
+
+TOUCHED R2D SLICE: `Ui/UiDropdown.h`, `Ui/UiDropdown.cpp`, `Ui/UiDropdownPopup.cpp`, `Ui/UiMenu.h`, `Ui/UiMenu.cpp`, `Ui/UiItemRender.h`, `Ui/UiItemRenderData.cpp`, `Ui/Ui.upp`, `Utilities/UiDropdownMenuRenderTest/*`, `docs/08_UI_MODEL_RENDERING_R2D.md`, `docs/ACTIVE_WORK.md`.
+
+STATUS: **R2D DROPDOWN + MENU IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+NEXT ACTION: verify final remote `main`, then Windows-validate Ui Debug source compile, the three deterministic suites (52/0, 11/0, 11/0), `UiDropdownDemo` and `UiMenuDemo` build/runtime behavior, including Dropdown popup scrolling/selection/multi-check/drag reorder and Menu check/radio/submenu/keyboard/theme behavior. Tiny mechanical compile fixes are Gary scope; substantive model/render/view issues return to implementation. Separately, fix the known Gallery capture recursion and visual/theme/zoom issues before renderer-family closure.
