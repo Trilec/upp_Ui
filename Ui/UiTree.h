@@ -27,6 +27,11 @@
 
     Thread context
     - GUI thread only.
+
+    Model ownership
+    - Model() always returns the model currently driving the Tree. The Tree owns
+      an internal UiTreeModel by default; SetModel(...) switches to an external
+      model and UseInternalModel() switches back without copying either model.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -147,6 +152,13 @@ public:
     const Style& GetCustomStyle() const { return style_; }
 
     UiTree& SetModel(UiTreeModel& model);
+    UiTree& UseInternalModel() { return SetModel(internal_model_); }
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiTreeModel& Model() { return *model_; }
+    const UiTreeModel& Model() const { return *model_; }
+    UiTree& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiTreeModel& GetInternalModel() { return internal_model_; }
     const UiTreeModel& GetModel() const { return *model_; }
 
