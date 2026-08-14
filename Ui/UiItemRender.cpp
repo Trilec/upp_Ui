@@ -123,6 +123,14 @@ Font ResolveItemFont(const UiItemRenderData& data, const UiItemRenderStyle& styl
     return f;
 }
 
+Font ShrinkVerticalItemFont(Font font, int steps)
+{
+    if(steps <= 0)
+        return font;
+    font.Height(max(DPI(8), font.GetHeight() - DPI(steps)));
+    return font;
+}
+
 } // namespace
 
 UiItemRenderData::UiItemRenderData()
@@ -543,23 +551,48 @@ void UiItemRenderImage::Layout()
     const UiItemRenderStyle& style = EffectiveStyle();
     content_ = UiStyledInnerRect(Bounds(), style.metrics, style.skin);
     media_ = title_ = subtitle_ = description_ = right_text_ = metadata_ = Rect(0, 0, 0, 0);
+
+    title_font_ = ResolveItemFont(data, style);
+    subtitle_font_ = style.subtitle_font;
+    description_font_ = style.description_font;
+    right_font_ = style.right_font;
+
     if(content_.IsEmpty())
         return;
 
-    Font title_font = ResolveItemFont(data, style);
-    int title_h = max(title_font.GetHeight() + DPI(2), DPI(14));
-    int subtitle_h = !data.subtitle.IsEmpty() && style.show_subtitle
-                   ? max(style.subtitle_font.GetHeight() + DPI(2), DPI(12)) : 0;
-    int description_h = !data.description.IsEmpty() && style.show_description
-                      ? max(style.description_font.GetHeight() + DPI(2), DPI(12)) : 0;
+    bool vertical = Direction() == UiDirection::V;
+    if(vertical) {
+        int shrink = 0;
+        if(content_.GetWidth() < DPI(50) || content_.GetHeight() < DPI(52))
+            shrink = 3;
+        else if(content_.GetWidth() < DPI(64) || content_.GetHeight() < DPI(68))
+            shrink = 2;
+        else if(content_.GetWidth() < DPI(78) || content_.GetHeight() < DPI(84))
+            shrink = 1;
 
-    if(Direction() == UiDirection::H) {
+        // Explicit model fonts are semantic caller choices. Theme-provided fonts
+        // may step down with compact vertical tiles, while the caller's custom
+        // title font remains untouched.
+        if(!data.use_custom_font)
+            title_font_ = ShrinkVerticalItemFont(title_font_, shrink);
+        subtitle_font_ = ShrinkVerticalItemFont(subtitle_font_, shrink);
+        description_font_ = ShrinkVerticalItemFont(description_font_, shrink);
+        right_font_ = ShrinkVerticalItemFont(right_font_, shrink);
+    }
+
+    int title_h = max(title_font_.GetHeight() + DPI(2), vertical ? DPI(10) : DPI(14));
+    int subtitle_h = !data.subtitle.IsEmpty() && style.show_subtitle
+                   ? max(subtitle_font_.GetHeight() + DPI(2), vertical ? DPI(9) : DPI(12)) : 0;
+    int description_h = !data.description.IsEmpty() && style.show_description
+                      ? max(description_font_.GetHeight() + DPI(2), vertical ? DPI(9) : DPI(12)) : 0;
+
+    if(!vertical) {
         int side = min(style.image_extent, min(content_.GetHeight(), max(DPI(16), content_.GetWidth() / 3)));
         media_ = RectC(content_.left, content_.top + (content_.GetHeight() - side) / 2, side, side);
         int left = min(content_.right, media_.right + style.content_gap);
         int right = content_.right;
         if(style.show_right_text && !data.right_text.IsEmpty()) {
-            int rw = min(GetTextSize(data.right_text, style.right_font).cx + DPI(4),
+            int rw = min(GetTextSize(data.right_text, right_font_).cx + DPI(4),
                          max(0, (right - left) / 2));
             right_text_ = Rect(max(left, right - rw), content_.top, right, content_.bottom);
             right = max(left, right_text_.left - style.content_gap);
@@ -626,18 +659,17 @@ void UiItemRenderImage::Paint(Draw& w, const UiItemRenderState& state) const
     if(!metadata_.IsEmpty())
         w.DrawRect(metadata_, IsNull(data.metadata_color) ? style.metadata_default : data.metadata_color);
 
-    Font title_font = ResolveItemFont(data, style);
     Color ink = ResolveItemInk(data, style, st);
     int align = Direction() == UiDirection::V ? ALIGN_CENTER : data.text_align;
-    DrawAlignedItemText(w, title_, data.title, title_font, ink, align);
+    DrawAlignedItemText(w, title_, data.title, title_font_, ink, align);
     if(!subtitle_.IsEmpty())
-        DrawAlignedItemText(w, subtitle_, data.subtitle, style.subtitle_font,
+        DrawAlignedItemText(w, subtitle_, data.subtitle, subtitle_font_,
                             enabled ? style.muted_ink : style.palette.ink[ST_DISABLED], align);
     if(!description_.IsEmpty())
-        DrawAlignedItemText(w, description_, data.description, style.description_font,
+        DrawAlignedItemText(w, description_, data.description, description_font_,
                             enabled ? style.muted_ink : style.palette.ink[ST_DISABLED], align);
     if(!right_text_.IsEmpty())
-        DrawAlignedItemText(w, right_text_, data.right_text, style.right_font,
+        DrawAlignedItemText(w, right_text_, data.right_text, right_font_,
                             enabled ? style.muted_ink : style.palette.ink[ST_DISABLED], data.right_text_align);
 }
 
