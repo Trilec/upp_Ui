@@ -1,61 +1,58 @@
 # ACTIVE WORK
 
-BASE: `63f4a6498fca55b47489871e60ab90a2cda4865b` (`main` refreshed immediately before R2C; contains the complete published R2A/R2B implementation checkpoint).
+BASE: `63f4a6498fca55b47489871e60ab90a2cda4865b` — live `main` at R2C start; complete published R2A/R2B checkpoint.
 
-TASK: `UI-MODEL-RENDERING-R2C` — integrate shared item rendering into Tree/Table and remove their remaining deep viewport prefix-scan paths.
+TASK: `UI-MODEL-RENDERING-R2C` — integrate shared item rendering into Table/Tree and remove their remaining deep viewport prefix-scan paths.
 
-AUTHORITATIVE PLAN: `docs/07_UI_MODEL_RENDERING_PLAN.md` (`ebd99c29a1dcc13735960213f317b852413f177c`). No compatibility/shim requirement: the clean model/render authority wins and legitimate callers/docs/tests are migrated with it.
+AUTHORITATIVE PLAN: `docs/07_UI_MODEL_RENDERING_PLAN.md` (`ebd99c29a1dcc13735960213f317b852413f177c`). Remote GitHub is authoritative. No compatibility/shim requirement; preserve one clean renderer/model authority. Never force-update `main`.
 
-PUBLISHED R1 FOUNDATION:
-- `67c04f3d9479cc342fdaaa330ba83e4caab449dd` — shared overflow-safe `UiModelView` arithmetic.
-- `2547e7ab54111e476f5b11d194babf9a12d718b4` — initial high-scale `UiGallery`.
-- `a6a2886082740067b56a369d0a573f6bfdb5b8bc` — `UiList` high-scale viewport/drag hardening.
-- `034a4a32469c2a901c505b16ea0a4c266f5beeb8` — deterministic 100,000-item scale tests.
-- `5f793decc799567de55aa98a252e00d2612b0db6` — Gary's accepted Gallery demo macro-collision rename.
+PRIOR ACCEPTED/PUBLISHED FOUNDATION:
+- R1 scale: `67c04f3d9479cc342fdaaa330ba83e4caab449dd`, `2547e7ab54111e476f5b11d194babf9a12d718b4`, `a6a2886082740067b56a369d0a573f6bfdb5b8bc`, `034a4a32469c2a901c505b16ea0a4c266f5beeb8`; Gary accepted Debug/Release 21/21 and Gallery manual scale checks.
+- R2A renderer foundation: `bc63cd440bdf08b120f27268eefccf5f04ffa248` through `20fc158820be5f82009afbf8d2fe46cb179f76e4` — `UiItemRenderData`, non-Ctrl `UiItemRender`, Basic/Image, dirty-gated prepared layout and theme/style integration.
+- R2B List/Gallery: source through `455d3d3b5581fc6480f24fbc620bfa6c7ac3265f`, deterministic acceptance `3f757ec0f682b269e628ed9332375519c7e6a112`, shared 10k demo `9e0f46ded9fe146337e02309ec79b3f44ab41a54`, public docs through `cf5dfa326ac3b8515cf322dddedf74de1f79c14f`, recovery checkpoint `63f4a6498fca55b47489871e60ab90a2cda4865b`.
+- R2A/R2B Windows validation is currently being performed by Gary; pre-R2C expected suite is `Checks: 39, Fails: 0` Debug/Release.
 
-WINDOWS R1 ACCEPTANCE: COMPLETE. Gary validated Debug/Release `Checks: 21, Fails: 0`, Release Gallery demo launch/reopen, 100,000-item deep scrolling/direct jumps, resize/tile reflow and multi-selection.
+R2C TABLE INSPECTION:
+- old Table Paint started rows/columns at zero and skipped to viewport;
+- `GetColumnLeft`, `FindVisibleColumn`, and resize hit testing repeatedly prefix-scanned variable column widths;
+- Table already had correct model-owned semantics and one transient editor, so R2C keeps selection/resize/sort/edit/grid chrome Table-owned and replaces only item-content presentation/viewport geometry.
 
-R2A PUBLISHED FOUNDATION:
-- `bc63cd440bdf08b120f27268eefccf5f04ffa248` + `651836c33b3a0938ea6fa94464fc5c29f8383b3c` — `UiItemRender` contract plus Basic/Image implementation.
-- `2c74e0d47c3532fa2cc41ca223bec754edab1ca9` — `UiModelItem.image` thumbnail/media content distinct from compact `icon`.
-- `b5a7e3b2cebc0eb1127fed10837d624e3b4d1701` + `a9305353d43aefe0ade150d73e6e6cccabcbe701` — package and umbrella integration.
-- `20fc158820be5f82009afbf8d2fe46cb179f76e4` — first deterministic renderer-lifecycle acceptance.
+R2C TABLE PUBLISHED:
+- `680079a672c939bac296ab7cd40d241dcbe6b399` — Table public renderer slots, visible-range/instrumentation API and retained-column members; removed competing `WhenPaintCell`/`WhenPaintHeader` authority.
+- `089d0a4843bf00eb29cda72ba55154c64a17f5c4` + `8c7b5eecad8783cbe61c0dd9940af2152233c27a` — shared `UiItemRenderData` adapters for `UiModelColumn`, `UiTableCell`, and `UiTableHeader`.
+- `5b1e0fc48b0a9ef544e30f513de38202a506fd67` — split Table core/style/model setup.
+- `18d70878d1397810030e4551bf83bae5770d120a` — retained `int64` column prefix geometry, binary column lookup, arithmetic visible-row range, direct visible-column range, model-change binding.
+- `cf65c40870787b7d014941b4fc46ae1d67ca5b78` — bounded visible/overscan cell/header renderer pools; Basic defaults; cell/header/row-header slots; per-column cell renderer override.
+- `a243306d65cb1fab929cec2a48a01f7e9b7cb1e7` — Paint consumes only prepared visible row/column renderer surfaces; table chrome remains Table-owned.
+- `94e3a44d02f39f29407f960f5eeda33db82dbb0c` — selection/editing/input/resize semantics preserved over split implementation.
+- `b601d5340cb35b55964c4aa77469173f4c98405e` — package integrates `UiItemRenderData.cpp` and split Table sources.
+- `cb671b642e0d20f5032ab89e20d925b2defcf243` — deterministic Table acceptance added.
 
-R2A IMPLEMENTED:
-- shared semantic `UiItemRenderData` plus `UiModelItem` mapping;
-- non-`Ctrl` `UiItemRender` prototype/clone model;
-- private prepared geometry with `PrepareLayout()` dirty gating and protected virtual `Layout()`;
-- `UiItemRenderState` and renderer-owned `UiItemRenderHit` geometry;
-- theme-driven `UiItemRenderStyle` using existing `UiTheme`, `UiRole`, `StyledPalette`, `StyledMetrics`, `StyledSkin` and `UiIconRenderMode`;
-- `UiItemRenderBasic` and `UiItemRenderImage`, both H/V capable;
-- renderer theme/data/rectangle/orientation changes invalidate bounded prepared layout; hot/pressed/selected/focused Paint does not relayout.
+R2C TABLE BEHAVIOUR:
+- cell/header renderer layout is prepared outside Paint;
+- renderer live count depends on visible+overscan row/column intersection, not total rows/columns;
+- 100,000-row deep vertical reach uses arithmetic row geometry;
+- variable-width columns use retained prefix offsets and binary lookup instead of prefix traversal;
+- cell updates invalidate at most the affected prepared renderer and do not rebuild column geometry;
+- column resize rebuilds retained prefix geometry once;
+- explicit cell/header/row-header render slots have theme-aware Basic defaults; columns can override cell renderer individually;
+- Table still owns alternate/read-only/warning/error/custom backgrounds, selection/hot/active chrome, grid, sort marker, resize guide and one transient editor.
 
-R2B PUBLISHED REFERENCE MIGRATION:
-- List migration: `569b44b65e89c3178d825c1078a09bbe762041dd` through `255ea0422a1892e3a7651f4143cd072272db47d5` plus package integration. `UiList` now uses a bounded horizontal renderer pool; default is `UiItemRenderBasic`; item content Paint no longer duplicates renderer layout/paint logic.
-- Gallery migration: `07082fcd20323530f70a78f8691ddc33bf09ac6b` through `455d3d3b5581fc6480f24fbc620bfa6c7ac3265f`. `UiGallery` now uses a bounded vertical renderer pool; default is `UiItemRenderImage`; the superseded `WhenPaintItem`/Gallery-item-style authority is removed.
-- `3f757ec0f682b269e628ed9332375519c7e6a112` — expanded deterministic 100,000-item renderer-pool/zoom acceptance.
-- `b325a6f548cf5f44ec238167d8644d817a7ba684` + `cbedd11972252929d06eb9058fbf315446ccd592` — Gallery marquee model-switch/cancel lifecycle fixes.
-- `9e0f46ded9fe146337e02309ec79b3f44ab41a54` — shared 10,000-item List/Gallery visual demo with 64 reused deterministic images.
-- `1918c4d4ff07c94d160759baea52f6daa61170a2` + `db5e1c4a71ad54c785112aff6737110a858cef5b` — Gallery topic + scale guide updated.
-- `cf5dfa326ac3b8515cf322dddedf74de1f79c14f` — public `UiItemRender` topic.
-- `63f4a6498fca55b47489871e60ab90a2cda4865b` — final R2A/R2B recovery checkpoint.
+DETERMINISTIC SUITE: Table adds 12 checks to the prior 39, so current expected total is **51 checks** before Tree acceptance is added. New checks cover 100,000 rows, row 99,999 reachability, bounded cell renderer pool, Paint-without-layout, narrow update/no-prefix-rebuild, 2,000 variable-width columns, deep horizontal bounded Paint, one-resize/one-prefix-rebuild, and per-column renderer override.
 
-R2A/R2B STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.** Gary is validating exact published `main`; expected `UiModelViewPerformanceTest` result is `Checks: 39, Fails: 0` Debug and Release.
+TABLE STATIC STATUS:
+- package membership is published;
+- `UiFill` default/None semantics verified in canonical `UiStyle.h`;
+- Table source ownership is split into core/model-view/render/paint/interaction rather than retaining duplicate monolithic definitions;
+- no Windows/U++ compile is claimed from this environment; Table is an implementation checkpoint pending later combined R2C validation.
 
-R2C INSPECTION FINDINGS:
-- `UiTree` already keeps a retained `visible_rows_` projection, but ordinary Paint starts at projection row 0 and continues until the viewport; repeated `UiFindVisibleRowIndex(...)` calls also linearly search the projection. R2C will add direct visible-row arithmetic plus an id->visible-row lookup rebuilt with the projection.
-- Tree hierarchy/disclosure/connector/drag chrome stays Tree-owned. Primary item content and each visible data column become separate `UiItemRender` surfaces for the same logical node. Attached real `Ctrl` accessories remain exceptional/transient and are not multiplied per logical item.
-- `UiTable` already owns one transient editor and direct cell model semantics, but Paint starts rows/columns at zero and `GetColumnLeft`/`FindVisibleColumn` repeatedly prefix-scan variable widths. R2C will retain column prefix geometry and derive first/last visible row/column before painting.
-- Table cell, column-header, and row-header presentation become explicit renderer slots with sensible Basic defaults and per-column cell renderer override support; row/column/table selection, resize, sort, editing and grid chrome remain Table-owned.
-- R2C keeps `UiItemRender` layout prepared outside Paint and uses bounded visible renderer pools rather than one renderer per node/cell/header.
+R2C TREE FINDINGS / NEXT:
+- `UiTree` retains `visible_rows_`, but ordinary Paint still starts at row 0 and multiple paths repeatedly call linear `UiFindVisibleRowIndex(...)`;
+- Tree hierarchy/disclosure/connectors/drop/selection remain Tree-owned;
+- primary content and each visible data column will become separate prepared `UiItemRender` surfaces for the same logical node;
+- rebuild projection will also rebuild a stable id->visible-row lookup; placeholder rows must not overwrite the real node lookup;
+- attached real `Ctrl` accessories remain exceptional and use the direct lookup for positioning.
 
-R2C PUBLISH PLAN:
-1. Table scale geometry + renderer slots/pools + deterministic high-scale acceptance; publish.
-2. Tree visible-row lookup/paint fast path + primary/column renderer pools + deterministic acceptance; publish.
-3. Update docs/package/demo coverage as required, review full R2C diff, record exact recovery checkpoint, then hand R2C Windows validation to Gary after his R2A/R2B result is incorporated.
+STATUS: **R2C TABLE IMPLEMENTED/PUBLISHED — PLATFORM VALIDATION DEFERRED; TREE IMPLEMENTATION IN PROGRESS.**
 
-PRESERVED MAIN STATE: remote GitHub is authoritative; accepted UiDoc/UiGraph history remains untouched. Never force-update `main`.
-
-STATUS: **R2C IMPLEMENTATION IN PROGRESS — TABLE FIRST.**
-
-NEXT ACTION: implement/publish the Table checkpoint from exact base `63f4a6498fca55b47489871e60ab90a2cda4865b`, then refetch `main` before the Tree checkpoint.
+NEXT ACTION: refetch live `main`, preserve any legitimate Gary/main advance, then implement/publish Tree visible-row lookup + direct visible Paint + primary/column renderer pools + deterministic high-scale acceptance. Final R2C review/docs/recovery follows Tree.
