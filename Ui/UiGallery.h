@@ -9,24 +9,22 @@
     - High-scale, model-backed gallery for uniformly sized visual items.
 
     Intent
-    - Keep logical item count independent of Ctrl count: ordinary items are painted,
-      hit-tested, selected, and scrolled arithmetically without one Ctrl per item.
-    - Make the uniform-item fast path the default so very large models remain
-      responsive and resize into a fluid wrapping column layout.
-    - Keep semantic state in UiListModel; the gallery owns only interaction,
-      viewport, selection, and transient visual state.
-    - Expose a visible/prefetch range so expensive thumbnails can be prepared
-      outside Paint() and only for useful items.
+    - Keep logical item count independent of Ctrl/renderer count.
+    - Keep ordinary viewport geometry arithmetic and bounded by visible/overscan
+      content even for hundred-thousand-item models.
+    - Present useful tiles through recycled UiItemRender instances prepared
+      outside Paint().
+    - Own gallery interaction: selection, marquee, zoom, scrolling and focus;
+      semantic item state stays in UiListModel.
 
     Thread context
     - GUI thread only while bound to a live control.
 
     Usage
-    - Bind an external UiListModel with SetModel(...) or populate GetInternalModel().
-    - SetItemSize(), SetGap(), and SetInset() mirror the geometry vocabulary used
-      by UiGridLayout while retaining model-view rather than child-layout semantics.
-    - Use WhenVisibleRange to prepare lazy assets and WhenPaintItem for render-only
-      custom item painting.
+    - Bind UiListModel with SetModel(...). The default vertical
+      UiItemRenderImage works without configuration and falls back to item.icon
+      when item.image is empty.
+    - Replace presentation with SetItemRender(...).
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -34,6 +32,7 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
 #include <Ui/UiModelView.h>
 #include <Ui/UiScrollBar.h>
 
@@ -42,13 +41,6 @@ namespace Upp {
 enum UiGallerySelectionMode : byte {
     UIGALLERYSEL_SINGLE = 0,
     UIGALLERYSEL_MULTI,
-};
-
-enum UiGalleryItemVisualState : byte {
-    UIGALLERYITEM_NORMAL = 0,
-    UIGALLERYITEM_HOT,
-    UIGALLERYITEM_SELECTED,
-    UIGALLERYITEM_DISABLED,
 };
 
 class UiGallery : public Ctrl, public CtrlStyled<UiGallery> {
@@ -60,32 +52,14 @@ public:
         StyledMetrics metrics;
         StyledSkin skin;
 
-        StyledPalette item_palette;
-        StyledMetrics item_metrics;
-
-        Font title_font = StdFont();
-        Font description_font = StdFont();
-        int icon_size = DPI(36);
-        int content_gap = DPI(6);
-        int text_gap = DPI(3);
-        int item_padding = DPI(8);
-        int metadata_size = DPI(8);
-        int metadata_inset = DPI(7);
-        Color description_ink = Color(100, 116, 139);
-        Color metadata_default = Color(65, 167, 248);
-        bool show_icons = true;
-        bool show_description = true;
-        bool show_metadata_marker = true;
+        Color marquee_fill = Color(219, 234, 254);
+        Color marquee_frame = Color(59, 130, 246);
+        int marquee_frame_width = DPI(1);
 
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
-              % item_palette % item_metrics
-              % title_font % description_font
-              % icon_size % content_gap % text_gap % item_padding
-              % metadata_size % metadata_inset
-              % description_ink % metadata_default
-              % show_icons % show_description % show_metadata_marker;
+              % marquee_fill % marquee_frame % marquee_frame_width;
         }
     };
 
@@ -109,7 +83,12 @@ public:
     const UiListModel& GetModel() const { return *model_; }
     UiListModel& GetModel() { return *model_; }
 
-    // Uniform cell geometry is the high-scale default and V1 layout contract.
+    UiGallery& SetItemRender(const UiItemRender& render);
+    const UiItemRender& GetItemRender() const;
+    int GetLiveItemRenderCount() const { return item_render_pool_.GetCount(); }
+    int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
+
+    // Uniform cell geometry is the high-scale default and scale contract.
     UiGallery& SetItemSize(Size size);
     UiGallery& SetUnifiedItemSize(Size size) { return SetItemSize(size); }
     Size GetItemSize() const { return item_size_; }
@@ -121,6 +100,14 @@ public:
     Rect GetInset() const { return inset_; }
     UiGallery& SetOverscanRows(int rows);
     int GetOverscanRows() const { return overscan_rows_; }
+
+    // Semantic tile zoom. SetItemSize establishes the 1.0 base size.
+    UiGallery& SetZoom(double zoom, Point anchor = Point(-1, -1));
+    UiGallery& ZoomBy(double factor, Point anchor = Point(-1, -1));
+    UiGallery& SetZoomRange(double minimum, double maximum, double step = 1.12);
+    double GetZoom() const { return zoom_; }
+    double GetMinZoom() const { return min_zoom_; }
+    double GetMaxZoom() const { return max_zoom_; }
 
     UiGallery& SetSelectionMode(UiGallerySelectionMode mode);
     UiGallerySelectionMode GetSelectionMode() const { return selection_mode_; }
@@ -148,17 +135,21 @@ public:
     UiVisibleRange GetVisibleRange(bool include_overscan = false) const;
     int GetLastPaintItemCount() const { return last_paint_item_count_; }
     int GetGeometryBuildCount() const { return geometry_build_count_; }
+    bool IsMarqueeSelecting() const { return marquee_active_; }
+    Rect GetMarqueeRect() const;
 
     virtual void Paint(Draw& w) override;
     virtual void Layout() override;
     virtual Size GetMinSize() const override;
     virtual void LeftDown(Point p, dword flags) override;
+    virtual void LeftDrag(Point p, dword flags) override;
     virtual void LeftUp(Point p, dword flags) override;
     virtual void LeftDouble(Point p, dword flags) override;
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseLeave() override;
     virtual void MouseWheel(Point p, int zdelta, dword keyflags) override;
     virtual bool Key(dword key, int count) override;
+    virtual void CancelMode() override;
     virtual void GotFocus() override;
     virtual void LostFocus() override;
     virtual void SetData(const Value& v) override;
@@ -168,10 +159,12 @@ public:
     Event<> WhenAction;
     Event<int, int> WhenVisibleRange;
 
-    // Render-only hook. Set handled=true to replace the default tile painter.
-    Event<Draw&, int, const UiModelItem&, const Rect&, UiGalleryItemVisualState, bool&> WhenPaintItem;
-
 private:
+    struct ItemRenderSlot {
+        One<UiItemRender> render;
+        int index = -1;
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
@@ -187,8 +180,14 @@ private:
 
     Rect GetBaseViewportRect() const;
     int HitTestItem(Point p) const;
-    void PaintDefaultItem(Draw& w, int index, const Rect& rect, UiGalleryItemVisualState state) const;
-    UiGalleryItemVisualState GetItemVisualState(int index) const;
+    UiItemRenderState GetItemRenderState(int index) const;
+
+    void EnsureItemRender() const;
+    void ResetItemRenderPool();
+    void InvalidateItemRenderData(int first = -1, int last = -1);
+    void PrepareItemRenders();
+    UiItemRender* FindPreparedItemRender(int index);
+    const UiItemRender* FindPreparedItemRender(int index) const;
 
     bool IsSelectableIndex(int index) const;
     void SelectSingle(int index);
@@ -197,6 +196,14 @@ private:
     void MoveCursor(int delta);
     void MoveCursorRows(int rows);
     void NotifySelectionChange();
+
+    void BeginMarquee(Point p, dword flags);
+    void UpdateMarquee(Point p, dword flags);
+    void UpdateMarqueeSelection();
+    void AutoScrollMarquee(Point p);
+    void EndMarquee(bool cancel);
+    Rect GetMarqueeContentRect() const;
+    Point ToContentPoint(Point p) const;
 
     Value GetSelectionToken(int index) const;
     int ResolveSelectionIndex(const Value& token) const;
@@ -212,7 +219,19 @@ private:
     Vector<UiListModel*> bound_models_;
     mutable int model_revision_ = -1;
 
+    One<UiItemRender> item_render_;
+    Array<ItemRenderSlot> item_render_pool_;
+    UiListModel* prepared_render_model_ = nullptr;
+    UiVisibleRange prepared_render_range_;
+    int last_render_layout_count_ = 0;
+
+    Size base_item_size_ = Size(DPI(96), DPI(92));
     Size item_size_ = Size(DPI(96), DPI(92));
+    double zoom_ = 1.0;
+    double min_zoom_ = 0.50;
+    double max_zoom_ = 2.50;
+    double zoom_step_ = 1.12;
+
     int gap_ = DPI(8);
     Rect inset_ = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
     int overscan_rows_ = 2;
@@ -233,6 +252,15 @@ private:
     int anchor_ = -1;
     int hot_ = -1;
     int pressed_ = -1;
+
+    bool marquee_candidate_ = false;
+    bool marquee_active_ = false;
+    Point marquee_start_content_ = Point(0, 0);
+    Point marquee_current_content_ = Point(0, 0);
+    Vector<int> marquee_open_selection_;
+    int marquee_open_anchor_ = -1;
+    dword marquee_flags_ = 0;
+    int marquee_threshold_ = DPI(4);
 
     UiVisibleRange notified_range_;
     mutable int last_paint_item_count_ = 0;
