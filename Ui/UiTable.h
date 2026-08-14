@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiTable_h_
+#ifndef _Ui_UiTable_h_
 #define _Ui_UiTable_h_
 
 /*
@@ -7,6 +7,7 @@
 
     License
     - Apache License 2.0, matching this repository's LICENSE file.
+
     UiTable
     =======
 
@@ -14,21 +15,15 @@
     - Styled, virtualized, model-driven table/grid control backed by UiTableModel.
 
     Intent
-    - Keep table data in the model while the control owns only viewport,
-      selection, active-cell, resize, and transient editing state.
-    - Render visible cells directly and create a single transient editor only
-      for the active edit target.
+    - Keep table data in the model while the control owns viewport, selection,
+      active-cell, resize, transient editing, column geometry and renderer pools.
+    - Render only visible cells/headers through UiItemRender instances prepared
+      outside Paint().
+    - Keep one transient editor for the active edit target rather than one Ctrl
+      per logical cell.
 
     Thread context
     - GUI thread only.
-
-    Usage
-    - Bind an external model with SetModel(...) or populate GetInternalModel().
-    - Use SetActiveCell(), SetSelection(), and SetData()/GetData() for view
-      state, and observe interaction through WhenSelection/WhenAction.
-
-    Changelog
-    - 2026-03: introduced as the base Ui table/grid control.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -36,6 +31,8 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
+#include <Ui/UiModelView.h>
 
 namespace Upp {
 
@@ -167,6 +164,16 @@ public:
     UiTableModel& GetModel() { return *model_; }
     const UiTableModel& GetModel() const { return *model_; }
 
+    // Presentation slots. Defaults are theme-aware UiItemRenderBasic instances.
+    UiTable& SetCellRender(const UiItemRender& render);
+    UiTable& SetHeaderRender(const UiItemRender& render);
+    UiTable& SetRowHeaderRender(const UiItemRender& render);
+    UiTable& SetColumnCellRender(int col, const UiItemRender& render);
+    UiTable& ClearColumnCellRender(int col);
+    const UiItemRender& GetCellRender() const;
+    const UiItemRender& GetHeaderRender() const;
+    const UiItemRender& GetRowHeaderRender() const;
+
     UiTable& ShowRowHeaders(bool on = true);
     UiTable& ShowColumnHeaders(bool on = true);
     UiTable& SetRowHeight(int px);
@@ -183,6 +190,14 @@ public:
     UiTableRange GetSelection() const { return selection_; }
     bool HasSelection() const { return selection_.IsValid(); }
     void ScrollToCell(int row, int col);
+
+    UiVisibleRange GetVisibleRowRange(int overscan_rows = 0) const;
+    UiVisibleRange GetVisibleColumnRange(int overscan_columns = 0) const;
+    int GetLiveCellRenderCount() const { return cell_render_pool_.GetCount(); }
+    int GetLiveHeaderRenderCount() const { return column_header_render_pool_.GetCount() + row_header_render_pool_.GetCount(); }
+    int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
+    int GetLastPaintCellCount() const { return last_paint_cell_count_; }
+    int GetColumnGeometryBuildCount() const { return column_geometry_build_count_; }
 
     bool BeginEdit();
     bool CommitEditValue(const Value& value);
@@ -214,8 +229,6 @@ public:
     Event<UiTableAxis, int> WhenHeaderAction;
     Event<EditString&, int, int, const UiTableCell&> WhenConfigureEditor;
     Gate<int, int, const Value&> WhenValidateEdit;
-    Event<Draw&, const Rect&, int, int, const UiTableCell&, bool, bool, bool, const Style&> WhenPaintCell;
-    Event<Draw&, const Rect&, UiTableAxis, int, const UiTableHeader&, bool, bool, const Style&> WhenPaintHeader;
 
 private:
     enum HitZone {
@@ -233,11 +246,26 @@ private:
         int edge_col = -1;
     };
 
+    struct CellRenderSlot {
+        One<UiItemRender> render;
+        const UiItemRender* prototype = nullptr;
+        int row = -1;
+        int col = -1;
+    };
+
+    struct HeaderRenderSlot {
+        One<UiItemRender> render;
+        int index = -1;
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
+    void BindModel(UiTableModel& model);
+    void HandleModelChange(const UiModelChange& change);
     void SyncModel();
     void SyncColumnWidths();
+    void RebuildColumnGeometry();
     void SyncScrollBars();
     Rect GetViewportRect() const;
     Rect GetDataRect() const;
@@ -270,6 +298,20 @@ private:
     bool CanEditCell(int row, int col) const;
     void CommitResize();
 
+    void EnsureDefaultRenders();
+    void ConfigureDefaultRenders();
+    const UiItemRender& ResolveCellRender(int col) const;
+    void ResetRenderPools();
+    void InvalidateCellRender(int row = -1, int col = -1);
+    void InvalidateHeaderRender(UiTableAxis axis, int index = -1);
+    void PrepareItemRenders();
+    UiItemRender* FindPreparedCellRender(int row, int col);
+    const UiItemRender* FindPreparedCellRender(int row, int col) const;
+    UiItemRender* FindPreparedHeaderRender(UiTableAxis axis, int index);
+    const UiItemRender* FindPreparedHeaderRender(UiTableAxis axis, int index) const;
+    UiItemRenderState GetCellRenderState(int row, int col) const;
+    UiItemRenderState GetHeaderRenderState(UiTableAxis axis, int index, bool hot) const;
+
 private:
     Style style_;
     mutable Style themed_style_;
@@ -278,10 +320,29 @@ private:
 
     UiTableModel internal_model_;
     UiTableModel* model_ = nullptr;
+    Vector<UiTableModel*> bound_models_;
     mutable int model_revision_ = -1;
     bool internal_mutation_enabled_ = true;
 
     Vector<int> column_widths_;
+    Vector<int64> column_offsets_;
+    int column_geometry_build_count_ = 0;
+
+    One<UiItemRender> cell_render_;
+    One<UiItemRender> header_render_;
+    One<UiItemRender> row_header_render_;
+    bool custom_cell_render_ = false;
+    bool custom_header_render_ = false;
+    bool custom_row_header_render_ = false;
+    VectorMap<int, One<UiItemRender>> column_cell_renders_;
+    Array<CellRenderSlot> cell_render_pool_;
+    Array<HeaderRenderSlot> column_header_render_pool_;
+    Array<HeaderRenderSlot> row_header_render_pool_;
+    UiVisibleRange prepared_rows_;
+    UiVisibleRange prepared_columns_;
+    int last_render_layout_count_ = 0;
+    mutable int last_paint_cell_count_ = 0;
+
     HScrollBar hscroll_;
     VScrollBar vscroll_;
     UiTablePos active_cell_;
@@ -304,4 +365,3 @@ private:
 }
 
 #endif
-
