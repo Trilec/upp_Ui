@@ -158,7 +158,7 @@ public:
     const UiListModel& GetModel() const { return *model_; }
 
     UiList& SetItemRender(const UiItemRender& render);
-    const UiItemRender& GetItemRender() const { return *item_render_; }
+    const UiItemRender& GetItemRender() const;
     int GetLiveItemRenderCount() const { return item_render_pool_.GetCount(); }
     int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
 
@@ -246,6 +246,7 @@ private:
     void ToggleSelection(int index);
     void SelectRangeTo(int index, bool additive);
 
+    void EnsureItemRender() const;
     void ResetItemRenderPool();
     void InvalidateItemRenderData(int first = -1, int last = -1);
     void PrepareItemRenders();
@@ -286,6 +287,7 @@ private:
 
     One<UiItemRender> item_render_;
     Array<ItemRenderSlot> item_render_pool_;
+    UiListModel* prepared_render_model_ = nullptr;
     UiVisibleRange prepared_render_range_;
     int last_render_layout_count_ = 0;
 
