@@ -13,10 +13,11 @@ public:
         SetRect(0, 0, DPI(1240), DPI(760));
 
         root_.SetDirection(UiDirection::V).SetGap(DPI(8)).SetInset(DPI(10));
+        // Keep GroupPanel on its theme-driven style. SetHeaderMode/SetInset are
+        // style edits and would freeze the light-resolved style at construction
+        // time, preventing a later Light/Dark switch from restyling the header.
         header_.SetTitle("Ui model rendering")
-               .SetSubTitle("One 10,000-item model · shared renderers · bounded visible pools")
-               .SetHeaderMode(UiGroupPanel::Inside)
-               .SetInset(Rect(DPI(10), DPI(7), DPI(10), DPI(7)));
+               .SetSubTitle("One 10,000-item model · shared renderers · bounded visible pools");
 
         actions_.SetDirection(UiDirection::H).SetGap(DPI(5)).SetInset(0)
                 .SetAlignItems(UiCrossAlign::Center);
@@ -51,7 +52,13 @@ public:
 
         root_.Add(header_).Fit();
         root_.Add(views_).Expand(1);
-        Add(root_.SizePos());
+
+        // UiBoxLayout is intentionally transparent. Put the showcase on a real
+        // theme-aware Surface panel so margins/gaps and lightweight transparent
+        // List rows inherit the active Light/Dark surface instead of TopWindow's
+        // platform paper color.
+        surface_.Add(root_.SizePos());
+        Add(surface_.SizePos());
 
         BuildDemoImages();
         BuildModel();
@@ -61,6 +68,7 @@ public:
     }
 
 private:
+    UiPanel surface_;
     UiBoxLayout root_;
     UiGroupPanel header_;
     UiBoxLayout actions_;
@@ -176,6 +184,8 @@ private:
         list_.RefreshLayout();
         gallery_.RefreshLayout();
         root_.RefreshLayout();
+        surface_.Refresh();
+        header_.Refresh();
         Refresh();
     }
 
