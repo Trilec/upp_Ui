@@ -5,60 +5,19 @@
 
 namespace Upp {
 
-static StyledState UiGalleryStyledState(UiGalleryItemVisualState state)
-{
-    switch(state) {
-    case UIGALLERYITEM_HOT:      return ST_HOT;
-    case UIGALLERYITEM_SELECTED: return ST_PRESSED;
-    case UIGALLERYITEM_DISABLED: return ST_DISABLED;
-    case UIGALLERYITEM_NORMAL:
-    default:                     return ST_NORMAL;
-    }
-}
-
-static void DrawGalleryText(Draw& w, const Rect& r, const String& text, Font font, Color ink)
-{
-    if(r.IsEmpty() || text.IsEmpty())
-        return;
-    Size ts = GetTextSize(text, font);
-    int x = r.left + max(0, (r.GetWidth() - ts.cx) / 2);
-    int y = r.top + max(0, (r.GetHeight() - ts.cy) / 2);
-    w.Clip(r);
-    w.DrawText(x, y, text, font, ink);
-    w.End();
-}
-
 const UiGallery::Style& UiGallery::StyleDefault()
 {
     static Style s;
     ONCELOCK {
-        const Color text = Color(17, 24, 39);
-        const Color muted = Color(100, 116, 139);
-        const Color disabled = Color(148, 163, 184);
-
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(White());
             s.palette.frame[i] = Color(226, 232, 240);
-            s.palette.ink[i] = text;
-            s.palette.icon[i] = muted;
-
-            s.item_palette.face[i] = UiFill::Solid(White());
-            s.item_palette.frame[i] = Color(226, 232, 240);
-            s.item_palette.ink[i] = text;
-            s.item_palette.icon[i] = muted;
+            s.palette.ink[i] = Color(17, 24, 39);
+            s.palette.icon[i] = Color(100, 116, 139);
         }
         s.palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
-        s.palette.ink[ST_DISABLED] = disabled;
-        s.palette.icon[ST_DISABLED] = disabled;
-
-        s.item_palette.face[ST_HOT] = UiFill::Solid(Color(245, 247, 250));
-        s.item_palette.frame[ST_HOT] = Color(203, 213, 225);
-        s.item_palette.face[ST_PRESSED] = UiFill::Solid(Color(232, 242, 255));
-        s.item_palette.frame[ST_PRESSED] = Color(65, 167, 248);
-        s.item_palette.face[ST_DISABLED] = UiFill::Solid(Color(248, 250, 252));
-        s.item_palette.frame[ST_DISABLED] = Color(226, 232, 240);
-        s.item_palette.ink[ST_DISABLED] = disabled;
-        s.item_palette.icon[ST_DISABLED] = disabled;
+        s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
+        s.palette.icon[ST_DISABLED] = Color(148, 163, 184);
 
         s.metrics = StyledMetrics();
         s.metrics.face_enabled = true;
@@ -72,27 +31,9 @@ const UiGallery::Style& UiGallery::StyleDefault()
         s.metrics.focus_color = Color(65, 167, 248);
         s.skin = StyledSkin();
 
-        s.item_metrics = StyledMetrics();
-        s.item_metrics.face_enabled = true;
-        s.item_metrics.frame_enabled = true;
-        s.item_metrics.frame_width = DPI(1);
-        s.item_metrics.radius = DPI(6);
-        s.item_metrics.focus_enabled = false;
-
-        s.title_font = StdFont();
-        s.description_font = StdFont();
-        s.description_font.Height(max(DPI(9), StdFont().GetHeight() - DPI(1)));
-        s.icon_size = DPI(36);
-        s.content_gap = DPI(6);
-        s.text_gap = DPI(3);
-        s.item_padding = DPI(8);
-        s.metadata_size = DPI(8);
-        s.metadata_inset = DPI(7);
-        s.description_ink = muted;
-        s.metadata_default = Color(65, 167, 248);
-        s.show_icons = true;
-        s.show_description = true;
-        s.show_metadata_marker = true;
+        s.marquee_fill = Color(219, 234, 254);
+        s.marquee_frame = Color(59, 130, 246);
+        s.marquee_frame_width = DPI(1);
     }
     return s;
 }
@@ -112,6 +53,7 @@ UiGallery::UiGallery()
             return;
         scroll_y_ = vscroll_.GetPos();
         ClampScroll();
+        PrepareItemRenders();
         UpdateVisibleRangeNotification();
         Refresh();
     };
@@ -152,28 +94,8 @@ void UiGallery::SyncThemeStyle()
     themed_style_.metrics = list.metrics;
     themed_style_.skin = list.skin;
     themed_style_.metrics.content_margin = Rect(0, 0, 0, 0);
-    themed_style_.title_font = list.font;
-    themed_style_.description_font = list.font;
-    themed_style_.description_ink = list.muted_ink;
-    themed_style_.metadata_default = list.metadata_default;
-
-    for(int i = 0; i < 4; i++) {
-        themed_style_.item_palette.face[i] = list.palette.face[i];
-        themed_style_.item_palette.frame[i] = list.palette.frame[i];
-        themed_style_.item_palette.ink[i] = list.palette.ink[i];
-        themed_style_.item_palette.icon[i] = list.palette.icon[i];
-    }
-    themed_style_.item_palette.face[ST_HOT] = UiFill::Solid(list.hot_face);
-    themed_style_.item_palette.frame[ST_HOT] = list.hot_frame;
-    themed_style_.item_palette.ink[ST_HOT] = list.hot_ink;
-    themed_style_.item_palette.face[ST_PRESSED] = UiFill::Solid(list.selected_face);
-    themed_style_.item_palette.frame[ST_PRESSED] = list.selected_frame;
-    themed_style_.item_palette.ink[ST_PRESSED] = list.selected_ink;
-    themed_style_.item_palette.face[ST_DISABLED] = list.palette.face[ST_DISABLED];
-    themed_style_.item_palette.frame[ST_DISABLED] = list.palette.frame[ST_DISABLED];
-    themed_style_.item_palette.ink[ST_DISABLED] = list.disabled_ink;
-    themed_style_.item_palette.icon[ST_DISABLED] = list.palette.icon[ST_DISABLED];
-
+    themed_style_.marquee_fill = list.selected_face;
+    themed_style_.marquee_frame = list.selected_frame;
     vscroll_.SetCustomStyle(UiTheme::ResolveScrollBar());
     theme_revision_ = revision;
 }
@@ -213,6 +135,8 @@ UiGallery& UiGallery::SetModel(UiListModel& model)
     cursor_ = anchor_ = hot_ = pressed_ = -1;
     scroll_y_ = 0;
     notified_range_ = UiVisibleRange();
+    EndMarquee(true);
+    ResetItemRenderPool();
     SyncModel();
     InvalidateGeometry();
     return *this;
@@ -222,9 +146,11 @@ UiGallery& UiGallery::SetItemSize(Size size)
 {
     size.cx = max(DPI(16), size.cx);
     size.cy = max(DPI(16), size.cy);
-    if(item_size_ == size)
+    if(base_item_size_ == size && zoom_ == 1.0)
         return *this;
+    base_item_size_ = size;
     item_size_ = size;
+    zoom_ = 1.0;
     InvalidateGeometry();
     return *this;
 }
@@ -265,14 +191,80 @@ UiGallery& UiGallery::SetOverscanRows(int rows)
     if(overscan_rows_ == rows)
         return *this;
     overscan_rows_ = rows;
+    PrepareItemRenders();
     UpdateVisibleRangeNotification();
     return *this;
+}
+
+UiGallery& UiGallery::SetZoomRange(double minimum, double maximum, double step)
+{
+    minimum = max(0.10, minimum);
+    maximum = max(minimum, maximum);
+    step = max(1.01, step);
+    min_zoom_ = minimum;
+    max_zoom_ = maximum;
+    zoom_step_ = step;
+    if(zoom_ < min_zoom_ || zoom_ > max_zoom_)
+        SetZoom(zoom_);
+    return *this;
+}
+
+UiGallery& UiGallery::SetZoom(double zoom, Point anchor)
+{
+    zoom = minmax(zoom, min_zoom_, max_zoom_);
+    if(fabs(zoom - zoom_) < 0.0001)
+        return *this;
+    if(!geometry_valid_)
+        UpdateGeometry();
+
+    if(anchor.x < 0 || anchor.y < 0)
+        anchor = viewport_.CenterPoint();
+    int anchor_index = HitTestItem(anchor);
+    double anchor_fraction_y = 0.5;
+    if(anchor_index >= 0) {
+        Rect before = GetItemRect(anchor_index);
+        if(before.GetHeight() > 0)
+            anchor_fraction_y = minmax(double(anchor.y - before.top) / before.GetHeight(), 0.0, 1.0);
+    }
+
+    zoom_ = zoom;
+    item_size_ = Size(max(DPI(16), int(base_item_size_.cx * zoom_ + 0.5)),
+                      max(DPI(16), int(base_item_size_.cy * zoom_ + 0.5)));
+    geometry_valid_ = false;
+    UpdateGeometry();
+
+    if(anchor_index >= 0 && model_ && anchor_index < model_->GetCount()) {
+        Rect after = GetItemRect(anchor_index);
+        int item_anchor_y = after.top + int(after.GetHeight() * anchor_fraction_y + 0.5);
+        scroll_y_ += item_anchor_y - anchor.y;
+        ClampScroll();
+        if(vscroll_.IsShown()) {
+            updating_scrollbar_ = true;
+            vscroll_.SetPos(scroll_y_);
+            updating_scrollbar_ = false;
+        }
+    }
+
+    InvalidateItemRenderData();
+    PrepareItemRenders();
+    UpdateVisibleRangeNotification();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+UiGallery& UiGallery::ZoomBy(double factor, Point anchor)
+{
+    if(factor <= 0)
+        return *this;
+    return SetZoom(zoom_ * factor, anchor);
 }
 
 UiGallery& UiGallery::SetSelectionMode(UiGallerySelectionMode mode)
 {
     if(selection_mode_ == mode)
         return *this;
+    EndMarquee(true);
     selection_mode_ = mode;
     if(mode == UIGALLERYSEL_SINGLE && selected_.GetCount() > 1) {
         int keep = IsSelectableIndex(cursor_) ? cursor_ : selected_[0];
@@ -361,6 +353,7 @@ UiGallery& UiGallery::SetScrollPos(int y)
         vscroll_.SetPos(scroll_y_);
         updating_scrollbar_ = false;
     }
+    PrepareItemRenders();
     UpdateVisibleRangeNotification();
     Refresh();
     return *this;
