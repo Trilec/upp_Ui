@@ -24,9 +24,8 @@ bool IsDarkSurface(Color c)
     return (c.GetR() + c.GetG() + c.GetB()) / 3 < 128;
 }
 
-UiListModel BuildModel()
+void BuildModel(UiListModel& model)
 {
-    UiListModel model;
     Vector<UiModelItem> items;
     items.Reserve(400);
     for(int i = 0; i < 400; i++) {
@@ -35,7 +34,6 @@ UiListModel BuildModel()
         items.Add(pick(item));
     }
     model.AddRange(items);
-    return model;
 }
 
 void TestGalleryCorrections(TestCtx& t)
@@ -43,7 +41,8 @@ void TestGalleryCorrections(TestCtx& t)
     UiThemeContext saved = UiTheme::GetContext();
     UiTheme::Set(UiThemeMode::Light);
 
-    UiListModel model = BuildModel();
+    UiListModel model;
+    BuildModel(model);
     UiGallery gallery;
     gallery.SetModel(model)
            .SetSelectionMode(UIGALLERYSEL_MULTI)
