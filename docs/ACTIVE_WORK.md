@@ -1,64 +1,126 @@
 # ACTIVE WORK
 
-BASE: `a0b07fad20c034dd5096335af591a971f9857f0a` — verified live `main` at R2D start; complete published R2C Tree/Table implementation checkpoint.
+CURRENT REMOTE BASE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merge of Gary's R2C demo-fix commit `1743fcbe4aee8d257015194910a9a6efc47c2726` with the published R2D checkpoint `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
 
-TASK: `UI-MODEL-RENDERING-R2D` — converge Dropdown and Menu on the shared model/render architecture.
+CURRENT TASK: `UI-GALLERY-CORRECTIVE + R2C-ACCEPTANCE-RECONCILIATION`.
 
-AUTHORITATIVE ARCHITECTURE: `docs/07_UI_MODEL_RENDERING_PLAN.md`. R2D implementation contract: `docs/08_UI_MODEL_RENDERING_R2D.md`. Remote GitHub is authoritative. Never force-update `main`.
+Remote GitHub is authoritative. Never force-update `main`.
 
-PRIOR WINDOWS EVIDENCE:
-- Gary tested R2A/R2B at `63f4a6498fca55b47489871e60ab90a2cda4865b`: Ui Debug source compile PASS, 0 warnings/errors; `UiModelViewPerformanceTest` Debug/Release **41/41 PASS**; Gallery demo Release builds/launches.
-- R2C adds 11 Table checks, so current combined `UiModelViewPerformanceTest` target is **52 checks**, not the stale 50 previously recorded. `UiTreeScaleTest` remains **11 checks**.
-- Gary's R2A/R2B Gallery acceptance found a real separate defect: `UiGallery::CancelMode()` calls `ReleaseCapture()` during capture teardown, causing recursive `CancelMode -> ReleaseCapture -> CancelMode` and Win32 stack overflow. Gallery dark-surface, marquee visibility/selection-frame and zoom-text issues are also still open. R2D does not claim those fixed.
+## R2C TREE + TABLE — WINDOWS ACCEPTED
 
-R2D DROPDOWN — PUBLISHED:
-- `7bdd240a678778f8f4170e84de14e1b4dfa3e9c9` — R2D recovery/audit start.
-- `8a3198c21f4bdccd4c091d29168e7a66867f1118` — new direct-model/render public contract.
-- `caa283ef2bf2125465bbcda68ca38e24640f1f11` — removes parallel `Vector<Item>` mirror and model conversion/sync authority; direct `UiListModel` operations plus collapsed shared renderer.
-- `96cc9414d4e868a26c8563135c41371e6d92e83c` — bounded visible popup renderer pool, popup geometry/renderer preparation outside Paint, direct-model popup selection/check/drag behavior.
-- `d9b38fc61c7511e00e6e3f1de74ff20e2c155223` — package includes `UiDropdownPopup.cpp`.
-- `ed5feccd6bcac39ef21979ce2a7dab4277b4737c` — `UiDropdown::Item` retained only as a direct `using Item = UiModelItem` spelling so existing demo/PropertyEditor source remains source-compatible without a second object type or state. Primary API/documentation uses `UiModelItem`.
+Gary validated published R2C source at `a0b07fad20c034dd5096335af591a971f9857f0a` on Windows/U++ CLANGx64.
 
-R2D DROPDOWN — RESULT:
-- `UiListModel` is the sole item-state authority for internal and external models.
-- No `items_`, `SyncItemsFromModel`, `ToModelItem`, `FromModelItem` or `RefreshFromModel` mirror path remains.
-- No competing Dropdown item-paint callback remains; `SetItemRender(const UiItemRender&)` is the item-presentation extension point.
-- collapsed face uses one prepared renderer instance; popup keeps only visible-row renderer instances.
-- default renderer is content-only `UiItemRenderBasic` configured from Dropdown style/theme.
-- Dropdown retains popup surface, group/separator, selection/check marker, badge, indicator, typeahead, drag handle/reorder and popup lifetime semantics.
-- popup scrollbar/visible geometry and renderer layout are prepared from Layout/scroll/model/style paths, not from popup Paint.
+Acceptance evidence:
+- Ui package Debug source compile: **PASS**, 82 files, 0 compile errors, 0 warnings. Final undefined `WinMain` link message is the expected attempt to link the Ui library package as an executable, not a source failure.
+- `Utilities/UiModelViewPerformanceTest` Debug: **Checks: 52, Fails: 0**, exit 0.
+- `Utilities/UiModelViewPerformanceTest` Release: **Checks: 52, Fails: 0**, exit 0.
+- `Utilities/UiTreeScaleTest` Debug: **Checks: 11, Fails: 0**, exit 0.
+- `Utilities/UiTreeScaleTest` Release: **Checks: 11, Fails: 0**, exit 0.
+- `UiTreeDemo` smoke: PASS — expand/collapse, arrow/Home/End navigation, multi-select paths, F2 rename/cancel, DnD path; no freeze/crash and no stale lazy `Loading...` row.
+- `UiTableDemo` smoke: PASS — vertical scrolling, active-cell/range selection, column resize and header-sort behavior; headers/cells remain stable; no freeze/crash.
+- Table demo has only about 560 px of four-column content, so it cannot meaningfully exercise deep horizontal overflow. This is a demo limitation, not a Table scale failure; deterministic R2C coverage exercises 2,000 columns.
+- automated synthetic Enter did not trigger the Table editor in the smoke driver, but the normal `LeftDouble`/Enter -> `BeginEdit` -> `CommitEdit`/`CancelEdit` implementation is present and no runtime defect was demonstrated. Do not invent a Table source fix from this automation limitation.
+- `UiTableRunTests`-style GUI runners wait for a window and were correctly not used as console pass/fail gates.
+- `git diff --check`: PASS.
 
-R2D MENU — PUBLISHED:
-- `f0c2bc683cbaa3a8dadeef32eba073c44d84c7a3` + `58df0ac8ffa23c98cdf0e178feec97ddcd85ea4a` — shared `UiMenuItem` -> `UiItemRenderData` adapter contract/implementation.
-- `972cbf349feb0fd550448460c1df8f1334f3bd29` — Menu popup shared-render public/pool contract.
-- `03bfb16474ba2be459857e69e550091f96ceba1f` — popup ordinary content uses bounded prepared shared renderers while Menu keeps domain chrome and command/session behavior.
+R2C status: **WINDOWS ACCEPTED.**
 
-R2D MENU — RESULT:
-- `UiMenuModel` remains the authoritative domain model; Menu is not forced into `UiListModel` or `UiModelItem` inheritance.
-- renderer handles popup icon/title/optional description/shortcut-or-right text/default-item emphasis.
-- Menu retains check/radio glyphs, submenu arrow, separator, hot/pressed popup chrome, top menu bar, command activation/request-first mutation, popup stack/session/focus semantics.
-- each open popup level owns only a visible-row renderer pool; a closed menu allocates no per-model renderer objects.
-- popup Paint consumes prepared renderer geometry and does not prepare renderer layout.
+The previously stale 50-check documentation is corrected: the authoritative combined R2C `UiModelViewPerformanceTest` total is **52** because the final Table integration contains two additional renderer checks.
 
-R2D TEST/DOC CHECKPOINTS:
-- `fe9ff5771da5ee4b061952dd70105ccd8ded56b5` + `e01d14be4c1149b208ab032ff2783af882c06e61` — focused `Utilities/UiDropdownMenuRenderTest` package and initial 11-check contract test.
-- `b67553ebd2d7bf30a48931effab2eac965fdc95d` — test made RTTI-independent while preserving 11 checks.
-- `01d3dc82c5a86fcf4a251fc6bcdd8e9dd0ee3e4a` — public R2D implementation documentation.
+### R2C demo include reconciliation
 
-DETERMINISTIC TARGETS AFTER R2D:
-- `Utilities/UiModelViewPerformanceTest`: **52 checks**, expected `Checks: 52, Fails: 0` Debug/Release.
-- `Utilities/UiTreeScaleTest`: **11 checks**, expected `Checks: 11, Fails: 0` Debug/Release.
-- `Utilities/UiDropdownMenuRenderTest`: **11 checks**, expected `Checks: 11, Fails: 0` Debug/Release.
+Gary found `UiTreeDemo` used shared `DemoToggleRow` / `DemoSliderRow` / `DemoColorRow` types without including the shared builder-demo header. His exact mechanical fix:
 
-R2D STATIC REVIEW:
-- compare R2C base `a0b07fad...` -> substantive R2D doc checkpoint `01d3dc82...`: R2D is ahead-only; touched slice is limited to Dropdown/Menu, shared item-render adapter, `Ui.upp`, focused tests and R2D docs/recovery state.
-- `Ui.upp` includes `UiDropdownPopup.cpp`.
-- Dropdown mirror/helper searches return no `items_`, `SyncItemsFromModel`, `ToModelItem`, `FromModelItem`, `RefreshFromModel` or Dropdown `WhenPaintItem` authority.
-- renderer pool ownership uses `Array` + `One<UiItemRender>`; no renderer per logical item is stored.
-- no Windows/U++ compile/runtime result is claimed for R2C/R2D from this implementation environment.
+```cpp
+#include <Ui/Ui.h>
+#include "../BuilderDemoSupport.h"
+```
 
-TOUCHED R2D SLICE: `Ui/UiDropdown.h`, `Ui/UiDropdown.cpp`, `Ui/UiDropdownPopup.cpp`, `Ui/UiMenu.h`, `Ui/UiMenu.cpp`, `Ui/UiItemRender.h`, `Ui/UiItemRenderData.cpp`, `Ui/Ui.upp`, `Utilities/UiDropdownMenuRenderTest/*`, `docs/08_UI_MODEL_RENDERING_R2D.md`, `docs/ACTIVE_WORK.md`.
+was committed as `1743fcbe4aee8d257015194910a9a6efc47c2726` and is now already in authoritative `main` through merge `a4f81014617dd758893e7cfc105a8a1f4ff24130`. Do not reapply it.
 
-STATUS: **R2D DROPDOWN + MENU IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+`examples/UiListDemo/main.cpp` has the same pre-existing missing include and remains a tiny demo-hygiene follow-up. The available GitHub write path replaces the entire large file, so this session deliberately did not risk a blind whole-file rewrite for one include. Safe mechanical fix when that demo is next touched:
 
-NEXT ACTION: verify final remote `main`, then Windows-validate Ui Debug source compile, the three deterministic suites (52/0, 11/0, 11/0), `UiDropdownDemo` and `UiMenuDemo` build/runtime behavior, including Dropdown popup scrolling/selection/multi-check/drag reorder and Menu check/radio/submenu/keyboard/theme behavior. Tiny mechanical compile fixes are Gary scope; substantive model/render/view issues return to implementation. Separately, fix the known Gallery capture recursion and visual/theme/zoom issues before renderer-family closure.
+```cpp
+#include <Ui/Ui.h>
+#include "../BuilderDemoSupport.h"
+```
+
+No library/runtime architecture depends on this outstanding demo include.
+
+## R2D DROPDOWN + MENU — IMPLEMENTATION COMPLETE, PLATFORM VALIDATION PENDING
+
+R2D substantive checkpoint: `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
+
+Implemented state:
+- Dropdown uses `UiListModel` as the sole row authority; no parallel `items_` mirror/conversion/sync path remains.
+- `UiDropdown::Item` is only a direct type alias to `UiModelItem`, not a second item class or state store.
+- Dropdown collapsed/popup item presentation uses bounded prepared `UiItemRender` instances; popup Paint does not prepare renderer geometry.
+- Menu keeps authoritative `UiMenuModel` semantics and uses shared `UiItemRender` only for ordinary popup icon/title/description/right-content presentation.
+- Menu retains check/radio, submenu, command, separator, popup stack/session and menu-bar semantics.
+- `Utilities/UiDropdownMenuRenderTest`: expected Windows Debug/Release **Checks: 11, Fails: 0**; still pending platform execution.
+- public implementation note: `docs/08_UI_MODEL_RENDERING_R2D.md`.
+
+## GALLERY CORRECTIVE — PUBLISHED SOURCE
+
+The Gallery defects found during R2A/R2B Windows acceptance have now been corrected in source on top of merged `main`.
+
+Published corrective checkpoints:
+- `e253f0630145d13bdd226f303633637e9e078dd8` — explicit Gallery interaction-style/capture/zoom contract (`selection_frame`, stronger marquee frame, `WhenZoom`, marquee capture ownership).
+- `d125dbba3ecdaea7f22ce7a1d4adb1a7c5930b7c` — theme-driven Gallery viewport no longer reuses List row/nine-slice skin; Dark mode derives viewport face plus interaction accent from current theme; semantic zoom emits `WhenZoom` only on actual change.
+- `66c566c8e6925e3a2c95b9364eccbfb2413d0ad0` — marquee fill moved behind tile content; marquee frame drawn on top; selected tiles receive an explicit Gallery-owned interaction frame.
+- `1d6e0656361469d268417c2ab8ee0434b3720ecf` — Win32 capture-recursion root fix: Gallery tracks owned marquee capture, clears ownership before release, and `CancelMode()` never calls `ReleaseCapture()`.
+- `46efb6cc7c0b84f48427cd452a711dc0b98f036b` — Gallery demo status listens to `WhenZoom`, so Ctrl+wheel and button zoom keep the displayed percentage live.
+- `dc0ccc1b4b6c4d3fc00132d1b0ae4da2a6512977` + `a90be27de3eedabee3e2c19a703392a0e018b818` + `dab52ffa3d4e1d751d9065488f5a6b0367c42010` + `1c6f0729f2dd2ca74b18d19f7a584d66586f252a` — focused `Utilities/UiGalleryRegressionTest` package and 11-check deterministic corrective suite.
+- `da2ba754a4f6c8d3a64f6fe37e466e4fe1b20471` — public scale guide updated with the accepted R2C totals and Gallery capture/theme/presentation invariants.
+
+### Gallery capture rule
+
+The former failure was:
+
+`CancelMode -> ReleaseCapture -> CancelMode -> ...`
+
+on Win32 capture teardown. Current rule:
+- only an active Gallery marquee may own capture;
+- ownership is cleared before a normal marquee release;
+- a re-entrant `CancelMode()` ends/restores marquee state without releasing capture;
+- `CancelMode()` itself never calls `ReleaseCapture()`.
+
+This removes the recursive path instead of adding a depth guard or swallowing the crash.
+
+### Gallery presentation rule
+
+- Gallery owns selection/marquee interaction chrome; the renderer owns ordinary item content.
+- marquee fill is behind tiles, so it remains visible in gaps without washing over images/text;
+- selection and marquee frames are explicit 2px theme-derived interaction strokes;
+- theme-driven Gallery viewport uses current List palette/metrics but a neutral Gallery surface skin, preventing a stale light row raster from surviving a Dark-mode switch;
+- `WhenZoom(double)` is the semantic zoom notification; no-op zoom changes do not emit it;
+- existing visible/overscan renderer-pool scale behavior remains intact and Paint still performs no renderer layout.
+
+`Utilities/UiGalleryRegressionTest` contains **11 checks** covering bounded pooling, explicit selection/marquee frames, zoom notification/no-op behavior, Dark viewport styling, Paint-without-relayout and passive non-marquee `CancelMode()` behavior.
+
+Gallery corrective status: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+## CURRENT DETERMINISTIC WINDOWS STATUS / TARGETS
+
+Already accepted:
+- `UiModelViewPerformanceTest`: Debug **52/0**, Release **52/0**.
+- `UiTreeScaleTest`: Debug **11/0**, Release **11/0**.
+
+Pending Windows execution:
+- `UiGalleryRegressionTest`: expected Debug/Release **Checks: 11, Fails: 0**.
+- `UiDropdownMenuRenderTest`: expected Debug/Release **Checks: 11, Fails: 0**.
+
+## CURRENT TOUCHED CORRECTIVE SLICE
+
+`Ui/UiGallery.h`, `Ui/UiGallery.cpp`, `Ui/UiGalleryPaint.cpp`, `Ui/UiGalleryInteraction.cpp`, `examples/UiGalleryDemo/main.cpp`, `Utilities/UiGalleryRegressionTest/*`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`, `docs/ACTIVE_WORK.md`.
+
+The Gallery source/test slice from merge base `a4f81014617dd758893e7cfc105a8a1f4ff24130` through `1c6f0729f2dd2ca74b18d19f7a584d66586f252a` was ahead-only (9 commits, 0 behind) and touched no unrelated control implementation. Subsequent documentation commits only record this accepted/corrective state.
+
+## NEXT ACTION
+
+Windows validate the Gallery correction at final remote `main`:
+1. Ui Debug source compile.
+2. `UiGalleryRegressionTest` Debug and Release: 11/0 each.
+3. `UiGalleryDemo` Release build/run: marquee drag/release/Escape/capture-loss must never stack-overflow; selected tiles and marquee frame must remain clearly visible; marquee fill must not wash over tile content; Dark mode must give a genuinely dark Gallery surface; Ctrl+wheel zoom must update the displayed zoom percentage and retain a sensible pointer anchor.
+4. R2D Dropdown/Menu Windows validation can be performed in the same sweep using `UiDropdownMenuRenderTest` 11/0 and the existing Dropdown/Menu demos.
+5. Apply the one-line `UiListDemo` `BuilderDemoSupport.h` include when doing that demo's next Windows build, unless a safe narrow-edit publication path has already done so.
