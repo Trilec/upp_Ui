@@ -49,4 +49,21 @@ UiItemRenderData UiMakeItemRenderData(const UiTableHeader& header, const String&
     return data;
 }
 
+UiItemRenderData UiMakeItemRenderData(const UiMenuItem& item, const String& right_text)
+{
+    UiItemRenderData data;
+    data.title = item.text;
+    data.description = item.description;
+    data.right_text = right_text.IsEmpty()
+                    ? (item.shortcut_text.IsEmpty() ? item.right_text : item.shortcut_text)
+                    : right_text;
+    data.data = item.data;
+    data.value = item.command_id;
+    data.icon = item.icon;
+    data.icon_render_mode = item.icon_render_mode;
+    data.enabled = item.enabled;
+    data.emphasized = item.default_item;
+    return data;
+}
+
 } // namespace Upp
