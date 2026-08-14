@@ -128,6 +128,10 @@ UiGallery& UiGallery::SetModel(UiListModel& model)
 {
     if(model_ == &model)
         return *this;
+
+    // Do not let an opening selection snapshot from the old model become
+    // meaningful against a newly bound model.
+    EndMarquee(false);
     model_ = &model;
     BindModel(model);
     model_revision_ = -1;
@@ -135,7 +139,6 @@ UiGallery& UiGallery::SetModel(UiListModel& model)
     cursor_ = anchor_ = hot_ = pressed_ = -1;
     scroll_y_ = 0;
     notified_range_ = UiVisibleRange();
-    EndMarquee(true);
     ResetItemRenderPool();
     SyncModel();
     InvalidateGeometry();
