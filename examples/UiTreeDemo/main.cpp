@@ -14,6 +14,7 @@
     - 2026-05: active demo sweep verified; header added during demo cleanup pass.
 */
 #include <Ui/Ui.h>
+#include "../BuilderDemoSupport.h"
 
 using namespace Upp;
 
