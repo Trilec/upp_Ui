@@ -21,9 +21,11 @@
     - GUI thread only while bound to a live control.
 
     Usage
-    - Bind UiListModel with SetModel(...). The default vertical
-      UiItemRenderImage works without configuration and falls back to item.icon
-      when item.image is empty.
+    - Model() always returns the model currently driving the Gallery. By default
+      it is the Gallery-owned internal UiListModel; SetModel(...) switches to an
+      external model and UseInternalModel() switches back without copying data.
+    - The default vertical UiItemRenderImage works without configuration and
+      falls back to item.icon when item.image is empty.
     - Replace presentation with SetItemRender(...).
 */
 
@@ -82,6 +84,13 @@ public:
     const Style& GetCustomStyle() const { return style_; }
 
     UiGallery& SetModel(UiListModel& model);
+    UiGallery& UseInternalModel() { return SetModel(internal_model_); }
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiListModel& Model() { return *model_; }
+    const UiListModel& Model() const { return *model_; }
+    UiGallery& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiListModel& GetInternalModel() { return internal_model_; }
     const UiListModel& GetModel() const { return *model_; }
     UiListModel& GetModel() { return *model_; }
