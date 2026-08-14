@@ -96,8 +96,8 @@ void TestItemRenderFoundation(TestCtx& t)
     t.Expect(!basic.PrepareLayout(RectC(0, 0, 280, 32), UiDirection::H) && basic.GetLayoutSerial() == serial,
              "unchanged renderer preparation does not relayout");
 
-    ImageDraw draw(280, 96);
-    draw.DrawRect(0, 0, 280, 96, White());
+    ImageDraw draw(280, 160);
+    draw.DrawRect(0, 0, 280, 160, White());
     UiItemRenderState normal;
     basic.Paint(draw, normal);
     UiItemRenderState selected;
@@ -105,9 +105,7 @@ void TestItemRenderFoundation(TestCtx& t)
     basic.Paint(draw, selected);
     t.Expect(basic.GetLayoutSerial() == serial,
              "normal and selected Paint calls consume prepared geometry without relayout");
-
-    UiItemRenderHit hit = basic.HitTest(Point(10, 10));
-    t.Expect(hit.IsHit(),
+    t.Expect(basic.HitTest(Point(10, 10)).IsHit(),
              "Basic renderer hit testing consumes prepared visible geometry");
 
     data.title = "Changed renderer item";
@@ -116,7 +114,6 @@ void TestItemRenderFoundation(TestCtx& t)
              && basic.GetLayoutSerial() == serial + 1,
              "rebound renderer data invalidates and prepares layout exactly once");
     serial = basic.GetLayoutSerial();
-
     t.Expect(basic.PrepareLayout(RectC(0, 0, 96, 104), UiDirection::V)
              && basic.GetLayoutSerial() == serial + 1,
              "orientation/allocated-rectangle changes explicitly relayout the renderer");
@@ -134,12 +131,18 @@ void TestItemRenderFoundation(TestCtx& t)
     image.Paint(draw, normal);
     t.Expect(image.GetLayoutSerial() == image_serial && image.HitTest(Point(12, 12)).IsHit(),
              "Image renderer shares the same prepared-layout Paint/HitTest contract");
+
+    UiThemeContext saved = UiTheme::GetContext();
+    UiTheme::Set(UiThemeMode::Dark);
+    image.GetStyle();
+    t.Expect(image.IsLayoutDirty() && image.PrepareLayout(RectC(0, 0, 104, 116), UiDirection::V),
+             "runtime theme revision invalidates only the prepared renderer layout");
+    UiTheme::Set(saved);
 }
 
 void TestModelBulkChange(TestCtx& t, UiListModel& model)
 {
     t.Section("shared model bulk notification");
-
     int revision_before = model.GetRevision();
     model.AddRange(BuildItems(100000));
     t.Expect(model.GetCount() == 100000,
@@ -150,31 +153,43 @@ void TestModelBulkChange(TestCtx& t, UiListModel& model)
 
 void TestListScale(TestCtx& t, UiListModel& model)
 {
-    t.Section("UiList high-scale viewport");
+    t.Section("UiList high-scale viewport + renderer pool");
 
     UiList list;
     list.SetModel(model);
     list.SetRect(0, 0, 520, 480);
     list.Layout();
-    list.ScrollTo(99999);
+    t.Expect(list.GetLiveItemRenderCount() > 0 && list.GetLiveItemRenderCount() < 50,
+             "UiList creates only a viewport-sized renderer pool for 100,000 rows");
+    t.Expect(list.GetLastRenderLayoutCount() <= list.GetLiveItemRenderCount(),
+             "UiList initial renderer layout visits only live pooled rows");
+    list.Layout();
+    t.Expect(list.GetLastRenderLayoutCount() == 0,
+             "unchanged UiList layout reuses prepared renderer geometry");
 
+    list.ScrollTo(99999);
     UiVisibleRange range = list.GetVisibleRange();
     t.Expect(range.Contains(99999),
              "UiList ScrollTo reaches row 99,999 without prefix traversal");
     t.Expect(range.GetCount() < 40,
              "UiList visible range remains viewport-sized at the end of a 100,000-row model");
+    t.Expect(list.GetLiveItemRenderCount() < 50,
+             "deep UiList scrolling does not grow renderer count with logical index");
 
     ImageDraw draw(520, 480);
     draw.DrawRect(0, 0, 520, 480, White());
+    int layouts_before_paint = list.GetLastRenderLayoutCount();
     list.Paint(draw);
     t.Expect(list.GetLastPaintItemCount() == range.GetCount(),
              "UiList paint visits only the computed visible rows");
-    t.Expect(list.GetLastPaintItemCount() < 40,
-             "UiList ordinary paint work is independent of total row count");
+    t.Expect(list.GetLastPaintItemCount() < 40 && list.GetLastRenderLayoutCount() == layouts_before_paint,
+             "UiList Paint does not trigger renderer layout");
 
     UiModelItem changed = model.Get(99999);
     changed.text = "Updated last item";
     model.Set(99999, changed);
+    t.Expect(list.GetLastRenderLayoutCount() <= 1,
+             "single visible UiList model update relayouts at most its bound renderer");
     list.Paint(draw);
     t.Expect(list.GetLastPaintItemCount() < 40,
              "single-row model update preserves bounded UiList paint work");
@@ -182,7 +197,7 @@ void TestListScale(TestCtx& t, UiListModel& model)
 
 void TestGalleryScale(TestCtx& t, UiListModel& model)
 {
-    t.Section("UiGallery high-scale viewport");
+    t.Section("UiGallery high-scale viewport + renderer pool");
 
     UiGallery gallery;
     gallery.SetModel(model)
@@ -203,6 +218,11 @@ void TestGalleryScale(TestCtx& t, UiListModel& model)
     int wide_columns = gallery.GetColumnCount();
     t.Expect(wide_columns >= 4,
              "UiGallery resolves fluid columns arithmetically from viewport width");
+    t.Expect(gallery.GetLiveItemRenderCount() > 0 && gallery.GetLiveItemRenderCount() < 160,
+             "UiGallery creates only visible/overscan renderers for 100,000 items");
+    gallery.Layout();
+    t.Expect(gallery.GetLastRenderLayoutCount() == 0,
+             "unchanged UiGallery layout reuses prepared renderer geometry");
 
     gallery.ScrollTo(99999);
     UiVisibleRange visible = gallery.GetVisibleRange(false);
@@ -213,19 +233,29 @@ void TestGalleryScale(TestCtx& t, UiListModel& model)
              "UiGallery visible plus overscan work stays bounded on a 100,000-item model");
     t.Expect(notified_first >= 0 && notified_last == 99999,
              "UiGallery exposes the useful visible/overscan range for lazy asset preparation");
+    t.Expect(gallery.GetLiveItemRenderCount() < 160,
+             "deep Gallery scrolling rebinds rather than accumulating renderers");
 
     ImageDraw draw(720, 520);
     draw.DrawRect(0, 0, 720, 520, White());
+    int layouts_before_paint = gallery.GetLastRenderLayoutCount();
     gallery.Paint(draw);
-    t.Expect(gallery.GetLastPaintItemCount() < 100,
-             "UiGallery paints only viewport-intersecting tiles");
+    t.Expect(gallery.GetLastPaintItemCount() < 100 && gallery.GetLastRenderLayoutCount() == layouts_before_paint,
+             "UiGallery Paint stays viewport-bounded and never lays out renderers");
 
     int builds = gallery.GetGeometryBuildCount();
     UiModelItem changed = model.Get(99999);
     changed.description = "Updated description";
     model.Set(99999, changed);
-    t.Expect(gallery.GetGeometryBuildCount() == builds,
-             "single item update does not rebuild UiGallery grid geometry");
+    t.Expect(gallery.GetGeometryBuildCount() == builds && gallery.GetLastRenderLayoutCount() <= 1,
+             "single Gallery item update skips grid rebuild and relayouts at most one visible renderer");
+
+    Size before_zoom = gallery.GetItemSize();
+    gallery.SetZoom(1.25, gallery.GetViewportRect().CenterPoint());
+    t.Expect(gallery.GetZoom() > 1.0 && gallery.GetItemSize().cx > before_zoom.cx,
+             "UiGallery semantic zoom changes uniform tile geometry without changing the model");
+    t.Expect(gallery.GetLiveItemRenderCount() < 160,
+             "UiGallery zoom retains a bounded visible renderer pool");
 
     gallery.SetRect(0, 0, 360, 520);
     gallery.Layout();
@@ -233,7 +263,7 @@ void TestGalleryScale(TestCtx& t, UiListModel& model)
              "UiGallery resize recomputes a narrower uniform wrapping grid");
     gallery.ScrollTo(99999);
     t.Expect(gallery.GetVisibleRange(false).Contains(99999),
-             "last logical item remains reachable after fluid column recomputation");
+             "last logical item remains reachable after zoom and fluid column recomputation");
 }
 
 } // namespace
