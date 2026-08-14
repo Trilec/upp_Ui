@@ -242,6 +242,14 @@ private:
     Rect description_;
     Rect right_text_;
     Rect metadata_;
+
+    // Resolved during Layout so zoom/tile fitting never performs font sizing in
+    // Paint. Horizontal List presentation keeps the theme fonts unchanged;
+    // vertical Gallery presentation may step them down within a bounded range.
+    Font title_font_;
+    Font subtitle_font_;
+    Font description_font_;
+    Font right_font_;
 };
 
 } // namespace Upp
