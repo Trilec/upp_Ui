@@ -50,9 +50,13 @@ void TestDropdownAuthority(TestCtx& t)
              "unchanged collapsed Dropdown layout reuses prepared renderer geometry");
 
     UiItemRenderImage image;
+    UiItemRenderStyle image_style = image.GetStyle();
+    image_style.icon_size = DPI(37);
+    image.SetCustomStyle(image_style);
     drop.SetItemRender(image);
     drop.Layout();
-    t.Expect(drop.GetLiveItemRenderCount() == 1 && drop.GetLastRenderLayoutCount() == 1,
+    t.Expect(drop.GetLiveItemRenderCount() == 1 && drop.GetLastRenderLayoutCount() == 1
+             && drop.GetItemRender().GetStyle().icon_size == DPI(37),
              "Dropdown renderer prototype can be replaced without changing model state");
 
     UiDropdown::Item spelling("Alias spelling", 3);
@@ -95,8 +99,11 @@ void TestMenuRenderData(TestCtx& t)
     model.AddChild(model.Root(), item);
     menu.SetModel(model);
     UiItemRenderImage image;
+    UiItemRenderStyle image_style = image.GetStyle();
+    image_style.icon_size = DPI(39);
+    image.SetCustomStyle(image_style);
     menu.SetItemRender(image);
-    t.Expect(dynamic_cast<const UiItemRenderImage *>(&menu.GetItemRender()) != nullptr
+    t.Expect(menu.GetItemRender().GetStyle().icon_size == DPI(39)
              && menu.GetLiveItemRenderCount() == 0,
              "Menu accepts a shared renderer prototype while closed without per-model renderer allocation");
 }
