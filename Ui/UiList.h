@@ -11,31 +11,23 @@
     ======
 
     Purpose
-    - Styled list control backed by UiListModel.
+    - Styled high-scale list control backed by UiListModel.
 
     Intent
-    - Keep list rows lightweight and model-driven while exposing a stable
-      control-level selection contract through SetData()/GetData().
-    - Keep ordinary viewport work proportional to visible rows rather than the
-      total model size, including direct jumps and drag insertion on large models.
-    - Single-selection uses one scalar Value token.
-    - Multi-selection uses a ValueArray of selection tokens.
-    - Tokens resolve to UiModelItem.data when present, otherwise to the row index.
+    - Keep ordinary rows model-driven and independent of child Ctrl count.
+    - Keep viewport work proportional to visible rows, including direct jumps
+      and drag insertion on very large models.
+    - Present visible row content through recycled UiItemRender instances; the
+      view owns geometry/selection/reorder/editing while renderers own prepared
+      row-content layout and painting.
 
     Thread context
     - GUI thread only.
 
     Usage
     - Bind an external model with SetModel(...) or populate GetInternalModel().
-    - Observe selection changes with WhenSelection.
-
-    Changelog
-    - 2026-03: added stable SetData/GetData selection contract and standardized
-      selection event naming for release cleanup.
-    - 2026-04: added control-owned drag reorder with explicit drag handle,
-      side placement, and insertion marker support.
-    - 2026-08: hardened uniform-row viewport traversal and drag insertion for
-      hundred-thousand-item model workloads.
+    - The default horizontal UiItemRenderBasic works without configuration.
+    - Replace presentation with SetItemRender(...) when needed.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -43,6 +35,7 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
 #include <Ui/UiModelView.h>
 
 namespace Upp {
@@ -71,6 +64,9 @@ public:
         StyledMetrics metrics;
         StyledSkin skin;
 
+        // Row extent and List-owned interaction chrome. Item content is painted
+        // by UiItemRender; these fields also remain the canonical theme source
+        // used by the built-in renderer family.
         Font font = StdFont();
         int row_height = DPI(26);
         int item_spacing = 0;
@@ -161,6 +157,11 @@ public:
     UiListModel& GetInternalModel() { return internal_model_; }
     const UiListModel& GetModel() const { return *model_; }
 
+    UiList& SetItemRender(const UiItemRender& render);
+    const UiItemRender& GetItemRender() const { return *item_render_; }
+    int GetLiveItemRenderCount() const { return item_render_pool_.GetCount(); }
+    int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
+
     UiList& SetSelectionMode(UiListSelectionMode mode);
     UiListSelectionMode GetSelectionMode() const { return selection_mode_; }
     UiList& ClearSelection();
@@ -215,6 +216,11 @@ public:
     Event<int, int> WhenReordered;
 
 private:
+    struct ItemRenderSlot {
+        One<UiItemRender> render;
+        int index = -1;
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
@@ -232,7 +238,6 @@ private:
     Rect GetDragRect(const Rect& row) const;
     Rect GetRightTextRect(const Rect& row, const UiModelItem& item) const;
     Rect GetTextRect(const Rect& row, bool has_check, bool has_icon, bool has_metadata, const UiModelItem& item) const;
-    void PaintCheck(Draw& w, const Rect& r, const UiModelItem& item, bool selected) const;
     void PaintRow(Draw& w, int index, const Rect& row) const;
     void MoveCursorBy(int delta);
     void MoveCursorToEdge(bool end);
@@ -240,6 +245,13 @@ private:
     void SelectSingle(int index);
     void ToggleSelection(int index);
     void SelectRangeTo(int index, bool additive);
+
+    void ResetItemRenderPool();
+    void InvalidateItemRenderData(int first = -1, int last = -1);
+    void PrepareItemRenders();
+    UiItemRender* FindPreparedItemRender(int index);
+    const UiItemRender* FindPreparedItemRender(int index) const;
+    UiItemRenderState GetItemRenderState(int index) const;
 
     // Selection token helpers implement the public SetData/GetData contract.
     Value GetSelectionToken(int index) const;
@@ -271,6 +283,11 @@ private:
     UiListModel* model_ = nullptr;
     Vector<UiListModel*> bound_models_;
     mutable int model_revision_ = -1;
+
+    One<UiItemRender> item_render_;
+    Array<ItemRenderSlot> item_render_pool_;
+    UiVisibleRange prepared_render_range_;
+    int last_render_layout_count_ = 0;
 
     Index<int> selected_;
     UiListSelectionMode selection_mode_ = UILISTSEL_SINGLE;
