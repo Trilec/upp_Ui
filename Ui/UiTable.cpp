@@ -74,19 +74,12 @@ UiTable::UiTable()
             CommitEdit();
     };
 
-    internal_model_.SetSize(12, 6);
-    for(int c = 0; c < internal_model_.GetColumnCount(); c++)
-        internal_model_.SetHeader(UITABLE_COLUMN_AXIS, c, UiTableHeader(Format("Column %d", c + 1)));
-    for(int r = 0; r < internal_model_.GetRowCount(); r++)
-        internal_model_.SetHeader(UITABLE_ROW_AXIS, r, UiTableHeader(Format("%d", r + 1)));
-
+    // A default Table is an empty model view. Sample rows/columns belong in
+    // demos, not in the control's hidden internal model.
     BindModel(internal_model_);
     SyncThemeStyle();
     SyncColumnWidths();
     RebuildColumnGeometry();
-    active_cell_ = UiTablePos{0, 0};
-    anchor_cell_ = active_cell_;
-    selection_ = MakeSingleCellSelection(0, 0);
     BackPaint();
     WantFocus();
 }
@@ -153,6 +146,8 @@ UiTable& UiTable::ClearCustomStyle()
 
 UiTable& UiTable::SetModel(UiTableModel& model)
 {
+    if(model_ == &model)
+        return *this;
     CancelEdit();
     model_ = &model;
     BindModel(model);
