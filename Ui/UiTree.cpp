@@ -434,12 +434,12 @@ UiTree& UiTree::MarkNodeChildrenLoaded(UiTreeNodeRef node, bool loaded)
 {
     if(!model_ || !model_->IsValid(node))
         return *this;
+    loading_ids_.RemoveKey(node.id);
     UiModelItem item = model_->Get(node);
     item.lazy_loaded = loaded;
     if(loaded)
         item.lazy_children = false;
     model_->Set(node, item);
-    loading_ids_.RemoveKey(node.id);
     return *this;
 }
 
