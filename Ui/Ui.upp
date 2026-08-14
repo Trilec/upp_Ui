@@ -19,6 +19,8 @@ file
 	UiTheme.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
+	UiItemRender.h,
+	UiItemRender.cpp,
 	UiModelView.h,
 	UiGraph/UiGraph.h,
 	UiGraph/UiGraphModel.h,
