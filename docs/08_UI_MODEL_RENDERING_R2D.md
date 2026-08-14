@@ -83,6 +83,15 @@ layout, scrolling, model/style changes and explicit visibility changes.
 `PopupWindow::Paint()` only consumes the prepared renderer pool plus Dropdown
 chrome. It does not call renderer layout or rebuild popup scrollbar geometry.
 
+`SetItemRender()` requests layout. U++ is allowed to service that layout request
+before a caller later invokes `Layout()` explicitly. Therefore instrumentation
+such as `GetLastRenderLayoutCount()` must not be used to require renderer
+preparation to happen in one particular caller-visible layout turn. The durable
+contract is that the replacement prototype/style survives cloning, the bounded
+collapsed/popup renderer population is correct, model/selection state is
+unchanged, and a subsequent unchanged layout performs no unnecessary renderer
+relayout.
+
 ## UiMenu
 
 ### Domain model stays domain-specific
@@ -157,13 +166,19 @@ bounded pool. Popup `Paint()` visits only the prepared visible range.
 - external model update without mirror refresh;
 - one collapsed renderer instance;
 - no relayout on unchanged collapsed layout;
-- renderer prototype replacement without model replacement;
+- renderer prototype/style replacement while preserving model and selection state;
 - the `UiDropdown::Item` spelling resolving directly to `UiModelItem`;
 - `UiMenuItem` to `UiItemRenderData` title/description/right mapping;
 - Menu payload/command/default-item mapping;
 - common renderer layout from Menu data;
 - Paint consuming prepared geometry without relayout;
 - Menu renderer prototype replacement while closed without per-model allocation.
+
+The prototype-replacement check deliberately does not require
+`GetLastRenderLayoutCount() == 1` after a subsequent explicit `Layout()`: Windows
+validation showed that `RefreshLayout()` may already have prepared the new
+renderer, making that later call correctly report zero new layouts. Requiring a
+second layout would test scheduling rather than renderer/model correctness.
 
 Windows acceptance should additionally build and exercise the existing
 `UiDropdownDemo` and `UiMenuDemo`, including popup scrolling, selection/checking,
