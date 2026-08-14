@@ -32,6 +32,7 @@
     - 2026-08: added UiRangeSliderEdit for range plus direct numeric entry.
     - 2026-08: exposed the reusable UiGraphModel / UiNodeGraph subsystem.
     - 2026-08: added UiGallery and shared high-scale model-view geometry helpers.
+    - 2026-08: added shared UiItemRender presentation infrastructure.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -43,6 +44,7 @@
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
 #include <Ui/UiModelView.h>
 #include <Ui/UiGraph/UiGraph.h>
 #include <Ui/UiLayoutCursor.h>
