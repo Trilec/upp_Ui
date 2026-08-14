@@ -333,7 +333,7 @@ void UiDropdown::PopupWindow::SyncScrollBarState()
 {
     if(!owner)
         return;
-    const Style& style = owner->GetEffectiveStyle();
+    const UiDropdown::Style& style = owner->GetEffectiveStyle();
     int extent = GetItemExtent();
     int count = owner->GetCount();
     int64 total64 = count > 0 ? (int64)count * extent - max(0, style.item_spacing) : 0;
@@ -380,7 +380,7 @@ Rect UiDropdown::PopupWindow::GetItemContentRect(int index) const
     if(!owner || inner.IsEmpty() || index < 0 || index >= owner->GetCount())
         return Rect(0, 0, 0, 0);
 
-    const Style& style = owner->GetEffectiveStyle();
+    const UiDropdown::Style& style = owner->GetEffectiveStyle();
     const UiModelItem& item = owner->GetModel().Get(index);
     int gap = DPI(6);
 
@@ -475,7 +475,7 @@ void UiDropdown::PopupWindow::Paint(Draw& target)
     if(!owner)
         return;
 
-    const Style& style = owner->GetEffectiveStyle();
+    const UiDropdown::Style& style = owner->GetEffectiveStyle();
     Rect bounds = GetSize();
     if(bounds.IsEmpty())
         return;
