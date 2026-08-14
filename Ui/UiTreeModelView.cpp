@@ -11,9 +11,9 @@ void UiTree::BindModel(UiTreeModel& model)
     bound_models_.Add(&model);
     Ptr<UiTree> self = this;
     UiTreeModel* observed = &model;
-    model.WhenChange << [self, observed](const UiModelChange&) {
+    model.WhenChange << [self, observed](const UiModelChange& change) {
         if(self && self->model_ == observed)
-            self->HandleModelChange(UiModelChange());
+            self->HandleModelChange(change);
     };
 }
 
@@ -110,7 +110,7 @@ void UiTree::EnsureLazyChildren(UiTreeNodeRef node)
 void UiTree::RebuildVisibleRows()
 {
     visible_rows_.Clear();
-    visible_row_ids_.Clear();
+    visible_row_by_id_.Clear();
     visible_lookup_build_count_++;
     ResetRenderPools();
     if(!model_ || !model_->IsValid(model_->Root()))
@@ -133,10 +133,11 @@ void UiTree::AddVisibleSubtree(int id, int depth)
     if(!model_->IsValid(node))
         return;
 
+    int row_index = visible_rows_.GetCount();
     VisibleRow& row = visible_rows_.Add();
     row.id = id;
     row.depth = depth;
-    visible_row_ids_.FindAdd(id);
+    visible_row_by_id_.Add(id, row_index);
     const UiModelItem& item = model_->Get(node);
     row.has_children = model_->GetChildCount(node) > 0 || item.lazy_children || IsNodeLoading(node);
     row.expanded = row.has_children && IsExpanded(node);
@@ -157,7 +158,10 @@ void UiTree::AddVisibleSubtree(int id, int depth)
 
 int UiTree::FindVisibleRow(int id) const
 {
-    return id >= 0 ? visible_row_ids_.Find(id) : -1;
+    if(id < 0)
+        return -1;
+    int q = visible_row_by_id_.Find(id);
+    return q >= 0 ? visible_row_by_id_[q] : -1;
 }
 
 int UiTree::GetVisibleRowIndex(UiTreeNodeRef node) const
