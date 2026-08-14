@@ -36,6 +36,9 @@ enum class UiRole : byte;
 class UiDropdown : public Ctrl, public CtrlStyled<UiDropdown> {
 public:
     typedef UiDropdown CLASSNAME;
+    // Convenience spelling only: there is no Dropdown-specific item object or
+    // mirror. UiModelItem remains the one data type stored by UiListModel.
+    using Item = UiModelItem;
 
     struct Style : ChStyle<Style> {
         StyledPalette palette;
@@ -54,7 +57,6 @@ public:
         Font font = StdFont();
         bool transparent = true;
 
-        // Used to configure the built-in UiItemRenderBasic row prototype.
         UiLabel::Style popup_item_style;
         int popup_max_height = DPI(300);
         int popup_min_width = DPI(120);
@@ -112,7 +114,6 @@ public:
 
     UiDropdown();
 
-    // Model ------------------------------------------------------------------
     UiDropdown& SetModel(UiListModel& model);
     UiDropdown& UseInternalModel();
     UiListModel& GetInternalModel() { return internal_model_; }
@@ -154,14 +155,12 @@ public:
     String GetItemDescription(int index) const;
     String GetItemRightText(int index) const;
 
-    // Shared item presentation -----------------------------------------------
     UiDropdown& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     int GetLiveItemRenderCount() const;
     int GetLastRenderLayoutCount() const;
     int GetLastPaintItemCount() const;
 
-    // Selection ---------------------------------------------------------------
     UiDropdown& Select(int index);
     UiDropdown& Select(const String& text, bool case_sensitive = false);
     UiDropdown& SelectByData(const Value& data);
@@ -183,7 +182,6 @@ public:
     Vector<int> GetCheckedIndices() const;
     Vector<Value> GetCheckedData() const;
 
-    // Configuration -----------------------------------------------------------
     UiDropdown& SetIndicatorSide(UiAlign side);
     UiDropdown& ShowIndicator(bool on = true);
     UiDropdown& SetIndicatorGlyphs(const Image& closed, const Image& opened);
@@ -216,7 +214,6 @@ public:
     UiDropdown& SetDragSide(UiAlign side);
     UiDropdown& SetDragGlyph(const Image& glyph);
 
-    // Styling ----------------------------------------------------------------
     UiDropdown& SetRole(UiRole role);
     UiRole GetRole() const { return (UiRole)role_; }
     UiDropdown& SetCustomStyle(const Style& s);
@@ -230,7 +227,6 @@ public:
     StyledSkin& StyledSkinRef() { return StyleEdit().skin; }
     void OnStyleChanged();
 
-    // Layout / sizing ---------------------------------------------------------
     Size GetMinSize() const override;
     void Layout() override;
     UiDropdown& SetSizeMin(Size sz);
@@ -240,7 +236,6 @@ public:
     UiDropdown& SetPlaceholderText(const String& text);
     UiDropdown& SetEmptyText(const String& text);
 
-    // Optional control-chrome hooks only; item presentation uses UiItemRender.
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&,
           const StyledSkin&, StyledState, bool> WhenPaintBackground;
     Event<Draw&, const Rect&, const StyledPalette&, const StyledMetrics&,
@@ -248,7 +243,6 @@ public:
     Event<String&, const UiModelItem&, int> WhenQueryItemText;
     Event<Draw&, const Rect&, int, const Style&> WhenPaintSelectionBadge;
 
-    // Ctrl -------------------------------------------------------------------
     void Paint(Draw& w) override;
     void LeftDown(Point p, dword flags) override;
     void LeftUp(Point p, dword flags) override;
@@ -260,7 +254,6 @@ public:
     void SetData(const Value& v) override;
     Value GetData() const override;
 
-    // Events -----------------------------------------------------------------
     Event<int> WhenSelect;
     Event<const String&> WhenSelectText;
     Event<const Value&> WhenSelectData;
@@ -272,7 +265,6 @@ public:
     Event<UiReorderRequest&> WhenReorderRequest;
     Event<int, int> WhenReordered;
 
-    // Popup ------------------------------------------------------------------
     bool IsPopupOpen() const { return popup_open_; }
     UiDropdown& OpenPopup();
     UiDropdown& ClosePopup();
