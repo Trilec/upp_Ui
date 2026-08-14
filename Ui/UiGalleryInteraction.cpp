@@ -34,6 +34,7 @@ void UiGallery::BeginMarquee(Point p, dword flags)
 
     marquee_candidate_ = true;
     marquee_active_ = false;
+    marquee_capture_owned_ = false;
     marquee_start_content_ = marquee_current_content_ = ToContentPoint(p);
     marquee_flags_ = flags;
     marquee_open_selection_ = GetSelection();
@@ -65,6 +66,7 @@ void UiGallery::UpdateMarquee(Point p, dword)
         marquee_active_ = true;
         marquee_candidate_ = false;
         SetCapture();
+        marquee_capture_owned_ = HasCapture();
     }
 
     AutoScrollMarquee(p);
@@ -129,7 +131,7 @@ void UiGallery::UpdateMarqueeSelection()
     NotifySelectionChange();
 }
 
-void UiGallery::EndMarquee(bool cancel)
+void UiGallery::EndMarquee(bool cancel, bool release_capture)
 {
     bool had_marquee = marquee_candidate_ || marquee_active_;
     if(cancel && had_marquee) {
@@ -144,8 +146,16 @@ void UiGallery::EndMarquee(bool cancel)
     marquee_candidate_ = false;
     marquee_active_ = false;
     marquee_open_selection_.Clear();
-    if(HasCapture())
+
+    // Mark capture ownership gone before releasing it. On Win32/U++ the
+    // ReleaseCapture path can synchronously drive CancelMode(); clearing this
+    // guard first makes that re-entry passive instead of recursively releasing
+    // the same capture again.
+    bool do_release = release_capture && marquee_capture_owned_ && HasCapture();
+    marquee_capture_owned_ = false;
+    if(do_release)
         ReleaseCapture();
+
     if(had_marquee)
         Refresh();
     if(cancel && had_marquee && WhenSelection)
@@ -324,9 +334,11 @@ bool UiGallery::Key(dword key, int)
 void UiGallery::CancelMode()
 {
     if(marquee_candidate_ || marquee_active_)
-        EndMarquee(true);
-    if(HasCapture())
-        ReleaseCapture();
+        EndMarquee(true, false);
+    marquee_capture_owned_ = false;
+    pressed_ = -1;
+    // Capture teardown owns ReleaseCapture(). Never call it from CancelMode():
+    // on Win32 that can recursively re-enter CancelMode before capture clears.
     Ctrl::CancelMode();
 }
 
