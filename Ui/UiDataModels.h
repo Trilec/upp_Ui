@@ -33,6 +33,8 @@
       target the end position (`to == GetCount()`).
     - 2026-08: moved the expanded UiGraphModel into Ui/UiGraph and removed the
       original integer-ID placeholder model.
+    - 2026-08: added optional image presentation content for shared item renders;
+      icon remains the compact glyph while image represents thumbnail/media.
 */
 
 #include <Core/Core.h>
@@ -64,6 +66,7 @@ struct UiModelItem : Moveable<UiModelItem> {
     Vector<UiModelColumn> columns;
     int    text_align = ALIGN_LEFT;
     int    right_text_align = ALIGN_RIGHT;
+    Image  image;
     Image  icon;
     UiIconRenderMode icon_render_mode = UiIconRenderMode::PreserveColor;
     bool   has_check = false;
@@ -89,9 +92,10 @@ struct UiModelItem : Moveable<UiModelItem> {
     UiModelItem(const UiModelItem& o)
         : text(o.text), data(o.data), enabled(o.enabled), description(o.description),
           right_text(o.right_text), columns(clone(o.columns)), text_align(o.text_align),
-          right_text_align(o.right_text_align), icon(o.icon), icon_render_mode(o.icon_render_mode),
-          has_check(o.has_check), checked(o.checked), group_header(o.group_header),
-          separator_before(o.separator_before), custom_ink_color(o.custom_ink_color), use_custom_font(o.use_custom_font),
+          right_text_align(o.right_text_align), image(o.image), icon(o.icon),
+          icon_render_mode(o.icon_render_mode), has_check(o.has_check), checked(o.checked),
+          group_header(o.group_header), separator_before(o.separator_before),
+          custom_ink_color(o.custom_ink_color), use_custom_font(o.use_custom_font),
           custom_font(o.custom_font), underline(o.underline), underline_color(o.underline_color),
           editable(o.editable), lazy_children(o.lazy_children), lazy_loaded(o.lazy_loaded),
           has_metadata(o.has_metadata), metadata_color(o.metadata_color) {}
@@ -105,6 +109,7 @@ struct UiModelItem : Moveable<UiModelItem> {
         columns = clone(o.columns);
         text_align = o.text_align;
         right_text_align = o.right_text_align;
+        image = o.image;
         icon = o.icon;
         icon_render_mode = o.icon_render_mode;
         has_check = o.has_check;
