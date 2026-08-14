@@ -26,10 +26,13 @@ void UiGallery::HandleModelChange(const UiModelChange& change)
     SyncModel();
 
     if(change.kind == UI_MODEL_UPDATE && geometry_valid_) {
-        UiVisibleRange visible = GetVisibleRange(true);
         int start = max(0, change.a);
         int count = max(1, change.b);
         int end = start + count - 1;
+        InvalidateItemRenderData(start, end);
+        PrepareItemRenders();
+
+        UiVisibleRange visible = GetVisibleRange(true);
         if(!visible.IsEmpty() && end >= visible.first && start <= visible.last) {
             int a = max(start, visible.first);
             int b = min(end, visible.last);
@@ -39,6 +42,7 @@ void UiGallery::HandleModelChange(const UiModelChange& change)
         return;
     }
 
+    InvalidateItemRenderData();
     InvalidateGeometry();
 }
 
@@ -215,17 +219,6 @@ int UiGallery::HitTestItem(Point p) const
         return -1;
     int index = row * columns_ + col;
     return index >= 0 && index < model_->GetCount() ? index : -1;
-}
-
-UiGalleryItemVisualState UiGallery::GetItemVisualState(int index) const
-{
-    if(!model_ || index < 0 || index >= model_->GetCount() || !model_->Get(index).enabled)
-        return UIGALLERYITEM_DISABLED;
-    if(IsSelected(index))
-        return UIGALLERYITEM_SELECTED;
-    if(index == hot_)
-        return UIGALLERYITEM_HOT;
-    return UIGALLERYITEM_NORMAL;
 }
 
 } // namespace Upp
