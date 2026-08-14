@@ -150,7 +150,6 @@ public:
     UiTreeModel& GetInternalModel() { return internal_model_; }
     const UiTreeModel& GetModel() const { return *model_; }
 
-    // Primary/column presentation. Tree remains authoritative for hierarchy chrome.
     UiTree& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     UiTree& SetColumnRender(int column, const UiItemRender& render);
@@ -359,7 +358,7 @@ private:
     mutable int model_revision_ = -1;
 
     Vector<VisibleRow> visible_rows_;
-    Index<int> visible_row_ids_;
+    VectorMap<int, int> visible_row_by_id_;
     int visible_lookup_build_count_ = 0;
     Index<int> expanded_ids_;
     Index<int> selected_ids_;
@@ -374,7 +373,6 @@ private:
     int last_render_layout_count_ = 0;
     mutable int last_paint_item_count_ = 0;
 
-    // Accessory controls are owned externally; the tree only tracks safe attached pointers.
     VectorMap<int, Vector<Ptr<Ctrl>>> node_ctrls_;
     bool root_visible_ = false;
     bool dnd_enabled_ = true;
