@@ -17,6 +17,11 @@
 
     Thread context
     - GUI thread only.
+
+    Model ownership
+    - Model() always returns the model currently driving the Dropdown. The
+      control owns an internal UiListModel by default; SetModel(...) switches to
+      an external model and UseInternalModel() switches back without copying.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -116,6 +121,12 @@ public:
 
     UiDropdown& SetModel(UiListModel& model);
     UiDropdown& UseInternalModel();
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiListModel& Model() { return *model_; }
+    const UiListModel& Model() const { return *model_; }
+    UiDropdown& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiListModel& GetInternalModel() { return internal_model_; }
     UiListModel& GetModel() { return *model_; }
     const UiListModel& GetModel() const { return *model_; }
