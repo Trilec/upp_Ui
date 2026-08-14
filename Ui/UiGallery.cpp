@@ -31,9 +31,11 @@ const UiGallery::Style& UiGallery::StyleDefault()
         s.metrics.focus_color = Color(65, 167, 248);
         s.skin = StyledSkin();
 
-        s.marquee_fill = Color(219, 234, 254);
+        s.marquee_fill = Color(239, 246, 255);
         s.marquee_frame = Color(59, 130, 246);
-        s.marquee_frame_width = DPI(1);
+        s.marquee_frame_width = DPI(2);
+        s.selection_frame = Color(59, 130, 246);
+        s.selection_frame_width = DPI(2);
     }
     return s;
 }
@@ -88,14 +90,39 @@ void UiGallery::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    themed_style_ = StyleDefault();
     UiList::Style list = UiTheme::ResolveList();
+    themed_style_ = StyleDefault();
     themed_style_.palette = list.palette;
     themed_style_.metrics = list.metrics;
-    themed_style_.skin = list.skin;
+    // Gallery owns one viewport surface rather than a List row skin. Keeping the
+    // theme palette while dropping row/nine-slice skin avoids stale light image
+    // surfaces when switching to Dark mode.
+    themed_style_.skin = StyledSkin();
     themed_style_.metrics.content_margin = Rect(0, 0, 0, 0);
-    themed_style_.marquee_fill = list.selected_face;
-    themed_style_.marquee_frame = list.selected_frame;
+    themed_style_.metrics.radius = 0;
+    themed_style_.metrics.face_enabled = true;
+
+    Color surface = SColorPaper();
+    if(themed_style_.palette.face[ST_NORMAL].IsSolid())
+        surface = themed_style_.palette.face[ST_NORMAL].color;
+    Color selected = list.selected_face;
+    if(IsNull(selected))
+        selected = surface;
+    themed_style_.marquee_fill = Blend(surface, selected, 96);
+
+    Color accent = list.drag_marker;
+    if(IsNull(accent))
+        accent = list.selected_frame;
+    if(IsNull(accent))
+        accent = themed_style_.metrics.focus_color;
+    if(IsNull(accent))
+        accent = Color(59, 130, 246);
+    themed_style_.marquee_frame = accent;
+    themed_style_.selection_frame = accent;
+    themed_style_.marquee_frame_width = DPI(2);
+    themed_style_.selection_frame_width = DPI(2);
+    themed_style_.metrics.focus_color = accent;
+
     vscroll_.SetCustomStyle(UiTheme::ResolveScrollBar());
     theme_revision_ = revision;
 }
@@ -253,6 +280,8 @@ UiGallery& UiGallery::SetZoom(double zoom, Point anchor)
     UpdateVisibleRangeNotification();
     RefreshLayout();
     Refresh();
+    if(WhenZoom)
+        WhenZoom(zoom_);
     return *this;
 }
 
