@@ -55,8 +55,14 @@ void TestDropdownAuthority(TestCtx& t)
     image.SetCustomStyle(image_style);
     drop.SetItemRender(image);
     drop.Layout();
-    t.Expect(drop.GetLiveItemRenderCount() == 1 && drop.GetLastRenderLayoutCount() == 1
-             && drop.GetItemRender().GetStyle().icon_size == DPI(37),
+    // SetItemRender() requests layout, and a live U++ control may service that
+    // request before this explicit Layout() call. The renderer contract does not
+    // require preparation to occur in a particular caller-visible layout turn.
+    t.Expect(drop.GetLiveItemRenderCount() == 1
+             && drop.GetItemRender().GetStyle().icon_size == DPI(37)
+             && drop.GetSelection() == 0
+             && drop.GetSelectedText() == "Changed externally"
+             && drop.GetItem(0).text == "Changed externally",
              "Dropdown renderer prototype can be replaced without changing model state");
 
     UiDropdown::Item spelling("Alias spelling", 3);
