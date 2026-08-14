@@ -95,14 +95,32 @@ Its high-scale geometry is intentionally uniform:
 
 `SetItemRender(...)` is the presentation extension point. Selection, scrolling,
 zoom, marquee selection, model ownership and useful-range calculation remain
-Gallery responsibilities. `SetZoom()`/`ZoomBy()` alter uniform cell geometry; on
-Windows, Ctrl+wheel routes to Gallery zoom. Expensive preview preparation should
-follow the bounded useful range rather than delaying cheap grid arithmetic.
+Gallery responsibilities. `SetZoom()`/`ZoomBy()` alter uniform cell geometry and
+emit `WhenZoom` only when the resolved semantic zoom actually changes; on Windows,
+Ctrl+wheel routes to Gallery zoom. Expensive preview preparation should follow the
+bounded useful range rather than delaying cheap grid arithmetic.
 
 Multi-select background marquee maps the band to row/column spans arithmetically.
 Plain drag replaces selection, Ctrl drag toggles against the opening selection,
 Shift drag extends/adds from the opening selection, Escape restores the opening
 selection, and edge drag autoscrolls.
+
+Gallery interaction chrome is view-owned. The marquee fill is drawn behind tile
+content, its frame is drawn above the tiles, and selected tiles receive an
+explicit theme-derived interaction frame independent of the renderer's own
+selected-state surface. This keeps thumbnails/text readable while making both
+marquee and selected-state boundaries obvious in Light and Dark modes.
+
+Gallery marquee capture has one explicit ownership rule: only the active Gallery
+marquee path may release capture, and that ownership flag is cleared before the
+release call. `CancelMode()` never calls `ReleaseCapture()`. This is required on
+Win32/U++ because capture release can synchronously re-enter `CancelMode()`; a
+release from inside that callback would recurse until stack overflow.
+
+The theme-driven Gallery viewport uses the current List palette/metrics but not a
+List row/nine-slice skin. Gallery is one viewport surface, so retaining a row skin
+can leave a stale light raster when switching to Dark mode. Custom Gallery styles
+may still provide their own explicit skin.
 
 Variable-height/masonry layout is intentionally outside the current high-scale
 contract. If added later it must declare its retained geometry/cache cost rather
@@ -195,9 +213,9 @@ rather than blindly scanning the entire graph.
 
 ## Validation
 
-`Utilities/UiModelViewPerformanceTest` now covers the renderer foundation plus
-List, Gallery and Table. The current R2C source target is **50 deterministic
-checks**. Its Table coverage includes:
+`Utilities/UiModelViewPerformanceTest` covers the renderer foundation plus List,
+Gallery and Table. R2C Windows acceptance established **52 deterministic checks**
+in both Debug and Release with `Fails: 0`. Its Table coverage includes:
 
 - 100,000 logical rows and direct row 99,999 reachability;
 - bounded cell/header renderer pools;
@@ -209,7 +227,8 @@ checks**. Its Table coverage includes:
 - per-column renderer override without losing bounded pooling.
 
 `Utilities/UiTreeScaleTest` is deliberately separate and contains **11
-deterministic checks**. It covers:
+deterministic checks**. R2C Windows acceptance established all 11 in both Debug
+and Release with `Fails: 0`. It covers:
 
 - a flat 100,000-node projection and exact final-row id lookup;
 - bounded primary/column renderer pools;
@@ -220,6 +239,13 @@ deterministic checks**. It covers:
 - lazy-loading placeholder lookup correctness;
 - zero-child lazy completion removing its placeholder in the same projection
   rebuild.
+
+`Utilities/UiGalleryRegressionTest` is the focused corrective suite for Gallery
+capture/theme/presentation behavior. It contains **11 checks** covering bounded
+renderers, explicit selection/marquee frames, semantic zoom notification,
+Dark-mode viewport styling, Paint-without-relayout and passive `CancelMode()` when
+no Gallery marquee is active. Windows Debug/Release execution remains pending for
+this corrective suite.
 
 These tests verify geometry, renderer-pool bounds, renderer-layout counts and paint
 visit counts rather than fragile elapsed-time thresholds. Windows Debug/Release
