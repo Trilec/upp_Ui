@@ -25,6 +25,11 @@
     Thread context
     - GUI thread only.
 
+    Model ownership
+    - Model() always returns the model currently driving the graph. UiNodeGraph
+      owns an internal UiGraphModel by default; SetModel(...) switches to an
+      external model and UseInternalModel() switches back without copying.
+
     Changelog
     - 2026-08: migrated from staging into Ui/UiGraph, removed the temporary
       namespace/package layer, integrated UiTheme, and reconciled geometry and
@@ -190,6 +195,12 @@ public:
 
     UiNodeGraph& SetModel(UiGraphModel& model);
     UiNodeGraph& UseInternalModel();
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiGraphModel& Model() { return *model_; }
+    const UiGraphModel& Model() const { return *model_; }
+    UiNodeGraph& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spellings retained only while repository callers migrate.
     UiGraphModel& GetInternalModel() { return internal_model_; }
     const UiGraphModel& GetModel() const { return *model_; }
     UiGraphModel& GetModel() { return *model_; }
