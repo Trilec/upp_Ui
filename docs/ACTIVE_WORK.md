@@ -34,9 +34,10 @@ R2B PUBLISHED REFERENCE MIGRATION:
 - List migration: `569b44b65e89c3178d825c1078a09bbe762041dd` through `255ea0422a1892e3a7651f4143cd072272db47d5` plus package integration. `UiList` now uses a bounded horizontal renderer pool; default is `UiItemRenderBasic`; item content Paint no longer duplicates renderer layout/paint logic.
 - Gallery migration: `07082fcd20323530f70a78f8691ddc33bf09ac6b` through `455d3d3b5581fc6480f24fbc620bfa6c7ac3265f`. `UiGallery` now uses a bounded vertical renderer pool; default is `UiItemRenderImage`; the superseded `WhenPaintItem`/Gallery-item-style authority is removed.
 - `3f757ec0f682b269e628ed9332375519c7e6a112` — expanded deterministic 100,000-item renderer-pool/zoom acceptance.
-- `b325a6f...` + `cbedd11972252929d06eb9058fbf315446ccd592` — Gallery marquee model-switch/cancel lifecycle fixes; opening selection is never restored against a newly bound model and cancel callbacks are truthful.
+- `b325a6f548cf5f44ec238167d8644d817a7ba684` + `cbedd11972252929d06eb9058fbf315446ccd592` — Gallery marquee model-switch/cancel lifecycle fixes; opening selection is never restored against a newly bound model and cancel callbacks are truthful.
 - `9e0f46ded9fe146337e02309ec79b3f44ab41a54` — shared 10,000-item List/Gallery visual demo with 64 small deterministic reused images, Basic/Image renderer switching, First/Last, zoom, theme toggle and visible live-pool counts.
 - `1918c4d4ff07c94d160759baea52f6daa61170a2` + `db5e1c4a71ad54c785112aff6737110a858cef5b` — Gallery topic + scale guide updated to the renderer architecture.
+- `cf5dfa326ac3b8515cf322dddedf74de1f79c14f` — dedicated public `UiItemRender` topic documenting data/prototype/pool/layout/Paint/theme usage.
 
 R2B BEHAVIOUR:
 - one `UiListModel` may drive List and Gallery simultaneously;
@@ -51,16 +52,18 @@ R2B BEHAVIOUR:
 DETERMINISTIC R2 TEST TARGET: `Utilities/UiModelViewPerformanceTest` now contains **39 checks**. Expected Windows Debug and Release result: `Checks: 39, Fails: 0`. Coverage includes renderer dirty-layout gating, clone independence, runtime theme invalidation, bounded List/Gallery renderer pools, deep item 99,999 reachability, Paint-without-layout, narrow visible update relayout, Gallery zoom/reflow and final-item reachability.
 
 STATIC/REPOSITORY REVIEW:
-- compare `15a57b7...` -> `db5e1c4...`: R2 slice is ahead 26, behind 0 and touches only renderer/List/Gallery/model/demo/test/docs/package files; accepted concurrent UiDoc/Graph files are untouched;
+- compare `15a57b7...` -> `db5e1c4...`: R2 source/demo/test/docs slice is ahead 26, behind 0 and touches only renderer/List/Gallery/model/demo/test/docs/package files; accepted concurrent UiDoc/Graph files are untouched;
 - `Ui.upp` contains `UiItemRender.cpp`, `UiListRender.cpp` and `UiGalleryRender.cpp`; `Ui.h` exports `UiItemRender.h`;
 - current Gallery API contains no `UiGalleryItemVisualState`; old `WhenPaintItem` is removed from the current topic/API and replaced by `SetItemRender(...)`;
 - List/Gallery deep ordinary paint paths still use arithmetic visible ranges; renderer pools bind useful-range indexes only;
 - no U++/Windows compile is claimed from this environment.
 
-TOUCHED R2 SLICE: `Ui/UiItemRender.*`, `Ui/UiDataModels.h`, `Ui/Ui.h`, `Ui/Ui.upp`, `Ui/UiList*`, `Ui/UiGallery*`, `Ui/src.tpp/UiGallery.tpp`, `Utilities/UiModelViewPerformanceTest/main.cpp`, `examples/UiGalleryDemo/main.cpp`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`, `docs/ACTIVE_WORK.md`.
+RECOVERY CHECKPOINT: `cf5dfa326ac3b8515cf322dddedf74de1f79c14f` contains all substantive R2A/R2B source, test, demo and public-documentation work. The following `ACTIVE_WORK` commit only records this state.
+
+TOUCHED R2 SLICE: `Ui/UiItemRender.*`, `Ui/UiDataModels.h`, `Ui/Ui.h`, `Ui/Ui.upp`, `Ui/UiList*`, `Ui/UiGallery*`, `Ui/src.tpp/UiItemRender.tpp`, `Ui/src.tpp/UiGallery.tpp`, `Utilities/UiModelViewPerformanceTest/main.cpp`, `examples/UiGalleryDemo/main.cpp`, `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md`, `docs/ACTIVE_WORK.md`.
 
 STATUS: **R2A + R2B IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
 
 PRESERVED MAIN STATE: remote GitHub is authoritative; accepted UiDoc/UiGraph history remains untouched. Never force-update `main`.
 
-NEXT ACTION: Windows acceptance on the exact current `main` checkpoint: build Ui, run Debug+Release `UiModelViewPerformanceTest` expecting 39/0, build/smoke `UiGalleryDemo`, manually verify shared List/Gallery data, renderer switching, First/Last, resize, Light/Dark, Gallery Ctrl+wheel/button zoom and plain/Ctrl/Shift/Escape marquee. Only tiny mechanical compile fixes are in Gary scope; substantive renderer/model/view fixes return to the implementation agent.
+NEXT ACTION: Windows acceptance on exact current `main`: build Ui, run Debug+Release `UiModelViewPerformanceTest` expecting 39/0, build/smoke `UiGalleryDemo`, manually verify shared List/Gallery data, renderer switching, First/Last, resize, Light/Dark, Gallery Ctrl+wheel/button zoom and plain/Ctrl/Shift/Escape marquee. Only tiny mechanical compile fixes are in Gary scope; substantive renderer/model/view fixes return to the implementation agent.
