@@ -1,8 +1,9 @@
 uses
+	Core,
 	Ui;
 
 file
 	main.cpp;
 
 mainconfig
-	"GUI CLANG" = "";
+	"" = "CONSOLE";
