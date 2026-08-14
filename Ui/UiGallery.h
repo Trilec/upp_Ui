@@ -52,14 +52,17 @@ public:
         StyledMetrics metrics;
         StyledSkin skin;
 
-        Color marquee_fill = Color(219, 234, 254);
+        Color marquee_fill = Color(239, 246, 255);
         Color marquee_frame = Color(59, 130, 246);
-        int marquee_frame_width = DPI(1);
+        int marquee_frame_width = DPI(2);
+        Color selection_frame = Color(59, 130, 246);
+        int selection_frame_width = DPI(2);
 
         void Serialize(Stream& s)
         {
             s % palette % metrics % skin
-              % marquee_fill % marquee_frame % marquee_frame_width;
+              % marquee_fill % marquee_frame % marquee_frame_width
+              % selection_frame % selection_frame_width;
         }
     };
 
@@ -157,6 +160,7 @@ public:
 
     Event<> WhenSelection;
     Event<> WhenAction;
+    Event<double> WhenZoom;
     Event<int, int> WhenVisibleRange;
 
 private:
@@ -201,7 +205,7 @@ private:
     void UpdateMarquee(Point p, dword flags);
     void UpdateMarqueeSelection();
     void AutoScrollMarquee(Point p);
-    void EndMarquee(bool cancel);
+    void EndMarquee(bool cancel, bool release_capture = true);
     Rect GetMarqueeContentRect() const;
     Point ToContentPoint(Point p) const;
 
@@ -255,6 +259,7 @@ private:
 
     bool marquee_candidate_ = false;
     bool marquee_active_ = false;
+    bool marquee_capture_owned_ = false;
     Point marquee_start_content_ = Point(0, 0);
     Point marquee_current_content_ = Point(0, 0);
     Vector<int> marquee_open_selection_;
