@@ -25,7 +25,9 @@
     - GUI thread only.
 
     Usage
-    - Bind an external model with SetModel(...) or populate GetInternalModel().
+    - Model() always returns the model currently driving the List. By default it
+      is the List-owned internal model; SetModel(...) switches to an external
+      model and UseInternalModel() switches back without copying either model.
     - The default horizontal UiItemRenderBasic works without configuration.
     - Replace presentation with SetItemRender(...) when needed.
 */
@@ -154,6 +156,14 @@ public:
     const Style& GetCustomStyle() const { return style_; }
 
     UiList& SetModel(UiListModel& model);
+    UiList& UseInternalModel() { return SetModel(internal_model_); }
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiListModel& Model() { return *model_; }
+    const UiListModel& Model() const { return *model_; }
+    UiList& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spellings retained only while repository callers are
+    // migrated in this convergence task; they are not separate authorities.
     UiListModel& GetInternalModel() { return internal_model_; }
     const UiListModel& GetModel() const { return *model_; }
 
