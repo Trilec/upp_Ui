@@ -7,36 +7,26 @@
 
     License
     - Apache License 2.0, matching this repository's LICENSE file.
+
     UiTree
     ------
 
     Purpose
-    - Styled tree control backed by UiTreeModel.
-    - Supports single and multi-selection, expansion, lazy loading, inline
-      rename, accessory controls, and drag/drop reparenting.
+    - Styled, virtualized tree control backed by UiTreeModel.
+    - Supports single/multi selection, expansion, lazy loading, inline rename,
+      accessory controls, renderer-backed columns, and drag/drop reparenting.
 
     Intent
-    - Public selection/data contract uses node data when available.
-    - Single-select GetData() returns one scalar selection token.
-    - Multi-select GetData() returns a ValueArray of selection tokens.
-    - Selection token fallback is the node id when the node has null data.
+    - Keep hierarchy and semantic state in UiTreeModel.
+    - Keep hierarchy/disclosure/connector/drop chrome in UiTree.
+    - Present primary item content and data columns through bounded
+      visible/overscan UiItemRender pools.
+    - Rebuild the visible projection after structural/model changes, but make
+      ordinary deep scrolling/painting depend on viewport size rather than the
+      index of the visible row.
 
     Thread context
     - GUI thread only.
-
-    Usage
-    - Bind an external model with SetModel(...) or populate GetInternalModel().
-    - Observe selection changes with WhenSelection.
-
-    Changelog
-    - 2026-03: standardized selection event naming and added SetData/GetData
-      selection contract for release cleanup.
-    - 2026-04: normalized custom tree icon naming and render policy onto
-      icon/icon_render_mode to match the wider Ui API vocabulary.
-    - 2026-04: added GetContentSize() to expose stable content extent for
-      parent containers and inspector shells.
-    - 2026-05: exposed GetNodeAt() so toolbox hover/help can use the same row
-      hit testing as normal selection without duplicating tree internals.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -44,6 +34,8 @@
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDataModels.h>
+#include <Ui/UiItemRender.h>
+#include <Ui/UiModelView.h>
 
 namespace Upp {
 
@@ -158,6 +150,12 @@ public:
     UiTreeModel& GetInternalModel() { return internal_model_; }
     const UiTreeModel& GetModel() const { return *model_; }
 
+    // Primary/column presentation. Tree remains authoritative for hierarchy chrome.
+    UiTree& SetItemRender(const UiItemRender& render);
+    const UiItemRender& GetItemRender() const;
+    UiTree& SetColumnRender(int column, const UiItemRender& render);
+    UiTree& ClearColumnRender(int column);
+
     UiTree& SetRootVisible(bool on = true);
     bool IsRootVisible() const { return root_visible_; }
 
@@ -214,6 +212,13 @@ public:
     void ScrollTo(UiTreeNodeRef node);
     void ScrollToSelection();
 
+    UiVisibleRange GetVisibleRange(int overscan_rows = 0) const;
+    int GetVisibleRowIndex(UiTreeNodeRef node) const;
+    int GetLiveItemRenderCount() const { return item_render_pool_.GetCount() + column_render_pool_.GetCount(); }
+    int GetLastRenderLayoutCount() const { return last_render_layout_count_; }
+    int GetLastPaintItemCount() const { return last_paint_item_count_; }
+    int GetVisibleRowLookupBuildCount() const { return visible_lookup_build_count_; }
+
     virtual void Paint(Draw& w) override;
     virtual void Layout() override;
     Size GetContentSize() const;
@@ -251,14 +256,33 @@ private:
         bool placeholder = false;
     };
 
+    struct ItemRenderSlot {
+        One<UiItemRender> render;
+        int row = -1;
+    };
+
+    struct ColumnRenderSlot {
+        One<UiItemRender> render;
+        const UiItemRender* prototype = nullptr;
+        int row = -1;
+        int column = -1;
+    };
+
+    struct ColumnRenderOverride {
+        int column = -1;
+        One<UiItemRender> render;
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
+    void BindModel(UiTreeModel& model);
+    void HandleModelChange(const UiModelChange& change);
     void SyncModel();
 
-    // Visible-row cache and attached child-control layout are rebuilt outside Paint().
     void RebuildVisibleRows();
     void AddVisibleSubtree(int id, int depth);
+    int FindVisibleRow(int id) const;
     void EnsureLazyChildren(UiTreeNodeRef node);
     void ClampScroll();
     void UpdateAttachedCtrls();
@@ -275,18 +299,21 @@ private:
     Vector<Rect> GetColumnRects(const Rect& row, const UiModelItem& item) const;
     Rect GetAccessoryRect(const Rect& row, int node_id, int index) const;
     Rect GetTextRect(const Rect& row, int depth, bool has_glyph, bool has_icon, bool has_metadata, int node_id) const;
+    Rect GetItemContentRect(const Rect& row, int depth, bool has_glyph, int node_id) const;
     int HitTestColumn(const Rect& row, const UiModelItem& item, Point p) const;
-    void PaintItemColumns(Draw& w, const Rect& row, const UiModelItem& item, bool enabled, bool selected) const;
     void PaintDropTarget(Draw& w, const Rect& viewport) const;
-    struct DropTarget {
-        int parent_id = -1;
-        int insert_pos = -1;
-        int hover_id = -1;
-        bool into = false;
-        bool valid = false;
-    };
 
-    // Selection/data helpers implement the public node-token contract.
+    void EnsureItemRender();
+    void ConfigureDefaultItemRender();
+    const UiItemRender& ResolveColumnRender(int column) const;
+    void ResetRenderPools();
+    void PrepareItemRenders();
+    UiItemRender* FindPreparedItemRender(int row);
+    const UiItemRender* FindPreparedItemRender(int row) const;
+    UiItemRender* FindPreparedColumnRender(int row, int column);
+    const UiItemRender* FindPreparedColumnRender(int row, int column) const;
+    UiItemRenderState GetItemRenderState(int row) const;
+
     void PaintChevron(Draw& w, const Rect& r, bool expanded, bool selected, bool hot) const;
     void PaintRow(Draw& w, int index, const Rect& row) const;
     void MoveCursorBy(int delta);
@@ -301,6 +328,15 @@ private:
     Vector<UiTreeNodeRef> GetDragNodes(UiTreeNodeRef primary) const;
     bool CanMoveNodes(const Vector<UiTreeNodeRef>& nodes, UiTreeNodeRef new_parent, int pos) const;
     bool MoveNodes(const Vector<UiTreeNodeRef>& nodes, UiTreeNodeRef new_parent, int pos);
+
+    struct DropTarget {
+        int parent_id = -1;
+        int insert_pos = -1;
+        int hover_id = -1;
+        bool into = false;
+        bool valid = false;
+    };
+
     DropTarget GetDropTarget(Point p) const;
     void SetDropTarget(const DropTarget& target);
     void ClearDropTarget();
@@ -311,7 +347,6 @@ private:
     void CancelRename();
 
 private:
-    // Style/theme state and model revision tracking feed the visible-row cache.
     Style style_;
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
@@ -319,13 +354,25 @@ private:
 
     UiTreeModel internal_model_;
     UiTreeModel* model_ = nullptr;
+    Vector<UiTreeModel*> bound_models_;
     Vector<int> column_widths_;
     mutable int model_revision_ = -1;
 
     Vector<VisibleRow> visible_rows_;
+    Index<int> visible_row_ids_;
+    int visible_lookup_build_count_ = 0;
     Index<int> expanded_ids_;
     Index<int> selected_ids_;
     Index<int> loading_ids_;
+
+    One<UiItemRender> item_render_;
+    bool custom_item_render_ = false;
+    Array<ColumnRenderOverride> column_render_overrides_;
+    Array<ItemRenderSlot> item_render_pool_;
+    Array<ColumnRenderSlot> column_render_pool_;
+    UiVisibleRange prepared_render_range_;
+    int last_render_layout_count_ = 0;
+    mutable int last_paint_item_count_ = 0;
 
     // Accessory controls are owned externally; the tree only tracks safe attached pointers.
     VectorMap<int, Vector<Ptr<Ctrl>>> node_ctrls_;
@@ -346,7 +393,6 @@ private:
     bool drop_into_ = false;
     int scroll_y_ = 0;
 
-    // Inline rename state is transient and must not outlive the active edit session.
     InlineEditor inline_editor_;
     bool editing_ = false;
     int editing_id_ = -1;
@@ -355,4 +401,3 @@ private:
 }
 
 #endif
-
