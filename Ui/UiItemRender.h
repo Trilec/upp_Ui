@@ -21,7 +21,7 @@
     Usage
     - Ordinary controls provide a default renderer. Advanced callers create a
       UiItemRenderBasic/UiItemRenderImage (or subclass), configure it, and pass it
-      to the owning view with SetItemRender(...).
+      to the owning view with the appropriate render-slot setter.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -96,6 +96,9 @@ struct UiItemRenderData : Moveable<UiItemRenderData> {
 };
 
 UiItemRenderData UiMakeItemRenderData(const UiModelItem& item);
+UiItemRenderData UiMakeItemRenderData(const UiModelColumn& column, bool enabled = true);
+UiItemRenderData UiMakeItemRenderData(const UiTableCell& cell, const String& display);
+UiItemRenderData UiMakeItemRenderData(const UiTableHeader& header, const String& display);
 
 struct UiItemRenderStyle : Moveable<UiItemRenderStyle> {
     StyledPalette palette;
@@ -156,9 +159,6 @@ public:
     bool HasCustomStyle() const { return has_custom_style_; }
     const UiItemRenderStyle& GetStyle() const;
 
-    // Safe to call whenever the view's useful range is synchronized. The
-    // virtual Layout() override runs only when data/theme/configuration or the
-    // assigned rectangle/direction actually changed.
     bool PrepareLayout(const Rect& rect, UiDirection direction);
     void InvalidateLayout();
     bool IsLayoutDirty() const { return layout_dirty_; }
