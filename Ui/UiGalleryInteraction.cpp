@@ -131,7 +131,8 @@ void UiGallery::UpdateMarqueeSelection()
 
 void UiGallery::EndMarquee(bool cancel)
 {
-    if(cancel && (marquee_candidate_ || marquee_active_)) {
+    bool had_marquee = marquee_candidate_ || marquee_active_;
+    if(cancel && had_marquee) {
         selected_.Clear();
         for(int i = 0; i < marquee_open_selection_.GetCount(); i++)
             if(IsSelectableIndex(marquee_open_selection_[i]))
@@ -145,8 +146,9 @@ void UiGallery::EndMarquee(bool cancel)
     marquee_open_selection_.Clear();
     if(HasCapture())
         ReleaseCapture();
-    Refresh();
-    if(cancel && WhenSelection)
+    if(had_marquee)
+        Refresh();
+    if(cancel && had_marquee && WhenSelection)
         WhenSelection();
 }
 
