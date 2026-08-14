@@ -1,104 +1,124 @@
 # ACTIVE WORK
 
-CURRENT CODE CHECKPOINT: `1a69143bb317e7325b1160c9f747b1ffa3f38f10` — published three-line Windows compile fix on top of Gallery corrective/R2D validation state.
-
-WINDOWS STOP-REPORT BASE: `f69fd6c1fb3259db9dd9a72e1e750ff3c0edd954` — exact HEAD Gary tested before the Dropdown compile blocker was fixed.
-
-BASELINE MERGE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merge of Gary's R2C demo-fix commit `1743fcbe4aee8d257015194910a9a6efc47c2726` with R2D checkpoint `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
-
 TASK: `UI-GALLERY-CORRECTIVE + R2D-WINDOWS-VALIDATION`.
 
 Remote GitHub is authoritative. Fetch live `main` before further work and never force-update it.
 
-## R2C TREE + TABLE — WINDOWS ACCEPTED
+BASELINE MERGE: `a4f81014617dd758893e7cfc105a8a1f4ff24130` — merged R2C demo fix plus R2D implementation checkpoint.
 
-Gary validated R2C on Windows/U++ CLANGx64.
+## ACCEPTED BASELINE
 
+R2C Tree + Table is Windows accepted:
 - Ui Debug source compile: PASS, 82 files, 0 compile errors, 0 warnings.
-- `UiModelViewPerformanceTest` Debug: **52/0**, Release: **52/0**.
-- `UiTreeScaleTest` Debug: **11/0**, Release: **11/0**.
-- `UiTreeDemo`: PASS for expand/collapse, navigation, multi-select paths, F2 rename/cancel and DnD; no stale lazy `Loading...` row, freeze or crash.
-- `UiTableDemo`: PASS for scrolling, selection, resize and header-sort behavior; no freeze/crash.
-- Four-column Table demo cannot meaningfully exercise deep horizontal overflow; deterministic R2C coverage does so with 2,000 columns.
-- synthetic Enter did not trigger the Table editor in the automation driver, but no Table source defect was demonstrated.
-- `git diff --check`: PASS.
+- `UiModelViewPerformanceTest`: Debug **52/0**, Release **52/0**.
+- `UiTreeScaleTest`: Debug **11/0**, Release **11/0**.
+- Tree and Table focused smoke: PASS; no freeze/crash.
 
-R2C STATUS: **WINDOWS ACCEPTED.**
-
-Gary's mechanical `UiTreeDemo` shared-support include fix `1743fcbe...` is already merged. `UiListDemo` still has the same pre-existing missing `../BuilderDemoSupport.h` include; apply it only when that demo is deliberately touched/built. It is not a library blocker.
+Gary's `UiTreeDemo` shared-support include fix `1743fcbe...` is merged. `UiListDemo` still has the same tiny pre-existing `../BuilderDemoSupport.h` include gap; Gary may fix it mechanically when that demo is deliberately built.
 
 ## R2D DROPDOWN + MENU
 
 Substantive R2D checkpoint: `ce825f8cb507fbce1b7139d9601c8c2eaf5c8f9d`.
 
-Implemented architecture:
-- Dropdown uses `UiListModel` as sole row authority; no parallel item mirror/conversion/sync state remains.
-- `UiDropdown::Item` is only a type alias to `UiModelItem`.
-- collapsed/popup Dropdown presentation uses bounded prepared `UiItemRender` instances; popup Paint does not prepare renderer geometry.
-- Menu keeps authoritative `UiMenuModel` semantics and uses shared `UiItemRender` for ordinary popup content while retaining check/radio/submenu/command/session/menu-bar semantics.
+Architecture remains:
+- Dropdown uses one authoritative `UiListModel`; no parallel item mirror/sync state.
+- collapsed/popup Dropdown content uses bounded prepared `UiItemRender` instances.
+- Menu keeps authoritative `UiMenuModel` semantics and uses shared rendering for ordinary popup content while retaining check/radio/submenu/command/session/menu-bar behavior.
 - `UiDropdownMenuRenderTest` target: Debug/Release **11/0** each.
-- implementation note: `docs/08_UI_MODEL_RENDERING_R2D.md`.
 
-### Windows compile stop and published fix
+Windows initially found three `UiDropdownPopup.cpp` type-name errors because `PopupWindow : TopWindow` inherited non-type `TopWindow::Style(dword)`, hiding unqualified `UiDropdown::Style` inside popup member scope. Published mechanical source fix:
+- `1a69143bb317e7325b1160c9f747b1ffa3f38f10` — exactly three `const UiDropdown::Style&` qualifications.
 
-At `f69fd6c1...`, Ui compilation stopped with exactly three errors in `Ui/UiDropdownPopup.cpp` because `UiDropdown::PopupWindow : TopWindow` inherited non-type `TopWindow::Style(dword)`, hiding the unqualified nested `UiDropdown::Style` type inside `PopupWindow` member scope.
+Gary subsequently confirmed at `d78f16134c14d5eeb6eabd60abb9b9c4d1dc5303`:
+- Ui Debug compile PASS, 0 warnings, 0 compile errors.
+- the three Dropdown errors are gone.
 
-Published fix: `1a69143bb317e7325b1160c9f747b1ffa3f38f10` — `UiDropdownPopup qualifies nested style in TopWindow scope`.
+R2D STATUS: **IMPLEMENTATION COMPLETE — WINDOWS RUNTIME/TEST VALIDATION PENDING.**
 
-The diff is exactly three replacements:
+## GALLERY CAPTURE + MARQUEE CORRECTIVE
 
-```cpp
-const UiDropdown::Style& style = owner->GetEffectiveStyle();
-```
+Already published and retained:
+- explicit Gallery-owned selection/marquee interaction frame;
+- marquee fill painted behind item content and frame painted above it;
+- `WhenZoom(double)` semantic notification;
+- Win32 capture-recursion root fix: Gallery tracks marquee capture ownership, clears ownership before normal release, and `CancelMode()` never calls `ReleaseCapture()`.
 
-in:
-- `PopupWindow::SyncScrollBarState()`
-- `PopupWindow::GetItemContentRect()`
-- `PopupWindow::Paint()`
+The former stack overflow path was:
+`CancelMode -> ReleaseCapture -> CancelMode -> ...`
+Current source removes that recursive ownership path; no depth guard/workaround was introduced.
 
-No other source line changed in that commit. The ordinary unqualified `Style` use inside `UiDropdown` member scope remains untouched because it is not affected by `TopWindow` name hiding.
+## WINDOWS DARK-THEME STOP REPORT
 
-R2D STATUS: **IMPLEMENTATION COMPLETE — WINDOWS VALIDATION RESUMPTION REQUIRED.**
+Gary retested exact HEAD `d78f16134c14d5eeb6eabd60abb9b9c4d1dc5303` with clean tree:
+- Ui Debug compile: PASS, 0 warnings/errors.
+- `UiGalleryRegressionTest` Debug: **11 checks, 1 fail**.
+- `UiGalleryRegressionTest` Release: **11 checks, 1 fail**.
+- sole failure: `Dark theme resolves Gallery viewport surface to a dark palette face`.
+- all other ten Gallery corrective checks passed.
+- Gary correctly stopped before Gallery runtime/R2D runtime tests.
 
-## GALLERY CORRECTIVE
+User screenshot confirmed the broader visual symptom: while Dark mode was active, Gallery viewport/tiles, List region and showcase header/margins still appeared light.
 
-Published corrective source includes:
-- `e253f063...` — explicit selection/marquee/capture/zoom contract.
-- `d125dbba...` — theme-driven Gallery viewport no longer reuses List row/nine-slice skin; Dark mode surface/accent resolve from current theme; semantic `WhenZoom`.
-- `66c566c8...` — marquee fill behind tile content, frame above it, explicit selected-tile frame.
-- `1d6e0656...` — Win32 capture-recursion root fix: Gallery owns marquee capture explicitly, clears ownership before release, and `CancelMode()` never calls `ReleaseCapture()`.
-- `46efb6cc...` — demo listens to `WhenZoom`, so Ctrl+wheel and button zoom keep status live.
-- `Utilities/UiGalleryRegressionTest` — **11 deterministic checks**.
-- `docs/06_UI_MODEL_VIEW_SCALE_GUIDE.md` — accepted R2C totals and Gallery capture/theme/presentation invariants.
+### Root cause
 
-Gallery interaction rules:
-- renderer owns ordinary item content; Gallery owns selection/marquee chrome;
-- marquee fill is behind tiles so images/text are not washed out;
-- marquee and selected-tile frames are explicit 2px theme-derived interaction strokes;
-- theme-driven Gallery viewport uses current theme palette/metrics without retaining a List row raster skin;
-- `WhenZoom(double)` fires only for an actual resolved zoom change;
-- visible/overscan renderer pooling and Paint-without-layout invariants remain unchanged.
+This was not a missing hardcoded dark RGB.
 
-GALLERY STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+1. The Minimal List role intentionally allows a transparent normal row face (`UiFill::None()` / lightweight row surface).
+2. Gallery copied that List palette, enabled its viewport face, but when the face remained `NONE` it fell through to platform `SColorPaper()` semantics; therefore the standalone Gallery remained white.
+3. The showcase root used transparent `UiBoxLayout` directly over the platform `TopWindow`, so the intentionally transparent List region also exposed white.
+4. `UiGalleryDemo` called style-mutating `UiGroupPanel::SetHeaderMode()` / `SetInset()` during construction, which entered `StyleEdit()` and froze the then-current Light style, preventing later theme switching from restyling the header.
 
-## WINDOWS STATUS / TARGETS
+### Published dark/theme corrections
+
+- `250e62cb67c2f67e861733e7d9ff185912daf30e` — Gallery keeps List-derived content palette semantics but, when a face is intentionally `NONE`, resolves the standalone viewport face through the current theme's `UiPanel` Surface role. No hardcoded dark palette; explicit solid/image List faces remain authoritative. Gallery still drops List row skin for the viewport.
+- `393113ade55e814c98e7a7dbee74b426624d1712` — Gallery showcase removes redundant style-mutating GroupPanel setters and puts its transparent layouts on a theme-aware `UiPanel` root surface. Header, margins/gaps and transparent List region can now remain theme-live.
+
+## GALLERY ZOOM-TEXT CORRECTIVE
+
+The original acceptance also found that Gallery tiles zoomed while text stayed full-size.
+
+Published:
+- `3be0fdef6ef599a38d73a14afe6be6c15898093e` — `UiItemRenderImage` stores layout-resolved fonts.
+- `fef9cd6fda28d989428cc3d39bac26e2e61e4b36` — vertical image-tile presentation uses a bounded 0/1/2/3-step font reduction ladder based on the allocated content rectangle. Normal-size tiles keep the theme font; compact tiles step down to a DPI-aware minimum. Horizontal List rendering is unchanged. Explicit custom model title fonts are preserved. Font sizing happens only in renderer `Layout()` and Paint consumes cached fonts.
+- `a071b808164c2ca206d6a5b6440cf2277e16ccdc` — scale guide records theme-surface, style-freezing and zoom-font rules plus the 10/11 Windows stop evidence.
+
+GALLERY STATUS: **CORRECTIVE IMPLEMENTATION COMPLETE — WINDOWS REVALIDATION PENDING.**
+
+## CURRENT WINDOWS TARGETS
 
 Already accepted:
 - `UiModelViewPerformanceTest`: Debug **52/0**, Release **52/0**.
 - `UiTreeScaleTest`: Debug **11/0**, Release **11/0**.
 
-Pending after code checkpoint `1a69143...`:
-- Ui Debug source compile must clear the previous three `UiDropdownPopup.cpp` errors.
-- `UiGalleryRegressionTest`: Debug/Release **11/0** each.
-- `UiDropdownMenuRenderTest`: Debug/Release **11/0** each.
-- Gallery, Dropdown and Menu runtime smoke.
+Revalidate at final remote HEAD:
+- Ui Debug source compile: PASS required.
+- `UiGalleryRegressionTest`: expected Debug **11/0**, Release **11/0**.
+- `UiDropdownMenuRenderTest`: expected Debug **11/0**, Release **11/0**.
+- Gallery/Dropdown/Menu focused runtime smoke.
+
+## GARY SCOPE DURING VALIDATION
+
+Gary does **not** need to stop for trivial mechanical defects. He may repair and locally commit a tiny obvious issue such as:
+- missing include;
+- required type qualification/name-shadow fix;
+- obvious spelling/identifier typo;
+- similarly mechanical build-only correction with no design/behavior choice.
+
+He should record the exact change/commit and continue validation. Stop and return to implementation for substantive rendering, model ownership, interaction, state, lifecycle, performance or architecture defects.
 
 ## NEXT ACTION
 
-1. Fetch live `main` and record the exact final recovery/documentation HEAD.
-2. Re-run Ui Debug source compile. Stop on the first new substantive source/runtime failure.
-3. Run `UiGalleryRegressionTest` Debug and Release: 11/0 each.
-4. Run `UiGalleryDemo` Release and verify repeated marquee drag/release/Escape/capture-loss never stack-overflows; selected tiles and marquee are clear; Dark is genuinely dark; marquee fill does not wash out content; Ctrl+wheel zoom updates the displayed percentage and remains sensibly pointer-anchored.
-5. Run `UiDropdownMenuRenderTest` Debug and Release: 11/0 each.
-6. Run `UiDropdownDemo` and `UiMenuDemo` Release for popup scroll/selection/multi-check/drag reorder and Menu check/radio/submenu/keyboard/theme behavior.
-7. Finish with `git diff --check` and clean `git status`.
+1. Fetch live `main`, record exact HEAD, require clean start.
+2. Build Ui Debug CLANGx64.
+3. Run `UiGalleryRegressionTest` Debug/Release: expected **11/0** each.
+4. Run `UiGalleryDemo` Release and verify:
+   - repeated marquee drag/release/Escape/edge-autoscroll never stack-overflows;
+   - selected tile and marquee frames remain obvious;
+   - marquee fill does not wash over images/text;
+   - Light -> Dark -> Light changes header, root/margins, List region and Gallery viewport/tile area coherently;
+   - Ctrl+wheel and +/- zoom both update status and keep a sensible anchor;
+   - at reduced tile zoom, theme text steps down discretely/boundedly rather than remaining full-size; 100% keeps normal text size;
+   - 10,000-item scrolling/First/Last remain responsive.
+5. Run `UiDropdownMenuRenderTest` Debug/Release: expected **11/0** each.
+6. Run Dropdown/Menu demos for popup scrolling, selection, multi-check/reorder, check/radio/submenus, keyboard and theme behavior.
+7. Finish with `git diff --check` and report final status/local mechanical commits if any.
