@@ -167,7 +167,10 @@ R2C adds:
 - a bounded primary-row renderer pool plus bounded renderer surfaces for visible
   data columns;
 - `SetColumnRender(...)` for column-specific presentation overrides;
-- Paint beginning at the computed visible projection row rather than row zero.
+- Paint beginning at the computed visible projection row rather than row zero;
+- lazy completion clears loading state before the model notification rebuilds the
+  projection, so a legitimate zero-child completion cannot leave a stale
+  `Loading...` placeholder.
 
 Tree continues to own hierarchy depth, connector lines, disclosure/loading glyphs,
 expansion, selection, drag/drop, focus/drop chrome, lazy lifecycle and attached
@@ -205,7 +208,7 @@ checks**. Its Table coverage includes:
 - exactly one retained-prefix rebuild for one column resize;
 - per-column renderer override without losing bounded pooling.
 
-`Utilities/UiTreeScaleTest` is deliberately separate and contains **10
+`Utilities/UiTreeScaleTest` is deliberately separate and contains **11
 deterministic checks**. It covers:
 
 - a flat 100,000-node projection and exact final-row id lookup;
@@ -214,7 +217,9 @@ deterministic checks**. It covers:
 - renderer layout remaining outside Paint;
 - projection/lookup correctness after model change;
 - per-column renderer override;
-- lazy-loading placeholder lookup correctness.
+- lazy-loading placeholder lookup correctness;
+- zero-child lazy completion removing its placeholder in the same projection
+  rebuild.
 
 These tests verify geometry, renderer-pool bounds, renderer-layout counts and paint
 visit counts rather than fragile elapsed-time thresholds. Windows Debug/Release
