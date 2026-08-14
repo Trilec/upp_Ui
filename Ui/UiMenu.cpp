@@ -32,13 +32,53 @@ Color BlendDisabledMenu(Color c)
     return Blend(c, SColorPaper(), 160);
 }
 
+UiItemRenderStyle MakeMenuItemRenderStyle(const UiMenu::Style& menu)
+{
+    UiItemRenderBasic basic;
+    UiItemRenderStyle style = basic.GetStyle();
+    style.metrics.face_enabled = false;
+    style.metrics.frame_enabled = false;
+    style.metrics.focus_enabled = false;
+    style.metrics.shadow.enabled = false;
+    style.metrics.content_margin = Rect(0, 0, 0, 0);
+    style.show_face = false;
+    style.show_image = false;
+    style.show_icon = menu.show_icons;
+    style.show_subtitle = false;
+    style.show_description = menu.show_descriptions;
+    style.show_right_text = menu.show_shortcuts;
+    style.show_metadata = false;
+    style.title_font = menu.font;
+    style.subtitle_font = menu.font;
+    style.description_font = menu.font;
+    style.description_font.Height(max(DPI(8), menu.font.GetHeight() - DPI(1)));
+    style.right_font = menu.font;
+    style.icon_size = menu.icon_size;
+    style.content_gap = menu.content_gap;
+    style.text_gap = DPI(1);
+    style.muted_ink = menu.right_ink;
+
+    for(int i = 0; i < 4; i++) {
+        style.palette.face[i] = UiFill::None();
+        style.palette.frame[i] = Null;
+        style.palette.ink[i] = menu.item_ink;
+        style.palette.icon[i] = menu.item_ink;
+    }
+    style.palette.ink[ST_DISABLED] = menu.disabled_ink;
+    style.palette.icon[ST_DISABLED] = menu.disabled_ink;
+    return style;
+}
+
 }
 
 UiMenu::PopupLevel::PopupLevel()
 {
     BackPaint();
     Add(vscroll_);
-    vscroll_.WhenScroll = [=] { Refresh(); };
+    vscroll_.WhenScroll = [=] {
+        PrepareItemRenders();
+        Refresh();
+    };
     SetFrame(NullFrame());
     WantFocus();
 }
@@ -47,6 +87,7 @@ void UiMenu::PopupLevel::Init(UiMenu* owner, int level)
 {
     owner_ = owner;
     level_ = level;
+    ResetRenderPool();
 }
 
 void UiMenu::PopupLevel::SetParentNode(UiMenuNodeRef parent)
@@ -55,6 +96,7 @@ void UiMenu::PopupLevel::SetParentNode(UiMenuNodeRef parent)
     hot_index_ = -1;
     pressed_index_ = -1;
     vscroll_.Set(0);
+    ResetRenderPool();
     for(int i = 0; i < GetItemCount(); i++) {
         UiMenuNodeRef child = owner_->GetChildNode(parent_node_, i);
         if(child.IsValid() && owner_->IsSelectable(owner_->GetModel().Get(child), child)) {
@@ -86,18 +128,29 @@ Rect UiMenu::PopupLevel::GetRowRect(int index) const
     int scroll = vscroll_.IsShown() ? vscroll_.Get() : 0;
     int extent = style.row_height + max(0, style.item_spacing);
     int row_top = style.popup_padding - scroll + index * extent;
-    return Rect(style.popup_padding, row_top, r.right - style.popup_padding - sb, row_top + style.row_height);
+    return Rect(style.popup_padding, row_top,
+                r.right - style.popup_padding - sb, row_top + style.row_height);
+}
+
+Rect UiMenu::PopupLevel::GetContentRect(int index) const
+{
+    if(!owner_ || index < 0 || index >= GetItemCount())
+        return Rect(0, 0, 0, 0);
+    UiMenuNodeRef node = owner_->GetChildNode(parent_node_, index);
+    if(!node.IsValid())
+        return Rect(0, 0, 0, 0);
+    return owner_->GetPopupContentRect(GetRowRect(index), node, owner_->GetModel().Get(node));
 }
 
 int UiMenu::PopupLevel::HitTestRow(Point p) const
 {
     if(!owner_ || !Rect(GetSize()).Contains(p))
         return -1;
-    for(int i = GetVisibleStart(), end = min(GetItemCount(), GetVisibleStart() + GetVisibleCount() + 1); i < end; i++) {
-        Rect rr = GetRowRect(i);
-        if(rr.Contains(p))
+    int start = GetVisibleStart();
+    int end = min(GetItemCount(), start + GetVisibleCount() + 1);
+    for(int i = start; i < end; i++)
+        if(GetRowRect(i).Contains(p))
             return i;
-    }
     return -1;
 }
 
@@ -131,27 +184,30 @@ void UiMenu::PopupLevel::EnsureVisible(int index)
     if(index < 0 || index >= GetItemCount())
         return;
     const Style& style = owner_->GetEffectiveStyle();
-    int top = index * style.row_height;
+    int extent = style.row_height + max(0, style.item_spacing);
+    int top = index * extent;
     int bottom = top + style.row_height;
     int page = max(style.row_height, GetSize().cy - style.popup_padding * 2);
     if(top < vscroll_.Get())
         vscroll_.Set(top);
     else if(bottom > vscroll_.Get() + page)
         vscroll_.Set(bottom - page);
+    PrepareItemRenders();
 }
 
 void UiMenu::PopupLevel::SyncScrollBar()
 {
     const Style& style = owner_->GetEffectiveStyle();
-    int total = GetItemCount() * style.row_height;
+    int extent = style.row_height + max(0, style.item_spacing);
+    int count = GetItemCount();
+    int total = count > 0 ? count * extent - max(0, style.item_spacing) : 0;
     int page = max(style.row_height, GetSize().cy - style.popup_padding * 2);
     bool show = total > page;
     vscroll_.Show(show);
     if(show) {
-        vscroll_.Set(0);
         vscroll_.SetTotal(total);
         vscroll_.SetPage(page);
-        vscroll_.SetLine(style.row_height);
+        vscroll_.SetLine(extent);
     }
     else
         vscroll_.Set(0);
@@ -166,8 +222,64 @@ void UiMenu::PopupLevel::SyncWindowRegion()
     Update();
 }
 
+void UiMenu::PopupLevel::ResetRenderPool()
+{
+    render_pool_.Clear();
+    prepared_first_ = prepared_last_ = -1;
+    last_render_layout_count_ = 0;
+}
+
+void UiMenu::PopupLevel::PrepareItemRenders()
+{
+    last_render_layout_count_ = 0;
+    if(!owner_ || GetItemCount() <= 0 || GetSize().cx <= 0 || GetSize().cy <= 0) {
+        prepared_first_ = prepared_last_ = -1;
+        return;
+    }
+
+    owner_->EnsureItemRender();
+    int first = GetVisibleStart();
+    int end = min(GetItemCount(), first + GetVisibleCount() + 1);
+    int count = max(0, end - first);
+    while(render_pool_.GetCount() < count) {
+        RenderSlot& slot = render_pool_.Add();
+        slot.render = owner_->item_render_->Clone();
+    }
+
+    for(int i = 0; i < count; i++) {
+        int index = first + i;
+        RenderSlot& slot = render_pool_[i];
+        UiMenuNodeRef node = owner_->GetChildNode(parent_node_, index);
+        if(!node.IsValid()) {
+            slot.index = -1;
+            continue;
+        }
+        if(slot.index != index) {
+            slot.render->SetData(owner_->MakeMenuRenderData(node, owner_->GetModel().Get(node)));
+            slot.index = index;
+        }
+        if(slot.render->PrepareLayout(GetContentRect(index), UiDirection::H))
+            last_render_layout_count_++;
+    }
+    for(int i = count; i < render_pool_.GetCount(); i++)
+        render_pool_[i].index = -1;
+    prepared_first_ = count ? first : -1;
+    prepared_last_ = count ? first + count - 1 : -1;
+}
+
+const UiItemRender* UiMenu::PopupLevel::FindPreparedRender(int index) const
+{
+    if(prepared_first_ < 0 || index < prepared_first_ || index > prepared_last_)
+        return nullptr;
+    int slot = index - prepared_first_;
+    if(slot < 0 || slot >= render_pool_.GetCount() || render_pool_[slot].index != index)
+        return nullptr;
+    return render_pool_[slot].render.operator->();
+}
+
 void UiMenu::PopupLevel::Paint(Draw& w)
 {
+    last_paint_item_count_ = 0;
     if(!owner_)
         return;
     const Style& style = owner_->GetEffectiveStyle();
@@ -181,13 +293,25 @@ void UiMenu::PopupLevel::Paint(Draw& w)
     dw.DrawRect(0, 0, 1, sz.cy, style.palette.frame[ST_NORMAL]);
     dw.DrawRect(sz.cx - 1, 0, 1, sz.cy, style.palette.frame[ST_NORMAL]);
 
-    int start = GetVisibleStart();
-    int end = min(GetItemCount(), start + GetVisibleCount() + 1);
-    for(int i = start; i < end; i++) {
+    int first = max(0, prepared_first_);
+    int last = min(GetItemCount() - 1, prepared_last_);
+    for(int i = first; i <= last; i++) {
         UiMenuNodeRef node = owner_->GetChildNode(parent_node_, i);
         if(!node.IsValid())
             continue;
-        owner_->PaintMenuRow(dw, GetRowRect(i), node, owner_->GetModel().Get(node), i == hot_index_, i == pressed_index_, false);
+        const UiMenuItem& item = owner_->GetModel().Get(node);
+        bool hot = i == hot_index_;
+        bool pressed = i == pressed_index_;
+        owner_->PaintPopupRowChrome(dw, GetRowRect(i), node, item, hot, pressed);
+        if(!item.separator && item.visible) {
+            UiItemRenderState state;
+            state.enabled = item.enabled;
+            state.hot = hot;
+            state.pressed = pressed;
+            if(const UiItemRender* render = FindPreparedRender(i))
+                render->Paint(dw, state);
+        }
+        last_paint_item_count_++;
     }
     w.DrawImage(0, 0, ib);
 }
@@ -196,6 +320,7 @@ void UiMenu::PopupLevel::Layout()
 {
     int sb = vscroll_.IsShown() ? ScrollBarSize() : 0;
     vscroll_.SetRect(GetSize().cx - sb, 0, sb, GetSize().cy);
+    PrepareItemRenders();
 }
 
 void UiMenu::PopupLevel::LeftDown(Point p, dword)
@@ -231,7 +356,8 @@ void UiMenu::PopupLevel::MouseMove(Point p, dword)
     }
     if(row >= 0) {
         UiMenuNodeRef node = owner_->GetChildNode(parent_node_, row);
-        if(node.IsValid() && owner_->HasSubMenu(node) && owner_->IsSelectable(owner_->GetModel().Get(node), node))
+        if(node.IsValid() && owner_->HasSubMenu(node)
+           && owner_->IsSelectable(owner_->GetModel().Get(node), node))
             owner_->OpenSubMenu(level_, row);
         else
             owner_->CloseLevelsFrom(level_ + 1);
@@ -250,9 +376,11 @@ void UiMenu::PopupLevel::MouseWheel(Point, int zdelta, dword)
 {
     if(!vscroll_.IsShown())
         return;
-    int extent = owner_->GetEffectiveStyle().row_height;
+    int extent = owner_->GetEffectiveStyle().row_height
+               + max(0, owner_->GetEffectiveStyle().item_spacing);
     int step = extent * max(1, GetVisibleCount() / 2);
     vscroll_.Set(vscroll_.Get() - sgn(zdelta) * step);
+    PrepareItemRenders();
     Refresh();
 }
 
@@ -298,7 +426,9 @@ UiMenu::UiMenu()
     model_ = &internal_model_;
     BackPaint();
     WantFocus();
+    BindModel(internal_model_);
     SyncThemeStyle();
+    ConfigureDefaultItemRender();
 }
 
 UiMenu::Style& UiMenu::StyleEdit()
@@ -328,10 +458,80 @@ void UiMenu::SyncThemeStyle()
         return;
     themed_style_ = UiTheme::ResolveMenu();
     theme_revision_ = rev;
+    ConfigureDefaultItemRender();
+    ResetItemRenderPools();
+}
+
+void UiMenu::ConfigureDefaultItemRender()
+{
+    if(custom_item_render_)
+        return;
+    const Style& menu = has_custom_style_ ? style_ : themed_style_;
+    UiItemRenderBasic basic;
+    basic.SetCustomStyle(MakeMenuItemRenderStyle(menu));
+    item_render_ = basic.Clone();
+}
+
+void UiMenu::EnsureItemRender()
+{
+    if(!item_render_)
+        ConfigureDefaultItemRender();
+}
+
+void UiMenu::ResetItemRenderPools()
+{
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        popup_levels_[i].ResetRenderPool();
+}
+
+UiMenu& UiMenu::SetItemRender(const UiItemRender& render)
+{
+    item_render_ = render.Clone();
+    custom_item_render_ = true;
+    ResetItemRenderPools();
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        popup_levels_[i].Layout();
+    Refresh();
+    return *this;
+}
+
+const UiItemRender& UiMenu::GetItemRender() const
+{
+    const_cast<UiMenu*>(this)->EnsureItemRender();
+    return *item_render_;
+}
+
+int UiMenu::GetLiveItemRenderCount() const
+{
+    int count = 0;
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        count += popup_levels_[i].GetLiveItemRenderCount();
+    return count;
+}
+
+int UiMenu::GetLastRenderLayoutCount() const
+{
+    int count = 0;
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        count += popup_levels_[i].GetLastRenderLayoutCount();
+    return count;
+}
+
+int UiMenu::GetLastPaintItemCount() const
+{
+    int count = 0;
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        count += popup_levels_[i].GetLastPaintItemCount();
+    return count;
 }
 
 void UiMenu::OnStyleChanged()
 {
+    if(!custom_item_render_)
+        ConfigureDefaultItemRender();
+    ResetItemRenderPools();
+    for(int i = 0; i < popup_levels_.GetCount(); i++)
+        popup_levels_[i].Layout();
     RefreshLayout();
     Refresh();
 }
@@ -348,6 +548,7 @@ UiMenu& UiMenu::ClearCustomStyle()
 {
     has_custom_style_ = false;
     theme_revision_ = 0;
+    SyncThemeStyle();
     OnStyleChanged();
     return *this;
 }
@@ -406,10 +607,9 @@ void UiMenu::SyncModel()
 
 void UiMenu::BindModel(UiMenuModel& model)
 {
-    for(int i = 0; i < bound_models_.GetCount(); i++) {
+    for(int i = 0; i < bound_models_.GetCount(); i++)
         if(bound_models_[i] == &model)
             return;
-    }
 
     bound_models_.Add(&model);
     Ptr<UiMenu> self = this;
@@ -424,9 +624,82 @@ void UiMenu::OnBoundModelChange(UiMenuModel* observed, const UiModelChange&)
 {
     if(model_ != observed)
         return;
+    ResetItemRenderPools();
     SyncModel();
     RefreshLayout();
     Refresh();
+}
+
+UiItemRenderData UiMenu::MakeMenuRenderData(UiMenuNodeRef, const UiMenuItem& item) const
+{
+    UiItemRenderData data = UiMakeItemRenderData(item, GetRightText(item));
+    if(!GetEffectiveStyle().show_icons)
+        data.icon = Image();
+    if(!GetEffectiveStyle().show_descriptions)
+        data.description.Clear();
+    if(!GetEffectiveStyle().show_shortcuts)
+        data.right_text.Clear();
+    data.has_check = false;
+    return data;
+}
+
+Rect UiMenu::GetPopupContentRect(const Rect& row, UiMenuNodeRef node, const UiMenuItem& item) const
+{
+    const Style& style = GetEffectiveStyle();
+    Rect rr = row.Deflated(DPI(1), 0);
+    int left = rr.left + style.left_padding;
+    int right = rr.right - style.right_padding;
+    if(style.show_checks)
+        left += style.check_size + style.content_gap;
+    if(HasSubMenu(node))
+        right -= style.arrow_size + style.content_gap;
+    if(item.separator)
+        return Rect(0, 0, 0, 0);
+    return Rect(min(left, right), rr.top, max(left, right), rr.bottom);
+}
+
+void UiMenu::PaintPopupRowChrome(Draw& w, const Rect& row, UiMenuNodeRef node,
+                                 const UiMenuItem& item, bool hot, bool pressed) const
+{
+    if(row.IsEmpty() || !item.visible)
+        return;
+    const Style& style = GetEffectiveStyle();
+    Rect rr = row.Deflated(DPI(1), 0);
+    w.DrawRect(rr, style.popup_bg);
+
+    if(item.separator_before && style.show_separators)
+        w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, style.separator_color);
+    if(item.separator) {
+        if(style.show_separators)
+            w.DrawRect(rr.left + style.left_padding, rr.top + rr.GetHeight() / 2,
+                       max(0, rr.GetWidth() - style.left_padding * 2), 1, style.separator_color);
+        return;
+    }
+    if(hot || pressed) {
+        Color bg = pressed ? style.pressed_bg : style.hot_bg;
+        Color frame = pressed ? style.pressed_frame : style.hot_frame;
+        w.DrawRect(rr, bg);
+        w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, frame);
+        w.DrawRect(rr.left, rr.bottom - 1, rr.GetWidth(), 1, frame);
+        w.DrawRect(rr.left, rr.top, 1, rr.GetHeight(), frame);
+        w.DrawRect(rr.right - 1, rr.top, 1, rr.GetHeight(), frame);
+    }
+
+    if(style.show_checks) {
+        Rect cr = RectC(rr.left + style.left_padding,
+                        rr.top + max(0, (rr.GetHeight() - style.check_size) / 2),
+                        style.check_size, style.check_size);
+        if(item.radio && item.checked)
+            DrawMenuRadioGlyph(w, cr, style.check_color);
+        else if(item.checkable && item.checked)
+            DrawMenuCheckGlyph(w, cr, style.check_color);
+    }
+    if(HasSubMenu(node)) {
+        Rect ar = RectC(rr.right - style.right_padding - style.arrow_size,
+                        rr.top + max(0, (rr.GetHeight() - style.arrow_size) / 2),
+                        style.arrow_size, style.arrow_size);
+        DrawMenuArrowGlyph(w, ar, style.arrow_color);
+    }
 }
 
 UiMenu& UiMenu::PopUp(Ctrl* owner, Point screen_pt)
@@ -810,10 +1083,9 @@ void UiMenu::HandleMenuBarKey(dword key)
         break;
     case K_DOWN:
     case K_ENTER:
-    case K_SPACE: {
+    case K_SPACE:
         OpenMenuBarPopup(hot_top_index_);
         break;
-    }
     case K_ESCAPE:
         CloseMenu();
         break;
@@ -884,16 +1156,21 @@ Size UiMenu::ComputePopupSize(UiMenuNodeRef parent) const
             row_w += style.icon_size + style.content_gap;
         row_w += GetTextSize(item.text, style.font).cx;
         if(!item.description.IsEmpty() && style.show_descriptions)
-            row_w = max(row_w, style.left_padding + style.right_padding + GetTextSize(item.description, style.font).cx);
-        String right = GetRightText(item);
-        if(!right.IsEmpty())
-            row_w += style.right_gap + GetTextSize(right, style.font).cx;
+            row_w = max(row_w, style.left_padding + style.right_padding
+                               + GetTextSize(item.description, style.font).cx);
+        if(style.show_shortcuts) {
+            String right = GetRightText(item);
+            if(!right.IsEmpty())
+                row_w += style.right_gap + GetTextSize(right, style.font).cx;
+        }
         if(HasSubMenu(node))
             row_w += style.right_gap + style.arrow_size;
         width = max(width, row_w + style.popup_padding * 2 + DPI(14));
     }
-    int content_h = count * style.row_height;
-    int height = min(style.popup_max_height, max(style.row_height, content_h + style.popup_padding * 2));
+    int extent = style.row_height + max(0, style.item_spacing);
+    int content_h = count > 0 ? count * extent - max(0, style.item_spacing) : style.row_height;
+    int height = min(style.popup_max_height,
+                     max(style.row_height, content_h + style.popup_padding * 2));
     return Size(width, height);
 }
 
@@ -928,81 +1205,24 @@ void UiMenu::PaintTopBar(Draw& w) const
     }
 }
 
-void UiMenu::PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node, const UiMenuItem& item, bool hot, bool pressed, bool top_bar) const
+void UiMenu::PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node,
+                          const UiMenuItem& item, bool hot, bool pressed, bool top_bar) const
 {
+    if(!top_bar) {
+        PaintPopupRowChrome(w, row, node, item, hot, pressed);
+        return;
+    }
     if(row.IsEmpty() || !item.visible)
         return;
     const Style& style = GetEffectiveStyle();
-    Rect rr = row.Deflated(top_bar ? 0 : DPI(1), top_bar ? DPI(1) : 0);
-
-    if(!top_bar)
-        w.DrawRect(rr, style.popup_bg);
-
-    if(!top_bar && item.separator_before && style.show_separators)
-        w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, style.separator_color);
-
-    if(item.separator) {
-        if(style.show_separators)
-            w.DrawRect(rr.left + style.left_padding, rr.top + rr.GetHeight() / 2, rr.GetWidth() - style.left_padding * 2, 1, style.separator_color);
-        return;
-    }
-
-    if(hot || pressed) {
-        Color bg = pressed ? style.pressed_bg : (top_bar ? style.active_bar_bg : style.hot_bg);
-        Color frame = pressed ? style.pressed_frame : style.hot_frame;
-        w.DrawRect(rr, bg);
-        if(!top_bar) {
-            w.DrawRect(rr.left, rr.top, rr.GetWidth(), 1, frame);
-            w.DrawRect(rr.left, rr.bottom - 1, rr.GetWidth(), 1, frame);
-            w.DrawRect(rr.left, rr.top, 1, rr.GetHeight(), frame);
-            w.DrawRect(rr.right - 1, rr.top, 1, rr.GetHeight(), frame);
-        }
-    }
-
-    Font font = top_bar ? style.bar_font : style.font;
+    Rect rr = row;
+    if(hot || pressed)
+        w.DrawRect(rr, pressed ? style.pressed_bg : style.active_bar_bg);
+    Font font = style.bar_font;
     Color ink = item.enabled ? style.item_ink : BlendDisabledMenu(style.disabled_ink);
-    Color right_ink = item.enabled ? style.right_ink : BlendDisabledMenu(style.right_ink);
-
-    if(top_bar) {
-        Size tsz = GetTextSize(item.text, font);
-        int ty = rr.top + max(0, (rr.GetHeight() - tsz.cy) / 2);
-        w.DrawText(rr.left + style.left_padding, ty, item.text, font, ink);
-        return;
-    }
-
-    int x = rr.left + style.left_padding;
-    Rect check_rect = RectC(x, rr.top + max(0, (rr.GetHeight() - style.check_size) / 2), style.check_size, style.check_size);
-    if(style.show_checks) {
-        if(item.radio && item.checked)
-            DrawMenuRadioGlyph(w, check_rect, style.check_color);
-        else if(item.checkable && item.checked)
-            DrawMenuCheckGlyph(w, check_rect, style.check_color);
-        x = check_rect.right + style.content_gap;
-    }
-
-    if(style.show_icons && !IsNull(item.icon)) {
-        Rect ir = RectC(x, rr.top + max(0, (rr.GetHeight() - style.icon_size) / 2), style.icon_size, style.icon_size);
-        Color icon_ink = item.enabled ? style.item_ink : BlendDisabledMenu(style.disabled_ink);
-                UiPaintStyledIcon(w, ir, item.icon, true, true, item.icon_render_mode, icon_ink, item.enabled);
-        x = ir.right + style.content_gap;
-    }
-
-    String right = GetRightText(item);
-    int right_edge = rr.right - style.right_padding;
-    if(HasSubMenu(node))
-        right_edge -= style.arrow_size + style.content_gap;
-    if(!right.IsEmpty()) {
-        Size rsz = GetTextSize(right, font);
-        w.DrawText(max(x, right_edge - rsz.cx), rr.top + max(0, (rr.GetHeight() - rsz.cy) / 2), right, font, right_ink);
-        right_edge -= rsz.cx + style.right_gap;
-    }
-
-    DrawTextEllipsis(w, x, rr.top + max(0, (rr.GetHeight() - font.GetHeight()) / 2), max(0, right_edge - x), item.text, "...", font, ink);
-
-    if(HasSubMenu(node)) {
-        Rect ar = RectC(rr.right - style.right_padding - style.arrow_size, rr.top + max(0, (rr.GetHeight() - style.arrow_size) / 2), style.arrow_size, style.arrow_size);
-        DrawMenuArrowGlyph(w, ar, style.arrow_color);
-    }
+    Size tsz = GetTextSize(item.text, font);
+    int ty = rr.top + max(0, (rr.GetHeight() - tsz.cy) / 2);
+    w.DrawText(rr.left + style.left_padding, ty, item.text, font, ink);
 }
 
 UiMenuNodeRef UiMenu::GetChildNode(UiMenuNodeRef parent, int index) const
@@ -1052,6 +1272,7 @@ void UiMenu::Paint(Draw& w)
 
 void UiMenu::Layout()
 {
+    SyncThemeStyle();
 }
 
 Size UiMenu::GetMinSize() const
@@ -1061,7 +1282,8 @@ Size UiMenu::GetMinSize() const
     int w = 0;
     for(int i = 0; i < GetTopItemCount(); i++)
         w += MeasureTopItem(GetChildNode(model_->Root(), i)).cx;
-    return UiStyledOuterSizeFromContent(Size(max(DPI(180), w), GetEffectiveStyle().bar_height), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    return UiStyledOuterSizeFromContent(Size(max(DPI(180), w), GetEffectiveStyle().bar_height),
+                                        GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
 }
 
 void UiMenu::LeftDown(Point p, dword)
@@ -1129,4 +1351,4 @@ void UiMenu::LostFocus()
     Refresh();
 }
 
-}
+} // namespace Upp
