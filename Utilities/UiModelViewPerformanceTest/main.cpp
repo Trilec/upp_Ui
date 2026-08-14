@@ -74,6 +74,68 @@ void TestPureGeometry(TestCtx& t)
              "uniform drag insertion maps a deep logical position without scanning preceding rows");
 }
 
+void TestItemRenderFoundation(TestCtx& t)
+{
+    t.Section("UiItemRender foundation");
+
+    UiModelItem model_item("Renderer item", 42);
+    model_item.description = "Shared presentation data";
+    model_item.right_text = "R2A";
+    model_item.has_metadata = true;
+    model_item.metadata_color = Color(37, 99, 235);
+
+    UiItemRenderData data = UiMakeItemRenderData(model_item);
+    t.Expect(data.title == model_item.text && data.description == model_item.description && data.data == model_item.data,
+             "UiModelItem maps into shared UiItemRenderData without view ownership");
+
+    UiItemRenderBasic basic;
+    basic.SetData(data);
+    t.Expect(basic.PrepareLayout(RectC(0, 0, 280, 32), UiDirection::H),
+             "first Basic renderer preparation performs layout");
+    int serial = basic.GetLayoutSerial();
+    t.Expect(!basic.PrepareLayout(RectC(0, 0, 280, 32), UiDirection::H) && basic.GetLayoutSerial() == serial,
+             "unchanged renderer preparation does not relayout");
+
+    ImageDraw draw(280, 96);
+    draw.DrawRect(0, 0, 280, 96, White());
+    UiItemRenderState normal;
+    basic.Paint(draw, normal);
+    UiItemRenderState selected;
+    selected.selected = true;
+    basic.Paint(draw, selected);
+    t.Expect(basic.GetLayoutSerial() == serial,
+             "normal and selected Paint calls consume prepared geometry without relayout");
+
+    UiItemRenderHit hit = basic.HitTest(Point(10, 10));
+    t.Expect(hit.IsHit(),
+             "Basic renderer hit testing consumes prepared visible geometry");
+
+    data.title = "Changed renderer item";
+    basic.SetData(data);
+    t.Expect(basic.IsLayoutDirty() && basic.PrepareLayout(RectC(0, 0, 280, 32), UiDirection::H)
+             && basic.GetLayoutSerial() == serial + 1,
+             "rebound renderer data invalidates and prepares layout exactly once");
+    serial = basic.GetLayoutSerial();
+
+    t.Expect(basic.PrepareLayout(RectC(0, 0, 96, 104), UiDirection::V)
+             && basic.GetLayoutSerial() == serial + 1,
+             "orientation/allocated-rectangle changes explicitly relayout the renderer");
+
+    One<UiItemRender> clone = basic.Clone();
+    clone->SetData(data);
+    t.Expect(clone->PrepareLayout(RectC(0, 0, 280, 32), UiDirection::H)
+             && clone->GetLayoutSerial() == 1,
+             "renderer prototypes clone into independent cheap visible instances");
+
+    UiItemRenderImage image;
+    image.SetData(data);
+    image.PrepareLayout(RectC(0, 0, 104, 116), UiDirection::V);
+    int image_serial = image.GetLayoutSerial();
+    image.Paint(draw, normal);
+    t.Expect(image.GetLayoutSerial() == image_serial && image.HitTest(Point(12, 12)).IsHit(),
+             "Image renderer shares the same prepared-layout Paint/HitTest contract");
+}
+
 void TestModelBulkChange(TestCtx& t, UiListModel& model)
 {
     t.Section("shared model bulk notification");
@@ -180,6 +242,7 @@ CONSOLE_APP_MAIN
 {
     TestCtx t;
     TestPureGeometry(t);
+    TestItemRenderFoundation(t);
 
     UiListModel model;
     TestModelBulkChange(t, model);
