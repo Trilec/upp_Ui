@@ -477,7 +477,7 @@ private:
     {
         if(!doc_ || id.IsEmpty())
             return nullptr;
-        for(const UiDocAnnotation& item : doc_->Core().GetAnnotations())
+        for(const UiDocAnnotation& item : doc_->Model().GetAnnotations())
             if(item.id == id && (item.type == "comment" || item.type == "review.comment"))
                 return &item;
         return nullptr;
@@ -487,7 +487,7 @@ private:
     {
         if(!doc_ || id.IsEmpty())
             return nullptr;
-        for(const UiDocAnnotation& item : doc_->Core().GetAnnotations())
+        for(const UiDocAnnotation& item : doc_->Model().GetAnnotations())
             if(item.id == id && item.type.StartsWith("metadata."))
                 return &item;
         return nullptr;

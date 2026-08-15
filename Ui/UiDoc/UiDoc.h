@@ -325,12 +325,6 @@ public:
     const UiDocCore& Model() const { return *model_; }
     UiDoc& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spelling while repository callers are migrated in this task.
-    // Model() is the canonical API and this alias will be removed once callers
-    // are clean.
-    UiDocCore& Core() { return Model(); }
-    const UiDocCore& Core() const { return Model(); }
-
     void NewDocument();
     bool Save(const String& path, String* error = nullptr) const;
     bool Load(const String& path, String* error = nullptr);

@@ -760,8 +760,8 @@ private:
             "Feature matrix\n";
 
         doc_editor.SetText(text);
-        doc_editor.Core().SetMeta("demo.document_type", "UiDoc v2 showcase");
-        doc_editor.Core().SetMeta("demo.workflow", "interactive rich document");
+        doc_editor.Model().SetMeta("demo.document_type", "UiDoc v2 showcase");
+        doc_editor.Model().SetMeta("demo.workflow", "interactive rich document");
         ApplyRoleToFragment("Project Aurora", "heading.1");
         ApplyRoleToFragment("UiDoc v2 sample document", "heading.3");
         ApplyRoleToFragment("Executive summary", "heading.2");
@@ -1095,7 +1095,7 @@ private:
         lbl_status_center.SetText(Format("%d word%s | %d characters | selection %d",
                                         words, words == 1 ? "" : "s", doc_editor.GetLength(), selection.GetLength()));
         lbl_status_right.SetText(Format("Revision %s | %d comment%s | %d metadata | %d match%s",
-                                       AsString((int64)doc_editor.Core().GetRevision()),
+                                       AsString((int64)doc_editor.Model().GetRevision()),
                                        comments, comments == 1 ? "" : "s", metadata,
                                        doc_editor.GetSearchMatchCount(), doc_editor.GetSearchMatchCount() == 1 ? "" : "es"));
     }
