@@ -171,11 +171,6 @@ public:
     UiTable& EnableInternalMutation(bool on = true);
     bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiTableModel& GetInternalModel() { return internal_model_; }
-    UiTableModel& GetModel() { return *model_; }
-    const UiTableModel& GetModel() const { return *model_; }
-
     UiTable& SetCellRender(const UiItemRender& render);
     UiTable& SetHeaderRender(const UiItemRender& render);
     UiTable& SetRowHeaderRender(const UiItemRender& render);

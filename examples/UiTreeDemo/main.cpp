@@ -603,14 +603,14 @@ void UiTreeDemoWindow::InitControls()
 {
     icon_list_model_ = UiIconListModel(true);
 
-    dataset_drop_.GetInternalModel().Clear();
+    dataset_drop_.Model().Clear();
     for(int i = 0; i < __countof(kDatasets); i++)
-        dataset_drop_.GetInternalModel().Add(kDatasets[i].label, kDatasets[i].value);
-    glyph_style_drop_.GetInternalModel().Clear();
+        dataset_drop_.Model().Add(kDatasets[i].label, kDatasets[i].value);
+    glyph_style_drop_.Model().Clear();
     for(int i = 0; i < __countof(kGlyphStyles); i++)
-        glyph_style_drop_.GetInternalModel().Add(kGlyphStyles[i].label, kGlyphStyles[i].value);
+        glyph_style_drop_.Model().Add(kGlyphStyles[i].label, kGlyphStyles[i].value);
 
-    UiListModel& icon_model = item_icon_drop_.GetInternalModel();
+    UiListModel& icon_model = item_icon_drop_.Model();
     icon_model.Clear();
     icon_model.Add(UiModelItem("None", String()));
     icon_model.AddRange(icon_list_model_.GetAll());

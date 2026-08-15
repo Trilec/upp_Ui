@@ -811,26 +811,26 @@ void UiListDemoWindow::InitControls()
 {
     icon_list_model_ = UiIconListModel(true);
 
-    dataset_drop_.GetInternalModel().Clear();
+    dataset_drop_.Model().Clear();
     for(int i = 0; i < __countof(kDatasets); i++)
-        dataset_drop_.GetInternalModel().Add(kDatasets[i].label, kDatasets[i].value);
-    drag_side_drop_.GetInternalModel().Clear();
+        dataset_drop_.Model().Add(kDatasets[i].label, kDatasets[i].value);
+    drag_side_drop_.Model().Clear();
     for(int i = 0; i < __countof(kSides); i++)
-        drag_side_drop_.GetInternalModel().Add(kSides[i].label, kSides[i].value);
-    role_drop_.GetInternalModel().Clear();
+        drag_side_drop_.Model().Add(kSides[i].label, kSides[i].value);
+    role_drop_.Model().Clear();
     for(int i = 0; i < __countof(kRoles); i++)
-        role_drop_.GetInternalModel().Add(kRoles[i].label, kRoles[i].value);
-    font_face_drop_.GetInternalModel().Clear();
+        role_drop_.Model().Add(kRoles[i].label, kRoles[i].value);
+    font_face_drop_.Model().Clear();
     for(int i = 0; i < __countof(kFontFaces); i++)
-        font_face_drop_.GetInternalModel().Add(kFontFaces[i].label, kFontFaces[i].value);
-    shadow_curve_drop_.GetInternalModel().Clear();
-    shadow_curve_drop_.GetInternalModel().Add("Linear", LISTSHADOW_LINEAR);
-    shadow_curve_drop_.GetInternalModel().Add("Soft", LISTSHADOW_SOFT);
-    shadow_curve_drop_.GetInternalModel().Add("Hard", LISTSHADOW_HARD);
-    shadow_curve_drop_.GetInternalModel().Add("Custom", LISTSHADOW_CUSTOM);
+        font_face_drop_.Model().Add(kFontFaces[i].label, kFontFaces[i].value);
+    shadow_curve_drop_.Model().Clear();
+    shadow_curve_drop_.Model().Add("Linear", LISTSHADOW_LINEAR);
+    shadow_curve_drop_.Model().Add("Soft", LISTSHADOW_SOFT);
+    shadow_curve_drop_.Model().Add("Hard", LISTSHADOW_HARD);
+    shadow_curve_drop_.Model().Add("Custom", LISTSHADOW_CUSTOM);
 
     auto repop_icon_drop = [&] {
-        UiListModel& m = item_icon_drop_.GetInternalModel();
+        UiListModel& m = item_icon_drop_.Model();
         m.Clear();
         m.Add(UiModelItem("None", String()));
         m.AddRange(icon_list_model_.GetAll());

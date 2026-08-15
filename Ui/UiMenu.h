@@ -121,11 +121,6 @@ public:
     UiMenu& EnableInternalMutation(bool on = true);
     bool IsInternalMutationEnabled() const { return internal_mutation_enabled_; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiMenuModel& GetInternalModel() { return internal_model_; }
-    UiMenuModel& GetModel() { return *model_; }
-    const UiMenuModel& GetModel() const { return *model_; }
-
     UiMenu& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     int GetLiveItemRenderCount() const;

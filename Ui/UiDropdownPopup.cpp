@@ -381,7 +381,7 @@ Rect UiDropdown::PopupWindow::GetItemContentRect(int index) const
         return Rect(0, 0, 0, 0);
 
     const UiDropdown::Style& style = owner->GetEffectiveStyle();
-    const UiModelItem& item = owner->GetModel().Get(index);
+    const UiModelItem& item = owner->Model().Get(index);
     int gap = DPI(6);
 
     bool drag = owner->drag_reorder_enabled_ && style.show_drag_handle
@@ -504,7 +504,7 @@ void UiDropdown::PopupWindow::Paint(Draw& target)
         Rect row = GetItemRect(i);
         if(row.bottom <= 0 || row.top >= bounds.bottom)
             continue;
-        const UiModelItem& item = owner->GetModel().Get(i);
+        const UiModelItem& item = owner->Model().Get(i);
         bool hot = i == owner->highlight_index_;
         bool selected = owner->multi_select_ ? item.checked : i == owner->selected_index_;
 

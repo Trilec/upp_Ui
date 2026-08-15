@@ -126,11 +126,6 @@ public:
     const UiListModel& Model() const { return *model_; }
     UiDropdown& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiListModel& GetInternalModel() { return internal_model_; }
-    UiListModel& GetModel() { return *model_; }
-    const UiListModel& GetModel() const { return *model_; }
-
     UiDropdown& Add(const String& text, const Value& data = Value(), bool enabled = true);
     UiDropdown& Add(const UiModelItem& item);
     UiDropdown& AddGroupHeader(const String& text);

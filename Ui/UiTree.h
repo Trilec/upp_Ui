@@ -158,10 +158,6 @@ public:
     const UiTreeModel& Model() const { return *model_; }
     UiTree& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiTreeModel& GetInternalModel() { return internal_model_; }
-    const UiTreeModel& GetModel() const { return *model_; }
-
     UiTree& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     UiTree& SetColumnRender(int column, const UiItemRender& render);

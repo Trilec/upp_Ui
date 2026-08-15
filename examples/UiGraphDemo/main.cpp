@@ -88,7 +88,7 @@ public:
         BuildGraph();
 
         graph_.WhenNodeAction = [=](UiGraphNodeRef ref) {
-            const UiGraphNode* node = graph_.GetModel().FindNode(ref);
+            const UiGraphNode* node = graph_.Model().FindNode(ref);
             if(node)
                 PromptOK(DeQtf(Format("Node: [* %s]&%s", node->title, node->subtitle)));
         };
@@ -144,7 +144,7 @@ private:
 
     void BuildGraph()
     {
-        UiGraphModel& model = graph_.GetInternalModel();
+        UiGraphModel& model = graph_.Model();
 
         UiGraphNode input = Node("Input", "Files, values and messages",
                                  Pointf(20, 230), UiGraphNodeShape::Cloud);

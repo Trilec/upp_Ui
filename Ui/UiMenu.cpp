@@ -99,7 +99,7 @@ void UiMenu::PopupLevel::SetParentNode(UiMenuNodeRef parent)
     ResetRenderPool();
     for(int i = 0; i < GetItemCount(); i++) {
         UiMenuNodeRef child = owner_->GetChildNode(parent_node_, i);
-        if(child.IsValid() && owner_->IsSelectable(owner_->GetModel().Get(child), child)) {
+        if(child.IsValid() && owner_->IsSelectable(owner_->Model().Get(child), child)) {
             hot_index_ = i;
             break;
         }
@@ -139,7 +139,7 @@ Rect UiMenu::PopupLevel::GetContentRect(int index) const
     UiMenuNodeRef node = owner_->GetChildNode(parent_node_, index);
     if(!node.IsValid())
         return Rect(0, 0, 0, 0);
-    return owner_->GetPopupContentRect(GetRowRect(index), node, owner_->GetModel().Get(node));
+    return owner_->GetPopupContentRect(GetRowRect(index), node, owner_->Model().Get(node));
 }
 
 int UiMenu::PopupLevel::HitTestRow(Point p) const
@@ -255,7 +255,7 @@ void UiMenu::PopupLevel::PrepareItemRenders()
             continue;
         }
         if(slot.index != index) {
-            slot.render->SetData(owner_->MakeMenuRenderData(node, owner_->GetModel().Get(node)));
+            slot.render->SetData(owner_->MakeMenuRenderData(node, owner_->Model().Get(node)));
             slot.index = index;
         }
         if(slot.render->PrepareLayout(GetContentRect(index), UiDirection::H))
@@ -299,7 +299,7 @@ void UiMenu::PopupLevel::Paint(Draw& w)
         UiMenuNodeRef node = owner_->GetChildNode(parent_node_, i);
         if(!node.IsValid())
             continue;
-        const UiMenuItem& item = owner_->GetModel().Get(node);
+        const UiMenuItem& item = owner_->Model().Get(node);
         bool hot = i == hot_index_;
         bool pressed = i == pressed_index_;
         owner_->PaintPopupRowChrome(dw, GetRowRect(i), node, item, hot, pressed);
@@ -334,7 +334,7 @@ void UiMenu::PopupLevel::LeftDown(Point p, dword)
     UiMenuNodeRef node = owner_->GetChildNode(parent_node_, row);
     if(!node.IsValid())
         return;
-    const UiMenuItem& item = owner_->GetModel().Get(node);
+    const UiMenuItem& item = owner_->Model().Get(node);
     if(!owner_->IsSelectable(item, node)) {
         Refresh();
         return;
@@ -357,7 +357,7 @@ void UiMenu::PopupLevel::MouseMove(Point p, dword)
     if(row >= 0) {
         UiMenuNodeRef node = owner_->GetChildNode(parent_node_, row);
         if(node.IsValid() && owner_->HasSubMenu(node)
-           && owner_->IsSelectable(owner_->GetModel().Get(node), node))
+           && owner_->IsSelectable(owner_->Model().Get(node), node))
             owner_->OpenSubMenu(level_, row);
         else
             owner_->CloseLevelsFrom(level_ + 1);

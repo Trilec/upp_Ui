@@ -199,7 +199,7 @@ private:
         divider_row_.Add("Icon", 4);
         divider_icon_row_.Dropdown().UseInternalModel();
         divider_icon_row_.Clear();
-        divider_icon_row_.Dropdown().GetInternalModel().AddRange(UiIconListModel().GetAll());
+        divider_icon_row_.Dropdown().Model().AddRange(UiIconListModel().GetAll());
         font_face_row_.Dropdown().UseInternalModel();
         font_face_row_.Clear();
         for(int i = 0; i < Font::GetFaceCount(); i++) {

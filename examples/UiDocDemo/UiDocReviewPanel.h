@@ -364,7 +364,7 @@ private:
 
     void RefreshCommentList()
     {
-        UiListModel& model = comment_list_.GetInternalModel();
+        UiListModel& model = comment_list_.Model();
         model.Clear();
         if(!doc_)
             return;
@@ -401,7 +401,7 @@ private:
 
     void RefreshMetadataList()
     {
-        UiListModel& model = metadata_list_.GetInternalModel();
+        UiListModel& model = metadata_list_.Model();
         model.Clear();
         if(!doc_)
             return;

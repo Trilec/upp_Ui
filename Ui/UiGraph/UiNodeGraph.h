@@ -200,11 +200,6 @@ public:
     const UiGraphModel& Model() const { return *model_; }
     UiNodeGraph& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiGraphModel& GetInternalModel() { return internal_model_; }
-    const UiGraphModel& GetModel() const { return *model_; }
-    UiGraphModel& GetModel() { return *model_; }
-
     // Child controls are externally owned. UiNodeGraph only tracks guarded
     // pointers, attaches them while visible, and removes them from the scene
     // when their node or the external control disappears.

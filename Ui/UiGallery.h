@@ -90,11 +90,6 @@ public:
     const UiListModel& Model() const { return *model_; }
     UiGallery& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spellings retained only while repository callers migrate.
-    UiListModel& GetInternalModel() { return internal_model_; }
-    const UiListModel& GetModel() const { return *model_; }
-    UiListModel& GetModel() { return *model_; }
-
     UiGallery& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     int GetLiveItemRenderCount() const { return item_render_pool_.GetCount(); }

@@ -1140,7 +1140,7 @@ void UiDropdownDemoWindow::InitControls()
         drop.UseInternalModel();
         drop.Clear();
         drop.Add("None", String());
-        drop.GetInternalModel().AddRange(icon_list_model_.GetAll());
+        drop.Model().AddRange(icon_list_model_.GetAll());
         drop.Select(0);
     };
     init_icon_drop(item_icon_drop_);
@@ -1487,12 +1487,12 @@ String UiDropdownDemoWindow::IconNameFor(const Image& icon) const
 
 UiListModel& UiDropdownDemoWindow::ActiveModel()
 {
-    return preview_.Showcase().GetInternalModel();
+    return preview_.Showcase().Model();
 }
 
 const UiListModel& UiDropdownDemoWindow::ActiveModel() const
 {
-    return preview_.Showcase().GetModel();
+    return preview_.Showcase().Model();
 }
 
 void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
@@ -1632,7 +1632,7 @@ void UiDropdownDemoWindow::ApplyDataset(DatasetMode mode)
 
     dd.UseInternalModel();
     dd.SetMultiSelect(config_.multi_select);
-    UiListModel& model = dd.GetInternalModel();
+    UiListModel& model = dd.Model();
     int first_selectable = -1;
     for(int i = 0; i < model.GetCount(); i++) {
         const UiModelItem& item = model.Get(i);
@@ -1879,7 +1879,7 @@ String UiDropdownDemoWindow::BuildUsageCode() const
             code << "UiModelItem head(" << QuoteCpp(it.text) << "); head.group_header = true; head.enabled = false; ";
             if(it.separator_before)
                 code << "head.separator_before = true; ";
-            code << "dropdown.GetInternalModel().Add(head);\n";
+            code << "dropdown.Model().Add(head);\n";
             continue;
         }
         code << "UiModelItem item(" << QuoteCpp(it.text) << ", " << QuoteCpp(AsString(it.data)) << ");\n";
@@ -1893,7 +1893,7 @@ String UiDropdownDemoWindow::BuildUsageCode() const
             code << "item.icon = " << icon_name << "();\n";
             code << "item.icon_render_mode = UiIconRenderMode::MonoTint;\n";
         }
-        code << "dropdown.GetInternalModel().Add(item);\n";
+        code << "dropdown.Model().Add(item);\n";
     }
     code << "// Dataset: " << DatasetLabel(config_.dataset) << "\n";
     code << "// Binding: Internal UiListModel\n";

@@ -162,11 +162,6 @@ public:
     const UiListModel& Model() const { return *model_; }
     UiList& ClearModel() { Model().Clear(); return *this; }
 
-    // Transitional spellings retained only while repository callers are
-    // migrated in this convergence task; they are not separate authorities.
-    UiListModel& GetInternalModel() { return internal_model_; }
-    const UiListModel& GetModel() const { return *model_; }
-
     UiList& SetItemRender(const UiItemRender& render);
     const UiItemRender& GetItemRender() const;
     int GetLiveItemRenderCount() const { return item_render_pool_.GetCount(); }
