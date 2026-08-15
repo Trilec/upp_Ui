@@ -183,6 +183,8 @@ void UiTree::OnStyleChanged()
 
 UiTree& UiTree::SetModel(UiTreeModel& model)
 {
+    if(model_ == &model)
+        return *this;
     CancelRename();
     model_ = &model;
     BindModel(model);
