@@ -1,10 +1,24 @@
 # ACTIVE WORK
 
-TASK: `UI-MODEL-API-CONVERGENCE + THEME-AUDIT`.
+TASK: `UI-MODEL-API-CONVERGENCE + UIDOC-FIRST-CLASS-MODEL + THEME-AUDIT`.
 
 Remote GitHub is authoritative. Never force-update `main`.
 
-BASE: `a7db124e03e474491fee0691614e52be6e92bffa` — R2D final Windows-validated demo cleanup. All R1/R2A/R2B/R2C/R2D and Gallery corrective acceptance is closed at this baseline.
+BASE: `a7db124e03e474491fee0691614e52be6e92bffa` — last previously Windows-accepted model/theme baseline recorded for this convergence sequence.
+
+STATUS: **IMPLEMENTATION + SOURCE CLEANUP COMPLETE — WINDOWS VALIDATION PENDING.**
+
+## PUBLISHED CHECKPOINTS
+
+Current sequence includes:
+
+- `c35054d256cf1b63113604726943f148fd65bb87` — canonical `Model()` accessor spelling across the existing model-backed controls and callers.
+- `f6ab4896d3a99f6dab6e9df0418ecf50c6e7ba8e` — UiDoc adopts first-class internal/external model binding.
+- `b7b4338530280216cc223ea0b82624b23e17f38c` through `d142a2bbae0a5a14c3bade19cf4edbfa2f07fbf2` — UiDoc binding tests, caller migration, legacy `Core()` removal, programmer docs and focused package dependencies.
+- `c10e27d2dba7ddfe6a1f40dd8f4122dd470d8b3f` — lifetime hardening test added after static review.
+- `7d37ee7bf5b1b228ba873f5df0670fad2d802faf` — UiDoc lifetime-binding contract documented.
+
+The final status-only `ACTIVE_WORK.md` commit may advance `main` beyond the code/document checkpoints above.
 
 ## CANONICAL MODEL CONTRACT
 
@@ -20,16 +34,18 @@ Control& ClearModel();
 ```
 
 Semantics:
+
 - the internal model always exists and is active by default;
 - `Model()` always returns the currently active model;
-- `SetModel(external)` switches authority without copying or clearing either model;
+- `SetModel(external)` switches authority without copying, merging or clearing either model;
 - switching external A -> external B leaves A untouched;
 - `UseInternalModel()` restores retained internal data;
-- `ClearModel()` clears only the currently active model and does not switch ownership;
-- normal model mutation notifications remain the synchronization authority;
-- there is no parallel item mirror or model/widget variant.
+- `ClearModel()` clears only the currently active model and does not switch authority;
+- model mutation notifications are the synchronization authority;
+- controls do not maintain parallel semantic mirrors.
 
 Implemented for:
+
 - `UiList` / `UiListModel`
 - `UiGallery` / `UiListModel`
 - `UiTree` / `UiTreeModel`
@@ -37,105 +53,90 @@ Implemented for:
 - `UiDropdown` / `UiListModel`
 - `UiMenu` / `UiMenuModel`
 - `UiNodeGraph` / `UiGraphModel`
+- `UiDoc` / `UiDocCore`
 
-All seven retain the existing high-scale architecture: one active non-owning model pointer, one owned internal model, bounded renderer/cached-view state where applicable, and inactive-model callbacks ignored by pointer identity.
+`UiDocCore` deliberately remains a document-specific model. It is not flattened into `UiModelItem` and does not inherit `UiDataModelBase` merely for naming symmetry. Its transaction/result/position-map contract remains authoritative for document edits.
 
-`UiTree::SetModel(same_model)` is now idempotent, matching the other model views.
+## UIDOC MODEL BINDING
 
-## DELIBERATE NON-MODEL CONTROLS
+`UiDoc` now has one active model pointer plus one retained internal `UiDocCore`.
 
-Audit concluded these should stay model-free:
-- `UiAccordion` — real child-control composite/container state.
-- `UiMatrixSelector` — small bounded preset/value selector.
-- `UiColorMatrix` — one compact 1-8-colour value/editor.
+Key accepted design points:
 
-Adding model classes to these would create indirection without sharing/scale value and would move the library toward the duplicate widget/model family we are deliberately avoiding.
+- `Model()` is the only public model accessor; the legacy `Core()` alias is removed.
+- `SetModel()` is idempotent when passed the already-active model.
+- multiple UiDoc views can bind the same external `UiDocCore` and keep independent caret/selection/viewport state;
+- edits or Undo/Redo performed on the shared model update every actively bound view;
+- callbacks from previously bound but inactive live models are ignored;
+- history depth belongs to `UiDocCore`, not visual `UiDoc::Style`;
+- `UiDocCore` is `Pte<UiDocCore>` so UiDoc can retain weak `Ptr<UiDocCore>` binding identities;
+- when an inactive external model is destroyed, its remembered binding identity expires; a later model created at the same address receives a fresh observer binding;
+- an external model remains non-owning and must outlive the period during which it is actively used by UiDoc.
 
-`PropertyEditorModel` remains a specialized schema/transaction model; it is not a competing ordinary control family.
+Canonical detail: `docs/10_UIDOC_MODEL_BINDING.md`.
 
-## TABLE CLEANUP
+## LEGACY ACCESSOR MIGRATION
 
-The hidden 12 x 6 sample dataset formerly created inside `UiTable` construction has been removed. A new Table now starts with an empty internal model like the other model views. Demos own their demo data.
+Repository UiDoc callers and tests have been migrated from `Core()` to `Model()` and the `Core()` alias is gone.
 
-## THEME AUDIT
+The wider List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph transitional `GetInternalModel()` / `GetModel()` aliases were also removed after repository caller migration. New code must use `Model()`.
 
-Real defects corrected:
-
-1. **UiList standalone viewport**
-   - Minimal List rows may remain transparent/lightweight.
-   - A theme-driven standalone List now fills missing viewport faces from semantic `UiPanelRole::Surface`.
-   - explicit custom List transparency remains caller-owned.
-
-2. **UiTable Dark chrome**
-   - the central resolver covered only part of Table's explicit domain colours.
-   - `UiTable::SyncThemeStyle()` now completes table/header/row-header, alternate, hover, read-only, selection/active and resize colours from semantic Surface/Subtle/List roles.
-   - warning/error semantic fills are dark-transformed from established defaults.
-   - explicit custom Table styles remain untouched.
-
-Audited and already coherent:
-- Gallery semantic Surface corrective — previously Windows accepted.
-- Tree theme-derived surface/selection/glyph colours.
-- Dropdown popup/collapsed theme — previously Windows accepted.
-- Menu bar/popup theme — previously Windows accepted.
-- NodeGraph semantic canvas/node/edge theme.
-- Accordion, MatrixSelector and ColorMatrix semantic theme roles with revision tracking.
-
-Styling rule: prefer semantic theme roles; do not scatter unrelated hard-coded Dark colours. Avoid configuration calls that accidentally enter `StyleEdit()` merely to repeat defaults, because that freezes a theme snapshot as a custom style.
-
-## NEW DETERMINISTIC TESTS
+## DETERMINISTIC TESTS
 
 `Utilities/UiModelBindingContractTest`
-- expected **49 checks**;
-- seven checks for each of List, Gallery, Tree, Table, Dropdown, Menu and NodeGraph;
-- covers default internal ownership, active `Model()` mutation, external identity, external mutation, external A -> B switching without copy/clear, active-only `ClearModel()`, and retained internal restoration.
+- expected **49 checks / 0 failures**;
+- covers List, Gallery, Tree, Table, Dropdown, Menu and NodeGraph ownership/switching semantics.
+
+`Utilities/UiDocModelBindingTest`
+- expected **20 checks / 0 failures**;
+- covers default internal ownership, external identity/no-copy binding, direct external mutation, idempotent same-model binding, two UiDoc views sharing one model, independent position remapping, inactive-model suppression, active-only `ClearModel()`, retained internal restoration, model-owned history policy, shared Undo authority, editing through the active external model, and deterministic same-address lifetime reuse.
 
 `Utilities/UiThemeSurfaceRegressionTest`
-- expected **13 checks**;
-- standalone List Dark/Light viewport paint;
-- complete Table Dark surfaces/domain chrome;
-- Tree, Dropdown, Menu and NodeGraph dark surfaces;
-- Accordion, MatrixSelector and ColorMatrix semantic dark theme state.
+- expected **13 checks / 0 failures**;
+- covers the focused semantic Light/Dark surface corrections from the same convergence sequence.
 
-Canonical docs:
-- `docs/03_UI_MODEL_GUIDE.md` — programmer-facing `Model()` usage and ownership/switching semantics.
-- `docs/09_UI_MODEL_API_AUDIT.md` — full control-by-control architecture/theme audit.
+Existing scale/regression gates retained from the model/theme audit:
+- `UiModelViewPerformanceTest` — **52/0**;
+- `UiTreeScaleTest` — **11/0**;
+- `UiGalleryRegressionTest` — **11/0**;
+- `UiDropdownMenuRenderTest` — **11/0**.
 
-## RECOVERY / DIFF INTEGRITY
+Existing UiDoc model/interaction/geometry/image/metadata suites remain authoritative and must not be weakened if a platform failure exposes a regression.
 
-A temporary Tree checkpoint was accidentally written from a partial file view during implementation. Full-diff review caught it before validation. Published recovery `15edcad3f4ddf2a5b5e957c784e8e86a9f7c25fe` restored the exact complete pre-task Tree source blob; `e4a3ff441692b16703234465af5f494f2c343123` then added only the intended two-line idempotent SetModel guard from the complete blob.
+## THEME AUDIT STATE
 
-The current compare against BASE is ahead-only and Tree source differs by only those two added guard lines.
+Previously implemented theme corrections remain unchanged by the UiDoc model-binding work:
 
-## LEGACY ACCESSOR SPELLING
+- standalone UiList viewport uses semantic Surface when no explicit custom face is supplied;
+- UiTable Dark chrome resolves its table/header/row/selection domain colours through semantic roles;
+- Gallery, Tree, Dropdown, Menu, NodeGraph, Accordion, MatrixSelector and ColorMatrix retain their accepted semantic-theme paths.
 
-`Model()` is canonical. A handful of existing repository demos still use old thin aliases such as `GetInternalModel()` / `GetModel()`.
+Styling rule remains: prefer semantic theme roles; do not scatter unrelated hard-coded Dark colours or enter custom-style mode merely to repeat defaults.
 
-Known mechanical caller migration includes:
-- `examples/UiBreadcrumbsDemo/main.cpp`
-- `examples/UiDocDemo/UiDocReviewPanel.h`
-- `examples/UiListDemo/main.cpp`
-- `examples/UiTreeDemo/main.cpp`
-- `examples/UiGraphDemo/main.cpp`
-- `examples/UiDropdownDemo/main.cpp`
-- plus internal Menu/Dropdown popup call sites where search finds the old active-model spelling.
+## STATIC REVIEW / DIFF INTEGRITY
 
-The old accessors currently remain as thin aliases only so published `main` is not deliberately broken between checkpoints. They do **not** own/copy/synchronize another model. New docs/new code must use `Model()`.
+Current UiDoc binding review confirmed:
 
-This remaining migration is mechanical and may be completed during the Windows validation sweep; once repository callers are clean, remove the transitional aliases from the seven public headers.
+- production UiDoc implementation uses `Model()` as the active semantic authority;
+- history policy no longer lives in `UiDoc::Style`;
+- no repository `doc.Core()` callers remain;
+- UiDoc test package declares the focused Core/Draw/CtrlCore/CtrlLib/Ui dependencies;
+- no package membership change is required for production UiDoc sources;
+- the lifetime hardening uses native U++ `Pte`/`Ptr` weak lifetime tracking rather than ownership or a second model store.
+
+The assistant cannot perform the Windows U++ compile/runtime gate in this environment.
 
 ## WINDOWS VALIDATION
 
-Required after caller migration:
-- Ui Debug CLANGx64 source compile.
-- `UiModelBindingContractTest`: Debug/Release **49/0**.
-- `UiThemeSurfaceRegressionTest`: Debug/Release **13/0**.
-- existing `UiModelViewPerformanceTest`: Debug/Release **52/0**.
-- existing `UiTreeScaleTest`: Debug/Release **11/0**.
-- existing `UiGalleryRegressionTest`: Debug/Release **11/0**.
-- existing `UiDropdownMenuRenderTest`: Debug/Release **11/0**.
-- focused Light/Dark smoke for standalone List, Table and NodeGraph plus compile smoke for migrated demos.
-- `git diff --check` and clean final status.
+Validate exact current `main` HEAD with CLANGx64 Debug and Release where requested.
 
-Gary may repair/commit tiny mechanical compile or accessor-spelling migrations and continue. Substantive model ownership, rendering, lifecycle, performance or theme defects return to implementation.
+Minimum focused gate:
 
-STATUS: **CORE IMPLEMENTATION COMPLETE — LEGACY SPELLING MIGRATION + PLATFORM VALIDATION PENDING.**
+1. Build/run `Utilities/UiDocModelBindingTest` Debug + Release — expected `UIDOC_MODEL_BINDING_SUMMARY checks=20 failed=0`.
+2. Build/run `Utilities/UiModelBindingContractTest` Debug + Release — expected 49/0.
+3. Build `Ui` Debug CLANGx64 to catch header/BLITZ integration issues.
+4. Build/run the existing UiDoc model, interaction and geometry tests in Debug; any existing expected summary must remain green.
+5. Build and launch `examples/UiDocDemo` Debug; smoke ordinary editing, Undo/Redo, metadata/search, table and image insertion.
+6. Run `git diff --check` and confirm a clean worktree at the exact tested HEAD.
+
+If a substantive ownership, lifecycle, notification, rendering or document-state failure appears, stop and return it to implementation. Do not weaken tests or restore retired model accessors.
