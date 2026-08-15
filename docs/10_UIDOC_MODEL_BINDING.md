@@ -68,6 +68,8 @@ preview.SetModel(document);
 
 The model is the single semantic authority. Each view retains its own caret, selection, scroll position, active object and layout caches. A model transaction emits `UiDocApplyResult`; each active bound view remaps its own positional state from the same position map and refreshes its derived layout.
 
+Derived view state is also reconciled against the model after notifications. If an external mutation removes the annotation, embed or table that a view currently has active, that stale transient selection is cleared rather than being allowed to intercept later keyboard or command handling. Valid active objects remain active across ordinary edits.
+
 This is particularly useful for agent-driven workflows: an agent can apply a deterministic `UiDocCoreTransaction` directly to the shared model and every bound view observes the same committed result without a second synchronization API.
 
 ## Change contract
@@ -100,7 +102,7 @@ Previously bound but inactive live models may still contain callbacks. `UiDoc` i
 - hit testing and paint state;
 - transient drag/resize interactions.
 
-Switching models resets view state that cannot safely carry across unrelated documents. It does not alter either model.
+Switching models resets view state that cannot safely carry across unrelated documents. It does not alter either model. Direct model mutations may remap positional state and invalidate only transient object selections that are no longer valid in the resulting model.
 
 ## History policy
 
