@@ -220,6 +220,39 @@ void UiDoc::OnCoreChange(const UiDocApplyResult& result)
     anchor_pos_ = ClampPos(anchor_pos_);
     caret_pos_ = ClampPos(caret_pos_);
 
+    if(!active_annotation_id_.IsEmpty()) {
+        bool found = false;
+        for(const UiDocAnnotation& annotation : Model().GetAnnotations())
+            if(annotation.id == active_annotation_id_) {
+                found = true;
+                break;
+            }
+        if(!found)
+            active_annotation_id_.Clear();
+    }
+
+    bool cleared_active_object = false;
+    if(!active_embed_id_.IsEmpty()) {
+        bool found = false;
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
+            if(embed.id == active_embed_id_) {
+                found = true;
+                break;
+            }
+        if(!found) {
+            ClearActiveObject();
+            cleared_active_object = true;
+        }
+    }
+
+    if(!cleared_active_object && !active_table_id_.IsEmpty()) {
+        UiDocTable table;
+        if(!Model().GetTable(active_table_id_, table) ||
+           active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
+           active_table_column_ < 0 || active_table_column_ >= table.columns)
+            ClearActiveObject();
+    }
+
     if(!result.positions.IsEmpty()) {
         paragraph_index_dirty_ = true;
         layout_positions_dirty_ = true;
