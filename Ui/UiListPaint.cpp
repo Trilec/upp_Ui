@@ -38,7 +38,24 @@ void UiList::Paint(Draw& w)
 {
     SyncModel();
     const Style& style = GetEffectiveStyle();
-    UiPaintStyledSurface(w, GetSize(), style.palette, style.metrics, style.skin,
+
+    StyledPalette viewport_palette = style.palette;
+    StyledMetrics viewport_metrics = style.metrics;
+    StyledSkin viewport_skin = style.skin;
+    if(!has_custom_style_) {
+        // Minimal List rows intentionally allow a transparent normal face, but
+        // a standalone List still owns a viewport. Resolve only missing
+        // viewport faces from the semantic Surface panel; row renderer styling
+        // remains untouched and therefore keeps lightweight/transparent rows.
+        const UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        for(int i = 0; i < 4; i++)
+            if(viewport_palette.face[i].IsNone() && panel.palette.face[i].IsSolid())
+                viewport_palette.face[i] = panel.palette.face[i];
+        viewport_metrics.face_enabled = true;
+        viewport_skin = StyledSkin();
+    }
+
+    UiPaintStyledSurface(w, GetSize(), viewport_palette, viewport_metrics, viewport_skin,
                          IsEnabled() ? ST_NORMAL : ST_DISABLED,
                          HasFocus(), false, false);
 
