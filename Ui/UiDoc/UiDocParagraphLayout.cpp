@@ -37,19 +37,19 @@ void UiDoc::LayoutParagraph(int index, int width) const
         return;
 
     ParagraphCache& paragraph = paragraphs_[index];
-    if(paragraph.valid && paragraph.width == width && paragraph.revision == core_.GetRevision())
+    if(paragraph.valid && paragraph.width == width && paragraph.revision == Model().GetRevision())
         return;
 
     paragraph.lines.Clear();
     paragraph.embeds.Clear();
     paragraph.width = width;
-    paragraph.revision = core_.GetRevision();
+    paragraph.revision = Model().GetRevision();
     paragraph.valid = true;
 
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int from = paragraph.from;
     int to = paragraph.to;
-    int indent_px = ParagraphBlockIndentAt(core_, from) * max(DPI(8), style_.margin_step * DPI(1));
+    int indent_px = ParagraphBlockIndentAt(Model(), from) * max(DPI(8), style_.margin_step * DPI(1));
     String role = BlockRoleAt(from);
 
     int role_indent_px = 0;
@@ -89,13 +89,13 @@ void UiDoc::LayoutParagraph(int index, int width) const
     };
 
     for(int pos = from; pos < to; pos++) {
-        const UiDocEmbedBlock* inline_image = text[pos] == (wchar)0xfffc ? InlineImageAt(core_, pos) : nullptr;
+        const UiDocEmbedBlock* inline_image = text[pos] == (wchar)0xfffc ? InlineImageAt(Model(), pos) : nullptr;
         if(inline_image) {
             UiDocResource resource;
             int image_width = inline_image->payload.Find("width") >= 0 ? (int)inline_image->payload["width"] : 0;
             int image_height = inline_image->payload.Find("height") >= 0 ? (int)inline_image->payload["height"] : 0;
             if(inline_image->payload.Find("resource_key") >= 0 &&
-               core_.GetResource(AsString(inline_image->payload["resource_key"]), resource)) {
+               Model().GetResource(AsString(inline_image->payload["resource_key"]), resource)) {
                 if(image_width <= 0) image_width = resource.width;
                 if(image_height <= 0) image_height = resource.height;
             }
@@ -155,7 +155,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
     }
 
     int embed_y = y;
-    for(const UiDocEmbedBlock& embed : core_.GetEmbeds()) {
+    for(const UiDocEmbedBlock& embed : Model().GetEmbeds()) {
         if(embed.range.from < from || embed.range.from > to)
             continue;
         if(embed.type != "table" && embed.type != "image" && embed.type != "hr" && embed.type != "page_break")
@@ -169,7 +169,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
 
         if(embed.type == "table") {
             UiDocTable table;
-            if(!core_.GetTable(embed.id, table))
+            if(!Model().GetTable(embed.id, table))
                 continue;
 
             int columns = max(1, table.columns);
@@ -352,7 +352,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
             UiDocResource resource;
             int image_width = embed.payload.Find("width") >= 0 ? (int)embed.payload["width"] : 0;
             int image_height = embed.payload.Find("height") >= 0 ? (int)embed.payload["height"] : 0;
-            if(embed.payload.Find("resource_key") >= 0 && core_.GetResource(AsString(embed.payload["resource_key"]), resource)) {
+            if(embed.payload.Find("resource_key") >= 0 && Model().GetResource(AsString(embed.payload["resource_key"]), resource)) {
                 if(image_width <= 0) image_width = resource.width;
                 if(image_height <= 0) image_height = resource.height;
             }
@@ -376,7 +376,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
     if(show_metadata_markers_) {
         int side_inset = min(DPI(8), max(0, available / 8));
         int card_width = max(DPI(40), available - 2 * side_inset);
-        for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+        for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
             if(!UiDocIsMetadataAnnotation(annotation) || annotation.resolved || !annotation.expanded)
                 continue;
             int anchor = annotation.range.from;

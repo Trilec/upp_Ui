@@ -10,6 +10,8 @@
 
     Contract
     - UiDocCore is the single authoritative document model.
+    - UiDoc owns an internal model by default and can bind an externally owned
+      UiDocCore without copying either model.
     - UiDoc owns view state only: caret/selection, search, viewport, layout,
       hit-testing, painting and input.
     - Layout is paragraph-cached and viewport-driven; there is no permanent
@@ -102,7 +104,6 @@ public:
         int table_min_cell_width = 56;
         int embed_gap = 8;
         int page_padding = 18;
-        int history_limit = 128;
 
         Color selection_fill = Color(178, 215, 255);
         Color search_fill = Color(255, 237, 158);
@@ -183,7 +184,9 @@ private:
         Vector<EmbedVisual> embeds;
     };
 
-    UiDocCore core_;
+    UiDocCore internal_model_;
+    UiDocCore* model_ = &internal_model_;
+    Vector<UiDocCore*> bound_models_;
     Style style_;
 
     int anchor_pos_ = 0;
@@ -232,6 +235,8 @@ private:
 
     VectorMap<String, Function<bool(UiDoc&, const Value&)> > commands_;
 
+    void BindModel(UiDocCore& model);
+    void ResetViewForModel();
     int ClampPos(int pos) const;
     UiDocRange NormalizeRange(UiDocRange range) const;
     UiDocRange SelectionRange() const;
@@ -313,22 +318,32 @@ public:
     StyledSkin& StyledSkinRef() { return style_.skin; }
     void OnStyleChanged();
 
-    UiDocCore& Core() { return core_; }
-    const UiDocCore& Core() const { return core_; }
+    UiDoc& SetModel(UiDocCore& model);
+    UiDoc& UseInternalModel() { return SetModel(internal_model_); }
+    bool IsUsingInternalModel() const { return model_ == &internal_model_; }
+    UiDocCore& Model() { return *model_; }
+    const UiDocCore& Model() const { return *model_; }
+    UiDoc& ClearModel() { Model().Clear(); return *this; }
+
+    // Transitional spelling while repository callers are migrated in this task.
+    // Model() is the canonical API and this alias will be removed once callers
+    // are clean.
+    UiDocCore& Core() { return Model(); }
+    const UiDocCore& Core() const { return Model(); }
 
     void NewDocument();
     bool Save(const String& path, String* error = nullptr) const;
     bool Load(const String& path, String* error = nullptr);
 
     void SetText(const String& text);
-    String GetText() const { return core_.GetTextUtf8(); }
-    const WString& GetTextW() const { return core_.GetText(); }
-    int GetLength() const { return core_.GetLength(); }
+    String GetText() const { return Model().GetTextUtf8(); }
+    const WString& GetTextW() const { return Model().GetText(); }
+    int GetLength() const { return Model().GetLength(); }
     void SetData(const Value& value) override;
     Value GetData() const override;
 
     void Replace(UiDocRange range, const WString& text);
-    WString GetSlice(UiDocRange range) const { return core_.GetSlice(range); }
+    WString GetSlice(UiDocRange range) const { return Model().GetSlice(range); }
 
     UiDocSelection GetSelection() const;
     void SetSelection(const UiDocSelection& selection);
@@ -374,20 +389,20 @@ public:
     Vector<UiDocAnnotation> GetMetadata(UiDocRange* range = nullptr) const;
     UiDoc& ConfigureMetadataType(const String& type, const Image& icon, Color tint = Null);
 
-    String AddResource(const UiDocResource& resource, bool dedupe = true) { return core_.AddResource(resource, dedupe); }
-    bool RemoveResource(const String& key) { return core_.RemoveResource(key); }
+    String AddResource(const UiDocResource& resource, bool dedupe = true) { return Model().AddResource(resource, dedupe); }
+    bool RemoveResource(const String& key) { return Model().RemoveResource(key); }
     String InsertImage(const String& resource_key, int width = 0, int height = 0,
                        const String& align = "inline");
     bool SetImageAlign(const String& embed_id, const String& align);
     bool RemoveEmbed(const String& id);
 
     String InsertTable(int columns = 3, int rows = 3, int header_rows = 1);
-    bool GetTable(const String& id, UiDocTable& table) const { return core_.GetTable(id, table); }
-    bool SetTable(const String& id, const UiDocTable& table) { return core_.SetTable(id, table); }
-    bool AddTableRow(const String& id, int row) { return core_.InsertTableRow(id, row); }
-    bool RemoveTableRow(const String& id, int row) { return core_.RemoveTableRow(id, row); }
-    bool AddTableColumn(const String& id, int column) { return core_.InsertTableColumn(id, column); }
-    bool RemoveTableColumn(const String& id, int column) { return core_.RemoveTableColumn(id, column); }
+    bool GetTable(const String& id, UiDocTable& table) const { return Model().GetTable(id, table); }
+    bool SetTable(const String& id, const UiDocTable& table) { return Model().SetTable(id, table); }
+    bool AddTableRow(const String& id, int row) { return Model().InsertTableRow(id, row); }
+    bool RemoveTableRow(const String& id, int row) { return Model().RemoveTableRow(id, row); }
+    bool AddTableColumn(const String& id, int column) { return Model().InsertTableColumn(id, column); }
+    bool RemoveTableColumn(const String& id, int column) { return Model().RemoveTableColumn(id, column); }
 
     void SetSearchQuery(const String& text);
     String GetSearchQuery() const { return search_query_; }
@@ -426,8 +441,8 @@ public:
 
     bool Undo();
     bool Redo();
-    bool CanUndo() const { return core_.CanUndo(); }
-    bool CanRedo() const { return core_.CanRedo(); }
+    bool CanUndo() const { return Model().CanUndo(); }
+    bool CanRedo() const { return Model().CanRedo(); }
 
     void Cut();
     void Copy() const;

@@ -109,7 +109,7 @@ void UiDoc::Layout()
     face.Deflate(frame);
 
     bool have_markers = false;
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(annotation.resolved)
             continue;
         if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
@@ -154,7 +154,7 @@ int UiDoc::PosAtDocumentPoint(Point point) const
         Rect r = embed.rect.Offseted(page_rect_.left + style_.page_padding,
                                      page_rect_.top + paragraph.top - scroll_y_);
         if(r.Contains(point)) {
-            for(const UiDocEmbedBlock& model : core_.GetEmbeds())
+            for(const UiDocEmbedBlock& model : Model().GetEmbeds())
                 if(model.id == embed.embed_id)
                     return model.range.from;
         }
@@ -208,7 +208,7 @@ Point UiDoc::DocumentPointAtPos(int pos) const
         if(pos < line.to || (last && pos <= line.to)) {
             if(line.glyphs.IsEmpty()) {
                 String role = BlockRoleAt(paragraph.from);
-                int indent_px = GeometryParagraphIndentAt(core_, paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
+                int indent_px = GeometryParagraphIndentAt(Model(), paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
                 local_x = indent_px + GeometryRoleIndent(role);
             }
             else {
@@ -232,7 +232,7 @@ Rect UiDoc::CaretRectInternal() const
     Point point = DocumentPointAtPos(caret_pos_);
 
     int sample_pos = caret_pos_;
-    if(sample_pos >= core_.GetLength() && sample_pos > 0)
+    if(sample_pos >= Model().GetLength() && sample_pos > 0)
         sample_pos--;
     UiDocTextStyle caret_style = typing_style_.IsDefault() ? StyleAt(sample_pos) : typing_style_;
     Font caret_font = ResolveFont(caret_style, BlockRoleAt(sample_pos));
@@ -286,13 +286,13 @@ int UiDoc::PosAtPoint(Point point) const
     String table_id;
     int row = -1, column = -1, cell_pos = 0;
     if(HitTestTable(point, table_id, row, column, cell_pos)) {
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == table_id)
                 return embed.range.from;
     }
     String embed_id;
     if(HitTestEmbed(point, embed_id))
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == embed_id)
                 return embed.range.from;
     return PosAtDocumentPoint(point);
@@ -389,11 +389,11 @@ bool UiDoc::HitTestEmbed(Point point, String& embed_id) const
             for(const VisualGlyph& glyph : line.glyphs) {
                 if(glyph.ch != (wchar)0xfffc)
                     continue;
-                const UiDocEmbedBlock* image = GeometryInlineImageAt(core_, glyph.pos);
+                const UiDocEmbedBlock* image = GeometryInlineImageAt(Model(), glyph.pos);
                 if(!image)
                     continue;
                 Rect rect = RectC(origin_x + glyph.x, y, glyph.width,
-                                  min(line.height, GeometryInlineImageHeight(core_, *image)));
+                                  min(line.height, GeometryInlineImageHeight(Model(), *image)));
                 if(rect.Contains(point)) {
                     embed_id = image->id;
                     return true;
@@ -425,7 +425,7 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
               : RectC(page_rect_.right, page_rect_.top, gutter, page_rect_.GetHeight());
 
     Index<int> visited;
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(annotation.resolved)
             continue;
         if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
@@ -437,7 +437,7 @@ bool UiDoc::HitTestAnnotation(Point point, String& annotation_id) const
         visited.Add(annotation.range.from);
 
         Vector<const UiDocAnnotation*> group;
-        for(const UiDocAnnotation& candidate : core_.GetAnnotations()) {
+        for(const UiDocAnnotation& candidate : Model().GetAnnotations()) {
             if(candidate.range.from != annotation.range.from || candidate.resolved)
                 continue;
             if(UiDocIsMetadataAnnotation(candidate) && !show_metadata_markers_)

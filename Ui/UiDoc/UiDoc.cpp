@@ -84,8 +84,7 @@ UiDoc::UiDoc()
     sb_.SetLine(DPI(18));
 
     style_ = StyleDefault();
-    core_.SetHistoryLimit(style_.history_limit);
-    core_.WhenChange = [=](const UiDocApplyResult& result) { OnCoreChange(result); };
+    BindModel(internal_model_);
 
     AnnotationLane comments;
     comments.id = "comments";
@@ -112,6 +111,52 @@ UiDoc::UiDoc()
     RegisterBuiltinCommands();
 }
 
+void UiDoc::BindModel(UiDocCore& model)
+{
+    for(UiDocCore* bound : bound_models_)
+        if(bound == &model)
+            return;
+
+    bound_models_.Add(&model);
+    Ptr<UiDoc> self = this;
+    UiDocCore* observed = &model;
+    model.WhenChange << [self, observed](const UiDocApplyResult& result) {
+        if(self && self->model_ == observed)
+            self->OnCoreChange(result);
+    };
+}
+
+void UiDoc::ResetViewForModel()
+{
+    anchor_pos_ = caret_pos_ = 0;
+    preferred_x_ = -1;
+    typing_style_ = UiDocTextStyle();
+    drag_selecting_ = false;
+    active_annotation_id_.Clear();
+    ClearActiveObject();
+    search_matches_.Clear();
+    search_match_index_ = -1;
+    scroll_y_ = 0;
+    sb_.Set(0);
+    glyph_width_cache_.Clear();
+    InvalidateAllLayout();
+    if(!search_query_.IsEmpty())
+        RecomputeSearch();
+    RefreshLayout();
+    Refresh();
+    WhenSelection();
+}
+
+UiDoc& UiDoc::SetModel(UiDocCore& model)
+{
+    if(model_ == &model)
+        return *this;
+    model_ = &model;
+    BindModel(model);
+    ResetViewForModel();
+    return *this;
+}
+
 UiDoc& UiDoc::SetCustomStyle(const Style& style)
 {
     style_ = style;
@@ -121,7 +166,6 @@ UiDoc& UiDoc::SetCustomStyle(const Style& style)
 
 void UiDoc::OnStyleChanged()
 {
-    core_.SetHistoryLimit(style_.history_limit);
     glyph_width_cache_.Clear();
     InvalidateAllLayout();
     BackPaint();
@@ -131,7 +175,7 @@ void UiDoc::OnStyleChanged()
 
 int UiDoc::ClampPos(int pos) const
 {
-    return ClampValue(pos, 0, core_.GetLength());
+    return ClampValue(pos, 0, Model().GetLength());
 }
 
 UiDocRange UiDoc::NormalizeRange(UiDocRange range) const
@@ -258,7 +302,7 @@ Color UiDoc::ResolveInk(const UiDocTextStyle& text_style) const
 UiDocTextStyle UiDoc::StyleAt(int pos) const
 {
     pos = ClampPos(pos);
-    for(const UiDocStyleRun& run : core_.GetStyles()) {
+    for(const UiDocStyleRun& run : Model().GetStyles()) {
         if(pos < run.from)
             break;
         if(pos >= run.from && pos < run.to)
@@ -270,7 +314,7 @@ UiDocTextStyle UiDoc::StyleAt(int pos) const
 String UiDoc::BlockRoleAt(int pos) const
 {
     UiDocRange probe(ClampPos(pos), ClampPos(pos));
-    Vector<UiDocBlock> blocks = core_.QueryBlocks(&probe);
+    Vector<UiDocBlock> blocks = Model().QueryBlocks(&probe);
     String role;
     int best = INT_MAX;
     for(const UiDocBlock& block : blocks) {
@@ -285,7 +329,7 @@ String UiDoc::BlockRoleAt(int pos) const
 
 void UiDoc::NewDocument()
 {
-    core_.Clear();
+    Model().Clear();
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
     ClearActiveObject();
@@ -299,12 +343,12 @@ void UiDoc::NewDocument()
 
 bool UiDoc::Save(const String& path, String* error) const
 {
-    return core_.Save(path, error);
+    return Model().Save(path, error);
 }
 
 bool UiDoc::Load(const String& path, String* error)
 {
-    if(!core_.Load(path, error))
+    if(!Model().Load(path, error))
         return false;
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
@@ -317,7 +361,7 @@ bool UiDoc::Load(const String& path, String* error)
 
 void UiDoc::SetText(const String& text)
 {
-    core_.Clear();
+    Model().Clear();
     UiDocCoreTransaction tx;
     tx.add_to_history = false;
     UiDocCoreChange change;
@@ -325,7 +369,7 @@ void UiDoc::SetText(const String& text)
     change.range = UiDocRange(0, 0);
     change.text = ToUnicode(text, CHARSET_UTF8);
     tx.changes.Add(pick(change));
-    core_.Apply(tx);
+    Model().Apply(tx);
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
     ClearActiveObject();
@@ -349,7 +393,7 @@ void UiDoc::Replace(UiDocRange range, const WString& text)
     tx.label = "Replace";
 
     if(!range.IsEmpty())
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(IsInlineImageEmbed(embed) && RangesOverlap(range, embed.range)) {
                 UiDocCoreChange remove;
                 remove.type = UiDocCoreChange::RemoveEmbed;
@@ -363,7 +407,7 @@ void UiDoc::Replace(UiDocRange range, const WString& text)
     replace.text = text;
     tx.changes.Add(pick(replace));
 
-    UiDocApplyResult result = core_.Apply(tx);
+    UiDocApplyResult result = Model().Apply(tx);
     if(result.ok) {
         int pos = ClampPos(range.from + text.GetCount());
         anchor_pos_ = caret_pos_ = pos;
@@ -403,7 +447,7 @@ void UiDoc::SetSelection(UiDocRange range)
 void UiDoc::SelectAll()
 {
     anchor_pos_ = 0;
-    caret_pos_ = core_.GetLength();
+    caret_pos_ = Model().GetLength();
     preferred_x_ = -1;
     ClearActiveObject();
     WhenSelection();
@@ -419,7 +463,7 @@ void UiDoc::SetBold(bool enabled)
         Refresh();
         return;
     }
-    core_.SetMark(range, UiDocTextStyle::BOLD, enabled);
+    Model().SetMark(range, UiDocTextStyle::BOLD, enabled);
 }
 
 void UiDoc::SetItalic(bool enabled)
@@ -431,7 +475,7 @@ void UiDoc::SetItalic(bool enabled)
         Refresh();
         return;
     }
-    core_.SetMark(range, UiDocTextStyle::ITALIC, enabled);
+    Model().SetMark(range, UiDocTextStyle::ITALIC, enabled);
 }
 
 void UiDoc::SetUnderline(bool enabled)
@@ -443,7 +487,7 @@ void UiDoc::SetUnderline(bool enabled)
         Refresh();
         return;
     }
-    core_.SetMark(range, UiDocTextStyle::UNDERLINE, enabled);
+    Model().SetMark(range, UiDocTextStyle::UNDERLINE, enabled);
 }
 
 void UiDoc::SetStrikeout(bool enabled)
@@ -455,7 +499,7 @@ void UiDoc::SetStrikeout(bool enabled)
         Refresh();
         return;
     }
-    core_.SetMark(range, UiDocTextStyle::STRIKE, enabled);
+    Model().SetMark(range, UiDocTextStyle::STRIKE, enabled);
 }
 
 void UiDoc::ToggleBold() { SetBold(!StyleMarkAt(HasSelection() ? StyleAt(SelectionRange().from) : typing_style_, UiDocTextStyle::BOLD)); }
@@ -471,7 +515,7 @@ void UiDoc::SetSelectionInk(Color ink)
         Refresh();
         return;
     }
-    core_.SetInk(range, ink);
+    Model().SetInk(range, ink);
 }
 
 void UiDoc::SetSelectionFont(const String& face, int height)
@@ -484,7 +528,7 @@ void UiDoc::SetSelectionFont(const String& face, int height)
         Refresh();
         return;
     }
-    core_.SetFont(range, face, height);
+    Model().SetFont(range, face, height);
 }
 
 void UiDoc::AdjustSelectionSize(int delta)
@@ -497,7 +541,7 @@ void UiDoc::AdjustSelectionSize(int delta)
     }
     UiDocTextStyle style;
     style.size_delta = ClampValue(StyleAt(range.from).size_delta + delta, -16, 48);
-    core_.SetStyle(range, style, UiDocCore::STYLE_SIZE_DELTA);
+    Model().SetStyle(range, style, UiDocCore::STYLE_SIZE_DELTA);
 }
 
 void UiDoc::AdjustSelectionLeading(int delta)
@@ -510,7 +554,7 @@ void UiDoc::AdjustSelectionLeading(int delta)
     }
     UiDocTextStyle style;
     style.leading_delta = ClampValue(StyleAt(range.from).leading_delta + delta, -16, 64);
-    core_.SetStyle(range, style, UiDocCore::STYLE_LEADING_DELTA);
+    Model().SetStyle(range, style, UiDocCore::STYLE_LEADING_DELTA);
 }
 
 void UiDoc::AdjustSelectionTracking(int delta)
@@ -523,13 +567,13 @@ void UiDoc::AdjustSelectionTracking(int delta)
     }
     UiDocTextStyle style;
     style.tracking_delta = ClampValue(StyleAt(range.from).tracking_delta + delta, -8, 24);
-    core_.SetStyle(range, style, UiDocCore::STYLE_TRACKING_DELTA);
+    Model().SetStyle(range, style, UiDocCore::STYLE_TRACKING_DELTA);
 }
 
 void UiDoc::SetBlockRole(const String& role)
 {
     UiDocRange range = SelectionRange();
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int from = range.from;
     int to = range.to;
     while(from > 0 && text[from - 1] != '\n')
@@ -537,35 +581,35 @@ void UiDoc::SetBlockRole(const String& role)
     while(to < text.GetCount() && text[to] != '\n')
         ++to;
     UiDocRange paragraph(from, to);
-    Vector<UiDocBlock> blocks = core_.QueryBlocks(&paragraph);
+    Vector<UiDocBlock> blocks = Model().QueryBlocks(&paragraph);
     for(UiDocBlock block : blocks) {
         if(block.range.from == from && block.range.to == to) {
             block.role = role;
-            core_.UpdateBlock(block);
+            Model().UpdateBlock(block);
             return;
         }
     }
-    core_.AddBlock(paragraph, role);
+    Model().AddBlock(paragraph, role);
 }
 
 void UiDoc::SetBlockIndent(int indent)
 {
     UiDocRange range = SelectionRange();
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int from = range.from;
     int to = range.to;
     while(from > 0 && text[from - 1] != '\n') --from;
     while(to < text.GetCount() && text[to] != '\n') ++to;
     UiDocRange paragraph(from, to);
-    Vector<UiDocBlock> blocks = core_.QueryBlocks(&paragraph);
+    Vector<UiDocBlock> blocks = Model().QueryBlocks(&paragraph);
     for(UiDocBlock block : blocks) {
         if(block.range.from == from && block.range.to == to) {
             block.indent = max(0, indent);
-            core_.UpdateBlock(block);
+            Model().UpdateBlock(block);
             return;
         }
     }
-    core_.AddBlock(paragraph, String(), max(0, indent));
+    Model().AddBlock(paragraph, String(), max(0, indent));
 }
 
 String UiDoc::GetBlockRole() const
@@ -577,35 +621,35 @@ String UiDoc::AddComment(const String& text, const ValueMap& meta)
 {
     ValueMap payload;
     payload.Add("text", text);
-    return core_.AddAnnotation(SelectionRange(), "review.comment", payload, meta);
+    return Model().AddAnnotation(SelectionRange(), "review.comment", payload, meta);
 }
 
 bool UiDoc::UpdateComment(const String& id, const String& text)
 {
     ValueMap payload;
     payload.Add("text", text);
-    return core_.UpdateAnnotation(id, payload);
+    return Model().UpdateAnnotation(id, payload);
 }
 
 bool UiDoc::ResolveComment(const String& id, bool resolved)
 {
-    return core_.SetAnnotationFlags(id, UiDocCore::ANNOT_RESOLVED, true, true, resolved);
+    return Model().SetAnnotationFlags(id, UiDocCore::ANNOT_RESOLVED, true, true, resolved);
 }
 
 bool UiDoc::RemoveComment(const String& id)
 {
-    return core_.RemoveAnnotation(id);
+    return Model().RemoveAnnotation(id);
 }
 
 Vector<UiDocAnnotation> UiDoc::GetComments(UiDocRange* range) const
 {
-    return core_.QueryAnnotations(range, "review.comment");
+    return Model().QueryAnnotations(range, "review.comment");
 }
 
 String UiDoc::InsertImage(const String& resource_key, int width, int height, const String& align)
 {
     UiDocResource resource;
-    if(!core_.GetResource(resource_key, resource))
+    if(!Model().GetResource(resource_key, resource))
         return String();
 
     width = width > 0 ? width : resource.width;
@@ -624,7 +668,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
 
     if(align == "inline" || align.IsEmpty()) {
         int at = ClampPos(caret_pos_);
-        String id = NextInlineImageId(core_);
+        String id = NextInlineImageId(Model());
         WString marker;
         marker.Cat((wchar)0xfffc);
         layout.Add("mode", "inline");
@@ -648,7 +692,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
         add.embed.layout = clone(layout);
         tx.changes.Add(pick(add));
 
-        if(!core_.Apply(tx).ok)
+        if(!Model().Apply(tx).ok)
             return String();
 
         anchor_pos_ = caret_pos_ = ClampPos(at + 1);
@@ -660,7 +704,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
 
     layout.Add("mode", "block");
     layout.Add("align", align);
-    String id = core_.AddEmbed(caret_pos_, "image", payload, layout);
+    String id = Model().AddEmbed(caret_pos_, "image", payload, layout);
     if(!id.IsEmpty()) {
         ClearActiveObject();
         active_embed_id_ = id;
@@ -671,7 +715,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
 
 bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
 {
-    for(const UiDocEmbedBlock& current : core_.GetEmbeds()) {
+    for(const UiDocEmbedBlock& current : Model().GetEmbeds()) {
         if(current.id != embed_id || current.type != "image")
             continue;
 
@@ -710,7 +754,7 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
         update.embed = next;
         tx.changes.Add(pick(update));
 
-        bool ok = core_.Apply(tx).ok;
+        bool ok = Model().Apply(tx).ok;
         if(ok) {
             active_embed_id_ = embed_id;
             Refresh();
@@ -723,7 +767,7 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
 bool UiDoc::RemoveEmbed(const String& id)
 {
     const UiDocEmbedBlock* found = nullptr;
-    for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+    for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
         if(embed.id == id) {
             found = &embed;
             break;
@@ -749,10 +793,10 @@ bool UiDoc::RemoveEmbed(const String& id)
         replace.range = marker;
         tx.changes.Add(pick(replace));
 
-        ok = core_.Apply(tx).ok;
+        ok = Model().Apply(tx).ok;
     }
     else
-        ok = core_.RemoveEmbed(id);
+        ok = Model().RemoveEmbed(id);
 
     if(!ok)
         return false;
@@ -764,7 +808,7 @@ bool UiDoc::RemoveEmbed(const String& id)
 
 String UiDoc::InsertTable(int columns, int rows, int header_rows)
 {
-    return core_.InsertTable(caret_pos_, columns, rows, header_rows);
+    return Model().InsertTable(caret_pos_, columns, rows, header_rows);
 }
 
 void UiDoc::SetSearchQuery(const String& text)
@@ -800,7 +844,7 @@ void UiDoc::RecomputeSearch()
         return;
     }
 
-    WString text = core_.GetText();
+    WString text = Model().GetText();
     WString query = ToUnicode(search_query_, CHARSET_UTF8);
     if(search_ignore_case_) {
         text = ToLower(text);
@@ -881,7 +925,7 @@ int UiDoc::ReplaceAllSearch(const WString& replacement)
         tx.changes.Add(pick(change));
     }
     int count = search_matches_.GetCount();
-    if(!core_.Apply(tx).ok)
+    if(!Model().Apply(tx).ok)
         return 0;
     RecomputeSearch();
     return count;
@@ -969,7 +1013,7 @@ void UiDoc::ShowMetadataMarkers(bool show)
 
 bool UiDoc::Undo()
 {
-    if(!core_.Undo())
+    if(!Model().Undo())
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     ClearActiveObject();
@@ -979,7 +1023,7 @@ bool UiDoc::Undo()
 
 bool UiDoc::Redo()
 {
-    if(!core_.Redo())
+    if(!Model().Redo())
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     ClearActiveObject();
@@ -997,7 +1041,7 @@ void UiDoc::Copy() const
 {
     UiDocRange range = SelectionRange();
     if(!range.IsEmpty())
-        WriteClipboardText(ToUtf8(core_.GetSlice(range)));
+        WriteClipboardText(ToUtf8(Model().GetSlice(range)));
 }
 
 void UiDoc::Paste()

@@ -85,7 +85,7 @@ String UiDoc::AddMetadata(UiDocRange anchor, const String& type,
     anchor = NormalizeRange(anchor);
 
     UiDocAnnotation annotation;
-    annotation.id = UiDocMetadataNextId(core_);
+    annotation.id = UiDocMetadataNextId(Model());
     annotation.range = anchor;
     annotation.type = UiDocNormalizeMetadataType(type);
     annotation.payload = clone(payload);
@@ -104,13 +104,13 @@ String UiDoc::AddMetadata(UiDocRange anchor, const String& type,
     tx.label = "Add metadata";
     tx.changes.Add(pick(add));
     String id = tx.changes[0].annotation.id;
-    return core_.Apply(tx).ok ? id : String();
+    return Model().Apply(tx).ok ? id : String();
 }
 
 bool UiDoc::UpdateMetadata(const String& id, const String& title, const String& text,
                            const ValueMap& payload)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
     ValueMap merged = UiDocMetadataMergedPayload(annotation->payload, payload);
@@ -121,7 +121,7 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
                            const String& title, const String& text,
                            const ValueMap& payload)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
 
@@ -143,7 +143,7 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
     tx.label = "Update metadata";
     tx.changes.Add(pick(remove));
     tx.changes.Add(pick(add));
-    if(!core_.Apply(tx).ok)
+    if(!Model().Apply(tx).ok)
         return false;
 
     // Core change observers run synchronously. Rebuild once more after they
@@ -158,13 +158,13 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
 
 bool UiDoc::RemoveMetadata(const String& id)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
-    return annotation && UiDocIsMetadataAnnotation(*annotation) && core_.RemoveAnnotation(id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
+    return annotation && UiDocIsMetadataAnnotation(*annotation) && Model().RemoveAnnotation(id);
 }
 
 bool UiDoc::SetMetadataExpanded(const String& id, bool expanded)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
 
@@ -178,12 +178,12 @@ bool UiDoc::SetMetadataExpanded(const String& id, bool expanded)
     tx.label = expanded ? "Expand metadata" : "Collapse metadata";
     tx.add_to_history = false;
     tx.changes.Add(pick(change));
-    return core_.Apply(tx).ok;
+    return Model().Apply(tx).ok;
 }
 
 bool UiDoc::ToggleMetadataExpanded(const String& id)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     return annotation && UiDocIsMetadataAnnotation(*annotation)
          ? SetMetadataExpanded(id, !annotation->expanded)
          : false;
@@ -196,7 +196,7 @@ Vector<UiDocAnnotation> UiDoc::GetMetadata(UiDocRange* range) const
     if(range)
         query = NormalizeRange(*range);
 
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(!UiDocIsMetadataAnnotation(annotation))
             continue;
         if(range && !UiDocMetadataRangesTouch(annotation.range, query))
@@ -230,7 +230,7 @@ void UiDoc::SetActiveAnnotation(const String& id)
         return;
     }
 
-    if(!UiDocMetadataById(core_, id))
+    if(!UiDocMetadataById(Model(), id))
         return;
     if(active_annotation_id_ != id) {
         active_annotation_id_ = id;
@@ -240,7 +240,7 @@ void UiDoc::SetActiveAnnotation(const String& id)
 
 bool UiDoc::RevealAnnotation(const String& id, bool select_range)
 {
-    const UiDocAnnotation* annotation = UiDocMetadataById(core_, id);
+    const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation)
         return false;
 

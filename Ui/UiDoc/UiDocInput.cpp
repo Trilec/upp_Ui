@@ -298,13 +298,13 @@ bool UiDoc::DeleteSelection()
 
     UiDocCoreTransaction tx;
     tx.label = "Delete";
-    AppendInlineImageRemovals(tx, core_, range);
+    AppendInlineImageRemovals(tx, Model(), range);
     UiDocCoreChange replace;
     replace.type = UiDocCoreChange::ReplaceText;
     replace.range = range;
     tx.changes.Add(pick(replace));
 
-    UiDocApplyResult result = core_.Apply(tx);
+    UiDocApplyResult result = Model().Apply(tx);
     if(!result.ok)
         return false;
     anchor_pos_ = caret_pos_ = range.from;
@@ -324,7 +324,7 @@ bool UiDoc::InsertText(const WString& text)
     bool extend_empty_block = false;
     UiDocBlock empty_block;
     if(range.IsEmpty() && !text.IsEmpty() && text.Find('\n') < 0) {
-        const WString& before = core_.GetText();
+        const WString& before = Model().GetText();
         int paragraph_from = from;
         int paragraph_to = from;
         while(paragraph_from > 0 && before[paragraph_from - 1] != '\n')
@@ -333,7 +333,7 @@ bool UiDoc::InsertText(const WString& text)
             ++paragraph_to;
         if(paragraph_from == paragraph_to) {
             UiDocRange point(paragraph_from, paragraph_to);
-            for(const UiDocBlock& block : core_.QueryBlocks(&point)) {
+            for(const UiDocBlock& block : Model().QueryBlocks(&point)) {
                 if(block.range.from == paragraph_from && block.range.to == paragraph_to &&
                    (!block.role.IsEmpty() || block.indent > 0)) {
                     empty_block.id = block.id;
@@ -350,7 +350,7 @@ bool UiDoc::InsertText(const WString& text)
 
     UiDocCoreTransaction tx;
     tx.label = "Type";
-    AppendInlineImageRemovals(tx, core_, range);
+    AppendInlineImageRemovals(tx, Model(), range);
 
     UiDocCoreChange replace;
     replace.type = UiDocCoreChange::ReplaceText;
@@ -379,7 +379,7 @@ bool UiDoc::InsertText(const WString& text)
         tx.changes.Add(pick(block));
     }
 
-    UiDocApplyResult result = core_.Apply(tx);
+    UiDocApplyResult result = Model().Apply(tx);
     if(!result.ok)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(from + text.GetCount());
@@ -398,9 +398,9 @@ bool UiDoc::InsertParagraphBreak()
 
     int sample = ClampPos(caret_pos_);
     String role = BlockRoleAt(sample);
-    int indent = InputBlockIndentAt(core_, sample);
+    int indent = InputBlockIndentAt(Model(), sample);
 
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int from = sample;
     int to = sample;
     while(from > 0 && text[from - 1] != '\n')
@@ -410,7 +410,7 @@ bool UiDoc::InsertParagraphBreak()
 
     bool list_role = role == "list.bullet" || role == "list.numbered";
     if(list_role) {
-        WString paragraph = core_.GetSlice(UiDocRange(from, to));
+        WString paragraph = Model().GetSlice(UiDocRange(from, to));
         bool empty = true;
         for(int i = 0; i < paragraph.GetCount(); i++)
             if(!IsSpace((int)paragraph[i])) {
@@ -449,12 +449,12 @@ bool UiDoc::DeleteBackward()
     UiDocRange range(from, caret_pos_);
     UiDocCoreTransaction tx;
     tx.label = "Backspace";
-    AppendInlineImageRemovals(tx, core_, range);
+    AppendInlineImageRemovals(tx, Model(), range);
     UiDocCoreChange replace;
     replace.type = UiDocCoreChange::ReplaceText;
     replace.range = range;
     tx.changes.Add(pick(replace));
-    if(!core_.Apply(tx).ok)
+    if(!Model().Apply(tx).ok)
         return false;
 
     anchor_pos_ = caret_pos_ = from;
@@ -471,18 +471,18 @@ bool UiDoc::DeleteForward()
         return RemoveEmbed(active_embed_id_);
     if(DeleteSelection())
         return true;
-    if(caret_pos_ >= core_.GetLength())
+    if(caret_pos_ >= Model().GetLength())
         return false;
 
     UiDocRange range(caret_pos_, caret_pos_ + 1);
     UiDocCoreTransaction tx;
     tx.label = "Delete";
-    AppendInlineImageRemovals(tx, core_, range);
+    AppendInlineImageRemovals(tx, Model(), range);
     UiDocCoreChange replace;
     replace.type = UiDocCoreChange::ReplaceText;
     replace.range = range;
     tx.changes.Add(pick(replace));
-    if(!core_.Apply(tx).ok)
+    if(!Model().Apply(tx).ok)
         return false;
 
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
@@ -493,7 +493,7 @@ bool UiDoc::DeleteForward()
 
 bool UiDoc::MoveWord(int direction, bool keep_selection)
 {
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int pos = caret_pos_;
     if(direction < 0) {
         if(pos <= 0)
@@ -588,7 +588,7 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
 bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
 {
     UiDocTable table;
-    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+    if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
@@ -603,7 +603,7 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
     }
     if(!InsertCellText(cell, pos, text))
         return false;
-    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+    if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     active_table_pos_ = pos + text.GetCount();
     active_table_anchor_pos_ = active_table_pos_;
@@ -616,7 +616,7 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
 bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int height)
 {
     UiDocTable table;
-    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+    if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
@@ -631,7 +631,7 @@ bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int he
     }
     if(!InsertCellImage(cell, pos, resource_key, width, height))
         return false;
-    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+    if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     active_table_anchor_pos_ = active_table_pos_ = pos + 1;
     WhenSelection();
@@ -643,7 +643,7 @@ bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int he
 bool UiDoc::DeleteActiveTableCell(bool forward)
 {
     UiDocTable table;
-    if(active_table_id_.IsEmpty() || !core_.GetTable(active_table_id_, table) ||
+    if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
        active_table_column_ < 0 || active_table_column_ >= table.columns)
         return false;
@@ -654,7 +654,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
     if(!selected.IsEmpty()) {
         if(!DeleteCellRange(cell, selected))
             return false;
-        if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+        if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
             return false;
         scroll_y_ = preserved_scroll;
         sb_.Set(scroll_y_);
@@ -672,7 +672,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
         return false;
     if(!DeleteCellUnit(cell, remove_at))
         return false;
-    if(!core_.SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
+    if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     scroll_y_ = preserved_scroll;
     sb_.Set(scroll_y_);

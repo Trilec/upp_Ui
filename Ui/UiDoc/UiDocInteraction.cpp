@@ -55,7 +55,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     if(HitTestAnnotation(p, annotation_id)) {
         bool toggle_metadata = false;
         bool next_expanded = false;
-        for(const UiDocAnnotation& annotation : core_.GetAnnotations())
+        for(const UiDocAnnotation& annotation : Model().GetAnnotations())
             if(annotation.id == annotation_id && annotation.type.StartsWith("metadata.")) {
                 toggle_metadata = true;
                 next_expanded = !annotation.expanded;
@@ -68,7 +68,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     }
 
     if(!active_embed_id_.IsEmpty()) {
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds()) {
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds()) {
             if(embed.id != active_embed_id_ || !InteractionInlineImage(embed))
                 continue;
             Point top_left = DocumentPointAtPos(embed.range.from);
@@ -108,7 +108,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
         table_drag_selecting_ = false;
         drag_selecting_ = false;
         preferred_x_ = -1;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == table_image_id) {
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.from);
                 break;
@@ -134,7 +134,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
         table_drag_selecting_ = true;
         drag_selecting_ = false;
         preferred_x_ = -1;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == table_id) {
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.from);
                 break;
@@ -149,7 +149,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
     if(HitTestEmbed(p, embed_id)) {
         ClearActiveObject();
         active_embed_id_ = embed_id;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == embed_id) {
                 if(InteractionInlineImage(embed)) {
                     anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
@@ -185,12 +185,12 @@ void UiDoc::LeftUp(Point p, dword)
         int next_width = max(DPI(24), image_resize_start_size_.cx + dx);
         int next_height = max(DPI(16), image_resize_start_size_.cy * next_width /
                                         max(1, image_resize_start_size_.cx));
-        for(const UiDocEmbedBlock& current : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& current : Model().GetEmbeds())
             if(current.id == id && InteractionInlineImage(current)) {
                 UiDocEmbedBlock next = current;
                 next.payload.GetAdd("width") = next_width;
                 next.payload.GetAdd("height") = next_height;
-                core_.UpdateEmbed(next);
+                Model().UpdateEmbed(next);
                 break;
             }
         image_resizing_ = false;
@@ -208,7 +208,7 @@ void UiDoc::LeftUp(Point p, dword)
         if(image_drag_moved_) {
             UiDocEmbedBlock source;
             bool found = false;
-            for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+            for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
                 if(embed.id == id && InteractionInlineImage(embed)) {
                     source = embed;
                     found = true;
@@ -237,7 +237,7 @@ void UiDoc::LeftUp(Point p, dword)
                     if(target != old_at && target != source.range.to) {
                         if(target > old_at)
                             target--;
-                        target = clamp(target, 0, max(0, core_.GetLength() - 1));
+                        target = clamp(target, 0, max(0, Model().GetLength() - 1));
 
                         UiDocCoreTransaction tx;
                         tx.label = "Move image";
@@ -267,7 +267,7 @@ void UiDoc::LeftUp(Point p, dword)
                         add.embed = moved;
                         tx.changes.Add(pick(add));
 
-                        if(core_.Apply(tx).ok) {
+                        if(Model().Apply(tx).ok) {
                             anchor_pos_ = caret_pos_ = ClampPos(target + 1);
                             active_embed_id_ = id;
                             WhenSelection();
@@ -331,7 +331,7 @@ void UiDoc::LeftDouble(Point p, dword)
     int row = -1, column = -1, cell_pos = 0;
     if(HitTestTable(p, table_id, row, column, cell_pos)) {
         UiDocTable table;
-        if(!core_.GetTable(table_id, table) || row < 0 || row >= table.rows.GetCount() ||
+        if(!Model().GetTable(table_id, table) || row < 0 || row >= table.rows.GetCount() ||
            column < 0 || column >= table.columns)
             return;
 
@@ -382,7 +382,7 @@ void UiDoc::LeftDouble(Point p, dword)
     if(HitTestEmbed(p, embed_id)) {
         ClearActiveObject();
         active_embed_id_ = embed_id;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == embed_id && InteractionInlineImage(embed)) {
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
                 break;
@@ -394,7 +394,7 @@ void UiDoc::LeftDouble(Point p, dword)
 
     ClearActiveObject();
     int pos = PosAtDocumentPoint(p);
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     if(text.IsEmpty())
         return;
     pos = clamp(pos, 0, text.GetCount() - 1);
@@ -440,7 +440,7 @@ bool UiDoc::Key(dword key, int count)
     if(!active_embed_id_.IsEmpty()) {
         UiDocEmbedBlock image;
         bool inline_image = false;
-        for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+        for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
             if(embed.id == active_embed_id_) {
                 image = embed;
                 inline_image = InteractionInlineImage(embed);
@@ -465,7 +465,7 @@ bool UiDoc::Key(dword key, int count)
 
     if(!active_table_id_.IsEmpty()) {
         UiDocTable table;
-        if(core_.GetTable(active_table_id_, table) &&
+        if(Model().GetTable(active_table_id_, table) &&
            active_table_row_ >= 0 && active_table_row_ < table.rows.GetCount() &&
            active_table_column_ >= 0 && active_table_column_ < table.columns) {
             const UiDocTableCell& cell = table.rows[active_table_row_].cells[active_table_column_];
@@ -539,7 +539,7 @@ bool UiDoc::Key(dword key, int count)
         case K_LEFT: return MoveWord(-1, shift);
         case K_RIGHT: return MoveWord(1, shift);
         case K_HOME: MoveCaret(0, shift); ScrollCaretIntoView(); return true;
-        case K_END: MoveCaret(core_.GetLength(), shift); ScrollCaretIntoView(); return true;
+        case K_END: MoveCaret(Model().GetLength(), shift); ScrollCaretIntoView(); return true;
         case K_BACKSPACE: {
             int old = caret_pos_;
             if(!MoveWord(-1, false))
@@ -564,13 +564,13 @@ bool UiDoc::Key(dword key, int count)
     case K_UP: return MoveVertical(-1, shift);
     case K_DOWN: return MoveVertical(1, shift);
     case K_HOME: {
-        const WString& text = core_.GetText();
+        const WString& text = Model().GetText();
         int pos = caret_pos_;
         while(pos > 0 && text[pos - 1] != '\n') pos--;
         MoveCaret(pos, shift); ScrollCaretIntoView(); return true;
     }
     case K_END: {
-        const WString& text = core_.GetText();
+        const WString& text = Model().GetText();
         int pos = caret_pos_;
         while(pos < text.GetCount() && text[pos] != '\n') pos++;
         MoveCaret(pos, shift); ScrollCaretIntoView(); return true;

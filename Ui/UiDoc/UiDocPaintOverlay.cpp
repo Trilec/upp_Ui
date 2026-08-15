@@ -102,9 +102,9 @@ void UiDoc::PaintEmbeds(Draw& w)
 
 void UiDoc::PaintAnnotations(Draw& w)
 {
-    if(core_.GetAnnotations().IsEmpty())
+    if(Model().GetAnnotations().IsEmpty())
         return;
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(annotation.resolved || UiDocIsMetadataAnnotation(annotation))
             continue;
         Point from = DocumentPointAtPos(annotation.range.from);
@@ -122,7 +122,7 @@ void UiDoc::PaintAnnotations(Draw& w)
 void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
 {
     const UiDocAnnotation* annotation = nullptr;
-    for(const UiDocAnnotation& candidate : core_.GetAnnotations())
+    for(const UiDocAnnotation& candidate : Model().GetAnnotations())
         if(candidate.id == visual.embed_id && UiDocIsMetadataAnnotation(candidate)) {
             annotation = &candidate;
             break;
@@ -213,7 +213,7 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
 void UiDoc::PaintGutter(Draw& w)
 {
     bool have_markers = false;
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(annotation.resolved)
             continue;
         if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
@@ -252,7 +252,7 @@ void UiDoc::PaintGutter(Draw& w)
         return;
 
     Index<int> painted_anchors;
-    for(const UiDocAnnotation& annotation : core_.GetAnnotations()) {
+    for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
         if(annotation.resolved)
             continue;
         if(UiDocIsMetadataAnnotation(annotation) && !show_metadata_markers_)
@@ -264,7 +264,7 @@ void UiDoc::PaintGutter(Draw& w)
         painted_anchors.Add(annotation.range.from);
 
         Vector<const UiDocAnnotation*> group;
-        for(const UiDocAnnotation& candidate : core_.GetAnnotations()) {
+        for(const UiDocAnnotation& candidate : Model().GetAnnotations()) {
             if(candidate.range.from != annotation.range.from || candidate.resolved)
                 continue;
             if(UiDocIsMetadataAnnotation(candidate) && !show_metadata_markers_)

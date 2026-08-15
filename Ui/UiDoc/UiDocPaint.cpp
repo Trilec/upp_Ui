@@ -116,7 +116,7 @@ void UiDoc::PaintText(Draw& w)
 {
     EnsureLayout();
     UiDocRange selection = SelectionRange();
-    const Vector<UiDocAnnotation>& annotations = core_.GetAnnotations();
+    const Vector<UiDocAnnotation>& annotations = Model().GetAnnotations();
     int origin_x = page_rect_.left + style_.page_padding;
     int viewport_top = page_rect_.top;
     int viewport_bottom = page_rect_.bottom;
@@ -130,7 +130,7 @@ void UiDoc::PaintText(Draw& w)
             continue;
 
         String role = BlockRoleAt(paragraph.from);
-        int indent_px = PaintBlockIndentAt(core_, paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
+        int indent_px = PaintBlockIndentAt(Model(), paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
 
         if(role == "list.bullet" || role == "list.numbered") {
             String marker;
@@ -178,13 +178,13 @@ void UiDoc::PaintText(Draw& w)
                     }
                 }
 
-                const UiDocEmbedBlock* inline_image = glyph.ch == (wchar)0xfffc ? PaintInlineImageAt(core_, glyph.pos) : nullptr;
+                const UiDocEmbedBlock* inline_image = glyph.ch == (wchar)0xfffc ? PaintInlineImageAt(Model(), glyph.pos) : nullptr;
                 if(inline_image) {
                     String key = inline_image->payload.Find("resource_key") >= 0 ? AsString(inline_image->payload["resource_key"]) : String();
                     UiDocResource resource;
                     int source_width = inline_image->payload.Find("width") >= 0 ? (int)inline_image->payload["width"] : glyph.width;
                     int image_height = inline_image->payload.Find("height") >= 0 ? (int)inline_image->payload["height"] : 0;
-                    if(core_.GetResource(key, resource)) {
+                    if(Model().GetResource(key, resource)) {
                         if(source_width <= 0) source_width = resource.width;
                         if(image_height <= 0) image_height = resource.height;
                     }
@@ -198,7 +198,7 @@ void UiDoc::PaintText(Draw& w)
                     if(selected)
                         w.DrawRect(cell, style_.selection_fill);
 
-                    Image image = core_.GetResource(key, resource) ? StreamRaster::LoadStringAny(resource.bytes) : Image();
+                    Image image = Model().GetResource(key, resource) ? StreamRaster::LoadStringAny(resource.bytes) : Image();
                     if(!image.IsEmpty())
                         w.DrawImage(image_rect.left, image_rect.top, image_rect.GetWidth(), image_rect.GetHeight(), image);
                     else {
@@ -246,7 +246,7 @@ void UiDoc::PaintText(Draw& w)
 void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
 {
     UiDocTable table;
-    if(!core_.GetTable(visual.embed_id, table))
+    if(!Model().GetTable(visual.embed_id, table))
         return;
 
     int paragraph_top = 0;
@@ -303,7 +303,7 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
 
             if(unit.image) {
                 UiDocResource resource;
-                if(core_.GetResource(unit.resource_key, resource)) {
+                if(Model().GetResource(unit.resource_key, resource)) {
                     Image image = StreamRaster::LoadStringAny(resource.bytes);
                     if(!image.IsEmpty())
                         w.DrawImage(ur.left, ur.top, ur.GetWidth(), ur.GetHeight(), image);
@@ -331,7 +331,7 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
 void UiDoc::PaintImage(Draw& w, const EmbedVisual& visual)
 {
     const UiDocEmbedBlock* found = nullptr;
-    for(const UiDocEmbedBlock& embed : core_.GetEmbeds())
+    for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
         if(embed.id == visual.embed_id) {
             found = &embed;
             break;
@@ -341,7 +341,7 @@ void UiDoc::PaintImage(Draw& w, const EmbedVisual& visual)
 
     String key = found->payload.Find("resource_key") >= 0 ? AsString(found->payload["resource_key"]) : String();
     UiDocResource resource;
-    if(key.IsEmpty() || !core_.GetResource(key, resource))
+    if(key.IsEmpty() || !Model().GetResource(key, resource))
         return;
     Image image = StreamRaster::LoadStringAny(resource.bytes);
     if(image.IsEmpty())

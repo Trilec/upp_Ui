@@ -7,7 +7,7 @@ namespace {
 Vector<UiDocRange> CommandParagraphRanges(const UiDoc& doc)
 {
     Vector<UiDocRange> out;
-    const WString& text = doc.Core().GetText();
+    const WString& text = doc.Model().GetText();
     UiDocSelection selection = doc.GetSelection();
     int from = min(selection.anchor, selection.caret);
     int to = max(selection.anchor, selection.caret);
@@ -43,19 +43,19 @@ bool ApplyParagraphRole(UiDoc& doc, const String& role)
     bool changed = false;
 
     for(const UiDocRange& paragraph : paragraphs) {
-        Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(&paragraph);
+        Vector<UiDocBlock> blocks = doc.Model().QueryBlocks(&paragraph);
         bool found_exact = false;
         for(UiDocBlock block : blocks) {
             if(block.range.from == paragraph.from && block.range.to == paragraph.to) {
                 found_exact = true;
                 if(block.role != role) {
                     block.role = role;
-                    changed = doc.Core().UpdateBlock(block) || changed;
+                    changed = doc.Model().UpdateBlock(block) || changed;
                 }
             }
         }
         if(!found_exact)
-            changed = !doc.Core().AddBlock(paragraph, role).IsEmpty() || changed;
+            changed = !doc.Model().AddBlock(paragraph, role).IsEmpty() || changed;
     }
     return changed || !paragraphs.IsEmpty();
 }
@@ -66,7 +66,7 @@ bool AdjustParagraphIndent(UiDoc& doc, int delta)
     bool changed = false;
 
     for(const UiDocRange& paragraph : paragraphs) {
-        Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(&paragraph);
+        Vector<UiDocBlock> blocks = doc.Model().QueryBlocks(&paragraph);
         UiDocBlock exact;
         bool found_exact = false;
         for(const UiDocBlock& block : blocks) {
@@ -82,11 +82,11 @@ bool AdjustParagraphIndent(UiDoc& doc, int delta)
         if(found_exact) {
             if(exact.indent != next) {
                 exact.indent = next;
-                changed = doc.Core().UpdateBlock(exact) || changed;
+                changed = doc.Model().UpdateBlock(exact) || changed;
             }
         }
         else if(next > 0)
-            changed = !doc.Core().AddBlock(paragraph, String(), next).IsEmpty() || changed;
+            changed = !doc.Model().AddBlock(paragraph, String(), next).IsEmpty() || changed;
     }
 
     return changed || !paragraphs.IsEmpty();
@@ -126,8 +126,8 @@ UiDocCommandState UiDoc::QueryBuiltinCommandState(const String& id) const
     else if(id == "format.italic") state.active = (style.flags & UiDocTextStyle::ITALIC) != 0;
     else if(id == "format.underline") state.active = (style.flags & UiDocTextStyle::UNDERLINE) != 0;
     else if(id == "format.strike") state.active = (style.flags & UiDocTextStyle::STRIKE) != 0;
-    else if(id == "edit.undo") state.enabled = core_.CanUndo();
-    else if(id == "edit.redo") state.enabled = core_.CanRedo();
+    else if(id == "edit.undo") state.enabled = Model().CanUndo();
+    else if(id == "edit.redo") state.enabled = Model().CanRedo();
     else if(id == "edit.copy" || id == "edit.cut") state.enabled = HasSelection();
     else if(id == "search.next" || id == "search.prev") state.enabled = !search_matches_.IsEmpty();
     else if(id.StartsWith("table.")) state.enabled = !active_table_id_.IsEmpty();
@@ -187,7 +187,7 @@ void UiDoc::RegisterBuiltinCommands()
         UiDocRange range(min(selection.anchor, selection.caret), max(selection.anchor, selection.caret));
         if(range.IsEmpty())
             return false;
-        WString text = doc.Core().GetSlice(range);
+        WString text = doc.Model().GetSlice(range);
         for(int i = 0; i < text.GetCount(); i++)
             text.Set(i, ToUpper(text[i]));
         doc.Replace(range, text);
@@ -198,7 +198,7 @@ void UiDoc::RegisterBuiltinCommands()
         UiDocRange range(min(selection.anchor, selection.caret), max(selection.anchor, selection.caret));
         if(range.IsEmpty())
             return false;
-        WString text = doc.Core().GetSlice(range);
+        WString text = doc.Model().GetSlice(range);
         for(int i = 0; i < text.GetCount(); i++)
             text.Set(i, ToLower(text[i]));
         doc.Replace(range, text);
@@ -248,10 +248,10 @@ void UiDoc::RegisterBuiltinCommands()
         return !doc.InsertTable(columns, rows, headers).IsEmpty();
     });
     RegisterCommand("insert.hr", [](UiDoc& doc, const Value&) {
-        return !doc.Core().AddEmbed(doc.GetSelection().caret, "hr").IsEmpty();
+        return !doc.Model().AddEmbed(doc.GetSelection().caret, "hr").IsEmpty();
     });
     RegisterCommand("insert.page_break", [](UiDoc& doc, const Value&) {
-        return !doc.Core().AddEmbed(doc.GetSelection().caret, "page_break").IsEmpty();
+        return !doc.Model().AddEmbed(doc.GetSelection().caret, "page_break").IsEmpty();
     });
     RegisterCommand("insert.image", [](UiDoc& doc, const Value& value) {
         if(!value.Is<ValueMap>())
@@ -268,23 +268,23 @@ void UiDoc::RegisterBuiltinCommands()
 
     RegisterCommand("table.row.add", [](UiDoc& doc, const Value&) {
         UiDocTable table;
-        if(doc.active_table_id_.IsEmpty() || !doc.Core().GetTable(doc.active_table_id_, table))
+        if(doc.active_table_id_.IsEmpty() || !doc.Model().GetTable(doc.active_table_id_, table))
             return false;
         int row = clamp(doc.active_table_row_ + 1, 0, table.rows.GetCount());
-        return doc.Core().InsertTableRow(doc.active_table_id_, row);
+        return doc.Model().InsertTableRow(doc.active_table_id_, row);
     });
     RegisterCommand("table.row.remove", [](UiDoc& doc, const Value&) {
-        return !doc.active_table_id_.IsEmpty() && doc.Core().RemoveTableRow(doc.active_table_id_, doc.active_table_row_);
+        return !doc.active_table_id_.IsEmpty() && doc.Model().RemoveTableRow(doc.active_table_id_, doc.active_table_row_);
     });
     RegisterCommand("table.column.add", [](UiDoc& doc, const Value&) {
         UiDocTable table;
-        if(doc.active_table_id_.IsEmpty() || !doc.Core().GetTable(doc.active_table_id_, table))
+        if(doc.active_table_id_.IsEmpty() || !doc.Model().GetTable(doc.active_table_id_, table))
             return false;
         int column = clamp(doc.active_table_column_ + 1, 0, table.columns);
-        return doc.Core().InsertTableColumn(doc.active_table_id_, column);
+        return doc.Model().InsertTableColumn(doc.active_table_id_, column);
     });
     RegisterCommand("table.column.remove", [](UiDoc& doc, const Value&) {
-        return !doc.active_table_id_.IsEmpty() && doc.Core().RemoveTableColumn(doc.active_table_id_, doc.active_table_column_);
+        return !doc.active_table_id_.IsEmpty() && doc.Model().RemoveTableColumn(doc.active_table_id_, doc.active_table_column_);
     });
 
     RegisterCommand("image.align.inline", [](UiDoc& doc, const Value&) {

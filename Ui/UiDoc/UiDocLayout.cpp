@@ -45,19 +45,19 @@ int UiDoc::EstimateParagraphHeight(int from, int to, int width) const
 {
     Font font = ResolveFont(UiDocTextStyle(), BlockRoleAt(from));
     int line_height = max(DPI(14), font.GetHeight() + style_.line_gap);
-    int usable = max(DPI(40), width - BlockIndentAt(core_, from) * DPI(16));
+    int usable = max(DPI(40), width - BlockIndentAt(Model(), from) * DPI(16));
     int avg = max(1, GetStdFontSize().cx);
     int chars_per_line = max(8, usable / avg);
     int chars = max(0, to - from);
     int lines = max(1, (chars + chars_per_line - 1) / chars_per_line);
     int height = lines * line_height + style_.paragraph_gap;
 
-    for(const UiDocEmbedBlock& embed : core_.GetEmbeds()) {
+    for(const UiDocEmbedBlock& embed : Model().GetEmbeds()) {
         if(embed.range.from < from || embed.range.from > to || !IsBlockEmbedType(embed.type))
             continue;
         if(embed.type == "table") {
             UiDocTable table;
-            if(core_.GetTable(embed.id, table))
+            if(Model().GetTable(embed.id, table))
                 height += max(DPI(32), table.rows.GetCount() * (line_height + 2 * style_.table_cell_padding)) + style_.embed_gap;
         }
         else if(embed.type == "image") {
@@ -95,7 +95,7 @@ void UiDoc::RebuildParagraphIndex() const
     paragraphs_.Clear();
     paragraph_tops_.Clear();
 
-    const WString& text = core_.GetText();
+    const WString& text = Model().GetText();
     int start = 0;
     for(int i = 0; i <= text.GetCount(); i++) {
         if(i < text.GetCount() && text[i] != '\n')
