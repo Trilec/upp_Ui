@@ -219,7 +219,7 @@ struct UiDocApplyResult : Moveable<UiDocApplyResult> {
     String error;
 };
 
-class UiDocCore {
+class UiDocCore : public Pte<UiDocCore> {
 public:
     enum StyleMask : dword {
         STYLE_FLAGS          = 1u << 0,
