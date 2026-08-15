@@ -43,7 +43,7 @@ struct TestCtx {
 
 static UiDocTextStyle StyleAt(const UiDoc& doc, int pos)
 {
-    for(const UiDocStyleRun& run : doc.Core().GetStyles())
+    for(const UiDocStyleRun& run : doc.Model().GetStyles())
         if(run.from <= pos && pos < run.to)
             return run.style;
     return UiDocTextStyle();
@@ -51,7 +51,7 @@ static UiDocTextStyle StyleAt(const UiDoc& doc, int pos)
 
 static const UiDocEmbedBlock* FindEmbed(const UiDoc& doc, const String& id)
 {
-    for(const UiDocEmbedBlock& embed : doc.Core().GetEmbeds())
+    for(const UiDocEmbedBlock& embed : doc.Model().GetEmbeds())
         if(embed.id == id)
             return &embed;
     return nullptr;
@@ -63,7 +63,7 @@ static void Case01_TextSelectionKeyboard(TestCtx& t)
     UiDoc doc;
     doc.SetText("abc");
     t.Expect(doc.GetText() == "abc", "SetText/GetText round-trip");
-    t.Expect(doc.GetLength() == 3, "length follows core text");
+    t.Expect(doc.GetLength() == 3, "length follows model text");
 
     doc.SetSelection(UiDocRange(3, 3));
     t.Expect(doc.Key('X', 1), "printable key handled");
@@ -80,9 +80,9 @@ static void Case01_TextSelectionKeyboard(TestCtx& t)
     t.EndCase();
 }
 
-static void Case02_CoreMappingAndEvents(TestCtx& t)
+static void Case02_ModelMappingAndEvents(TestCtx& t)
 {
-    t.BeginCase("Core Mapping Into View", "Direct Core edits remap UiDoc selection and emit mapped-before-change events.");
+    t.BeginCase("Model Mapping Into View", "Direct model edits remap UiDoc selection and emit mapped-before-change events.");
     UiDoc doc;
     doc.SetText("zero alpha beta");
     doc.SetSelection(UiDocRange(5, 10));
@@ -91,10 +91,10 @@ static void Case02_CoreMappingAndEvents(TestCtx& t)
     doc.WhenMapped = [&](const UiDocPositionMap&) { events << 'M'; };
     doc.WhenChange = [&] { events << 'C'; };
 
-    UiDocApplyResult result = doc.Core().Replace(UiDocRange(0, 0), WString("XX "));
-    t.Expect(result.ok, "direct Core edit succeeds");
+    UiDocApplyResult result = doc.Model().Replace(UiDocRange(0, 0), WString("XX "));
+    t.Expect(result.ok, "direct model edit succeeds");
     UiDocSelection selection = doc.GetSelection();
-    t.Expect(selection.anchor == 8 && selection.caret == 13, "selection remaps through Core position map");
+    t.Expect(selection.anchor == 8 && selection.caret == 13, "selection remaps through model position map");
     t.Expect(events == "MC", "WhenMapped precedes WhenChange");
     t.EndCase();
 }
@@ -117,10 +117,10 @@ static void Case03_SelectionFormatting(TestCtx& t)
     doc.AdjustSelectionTracking(1);
 
     UiDocTextStyle style = StyleAt(doc, 1);
-    t.Expect((style.flags & UiDocTextStyle::BOLD) != 0, "bold stored in Core style run");
-    t.Expect((style.flags & UiDocTextStyle::ITALIC) != 0, "italic stored in Core style run");
-    t.Expect((style.flags & UiDocTextStyle::UNDERLINE) != 0, "underline stored in Core style run");
-    t.Expect((style.flags & UiDocTextStyle::STRIKE) != 0, "strike stored in Core style run");
+    t.Expect((style.flags & UiDocTextStyle::BOLD) != 0, "bold stored in model style run");
+    t.Expect((style.flags & UiDocTextStyle::ITALIC) != 0, "italic stored in model style run");
+    t.Expect((style.flags & UiDocTextStyle::UNDERLINE) != 0, "underline stored in model style run");
+    t.Expect((style.flags & UiDocTextStyle::STRIKE) != 0, "strike stored in model style run");
     t.Expect(style.ink == Color(20, 40, 80), "ink stored");
     t.Expect(style.font_face == "Arial" && style.font_height == 18, "font face and height stored");
     t.Expect(style.size_delta == 2, "size delta stored");
@@ -149,7 +149,7 @@ static void Case04_TypingStyle(TestCtx& t)
 
 static void Case05_BlockRoleAndIndent(TestCtx& t)
 {
-    t.BeginCase("Semantic Block Facade", "Applies screenplay role and indent to a paragraph using sparse Core blocks.");
+    t.BeginCase("Semantic Block Facade", "Applies screenplay role and indent to a paragraph using sparse model blocks.");
     UiDoc doc;
     doc.SetText("INT. ROOM\nAction line\n");
     doc.SetSelection(UiDocRange(0, 0));
@@ -157,7 +157,7 @@ static void Case05_BlockRoleAndIndent(TestCtx& t)
     t.Expect(doc.ExecuteCommand("block.screenplay.scene"), "screenplay role command executes");
     doc.SetBlockIndent(2);
 
-    Vector<UiDocBlock> blocks = doc.Core().QueryBlocks(nullptr, "screenplay.scene");
+    Vector<UiDocBlock> blocks = doc.Model().QueryBlocks(nullptr, "screenplay.scene");
     t.Expect(blocks.GetCount() == 1, "one screenplay scene block stored");
     if(!blocks.IsEmpty()) {
         t.Expect(blocks[0].range.from == 0 && blocks[0].range.to == 9, "role covers first paragraph only");
@@ -182,7 +182,7 @@ static void Case06_CommentsLifecycleAndRemap(TestCtx& t)
     t.Expect(doc.UpdateComment(id, "updated review"), "comment text update succeeds");
     t.Expect(doc.ResolveComment(id, true), "comment resolves");
 
-    doc.Core().Replace(UiDocRange(0, 0), WString("XX "));
+    doc.Model().Replace(UiDocRange(0, 0), WString("XX "));
     Vector<UiDocAnnotation> comments = doc.GetComments();
     t.Expect(comments.GetCount() == 1, "comment remains after text remap");
     if(!comments.IsEmpty()) {
@@ -233,7 +233,7 @@ static void Case07_AnnotationLaneViewState(TestCtx& t)
 
 static void Case08_ResourceImageLifecycle(TestCtx& t)
 {
-    t.BeginCase("Resource + Image Embed", "Inserts an image by Core resource key and validates alignment/history without duplicating bytes.");
+    t.BeginCase("Resource + Image Embed", "Inserts an image by model resource key and validates alignment/history without duplicating bytes.");
     UiDoc doc;
     doc.SetText("image\n");
     doc.SetSelection(UiDocRange(2, 2));
@@ -252,7 +252,7 @@ static void Case08_ResourceImageLifecycle(TestCtx& t)
     String embed_id = doc.InsertImage(key, 40, 20, "left");
     t.Expect(!embed_id.IsEmpty(), "image embed inserted");
     const UiDocEmbedBlock* embed = FindEmbed(doc, embed_id);
-    t.Expect(embed && embed->type == "image", "image embed stored in Core");
+    t.Expect(embed && embed->type == "image", "image embed stored in model");
     if(embed) {
         t.Expect(AsString(embed->payload["resource_key"]) == key, "embed references resource key only");
         t.Expect((int)embed->payload["width"] == 40 && (int)embed->payload["height"] == 20, "requested image dimensions stored");
@@ -270,7 +270,7 @@ static void Case08_ResourceImageLifecycle(TestCtx& t)
     t.Expect(doc.RemoveEmbed(embed_id), "image embed removal succeeds");
     t.Expect(FindEmbed(doc, embed_id) == nullptr, "embed removed while resource remains");
     UiDocResource stored;
-    t.Expect(doc.Core().GetResource(key, stored), "resource still exists after embed removal");
+    t.Expect(doc.Model().GetResource(key, stored), "resource still exists after embed removal");
     t.Expect(doc.Undo(), "undo restores removed image embed");
     t.Expect(FindEmbed(doc, embed_id) != nullptr, "image embed restored");
     t.EndCase();
@@ -404,7 +404,7 @@ static void Case12_CommandRoutingAndState(TestCtx& t)
     t.Expect(before.enabled && !before.active, "bold command initially enabled/inactive");
     t.Expect(doc.ExecuteCommand("format.bold"), "builtin bold command executes");
     t.Expect(doc.QueryCommandState("format.bold").active, "bold command becomes active");
-    t.Expect(doc.QueryCommandState("edit.undo").enabled, "undo command state tracks Core history");
+    t.Expect(doc.QueryCommandState("edit.undo").enabled, "undo command state tracks model history");
     t.Expect(doc.ExecuteCommand("edit.undo"), "undo command executes through registry");
     t.Expect(!doc.QueryCommandState("format.bold").active, "undo clears active bold state");
 
@@ -431,11 +431,11 @@ static void Case13_InsertCommands(TestCtx& t)
     table_args.Add(1);
     table_args.Add(0);
     t.Expect(doc.ExecuteCommand("insert.table", table_args), "insert.table command succeeds");
-    t.Expect(doc.Core().QueryEmbeds(nullptr, "table").GetCount() == 1, "table embed created");
+    t.Expect(doc.Model().QueryEmbeds(nullptr, "table").GetCount() == 1, "table embed created");
     t.Expect(doc.ExecuteCommand("insert.hr"), "insert.hr command succeeds");
     t.Expect(doc.ExecuteCommand("insert.page_break"), "insert.page_break command succeeds");
-    t.Expect(doc.Core().QueryEmbeds(nullptr, "hr").GetCount() == 1, "horizontal rule embed created");
-    t.Expect(doc.Core().QueryEmbeds(nullptr, "page_break").GetCount() == 1, "page break embed created");
+    t.Expect(doc.Model().QueryEmbeds(nullptr, "hr").GetCount() == 1, "horizontal rule embed created");
+    t.Expect(doc.Model().QueryEmbeds(nullptr, "page_break").GetCount() == 1, "page break embed created");
     t.EndCase();
 }
 
@@ -455,19 +455,22 @@ static void Case14_NewDocumentAndData(TestCtx& t)
     UiDocSelection selection = doc.GetSelection();
     t.Expect(selection.anchor == 0 && selection.caret == 0, "NewDocument resets selection");
     t.Expect(doc.GetSearchQuery().IsEmpty() && doc.GetSearchMatchCount() == 0, "NewDocument clears search state");
-    t.Expect(doc.GetComments().IsEmpty(), "NewDocument clears annotations through Core");
+    t.Expect(doc.GetComments().IsEmpty(), "NewDocument clears annotations through model");
     t.Expect(!doc.CanUndo() && !doc.CanRedo(), "NewDocument clears history");
     t.EndCase();
 }
 
-static void Case15_StyleHistoryLimit(TestCtx& t)
+static void Case15_ModelHistoryLimit(TestCtx& t)
 {
-    t.BeginCase("Style History Limit", "SetCustomStyle propagates history_limit into UiDocCore.");
+    t.BeginCase("Model History Limit", "History depth is model policy and visual style changes do not override it.");
     UiDoc doc;
+    doc.Model().SetHistoryLimit(2);
+    t.Expect(doc.Model().GetHistoryLimit() == 2, "history limit is configured directly on the active model");
+
     UiDoc::Style style = doc.GetStyle();
-    style.history_limit = 2;
+    style.page_padding += DPI(1);
     doc.SetCustomStyle(style);
-    t.Expect(doc.Core().GetHistoryLimit() == 2, "custom style updates Core history limit");
+    t.Expect(doc.Model().GetHistoryLimit() == 2, "visual style changes leave model-owned history policy unchanged");
 
     doc.SetText("a");
     doc.Replace(UiDocRange(1, 1), WString("b"));
@@ -476,13 +479,13 @@ static void Case15_StyleHistoryLimit(TestCtx& t)
     t.Expect(doc.GetText() == "abcd", "three edits applied");
     t.Expect(doc.Undo() && doc.GetText() == "abc", "latest edit undo available");
     t.Expect(doc.Undo() && doc.GetText() == "ab", "second retained edit undo available");
-    t.Expect(!doc.Undo(), "history older than configured limit discarded");
+    t.Expect(!doc.Undo(), "history older than configured model limit discarded");
     t.EndCase();
 }
 
 static void Case16_SnapshotComposition(TestCtx& t)
 {
-    t.BeginCase("Core Snapshot Through UiDoc", "Round-trips the complete logical model through the Core owned by two UiDoc instances.");
+    t.BeginCase("Model Snapshot Through UiDoc", "Round-trips the complete logical model through two UiDoc instances.");
     UiDoc source;
     source.SetText("Scene\nAction\n");
     source.SetSelection(UiDocRange(0, 5));
@@ -502,18 +505,18 @@ static void Case16_SnapshotComposition(TestCtx& t)
     String image_id = source.InsertImage(key, 4, 4, "right");
     t.Expect(!image_id.IsEmpty(), "snapshot source contains image embed");
 
-    String json = source.Core().ToJson();
+    String json = source.Model().ToJson();
     t.Expect(!json.IsEmpty(), "logical snapshot serialized");
 
     UiDoc restored;
     String error;
-    t.Expect(restored.Core().FromJson(json, &error), String("snapshot restored: ") + error);
-    t.Expect(restored.GetText() == source.GetText(), "restored UiDoc sees Core text");
-    t.Expect(restored.Core().GetStyles().GetCount() == source.Core().GetStyles().GetCount(), "style runs restored");
-    t.Expect(restored.Core().GetBlocks().GetCount() == source.Core().GetBlocks().GetCount(), "semantic blocks restored");
+    t.Expect(restored.Model().FromJson(json, &error), String("snapshot restored: ") + error);
+    t.Expect(restored.GetText() == source.GetText(), "restored UiDoc sees model text");
+    t.Expect(restored.Model().GetStyles().GetCount() == source.Model().GetStyles().GetCount(), "style runs restored");
+    t.Expect(restored.Model().GetBlocks().GetCount() == source.Model().GetBlocks().GetCount(), "semantic blocks restored");
     t.Expect(restored.GetComments().GetCount() == 1, "comments restored");
-    t.Expect(restored.Core().GetResources().GetCount() == 1, "resource table restored");
-    t.Expect(restored.Core().GetEmbeds().GetCount() == 1, "embed table restored");
+    t.Expect(restored.Model().GetResources().GetCount() == 1, "resource table restored");
+    t.Expect(restored.Model().GetEmbeds().GetCount() == 1, "embed table restored");
     t.EndCase();
 }
 
@@ -543,10 +546,10 @@ CONSOLE_APP_MAIN
 {
     TestCtx t;
     Cout() << "UiDoc v2 editor/model regression suite\n";
-    Cout() << "Coverage: UiDoc facade + UiDocCore composition, selection mapping, formatting, semantic blocks, comments, view lanes, resources/images, canonical tables, search, commands, history, snapshots and viewport geometry.\n";
+    Cout() << "Coverage: UiDoc facade + UiDocCore composition, selection mapping, formatting, semantic blocks, comments, view lanes, resources/images, canonical tables, search, commands, model history, snapshots and viewport geometry.\n";
 
     Case01_TextSelectionKeyboard(t);
-    Case02_CoreMappingAndEvents(t);
+    Case02_ModelMappingAndEvents(t);
     Case03_SelectionFormatting(t);
     Case04_TypingStyle(t);
     Case05_BlockRoleAndIndent(t);
@@ -559,7 +562,7 @@ CONSOLE_APP_MAIN
     Case12_CommandRoutingAndState(t);
     Case13_InsertCommands(t);
     Case14_NewDocumentAndData(t);
-    Case15_StyleHistoryLimit(t);
+    Case15_ModelHistoryLimit(t);
     Case16_SnapshotComposition(t);
     Case17_LayoutGeometry(t);
 
