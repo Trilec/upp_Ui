@@ -30,7 +30,7 @@ editor.SetModel(document);
 
 `SetModel()` switches authority. It does not copy, merge or clear either the previous or the newly supplied model. `UseInternalModel()` restores the retained internal document. `ClearModel()` clears only whichever model is currently active and does not switch ownership.
 
-External models are non-owning and must outlive the period in which a `UiDoc` uses them.
+External models are non-owning and must outlive the period in which a `UiDoc` uses them. UiDoc keeps only weak lifetime bookkeeping for models that were bound previously, so an inactive external model may be destroyed normally; a later `UiDocCore` created at the same address is treated as a new model and receives a fresh binding.
 
 ## Why UiDocCore remains domain-specific
 
@@ -84,7 +84,7 @@ UiDocPositionMap
 
 It carries document revision, changed range and exact position mapping needed for text/range edits. That remains the authoritative synchronization path.
 
-Previously bound but inactive models may still contain callbacks. `UiDoc` ignores those notifications unless the observed model is the model currently selected by `Model()`.
+Previously bound but inactive live models may still contain callbacks. `UiDoc` ignores those notifications unless the observed model is the model currently selected by `Model()`. Weak lifetime tracking ensures a destroyed inactive model no longer occupies a binding identity merely because another object later reuses its address.
 
 ## Model state versus view state
 
