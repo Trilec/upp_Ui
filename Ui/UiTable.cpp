@@ -14,6 +14,59 @@ UiTable::Style MakeUiTableDefaultStyle()
     return s;
 }
 
+Color UiTableFace(const StyledPalette& palette, int state, Color fallback)
+{
+    return palette.face[state].IsSolid() && !IsNull(palette.face[state].color)
+         ? palette.face[state].color
+         : fallback;
+}
+
+Color UiTableColor(Color value, Color fallback)
+{
+    return IsNull(value) ? fallback : value;
+}
+
+void ResolveUiTableChrome(UiTable::Style& s)
+{
+    const UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    const UiPanel::Style subtle = UiTheme::ResolvePanel(UiPanelRole::Subtle);
+    const UiList::Style list = UiTheme::ResolveList();
+    const UiThemeContext ctx = UiTheme::GetContext();
+
+    s.table_bg = UiTableFace(surface.palette, ST_NORMAL, s.table_bg);
+    s.header_bg = UiTableFace(subtle.palette, ST_NORMAL, s.table_bg);
+    s.header_hot_bg = UiTableFace(subtle.palette, ST_HOT, s.header_bg);
+    s.row_header_bg = s.header_bg;
+
+    s.header_ink = UiTableColor(surface.palette.ink[ST_NORMAL], s.header_ink);
+    s.cell_ink = UiTableColor(surface.palette.ink[ST_NORMAL], s.cell_ink);
+    s.muted_ink = UiTableColor(surface.palette.ink[ST_DISABLED], s.muted_ink);
+    s.grid_color = UiTableColor(subtle.palette.frame[ST_NORMAL],
+                                UiTableColor(surface.palette.frame[ST_NORMAL], s.grid_color));
+
+    s.alternate_row_bg = UiTableFace(subtle.palette, ST_NORMAL, s.table_bg);
+    s.hover_bg = UiTableFace(surface.palette, ST_HOT,
+                             UiTableFace(subtle.palette, ST_HOT, s.table_bg));
+    s.read_only_bg = UiTableFace(subtle.palette, ST_NORMAL, s.table_bg);
+
+    s.selection_bg = UiTableColor(list.selected_face,
+                                  UiTableFace(surface.palette, ST_PRESSED, s.table_bg));
+    s.selection_border = UiTableColor(list.selected_frame,
+                                      UiTableColor(list.drag_marker, s.selection_border));
+    s.active_bg = s.selection_bg;
+    s.active_border = UiTableColor(list.drag_marker, s.selection_border);
+    s.resize_guide = s.active_border;
+
+    if(UiThemeDetail::ResolveEffectiveMode(ctx.mode) == UiThemeMode::Dark) {
+        // Warning/error are semantic cell states rather than ordinary panel
+        // roles. Transform their established defaults through the same dark
+        // palette helper used by the central theme instead of carrying light
+        // warning/error fills into a dark table.
+        s.warning_bg = UiThemeDetail::ForceDarkFace(UiTable::StyleDefault().warning_bg);
+        s.error_bg = UiThemeDetail::ForceDarkFace(UiTable::StyleDefault().error_bg);
+    }
+}
+
 }
 
 bool UiTable::InlineEditor::Key(dword key, int count)
@@ -110,6 +163,7 @@ void UiTable::SyncThemeStyle()
     if(theme_revision_ == rev)
         return;
     themed_style_ = UiTheme::ResolveTable();
+    ResolveUiTableChrome(themed_style_);
     theme_revision_ = rev;
     ConfigureDefaultRenders();
     ResetRenderPools();
