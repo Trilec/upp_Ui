@@ -186,7 +186,7 @@ private:
 
     UiDocCore internal_model_;
     UiDocCore* model_ = &internal_model_;
-    Vector<UiDocCore*> bound_models_;
+    Vector<Ptr<UiDocCore>> bound_models_;
     Style style_;
 
     int anchor_pos_ = 0;
