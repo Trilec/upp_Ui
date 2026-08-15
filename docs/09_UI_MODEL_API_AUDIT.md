@@ -240,9 +240,11 @@ custom style and freezes the current theme snapshot.
 
 ## Deterministic validation
 
-New package `Utilities/UiModelBindingContractTest` provides 42 checks: six model
+New package `Utilities/UiModelBindingContractTest` provides 49 checks: seven model
 ownership/switching checks for each of List, Gallery, Tree, Table, Dropdown, Menu
-and NodeGraph.
+and NodeGraph. In addition to internal/external ownership, it explicitly switches
+from external dataset A to external dataset B and verifies that A is neither
+copied nor cleared.
 
 New package `Utilities/UiThemeSurfaceRegressionTest` provides 13 checks covering:
 
