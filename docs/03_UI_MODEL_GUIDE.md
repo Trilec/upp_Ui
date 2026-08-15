@@ -52,6 +52,7 @@ The same ownership vocabulary is used by:
 - `UiDropdown` -> `UiListModel`
 - `UiMenu` -> `UiMenuModel`
 - `UiNodeGraph` -> `UiGraphModel`
+- `UiDoc` -> `UiDocCore`
 
 Each exposes:
 
@@ -63,6 +64,13 @@ Control& UseInternalModel();
 bool IsUsingInternalModel() const;
 Control& ClearModel();
 ```
+
+`UiDocCore` deliberately remains a document-specific model rather than inheriting
+`UiDataModelBase` or flattening document state into `UiModelItem`. Its
+`UiDocCoreTransaction`, `UiDocApplyResult` and position-map notifications carry
+richer positional-edit semantics needed by document views. The ownership
+vocabulary is shared; the domain model and change payload remain appropriate to
+the domain. See `10_UIDOC_MODEL_BINDING.md`.
 
 ## Switching models
 
@@ -156,6 +164,12 @@ For model-backed views:
   not record state;
 - callbacks from previously bound inactive models are ignored by the view.
 
+For `UiDoc`, caret, selection, scroll position, active object and paragraph/layout
+caches are view state. Text, style runs, blocks, annotations, resources, embeds,
+anchors, revisions and Undo/Redo history are `UiDocCore` state. Multiple UiDoc
+views can therefore share one document model while retaining independent view
+state.
+
 This is why retired synchronization APIs such as `RefreshFromModel()` must not
 return. If model data changes through its public mutation API, its change event is
 the synchronization path.
@@ -200,6 +214,11 @@ control.WhenReorderRequest = [=](UiReorderRequest& r) {
 
 "Mutate silently, notify afterward" is not the target architecture.
 
+`UiDoc` now shares the model-ownership contract, but its richer request-first
+user-edit interception is deliberately a separate future policy layer. Any such
+layer must carry or produce `UiDocCoreTransaction`; it must not introduce a
+second document store or weaken the existing revision/position-map contract.
+
 ## Stable identity and values
 
 Use model IDs/data payloads for program logic rather than display labels.
@@ -210,9 +229,9 @@ For shared `UiModelItem` records, `data` is the normal application payload while
 `text`, `description`, `right_text`, image/icon, check state and columns are
 presentation-oriented record fields.
 
-Graph, Menu, Tree and Table keep their domain-specific model structures where
-those structures carry real semantics. Sharing the ownership vocabulary does not
-force every domain into `UiListModel`.
+Graph, Menu, Tree, Table and UiDoc keep their domain-specific model structures
+where those structures carry real semantics. Sharing the ownership vocabulary
+does not force every domain into `UiListModel` or `UiModelItem`.
 
 ## Model lifetime
 
@@ -266,6 +285,11 @@ Model ownership simplicity must not weaken virtualization:
 - explicit full-model operations such as Select All may be O(N), but scrolling,
   painting, hover and hit testing may not become O(N).
 
+UiDoc uses a different scale shape: document state remains sparse and paragraph
+layout stays viewport-driven/cached rather than allocating a child control or
+persistent geometry object per character. Binding an external UiDocCore does not
+copy document records or create another layout model.
+
 The deterministic scale tests remain the authority for these invariants.
 
 ## Common mistakes
@@ -278,5 +302,7 @@ The deterministic scale tests remain the authority for these invariants.
 - Restoring retired `RefreshFromModel()`-style synchronization.
 - Matching application records by display label instead of stable data/ID.
 - Using a view as the source of application-owned semantic truth.
+- Flattening a domain model such as UiDocCore or UiGraphModel into UiModelItem
+  merely for type uniformity.
 - Freezing a theme-derived style accidentally while configuring a model view;
   use semantic theme defaults unless a local custom style is intentional.
