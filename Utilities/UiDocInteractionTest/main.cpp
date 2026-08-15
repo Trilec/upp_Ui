@@ -31,7 +31,7 @@ static UiDoc::Style TestStyle(int padding = DPI(24))
 static String ExactRole(const UiDoc& doc, int from, int to)
 {
     UiDocRange range(from, to);
-    for(const UiDocBlock& block : doc.Core().QueryBlocks(&range))
+    for(const UiDocBlock& block : doc.Model().QueryBlocks(&range))
         if(block.range.from == from && block.range.to == to)
             return block.role;
     return String();
@@ -40,7 +40,7 @@ static String ExactRole(const UiDoc& doc, int from, int to)
 static int ExactIndent(const UiDoc& doc, int from, int to)
 {
     UiDocRange range(from, to);
-    for(const UiDocBlock& block : doc.Core().QueryBlocks(&range))
+    for(const UiDocBlock& block : doc.Model().QueryBlocks(&range))
         if(block.range.from == from && block.range.to == to)
             return block.indent;
     return 0;

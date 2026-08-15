@@ -30,7 +30,7 @@ static UiDoc::Style GeometryStyle(int padding)
 
 static const UiDocAnnotation* FindMetadata(const UiDoc& doc, const String& id)
 {
-    for(const UiDocAnnotation& annotation : doc.Core().GetAnnotations())
+    for(const UiDocAnnotation& annotation : doc.Model().GetAnnotations())
         if(annotation.id == id && annotation.type.StartsWith("metadata."))
             return &annotation;
     return nullptr;

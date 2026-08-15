@@ -19,7 +19,7 @@ struct MetadataTestCtx {
 
 static const UiDocAnnotation* FindMetadata(const UiDoc& doc, const String& id)
 {
-    for(const UiDocAnnotation& annotation : doc.Core().GetAnnotations())
+    for(const UiDocAnnotation& annotation : doc.Model().GetAnnotations())
         if(annotation.id == id)
             return &annotation;
     return nullptr;
@@ -113,7 +113,7 @@ static void TestMetadataLifecycle(MetadataTestCtx& t)
     t.Expect(doc.PointAtPos(second).y == shown_y,
              "restoring metadata visibility restores expanded reference-card layout");
 
-    String json = doc.Core().ToJson();
+    String json = doc.Model().ToJson();
     UiDocCore restored;
     String error;
     t.Expect(restored.FromJson(json, &error), "metadata document JSON restores");

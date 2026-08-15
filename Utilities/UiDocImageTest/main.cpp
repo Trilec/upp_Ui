@@ -42,7 +42,7 @@ static UiDocResource MakeImageResource()
 
 static const UiDocEmbedBlock* FindEmbed(const UiDoc& doc, const String& id)
 {
-    for(const UiDocEmbedBlock& embed : doc.Core().GetEmbeds())
+    for(const UiDocEmbedBlock& embed : doc.Model().GetEmbeds())
         if(embed.id == id)
             return &embed;
     return nullptr;
@@ -169,13 +169,13 @@ static void TestResizeAndReposition(ImageTestCtx& t)
 
     t.Expect(doc.GetTextW().GetCount() == 8 && doc.GetTextW()[0] == (wchar)0xfffc,
              "dragging an inline image moves its logical marker to the drop position");
-    t.Expect(doc.Core().GetEmbeds().GetCount() == 1 && doc.Core().GetEmbeds()[0].range.from == 0,
+    t.Expect(doc.Model().GetEmbeds().GetCount() == 1 && doc.Model().GetEmbeds()[0].range.from == 0,
              "dragging an inline image moves its embed anchor with the marker");
     t.Expect(doc.Undo(), "body image reposition is one undoable edit");
-    t.Expect(doc.GetTextW()[4] == (wchar)0xfffc && doc.Core().GetEmbeds()[0].range.from == 4,
+    t.Expect(doc.GetTextW()[4] == (wchar)0xfffc && doc.Model().GetEmbeds()[0].range.from == 4,
              "reposition Undo restores the prior inline location");
     t.Expect(doc.Redo(), "body image reposition Redo succeeds");
-    t.Expect(doc.GetTextW()[0] == (wchar)0xfffc && doc.Core().GetEmbeds()[0].range.from == 0,
+    t.Expect(doc.GetTextW()[0] == (wchar)0xfffc && doc.Model().GetEmbeds()[0].range.from == 0,
              "reposition Redo restores the new inline location");
 }
 
@@ -362,7 +362,7 @@ static void TestRoundTrip(ImageTestCtx& t)
     String id = doc.InsertImage(key, DPI(80), DPI(40), "inline");
     t.Expect(!id.IsEmpty(), "round-trip image inserted");
 
-    String json = doc.Core().ToJson();
+    String json = doc.Model().ToJson();
     UiDocCore restored;
     String error;
     t.Expect(restored.FromJson(json, &error), "inline image document JSON restores successfully");
