@@ -1,184 +1,282 @@
 # 03 — Ui Model Guide
 
-Model-driven architecture for `upp_Ui`, represented by `PropertyEditorCore`,
-`PropertyEditor`, and the model-backed controls (`UiList`, `UiTree`, `UiMenu`,
-`UiDropdown`, `UiTable`, and data-presenting controls).
+`upp_Ui` uses models where they remove duplicated state or allow data to be
+shared, switched, virtualized, or presented by more than one view. A programmer
+should not need to manage a separate model object for the simple case.
 
-For the complete PropertyEditor schema, factory, adapter, transaction,
-resource-provider, layout, and performance contracts, continue with
+For PropertyEditor schema/factory/transaction details, continue with
 `05_UI_PROPERTY_EDITOR_GUIDE.md`.
 
-## Model/view separation
+## The normal model-backed control contract
 
-- The **control owns interaction**: hit testing, keyboard/pointer input, drag
-  threshold, insertion markers, hover/pressed/focus visuals, local selection
-  visuals.
-- The **owner/model/command layer owns semantic state changes**: validity,
-  undo/redo, persistence, business rules, generated-output refresh, and
-  cross-view synchronization.
-- A view model is a projection, never the source of truth for application-owned
-  data.
+The genuine model views share one programmer-facing rule:
+
+> `Model()` always returns the model currently driving the control.
+
+The control always owns an internal model. If the application never supplies a
+model, that internal model is active automatically.
+
+```cpp
+UiList list;
+list.Model().Add("Apple");
+list.Model().Add("Banana");
+list.Model().Add("Orange");
+```
+
+There is no separate non-model `UiList` variant and no model refresh call. Model
+mutation emits the change notification that keeps the view synchronized.
+
+When application code needs to own or share the data, bind an external model:
+
+```cpp
+UiListModel fruit;
+UiList list;
+
+list.SetModel(fruit);
+list.Model().Add("Apple", 100);
+list.Model().Add("Banana", 200);
+```
+
+After `SetModel(fruit)`, `list.Model()` and `fruit` are the same object:
+
+```cpp
+ASSERT(&list.Model() == &fruit);
+```
+
+The same ownership vocabulary is used by:
+
+- `UiList` -> `UiListModel`
+- `UiGallery` -> `UiListModel`
+- `UiTree` -> `UiTreeModel`
+- `UiTable` -> `UiTableModel`
+- `UiDropdown` -> `UiListModel`
+- `UiMenu` -> `UiMenuModel`
+- `UiNodeGraph` -> `UiGraphModel`
+
+Each exposes:
+
+```cpp
+ModelType& Model();
+const ModelType& Model() const;
+Control& SetModel(ModelType& model);
+Control& UseInternalModel();
+bool IsUsingInternalModel() const;
+Control& ClearModel();
+```
+
+## Switching models
+
+Switching changes which model drives the view. It never copies, merges, or
+implicitly clears data.
+
+```cpp
+UiList list;
+list.Model().Add("Internal A");
+list.Model().Add("Internal B");
+
+UiListModel database_a;
+database_a.Add("Database A / 1");
+list.SetModel(database_a);      // List now presents database_a
+
+UiListModel database_b;
+database_b.Add("Database B / 1");
+list.SetModel(database_b);      // O(1) ownership switch; no item copy
+
+list.UseInternalModel();        // Internal A/B are still there
+```
+
+This makes switching between datasets/databases natural while preserving a
+simple local-data mode.
+
+`IsUsingInternalModel()` reports which ownership mode is active:
+
+```cpp
+if(list.IsUsingInternalModel())
+    Cout() << "local data";
+```
+
+`ClearModel()` means exactly one thing:
+
+> clear the currently active model, without changing which model is active.
+
+```cpp
+list.SetModel(database_a);
+list.ClearModel();              // clears database_a
+ASSERT(&list.Model() == &database_a);
+```
+
+To clear the retained internal model after using an external model, switch to it
+explicitly and clear it:
+
+```cpp
+list.UseInternalModel().ClearModel();
+```
+
+There is deliberately no implicit transfer from one model to another.
+
+## Why there is no separate widget-only family
+
+The internal model already gives the simple control experience:
+
+```cpp
+UiList list;
+list.Model().Add("One");
+```
+
+An external model is an ownership/sharing option, not a different widget type.
+Maintaining a second set of non-model widgets would create parallel state,
+duplicate APIs, and different code paths for the same interaction.
+
+The model also enables high-scale views to keep logical record count independent
+of live `Ctrl`/renderer count. See `06_UI_MODEL_VIEW_SCALE_GUIDE.md`.
+
+## Controls that deliberately do not need a model
+
+Not every control becomes better by adding a model object.
+
+- `UiAccordion` is a composite container whose sections own real child controls.
+- `UiMatrixSelector` is a small bounded value/preset selector.
+- `UiColorMatrix` is one compact multi-colour value/editor.
+
+These are not "widget versions" of hidden model controls. Their state is already
+the direct value/composition the application is editing. Creating separate model
+classes for them would add indirection without sharing or scale benefit.
+
+## One authoritative state
+
+For model-backed views:
+
+- the active model owns semantic record state;
+- the control owns interaction state: viewport, hover, pressed state, local
+  selection visuals, drag threshold, insertion/drop chrome and transient editor
+  lifetime;
+- renderer instances own prepared presentation geometry only;
+- no control maintains a parallel item mirror;
+- switching models changes the active pointer and resets view state as needed,
+  not record state;
+- callbacks from previously bound inactive models are ignored by the view.
+
+This is why retired synchronization APIs such as `RefreshFromModel()` must not
+return. If model data changes through its public mutation API, its change event is
+the synchronization path.
 
 ## Request-first mutation contract
 
-For any data-changing operation the control computes and reports user intent
-before mutating authoritative data:
+For user operations that may change application-owned data, the control computes
+and reports intent before mutation:
 
 1. The user performs an operation.
 2. The control computes the proposed target.
-3. The control emits a request event (e.g. `WhenReorderRequest`).
-4. Rejected → nothing changes. Handled → the owner performed/scheduled the change.
-   Unhandled and internal mutation enabled → the control mutates its local model.
-5. A post-change notification may fire after data changed.
+3. The control emits a request event, such as `WhenReorderRequest`.
+4. Rejected -> nothing changes.
+5. Handled -> the owner performed or scheduled the change.
+6. Unhandled + internal mutation enabled -> the control may mutate the active
+   model directly.
+7. The model notification updates every bound view.
 
-Shared request structs live in `UiDataModels.h`:
+Shared request structs include:
 
-- `UiReorderRequest` — move within the same list/dropdown.
-- `UiTreeMoveRequest` — move to a new parent/container.
-- `UiMenuActionRequest` — menu action.
-- `UiTableEditRequest` — cell/table edit.
+- `UiReorderRequest` — List/Dropdown reorder.
+- `UiTreeMoveRequest` — Tree reparent/move.
+- `UiMenuActionRequest` — Menu semantic action.
+- `UiTableEditRequest` — Table edit.
+- Graph request structures for node moves, connections and deletion.
 
-Implemented request hooks: `UiList::WhenReorderRequest`,
-`UiDropdown::WhenReorderRequest`, `UiTree::WhenMoveRequest`,
-`UiMenu::WhenActionRequest`, `UiTable::WhenEditRequest`.
-
-Internal mutation is explicit and supported for demos/local widgets:
+Simple/local use can allow internal mutation:
 
 ```cpp
-control.EnableInternalMutation(true);   // simple/local mode
+control.EnableInternalMutation(true);
 ```
 
-Command-driven tools use request-first with internal mutation disabled:
+Command-driven applications can disable it and handle the request:
 
 ```cpp
 control.EnableInternalMutation(false);
 control.WhenReorderRequest = [=](UiReorderRequest& r) {
     r.handled = true;
-    Dispatch(MoveNodeCommand(r.from, r.before));
+    Dispatch(MoveItemCommand(r.from, r.before));
 };
 ```
 
-The default implementation path must remain request-first. "Mutate silently,
-notify afterward" is not the target architecture.
+"Mutate silently, notify afterward" is not the target architecture.
 
-## Ownership and lifetime
+## Stable identity and values
 
-- The model is owned by the application; the control only references it.
-  `PropertyEditor::SetModel(PropertyEditorModel*)` takes a non-owning pointer.
-- `PropertyEditorModel` is headless (no `Ctrl` dependency beyond `Draw`) and
-  thread-neutral as a data structure; mutation is expected on the GUI thread
-  unless the owner synchronizes.
+Use model IDs/data payloads for program logic rather than display labels.
+Display text can change, localize, or be rendered differently without changing
+identity.
 
-## Values, IDs, and labels
+For shared `UiModelItem` records, `data` is the normal application payload while
+`text`, `description`, `right_text`, image/icon, check state and columns are
+presentation-oriented record fields.
 
-- `PropertyEditorItem` has a stable `id` (programmatic key), a human `label`,
-  an optional `group`, `help`, and `unit`.
-- IDs are the canonical key for `SetValue`/`GetValue`/`Find`. Labels are for
-  display. Never match on labels in logic.
+Graph, Menu, Tree and Table keep their domain-specific model structures where
+those structures carry real semantics. Sharing the ownership vocabulary does not
+force every domain into `UiListModel`.
 
-## Current/selection state
+## Model lifetime
 
-- `PropertyEditorItem.value` is the current value; `default_value` supports
-  reset. `mixed` and `inherited` flags describe aggregate rows.
-- `PropertyEditor::GetSelectedPropertyId()` / `SelectProperty(id)` track the
-  selected row; `WhenSelection` reports it.
+An external model passed to `SetModel(model)` is non-owning from the control's
+point of view. It must outlive the period during which the control uses it.
 
-## Read/write propagation and callbacks
+The internal model is owned by the control and always exists. `UseInternalModel()`
+is therefore lifetime-safe and requires no allocation.
 
-`PropertyEditorModel` emits:
+Mutate bound models on the GUI thread unless the application provides its own
+synchronization.
 
-- `WhenStructureChanged` — items added/removed/reordered.
-- `WhenValueChanged(id)` — a value changed.
-- `WhenPreview(id, value)` — an editor previewed a candidate.
-- `WhenCommit(id, value)` — an editor committed a candidate.
-- `WhenReset(id)` — a value reset to default.
-- `WhenGroupMetadataChanged` — group subtitle changes.
+## PropertyEditor is a specialized model consumer
 
-`PropertyEditor` forwards user interaction through `WhenPreview`, `WhenCommit`,
-`WhenReset`, `WhenOverride`, `WhenSelection`, `WhenHelp`.
+`PropertyEditorModel` is a headless property schema/value model with additional
+normalization, validation, preview/commit/reset and impact semantics. It is not a
+reason to duplicate the normal List/Tree/Table control family.
 
-## Validation
+`PropertyEditorItem` has a stable `id`, human `label`, optional grouping/help/unit
+metadata, current/default value, validation hooks and refresh-impact information.
 
-- `PropertyEditorItem.normalize` (Function) and `validate` (Function) are
-  optional per-item hooks.
-- `Preview(id, candidate, error)` and `Commit(id, candidate, error)` route
-  through `PropertyEditorNormalizeValue` before applying.
-- `SetValidationError(id, error)` surfaces a per-property error.
-- Validate enum values and clamp ranges when loading persisted values.
+`PropertyEditorModel` emits specialized events including:
 
-## Commit/revert semantics
+- `WhenStructureChanged`
+- `WhenValueChanged(id)`
+- `WhenPreview(id, value)`
+- `WhenCommit(id, value)`
+- `WhenReset(id)`
+- `WhenGroupMetadataChanged`
 
-- `Preview` applies a candidate without committing (live inspector feedback).
-- `Commit` finalizes; `Reset` restores the default value.
-- `WhenPreview`/`WhenCommit` events let the owner stage/undo as needed.
+`PropertyEditor` forwards interaction through its preview/commit/reset/override
+and selection events. See `05_UI_PROPERTY_EDITOR_GUIDE.md` for the full contract.
 
 ## Avoiding feedback loops
 
-- Do not call `SetValue` from inside a `WhenValueChanged` handler for the same
-  id without a guard.
-- `PropertyEditor` uses internal flags (`syncing_editor_`,
-  `applying_editor_preview_`, `dispatching_editor_callback_`) to avoid
-  re-entrant commits while an inline editor is active.
-- One authoritative source of state: the model (or the application-owned model
-  behind it). The view refreshes from the model; it never becomes the source of
-  truth.
+- Do not mutate the same model property recursively from its own change handler
+  without a guard.
+- Model notifications are observations; request events are authorization.
+- Do not keep a second array/view-model mirror merely to feed a control.
+- Do not call refresh/sync helpers after normal model mutation; the model event is
+  authoritative.
 
-## PropertyEditorCore responsibilities
+## Scale rules
 
-- Headless property schema + value model (`PropertyEditorModel`,
-  `PropertyEditorItem`).
-- Property kinds (`PropertyEditorKind`): Text, Multiline, Integer, Double,
-  NumericInt, NumericDouble, Boolean, Choice, Color, ColorPalette, FillRecipe,
-  FilePath, SliderInt, SliderDouble, Vector2, Vector3, Curve, ReadOnly, Custom.
-- Domains (`PropertyEditorDomain`): General, Content, Behaviour, Layout,
-  Appearance, Theme, Runtime, DesignerOnly.
-- Impact bits (`PropertyEditorImpact`): Paint, ControlState, LocalLayout,
-  AncestorLayout, Subtree, Structure, Selection, InspectorSchema, Code,
-  ThemeGlobal, FullPreview — used to decide what to refresh when a property
-  changes.
-- Value/vector/curve helpers: `PropertyEditorMakeVector`, `PropertyEditorReadVector`,
-  `PropertyEditorMakeCurve`, `PropertyEditorNormalizeCurve`, etc.
+Model ownership simplicity must not weaken virtualization:
 
-## PropertyEditor responsibilities
+- ordinary List/Gallery/Table/Tree viewport work remains proportional to visible
+  or overscan content;
+- model switching never copies N records merely to display them;
+- renderer pools remain bounded independently of logical record count;
+- explicit full-model operations such as Select All may be O(N), but scrolling,
+  painting, hover and hit testing may not become O(N).
 
-- The `Ui`-backed `ParentCtrl` that renders the model, group rows, filter box,
-  reset/override actions, inline editors, and the value summary.
-- `SetModel(PropertyEditorModel*)`, `SetFactory(PropertyEditorFactory*)`,
-  `SetStyle(PropertyEditorStyle)`, `SetPaletteMode(...)` (FollowUiTheme/Light/
-  Dark).
-- `ShowFilter`, `SetFilter`, `ExpandAll`, `CollapseAll`, `RefreshModel`,
-  `RefreshValue(id)`, label width/ratio controls.
+The deterministic scale tests remain the authority for these invariants.
 
-## Adding model-backed properties/editors
+## Common mistakes
 
-1. Add the item to the model:
-   ```cpp
-   model.AddNumericInt("row_height", "Row height", 28, 8, 64, 1, "Layout")
-        .SetHelp("Height of each row.");
-   ```
-2. Choose the right `PropertyEditorKind`; for choices use `AddChoice` +
-   `AddChoice(value, label)`.
-3. Set impact so the owner knows what to refresh
-   (`item.SetImpact(PropertyImpactLocalLayout)`).
-4. Wire `WhenPreview`/`WhenCommit` to apply the property to the live object and
-   `WhenReset` to restore the default.
-5. For custom editors implement a `PropertyValueEditor` via the factory.
-
-## Integrating a control into PropertyEditor
-
-- Expose the control's editable state through typed setters that the inspector
-  can call (SetX/GetX pairs).
-- Advertise a style/theme override surface for appearance properties — see
-  `02_UI_THEME_GUIDE.md`.
-- Do not mutate the control directly from `WhenValueChanged` in a way that
-  re-enters the model; route through preview/commit and refresh the view.
-
-## Common implementation mistakes
-
-- Matching items by label instead of id.
-- Mutating a control from inside its own change callback (feedback loop).
-- Using the view as the source of truth for application-owned data.
-- Forgetting `impact` so the owner cannot decide what to refresh.
-- Skipping validation/normalization for enum or range-backed values.
-- Mixing `WhenX` post-change notifications with authorization; notifications are
-  observations, requests are authorization.
+- Exposing internal-model implementation details in ordinary usage instead of
+  using `Model()`.
+- Clearing or copying the old model when `SetModel()` is called.
+- Assuming `ClearModel()` switches ownership.
+- Keeping a parallel item container in the control.
+- Restoring retired `RefreshFromModel()`-style synchronization.
+- Matching application records by display label instead of stable data/ID.
+- Using a view as the source of application-owned semantic truth.
+- Freezing a theme-derived style accidentally while configuring a model view;
+  use semantic theme defaults unless a local custom style is intentional.
