@@ -1,4 +1,5 @@
 #include <Ui/Ui.h>
+#include <new>
 
 using namespace Upp;
 
@@ -83,6 +84,28 @@ CONSOLE_APP_MAIN
              "notifications from a previously bound inactive model are ignored by UiDoc");
     t.Expect(peer.GetText().StartsWith("YXExternal"),
              "another UiDoc still actively bound to the old model continues to receive it");
+
+    doc.UseInternalModel();
+    alignas(UiDocCore) byte model_storage[sizeof(UiDocCore)];
+    UiDocCore *first_at_address = new(model_storage) UiDocCore;
+    Seed(*first_at_address, "First lifetime");
+    doc.SetModel(*first_at_address);
+    doc.UseInternalModel();
+    first_at_address->~UiDocCore();
+
+    UiDocCore *second_at_address = new(model_storage) UiDocCore;
+    Seed(*second_at_address, "Second lifetime");
+    doc.SetModel(*second_at_address);
+    doc.SetSelection(UiDocRange(2, 2));
+    int before_reused_address = doc_changes;
+    second_at_address->Replace(UiDocRange(0, 0), WString("Q"));
+    UiDocSelection reused_selection = doc.GetSelection();
+    t.Expect(doc_changes == before_reused_address + 1 &&
+             reused_selection.anchor == 3 && reused_selection.caret == 3,
+             "a new UiDocCore at a previously used address receives a fresh binding notification");
+    doc.UseInternalModel();
+    second_at_address->~UiDocCore();
+    doc.SetModel(external_b);
 
     doc.ClearModel();
     t.Expect(&doc.Model() == &external_b && external_b.GetLength() == 0,
