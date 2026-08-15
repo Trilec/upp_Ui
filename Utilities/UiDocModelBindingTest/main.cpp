@@ -133,6 +133,26 @@ CONSOLE_APP_MAIN
     t.Expect(doc.GetText() == before_edit && peer.GetText() == before_edit && doc_changes >= doc_before_undo + 2,
              "model Undo refreshes all active views from the authoritative shared state");
 
+    UiDocCore visual_model;
+    Seed(visual_model, "Visual object");
+    UiDoc visual;
+    visual.SetModel(visual_model);
+    UiDocResource picture;
+    picture.resource_type = "image";
+    picture.content_hash = "binding-active-image";
+    picture.bytes = "not-decoded-in-binding-test";
+    picture.mime = "image/png";
+    picture.width = 16;
+    picture.height = 16;
+    String picture_key = visual.AddResource(picture, false);
+    String picture_id = visual.InsertImage(picture_key, 16, 16, "left");
+    t.Expect(!picture_key.IsEmpty() && !picture_id.IsEmpty() &&
+             visual.QueryCommandState("image.align.left").enabled,
+             "a model-backed image can become active view state");
+    t.Expect(visual_model.RemoveEmbed(picture_id) &&
+             !visual.QueryCommandState("image.align.left").enabled,
+             "external model removal clears stale active image view state");
+
     UiDocCore external_c;
     Seed(external_c, "Third model");
     doc.SetModel(external_c);
