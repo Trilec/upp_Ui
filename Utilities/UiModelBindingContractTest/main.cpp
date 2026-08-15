@@ -30,12 +30,18 @@ void TestList(TestCtx& t)
              "List SetModel makes the supplied model the active Model()");
     list.Model().Add("External list 2", 3);
     t.Expect(external.GetCount() == 2, "List Model() mutation reaches the supplied external model");
+    UiListModel external_b;
+    external_b.Add("External list B", 4);
+    list.SetModel(external_b);
+    t.Expect(&list.Model() == &external_b && external.GetCount() == 2 && external_b.GetCount() == 1,
+             "List can switch external datasets without copying or clearing the previous model");
     list.ClearModel();
-    t.Expect(external.IsEmpty(), "List ClearModel clears the active external model only");
+    t.Expect(external_b.IsEmpty() && external.GetCount() == 2,
+             "List ClearModel clears the active external model only");
     list.UseInternalModel();
     t.Expect(list.IsUsingInternalModel() && list.Model().GetCount() == 1
              && list.Model().Get(0).text == "Internal list",
-             "List UseInternalModel restores retained internal data after an external-model detour");
+             "List UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestGallery(TestCtx& t)
@@ -51,12 +57,18 @@ void TestGallery(TestCtx& t)
              "Gallery SetModel makes the supplied model the active Model()");
     gallery.Model().Add("External gallery 2", 3);
     t.Expect(external.GetCount() == 2, "Gallery Model() mutation reaches the supplied external model");
+    UiListModel external_b;
+    external_b.Add("External gallery B", 4);
+    gallery.SetModel(external_b);
+    t.Expect(&gallery.Model() == &external_b && external.GetCount() == 2 && external_b.GetCount() == 1,
+             "Gallery can switch external datasets without copying or clearing the previous model");
     gallery.ClearModel();
-    t.Expect(external.IsEmpty(), "Gallery ClearModel clears the active external model only");
+    t.Expect(external_b.IsEmpty() && external.GetCount() == 2,
+             "Gallery ClearModel clears the active external model only");
     gallery.UseInternalModel();
     t.Expect(gallery.IsUsingInternalModel() && gallery.Model().GetCount() == 1
              && gallery.Model().Get(0).text == "Internal gallery",
-             "Gallery UseInternalModel restores retained internal data after an external-model detour");
+             "Gallery UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestTree(TestCtx& t)
@@ -75,13 +87,20 @@ void TestTree(TestCtx& t)
     tree.Model().AddChild(tree.Model().Root(), UiModelItem("External tree 2", 3));
     t.Expect(external.GetChildCount(external.Root()) == 2,
              "Tree Model() mutation reaches the supplied external model");
+    UiTreeModel external_b;
+    external_b.AddChild(external_b.Root(), UiModelItem("External tree B", 4));
+    tree.SetModel(external_b);
+    t.Expect(&tree.Model() == &external_b && external.GetChildCount(external.Root()) == 2
+             && external_b.GetChildCount(external_b.Root()) == 1,
+             "Tree can switch external datasets without copying or clearing the previous model");
     tree.ClearModel();
-    t.Expect(external.GetChildCount(external.Root()) == 0,
+    t.Expect(external_b.GetChildCount(external_b.Root()) == 0
+             && external.GetChildCount(external.Root()) == 2,
              "Tree ClearModel clears the active external model only");
     tree.UseInternalModel();
     t.Expect(tree.IsUsingInternalModel() && tree.Model().GetChildCount(tree.Model().Root()) == 1
              && tree.Model().Get(tree.Model().GetChild(tree.Model().Root(), 0)).text == "Internal tree",
-             "Tree UseInternalModel restores retained internal data after an external-model detour");
+             "Tree UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestTable(TestCtx& t)
@@ -103,13 +122,21 @@ void TestTable(TestCtx& t)
              "Table SetModel makes the supplied model the active Model()");
     table.Model().SetSize(3, 1);
     t.Expect(external.GetRowCount() == 3, "Table Model() mutation reaches the supplied external model");
+    UiTableModel external_b;
+    external_b.SetSize(1, 2);
+    external_b.SetCellValue(0, 0, "External table B");
+    table.SetModel(external_b);
+    t.Expect(&table.Model() == &external_b && external.GetRowCount() == 3
+             && external_b.GetRowCount() == 1 && external_b.GetColumnCount() == 2,
+             "Table can switch external datasets without copying or clearing the previous model");
     table.ClearModel();
-    t.Expect(external.GetRowCount() == 0 && external.GetColumnCount() == 0,
+    t.Expect(external_b.GetRowCount() == 0 && external_b.GetColumnCount() == 0
+             && external.GetRowCount() == 3,
              "Table ClearModel clears the active external model only");
     table.UseInternalModel();
     t.Expect(table.IsUsingInternalModel() && table.Model().GetRowCount() == 2
              && table.Model().GetCellValue(0, 0) == Value("Internal table"),
-             "Table UseInternalModel restores retained internal data after an external-model detour");
+             "Table UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestDropdown(TestCtx& t)
@@ -127,13 +154,18 @@ void TestDropdown(TestCtx& t)
     drop.Model().Add("External dropdown 2", 3);
     t.Expect(external.GetCount() == 2 && drop.GetCount() == 2,
              "Dropdown Model() mutation reaches the supplied external model");
+    UiListModel external_b;
+    external_b.Add("External dropdown B", 4);
+    drop.SetModel(external_b);
+    t.Expect(&drop.Model() == &external_b && external.GetCount() == 2 && drop.GetCount() == 1,
+             "Dropdown can switch external datasets without copying or clearing the previous model");
     drop.ClearModel();
-    t.Expect(external.IsEmpty() && drop.GetCount() == 0,
+    t.Expect(external_b.IsEmpty() && external.GetCount() == 2 && drop.GetCount() == 0,
              "Dropdown ClearModel clears the active external model only");
     drop.UseInternalModel();
     t.Expect(drop.IsUsingInternalModel() && drop.Model().GetCount() == 1
              && drop.Model().Get(0).text == "Internal dropdown",
-             "Dropdown UseInternalModel restores retained internal data after an external-model detour");
+             "Dropdown UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestMenu(TestCtx& t)
@@ -152,13 +184,20 @@ void TestMenu(TestCtx& t)
     menu.Model().AddChild(menu.Model().Root(), UiMenuItem("External menu 2", 3));
     t.Expect(external.GetChildCount(external.Root()) == 2,
              "Menu Model() mutation reaches the supplied external model");
+    UiMenuModel external_b;
+    external_b.AddChild(external_b.Root(), UiMenuItem("External menu B", 4));
+    menu.SetModel(external_b);
+    t.Expect(&menu.Model() == &external_b && external.GetChildCount(external.Root()) == 2
+             && external_b.GetChildCount(external_b.Root()) == 1,
+             "Menu can switch external datasets without copying or clearing the previous model");
     menu.ClearModel();
-    t.Expect(external.GetChildCount(external.Root()) == 0,
+    t.Expect(external_b.GetChildCount(external_b.Root()) == 0
+             && external.GetChildCount(external.Root()) == 2,
              "Menu ClearModel clears the active external model only");
     menu.UseInternalModel();
     t.Expect(menu.IsUsingInternalModel() && menu.Model().GetChildCount(menu.Model().Root()) == 1
              && menu.Model().Get(menu.Model().GetChild(menu.Model().Root(), 0)).text == "Internal menu",
-             "Menu UseInternalModel restores retained internal data after an external-model detour");
+             "Menu UseInternalModel restores retained internal data after external-model detours");
 }
 
 void TestGraph(TestCtx& t)
@@ -176,12 +215,19 @@ void TestGraph(TestCtx& t)
     graph.Model().AddNode("External graph 2", Pointf(50, 60));
     t.Expect(external.GetNodeCount() == 2,
              "NodeGraph Model() mutation reaches the supplied external model");
+    UiGraphModel external_b;
+    external_b.AddNode("External graph B", Pointf(70, 80));
+    graph.SetModel(external_b);
+    t.Expect(&graph.Model() == &external_b && external.GetNodeCount() == 2
+             && external_b.GetNodeCount() == 1,
+             "NodeGraph can switch external datasets without copying or clearing the previous model");
     graph.ClearModel();
-    t.Expect(external.IsEmpty(), "NodeGraph ClearModel clears the active external model only");
+    t.Expect(external_b.IsEmpty() && external.GetNodeCount() == 2,
+             "NodeGraph ClearModel clears the active external model only");
     graph.UseInternalModel();
     t.Expect(graph.IsUsingInternalModel() && graph.Model().GetNodeCount() == 1
              && graph.Model().GetNode(0).title == "Internal graph",
-             "NodeGraph UseInternalModel restores retained internal data after an external-model detour");
+             "NodeGraph UseInternalModel restores retained internal data after external-model detours");
 }
 
 } // namespace
