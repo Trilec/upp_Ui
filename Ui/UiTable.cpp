@@ -32,6 +32,11 @@ void ResolveUiTableChrome(UiTable::Style& s)
     const UiPanel::Style subtle = UiTheme::ResolvePanel(UiPanelRole::Subtle);
     const UiList::Style list = UiTheme::ResolveList();
     const UiThemeContext ctx = UiTheme::GetContext();
+    const bool role_tuned = UiThemeDetail::IsRoleTunedPreset(ctx.preset);
+    const UiThemeDetail::MinimalRoleColors standard_role =
+        UiThemeDetail::MinimalRole(ctx.mode, UiRole::Standard);
+    const UiThemeDetail::MinimalRoleColors accent_role =
+        UiThemeDetail::MinimalRole(ctx.mode, UiRole::Accent);
 
     s.table_bg = UiTableFace(surface.palette, ST_NORMAL, s.table_bg);
     s.header_bg = UiTableFace(subtle.palette, ST_NORMAL, s.table_bg);
@@ -56,6 +61,20 @@ void ResolveUiTableChrome(UiTable::Style& s)
     s.active_bg = s.selection_bg;
     s.active_border = UiTableColor(list.drag_marker, s.selection_border);
     s.resize_guide = s.active_border;
+
+    // Minimal/Pill list rows intentionally permit frame-less selection. A Table
+    // has a different interaction contract: the active cell and range boundary
+    // need an explicit, readable edge. Resolve those domain colours from the
+    // same semantic Standard/Accent role palette instead of inheriting a null
+    // List row frame or a platform-dependent text colour.
+    if(role_tuned) {
+        s.header_ink = standard_role.ink;
+        s.cell_ink = standard_role.ink;
+        s.muted_ink = standard_role.ink_disabled;
+        s.selection_border = accent_role.frame;
+        s.active_border = accent_role.frame_pressed;
+        s.resize_guide = accent_role.frame_pressed;
+    }
 
     if(UiThemeDetail::ResolveEffectiveMode(ctx.mode) == UiThemeMode::Dark) {
         // Warning/error are semantic cell states rather than ordinary panel
