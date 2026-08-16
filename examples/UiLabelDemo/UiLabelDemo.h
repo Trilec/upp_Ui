@@ -26,6 +26,9 @@
     - PropertyEditor models are the single authored state. Preview and source
       generation read the same values, avoiding parallel demo-only state.
     - Theme rows remain inherited until their override action is activated.
+    - Override presentation follows docs/11_UI_PROPERTY_OVERRIDE_LAYOUT.md;
+      stable runtime ids are normalized to that human-facing layout before the
+      PropertyEditor observes structure changes.
 
 */
 
@@ -34,6 +37,13 @@
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
 
 namespace Upp {
+
+class UiLabelOverrideModel : public PropertyEditorModel {
+public:
+    // Preserve stable ids/value semantics while enforcing the canonical Label
+    // group paths and concise row labels used by demos and UiDesigner.
+    void StructureChanged();
+};
 
 class UiLabelDemo : public TopWindow {
 public:
@@ -82,7 +92,8 @@ private:
     UiToolButton btn_copy_code;
 
     PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_inspector, pe_model_override;
+    PropertyEditorModel pe_model_inspector;
+    UiLabelOverrideModel pe_model_override;
     String str_generated_code;
 };
 
