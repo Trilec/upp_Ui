@@ -8,6 +8,43 @@ BASE: `a7db124e03e474491fee0691614e52be6e92bffa` — last previously Windows-acc
 
 STATUS: **IMPLEMENTATION + SOURCE CLEANUP COMPLETE — WINDOWS VALIDATION PENDING.**
 
+## FOLLOW-ON DESIGN CHECKPOINT — PROPERTYEDITOR OVERRIDE LAYOUT
+
+BASE: `55e02a537b25bd73ff32088a0f543be0946726e0` — exact `upp_Ui/main` inspected before documenting the normalized PropertyEditor override layout.
+
+TASK: `UI-PROPERTY-OVERRIDE-LAYOUT`.
+
+TOUCHED:
+
+- `docs/11_UI_PROPERTY_OVERRIDE_LAYOUT.md`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **GROUPING + PAINT-LAYER CONTRACT DOCUMENTED — DEMO/DESIGNER MIGRATION PENDING.**
+
+PUBLISHED:
+
+- `5a51d6d682710db8c5d20822f552749f7743c439` — canonical PropertyEditor override layout and paint-layer reference.
+
+SOURCE REVIEW:
+
+- shared `UiDraw.h` confirms the existing three-stage paint contract: Background -> control-owned Content -> Foreground;
+- default Background owns outer shadow, Face or active Skin, Frame, inset shadow and Highlight;
+- active Skin draws image/9-slice and suppresses ordinary Face fill, so Inspector/demo organisation treats `Skin` as a nested Face path while preserving the API terms `Skin`, `Slice` and `Content Inset`;
+- default Foreground currently owns the focus ring only; `WhenPaintForeground` remains the live extension point for custom paint-only overlays such as glass sheen/decorative/animated passes;
+- no shared authored `StyledOverlay` exists, so do not expose an empty generic Foreground override group until a real shared API exists;
+- inspected representative style contracts: UiLabel, UiList, UiDropdown, UiAccordion and UiBaseEdit;
+- composite controls should preserve real nested domains such as Dropdown `Popup/*` and Accordion `Header/*` / `Body/*` rather than flattening them;
+- group headings use API vocabulary, state rows do not repeat the heading prefix, `General` stays small, and demos/UiDesigner must converge on the same ids, labels, paths and ordering.
+
+NEXT:
+
+1. Normalize the UiLabel PropertyEditor demo first and use it as the visual reference.
+2. Bring the UiDesigner Label adapter to the same grouping/coverage contract.
+3. Stress-test the convention against UiList and UiBaseEdit, then the composite UiDropdown and UiAccordion adapters/demos.
+4. Migrate remaining control demos/adapters without inventing Designer-only terminology or parallel style state.
+
+No runtime source was changed by this documentation checkpoint.
+
 ## PUBLISHED CHECKPOINTS
 
 Important checkpoints in the current sequence:

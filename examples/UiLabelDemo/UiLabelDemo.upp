@@ -9,6 +9,7 @@ uses
 file
 	UiLabelDemo.h,
 	UiLabelDemo.cpp,
+	UiLabelOverrideLayout.cpp,
 	main.cpp;
 
 mainconfig
