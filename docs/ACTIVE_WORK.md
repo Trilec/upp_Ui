@@ -12,13 +12,14 @@ STATUS: **IMPLEMENTATION + SOURCE CLEANUP COMPLETE — WINDOWS VALIDATION PENDIN
 
 Important checkpoints in the current sequence:
 
-- `c35054d256cf1b63113604726943f148fd65bb87` — canonical `Model()` accessor spelling across the existing model-backed controls and callers.
+- `c35054d256cf1b63113604726943f148fd65bb87` — canonical `Model()` accessor spelling across the existing model-backed controls and callers. Gary validated the mechanical migration itself with Ui Debug 0 warnings/errors and `UiModelBindingContractTest` 49/0 in Debug + Release before stopping at a pre-existing Table theme failure.
 - `f6ab4896d3a99f6dab6e9df0418ecf50c6e7ba8e` — UiDoc adopts first-class internal/external model binding.
 - `b7b4338530280216cc223ea0b82624b23e17f38c` through `d142a2bbae0a5a14c3bade19cf4edbfa2f07fbf2` — UiDoc binding tests, caller migration, legacy `Core()` removal, programmer docs and focused package dependencies.
 - `b031c7f751f3aad866bdb12690c94dde8756bcd0` through `7d37ee7bf5b1b228ba873f5df0670fad2d802faf` — weak lifetime identity, same-address model reuse regression, and lifetime contract documentation.
 - `33d1c3508f48facbe7a0f2e45ced2c00d6672aec` — UiDoc reconciles transient active annotation/embed/table state after authoritative model changes.
 - `6944b15875cdd494afc40f4c2dc8e03a823e0e02` — focused regression for direct external-model removal of an active image.
 - `853195ec9db4a41e2230f8dabdad5f55453c192b` / `c3d0dc22b70083475d7f08800ab3aa4392ecada7` — canonical model audit and UiDoc binding documentation brought to the final source contract.
+- `43a91954ac40e99f82d5e29807eea569d1a5a2b5` — Table Dark-mode corrective after Windows `UiThemeSurfaceRegressionTest` stopped at 12/13: role-tuned Table header/cell ink now comes from semantic Standard role colours and selection/active/resize borders from semantic Accent role colours.
 
 The final status/documentation commit may advance `main` beyond these checkpoints. Always validate the exact remote HEAD supplied in the validation task.
 
@@ -91,6 +92,7 @@ The wider List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph transitional `GetInter
 `Utilities/UiModelBindingContractTest`
 - expected **49 checks / 0 failures**;
 - covers List, Gallery, Tree, Table, Dropdown, Menu and NodeGraph ownership/switching semantics.
+- Gary already observed 49/0 in Debug and Release on the canonical accessor-cleanup commit; rerun on the final combined HEAD because later UiDoc/theme commits legitimately advanced main.
 
 `Utilities/UiDocModelBindingTest`
 - expected **22 checks / 0 failures**;
@@ -99,6 +101,8 @@ The wider List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph transitional `GetInter
 `Utilities/UiThemeSurfaceRegressionTest`
 - expected **13 checks / 0 failures**;
 - covers the focused semantic Light/Dark surface corrections from the same convergence sequence.
+- Windows at the pre-corrective accessor-cleanup state produced 12/13 in both Debug and Release; the only failure was `Table Dark mode keeps readable ink and explicit selection/active borders`.
+- `43a91954...` resolves that invariant from semantic Standard/Accent role colours without changing the 13-check contract.
 
 Existing scale/regression gates retained from the model/theme audit:
 - `UiModelViewPerformanceTest` — **52/0**;
@@ -117,11 +121,14 @@ Do not weaken an existing suite if a platform failure exposes a regression.
 
 ## THEME AUDIT STATE
 
-Previously implemented theme corrections remain unchanged by the UiDoc model-binding work:
+Implemented theme corrections:
 
 - standalone UiList viewport uses semantic Surface when no explicit custom face is supplied;
-- UiTable Dark chrome resolves its table/header/row/selection domain colours through semantic roles;
+- UiTable Dark chrome resolves table/header/row surfaces through semantic roles;
+- for Minimal/Pill, Table text uses semantic Standard role ink and Table range/active/resize borders use semantic Accent role colours, because List rows are allowed to be frame-less while Table active-cell chrome is not;
 - Gallery, Tree, Dropdown, Menu, NodeGraph, Accordion, MatrixSelector and ColorMatrix retain their accepted semantic-theme paths.
+
+The Table corrective is deliberately local to theme-driven styles. Explicit `SetCustomStyle(...)` remains caller-owned and is not overwritten.
 
 Styling rule remains: prefer semantic theme roles; do not scatter unrelated hard-coded Dark colours or enter custom-style mode merely to repeat defaults.
 
@@ -136,7 +143,8 @@ Current review confirmed:
 - no package membership change is required for production UiDoc sources;
 - lifetime hardening uses native U++ `Pte`/`Ptr` weak lifetime tracking rather than ownership or a second model store;
 - external model object removal now reconciles transient active view state without clearing valid selections on unrelated edits;
-- final source changes are bounded to the model-binding contract and its deterministic regression coverage.
+- canonical List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph accessor migration is published as `c35054d...` and does not maintain compatibility aliases;
+- Table theme corrective `43a91954...` changes only `ResolveUiTableChrome(...)` and leaves model/render/geometry code untouched.
 
 The assistant cannot perform the Windows U++ compile/runtime gate in this environment.
 
@@ -147,16 +155,18 @@ Validate exact current `main` HEAD with CLANGx64.
 Required gate:
 
 1. Build `Ui` Debug to catch header/BLITZ integration issues.
-2. Build/run `Utilities/UiDocModelBindingTest` Debug + Release — expected `UIDOC_MODEL_BINDING_SUMMARY checks=22 failed=0`.
+2. Build/run `Utilities/UiThemeSurfaceRegressionTest` Debug + Release — expected 13/0. This is the first resumed gate after the Table corrective.
 3. Build/run `Utilities/UiModelBindingContractTest` Debug + Release — expected 49/0.
-4. Build/run `Utilities/UiDocModelTest` Debug + Release — 17 cases, zero case/check failures.
-5. Build/run `Utilities/UiDocInteractionTest` Debug + Release — expected 41/0.
-6. Build/run `Utilities/UiDocGeometryTest` Debug + Release — expected 16/0.
-7. Build/run `Utilities/UiDocImageTest` Debug + Release — expected 75/0.
-8. Build/run `Utilities/UiDocMetadataTest` Debug + Release — require its emitted zero-failure summary.
-9. Retain the existing convergence gates: `UiThemeSurfaceRegressionTest` 13/0, `UiModelViewPerformanceTest` 52/0, `UiTreeScaleTest` 11/0, `UiGalleryRegressionTest` 11/0, `UiDropdownMenuRenderTest` 11/0 (Debug + Release).
-10. Build/launch `examples/UiDocDemo` Debug + Release and smoke ordinary editing, Undo/Redo, search, comments/metadata, table and image insertion/removal.
-11. Compile-smoke the migrated model API demos: `UiBreadcrumbsDemo`, `UiListDemo`, `UiTreeDemo`, `UiGraphDemo`, `UiDropdownDemo`.
-12. Run `git diff --check`; confirm clean `git status --short` and report exact `git rev-parse HEAD`.
+4. Build/run `Utilities/UiDocModelBindingTest` Debug + Release — expected `UIDOC_MODEL_BINDING_SUMMARY checks=22 failed=0`.
+5. Build/run `Utilities/UiDocModelTest` Debug + Release — 17 cases, zero case/check failures.
+6. Build/run `Utilities/UiDocInteractionTest` Debug + Release — expected 41/0.
+7. Build/run `Utilities/UiDocGeometryTest` Debug + Release — expected 16/0.
+8. Build/run `Utilities/UiDocImageTest` Debug + Release — expected 75/0.
+9. Build/run `Utilities/UiDocMetadataTest` Debug + Release — require its emitted zero-failure summary.
+10. Retain the existing convergence gates: `UiModelViewPerformanceTest` 52/0, `UiTreeScaleTest` 11/0, `UiGalleryRegressionTest` 11/0, `UiDropdownMenuRenderTest` 11/0 (Debug + Release).
+11. Build/launch `examples/UiDocDemo` Debug + Release and smoke ordinary editing, Undo/Redo, search, comments/metadata, table and image insertion/removal.
+12. Focused UiTable Dark smoke: visible cell/header text, explicit selected range and active-cell border, resize guide, alternate/read-only/hover state, then Light restoration.
+13. Compile-smoke the migrated model API demos: `UiBreadcrumbsDemo`, `UiListDemo`, `UiTreeDemo`, `UiGraphDemo`, `UiDropdownDemo`.
+14. Run `git diff --check`; confirm clean `git status --short` and report exact `git rev-parse HEAD`.
 
 If a substantive ownership, lifecycle, notification, rendering or document-state failure appears, stop and return it to implementation. Do not edit source, weaken tests or restore retired model accessors during validation.
