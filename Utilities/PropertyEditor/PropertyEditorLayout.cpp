@@ -25,6 +25,33 @@ static String PeGroupLeaf(const String& path)
     return q >= 0 ? path.Mid(q + 1) : path;
 }
 
+static Vector<int> PePropertyOrder(const PropertyEditorModel& model)
+{
+    Vector<int> order;
+    order.SetCount(model.GetCount());
+    for(int i = 0; i < order.GetCount(); i++)
+        order[i] = i;
+
+    // Stable insertion sort keeps raw model order as the tie-breaker while
+    // allowing callers to intentionally group presentation through sort_order.
+    for(int i = 1; i < order.GetCount(); i++) {
+        const int current = order[i];
+        int j = i;
+        while(j > 0) {
+            const int previous = order[j - 1];
+            const int previous_sort = model[previous].sort_order;
+            const int current_sort = model[current].sort_order;
+            if(previous_sort < current_sort ||
+               (previous_sort == current_sort && previous < current))
+                break;
+            order[j] = previous;
+            j--;
+        }
+        order[j] = current;
+    }
+    return order;
+}
+
 void PropertyEditor::SetLabelAuto()
 {
     label_mode_ = PropertyEditorLabelMode::Auto;
@@ -312,11 +339,12 @@ void PropertyEditor::RebuildRows()
     content_height_ = 0;
 
     if(model_) {
+        const Vector<int> model_order = PePropertyOrder(*model_);
         Vector<String> previous_chain;
         VectorMap<String, int> override_local;
         VectorMap<String, int> override_total;
-        for(int i = 0; i < model_->GetCount(); i++) {
-            const PropertyEditorItem& item = (*model_)[i];
+        for(int model_index : model_order) {
+            const PropertyEditorItem& item = (*model_)[model_index];
             if(!item.overrideable)
                 continue;
             for(const String& path : PeGroupChain(item.group)) {
@@ -335,8 +363,8 @@ void PropertyEditor::RebuildRows()
         int ordinal = 0;
         bool filtering = !TrimBoth(GetFilter()).IsEmpty();
 
-        for(int i = 0; i < model_->GetCount(); i++) {
-            const PropertyEditorItem& item = (*model_)[i];
+        for(int model_index : model_order) {
+            const PropertyEditorItem& item = (*model_)[model_index];
             if(!item.visible || !MatchesFilter(item))
                 continue;
 
@@ -376,7 +404,7 @@ void PropertyEditor::RebuildRows()
                 continue;
 
             DisplayRow& row = rows_.Add();
-            row.model_index = i;
+            row.model_index = model_index;
             row.group_depth = chain.GetCount();
             row.y = content_height_;
             row.cy = style_.row_height * ResolveRowSpan(item);
