@@ -349,6 +349,42 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     t.Expect(graph.GetSelectedNodes().GetCount() == 1 && graph.IsNodeSelected(centre),
              "double-click clears prior selection and leaves only the double-clicked node selected");
 
+    Vector<UiGraphNodeRef> batch_nodes;
+    for(int y = 60; y < 63; y++)
+        for(int x = 60; x < 64; x++)
+            batch_nodes.Add(nodes[y * 100 + x]);
+    int batch_spatial_build = graph.GetSpatialBuildSerial();
+    int batch_spatial_updates = graph.GetSpatialUpdateSerial();
+    int batch_geometry = graph.GetGeometryBuildSerial();
+    int batch_flush = graph.GetBatchFlushSerial();
+    graph.BeginBatchUpdate();
+    graph.BeginBatchUpdate();
+    for(UiGraphNodeRef ref : batch_nodes) {
+        const UiGraphNode* node = model.FindNode(ref);
+        ASSERT(node);
+        model.SetNodePosition(ref, node->position + Pointf(3, 2));
+    }
+    t.Expect(graph.IsBatchUpdating()
+             && graph.GetSpatialUpdateSerial() == batch_spatial_updates
+             && graph.GetGeometryBuildSerial() == batch_geometry,
+             "nested batch defers retained spatial and prepared-geometry work during authoritative model mutations");
+    graph.EndBatchUpdate();
+    t.Expect(graph.IsBatchUpdating()
+             && graph.GetSpatialUpdateSerial() == batch_spatial_updates
+             && graph.GetGeometryBuildSerial() == batch_geometry,
+             "inner EndBatchUpdate does not flush the outer transaction");
+    graph.EndBatchUpdate();
+    t.Expect(!graph.IsBatchUpdating()
+             && graph.GetBatchFlushSerial() == batch_flush + 1
+             && graph.GetSpatialBuildSerial() == batch_spatial_build
+             && graph.GetSpatialUpdateSerial() > batch_spatial_updates
+             && graph.GetGeometryBuildSerial() == batch_geometry + 1,
+             "outer batch commit updates local spatial records and rebuilds prepared geometry exactly once");
+    t.Expect(graph.GetLastBatchNodeUpdateCount() == batch_nodes.GetCount()
+             && graph.GetLastBatchEdgeUpdateCount() > 0
+             && graph.GetLastBatchEdgeUpdateCount() < 64,
+             "batch commit work is bounded to touched nodes and their unique incident edges");
+
     UiGraphModel external_b;
     external_b.AddNode("External B", Pointf(5000, 5000), Sizef(64, 44));
     int a_nodes = model.GetNodeCount();

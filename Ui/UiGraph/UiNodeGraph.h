@@ -43,6 +43,8 @@
       re-entrancy safe while keeping middle-button panning capture-free.
     - 2026-08: added transient spatial marquee preview state without turning
       preview membership into semantic selection or prepared geometry state.
+    - 2026-08: added nested view-side batch coalescing so authoritative model
+      mutations can update retained spatial/prepared state once per transaction.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -173,7 +175,7 @@ public:
         int fit_margin = DPI(36);
         Color selection_box_fill = Color(59, 130, 246);
         Color selection_box_frame = Color(37, 99, 235);
-        int selection_box_alpha = 30;
+        int selection_box_alpha = 24;
 
         void Serialize(Stream& s);
     };
@@ -208,6 +210,14 @@ public:
     UiGraphModel& Model() { return *model_; }
     const UiGraphModel& Model() const { return *model_; }
     UiNodeGraph& ClearModel() { Model().Clear(); return *this; }
+
+    // Coalesce view/spatial work around multiple authoritative Model()
+    // mutations. Model contents and notifications remain immediate; this scope
+    // only defers UiNodeGraph's retained-index/geometry response until the
+    // outermost EndBatchUpdate(). Do not switch model bindings while open.
+    UiNodeGraph& BeginBatchUpdate();
+    UiNodeGraph& EndBatchUpdate();
+    bool IsBatchUpdating() const { return batch_update_depth_ > 0; }
 
     // Child controls are externally owned. UiNodeGraph only tracks guarded
     // pointers, attaches them while visible, and removes them from the scene
@@ -267,6 +277,10 @@ public:
     int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
     int GetLastMarqueeCandidateCount() const { return last_marquee_candidate_count_; }
     int GetMarqueePreviewNodeCount() const { return marquee_preview_nodes_.GetCount(); }
+    bool IsMarqueePreviewDeferred() const { return marquee_preview_deferred_; }
+    int GetBatchFlushSerial() const { return batch_flush_serial_; }
+    int GetLastBatchNodeUpdateCount() const { return last_batch_node_update_count_; }
+    int GetLastBatchEdgeUpdateCount() const { return last_batch_edge_update_count_; }
     int GetAttachedNodeCtrlCount() const { return node_ctrls_.GetCount(); }
 
     virtual void SetData(const Value& v) override;
@@ -389,6 +403,8 @@ private:
 
     void BindModel(UiGraphModel& model);
     void HandleModelChange(const UiGraphChange& change);
+    void RecordBatchModelChange(const UiGraphChange& change);
+    void FlushBatchModelChanges();
     Value GetSelectionToken(UiGraphNodeRef node) const;
     UiGraphNodeRef ResolveSelectionNode(const Value& token) const;
 
@@ -492,6 +508,16 @@ private:
     Vector<UiGraphModel*> bound_models_;
     int model_revision_ = -1;
 
+    int batch_update_depth_ = 0;
+    bool batch_reset_ = false;
+    Index<UiGraphId> batch_nodes_;
+    Index<UiGraphId> batch_edges_;
+    Index<UiGraphId> batch_removed_nodes_;
+    Index<UiGraphId> batch_removed_edges_;
+    int batch_flush_serial_ = 0;
+    int last_batch_node_update_count_ = 0;
+    int last_batch_edge_update_count_ = 0;
+
     VectorMap<UiGraphId, Ptr<Ctrl>> node_ctrls_;
     VectorMap<UiGraphId, NodeGeometry> node_geometry_;
     VectorMap<UiGraphId, EdgeGeometry> edge_geometry_;
@@ -543,6 +569,7 @@ private:
     Pointf pan_at_press_;
     Rect marquee_;
     Index<UiGraphId> marquee_preview_nodes_;
+    bool marquee_preview_deferred_ = false;
     UiGraphNodeRef pressed_node_;
     UiGraphPortRef connection_source_;
     UiGraphPortRef connection_target_;

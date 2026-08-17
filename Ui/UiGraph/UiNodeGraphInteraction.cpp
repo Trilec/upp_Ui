@@ -6,9 +6,18 @@ namespace Upp {
 
 namespace {
 
+constexpr int64 kMarqueePreviewMaxCells = 256;
+
 bool HasSelectionModifier(dword flags)
 {
     return (flags & (K_CTRL | K_SHIFT)) != 0;
+}
+
+void RemoveIndexedId(Index<UiGraphId>& ids, UiGraphId id)
+{
+    int i = ids.Find(id);
+    if(i >= 0)
+        ids.Remove(i);
 }
 
 } // namespace
@@ -30,6 +39,130 @@ void UiNodeGraph::ReleaseInteractionCapture()
     interaction_capture_owned_ = false;
     if(HasCapture())
         ReleaseCapture();
+}
+
+UiNodeGraph& UiNodeGraph::BeginBatchUpdate()
+{
+    if(batch_update_depth_ == 0) {
+        batch_reset_ = false;
+        batch_nodes_.Clear();
+        batch_edges_.Clear();
+        batch_removed_nodes_.Clear();
+        batch_removed_edges_.Clear();
+        last_batch_node_update_count_ = 0;
+        last_batch_edge_update_count_ = 0;
+    }
+    batch_update_depth_++;
+    return *this;
+}
+
+UiNodeGraph& UiNodeGraph::EndBatchUpdate()
+{
+    ASSERT(batch_update_depth_ > 0);
+    if(batch_update_depth_ <= 0)
+        return *this;
+    batch_update_depth_--;
+    if(batch_update_depth_ == 0)
+        FlushBatchModelChanges();
+    return *this;
+}
+
+void UiNodeGraph::RecordBatchModelChange(const UiGraphChange& change)
+{
+    if(batch_reset_)
+        return;
+
+    switch(change.kind) {
+    case UiGraphChangeKind::NodeAdded:
+    case UiGraphChangeKind::NodeUpdated:
+    case UiGraphChangeKind::PortAdded:
+    case UiGraphChangeKind::PortUpdated:
+    case UiGraphChangeKind::PortRemoved:
+        if(change.node.IsValid()) {
+            RemoveIndexedId(batch_removed_nodes_, change.node.id);
+            batch_nodes_.FindAdd(change.node.id);
+        }
+        break;
+    case UiGraphChangeKind::NodeRemoved:
+        if(change.node.IsValid()) {
+            RemoveIndexedId(batch_nodes_, change.node.id);
+            batch_removed_nodes_.FindAdd(change.node.id);
+        }
+        break;
+    case UiGraphChangeKind::EdgeAdded:
+    case UiGraphChangeKind::EdgeUpdated:
+        if(change.edge.IsValid()) {
+            RemoveIndexedId(batch_removed_edges_, change.edge.id);
+            batch_edges_.FindAdd(change.edge.id);
+        }
+        break;
+    case UiGraphChangeKind::EdgeRemoved:
+        if(change.edge.IsValid()) {
+            RemoveIndexedId(batch_edges_, change.edge.id);
+            batch_removed_edges_.FindAdd(change.edge.id);
+        }
+        break;
+    case UiGraphChangeKind::Reset:
+    case UiGraphChangeKind::Cleared:
+    default:
+        batch_reset_ = true;
+        batch_nodes_.Clear();
+        batch_edges_.Clear();
+        batch_removed_nodes_.Clear();
+        batch_removed_edges_.Clear();
+        break;
+    }
+}
+
+void UiNodeGraph::FlushBatchModelChanges()
+{
+    bool have_changes = batch_reset_ || !batch_nodes_.IsEmpty() || !batch_edges_.IsEmpty()
+                        || !batch_removed_nodes_.IsEmpty() || !batch_removed_edges_.IsEmpty();
+    if(!have_changes)
+        return;
+
+    if(batch_reset_ || spatial_dirty_) {
+        InvalidateSpatialIndex();
+        EnsureSpatialIndex();
+        last_batch_node_update_count_ = model_ ? model_->GetNodeCount() : 0;
+        last_batch_edge_update_count_ = model_ ? model_->GetEdgeCount() : 0;
+    }
+    else {
+        // Node geometry changes also move/re-anchor current incident edges. Add
+        // their final IDs once here rather than per intermediate model event.
+        if(model_)
+            for(int i = 0; i < batch_nodes_.GetCount(); i++) {
+                UiGraphNodeRef node{batch_nodes_[i]};
+                for(UiGraphEdgeRef edge : model_->GetNodeEdges(node))
+                    if(batch_removed_edges_.Find(edge.id) < 0)
+                        batch_edges_.FindAdd(edge.id);
+            }
+
+        last_batch_node_update_count_ = batch_nodes_.GetCount() + batch_removed_nodes_.GetCount();
+        last_batch_edge_update_count_ = batch_edges_.GetCount() + batch_removed_edges_.GetCount();
+
+        for(int i = 0; i < batch_removed_edges_.GetCount(); i++)
+            RemoveSpatialEdge(UiGraphEdgeRef{batch_removed_edges_[i]});
+        for(int i = 0; i < batch_removed_nodes_.GetCount(); i++)
+            RemoveSpatialNode(UiGraphNodeRef{batch_removed_nodes_[i]});
+        for(int i = 0; i < batch_nodes_.GetCount(); i++)
+            UpdateSpatialNode(UiGraphNodeRef{batch_nodes_[i]});
+        for(int i = 0; i < batch_edges_.GetCount(); i++)
+            UpdateSpatialEdge(UiGraphEdgeRef{batch_edges_[i]});
+    }
+
+    batch_reset_ = false;
+    batch_nodes_.Clear();
+    batch_edges_.Clear();
+    batch_removed_nodes_.Clear();
+    batch_removed_edges_.Clear();
+    batch_flush_serial_++;
+
+    model_revision_ = -1;
+    InvalidateGeometry();
+    PrepareGeometry();
+    UpdateAttachedCtrls();
+    Refresh();
 }
 
 void UiNodeGraph::BeginNodeDrag(Point p, UiGraphNodeRef primary)
@@ -88,19 +221,28 @@ void UiNodeGraph::CommitNodeDrag()
     request.before = clone(drag_start_positions_);
     request.after = clone(drag_preview_positions_);
     WhenNodeMoveRequest(request);
-    if(request.accept && internal_mutation_ && !request.handled && model_)
+
+    bool apply_internal = request.accept && internal_mutation_ && !request.handled && model_;
+    if(apply_internal) {
+        BeginBatchUpdate();
         for(int i = 0; i < request.after.GetCount(); i++)
             model_->SetNodePosition(UiGraphNodeRef{request.after.GetKey(i)}, request.after[i]);
+    }
 
     drag_start_positions_.Clear();
     drag_preview_positions_.Clear();
     interaction_ = InteractionMode::None;
     pressed_node_ = UiGraphNodeRef();
     ReleaseInteractionCapture();
-    InvalidateGeometry();
-    PrepareGeometry();
-    UpdateAttachedCtrls();
-    Refresh();
+
+    if(apply_internal)
+        EndBatchUpdate();
+    else {
+        InvalidateGeometry();
+        PrepareGeometry();
+        UpdateAttachedCtrls();
+        Refresh();
+    }
 }
 
 void UiNodeGraph::CancelNodeDrag()
@@ -210,6 +352,7 @@ void UiNodeGraph::BeginMarquee(Point p)
     press_point_ = last_point_ = p;
     marquee_ = Rect(p, p);
     marquee_preview_nodes_.Clear();
+    marquee_preview_deferred_ = false;
     last_marquee_candidate_count_ = 0;
     AcquireInteractionCapture();
     RefreshDamage(RectC(p.x - DPI(3), p.y - DPI(3), DPI(7), DPI(7)));
@@ -225,36 +368,74 @@ void UiNodeGraph::UpdateMarquee(Point p)
     marquee_ = Rect(min(press_point_.x, p.x), min(press_point_.y, p.y),
                     max(press_point_.x, p.x) + 1, max(press_point_.y, p.y) + 1);
 
-    Rect damage = (old | marquee_).Inflated(DPI(3));
     Index<UiGraphId> next_preview;
     last_marquee_candidate_count_ = 0;
+    marquee_preview_deferred_ = false;
 
-    // Preview is broad-phase only: query the same retained world-space cells as
-    // viewport culling and cache selectable node IDs. No semantic selection or
-    // prepared geometry is changed while the pointer moves.
+    // Live candidate preview is intentionally opportunistic. Local rectangles
+    // query the retained hash every move; a very large/zoomed-out marquee skips
+    // live candidate work and resolves once on mouse-up instead.
     if(model_ && !marquee_.IsEmpty()) {
         EnsureSpatialIndex();
         WorldRect area;
         area.Include(ScreenToWorld(marquee_.TopLeft()));
         area.Include(ScreenToWorld(marquee_.BottomRight()));
-        Index<UiGraphId> nodes;
-        Index<UiGraphId> edges;
-        QuerySpatial(area, nodes, edges);
-        last_marquee_candidate_count_ = nodes.GetCount();
-        for(int i = 0; i < nodes.GetCount(); i++) {
-            UiGraphNodeRef ref{nodes[i]};
-            const UiGraphNode* node = model_->FindNode(ref);
-            if(node && node->selectable)
-                next_preview.FindAdd(ref.id);
+        int x0, y0, x1, y1;
+        SpatialCellRange(area, x0, y0, x1, y1);
+        int64 cells = x1 >= x0 && y1 >= y0
+                    ? (int64)(x1 - x0 + 1) * (int64)(y1 - y0 + 1)
+                    : 0;
+        if(cells > 0 && cells <= kMarqueePreviewMaxCells) {
+            Index<UiGraphId> nodes;
+            Index<UiGraphId> edges;
+            QuerySpatial(area, nodes, edges);
+            last_marquee_candidate_count_ = nodes.GetCount();
+            for(int i = 0; i < nodes.GetCount(); i++) {
+                UiGraphNodeRef ref{nodes[i]};
+                const UiGraphNode* node = model_->FindNode(ref);
+                if(node && node->selectable)
+                    next_preview.FindAdd(ref.id);
+            }
         }
+        else if(cells > kMarqueePreviewMaxCells)
+            marquee_preview_deferred_ = true;
     }
+
+    // Repaint only the old/new border plus the changed translucent-fill strips.
+    // The overlapping interior is visually identical and does not need damage.
+    auto refresh_border = [&](Rect r) {
+        if(r.IsEmpty())
+            return;
+        int b = DPI(3);
+        RefreshDamage(Rect(r.left - b, r.top - b, r.right + b, r.top + b + 1));
+        RefreshDamage(Rect(r.left - b, r.bottom - b - 1, r.right + b, r.bottom + b));
+        RefreshDamage(Rect(r.left - b, r.top, r.left + b + 1, r.bottom));
+        RefreshDamage(Rect(r.right - b - 1, r.top, r.right + b, r.bottom));
+    };
+    auto refresh_difference = [&](Rect a, Rect b) {
+        if(a.IsEmpty())
+            return;
+        Rect i = a & b;
+        if(i.IsEmpty()) {
+            RefreshDamage(a.Inflated(DPI(1)));
+            return;
+        }
+        if(a.top < i.top) RefreshDamage(Rect(a.left, a.top, a.right, i.top).Inflated(DPI(1)));
+        if(i.bottom < a.bottom) RefreshDamage(Rect(a.left, i.bottom, a.right, a.bottom).Inflated(DPI(1)));
+        if(a.left < i.left) RefreshDamage(Rect(a.left, i.top, i.left, i.bottom).Inflated(DPI(1)));
+        if(i.right < a.right) RefreshDamage(Rect(i.right, i.top, a.right, i.bottom).Inflated(DPI(1)));
+    };
+    refresh_difference(old, marquee_);
+    refresh_difference(marquee_, old);
+    refresh_border(old);
+    refresh_border(marquee_);
 
     for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
         UiGraphId id = marquee_preview_nodes_[i];
         if(next_preview.Find(id) < 0) {
             const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{id});
             if(g)
-                damage |= g->paint_bounds.Inflated(DPI(3));
+                RefreshDamage(g->paint_bounds.Inflated(DPI(3)));
         }
     }
     for(int i = 0; i < next_preview.GetCount(); i++) {
@@ -262,14 +443,13 @@ void UiNodeGraph::UpdateMarquee(Point p)
         if(marquee_preview_nodes_.Find(id) < 0) {
             const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{id});
             if(g)
-                damage |= g->paint_bounds.Inflated(DPI(3));
+                RefreshDamage(g->paint_bounds.Inflated(DPI(3)));
         }
     }
 
     marquee_preview_nodes_.Clear();
     for(int i = 0; i < next_preview.GetCount(); i++)
         marquee_preview_nodes_.Add(next_preview[i]);
-    RefreshDamage(damage);
 }
 
 void UiNodeGraph::CommitMarquee(dword flags)
@@ -283,9 +463,26 @@ void UiNodeGraph::CommitMarquee(dword flags)
         selected_edges_.Clear();
     }
 
-    // UpdateMarquee already resolved the final rectangle through the retained
-    // spatial hash. Commit those cached IDs directly so mouse-up performs no
-    // second graph query and preview never becomes a parallel semantic store.
+    // Large rectangles deliberately skip live candidate preview. Resolve that
+    // one final selection here; ordinary rectangles commit the cached preview
+    // without a second spatial query.
+    if(marquee_preview_deferred_ && model_ && !marquee_.IsEmpty()) {
+        EnsureSpatialIndex();
+        WorldRect area;
+        area.Include(ScreenToWorld(marquee_.TopLeft()));
+        area.Include(ScreenToWorld(marquee_.BottomRight()));
+        Index<UiGraphId> nodes;
+        Index<UiGraphId> edges;
+        QuerySpatial(area, nodes, edges);
+        marquee_preview_nodes_.Clear();
+        for(int i = 0; i < nodes.GetCount(); i++) {
+            UiGraphNodeRef ref{nodes[i]};
+            const UiGraphNode* node = model_->FindNode(ref);
+            if(node && node->selectable)
+                marquee_preview_nodes_.FindAdd(ref.id);
+        }
+    }
+
     if(model_)
         for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
             UiGraphNodeRef ref{marquee_preview_nodes_[i]};
@@ -295,6 +492,7 @@ void UiNodeGraph::CommitMarquee(dword flags)
         }
 
     marquee_preview_nodes_.Clear();
+    marquee_preview_deferred_ = false;
     last_marquee_candidate_count_ = 0;
     marquee_ = Rect(0, 0, 0, 0);
     interaction_ = InteractionMode::None;
@@ -312,15 +510,24 @@ void UiNodeGraph::DeleteSelection()
     if(request.nodes.IsEmpty() && request.edges.IsEmpty())
         return;
     WhenDeleteRequest(request);
-    if(request.accept && internal_mutation_ && !request.handled) {
+
+    bool apply_internal = request.accept && internal_mutation_ && !request.handled;
+    if(apply_internal) {
+        BeginBatchUpdate();
         for(UiGraphEdgeRef edge : request.edges)
             model_->RemoveEdge(edge);
         for(UiGraphNodeRef node : request.nodes)
             model_->RemoveNode(node);
     }
+
     selected_nodes_.Clear();
     selected_edges_.Clear();
-    NotifySelection();
+    if(apply_internal) {
+        EndBatchUpdate();
+        WhenSelection();
+    }
+    else
+        NotifySelection();
 }
 
 void UiNodeGraph::LeftDown(Point p, dword flags)
@@ -389,8 +596,8 @@ void UiNodeGraph::MiddleUp(Point, dword)
 void UiNodeGraph::MouseMove(Point p, dword)
 {
     // Active interactions own their geometry/update path. Marquee movement may
-    // query spatial cells for transient preview IDs, but must never rebuild the
-    // spatial index, prepared geometry, or semantic selection.
+    // query a bounded set of spatial cells for transient preview IDs, but must
+    // never rebuild the spatial index, prepared geometry, or semantic selection.
     if(interaction_ == InteractionMode::NodeDrag) {
         UpdateNodeDrag(p);
         return;
@@ -503,13 +710,19 @@ bool UiNodeGraph::Key(dword key, int count)
         }
         if(!request.after.IsEmpty()) {
             WhenNodeMoveRequest(request);
-            if(request.accept && internal_mutation_ && !request.handled)
+            bool apply_internal = request.accept && internal_mutation_ && !request.handled;
+            if(apply_internal) {
+                BeginBatchUpdate();
                 for(int i = 0; i < request.after.GetCount(); i++)
                     model_->SetNodePosition(UiGraphNodeRef{request.after.GetKey(i)}, request.after[i]);
-            InvalidateGeometry();
-            PrepareGeometry();
-            UpdateAttachedCtrls();
-            Refresh();
+                EndBatchUpdate();
+            }
+            else {
+                InvalidateGeometry();
+                PrepareGeometry();
+                UpdateAttachedCtrls();
+                Refresh();
+            }
         }
         return true;
     }
@@ -529,9 +742,10 @@ void UiNodeGraph::CancelMode()
         for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
             const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{marquee_preview_nodes_[i]});
             if(g)
-                old |= g->paint_bounds.Inflated(DPI(3));
+                RefreshDamage(g->paint_bounds.Inflated(DPI(3)));
         }
         marquee_preview_nodes_.Clear();
+        marquee_preview_deferred_ = false;
         last_marquee_candidate_count_ = 0;
         marquee_ = Rect(0, 0, 0, 0);
         interaction_ = InteractionMode::None;

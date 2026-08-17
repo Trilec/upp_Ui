@@ -784,6 +784,11 @@ void UiNodeGraph::BindModel(UiGraphModel& model)
 
 void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
 {
+    if(batch_update_depth_ > 0) {
+        RecordBatchModelChange(change);
+        return;
+    }
+
     EnsureSpatialIndex();
     switch(change.kind) {
     case UiGraphChangeKind::NodeAdded:
@@ -825,6 +830,9 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
 UiNodeGraph& UiNodeGraph::SetModel(UiGraphModel& model)
 {
     if(model_ == &model)
+        return *this;
+    ASSERT(batch_update_depth_ == 0);
+    if(batch_update_depth_ > 0)
         return *this;
     model_ = &model;
     BindModel(model);
@@ -1583,6 +1591,8 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
 
 void UiNodeGraph::PrepareGeometry()
 {
+    if(batch_update_depth_ > 0)
+        return;
     if(!geometry_dirty_ && model_ && model_revision_ == model_->GetRevision() &&
        geometry_zoom_ == zoom_ && geometry_pan_ == pan_ && geometry_size_ == GetSize())
         return;
@@ -1970,10 +1980,12 @@ void UiNodeGraph::PaintMarquee(Draw& w) const
     RGBA fill(style.selection_box_fill);
     fill.a = (byte)minmax(style.selection_box_alpha, 0, 255);
 
-    // A one-pixel alpha tile scales to the marquee without allocating a
-    // marquee-sized ImageBuffer on every pointer move.
+    // Windows-style selection marquee: a constant one-pixel alpha tile scales
+    // across the rectangle, preserving a very light translucent blue interior
+    // without allocating a marquee-sized buffer on each pointer move.
     ImageBuffer ib(Size(1, 1));
-    ib[0][0] = fill;
+    BufferPainter bp(ib, MODE_ANTIALIASED);
+    bp.Clear(fill);
     Image tile = ib;
     w.DrawImage(marquee_, tile);
 
@@ -2101,6 +2113,28 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             // do not stack the rectangular focus ring on top of it.
             UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&!IsNodeSelected(node->ref));
         }
+    }
+
+    bool have_preview = false;
+    for(int q : paint_nodes)
+        if(marquee_preview_nodes_.Find(node_geometry_[q].ref.id) >= 0
+           && !IsNodeSelected(node_geometry_[q].ref)) { have_preview = true; break; }
+    if(have_preview) {
+        ImageBuffer preview_buffer(paint.GetSize());
+        BufferPainter pp(preview_buffer, MODE_ANTIALIASED);
+        pp.Clear(RGBAZero());
+        pp.Translate(-paint.left, -paint.top);
+        const Color selection = GetEffectiveStyle().selection_box_frame;
+        RGBA wash(selection);
+        wash.a = 18;
+        for(int q : paint_nodes) {
+            const NodeGeometry& g = node_geometry_[q];
+            if(marquee_preview_nodes_.Find(g.ref.id) >= 0 && !IsNodeSelected(g.ref) && !g.hit_path.IsEmpty()) {
+                FillPath(pp, g.hit_path, wash);
+                StrokePath(pp, g.hit_path, 1.0, selection, true);
+            }
+        }
+        w.DrawImage(paint.left, paint.top, preview_buffer);
     }
 
     bool have_selected = false;
