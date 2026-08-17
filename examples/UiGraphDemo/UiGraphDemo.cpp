@@ -20,6 +20,75 @@ Color GraphDemoFillColor(const UiFill& fill, Color fallback)
     return fill.IsSolid() && !IsNull(fill.color) ? fill.color : fallback;
 }
 
+ValueMap GraphDemoSolidRecipe(Color color)
+{
+    ValueMap recipe;
+    recipe.Set("mode", "Solid");
+    recipe.Set("solid", color);
+    return recipe;
+}
+
+Value GraphDemoMapValue(const ValueMap& map, const String& key, const Value& fallback)
+{
+    int q = map.Find(key);
+    return q >= 0 ? map.GetValue(q) : fallback;
+}
+
+Value GraphDemoFillRecipe(const UiFill& fill, Color fallback)
+{
+    if(fill.IsSolid())
+        return GraphDemoSolidRecipe(GraphDemoFillColor(fill, fallback));
+    ValueMap recipe;
+    recipe.Set("mode", "None");
+    return recipe;
+}
+
+void GraphDemoApplyFillRecipe(UiFill& target, const Value& value)
+{
+    if(!value.Is<ValueMap>())
+        return;
+    ValueMap recipe = value;
+    String mode = AsString(GraphDemoMapValue(recipe, "mode", "None"));
+    if(mode == "Solid") {
+        target = UiFill::Solid(Color(GraphDemoMapValue(recipe, "solid", White())));
+        return;
+    }
+    if(mode == "QuadGradient") {
+        Color tl(GraphDemoMapValue(recipe, "top_left", White()));
+        Color tr(GraphDemoMapValue(recipe, "top_right", tl));
+        Color bl(GraphDemoMapValue(recipe, "bottom_left", tl));
+        Color br(GraphDemoMapValue(recipe, "bottom_right", tr));
+        int tile = max(8, (int)GraphDemoMapValue(recipe, "tile_size", 32));
+        int blur = max(0, (int)GraphDemoMapValue(recipe, "blur", 0));
+        target = UiFill::ImageFill(MakeQuadGradientTile(tile, tl, tr, bl, br, blur));
+        return;
+    }
+    target = UiFill::None();
+}
+
+String GraphDemoRecipeKey(const String& style_class, const String& state)
+{
+    return style_class + ":face:" + state;
+}
+
+void GraphDemoProjectState(UiGraphNodeStyle& style, int source, int target)
+{
+    source = minmax(source, ST_NORMAL, ST_DISABLED);
+    target = minmax(target, ST_NORMAL, ST_DISABLED);
+    if(source == target)
+        return;
+    style.palette.face[target] = style.palette.face[source];
+    style.palette.frame[target] = style.palette.frame[source];
+    style.palette.ink[target] = style.palette.ink[source];
+    style.palette.icon[target] = style.palette.icon[source];
+    style.header_face[target] = style.header_face[source];
+    style.title_ink[target] = style.title_ink[source];
+    style.subtitle_ink[target] = style.subtitle_ink[source];
+    style.description_ink[target] = style.description_ink[source];
+    style.port_frame[target] = style.port_frame[source];
+    style.port_label_ink[target] = style.port_label_ink[source];
+}
+
 UiGraphNodeShape GraphDemoParseShape(const String& value)
 {
     if(value == "Rectangle") return UiGraphNodeShape::Rectangle;
@@ -145,9 +214,11 @@ UiGraphDemo::UiGraphDemo()
           .EnableInternalMutation(true)
           .SetAutoFitOnFirstPaint(true);
 
-    graph_.WhenResolveNodeStyle = [=](const UiGraphNode& node, UiGraphVisualState,
+    graph_.WhenResolveNodeStyle = [=](const UiGraphNode& node, UiGraphVisualState state,
                                       UiGraphNodeStyle& style) {
         ApplyDemoPreset(node, style);
+        if(state == UiGraphVisualState::Selected && node.ref == selected_node_)
+            GraphDemoProjectState(style, style_preview_state_, ST_PRESSED);
     };
 
     SetScaleMode(false);
@@ -269,55 +340,68 @@ void UiGraphDemo::BuildStyleEditorModel()
 {
     UiGraphNodeStyle base = graph_.GetStyle().node;
     static const char *labels[] = { "Normal", "Hot", "Selected", "Disabled" };
+
     for(int i = 0; i < 4; i++) {
         int si = GraphDemoStyleIndex(i);
-        pe_model_style.AddColor("face." + String(GraphDemoStateId(i)), labels[i],
-                                GraphDemoFillColor(base.palette.face[si], White()), "Face");
+        pe_model_style.Add("face." + String(GraphDemoStateId(i)), labels[i],
+                           PropertyEditorKind::FillRecipe,
+                           GraphDemoFillRecipe(base.palette.face[si], White()), "Face");
     }
 
-    pe_model_style.AddBoolean("frame.enabled", "Enabled", base.metrics.frame_enabled, "Frame");
-    pe_model_style.AddNumericInt("frame.width", "Width", base.metrics.frame_width, 0, 12, 1, "Frame").SetUnit("px");
+    pe_model_style.AddBoolean("frame_enabled", "Enabled", base.metrics.frame_enabled, "Frame");
+    pe_model_style.AddNumericInt("frame_width", "Width", base.metrics.frame_width, 0, 12, 1, "Frame").SetUnit("px");
     for(int i = 0; i < 4; i++) {
         int si = GraphDemoStyleIndex(i);
         pe_model_style.AddColor("frame." + String(GraphDemoStateId(i)), labels[i], base.palette.frame[si], "Frame");
+    }
+
+    for(int i = 0; i < 4; i++) {
+        int si = GraphDemoStyleIndex(i);
         pe_model_style.AddColor("ink." + String(GraphDemoStateId(i)), labels[i], base.title_ink[si], "Ink");
+    }
+
+    for(int i = 0; i < 4; i++) {
+        int si = GraphDemoStyleIndex(i);
         pe_model_style.AddColor("header." + String(GraphDemoStateId(i)), labels[i], base.header_face[si], "Header");
     }
 
-    pe_model_style.AddNumericInt("typography.title", "Title height", max(1, base.title_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
-    pe_model_style.AddNumericInt("typography.subtitle", "Subtitle height", max(1, base.subtitle_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
-    pe_model_style.AddNumericInt("typography.description", "Description height", max(1, base.description_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    pe_model_style.AddNumericInt("font_title", "Title height", max(1, base.title_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    pe_model_style.AddNumericInt("font_subtitle", "Subtitle height", max(1, base.subtitle_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    pe_model_style.AddNumericInt("font_description", "Description height", max(1, base.description_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
 
-    pe_model_style.AddNumericInt("margin.left", "Left", base.metrics.content_margin.left, 0, 64, 1, "Content Margin");
-    pe_model_style.AddNumericInt("margin.top", "Top", base.metrics.content_margin.top, 0, 64, 1, "Content Margin");
-    pe_model_style.AddNumericInt("margin.right", "Right", base.metrics.content_margin.right, 0, 64, 1, "Content Margin");
-    pe_model_style.AddNumericInt("margin.bottom", "Bottom", base.metrics.content_margin.bottom, 0, 64, 1, "Content Margin");
+    pe_model_style.AddNumericInt("margin_left", "Left", base.metrics.content_margin.left, 0, 64, 1, "Content Margin");
+    pe_model_style.AddNumericInt("margin_top", "Top", base.metrics.content_margin.top, 0, 64, 1, "Content Margin");
+    pe_model_style.AddNumericInt("margin_right", "Right", base.metrics.content_margin.right, 0, 64, 1, "Content Margin");
+    pe_model_style.AddNumericInt("margin_bottom", "Bottom", base.metrics.content_margin.bottom, 0, 64, 1, "Content Margin");
 
-    pe_model_style.AddBoolean("focus.enabled", "Enabled", base.metrics.focus_enabled, "Focus");
-    pe_model_style.AddNumericInt("focus.margin", "Margin", base.metrics.focus_margin, 0, 24, 1, "Focus");
-    pe_model_style.AddNumericInt("focus.alpha", "Alpha", base.metrics.focus_alpha, 0, 255, 1, "Focus");
-    pe_model_style.AddColor("focus.color", "Colour", base.metrics.focus_color, "Focus");
+    pe_model_style.AddBoolean("focus_enabled", "Enabled", base.metrics.focus_enabled, "Focus");
+    pe_model_style.AddNumericInt("focus_margin", "Margin", base.metrics.focus_margin, 0, 24, 1, "Focus");
+    pe_model_style.AddNumericInt("focus_alpha", "Alpha", base.metrics.focus_alpha, 0, 255, 1, "Focus");
+    pe_model_style.AddColor("focus_color", "Colour", base.metrics.focus_color, "Focus");
 
-    pe_model_style.AddBoolean("shadow.enabled", "Enabled", base.metrics.shadow.enabled, "Shadow");
-    pe_model_style.AddNumericInt("shadow.distance", "Distance", base.metrics.shadow.distance, 0, 48, 1, "Shadow");
-    pe_model_style.AddNumericInt("shadow.x", "Offset X", base.metrics.shadow.offset_x, -48, 48, 1, "Shadow");
-    pe_model_style.AddNumericInt("shadow.y", "Offset Y", base.metrics.shadow.offset_y, -48, 48, 1, "Shadow");
-    pe_model_style.AddNumericInt("shadow.alpha", "Alpha", base.metrics.shadow.alpha, 0, 255, 1, "Shadow");
-    pe_model_style.AddColor("shadow.color", "Colour", base.metrics.shadow.color, "Shadow");
-    pe_model_style.AddBoolean("shadow.inset", "Inset", base.metrics.shadow.inset, "Shadow");
+    pe_model_style.AddBoolean("shadow_enabled", "Enabled", base.metrics.shadow.enabled, "Shadow");
+    pe_model_style.AddNumericInt("shadow_distance", "Distance", base.metrics.shadow.distance, 0, 48, 1, "Shadow");
+    pe_model_style.AddNumericInt("shadow_x", "Offset X", base.metrics.shadow.offset_x, -48, 48, 1, "Shadow");
+    pe_model_style.AddNumericInt("shadow_y", "Offset Y", base.metrics.shadow.offset_y, -48, 48, 1, "Shadow");
+    pe_model_style.AddNumericInt("shadow_alpha", "Alpha", base.metrics.shadow.alpha, 0, 255, 1, "Shadow");
+    pe_model_style.AddColor("shadow_color", "Colour", base.metrics.shadow.color, "Shadow");
+    pe_model_style.AddBoolean("shadow_inset", "Inset", base.metrics.shadow.inset, "Shadow");
 
-    pe_model_style.AddBoolean("highlight.enabled", "Enabled", base.metrics.highlight.enabled, "Highlight");
-    pe_model_style.AddNumericInt("highlight.thickness", "Thickness", base.metrics.highlight.thickness, 0, 16, 1, "Highlight");
-    pe_model_style.AddNumericInt("highlight.alpha", "Alpha", base.metrics.highlight.alpha, 0, 255, 1, "Highlight");
-    pe_model_style.AddColor("highlight.color", "Colour", base.metrics.highlight.color, "Highlight");
+    pe_model_style.AddBoolean("highlight_enabled", "Enabled", base.metrics.highlight.enabled, "Highlight");
+    pe_model_style.AddNumericInt("highlight_thickness", "Thickness", base.metrics.highlight.thickness, 0, 16, 1, "Highlight");
+    pe_model_style.AddNumericInt("highlight_alpha", "Alpha", base.metrics.highlight.alpha, 0, 255, 1, "Highlight");
+    pe_model_style.AddColor("highlight_color", "Colour", base.metrics.highlight.color, "Highlight");
 
-    pe_model_style.AddNumericInt("ports.radius", "Radius", base.port_radius, 2, 24, 1, "Ports");
-    pe_model_style.AddNumericInt("ports.hit_radius", "Hit radius", base.port_hit_radius, 4, 36, 1, "Ports");
-    pe_model_style.AddNumericInt("ports.spacing", "Spacing", base.port_spacing, 8, 80, 1, "Ports");
-    pe_model_style.AddBoolean("ports.labels", "Show labels", base.show_port_labels, "Ports");
-    pe_model_style.AddBoolean("ports.types", "Show type", base.show_port_type, "Ports");
+    pe_model_style.AddNumericInt("ports_radius", "Radius", base.port_radius, 2, 24, 1, "Ports");
+    pe_model_style.AddNumericInt("ports_hit_radius", "Hit radius", base.port_hit_radius, 4, 36, 1, "Ports");
+    pe_model_style.AddNumericInt("ports_spacing", "Spacing", base.port_spacing, 8, 80, 1, "Ports");
+    pe_model_style.AddBoolean("ports_labels", "Show labels", base.show_port_labels, "Ports");
+    pe_model_style.AddBoolean("ports_types", "Show type", base.show_port_type, "Ports");
 
-    pe_model_style.SetGroupSubtitle("Face", "node surface states; Selected maps to graph selection state");
+    pe_model_style.SetGroupSubtitle("Face", "shared FillRecipe surface states; selection chrome is independent");
+    pe_model_style.SetGroupSubtitle("Frame", "surface frame states and width");
+    pe_model_style.SetGroupSubtitle("Ink", "title/text state colour");
+    pe_model_style.SetGroupSubtitle("Header", "graph-specific header band colour");
     pe_model_style.SetGroupSubtitle("Shadow", "canonical StyledMetrics shadow path");
     pe_model_style.SetGroupSubtitle("Ports", "painted port presentation, never child controls");
     pe_model_style.StructureChanged();
@@ -366,6 +450,7 @@ void UiGraphDemo::ConnectEvents()
     pe_inspector.WhenCommit = apply_node;
     pe_inspector.WhenCancel = apply_node;
 
+    pe_style.WhenSelection = [=](String id) { SetStylePreviewProperty(id); };
     pe_style.WhenBeginEdit = [=](String id, Value value) { BeginStyleTransaction(id, value); };
     pe_style.WhenPreview = [=](String id, Value value) {
         if(!syncing_editors_) ApplyStyleProperty(id, value);
@@ -399,6 +484,7 @@ void UiGraphDemo::SetScaleMode(bool scale)
 
     CommitStyleTransaction();
     scale_mode_ = scale;
+    style_preview_state_ = ST_NORMAL;
     if(scale) {
         graph_.SetAutoFitOnFirstPaint(false);
         EnsureScaleGraph();
@@ -434,10 +520,12 @@ void UiGraphDemo::SyncSelection()
 {
     Vector<UiGraphNodeRef> selected = graph_.GetSelectedNodes();
     selected_node_ = selected.IsEmpty() ? UiGraphNodeRef() : selected[0];
+    style_preview_state_ = ST_NORMAL;
     SyncNodeEditor();
     SyncStyleEditor();
     UpdateStatus();
     UpdateGeneratedCode();
+    graph_.Refresh();
 }
 
 void UiGraphDemo::SyncNodeEditor()
@@ -491,41 +579,45 @@ void UiGraphDemo::SyncStyleEditor()
         UiGraphNodeStyle style = ResolvePresentedStyle(*node);
         for(int i = 0; i < 4; i++) {
             int si = GraphDemoStyleIndex(i);
-            pe_model_style.SetValue("face." + String(GraphDemoStateId(i)),
-                                    GraphDemoFillColor(style.palette.face[si], White()), false);
-            pe_model_style.SetValue("frame." + String(GraphDemoStateId(i)), style.palette.frame[si], false);
-            pe_model_style.SetValue("ink." + String(GraphDemoStateId(i)), style.title_ink[si], false);
-            pe_model_style.SetValue("header." + String(GraphDemoStateId(i)), style.header_face[si], false);
+            String suffix = GraphDemoStateId(i);
+            String recipe_key = GraphDemoRecipeKey(node->style_class, suffix);
+            int recipe = node->style_class.StartsWith("custom:") ? face_recipes_.Find(recipe_key) : -1;
+            pe_model_style.SetValue("face." + suffix,
+                                    recipe >= 0 ? face_recipes_[recipe]
+                                                : GraphDemoFillRecipe(style.palette.face[si], White()), false);
+            pe_model_style.SetValue("frame." + suffix, style.palette.frame[si], false);
+            pe_model_style.SetValue("ink." + suffix, style.title_ink[si], false);
+            pe_model_style.SetValue("header." + suffix, style.header_face[si], false);
         }
-        pe_model_style.SetValue("frame.enabled", style.metrics.frame_enabled, false);
-        pe_model_style.SetValue("frame.width", style.metrics.frame_width, false);
-        pe_model_style.SetValue("typography.title", max(1, style.title_font.GetHeight()), false);
-        pe_model_style.SetValue("typography.subtitle", max(1, style.subtitle_font.GetHeight()), false);
-        pe_model_style.SetValue("typography.description", max(1, style.description_font.GetHeight()), false);
-        pe_model_style.SetValue("margin.left", style.metrics.content_margin.left, false);
-        pe_model_style.SetValue("margin.top", style.metrics.content_margin.top, false);
-        pe_model_style.SetValue("margin.right", style.metrics.content_margin.right, false);
-        pe_model_style.SetValue("margin.bottom", style.metrics.content_margin.bottom, false);
-        pe_model_style.SetValue("focus.enabled", style.metrics.focus_enabled, false);
-        pe_model_style.SetValue("focus.margin", style.metrics.focus_margin, false);
-        pe_model_style.SetValue("focus.alpha", style.metrics.focus_alpha, false);
-        pe_model_style.SetValue("focus.color", style.metrics.focus_color, false);
-        pe_model_style.SetValue("shadow.enabled", style.metrics.shadow.enabled, false);
-        pe_model_style.SetValue("shadow.distance", style.metrics.shadow.distance, false);
-        pe_model_style.SetValue("shadow.x", style.metrics.shadow.offset_x, false);
-        pe_model_style.SetValue("shadow.y", style.metrics.shadow.offset_y, false);
-        pe_model_style.SetValue("shadow.alpha", style.metrics.shadow.alpha, false);
-        pe_model_style.SetValue("shadow.color", style.metrics.shadow.color, false);
-        pe_model_style.SetValue("shadow.inset", style.metrics.shadow.inset, false);
-        pe_model_style.SetValue("highlight.enabled", style.metrics.highlight.enabled, false);
-        pe_model_style.SetValue("highlight.thickness", style.metrics.highlight.thickness, false);
-        pe_model_style.SetValue("highlight.alpha", style.metrics.highlight.alpha, false);
-        pe_model_style.SetValue("highlight.color", style.metrics.highlight.color, false);
-        pe_model_style.SetValue("ports.radius", style.port_radius, false);
-        pe_model_style.SetValue("ports.hit_radius", style.port_hit_radius, false);
-        pe_model_style.SetValue("ports.spacing", style.port_spacing, false);
-        pe_model_style.SetValue("ports.labels", style.show_port_labels, false);
-        pe_model_style.SetValue("ports.types", style.show_port_type, false);
+        pe_model_style.SetValue("frame_enabled", style.metrics.frame_enabled, false);
+        pe_model_style.SetValue("frame_width", style.metrics.frame_width, false);
+        pe_model_style.SetValue("font_title", max(1, style.title_font.GetHeight()), false);
+        pe_model_style.SetValue("font_subtitle", max(1, style.subtitle_font.GetHeight()), false);
+        pe_model_style.SetValue("font_description", max(1, style.description_font.GetHeight()), false);
+        pe_model_style.SetValue("margin_left", style.metrics.content_margin.left, false);
+        pe_model_style.SetValue("margin_top", style.metrics.content_margin.top, false);
+        pe_model_style.SetValue("margin_right", style.metrics.content_margin.right, false);
+        pe_model_style.SetValue("margin_bottom", style.metrics.content_margin.bottom, false);
+        pe_model_style.SetValue("focus_enabled", style.metrics.focus_enabled, false);
+        pe_model_style.SetValue("focus_margin", style.metrics.focus_margin, false);
+        pe_model_style.SetValue("focus_alpha", style.metrics.focus_alpha, false);
+        pe_model_style.SetValue("focus_color", style.metrics.focus_color, false);
+        pe_model_style.SetValue("shadow_enabled", style.metrics.shadow.enabled, false);
+        pe_model_style.SetValue("shadow_distance", style.metrics.shadow.distance, false);
+        pe_model_style.SetValue("shadow_x", style.metrics.shadow.offset_x, false);
+        pe_model_style.SetValue("shadow_y", style.metrics.shadow.offset_y, false);
+        pe_model_style.SetValue("shadow_alpha", style.metrics.shadow.alpha, false);
+        pe_model_style.SetValue("shadow_color", style.metrics.shadow.color, false);
+        pe_model_style.SetValue("shadow_inset", style.metrics.shadow.inset, false);
+        pe_model_style.SetValue("highlight_enabled", style.metrics.highlight.enabled, false);
+        pe_model_style.SetValue("highlight_thickness", style.metrics.highlight.thickness, false);
+        pe_model_style.SetValue("highlight_alpha", style.metrics.highlight.alpha, false);
+        pe_model_style.SetValue("highlight_color", style.metrics.highlight.color, false);
+        pe_model_style.SetValue("ports_radius", style.port_radius, false);
+        pe_model_style.SetValue("ports_hit_radius", style.port_hit_radius, false);
+        pe_model_style.SetValue("ports_spacing", style.port_spacing, false);
+        pe_model_style.SetValue("ports_labels", style.show_port_labels, false);
+        pe_model_style.SetValue("ports_types", style.show_port_type, false);
     }
     pe_style.RefreshModel();
     syncing_editors_ = false;
@@ -590,11 +682,15 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
     if(!node)
         return;
     UiGraphNodeStyle style = ResolvePresentedStyle(*node);
+    String face_state;
 
     for(int i = 0; i < 4; i++) {
         int si = GraphDemoStyleIndex(i);
         String suffix = GraphDemoStateId(i);
-        if(id == "face." + suffix) style.palette.face[si] = UiFill::Solid(Color(value));
+        if(id == "face." + suffix) {
+            GraphDemoApplyFillRecipe(style.palette.face[si], value);
+            face_state = suffix;
+        }
         else if(id == "frame." + suffix) style.palette.frame[si] = Color(value);
         else if(id == "ink." + suffix) {
             style.title_ink[si] = Color(value);
@@ -605,41 +701,59 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
         else if(id == "header." + suffix) style.header_face[si] = Color(value);
     }
 
-    if(id == "frame.enabled") style.metrics.frame_enabled = (bool)value;
-    else if(id == "frame.width") style.metrics.frame_width = max(0, (int)value);
-    else if(id == "typography.title") style.title_font.Height(max(6, (int)value));
-    else if(id == "typography.subtitle") style.subtitle_font.Height(max(6, (int)value));
-    else if(id == "typography.description") style.description_font.Height(max(6, (int)value));
-    else if(id == "margin.left") style.metrics.content_margin.left = max(0, (int)value);
-    else if(id == "margin.top") style.metrics.content_margin.top = max(0, (int)value);
-    else if(id == "margin.right") style.metrics.content_margin.right = max(0, (int)value);
-    else if(id == "margin.bottom") style.metrics.content_margin.bottom = max(0, (int)value);
-    else if(id == "focus.enabled") style.metrics.focus_enabled = (bool)value;
-    else if(id == "focus.margin") style.metrics.focus_margin = max(0, (int)value);
-    else if(id == "focus.alpha") style.metrics.focus_alpha = minmax((int)value, 0, 255);
-    else if(id == "focus.color") style.metrics.focus_color = Color(value);
-    else if(id == "shadow.enabled") style.metrics.shadow.enabled = (bool)value;
-    else if(id == "shadow.distance") style.metrics.shadow.distance = max(0, (int)value);
-    else if(id == "shadow.x") style.metrics.shadow.offset_x = (int)value;
-    else if(id == "shadow.y") style.metrics.shadow.offset_y = (int)value;
-    else if(id == "shadow.alpha") style.metrics.shadow.alpha = minmax((int)value, 0, 255);
-    else if(id == "shadow.color") style.metrics.shadow.color = Color(value);
-    else if(id == "shadow.inset") style.metrics.shadow.inset = (bool)value;
-    else if(id == "highlight.enabled") style.metrics.highlight.enabled = (bool)value;
-    else if(id == "highlight.thickness") style.metrics.highlight.thickness = max(0, (int)value);
-    else if(id == "highlight.alpha") style.metrics.highlight.alpha = minmax((int)value, 0, 255);
-    else if(id == "highlight.color") style.metrics.highlight.color = Color(value);
-    else if(id == "ports.radius") style.port_radius = max(2, (int)value);
-    else if(id == "ports.hit_radius") style.port_hit_radius = max(4, (int)value);
-    else if(id == "ports.spacing") style.port_spacing = max(8, (int)value);
-    else if(id == "ports.labels") style.show_port_labels = (bool)value;
-    else if(id == "ports.types") style.show_port_type = (bool)value;
+    if(id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
+    else if(id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(id == "font_title") style.title_font.Height(max(6, (int)value));
+    else if(id == "font_subtitle") style.subtitle_font.Height(max(6, (int)value));
+    else if(id == "font_description") style.description_font.Height(max(6, (int)value));
+    else if(id == "margin_left") style.metrics.content_margin.left = max(0, (int)value);
+    else if(id == "margin_top") style.metrics.content_margin.top = max(0, (int)value);
+    else if(id == "margin_right") style.metrics.content_margin.right = max(0, (int)value);
+    else if(id == "margin_bottom") style.metrics.content_margin.bottom = max(0, (int)value);
+    else if(id == "focus_enabled") style.metrics.focus_enabled = (bool)value;
+    else if(id == "focus_margin") style.metrics.focus_margin = max(0, (int)value);
+    else if(id == "focus_alpha") style.metrics.focus_alpha = minmax((int)value, 0, 255);
+    else if(id == "focus_color") style.metrics.focus_color = Color(value);
+    else if(id == "shadow_enabled") style.metrics.shadow.enabled = (bool)value;
+    else if(id == "shadow_distance") style.metrics.shadow.distance = max(0, (int)value);
+    else if(id == "shadow_x") style.metrics.shadow.offset_x = (int)value;
+    else if(id == "shadow_y") style.metrics.shadow.offset_y = (int)value;
+    else if(id == "shadow_alpha") style.metrics.shadow.alpha = minmax((int)value, 0, 255);
+    else if(id == "shadow_color") style.metrics.shadow.color = Color(value);
+    else if(id == "shadow_inset") style.metrics.shadow.inset = (bool)value;
+    else if(id == "highlight_enabled") style.metrics.highlight.enabled = (bool)value;
+    else if(id == "highlight_thickness") style.metrics.highlight.thickness = max(0, (int)value);
+    else if(id == "highlight_alpha") style.metrics.highlight.alpha = minmax((int)value, 0, 255);
+    else if(id == "highlight_color") style.metrics.highlight.color = Color(value);
+    else if(id == "ports_radius") style.port_radius = max(2, (int)value);
+    else if(id == "ports_hit_radius") style.port_hit_radius = max(4, (int)value);
+    else if(id == "ports_spacing") style.port_spacing = max(8, (int)value);
+    else if(id == "ports_labels") style.show_port_labels = (bool)value;
+    else if(id == "ports_types") style.show_port_type = (bool)value;
 
-    EnsureCustomStyle(selected_node_, style);
+    String custom_name = EnsureCustomStyle(selected_node_, style);
+    if(!face_state.IsEmpty()) {
+        String key = GraphDemoRecipeKey(custom_name, face_state);
+        int q = face_recipes_.Find(key);
+        if(q < 0) face_recipes_.Add(key, value);
+        else face_recipes_[q] = value;
+    }
     pe_model_node.SetValue("style_preset", "Custom", false);
     pe_inspector.RefreshValue("style_preset");
     UpdateGeneratedCode();
     UpdateStatus();
+}
+
+void UiGraphDemo::SetStylePreviewProperty(const String& id)
+{
+    int next = ST_NORMAL;
+    if(id.EndsWith(".hot")) next = ST_HOT;
+    else if(id.EndsWith(".selected")) next = ST_PRESSED;
+    else if(id.EndsWith(".disabled")) next = ST_DISABLED;
+    if(style_preview_state_ == next)
+        return;
+    style_preview_state_ = next;
+    graph_.Refresh();
 }
 
 void UiGraphDemo::BeginStyleTransaction(const String&, const Value&)
@@ -662,7 +776,7 @@ void UiGraphDemo::CommitStyleTransaction()
     UpdateGeneratedCode();
 }
 
-void UiGraphDemo::CancelStyleTransaction(const String&, const Value&)
+void UiGraphDemo::CancelStyleTransaction(const String& id, const Value& value)
 {
     if(!style_transaction_active_)
         return;
@@ -674,14 +788,26 @@ void UiGraphDemo::CancelStyleTransaction(const String&, const Value&)
             if(i < 0) custom_styles_.Add(style_transaction_original_class_, style_transaction_original_style_);
             else custom_styles_[i] = style_transaction_original_style_;
             graph_.SetNodeStyleClass(style_transaction_original_class_, style_transaction_original_style_);
+
+            if(id.StartsWith("face.")) {
+                String state = id.Mid(5);
+                String key = GraphDemoRecipeKey(style_transaction_original_class_, state);
+                int q = face_recipes_.Find(key);
+                if(q < 0) face_recipes_.Add(key, value);
+                else face_recipes_[q] = value;
+            }
         }
-        UiGraphNode node = *current;
-        node.style_class = style_transaction_original_class_;
-        graph_.Model().UpdateNode(style_transaction_node_, node);
+        UiGraphNode restored = *current;
+        restored.style_class = style_transaction_original_class_;
+        graph_.Model().UpdateNode(style_transaction_node_, restored);
     }
     if(preview_name != style_transaction_original_class_) {
         int i = custom_styles_.Find(preview_name);
         if(i >= 0) custom_styles_.Remove(i);
+        for(int state = 0; state < 4; state++) {
+            int q = face_recipes_.Find(GraphDemoRecipeKey(preview_name, GraphDemoStateId(state)));
+            if(q >= 0) face_recipes_.Remove(q);
+        }
         graph_.RemoveNodeStyleClass(preview_name);
     }
     style_transaction_active_ = false;
