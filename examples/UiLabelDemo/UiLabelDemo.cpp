@@ -680,8 +680,31 @@ void UiLabelDemo::ApplyTheme()
     pnl_code_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
     lbl_preview_caption.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
     btn_exit.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+    ConfigureModeButton(btn_inspector_mode);
+    ConfigureModeButton(btn_overrides_mode);
+    ConfigureModeButton(btn_code_mode);
     pe_inspector.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     pe_overrides.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+}
+
+void UiLabelDemo::ConfigureModeButton(UiToolButton& button)
+{
+    // Keep a checkable mode button visibly "selected": a blue-tinted face, blue
+    // ink/icon and a 2px accent underline in the checked (pressed) state, with
+    // a lighter face on hover. The rest of the style stays theme-driven.
+    UiToolButton::Style style = button.GetStyle();
+    const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+    const Color accent   = Color(0, 112, 216);
+    const Color selected = dark ? Color(22, 52, 96) : Color(207, 226, 250);
+    const Color hover    = dark ? Color(30, 34, 40) : Color(246, 248, 251);
+    style.palette.face[ST_HOT]     = UiFill::Solid(hover);
+    style.palette.face[ST_PRESSED] = UiFill::Solid(selected);
+    style.palette.ink[ST_PRESSED]  = accent;
+    style.palette.icon[ST_PRESSED] = accent;
+    style.underline = true;
+    style.underline_width = DPI(2);
+    style.underline_offset = DPI(0);
+    button.SetCustomStyle(style);
 }
 
 void UiLabelDemo::Layout()

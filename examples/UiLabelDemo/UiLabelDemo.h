@@ -62,6 +62,7 @@ private:
     void ConnectEvents();
     void ApplyProjection();
     void ApplyTheme();
+    void ConfigureModeButton(UiToolButton& button);
     void UpdateOverrideSummaries();
     void UpdateGeneratedCode();
     void SelectPage(int page);
