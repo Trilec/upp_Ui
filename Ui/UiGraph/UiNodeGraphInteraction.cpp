@@ -228,17 +228,33 @@ void UiNodeGraph::CommitMarquee(dword flags)
 {
     if(interaction_ != InteractionMode::Marquee)
         return;
+
     bool additive = multi_selection_ && HasSelectionModifier(flags);
     if(!additive) {
         selected_nodes_.Clear();
         selected_edges_.Clear();
     }
-    for(int i = 0; i < node_geometry_.GetCount(); i++) {
-        const NodeGeometry& g = node_geometry_[i];
-        const UiGraphNode* node = model_ ? model_->FindNode(g.ref) : nullptr;
-        if(node && node->selectable && !(marquee_ & g.rect).IsEmpty())
-            selected_nodes_.FindAdd(g.ref.id);
+
+    // Dragging the marquee is overlay-only. Selection work happens once here,
+    // on mouse-up, by querying the same world-space index used by viewport
+    // culling. This keeps selection release proportional to the covered cells,
+    // not to prepared geometry or total model size.
+    if(model_ && !marquee_.IsEmpty()) {
+        EnsureSpatialIndex();
+        WorldRect area;
+        area.Include(ScreenToWorld(marquee_.TopLeft()));
+        area.Include(ScreenToWorld(marquee_.BottomRight()));
+        Index<UiGraphId> nodes;
+        Index<UiGraphId> edges;
+        QuerySpatial(area, nodes, edges);
+        for(int i = 0; i < nodes.GetCount(); i++) {
+            UiGraphNodeRef ref{nodes[i]};
+            const UiGraphNode* node = model_->FindNode(ref);
+            if(node && node->selectable)
+                selected_nodes_.FindAdd(ref.id);
+        }
     }
+
     marquee_ = Rect(0, 0, 0, 0);
     interaction_ = InteractionMode::None;
     ReleaseInteractionCapture();
