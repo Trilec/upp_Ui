@@ -325,15 +325,20 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
         graph.MouseMove(end, 0);
         t.Expect(graph.GetGeometryBuildSerial() == marquee_geometry
                  && graph.GetSpatialBuildSerial() == marquee_spatial,
-                 "marquee drag at zoom 0.5 performs overlay damage only with no geometry/spatial rebuild");
+                 "marquee drag at zoom 0.5 queries preview cells without rebuilding geometry or the spatial index");
+        int preview = graph.GetMarqueePreviewNodeCount();
+        t.Expect(preview > 0 && preview < 200
+                 && graph.GetLastMarqueeCandidateCount() < 240,
+                 "marquee preview remains a bounded transient spatial candidate set");
         graph.LeftUp(end, 0);
         int selected = graph.GetSelectedNodes().GetCount();
-        t.Expect(selected > 0 && selected < 200
+        t.Expect(selected == preview && selected > 0
                  && graph.GetSpatialBuildSerial() == marquee_spatial,
-                 "marquee release resolves a local selection through retained spatial cells without rebuilding the index");
+                 "marquee release commits the cached spatial preview without a second index rebuild/query path");
     }
     else {
         t.Expect(false, "marquee drag invariant could not be exercised");
+        t.Expect(false, "marquee preview invariant could not be exercised");
         t.Expect(false, "marquee release invariant could not be exercised");
     }
 
