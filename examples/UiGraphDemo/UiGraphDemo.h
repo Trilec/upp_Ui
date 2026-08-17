@@ -53,6 +53,7 @@ private:
     void SyncStyleEditor();
     void ApplyNodeProperty(const String& id, const Value& value);
     void ApplyStyleProperty(const String& id, const Value& value);
+    void SetStylePreviewProperty(const String& id);
 
     void BeginStyleTransaction(const String& id, const Value& value);
     void CommitStyleTransaction();
@@ -101,6 +102,7 @@ private:
     UiGraphNodeRef selected_node_;
     bool scale_mode_ = false;
     bool syncing_editors_ = false;
+    int style_preview_state_ = ST_NORMAL;
 
     bool style_transaction_active_ = false;
     UiGraphNodeRef style_transaction_node_;
