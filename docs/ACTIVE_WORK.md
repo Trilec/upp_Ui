@@ -4,7 +4,40 @@ Remote GitHub is authoritative. Never force-update `main`. Work directly from re
 
 ## CURRENT SUPERVISORY STATE — 2026-08-17
 
-STATUS: **UIGRAPH CORRECTIVE SOURCE IMPLEMENTED — WINDOWS VALIDATION PENDING; UI LABEL REFERENCE ACCEPTED; FOUR-CONTROL SOURCE WORK COMPLETE.**
+STATUS: **UIGRAPH SPATIAL INTERACTION R2 IN PROGRESS — MARQUEE PREVIEW PUBLISHED; BATCH COALESCING NEXT; WINDOWS VALIDATION PENDING; UI LABEL REFERENCE ACCEPTED; FOUR-CONTROL SOURCE WORK COMPLETE.**
+
+### UiGraph spatial-interaction continuation — 2026-08-17
+
+BASE: `5ff17bdf2d365fbf95d172690f1c1f7fc30e0e1a` (`main` at this continuation refresh).
+
+TASK: `UI-NODEGRAPH-SPATIAL-INTERACTION-R2` — finish the retained spatial-hash interaction path with transient marquee feedback and coalesced view/spatial updates for multi-node graph mutations.
+
+PUBLISHED:
+
+- `f85751adb4620776bdb34e0128fb035ee3ed5a06` — transient marquee candidate cache. Marquee movement queries the existing world-space hash, keeps semantic selection unchanged, damages only changed preview nodes/rectangle, and mouse-up commits the cached IDs without a second spatial query.
+
+STATUS: **PARTIAL — first R2 slice published and verified; visual preview overlay + UiNodeGraph batch-update scope remain in implementation.**
+
+TOUCHED SO FAR:
+
+- `Ui/UiGraph/UiNodeGraph.h`
+- `Ui/UiGraph/UiNodeGraphInteraction.cpp`
+- `Utilities/UiNodeGraphScaleTest/main.cpp`
+- `docs/ACTIVE_WORK.md`
+
+DETERMINISTIC CONTRACT SO FAR:
+
+- `UiNodeGraphScaleTest` expected total is now **45 checks / 0 failures** before the forthcoming batch tests are added;
+- zoom-0.5 marquee movement may query spatial cells for transient preview IDs but must not rebuild prepared geometry or the spatial index;
+- preview candidates remain locally bounded and are not semantic selection until mouse-up;
+- mouse-up commits the cached preview rather than querying the graph again.
+
+NEXT ACTION:
+
+1. paint preview-only nodes with a lightweight shape-path overlay while keeping committed selection as the independent 2px overlay;
+2. add nested `UiNodeGraph::BeginBatchUpdate()/EndBatchUpdate()` coalescing for authoritative `graph.Model()` mutations and route internal multi-node move/delete operations through it;
+3. extend the 10k test to prove batch mutations cause no spatial/geometry work until outer commit, no full spatial rebuild, and one prepared-geometry pass;
+4. update this recovery log again and only then hand the final documented `main` descendant to Gary.
 
 The previous long-form convergence/Label/UiGraph record is preserved verbatim in `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`. Task-specific four-control detail is retained in `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`.
 
@@ -127,7 +160,7 @@ SOURCE RESULT:
 
 DETERMINISTIC SCALE CONTRACT:
 
-- `Utilities/UiNodeGraphScaleTest` now expects **44 checks / 0 failures**;
+- `Utilities/UiNodeGraphScaleTest` now expects **44 checks / 0 failures** at the R1 baseline; R2 raises this as documented above;
 - 10,000 nodes / 19,800 bounded-neighbour edges remain the fixture;
 - paint visit counts are required to be <= bounded prepared counts because dirty-region spatial painting can visit less than the full prepared viewport;
 - at zoom 0.5, repeated marquee MouseMove must leave both geometry and spatial build serials unchanged;
@@ -135,25 +168,18 @@ DETERMINISTIC SCALE CONTRACT:
 - double-click must reduce an existing multi-selection to the double-clicked node only;
 - zoom-0.5 hover must resolve a tiny spatial pointer neighbourhood (`node hit candidates < 24`, `port hit candidates < 32`) without rebuilding the spatial index.
 
-VALIDATION: source-reviewed architecture; **no Windows/U++ PASS claimed yet**. The prior acceptance remains STOPPED until Gary reruns the focused graph gates on a final documented `main` descendant containing `3dab24cefdc64650fd83d99781c31a508bbc79f6`.
+VALIDATION: source-reviewed architecture; **no Windows/U++ PASS claimed yet**. The prior acceptance remains STOPPED until Gary reruns the focused graph gates on the final documented R2 `main` descendant.
 
-BOUNDARY / DEFERRED BY DESIGN:
+BOUNDARY / DEFERRED BY DESIGN AT R1:
 
 - no second spatial tree or hover-region cache is added; the current hash query is intentionally the simplest broad phase until profiling demonstrates otherwise;
-- no model-wide batch API is introduced in this corrective. Multi-node paste/layout/delete coalescing is a separate model-notification design and must not be smuggled into the acceptance fix;
+- the prior no-batch deferral is superseded by active R2: a UiNodeGraph view-side coalescing scope is now explicitly in implementation, while shared UiDataModelBase notification semantics remain unchanged;
 - public `HitTestNode/Port/Edge` remain compatibility helpers over the bounded prepared viewport; production live mouse interaction uses the spatial helpers directly;
-- custom/non-rectangular image-backed Face recipes and deeper prepared-geometry style micro-invalidation are not required to close the reported Windows blockers and should be treated as separate renderer enhancements if future visual/performance evidence justifies them.
-
-NEXT ACTION:
-
-1. Gary pulls current `main` and confirms `3dab24cefdc64650fd83d99781c31a508bbc79f6` is an ancestor of HEAD.
-2. Build/run UiGraphTest Debug + Release, UiNodeGraphScaleTest Debug + Release (**44/0**), UiDataModelsTest Debug, and UiGraphDemo Debug + Release.
-3. Recheck the original manual blockers: live FillRecipe/color preview, consistent 2px selection outline on every standard shape, sole double-click selection, smooth translucent marquee at zoom 0.5, spatially bounded pointer candidate counts, pan regression and 10k mode.
-4. Stop on any substantive runtime/rendering/model failure; only obvious mechanical Windows build fixes may be committed during validation.
+- custom/non-rectangular image-backed Face recipes and deeper prepared-geometry style micro-invalidation are not required to close the reported Windows blockers and remain separate renderer enhancements.
 
 ## NEXT
 
-1. Complete the active UiGraph Windows gate before treating the earlier UiGraph acceptance as closed.
+1. Finish the R2 visual-preview and batch-coalescing slice, update this log, then run the active UiGraph Windows gate before treating UiGraph acceptance as closed.
 2. Complete the four-control Windows gates above and source-review any genuinely mechanical platform correction before publishing it.
 3. Remove stale temporary/Label branches only after comparing each tip to current `main`; the accidental `DO_NOT_USE` branch contains no useful work and is safe to delete.
 4. Continue remaining control normalization from the same documented convention rather than introducing a new parallel schema framework.

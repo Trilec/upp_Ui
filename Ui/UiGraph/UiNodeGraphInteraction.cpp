@@ -209,6 +209,8 @@ void UiNodeGraph::BeginMarquee(Point p)
     interaction_ = InteractionMode::Marquee;
     press_point_ = last_point_ = p;
     marquee_ = Rect(p, p);
+    marquee_preview_nodes_.Clear();
+    last_marquee_candidate_count_ = 0;
     AcquireInteractionCapture();
     RefreshDamage(RectC(p.x - DPI(3), p.y - DPI(3), DPI(7), DPI(7)));
 }
@@ -217,11 +219,57 @@ void UiNodeGraph::UpdateMarquee(Point p)
 {
     if(interaction_ != InteractionMode::Marquee)
         return;
+
     Rect old = marquee_;
     last_point_ = p;
     marquee_ = Rect(min(press_point_.x, p.x), min(press_point_.y, p.y),
                     max(press_point_.x, p.x) + 1, max(press_point_.y, p.y) + 1);
-    RefreshDamage((old | marquee_).Inflated(DPI(3)));
+
+    Rect damage = (old | marquee_).Inflated(DPI(3));
+    Index<UiGraphId> next_preview;
+    last_marquee_candidate_count_ = 0;
+
+    // Preview is broad-phase only: query the same retained world-space cells as
+    // viewport culling and cache selectable node IDs. No semantic selection or
+    // prepared geometry is changed while the pointer moves.
+    if(model_ && !marquee_.IsEmpty()) {
+        EnsureSpatialIndex();
+        WorldRect area;
+        area.Include(ScreenToWorld(marquee_.TopLeft()));
+        area.Include(ScreenToWorld(marquee_.BottomRight()));
+        Index<UiGraphId> nodes;
+        Index<UiGraphId> edges;
+        QuerySpatial(area, nodes, edges);
+        last_marquee_candidate_count_ = nodes.GetCount();
+        for(int i = 0; i < nodes.GetCount(); i++) {
+            UiGraphNodeRef ref{nodes[i]};
+            const UiGraphNode* node = model_->FindNode(ref);
+            if(node && node->selectable)
+                next_preview.FindAdd(ref.id);
+        }
+    }
+
+    for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
+        UiGraphId id = marquee_preview_nodes_[i];
+        if(next_preview.Find(id) < 0) {
+            const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{id});
+            if(g)
+                damage |= g->paint_bounds.Inflated(DPI(3));
+        }
+    }
+    for(int i = 0; i < next_preview.GetCount(); i++) {
+        UiGraphId id = next_preview[i];
+        if(marquee_preview_nodes_.Find(id) < 0) {
+            const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{id});
+            if(g)
+                damage |= g->paint_bounds.Inflated(DPI(3));
+        }
+    }
+
+    marquee_preview_nodes_.Clear();
+    for(int i = 0; i < next_preview.GetCount(); i++)
+        marquee_preview_nodes_.Add(next_preview[i]);
+    RefreshDamage(damage);
 }
 
 void UiNodeGraph::CommitMarquee(dword flags)
@@ -235,26 +283,19 @@ void UiNodeGraph::CommitMarquee(dword flags)
         selected_edges_.Clear();
     }
 
-    // Dragging the marquee is overlay-only. Selection work happens once here,
-    // on mouse-up, by querying the same world-space index used by viewport
-    // culling. This keeps selection release proportional to the covered cells,
-    // not to prepared geometry or total model size.
-    if(model_ && !marquee_.IsEmpty()) {
-        EnsureSpatialIndex();
-        WorldRect area;
-        area.Include(ScreenToWorld(marquee_.TopLeft()));
-        area.Include(ScreenToWorld(marquee_.BottomRight()));
-        Index<UiGraphId> nodes;
-        Index<UiGraphId> edges;
-        QuerySpatial(area, nodes, edges);
-        for(int i = 0; i < nodes.GetCount(); i++) {
-            UiGraphNodeRef ref{nodes[i]};
+    // UpdateMarquee already resolved the final rectangle through the retained
+    // spatial hash. Commit those cached IDs directly so mouse-up performs no
+    // second graph query and preview never becomes a parallel semantic store.
+    if(model_)
+        for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
+            UiGraphNodeRef ref{marquee_preview_nodes_[i]};
             const UiGraphNode* node = model_->FindNode(ref);
             if(node && node->selectable)
                 selected_nodes_.FindAdd(ref.id);
         }
-    }
 
+    marquee_preview_nodes_.Clear();
+    last_marquee_candidate_count_ = 0;
     marquee_ = Rect(0, 0, 0, 0);
     interaction_ = InteractionMode::None;
     ReleaseInteractionCapture();
@@ -347,8 +388,9 @@ void UiNodeGraph::MiddleUp(Point, dword)
 
 void UiNodeGraph::MouseMove(Point p, dword)
 {
-    // Active interactions own their geometry/update path. In particular,
-    // marquee movement is overlay-only and must not touch prepared geometry.
+    // Active interactions own their geometry/update path. Marquee movement may
+    // query spatial cells for transient preview IDs, but must never rebuild the
+    // spatial index, prepared geometry, or semantic selection.
     if(interaction_ == InteractionMode::NodeDrag) {
         UpdateNodeDrag(p);
         return;
@@ -484,6 +526,13 @@ void UiNodeGraph::CancelMode()
         EndPan();
     else if(interaction_ == InteractionMode::Marquee) {
         Rect old = marquee_;
+        for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
+            const NodeGeometry* g = FindNodeGeometry(UiGraphNodeRef{marquee_preview_nodes_[i]});
+            if(g)
+                old |= g->paint_bounds.Inflated(DPI(3));
+        }
+        marquee_preview_nodes_.Clear();
+        last_marquee_candidate_count_ = 0;
         marquee_ = Rect(0, 0, 0, 0);
         interaction_ = InteractionMode::None;
         RefreshDamage(old.Inflated(DPI(3)));

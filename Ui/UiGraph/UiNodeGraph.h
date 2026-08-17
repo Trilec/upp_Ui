@@ -41,6 +41,8 @@
       geometry and read-only scale instrumentation for 10,000-node workloads.
     - 2026-08: made left-button capture release explicitly owned and
       re-entrancy safe while keeping middle-button panning capture-free.
+    - 2026-08: added transient spatial marquee preview state without turning
+      preview membership into semantic selection or prepared geometry state.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -263,6 +265,8 @@ public:
     int GetLastNodeHitCandidateCount() const { return last_node_hit_candidate_count_; }
     int GetLastPortHitCandidateCount() const { return last_port_hit_candidate_count_; }
     int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
+    int GetLastMarqueeCandidateCount() const { return last_marquee_candidate_count_; }
+    int GetMarqueePreviewNodeCount() const { return marquee_preview_nodes_.GetCount(); }
     int GetAttachedNodeCtrlCount() const { return node_ctrls_.GetCount(); }
 
     virtual void SetData(const Value& v) override;
@@ -515,6 +519,7 @@ private:
     mutable int last_node_hit_candidate_count_ = 0;
     mutable int last_port_hit_candidate_count_ = 0;
     mutable int last_edge_hit_candidate_count_ = 0;
+    int last_marquee_candidate_count_ = 0;
 
     Index<UiGraphId> selected_nodes_;
     Index<UiGraphId> selected_edges_;
@@ -537,6 +542,7 @@ private:
     Point last_point_;
     Pointf pan_at_press_;
     Rect marquee_;
+    Index<UiGraphId> marquee_preview_nodes_;
     UiGraphNodeRef pressed_node_;
     UiGraphPortRef connection_source_;
     UiGraphPortRef connection_target_;
