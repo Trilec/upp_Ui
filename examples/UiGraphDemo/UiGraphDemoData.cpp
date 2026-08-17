@@ -53,6 +53,63 @@ uint32 GraphDemoMix(uint32 value)
     return value;
 }
 
+void GraphDemoPastelPalette(const UiGraphNode& node, UiGraphNodeStyle& style)
+{
+    bool dark = UiThemeDetail::ResolveEffectiveMode(UiTheme::GetContext().mode) == UiThemeMode::Dark;
+    Color face, frame, header;
+
+    if(!dark) {
+        switch(node.role) {
+        case UiGraphNodeRole::Subtle:
+            face = Color(245, 248, 250); frame = Color(190, 201, 209); header = Color(236, 242, 245); break;
+        case UiGraphNodeRole::Accent:
+            face = Color(239, 246, 255); frame = Color(157, 184, 218); header = Color(228, 239, 253); break;
+        case UiGraphNodeRole::Alert:
+            face = Color(255, 244, 246); frame = Color(218, 171, 179); header = Color(252, 232, 236); break;
+        case UiGraphNodeRole::Standard:
+        default:
+            face = Color(248, 250, 252); frame = Color(184, 196, 210); header = Color(239, 244, 248); break;
+        }
+        style.palette.face[ST_NORMAL] = UiFill::Solid(face);
+        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 72));
+        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 28));
+        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(238, 241, 245), 112));
+        style.palette.frame[ST_NORMAL] = frame;
+        style.palette.frame[ST_HOT] = Blend(frame, Color(91, 126, 168), 68);
+        style.palette.frame[ST_PRESSED] = Blend(frame, Color(70, 105, 150), 96);
+        style.palette.frame[ST_DISABLED] = Blend(frame, Color(218, 224, 231), 132);
+        style.header_face[ST_NORMAL] = header;
+        style.header_face[ST_HOT] = Blend(header, White(), 56);
+        style.header_face[ST_PRESSED] = Blend(header, frame, 30);
+        style.header_face[ST_DISABLED] = Blend(header, face, 110);
+    }
+    else {
+        switch(node.role) {
+        case UiGraphNodeRole::Subtle:
+            face = Color(38, 45, 49); frame = Color(83, 100, 106); header = Color(45, 52, 56); break;
+        case UiGraphNodeRole::Accent:
+            face = Color(40, 50, 65); frame = Color(92, 122, 158); header = Color(46, 59, 78); break;
+        case UiGraphNodeRole::Alert:
+            face = Color(61, 44, 48); frame = Color(151, 101, 110); header = Color(73, 50, 55); break;
+        case UiGraphNodeRole::Standard:
+        default:
+            face = Color(42, 47, 55); frame = Color(93, 104, 119); header = Color(49, 55, 64); break;
+        }
+        style.palette.face[ST_NORMAL] = UiFill::Solid(face);
+        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, frame, 38));
+        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 62));
+        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(32, 35, 40), 104));
+        style.palette.frame[ST_NORMAL] = frame;
+        style.palette.frame[ST_HOT] = Blend(frame, Color(160, 178, 200), 48);
+        style.palette.frame[ST_PRESSED] = Blend(frame, Color(174, 192, 214), 72);
+        style.palette.frame[ST_DISABLED] = Blend(frame, Color(63, 70, 80), 116);
+        style.header_face[ST_NORMAL] = header;
+        style.header_face[ST_HOT] = Blend(header, frame, 34);
+        style.header_face[ST_PRESSED] = Blend(header, frame, 52);
+        style.header_face[ST_DISABLED] = Blend(header, face, 112);
+    }
+}
+
 } // namespace
 
 void UiGraphDemo::BuildReferenceGraph()
@@ -197,8 +254,6 @@ void UiGraphDemo::EnsureScaleGraph()
             int i = y * width + x;
             uint32 mixed = GraphDemoMix((uint32)i + 1U);
             UiGraphNode node;
-            // Keep the external showcase model in its own stable-id range so
-            // selected-node custom style names cannot alias the internal demo model.
             node.ref.id = scale_id_base + i + 1;
             node.title = Format("%d", i);
             node.position = Pointf(x * 92.0, y * 72.0);
@@ -243,9 +298,13 @@ void UiGraphDemo::EnsureScaleGraph()
 void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& style) const
 {
     const String& preset = node.style_class;
-    if(preset.IsEmpty() || preset.StartsWith("custom:"))
+    if(preset.StartsWith("custom:"))
         return;
 
+    GraphDemoPastelPalette(node, style);
+
+    if(preset.IsEmpty())
+        return;
     if(preset == "soft") {
         style.metrics.shadow.enabled = true;
         style.metrics.shadow.distance = DPI(4);
