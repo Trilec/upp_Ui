@@ -49,7 +49,8 @@ int CanonicalOrder(const String& id)
         "highlight_enabled", "highlight_thickness", "highlight_x", "highlight_y",
         "highlight_alpha", "highlight_color", "highlight_style"
     };
-    for(int i = 0; i < __countof(ids); i++)
+    const int count = int(sizeof(ids) / sizeof(ids[0]));
+    for(int i = 0; i < count; i++)
         if(id == ids[i])
             return i;
     return -1;
