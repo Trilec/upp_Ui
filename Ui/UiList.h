@@ -129,6 +129,7 @@ public:
               % show_icons % show_checks % show_metadata_marker % show_drag_handle
               % drag_side % drag_glyph
               % hot_as_underline % selected_as_underline % state_underline_thickness
+              % striped_rows
               % ink % disabled_ink % muted_ink
               % hot_face % hot_frame % hot_ink
               % selected_face % selected_frame % selected_ink

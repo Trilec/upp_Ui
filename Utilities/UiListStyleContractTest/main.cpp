@@ -92,6 +92,16 @@ CONSOLE_APP_MAIN
               !frameless.metrics.frame_enabled,
           "disabled row-state frames remain genuinely frameless");
 
+    StringStream stored;
+    style.Serialize(stored);
+    UiList::Style restored = UiList::StyleDefault();
+    StringStream loading(stored.GetResult());
+    restored.Serialize(loading);
+    Check(restored.striped_rows == style.striped_rows &&
+              restored.row_even_face == style.row_even_face &&
+              restored.row_odd_face == style.row_odd_face,
+          "List striped-row style survives serialization round trip");
+
     Cout() << "UILIST_STYLE_CONTRACT_SUMMARY checks=" << checks
            << " failed=" << failed << '\n';
     SetExitCode(failed ? 1 : 0);
