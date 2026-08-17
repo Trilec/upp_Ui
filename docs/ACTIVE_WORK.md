@@ -260,3 +260,49 @@ Cross-repository Designer reference checkpoint:
 - Skin is intentionally not exposed in Designer yet because theme-adapter preview has no document resource resolver. Treat any fake raw-path Skin implementation as a regression, not a fix.
 
 If a substantive ownership, lifecycle, notification, rendering or document-state failure appears, stop and return it to implementation. Do not edit source, weaken tests or restore retired model accessors during validation.
+
+## UI-NODEGRAPH-SCALE-R1
+
+BASE: `c07ae7f273ec1712be5a381a05d137a08775decd` — current `main` immediately before Graph promotion; its Label acceptance audit was preserved unchanged.
+
+PUBLISHED: `f5069a2bd95a3002eb020e5739a85dc0b1866764` — reviewed Graph code/test/demo promotion onto current `main`.
+
+STATUS: **IMPLEMENTATION + SOURCE REVIEW COMPLETE — WINDOWS U++ VALIDATION PENDING.**
+
+TOUCHED:
+- `Ui/Ui.upp`
+- `Ui/UiGraph/UiGraphModel.h/.cpp`
+- `Ui/UiGraph/UiNodeGraph.h/.cpp`
+- `Ui/UiGraph/UiNodeGraphSpatial.cpp`
+- `Ui/UiGraph/UiNodeGraphInteraction.cpp`
+- `Utilities/UiNodeGraphScaleTest/`
+- `examples/UiGraphDemo/`
+
+SOURCE RESULT:
+- retained per-node edge adjacency makes ordinary incident/port/connection work local-degree based;
+- retained world-space spatial hashing bounds ordinary viewport preparation, paint and hit testing to relevant candidates;
+- pan/zoom and live node-style-class editing reuse the world spatial index rather than rebuilding the 10,000-node scene;
+- Paint consumes prepared geometry; explicit whole-graph operations remain intentionally O(N);
+- generic authored node size is `64x44`; compact LOD retains shape/title/ports and richer explicit nodes retain secondary content;
+- `FitToGraph()` may zoom out but never auto-enlarges above authored 1:1;
+- edges/labels paint below node surfaces/content; current vector rendering remains antialiased and backend-neutral for future OpenGL/Vulkan work;
+- middle-button pan is capture-free and left-button capture release is explicitly owned/re-entrancy safe;
+- no Ctrl-per-node path was introduced; externally owned child controls remain exceptional node content only.
+
+FOCUSED SCALE TEST:
+- deterministic 10,000 nodes + 19,800 nearest-neighbour edges;
+- deterministic variation across standard shapes, semantic roles and reusable style classes;
+- bounded prepared/paint/hit work, deep navigation, local spatial mutation, pan/zoom reuse, live style-preview reuse, model switching and active-only `ClearModel()`;
+- small-graph fit asserts exactly 1.0 rather than auto-enlargement;
+- exact emitted check count must be reported by Windows validation; zero failures required.
+
+DEMO:
+- canonical UiLabel-style PropertyEditor shell with Reference / 10k modes;
+- Reference mode uses the retained internal graph model and demonstrates all standard shapes, route families, arrow/stroke variants, waypoints, roles/presets and two externally owned embedded controls;
+- 10k mode binds a separate external model with high explicit stable IDs, deterministic visual variety and 19,800 bounded edges;
+- Inspector writes selected-node state through `graph.Model().UpdateNode(...)`; PropertyEditor is not a parallel node store;
+- Style page authors real UiNodeGraph presentation state; status exposes model/prepared/candidate counts and zoom.
+
+VALIDATION: source/static review complete; Windows U++/CLANGx64 compile/runtime pending. No platform PASS is claimed.
+
+NEXT ACTION: run the focused Graph Windows validation on current `main`; if accepted, delete the obsolete `agent/uigraph-scale-hardening` branch. Small mechanical U++/Windows fixes are allowed; architecture/model/spatial/public-API/test-weakening changes are not.
