@@ -1,4 +1,5 @@
 #include <Ui/UiListRenderStyle.h>
+#include <Ui/UiIcons.h>
 
 using namespace Upp;
 
