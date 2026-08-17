@@ -112,6 +112,19 @@ bool FindAnyPortAtNode(UiNodeGraph& graph, const UiGraphNode& node)
     return false;
 }
 
+Point FindBlankPoint(UiNodeGraph& graph)
+{
+    for(int y = 36; y < 760; y += 8)
+        for(int x = 36; x < 1160; x += 8) {
+            Point p(x, y);
+            if(!graph.HitTestPort(p).IsValid() &&
+               !graph.HitTestNode(p).IsValid() &&
+               !graph.HitTestEdge(p).IsValid())
+                return p;
+        }
+    return Point(-1, -1);
+}
+
 void RunModelScale(TestCtx& t, UiGraphModel& model, Vector<UiGraphNodeRef>& nodes)
 {
     const int width = 100;
@@ -221,15 +234,15 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     graph.Paint(draw);
     t.Expect(graph.GetGeometryBuildSerial() == geometry_before_paint,
              "Paint consumes prepared graph geometry without rebuilding it");
-    t.Expect(graph.GetLastPaintNodeVisitCount() == graph.GetPreparedNodeCount()
+    t.Expect(graph.GetLastPaintNodeVisitCount() <= graph.GetPreparedNodeCount()
              && graph.GetLastPaintNodeVisitCount() < 600,
-             "Paint considers only the bounded prepared node set");
-    t.Expect(graph.GetLastPaintEdgeVisitCount() == graph.GetPreparedEdgeCount()
+             "Paint visits only dirty/spatial node candidates within the bounded prepared set");
+    t.Expect(graph.GetLastPaintEdgeVisitCount() <= graph.GetPreparedEdgeCount()
              && graph.GetLastPaintEdgeVisitCount() < 2200,
-             "Paint considers only the bounded prepared edge set");
+             "Paint visits only dirty/spatial edge candidates within the bounded prepared set");
     t.Expect(graph.GetLastPaintedNodeCount() <= graph.GetLastPaintNodeVisitCount()
              && graph.GetLastPaintedEdgeCount() <= graph.GetLastPaintEdgeVisitCount(),
-             "viewport clipping can only reduce work after spatial candidate preparation");
+             "dirty clipping can only reduce work after spatial candidate preparation");
 
     UiGraphNodeRef deep = nodes.Top();
     const UiGraphNode* deep_node = model.FindNode(deep);
@@ -282,6 +295,45 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     graph.Paint(draw);
     t.Expect(graph.GetGeometryBuildSerial() == geometry_before_paint,
              "repeated Paint after pan/zoom remains geometry-read-only");
+
+    UiGraphNodeRef centre = nodes[50 * 100 + 50];
+    const UiGraphNode* centre_node = model.FindNode(centre);
+    ASSERT(centre_node);
+    graph.SetZoom(0.5, Point(600, 400));
+    graph.CenterOnNode(centre);
+    graph.ClearSelection();
+    Point blank = FindBlankPoint(graph);
+    t.Expect(blank.x >= 0 && blank.y >= 0,
+             "0.5 zoom viewport exposes a blank point suitable for marquee interaction");
+    if(blank.x >= 0) {
+        Point end(min(1160, blank.x + 240), min(760, blank.y + 160));
+        int marquee_geometry = graph.GetGeometryBuildSerial();
+        int marquee_spatial = graph.GetSpatialBuildSerial();
+        graph.LeftDown(blank, 0);
+        graph.MouseMove(Point((blank.x + end.x) / 2, (blank.y + end.y) / 2), 0);
+        graph.MouseMove(end, 0);
+        t.Expect(graph.GetGeometryBuildSerial() == marquee_geometry
+                 && graph.GetSpatialBuildSerial() == marquee_spatial,
+                 "marquee drag at zoom 0.5 performs overlay damage only with no geometry/spatial rebuild");
+        graph.LeftUp(end, 0);
+        int selected = graph.GetSelectedNodes().GetCount();
+        t.Expect(selected > 0 && selected < 200
+                 && graph.GetSpatialBuildSerial() == marquee_spatial,
+                 "marquee release resolves a local selection through retained spatial cells without rebuilding the index");
+    }
+    else {
+        t.Expect(false, "marquee drag invariant could not be exercised");
+        t.Expect(false, "marquee release invariant could not be exercised");
+    }
+
+    UiGraphNodeRef neighbour = nodes[50 * 100 + 51];
+    graph.SelectNode(centre);
+    graph.SelectNode(neighbour, true);
+    Point centre_hit = graph.WorldToScreen(centre_node->position + Pointf(centre_node->size.cx * 0.5,
+                                                                           centre_node->size.cy * 0.5));
+    graph.LeftDouble(centre_hit, 0);
+    t.Expect(graph.GetSelectedNodes().GetCount() == 1 && graph.IsNodeSelected(centre),
+             "double-click clears prior selection and leaves only the double-clicked node selected");
 
     UiGraphModel external_b;
     external_b.AddNode("External B", Pointf(5000, 5000), Sizef(64, 44));
