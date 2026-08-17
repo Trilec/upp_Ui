@@ -26,14 +26,15 @@ TOUCHED:
 - `docs/ACTIVE_WORK.md`
 - cross-repository consumer: `Trilec/upp_uidesigner` dedicated Label theme adapter + focused test/coverage note.
 
-STATUS: **REFERENCE IMPLEMENTATION PUBLISHED — WINDOWS VALIDATION PENDING.**
+STATUS: **LABEL REFERENCE ACCEPTED — INTERACTIVE DESIGNER QUADGRADIENT RESELECTION SMOKE DEFERRED.**
 
 PUBLISHED:
 
 - `5a51d6d682710db8c5d20822f552749f7743c439` — canonical PropertyEditor override layout and paint-layer reference.
 - `564e42c9c4906f59c3d91da0d64bfffab021eee1` — UiLabel demo includes the canonical override layout normalizer.
 - `0b63f9cb5483e68a5fc0518cce0a54119ce25757` — PropertyEditor honors stable `sort_order`; UiLabel uses canonical display ordering; focused sort-order test published.
-- cross-repository Designer reference head at this checkpoint: `Trilec/upp_uidesigner` `155e51eb696537f8ac6a8a3af1629d2278513f66`.
+- `8a016656651fb929c08ac1c2f801a6b8c2f2ab77` — UiLabelDemo selected mode button styling published after Windows validation.
+- cross-repository Designer accepted head: `Trilec/upp_uidesigner` `59cb685219dc94bcad8d8cba82d1acc7528c6836`.
 
 SOURCE REVIEW:
 
@@ -48,14 +49,26 @@ SOURCE REVIEW:
 - `PropertyEditorItem::sort_order` is now the stable presentation-order authority. `PropertyEditorModel::Add()` already defaults it to insertion order, so existing models retain their prior order unless they intentionally assign another value;
 - UiLabel no longer depends on interleaved construction order for display. Its normalizer assigns the documented General -> Face -> Face/Skin -> Frame -> Ink -> Icon -> Typography -> Content Margin -> Focus -> Shadow -> Highlight order without copying or replacing model items;
 - UiDesigner is a consumer of this convention. Its dedicated `label` adapter mirrors the non-resource Label groups and uses `PropertyEditorKind::FillRecipe` for Face states, preserving authored Solid/QuadGradient recipes through preview resolution and generated C++;
-- Designer Skin image editing remains explicitly deferred until the theme-adapter preview contract can resolve `UiDesignerDocument::resources`. Do not fake a Skin image row before that resource-aware contract exists.
+- Designer Skin image editing remains explicitly deferred until the theme-adapter preview contract can resolve `UiDesignerDocument::resources`. Do not fake a Skin image row before that resource-aware contract exists;
+- Designer commit `59cb685...` was source-reviewed as a mechanical migration only: four Preview accesses plus matching Tree/List test assertions changed from retired `GetInternalModel()` to canonical `Model()`, with no ownership or expectation changes.
+
+VALIDATION:
+
+- `Utilities/PropertyEditorSortOrderTest` Debug + Release: `PROPERTY_EDITOR_SORT_ORDER_SUMMARY checks=5 failed=0`.
+- `examples/UiLabelDemo` Debug + Release: PASS, zero errors/warnings; canonical grouped order confirmed and mode-button selection styling smoke passed.
+- `tests/LabelThemeAdapterTest` in `Trilec/upp_uidesigner` Debug + Release: `checks=242 failed=0`.
+- UiDesigner Debug + Release: PASS, zero errors/warnings; Release launched and remained responsive.
+- Gary's Designer repository grep after `59cb685...`: no `GetInternalModel()` matches.
+- `git diff --check`: PASS in both validation repos.
+- Designer Skin remains absent as intended.
+- The specific add/select UiLabel + QuadGradient refresh/reselection interaction remains manually unverified because custom U++ controls expose no Windows UI Automation descendants. This is a deferred interactive smoke, not a source/build blocker.
 
 NEXT:
 
-1. Windows-validate `Utilities/PropertyEditorSortOrderTest` and build/launch `examples/UiLabelDemo`; visually confirm headings are contiguous and Skin is nested under Face.
-2. In `Trilec/upp_uidesigner`, build/run `tests/LabelThemeAdapterTest`, build the Designer, and smoke a UiLabel selection in the Inspector including a Face QuadGradient override.
-3. After the Label reference is accepted, normalize UiList and UiBaseEdit, then the composite UiDropdown and UiAccordion demos/adapters.
-4. Migrate remaining control demos/adapters without inventing Designer-only terminology or parallel style state.
+1. Normalize UiList and UiBaseEdit using the accepted Label reference convention.
+2. Then normalize the composite UiDropdown and UiAccordion demos/adapters while preserving Popup/Header/Body domains.
+3. When convenient interactive Windows access is available, perform the deferred Designer UiLabel QuadGradient reselection smoke; do not block the next implementation slice on UI Automation limitations.
+4. Continue remaining control demos/adapters without inventing Designer-only terminology or parallel style state.
 
 The reference checkpoint changes PropertyEditor presentation ordering only; it does not change control runtime style ownership or introduce new visual state. `sort_order` defaults preserve existing insertion order for models that do not opt into explicit ordering.
 
@@ -201,7 +214,8 @@ Current review confirmed:
 - canonical List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph accessor migration is published as `c35054d...` and does not maintain compatibility aliases;
 - Table theme corrective `43a91954...` changes only `ResolveUiTableChrome(...)` and leaves model/render/geometry code untouched;
 - PropertyEditor presentation ordering now uses stable `sort_order`, with raw model index as the equal-order tie-breaker;
-- UiLabel override ids and authored values remain unchanged while the PropertyEditor presentation is normalized to the documented reference layout.
+- UiLabel override ids and authored values remain unchanged while the PropertyEditor presentation is normalized to the documented reference layout;
+- cross-repository Designer preview/test callers are migrated to `Model()` at `59cb685...`; Gary's post-migration repository grep reported no remaining `GetInternalModel()` calls.
 
 The assistant cannot perform the Windows U++ compile/runtime gate in this environment.
 
@@ -209,33 +223,40 @@ The assistant cannot perform the Windows U++ compile/runtime gate in this enviro
 
 Validate exact current `main` HEAD with CLANGx64.
 
-Required gate:
+Label reference subset already completed on Windows:
 
-1. Build/run `Utilities/PropertyEditorSortOrderTest` Debug + Release — expected `PROPERTY_EDITOR_SORT_ORDER_SUMMARY checks=5 failed=0`.
-2. Build `Ui` Debug to catch header/BLITZ integration issues.
-3. Build/launch `examples/UiLabelDemo` Debug + Release. In Theme Overrides confirm one contiguous `General`, `Face`, `Frame`, `Ink`, `Icon`, `Typography`, `Content Margin`, `Focus`, `Shadow`, `Highlight` sequence; `Skin` must appear nested under `Face`, with `Slice` and `Content Inset` nested beneath Skin. Exercise Normal/Hot/Pressed/Disabled Face FillRecipe, Frame/Ink/Icon states, and a Skin image/9-slice.
-4. Build/run `Utilities/UiThemeSurfaceRegressionTest` Debug + Release — expected 13/0.
-5. Build/run `Utilities/UiModelBindingContractTest` Debug + Release — expected 49/0.
-6. Build/run `Utilities/UiDocModelBindingTest` Debug + Release — expected `UIDOC_MODEL_BINDING_SUMMARY checks=22 failed=0`.
-7. Build/run `Utilities/UiDocModelTest` Debug + Release — 17 cases, zero case/check failures.
-8. Build/run `Utilities/UiDocInteractionTest` Debug + Release — expected 41/0.
-9. Build/run `Utilities/UiDocGeometryTest` Debug + Release — expected 16/0.
-10. Build/run `Utilities/UiDocImageTest` Debug + Release — expected 75/0.
-11. Build/run `Utilities/UiDocMetadataTest` Debug + Release — require its emitted zero-failure summary.
-12. Retain the existing convergence gates: `UiModelViewPerformanceTest` 52/0, `UiTreeScaleTest` 11/0, `UiGalleryRegressionTest` 11/0, `UiDropdownMenuRenderTest` 11/0 (Debug + Release).
-13. Build/launch `examples/UiDocDemo` Debug + Release and smoke ordinary editing, Undo/Redo, search, comments/metadata, table and image insertion/removal.
-14. Focused UiTable Dark smoke: visible cell/header text, explicit selected range and active-cell border, resize guide, alternate/read-only/hover state, then Light restoration.
-15. Compile-smoke the migrated model API demos: `UiBreadcrumbsDemo`, `UiListDemo`, `UiTreeDemo`, `UiGraphDemo`, `UiDropdownDemo`.
-16. Run `git diff --check`; confirm clean `git status --short` and report exact `git rev-parse HEAD`.
+- `PropertyEditorSortOrderTest` Debug + Release: 5/0;
+- UiLabelDemo Debug + Release: clean builds and GUI ordering smoke;
+- Designer `LabelThemeAdapterTest` Debug + Release at `59cb685...`: 242/0;
+- UiDesigner Debug + Release: clean builds; Release launch responsive;
+- deferred only: manual custom-control QuadGradient refresh/reselection smoke.
 
-Cross-repository Designer validation for this reference checkpoint:
+Remaining wider convergence gate:
+
+1. Build `Ui` Debug to catch header/BLITZ integration issues.
+2. Build/run `Utilities/UiThemeSurfaceRegressionTest` Debug + Release — expected 13/0.
+3. Build/run `Utilities/UiModelBindingContractTest` Debug + Release — expected 49/0.
+4. Build/run `Utilities/UiDocModelBindingTest` Debug + Release — expected `UIDOC_MODEL_BINDING_SUMMARY checks=22 failed=0`.
+5. Build/run `Utilities/UiDocModelTest` Debug + Release — 17 cases, zero case/check failures.
+6. Build/run `Utilities/UiDocInteractionTest` Debug + Release — expected 41/0.
+7. Build/run `Utilities/UiDocGeometryTest` Debug + Release — expected 16/0.
+8. Build/run `Utilities/UiDocImageTest` Debug + Release — expected 75/0.
+9. Build/run `Utilities/UiDocMetadataTest` Debug + Release — require its emitted zero-failure summary.
+10. Retain the existing convergence gates: `UiModelViewPerformanceTest` 52/0, `UiTreeScaleTest` 11/0, `UiGalleryRegressionTest` 11/0, `UiDropdownMenuRenderTest` 11/0 (Debug + Release).
+11. Build/launch `examples/UiDocDemo` Debug + Release and smoke ordinary editing, Undo/Redo, search, comments/metadata, table and image insertion/removal.
+12. Focused UiTable Dark smoke: visible cell/header text, explicit selected range and active-cell border, resize guide, alternate/read-only/hover state, then Light restoration.
+13. Compile-smoke the migrated model API demos: `UiBreadcrumbsDemo`, `UiListDemo`, `UiTreeDemo`, `UiGraphDemo`, `UiDropdownDemo`.
+14. Run `git diff --check`; confirm clean `git status --short` and report exact `git rev-parse HEAD`.
+
+Cross-repository Designer reference checkpoint:
 
 - repository: `Trilec/upp_uidesigner`;
-- expected published reference head before any later doc-only advance: `155e51eb696537f8ac6a8a3af1629d2278513f66`;
-- build/run `tests/LabelThemeAdapterTest` Debug + Release and require its emitted zero-failure summary;
-- build the Designer Debug + Release and smoke a UiLabel selection in Inspector Theme Overrides;
-- verify General -> Face -> Frame -> Ink -> Icon -> Typography -> Content Margin -> Focus -> Shadow -> Highlight ordering;
-- verify Face state rows use FillRecipe and a QuadGradient previews/round-trips without losing its four colours/tile/blur;
+- accepted published head before any later docs-only advance: `59cb685219dc94bcad8d8cba82d1acc7528c6836`;
+- `tests/LabelThemeAdapterTest` Debug + Release passed 242/0;
+- Designer Debug + Release builds passed with zero warnings/errors and Release launched responsively;
+- General -> Face -> Frame -> Ink -> Icon -> Typography -> Content Margin -> Focus -> Shadow -> Highlight schema ordering is covered by the focused adapter test/source review;
+- Face state rows use FillRecipe and authored QuadGradient values are preserved by field resolution/codegen tests;
+- the remaining manual add/select/reselect QuadGradient interaction is deferred because Windows UI Automation cannot reach custom U++ descendants;
 - Skin is intentionally not exposed in Designer yet because theme-adapter preview has no document resource resolver. Treat any fake raw-path Skin implementation as a regression, not a fix.
 
 If a substantive ownership, lifecycle, notification, rendering or document-state failure appears, stop and return it to implementation. Do not edit source, weaken tests or restore retired model accessors during validation.
