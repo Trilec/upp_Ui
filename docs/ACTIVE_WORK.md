@@ -4,7 +4,7 @@ Remote GitHub is authoritative. Never force-update `main`. Work directly from re
 
 ## CURRENT SUPERVISORY STATE — 2026-08-17
 
-STATUS: **UIGRAPH CORRECTIVE SOURCE IMPLEMENTED — FINAL REVIEW + WINDOWS VALIDATION PENDING; UI LABEL REFERENCE ACCEPTED; FOUR-CONTROL SOURCE WORK COMPLETE.**
+STATUS: **UIGRAPH CORRECTIVE SOURCE IMPLEMENTED — WINDOWS VALIDATION PENDING; UI LABEL REFERENCE ACCEPTED; FOUR-CONTROL SOURCE WORK COMPLETE.**
 
 The previous long-form convergence/Label/UiGraph record is preserved verbatim in `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`. Task-specific four-control detail is retained in `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`.
 
@@ -82,7 +82,9 @@ TASK: `UI-NODEGRAPH-CORRECTIVE-R1` — close Windows acceptance findings for liv
 TOUCHED:
 
 - `Ui/UiGraph/UiNodeGraph.cpp`
+- `Ui/UiGraph/UiNodeGraph.h`
 - `Ui/UiGraph/UiNodeGraphInteraction.cpp`
+- `Ui/UiGraph/UiNodeGraphSpatial.cpp`
 - `Utilities/UiNodeGraphScaleTest/main.cpp`
 - `examples/UiGraphDemo/UiGraphDemo.cpp`
 - `examples/UiGraphDemo/UiGraphDemo.h`
@@ -99,6 +101,11 @@ PUBLISHED:
 - `966b83256dad491d6018b4eb3d055ed28acf0aba` — UiGraphDemo style page normalized to shared FillRecipe Face values and UiLabel-style group/id grammar; selected-node state row previews live without overwriting authored state.
 - `02b104f043105c63733755c0ee39c730b5a95305` — softer deterministic demo-only role palette; production semantic theme roles unchanged.
 - `6e8d06e40ab082e4705e6ccb478c0711fd145b90` — scale test updated for dirty/spatial paint visits, zero-work marquee drag at zoom 0.5, spatial selection on release and sole double-click selection.
+- `f1d65afa53ba0893ca6af631e71e97ae25ada0fe` — corrective recovery checkpoint before final spatial interaction hardening.
+- `0706515349298eda51332cee61192f185216847b` — private spatial node/port/edge interaction hit helpers declared.
+- `314b05121d44cabc5bf255a2895303b79d8de705` — pointer hit helpers query tiny world-space regions through the retained spatial hash, then exact-test only local prepared geometry.
+- `14882ae3f7f3aa17aef72d19096a61a451051b01` — mouse-down, hover, double-click and connection-target discovery use spatial interaction hit queries.
+- `3dab24cefdc64650fd83d99781c31a508bbc79f6` — deterministic scale coverage for local pointer neighbourhoods at zoom 0.5.
 
 SOURCE RESULT:
 
@@ -108,35 +115,45 @@ SOURCE RESULT:
 - Graph paint further narrows viewport-prepared geometry through the current dirty rectangle and the same spatial index; antialiased edge/node buffers are allocated to the dirty rectangle rather than the whole viewport;
 - selected standard nodes receive one final antialiased 2px outline built from their actual shape path; rectangular focus chrome is not stacked on selected nodes;
 - double-click clears prior node/edge selection, selects only the clicked node, then fires `WhenNodeAction`;
-- UiGraphDemo Face state rows now use the shared `PropertyEditorKind::FillRecipe`; Frame/Ink/Header remain Color because those are the current runtime field types;
+- UiGraphDemo Face state rows use the shared `PropertyEditorKind::FillRecipe`; Frame/Ink/Header remain Color because those are the current runtime field types;
 - the selected node paint-projects whichever Normal/Hot/Selected/Disabled style row is being inspected so live colour/fill edits are visibly testable while the 2px selection chrome remains independent;
 - authored Face recipes for local custom styles are retained by style token/state so a QuadGradient recipe survives PropertyEditor refresh/reselection instead of being reverse-engineered from the generated image;
 - PropertyEditor groups follow the accepted Label grammar: Face, Frame, Ink, Header, Typography, Content Margin, Focus, Shadow, Highlight, Ports, with state rows labelled only Normal/Hot/Selected/Disabled;
 - the demo palette is intentionally softer/pastel and theme-aware without changing global UiTheme role colours;
-- viewport status continues to expose logical nodes/edges, prepared nodes/edges, candidate nodes/edges and zoom.
+- viewport status exposes logical nodes/edges, prepared nodes/edges, candidate nodes/edges and zoom;
+- the retained world-space spatial hash remains the sole broad-phase index; no quadtree/R-tree/BVH was added;
+- live pointer interactions now query a small screen-radius converted to world space, use `QuerySpatial`, and exact-test only the returned node/port/edge candidates;
+- node drag preview still leaves the authoritative spatial index unchanged until the model commit; ordinary node mutations update only the affected node spatial record and incident edge records.
 
 DETERMINISTIC SCALE CONTRACT:
 
-- `Utilities/UiNodeGraphScaleTest` now expects **42 checks / 0 failures**;
+- `Utilities/UiNodeGraphScaleTest` now expects **44 checks / 0 failures**;
 - 10,000 nodes / 19,800 bounded-neighbour edges remain the fixture;
-- paint visit counts are required to be <= bounded prepared counts because dirty-region spatial painting can now visit less than the full prepared viewport;
+- paint visit counts are required to be <= bounded prepared counts because dirty-region spatial painting can visit less than the full prepared viewport;
 - at zoom 0.5, repeated marquee MouseMove must leave both geometry and spatial build serials unchanged;
 - marquee mouse-up must produce a bounded local selection while leaving spatial build serial unchanged;
-- double-click must reduce an existing multi-selection to the double-clicked node only.
+- double-click must reduce an existing multi-selection to the double-clicked node only;
+- zoom-0.5 hover must resolve a tiny spatial pointer neighbourhood (`node hit candidates < 24`, `port hit candidates < 32`) without rebuilding the spatial index.
 
-VALIDATION: source review in progress; **no Windows/U++ PASS claimed yet**. The prior acceptance remains STOPPED until the final static review is complete and Gary reruns the focused graph gates.
+VALIDATION: source-reviewed architecture; **no Windows/U++ PASS claimed yet**. The prior acceptance remains STOPPED until Gary reruns the focused graph gates on a final documented `main` descendant containing `3dab24cefdc64650fd83d99781c31a508bbc79f6`.
+
+BOUNDARY / DEFERRED BY DESIGN:
+
+- no second spatial tree or hover-region cache is added; the current hash query is intentionally the simplest broad phase until profiling demonstrates otherwise;
+- no model-wide batch API is introduced in this corrective. Multi-node paste/layout/delete coalescing is a separate model-notification design and must not be smuggled into the acceptance fix;
+- public `HitTestNode/Port/Edge` remain compatibility helpers over the bounded prepared viewport; production live mouse interaction uses the spatial helpers directly;
+- custom/non-rectangular image-backed Face recipes and deeper prepared-geometry style micro-invalidation are not required to close the reported Windows blockers and should be treated as separate renderer enhancements if future visual/performance evidence justifies them.
 
 NEXT ACTION:
 
-1. Finish final source/compile-risk review of the corrective diff, including U++ alpha/image-buffer semantics and the large `UiNodeGraph.cpp` painter change.
-2. Fix only concrete issues found by that review; do not broaden the runtime style API merely to manufacture FillRecipe symmetry for Color fields.
-3. Recompare `67bb841...` -> final `main` to ensure only intended Graph/demo/test/docs paths are present.
-4. Hand Gary one focused Windows acceptance task: Ui build, UiGraphTest D/R, UiNodeGraphScaleTest D/R (42/0), UiDataModelsTest regression, UiGraphDemo D/R plus the reported manual blocker checks.
-5. Only after PASS remove the obsolete `agent/uigraph-scale-hardening` branch after confirming its reviewed content is already ancestral/equivalent in current `main`.
+1. Gary pulls current `main` and confirms `3dab24cefdc64650fd83d99781c31a508bbc79f6` is an ancestor of HEAD.
+2. Build/run UiGraphTest Debug + Release, UiNodeGraphScaleTest Debug + Release (**44/0**), UiDataModelsTest Debug, and UiGraphDemo Debug + Release.
+3. Recheck the original manual blockers: live FillRecipe/color preview, consistent 2px selection outline on every standard shape, sole double-click selection, smooth translucent marquee at zoom 0.5, spatially bounded pointer candidate counts, pan regression and 10k mode.
+4. Stop on any substantive runtime/rendering/model failure; only obvious mechanical Windows build fixes may be committed during validation.
 
 ## NEXT
 
-1. Complete the active UiGraph corrective review/Windows gate before treating the earlier UiGraph acceptance as closed.
+1. Complete the active UiGraph Windows gate before treating the earlier UiGraph acceptance as closed.
 2. Complete the four-control Windows gates above and source-review any genuinely mechanical platform correction before publishing it.
 3. Remove stale temporary/Label branches only after comparing each tip to current `main`; the accidental `DO_NOT_USE` branch contains no useful work and is safe to delete.
 4. Continue remaining control normalization from the same documented convention rather than introducing a new parallel schema framework.
