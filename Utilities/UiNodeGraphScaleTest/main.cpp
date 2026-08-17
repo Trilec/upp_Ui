@@ -302,6 +302,17 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     graph.SetZoom(0.5, Point(600, 400));
     graph.CenterOnNode(centre);
     graph.ClearSelection();
+
+    Point centre_hit = graph.WorldToScreen(centre_node->position + Pointf(centre_node->size.cx * 0.5,
+                                                                           centre_node->size.cy * 0.5));
+    int pointer_spatial = graph.GetSpatialBuildSerial();
+    graph.MouseMove(centre_hit, 0);
+    t.Expect(graph.GetLastNodeHitCandidateCount() < 24
+             && graph.GetLastPortHitCandidateCount() < 32,
+             "0.5 zoom hover resolves only a tiny spatial pointer neighbourhood rather than the prepared viewport");
+    t.Expect(graph.GetSpatialBuildSerial() == pointer_spatial,
+             "pointer hover reuses the retained spatial hash without rebuilding it");
+
     Point blank = FindBlankPoint(graph);
     t.Expect(blank.x >= 0 && blank.y >= 0,
              "0.5 zoom viewport exposes a blank point suitable for marquee interaction");
@@ -329,8 +340,6 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     UiGraphNodeRef neighbour = nodes[50 * 100 + 51];
     graph.SelectNode(centre);
     graph.SelectNode(neighbour, true);
-    Point centre_hit = graph.WorldToScreen(centre_node->position + Pointf(centre_node->size.cx * 0.5,
-                                                                           centre_node->size.cy * 0.5));
     graph.LeftDouble(centre_hit, 0);
     t.Expect(graph.GetSelectedNodes().GetCount() == 1 && graph.IsNodeSelected(centre),
              "double-click clears prior selection and leaves only the double-clicked node selected");
