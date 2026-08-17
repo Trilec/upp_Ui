@@ -93,6 +93,7 @@ private:
     UiGraphModel scale_model_;
     Vector<UiGraphNodeRef> scale_nodes_;
     VectorMap<String, UiGraphNodeStyle> custom_styles_;
+    VectorMap<String, Value> face_recipes_;
 
     UiButton embedded_action_;
     UiToggle embedded_toggle_;
