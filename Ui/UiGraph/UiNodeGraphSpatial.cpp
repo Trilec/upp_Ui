@@ -373,4 +373,130 @@ void UiNodeGraph::QuerySpatial(const WorldRect& area,
         edges.FindAdd(spatial_global_edges_[i]);
 }
 
+UiGraphNodeRef UiNodeGraph::HitTestNodeSpatial(Point p) const
+{
+    UiNodeGraph* self = const_cast<UiNodeGraph*>(this);
+    self->PrepareGeometry();
+    self->EnsureSpatialIndex();
+    last_node_hit_candidate_count_ = 0;
+    if(!model_)
+        return UiGraphNodeRef();
+
+    const int r = max(1, DPI(2));
+    WorldRect area;
+    area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
+    area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
+    Index<UiGraphId> nodes;
+    Index<UiGraphId> edges;
+    QuerySpatial(area, nodes, edges);
+    last_node_hit_candidate_count_ = nodes.GetCount();
+
+    Vector<int> geometry;
+    geometry.Reserve(nodes.GetCount());
+    for(int i = 0; i < nodes.GetCount(); i++) {
+        int q = node_geometry_.Find(nodes[i]);
+        if(q >= 0)
+            geometry.Add(q);
+    }
+    Sort(geometry, [&](int a, int b) {
+        const NodeGeometry& ga = node_geometry_[a];
+        const NodeGeometry& gb = node_geometry_[b];
+        return ga.z_order != gb.z_order ? ga.z_order < gb.z_order : ga.ref.id < gb.ref.id;
+    });
+    for(int i = geometry.GetCount() - 1; i >= 0; --i) {
+        const NodeGeometry& g = node_geometry_[geometry[i]];
+        const UiGraphNode* node = model_->FindNode(g.ref);
+        if(node && PointInNodeGeometry(*node, g, p))
+            return g.ref;
+    }
+    return UiGraphNodeRef();
+}
+
+UiGraphPortRef UiNodeGraph::HitTestPortSpatial(Point p) const
+{
+    UiNodeGraph* self = const_cast<UiNodeGraph*>(this);
+    self->PrepareGeometry();
+    self->EnsureSpatialIndex();
+    last_port_hit_candidate_count_ = 0;
+    if(!model_)
+        return UiGraphPortRef();
+
+    // Broad enough for custom per-style hit radii while still touching only a
+    // handful of hash cells even at low zoom. Exact port rects decide the hit.
+    const int r = max(12, DPI(32));
+    WorldRect area;
+    area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
+    area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
+    Index<UiGraphId> nodes;
+    Index<UiGraphId> edges;
+    QuerySpatial(area, nodes, edges);
+    last_port_hit_candidate_count_ = nodes.GetCount();
+
+    Vector<int> geometry;
+    geometry.Reserve(nodes.GetCount());
+    for(int i = 0; i < nodes.GetCount(); i++) {
+        int q = node_geometry_.Find(nodes[i]);
+        if(q >= 0)
+            geometry.Add(q);
+    }
+    Sort(geometry, [&](int a, int b) {
+        const NodeGeometry& ga = node_geometry_[a];
+        const NodeGeometry& gb = node_geometry_[b];
+        return ga.z_order != gb.z_order ? ga.z_order < gb.z_order : ga.ref.id < gb.ref.id;
+    });
+    for(int n = geometry.GetCount() - 1; n >= 0; --n) {
+        const NodeGeometry& g = node_geometry_[geometry[n]];
+        const UiGraphNode* node = model_->FindNode(g.ref);
+        if(!node)
+            continue;
+        for(int i = g.port_hits.GetCount() - 1; i >= 0; --i)
+            if(g.port_hits[i].Contains(p))
+                return UiGraphPortRef{node->ref, g.port_hits.GetKey(i)};
+    }
+    return UiGraphPortRef();
+}
+
+UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
+{
+    UiNodeGraph* self = const_cast<UiNodeGraph*>(this);
+    self->PrepareGeometry();
+    self->EnsureSpatialIndex();
+    last_edge_hit_candidate_count_ = 0;
+    if(!model_)
+        return UiGraphEdgeRef();
+
+    const int r = max(10, DPI(24));
+    WorldRect area;
+    area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
+    area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
+    Index<UiGraphId> nodes;
+    Index<UiGraphId> edges;
+    QuerySpatial(area, nodes, edges);
+    last_edge_hit_candidate_count_ = edges.GetCount();
+
+    Vector<int> geometry;
+    geometry.Reserve(edges.GetCount());
+    for(int i = 0; i < edges.GetCount(); i++) {
+        int q = edge_geometry_.Find(edges[i]);
+        if(q >= 0)
+            geometry.Add(q);
+    }
+    Sort(geometry);
+    for(int i = geometry.GetCount() - 1; i >= 0; --i) {
+        const EdgeGeometry& g = edge_geometry_[geometry[i]];
+        if(!g.bounds.Contains(p))
+            continue;
+        const UiGraphEdge* edge = model_->FindEdge(g.ref);
+        if(!edge || !edge->selectable)
+            continue;
+        UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
+        for(int n = 1; n < g.points.GetCount(); n++)
+            if(DistanceToSegment(Pointf(p.x, p.y),
+                                 Pointf(g.points[n - 1].x, g.points[n - 1].y),
+                                 Pointf(g.points[n].x, g.points[n].y)) <= style.interaction_width)
+                return g.ref;
+    }
+    return UiGraphEdgeRef();
+}
+
 } // namespace Upp
