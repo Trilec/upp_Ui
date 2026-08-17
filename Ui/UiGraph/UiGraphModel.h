@@ -34,6 +34,11 @@
     Changelog
     - 2026-08: migrated the staged graph model into the Ui package, removed the
       temporary UiGraphAssembly namespace, and integrated UiDataModelBase.
+    - 2026-08: added retained per-node edge adjacency so ordinary incident-edge,
+      port-edge and connection checks scale with local degree rather than the
+      complete graph edge count.
+    - 2026-08: made the authored 1:1 node default a compact representation;
+      richer graph nodes remain free to provide any larger explicit size.
 */
 
 #include <Core/Core.h>
@@ -229,8 +234,8 @@ struct UiGraphNode : Moveable<UiGraphNode> {
     Size icon_size = Size(0, 0);
     UiIconRenderMode icon_render_mode = UiIconRenderMode::Auto;
     Pointf position = Pointf(0, 0);
-    Sizef size = Sizef(180, 110);
-    double corner_radius = 10.0;
+    Sizef size = Sizef(64, 44);
+    double corner_radius = 8.0;
     int z_order = 0;
     bool enabled = true;
     bool visible = true;
@@ -402,7 +407,7 @@ public:
 
     UiGraphNodeRef AddNode(const UiGraphNode& node);
     UiGraphNodeRef AddNode(const String& title, Pointf position = Pointf(0, 0),
-                           Sizef size = Sizef(180, 110));
+                           Sizef size = Sizef(64, 44));
     bool UpdateNode(UiGraphNodeRef ref, const UiGraphNode& node);
     bool SetNodePosition(UiGraphNodeRef ref, Pointf position);
     bool SetNodeSize(UiGraphNodeRef ref, Sizef size);
@@ -445,6 +450,7 @@ public:
     Vector<UiGraphEdgeRef> GetIncomingEdges(const UiGraphPortRef& target) const;
     Vector<UiGraphEdgeRef> GetOutgoingEdges(const UiGraphPortRef& source) const;
     Vector<UiGraphEdgeRef> GetNodeEdges(UiGraphNodeRef node) const;
+    int GetIncidentEdgeCount(UiGraphNodeRef node) const;
 
     UiGraphConnectionDecision ValidateConnection(const UiGraphPortRef& source,
                                                  const UiGraphPortRef& target,
@@ -465,13 +471,18 @@ public:
                                  UiTreeNodeRef root,
                                  bool include_root = true,
                                  Pointf origin = Pointf(0, 0),
-                                 double x_spacing = 240.0,
-                                 double y_spacing = 150.0);
+                                 double x_spacing = 112.0,
+                                 double y_spacing = 72.0);
 
 private:
     int FindNodeIndex(UiGraphNodeRef ref) const;
     int FindEdgeIndex(UiGraphEdgeRef ref) const;
     bool ValidateNodePorts(const UiGraphNode& node, String* error = nullptr) const;
+    const Vector<UiGraphEdgeRef>* FindNodeEdgeRefs(UiGraphNodeRef node) const;
+    void EnsureNodeEdgeBucket(UiGraphNodeRef node);
+    void IndexEdge(const UiGraphEdge& edge);
+    void UnindexEdge(const UiGraphEdge& edge);
+    void RebuildEdgeIndex();
     void RemoveEdgesForNode(UiGraphNodeRef node);
     void RemoveEdgesForPort(const UiGraphPortRef& port);
     void NormalizeIncidentEdges(UiGraphNodeRef node);
@@ -486,6 +497,7 @@ private:
 private:
     VectorMap<UiGraphId, UiGraphNode> nodes_;
     VectorMap<UiGraphId, UiGraphEdge> edges_;
+    VectorMap<UiGraphId, Vector<UiGraphEdgeRef>> node_edges_;
     UiGraphId next_node_id_ = 1;
     UiGraphId next_edge_id_ = 1;
     Function<bool(const UiGraphPort&, const UiGraphPort&)> type_compatibility_;

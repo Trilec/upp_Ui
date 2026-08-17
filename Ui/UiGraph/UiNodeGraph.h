@@ -21,6 +21,9 @@
       the model.
     - Support request-first editing so command-driven applications can disable
       direct model mutation without inventing a second interaction path.
+    - Keep world-space scene indexing independent from screen-space rendering so
+      large graphs remain viewport-bounded and a future GPU backend can consume
+      the same semantic/spatial scene contract.
 
     Thread context
     - GUI thread only.
@@ -34,6 +37,10 @@
     - 2026-08: migrated from staging into Ui/UiGraph, removed the temporary
       namespace/package layer, integrated UiTheme, and reconciled geometry and
       paint declarations with the implementation.
+    - 2026-08: added retained world-space spatial indexing, bounded prepared
+      geometry and read-only scale instrumentation for 10,000-node workloads.
+    - 2026-08: made left-button capture release explicitly owned and
+      re-entrancy safe while keeping middle-button panning capture-free.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -240,8 +247,23 @@ public:
     UiGraphEdgeRef HitTestEdge(Point p) const;
     UiGraphPortRef HitTestPort(Point p) const;
 
-    // Layout/cache rebuilds increment this serial. Paint() must not mutate it.
+    // Read-only scale evidence. These counters expose real production work and
+    // do not alter model semantics or geometry preparation.
     int GetGeometryBuildSerial() const { return geometry_build_serial_; }
+    int GetSpatialBuildSerial() const { return spatial_build_serial_; }
+    int GetSpatialUpdateSerial() const { return spatial_update_serial_; }
+    int GetPreparedNodeCount() const { return node_geometry_.GetCount(); }
+    int GetPreparedEdgeCount() const { return edge_geometry_.GetCount(); }
+    int GetLastNodeCandidateCount() const { return last_node_candidate_count_; }
+    int GetLastEdgeCandidateCount() const { return last_edge_candidate_count_; }
+    int GetLastPaintNodeVisitCount() const { return last_paint_node_visit_count_; }
+    int GetLastPaintEdgeVisitCount() const { return last_paint_edge_visit_count_; }
+    int GetLastPaintedNodeCount() const { return last_painted_node_count_; }
+    int GetLastPaintedEdgeCount() const { return last_painted_edge_count_; }
+    int GetLastNodeHitCandidateCount() const { return last_node_hit_candidate_count_; }
+    int GetLastPortHitCandidateCount() const { return last_port_hit_candidate_count_; }
+    int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
+    int GetAttachedNodeCtrlCount() const { return node_ctrls_.GetCount(); }
 
     virtual void SetData(const Value& v) override;
     virtual Value GetData() const override;
@@ -313,6 +335,8 @@ private:
         VectorMap<String, Rect> port_hits;
         VectorMap<String, Rect> port_labels;
         int z_order = 0;
+        bool compact = false;
+        bool micro = false;
     };
 
     struct EdgeGeometry : Moveable<EdgeGeometry> {
@@ -320,6 +344,24 @@ private:
         Vector<Point> points;
         Rect bounds;
         Point label_point;
+    };
+
+    struct WorldRect : Moveable<WorldRect> {
+        double left = 0;
+        double top = 0;
+        double right = 0;
+        double bottom = 0;
+        bool valid = false;
+
+        void Include(Pointf p);
+        void Include(const WorldRect& r);
+        WorldRect Inflated(double amount) const;
+        bool Intersects(const WorldRect& r) const;
+    };
+
+    struct SpatialCell : Moveable<SpatialCell> {
+        Vector<UiGraphId> nodes;
+        Vector<UiGraphId> edges;
     };
 
     enum class InteractionMode : byte {
@@ -348,6 +390,24 @@ private:
 
     int GetNodeCtrlIndex(UiGraphNodeRef node) const;
     void UpdateAttachedCtrls();
+
+    void InvalidateSpatialIndex();
+    void EnsureSpatialIndex();
+    void RebuildSpatialIndex();
+    void UpdateSpatialNode(UiGraphNodeRef ref);
+    void RemoveSpatialNode(UiGraphNodeRef ref);
+    void UpdateSpatialEdge(UiGraphEdgeRef ref);
+    void RemoveSpatialEdge(UiGraphEdgeRef ref);
+    WorldRect GetNodeWorldBounds(const UiGraphNode& node) const;
+    WorldRect GetEdgeWorldBounds(const UiGraphEdge& edge) const;
+    WorldRect GetViewportWorldBounds(double screen_margin) const;
+    void QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes, Index<UiGraphId>& edges) const;
+    void AddNodeToSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
+    void AddEdgeToSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds, bool force_global);
+    void RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
+    void RemoveEdgeFromSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds);
+    static int64 SpatialCellKey(int x, int y);
+    static void SpatialCellRange(const WorldRect& bounds, int& x0, int& y0, int& x1, int& y1);
 
     void InvalidateGeometry();
     void PrepareGeometry();
@@ -392,6 +452,8 @@ private:
     static Rect RouteBounds(const Vector<Point>& route, int inflate);
     static bool PointInPolygon(const Vector<Pointf>& polygon, Pointf point);
 
+    void AcquireInteractionCapture();
+    void ReleaseInteractionCapture();
     void BeginNodeDrag(Point p, UiGraphNodeRef primary);
     void UpdateNodeDrag(Point p);
     void CommitNodeDrag();
@@ -432,6 +494,25 @@ private:
     Pointf geometry_pan_;
     Size geometry_size_;
 
+    VectorMap<int64, SpatialCell> spatial_cells_;
+    VectorMap<UiGraphId, WorldRect> node_world_bounds_;
+    VectorMap<UiGraphId, WorldRect> edge_world_bounds_;
+    Index<UiGraphId> spatial_global_nodes_;
+    Index<UiGraphId> spatial_global_edges_;
+    bool spatial_dirty_ = true;
+    int spatial_build_serial_ = 0;
+    int spatial_update_serial_ = 0;
+
+    int last_node_candidate_count_ = 0;
+    int last_edge_candidate_count_ = 0;
+    int last_paint_node_visit_count_ = 0;
+    int last_paint_edge_visit_count_ = 0;
+    int last_painted_node_count_ = 0;
+    int last_painted_edge_count_ = 0;
+    mutable int last_node_hit_candidate_count_ = 0;
+    mutable int last_port_hit_candidate_count_ = 0;
+    mutable int last_edge_hit_candidate_count_ = 0;
+
     Index<UiGraphId> selected_nodes_;
     Index<UiGraphId> selected_edges_;
     UiGraphNodeRef hot_node_;
@@ -448,6 +529,7 @@ private:
     Pointf pan_ = Pointf(0, 0);
 
     InteractionMode interaction_ = InteractionMode::None;
+    bool interaction_capture_owned_ = false;
     Point press_point_;
     Point last_point_;
     Pointf pan_at_press_;

@@ -1,8 +1,18 @@
-description "Interactive UiGraph roles, icons, attached controls, routing and editing demo";
+description "Interactive UiNodeGraph model, scale and PropertyEditor reference demo";
 
 uses
+	Core,
+	Draw,
+	CtrlCore,
 	CtrlLib,
-	Ui;
+	Ui,
+	Utilities/PropertyEditor;
 
 file
+	UiGraphDemo.h,
+	UiGraphDemo.cpp,
+	UiGraphDemoData.cpp,
 	main.cpp;
+
+mainconfig
+	"" = "GUI";

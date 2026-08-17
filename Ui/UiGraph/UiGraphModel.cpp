@@ -168,6 +168,62 @@ bool UiGraphModel::Contains(UiGraphEdgeRef ref) const
     return FindEdgeIndex(ref) >= 0;
 }
 
+const Vector<UiGraphEdgeRef>* UiGraphModel::FindNodeEdgeRefs(UiGraphNodeRef node) const
+{
+    int i = node.IsValid() ? node_edges_.Find(node.id) : -1;
+    return i >= 0 ? &node_edges_[i] : nullptr;
+}
+
+void UiGraphModel::EnsureNodeEdgeBucket(UiGraphNodeRef node)
+{
+    if(!node.IsValid() || node_edges_.Find(node.id) >= 0)
+        return;
+    Vector<UiGraphEdgeRef> empty;
+    node_edges_.Add(node.id, pick(empty));
+}
+
+void UiGraphModel::IndexEdge(const UiGraphEdge& edge)
+{
+    if(!edge.ref.IsValid())
+        return;
+    EnsureNodeEdgeBucket(edge.source.node);
+    EnsureNodeEdgeBucket(edge.target.node);
+
+    int s = node_edges_.Find(edge.source.node.id);
+    if(s >= 0 && FindIndex(node_edges_[s], edge.ref) < 0)
+        node_edges_[s].Add(edge.ref);
+
+    if(edge.target.node != edge.source.node) {
+        int t = node_edges_.Find(edge.target.node.id);
+        if(t >= 0 && FindIndex(node_edges_[t], edge.ref) < 0)
+            node_edges_[t].Add(edge.ref);
+    }
+}
+
+void UiGraphModel::UnindexEdge(const UiGraphEdge& edge)
+{
+    auto remove_from = [&](UiGraphNodeRef node) {
+        int i = node.IsValid() ? node_edges_.Find(node.id) : -1;
+        if(i < 0)
+            return;
+        int q = FindIndex(node_edges_[i], edge.ref);
+        if(q >= 0)
+            node_edges_[i].Remove(q);
+    };
+    remove_from(edge.source.node);
+    if(edge.target.node != edge.source.node)
+        remove_from(edge.target.node);
+}
+
+void UiGraphModel::RebuildEdgeIndex()
+{
+    node_edges_.Clear();
+    for(const UiGraphNode& node : nodes_.GetValues())
+        EnsureNodeEdgeBucket(node.ref);
+    for(const UiGraphEdge& edge : edges_.GetValues())
+        IndexEdge(edge);
+}
+
 bool UiGraphModel::ValidateNodePorts(const UiGraphNode& node, String* error) const
 {
     Index<String> ids;
@@ -210,6 +266,7 @@ UiGraphNodeRef UiGraphModel::AddNode(const UiGraphNode& source)
     node.icon_size.cy = max(0, node.icon_size.cy);
     node.corner_radius = max(0.0, node.corner_radius);
     nodes_.Add(id, node);
+    EnsureNodeEdgeBucket(node.ref);
     NotifyGraph(UiGraphChangeKind::NodeAdded, node.ref);
     return node.ref;
 }
@@ -279,25 +336,24 @@ bool UiGraphModel::SetNodeSize(UiGraphNodeRef ref, Sizef size)
 
 void UiGraphModel::RemoveEdgesForNode(UiGraphNodeRef node)
 {
-    for(int i = edges_.GetCount() - 1; i >= 0; --i) {
-        const UiGraphEdge& edge = edges_[i];
-        if(edge.source.node == node || edge.target.node == node) {
-            UiGraphEdgeRef ref = edge.ref;
-            edges_.Remove(i);
-            NotifyGraph(UiGraphChangeKind::EdgeRemoved, UiGraphNodeRef(), ref);
-        }
-    }
+    const Vector<UiGraphEdgeRef>* indexed = FindNodeEdgeRefs(node);
+    if(!indexed)
+        return;
+    Vector<UiGraphEdgeRef> refs = clone(*indexed);
+    for(UiGraphEdgeRef ref : refs)
+        RemoveEdge(ref);
 }
 
 void UiGraphModel::RemoveEdgesForPort(const UiGraphPortRef& port)
 {
-    for(int i = edges_.GetCount() - 1; i >= 0; --i) {
-        const UiGraphEdge& edge = edges_[i];
-        if(edge.source == port || edge.target == port) {
-            UiGraphEdgeRef ref = edge.ref;
-            edges_.Remove(i);
-            NotifyGraph(UiGraphChangeKind::EdgeRemoved, UiGraphNodeRef(), ref);
-        }
+    const Vector<UiGraphEdgeRef>* indexed = FindNodeEdgeRefs(port.node);
+    if(!indexed)
+        return;
+    Vector<UiGraphEdgeRef> refs = clone(*indexed);
+    for(UiGraphEdgeRef ref : refs) {
+        const UiGraphEdge* edge = FindEdge(ref);
+        if(edge && (edge->source == port || edge->target == port))
+            RemoveEdge(ref);
     }
 }
 
@@ -322,6 +378,9 @@ bool UiGraphModel::RemoveNode(UiGraphNodeRef ref)
     if(i < 0)
         return false;
     RemoveEdgesForNode(ref);
+    int ai = node_edges_.Find(ref.id);
+    if(ai >= 0)
+        node_edges_.Remove(ai);
     nodes_.Remove(i);
     NotifyGraph(UiGraphChangeKind::NodeRemoved, ref);
     return true;
@@ -487,25 +546,38 @@ UiGraphConnectionDecision UiGraphModel::ValidateConnection(const UiGraphPortRef&
 
     bool replace_source = false;
     bool replace_target = false;
-    for(int i = 0; i < edges_.GetCount(); i++) {
-        const UiGraphEdge& edge = edges_[i];
-        if(edge.ref == ignore)
-            continue;
-        if(edge.source == source_ref && edge.target == target_ref) {
-            out.message = "Duplicate connection";
-            return out;
+    auto inspect_node = [&](UiGraphNodeRef node_ref) -> bool {
+        const Vector<UiGraphEdgeRef>* refs = FindNodeEdgeRefs(node_ref);
+        if(!refs)
+            return true;
+        for(UiGraphEdgeRef ref : *refs) {
+            if(ref == ignore)
+                continue;
+            const UiGraphEdge* edge = FindEdge(ref);
+            if(!edge)
+                continue;
+            if(edge->source == source_ref && edge->target == target_ref) {
+                out.message = "Duplicate connection";
+                return false;
+            }
+            if(source->multiplicity == UiGraphPortMultiplicity::Single && edge->source == source_ref) {
+                replace_source = true;
+                if(FindIndex(out.edges_to_replace, edge->ref) < 0)
+                    out.edges_to_replace.Add(edge->ref);
+            }
+            if(target->multiplicity == UiGraphPortMultiplicity::Single && edge->target == target_ref) {
+                replace_target = true;
+                if(FindIndex(out.edges_to_replace, edge->ref) < 0)
+                    out.edges_to_replace.Add(edge->ref);
+            }
         }
-        if(source->multiplicity == UiGraphPortMultiplicity::Single && edge.source == source_ref) {
-            replace_source = true;
-            if(FindIndex(out.edges_to_replace, edge.ref) < 0)
-                out.edges_to_replace.Add(edge.ref);
-        }
-        if(target->multiplicity == UiGraphPortMultiplicity::Single && edge.target == target_ref) {
-            replace_target = true;
-            if(FindIndex(out.edges_to_replace, edge.ref) < 0)
-                out.edges_to_replace.Add(edge.ref);
-        }
-    }
+        return true;
+    };
+
+    if(!inspect_node(source_ref.node))
+        return out;
+    if(target_ref.node != source_ref.node && !inspect_node(target_ref.node))
+        return out;
 
     if(replace_source && replace_target)
         out.action = UiGraphConnectionAction::ReplaceBoth;
@@ -547,6 +619,7 @@ UiGraphEdgeRef UiGraphModel::AddEdge(const UiGraphEdge& source,
     next_edge_id_ = max(next_edge_id_, id + 1);
     edge.ref.id = id;
     edges_.Add(id, edge);
+    IndexEdge(edge);
     NotifyGraph(UiGraphChangeKind::EdgeAdded, UiGraphNodeRef(), edge.ref);
     return edge.ref;
 }
@@ -579,9 +652,12 @@ bool UiGraphModel::UpdateEdge(UiGraphEdgeRef ref,
     i = FindEdgeIndex(ref);
     if(i < 0)
         return false;
+    UiGraphEdge old = edges_[i];
     UiGraphEdge edge = source;
     edge.ref = ref;
+    UnindexEdge(old);
     edges_[i] = edge;
+    IndexEdge(edge);
     NotifyGraph(UiGraphChangeKind::EdgeUpdated, UiGraphNodeRef(), ref);
     return true;
 }
@@ -605,6 +681,8 @@ bool UiGraphModel::RemoveEdge(UiGraphEdgeRef ref)
     int i = FindEdgeIndex(ref);
     if(i < 0)
         return false;
+    UiGraphEdge edge = edges_[i];
+    UnindexEdge(edge);
     edges_.Remove(i);
     NotifyGraph(UiGraphChangeKind::EdgeRemoved, UiGraphNodeRef(), ref);
     return true;
@@ -644,28 +722,41 @@ const UiGraphEdge* UiGraphModel::FindEdge(UiGraphEdgeRef ref) const
 Vector<UiGraphEdgeRef> UiGraphModel::GetIncomingEdges(const UiGraphPortRef& target) const
 {
     Vector<UiGraphEdgeRef> out;
-    for(const UiGraphEdge& edge : edges_.GetValues())
-        if(edge.target == target)
-            out.Add(edge.ref);
+    const Vector<UiGraphEdgeRef>* refs = FindNodeEdgeRefs(target.node);
+    if(!refs)
+        return out;
+    for(UiGraphEdgeRef ref : *refs) {
+        const UiGraphEdge* edge = FindEdge(ref);
+        if(edge && edge->target == target)
+            out.Add(ref);
+    }
     return out;
 }
 
 Vector<UiGraphEdgeRef> UiGraphModel::GetOutgoingEdges(const UiGraphPortRef& source) const
 {
     Vector<UiGraphEdgeRef> out;
-    for(const UiGraphEdge& edge : edges_.GetValues())
-        if(edge.source == source)
-            out.Add(edge.ref);
+    const Vector<UiGraphEdgeRef>* refs = FindNodeEdgeRefs(source.node);
+    if(!refs)
+        return out;
+    for(UiGraphEdgeRef ref : *refs) {
+        const UiGraphEdge* edge = FindEdge(ref);
+        if(edge && edge->source == source)
+            out.Add(ref);
+    }
     return out;
 }
 
 Vector<UiGraphEdgeRef> UiGraphModel::GetNodeEdges(UiGraphNodeRef node) const
 {
-    Vector<UiGraphEdgeRef> out;
-    for(const UiGraphEdge& edge : edges_.GetValues())
-        if(edge.source.node == node || edge.target.node == node)
-            out.Add(edge.ref);
-    return out;
+    const Vector<UiGraphEdgeRef>* refs = FindNodeEdgeRefs(node);
+    return refs ? clone(*refs) : Vector<UiGraphEdgeRef>();
+}
+
+int UiGraphModel::GetIncidentEdgeCount(UiGraphNodeRef node) const
+{
+    const Vector<UiGraphEdgeRef>* refs = FindNodeEdgeRefs(node);
+    return refs ? refs->GetCount() : 0;
 }
 
 UiGraphModel& UiGraphModel::SetTypeCompatibilityResolver(
@@ -725,6 +816,7 @@ void UiGraphModel::Clear()
         return;
     nodes_.Clear();
     edges_.Clear();
+    node_edges_.Clear();
     next_node_id_ = 1;
     next_edge_id_ = 1;
     NotifyGraph(UiGraphChangeKind::Cleared);
@@ -750,6 +842,7 @@ void UiGraphModel::Serialize(Stream& s)
         type_compatibility_ = Function<bool(const UiGraphPort&, const UiGraphPort&)>();
         next_node_id_ = max<UiGraphId>(1, next_node_id_);
         next_edge_id_ = max<UiGraphId>(1, next_edge_id_);
+        RebuildEdgeIndex();
         NotifyGraph(UiGraphChangeKind::Reset);
     }
 }

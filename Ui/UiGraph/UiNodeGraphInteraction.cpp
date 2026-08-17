@@ -13,6 +13,25 @@ bool HasSelectionModifier(dword flags)
 
 } // namespace
 
+void UiNodeGraph::AcquireInteractionCapture()
+{
+    if(interaction_capture_owned_)
+        return;
+    SetCapture();
+    interaction_capture_owned_ = HasCapture();
+}
+
+void UiNodeGraph::ReleaseInteractionCapture()
+{
+    if(!interaction_capture_owned_)
+        return;
+    // Win32/U++ can synchronously re-enter CancelMode while releasing capture.
+    // Clear ownership first so that callback cannot recursively release again.
+    interaction_capture_owned_ = false;
+    if(HasCapture())
+        ReleaseCapture();
+}
+
 void UiNodeGraph::BeginNodeDrag(Point p, UiGraphNodeRef primary)
 {
     const UiGraphNode* node = model_ ? model_->FindNode(primary) : nullptr;
@@ -33,7 +52,7 @@ void UiNodeGraph::BeginNodeDrag(Point p, UiGraphNodeRef primary)
             drag_preview_positions_.Add(ref.id, n->position);
         }
     }
-    SetCapture();
+    AcquireInteractionCapture();
 }
 
 void UiNodeGraph::UpdateNodeDrag(Point p)
@@ -77,8 +96,7 @@ void UiNodeGraph::CommitNodeDrag()
     drag_preview_positions_.Clear();
     interaction_ = InteractionMode::None;
     pressed_node_ = UiGraphNodeRef();
-    if(HasCapture())
-        ReleaseCapture();
+    ReleaseInteractionCapture();
     InvalidateGeometry();
     PrepareGeometry();
     UpdateAttachedCtrls();
@@ -108,7 +126,7 @@ void UiNodeGraph::BeginConnection(Point p, const UiGraphPortRef& source)
     connection_target_ = UiGraphPortRef();
     connection_decision_ = UiGraphConnectionDecision();
     press_point_ = last_point_ = p;
-    SetCapture();
+    AcquireInteractionCapture();
     Refresh();
 }
 
@@ -152,8 +170,7 @@ void UiNodeGraph::CancelConnection()
     connection_decision_ = UiGraphConnectionDecision();
     if(interaction_ == InteractionMode::Connect)
         interaction_ = InteractionMode::None;
-    if(HasCapture())
-        ReleaseCapture();
+    ReleaseInteractionCapture();
     Refresh();
 }
 
@@ -192,7 +209,7 @@ void UiNodeGraph::BeginMarquee(Point p)
     interaction_ = InteractionMode::Marquee;
     press_point_ = last_point_ = p;
     marquee_ = Rect(p, p);
-    SetCapture();
+    AcquireInteractionCapture();
     Refresh();
 }
 
@@ -223,8 +240,7 @@ void UiNodeGraph::CommitMarquee(dword flags)
     }
     marquee_ = Rect(0, 0, 0, 0);
     interaction_ = InteractionMode::None;
-    if(HasCapture())
-        ReleaseCapture();
+    ReleaseInteractionCapture();
     NotifySelection();
 }
 
@@ -453,8 +469,7 @@ void UiNodeGraph::CancelMode()
         interaction_ = InteractionMode::None;
         Refresh();
     }
-    if(HasCapture())
-        ReleaseCapture();
+    ReleaseInteractionCapture();
     Ctrl::CancelMode();
 }
 
@@ -465,7 +480,7 @@ void UiNodeGraph::GotFocus()
 
 void UiNodeGraph::LostFocus()
 {
-    if(interaction_ != InteractionMode::None)
+    if(interaction_ != InteractionMode::None || interaction_capture_owned_)
         CancelMode();
     Refresh();
 }
