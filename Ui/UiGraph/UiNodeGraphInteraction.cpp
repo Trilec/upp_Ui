@@ -210,17 +210,18 @@ void UiNodeGraph::BeginMarquee(Point p)
     press_point_ = last_point_ = p;
     marquee_ = Rect(p, p);
     AcquireInteractionCapture();
-    Refresh();
+    RefreshDamage(RectC(p.x - DPI(3), p.y - DPI(3), DPI(7), DPI(7)));
 }
 
 void UiNodeGraph::UpdateMarquee(Point p)
 {
     if(interaction_ != InteractionMode::Marquee)
         return;
+    Rect old = marquee_;
     last_point_ = p;
     marquee_ = Rect(min(press_point_.x, p.x), min(press_point_.y, p.y),
                     max(press_point_.x, p.x) + 1, max(press_point_.y, p.y) + 1);
-    Refresh();
+    RefreshDamage((old | marquee_).Inflated(DPI(3)));
 }
 
 void UiNodeGraph::CommitMarquee(dword flags)
@@ -314,8 +315,10 @@ void UiNodeGraph::LeftDouble(Point p, dword)
 {
     PrepareGeometry();
     UiGraphNodeRef node = HitTestNode(p);
-    if(node.IsValid())
+    if(node.IsValid()) {
+        SelectNode(node, false);
         WhenNodeAction(node);
+    }
 }
 
 void UiNodeGraph::MiddleDown(Point p, dword)
@@ -330,7 +333,8 @@ void UiNodeGraph::MiddleUp(Point, dword)
 
 void UiNodeGraph::MouseMove(Point p, dword)
 {
-    PrepareGeometry();
+    // Active interactions own their geometry/update path. In particular,
+    // marquee movement is overlay-only and must not touch prepared geometry.
     if(interaction_ == InteractionMode::NodeDrag) {
         UpdateNodeDrag(p);
         return;
@@ -348,6 +352,7 @@ void UiNodeGraph::MouseMove(Point p, dword)
         return;
     }
 
+    PrepareGeometry();
     UiGraphPortRef port = HitTestPort(p);
     UiGraphNodeRef node = HitTestNode(p);
     UiGraphEdgeRef edge = node.IsValid() ? UiGraphEdgeRef() : HitTestEdge(p);
@@ -465,9 +470,10 @@ void UiNodeGraph::CancelMode()
     else if(interaction_ == InteractionMode::Pan)
         EndPan();
     else if(interaction_ == InteractionMode::Marquee) {
+        Rect old = marquee_;
         marquee_ = Rect(0, 0, 0, 0);
         interaction_ = InteractionMode::None;
-        Refresh();
+        RefreshDamage(old.Inflated(DPI(3)));
     }
     ReleaseInteractionCapture();
     Ctrl::CancelMode();
