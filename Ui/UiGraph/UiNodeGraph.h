@@ -402,6 +402,9 @@ private:
     WorldRect GetEdgeWorldBounds(const UiGraphEdge& edge) const;
     WorldRect GetViewportWorldBounds(double screen_margin) const;
     void QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes, Index<UiGraphId>& edges) const;
+    UiGraphNodeRef HitTestNodeSpatial(Point p) const;
+    UiGraphPortRef HitTestPortSpatial(Point p) const;
+    UiGraphEdgeRef HitTestEdgeSpatial(Point p) const;
     void AddNodeToSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
     void AddEdgeToSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds, bool force_global);
     void RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
