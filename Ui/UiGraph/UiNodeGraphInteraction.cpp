@@ -135,7 +135,7 @@ void UiNodeGraph::UpdateConnection(Point p)
     if(interaction_ != InteractionMode::Connect)
         return;
     last_point_ = p;
-    UiGraphPortRef target = HitTestPort(p);
+    UiGraphPortRef target = HitTestPortSpatial(p);
     if(target != connection_target_) {
         connection_target_ = target;
         connection_decision_ = target.IsValid() && model_
@@ -285,8 +285,7 @@ void UiNodeGraph::DeleteSelection()
 void UiNodeGraph::LeftDown(Point p, dword flags)
 {
     SetFocus();
-    PrepareGeometry();
-    UiGraphPortRef port = HitTestPort(p);
+    UiGraphPortRef port = HitTestPortSpatial(p);
     if(port.IsValid()) {
         const UiGraphPort* pp = model_ ? model_->FindPort(port) : nullptr;
         if(pp && pp->ProvidesOutput() && editable_) {
@@ -295,7 +294,7 @@ void UiNodeGraph::LeftDown(Point p, dword flags)
         }
     }
 
-    UiGraphNodeRef node = HitTestNode(p);
+    UiGraphNodeRef node = HitTestNodeSpatial(p);
     bool additive = multi_selection_ && HasSelectionModifier(flags);
     if(node.IsValid()) {
         const UiGraphNode* n = model_ ? model_->FindNode(node) : nullptr;
@@ -306,7 +305,7 @@ void UiNodeGraph::LeftDown(Point p, dword flags)
         return;
     }
 
-    UiGraphEdgeRef edge = HitTestEdge(p);
+    UiGraphEdgeRef edge = HitTestEdgeSpatial(p);
     if(edge.IsValid()) {
         SelectEdge(edge, additive);
         return;
@@ -329,8 +328,7 @@ void UiNodeGraph::LeftUp(Point p, dword flags)
 
 void UiNodeGraph::LeftDouble(Point p, dword)
 {
-    PrepareGeometry();
-    UiGraphNodeRef node = HitTestNode(p);
+    UiGraphNodeRef node = HitTestNodeSpatial(p);
     if(node.IsValid()) {
         SelectNode(node, false);
         WhenNodeAction(node);
@@ -368,10 +366,9 @@ void UiNodeGraph::MouseMove(Point p, dword)
         return;
     }
 
-    PrepareGeometry();
-    UiGraphPortRef port = HitTestPort(p);
-    UiGraphNodeRef node = HitTestNode(p);
-    UiGraphEdgeRef edge = node.IsValid() ? UiGraphEdgeRef() : HitTestEdge(p);
+    UiGraphPortRef port = HitTestPortSpatial(p);
+    UiGraphNodeRef node = HitTestNodeSpatial(p);
+    UiGraphEdgeRef edge = node.IsValid() ? UiGraphEdgeRef() : HitTestEdgeSpatial(p);
     if(port != hot_port_ || node != hot_node_ || edge != hot_edge_) {
         hot_port_ = port;
         hot_node_ = node;
