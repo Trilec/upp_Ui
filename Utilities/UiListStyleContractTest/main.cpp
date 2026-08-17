@@ -66,7 +66,7 @@ CONSOLE_APP_MAIN
     UiModelItem item("Row", 1);
     item.has_check = true;
     item.checked = true;
-    item.icon = CtrlImg::exclamation();
+    item.icon = ICON_DESIGN_DRAG_INDICATOR_48();
     item.has_metadata = true;
     UiItemRenderData data = UiListOwnedItemRenderData(style, item);
     Check(!data.has_check && !data.checked,

@@ -6,6 +6,9 @@ TASK: normalize UiList, UiBaseEdit, UiDropdown and UiAccordion against the accep
 
 STATUS: **UILIST RUNTIME SOURCE COMPLETE — WINDOWS VALIDATION PENDING.**
 
+PUBLISHED:
+- `a53154e19afc2ee654821775373d6a51435e7cc2` — owning List style becomes authoritative for built-in row rendering; stray connector-probe files removed in the same tree checkpoint.
+
 CURRENT CHECKPOINT:
 - the built-in UiList row renderer now projects the owning List style instead of independently resolving row presentation from global theme state;
 - viewport Skin/shadow/focus remain viewport-owned and are not copied into rows;
@@ -20,19 +23,19 @@ TOUCHED:
 - `Ui/UiListPaint.cpp`
 - `Ui/UiListRender.cpp`
 - `Ui/UiListRenderStyle.h`
+- `Ui/Ui.upp`
 - `Utilities/UiListStyleContractTest/`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
 
 VALIDATION:
-- source/static review in progress;
+- source/static review complete for style authority and bounded-renderer invalidation path;
 - Windows U++ Debug/Release test/build pending;
 - existing `UiModelViewPerformanceTest` remains a required regression gate because unchanged List Layout must still report zero renderer relayouts.
 
 NEXT:
-1. source-review and verify this List checkpoint on remote;
-2. normalize UiList + UiBaseEdit Designer adapters and add focused adapter tests;
-3. normalize UiDropdown + UiAccordion typed Designer adapters;
-4. normalize the four demos;
-5. hand the accumulated meaningful checkpoints to Gary for Windows validation.
+1. normalize UiList + UiBaseEdit Designer adapters and add focused adapter tests;
+2. normalize UiDropdown + UiAccordion typed Designer adapters;
+3. normalize the four demos;
+4. hand the accumulated meaningful checkpoints to Gary for Windows validation.
 
 Repository-wide `docs/ACTIVE_WORK.md` remains intact so concurrent UiGraph recovery evidence is not overwritten; this task-specific recovery log is the authority for the four-control override rollout until the work is folded back into the main checkpoint.

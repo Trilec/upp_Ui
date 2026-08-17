@@ -142,6 +142,7 @@ file
 	UiTreeRender.cpp,
 	UiTreeInteraction.cpp,
 	UiList.h,
+	UiListRenderStyle.h,
 	UiList.cpp,
 	UiListModelView.cpp,
 	UiListRender.cpp,
