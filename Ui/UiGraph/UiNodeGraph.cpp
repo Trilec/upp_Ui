@@ -1966,43 +1966,98 @@ void UiNodeGraph::PaintConnectionPreview(Painter& p)
 void UiNodeGraph::PaintMarquee(Draw& w) const
 {
     if(interaction_ != InteractionMode::Marquee || marquee_.IsEmpty()) return;
-    const Style& style = GetEffectiveStyle(); RGBA fill(style.selection_box_fill); fill.a = (byte)minmax(style.selection_box_alpha, 0, 255);
-    ImageBuffer ib(marquee_.GetSize()); BufferPainter p(ib, MODE_ANTIALIASED); p.Clear(fill); w.DrawImage(marquee_.left, marquee_.top, ib);
-    w.DrawRect(marquee_.left, marquee_.top, marquee_.GetWidth(), 1, style.selection_box_frame);
-    w.DrawRect(marquee_.left, marquee_.bottom - 1, marquee_.GetWidth(), 1, style.selection_box_frame);
-    w.DrawRect(marquee_.left, marquee_.top, 1, marquee_.GetHeight(), style.selection_box_frame);
-    w.DrawRect(marquee_.right - 1, marquee_.top, 1, marquee_.GetHeight(), style.selection_box_frame);
+    const Style& style = GetEffectiveStyle();
+    RGBA fill(style.selection_box_fill);
+    fill.a = (byte)minmax(style.selection_box_alpha, 0, 255);
+
+    // A one-pixel alpha tile scales to the marquee without allocating a
+    // marquee-sized ImageBuffer on every pointer move.
+    ImageBuffer ib(Size(1, 1));
+    ib[0][0] = fill;
+    Image tile = ib;
+    w.DrawImage(marquee_, tile);
+
+    const int border = DPI(1);
+    w.DrawRect(marquee_.left, marquee_.top, marquee_.GetWidth(), border, style.selection_box_frame);
+    w.DrawRect(marquee_.left, marquee_.bottom - border, marquee_.GetWidth(), border, style.selection_box_frame);
+    w.DrawRect(marquee_.left, marquee_.top, border, marquee_.GetHeight(), style.selection_box_frame);
+    w.DrawRect(marquee_.right - border, marquee_.top, border, marquee_.GetHeight(), style.selection_box_frame);
 }
 
 void UiNodeGraph::PaintGraphGeometry(Draw& w)
 {
     Size size = GetSize(); if(size.cx <= 0 || size.cy <= 0) return;
     Rect viewport(Point(0,0), size);
+    Rect paint = w.GetPaintRect() & viewport;
+    if(paint.IsEmpty()) return;
+
     last_paint_node_visit_count_ = 0;
     last_paint_edge_visit_count_ = 0;
     last_painted_node_count_ = 0;
     last_painted_edge_count_ = 0;
 
-    // Connections are deliberately painted first. Node surfaces/content and
-    // selection chrome are composited over them, matching graph-scene depth.
-    ImageBuffer edge_buffer(size); BufferPainter ep(edge_buffer, MODE_ANTIALIASED); ep.Clear(RGBAZero());
-    for(int i = 0; i < edge_geometry_.GetCount(); i++) {
-        last_paint_edge_visit_count_++;
-        const EdgeGeometry& g = edge_geometry_[i];
-        if((g.bounds & viewport).IsEmpty()) continue;
+    // Query only the dirty screen region through the retained world-space
+    // index. Prepared geometry stays viewport-bounded, while damage repaint is
+    // further bounded to the spatial cells that can actually affect this paint.
+    WorldRect paint_world;
+    paint_world.Include(ScreenToWorld(paint.TopLeft()));
+    paint_world.Include(ScreenToWorld(paint.BottomRight()));
+    paint_world = paint_world.Inflated(160.0 / max(zoom_, 0.01));
+    Index<UiGraphId> node_ids;
+    Index<UiGraphId> edge_ids;
+    QuerySpatial(paint_world, node_ids, edge_ids);
+    for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
+        UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
+        node_ids.FindAdd(ref.id);
+        if(model_)
+            for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
+                edge_ids.FindAdd(edge.id);
+    }
+
+    Vector<int> paint_nodes;
+    paint_nodes.Reserve(node_ids.GetCount());
+    for(int i = 0; i < node_ids.GetCount(); i++) {
+        int q = node_geometry_.Find(node_ids[i]);
+        if(q >= 0 && !(node_geometry_[q].paint_bounds & paint).IsEmpty())
+            paint_nodes.Add(q);
+    }
+    Sort(paint_nodes, [&](int a, int b) {
+        const NodeGeometry& ga = node_geometry_[a];
+        const NodeGeometry& gb = node_geometry_[b];
+        return ga.z_order != gb.z_order ? ga.z_order < gb.z_order : ga.ref.id < gb.ref.id;
+    });
+
+    Vector<int> paint_edges;
+    paint_edges.Reserve(edge_ids.GetCount());
+    for(int i = 0; i < edge_ids.GetCount(); i++) {
+        int q = edge_geometry_.Find(edge_ids[i]);
+        if(q >= 0 && !(edge_geometry_[q].bounds & paint).IsEmpty())
+            paint_edges.Add(q);
+    }
+
+    last_paint_node_visit_count_ = paint_nodes.GetCount();
+    last_paint_edge_visit_count_ = paint_edges.GetCount();
+
+    // Connections are deliberately painted first. Use a buffer only as large
+    // as the dirty rectangle and translate absolute scene coordinates into it.
+    ImageBuffer edge_buffer(paint.GetSize());
+    BufferPainter ep(edge_buffer, MODE_ANTIALIASED);
+    ep.Clear(RGBAZero());
+    ep.Translate(-paint.left, -paint.top);
+    for(int q : paint_edges) {
+        const EdgeGeometry& g = edge_geometry_[q];
         const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
         last_painted_edge_count_++;
         UiGraphVisualState state = GetEdgeVisualState(*edge);
         PaintEdge(ep, *edge, g, ResolveEdgeStyle(*edge, state), state);
     }
     PaintConnectionPreview(ep);
-    w.DrawImage(0,0,edge_buffer);
+    w.DrawImage(paint.left, paint.top, edge_buffer);
 
-    // Edge labels/overlays are still below nodes so a node always wins visual
+    // Edge labels/overlays remain below nodes so a node always wins visual
     // depth over a connection that crosses it.
-    for(int i = 0; i < edge_geometry_.GetCount(); i++) {
-        const EdgeGeometry& g = edge_geometry_[i];
-        if((g.bounds & viewport).IsEmpty()) continue;
+    for(int q : paint_edges) {
+        const EdgeGeometry& g = edge_geometry_[q];
         const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
         UiGraphVisualState state = GetEdgeVisualState(*edge); UiGraphEdgeStyle style = ResolveEdgeStyle(*edge,state); int si = VisualStateIndex(state);
         if(!edge->title.IsEmpty()) {
@@ -2013,24 +2068,26 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(WhenPaintEdgeOverlay) WhenPaintEdgeOverlay(w,*edge,g.points,state);
     }
 
-    for(int i = 0; i < node_geometry_.GetCount(); i++) {
-        last_paint_node_visit_count_++;
-        const NodeGeometry& g = node_geometry_[i]; if((g.paint_bounds & viewport).IsEmpty()) continue;
+    for(int q : paint_nodes) {
+        const NodeGeometry& g = node_geometry_[q];
         const UiGraphNode* node = model_->FindNode(g.ref); if(!node) continue;
         last_painted_node_count_++;
         UiGraphVisualState state = GetNodeVisualState(*node); PaintNodeSurface(w,*node,g,ResolveNodeStyle(*node,state),state);
     }
 
-    ImageBuffer node_buffer(size); BufferPainter np(node_buffer, MODE_ANTIALIASED); np.Clear(RGBAZero());
-    for(int i = 0; i < node_geometry_.GetCount(); i++) {
-        const NodeGeometry& g = node_geometry_[i]; if((g.paint_bounds & viewport).IsEmpty()) continue;
+    ImageBuffer node_buffer(paint.GetSize());
+    BufferPainter np(node_buffer, MODE_ANTIALIASED);
+    np.Clear(RGBAZero());
+    np.Translate(-paint.left, -paint.top);
+    for(int q : paint_nodes) {
+        const NodeGeometry& g = node_geometry_[q];
         const UiGraphNode* node = model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state = GetNodeVisualState(*node); PaintNodeDetails(np,*node,g,ResolveNodeStyle(*node,state),state);
     }
-    w.DrawImage(0,0,node_buffer);
+    w.DrawImage(paint.left,paint.top,node_buffer);
 
-    for(int i = 0; i < node_geometry_.GetCount(); i++) {
-        const NodeGeometry& g=node_geometry_[i]; if((g.paint_bounds&viewport).IsEmpty()) continue;
+    for(int q : paint_nodes) {
+        const NodeGeometry& g=node_geometry_[q];
         const UiGraphNode* node=model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state=GetNodeVisualState(*node); UiGraphNodeStyle style=ResolveNodeStyle(*node,state);
         PaintNodeText(w,*node,g,style,state); if(WhenPaintNodeOverlay) WhenPaintNodeOverlay(w,*node,g.rect,state);
@@ -2040,8 +2097,27 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             if(node->shape==UiGraphNodeShape::Rectangle) metrics.radius=0;
             else if(node->shape==UiGraphNodeShape::Capsule) metrics.radius=max(0,min(g.surface.GetWidth(),g.surface.GetHeight())/2);
             else metrics.radius=max(0,fround(node->corner_radius*zoom_));
-            UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&IsNodeSelected(node->ref));
+            // Selected nodes use one shape-independent selection overlay below;
+            // do not stack the rectangular focus ring on top of it.
+            UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&!IsNodeSelected(node->ref));
         }
+    }
+
+    bool have_selected = false;
+    for(int q : paint_nodes)
+        if(IsNodeSelected(node_geometry_[q].ref)) { have_selected = true; break; }
+    if(have_selected) {
+        ImageBuffer selection_buffer(paint.GetSize());
+        BufferPainter sp(selection_buffer, MODE_ANTIALIASED);
+        sp.Clear(RGBAZero());
+        sp.Translate(-paint.left, -paint.top);
+        const Color selection = GetEffectiveStyle().selection_box_frame;
+        for(int q : paint_nodes) {
+            const NodeGeometry& g = node_geometry_[q];
+            if(IsNodeSelected(g.ref) && !g.hit_path.IsEmpty())
+                StrokePath(sp, g.hit_path, (double)DPI(2), selection, true);
+        }
+        w.DrawImage(paint.left, paint.top, selection_buffer);
     }
 }
 
