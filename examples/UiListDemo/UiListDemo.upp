@@ -1,9 +1,11 @@
+description "UiList builder demo";
+
 uses
-	CtrlLib,
-	Ui;
+    CtrlLib,
+    Ui;
 
 file
-	main.cpp;
+    NormalizedDemo.cpp;
 
 mainconfig
-	"" = "GUI";
+    "" = "GUI";

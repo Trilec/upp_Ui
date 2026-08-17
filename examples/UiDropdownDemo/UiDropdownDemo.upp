@@ -1,16 +1,14 @@
-description "UiDropdown Demo\377";
+description "UiDropdown standalone builder demo";
 
 uses
-	Core,
-	Draw,
-	CtrlCore,
-	CtrlLib,
-	Painter,
-	Ui;
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui;
 
 file
-	main.cpp;
+    NormalizedDemo.cpp;
 
 mainconfig
-	"" = "GUI";
-
+    "" = "GUI";
