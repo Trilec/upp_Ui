@@ -1,0 +1,14 @@
+description "PropertyEditor stable sort_order presentation contract";
+
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Utilities/PropertyEditor;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "CONSOLE";
