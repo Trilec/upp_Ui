@@ -164,6 +164,7 @@ void UiList::SyncThemeStyle()
         return;
     themed_style_ = UiTheme::ResolveList();
     theme_revision_ = revision;
+    ResetItemRenderPool();
 }
 
 UiList& UiList::SetCustomStyle(const Style& s)
@@ -187,6 +188,7 @@ UiList& UiList::ClearCustomStyle()
 
 void UiList::OnStyleChanged()
 {
+    ResetItemRenderPool();
     RefreshLayout();
     Refresh();
 }

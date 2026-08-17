@@ -1,4 +1,5 @@
 #include <Ui/UiList.h>
+#include <Ui/UiListRenderStyle.h>
 
 namespace Upp {
 
@@ -53,6 +54,9 @@ void UiList::PrepareItemRenders()
     EnsureItemRender();
     last_render_layout_count_ = 0;
 
+    const Style& style = GetEffectiveStyle();
+    const bool list_owned_style = !item_render_->HasCustomStyle();
+
     if(prepared_render_model_ != model_) {
         InvalidateItemRenderData();
         prepared_render_model_ = model_;
@@ -73,7 +77,12 @@ void UiList::PrepareItemRenders()
         int index = range.first + slot_index;
         ItemRenderSlot& slot = item_render_pool_[slot_index];
         if(slot.index != index) {
-            slot.render->SetData(UiMakeItemRenderData(model_->Get(index)));
+            UiItemRenderData data = list_owned_style
+                ? UiListOwnedItemRenderData(style, model_->Get(index))
+                : UiMakeItemRenderData(model_->Get(index));
+            slot.render->SetData(data);
+            if(list_owned_style)
+                slot.render->SetCustomStyle(UiListOwnedItemRenderStyle(style, index));
             slot.index = index;
         }
         if(slot.render->PrepareLayout(GetRowRect(index), UiDirection::H))

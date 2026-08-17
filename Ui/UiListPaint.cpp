@@ -3,6 +3,52 @@
 
 namespace Upp {
 
+static void PaintListBadge(Draw& w, const Rect& row, const Rect& badge,
+                           const UiList::Style& style, const UiModelItem& item,
+                           bool enabled)
+{
+    if(badge.IsEmpty() || item.right_text.IsEmpty())
+        return;
+
+    Rect r = badge;
+    int vertical_pad = min(DPI(4), max(0, (r.GetHeight() - style.font.GetHeight()) / 2));
+    r.Deflate(0, vertical_pad);
+    if(r.IsEmpty())
+        return;
+
+    StyledPalette palette;
+    StyledMetrics metrics;
+    Color face = style.badge_face;
+    if(IsNull(face)) {
+        const UiFill& fallback = style.palette.face[ST_NORMAL];
+        face = fallback.IsSolid() ? fallback.color : SColorPaper();
+    }
+    for(int i = 0; i < 4; i++) {
+        palette.face[i] = UiFill::Solid(face);
+        palette.frame[i] = style.badge_frame;
+        palette.ink[i] = style.badge_ink;
+        palette.icon[i] = style.badge_ink;
+    }
+    metrics.face_enabled = true;
+    metrics.frame_enabled = !IsNull(style.badge_frame);
+    metrics.frame_width = DPI(1);
+    metrics.radius = max(0, style.badge_radius);
+    metrics.focus_enabled = false;
+    metrics.shadow.enabled = false;
+    UiPaintStyledSurface(w, r, palette, metrics, StyledSkin(),
+                         enabled ? ST_NORMAL : ST_DISABLED,
+                         false, false, false);
+
+    Font font = item.use_custom_font ? item.custom_font : style.font;
+    Size text = GetTextSize(item.right_text, font);
+    int x = r.left + max(0, (r.GetWidth() - text.cx) / 2);
+    int y = r.top + max(0, (r.GetHeight() - text.cy) / 2);
+    w.Clip(r);
+    w.DrawText(x, y, item.right_text, font,
+               enabled ? style.badge_ink : style.disabled_ink);
+    w.End();
+}
+
 void UiList::PaintRow(Draw& w, int index, const Rect& row) const
 {
     if(!model_ || index < 0 || index >= model_->GetCount() || row.IsEmpty())
@@ -17,6 +63,24 @@ void UiList::PaintRow(Draw& w, int index, const Rect& row) const
     const UiItemRender *render = FindPreparedItemRender(index);
     if(render)
         render->Paint(w, GetItemRenderState(index));
+
+    if(style.right_text_as_badge && !item.right_text.IsEmpty())
+        PaintListBadge(w, row, GetRightTextRect(row, item), style, item,
+                       item.enabled && IsEnabled());
+
+    const bool selected_underline = style.selected_as_underline && IsSelected(index);
+    const bool hot_underline = !selected_underline && style.hot_as_underline && index == hot_;
+    if(selected_underline || hot_underline) {
+        const int thickness = max(1, style.state_underline_thickness);
+        const int inset = max(0, style.h_padding);
+        const int width = max(0, row.GetWidth() - inset * 2);
+        Color ink = selected_underline ? style.selected_frame : style.hot_frame;
+        if(IsNull(ink))
+            ink = selected_underline ? style.selected_ink : style.hot_ink;
+        if(width > 0)
+            w.DrawRect(row.left + inset, row.bottom - thickness,
+                       width, thickness, ink);
+    }
 
     if(drag_reorder_enabled_ && style.show_drag_handle) {
         Rect dr = GetDragRect(row);
