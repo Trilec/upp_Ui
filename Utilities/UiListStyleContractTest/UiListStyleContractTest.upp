@@ -1,0 +1,11 @@
+description "UiList owning-style row renderer contract";
+
+uses
+    Core,
+    Ui;
+
+mainconfig
+    "CONSOLE" = "1";
+
+file
+    main.cpp;
