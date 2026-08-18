@@ -159,6 +159,22 @@ class UiDataModelBase : public Pte<UiDataModelBase> {
 public:
     Event<const UiModelChange&> WhenChange;
 
+    UiDataModelBase() {}
+    UiDataModelBase(const UiDataModelBase& src)
+        : revision_(src.revision_)
+    {
+        // A copied model is a new observable object. Do not copy callbacks or
+        // Pte weak-identity state from the source object.
+    }
+    UiDataModelBase& operator=(const UiDataModelBase& src)
+    {
+        if(this != &src)
+            revision_ = src.revision_;
+        // Assignment changes semantic contents in derived models, not the
+        // destination object's observer identity or installed callbacks.
+        return *this;
+    }
+
     int GetRevision() const { return revision_; }
 
 protected:
