@@ -252,8 +252,11 @@ void UiNodeGraph::RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect
     for(int y = y0; y <= y1; y++)
         for(int x = x0; x <= x1; x++) {
             int i = spatial_cells_.Find(SpatialCellKey(x, y));
-            if(i >= 0)
-                RemoveId(spatial_cells_[i].nodes, ref.id);
+            if(i < 0)
+                continue;
+            RemoveId(spatial_cells_[i].nodes, ref.id);
+            if(spatial_cells_[i].nodes.IsEmpty() && spatial_cells_[i].edges.IsEmpty())
+                spatial_cells_.Remove(i);
         }
 }
 
@@ -269,8 +272,11 @@ void UiNodeGraph::RemoveEdgeFromSpatialCells(UiGraphEdgeRef ref, const WorldRect
     for(int y = y0; y <= y1; y++)
         for(int x = x0; x <= x1; x++) {
             int i = spatial_cells_.Find(SpatialCellKey(x, y));
-            if(i >= 0)
-                RemoveId(spatial_cells_[i].edges, ref.id);
+            if(i < 0)
+                continue;
+            RemoveId(spatial_cells_[i].edges, ref.id);
+            if(spatial_cells_[i].nodes.IsEmpty() && spatial_cells_[i].edges.IsEmpty())
+                spatial_cells_.Remove(i);
         }
 }
 
