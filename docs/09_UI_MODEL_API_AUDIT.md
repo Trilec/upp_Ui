@@ -1,8 +1,8 @@
 # 09 — Ui Model API + Theme Audit
 
 This audit records the model-ownership simplification performed after R2 model
-rendering acceptance and the subsequent UiDoc convergence onto the same public
-ownership vocabulary.
+rendering acceptance, the subsequent UiDoc convergence onto the same public
+ownership vocabulary, and the final lifetime hardening of ordinary shared models.
 
 ## Decision
 
@@ -129,6 +129,14 @@ Graph topology, ports and edges remain domain model state. Geometry caches,
 selection, pan/zoom and transient drag/connect/marquee state remain view state.
 The canvas is resolved through an explicit semantic dark/light theme surface.
 
+The final Graph hardening keeps one retained world-space spatial hash as the
+broad-phase authority. Public `HitTestNode`, `HitTestPort` and `HitTestEdge` now
+use the same small spatial-neighborhood queries as live pointer interaction rather
+than retaining a second prepared-viewport scan path. Node-style-class preview
+rebuilds only currently prepared users of that class plus their prepared incident
+edges; it does not rebuild the world index or full prepared viewport. Empty hash
+cells are removed when their final occupant leaves.
+
 ### UiDoc
 
 Model: `UiDocCore`.
@@ -158,6 +166,32 @@ document into generic items:
 symmetry and is not mirrored through `UiModelItem`.
 
 See `docs/10_UIDOC_MODEL_BINDING.md` for the programmer-facing contract.
+
+## Shared observer lifetime contract
+
+`UiListModel`, `UiTreeModel`, `UiTableModel`, `UiMenuModel` and `UiGraphModel`
+inherit the lightweight `UiDataModelBase` notification contract. Their views may
+leave callbacks attached to previously used external models and ignore those
+callbacks while the model is inactive.
+
+Raw address identity is insufficient for that pattern: external model A can be
+destroyed and a fresh model B can later be allocated at the same address. The
+shared model layer therefore carries weak `Pte` identity and views remember
+previous bindings through `UiModelObserverSet`. Expired identities are pruned
+before deduplication, so B always receives a fresh observer even when its address
+matches destroyed A.
+
+Copy/value semantics remain explicit:
+
+- copying a `UiDataModelBase` creates a fresh weak identity and does not copy
+  installed callbacks;
+- assignment preserves the destination object's identity and callbacks while
+  copying revision semantics;
+- active external ownership remains non-owning; weak observer bookkeeping does
+  not extend a model's lifetime.
+
+This lifetime rule is shared by List, Gallery, Tree, Table, Dropdown, Menu and
+NodeGraph and matches the same-address hardening already established for UiDoc.
 
 ## Controls deliberately not given models
 
@@ -217,11 +251,13 @@ Rules:
 6. `ClearModel()` clears the currently active model and does not switch models.
 7. Previously installed model callbacks may remain connected, but a view ignores
    notifications whose observed model is not the current model.
-8. External models are non-owning and must outlive the period in which they are
+8. Binding deduplication is lifetime-aware rather than raw-address-only; a fresh
+   object that reuses a destroyed model's address must receive a fresh callback.
+9. External models are non-owning and must outlive the period in which they are
    actively used by a view.
-9. Derived interaction state must remain valid after external mutation; when a
-   selected model object disappears, the view clears or clamps that transient
-   state rather than retaining a stale semantic reference.
+10. Derived interaction state must remain valid after external mutation; when a
+    selected model object disappears, the view clears or clamps that transient
+    state rather than retaining a stale semantic reference.
 
 ## Performance result
 
@@ -233,6 +269,8 @@ The API convergence adds no new semantic data layer.
 - List/Gallery/Table/Tree renderer pools remain bounded by useful viewport
   content;
 - Tree projection and Graph geometry retain their domain-specific cache contracts;
+- Graph point hit tests query retained spatial cells before exact geometry tests;
+- Graph local style-class updates do not rebuild the full spatial/prepared scene;
 - UiDoc paragraph/layout caches remain derived view state and are invalidated from
   `UiDocApplyResult`, not mirrored document storage.
 
@@ -245,7 +283,10 @@ Existing scale tests remain required after the API migration.
 - standalone theme-driven `UiList` viewport receives a semantic Surface face
   even when Minimal row presentation is intentionally transparent;
 - `UiTable` resolves ordinary Table domain chrome coherently in Dark mode rather
-  than retaining selected Light-only defaults.
+  than retaining selected Light-only defaults;
+- NodeGraph committed selection uses the semantic Accent path rather than the
+  darker pressed Accent, with a consistent approximately 2px shape-following
+  overlay independent of node-shape frame styling.
 
 ### Already coherent
 
@@ -271,9 +312,11 @@ style and freezes the current theme snapshot.
 
 ## Deterministic validation
 
-`Utilities/UiModelBindingContractTest` provides **49 checks**: seven ownership /
-switching checks for each of List, Gallery, Tree, Table, Dropdown, Menu and
-NodeGraph.
+`Utilities/UiModelBindingContractTest` now provides **55 checks**: the existing
+seven ownership/switching checks for each of List, Gallery, Tree, Table, Dropdown,
+Menu and NodeGraph, plus six weak-identity tests covering independent copy
+identity, assignment identity preservation, expiration, same-address helper reuse,
+List rebinding and NodeGraph rebinding.
 
 `Utilities/UiDocModelBindingTest` provides **22 checks** covering:
 
@@ -299,6 +342,7 @@ Existing scale/regression gates remain authoritative:
 - `UiTreeScaleTest` — 11 checks;
 - `UiGalleryRegressionTest` — 11 checks;
 - `UiDropdownMenuRenderTest` — 11 checks;
+- `UiNodeGraphScaleTest` — **51 checks** after final spatial/local-update hardening;
 - the existing UiDoc model/interaction/geometry/image/metadata suites.
 
 Windows validation must run the focused binding suites in Debug and Release and
