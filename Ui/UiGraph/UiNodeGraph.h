@@ -176,7 +176,7 @@ public:
         double zoom_step = 1.12;
         int fit_margin = DPI(36);
         Color selection_box_fill = Color(59, 130, 246);
-        Color selection_box_frame = Color(37, 99, 235);
+        Color selection_box_frame = Color(59, 130, 246);
         int selection_box_alpha = 24;
 
         void Serialize(Stream& s);
