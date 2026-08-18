@@ -206,6 +206,14 @@ bool UiTreeModel::Set(UiTreeNodeRef node, const UiModelItem& it)
     return true;
 }
 
+bool UiTreeModel::Touch(UiTreeNodeRef node)
+{
+    if(!IsValid(node))
+        return false;
+    Notify(UI_MODEL_UPDATE, node.id, 1);
+    return true;
+}
+
 void UiTreeModel::FreeSubtree(int id)
 {
     Node& n = nodes_[id];
@@ -481,6 +489,14 @@ bool UiTableModel::SetCell(int row, int col, const UiTableCell& cell)
     return true;
 }
 
+bool UiTableModel::TouchCell(int row, int col)
+{
+    if(!IsValidCell(row, col))
+        return false;
+    Notify(UI_MODEL_UPDATE, row, col, 1);
+    return true;
+}
+
 Value UiTableModel::GetCellValue(int row, int col) const
 {
     return IsValidCell(row, col) ? cells_[row][col].value : Value();
@@ -524,6 +540,15 @@ bool UiTableModel::SetHeader(UiTableAxis axis, int index, const UiTableHeader& h
     if(index < 0 || index >= headers.GetCount())
         return false;
     headers[index] = header;
+    Notify(UI_MODEL_UPDATE, axis, index, 0);
+    return true;
+}
+
+bool UiTableModel::TouchHeader(UiTableAxis axis, int index)
+{
+    Vector<UiTableHeader>& headers = axis == UITABLE_ROW_AXIS ? row_headers_ : column_headers_;
+    if(index < 0 || index >= headers.GetCount())
+        return false;
     Notify(UI_MODEL_UPDATE, axis, index, 0);
     return true;
 }
@@ -643,6 +668,14 @@ bool UiMenuModel::Set(UiMenuNodeRef node, const UiMenuItem& item)
     if(!IsValid(node))
         return false;
     nodes_[node.id].item = item;
+    Notify(UI_MODEL_UPDATE, node.id, 1);
+    return true;
+}
+
+bool UiMenuModel::Touch(UiMenuNodeRef node)
+{
+    if(!IsValid(node))
+        return false;
     Notify(UI_MODEL_UPDATE, node.id, 1);
     return true;
 }
