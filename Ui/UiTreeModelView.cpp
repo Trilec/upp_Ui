@@ -17,8 +17,56 @@ void UiTree::BindModel(UiTreeModel& model)
     };
 }
 
-void UiTree::HandleModelChange(const UiModelChange&)
+void UiTree::HandleModelChange(const UiModelChange& change)
 {
+    if(change.kind == UI_MODEL_UPDATE && model_) {
+        UiTreeNodeRef node{change.a};
+        int row = model_->IsValid(node) ? FindVisibleRow(node.id) : -1;
+        bool projection_changed = false;
+
+        if(row >= 0 && row < visible_rows_.GetCount()) {
+            const UiModelItem& item = model_->Get(node);
+            bool has_children = model_->GetChildCount(node) > 0 || item.lazy_children || IsNodeLoading(node);
+            bool expanded = has_children && IsExpanded(node);
+            bool placeholder = row + 1 < visible_rows_.GetCount()
+                            && visible_rows_[row + 1].placeholder
+                            && visible_rows_[row + 1].id == node.id;
+            bool placeholder_should_exist = expanded && model_->GetChildCount(node) == 0 && IsNodeLoading(node);
+            projection_changed = visible_rows_[row].has_children != has_children
+                              || visible_rows_[row].expanded != expanded
+                              || placeholder != placeholder_should_exist;
+        }
+
+        if(!projection_changed) {
+            model_revision_ = model_->GetRevision();
+
+            if(row >= 0 && row < visible_rows_.GetCount()) {
+                const UiModelItem& item = model_->Get(node);
+                visible_rows_[row].has_children = model_->GetChildCount(node) > 0
+                                               || item.lazy_children || IsNodeLoading(node);
+                visible_rows_[row].expanded = visible_rows_[row].has_children && IsExpanded(node);
+            }
+
+            if(selected_ids_.Find(node.id) >= 0 && !IsSelectableNode(node))
+                selected_ids_.RemoveKey(node.id);
+            if(cursor_id_ == node.id && !IsSelectableNode(node))
+                cursor_id_ = -1;
+            if(anchor_id_ == node.id && !IsSelectableNode(node))
+                anchor_id_ = cursor_id_;
+            if(editing_id_ == node.id && !IsSelectableNode(node))
+                CancelRename();
+
+            if(row >= 0) {
+                ResetRenderPools();
+                PrepareItemRenders();
+                UpdateAttachedCtrls();
+                RefreshLayout();
+                Refresh(GetRowRect(row));
+            }
+            return;
+        }
+    }
+
     model_revision_ = -1;
     SyncModel();
     ResetRenderPools();
@@ -68,20 +116,25 @@ void UiTree::SyncModel()
 
     model_revision_ = revision;
     RebuildVisibleRows();
-    if(cursor_id_ >= 0 && !model_->IsValid(UiTreeNodeRef{cursor_id_}))
-        cursor_id_ = visible_rows_.IsEmpty() ? -1 : visible_rows_[0].id;
-    if(anchor_id_ >= 0 && !model_->IsValid(UiTreeNodeRef{anchor_id_}))
+    if(cursor_id_ >= 0 && (!model_->IsValid(UiTreeNodeRef{cursor_id_})
+                           || !IsSelectableNode(UiTreeNodeRef{cursor_id_})))
+        cursor_id_ = -1;
+    if(anchor_id_ >= 0 && (!model_->IsValid(UiTreeNodeRef{anchor_id_})
+                           || !IsSelectableNode(UiTreeNodeRef{anchor_id_})))
         anchor_id_ = cursor_id_;
     if(hot_id_ >= 0 && !model_->IsValid(UiTreeNodeRef{hot_id_}))
         hot_id_ = -1;
-    if(editing_id_ >= 0 && !model_->IsValid(UiTreeNodeRef{editing_id_}))
+    if(editing_id_ >= 0 && (!model_->IsValid(UiTreeNodeRef{editing_id_})
+                            || !IsSelectableNode(UiTreeNodeRef{editing_id_})))
         CancelRename();
     for(int i = loading_ids_.GetCount() - 1; i >= 0; i--)
         if(!model_->IsValid(UiTreeNodeRef{loading_ids_[i]}))
             loading_ids_.Remove(i);
-    for(int i = selected_ids_.GetCount() - 1; i >= 0; i--)
-        if(!model_->IsValid(UiTreeNodeRef{selected_ids_[i]}))
+    for(int i = selected_ids_.GetCount() - 1; i >= 0; i--) {
+        UiTreeNodeRef node{selected_ids_[i]};
+        if(!model_->IsValid(node) || !IsSelectableNode(node))
             selected_ids_.Remove(i);
+    }
     if(selection_mode_ == UITREESEL_SINGLE && selected_ids_.GetCount() > 1)
         SelectSingle(UiTreeNodeRef{cursor_id_});
     ClampScroll();
