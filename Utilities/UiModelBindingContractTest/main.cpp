@@ -1,4 +1,5 @@
 #include <Ui/Ui.h>
+#include <new>
 
 using namespace Upp;
 
@@ -119,7 +120,7 @@ void TestTable(TestCtx& t)
     table.SetModel(external);
     t.Expect(!table.IsUsingInternalModel() && &table.Model() == &external
              && table.Model().GetCellValue(0, 0) == Value("External table"),
-             "Table SetModel makes the supplied model the active Model()");
+             "Table SetModel makes the supplied external model the active Model()");
     table.Model().SetSize(3, 1);
     t.Expect(external.GetRowCount() == 3, "Table Model() mutation reaches the supplied external model");
     UiTableModel external_b;
@@ -230,6 +231,73 @@ void TestGraph(TestCtx& t)
              "NodeGraph UseInternalModel restores retained internal data after external-model detours");
 }
 
+void TestObserverLifetime(TestCtx& t)
+{
+    UiDataModelBase base_a;
+    Ptr<UiDataModelBase> weak_a = &base_a;
+    UiDataModelBase base_copy(base_a);
+    Ptr<UiDataModelBase> weak_copy = &base_copy;
+    t.Expect(weak_a && weak_copy && ~weak_a == &base_a && ~weak_copy == &base_copy,
+             "copying a shared model base creates an independent weak observer identity");
+
+    UiDataModelBase base_target;
+    Ptr<UiDataModelBase> weak_target = &base_target;
+    base_target = base_a;
+    t.Expect(weak_target && ~weak_target == &base_target,
+             "assigning a shared model base preserves the destination observer identity");
+
+    alignas(UiListModel) byte list_storage[sizeof(UiListModel)];
+    UiModelObserverSet<UiListModel> observers;
+    UiListModel* observer_a = new (list_storage) UiListModel;
+    observers.Add(observer_a);
+    observer_a->~UiListModel();
+    t.Expect(observers.GetCount() == 1 && observers[0] == nullptr,
+             "destroying an observed model invalidates its weak identity without dereferencing stale storage");
+    UiListModel* observer_b = new (list_storage) UiListModel;
+    observers.Add(observer_b);
+    t.Expect(observers.GetCount() == 1 && observers[0] == observer_b,
+             "adding a fresh model at the same address prunes the expired identity and remembers the new object");
+    observer_b->~UiListModel();
+
+    alignas(UiListModel) byte list_control_storage[sizeof(UiListModel)];
+    UiList list;
+    UiListModel* list_a = new (list_control_storage) UiListModel;
+    list_a->Add("A0", 0);
+    list.SetModel(*list_a);
+    list.UseInternalModel();
+    list_a->~UiListModel();
+
+    UiListModel* list_b = new (list_control_storage) UiListModel;
+    list_b->Add("B0", 0);
+    list_b->Add("B1", 1);
+    list.SetModel(*list_b);
+    list.Select(1);
+    list_b->Remove(1);
+    t.Expect(list.GetSelectionCount() == 0,
+             "List receives change notifications after an external model is recreated at the same address");
+    list.UseInternalModel();
+    list_b->~UiListModel();
+
+    alignas(UiGraphModel) byte graph_storage[sizeof(UiGraphModel)];
+    UiNodeGraph graph;
+    graph.SetRect(0, 0, 640, 480);
+    UiGraphModel* graph_a = new (graph_storage) UiGraphModel;
+    graph_a->AddNode("A", Pointf(20, 20));
+    graph.SetModel(*graph_a);
+    graph.UseInternalModel();
+    graph_a->~UiGraphModel();
+
+    UiGraphModel* graph_b = new (graph_storage) UiGraphModel;
+    graph.SetModel(*graph_b);
+    int spatial_updates = graph.GetSpatialUpdateSerial();
+    graph_b->AddNode("B", Pointf(30, 30));
+    t.Expect(graph.GetSpatialUpdateSerial() > spatial_updates
+             && graph.GetPreparedNodeCount() == 1,
+             "NodeGraph observes a fresh external model recreated at the same address");
+    graph.UseInternalModel();
+    graph_b->~UiGraphModel();
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
@@ -242,6 +310,7 @@ CONSOLE_APP_MAIN
     TestDropdown(t);
     TestMenu(t);
     TestGraph(t);
+    TestObserverLifetime(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
 }
