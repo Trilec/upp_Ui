@@ -37,6 +37,8 @@
       icon remains the compact glyph while image represents thumbnail/media.
     - 2026-08: made shared model observer identity lifetime-aware so a destroyed
       inactive external model cannot block a later model reusing the same address.
+    - 2026-08: centralized sequential index remapping and added ranged Touch()
+      notification for bulk presentation updates to existing list items.
 */
 
 #include <Core/Core.h>
@@ -148,6 +150,64 @@ struct UiModelChange {
     int c = -1;
 };
 
+// Shared helpers for views over sequential UiListModel rows. UiModelChange has
+// domain-specific payloads for Tree/Table/Graph, so these helpers deliberately
+// apply only to the List-model convention: INSERT/ERASE use (start,count) and
+// MOVE uses (old_index,new_index).
+inline bool UiIsSequentialStructuralChange(const UiModelChange& change)
+{
+    return change.kind == UI_MODEL_INSERT || change.kind == UI_MODEL_ERASE ||
+           change.kind == UI_MODEL_MOVE || change.kind == UI_MODEL_CLEAR ||
+           change.kind == UI_MODEL_RESET;
+}
+
+inline int UiRemapSequentialIndex(int index, const UiModelChange& change)
+{
+    if(index < 0)
+        return index;
+
+    switch(change.kind) {
+    case UI_MODEL_INSERT: {
+        int count = max(1, change.b);
+        return index >= change.a ? index + count : index;
+    }
+    case UI_MODEL_ERASE: {
+        int count = max(1, change.b);
+        if(index < change.a)
+            return index;
+        if(index < change.a + count)
+            return -1;
+        return index - count;
+    }
+    case UI_MODEL_MOVE:
+        if(change.a == change.b)
+            return index;
+        if(index == change.a)
+            return change.b;
+        if(change.a < change.b && index > change.a && index <= change.b)
+            return index - 1;
+        if(change.b < change.a && index >= change.b && index < change.a)
+            return index + 1;
+        return index;
+    case UI_MODEL_CLEAR:
+    case UI_MODEL_RESET:
+        return -1;
+    default:
+        return index;
+    }
+}
+
+inline void UiRemapSequentialSelection(Index<int>& selection, const UiModelChange& change)
+{
+    Index<int> remapped;
+    for(int i = 0; i < selection.GetCount(); i++) {
+        int index = UiRemapSequentialIndex(selection[i], change);
+        if(index >= 0)
+            remapped.FindAdd(index);
+    }
+    selection = pick(remapped);
+}
+
 struct UiReorderRequest {
     int from = -1;
     int before = -1;
@@ -231,6 +291,9 @@ public:
     bool IsEmpty() const { return items_.IsEmpty(); }
 
     const UiModelItem& Get(int i) const;
+    // Mutable access is useful for bounded bulk preparation. After changing one
+    // or more existing rows through this reference, call Touch(first,count) once
+    // so revisions and every bound view observe the complete changed range.
     UiModelItem& Get(int i);
 
     int Add(const UiModelItem& it);
@@ -238,6 +301,7 @@ public:
     UiListModel& AddRange(const Vector<UiModelItem>& items);
     bool Insert(int pos, const UiModelItem& it);
     bool Set(int pos, const UiModelItem& it);
+    bool Touch(int first, int count = 1);
     bool Remove(int pos);
     // Move item `from` before logical position `to`. `to == GetCount()`
     // appends the moved item at the end.
