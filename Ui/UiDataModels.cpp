@@ -55,6 +55,14 @@ bool UiListModel::Set(int pos, const UiModelItem& it)
     return true;
 }
 
+bool UiListModel::Touch(int first, int count)
+{
+    if(first < 0 || count <= 0 || first >= items_.GetCount() || count > items_.GetCount() - first)
+        return false;
+    Notify(UI_MODEL_UPDATE, first, count);
+    return true;
+}
+
 bool UiListModel::Remove(int pos)
 {
     if(pos < 0 || pos >= items_.GetCount())
@@ -328,10 +336,17 @@ UiListModel UiTreeModel::ExportList(UiTreeNodeRef parent, bool recursive) const
 
 void UiTreeModel::ImportList(UiTreeNodeRef parent, const UiListModel& list)
 {
-    if(!IsValid(parent))
+    if(!IsValid(parent) || list.IsEmpty())
         return;
-    for(int i = 0; i < list.GetCount(); i++)
-        AddChild(parent, list.Get(i));
+
+    int start = nodes_[parent.id].children.GetCount();
+    for(int i = 0; i < list.GetCount(); i++) {
+        int id = AllocNode();
+        nodes_[id].parent = parent.id;
+        nodes_[id].item = list.Get(i);
+        nodes_[parent.id].children.Add(id);
+    }
+    Notify(UI_MODEL_INSERT, parent.id, start, list.GetCount());
 }
 
 UiTableModel::UiTableModel()
