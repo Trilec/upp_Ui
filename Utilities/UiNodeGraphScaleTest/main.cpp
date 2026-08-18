@@ -218,14 +218,18 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
              "initial 1:1 prepared node geometry is spatially bounded well below 10,000 nodes");
     t.Expect(graph.GetPreparedEdgeCount() < 2200 && graph.GetLastEdgeCandidateCount() < 2200,
              "initial prepared edge geometry is spatially bounded below the 19,800-edge model");
+    t.Expect(UiNodeGraph::StyleDefault().selection_box_frame == Color(59, 130, 246),
+             "committed selection chrome defaults to the explicit bright blue contract");
 
     int style_spatial_build = graph.GetSpatialBuildSerial();
+    int style_geometry_build = graph.GetGeometryBuildSerial();
     UiGraphNodeStyle live_style = soft;
     live_style.port_radius += 1;
-    graph.SetNodeStyleClass("live-preview", live_style);
-    graph.RemoveNodeStyleClass("live-preview");
-    t.Expect(graph.GetSpatialBuildSerial() == style_spatial_build,
-             "live node style-class edits rebuild prepared presentation without rebuilding the 10,000-node spatial index");
+    graph.SetNodeStyleClass("soft", live_style);
+    t.Expect(graph.GetSpatialBuildSerial() == style_spatial_build
+             && graph.GetGeometryBuildSerial() == style_geometry_build,
+             "prepared node style-class preview updates locally without rebuilding the spatial index or full viewport geometry");
+    graph.SetNodeStyleClass("soft", soft);
 
     int spatial_build = graph.GetSpatialBuildSerial();
     int geometry_before_paint = graph.GetGeometryBuildSerial();
@@ -257,12 +261,11 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
                                                                        deep_node->size.cy * 0.5));
     t.Expect(graph.HitTestNode(deep_hit) == deep,
              "deep/high-index node is hit directly through the spatially prepared region");
-    t.Expect(graph.GetLastNodeHitCandidateCount() <= graph.GetPreparedNodeCount()
-             && graph.GetLastNodeHitCandidateCount() < 600,
-             "deep node hit testing does not depend on scanning from node zero");
+    t.Expect(graph.GetLastNodeHitCandidateCount() < 24,
+             "public node hit testing uses a tiny spatial neighbourhood rather than scanning prepared geometry");
     t.Expect(FindAnyPortAtNode(graph, *deep_node)
-             && graph.GetLastPortHitCandidateCount() <= graph.GetPreparedNodeCount(),
-             "deep node port hit testing stays within the prepared spatial candidates");
+             && graph.GetLastPortHitCandidateCount() < 32,
+             "public port hit testing stays within a tiny spatial neighbourhood");
 
     int model_nodes_before_selection = model.GetNodeCount();
     int model_edges_before_selection = model.GetEdgeCount();
@@ -316,6 +319,8 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     Point blank = FindBlankPoint(graph);
     t.Expect(blank.x >= 0 && blank.y >= 0,
              "0.5 zoom viewport exposes a blank point suitable for marquee interaction");
+    t.Expect(blank.x < 0 || graph.GetLastEdgeHitCandidateCount() < 96,
+             "public edge hit testing also remains bounded to the local spatial neighbourhood");
     if(blank.x >= 0) {
         Point end(min(1160, blank.x + 240), min(760, blank.y + 160));
         int marquee_geometry = graph.GetGeometryBuildSerial();
