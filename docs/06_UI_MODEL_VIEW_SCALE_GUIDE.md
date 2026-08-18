@@ -221,16 +221,51 @@ projection; that does not weaken the ordinary scrolling/painting contract.
 
 ## UiNodeGraph
 
-`UiNodeGraph` already follows a retained-scene philosophy: normal graph objects are
-painted rather than represented by one `Ctrl` each, stable graph IDs live in
-`UiGraphModel`, and geometry/damage can be rebuilt narrowly for changed nodes and
-edges.
+`UiNodeGraph` uses two deliberately separate retained layers:
 
-Different node classes may later choose different `UiItemRender` presentations
-for node content while Graph retains shape, ports, edges, world geometry and
-interaction. Very large spatial graphs still require viewport culling/spatial
-lookup so pan, zoom, paint and hit testing depend on spatially relevant objects
-rather than blindly scanning the entire graph.
+1. **world-space broad phase** — one persistent spatial hash containing logical
+   node/edge bounds;
+2. **screen-space prepared scene** — only spatial candidates relevant to the
+   current viewport/overscan plus transient drag dependencies.
+
+Normal graph objects are painted rather than represented by one `Ctrl` each, and
+stable graph IDs live only in `UiGraphModel`. Exceptional embedded interactive
+content may attach an externally-owned `Ctrl`; that does not change the ordinary
+virtual-node contract.
+
+The final high-scale rules are:
+
+- pan/zoom changes screen preparation but reuses the world-space index;
+- node geometry mutation removes/reinserts that node's spatial record and updates
+  its incident edges rather than rebuilding the hash;
+- nested `BeginBatchUpdate()` / `EndBatchUpdate()` coalesces multiple authoritative
+  model mutations into one retained-view response at the outer commit;
+- empty spatial hash cells are deleted when their final node/edge leaves so long
+  editing sessions do not accumulate vacant buckets;
+- public `HitTestNode`, `HitTestPort` and `HitTestEdge` use the same tiny
+  world-space spatial-neighborhood queries as live pointer interaction and then
+  exact-test only those candidates;
+- normal local marquee drag queries only intersecting cells for transient preview;
+  semantic selection commits on release;
+- a marquee spanning more than 256 cells suppresses live candidate hints and
+  performs one final spatial query on release rather than making zoomed-out drag
+  expensive;
+- node-style-class preview rebuilds only currently prepared users of that class
+  and their prepared incident edges; it does not rebuild the spatial hash or the
+  complete prepared viewport;
+- edge/global style changes may legitimately invalidate broader routing/spatial
+  state because route extent can change;
+- dirty-region paint queries the spatial hash for the dirty world area and paints
+  only intersecting prepared nodes/edges;
+- selection chrome is a final independent approximately 2px shape-following
+  Accent overlay, so node-shape frame styling does not define selection identity.
+
+The spatial hash is the chosen broad phase for this editor workload because
+ordinary nodes have broadly similar extents and insert/remove/move operations are
+simple and local. Do not add a parallel quadtree/R-tree/BVH unless measured graph
+workloads demonstrate a real limitation of the hash. A future GPU renderer should
+consume the same model/spatial/prepared-scene boundaries rather than moving model
+semantics into a rendering backend.
 
 ## Validation
 
@@ -269,6 +304,13 @@ no Gallery marquee is active. At checkpoint `d78f161...`, Windows Debug and Rele
 both reached 10/11: the sole failure proved that a transparent Minimal List face
 was not resolving to a concrete dark Gallery surface. The Panel/Surface fallback
 was subsequently corrected and now requires Windows revalidation.
+
+`Utilities/UiNodeGraphScaleTest` now contains **51 deterministic checks**. In
+addition to the 10,000-node / 19,800-edge topology and existing bounded prepared
+scene, marquee and batch evidence, it verifies that public node/port/edge hit
+queries remain spatially bounded and that a live update of the actually-used
+`soft` node style class increments neither the full spatial-build serial nor the
+full geometry-build serial.
 
 These tests verify geometry, renderer-pool bounds, renderer-layout counts and paint
 visit counts rather than fragile elapsed-time thresholds. Windows Debug/Release
