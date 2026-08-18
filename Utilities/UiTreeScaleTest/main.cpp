@@ -73,11 +73,11 @@ void TestFlatHundredThousand(TestCtx& t)
     int lookup_builds = tree.GetVisibleRowLookupBuildCount();
     tail_item.text = "Updated tail node";
     model.Set(tail, tail_item);
-    t.Expect(tree.GetVisibleRowLookupBuildCount() == lookup_builds + 1
+    t.Expect(tree.GetVisibleRowLookupBuildCount() == lookup_builds
              && tree.GetLastRenderLayoutCount() < 100,
-             "one model update rebuilds projection lookup once and prepares only bounded renderers");
+             "ordinary model item update preserves Tree projection lookup and prepares only bounded renderers");
     t.Expect(tree.GetVisibleRowIndex(tail) == 99999,
-             "direct id-to-row lookup remains correct after projection rebuild");
+             "direct id-to-row lookup remains correct after a projection-neutral update");
 
     UiItemRenderImage image_render;
     tree.SetColumnRender(1, image_render);
@@ -103,10 +103,13 @@ void TestLazyPlaceholderLookup(TestCtx& t)
     t.Expect(tree.GetVisibleRowIndex(lazy) == 0 && tree.GetVisibleRowIndex(sibling) == 2,
              "lazy loading placeholder is not indexed as the node and later sibling keeps its exact projection row");
 
+    int lookup_builds = tree.GetVisibleRowLookupBuildCount();
     tree.MarkNodeChildrenLoaded(lazy, true);
     tree.Layout();
     t.Expect(!tree.IsNodeLoading(lazy) && tree.GetVisibleRowIndex(sibling) == 1,
              "zero-child lazy completion clears its placeholder during the same projection rebuild");
+    t.Expect(tree.GetVisibleRowLookupBuildCount() > lookup_builds,
+             "lazy/disclosure update still rebuilds Tree projection when placeholder structure changes");
 }
 
 } // namespace
