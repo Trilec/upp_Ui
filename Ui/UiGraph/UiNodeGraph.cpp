@@ -1986,6 +1986,7 @@ void UiNodeGraph::PaintMarquee(Draw& w) const
     ImageBuffer ib(Size(1, 1));
     BufferPainter bp(ib, MODE_ANTIALIASED);
     bp.Clear(fill);
+    bp.Finish();
     Image tile = ib;
     w.DrawImage(marquee_, tile);
 
@@ -2064,6 +2065,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         PaintEdge(ep, *edge, g, ResolveEdgeStyle(*edge, state), state);
     }
     PaintConnectionPreview(ep);
+    ep.Finish();
     w.DrawImage(paint.left, paint.top, edge_buffer);
 
     // Edge labels/overlays remain below nodes so a node always wins visual
@@ -2096,6 +2098,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         const UiGraphNode* node = model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state = GetNodeVisualState(*node); PaintNodeDetails(np,*node,g,ResolveNodeStyle(*node,state),state);
     }
+    np.Finish();
     w.DrawImage(paint.left,paint.top,node_buffer);
 
     for(int q : paint_nodes) {
@@ -2134,6 +2137,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 StrokePath(pp, g.hit_path, 1.0, selection, true);
             }
         }
+        pp.Finish();
         w.DrawImage(paint.left, paint.top, preview_buffer);
     }
 
@@ -2151,6 +2155,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             if(IsNodeSelected(g.ref) && !g.hit_path.IsEmpty())
                 StrokePath(sp, g.hit_path, (double)DPI(2), selection, true);
         }
+        sp.Finish();
         w.DrawImage(paint.left, paint.top, selection_buffer);
     }
 }
