@@ -3,11 +3,16 @@ uses
 	Draw,
 	CtrlCore,
 	CtrlLib,
-	Ui;
+	Ui,
+	Utilities/PropertyEditor;
 
 file
+	UiButtonDemo.h,
+	UiButtonDemo.cpp,
+	UiButtonProperties.cpp,
+	UiButtonOverrides.cpp,
+	UiButtonCode.cpp,
 	main.cpp;
 
 mainconfig
 	"" = "GUI";
-
