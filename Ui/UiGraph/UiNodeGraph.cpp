@@ -6,7 +6,6 @@
 namespace Upp {
 
 namespace {
-
 template <class T>
 void NodeGraphSerializeEnum(Stream& s, T& value)
 {
@@ -396,7 +395,7 @@ UiNodeGraph::Style ResolveNodeGraphTheme(const UiThemeContext& context)
     s.grid_major = dark ? Color(58, 58, 58) : Color(203, 213, 225);
     s.edge.label_background = standard.face;
     s.selection_box_fill = standard.accent;
-    s.selection_box_frame = standard.accent_pressed;
+    s.selection_box_frame = standard.accent;
 
     switch(ctx.preset) {
     case UiThemePreset::Linear:
@@ -575,6 +574,7 @@ const UiNodeGraph::Style& UiNodeGraph::StyleDefault()
         s.node.metrics.shadow.mode = SHADOW_CURVE;
         s.node.metrics.shadow.curve = ShadowSoft();
         s.node.skin = StyledSkin();
+        s.selection_box_frame = Color(59, 130, 246);
     }
     return s;
 }
@@ -670,28 +670,59 @@ UiNodeGraph& UiNodeGraph::SetNodeStyleClass(const String& name, const UiGraphNod
 {
     if(name.IsEmpty())
         return *this;
+
+    PrepareGeometry();
+    Vector<UiGraphNodeRef> affected;
+    Rect damage;
+    if(model_)
+        for(int n = 0; n < node_geometry_.GetCount(); n++) {
+            UiGraphNodeRef ref = node_geometry_[n].ref;
+            const UiGraphNode* node = model_->FindNode(ref);
+            if(node && node->style_class == name) {
+                affected.Add(ref);
+                damage |= GetNodeDamage(ref);
+            }
+        }
+
     int i = node_styles_.Find(name);
     if(i < 0) node_styles_.Add(name, style); else node_styles_[i] = style;
-    // Node style classes can change local prepared geometry (margins, ports,
-    // child-control lane) but not model world occupancy or edge routing.
-    InvalidateGeometry();
-    PrepareGeometry();
-    UpdateAttachedCtrls();
-    RefreshLayout();
-    Refresh();
+
+    for(UiGraphNodeRef ref : affected)
+        damage |= RebuildNodeAndEdges(ref);
+    if(!affected.IsEmpty()) {
+        UpdateAttachedCtrls();
+        RefreshLayout();
+        RefreshDamage(damage);
+    }
     return *this;
 }
 
 UiNodeGraph& UiNodeGraph::RemoveNodeStyleClass(const String& name)
 {
     int i = node_styles_.Find(name);
-    if(i >= 0) {
-        node_styles_.Remove(i);
-        InvalidateGeometry();
-        PrepareGeometry();
+    if(i < 0)
+        return *this;
+
+    PrepareGeometry();
+    Vector<UiGraphNodeRef> affected;
+    Rect damage;
+    if(model_)
+        for(int n = 0; n < node_geometry_.GetCount(); n++) {
+            UiGraphNodeRef ref = node_geometry_[n].ref;
+            const UiGraphNode* node = model_->FindNode(ref);
+            if(node && node->style_class == name) {
+                affected.Add(ref);
+                damage |= GetNodeDamage(ref);
+            }
+        }
+
+    node_styles_.Remove(i);
+    for(UiGraphNodeRef ref : affected)
+        damage |= RebuildNodeAndEdges(ref);
+    if(!affected.IsEmpty()) {
         UpdateAttachedCtrls();
         RefreshLayout();
-        Refresh();
+        RefreshDamage(damage);
     }
     return *this;
 }
@@ -769,8 +800,8 @@ UiGraphEdgeStyle UiNodeGraph::ResolveEdgeStyle(const UiGraphEdge& edge, UiGraphV
 
 void UiNodeGraph::BindModel(UiGraphModel& model)
 {
-    for(UiGraphModel* bound : bound_models_)
-        if(bound == &model)
+    for(int i = 0; i < bound_models_.GetCount(); i++)
+        if(bound_models_[i] == &model)
             return;
     bound_models_.Add(&model);
     Ptr<UiNodeGraph> self = this;
@@ -1625,8 +1656,6 @@ void UiNodeGraph::RebuildGeometry()
     Index<UiGraphId> edge_candidates;
     QuerySpatial(GetViewportWorldBounds(160.0), node_candidates, edge_candidates);
 
-    // Drag previews deliberately remain outside the authoritative spatial index
-    // until committed. Keep the active drag and its incident edges prepared.
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_candidates.FindAdd(ref.id);
@@ -1634,8 +1663,6 @@ void UiNodeGraph::RebuildGeometry()
             edge_candidates.FindAdd(edge.id);
     }
 
-    // Exact edge anchors need endpoint geometry even when the endpoint itself is
-    // just outside the viewport margin.
     for(int i = 0; i < edge_candidates.GetCount(); i++) {
         const UiGraphEdge* edge = model_->FindEdge(UiGraphEdgeRef{edge_candidates[i]});
         if(edge) {
@@ -1689,18 +1716,50 @@ void UiNodeGraph::RebuildGeometry()
 
 Rect UiNodeGraph::RebuildNodeAndEdges(UiGraphNodeRef ref)
 {
-    Rect damage = GetNodeDamage(ref);
-    InvalidateGeometry();
     PrepareGeometry();
+    Rect damage = GetNodeDamage(ref);
+    if(!model_ || geometry_dirty_)
+        return damage;
+
+    int i = node_geometry_.Find(ref.id);
+    const UiGraphNode* node = model_->FindNode(ref);
+    if(i >= 0) {
+        if(node && node->visible) {
+            NodeGeometry g;
+            BuildNodeGeometry(*node, g);
+            node_geometry_[i] = pick(g);
+        }
+        else
+            node_geometry_.Remove(i);
+    }
+
+    if(model_)
+        for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
+            damage |= RebuildEdge(edge);
     damage |= GetNodeDamage(ref);
     return damage;
 }
 
 Rect UiNodeGraph::RebuildEdge(UiGraphEdgeRef ref)
 {
-    Rect damage = GetEdgeDamage(ref);
-    InvalidateGeometry();
     PrepareGeometry();
+    Rect damage = GetEdgeDamage(ref);
+    if(!model_ || geometry_dirty_)
+        return damage;
+
+    int i = edge_geometry_.Find(ref.id);
+    if(i < 0)
+        return damage;
+
+    const UiGraphEdge* edge = model_->FindEdge(ref);
+    if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target)) {
+        edge_geometry_.Remove(i);
+        return damage;
+    }
+
+    EdgeGeometry g;
+    BuildEdgeGeometry(*edge, g);
+    edge_geometry_[i] = pick(g);
     damage |= GetEdgeDamage(ref);
     return damage;
 }
@@ -1781,48 +1840,17 @@ bool UiNodeGraph::PointInNodeGeometry(const UiGraphNode& node, const NodeGeometr
 
 UiGraphPortRef UiNodeGraph::HitTestPort(Point p) const
 {
-    UiNodeGraph* self = const_cast<UiNodeGraph*>(this); self->PrepareGeometry();
-    last_port_hit_candidate_count_ = 0;
-    if(!model_) return UiGraphPortRef();
-    for(int n = node_geometry_.GetCount() - 1; n >= 0; --n) {
-        last_port_hit_candidate_count_++;
-        const NodeGeometry& g = node_geometry_[n]; const UiGraphNode* node = model_->FindNode(g.ref);
-        if(!node) continue;
-        for(int i = g.port_hits.GetCount() - 1; i >= 0; --i)
-            if(g.port_hits[i].Contains(p)) return UiGraphPortRef{node->ref, g.port_hits.GetKey(i)};
-    }
-    return UiGraphPortRef();
+    return HitTestPortSpatial(p);
 }
 
 UiGraphNodeRef UiNodeGraph::HitTestNode(Point p) const
 {
-    UiNodeGraph* self = const_cast<UiNodeGraph*>(this); self->PrepareGeometry();
-    last_node_hit_candidate_count_ = 0;
-    for(int i = node_geometry_.GetCount() - 1; i >= 0; --i) {
-        last_node_hit_candidate_count_++;
-        const NodeGeometry& g = node_geometry_[i]; const UiGraphNode* node = model_ ? model_->FindNode(g.ref) : nullptr;
-        if(node && PointInNodeGeometry(*node, g, p)) return g.ref;
-    }
-    return UiGraphNodeRef();
+    return HitTestNodeSpatial(p);
 }
 
 UiGraphEdgeRef UiNodeGraph::HitTestEdge(Point p) const
 {
-    UiNodeGraph* self = const_cast<UiNodeGraph*>(this); self->PrepareGeometry();
-    last_edge_hit_candidate_count_ = 0;
-    if(!model_) return UiGraphEdgeRef();
-    for(int i = edge_geometry_.GetCount() - 1; i >= 0; --i) {
-        last_edge_hit_candidate_count_++;
-        const EdgeGeometry& g = edge_geometry_[i];
-        if(!g.bounds.Contains(p)) continue;
-        const UiGraphEdge* edge = model_->FindEdge(g.ref);
-        if(!edge || !edge->selectable) continue;
-        UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
-        for(int n = 1; n < g.points.GetCount(); n++)
-            if(DistanceToSegment(Pointf(p.x, p.y), Pointf(g.points[n-1].x, g.points[n-1].y), Pointf(g.points[n].x, g.points[n].y)) <= style.interaction_width)
-                return g.ref;
-    }
-    return UiGraphEdgeRef();
+    return HitTestEdgeSpatial(p);
 }
 
 void UiNodeGraph::PaintGrid(Draw& w, const Rect& outer) const
@@ -1980,9 +2008,6 @@ void UiNodeGraph::PaintMarquee(Draw& w) const
     RGBA fill(style.selection_box_fill);
     fill.a = (byte)minmax(style.selection_box_alpha, 0, 255);
 
-    // Windows-style selection marquee: a constant one-pixel alpha tile scales
-    // across the rectangle, preserving a very light translucent blue interior
-    // without allocating a marquee-sized buffer on each pointer move.
     ImageBuffer ib(Size(1, 1));
     BufferPainter bp(ib, MODE_ANTIALIASED);
     bp.Clear(fill);
@@ -2009,9 +2034,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_painted_node_count_ = 0;
     last_painted_edge_count_ = 0;
 
-    // Query only the dirty screen region through the retained world-space
-    // index. Prepared geometry stays viewport-bounded, while damage repaint is
-    // further bounded to the spatial cells that can actually affect this paint.
     WorldRect paint_world;
     paint_world.Include(ScreenToWorld(paint.TopLeft()));
     paint_world.Include(ScreenToWorld(paint.BottomRight()));
@@ -2051,8 +2073,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_paint_node_visit_count_ = paint_nodes.GetCount();
     last_paint_edge_visit_count_ = paint_edges.GetCount();
 
-    // Connections are deliberately painted first. Use a buffer only as large
-    // as the dirty rectangle and translate absolute scene coordinates into it.
     ImageBuffer edge_buffer(paint.GetSize());
     BufferPainter ep(edge_buffer, MODE_ANTIALIASED);
     ep.Clear(RGBAZero());
@@ -2068,8 +2088,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     ep.Finish();
     w.DrawImage(paint.left, paint.top, edge_buffer);
 
-    // Edge labels/overlays remain below nodes so a node always wins visual
-    // depth over a connection that crosses it.
     for(int q : paint_edges) {
         const EdgeGeometry& g = edge_geometry_[q];
         const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
@@ -2112,8 +2130,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             if(node->shape==UiGraphNodeShape::Rectangle) metrics.radius=0;
             else if(node->shape==UiGraphNodeShape::Capsule) metrics.radius=max(0,min(g.surface.GetWidth(),g.surface.GetHeight())/2);
             else metrics.radius=max(0,fround(node->corner_radius*zoom_));
-            // Selected nodes use one shape-independent selection overlay below;
-            // do not stack the rectangular focus ring on top of it.
             UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&!IsNodeSelected(node->ref));
         }
     }
