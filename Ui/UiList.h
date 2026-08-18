@@ -288,7 +288,7 @@ private:
 
     UiListModel internal_model_;
     UiListModel* model_ = nullptr;
-    Vector<UiListModel*> bound_models_;
+    UiModelObserverSet<UiListModel> bound_models_;
     mutable int model_revision_ = -1;
 
     One<UiItemRender> item_render_;
