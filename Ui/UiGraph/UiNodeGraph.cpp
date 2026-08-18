@@ -691,7 +691,6 @@ UiNodeGraph& UiNodeGraph::SetNodeStyleClass(const String& name, const UiGraphNod
         damage |= RebuildNodeAndEdges(ref);
     if(!affected.IsEmpty()) {
         UpdateAttachedCtrls();
-        RefreshLayout();
         RefreshDamage(damage);
     }
     return *this;
@@ -721,7 +720,6 @@ UiNodeGraph& UiNodeGraph::RemoveNodeStyleClass(const String& name)
         damage |= RebuildNodeAndEdges(ref);
     if(!affected.IsEmpty()) {
         UpdateAttachedCtrls();
-        RefreshLayout();
         RefreshDamage(damage);
     }
     return *this;
@@ -732,7 +730,7 @@ UiNodeGraph& UiNodeGraph::SetEdgeStyleClass(const String& name, const UiGraphEdg
     if(name.IsEmpty())
         return *this;
     int i = edge_styles_.Find(name);
-    if(i < 0) edge_styles_.Add(name, style); else edge_styles_[i] = style;
+    if(i < 0) node_styles_.Add(name, style); else edge_styles_[i] = style;
     InvalidateSpatialIndex();
     InvalidateGeometry();
     PrepareGeometry();
