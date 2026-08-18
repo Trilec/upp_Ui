@@ -172,7 +172,9 @@ void TestTreeBulkImport(TestCtx& t)
 {
     UiTreeModel tree;
     UiListModel source;
-    source.Add("One", 1).Add("Two", 2).Add("Three", 3);
+    source.Add("One", 1);
+    source.Add("Two", 2);
+    source.Add("Three", 3);
 
     int notifications = 0;
     UiModelChange last;
