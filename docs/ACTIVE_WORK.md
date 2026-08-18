@@ -4,151 +4,114 @@ Remote GitHub is authoritative. Never force-update `main`. Work directly from re
 
 ## CURRENT SUPERVISORY STATE — 2026-08-18
 
-STATUS: **UI-NODEGRAPH-FINAL-AUDIT-R1 SOURCE IMPLEMENTATION COMPLETE — FINAL WINDOWS VALIDATION PENDING.**
+STATUS: **UI-NODEGRAPH-FINAL-AUDIT-R1 SOURCE CORRECTIVE PUBLISHED — WINDOWS REVALIDATION PENDING.**
+
+Remote branch state is `main` only.
 
 Detailed prior history is preserved in:
 - `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
 
-Remote branch state is `main` only.
+## UI-NODEGRAPH-FINAL-AUDIT-R1
 
-## ACTIVE TASK — UI-NODEGRAPH-FINAL-AUDIT-R1
+Audit/recovery base:
+- `9172d67ebcbbad91b1ced2f1f2d05e07814c6b97`
 
-Audit start / recovery base:
-- `9172d67ebcbbad91b1ced2f1f2d05e07814c6b97` — final-audit recovery marker over Gary's last pre-audit Graph code.
+Final hardening line before the latest corrective:
+- `b923699776f563abdbb905ed2a7c1b898be1f7fd` — source hardening plus programmer docs, awaiting Windows validation.
 
-Pre-audit Graph code:
-- `1e1d14664a71eb225ab470241ecf7a62338bdbf4` — five explicit `BufferPainter::Finish()` calls. Windows tests remained green, but this did not correct the dark committed-selection appearance.
+### Gary validation at `b9236997...`
 
-Final hardening implementation checkpoints:
-- `80b02c7d14e53fd3f5956e91a06f4afe140f657a` — prune empty Graph spatial-hash cells.
-- `ed25df1e9254e7eab0d0b974db384e16e15887f1` — introduce lifetime-aware shared model observer identity.
-- `c4189c324ff5921d8fd16cd0ead0ca0dff7046c5` — make shared model copy/assignment semantics safe with weak identity: copies receive fresh observer identity; assignment preserves destination identity/callbacks.
-- List/Gallery/Tree/Table/Dropdown/Menu headers were migrated to `UiModelObserverSet` in bounded commits; no public model API changed.
-- `cf930052ab242faf6be6f7c0686f732854728db7` — NodeGraph header migrated to lifetime-safe model observers.
-- `34443e9385f19382d2d4f2c9834bd1d8b710b655` — Graph source convergence: semantic Accent selection colour, public spatial hit-test authority, genuinely local prepared node/edge rebuild helpers, local node-style-class preview updates.
-- `60e6223d913f78770debe2a481c03cd1d7e19697` — model-binding lifetime regression coverage.
-- `2a43ebb4525ef521e0d851ea8b38eee8aadbbe88` — Graph scale regressions for public spatial hit tests and local style-class updates.
-- `b3375564dff21c124374472aabfd79d62ef0d51e` — direct `UiNodeGraph::Style` selection default aligned with the bright Accent chrome contract.
+Gary refreshed exact `main`, clean tree and matching remote.
 
-Programmer documentation:
-- `4a4a2b69cf046fe1be599fccf0893d32b574c19a` — model API/lifetime audit updated.
-- `9de91580d717a157e8b3b4ae021fdedd7d7b849f` — model-view scale guide updated with final NodeGraph spatial/prepared contract.
+Passed:
+- `Utilities/UiGraphTest` Debug: **90/90**.
+- `Utilities/UiGraphTest` Release: **90/90**.
 
-### FINAL SOURCE CONTRACT
+Stopped correctly on:
+- `Utilities/UiNodeGraphScaleTest` Debug: **checks=51 failed=1**.
+- failing assertion: `prepared node style-class preview updates locally without rebuilding the spatial index or full viewport geometry`.
 
-Keep these decisions:
-- semantic topology lives only in `UiGraphModel`; stable node/edge ids are `int64`;
-- per-node adjacency is a derived local-degree index, not a second semantic graph;
-- ordinary graph nodes remain painted virtual objects, not one `Ctrl` per node;
-- the retained world-space spatial hash is the sole broad-phase spatial index;
-- prepared screen geometry is viewport-bounded derived view state;
-- public and live pointer node/port/edge hit testing use the same small world-space spatial query followed by exact geometry tests;
-- node/edge removal prunes vacated spatial buckets when the bucket becomes empty;
-- pan/zoom reuse the retained spatial hash;
-- node-style-class edits rebuild only currently prepared users of that class plus prepared incident edges; they do not rebuild the full spatial index or full prepared viewport;
-- `RebuildNodeAndEdges()` / `RebuildEdge()` now perform local prepared updates when the prepared scene is clean;
-- marquee selection commits on release; local live preview uses the retained hash and marquees over 256 cells deliberately defer preview until release;
-- `BeginBatchUpdate()` / `EndBatchUpdate()` coalesce UiNodeGraph retained-index/geometry work around authoritative immediate model mutation;
-- middle-button pan remains capture-free; left-button capture release remains re-entrancy-safe;
-- committed selection chrome is the semantic bright Accent path and remains an independent approximately 2px shape-following final overlay;
-- canonical `Model()/SetModel()/UseInternalModel()/ClearModel()` ownership semantics remain unchanged;
-- no quadtree/R-tree/BVH replacement is required for this scale target;
-- current Painter backend remains replaceable later without moving semantic/spatial authority into a GPU backend.
+Release scale, model-binding, data-model and GUI/manual acceptance were not run after that stop.
 
-### MODEL OBSERVER LIFETIME HARDENING
+### Root cause and corrective
 
-List, Gallery, Tree, Table, Dropdown, Menu and NodeGraph now share `UiModelObserverSet` rather than retaining raw-address-only bound-model identity.
+The local prepared-node/incident-edge rebuild path itself was correct. The regression was caused by `SetNodeStyleClass()` and `RemoveNodeStyleClass()` calling `RefreshLayout()` after their local rebuild. `UiNodeGraph::Layout()` deliberately invalidates and prepares the complete viewport geometry, defeating the local style-preview contract and incrementing `geometry_build_serial_`.
 
-Rules:
-- external active models remain non-owning and must outlive active use;
-- inactive callbacks may remain installed but are ignored by views that no longer use that model;
-- expired weak identities are pruned before binding deduplication;
-- if model B is allocated at the exact address previously occupied by destroyed model A, B receives a fresh observer;
-- copying `UiDataModelBase` creates a fresh weak identity and does not copy callbacks;
-- assigning `UiDataModelBase` preserves the destination object's weak identity and installed callbacks.
+Corrective publication:
+- `f2c1c66d9ba2c5ba536ba08e483c8e4e07f1d77d` — removed the two redundant `RefreshLayout()` calls. Parent-diff review caught an accidental reconstruction typo in `SetEdgeStyleClass()` before validation.
+- `97d87013bd5894e8d6927f4caadfd37b31bb10a0` — restored the correct `edge_styles_.Add(...)` insertion. This correction changes only that accidental line.
 
-This matches the same-address lifetime hardening already used by UiDoc without changing the ordinary model API.
+Net production diff from `b9236997...` to `97d87013...` is the two intended node-style `RefreshLayout()` removals plus EOF newline normalization. No Graph/model architecture changed.
 
-### DETERMINISTIC TEST CONTRACT AFTER THIS HARDENING
+### Final Graph/model contract
 
-Expected after compile succeeds:
-- `Utilities/UiGraphTest`: existing **90/90** Debug + Release.
-- `Utilities/UiNodeGraphScaleTest`: **UINODEGRAPH_SCALE_SUMMARY checks=51 failed=0** Debug + Release.
-- `Utilities/UiModelBindingContractTest`: **Checks: 55, Fails: 0** Debug + Release.
-- `Utilities/UiDataModelsTest`: existing **7535 checks / 0 fails** Debug regression.
+Keep:
+- semantic topology only in `UiGraphModel`, stable `int64` identities;
+- derived per-node adjacency for incident-edge work;
+- painted ordinary nodes rather than one `Ctrl` per node;
+- retained world-space spatial hash as the sole Graph broad phase;
+- viewport-bounded prepared geometry;
+- public/live node, port and edge hit testing through small spatial queries plus exact tests;
+- pruning of empty spatial buckets;
+- local node-style-class preview rebuild of prepared users plus prepared incident edges, with no full spatial or viewport geometry rebuild;
+- adaptive spatial marquee preview with semantic selection commit on release;
+- nested view-side batch coalescing around immediate authoritative model mutation;
+- bright semantic Accent committed-selection chrome;
+- canonical `Model()/SetModel()/UseInternalModel()/ClearModel()` semantics;
+- `UiModelObserverSet` lifetime-safe external-model observer identity across List/Gallery/Tree/Table/Dropdown/Menu/Graph.
 
-New model-binding coverage includes:
-- independent weak identity after base copy;
-- destination identity preservation after assignment;
-- expired weak observer identity after destruction;
-- exact same-address helper reuse;
-- UiList callback delivery after exact same-address external model reuse;
-- UiNodeGraph callback/spatial response after exact same-address external model reuse.
+Do not add a second spatial index or parallel semantic store.
 
-New Graph scale coverage includes:
-- public node hit candidate count stays tiny;
-- public port hit candidate count stays tiny;
-- public edge hit candidate count remains locally bounded;
-- updating the actually-used `soft` node style class increments neither the full spatial-build serial nor the full geometry-build serial;
-- default committed selection chrome is the explicit bright-blue contract.
+### Required Windows restart
 
-No Windows PASS is claimed for these new source changes yet.
+Gary should refresh current `main` and first rerun:
+- `Utilities/UiNodeGraphScaleTest` Debug — required `UINODEGRAPH_SCALE_SUMMARY checks=51 failed=0`.
 
-### PRE-HARDENING WINDOWS EVIDENCE
+If green, continue the previously issued final acceptance:
+- scale Release 51/0;
+- `UiModelBindingContractTest` Debug+Release: **55/0**;
+- `UiDataModelsTest` Debug: **7535/0**;
+- `UiGraphDemo` Debug+Release;
+- blue ~2px shape-following selection chrome;
+- local/adaptive marquee;
+- 10k navigation;
+- batch mutation;
+- PropertyEditor preview/Cancel;
+- middle-pan regression;
+- Light/Dark;
+- Reference -> 10k -> Reference and embedded-control retention.
 
-Gary previously established on the R2 line:
-- `Utilities/UiGraphTest` Debug + Release: **90/90 passed**.
-- `Utilities/UiNodeGraphScaleTest` Debug + Release: **49/0** before the two new checks.
-- `Utilities/UiDataModelsTest` Debug: **7535 / 0 / PASS**.
-- `examples/UiGraphDemo` Debug built/launched responsively; Release built successfully.
-- `git diff --check`: PASS; reported worktree clean.
+## SYMBOL PICKER / GALLERY CONVERGENCE
 
-That evidence remains useful regression history but does not validate the final weak-observer/local-prepared changes.
+`upp_uisymbolpicker` is **not a Graph consumer for its icon library**. The appropriate reusable control is `UiGallery` backed by `UiListModel`.
 
-### MANUAL ACCEPTANCE TO RESUME
+Current Symbol Picker library still creates one `SymbolPickerIconTile : ParentCtrl` plus two child `Label`s for every displayed icon inside a wrapping `UiBoxLayout`, and hard-caps the unfiltered All view to 240 items. Its own supervisor handoff confirms that removing the cap and eagerly creating all 5,057 current-style icons blocks startup for tens of seconds.
 
-Gary must start with the original stop condition:
-- selected Rectangle must show clearly blue approximately 2px shape-following committed-selection chrome, not dark/black.
+`UiGallery` was specifically redesigned to remove that scaling failure:
+- model item count is independent of visual Ctrl/renderer count;
+- uniform grid geometry is arithmetic;
+- renderers are non-`Ctrl` and recycled for visible+overscan cells only;
+- normal paint/hit/scroll work is viewport bounded;
+- `WhenVisibleRange` exists for lazy image preparation;
+- multi-selection, marquee, selection chrome and zoom are view-owned;
+- semantic items remain in `UiListModel`;
+- model binding now has lifetime-safe observer identity.
 
-If that passes, continue:
-- selection chrome across every standard shape;
-- Windows-style local marquee and adaptive large-marquee fallback;
-- 10k pan/zoom and bounded candidate/prepared counts;
-- multi-node batch drag/key/delete;
-- PropertyEditor Face FillRecipe / Color live preview and Cancel restoration, with no full prepared/spatial rebuild stall;
-- middle-pan capture regression;
-- Light/Dark theme smoke;
-- Reference -> 10k -> Reference model retention;
-- exceptional embedded controls survive model switching.
+Do **not** add Graph's spatial hash to Gallery. Uniform row/column arithmetic is cheaper and already computes visible and marquee-intersecting cells directly.
 
-## SYMBOL PICKER / OTHER CONSUMERS
+Potential Gallery polish that may be useful to Symbol Picker, but must stay surgical:
+- align marquee appearance with the Windows-style interaction language (thin Accent frame + light translucent Accent fill);
+- consider transient marquee preview with semantic selection committed on release if live selection notifications prove expensive at very large/zoomed-out ranges;
+- damage only old/new marquee and changed visible cells rather than repainting unrelated viewport content;
+- keep selection frame independent from renderer-selected presentation;
+- preserve capture-ownership hardening already present in Gallery.
 
-The architecture is now source-stable. Other sessions may continue design and source review against current `main`, but should wait for the final Gary Windows PASS/final SHA before treating this as the accepted Graph integration baseline.
-
-Do not reintroduce:
-- parallel semantic node stores;
-- Ctrl-per-ordinary-node rendering;
-- prepared-viewport scan hit testing;
-- raw-address-only model observer deduplication;
-- full spatial/prepared rebuilds for ordinary local style preview;
-- retired `GetModel()` / `GetInternalModel()` aliases.
-
-## OTHER ACTIVE WORK
-
-### Four-control override normalization
-
-Status: **SOURCE IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING.**
-
-Authoritative detail and exact gates are in `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`.
-
-### UiLabel
-
-Accepted reference implementation. Continue using the accepted UiLabel PropertyEditor grammar and shared FillRecipe conventions; do not introduce a parallel schema dialect.
+The primary Symbol Picker migration should not wait for a spatial structure: use `UiGallery` + a filtered `UiListModel` projection, remove the 240 cap after migration, and drive SVG/image decode from useful visible range plus cache.
 
 ## NEXT
 
-1. Perform final static diff/package/declaration review from `9172d67...` to current `main`.
-2. Gary runs the final bounded Windows validation below the current main-only branch.
-3. If Gary reports only trivial mechanical compile issues, fix minimally and republish; substantive failures return to supervisor.
-4. After all automated/manual gates pass, current/final main becomes the accepted Graph/model baseline for Symbol Picker and other consumers.
+1. Gary reruns the corrected Graph 51-check Debug gate at current `main`, then completes final acceptance if green.
+2. Symbol Picker session refreshes `Trilec/upp_uisymbolpicker` `main`, reads `docs/SUPERVISOR_LIBRARY_DISPLAY_HANDOFF.md`, and migrates the library viewport from eager `SymbolPickerIconTile` controls / `UiBoxLayout` to `UiGallery` + `UiListModel`.
+3. Preserve SymbolPicker catalog/project/command semantics; the Gallery model is a derived filtered presentation projection, not a replacement for `SymbolPickerModel` or `SymbolPickerCatalog`.
+4. Measure with the real 5,057-icons-per-style All fixture and remove `kLibraryAllInitialLimit` only when the Gallery path is active.
