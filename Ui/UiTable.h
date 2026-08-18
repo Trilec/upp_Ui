@@ -331,7 +331,7 @@ private:
 
     UiTableModel internal_model_;
     UiTableModel* model_ = nullptr;
-    Vector<UiTableModel*> bound_models_;
+    UiModelObserverSet<UiTableModel> bound_models_;
     mutable int model_revision_ = -1;
     bool internal_mutation_enabled_ = true;
 
