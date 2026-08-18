@@ -73,8 +73,8 @@ String GraphDemoRecipeKey(const String& style_class, const String& state)
 
 void GraphDemoProjectState(UiGraphNodeStyle& style, int source, int target)
 {
-    source = minmax(source, ST_NORMAL, ST_DISABLED);
-    target = minmax(target, ST_NORMAL, ST_DISABLED);
+    source = minmax(source, (int)ST_NORMAL, (int)ST_DISABLED);
+    target = minmax(target, (int)ST_NORMAL, (int)ST_DISABLED);
     if(source == target)
         return;
     style.palette.face[target] = style.palette.face[source];
