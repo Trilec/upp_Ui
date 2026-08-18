@@ -4,87 +4,101 @@ Remote GitHub is authoritative. Never force-update `main`. Work directly from re
 
 ## CURRENT SUPERVISORY STATE — 2026-08-18
 
-STATUS: **UIGRAPH R2 AUTOMATED WINDOWS GATES PASS; MANUAL ACCEPTANCE STOPPED ON SELECTION-CHROME RENDERING; FOUR-CONTROL SOURCE WORK COMPLETE — WINDOWS VALIDATION PENDING.**
+STATUS: **UIGRAPH R2 AUTOMATED WINDOWS GATES PASS; FINAL GRAPH/MODEL CLEANUP AUDIT IN PROGRESS; MANUAL ACCEPTANCE STILL BLOCKED ON SELECTION CHROME.**
 
 Detailed prior history is preserved in:
 - `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
 
-## ACTIVE TASK — UI-NODEGRAPH-SPATIAL-INTERACTION-R2
+Remote branch state has been pruned to `main` only.
 
-Source checkpoints:
-- `ef3d518a1a1ddd7edca1c4e5857433fc6f36d527` — final R2 spatial interaction / marquee / batch code.
-- `56ab7bdec916b1b022873ee58f0465bbc24d2af9` — R2 completion documentation checkpoint used for the first Windows acceptance run.
-- `13337c98b98b26898c0c5fb5c1eddd0fac1088ce` — Gary's allowed mechanical Windows fix: explicit integer casts for `StyledState` bounds in `UiGraphDemo.cpp`.
+## ACTIVE TASK — UI-NODEGRAPH-FINAL-AUDIT-R1
 
-Core R2 architecture remains accepted at source level:
-- retained world-space spatial hash is the sole broad-phase index;
-- pointer hit-testing queries tiny world-space neighborhoods and exact-tests only local candidates;
-- marquee uses a Windows-style thin blue frame plus translucent blue fill;
-- local marquee preview uses retained spatial cells and does not commit selection until release;
-- large marquee preview defers candidate hints after the 256-cell threshold and resolves once on release;
-- repaint is damage-bounded;
-- `BeginBatchUpdate()` / `EndBatchUpdate()` coalesce UiNodeGraph retained-index/geometry response around authoritative `Model()` mutation;
-- local batch movement updates touched nodes and unique incident edges without a full spatial rebuild;
-- ordinary nodes remain painted virtual objects; semantic topology remains solely in `UiGraphModel`;
-- canonical `Model()/SetModel()/UseInternalModel()/ClearModel()` ownership semantics remain unchanged.
+REFRESHED BASE: `1e1d14664a71eb225ab470241ecf7a62338bdbf4` — current `main` at audit start.
 
-## WINDOWS EVIDENCE — 2026-08-18
+Published Graph checkpoints immediately preceding this audit:
+- `ef3d518a1a1ddd7edca1c4e5857433fc6f36d527` — R2 retained spatial interaction / adaptive marquee / batch-update implementation.
+- `13337c98b98b26898c0c5fb5c1eddd0fac1088ce` — Gary mechanical Windows compile fix: explicit integer casts around `StyledState` bounds in `UiGraphDemo.cpp`.
+- `1e1d14664a71eb225ab470241ecf7a62338bdbf4` — five explicit `BufferPainter::Finish()` calls before Graph temporary image buffers are consumed.
 
-Starting acceptance HEAD: `56ab7bdec916b1b022873ee58f0465bbc24d2af9`.
+### WINDOWS EVIDENCE
 
-Automated results reported by Gary:
-- `Utilities/UiGraphTest` Debug: **90/90 passed**.
-- `Utilities/UiGraphTest` Release: **90/90 passed**.
-- `Utilities/UiNodeGraphScaleTest` Debug: **UINODEGRAPH_SCALE_SUMMARY checks=49 failed=0**.
-- `Utilities/UiNodeGraphScaleTest` Release: **UINODEGRAPH_SCALE_SUMMARY checks=49 failed=0**.
-- `Utilities/UiDataModelsTest` Debug: **Checks 7535 / Fails 0 / PASS**.
-- `examples/UiGraphDemo` Release: built successfully.
-- `examples/UiGraphDemo` Debug: built and launched responsively after the mechanical cast fix.
-- `git diff --check`: PASS.
-- final reported worktree after the mechanical fix: clean.
+Gary's focused automated gate is green on the published R2 line:
+- `Utilities/UiGraphTest` Debug + Release: **90/90 passed**.
+- `Utilities/UiNodeGraphScaleTest` Debug + Release: **UINODEGRAPH_SCALE_SUMMARY checks=49 failed=0**.
+- `Utilities/UiDataModelsTest` Debug: **7535 checks / 0 fails / PASS**.
+- `examples/UiGraphDemo` Debug: builds, launches and remains responsive.
+- `examples/UiGraphDemo` Release: builds successfully.
+- `git diff --check`: PASS; worktree clean at each reported stop.
 
-Mechanical build fix:
-- commit `13337c98b98b26898c0c5fb5c1eddd0fac1088ce`;
-- `GraphDemoProjectState()` now casts `ST_NORMAL` / `ST_DISABLED` to `int` for `minmax` type consistency;
-- no architecture or test contract changed.
+The explicit Painter-finalization experiment did **not** change the manual failure: the initially selected Rectangle still appears with a dark/black committed-selection outline. Manual acceptance remains stopped before marquee/10k/batch/PropertyEditor/pan/theme/model-retention smoke.
 
-### MANUAL STOP / CURRENT BLOCKER
+### ACCEPTED R2 ARCHITECTURE
 
-Gary correctly stopped the GUI acceptance at the first substantive failure:
-- the initially selected Rectangle rendered a dark/black committed-selection outline instead of the required consistent blue approximately 2px shape-following selection chrome.
+Keep these decisions:
+- semantic topology lives only in `UiGraphModel`; stable node/edge ids are `int64`;
+- per-node adjacency is a derived local-degree index, not a second semantic graph;
+- ordinary graph nodes remain painted virtual objects, not one `Ctrl` per node;
+- the retained world-space spatial hash is the sole broad-phase spatial index;
+- prepared screen geometry is viewport-bounded derived view state;
+- point interaction uses a small world-space spatial query followed by exact shape/port/edge tests;
+- marquee selection commits on release; local live preview uses the retained hash and large marquess deliberately defer preview after the 256-cell threshold;
+- `BeginBatchUpdate()` / `EndBatchUpdate()` coalesce UiNodeGraph retained-index/geometry work around authoritative immediate model mutation;
+- middle-button pan remains capture-free; left-button capture release remains re-entrancy-safe;
+- canonical `Model()/SetModel()/UseInternalModel()/ClearModel()` ownership semantics remain unchanged;
+- no quadtree/R-tree/BVH replacement is required for this scale target.
 
-Because this was a stop condition, the remaining manual checks were not run:
-- marquee appearance/performance;
-- 10k navigation and adaptive large-marquee behavior;
-- batch drag/key/delete smoke;
-- PropertyEditor live preview / Cancel;
-- middle-pan regression;
-- theme smoke;
-- Reference -> 10k -> Reference retention.
+### FINAL AUDIT FINDINGS TO CORRECT BEFORE SYMBOL-PICKER INTEGRATION
 
-### SOURCE DIAGNOSIS TO CONTINUE FROM
+1. **Selection colour resolution**
+   - theme resolution currently sets `selection_box_frame` to Standard `accent_pressed`, RGB `(0,96,176)`;
+   - this is considerably darker than the Windows-style Standard `accent`, RGB `(0,120,212)`, and the explicit Painter-finalization test proved buffer completion was not the visual cause;
+   - use the semantic Accent colour for committed selection/marquee chrome and add rendered-image coverage instead of changing model/spatial architecture.
 
-The resolved Graph selection colour is semantic blue (`selection_box_frame` resolves from the Standard role accent path), so the reported black stroke is not explained by the intended theme value.
+2. **Duplicate public hit-test path**
+   - live interaction uses `HitTestNodeSpatial/PortSpatial/EdgeSpatial`;
+   - public `HitTestNode/Port/Edge` still contain the older prepared-geometry scan loops;
+   - converge the public API onto the retained spatial broad phase and remove the duplicate scan implementation.
 
-The Graph paint path currently consumes several `ImageBuffer`s while their `BufferPainter` objects are still alive and without an explicit `Finish()` first. U++ documents `BufferPainter::Finish()` as the operation that guarantees scheduled painting is complete; the destructor invokes it automatically. The affected Graph buffers include:
-- marquee alpha tile (`bp`);
-- edge buffer (`ep`);
-- node-details buffer (`np`);
-- transient marquee-preview buffer (`pp`);
-- committed selection buffer (`sp`).
+3. **Empty spatial-cell retention**
+   - node/edge removal removes ids from hash buckets but currently leaves empty `SpatialCell` entries behind;
+   - prune a bucket when both node and edge vectors become empty so repeated long-distance editing cannot accumulate empty cells.
 
-NEXT CORRECTIVE:
-1. explicitly call `Finish()` before each of those Painter-backed buffers is converted/drawn;
-2. add focused rendered-image coverage for a selected Rectangle so the expected blue selection chrome reaches the final image, rather than only asserting selection state;
-3. rebuild/re-run the focused Windows Graph gates and resume manual acceptance from selection chrome onward;
-4. if the rendered selection is still wrong after correct BufferPainter finalization, inspect the selected-state frame/overlay composition next rather than changing spatial/model architecture.
+4. **Node-style preview still rebuilds all prepared geometry**
+   - `SetNodeStyleClass()` / `RemoveNodeStyleClass()` correctly avoid rebuilding the world spatial index, but currently invalidate/rebuild the entire prepared viewport;
+   - update only currently prepared nodes using the changed class plus their prepared incident edges, repainting their old/new damage;
+   - off-screen nodes need no work and resolve the new class when they later enter the viewport.
 
-No Windows PASS is claimed for the manual Graph acceptance yet.
+5. **Misleading incremental helper names**
+   - `RebuildNodeAndEdges()` / `RebuildEdge()` currently invalidate and rebuild the complete prepared viewport despite their names;
+   - either make them genuinely local as part of item 4 or remove/rename them so the implementation matches the API intent.
 
-## BRANCH STATE
+6. **Ordinary model observer lifetime identity**
+   - List/Gallery/Tree/Table/Dropdown/Menu/NodeGraph still deduplicate model observers with raw model addresses in `bound_models_`;
+   - UiDoc already solved the same-address-reuse problem with `Pte`/`Ptr` weak lifetime bookkeeping;
+   - harden the ordinary model-backed controls to the same lifetime-safe identity rule without changing public ownership semantics, and add a deterministic same-address-reuse contract regression.
 
-Repository policy is main-only for ordinary work. Gary is currently pruning obsolete temporary branches. The intended steady state is local/remote `main` only.
+### CLEAN FINDINGS
+
+- `UiGraphModel` adjacency maintenance is coherent across add/update/reconnect/remove and serialization rebuild; ordinary local topology operations no longer scan the complete edge set.
+- spatial edge bounds deliberately overestimate routes, avoiding false-negative culling; custom/dynamic routes conservatively fall back to global candidates.
+- pan/zoom reuse the retained spatial hash.
+- current Graph header has a useful Purpose/Intent/Thread/Model-ownership description and its private areas are broadly grouped by style, model binding, spatial, prepared geometry, paint and interaction.
+- public scale diagnostics are extensive but currently useful to demos/tests; do not remove them during this corrective unless a compatibility-safe diagnostics snapshot is introduced deliberately.
+
+## SYMBOL PICKER / OTHER CONSUMERS
+
+Other sessions may read and design against the R2 architecture now, but should **not publish an integration pinned to `1e1d146...` as the final Graph baseline**. Wait for this final audit corrective and its Windows validation SHA.
+
+The final handoff will preserve:
+- compact authored 1:1 nodes;
+- stable model identities and canonical model binding;
+- retained spatial-hash culling;
+- viewport-prepared geometry;
+- local point/marquee interaction;
+- batched view updates;
+- UiTheme/style-class presentation;
+- UiLabel-compatible PropertyEditor grouping and shared FillRecipe use.
 
 ## OTHER ACTIVE WORK
 
@@ -94,19 +108,13 @@ Status: **SOURCE IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING.**
 
 Authoritative detail and exact gates are in `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`.
 
-Key checkpoints:
-- UiList renderer authority: `d0579b8753748ca765710f6c29805d2859ddf6aa`.
-- UiList striped-row persistence: `97d1531192f712365cddea1f9390a1a031e01836`.
-- UiDesigner List/Edit adapters: `c27f499c8d51ad73037d9a60481bb73d870d38a7`.
-- UiDesigner Dropdown/Accordion adapters: `ec02f1cbcc040f70ad55e656b98ec64640142cec`.
-
 ### UiLabel
 
 Accepted reference implementation. Continue using the accepted UiLabel PropertyEditor grammar and shared FillRecipe conventions; do not introduce a parallel schema dialect.
 
 ## NEXT
 
-1. Complete the narrow Graph BufferPainter/selection corrective above.
-2. Resume the stopped Graph manual Windows acceptance from selection chrome onward.
-3. Finish obsolete branch pruning so `main` is the only working branch.
-4. Run the four-control Windows gates in `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`.
+1. Implement and publish the six bounded final-audit corrections above in recoverable checkpoints.
+2. Source-review the full Graph/model-binding diff and update programmer comments/docs where the final contracts changed.
+3. Gary reruns the focused Graph tests plus `UiModelBindingContractTest` and resumes manual Graph acceptance from selection chrome onward.
+4. Once Windows accepted, publish the final Graph/model handoff SHA for Symbol Picker and other consumers.
