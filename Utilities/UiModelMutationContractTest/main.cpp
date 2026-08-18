@@ -17,19 +17,48 @@ struct TestCtx {
     }
 };
 
-UiListModel MakeSequenceModel()
+void FillSequenceModel(UiListModel& model)
 {
-    UiListModel model;
     model.Add("A", 10);
     model.Add("B", 20);
     model.Add("C", 30);
     model.Add("D", 40);
-    return model;
+}
+
+void TestRangedTouch(TestCtx& t)
+{
+    UiListModel model;
+    FillSequenceModel(model);
+
+    int notifications = 0;
+    UiModelChange last;
+    model.WhenChange << [&](const UiModelChange& change) {
+        notifications++;
+        last = change;
+    };
+
+    int revision = model.GetRevision();
+    model.Get(1).description = "Prepared B";
+    model.Get(2).description = "Prepared C";
+    bool touched = model.Touch(1, 2);
+    t.Expect(touched && notifications == 1 && model.GetRevision() == revision + 1,
+             "UiListModel Touch emits exactly one revision/notification for a prepared range");
+    t.Expect(last.kind == UI_MODEL_UPDATE && last.a == 1 && last.b == 2,
+             "UiListModel Touch reports the exact contiguous update range");
+    t.Expect(model.Get(1).description == "Prepared B" && model.Get(2).description == "Prepared C",
+             "UiListModel Touch preserves in-place prepared item content");
+
+    revision = model.GetRevision();
+    notifications = 0;
+    t.Expect(!model.Touch(-1, 1) && !model.Touch(0, 0) && !model.Touch(3, 2)
+             && notifications == 0 && model.GetRevision() == revision,
+             "UiListModel Touch rejects invalid ranges without changing revision state");
 }
 
 void TestListSemanticSelection(TestCtx& t)
 {
-    UiListModel model = MakeSequenceModel();
+    UiListModel model;
+    FillSequenceModel(model);
     UiList list;
     list.SetModel(model);
     list.Select(2);
@@ -60,7 +89,8 @@ void TestListSemanticSelection(TestCtx& t)
 
 void TestGallerySemanticSelection(TestCtx& t)
 {
-    UiListModel model = MakeSequenceModel();
+    UiListModel model;
+    FillSequenceModel(model);
     UiGallery gallery;
     gallery.SetModel(model);
     gallery.Select(2);
@@ -95,6 +125,7 @@ void TestGallerySemanticSelection(TestCtx& t)
 CONSOLE_APP_MAIN
 {
     TestCtx t;
+    TestRangedTouch(t);
     TestListSemanticSelection(t);
     TestGallerySemanticSelection(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
