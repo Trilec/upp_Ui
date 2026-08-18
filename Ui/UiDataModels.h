@@ -35,6 +35,8 @@
       original integer-ID placeholder model.
     - 2026-08: added optional image presentation content for shared item renders;
       icon remains the compact glyph while image represents thumbnail/media.
+    - 2026-08: made shared model observer identity lifetime-aware so a destroyed
+      inactive external model cannot block a later model reusing the same address.
 */
 
 #include <Core/Core.h>
@@ -153,7 +155,7 @@ struct UiReorderRequest {
     bool handled = false;
 };
 
-class UiDataModelBase {
+class UiDataModelBase : public Pte<UiDataModelBase> {
 public:
     Event<const UiModelChange&> WhenChange;
 
@@ -173,6 +175,38 @@ protected:
 
 private:
     int revision_ = 0;
+};
+
+// Views may leave callbacks attached to previously used external models and
+// ignore them while inactive. Keep only weak model identities here: expired
+// models are pruned before a new binding is remembered, so address reuse cannot
+// suppress observation of a fresh model allocated at the same location.
+template <class Model>
+class UiModelObserverSet {
+public:
+    int GetCount() const { return models_.GetCount(); }
+
+    Model* operator[](int i) const
+    {
+        return static_cast<Model*>(~models_[i]);
+    }
+
+    void Add(Model* model)
+    {
+        for(int i = models_.GetCount() - 1; i >= 0; --i)
+            if(!models_[i])
+                models_.Remove(i);
+        if(!model)
+            return;
+        UiDataModelBase* base = static_cast<UiDataModelBase*>(model);
+        for(int i = 0; i < models_.GetCount(); i++)
+            if(~models_[i] == base)
+                return;
+        models_.Add(Ptr<UiDataModelBase>(base));
+    }
+
+private:
+    Vector<Ptr<UiDataModelBase>> models_;
 };
 
 class UiListModel : public UiDataModelBase {
