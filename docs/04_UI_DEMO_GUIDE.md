@@ -37,7 +37,7 @@ application.
 - package structure;
 - header and application actions;
 - preview/property-area proportions;
-- Inspector / Theme Overrides / Code navigation;
+- Inspector / Theme Overrides / optional Data / Code navigation;
 - `UiStack` page switching;
 - production `PropertyEditor` integration;
 - model-driven preview updates;
@@ -111,10 +111,13 @@ The right side follows the same conceptual language as UiDesigner:
 
 1. **Inspector**
 2. **Theme Overrides**
-3. **Code**
+3. **Data** — only for model/domain-backed controls
+4. **Code**
 
-Use compact `UiToolButton` actions at the top to select the current page and a
-`UiStack` underneath to display the selected content.
+Ordinary controls omit Data and retain the standard three-page Inspector /
+Theme Overrides / Code shell. Use compact `UiToolButton` actions at the top to
+select the current page and a `UiStack` underneath to display the selected
+content.
 
 Only one page should normally be active at a time.
 
@@ -212,6 +215,29 @@ Do not create a generic collection of styling options merely because
 PropertyEditor can display them.
 
 The Overrides page should document the real style contract of the control.
+
+---
+
+## Data
+
+A Data page is appropriate only when the demonstrated control owns or binds
+meaningful model/domain data, such as Dropdown, List, Tree, Table, Gallery or
+Menu.
+
+The page edits the **same active model that drives the live preview**. Do not
+maintain a second demo-only array, tree or table and manually synchronize it with
+the control.
+
+Use the public model API for mutations such as add, remove, edit, reorder or
+reparent where those operations are supported. Changes should become visible in
+the live control immediately and continue to respect the control's normal
+request-first interaction semantics.
+
+Richer domain controls such as Graph or Doc may keep specialized model tooling
+rather than being forced into a generic list-style Data editor. Their underlying
+`UiGraphModel`, `UiDocCore` or equivalent production model remains authoritative.
+
+Ordinary non-model controls should not display an empty Data page.
 
 ---
 
@@ -395,9 +421,10 @@ For each migration:
 3. identify its real style/override surface;
 4. choose the best available PropertyEditor adapters;
 5. provide a generous live preview;
-6. generate useful corresponding code;
-7. keep the package self-contained and readable;
-8. compile and visually validate it before using it as the basis for another
+6. add a model-authoritative Data page when the control/domain warrants it;
+7. generate useful corresponding code;
+8. keep the package self-contained and readable;
+9. compile and visually validate it before using it as the basis for another
    migration.
 
 The objective is consistency without forcing every control into an identical

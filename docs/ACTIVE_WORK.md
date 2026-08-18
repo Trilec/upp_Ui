@@ -2,15 +2,60 @@
 
 Remote GitHub is authoritative. Never force-update `main`. Work directly from refreshed `main`; preserve unrelated concurrent advances.
 
-## CURRENT SUPERVISORY STATE — 2026-08-18
+## CURRENT SUPERVISORY STATE — 2026-08-19
 
-STATUS: **UI-NODEGRAPH-FINAL-AUDIT-R1 SOURCE CORRECTIVE PUBLISHED — WINDOWS REVALIDATION PENDING.**
+STATUS: **UI-DEMO-MODERNIZATION-PILOT / UIBUTTON SOURCE REPLACEMENT PUBLISHED; WINDOWS VALIDATION PENDING. GRAPH WINDOWS REVALIDATION ALSO REMAINS PENDING.**
 
-Remote branch state is `main` only.
+Authoritative work branch is `main`. An accidental inert connector-created branch `temp-demo-button-do-not-use` exists only as a cleanup item; do not use it for work. It should be deleted in GitHub when convenient.
 
 Detailed prior history is preserved in:
 - `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
+
+## UI-DEMO-MODERNIZATION-PILOT — UIBUTTON
+
+BASE:
+- `de786f34bbf89dc083d9927e78950e5882e5bbae` — canonical demo modernization plan on `main`.
+
+TASK:
+- replace the legacy `examples/UiButtonDemo` builder with the first canonical full-control demo generation;
+- use the UiLabel-style shell, production PropertyEditor, model-authored Inspector state, explicit inherited/local Theme Overrides and generated C++;
+- preserve normal live UiButton interaction and use this demo as the first pilot before Dropdown.
+
+TOUCHED:
+- `examples/UiButtonDemo/UiButtonDemo.h`
+- `examples/UiButtonDemo/UiButtonDemo.cpp`
+- `examples/UiButtonDemo/UiButtonProperties.cpp`
+- `examples/UiButtonDemo/UiButtonOverrides.cpp`
+- `examples/UiButtonDemo/UiButtonCode.cpp`
+- `examples/UiButtonDemo/main.cpp`
+- `examples/UiButtonDemo/UiButtonDemo.upp`
+- `docs/04_UI_DEMO_GUIDE.md`
+- `docs/ACTIVE_WORK.md`
+
+SOURCE CONTRACT:
+- the old demo-only `ButtonConfig` / custom property-row builder is removed rather than retained beside the new path;
+- the preview is the real `UiButton`;
+- Inspector values map to live public Button APIs, including content/icon layout, sizing, focus, checkable/checked and underline behavior;
+- a direct preview click synchronizes the resulting checked state back into the Inspector model so PropertyEditor remains authoritative;
+- Theme Overrides use the live Button style surface and canonical General / Face/Skin / Frame / Ink / Icon / Typography / Focus / Shadow / Highlight / Press Offset grammar;
+- `press_offset` is exposed because the Button paint path consumes it; `overpaint` is deliberately not exposed because the current Button implementation does not consume it;
+- generated code reads the same Inspector/override models and omits custom style code when no local override is active;
+- no UiDesigner dependency or replacement demo framework is introduced.
+
+PUBLISHED:
+- `8c5b8168206f195711a4b624b9c5793c7d6fb02d` — replaced the legacy UiButton demo with the canonical UiLabel-style shell, production PropertyEditor Inspector/Overrides, model-authoritative live preview and generated-code page.
+
+VALIDATION:
+- complete current Button header/implementation and legacy demo package inspected;
+- canonical UiLabel demo and current PropertyEditor/override guides used as the reference;
+- declarations/definitions, package dependencies, group ownership and generated-code paths statically reviewed;
+- implementation commit is one fast-forward commit ahead of the recorded base and its GitHub diff contains only the UiButton demo package replacement;
+- no Windows build/run PASS is claimed yet.
+
+NEXT ACTION:
+1. Windows Debug build + launch `examples/UiButtonDemo` and smoke Inspector, Overrides, Code, direct checkable interaction and Light/Dark;
+2. if green, record acceptance and proceed to `UiDropdownDemo`; do not start the broader pilot rollout from an unvalidated Button shell.
 
 ## UI-NODEGRAPH-FINAL-AUDIT-R1
 
@@ -111,7 +156,8 @@ The primary Symbol Picker migration should not wait for a spatial structure: use
 
 ## NEXT
 
-1. Gary reruns the corrected Graph 51-check Debug gate at current `main`, then completes final acceptance if green.
-2. Symbol Picker session refreshes `Trilec/upp_uisymbolpicker` `main`, reads `docs/SUPERVISOR_LIBRARY_DISPLAY_HANDOFF.md`, and migrates the library viewport from eager `SymbolPickerIconTile` controls / `UiBoxLayout` to `UiGallery` + `UiListModel`.
-3. Preserve SymbolPicker catalog/project/command semantics; the Gallery model is a derived filtered presentation projection, not a replacement for `SymbolPickerModel` or `SymbolPickerCatalog`.
-4. Measure with the real 5,057-icons-per-style All fixture and remove `kLibraryAllInitialLimit` only when the Gallery path is active.
+1. Windows-smoke the published UiButton modernization before beginning the Dropdown pilot.
+2. Gary reruns the corrected Graph 51-check Debug gate at current `main`, then completes final acceptance if green.
+3. Symbol Picker session refreshes `Trilec/upp_uisymbolpicker` `main`, reads `docs/SUPERVISOR_LIBRARY_DISPLAY_HANDOFF.md`, and migrates the library viewport from eager `SymbolPickerIconTile` controls / `UiBoxLayout` to `UiGallery` + `UiListModel`.
+4. Preserve SymbolPicker catalog/project/command semantics; the Gallery model is a derived filtered presentation projection, not a replacement for `SymbolPickerModel` or `SymbolPickerCatalog`.
+5. Measure with the real 5,057-icons-per-style All fixture and remove `kLibraryAllInitialLimit` only when the Gallery path is active.
