@@ -5,65 +5,6 @@
 
 namespace Upp {
 
-namespace {
-
-bool IsStructuralModelChange(const UiModelChange& change)
-{
-    return change.kind == UI_MODEL_INSERT || change.kind == UI_MODEL_ERASE ||
-           change.kind == UI_MODEL_MOVE || change.kind == UI_MODEL_CLEAR ||
-           change.kind == UI_MODEL_RESET;
-}
-
-int RemapModelIndex(int index, const UiModelChange& change)
-{
-    if(index < 0)
-        return index;
-
-    switch(change.kind) {
-    case UI_MODEL_INSERT: {
-        int count = max(1, change.b);
-        return index >= change.a ? index + count : index;
-    }
-    case UI_MODEL_ERASE: {
-        int count = max(1, change.b);
-        if(index < change.a)
-            return index;
-        if(index < change.a + count)
-            return -1;
-        return index - count;
-    }
-    case UI_MODEL_MOVE:
-        if(change.a == change.b)
-            return index;
-        if(index == change.a)
-            return change.b;
-        if(change.a < change.b && index > change.a && index <= change.b)
-            return index - 1;
-        if(change.b < change.a && index >= change.b && index < change.a)
-            return index + 1;
-        return index;
-    case UI_MODEL_CLEAR:
-    case UI_MODEL_RESET:
-        return -1;
-    default:
-        return index;
-    }
-}
-
-void RemapModelSelection(Index<int>& selection, const UiModelChange& change)
-{
-    Index<int> remapped;
-    remapped.Reserve(selection.GetCount());
-    for(int i = 0; i < selection.GetCount(); i++) {
-        int index = RemapModelIndex(selection[i], change);
-        if(index >= 0)
-            remapped.FindAdd(index);
-    }
-    selection = pick(remapped);
-}
-
-} // namespace
-
 void UiGallery::BindModel(UiListModel& model)
 {
     for(int i = 0; i < bound_models_.GetCount(); i++)
@@ -81,14 +22,14 @@ void UiGallery::BindModel(UiListModel& model)
 
 void UiGallery::HandleModelChange(const UiModelChange& change)
 {
-    if(IsStructuralModelChange(change)) {
+    if(UiIsSequentialStructuralChange(change)) {
         if(marquee_candidate_ || marquee_active_)
             EndMarquee(true);
-        RemapModelSelection(selected_, change);
-        cursor_ = RemapModelIndex(cursor_, change);
-        anchor_ = RemapModelIndex(anchor_, change);
-        hot_ = RemapModelIndex(hot_, change);
-        pressed_ = RemapModelIndex(pressed_, change);
+        UiRemapSequentialSelection(selected_, change);
+        cursor_ = UiRemapSequentialIndex(cursor_, change);
+        anchor_ = UiRemapSequentialIndex(anchor_, change);
+        hot_ = UiRemapSequentialIndex(hot_, change);
+        pressed_ = UiRemapSequentialIndex(pressed_, change);
     }
 
     model_revision_ = -1;
