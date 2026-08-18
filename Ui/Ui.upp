@@ -19,6 +19,7 @@ file
 	UiTheme.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
+	UiDataModelMutation.cpp,
 	UiItemRender.h,
 	UiItemRender.cpp,
 	UiItemRenderData.cpp,
