@@ -263,7 +263,7 @@ private:
 
     UiMenuModel internal_model_;
     UiMenuModel* model_ = nullptr;
-    Vector<UiMenuModel*> bound_models_;
+    UiModelObserverSet<UiMenuModel> bound_models_;
     mutable int model_revision_ = -1;
 
     One<UiItemRender> item_render_;
