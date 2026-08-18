@@ -37,8 +37,8 @@
       icon remains the compact glyph while image represents thumbnail/media.
     - 2026-08: made shared model observer identity lifetime-aware so a destroyed
       inactive external model cannot block a later model reusing the same address.
-    - 2026-08: centralized sequential index remapping and added ranged Touch()
-      notification for bulk presentation updates to existing list items.
+    - 2026-08: centralized sequential index remapping and added explicit Touch()
+      notification APIs for mutable model access and ranged list preparation.
 */
 
 #include <Core/Core.h>
@@ -152,8 +152,8 @@ struct UiModelChange {
 
 // Shared helpers for views over sequential UiListModel rows. UiModelChange has
 // domain-specific payloads for Tree/Table/Graph, so these helpers deliberately
-// apply only to the List-model convention: INSERT/ERASE use (start,count) and
-// MOVE uses (old_index,new_index).
+// apply only to the List-model convention: INSERT/ERASE use (start,count),
+// MOVE uses (old_index,new_index,c=1), and SwapItems uses MOVE with c=0.
 inline bool UiIsSequentialStructuralChange(const UiModelChange& change)
 {
     return change.kind == UI_MODEL_INSERT || change.kind == UI_MODEL_ERASE ||
@@ -182,6 +182,13 @@ inline int UiRemapSequentialIndex(int index, const UiModelChange& change)
     case UI_MODEL_MOVE:
         if(change.a == change.b)
             return index;
+        if(change.c == 0) {
+            if(index == change.a)
+                return change.b;
+            if(index == change.b)
+                return change.a;
+            return index;
+        }
         if(index == change.a)
             return change.b;
         if(change.a < change.b && index > change.a && index <= change.b)
@@ -347,6 +354,7 @@ public:
     const UiModelItem& Get(UiTreeNodeRef node) const;
     UiModelItem& Get(UiTreeNodeRef node);
     bool Set(UiTreeNodeRef node, const UiModelItem& it);
+    bool Touch(UiTreeNodeRef node);
 
     bool Remove(UiTreeNodeRef node);
     bool Move(UiTreeNodeRef node, UiTreeNodeRef new_parent, int pos = -1);
@@ -456,6 +464,7 @@ public:
     const UiTableCell& GetCell(int row, int col) const;
     UiTableCell& GetCell(int row, int col);
     bool SetCell(int row, int col, const UiTableCell& cell);
+    bool TouchCell(int row, int col);
     Value GetCellValue(int row, int col) const;
     bool SetCellValue(int row, int col, const Value& value);
     bool IsCellEditable(int row, int col) const;
@@ -463,6 +472,7 @@ public:
     const UiTableHeader& GetHeader(UiTableAxis axis, int index) const;
     UiTableHeader& GetHeader(UiTableAxis axis, int index);
     bool SetHeader(UiTableAxis axis, int index, const UiTableHeader& header);
+    bool TouchHeader(UiTableAxis axis, int index);
     Value GetHeaderValue(UiTableAxis axis, int index) const;
     bool SetHeaderValue(UiTableAxis axis, int index, const Value& value);
 
@@ -526,6 +536,7 @@ public:
     const UiMenuItem& Get(UiMenuNodeRef node) const;
     UiMenuItem& Get(UiMenuNodeRef node);
     bool Set(UiMenuNodeRef node, const UiMenuItem& item);
+    bool Touch(UiMenuNodeRef node);
 
     bool Remove(UiMenuNodeRef node);
     bool RemoveChildren(UiMenuNodeRef parent);
