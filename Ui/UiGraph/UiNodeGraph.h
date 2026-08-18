@@ -45,6 +45,8 @@
       preview membership into semantic selection or prepared geometry state.
     - 2026-08: added nested view-side batch coalescing so authoritative model
       mutations can update retained spatial/prepared state once per transaction.
+    - 2026-08: hardened external model observer identity against destroyed-model
+      address reuse while preserving the canonical non-owning binding contract.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -505,7 +507,7 @@ private:
 
     UiGraphModel internal_model_;
     UiGraphModel* model_ = nullptr;
-    Vector<UiGraphModel*> bound_models_;
+    UiModelObserverSet<UiGraphModel> bound_models_;
     int model_revision_ = -1;
 
     int batch_update_depth_ = 0;
