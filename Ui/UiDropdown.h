@@ -383,7 +383,7 @@ private:
 
     UiListModel internal_model_;
     UiListModel* model_ = nullptr;
-    Vector<UiListModel*> bound_models_;
+    UiModelObserverSet<UiListModel> bound_models_;
 
     One<UiItemRender> item_render_;
     bool custom_item_render_ = false;
