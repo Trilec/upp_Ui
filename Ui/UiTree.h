@@ -361,7 +361,7 @@ private:
 
     UiTreeModel internal_model_;
     UiTreeModel* model_ = nullptr;
-    Vector<UiTreeModel*> bound_models_;
+    UiModelObserverSet<UiTreeModel> bound_models_;
     Vector<int> column_widths_;
     mutable int model_revision_ = -1;
 
