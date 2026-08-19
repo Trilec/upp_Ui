@@ -402,7 +402,7 @@ void UiSplitButton::Paint(Draw& w)
 
 void UiSplitButton::LeftDown(Point p, dword keyflags)
 {
-    if(!IsEnabled())
+    if(!IsEnabled() || !IsInteractionPoint(p))
         return;
     if(GetSplitRect().Contains(p)) {
         // The arrow region is its own command target. The main region keeps
@@ -423,14 +423,14 @@ void UiSplitButton::LeftUp(Point p, dword keyflags)
         Refresh();
         return;
     }
-    if(GetSplitRect().Contains(p) || popup_open_)
+    if((IsInteractionPoint(p) && GetSplitRect().Contains(p)) || popup_open_)
         return;
     UiButton::LeftUp(p, keyflags);
 }
 
 void UiSplitButton::MouseMove(Point p, dword keyflags)
 {
-    bool next_split_hot = GetSplitRect().Contains(p);
+    bool next_split_hot = IsInteractionPoint(p) && GetSplitRect().Contains(p);
     if(split_hot_ != next_split_hot) {
         split_hot_ = next_split_hot;
         Refresh();
