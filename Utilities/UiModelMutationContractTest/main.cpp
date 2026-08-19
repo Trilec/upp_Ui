@@ -168,6 +168,43 @@ void TestSequentialSemanticSelection(TestCtx& t)
     }
 }
 
+void TestDropdownSharedMutationContract(TestCtx& t)
+{
+    UiListModel model;
+    FillSequenceModel(model);
+    UiDropdown dropdown;
+    dropdown.SetModel(model);
+    dropdown.Select(2);
+
+    model.SwapItems(2, 0);
+    t.Expect(dropdown.GetSelectedData() == Value(30),
+             "Dropdown selection follows the same semantic item across SwapItems");
+
+    dropdown.SetMultiSelect(true);
+    int notifications = 0;
+    UiModelChange last;
+    model.WhenChange << [&](const UiModelChange& change) {
+        notifications++;
+        last = change;
+    };
+
+    ValueArray wanted;
+    wanted.Add(10);
+    wanted.Add(30);
+    dropdown.SetData(wanted);
+    t.Expect(notifications == 1 && last.kind == UI_MODEL_UPDATE && last.a == 0 && last.b == 3,
+             "Dropdown multi-value SetData publishes one ranged model update");
+    t.Expect(dropdown.GetCheckedCount() == 2,
+             "Dropdown multi-value SetData updates the requested checked set");
+
+    notifications = 0;
+    dropdown.ClearChecked();
+    t.Expect(notifications == 1 && last.kind == UI_MODEL_UPDATE && last.a == 0 && last.b == 3,
+             "Dropdown ClearChecked publishes one ranged model update");
+    t.Expect(dropdown.GetCheckedCount() == 0,
+             "Dropdown ClearChecked clears the complete checked set");
+}
+
 void TestTreeBulkImport(TestCtx& t)
 {
     UiTreeModel tree;
@@ -199,6 +236,7 @@ CONSOLE_APP_MAIN
     TestCtx t;
     TestExplicitTouchContracts(t);
     TestSequentialSemanticSelection(t);
+    TestDropdownSharedMutationContract(t);
     TestTreeBulkImport(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
