@@ -37,7 +37,7 @@ String CppColor(Color color)
     return Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB());
 }
 
-Value MapValue(const ValueMap& map, const String& key, const Value& fallback)
+Value CodeMapValue(const ValueMap& map, const String& key, const Value& fallback)
 {
     int q = map.Find(key);
     return q >= 0 ? map.GetValue(q) : fallback;
@@ -49,17 +49,17 @@ String FillRecipeCode(const Value& value)
         return "UiFill::None()";
 
     ValueMap recipe = value;
-    String mode = AsString(MapValue(recipe, "mode", "None"));
+    String mode = AsString(CodeMapValue(recipe, "mode", "None"));
     if(mode == "Solid")
-        return "UiFill::Solid(" + CppColor(Color(MapValue(recipe, "solid", White()))) + ")";
+        return "UiFill::Solid(" + CppColor(Color(CodeMapValue(recipe, "solid", White()))) + ")";
     if(mode == "QuadGradient") {
         return Format("UiFill::ImageFill(MakeQuadGradientTile(DPI(%d), %s, %s, %s, %s, %d))",
-                      max(8, (int)MapValue(recipe, "tile_size", 32)),
-                      CppColor(Color(MapValue(recipe, "top_left", White()))),
-                      CppColor(Color(MapValue(recipe, "top_right", White()))),
-                      CppColor(Color(MapValue(recipe, "bottom_left", White()))),
-                      CppColor(Color(MapValue(recipe, "bottom_right", White()))),
-                      max(0, (int)MapValue(recipe, "blur", 0)));
+                      max(8, (int)CodeMapValue(recipe, "tile_size", 32)),
+                      CppColor(Color(CodeMapValue(recipe, "top_left", White()))),
+                      CppColor(Color(CodeMapValue(recipe, "top_right", White()))),
+                      CppColor(Color(CodeMapValue(recipe, "bottom_left", White()))),
+                      CppColor(Color(CodeMapValue(recipe, "bottom_right", White()))),
+                      max(0, (int)CodeMapValue(recipe, "blur", 0)));
     }
     return "UiFill::None()";
 }
