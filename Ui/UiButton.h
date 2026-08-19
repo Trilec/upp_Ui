@@ -28,6 +28,9 @@
       SetCustomStyle() to configure button behavior and appearance.
     - SetPressedContentOffset() controls paint-only displacement of icon/text
       while pressed; it does not change layout, control bounds, or hit geometry.
+    - Pointer interaction defaults to the styled surface rather than the full
+      outer paint bounds, so procedural outer shadows are decorative only.
+      SetInteractionInset() can exclude additional baked image/9-slice decoration.
     - Setters and style/theme changes drive cache invalidation and layout
       refresh; Paint() also repairs stale layout before drawing.
 
@@ -45,6 +48,9 @@
     - 2026-08: documented press_offset as paint-only pressed-content feedback
       and exposed SetPressedContentOffset()/GetPressedContentOffset() so callers
       need not infer its semantics from the Style field name.
+    - 2026-08: hardened pointer interaction to follow UiStyledSurfaceRect(),
+      excluding procedural outer shadows by default and allowing an explicit
+      additional interaction inset for baked decorative pixels.
 */
 
 #include <type_traits>
@@ -123,6 +129,12 @@ protected:
     bool        mouse_over_   = false;
     bool        pressed_      = false;
     StyledState visual_state_ = ST_NORMAL;
+
+    // Additional non-negative thickness removed from the styled surface for
+    // pointer interaction. This is deliberately control state rather than
+    // Style serialization: procedural shadow exclusion is automatic, while
+    // baked decorative pixels are a control/asset integration choice.
+    Rect interaction_inset_ = Rect(0, 0, 0, 0);
 
 	Size           user_min_size_ = Size(0, 0);
 	One<Animation> anim_;
@@ -224,6 +236,27 @@ public:
     UiButton& SetPressedContentOffset(int x, int y) { return SetPressedContentOffset(Point(x, y)); }
     Point     GetPressedContentOffset() const { return GetEffectiveStyle().press_offset; }
 
+    // Pointer activation follows the painted styled surface, excluding any
+    // procedural outer shadow reserved by StyledMetrics. interaction_inset is
+    // an additional l/t/r/b thickness for image/9-slice assets that contain
+    // decorative pixels inside that surface rectangle.
+    UiButton& SetInteractionInset(const Rect& inset)
+    {
+        interaction_inset_ = UiNonNegativeThickness(inset);
+        Refresh();
+        return *this;
+    }
+    UiButton& SetInteractionInset(int all) { return SetInteractionInset(Rect(all, all, all, all)); }
+    Rect      GetInteractionInset() const { return interaction_inset_; }
+    Rect      GetInteractionRect() const
+    {
+        Rect r = UiStyledSurfaceRect(Rect(GetSize()), GetEffectiveStyle().metrics);
+        if(!UiIsZeroThicknessRect(interaction_inset_))
+            r = UiApplyThicknessRect(r, interaction_inset_);
+        return r;
+    }
+    bool      IsInteractionPoint(Point p) const { return GetInteractionRect().Contains(p); }
+
     UiButton& ClickFocus(bool on = true);
 
     UiButton& SetCheckable(bool on = true);
@@ -272,6 +305,7 @@ public:
     virtual void LeftDown(Point p, dword keyflags) override;
     virtual void LeftUp(Point p, dword keyflags) override;
     virtual void MouseEnter(Point p, dword keyflags) override;
+    virtual void MouseMove(Point p, dword keyflags) override;
     virtual void MouseLeave() override;
     virtual void GotFocus() override;
     virtual void LostFocus() override;
