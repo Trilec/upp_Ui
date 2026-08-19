@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiButton_h_
+#ifndef _Ui_UiButton_h_
 #define _Ui_UiButton_h_
 
 /*
@@ -26,6 +26,8 @@
     Usage
     - Use SetText(), SetIcon(), SetIconRenderMode(), SetContentInset(), SetContentGap(), SetCheckable(), and
       SetCustomStyle() to configure button behavior and appearance.
+    - SetPressedContentOffset() controls paint-only displacement of icon/text
+      while pressed; it does not change layout, control bounds, or hit geometry.
     - Setters and style/theme changes drive cache invalidation and layout
       refresh; Paint() also repairs stale layout before drawing.
 
@@ -40,6 +42,9 @@
       one content_gap so buttons no longer expose separate icon/text margins.
     - 2026-05: exposed explicit content inset setters so split-button and
       other button-like controls can tune body padding without style hacks.
+    - 2026-08: documented press_offset as paint-only pressed-content feedback
+      and exposed SetPressedContentOffset()/GetPressedContentOffset() so callers
+      need not infer its semantics from the Style field name.
 */
 
 #include <type_traits>
@@ -61,6 +66,11 @@ public:
         StyledMetrics metrics;
         StyledSkin    skin;
 
+        // Paint-only feedback applied to the icon/text block while the button
+        // is in its pressed visual state. This does NOT move the styled face,
+        // participate in layout/min-size calculation, or alter pointer hit
+        // geometry. The storage name is retained for style/source compatibility;
+        // new control code should prefer SetPressedContentOffset().
         Point press_offset = Point(0, 0);
 
         int   overpaint    = 0;
@@ -202,6 +212,17 @@ public:
     UiButton& SetContentInset(const Rect& inset);
     UiButton& SetContentInset(int all) { return SetContentInset(Rect(all, all, all, all)); }
     Rect      GetContentInset() const { return GetEffectiveStyle().metrics.content_margin; }
+
+    // Visual press feedback only: moves icon/text while ST_PRESSED is painted.
+    // It intentionally does not affect the button face, layout, or hit bounds.
+    UiButton& SetPressedContentOffset(Point offset)
+    {
+        StyleEdit().press_offset = offset;
+        Refresh();
+        return *this;
+    }
+    UiButton& SetPressedContentOffset(int x, int y) { return SetPressedContentOffset(Point(x, y)); }
+    Point     GetPressedContentOffset() const { return GetEffectiveStyle().press_offset; }
 
     UiButton& ClickFocus(bool on = true);
 
