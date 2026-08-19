@@ -427,8 +427,21 @@ void UiSplitButton::LeftUp(Point p, dword keyflags)
         Refresh();
         return;
     }
-    if((IsInteractionPoint(p) && GetSplitRect().Contains(p)) || popup_open_)
+    if(popup_open_)
         return;
+    if(IsInteractionPoint(p) && GetSplitRect().Contains(p)) {
+        // A main-body press dragged into the split lane must end without
+        // activating either command and without leaving capture/pressed state
+        // behind. Arrow-originated presses are handled by split_pressed_ above.
+        if(pressed_) {
+            pressed_ = false;
+            ReleaseCapture();
+            mouse_over_ = true;
+            UpdateVisualState();
+            Refresh();
+        }
+        return;
+    }
     UiButton::LeftUp(p, keyflags);
 }
 
