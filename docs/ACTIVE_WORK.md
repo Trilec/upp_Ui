@@ -9,7 +9,7 @@ Detailed older history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-19
 
-STATUS: **SHARED MODEL AUDIT SOURCE COMPLETE — WINDOWS HEALTH SMOKE PENDING. GRAPH CORRECTIVE SOURCE COMPLETE — WINDOWS REVALIDATION PENDING. UIBUTTON MODERNIZED DEMO SOURCE PUBLISHED — WINDOWS PENDING. SYMBOL PICKER 5K GALLERY SOURCE PUBLISHED — WINDOWS PENDING.**
+STATUS: **SHARED MODEL AUDIT SOURCE COMPLETE — WINDOWS HEALTH SMOKE PENDING. GRAPH CORRECTIVE SOURCE COMPLETE — WINDOWS REVALIDATION PENDING. UIBUTTON MODERNIZED DEMO + INTERACTION HARDENING SOURCE COMPLETE — WINDOWS PENDING. SYMBOL PICKER 5K GALLERY SOURCE PUBLISHED — WINDOWS PENDING.**
 
 An inert accidental branch `temp-demo-button-do-not-use` exists only as a cleanup item. Do not work from it; `main` is authoritative.
 
@@ -172,11 +172,34 @@ Current gate: Debug build/launch and smoke Preview / Inspector / Overrides / Cod
 
 ---
 
+## UIBUTTON-INTERACTION-HARDENING-R1 — SOURCE COMPLETE, WINDOWS PENDING
+
+Final source line immediately below the compatibility clarification:
+- `05c7c378d427512f3cd04f0e78b4953920765572` — final Button/SplitButton interaction implementation.
+- `b382752b35b0f04b9dbd92f3eebca347544f9763` — focused interaction-contract fixture and SplitButton fluent-API coverage.
+
+Contract:
+- `Style::press_offset` remains as compatibility/serialization storage, but its declaration now states that it is **paint-only icon/text displacement while pressed**. New control code should use `SetPressedContentOffset()` / `GetPressedContentOffset()`.
+- pointer interaction defaults to `UiStyledSurfaceRect()`, matching the styled face/frame/skin surface and excluding procedural outer-shadow margins.
+- `SetInteractionInset()` supplies an additional non-negative l/t/r/b hit inset for baked image/9-slice decoration without abusing content geometry.
+- `StyledSkin::content_inset` remains content geometry; it does not silently redefine the pointer target.
+- `UiSplitButton` uses the same styled-surface contract for its main and arrow lanes, keeps split layout/divider geometry out of outer-shadow margins, and cancels a main-body press released over the split lane without firing either command.
+- SplitButton retains fluent wrappers for the new shared Button APIs.
+
+Test gate:
+- `Utilities/UiButtonInteractionContractTest` — **11 checks / 0 failures required**. Covers procedural-shadow exclusion, explicit interaction inset/clamping, hover geometry, skin-content separation, pressed-content API semantics, and SplitButton fluent propagation.
+- Then build/launch `examples/UiButtonDemo` and smoke shadow/skin controls plus ordinary, checkable and Light/Dark button interaction.
+
+No Windows PASS is claimed for this line yet.
+
+---
+
 ## NEXT
 
 1. **Do not move the shared `upp_Ui` model source while Gary runs the interim smoke.** Record his exact tested SHA.
-2. If `UiModelMutationContractTest`, `UiModelViewPerformanceTest`, `UiTreeScaleTest`, Graph 51/0, `UiGraphTest`, UiButtonDemo and SymbolPicker build/launch are green, record the common Windows-smoke baseline.
-3. If Gary tested before the final single-pass selection commits (`36d41d3f...` through `67476bed...`), rerun at least `UiModelMutationContractTest` plus a Ui compile on the final descendant before acceptance.
-4. After smoke, optionally simplify SymbolPicker visible-image preparation to mutable image updates + one ranged `UiListModel::Touch()` per useful range; review it as an app adoption of the shared API, not another model redesign.
-5. Complete Graph manual acceptance after its corrected automated gates pass.
-6. Delete the inert `temp-demo-button-do-not-use` branch when convenient.
+2. Add `UiButtonInteractionContractTest` to the next Windows health smoke; require 11/0 before accepting the new Button interaction line.
+3. If `UiModelMutationContractTest`, `UiModelViewPerformanceTest`, `UiTreeScaleTest`, Graph 51/0, `UiGraphTest`, UiButton interaction/demo and SymbolPicker build/launch are green, record the common Windows-smoke baseline.
+4. If Gary tested before the final single-pass selection commits (`36d41d3f...` through `67476bed...`), rerun at least `UiModelMutationContractTest` plus a Ui compile on the final descendant before acceptance.
+5. After smoke, optionally simplify SymbolPicker visible-image preparation to mutable image updates + one ranged `UiListModel::Touch()` per useful range; review it as an app adoption of the shared API, not another model redesign.
+6. Complete Graph manual acceptance after its corrected automated gates pass.
+7. Delete the inert `temp-demo-button-do-not-use` branch when convenient.
