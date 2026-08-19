@@ -160,16 +160,16 @@ void UiButtonDemo::BuildOverrideModel()
                     .AddChoice("Dotted", "Dotted"));
 
     MarkOverride(pe_model_override.AddNumericInt("press_offset_x", "Offset X", base.press_offset.x,
-                                                  -16, 16, 1, "Press Offset"));
+                                                  -16, 16, 1, "Pressed Content Offset"));
     MarkOverride(pe_model_override.AddNumericInt("press_offset_y", "Offset Y", base.press_offset.y,
-                                                  -16, 16, 1, "Press Offset"));
+                                                  -16, 16, 1, "Pressed Content Offset"));
 
     pe_model_override.SetGroupSubtitle("General", "whole-control appearance");
     pe_model_override.SetGroupSubtitle("Face", "state fill plus optional image skin");
     pe_model_override.SetGroupSubtitle("Frame", "border geometry and state colours");
     pe_model_override.SetGroupSubtitle("Ink", "text colours by interaction state");
     pe_model_override.SetGroupSubtitle("Icon", "icon tint by interaction state");
-    pe_model_override.SetGroupSubtitle("Press Offset", "pressed content displacement");
+    pe_model_override.SetGroupSubtitle("Pressed Content Offset", "paint-only icon/text displacement while pressed");
     pe_model_override.StructureChanged();
     UpdateOverrideSummaries();
 }
