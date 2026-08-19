@@ -106,6 +106,16 @@ For application identity across a complete filtered/reordered projection,
 index state on RESET and the application may restore selection by that stable
 key where appropriate.
 
+List and Gallery restore multi-selection tokens with
+`UiResolveSequentialSelectionTokens()`. The helper resolves all stable
+`UiModelItem::data` tokens in one model scan, then applies numeric row-index
+fallback only to unresolved numeric tokens. This preserves the single-token
+identity contract while avoiding O(selection x model) work when a large
+projection restores thousands of selected records.
+
+Do not restore a large stable selection by calling a linear `FindByData` /
+`ResolveSelectionIndex` once for every token.
+
 ## 4. Stable-ID identity: Tree, Menu and Graph
 
 Tree, Menu and Graph have real stable node/edge identities. They must not be
