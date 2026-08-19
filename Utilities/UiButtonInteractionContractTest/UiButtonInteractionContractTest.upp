@@ -1,0 +1,9 @@
+uses
+	Core,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "CONSOLE";
