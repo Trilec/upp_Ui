@@ -12,6 +12,7 @@
     - Keep viewport work proportional to visible content rather than total model size.
     - Use uniform extents for the fast path used by UiList and UiGallery.
     - Keep geometry calculations overflow-safe for very large logical item counts.
+    - Resolve batches of stable sequential-view selection tokens in one model scan.
 
     Thread context
     - Pure helpers; no GUI state is mutated.
@@ -117,6 +118,71 @@ inline UiVisibleRange UiComputeGridVisibleRange(int item_count,
     int64 last = ((int64)row_range.last + 1) * columns - 1;
     out.first = (int)(first >= item_count ? item_count - 1 : first);
     out.last = (int)(last >= item_count ? item_count - 1 : last);
+    return out;
+}
+
+// Resolve a single token or ValueArray of tokens in O(model + token) work.
+// Stable item.data values take precedence over the legacy numeric-index fallback,
+// matching List/Gallery single-token semantics without scanning the model once
+// for every selected token. Duplicate tokens still resolve to the first matching
+// selectable row, and duplicate results are suppressed.
+template <class Model, class IsSelectable>
+inline Vector<int> UiResolveSequentialSelectionTokens(const Model& model,
+                                                       const Value& value,
+                                                       IsSelectable is_selectable)
+{
+    Vector<int> out;
+    if(IsNull(value))
+        return out;
+
+    ValueArray values;
+    if(value.Is<ValueArray>())
+        values = value;
+    else
+        values.Add(value);
+
+    Index<Value> tokens;
+    for(int i = 0; i < values.GetCount(); i++)
+        tokens.FindAdd(values[i]);
+    if(tokens.IsEmpty())
+        return out;
+
+    Vector<int> resolved;
+    resolved.SetCount(tokens.GetCount(), -1);
+
+    for(int i = 0; i < model.GetCount(); i++) {
+        if(!is_selectable(i))
+            continue;
+        const auto& item = model.Get(i);
+        if(IsNull(item.data))
+            continue;
+        int token = tokens.Find(item.data);
+        if(token >= 0 && resolved[token] < 0)
+            resolved[token] = i;
+    }
+
+    for(int i = 0; i < tokens.GetCount(); i++) {
+        if(resolved[i] >= 0)
+            continue;
+        const Value& token = tokens[i];
+        int index = -1;
+        if(token.Is<int>())
+            index = token;
+        else if(token.Is<int64>()) {
+            int64 v = token;
+            if(v >= 0 && v <= INT_MAX)
+                index = (int)v;
+        }
+        if(index >= 0 && index < model.GetCount() && is_selectable(index))
+            resolved[i] = index;
+    }
+
+    Index<int> unique;
+    for(int i = 0; i < resolved.GetCount(); i++)
+        if(resolved[i] >= 0)
+            unique.FindAdd(resolved[i]);
+    for(int i = 0; i < unique.GetCount(); i++)
+        out.Add(unique[i]);
     return out;
 }
 
