@@ -631,9 +631,23 @@ void UiButton::Layout()
     UpdateLayout(content);
 }
 
-void UiButton::MouseEnter(Point, dword)
+void UiButton::MouseEnter(Point p, dword keyflags)
 {
-    mouse_over_ = true;
+    MouseMove(p, keyflags);
+}
+
+void UiButton::MouseMove(Point p, dword)
+{
+    bool next_over = IsEnabled() && IsInteractionPoint(p);
+    if(mouse_over_ == next_over)
+        return;
+
+    mouse_over_ = next_over;
+    if(!mouse_over_ && pressed_) {
+        pressed_ = false;
+        ReleaseCapture();
+    }
+
     UpdateVisualState();
     Refresh();
 }
@@ -651,9 +665,13 @@ void UiButton::MouseLeave()
     Refresh();
 }
 
-void UiButton::LeftDown(Point, dword)
+void UiButton::LeftDown(Point p, dword)
 {
+    if(!IsEnabled() || !IsInteractionPoint(p))
+        return;
+
     pressed_ = true;
+    mouse_over_ = true;
     SetCapture();
     if(click_focus_)
         SetFocus();
@@ -666,10 +684,11 @@ void UiButton::LeftUp(Point p, dword)
     bool was_pressed = pressed_;
     pressed_ = false;
     ReleaseCapture();
+    mouse_over_ = IsEnabled() && IsInteractionPoint(p);
     UpdateVisualState();
     Refresh();
 
-    if(was_pressed && Rect(GetSize()).Contains(p))
+    if(was_pressed && IsInteractionPoint(p))
         Activate_();
 }
 
