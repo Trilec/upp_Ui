@@ -39,6 +39,9 @@
       wider history popup.
     - 2026-05: added independent split-gap and split-chevron sizing so the
       Designer can expose body inset and split lane spacing without hacks.
+    - 2026-08: adopted UiButton's styled interaction surface for both the main
+      and split command targets and preserved fluent wrappers for the new
+      pressed-content and interaction-inset APIs.
 */
 
 #include <Ui/UiButton.h>
@@ -137,6 +140,10 @@ public:
     UiSplitButton& SetIconSide(UiAlign side) { UiButton::SetIconSide(side); return *this; }
     UiSplitButton& SetAlign(UiAlign h, UiAlign v) { UiButton::SetAlign(h, v); return *this; }
     UiSplitButton& SetContentGap(int gap) { UiButton::SetContentGap(gap); return *this; }
+    UiSplitButton& SetPressedContentOffset(Point offset) { UiButton::SetPressedContentOffset(offset); return *this; }
+    UiSplitButton& SetPressedContentOffset(int x, int y) { UiButton::SetPressedContentOffset(x, y); return *this; }
+    UiSplitButton& SetInteractionInset(const Rect& inset) { UiButton::SetInteractionInset(inset); return *this; }
+    UiSplitButton& SetInteractionInset(int all) { UiButton::SetInteractionInset(all); return *this; }
     UiSplitButton& SetCustomStyle(const Style& s) { UiButton::SetCustomStyle(s); return *this; }
     UiSplitButton& ClearCustomStyle() { UiButton::ClearCustomStyle(); return *this; }
 
