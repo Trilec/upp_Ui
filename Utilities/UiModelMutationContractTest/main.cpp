@@ -168,6 +168,84 @@ void TestSequentialSemanticSelection(TestCtx& t)
     }
 }
 
+void TestDropdownSharedMutationContract(TestCtx& t)
+{
+    UiListModel model;
+    FillSequenceModel(model);
+    UiDropdown dropdown;
+    dropdown.SetModel(model);
+    dropdown.Select(2);
+
+    model.SwapItems(2, 0);
+    t.Expect(dropdown.GetSelectedData() == Value(30),
+             "Dropdown selection follows the same semantic item across SwapItems");
+
+    dropdown.SetMultiSelect(true);
+    int notifications = 0;
+    UiModelChange last;
+    model.WhenChange << [&](const UiModelChange& change) {
+        notifications++;
+        last = change;
+    };
+
+    ValueArray wanted;
+    wanted.Add(10);
+    wanted.Add(30);
+    dropdown.SetData(wanted);
+    t.Expect(notifications == 1 && last.kind == UI_MODEL_UPDATE && last.a == 0 && last.b == 3,
+             "Dropdown multi-value SetData publishes one ranged model update");
+    t.Expect(dropdown.GetCheckedCount() == 2,
+             "Dropdown multi-value SetData updates the requested checked set");
+
+    notifications = 0;
+    dropdown.ClearChecked();
+    t.Expect(notifications == 1 && last.kind == UI_MODEL_UPDATE && last.a == 0 && last.b == 3,
+             "Dropdown ClearChecked publishes one ranged model update");
+    t.Expect(dropdown.GetCheckedCount() == 0,
+             "Dropdown ClearChecked clears the complete checked set");
+}
+
+void TestSequentialSelectionTokenScale(TestCtx& t)
+{
+    struct CountingModel {
+        Vector<UiModelItem> items;
+        mutable int gets = 0;
+
+        int GetCount() const { return items.GetCount(); }
+        const UiModelItem& Get(int index) const
+        {
+            gets++;
+            return items[index];
+        }
+    };
+
+    CountingModel model;
+    model.items.Reserve(10000);
+    for(int i = 0; i < 10000; i++) {
+        UiModelItem item(Format("Row %d", i), Format("id-%d", i));
+        if(i == 7)
+            item.data = 42;
+        model.items.Add(pick(item));
+    }
+
+    ValueArray wanted;
+    wanted.Add(42); // Must resolve semantic data row 7, not numeric fallback row 42.
+    for(int i = 0; i < 10000; i += 5)
+        wanted.Add(Format("id-%d", i));
+
+    Vector<int> resolved = UiResolveSequentialSelectionTokens(model, wanted,
+        [](int) { return true; });
+
+    t.Expect(model.gets == model.GetCount(),
+             "batch selection token restore scans a 10,000-row model exactly once");
+    t.Expect(resolved.GetCount() == 2001,
+             "batch selection token restore resolves the complete large stable-token set");
+    t.Expect(resolved.GetCount() > 0 && resolved[0] == 7,
+             "stable item.data match keeps precedence over numeric row-index fallback");
+    t.Expect(FindIndex(resolved, 9995) >= 0,
+             "batch selection token restore resolves deep stable identities");
+}
+
 void TestTreeBulkImport(TestCtx& t)
 {
     UiTreeModel tree;
@@ -199,6 +277,8 @@ CONSOLE_APP_MAIN
     TestCtx t;
     TestExplicitTouchContracts(t);
     TestSequentialSemanticSelection(t);
+    TestDropdownSharedMutationContract(t);
+    TestSequentialSelectionTokenScale(t);
     TestTreeBulkImport(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);

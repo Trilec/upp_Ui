@@ -289,15 +289,10 @@ void UiList::SetData(const Value& v)
 
     if(selection_mode_ == UILISTSEL_MULTI || v.Is<ValueArray>()) {
         selected_.Clear();
-        ValueArray values;
-        if(v.Is<ValueArray>())
-            values = v;
-        else
-            values.Add(v);
-
-        for(int i = 0; i < values.GetCount(); i++) {
-            int index = ResolveSelectionIndex(values[i]);
-            if(index >= 0)
+        if(model_) {
+            Vector<int> resolved = UiResolveSequentialSelectionTokens(*model_, v,
+                [=](int index) { return IsSelectableIndex(index); });
+            for(int index : resolved)
                 selected_.FindAdd(index);
         }
 

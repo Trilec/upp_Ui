@@ -478,14 +478,10 @@ void UiGallery::SetData(const Value& value)
 
     if(selection_mode_ == UIGALLERYSEL_MULTI || value.Is<ValueArray>()) {
         selected_.Clear();
-        ValueArray values;
-        if(value.Is<ValueArray>())
-            values = value;
-        else
-            values.Add(value);
-        for(int i = 0; i < values.GetCount(); i++) {
-            int index = ResolveSelectionIndex(values[i]);
-            if(index >= 0)
+        if(model_) {
+            Vector<int> resolved = UiResolveSequentialSelectionTokens(*model_, value,
+                [=](int index) { return IsSelectableIndex(index); });
+            for(int index : resolved)
                 selected_.FindAdd(index);
         }
         Vector<int> selection = GetSelection();
