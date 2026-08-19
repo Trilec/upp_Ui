@@ -4,13 +4,73 @@ Remote GitHub is authoritative. Never force-update `main`. Work directly from re
 
 ## CURRENT SUPERVISORY STATE — 2026-08-19
 
-STATUS: **UI-DEMO-MODERNIZATION-PILOT / UIBUTTON SOURCE REPLACEMENT PUBLISHED; WINDOWS VALIDATION PENDING. GRAPH WINDOWS REVALIDATION ALSO REMAINS PENDING.**
+STATUS: **SHARED MODEL AUDIT SOURCE COMPLETE — WINDOWS HEALTH SMOKE PENDING. UI-DEMO-MODERNIZATION-PILOT / UIBUTTON SOURCE REPLACEMENT PUBLISHED — WINDOWS PENDING. GRAPH WINDOWS REVALIDATION REMAINS PENDING. SYMBOL PICKER 5K GALLERY MIGRATION SOURCE PUBLISHED — WINDOWS PENDING.**
 
 Authoritative work branch is `main`. An accidental inert connector-created branch `temp-demo-button-do-not-use` exists only as a cleanup item; do not use it for work. It should be deleted in GitHub when convenient.
 
 Detailed prior history is preserved in:
 - `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
+
+## SHARED-MODEL-AUDIT-R1 — SYMBOLPICKER / GRAPH LESSONS
+
+OBJECTIVE:
+- use the 5,000+ item Symbol Picker Gallery and the Graph scale work as real stress fixtures for the common model/view layer;
+- fix genuine shared model/view defects in `upp_Ui` rather than patching them only in an application;
+- avoid adding APIs merely for symmetry when the existing domain model has different identity semantics.
+
+SOURCE RESULT:
+- ordinary model-backed controls use lifetime-safe weak observer identity (`UiModelObserverSet`) so a destroyed inactive external model cannot suppress a later model allocated at the same address;
+- `UiListModel` exposes mutable `Get()` plus ranged `Touch(first,count)` so a bounded prepared range can be mutated and published with one UPDATE rather than one `Set()` notification per row;
+- Tree, Table and Menu now have explicit `Touch`, `TouchCell` / `TouchHeader`, and `Touch` publication APIs matching Graph's existing `TouchNode` / `TouchEdge` principle;
+- List, Gallery and Dropdown share `UiIsSequentialStructuralChange`, `UiRemapSequentialIndex` and `UiRemapSequentialSelection` rather than carrying divergent insert/erase/move logic;
+- true `UiListModel::SwapItems()` identity is encoded as MOVE with `c=0` and handled by the shared remapper;
+- List/Gallery sequential selection/cursor state follows the same semantic row through insert/erase/move/swap and is invalidated on reset/clear as appropriate;
+- Dropdown now follows the same shared remapper, including true swaps;
+- Dropdown bulk checked-state clear/set mutates rows in place and emits one ranged `Touch()` instead of N row updates;
+- ordinary Tree node UPDATE no longer rebuilds the entire flattened visible projection unless the update can actually alter lazy/disclosure projection structure;
+- `UiTreeModel::ImportList()` emits one bulk structural insert/revision rather than one event per imported child;
+- Table deliberately remains coordinate/range based: row/column structural changes clamp active cell/selection rather than pretending the current Table model has stable row IDs;
+- Menu/Tree/Graph retain stable domain IDs and therefore deliberately do not use the sequential list remapper;
+- Gallery remains a uniform arithmetic grid; no Graph spatial hash/R-tree/quadtree/BVH is introduced.
+
+PUBLISHED MODEL-AUDIT LINE:
+- `fc3052cb35de8945854e771edfec42115668a8b7` / `ae6a2948fd3951fbe1d2407f96b75258617dd769` — List/Gallery semantic view-state mutation handling;
+- `2bbd8d780ffa10d78c94139bd7eb3dd73e6d9603` through `e7131460f2a53117e44864f3eda5632d77fb2b57` — shared sequential remapping and explicit model Touch contracts;
+- `8f451b28a73db4403a8cb095a6d684ecb2673db6` / `8cff510a9831976d4964e469f2fe95e99146a0cb` — Tree projection-local ordinary updates + scale contract;
+- `7008d06b1f53ee0aea74f96a33d4a76bbc00c232` / `38217648b91a01861cc48dc8e4b5acbf3b1b4cf0` — ranged List Touch and one-event Tree bulk import in canonical model source;
+- `7abbf976e8294c89fc0c33b65aa887a2045347d7` — explicit Tree/Table/Menu Touch implementations;
+- `99bc61354e0d18408bb9ba9621540aaa34c0e3b7` / `01c8cd7298dcf5e368c2fa5c8467ea128a6d1fb4` — mutation/swap/import contract coverage and fixture correction;
+- `69f7848a468a1abb4986b97659b4ffc303d62b3a` — Dropdown shared remapper + ranged bulk checked-state updates;
+- `5259a66a277a82f5ddba85acfbb0d90622b57880` — Dropdown shared mutation regressions;
+- `2d5999689e3355745ea630fb94979cd2f3ff7f87` — programmer contract in `docs/13_UI_MODEL_MUTATION_SCALE_CONTRACT.md`.
+
+TEST CONTRACT:
+- `Utilities/UiModelMutationContractTest` is the focused mutation/identity regression package and must report zero failures;
+- `Utilities/UiModelViewPerformanceTest` remains the structural 100,000-record List/Gallery scale gate: bounded renderer pools, deep direct navigation, viewport-bounded Paint and arithmetic Gallery geometry;
+- `Utilities/UiTreeScaleTest` now distinguishes ordinary projection-neutral UPDATE from disclosure/lazy projection-changing UPDATE.
+
+API-AUDIT DECISIONS:
+- no `UiListModel::SetAll()` was added merely to collapse `Clear()+AddRange()` from two already-bulk structural notifications to one; this remains a possible future optimization only if measurement shows those two events are themselves material;
+- no List-style row identity was imposed on Table without a stable-row-ID model contract;
+- no visible-range callbacks were added to every control simply because Gallery has one; `UiGallery::WhenVisibleRange` exists because thumbnail/lazy-asset preparation is a demonstrated provider use case;
+- no spatial structure was added to Gallery while uniform-grid arithmetic is strictly cheaper.
+
+PROGRAMMER RULES:
+- mutable model access must be followed by the appropriate `Touch*()` publication;
+- bulk semantic operations should emit one describable bulk event where practical;
+- presentation-only UPDATE must invalidate only affected prepared/visible state unless it genuinely changes a derived projection;
+- applications should carry stable identity in model IDs or `UiModelItem::data`, not display text;
+- fix the lowest reusable layer that owns a defect; do not move domain semantics into generic models and do not leave shared model defects patched only in apps.
+
+VALIDATION:
+- complete touched model/view dependency slices and the relevant high-scale consumers were statically inspected;
+- full Windows health smoke is pending while the supervisor freezes source;
+- no Windows PASS is claimed for these newest model-audit commits yet.
+
+NEXT ACTION:
+- Gary runs the issued interim Windows health smoke against one refreshed `upp_Ui/main`: `UiModelMutationContractTest`, `UiModelViewPerformanceTest`, `UiTreeScaleTest`, corrected Graph 51-check gate, `UiGraphTest`, `UiButtonDemo`, plus Gallery-backed SymbolPicker build/launch;
+- only concrete compiler/runtime evidence should reopen the shared-model source architecture.
 
 ## UI-DEMO-MODERNIZATION-PILOT — UIBUTTON
 
@@ -129,35 +189,48 @@ If green, continue the previously issued final acceptance:
 
 ## SYMBOL PICKER / GALLERY CONVERGENCE
 
-`upp_uisymbolpicker` is **not a Graph consumer for its icon library**. The appropriate reusable control is `UiGallery` backed by `UiListModel`.
+`upp_uisymbolpicker` is **not a Graph consumer for its icon library**. Its production library is now `UiGallery` backed by a filtered `UiListModel` presentation projection.
 
-Current Symbol Picker library still creates one `SymbolPickerIconTile : ParentCtrl` plus two child `Label`s for every displayed icon inside a wrapping `UiBoxLayout`, and hard-caps the unfiltered All view to 240 items. Its own supervisor handoff confirms that removing the cap and eagerly creating all 5,057 current-style icons blocks startup for tens of seconds.
+PUBLISHED SYMBOL PICKER BASELINE:
+- `5ebd0182033fdc9195df8b91f577eeb9631da8e8` — documented 5K Gallery baseline;
+- final code immediately beneath that documentation: `36a5c77c9cc843edb393f54921ae8a88f167a0a8`.
 
-`UiGallery` was specifically redesigned to remove that scaling failure:
-- model item count is independent of visual Ctrl/renderer count;
-- uniform grid geometry is arithmetic;
-- renderers are non-`Ctrl` and recycled for visible+overscan cells only;
-- normal paint/hit/scroll work is viewport bounded;
-- `WhenVisibleRange` exists for lazy image preparation;
-- multi-selection, marquee, selection chrome and zoom are view-owned;
-- semantic items remain in `UiListModel`;
-- model binding now has lifetime-safe observer identity.
+SOURCE RESULT IN `Trilec/upp_uisymbolpicker`:
+- removed the old 2,288-line per-icon `SymbolPickerView`, responsive layout and `SymbolPickerIconTile : ParentCtrl` library path;
+- removed the hard 240-item All cap;
+- full active-style projection is intended to expose roughly 5,057 generated symbols;
+- library uses `SymbolPickerLibraryProjection -> UiListModel -> UiGallery`;
+- collection surface also uses `SymbolPickerCollectionProjection -> UiListModel -> UiGallery`;
+- Gallery retains only a viewport/overscan-sized `UiItemRender` pool rather than one Ctrl hierarchy per logical symbol;
+- stable catalog identity is carried through `UiModelItem::data` / projection row mapping;
+- catalog lookup by catalog/source ID is indexed rather than repeatedly scanning the generated catalog;
+- style-aware category counts correspond to the active style;
+- SVG/image previews are decoded lazily from Gallery useful visible range and reused through a simple hashed rendered-image cache with hard 8,192-entry ceiling;
+- domain/project/command state remains in SymbolPickerModel/Catalog/CommandStack rather than being duplicated into `UiListModel`;
+- structural 5K Gallery smoke covers full active-style exposure, no 240 cap, bounded renderer pool/Paint, deep final-item navigation and stable selection tokens.
+
+SHARED-LAYER LESSONS NOW ROLLED INTO `upp_Ui`:
+- lifetime-safe model observation;
+- shared sequential List/Gallery/Dropdown remapping;
+- ranged `UiListModel::Touch()` for prepared visible image/content batches;
+- projection-local UPDATE handling;
+- one-event bulk Tree import;
+- explicit mutable-access publication APIs across the lightweight models.
+
+The Symbol Picker's current visible-image loops may now be simplified to mutate the prepared image fields and publish one ranged `Touch()` per useful range. That is an application adoption of an already-shared API, not a new model redesign; perform it only after/with concrete build evidence and review the large workspace diff carefully.
 
 Do **not** add Graph's spatial hash to Gallery. Uniform row/column arithmetic is cheaper and already computes visible and marquee-intersecting cells directly.
 
-Potential Gallery polish that may be useful to Symbol Picker, but must stay surgical:
-- align marquee appearance with the Windows-style interaction language (thin Accent frame + light translucent Accent fill);
-- consider transient marquee preview with semantic selection committed on release if live selection notifications prove expensive at very large/zoomed-out ranges;
-- damage only old/new marquee and changed visible cells rather than repainting unrelated viewport content;
-- keep selection frame independent from renderer-selected presentation;
+Potential later Gallery interaction polish, only if measured/useful:
+- thin Accent marquee frame + light translucent Accent fill;
+- transient marquee preview with semantic commit on release if very large live multi-selection notifications prove expensive;
+- damage only old/new marquee and changed visible cells;
 - preserve capture-ownership hardening already present in Gallery.
-
-The primary Symbol Picker migration should not wait for a spatial structure: use `UiGallery` + a filtered `UiListModel` projection, remove the 240 cap after migration, and drive SVG/image decode from useful visible range plus cache.
 
 ## NEXT
 
-1. Windows-smoke the published UiButton modernization before beginning the Dropdown pilot.
-2. Gary reruns the corrected Graph 51-check Debug gate at current `main`, then completes final acceptance if green.
-3. Symbol Picker session refreshes `Trilec/upp_uisymbolpicker` `main`, reads `docs/SUPERVISOR_LIBRARY_DISPLAY_HANDOFF.md`, and migrates the library viewport from eager `SymbolPickerIconTile` controls / `UiBoxLayout` to `UiGallery` + `UiListModel`.
-4. Preserve SymbolPicker catalog/project/command semantics; the Gallery model is a derived filtered presentation projection, not a replacement for `SymbolPickerModel` or `SymbolPickerCatalog`.
-5. Measure with the real 5,057-icons-per-style All fixture and remove `kLibraryAllInitialLimit` only when the Gallery path is active.
+1. Gary runs the interim Windows health smoke against one refreshed common `upp_Ui/main` and reports exact tested SHA.
+2. If the shared-model/Graph/Button smoke is green, freeze that common Ui baseline for the first full SymbolPicker Windows acceptance.
+3. SymbolPicker Debug NON-BLITZ build/launch must show the full ~5,057 active-style Gallery promptly, with bounded renderer count and lazy preview fill; no restoration of the 240 cap or per-item Ctrl path.
+4. Graph still requires the corrected 51/0 Debug scale rerun before its final manual acceptance can be called closed.
+5. Delete the inert `temp-demo-button-do-not-use` branch when convenient; it is not a working branch.
