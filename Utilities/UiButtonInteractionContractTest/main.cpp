@@ -70,6 +70,15 @@ void TestInteractionGeometry(TestCtx& t)
     button.SetPressedContentOffset(2, 1);
     t.Expect(button.GetPressedContentOffset() == Point(2, 1),
              "pressed-content displacement has an explicit semantic API separate from hit geometry");
+
+    UiSplitButton split;
+    split.SetInteractionInset(2)
+         .SetPressedContentOffset(1, 1)
+         .SetSplitWidth(DPI(28))
+         .SetPopupMinWidth(DPI(160));
+    t.Expect(split.GetInteractionInset() == Rect(2, 2, 2, 2)
+             && split.GetPressedContentOffset() == Point(1, 1),
+             "split button preserves fluent access to the shared interaction and pressed-content APIs");
 }
 
 } // namespace
