@@ -50,15 +50,18 @@ UiSplitButton::Style UiSplitButton::ResolveThemeStyle() const
 
 Rect UiSplitButton::GetContentLayoutRect(const Rect& outer, const Style& style) const
 {
-    Rect main = outer;
-    Rect split = GetSplitRect();
-    main.right = max(main.left, split.left - split_content_gap_);
-    return UiStyledInnerRect(main, style.metrics, style.skin);
+    Rect content = UiButton::GetContentLayoutRect(outer, style);
+    Rect surface = UiStyledSurfaceRect(outer, style.metrics);
+    int w = min(max(DPI(18), split_width_), max(0, surface.GetWidth()));
+    int split_left = surface.right - w;
+    content.right = max(content.left, min(content.right, split_left - split_content_gap_));
+    return content;
 }
 
 Rect UiSplitButton::GetSplitRect() const
 {
-    Rect r = GetSize();
+    const Style& style = GetEffectiveStyle();
+    Rect r = UiStyledSurfaceRect(Rect(GetSize()), style.metrics);
     if(r.IsEmpty())
         return r;
     int w = min(max(DPI(18), split_width_), max(0, r.GetWidth()));
@@ -67,7 +70,8 @@ Rect UiSplitButton::GetSplitRect() const
 
 Rect UiSplitButton::GetMainRect() const
 {
-    Rect r = GetSize();
+    const Style& style = GetEffectiveStyle();
+    Rect r = UiStyledSurfaceRect(Rect(GetSize()), style.metrics);
     Rect split = GetSplitRect();
     r.right = max(r.left, split.left);
     return r;
@@ -379,7 +383,7 @@ void UiSplitButton::DrawSplitAffordance(Draw& w, const Rect& r)
     if(IsNull(line))
         line = Blend(SColorShadow(), SColorPaper(), 130);
     int divider_w = max(1, st.metrics.frame_width);
-    w.DrawRect(split.left, r.top + DPI(5), divider_w, max(0, r.GetHeight() - DPI(10)), line);
+    w.DrawRect(split.left, split.top + DPI(5), divider_w, max(0, split.GetHeight() - DPI(10)), line);
 
     int side = min(max(DPI(8), split_icon_size_), max(DPI(8), split.GetWidth() - DPI(10)));
     Rect ir(split.left + (split.GetWidth() - side) / 2,
