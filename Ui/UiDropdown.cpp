@@ -11,30 +11,6 @@ const UiModelItem& EmptyDropdownItem()
     return item;
 }
 
-int RemapErasedIndex(int index, int start, int count)
-{
-    if(index < 0 || count <= 0)
-        return index;
-    if(index < start)
-        return index;
-    if(index < start + count)
-        return -1;
-    return index - count;
-}
-
-int RemapMovedIndex(int index, int from, int to)
-{
-    if(index < 0 || from < 0 || to < 0 || from == to)
-        return index;
-    if(index == from)
-        return to;
-    if(from < to && index > from && index <= to)
-        return index - 1;
-    if(to < from && index >= to && index < from)
-        return index + 1;
-    return index;
-}
-
 UiItemRenderStyle MakeDropdownItemRenderStyle(const UiDropdown::Style& dd)
 {
     UiItemRenderBasic base;
@@ -339,28 +315,11 @@ void UiDropdown::BindModel(UiListModel& model)
 
 void UiDropdown::NormalizeIndexesAfterChange(const UiModelChange& change)
 {
-    if(change.kind == UI_MODEL_INSERT) {
-        int count = max(1, change.b);
-        if(selected_index_ >= change.a) selected_index_ += count;
-        if(highlight_index_ >= change.a) highlight_index_ += count;
-        if(hot_drag_ >= change.a) hot_drag_ += count;
-        if(pressed_drag_ >= change.a) pressed_drag_ += count;
-    }
-    else if(change.kind == UI_MODEL_ERASE) {
-        int count = max(1, change.b);
-        selected_index_ = RemapErasedIndex(selected_index_, change.a, count);
-        highlight_index_ = RemapErasedIndex(highlight_index_, change.a, count);
-        hot_drag_ = RemapErasedIndex(hot_drag_, change.a, count);
-        pressed_drag_ = RemapErasedIndex(pressed_drag_, change.a, count);
-    }
-    else if(change.kind == UI_MODEL_MOVE) {
-        selected_index_ = RemapMovedIndex(selected_index_, change.a, change.b);
-        highlight_index_ = RemapMovedIndex(highlight_index_, change.a, change.b);
-        hot_drag_ = RemapMovedIndex(hot_drag_, change.a, change.b);
-        pressed_drag_ = RemapMovedIndex(pressed_drag_, change.a, change.b);
-    }
-    else if(change.kind == UI_MODEL_CLEAR || change.kind == UI_MODEL_RESET) {
-        selected_index_ = highlight_index_ = hot_drag_ = pressed_drag_ = -1;
+    if(UiIsSequentialStructuralChange(change)) {
+        selected_index_ = UiRemapSequentialIndex(selected_index_, change);
+        highlight_index_ = UiRemapSequentialIndex(highlight_index_, change);
+        hot_drag_ = UiRemapSequentialIndex(hot_drag_, change);
+        pressed_drag_ = UiRemapSequentialIndex(pressed_drag_, change);
     }
 
     int count = GetCount();
@@ -694,13 +653,19 @@ UiDropdown& UiDropdown::SetCheckedByData(const Value& data, bool checked)
 
 UiDropdown& UiDropdown::ClearChecked()
 {
+    int first = -1;
+    int last = -1;
     for(int i = 0; i < GetCount(); i++) {
-        if(!model_->Get(i).checked)
+        UiModelItem& item = model_->Get(i);
+        if(!item.checked)
             continue;
-        UiModelItem item = model_->Get(i);
         item.checked = false;
-        model_->Set(i, item);
+        if(first < 0)
+            first = i;
+        last = i;
     }
+    if(first >= 0)
+        model_->Touch(first, last - first + 1);
     return *this;
 }
 
@@ -754,14 +719,21 @@ void UiDropdown::SetData(const Value& v)
     }
     else
         wanted.FindAdd(v);
+
+    int first = -1;
+    int last = -1;
     for(int i = 0; i < GetCount(); i++) {
-        UiModelItem item = model_->Get(i);
+        UiModelItem& item = model_->Get(i);
         bool checked = wanted.Find(item.data) >= 0 && IsSelectableItem(i);
-        if(item.checked != checked) {
-            item.checked = checked;
-            model_->Set(i, item);
-        }
+        if(item.checked == checked)
+            continue;
+        item.checked = checked;
+        if(first < 0)
+            first = i;
+        last = i;
     }
+    if(first >= 0)
+        model_->Touch(first, last - first + 1);
 }
 
 Value UiDropdown::GetData() const
