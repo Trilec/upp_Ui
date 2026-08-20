@@ -1,4 +1,5 @@
 #include "PropertyEditor.h"
+#include <Ui/UiColorPicker/UiColorPicker.h>
 
 namespace Upp {
 
@@ -74,6 +75,11 @@ static bool PeIsTextBoolean(const PropertyEditorItem& item)
 {
     return item.kind == PropertyEditorKind::Boolean &&
            item.boolean_presentation != PropertyBooleanPresentation::Check;
+}
+
+static String PeColorClipboardText(Color color)
+{
+    return Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB());
 }
 
 void PropertyEditor::ActivateRow(int display_index)
@@ -290,6 +296,69 @@ void PropertyEditor::ToggleOverride(int display_index)
     WhenOverride(item.id, !item.override_active);
 }
 
+bool PropertyEditor::IsColorDropTarget(int display_index) const
+{
+    if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
+        return false;
+    const DisplayRow& row = rows_[display_index];
+    if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
+        return false;
+    const PropertyEditorItem& item = (*model_)[row.model_index];
+    return item.kind == PropertyEditorKind::Color && item.enabled &&
+           !item.read_only && (item.value_editable || item.overrideable);
+}
+
+bool PropertyEditor::CommitColorText(const String& property_id,
+                                     const String& text,
+                                     bool allow_override_activation)
+{
+    if(!model_ || property_id.IsEmpty())
+        return false;
+
+    Color color;
+    int alpha = 255;
+    if(!UiColorPicker::ParseColorText(TrimBoth(text), color, alpha))
+        return false;
+
+    PropertyEditorItem *item = model_->Find(property_id);
+    if(!item || item->kind != PropertyEditorKind::Color ||
+       !item->enabled || item->read_only)
+        return false;
+
+    if(item->overrideable && !item->override_active) {
+        if(!allow_override_activation)
+            return false;
+        WhenOverride(property_id, true);
+        Ptr<PropertyEditor> self = this;
+        const String deferred_text = text;
+        PostCallback([self, property_id, deferred_text] {
+            if(self)
+                self->CommitColorText(property_id, deferred_text, false);
+        });
+        return true;
+    }
+
+    if(!item->value_editable)
+        return false;
+
+    BeginTransaction(property_id);
+    String error;
+    if(!model_->Commit(property_id, color, &error)) {
+        EndTransaction();
+        return false;
+    }
+
+    PropertyEditorItem *committed = model_->Find(property_id);
+    if(committed) {
+        dispatching_editor_callback_ = true;
+        WhenCommit(property_id, committed->value);
+        dispatching_editor_callback_ = false;
+    }
+    EndTransaction();
+    RefreshValue(property_id);
+    return true;
+}
+
 void PropertyEditor::LeftDown(Point p, dword)
 {
     if(GetLabelDividerRect().Contains(p)) {
@@ -400,6 +469,47 @@ void PropertyEditor::MouseWheel(Point p, int zdelta, dword)
     }
 }
 
+void PropertyEditor::DragEnter()
+{
+    color_drop_display_row_ = -1;
+    Refresh();
+}
+
+void PropertyEditor::DragAndDrop(Point p, PasteClip& clip)
+{
+    const int row = FindDisplayRow(p);
+    if(!IsColorDropTarget(row) || !AcceptText(clip)) {
+        clip.Reject();
+        if(color_drop_display_row_ != -1) {
+            color_drop_display_row_ = -1;
+            Refresh();
+        }
+        return;
+    }
+
+    color_drop_display_row_ = row;
+    clip.SetAction(DND_COPY);
+    Refresh();
+    if(!clip.IsPaste())
+        return;
+
+    const DisplayRow& display = rows_[row];
+    const String property_id = (*model_)[display.model_index].id;
+    const String text = GetString(clip);
+    selected_display_row_ = row;
+    color_drop_display_row_ = -1;
+    CommitColorText(property_id, text, true);
+    Refresh();
+}
+
+void PropertyEditor::DragLeave()
+{
+    if(color_drop_display_row_ == -1)
+        return;
+    color_drop_display_row_ = -1;
+    Refresh();
+}
+
 bool PropertyEditor::Key(dword key, int count)
 {
     if(key == K_ESCAPE) {
@@ -407,6 +517,22 @@ bool PropertyEditor::Key(dword key, int count)
             DeactivateEditor();
             return true;
         }
+    }
+
+    if(key == K_CTRL_C) {
+        const PropertyEditorItem *item = GetSelectedProperty();
+        if(item && item->kind == PropertyEditorKind::Color &&
+           !item->mixed && item->value.GetType() == COLOR_V) {
+            WriteClipboardText(PeColorClipboardText(Color(item->value)));
+            return true;
+        }
+    }
+
+    if(key == K_CTRL_V) {
+        const PropertyEditorItem *item = GetSelectedProperty();
+        if(item && item->kind == PropertyEditorKind::Color &&
+           IsClipboardAvailableText())
+            return CommitColorText(item->id, ReadClipboardText(), true);
     }
 
     if(key == K_CTRL_Z) {
