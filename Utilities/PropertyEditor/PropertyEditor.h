@@ -265,21 +265,12 @@ private:
     String active_property_id_;
     String inline_preview_property_id_;
     bool layout_in_progress_ = false;
-    int refresh_model_count_ = 0;
-    int refresh_value_count_ = 0;
-    int refresh_structure_count_ = 0;
-    int layout_count_ = 0;
-    int paint_count_ = 0;
-    int active_editor_create_count_ = 0;
-    int inline_editor_create_count_ = 0;
-    int transaction_begin_count_ = 0;
-    int transaction_commit_count_ = 0;
-    int transaction_cancel_count_ = 0;
-    bool transaction_active_ = false;
+
     String transaction_property_id_;
     Value transaction_original_value_;
     bool transaction_original_mixed_ = false;
     bool transaction_original_inherited_ = false;
+    bool transaction_active_ = false;
 };
 
 }
