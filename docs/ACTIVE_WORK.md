@@ -7,11 +7,36 @@ Detailed older history:
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
 - `docs/13_UI_MODEL_MUTATION_SCALE_CONTRACT.md` — current shared mutation/identity/scale contract.
 
-## CURRENT SUPERVISORY STATE — 2026-08-19
+## CURRENT SUPERVISORY STATE — 2026-08-20
 
-STATUS: **SHARED MODEL AUDIT SOURCE COMPLETE — WINDOWS HEALTH SMOKE PENDING. GRAPH CORRECTIVE SOURCE COMPLETE — WINDOWS REVALIDATION PENDING. UIBUTTON MODERNIZED DEMO + INTERACTION HARDENING SOURCE COMPLETE — WINDOWS PENDING. SYMBOL PICKER 5K GALLERY SOURCE PUBLISHED — WINDOWS PENDING.**
+STATUS: **PROPERTYEDITOR COLOUR-TRANSFER SOURCE PUBLISHED — WINDOWS VALIDATION PENDING. EXISTING SHARED-MODEL / GRAPH / BUTTON / SYMBOL-PICKER WINDOWS GATES REMAIN PENDING.**
 
 An inert accidental branch `temp-demo-button-do-not-use` exists only as a cleanup item. Do not work from it; `main` is authoritative.
+
+---
+
+## PROPERTYEDITOR-COLOUR-TRANSFER — SOURCE PUBLISHED, WINDOWS PENDING
+
+Current source checkpoint before this documentation commit:
+- `1088011f5b806ec7a21d58774b8a80ab1bace6b7`.
+
+Purpose: provide a reusable colour-transfer contract for Theme Builder and any other PropertyEditor consumer without introducing an application-specific drag payload.
+
+Current behavior:
+- `PropertyEditorKind::Color` rows accept standard text drops;
+- colour text is parsed through production `UiColorPicker::ParseColorText()`;
+- a valid drop commits through the existing PropertyEditor model / `WhenCommit` path;
+- inactive override rows are activated first and the colour commit is deferred until the rebuilt model is editable;
+- the value cell is highlighted while it is the active colour-drop target;
+- `Ctrl+C` on a selected Color row writes `#RRGGBB`;
+- `Ctrl+V` reads clipboard text, parses it through the same production parser and commits normally.
+
+Design boundaries:
+- do not create a Designer-only colour payload when standard colour text is sufficient;
+- do not guess whether a drop on a rendered control means Face / Frame / Ink / Icon / Shadow etc.; direct rendered-control colour drops remain deliberately out of scope;
+- keep drag/drop and clipboard behavior in reusable `Utilities/PropertyEditor`, not in one application shell.
+
+Primary downstream validation is the `Trilec/upp_uidesigner` `tests/ThemeBuilderContractTest` package plus an actual UiDesigner Debug/Release build. No Windows PASS is claimed yet.
 
 ---
 
@@ -196,10 +221,10 @@ No Windows PASS is claimed for this line yet.
 
 ## NEXT
 
-1. **Do not move the shared `upp_Ui` model source while Gary runs the interim smoke.** Record his exact tested SHA.
-2. Add `UiButtonInteractionContractTest` to the next Windows health smoke; require 11/0 before accepting the new Button interaction line.
-3. If `UiModelMutationContractTest`, `UiModelViewPerformanceTest`, `UiTreeScaleTest`, Graph 51/0, `UiGraphTest`, UiButton interaction/demo and SymbolPicker build/launch are green, record the common Windows-smoke baseline.
-4. If Gary tested before the final single-pass selection commits (`36d41d3f...` through `67476bed...`), rerun at least `UiModelMutationContractTest` plus a Ui compile on the final descendant before acceptance.
+1. Validate the new PropertyEditor colour-transfer source through the current UiDesigner Theme Builder compile/test gate; keep source fixes with the supervisor.
+2. Do not move the shared `upp_Ui` model source underneath unrelated active Windows validation unless a concrete failure requires it.
+3. Add `UiButtonInteractionContractTest` to the next broader Windows health smoke; require 11/0 before accepting the Button interaction line.
+4. If `UiModelMutationContractTest`, `UiModelViewPerformanceTest`, `UiTreeScaleTest`, Graph 51/0, `UiGraphTest`, UiButton interaction/demo and SymbolPicker build/launch are green, record the common Windows-smoke baseline.
 5. After smoke, optionally simplify SymbolPicker visible-image preparation to mutable image updates + one ranged `UiListModel::Touch()` per useful range; review it as an app adoption of the shared API, not another model redesign.
 6. Complete Graph manual acceptance after its corrected automated gates pass.
 7. Delete the inert `temp-demo-button-do-not-use` branch when convenient.
