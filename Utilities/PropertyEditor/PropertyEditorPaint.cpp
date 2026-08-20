@@ -119,7 +119,7 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
         DrawValueSummary(w, item, value_rect);
 
     if(display_index == color_drop_display_row_ && !value_rect.IsEmpty())
-        DrawFrame(w, value_rect.Deflated(DPI(1)), SColorHighlight(), DPI(2));
+        DrawFatFrame(w, value_rect.Deflated(DPI(1)), SColorHighlight(), DPI(2));
 
     if(item.resettable && !item.overrideable) {
         Rect reset = GetResetRect(display_index);
