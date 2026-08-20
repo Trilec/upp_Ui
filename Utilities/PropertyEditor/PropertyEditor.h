@@ -133,6 +133,9 @@ public:
     virtual void MouseLeave() override;
     virtual Image CursorImage(Point p, dword keyflags) override;
     virtual void MouseWheel(Point p, int zdelta, dword keyflags) override;
+    virtual void DragEnter() override;
+    virtual void DragAndDrop(Point p, PasteClip& clip) override;
+    virtual void DragLeave() override;
     virtual bool Key(dword key, int count) override;
     virtual void ChildGotFocus() override;
 
@@ -209,6 +212,9 @@ private:
     void BeginTransaction(const String& property_id);
     void EndTransaction();
     bool CancelTransaction();
+    bool IsColorDropTarget(int display_index) const;
+    bool CommitColorText(const String& property_id, const String& text,
+                         bool allow_override_activation = true);
 
     void DrawGroupRow(Draw& w, int display_index, const DisplayRow& row,
                       const Rect& r);
@@ -243,6 +249,7 @@ private:
     int active_display_row_ = -1;
     int selected_display_row_ = -1;
     int hover_display_row_ = -1;
+    int color_drop_display_row_ = -1;
 
     Rect viewport_;
     int content_height_ = 0;
@@ -258,12 +265,21 @@ private:
     String active_property_id_;
     String inline_preview_property_id_;
     bool layout_in_progress_ = false;
-
+    int refresh_model_count_ = 0;
+    int refresh_value_count_ = 0;
+    int refresh_structure_count_ = 0;
+    int layout_count_ = 0;
+    int paint_count_ = 0;
+    int active_editor_create_count_ = 0;
+    int inline_editor_create_count_ = 0;
+    int transaction_begin_count_ = 0;
+    int transaction_commit_count_ = 0;
+    int transaction_cancel_count_ = 0;
+    bool transaction_active_ = false;
     String transaction_property_id_;
     Value transaction_original_value_;
     bool transaction_original_mixed_ = false;
     bool transaction_original_inherited_ = false;
-    bool transaction_active_ = false;
 };
 
 }
