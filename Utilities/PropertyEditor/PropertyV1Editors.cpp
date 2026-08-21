@@ -143,13 +143,13 @@ public:
         matrix_.WhenChanging = [=] {
             if(!syncing_) {
                 SyncReadout();
-                WhenPreview(matrix_.GetData());
+                WhenPreview(GetEditorValue());
             }
         };
         matrix_.WhenAction = [=] {
             if(!syncing_) {
                 SyncReadout();
-                WhenCommit(matrix_.GetData());
+                WhenCommit(GetEditorValue());
             }
         };
         UpdateVisible();
@@ -159,6 +159,14 @@ public:
     {
         syncing_ = true;
         variant_ = item.editor_variant;
+        canonical_values_.Clear();
+        for(const PropertyEditorChoice& choice : item.choices) {
+            if(!choice.value.Is<String>())
+                continue;
+            const String key = ToLower(AsString(choice.value));
+            if(canonical_values_.Find(key) < 0)
+                canonical_values_.Add(key, choice.value);
+        }
         matrix_.SetPreset(PeMatrixPreset(variant_));
         matrix_.SetSelectionMode(item.editor_variant == "QuadPair"
                                  ? UiMatrixSelectionMode::Pair
@@ -168,9 +176,10 @@ public:
         expand_.Enable(item.expanded_row_span > 1);
         dialog_.Enable(enabled_);
         matrix_.ClearDefault();
-        if(!IsNull(item.default_value))
+        const Value default_value = MatrixValue(item.default_value);
+        if(!IsNull(default_value))
             for(int i = 0; i < matrix_.GetCellCount(); i++)
-                if(matrix_.GetCell(i).value == item.default_value) {
+                if(matrix_.GetCell(i).value == default_value) {
                     matrix_.SetDefault(i);
                     break;
                 }
@@ -182,12 +191,15 @@ public:
     {
         syncing_ = true;
         if(!mixed)
-            matrix_.SetData(value);
+            matrix_.SetData(MatrixValue(value));
         syncing_ = false;
         SyncReadout(mixed);
     }
 
-    Value GetEditorValue() const override { return matrix_.GetData(); }
+    Value GetEditorValue() const override
+    {
+        return CanonicalValue(matrix_.GetData());
+    }
     void FocusEditor() override { expanded_ ? matrix_.SetFocus() : expand_.SetFocus(); }
     void SetExpanded(bool expanded) override
     {
@@ -220,6 +232,23 @@ public:
     }
 
 private:
+    Value MatrixValue(const Value& value) const
+    {
+        if(value.Is<String>() && !canonical_values_.IsEmpty())
+            return ToLower(AsString(value));
+        return value;
+    }
+
+    Value CanonicalValue(const Value& value) const
+    {
+        if(value.Is<String>()) {
+            const int q = canonical_values_.Find(ToLower(AsString(value)));
+            if(q >= 0)
+                return canonical_values_[q];
+        }
+        return value;
+    }
+
     void ActionIconsChanged() override
     {
         const Image icon = expanded_ ? action_icons_.collapse : action_icons_.expand;
@@ -284,14 +313,15 @@ private:
         if(dlg.Run() == IDOK) {
             matrix_.SetData(dlg.matrix.GetData());
             SyncReadout();
-            WhenPreview(matrix_.GetData());
-            WhenCommit(matrix_.GetData());
+            WhenPreview(GetEditorValue());
+            WhenCommit(GetEditorValue());
         }
     }
 
     UiMatrixSelector matrix_;
     PropertyActionLabel readout_;
     UiToolButton expand_, dialog_;
+    VectorMap<String, Value> canonical_values_;
     String variant_;
     bool expanded_ = false;
     bool enabled_ = true;
