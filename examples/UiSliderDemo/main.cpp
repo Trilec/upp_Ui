@@ -100,14 +100,12 @@ public:
         UiTheme::Set(context);
         RegisterPropertyEditorV1Editors(factory_);
 
-        cfg_[SAMPLE_RANGE].value = 50.0;
-
         Add(header_);
         Add(preview_panel_);
         Add(rail_panel_);
 
         header_.SetTitle("Slider family")
-               .SetSubTitle("UiSlider and UiRangeSlider share one style contract but keep their own value semantics")
+               .SetSubTitle("UiSlider and UiRangeSlider share UiSlider::Style while retaining distinct value semantics")
                .SetMedia(ICON_DESIGN_TUNE_48())
                .SetMediaAutoFit(true)
                .ShowTitleLine(false)
@@ -150,7 +148,8 @@ public:
                   .Add("Current changes", "changes")
                   .Add("Full explicit", "explicit");
         code_mode_.SelectByData("changes");
-        code_.SetEditable(false).SetAcceptsTabs(true);
+        code_.SetEditable(false);
+        code_.SetAcceptsTabs(true);
 
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
@@ -231,9 +230,11 @@ private:
         if(sample == SAMPLE_SLIDER)
             Resettable(model_.AddNumericDouble("value", "Value", cfg.value, cfg.minimum, cfg.maximum, cfg.step, "Value"));
         else {
-            PropertyEditorItem& range = AddPropertyAdjustableRange(model_, "range_values", "Bounds / selection",
-                cfg.minimum, cfg.bound_lower, cfg.lower, cfg.upper, cfg.bound_upper, cfg.maximum, cfg.step, "Value");
-            Resettable(range);
+            PropertyEditorItem& range_item = AddPropertyAdjustableRange(
+                model_, "range_values", "Bounds / selection",
+                cfg.minimum, cfg.bound_lower, cfg.lower, cfg.upper,
+                cfg.bound_upper, cfg.maximum, cfg.step, "Value");
+            Resettable(range_item);
             Resettable(model_.AddBoolean("adjustable_bounds", "Adjustable bounds", cfg.adjustable_bounds, "Value"));
             Resettable(model_.AddBoolean("endpoint_markers", "Endpoint markers", cfg.endpoint_markers, "Value"));
         }
@@ -273,7 +274,8 @@ private:
         Resettable(model_.AddColor("thumb_color", "Face colour", cfg.thumb_color, "Thumb"));
         Resettable(model_.AddColor("thumb_frame_color", "Frame colour", cfg.thumb_frame_color, "Thumb"));
 
-        model_.SetGroupSubtitle("Value", sample == SAMPLE_RANGE ? "two-handle interval and adjustable bounds" : "single scalar value");
+        model_.SetGroupSubtitle("Value", sample == SAMPLE_RANGE
+            ? "two-handle interval and adjustable bounds" : "single scalar value");
         model_.SetGroupSubtitle("Ticks", "shared tick presentation");
         model_.SetGroupSubtitle("Track", "shared UiSlider::Style track domain");
         model_.SetGroupSubtitle("Thumb", "shared UiSlider::Style thumb domain");
@@ -289,17 +291,23 @@ private:
         cfg.maximum = (double)Get("maximum");
         cfg.step = max(0.01, (double)Get("step"));
         cfg.enabled = (bool)Get("enabled");
-        if(cfg.maximum <= cfg.minimum) cfg.maximum = cfg.minimum + cfg.step;
+        if(cfg.maximum <= cfg.minimum)
+            cfg.maximum = cfg.minimum + cfg.step;
+
         if(sample == SAMPLE_SLIDER)
             cfg.value = minmax((double)Get("value"), cfg.minimum, cfg.maximum);
         else {
-            Vector<double> v = PropertyEditorReadVector(Get("range_values"), 4, 0.0);
-            if(v.GetCount() == 4) {
-                cfg.bound_lower = v[0]; cfg.lower = v[1]; cfg.upper = v[2]; cfg.bound_upper = v[3];
+            Vector<double> values = PropertyEditorReadVector(Get("range_values"), 4, 0.0);
+            if(values.GetCount() == 4) {
+                cfg.bound_lower = values[0];
+                cfg.lower = values[1];
+                cfg.upper = values[2];
+                cfg.bound_upper = values[3];
             }
             cfg.adjustable_bounds = (bool)Get("adjustable_bounds");
             cfg.endpoint_markers = (bool)Get("endpoint_markers");
         }
+
         cfg.show_ticks = (bool)Get("show_ticks");
         cfg.major_ticks = (int)Get("major_ticks");
         cfg.minor_ticks = (int)Get("minor_ticks");
@@ -312,7 +320,8 @@ private:
         cfg.track_height = (int)Get("track_height");
         cfg.thumb_width = (int)Get("thumb_width");
         cfg.thumb_height = (int)Get("thumb_height");
-        if(sample == SAMPLE_SLIDER) cfg.expand_track = (bool)Get("expand_track");
+        if(sample == SAMPLE_SLIDER)
+            cfg.expand_track = (bool)Get("expand_track");
         cfg.track_face_enabled = (bool)Get("track_face_enabled");
         cfg.track_frame_enabled = (bool)Get("track_frame_enabled");
         cfg.track_radius = (int)Get("track_radius");
@@ -401,6 +410,37 @@ private:
         Refresh();
     }
 
+    void SyncSliderValue()
+    {
+        cfg_[SAMPLE_SLIDER].value = slider_.GetValue();
+        if(selected_ == SAMPLE_SLIDER && model_.Find("value")) {
+            model_.SetValue("value", cfg_[SAMPLE_SLIDER].value, false);
+            properties_.RefreshValue("value");
+        }
+        UpdateStatus();
+        UpdateCode();
+    }
+
+    void SyncRangeValues()
+    {
+        SliderConfig& cfg = cfg_[SAMPLE_RANGE];
+        cfg.bound_lower = range_.GetLowerBound();
+        cfg.lower = range_.GetLowerValue();
+        cfg.upper = range_.GetUpperValue();
+        cfg.bound_upper = range_.GetUpperBound();
+        if(selected_ == SAMPLE_RANGE && model_.Find("range_values")) {
+            ValueArray values;
+            values.Add(cfg.bound_lower);
+            values.Add(cfg.lower);
+            values.Add(cfg.upper);
+            values.Add(cfg.bound_upper);
+            model_.SetValue("range_values", values, false);
+            properties_.RefreshValue("range_values");
+        }
+        UpdateStatus();
+        UpdateCode();
+    }
+
     void Connect()
     {
         slider_button_.WhenAction = [=] { SelectSample(SAMPLE_SLIDER); };
@@ -411,8 +451,14 @@ private:
         theme_button_.WhenAction = [=] { ToggleTheme(); };
         exit_button_.WhenAction = [=] { Close(); };
 
-        properties_.WhenPreview = [=](String, Value) { PullConfig(selected_); ApplyAll(); };
-        properties_.WhenCommit = [=](String, Value) { PullConfig(selected_); ApplyAll(); };
+        properties_.WhenPreview = [=](String, Value) {
+            PullConfig(selected_);
+            ApplyAll();
+        };
+        properties_.WhenCommit = [=](String, Value) {
+            PullConfig(selected_);
+            ApplyAll();
+        };
         properties_.WhenReset = [=](String id) {
             PropertyEditorItem *item = model_.Find(id);
             if(item && item->resettable) {
@@ -423,30 +469,10 @@ private:
             }
         };
 
-        slider_.WhenChanging = [=] {
-            cfg_[SAMPLE_SLIDER].value = slider_.GetValue();
-            if(selected_ == SAMPLE_SLIDER && model_.Find("value")) {
-                model_.SetValue("value", cfg_[SAMPLE_SLIDER].value, false);
-                properties_.RefreshValue("value");
-            }
-            UpdateStatus(); UpdateCode();
-        };
-        slider_.WhenAction = slider_.WhenChanging;
-
-        range_.WhenChanging = [=] {
-            SliderConfig& cfg = cfg_[SAMPLE_RANGE];
-            cfg.bound_lower = range_.GetLowerBound();
-            cfg.lower = range_.GetLowerValue();
-            cfg.upper = range_.GetUpperValue();
-            cfg.bound_upper = range_.GetUpperBound();
-            if(selected_ == SAMPLE_RANGE && model_.Find("range_values")) {
-                ValueArray v; v.Add(cfg.bound_lower); v.Add(cfg.lower); v.Add(cfg.upper); v.Add(cfg.bound_upper);
-                model_.SetValue("range_values", v, false);
-                properties_.RefreshValue("range_values");
-            }
-            UpdateStatus(); UpdateCode();
-        };
-        range_.WhenAction = range_.WhenChanging;
+        slider_.WhenChanging = [=] { SyncSliderValue(); };
+        slider_.WhenAction = [=] { SyncSliderValue(); };
+        range_.WhenChanging = [=] { SyncRangeValues(); };
+        range_.WhenAction = [=] { SyncRangeValues(); };
     }
 
     void SelectSample(SliderSample sample)
@@ -464,7 +490,8 @@ private:
     {
         if(selected_ == SAMPLE_RANGE)
             status_.SetText(Format("Selected UiRangeSlider · %.2f … %.2f inside %.2f … %.2f",
-                                   range_.GetLowerValue(), range_.GetUpperValue(), range_.GetLowerBound(), range_.GetUpperBound()));
+                                   range_.GetLowerValue(), range_.GetUpperValue(),
+                                   range_.GetLowerBound(), range_.GetUpperBound()));
         else
             status_.SetText(Format("Selected UiSlider · value %.2f", slider_.GetValue()));
     }
@@ -478,12 +505,13 @@ private:
         code_mode_.Show(on);
         code_.Show(on);
         ApplyTheme();
-        if(on) UpdateCode();
+        if(on)
+            UpdateCode();
     }
 
     void EmitStyle(String& out, const SliderConfig& cfg, bool explicit_style) const
     {
-        out << "\n// Slider and RangeSlider deliberately share UiSlider::Style.\n";
+        out << "\n// Optional local design block. Slider and RangeSlider share UiSlider::Style.\n";
         out << "UiSlider::Style style = UiTheme::ResolveSlider();\n";
         out << "style.show_ticks = " << CppBool(cfg.show_ticks) << ";\n"
             << "style.major_ticks = " << cfg.major_ticks << ";\n"
@@ -521,6 +549,7 @@ private:
         String out = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
         if(selected_ == SAMPLE_SLIDER) {
             out << "UiSlider slider;\n\n"
+                << "// Scalar range and value use the ordinary public API.\n"
                 << "slider.SetDirection(UiDirection::" << (ParseDirection(cfg.direction) == UiDirection::V ? "V" : "H") << ")\n"
                 << "      .SetRange(" << cfg.minimum << ", " << cfg.maximum << ")\n"
                 << "      .SetStep(" << cfg.step << ")\n"
@@ -536,6 +565,7 @@ private:
         }
         else {
             out << "UiRangeSlider range;\n\n"
+                << "// The selected interval and optional outer bounds are one authoritative range state.\n"
                 << "range.SetDirection(UiDirection::" << (ParseDirection(cfg.direction) == UiDirection::V ? "V" : "H") << ")\n"
                 << "     .SetRange(" << cfg.minimum << ", " << cfg.maximum << ")\n"
                 << "     .SetStep(" << cfg.step << ")\n"
@@ -583,7 +613,8 @@ private:
         theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
         exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     }
 
 private:
