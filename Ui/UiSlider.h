@@ -23,10 +23,14 @@
     Usage
     - Use SetRange(), SetStep(), and SetData/GetData for generic value binding.
     - Observe committed user changes with WhenAction.
+    - `Style::track_size.cx` is the preferred major-axis track length and
+      `track_size.cy` is the cross-axis thickness for both orientations.
 
     Changelog
     - 2026-03: added release-standard header documentation.
     - 2026-04: added part-aware paint hooks for track, active track, and thumb.
+    - 2026-08: aligned vertical track geometry and focus/input hygiene with
+      UiRangeSlider while preserving the shared UiSlider::Style contract.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -57,6 +61,9 @@ public:
         int     tick_gap = DPI(3);
         Color   tick_color = SColorShadow();
         UiAlign tick_side = UiAlign::BOTTOM;
+        // cx = preferred major-axis length, cy = cross-axis thickness.
+        // The meaning is orientation-independent; vertical sliders do not
+        // reinterpret cx as their physical width.
         Size    track_size = Size(DPI(120), DPI(4));
         Size    thumb_size = Size(DPI(20), DPI(20));
         bool    thumb_inner_ring = false;
@@ -124,6 +131,9 @@ public:
     UiSlider& SetTrackSize(Size sz);
     UiSlider& ExpandTrack(bool on = true) { expand_track_ = on; RefreshLayout(); Refresh(); return *this; }
     bool      IsTrackExpanded() const { return expand_track_; }
+    // Exposes the actual painted track for layout/composition tests. With
+    // ExpandTrack(false), track_size.cx is the preferred major-axis length;
+    // with ExpandTrack(true), the allocated major axis determines the length.
     Rect      GetTrackGeometry() const { return GetTrackRect(); }
     UiSlider& SetThumbSize(Size sz);
 
