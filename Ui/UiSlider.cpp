@@ -31,8 +31,7 @@ static UiAlign UiSliderNormalizeTickSide_(UiDirection dir, UiAlign side)
 const UiSlider::Style& UiSlider::StyleDefault()
 {
     static Style s;
-    static bool init = false;
-    if(!init) {
+    ONCELOCK {
         for(int st = 0; st < 4; st++) {
             s.track_palette.face[st] = UiFill::Solid(Color(218, 221, 228));
             s.track_palette.frame[st] = Color(128, 138, 154);
@@ -79,20 +78,20 @@ const UiSlider::Style& UiSlider::StyleDefault()
         s.thumb_inner_ring = true;
         s.thumb_inner_ring_width = DPI(2);
         s.thumb_inner_ring_color = White();
-
-        init = true;
     }
     return s;
 }
 
 UiSlider::UiSlider()
 {
+    WantFocus();
     SyncThemeStyle();
 }
 
 UiSlider::UiSlider(UiDirection dir)
     : dir_(dir)
 {
+    WantFocus();
     SyncThemeStyle();
 }
 
@@ -200,6 +199,7 @@ UiSlider& UiSlider::SetTicks(bool on, int major_ticks, int minor_per_major)
     style.show_ticks = on;
     style.major_ticks = max(0, major_ticks);
     style.minor_ticks_per_major = max(0, minor_per_major);
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -207,6 +207,7 @@ UiSlider& UiSlider::SetTicks(bool on, int major_ticks, int minor_per_major)
 UiSlider& UiSlider::SetTickSide(UiAlign side)
 {
     StyleEdit().tick_side = UiSliderNormalizeTickSide_(dir_, side);
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -245,22 +246,21 @@ Value UiSlider::GetData() const
 Size UiSlider::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    Size track = Size(max(DPI(50), style.track_size.cx), max(1, style.track_size.cy));
+    const int track_major = max(DPI(50), style.track_size.cx);
+    const int track_cross = max(1, style.track_size.cy);
     Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
-    int cross = dir_ == UiDirection::H ? max(DPI(18), max(track.cy, thumb.cy))
-                                       : max(DPI(18), max(track.cx, thumb.cx));
+    int cross = dir_ == UiDirection::H ? max(DPI(18), max(track_cross, thumb.cy))
+                                       : max(DPI(18), max(track_cross, thumb.cx));
     int tick_span = style.show_ticks ? (style.tick_gap + max(style.tick_len_major, style.tick_len_minor)) : 0;
-    int major = dir_ == UiDirection::H ? max(track.cx + DPI(16), thumb.cx + DPI(16))
-                                       : max(track.cy + DPI(16), thumb.cy + DPI(16));
+    int thumb_major = dir_ == UiDirection::H ? thumb.cx : thumb.cy;
+    int major = max(track_major + DPI(16), thumb_major + DPI(16));
     Size natural = dir_ == UiDirection::H
                  ? Size(major + DPI(16), cross + tick_span + DPI(10))
                  : Size(cross + tick_span + DPI(10), major + DPI(16));
-    if(!IsNull(user_min_size_)) {
-        if(user_min_size_.cx > 0)
-            natural.cx = max(natural.cx, user_min_size_.cx);
-        if(user_min_size_.cy > 0)
-            natural.cy = max(natural.cy, user_min_size_.cy);
-    }
+    if(user_min_size_.cx > 0)
+        natural.cx = max(natural.cx, user_min_size_.cx);
+    if(user_min_size_.cy > 0)
+        natural.cy = max(natural.cy, user_min_size_.cy);
     return natural;
 }
 
@@ -277,21 +277,22 @@ Rect UiSlider::GetTrackRect() const
     if(outer.IsEmpty())
         return outer;
 
-    Size track = Size(max(DPI(20), style.track_size.cx), max(1, style.track_size.cy));
+    const int track_major = max(DPI(20), style.track_size.cx);
+    const int track_cross = max(1, style.track_size.cy);
+    const int pad = max(DPI(8), track_cross * 2 + DPI(2));
     if(dir_ == UiDirection::H) {
-        int pad = max(DPI(8), track.cy * 2 + DPI(2));
         int available = max(0, outer.GetWidth() - 2 * pad);
-        int width = expand_track_ ? available : min(available, track.cx);
+        int width = expand_track_ ? available : min(available, track_major);
         int x = outer.left + (outer.GetWidth() - width) / 2;
-        int y = outer.CenterPoint().y - track.cy / 2;
-        return RectC(x, y, width, track.cy);
+        int y = outer.CenterPoint().y - track_cross / 2;
+        return RectC(x, y, width, track_cross);
     }
-    int pad = max(DPI(8), track.cx * 2 + DPI(2));
+
     int available = max(0, outer.GetHeight() - 2 * pad);
-    int height = expand_track_ ? available : min(available, track.cy);
-    int x = outer.CenterPoint().x - track.cx / 2;
+    int height = expand_track_ ? available : min(available, track_major);
+    int x = outer.CenterPoint().x - track_cross / 2;
     int y = outer.top + (outer.GetHeight() - height) / 2;
-    return RectC(x, y, track.cx, height);
+    return RectC(x, y, track_cross, height);
 }
 
 int UiSlider::ValueToPos(double v) const
@@ -342,7 +343,7 @@ static Rect UiSliderGetThumbVisualRect_(Rect thumb, const UiSlider::Style& style
     if(thumb.IsEmpty())
         return thumb;
 
-    int track_cross = max(1, min(style.track_size.cx, style.track_size.cy));
+    int track_cross = max(1, style.track_size.cy);
     int min_w = max(DPI(8), track_cross * 2 + DPI(4));
     int min_h = max(DPI(8), track_cross * 2 + DPI(4));
     int inset_x = max(DPI(1), thumb.GetWidth() / 8);
@@ -580,6 +581,9 @@ void UiSlider::MouseMove(Point p, dword)
 
 void UiSlider::MouseWheel(Point, int zdelta, dword)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return;
+
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
     if(zdelta > 0)
         SetValueInternal(value_ + d, true, true);
@@ -589,6 +593,9 @@ void UiSlider::MouseWheel(Point, int zdelta, dword)
 
 bool UiSlider::Key(dword key, int)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return false;
+
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
 
     if(dir_ == UiDirection::H) {
