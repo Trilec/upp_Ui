@@ -114,7 +114,24 @@ const char *PropertyEditorMatrixId();
 const char *PropertyEditorIconId();
 const char *PropertyEditorFontId();
 const char *PropertyEditorImageId();
+
+// Semantic v2 adapters. These remain visual-package custom editors so the
+// PropertyEditorCore schema stays headless and applications can still use the
+// generic Custom escape hatch for their own domain types.
+const char *PropertyEditorDateTimeId();
+const char *PropertyEditorDurationId();
+const char *PropertyEditorGeometryId();
+const char *PropertyEditorFlagsId();
+const char *PropertyEditorStringListId();
+const char *PropertyEditorGradientId();
+const char *PropertyEditorKeyChordId();
+const char *PropertyEditorReferenceId();
+const char *PropertyEditorOptionalId();
+
 void RegisterPropertyEditorV1Editors(PropertyEditorFactory& factory);
+void RegisterPropertyEditorSemanticEditors(PropertyEditorFactory& factory);
+// Preferred complete registration point for new applications/demos.
+void RegisterPropertyEditorEditors(PropertyEditorFactory& factory);
 
 PropertyEditorItem& AddPropertyRange(PropertyEditorModel& model,
                                      const String& id, const String& label,
@@ -147,6 +164,108 @@ PropertyEditorItem& AddPropertyImage(PropertyEditorModel& model,
                                      const Value& value,
                                      const String& picker_provider,
                                      const String& group = String());
+
+// Date / time values use the production UiDateTime picker. Date stores Date;
+// Time and DateTime store Time, with Time normalized to the 1970-01-01 anchor.
+PropertyEditorItem& AddPropertyDate(PropertyEditorModel& model,
+                                    const String& id, const String& label,
+                                    Date value, const String& group = String());
+PropertyEditorItem& AddPropertyTime(PropertyEditorModel& model,
+                                    const String& id, const String& label,
+                                    Time value, bool show_seconds = false,
+                                    const String& group = String());
+PropertyEditorItem& AddPropertyDateTime(PropertyEditorModel& model,
+                                        const String& id, const String& label,
+                                        Time value, bool show_seconds = false,
+                                        const String& group = String());
+
+// Duration is stored in seconds. The editor chooses a convenient display unit
+// (ms / s / min / h) without changing the durable value unit.
+PropertyEditorItem& AddPropertyDuration(PropertyEditorModel& model,
+                                        const String& id, const String& label,
+                                        double seconds,
+                                        double minimum_seconds = 0.0,
+                                        double maximum_seconds = 86400.0,
+                                        double step_seconds = 0.001,
+                                        const String& group = String());
+
+// Semantic geometry values are ValueArray-based to keep Core independent of
+// Ui/geometry controls. Point/Size contain 2 numbers; Rect/Insets/Corners 4.
+PropertyEditorItem& AddPropertyPoint(PropertyEditorModel& model,
+                                     const String& id, const String& label,
+                                     double x, double y,
+                                     const String& group = String());
+PropertyEditorItem& AddPropertySize(PropertyEditorModel& model,
+                                    const String& id, const String& label,
+                                    double cx, double cy,
+                                    const String& group = String());
+PropertyEditorItem& AddPropertyRect(PropertyEditorModel& model,
+                                    const String& id, const String& label,
+                                    double x, double y, double cx, double cy,
+                                    const String& group = String());
+PropertyEditorItem& AddPropertyInsets(PropertyEditorModel& model,
+                                      const String& id, const String& label,
+                                      double left, double top,
+                                      double right, double bottom,
+                                      bool linked = false,
+                                      const String& group = String());
+PropertyEditorItem& AddPropertyCorners(PropertyEditorModel& model,
+                                       const String& id, const String& label,
+                                       double top_left, double top_right,
+                                       double bottom_right, double bottom_left,
+                                       bool linked = false,
+                                       const String& group = String());
+
+// Flags store a ValueArray of selected choice values. Add choices to the
+// returned PropertyEditorItem with AddChoice(value,label[,icon]).
+PropertyEditorItem& AddPropertyFlags(PropertyEditorModel& model,
+                                     const String& id, const String& label,
+                                     const ValueArray& selected,
+                                     const String& group = String());
+
+// A bounded small ordered string collection. This is for property-sized arrays,
+// not a replacement for model-authoritative Data pages such as List/Tree/Table.
+PropertyEditorItem& AddPropertyStringList(PropertyEditorModel& model,
+                                          const String& id, const String& label,
+                                          const ValueArray& values,
+                                          int maximum_items = 32,
+                                          const String& group = String());
+
+// Gradient recipe schema:
+// { mode: "Linear"|"Radial", angle: double, interpolation: "Linear"|"Smooth",
+//   stops: [ { position:0..1, color:Color, alpha:0..255 }, ... ] }
+Value PropertyEditorMakeGradientStop(double position, Color color, int alpha = 255);
+Value PropertyEditorMakeGradient(const ValueArray& stops,
+                                 const String& mode = "Linear",
+                                 double angle = 0.0,
+                                 const String& interpolation = "Linear");
+PropertyEditorItem& AddPropertyGradient(PropertyEditorModel& model,
+                                        const String& id, const String& label,
+                                        const Value& recipe,
+                                        const String& group = String());
+
+// Key chords store a canonical string such as "Ctrl+Shift+S".
+PropertyEditorItem& AddPropertyKeyChord(PropertyEditorModel& model,
+                                        const String& id, const String& label,
+                                        const String& chord,
+                                        const String& group = String());
+
+// Generic resource/reference browser. The application owns the picker provider;
+// the PropertyEditor only stores/displays the returned Value.
+PropertyEditorItem& AddPropertyReference(PropertyEditorModel& model,
+                                         const String& id, const String& label,
+                                         const Value& value,
+                                         const String& picker_provider,
+                                         const String& group = String());
+
+// First-class nullable value presentation. Variant can be "text", "int" or
+// "double". Null is a normal durable value, not an inherited-state sentinel.
+PropertyEditorItem& AddPropertyOptional(PropertyEditorModel& model,
+                                        const String& id, const String& label,
+                                        const Value& value,
+                                        const Value& fallback,
+                                        const String& variant = "text",
+                                        const String& group = String());
 
 class PropertyCurveCanvas : public Ctrl {
 public:
