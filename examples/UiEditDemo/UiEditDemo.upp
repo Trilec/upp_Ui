@@ -1,0 +1,10 @@
+uses
+	CtrlLib,
+	Ui,
+	Utilities/PropertyEditor;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
