@@ -1,9 +1,7 @@
 uses
-	Core,
-	Draw,
-	CtrlCore,
 	CtrlLib,
-	Ui;
+	Ui,
+	Utilities/PropertyEditor;
 
 file
 	main.cpp;
