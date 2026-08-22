@@ -81,12 +81,42 @@ void TestInteractionGeometry(TestCtx& t)
              "split button preserves fluent access to the shared interaction and pressed-content APIs");
 }
 
+void TestIconSizingContract(TestCtx& t)
+{
+    UiButton button;
+    button.SetText(String())
+          .SetIcon(ICON_DESIGN_WIDGETS_48())
+          .SetIconSize(31, 17)
+          .SetIconScaleToContent(false)
+          .SetIconRenderMode(UiIconRenderMode::MonoTint);
+
+    t.Expect(button.GetIconSize() == Size(31, 17),
+             "explicit button icon width and height remain independent authored dimensions");
+    t.Expect(!button.IsIconScaleToContent(),
+             "explicit button icon sizing is not silently converted to scale-to-content");
+    t.Expect(button.GetIconRenderMode() == UiIconRenderMode::MonoTint,
+             "button keeps the shared explicit icon render-mode contract");
+
+    const Size exact_min = button.GetMinSize();
+    t.Expect(exact_min.cx >= 31 && exact_min.cy >= 17,
+             "button natural sizing reserves the explicit icon dimensions");
+
+    button.SetIconScaleToContent(true);
+    t.Expect(button.IsIconScaleToContent(),
+             "scale-to-content remains an explicit independent presentation mode");
+
+    button.SetIconScaleToContent(false).SetIconSize(18, 29);
+    t.Expect(button.GetIconSize() == Size(18, 29),
+             "changing explicit icon dimensions preserves the requested non-square size");
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
 {
     TestCtx t;
     TestInteractionGeometry(t);
+    TestIconSizingContract(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
 }
