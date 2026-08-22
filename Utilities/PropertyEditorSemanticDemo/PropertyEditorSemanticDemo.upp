@@ -1,0 +1,15 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui,
+	Ui/UiOsFileDialog,
+	Utilities/PropertyEditorCore,
+	Utilities/PropertyEditor;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
