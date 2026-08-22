@@ -2,121 +2,126 @@
 
 ## Status
 
-BASE: `01c8cd7298dcf5e368c2fa5c8467ea128a6d1fb4` (`main`)
+OBJECTIVE: modernize the `examples/*Demo` applications into self-contained executable documentation built around the production `PropertyEditor`, real control APIs, live preview and useful generated U++.
 
-OBJECTIVE: Replace the remaining legacy `examples/*Demo` applications with a coherent generation of full control demos based on the `UiLabelDemo` shell, production `PropertyEditor`, canonical override grouping, and model-authoritative Data pages where appropriate.
-
-`UiLabelDemo` remains the canonical reference. This is a demo/documentation modernization program; it must not redesign production controls merely to make a demo convenient.
+`UiLabelDemo` remains the interaction reference. The current accepted source direction also includes Button, CheckBox, RadioButton, Toggle, Dropdown, the combined Slider/RangeSlider family, the combined Edit family, and Tab. Windows/visual acceptance is tracked separately in `docs/ACTIVE_WORK.md`.
 
 ## Non-negotiable architecture
 
-Every migrated full demo should use the same visual and interaction language while remaining a self-contained U++ package:
+Each demo stands on its own.
+
+Do **not** create or reintroduce a shared `DemoBase`, `BuilderDemoSupport`, shared demo shell, shared generated-code helper layer, or other demo-only framework whose purpose is to reduce duplication between examples. Some duplicated setup is intentional: a programmer should be able to open one demo and understand that control without tracing through another package.
+
+Reuse production `Ui` controls, `PropertyEditor`, models and theme resolvers. Shared behavior belongs in production code only when it is genuinely a reusable product capability.
+
+Typical full demo shape:
 
 ```text
 UiTitleCard header
-  control identity/title/subtitle
-                                      Theme   Help   Exit
+  control identity/title/subtitle                  Theme / Help / Exit
 
-Main preview / live interaction       Right rail
-                                      [Inspector]
-                                      [Overrides]
-                                      [Data]*
-                                      [Code]
+live control preview                               right rail
+                                                   Properties / Overrides
+                                                   Data* / Code
 ```
 
-`Data` is present only where the control owns or binds meaningful model/domain data.
+`Data` is present only where the demonstrated control owns or binds meaningful model/domain data.
 
-The shell is a pattern, not a new `DemoBase` framework. Do not hide the demos behind a demo-only inheritance layer. Reuse production Ui/PropertyEditor facilities and only extract genuinely reusable production helpers after repeated need is proven.
+## PropertyEditor contract
 
-### Inspector
+- The PropertyEditor represents real public control properties or real style fields.
+- Its model is the demo's authoritative authored configuration; the preview and generated code read the same state.
+- Bounded numerics use the standard value-to-slider affordance.
+- Focused numeric mouse-wheel edits adjust the value rather than scrolling the PropertyEditor.
+- Cardinal directions use the shared `Cardinal4` matrix when the domain is Left / Right / Top / Bottom.
+- Icon, colour, font and other rich values use the production PropertyEditor editors.
+- Normal properties and authored/inherited style state remain separate concepts.
+- Demos use the same concise grouping language as UiDesigner where the underlying API is the same.
 
-- Represents the control's real public API and behaviour.
-- Uses production `PropertyEditor` and the most expressive available adapters.
-- PropertyEditor models are authoritative authored demo state.
-- Preview and generated code read the same state.
-- No hand-built parallel property-row system.
+## Theme / style editing
 
-### Theme Overrides
+A standalone demo may expose a large amount of style detail because one of its purposes is to explain a difficult control in isolation.
 
-- Exposes only style fields that are live in the current control.
-- Uses the canonical grammar in `11_UI_PROPERTY_OVERRIDE_LAYOUT.md`.
-- Common groups remain API nouns: General, Face/Skin, Frame, Ink, Icon, Typography, Content Margin, Focus, Shadow, Highlight.
-- Composite controls preserve nested domains such as Slider/Track/Thumb, Dropdown/Popup, Accordion/Header/Body.
-- State vocabulary follows the real control; do not manufacture Normal/Hot/Pressed/Disabled symmetry where it does not exist.
-- Demo and UiDesigner property ids, labels, group paths, ordering and inherited/override semantics should converge.
+- Start from the real `UiTheme::Resolve...()` style where available.
+- Expose only real fields that affect the demonstrated control.
+- Keep composite style ownership visible: e.g. Slider/Track/Thumb, Dropdown/Popup, Tab/Body/Tab Surface/Indicator, Accordion/Header/Body.
+- Do not flatten unrelated style domains just to shorten the PropertyEditor.
+- Do not invent state symmetry that the production control does not have.
 
-### Data page
+Theme Studio answers “how should the application look as a whole?” A standalone demo answers “how do I use and locally configure this control?”
 
-Required for the normal model-backed collection controls:
+## Generated code is a first-class output
 
-- `UiDropdownDemo` -> active `UiListModel`
-- `UiListDemo` -> active `UiListModel`
-- `UiTreeDemo` -> active `UiTreeModel`
-- `UiTableDemo` -> active `UiTableModel`
-- `UiGalleryDemo` -> active `UiListModel`
-- `UiMenuDemo` -> active `UiMenuModel`
+The Code page is not decoration. A demo is successful when a programmer can copy the generated U++ and understand how to reproduce what is being shown.
 
-The Data page edits the same active model driving the preview. It must not maintain a second array/tree/table mirror that requires manual synchronization. Mutations use the public model APIs and respect request-first control semantics.
+For modernized demos, prefer these code views where practical:
 
-`UiGraphDemo` and `UiDocDemo` have richer domain models. Their eventual model/data page should preserve `UiGraphModel` / `UiDocCore` authority and existing specialized tooling rather than forcing them into a generic list editor.
+1. **Usage** — concise normal public API, relying on `UiTheme` for appearance.
+2. **Current changes** — the normal usage plus only local design/style changes that differ from the demo defaults/theme.
+3. **Full explicit** — the complete relevant local style recipe for learning/debugging.
 
-Data surfaces should support the operations meaningful to the model: add, remove, rename/edit, reorder/reparent where supported, and useful item/header metadata. They should make model changes visible immediately in the live control.
+Generated code must:
 
-### Code page
+- use current public APIs;
+- use meaningful variable names;
+- separate ordinary control behavior from optional local design/style;
+- include short comments where ownership is otherwise non-obvious;
+- omit demo-window/layout scaffolding;
+- include the active data/model fixture where that is essential to understanding the control;
+- remain paste-oriented and readable rather than dumping internal state.
 
-- Emits readable U++ using the current public API.
-- Reflects Inspector state, active local overrides and model fixture where practical.
-- Omits demo-only scaffolding.
-- When no local override is authored, prefer concise role/theme-based code.
+`UiLabelDemo` and `UiButtonDemo` predate the three-mode selector but were re-reviewed during the current slice: both already generate from the same Inspector/Overrides state and emit local style only from authored overrides. Do not destabilize those accepted reference demos merely to make the selector UI identical; converge them later only when there is a concrete UX benefit.
 
-## Repository inventory
+## Family demos
 
-The current `examples/` tree contains 36 demo packages. `UiLabelDemo` is the accepted canonical baseline; the remaining 35 are migration candidates, subject to a fresh source/API audit before each replacement.
+Combining demos is appropriate only when the controls genuinely share a production API/style foundation and separate full shells would mostly repeat the same lesson.
 
-Large legacy files are a reason to simplify source structure, not a reason to preserve legacy demo architecture. Substantial replacements should normally use a readable `Demo.h` / `Demo.cpp` / `main.cpp` / `.upp` split. Small demos may remain one source file.
+Current family decisions:
 
-Do not retain old and new demo implementations side by side once the replacement is accepted. Files such as legacy `NormalizedDemo.cpp` should be removed only after confirming that no package/test still depends on them.
+- `UiEditDemo` is the combined reference for `UiLineEdit`, `UiPasswordEdit`, `UiMaskEdit` and `UiMultiEdit`. All samples remain visible; selecting one changes the single PropertyEditor and code output. Common `UiBaseEdit` properties stay common while subtype-specific fields appear only for that subtype.
+- `UiSliderDemo` is the combined Slider family reference for `UiSlider` and `UiRangeSlider`. The two controls share `UiSlider::Style`; selection changes value/range-specific properties and code generation. The former standalone `UiRangeSliderDemo` package has been retired.
 
-## Implementation order
+Do not combine controls merely because they look similar. RadioButton and CheckBox, for example, remain useful focused examples even though their indicator concepts overlap.
 
-### Pilot sequence — establish the generation
+## Model-backed Data pages
 
-These five are deliberately first because together they prove the important patterns before broad rollout:
+Required for ordinary model-backed collection controls:
 
-1. `UiButtonDemo`
-   - establish the canonical shell, Inspector, Overrides and Code implementation on a conventional styled control;
-   - verify state palette, icon/content, sizing, behaviour and generated code.
+- `UiDropdownDemo` -> the exact active `UiListModel`;
+- `UiListDemo` -> active `UiListModel`;
+- `UiTreeDemo` -> active `UiTreeModel`;
+- `UiTableDemo` -> active `UiTableModel`;
+- `UiGalleryDemo` -> active `UiListModel`;
+- `UiMenuDemo` -> active `UiMenuModel`.
 
-2. `UiDropdownDemo`
-   - establish the fourth `Data` page;
-   - edit the bound `UiListModel` directly;
-   - exercise collapsed control + nested Popup override domains;
-   - retire legacy/normalized dual-demo structure if no longer required.
+The Data page must edit the same model driving the preview. Never maintain a second mirror collection just for the demo.
 
-3. `UiSliderDemo`
-   - establish a composite control override layout with real Track/Thumb domains;
-   - use bounded numeric/range PropertyEditor presentations rather than generic text fields.
+The modernized Dropdown establishes the first accepted source pattern: Properties / Data / Code, with the Data page mutating the same external `UiListModel` bound to the live dropdown. The obsolete `NormalizedDemo.cpp` path has been removed.
 
-4. `UiCheckBoxDemo`
-   - establish indicator/content grouping and checked/indeterminate/disabled interaction where supported.
+## Current modernization tranche
 
-5. `UiToggleDemo`
-   - prove the same shell can express a related control without copying a second configuration architecture.
+Source-complete, Windows/visual acceptance pending:
 
-Do not begin a large parallel rewrite before these five have been source-reviewed and Windows-smoked. Lessons from the pilot become the exact migration pattern for later waves.
+- `UiLabelDemo` — canonical PropertyEditor reference; reviewed for current icon/editor and generated-code behavior.
+- `UiButtonDemo` — canonical styled-control reference; reviewed against current Button API and generated code.
+- `UiCheckBoxDemo` — PropertyEditor + production Code view.
+- `UiRadioButtonDemo` — focused exclusive-selection example with Usage / Current changes / Full explicit code.
+- `UiToggleDemo` — Track/Thumb focused example with the same code modes.
+- `UiDropdownDemo` — model-authoritative Data page plus collapsed/Popup style and code modes.
+- `UiSliderDemo` — combined Slider / RangeSlider family with shared style and range-specific properties/code.
+- `UiEditDemo` — combined Line / Password / Mask / Multi-line family with subtype-specific code.
+- `UiTabDemo` — focused explanation of the difficult Tab style domains with code modes.
 
-### Wave 2 — related interaction/value controls
+## Likely next groups after this tranche is accepted
 
-- `UiRadioButtonDemo`
-- `UiRangeSliderDemo`
+Interaction/value:
+
 - `UiSplitButtonDemo`
 - `UiProgressBarDemo`
 - `UiScrollBarDemo`
 - `UiMatrixSelectorDemo`
 
-Focus: stateful indicators, ranges, orientation, compound menus/actions and control-specific style domains.
-
-### Wave 3 — remaining model/data controls
+Model/data:
 
 - `UiListDemo`
 - `UiTreeDemo`
@@ -124,128 +129,49 @@ Focus: stateful indicators, ranges, orientation, compound menus/actions and cont
 - `UiGalleryDemo`
 - `UiMenuDemo`
 
-All receive the Data page and demonstrate the canonical model-binding contract. Use the active model as semantic authority, preserve virtualization, and never create one persistent child editor/control per logical record merely for the demo.
+Remaining edit/value selectors:
 
-### Wave 4 — edit/input family
-
-- `UiLineEditDemo`
-- `UiMultiEditDemo`
-- `UiPasswordEditDemo`
-- `UiMaskEditDemo`
 - `UiIntFloatDemo`
 - `UiDateTimeDemo`
 - `UiFontSelectorDemo`
 
-Follow the BaseEdit-style organization where applicable: common surface groups plus Editing, Underline, Whitespace and control-specific value/validation behaviour.
-
-### Wave 5 — containers/navigation/layout surfaces
+Containers/navigation:
 
 - `UiPanelDemo`
 - `UiScrollPanelDemo`
 - `UiSplitterDemo`
-- `UiTabDemo`
 - `UiAccordionDemo`
 - `UiBreadcrumbsDemo`
 - `UiTitleCardDemo`
 
-Preserve a generous live preview. Composite controls use nested real sub-style domains; for example Accordion keeps Header and Body rather than flattening them into a generic appearance list.
+Specialized/large demos remain later: ColorPicker, Theme, OS file dialog, Graph and Doc. Preserve current Graph validation evidence before touching Graph demo code.
 
-### Wave 6 — specialized/large demos
-
-- `UiColorPickerDemo`
-- `UiThemeDemo`
-- `UiOsFileDialogDemo`
-- `UiGraphDemo`
-- `UiDocDemo`
-
-These are last because their demos already carry specialized workflows or platform/domain behaviour. Normalize shell and PropertyEditor organization without discarding useful specialized functionality.
-
-`UiGraphDemo` must not be disturbed while the currently published Graph hardening line is still awaiting its Windows acceptance restart. Refresh and preserve that evidence before touching Graph demo-only files.
-
-## Per-demo migration procedure
-
-Before replacing any demo:
+## Per-demo procedure
 
 1. Refresh remote `main` and record HEAD.
-2. Read the complete current demo package, `.upp`, demonstrated control header/style, relevant implementation paint/layout/interaction files, and associated tests.
-3. Inventory the real public Inspector API and live style surface.
-4. Map override ids/groups to `11_UI_PROPERTY_OVERRIDE_LAYOUT.md`; preserve real control-specific nested domains.
-5. Build the new UiLabel-style shell and generous live preview.
-6. Build production PropertyEditor Inspector and Theme Overrides models.
-7. Add Data page only where the control/domain model warrants it.
-8. Add generated Code page using the real public API.
-9. Remove obsolete legacy demo paths only after callers/package membership are checked.
-10. Review the full diff, declarations/definitions, includes, `.upp` dependencies and `git diff --check`.
-11. Publish the coherent demo checkpoint directly to `main` and verify the remote commit/diff.
-12. Update `docs/ACTIVE_WORK.md` with BASE / TASK / TOUCHED / STATUS / PUBLISHED / VALIDATION / NEXT ACTION.
+2. Read the complete existing demo package, `.upp`, production control header/style and relevant tests.
+3. Inventory the real public behavior/style surface.
+4. Build the self-contained live preview and production PropertyEditor.
+5. Add a model-authoritative Data page only when required.
+6. Produce clean generated U++ from the same authored state.
+7. Remove obsolete demo-only implementations only after package/caller checks.
+8. Review declarations/definitions, includes, API calls, package membership and the complete diff.
+9. Publish a bounded checkpoint to `main`; never force update.
+10. Run the Windows build/visual gate before calling the demo accepted.
 
-## Definition of done for each demo
+## Definition of done
 
-A migrated demo is not complete merely because it resembles `UiLabelDemo`.
+A migrated demo is complete when:
 
-Required:
+- it is self-contained and understandable without another demo package;
+- it demonstrates the real production control and normal interaction;
+- PropertyEditor changes visibly update that control;
+- styling maps to actual style ownership;
+- generated code is useful executable documentation;
+- Data pages, where present, edit the real active model;
+- Light/Dark works coherently;
+- package dependencies are direct and appropriate;
+- no obsolete competing demo implementation remains;
+- relevant deterministic tests/builds and Windows visual smoke pass.
 
-- canonical TitleCard header with compact Theme / Help / Exit actions;
-- generous real-control preview;
-- Inspector uses production `PropertyEditor` and maps to live public APIs;
-- Theme Overrides uses actual supported style fields and canonical grouping;
-- inherited versus authored override behaviour is explicit;
-- Code page follows current authored state;
-- Data page is present and model-authoritative where required;
-- Light/Dark switching updates the complete demo coherently;
-- normal control interaction remains available in preview;
-- no duplicate authoritative demo configuration/model store;
-- no UiDesigner dependency;
-- package membership/dependencies are correct;
-- source is readable enough to serve as executable documentation.
-
-## Validation policy
-
-### During implementation
-
-Every published demo checkpoint receives static review and `git diff --check` where available. No Windows PASS is claimed from source review alone.
-
-### Windows validation
-
-For each meaningful checkpoint, build the migrated demo in Debug first and launch it. Manually check:
-
-- header/sizing at normal and resized window dimensions;
-- Inspector preview and commit behaviour;
-- override enable/disable/inheritance and Reset semantics;
-- Code page updates;
-- Data mutation/model synchronization for data controls;
-- primary keyboard/mouse interaction of the demonstrated control;
-- Light/Dark theme;
-- no obvious clipping, stale state or layout collapse.
-
-Run the control's relevant deterministic Utility tests. For model-backed waves also preserve the shared model-binding/mutation/data-model suites. Run Release builds at wave acceptance, not necessarily after every trivial source edit.
-
-Stop on the first compile/runtime/regression failure and correct the root cause rather than weakening a test or hiding a control capability.
-
-## Publishing cadence
-
-Work on `main` only.
-
-- Refresh `main` immediately before each publish.
-- A substantial demo replacement normally deserves its own checkpoint.
-- Closely related small demos may share a commit only when they share the same implementation/validation path.
-- Do not publish one giant 35-demo rewrite.
-- Do not create meaningless one-line checkpoint commits.
-- After every publish, fetch/verify the resulting remote commit and inspect its diff.
-- Keep `docs/ACTIVE_WORK.md` current so a crashed session can continue from repository state without chat reconstruction.
-- Never force-update `main` or overwrite unrelated concurrent work.
-
-## Documentation changes to make with the first implementation checkpoint
-
-Update `04_UI_DEMO_GUIDE.md` to formalize the optional fourth `Data` page for model/domain-backed demos while keeping Inspector / Theme Overrides / Code as the standard three-page shell for ordinary controls.
-
-Keep `11_UI_PROPERTY_OVERRIDE_LAYOUT.md` as the naming/grouping authority. Add control-specific examples there only when migration work proves a stable grouping that will also be useful to UiDesigner.
-
-## Completion target
-
-The program is complete when all 36 current demo packages have been audited and every applicable demo either:
-
-- uses the new canonical shell/PropertyEditor architecture; or
-- has a documented, justified specialized structure that preserves the same interaction language without forcing an unsuitable generic shell.
-
-The final acceptance should include a repository-wide demo build/smoke sweep, relevant deterministic Utility suites, and a final source audit ensuring the legacy demo generation is no longer being used as a reference.
+No source-review result alone is a Windows PASS.
