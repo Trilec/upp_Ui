@@ -127,7 +127,8 @@ public:
                   .Add("Current changes", "changes")
                   .Add("Full explicit", "explicit");
         code_mode_.SelectByData("changes");
-        code_.SetEditable(false).SetAcceptsTabs(true);
+        code_.SetEditable(false);
+        code_.SetAcceptsTabs(true);
 
         Connect();
         ApplyTheme();
@@ -358,7 +359,7 @@ private:
                  .SetPopupBackground(Color(Get("popup_background")))
                  .SetPopupSelectionMarker((bool)Get("selection_marker"))
                  .SetPopupMarkerSide(ParseSide(AsString(Get("marker_side"))))
-                 .SetPopupMarkerRenderMode(ParseIconMode(AsString(Get("marker_mode")))
+                 .SetPopupMarkerRenderMode(ParseIconMode(AsString(Get("marker_mode"))))
                  .EnableDragReorder((bool)Get("drag_reorder"))
                  .EnableInternalMutation((bool)Get("internal_mutation"))
                  .ShowDragHandle((bool)Get("drag_handle"));
@@ -484,7 +485,7 @@ private:
                    Changed("popup_min_width") || Changed("popup_max_height") || Changed("popup_item_height") || Changed("popup_max_items") || Changed("popup_scrollbar") ||
                    Changed("popup_space") || Changed("popup_frame_width") || Changed("popup_radius") || Changed("popup_frame") || Changed("popup_background");
         if(!any) return;
-        out << "\n// Local design changes. The popup owns a nested style domain.\n";
+        out << "\n// Optional local design changes. Popup styling is a nested domain of UiDropdown::Style.\n";
         out << "UiDropdown::Style style = UiTheme::ResolveDropdown(" << RoleCode(ParseRole(AsString(Get("role")))) << ");\n";
         if(use("radius")) out << "style.metrics.radius = DPI(" << (int)Get("radius") << ");\n";
         if(use("frame_width")) out << "style.metrics.frame_width = DPI(" << (int)Get("frame_width") << ");\n";
@@ -514,7 +515,7 @@ private:
         String mode = AsString(code_mode_.GetSelectedData());
         String out = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
         EmitDataCode(out);
-        out << "\n// Collapsed-control behaviour.\n";
+        out << "\n// Collapsed-control behaviour and content.\n";
         out << "dropdown.SetRole(" << RoleCode(ParseRole(AsString(Get("role")))) << ")\n"
             << "        .SetPlaceholderText(" << CppString(AsString(Get("placeholder"))) << ")\n"
             << "        .SetMultiSelect(" << CppBool((bool)Get("multi_select")) << ")\n"
@@ -558,7 +559,8 @@ private:
         theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
         exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     }
 
 private:
