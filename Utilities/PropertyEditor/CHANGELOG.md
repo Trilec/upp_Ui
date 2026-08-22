@@ -1,6 +1,22 @@
 # PropertyEditor Visual Changelog
 
-Version: **1.0.0**
+Version: **1.1.0**
+
+## 2026-08 - v1.1 semantic value adapters
+
+- added complete standard registration through `RegisterPropertyEditorEditors()` while retaining `RegisterPropertyEditorV1Editors()` for compatibility;
+- added Date, Time and DateTime adapters backed by production `UiDateTime`;
+- added canonical-seconds Duration editing with ms/s/min/h presentation and no false commit when only the display unit changes;
+- added semantic Point, Size and Rect compound editors;
+- added Insets/Padding/Margins-style four-sided editing and four-corner radii with link/unlink presentation state;
+- added Flags / multi-choice editing and bounded ordered string collections;
+- added normalized Linear/Radial gradient recipes with arbitrary ordered stops, alpha, angle and interpolation;
+- added canonical keyboard Key Chord editing;
+- added application-provider Resource / Reference browsing without moving domain ownership into PropertyEditor;
+- added explicit nullable Optional text/int/double values, separate from inherited/theme override state;
+- split semantic implementation into scalar, collection/reference and gradient source slices while keeping `PropertyEditorCore` headless;
+- added `PropertyEditorSemanticRunTests` deterministic contract coverage and `PropertyEditorSemanticDemo` as the visual capability matrix;
+- documented semantic durable-value conventions and integration boundaries in the package README.
 
 ## 2026-08 - v1 hardening and acceptance
 
