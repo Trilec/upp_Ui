@@ -87,7 +87,8 @@ public:
                   .Add("Current changes", "changes")
                   .Add("Full explicit", "explicit");
         code_mode_.SelectByData("changes");
-        code_.SetEditable(false).SetAcceptsTabs(true);
+        code_.SetEditable(false);
+        code_.SetAcceptsTabs(true);
 
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
@@ -281,7 +282,7 @@ private:
                    Changed("thumb_width") || Changed("thumb_height") || Changed("thumb_radius") || Changed("thumb_inset") ||
                    Changed("thumb_frame_width") || Changed("thumb_face") || Changed("thumb_frame");
         if(!any) return;
-        out << "\n// Local design changes relative to the current UiTheme.\n";
+        out << "\n// Optional local design changes relative to the current UiTheme.\n";
         out << "UiToggle::Style style = UiTheme::ResolveToggle(UiRole::Accent);\n";
         if(use("animate")) out << "style.animate = " << CppBool((bool)Get("animate")) << ";\n";
         if(use("animation_ms")) out << "style.animation_ms = " << (int)Get("animation_ms") << ";\n";
@@ -347,7 +348,8 @@ private:
         theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
         exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     }
 
 private:
