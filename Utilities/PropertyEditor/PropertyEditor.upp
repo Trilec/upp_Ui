@@ -9,6 +9,7 @@ file
 	PropertyValueEditors.h,
 	PropertyValueEditors.cpp,
 	PropertyV1Editors.cpp,
+	PropertySemanticEditors.cpp,
 	PropertyEditor.h,
 	PropertyEditorBase.cpp,
 	PropertyEditorLayout.cpp,
