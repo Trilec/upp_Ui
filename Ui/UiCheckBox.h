@@ -31,7 +31,9 @@
     - 2026-03-31: moved shared indicator layout/state helpers to UiIndicatorSupport.
     - 2026-03-31: moved shared text/layout/input state into UiIndicatorBase.
     - 2026-03-31: disabled controls now ignore keyboard activation paths.
-    - 2026-04-21: added icon-driven marker override support for checked and tri-state states.`r`n    renamed the public tri-state marker API to `tri_state_icon`.
+    - 2026-04-21: added icon-driven marker override support for checked and
+      tri-state states.
+    - 2026-04-21: renamed the public tri-state marker API to tri_state_icon.
 */
 
 #include <CtrlCore/CtrlCore.h>
