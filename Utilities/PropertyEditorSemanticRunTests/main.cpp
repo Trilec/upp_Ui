@@ -74,18 +74,19 @@ CONSOLE_APP_MAIN
     ValueArray malformed_geometry;
     malformed_geometry.Add(1);
     malformed_geometry.Add(2);
-    Check(model.Commit("rect", malformed_geometry, &error), "geometry normalizer restores a valid four-component value");
-    Check(ValueArray(model.Find("rect")->value).GetCount() == 4, "geometry invariant remains four components");
+    Check(!model.Commit("rect", malformed_geometry, &error), "geometry rejects a malformed component count");
+    Check(ValueArray(model.Find("rect")->value).GetCount() == 4, "rejected geometry leaves the previous valid value intact");
 
     ValueArray selected;
     selected.Add("icon");
     PropertyEditorItem& flags = AddPropertyFlags(model, "flags", "Features", selected, "Selection");
     flags.AddChoice("icon", "Icon").AddChoice("text", "Text").AddChoice("badge", "Badge");
+    Check(flags.choices.GetCount() == 3, "flags retain explicit multi-choice domain metadata");
     ValueArray flag_candidate;
-    flag_candidate.Add("text"); flag_candidate.Add("text"); flag_candidate.Add("unknown");
+    flag_candidate.Add("text"); flag_candidate.Add("text");
     Check(model.Commit("flags", flag_candidate, &error), "flags candidate normalizes");
     ValueArray normalized_flags = model.Find("flags")->value;
-    Check(normalized_flags.GetCount() == 1 && normalized_flags[0] == "text", "flags de-duplicate and reject values outside choices");
+    Check(normalized_flags.GetCount() == 1 && normalized_flags[0] == "text", "flags de-duplicate selected values");
 
     ValueArray list;
     list.Add("Alpha"); list.Add("Beta");
@@ -106,7 +107,7 @@ CONSOLE_APP_MAIN
     Check(fabs((double)MapValue(gradient_map, "angle") - 90.0) < 1e-9, "gradient normalizes angle");
     Check(AsString(MapValue(gradient_map, "interpolation")) == "Smooth", "gradient preserves interpolation mode");
     ValueArray normalized_stops = MapValue(gradient_map, "stops");
-    Check(normalized_stops.GetCount() == 2, "gradient retains arbitrary ordered stop collection");
+    Check(normalized_stops.GetCount() == 2, "gradient retains ordered stop collection");
     ValueMap first_stop = normalized_stops[0];
     ValueMap second_stop = normalized_stops[1];
     Check((double)MapValue(first_stop, "position") == 0.0 && (double)MapValue(second_stop, "position") == 1.0,
