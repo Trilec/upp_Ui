@@ -86,7 +86,7 @@ PropertyEditor::PropertyEditor()
 {
     WantFocus();
     style_ = PropertyEditorStyle::System();
-    RegisterPropertyEditorV1Editors(PropertyEditorFactory::Global());
+    RegisterPropertyEditorEditors(PropertyEditorFactory::Global());
 
     Add(filter_);
     Add(scroll_);
@@ -146,7 +146,7 @@ void PropertyEditor::SetFactory(PropertyEditorFactory *factory)
 {
     factory_ = factory;
     if(factory_)
-        RegisterPropertyEditorV1Editors(*factory_);
+        RegisterPropertyEditorEditors(*factory_);
     RebuildRows();
 }
 
