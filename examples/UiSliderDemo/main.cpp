@@ -1,432 +1,23 @@
+#include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 
 using namespace Upp;
 
 namespace {
 
-/*
-    UiToggleDemo
-    ============
-
-    Purpose
-    - Interactive single-control builder for UiToggle.
-
-    Intent
-    - Mirror the panel demo direction with one centered showcase control,
-      a live usage block, a compact state readout, and only the parameters
-      that materially belong to UiToggle itself.
-
-    Notes
-    - This demo intentionally prefers theme defaults over deep styling.
-    - The shell styling is limited to the shared demo chrome language.
-
-    Changelog
-    - v0.1.0: Replaced the legacy multi-toggle sample with a panel-style builder shell.
-*/
-
-static const char* DEMO_VERSION = "v0.4.0";
-static const int DEMO_RADIUS = 8;
-
-Font DemoSans(int px, bool bold = false)
+UiDirection ParseDirection(const String& value)
 {
-    Font f = SansSerifZ(px);
-    if(Font::FindFaceNameIndex("Inter") >= 0)
-        f.FaceName("Inter");
-    if(bold)
-        f.Bold();
-    return f;
+    return value == "Vertical" ? UiDirection::V : UiDirection::H;
 }
 
-Font DemoMono(int px, bool bold = false)
+UiAlign ParseTickSide(const String& value)
 {
-    Font f = MonospaceZ(px);
-    if(Font::FindFaceNameIndex("Fira Code") >= 0)
-        f.FaceName("Fira Code");
-    if(bold)
-        f.Bold();
-    return f;
-}
-
-struct DemoPalette {
-    UiThemeMode mode = UiThemeMode::Light;
-    bool dark = false;
-
-    Color blue;
-    Color ink;
-    Color paper;
-    Color grid;
-    Color divider;
-    Color preview_frame;
-    Color preview_hint;
-    Color code_face;
-    Color code_frame;
-    Color code_ink;
-};
-
-DemoPalette ResolveDemoPalette(UiThemeMode mode)
-{
-    DemoPalette p;
-    p.mode = mode;
-    p.dark = mode == UiThemeMode::Dark;
-    p.blue = Color(44, 99, 212);
-
-    if(p.dark) {
-        p.ink = Color(224, 224, 224);
-        p.paper = Color(25, 25, 25);
-        p.grid = Color(44, 44, 44);
-        p.divider = Color(51, 51, 51);
-        p.preview_frame = Color(76, 76, 76);
-        p.preview_hint = Color(166, 166, 166);
-        p.code_face = Color(18, 18, 18);
-        p.code_frame = Color(44, 44, 44);
-        p.code_ink = Color(110, 255, 160);
-    }
-    else {
-        p.ink = Color(28, 47, 78);
-        p.paper = Color(250, 252, 255);
-        p.grid = Color(236, 240, 247);
-        p.divider = Color(228, 235, 246);
-        p.preview_frame = Color(208, 219, 236);
-        p.preview_hint = Color(106, 128, 164);
-        p.code_face = Color(10, 15, 29);
-        p.code_frame = Color(30, 41, 59);
-        p.code_ink = Color(110, 255, 160);
-    }
-
-    return p;
-}
-
-void DrawDotGrid(Draw& w, const Rect& r, Color dot, int step, int size)
-{
-    for(int y = r.top; y < r.bottom; y += step)
-        for(int x = r.left; x < r.right; x += step)
-            w.DrawRect(x, y, size, size, dot);
-}
-
-void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap = 4)
-{
-    for(int x = r.left; x < r.right; x += dash + gap) {
-        int len = min(dash, r.right - x);
-        w.DrawRect(x, r.top, len, 1, color);
-        w.DrawRect(x, r.bottom - 1, len, 1, color);
-    }
-    for(int y = r.top; y < r.bottom; y += dash + gap) {
-        int len = min(dash, r.bottom - y);
-        w.DrawRect(r.left, y, 1, len, color);
-        w.DrawRect(r.right - 1, y, 1, len, color);
-    }
-}
-
-UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
-{
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.code_face);
-        s.palette.frame[i] = c.code_frame;
-        s.palette.ink[i] = c.code_ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(DEMO_RADIUS);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(15), DPI(15));
-    s.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiScrollPanel::Style MakeCodeScrollStyle()
-{
-    UiScrollPanel::Style s = UiScrollPanel::StyleDefault();
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::None();
-        s.palette.frame[i] = Null;
-    }
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.frame_width = 0;
-    s.metrics.radius = 0;
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(0, 0, 0, 0);
-    return s;
-}
-
-UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiLabelRole::Body);
-    for(int i = 0; i < 4; i++)
-        s.palette.ink[i] = c.code_ink;
-    s.transparent = true;
-    s.font = DemoMono(10);
-    s.metrics.radius = DPI(999);
-    s.metrics.focus_enabled = true;
-    return s;
-}
-
-UiAccordion::Style MakeDemoAccordionStyle()
-{
-    UiAccordion::Style s = UiAccordion::StyleDefault();
-    s.transparent = true;
-    s.metrics.face_enabled = false;
-    s.metrics.frame_enabled = false;
-    s.metrics.frame_width = 0;
-    s.metrics.focus_enabled = false;
-    s.metrics.shadow.enabled = false;
-    s.body_style.transparent = true;
-    s.body_style.metrics.face_enabled = false;
-    s.body_style.metrics.frame_enabled = false;
-    s.body_style.metrics.frame_width = 0;
-    s.body_style.metrics.shadow.enabled = false;
-    return s;
-}
-
-UiBezierCurveEditor::Style MakeCurveEditorStyle(const DemoPalette& c)
-{
-    UiBezierCurveEditor::Style s = UiBezierCurveEditor::StyleDefault();
-    s.fill_background = false;
-    s.invert_y = true;
-    s.axis = Blend(c.divider, c.paper, c.dark ? 12 : 22);
-    s.curve = Color(212, 62, 62);
-    s.handle_fill = c.blue;
-    s.handle_ring = c.dark ? Color(233, 238, 247) : White();
-    s.handle_selected = Color(212, 62, 62);
-    s.radius = DPI(5);
-    s.ring = DPI(3);
-    s.inset = DPI(8);
-    s.hit_radius = DPI(12);
-    s.stroke = DPI(2);
-    return s;
-}
-
-void DrawRoundedBox(Draw& w, const Rect& r, int radius, Color face, Color frame, int frame_width = 1)
-{
-    if(r.IsEmpty())
-        return;
-    ImageBuffer ib(r.GetWidth(), r.GetHeight());
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    p.Begin();
-    double rad = min<double>(radius, min(r.GetWidth(), r.GetHeight()) / 2.0);
-    p.RoundedRectangle(0.5, 0.5, r.GetWidth() - 1.0, r.GetHeight() - 1.0, rad);
-    p.Fill(face);
-    if(!IsNull(frame) && frame_width > 0)
-        p.Stroke(frame_width, frame);
-    p.End();
-    w.DrawImage(r.left, r.top, ib);
-}
-
-class DemoCodePanel : public UiPanel {
-public:
-    typedef DemoCodePanel CLASSNAME;
-
-    DemoCodePanel(int h = DPI(146))
-        : block_height_(h)
-    {
-        Add(scroll_);
-        scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-        scroll_.Content().Add(code_);
-        code_.NoWantFocus();
-    }
-
-    UiLabel& Code() { return code_; }
-    UiScrollPanel& Scroll() { return scroll_; }
-
-    virtual Size GetMinSize() const override
-    {
-        return Size(DPI(180), block_height_);
-    }
-
-    virtual void Layout() override
-    {
-        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
-        scroll_.SetRect(rc);
-        scroll_.Layout();
-        Rect viewport = scroll_.GetViewportRect();
-        int content_w = max(0, viewport.GetWidth() - DPI(5));
-        int content_h = max(viewport.GetHeight(), code_.GetMinSize().cy) + DPI(5);
-        code_.SetRect(0, 0, content_w, content_h);
-    }
-
-private:
-    UiScrollPanel scroll_;
-    UiLabel code_;
-    int block_height_ = 0;
-};
-class SliderPreview : public Ctrl {
-public:
-    typedef SliderPreview CLASSNAME;
-
-    SliderPreview()
-    {
-        NoWantFocus();
-        Add(slider_);
-        slider_.NoWantFocus();
-    }
-
-    UiSlider& Showcase() { return slider_; }
-
-    void SetPalette(const DemoPalette& palette)
-    {
-        palette_ = palette;
-        Refresh();
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Rect r = GetSize();
-        w.DrawRect(r, palette_.paper);
-        Rect canvas = r.Deflated(DPI(16), DPI(20));
-        DrawDotGrid(w, canvas, palette_.grid, DPI(20), DPI(2));
-        DrawDashedRect(w, canvas, palette_.preview_frame);
-
-        String hint = "LIVE SLIDER";
-        Size hs = GetTextSize(hint, DemoSans(10, true));
-        w.DrawText(canvas.left + DPI(12), canvas.top - hs.cy - DPI(6), hint, DemoSans(10, true), palette_.ink);
-        w.DrawText(canvas.left + DPI(96), canvas.top - hs.cy - DPI(6), "Centered preview generated from active properties.", DemoSans(8), palette_.preview_hint);
-    }
-
-    virtual void Layout() override
-    {
-        Rect canvas = Rect(GetSize()).Deflated(DPI(16), DPI(20));
-        Size sz = slider_.GetMinSize();
-        if(slider_.GetDirection() == UiDirection::H) {
-            int w = min(canvas.GetWidth() - DPI(48), max(sz.cx, DPI(260)));
-            int x = canvas.left + (canvas.GetWidth() - w) / 2;
-            int y = canvas.top + (canvas.GetHeight() - sz.cy) / 2;
-            slider_.SetRect(x, y, w, sz.cy);
-        }
-        else {
-            int h = min(canvas.GetHeight() - DPI(48), max(sz.cy, DPI(260)));
-            int x = canvas.left + (canvas.GetWidth() - sz.cx) / 2;
-            int y = canvas.top + (canvas.GetHeight() - h) / 2;
-            slider_.SetRect(x, y, sz.cx, h);
-        }
-    }
-
-private:
-    DemoPalette palette_;
-    UiSlider slider_;
-};
-
-struct SliderConfig {
-    UiDirection direction = UiDirection::H;
-    double min = 0.0;
-    double max = 100.0;
-    double value = 35.0;
-    double step = 1.0;
-    bool enabled = true;
-
-    bool ticks = true;
-    int major_ticks = 11;
-    int minor_ticks = 4;
-    UiAlign tick_side = UiAlign::BOTTOM;
-    int tick_len_major = DPI(5);
-    int tick_len_minor = DPI(3);
-    int tick_gap = DPI(4);
-
-    int track_width = DPI(120);
-    int track_height = DPI(4);
-    int thumb_width = DPI(14);
-    int thumb_height = DPI(18);
-    int track_radius = DPI(999);
-    int thumb_radius = DPI(999);
-    int track_frame_width = 0;
-    int thumb_frame_width = DPI(2);
-    bool track_fill = true;
-    bool track_frame = false;
-    bool thumb_fill = true;
-    bool thumb_frame = true;
-    Color track_color = Color(134, 135, 134);
-    Color active_color = Color(37, 99, 235);
-    Color thumb_color = Color(37, 99, 235);
-    Color thumb_frame_color = Color(214, 223, 235);
-    Color tick_color = Color(148, 163, 184);
-
-    bool shadow = false;
-    int shadow_distance = DPI(6);
-    int shadow_offset_x = 0;
-    int shadow_offset_y = DPI(3);
-    int shadow_alpha = 96;
-    ShadowCurve shadow_curve = ShadowSoft();
-    Color shadow_color = Color(0, 0, 0);
-};
-
-enum SliderShadowPreset {
-    SLIDERSHADOW_LINEAR = 0,
-    SLIDERSHADOW_SOFT,
-    SLIDERSHADOW_HARD,
-    SLIDERSHADOW_CUSTOM,
-};
-
-bool SameShadowCurve(const ShadowCurve& a, const ShadowCurve& b, double eps = 0.0005)
-{
-    return fabs(a.x1 - b.x1) <= eps &&
-           fabs(a.y1 - b.y1) <= eps &&
-           fabs(a.x2 - b.x2) <= eps &&
-           fabs(a.y2 - b.y2) <= eps;
-}
-
-SliderShadowPreset ResolveShadowPreset(const ShadowCurve& c)
-{
-    if(SameShadowCurve(c, ShadowLinear()))
-        return SLIDERSHADOW_LINEAR;
-    if(SameShadowCurve(c, ShadowSoft()))
-        return SLIDERSHADOW_SOFT;
-    if(SameShadowCurve(c, ShadowHardCurve()))
-        return SLIDERSHADOW_HARD;
-    return SLIDERSHADOW_CUSTOM;
-}
-
-ShadowCurve SliderShadowPresetCurve(SliderShadowPreset preset)
-{
-    switch(preset) {
-    case SLIDERSHADOW_LINEAR: return ShadowLinear();
-    case SLIDERSHADOW_SOFT:   return ShadowSoft();
-    case SLIDERSHADOW_HARD:   return ShadowHardCurve();
-    default:                  return ShadowSoft();
-    }
-}
-
-UiSlider::Style MakeSliderStyle(const SliderConfig& config)
-{
-    UiSlider::Style style = UiTheme::ResolveSlider();
-    style.track_size = Size(config.track_width, config.track_height);
-    style.thumb_size = Size(config.thumb_width, config.thumb_height);
-    style.show_ticks = config.ticks;
-    style.major_ticks = config.major_ticks;
-    style.minor_ticks_per_major = config.minor_ticks;
-    style.tick_len_major = config.tick_len_major;
-    style.tick_len_minor = config.tick_len_minor;
-    style.tick_gap = config.tick_gap;
-    style.tick_side = config.tick_side;
-    style.tick_color = config.tick_color;
-
-    style.track_metrics.radius = config.track_radius;
-    style.track_metrics.face_enabled = config.track_fill;
-    style.track_metrics.frame_enabled = config.track_frame;
-    style.track_metrics.frame_width = config.track_frame_width;
-    style.track_metrics.shadow.enabled = config.shadow;
-    style.track_metrics.shadow.distance = max(0, config.shadow_distance);
-    style.track_metrics.shadow.offset_x = config.shadow_offset_x;
-    style.track_metrics.shadow.offset_y = config.shadow_offset_y;
-    style.track_metrics.shadow.alpha = clamp(config.shadow_alpha, 0, 255);
-    style.track_metrics.shadow.color = config.shadow_color;
-    style.track_metrics.shadow.mode = SHADOW_CURVE;
-    style.track_metrics.shadow.curve = config.shadow_curve;
-
-    style.thumb_metrics.radius = config.thumb_radius;
-    style.thumb_metrics.face_enabled = config.thumb_fill;
-    style.thumb_metrics.frame_enabled = config.thumb_frame;
-    style.thumb_metrics.frame_width = config.thumb_frame_width;
-
-    for(int i = 0; i < 4; i++) {
-        style.track_palette.face[i] = UiFill::Solid(config.track_color);
-        style.track_palette.frame[i] = config.track_color;
-        style.track_palette.ink[i] = config.active_color;
-        style.thumb_palette.face[i] = UiFill::Solid(config.thumb_color);
-        style.thumb_palette.frame[i] = config.thumb_frame_color;
-    }
-    return style;
+    const String v = ToLower(value);
+    if(v == "left") return UiAlign::LEFT;
+    if(v == "right") return UiAlign::RIGHT;
+    if(v == "top") return UiAlign::TOP;
+    return UiAlign::BOTTOM;
 }
 
 class UiSliderDemoWindow : public TopWindow {
@@ -435,637 +26,292 @@ public:
 
     UiSliderDemoWindow()
     {
-            BackPaint();
         Title("UiSlider Demo");
         Sizeable().Zoomable();
-        SetRect(0, 0, DPI(920), DPI(620));
-        SetMinSize(Size(DPI(820), DPI(520)));
+        SetRect(0, 0, DPI(1180), DPI(760));
+
+        UiThemeContext context = UiTheme::GetContext();
+        context.preset = UiThemePreset::Minimal;
+        context.mode = UiThemeMode::Light;
+        UiTheme::Set(context);
+
+        RegisterPropertyEditorV1Editors(factory_);
 
         Add(header_);
-        Add(version_badge_);
-        Add(theme_shell_);
-        Add(theme_icon_);
-        Add(theme_toggle_);
-        Add(exit_button_);
-        Add(preview_);
-        Add(inspector_scroll_);
-        inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-        inspector_scroll_.Content().Add(inspector_acc_);
+        Add(preview_panel_);
+        Add(inspector_panel_);
 
-        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_section_.SizePos());
-        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
-        inspector_acc_.GetSectionContent(inspector_acc_.AddSection("PROPERTIES", true)).Add(props_section_.SizePos());
-
-        usage_section_.SetGap(DPI(5)).SetInset(0);
-        usage_toolbar_.SetGap(DPI(2)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        usage_section_.Add(usage_toolbar_).Fixed(DPI(32));
-        usage_section_.Add(code_panel_).Fit();
-        usage_toolbar_.Add(usage_toolbar_fill_).Expand(1);
-        usage_toolbar_.Add(copy_label_).Fixed(DPI(48));
-        usage_toolbar_.Add(copy_button_).Fixed(DPI(18));
-
-        state_box_.SetGap(DPI(4)).SetInset(0);
-        state_theme_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        state_size_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        state_box_.Add(state_theme_row_).Fit();
-        state_box_.Add(state_size_row_).Fit();
-        state_theme_row_.Add(state_theme_label_).Expand(1).MinHeight(DPI(18));
-        state_theme_row_.Add(state_theme_value_).Fixed(DPI(72)).MinHeight(DPI(18));
-        state_size_row_.Add(state_size_label_).Expand(1).MinHeight(DPI(18));
-        state_size_row_.Add(state_size_value_).Fixed(DPI(72)).MinHeight(DPI(18));
-
-        props_section_.SetGap(DPI(2)).SetInset(0);
-        props_section_.Add(layout_acc_).Fit();
-        props_section_.Add(appearance_acc_).Fit();
-        props_section_.Add(shadow_acc_).Fit();
-        layout_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        appearance_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        shadow_acc_.SetSingleOpen(false).SetEnforceOne(false);
-        layout_acc_.GetSectionContent(layout_acc_.AddSection("LAYOUT", true)).Add(layout_box_.SizePos());
-        appearance_acc_.GetSectionContent(appearance_acc_.AddSection("APPEARANCE", true)).Add(appearance_box_.SizePos());
-        shadow_acc_.GetSectionContent(shadow_acc_.AddSection("SHADOW", true)).Add(shadow_box_.SizePos());
-        layout_box_.SetGap(DPI(2)).SetInset(0);
-        appearance_box_.SetGap(DPI(2)).SetInset(0);
-        shadow_box_.SetGap(DPI(2)).SetInset(0);
-
-        layout_box_.Add(value_row_).Fit();
-        layout_box_.Add(min_row_).Fit();
-        layout_box_.Add(max_row_).Fit();
-        layout_box_.Add(step_row_).Fit();
-        layout_box_.Add(enabled_row_).Fit();
-        layout_box_.Add(direction_row_box_).Fit();
-        layout_box_.Add(ticks_row_).Fit();
-        layout_box_.Add(tick_side_row_box_).Fit();
-        layout_box_.Add(major_ticks_row_).Fit();
-        layout_box_.Add(minor_ticks_row_).Fit();
-        value_row_.SetLabel("Value").SetValueText("35.00");
-        min_row_.SetLabel("Min").SetValueText("0.00");
-        max_row_.SetLabel("Max").SetValueText("100.00");
-        step_row_.SetLabel("Step").SetValueText("1.00");
-        enabled_row_.SetLabel("Enabled");
-        ticks_row_.SetLabel("Show Ticks");
-        major_ticks_row_.SetLabel("Major").SetValueText("11");
-        minor_ticks_row_.SetLabel("Minor").SetValueText("4");
-        direction_row_box_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        direction_label_.SetText("Direction").NoWantFocus();
-        direction_row_box_.Add(direction_label_).Fixed(DPI(82)).MinHeight(DPI(20));
-        direction_row_box_.Add(direction_drop_).Expand(1).MinHeight(DPI(24));
-        tick_side_row_box_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        tick_side_label_.SetText("Tick Side").NoWantFocus();
-        tick_side_row_box_.Add(tick_side_label_).Fixed(DPI(82)).MinHeight(DPI(20));
-        tick_side_row_box_.Add(tick_side_drop_).Expand(1).MinHeight(DPI(24));
-
-        appearance_box_.Add(thick_row_).Fit();
-        appearance_box_.Add(track_px_row_).Fit();
-        appearance_box_.Add(thumb_len_row_).Fit();
-        appearance_box_.Add(thumb_height_row_).Fit();
-        appearance_box_.Add(track_radius_row_).Fit();
-        appearance_box_.Add(thumb_radius_row_).Fit();
-        appearance_box_.Add(track_fill_row_).Fit();
-        appearance_box_.Add(track_frame_row_).Fit();
-        appearance_box_.Add(track_frame_width_row_).Fit();
-        appearance_box_.Add(track_color_row_).Fit();
-        appearance_box_.Add(active_color_row_).Fit();
-        appearance_box_.Add(thumb_fill_row_).Fit();
-        appearance_box_.Add(thumb_frame_row_).Fit();
-        appearance_box_.Add(thumb_frame_width_row_).Fit();
-        appearance_box_.Add(thumb_color_row_).Fit();
-        appearance_box_.Add(thumb_frame_color_row_).Fit();
-        appearance_box_.Add(tick_len_major_row_).Fit();
-        appearance_box_.Add(tick_len_minor_row_).Fit();
-        appearance_box_.Add(tick_gap_row_).Fit();
-        appearance_box_.Add(tick_color_row_).Fit();
-        thick_row_.SetLabel("Track W").SetValueText("120px");
-        track_px_row_.SetLabel("Track H").SetValueText("4px");
-        thumb_len_row_.SetLabel("Thumb W").SetValueText("14px");
-        thumb_height_row_.SetLabel("Thumb H").SetValueText("18px");
-        track_radius_row_.SetLabel("Track Rad").SetValueText("999px");
-        thumb_radius_row_.SetLabel("Thumb Rad").SetValueText("999px");
-        track_fill_row_.SetLabel("Track Fill");
-        track_frame_row_.SetLabel("Track Frame");
-        track_frame_width_row_.SetLabel("Track Frm").SetValueText("0px");
-        track_color_row_.SetLabel("Track Color").SetColorCount(1).ShowValue(false);
-        active_color_row_.SetLabel("Active Color").SetColorCount(1).ShowValue(false);
-        thumb_fill_row_.SetLabel("Thumb Fill");
-        thumb_frame_row_.SetLabel("Thumb Frame");
-        thumb_frame_width_row_.SetLabel("Thumb Frm").SetValueText("2px");
-        thumb_color_row_.SetLabel("Thumb Fill").SetColorCount(1).ShowValue(false);
-        thumb_frame_color_row_.SetLabel("Thumb Frame").SetColorCount(1).ShowValue(false);
-        tick_len_major_row_.SetLabel("Tick Major").SetValueText("5px");
-        tick_len_minor_row_.SetLabel("Tick Minor").SetValueText("3px");
-        tick_gap_row_.SetLabel("Tick Gap").SetValueText("4px");
-        tick_color_row_.SetLabel("Tick Color").SetColorCount(1).ShowValue(false);
-
-        shadow_box_.Add(shadow_toggle_row_).Fit();
-        shadow_box_.Add(shadow_color_row_).Fit();
-        shadow_box_.Add(shadow_distance_row_).Fit();
-        shadow_box_.Add(shadow_offset_x_row_).Fit();
-        shadow_box_.Add(shadow_offset_y_row_).Fit();
-        shadow_curve_preset_row_box_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        shadow_curve_preset_label_.SetText("Curve").NoWantFocus();
-        shadow_box_.Add(shadow_curve_preset_row_box_).Fit();
-        shadow_curve_preset_row_box_.Add(shadow_curve_preset_label_).Fixed(DPI(82)).MinHeight(DPI(20));
-        shadow_curve_preset_row_box_.Add(shadow_curve_preset_drop_).Expand(1).MinHeight(DPI(24));
-        shadow_box_.Add(shadow_curve_field_).Fixed(DPI(98));
-        shadow_box_.Add(shadow_alpha_row_).Fit();
-        shadow_toggle_row_.SetLabel("Shadow");
-        shadow_color_row_.SetLabel("Shadow Color").SetColorCount(1).ShowValue(false);
-        shadow_distance_row_.SetLabel("Shadow Dist").SetValueText("6px");
-        shadow_offset_x_row_.SetLabel("Shadow X").SetValueText("0px");
-        shadow_offset_y_row_.SetLabel("Shadow Y").SetValueText("3px");
-        shadow_alpha_row_.SetLabel("Shadow Alpha").SetValueText("96");
-
-        value_row_.SetValueWidth(DPI(64));
-        min_row_.SetValueWidth(DPI(64));
-        max_row_.SetValueWidth(DPI(64));
-        step_row_.SetValueWidth(DPI(64));
-        major_ticks_row_.SetValueWidth(DPI(64));
-        minor_ticks_row_.SetValueWidth(DPI(64));
-        thick_row_.SetValueWidth(DPI(64));
-        track_px_row_.SetValueWidth(DPI(64));
-        thumb_len_row_.SetValueWidth(DPI(64));
-        thumb_height_row_.SetValueWidth(DPI(64));
-        track_radius_row_.SetValueWidth(DPI(64));
-        thumb_radius_row_.SetValueWidth(DPI(64));
-        track_frame_width_row_.SetValueWidth(DPI(64));
-        thumb_frame_width_row_.SetValueWidth(DPI(64));
-        tick_len_major_row_.SetValueWidth(DPI(64));
-        tick_len_minor_row_.SetValueWidth(DPI(64));
-        tick_gap_row_.SetValueWidth(DPI(64));
-        shadow_distance_row_.SetValueWidth(DPI(64));
-        shadow_offset_x_row_.SetValueWidth(DPI(64));
-        shadow_offset_y_row_.SetValueWidth(DPI(64));
-        shadow_alpha_row_.SetValueWidth(DPI(64));
-
-        header_.SetTitle("U++ UiSlider Builder")
-               .SetSubTitle("Configure one slider surface and copy the exact control code for the current result.")
-               .SetMedia(ICON_BRAND_NEWLOGO_V5_48())
+        header_.SetTitle("UiSlider")
+               .SetSubTitle("Live PropertyEditor reference for range, ticks, geometry and track/thumb styling")
+               .SetMedia(ICON_DESIGN_TUNE_48())
+               .SetMediaSide(UiAlign::LEFT)
+               .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
+               .SetMediaAutoFit(true)
                .ShowTitleLine(false)
-               .ShowCardLine(false)
-               .SetSelectable(false)
-               .SetShowFocus(false)
-               .EnableHover(false);
+               .SetContentInset(DPI(8))
+               .SetContentCell(header_actions_);
+        header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        header_actions_.AddSpacer(1).Expand(1);
+        theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16))
+                     .Tip("Toggle light/dark theme");
+        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16))
+                    .Tip("Close demo");
+        header_actions_.Add(theme_button_).Fixed(DPI(34));
+        header_actions_.Add(exit_button_).Fixed(DPI(34));
 
-        version_badge_.SetText(DEMO_VERSION).NoWantFocus();
-        theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48())
-                    .SetText("Exit")
-                    .SetIconSize(DPI(15), DPI(15))
-                    .SetIconRenderMode(UiIconRenderMode::MonoTint);
+        preview_panel_.Add(slider_);
+        preview_panel_.Add(caption_);
+        preview_panel_.Add(status_);
+        caption_.SetText("Centered live UiSlider preview")
+                .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
+        status_.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
 
-        copy_label_.SetText("Copy Code").NoWantFocus();
-        copy_button_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(14), DPI(14)).NoWantFocus();
-        code_panel_.Code().SetSelectable(true);
-        copy_button_.WhenAction = [=] { WriteClipboardText(code_panel_.Code().GetText().ToString()); };
-        value_row_.Slider().SetRange(config_.min, config_.max).SetStep(0.5).SetValue(config_.value);
-        value_row_.WhenAction = [=] { config_.value = value_row_.Slider().GetValue(); RefreshFromConfig(); };
-        min_row_.Slider().SetRange(-100, 100).SetStep(1).SetValue(config_.min);
-        min_row_.WhenAction = [=] { config_.min = min_row_.Slider().GetValue(); RefreshFromConfig(); };
-        max_row_.Slider().SetRange(0, 200).SetStep(1).SetValue(config_.max);
-        max_row_.WhenAction = [=] { config_.max = max_row_.Slider().GetValue(); RefreshFromConfig(); };
-        step_row_.Slider().SetRange(0.1, 20.0).SetStep(0.1).SetValue(config_.step);
-        step_row_.WhenAction = [=] { config_.step = step_row_.Slider().GetValue(); RefreshFromConfig(); };
-        enabled_row_.Toggle().WhenAction = [=] { config_.enabled = enabled_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        ticks_row_.Toggle().WhenAction = [=] { config_.ticks = ticks_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        major_ticks_row_.Slider().SetRange(2, 20).SetStep(1).SetValue(config_.major_ticks);
-        major_ticks_row_.WhenAction = [=] { config_.major_ticks = int(major_ticks_row_.Slider().GetValue()); RefreshFromConfig(); };
-        minor_ticks_row_.Slider().SetRange(0, 8).SetStep(1).SetValue(config_.minor_ticks);
-        minor_ticks_row_.WhenAction = [=] { config_.minor_ticks = int(minor_ticks_row_.Slider().GetValue()); RefreshFromConfig(); };
-        direction_drop_.Add("Horizontal", (int)UiDirection::H);
-        direction_drop_.Add("Vertical", (int)UiDirection::V);
-        direction_drop_.WhenSelect = [=](int) {
-            config_.direction = (UiDirection)(int)direction_drop_.GetSelectedData();
-            RefreshFromConfig();
-        };
-        tick_side_drop_.Add("Top", (int)UiAlign::TOP);
-        tick_side_drop_.Add("Bottom", (int)UiAlign::BOTTOM);
-        tick_side_drop_.Add("Left", (int)UiAlign::LEFT);
-        tick_side_drop_.Add("Right", (int)UiAlign::RIGHT);
-        tick_side_drop_.WhenSelect = [=](int) {
-            config_.tick_side = (UiAlign)(int)tick_side_drop_.GetSelectedData();
-            RefreshFromConfig();
-        };
+        inspector_panel_.Add(properties_.SizePos());
+        properties_.SetFactory(&factory_);
+        properties_.SetModel(&model_);
+        properties_.SetLabelRatio(38);
+        PropertyEditorStyle pe_style = PropertyEditorStyle::System();
+        pe_style.show_group_summaries = true;
+        properties_.SetStyle(pe_style);
 
-        thick_row_.Slider().SetRange(DPI(20), DPI(200)).SetStep(1).SetValue(config_.track_width);
-        thick_row_.WhenAction = [=] { config_.track_width = int(thick_row_.Slider().GetValue()); RefreshFromConfig(); };
-        track_px_row_.Slider().SetRange(2, DPI(200)).SetStep(1).SetValue(config_.track_height);
-        track_px_row_.WhenAction = [=] { config_.track_height = int(track_px_row_.Slider().GetValue()); RefreshFromConfig(); };
-        thumb_len_row_.Slider().SetRange(DPI(8), DPI(200)).SetStep(1).SetValue(config_.thumb_width);
-        thumb_len_row_.WhenAction = [=] { config_.thumb_width = int(thumb_len_row_.Slider().GetValue()); RefreshFromConfig(); };
-        thumb_height_row_.Slider().SetRange(DPI(8), DPI(200)).SetStep(1).SetValue(config_.thumb_height);
-        thumb_height_row_.WhenAction = [=] { config_.thumb_height = int(thumb_height_row_.Slider().GetValue()); RefreshFromConfig(); };
-        track_radius_row_.Slider().SetRange(0, DPI(999)).SetStep(1).SetValue(config_.track_radius);
-        track_radius_row_.WhenAction = [=] { config_.track_radius = int(track_radius_row_.Slider().GetValue()); RefreshFromConfig(); };
-        thumb_radius_row_.Slider().SetRange(0, DPI(999)).SetStep(1).SetValue(config_.thumb_radius);
-        thumb_radius_row_.WhenAction = [=] { config_.thumb_radius = int(thumb_radius_row_.Slider().GetValue()); RefreshFromConfig(); };
-        track_fill_row_.Toggle().WhenAction = [=] { config_.track_fill = track_fill_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        track_frame_row_.Toggle().WhenAction = [=] { config_.track_frame = track_frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        track_frame_width_row_.Slider().SetRange(0, 8).SetStep(1).SetValue(config_.track_frame_width);
-        track_frame_width_row_.WhenAction = [=] { config_.track_frame_width = int(track_frame_width_row_.Slider().GetValue()); RefreshFromConfig(); };
-        track_color_row_.WhenAction = [=] { config_.track_color = track_color_row_.GetColor(0); RefreshFromConfig(); };
-        active_color_row_.WhenAction = [=] { config_.active_color = active_color_row_.GetColor(0); RefreshFromConfig(); };
-        thumb_fill_row_.Toggle().WhenAction = [=] { config_.thumb_fill = thumb_fill_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        thumb_frame_row_.Toggle().WhenAction = [=] { config_.thumb_frame = thumb_frame_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        thumb_frame_width_row_.Slider().SetRange(0, 8).SetStep(1).SetValue(config_.thumb_frame_width);
-        thumb_frame_width_row_.WhenAction = [=] { config_.thumb_frame_width = int(thumb_frame_width_row_.Slider().GetValue()); RefreshFromConfig(); };
-        thumb_color_row_.WhenAction = [=] { config_.thumb_color = thumb_color_row_.GetColor(0); RefreshFromConfig(); };
-        thumb_frame_color_row_.WhenAction = [=] { config_.thumb_frame_color = thumb_frame_color_row_.GetColor(0); RefreshFromConfig(); };
-        tick_len_major_row_.Slider().SetRange(1, 12).SetStep(1).SetValue(config_.tick_len_major);
-        tick_len_major_row_.WhenAction = [=] { config_.tick_len_major = int(tick_len_major_row_.Slider().GetValue()); RefreshFromConfig(); };
-        tick_len_minor_row_.Slider().SetRange(1, 10).SetStep(1).SetValue(config_.tick_len_minor);
-        tick_len_minor_row_.WhenAction = [=] { config_.tick_len_minor = int(tick_len_minor_row_.Slider().GetValue()); RefreshFromConfig(); };
-        tick_gap_row_.Slider().SetRange(0, 12).SetStep(1).SetValue(config_.tick_gap);
-        tick_gap_row_.WhenAction = [=] { config_.tick_gap = int(tick_gap_row_.Slider().GetValue()); RefreshFromConfig(); };
-        tick_color_row_.WhenAction = [=] { config_.tick_color = tick_color_row_.GetColor(0); RefreshFromConfig(); };
-
-        shadow_toggle_row_.Toggle().WhenAction = [=] { config_.shadow = shadow_toggle_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        shadow_color_row_.WhenAction = [=] { config_.shadow_color = shadow_color_row_.GetColor(0); RefreshFromConfig(); };
-        shadow_distance_row_.Slider().SetRange(0, 24).SetStep(1).SetValue(config_.shadow_distance);
-        shadow_distance_row_.WhenAction = [=] { config_.shadow_distance = int(shadow_distance_row_.Slider().GetValue()); RefreshFromConfig(); };
-        shadow_offset_x_row_.Slider().SetRange(-24, 24).SetStep(1).SetValue(config_.shadow_offset_x);
-        shadow_offset_x_row_.WhenAction = [=] { config_.shadow_offset_x = int(shadow_offset_x_row_.Slider().GetValue()); RefreshFromConfig(); };
-        shadow_offset_y_row_.Slider().SetRange(-24, 24).SetStep(1).SetValue(config_.shadow_offset_y);
-        shadow_offset_y_row_.WhenAction = [=] { config_.shadow_offset_y = int(shadow_offset_y_row_.Slider().GetValue()); RefreshFromConfig(); };
-        shadow_alpha_row_.Slider().SetRange(0, 255).SetStep(1).SetValue(config_.shadow_alpha);
-        shadow_alpha_row_.WhenAction = [=] { config_.shadow_alpha = int(shadow_alpha_row_.Slider().GetValue()); RefreshFromConfig(); };
-        shadow_curve_preset_drop_.Add("Linear", SLIDERSHADOW_LINEAR);
-        shadow_curve_preset_drop_.Add("Soft", SLIDERSHADOW_SOFT);
-        shadow_curve_preset_drop_.Add("Hard", SLIDERSHADOW_HARD);
-        shadow_curve_preset_drop_.Add("Custom", SLIDERSHADOW_CUSTOM);
-        shadow_curve_preset_drop_.WhenSelect = [=](int) {
-            SliderShadowPreset preset = (SliderShadowPreset)(int)shadow_curve_preset_drop_.GetSelectedData();
-            if(preset != SLIDERSHADOW_CUSTOM)
-                config_.shadow_curve = SliderShadowPresetCurve(preset);
-            shadow_curve_field_.SetCurve(config_.shadow_curve);
-            RefreshFromConfig();
-        };
-        shadow_curve_field_.WhenChanging = [=] {
-            config_.shadow_curve = shadow_curve_field_.GetCurve();
-            shadow_curve_preset_drop_.SelectByData(SLIDERSHADOW_CUSTOM);
-            RefreshFromConfig();
-        };
-        shadow_curve_field_.WhenAction = shadow_curve_field_.WhenChanging;
-
-        theme_toggle_.WhenAction = [=] {
-            ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light);
-        };
-        exit_button_.WhenAction = [=] { Close(); };
-
-        ApplyTheme(UiThemeMode::Light);
-        SyncControlsFromConfig();
-        RefreshFromConfig();
-    }
-
-    virtual void Paint(Draw& w) override
-    {
-        Rect r(Point(0, 0), GetSize());
-        w.DrawRect(r, palette_.paper);
-        int split_x = int(r.GetWidth() * 0.64);
-        int header_h = DPI(78);
-        w.DrawRect(split_x, 0, 1, r.GetHeight(), palette_.divider);
-        w.DrawRect(0, header_h, r.GetWidth(), 1, palette_.divider);
+        BuildModel();
+        Connect();
+        ApplyTheme();
+        ApplyProjection();
     }
 
     virtual void Layout() override
     {
-        Rect r(Point(0, 0), GetSize());
-        int split_x = int(r.GetWidth() * 0.64);
-        int header_h = DPI(78);
-        int body_y = header_h + 1;
+        Rect client = GetSize();
+        const int pad = DPI(12);
+        const int gap = DPI(10);
+        const int header_h = DPI(72);
+        const int right_w = min(DPI(440), max(DPI(350), client.GetWidth() * 37 / 100));
 
-        header_.SetRect(DPI(18), DPI(12), max(0, split_x - DPI(36)), header_h - DPI(18));
-        version_badge_.SetRect(split_x + DPI(16), DPI(16), DPI(86), DPI(34));
-        theme_shell_.SetRect(split_x + DPI(110), DPI(16), DPI(96), DPI(34));
-        theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
-        theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(48) - DPI(6), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
-        exit_button_.SetRect(r.right - DPI(112), DPI(16), DPI(94), DPI(34));
+        header_.SetRect(pad, pad, max(0, client.GetWidth() - pad * 2), header_h);
+        const int top = pad + header_h + gap;
+        const int body_h = max(0, client.GetHeight() - top - pad);
+        const int preview_w = max(0, client.GetWidth() - pad * 3 - right_w);
+        preview_panel_.SetRect(pad, top, preview_w, body_h);
+        inspector_panel_.SetRect(pad + preview_w + gap, top, right_w, body_h);
 
-        preview_.SetRect(0, body_y, split_x, max(0, r.bottom - body_y));
-        inspector_scroll_.SetRect(split_x + DPI(16), body_y + DPI(8), max(0, r.right - split_x - DPI(28)), max(0, r.bottom - body_y - DPI(16)));
-        Rect scroll_inner = UiStyledInnerRect(inspector_scroll_.GetSize(), inspector_scroll_.GetStyle().metrics, inspector_scroll_.GetStyle().skin);
-        int acc_w = max(0, scroll_inner.GetWidth() - DPI(14));
-        inspector_acc_.SetRect(0, 0, acc_w, inspector_acc_.GetMinSize().cy);
+        Rect pr = preview_panel_.GetSize();
+        const bool horizontal = slider_.GetDirection() == UiDirection::H;
+        if(horizontal) {
+            const int cx = min(DPI(420), max(DPI(220), pr.GetWidth() - DPI(80)));
+            const int cy = max(DPI(42), slider_.GetMinSize().cy);
+            slider_.SetRect(max(0, (pr.GetWidth() - cx) / 2),
+                            max(DPI(30), (pr.GetHeight() - cy) / 2 - DPI(20)),
+                            cx, cy);
+        }
+        else {
+            const int cx = max(DPI(48), slider_.GetMinSize().cx);
+            const int cy = min(DPI(420), max(DPI(220), pr.GetHeight() - DPI(150)));
+            slider_.SetRect(max(0, (pr.GetWidth() - cx) / 2),
+                            max(DPI(30), (pr.GetHeight() - cy) / 2 - DPI(20)),
+                            cx, cy);
+        }
+        caption_.SetRect(DPI(18), max(0, pr.bottom - DPI(78)),
+                         max(0, pr.GetWidth() - DPI(36)), DPI(26));
+        status_.SetRect(DPI(18), max(0, pr.bottom - DPI(48)),
+                        max(0, pr.GetWidth() - DPI(36)), DPI(26));
     }
 
 private:
-    String BuildUsageCode() const
+    Value Get(const char *id) const
     {
-        String code;
-        code << "UiSlider::Style style = UiTheme::ResolveSlider();\n";
-        code << "style.track_size = Size(" << config_.track_width << ", " << config_.track_height << ");\n";
-        code << "style.thumb_size = Size(" << config_.thumb_width << ", " << config_.thumb_height << ");\n";
-        code << "style.track_metrics.radius = " << config_.track_radius << ";\n";
-        code << "style.thumb_metrics.radius = " << config_.thumb_radius << ";\n";
-        code << "style.track_metrics.face_enabled = " << (config_.track_fill ? "true" : "false") << ";\n";
-        code << "style.track_metrics.frame_enabled = " << (config_.track_frame ? "true" : "false") << ";\n";
-        code << "style.track_metrics.frame_width = " << config_.track_frame_width << ";\n";
-        code << "style.thumb_metrics.face_enabled = " << (config_.thumb_fill ? "true" : "false") << ";\n";
-        code << "style.thumb_metrics.frame_enabled = " << (config_.thumb_frame ? "true" : "false") << ";\n";
-        code << "style.thumb_metrics.frame_width = " << config_.thumb_frame_width << ";\n";
-        code << "style.show_ticks = " << (config_.ticks ? "true" : "false") << ";\n";
-        code << "style.major_ticks = " << config_.major_ticks << ";\n";
-        code << "style.minor_ticks_per_major = " << config_.minor_ticks << ";\n";
-        code << "style.tick_len_major = " << config_.tick_len_major << ";\n";
-        code << "style.tick_len_minor = " << config_.tick_len_minor << ";\n";
-        code << "style.tick_gap = " << config_.tick_gap << ";\n";
-        code << "style.tick_side = " << (config_.tick_side == UiAlign::TOP ? "UiAlign::TOP" : config_.tick_side == UiAlign::BOTTOM ? "UiAlign::BOTTOM" : config_.tick_side == UiAlign::LEFT ? "UiAlign::LEFT" : "UiAlign::RIGHT") << ";\n";
-        code << "style.tick_color = Color(" << config_.tick_color.GetR() << ", " << config_.tick_color.GetG() << ", " << config_.tick_color.GetB() << ");\n";
-        code << "style.track_palette.face[ST_NORMAL] = UiFill::Solid(Color(" << config_.track_color.GetR() << ", " << config_.track_color.GetG() << ", " << config_.track_color.GetB() << "));\n";
-        code << "style.track_palette.frame[ST_NORMAL] = Color(" << config_.track_color.GetR() << ", " << config_.track_color.GetG() << ", " << config_.track_color.GetB() << ");\n";
-        code << "style.track_palette.ink[ST_NORMAL] = Color(" << config_.active_color.GetR() << ", " << config_.active_color.GetG() << ", " << config_.active_color.GetB() << ");\n";
-        code << "style.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Color(" << config_.thumb_color.GetR() << ", " << config_.thumb_color.GetG() << ", " << config_.thumb_color.GetB() << "));\n";
-        code << "style.thumb_palette.frame[ST_NORMAL] = Color(" << config_.thumb_frame_color.GetR() << ", " << config_.thumb_frame_color.GetG() << ", " << config_.thumb_frame_color.GetB() << ");\n";
-        code << "style.track_metrics.shadow.enabled = " << (config_.shadow ? "true" : "false") << ";\n";
-        code << "style.track_metrics.shadow.distance = " << config_.shadow_distance << ";\n";
-        code << "style.track_metrics.shadow.offset_x = " << config_.shadow_offset_x << ";\n";
-        code << "style.track_metrics.shadow.offset_y = " << config_.shadow_offset_y << ";\n";
-        code << "style.track_metrics.shadow.alpha = " << config_.shadow_alpha << ";\n";
-        code << "style.track_metrics.shadow.color = Color(" << config_.shadow_color.GetR() << ", " << config_.shadow_color.GetG() << ", " << config_.shadow_color.GetB() << ");\n";
-        code << "style.track_metrics.shadow.mode = SHADOW_CURVE;\n";
-        code << "style.track_metrics.shadow.curve = ShadowCurve { " << Format("%.3f", config_.shadow_curve.x1) << ", " << Format("%.3f", config_.shadow_curve.y1) << ", " << Format("%.3f", config_.shadow_curve.x2) << ", " << Format("%.3f", config_.shadow_curve.y2) << " };\n\n";
-        code << "UiSlider slider;\n";
-        code << "slider.SetCustomStyle(style)\n";
-        code << "      .SetDirection(" << (config_.direction == UiDirection::H ? "UiDirection::H" : "UiDirection::V") << ")\n";
-        code << "      .SetRange(" << Format("%.2f", config_.min) << ", " << Format("%.2f", config_.max) << ")\n";
-        code << "      .SetStep(" << Format("%.2f", config_.step) << ")\n";
-        code << "      .SetValue(" << Format("%.2f", config_.value) << ")\n";
-        code << "      .SetTicks(" << (config_.ticks ? "true" : "false") << ", " << config_.major_ticks << ", " << config_.minor_ticks << ")\n";
-        code << "      .SetTickSide(" << (config_.tick_side == UiAlign::TOP ? "UiAlign::TOP" : config_.tick_side == UiAlign::BOTTOM ? "UiAlign::BOTTOM" : config_.tick_side == UiAlign::LEFT ? "UiAlign::LEFT" : "UiAlign::RIGHT") << ");\n";
-        if(!config_.enabled)
-            code << "slider.Disable();\n";
-        return code;
-    }
-    void SyncControlsFromConfig()
-    {
-        value_row_.Slider().SetRange(config_.min, config_.max).SetValue(config_.value);
-        min_row_.Slider().SetValue(config_.min);
-        max_row_.Slider().SetValue(config_.max);
-        step_row_.Slider().SetValue(config_.step);
-        enabled_row_.Toggle().SetOn(config_.enabled);
-        ticks_row_.Toggle().SetOn(config_.ticks);
-        major_ticks_row_.Slider().SetValue(config_.major_ticks);
-        minor_ticks_row_.Slider().SetValue(config_.minor_ticks);
-        direction_drop_.SelectByData((int)config_.direction);
-        tick_side_drop_.SelectByData((int)config_.tick_side);
-        thick_row_.Slider().SetValue(config_.track_width);
-        track_px_row_.Slider().SetValue(config_.track_height);
-        thumb_len_row_.Slider().SetValue(config_.thumb_width);
-        thumb_height_row_.Slider().SetValue(config_.thumb_height);
-        track_radius_row_.Slider().SetValue(config_.track_radius);
-        thumb_radius_row_.Slider().SetValue(config_.thumb_radius);
-        track_fill_row_.Toggle().SetOn(config_.track_fill);
-        track_frame_row_.Toggle().SetOn(config_.track_frame);
-        track_frame_width_row_.Slider().SetValue(config_.track_frame_width);
-        track_color_row_.SetColor(0, config_.track_color);
-        active_color_row_.SetColor(0, config_.active_color);
-        thumb_fill_row_.Toggle().SetOn(config_.thumb_fill);
-        thumb_frame_row_.Toggle().SetOn(config_.thumb_frame);
-        thumb_frame_width_row_.Slider().SetValue(config_.thumb_frame_width);
-        thumb_color_row_.SetColor(0, config_.thumb_color);
-        thumb_frame_color_row_.SetColor(0, config_.thumb_frame_color);
-        tick_len_major_row_.Slider().SetValue(config_.tick_len_major);
-        tick_len_minor_row_.Slider().SetValue(config_.tick_len_minor);
-        tick_gap_row_.Slider().SetValue(config_.tick_gap);
-        tick_color_row_.SetColor(0, config_.tick_color);
-        shadow_toggle_row_.Toggle().SetOn(config_.shadow);
-        shadow_color_row_.SetColor(0, config_.shadow_color);
-        shadow_distance_row_.Slider().SetValue(config_.shadow_distance);
-        shadow_offset_x_row_.Slider().SetValue(config_.shadow_offset_x);
-        shadow_offset_y_row_.Slider().SetValue(config_.shadow_offset_y);
-        shadow_alpha_row_.Slider().SetValue(config_.shadow_alpha);
-        shadow_curve_field_.SetCurve(config_.shadow_curve);
-        shadow_curve_preset_drop_.SelectByData(ResolveShadowPreset(config_.shadow_curve));
+        const PropertyEditorItem *item = model_.Find(id);
+        return item ? item->value : Value();
     }
 
-    void RefreshState()
+    PropertyEditorItem& Resettable(PropertyEditorItem& item)
     {
-        Size sz = preview_.Showcase().GetMinSize();
-        state_theme_label_.SetText("Theme");
-        state_theme_value_.SetText(palette_.dark ? "Dark" : "Light");
-        state_size_label_.SetText("Resolved Size");
-        state_size_value_.SetText(AsString(sz.cx) + " x " + AsString(sz.cy));
+        item.SetDefault(item.value);
+        return item;
     }
 
-    void RefreshFromConfig()
+    void BuildModel()
     {
-        if(config_.max <= config_.min)
-            config_.max = config_.min + max(1.0, config_.step);
-        config_.value = minmax(config_.value, config_.min, config_.max);
+        Resettable(model_.AddChoice("direction", "Direction", "Horizontal", "Value")
+            .AddChoice("Horizontal", "Horizontal").AddChoice("Vertical", "Vertical"));
+        Resettable(model_.AddNumericDouble("minimum", "Minimum", 0.0, -1000.0, 1000.0, 1.0, "Value"));
+        Resettable(model_.AddNumericDouble("maximum", "Maximum", 100.0, -1000.0, 1000.0, 1.0, "Value"));
+        Resettable(model_.AddNumericDouble("value", "Value", 35.0, -1000.0, 1000.0, 0.1, "Value"));
+        Resettable(model_.AddNumericDouble("step", "Step", 1.0, 0.01, 100.0, 0.01, "Value"));
+        Resettable(model_.AddBoolean("enabled", "Enabled", true, "Value"));
 
-        UiSlider& showcase = preview_.Showcase();
-        UiSlider::Style style = MakeSliderStyle(config_);
-        showcase.SetCustomStyle(style)
-                .SetDirection(config_.direction)
-                .SetRange(config_.min, config_.max)
-                .SetStep(config_.step)
-                .SetValue(config_.value)
-                .SetTicks(config_.ticks, config_.major_ticks, config_.minor_ticks)
-                .SetTickSide(config_.tick_side);
-        showcase.Enable(config_.enabled);
+        Resettable(model_.AddBoolean("show_ticks", "Show ticks", true, "Ticks"));
+        Resettable(model_.AddNumericInt("major_ticks", "Major ticks", 11, 0, 50, 1, "Ticks"));
+        Resettable(model_.AddNumericInt("minor_ticks", "Minor / major", 4, 0, 10, 1, "Ticks"));
+        AddPropertyMatrix(model_, "tick_side", "Tick side", "bottom", "Cardinal4", "Ticks");
+        Resettable(*model_.Find("tick_side"));
+        Resettable(model_.AddNumericInt("tick_major_len", "Major length", 6, 0, 24, 1, "Ticks").SetUnit("px"));
+        Resettable(model_.AddNumericInt("tick_minor_len", "Minor length", 3, 0, 16, 1, "Ticks").SetUnit("px"));
+        Resettable(model_.AddNumericInt("tick_gap", "Gap", 3, 0, 20, 1, "Ticks").SetUnit("px"));
+        Resettable(model_.AddColor("tick_color", "Colour", Color(148, 163, 184), "Ticks"));
 
-        value_row_.Slider().SetRange(config_.min, config_.max);
-        value_row_.SetValueText(Format("%.2f", config_.value));
-        min_row_.SetValueText(Format("%.2f", config_.min));
-        max_row_.SetValueText(Format("%.2f", config_.max));
-        step_row_.SetValueText(Format("%.2f", config_.step));
-        major_ticks_row_.SetValueText(AsString(config_.major_ticks));
-        minor_ticks_row_.SetValueText(AsString(config_.minor_ticks));
-        thick_row_.SetValueText(AsString(config_.track_width) + "px");
-        track_px_row_.SetValueText(AsString(config_.track_height) + "px");
-        thumb_len_row_.SetValueText(AsString(config_.thumb_width) + "px");
-        thumb_height_row_.SetValueText(AsString(config_.thumb_height) + "px");
-        track_radius_row_.SetValueText(AsString(config_.track_radius) + "px");
-        thumb_radius_row_.SetValueText(AsString(config_.thumb_radius) + "px");
-        track_frame_width_row_.SetValueText(AsString(config_.track_frame_width) + "px");
-        thumb_frame_width_row_.SetValueText(AsString(config_.thumb_frame_width) + "px");
-        tick_len_major_row_.SetValueText(AsString(config_.tick_len_major) + "px");
-        tick_len_minor_row_.SetValueText(AsString(config_.tick_len_minor) + "px");
-        tick_gap_row_.SetValueText(AsString(config_.tick_gap) + "px");
-        shadow_distance_row_.SetValueText(AsString(config_.shadow_distance) + "px");
-        shadow_offset_x_row_.SetValueText(AsString(config_.shadow_offset_x) + "px");
-        shadow_offset_y_row_.SetValueText(AsString(config_.shadow_offset_y) + "px");
-        shadow_alpha_row_.SetValueText(AsString(config_.shadow_alpha));
+        Resettable(model_.AddNumericInt("track_width", "Track width", 120, 20, 600, 1, "Geometry").SetUnit("px"));
+        Resettable(model_.AddNumericInt("track_height", "Track height", 4, 1, 64, 1, "Geometry").SetUnit("px"));
+        Resettable(model_.AddNumericInt("thumb_width", "Thumb width", 20, 4, 96, 1, "Geometry").SetUnit("px"));
+        Resettable(model_.AddNumericInt("thumb_height", "Thumb height", 20, 4, 96, 1, "Geometry").SetUnit("px"));
+        Resettable(model_.AddBoolean("expand_track", "Expand track", true, "Geometry"));
 
-        code_panel_.Code().SetText(BuildUsageCode());
-        RefreshState();
-        inspector_acc_.RefreshLayout();
-        inspector_scroll_.RefreshLayout();
-        preview_.RefreshLayout();
-        preview_.Refresh();
+        Resettable(model_.AddBoolean("track_face_enabled", "Face enabled", true, "Track"));
+        Resettable(model_.AddBoolean("track_frame_enabled", "Frame enabled", false, "Track"));
+        Resettable(model_.AddNumericInt("track_radius", "Radius", 999, 0, 999, 1, "Track").SetUnit("px"));
+        Resettable(model_.AddNumericInt("track_frame_width", "Frame width", 0, 0, 12, 1, "Track").SetUnit("px"));
+        Resettable(model_.AddColor("track_color", "Track colour", Color(148, 163, 184), "Track"));
+        Resettable(model_.AddColor("active_color", "Active colour", Color(37, 99, 235), "Track"));
+
+        Resettable(model_.AddBoolean("thumb_face_enabled", "Face enabled", true, "Thumb"));
+        Resettable(model_.AddBoolean("thumb_frame_enabled", "Frame enabled", true, "Thumb"));
+        Resettable(model_.AddNumericInt("thumb_radius", "Radius", 999, 0, 999, 1, "Thumb").SetUnit("px"));
+        Resettable(model_.AddNumericInt("thumb_frame_width", "Frame width", 2, 0, 12, 1, "Thumb").SetUnit("px"));
+        Resettable(model_.AddColor("thumb_color", "Face colour", Color(37, 99, 235), "Thumb"));
+        Resettable(model_.AddColor("thumb_frame_color", "Frame colour", Color(214, 223, 235), "Thumb"));
+
+        model_.SetGroupSubtitle("Value", "range and live value interaction");
+        model_.SetGroupSubtitle("Ticks", "shared tick geometry");
+        model_.SetGroupSubtitle("Geometry", "real track and thumb sizing");
+        model_.SetGroupSubtitle("Track", "track surface and active ink");
+        model_.SetGroupSubtitle("Thumb", "thumb surface");
+        model_.StructureChanged();
     }
 
-    void ApplyTheme(UiThemeMode mode)
+    void Connect()
     {
-        UiThemeContext ctx = UiTheme::GetContext();
-        ctx.preset = UiThemePreset::Minimal;
-        ctx.mode = mode;
-        UiTheme::Set(ctx);
+        theme_button_.WhenAction = [=] { ToggleTheme(); };
+        exit_button_.WhenAction = [=] { Close(); };
+        properties_.WhenPreview = [=](String, Value) { ApplyProjection(); };
+        properties_.WhenCommit = [=](String, Value) { ApplyProjection(); };
+        properties_.WhenReset = [=](String id) {
+            PropertyEditorItem *item = model_.Find(id);
+            if(item && item->resettable) {
+                model_.SetValue(id, item->default_value);
+                ApplyProjection();
+                properties_.RefreshModel();
+            }
+        };
+        slider_.WhenChanging = [=] { SyncLiveValue(); };
+        slider_.WhenAction = [=] { SyncLiveValue(); };
+    }
 
-        palette_ = ResolveDemoPalette(mode);
+    void SyncLiveValue()
+    {
+        model_.SetValue("value", slider_.GetValue(), false);
+        properties_.RefreshValue("value");
+        UpdateStatus();
+    }
 
-        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
-        version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
-        theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
-        theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
-        theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
-        theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
-        theme_toggle_.SetData(mode == UiThemeMode::Dark);
-        exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
-        copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
-        copy_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
-        code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
-        code_panel_.Scroll().SetCustomStyle(MakeCodeScrollStyle());
-        code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
-        inspector_scroll_.SetCustomStyle(UiScrollPanel::StyleDefault());
-        UiAccordion::Style acc = MakeDemoAccordionStyle();
-        inspector_acc_.SetCustomStyle(acc);
-        layout_acc_.SetCustomStyle(acc);
-        appearance_acc_.SetCustomStyle(acc);
-        shadow_acc_.SetCustomStyle(acc);
-        direction_drop_.SetCustomStyle(UiTheme::ResolveDropdown());
-        tick_side_drop_.SetCustomStyle(UiTheme::ResolveDropdown());
-        shadow_curve_preset_drop_.SetCustomStyle(UiTheme::ResolveDropdown());
-        shadow_curve_field_.SetCurveStyle(MakeCurveEditorStyle(palette_));
-        shadow_curve_field_.SetFormulaSelectable(true).SetShowFormula(true).SetShowCopy(true).SetFlipVertical(true);
-        preview_.SetPalette(palette_);
+    void ApplyProjection()
+    {
+        double minimum = (double)Get("minimum");
+        double maximum = (double)Get("maximum");
+        if(maximum <= minimum) {
+            maximum = minimum + max(0.01, (double)Get("step"));
+            model_.SetValue("maximum", maximum, false);
+            properties_.RefreshValue("maximum");
+        }
+        const double step = max(0.01, (double)Get("step"));
+        const double value = minmax((double)Get("value"), minimum, maximum);
+        if(value != (double)Get("value")) {
+            model_.SetValue("value", value, false);
+            properties_.RefreshValue("value");
+        }
 
-        UiLabel::Style row_label = UiTheme::ResolveLabel(UiRole::Standard);
-        UiLabel::Style row_value = UiTheme::ResolveLabel(UiRole::Subtle);
-        row_value.align_h = UiAlign::RIGHT;
-        state_theme_label_.SetCustomStyle(row_label);
-        state_theme_value_.SetCustomStyle(row_value);
-        state_size_label_.SetCustomStyle(row_label);
-        state_size_value_.SetCustomStyle(row_value);
-        value_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        min_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        max_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        step_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        enabled_row_.SetLabelStyle(row_label);
-        ticks_row_.SetLabelStyle(row_label);
-        major_ticks_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        minor_ticks_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        direction_label_.SetCustomStyle(row_label);
-        tick_side_label_.SetCustomStyle(row_label);
-        thick_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        track_px_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        thumb_len_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        thumb_height_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        track_radius_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        thumb_radius_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        track_fill_row_.SetLabelStyle(row_label);
-        track_frame_row_.SetLabelStyle(row_label);
-        track_frame_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        track_color_row_.SetLabelStyle(row_label);
-        active_color_row_.SetLabelStyle(row_label);
-        thumb_fill_row_.SetLabelStyle(row_label);
-        thumb_frame_row_.SetLabelStyle(row_label);
-        thumb_frame_width_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        thumb_color_row_.SetLabelStyle(row_label);
-        thumb_frame_color_row_.SetLabelStyle(row_label);
-        tick_len_major_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        tick_len_minor_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        tick_gap_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        tick_color_row_.SetLabelStyle(row_label);
-        shadow_toggle_row_.SetLabelStyle(row_label);
-        shadow_color_row_.SetLabelStyle(row_label);
-        shadow_distance_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_offset_x_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_offset_y_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
-        shadow_curve_preset_label_.SetCustomStyle(row_label);
-        shadow_alpha_row_.SetLabelStyle(row_label).SetValueStyle(row_value);
+        UiSlider::Style style = UiTheme::ResolveSlider();
+        style.show_ticks = (bool)Get("show_ticks");
+        style.major_ticks = (int)Get("major_ticks");
+        style.minor_ticks_per_major = (int)Get("minor_ticks");
+        style.tick_side = ParseTickSide(AsString(Get("tick_side")));
+        style.tick_len_major = DPI((int)Get("tick_major_len"));
+        style.tick_len_minor = DPI((int)Get("tick_minor_len"));
+        style.tick_gap = DPI((int)Get("tick_gap"));
+        style.tick_color = Color(Get("tick_color"));
+        style.track_size = Size(DPI((int)Get("track_width")), DPI((int)Get("track_height")));
+        style.thumb_size = Size(DPI((int)Get("thumb_width")), DPI((int)Get("thumb_height")));
 
-        RefreshFromConfig();
+        style.track_metrics.face_enabled = (bool)Get("track_face_enabled");
+        style.track_metrics.frame_enabled = (bool)Get("track_frame_enabled");
+        style.track_metrics.radius = DPI((int)Get("track_radius"));
+        style.track_metrics.frame_width = DPI((int)Get("track_frame_width"));
+        style.thumb_metrics.face_enabled = (bool)Get("thumb_face_enabled");
+        style.thumb_metrics.frame_enabled = (bool)Get("thumb_frame_enabled");
+        style.thumb_metrics.radius = DPI((int)Get("thumb_radius"));
+        style.thumb_metrics.frame_width = DPI((int)Get("thumb_frame_width"));
+        for(int i = 0; i < 4; i++) {
+            style.track_palette.face[i] = UiFill::Solid(Color(Get("track_color")));
+            style.track_palette.frame[i] = Color(Get("track_color"));
+            style.track_palette.ink[i] = Color(Get("active_color"));
+            style.thumb_palette.face[i] = UiFill::Solid(Color(Get("thumb_color")));
+            style.thumb_palette.frame[i] = Color(Get("thumb_frame_color"));
+        }
+
+        slider_.SetDirection(ParseDirection(AsString(Get("direction"))))
+               .SetRange(minimum, maximum)
+               .SetStep(step)
+               .SetCustomStyle(style)
+               .SetTicks(style.show_ticks, style.major_ticks, style.minor_ticks_per_major)
+               .SetTickSide(style.tick_side)
+               .SetTrackSize(style.track_size)
+               .SetThumbSize(style.thumb_size)
+               .ExpandTrack((bool)Get("expand_track"))
+               .SetValue(value);
+        slider_.Enable((bool)Get("enabled"));
+        UpdateStatus();
+        RefreshLayout();
         Refresh();
     }
 
+    void UpdateStatus()
+    {
+        status_.SetText(Format("%s · %.2f  [%g … %g]  step %g",
+                               AsString(Get("direction")),
+                               slider_.GetValue(), slider_.GetMin(), slider_.GetMax(),
+                               slider_.GetStep()));
+    }
+
+    void ToggleTheme()
+    {
+        UiThemeContext context = UiTheme::GetContext();
+        context.mode = context.mode == UiThemeMode::Dark ? UiThemeMode::Light
+                                                          : UiThemeMode::Dark;
+        UiTheme::Set(context);
+        Ctrl::SwapDarkLight();
+        ApplyTheme();
+        ApplyProjection();
+    }
+
+    void ApplyTheme()
+    {
+        UiTitleCard::Style header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+        header_style.title_line = false;
+        header_.SetCustomStyle(header_style);
+        preview_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+        inspector_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+        caption_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        status_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+        theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+    }
+
 private:
-    DemoPalette palette_;
-    SliderConfig config_;
-
     UiTitleCard header_;
-    UiLabel version_badge_;
-    UiPanel theme_shell_;
-    UiLabel theme_icon_;
-    UiToggle theme_toggle_;
-    UiButton exit_button_;
-
-    SliderPreview preview_;
-    UiScrollPanel inspector_scroll_;
-    UiAccordion inspector_acc_;
-    UiBoxLayout usage_section_ { UiDirection::V };
-    UiBoxLayout usage_toolbar_ { UiDirection::H };
-    ParentCtrl usage_toolbar_fill_;
-    UiLabel copy_label_;
-    UiButton copy_button_;
-    DemoCodePanel code_panel_;
-
-    UiBoxLayout state_box_ { UiDirection::V };
-    UiBoxLayout state_theme_row_ { UiDirection::H };
-    UiBoxLayout state_size_row_ { UiDirection::H };
-    UiLabel state_theme_label_, state_theme_value_;
-    UiLabel state_size_label_, state_size_value_;
-
-    UiBoxLayout props_section_ { UiDirection::V };
-    UiAccordion layout_acc_, appearance_acc_, shadow_acc_;
-    UiBoxLayout layout_box_ { UiDirection::V };
-    UiBoxLayout appearance_box_ { UiDirection::V };
-    UiBoxLayout shadow_box_ { UiDirection::V };
-
-    DemoSliderRow value_row_;
-    DemoSliderRow min_row_;
-    DemoSliderRow max_row_;
-    DemoSliderRow step_row_;
-    DemoToggleRow enabled_row_;
-    UiBoxLayout direction_row_box_ { UiDirection::H };
-    UiLabel direction_label_;
-    UiDropdown direction_drop_;
-    DemoToggleRow ticks_row_;
-    UiBoxLayout tick_side_row_box_ { UiDirection::H };
-    UiLabel tick_side_label_;
-    UiDropdown tick_side_drop_;
-    DemoSliderRow major_ticks_row_;
-    DemoSliderRow minor_ticks_row_;
-
-    DemoSliderRow thick_row_;
-    DemoSliderRow track_px_row_;
-    DemoSliderRow thumb_len_row_;
-    DemoSliderRow thumb_height_row_;
-    DemoSliderRow track_radius_row_;
-    DemoSliderRow thumb_radius_row_;
-    DemoToggleRow track_fill_row_;
-    DemoToggleRow track_frame_row_;
-    DemoSliderRow track_frame_width_row_;
-    DemoColorRow track_color_row_;
-    DemoColorRow active_color_row_;
-    DemoToggleRow thumb_fill_row_;
-    DemoToggleRow thumb_frame_row_;
-    DemoSliderRow thumb_frame_width_row_;
-    DemoColorRow thumb_color_row_;
-    DemoColorRow thumb_frame_color_row_;
-    DemoSliderRow tick_len_major_row_;
-    DemoSliderRow tick_len_minor_row_;
-    DemoSliderRow tick_gap_row_;
-    DemoColorRow tick_color_row_;
-
-    DemoToggleRow shadow_toggle_row_;
-    DemoColorRow shadow_color_row_;
-    DemoSliderRow shadow_distance_row_;
-    DemoSliderRow shadow_offset_x_row_;
-    DemoSliderRow shadow_offset_y_row_;
-    UiBoxLayout shadow_curve_preset_row_box_ { UiDirection::H };
-    UiLabel shadow_curve_preset_label_;
-    UiDropdown shadow_curve_preset_drop_;
-    UiBezierCurveField shadow_curve_field_;
-    DemoSliderRow shadow_alpha_row_;
+    UiBoxLayout header_actions_ { UiDirection::H };
+    UiToolButton theme_button_, exit_button_;
+    UiPanel preview_panel_, inspector_panel_;
+    UiSlider slider_;
+    UiLabel caption_, status_;
+    PropertyEditor properties_;
+    PropertyEditorFactory factory_;
+    PropertyEditorModel model_;
 };
 
-}
+} // namespace
 
 GUI_APP_MAIN
 {
     UiSliderDemoWindow().Run();
 }
-
-
-
-
