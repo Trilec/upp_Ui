@@ -165,12 +165,13 @@ public:
         unit_.WhenAction = [=] {
             if(syncing_)
                 return;
+            // Unit selection is an editor-presentation choice. It must not
+            // manufacture a model commit or undo record when the durable
+            // duration in seconds has not changed.
             const double seconds = value_seconds_;
             syncing_ = true;
             SyncAmount(seconds);
             syncing_ = false;
-            WhenPreview(seconds);
-            WhenCommit(seconds);
         };
     }
 
@@ -193,15 +194,18 @@ public:
 
         value_seconds_ = minmax((double)value, minimum_, maximum_);
         syncing_ = true;
-        const double absolute = fabs(value_seconds_);
-        if(absolute >= 3600.0 && fmod(absolute, 3600.0) < 1e-9)
-            unit_.SelectByData(3600.0);
-        else if(absolute >= 60.0 && fmod(absolute, 60.0) < 1e-9)
-            unit_.SelectByData(60.0);
-        else if(absolute > 0.0 && absolute < 1.0)
-            unit_.SelectByData(0.001);
-        else
-            unit_.SelectByData(1.0);
+        if(!unit_initialized_) {
+            const double absolute = fabs(value_seconds_);
+            if(absolute >= 3600.0 && fmod(absolute, 3600.0) < 1e-9)
+                unit_.SelectByData(3600.0);
+            else if(absolute >= 60.0 && fmod(absolute, 60.0) < 1e-9)
+                unit_.SelectByData(60.0);
+            else if(absolute > 0.0 && absolute < 1.0)
+                unit_.SelectByData(0.001);
+            else
+                unit_.SelectByData(1.0);
+            unit_initialized_ = true;
+        }
         SyncAmount(value_seconds_);
         syncing_ = false;
     }
@@ -248,6 +252,7 @@ private:
     double minimum_ = 0.0;
     double maximum_ = 86400.0;
     double step_ = 0.001;
+    bool unit_initialized_ = false;
     bool syncing_ = false;
 };
 
@@ -265,19 +270,28 @@ public:
         Add(link_);
         link_.SetText("Link").SetCheckable();
         link_.WhenAction = [=] {
+            const Value before = GetEditorValue();
             linked_ = link_.IsChecked();
             if(linked_)
                 Propagate(0);
-            Value value = GetEditorValue();
-            WhenPreview(value);
-            WhenCommit(value);
+            const Value after = GetEditorValue();
+            // Link/unlink is editing-mode state. Only enabling Link while the
+            // sides differ changes the durable geometry value.
+            if(after != before) {
+                WhenPreview(after);
+                WhenCommit(after);
+            }
         };
     }
 
     void Configure(const PropertyEditorItem& item) override
     {
-        variant_ = item.editor_variant;
-        linked_ = variant_.EndsWith(".linked");
+        const String next_variant = item.editor_variant;
+        if(!configured_ || next_variant != variant_) {
+            variant_ = next_variant;
+            linked_ = variant_.EndsWith(".linked");
+            configured_ = true;
+        }
         link_.SetChecked(linked_);
         count_ = variant_.StartsWith("point") || variant_.StartsWith("size") ? 2 : 4;
         linkable_ = variant_.StartsWith("insets") || variant_.StartsWith("corners");
@@ -377,6 +391,7 @@ private:
     int count_ = 2;
     bool linkable_ = false;
     bool linked_ = false;
+    bool configured_ = false;
     bool syncing_ = false;
 };
 
