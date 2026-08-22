@@ -118,7 +118,8 @@ public:
                   .Add("Current changes", "changes")
                   .Add("Full explicit", "explicit");
         code_mode_.SelectByData("changes");
-        code_.SetEditable(false).SetAcceptsTabs(true);
+        code_.SetEditable(false);
+        code_.SetAcceptsTabs(true);
 
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
@@ -359,7 +360,7 @@ private:
     void EmitStyle(String& out, bool explicit_style) const
     {
         const UiTabVisual visual = ParseVisual(AsString(Get("visual")));
-        out << "\n// Local design block. UiTab has separate body and per-tab style domains.\n";
+        out << "\n// Optional local design block: body, per-tab surface and active indicator are separate domains.\n";
         out << "UiTab::Style style = UiTheme::ResolveTab(UiRole::Standard, " << VisualCode(visual) << ");\n";
         out << "style.tab_extent = DPI(" << (int)Get("tab_extent") << ");\n"
             << "style.item_spacing = DPI(" << (int)Get("item_spacing") << ");\n"
@@ -407,6 +408,7 @@ private:
         out << "tabs.Add(overview, \"Overview\", ICON_DESIGN_HOME_48());\n"
             << "tabs.Add(settings, \"Settings\", ICON_DESIGN_SETTINGS_48());\n"
             << "tabs.Add(notes, \"Notes\", ICON_EDITOR_NOTES_48());\n\n";
+        out << "// Public behaviour/layout API.\n";
         out << "tabs.SetVisual(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ")\n"
             << "    .SetPlacement(" << SideCode(ParseSide(AsString(Get("placement")))) << ")\n"
             << "    .SetExpandTabs(" << CppBool((bool)Get("expand_tabs")) << ")\n"
@@ -420,7 +422,10 @@ private:
         if(mode == "changes") {
             bool any = false;
             for(int i = 0; i < model_.GetCount(); i++)
-                if(model_[i].value != model_[i].default_value && model_[i].group != "General") { any = true; break; }
+                if(model_[i].value != model_[i].default_value && model_[i].group != "General") {
+                    any = true;
+                    break;
+                }
             if(any) EmitStyle(out, false);
             else out << "\n// No local design changes: the active UiTheme supplies the style.\n";
         }
@@ -461,7 +466,8 @@ private:
         theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
         exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     }
 
 private:
