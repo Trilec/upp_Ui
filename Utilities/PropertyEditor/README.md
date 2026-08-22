@@ -1,66 +1,89 @@
 # PropertyEditor
 
-`Utilities/PropertyEditor` is a reusable Ui-backed property-browser package. It is not tied to the Ui Designer.
+`Utilities/PropertyEditor` is a reusable Ui-backed property-browser package. It is not tied to UiDesigner.
 
-Version: **1.0.0**
+Version: **1.1.0**
 
 ## Package layout
 
-- `Utilities/PropertyEditor` - reusable Ui-backed library package
-- `Utilities/PropertyEditorDemo` - interactive demonstration
-- `Utilities/PropertyEditorTests` - legacy and regression coverage
-- `Utilities/PropertyEditorV1RunTests` - focused v1 interaction and stress coverage
-- `Utilities/PropertyEditorCoreProbe` - verifies the headless package boundary
+- `Utilities/PropertyEditor` — reusable Ui-backed library package
+- `Utilities/PropertyEditorCore` — headless property schema/model/normalization
+- `Utilities/PropertyEditorDemo` — broad built-in/editor interaction demonstration
+- `Utilities/PropertyEditorSemanticDemo` — semantic value/editor capability demonstration
+- `Utilities/PropertyEditorTests` — legacy and regression coverage
+- `Utilities/PropertyEditorV1RunTests` — focused interaction and stress coverage
+- `Utilities/PropertyEditorSemanticRunTests` — semantic adapter/model contract coverage
+- `Utilities/PropertyEditorCoreProbe` — verifies the headless package boundary
 
 ## Design goals
 
 - one headless property schema/model;
-- collapsible categories;
-- filter/search;
-- alternate row shading;
-- Follow Ui theme, System, Light and Dark row palettes;
-- summary-on-idle rows by default, with explicit reusable inline hosting for compact compound editors;
+- collapsible categories and live filtering;
+- alternate row shading and Ui/System/Light/Dark palettes;
+- summary-on-idle rows with reusable compact inline hosting;
 - preview and final-commit events;
-- custom editor registration;
-- Ui-backed value delegates for live preview and commit;
-- mixed and inherited values;
-- validation and reset support;
-- no dependency on the Designer model or window.
+- mixed, inherited, validation and reset state;
+- first-class rich value adapters without UiDesigner dependencies;
+- custom editor/provider registration for application-specific domains;
+- viewport-bounded rich editor construction;
+- no application history/state ownership inside PropertyEditor.
 
-`PropertyEditorCore` remains the only authority for property schema,
-normalization and validation. The visual package maps that semantic metadata to
-concrete `Ui` controls through one `PropertyEditorFactory`; applications remain
-responsible for commands, undo and domain-specific resource browsers.
+`PropertyEditorCore` remains the authority for schema, normalization and validation. The visual package maps semantic metadata to production `Ui` controls through `PropertyEditorFactory`; applications remain responsible for commands, undo, theme/document ownership and domain-specific resource browsers.
 
 ## Built-in editors
 
-- Text
-- Multiline text
-- Integer
-- Double
-- Typed numeric integer and double editors with optional slider mode
-- Boolean
+Core/basic presentations:
+
+- Text and multiline text
+- Integer and Double
+- typed numeric Integer/Double with value-to-slider mode
+- Boolean (`Check`, `OnOff`, `TrueFalse`)
 - Choice
 - Color
-- One-to-four color palette
-- Fill recipe with persistent Solid/Gradient controls
-- File path
-- Integer slider
-- Double slider
-- Vector2
-- Vector3
-- Curve
-- Read-only
+- ordered ColorPalette (1–8 slots)
+- FillRecipe
+- FilePath
+- Integer/Double sliders
+- Vector2 / Vector3
+- point Curve and cubic Bézier Curve
+- ReadOnly
 - Custom factory editor
-- Range (`UiRangeSliderEdit`)
-- Matrix (`UiMatrixSelector`, including `QuadPair`)
-- Icon and Font catalog choices
-- Provider-driven Image selection with an optional compact thumbnail provider
 
-Boolean properties support `Check`, `OnOff`, and `TrueFalse` presentation.
-Single Color properties are always hosted inline as a stable swatch plus
-`#RRGGBB`, so the first click opens the picker without replacing or shifting the
-row.
+First-class visual adapters:
+
+- Range (`UiRangeSliderEdit`)
+- Adjustable Range
+- Matrix (`UiMatrixSelector`, including Position9, Cardinal4 and QuadPair)
+- Icon catalog
+- Font catalog
+- provider-driven Image with compact thumbnails
+
+Semantic adapters:
+
+- Date
+- Time
+- DateTime
+- unit-aware Duration
+- Point
+- Size
+- Rect
+- Insets / Padding / Margins-style four-sided geometry
+- four-corner radii
+- Flags / multi-choice
+- small ordered String List
+- Gradient recipe with Linear/Radial mode, arbitrary ordered stops, stop alpha, angle and interpolation
+- keyboard Key Chord
+- generic provider-driven Resource / Reference
+- explicit Optional / Null values (`text`, `int`, `double` variants)
+
+The PropertyEditor constructor and `SetFactory()` register the complete standard adapter set. New code that prepares a factory directly can call:
+
+```cpp
+PropertyEditorFactory factory;
+RegisterPropertyEditorEditors(factory);
+```
+
+`RegisterPropertyEditorV1Editors()` remains available for compatibility with older callers that intentionally want only the original adapter set.
 
 ## Minimal usage
 
@@ -73,22 +96,113 @@ PropertyEditor editor;
 model.AddText("name", "Name", "Object", "General")
      .SetHelp("Display name.");
 
-model.AddDouble("opacity", "Opacity", 1.0, "Appearance")
-     .SetRange(0.0, 1.0, 0.01)
-     .SetImpact(PropertyImpactPaint);
-
+model.AddNumericDouble("opacity", "Opacity", 1.0, 0.0, 1.0, 0.01,
+                       "Appearance");
 model.AddBoolean("enabled", "Enabled", true, "Behaviour");
+
+AddPropertyInsets(model, "padding", "Padding",
+                  12, 12, 12, 12, true, "Layout");
+AddPropertyKeyChord(model, "save_key", "Save shortcut",
+                    "Ctrl+S", "Input");
 
 editor.SetModel(&model);
 
 model.WhenPreview = [&](String id, Value value) {
-    // Apply a temporary live preview.
+    // Apply temporary live preview.
 };
 
 model.WhenCommit = [&](String id, Value value) {
-    // Create the durable command / undo record.
+    // Create durable command / undo record.
 };
 ```
+
+## Semantic value conventions
+
+### Date / Time / DateTime
+
+`AddPropertyDate()` stores a `Date` and uses production `UiDateTime` in Date mode.
+
+`AddPropertyTime()` stores a `Time` anchored to `1970-01-01`, making the value unambiguous while retaining the existing U++ `Time` type. Seconds can be enabled or omitted.
+
+`AddPropertyDateTime()` stores a normal U++ `Time` with date and clock fields.
+
+All three are nullable and use the real `UiDateTime` picker/editor rather than parsing a generic text field.
+
+### Duration
+
+`AddPropertyDuration()` stores **seconds** as the durable value. The visual editor can display/edit milliseconds, seconds, minutes or hours without changing the application-facing unit. Minimum, maximum and step are also declared in seconds.
+
+### Semantic geometry
+
+Geometry helpers store numeric `ValueArray` values:
+
+- Point: `[x, y]`
+- Size: `[width, height]`
+- Rect: `[x, y, width, height]`
+- Insets: `[left, top, right, bottom]`
+- Corners: `[topLeft, topRight, bottomRight, bottomLeft]`
+
+Insets and Corners can begin in linked editing mode. Link/unlink is an editor presentation state: it changes how the user edits the four components, not the stored value shape.
+
+### Flags / multi-choice
+
+`AddPropertyFlags()` stores a `ValueArray` of selected choice values. Add the available domain using the returned item's normal `AddChoice()` API. The visual editor presents those choices as independent checkboxes and commits the complete selected set.
+
+### Small ordered lists
+
+`AddPropertyStringList()` stores a bounded `ValueArray` of strings and provides Add / Remove / Up / Down editing. This adapter is intentionally for **property-sized collections**.
+
+It is not a replacement for model-authoritative Data pages or `UiListModel` / `UiTreeModel` / `UiTableModel` when the collection is the application's real data domain.
+
+### Gradient
+
+Gradient recipes use a `ValueMap`:
+
+```text
+{
+  mode: "Linear" | "Radial",
+  angle: 0..360,
+  interpolation: "Linear" | "Smooth",
+  stops: [
+    { position: 0..1, color: Color, alpha: 0..255 },
+    ...
+  ]
+}
+```
+
+Use `PropertyEditorMakeGradientStop()` and `PropertyEditorMakeGradient()` to build normalized recipes. At least two stops are retained; positions and alpha are clamped and stops are ordered by position.
+
+### Key chord
+
+`AddPropertyKeyChord()` stores a canonical human-readable string such as `Ctrl+Shift+S`. Common modifier aliases are normalized and modifiers are ordered consistently.
+
+### Resource/reference
+
+`AddPropertyReference()` stores an application-defined `Value` and delegates browsing to a registered picker provider. PropertyEditor does not interpret project IDs, asset URIs or repository resources.
+
+Register the provider with the global/default factory (the same provider boundary used by Image):
+
+```cpp
+PropertyEditorFactory::Global().RegisterPicker(
+    "project-resource",
+    [](Value& value, Ctrl *owner) {
+        return PickProjectResource(value, owner);
+    });
+```
+
+### Optional/null
+
+`AddPropertyOptional()` makes null an explicit durable state, with a separate Set/unset affordance. It is intentionally different from `inherited`/theme override state. Current built-in optional variants are text, integer and double; Reset returns to the helper's supplied fallback/default value.
+
+## Rich editor interaction
+
+Single Color properties use a stable inline swatch plus `#RRGGBB`. FillRecipe keeps persistent Solid/Gradient controls. ColorPalette supports one through eight ordered directly clickable swatches.
+
+Rich editors that support compact and expanded presentations use `SetExpandedRowSpan(rows)`. Matrix, Curve, Image and Multiline adapters remain one row by default, expand in place on demand and retain separate dialog actions where a larger editor is useful. Vector2/Vector3 can stack components when an Inspector is narrow.
+
+`PropertyEditorStyle::action_icons` centrally controls expand, collapse, dialog, browse and numeric-slider actions. Reset remains a row-state action rather than an editor-mode action.
+
+Numeric slider-toggle mode, semantic geometry link mode and other editor affordances are view/editing concepts. They do not replace reset, inherited/authored or mixed-value state.
 
 ## Custom editors
 
@@ -102,7 +216,7 @@ PropertyEditorFactory::Global().RegisterCustom(
 
 Then declare the item with `PropertyEditorKind::Custom` and set `custom_editor`.
 
-A compact compound editor can keep its real controls mounted in the value row:
+A compact compound editor can keep real controls mounted in the value row:
 
 ```cpp
 PropertyEditorItem& item = model.Add(
@@ -111,87 +225,22 @@ item.custom_editor = "my-editor";
 item.SetInlineEditor();
 ```
 
-Inline hosting is a presentation choice only. It uses the same factory, model normalization, preview, commit, validation, reset, mixed-value and inherited-value paths as an editor activated on demand. New control adapters should therefore declare the correct property kind and metadata; they should not add control-specific row logic to `PropertyEditor`.
-
-`FillRecipe` keeps its established inline presentation automatically. Its
-Solid mode opens one UiColorPicker slot and Quad Gradient opens four ordered
-slots as one recipe transaction. `ColorPalette` supports one through eight
-ordered, directly clickable swatches and transfers the complete slot array on
-preview and commit.
-
-Rich inline controls are virtualized to the visible viewport plus one-row
-overscan. Scrolling, filtering, group changes and model replacement destroy
-slots that are no longer visible; the editor never constructs one rich control
-per model item. Compact row height comes from `row_span`.
-
-`SetIndent(levels)` expresses property hierarchy independently of group paths.
-Use nested group paths for collapsible subheadings and indentation for child
-properties within those headings. Multiline and composite adapters can request
-additional rows with `SetRowSpan`; dialog-backed editors such as Curve retain a
-compact summary and open their complete editor on demand.
-
-Rich editors that support compact and inline presentations declare
-`SetExpandedRowSpan(rows)`. The model stores only that capability; temporary
-expanded/collapsed state belongs to the PropertyEditor view and is controlled
-with `SetPropertyExpanded(id, expanded)`. Matrix, Curve, Image and Multiline
-adapters use this contract to remain one row by default, expand in place when
-requested, and retain a separate dialog action where a larger editor is useful.
-Clicking or keyboard-activating a compact expandable summary opens it directly.
-Expanded mode gives the
-editor the complete value rectangle and keeps compact tool actions in a narrow
-right-hand rail instead of repeating the compact summary above the editor.
-Vector2 and Vector3 can use the same contract to stack components when a narrow
-Inspector cannot present all values clearly.
-
-`PropertyEditorStyle::action_icons` centrally controls the expand, collapse,
-dialog, browse, and numeric-slider images and their common compact size.
-`filter_gap` reserves separation between the fixed filter and row viewport.
-`reset_icon` remains
-separate because Reset is a row-state action rather than an editor action.
-Nested group rows derive a restrained 10% lighter background from
-`group_background`; applications do not need to maintain a second heading
-colour.
-
-Mixed values represent a real multi-selection state: selected objects currently
-have different values, so the editor starts empty. Entering one value commits
-that value as the shared replacement and clears the mixed state. Mixed is not a
-special floating-point notation.
+Inline hosting uses the same model normalization, preview, commit, validation, reset, mixed and inherited paths as an editor activated on demand. New control adapters should declare semantic metadata rather than adding control-specific row logic to `PropertyEditor`.
 
 ## Resource providers
 
-Icon choices use the shared `UiIconCatalog`, and font faces use the platform
-font catalogue. Both catalogues are initialized lazily once and reused by all
-editor instances.
+Icon choices use the shared `UiIconCatalog`, and font faces use the platform font catalogue. Both catalogues are initialized lazily and reused.
 
-Image values stay application-defined. Register a chooser and, optionally, a
-thumbnail resolver under the same provider id:
+Image/reference values stay application-defined. Image providers may additionally register a thumbnail resolver. The PropertyEditor package itself does not load project assets and has no SymbolPicker dependency.
 
-```cpp
-factory.RegisterPicker("project-image", [](Value& value, Ctrl *owner) {
-    return OpenProjectImageBrowser(value, owner);
-});
-factory.RegisterThumbnailProvider("project-image", [](const Value& value) {
-    return ResolveProjectThumbnail(value);
-});
-```
+## Existing curve support
 
-The thumbnail is fitted into a compact one-line cell without changing aspect
-ratio. PropertyEditor does not load project files and has no SymbolPicker
-dependency.
+`AddCurve()` stores a normalized multi-point `0..1` curve. The editor can add/manipulate points and `ResetLinear()` restores `(0,0) → (1,1)`.
 
-## Value conventions
-
-- Vector2 and Vector3 use `ValueArray` numeric components.
-- Curves use a `ValueArray` of two-element `ValueArray` points.
-- Curve coordinates are normalized to `0..1`.
-- A mixed value is represented by `PropertyEditorItem::mixed`, not by corrupting the stored value.
-- Numeric ranges and slider-toggle availability belong to the property schema; the view must not invent semantic ranges.
+`AddBezierCurve()` stores cubic Bézier control points and uses `UiBezierCurveEditor` for inline/dialog editing. These are distinct capabilities and remain available alongside the new Gradient recipe editor.
 
 ## Integration boundary
 
-The package does not write application state directly. The owning application decides how preview and commit events map to commands, undo, live runtime objects, theme documents, or MCP requests.
+The package does not write application state directly. The owning application decides how preview/commit maps to commands, undo, live runtime objects, theme documents or external requests.
 
-An edit transaction captures its original value when editing starts. Escape
-restores that origin and emits `WhenCancel`. `Ctrl+Z` emits `WhenUndoRequest` so
-the host can invoke its own undo stack; PropertyEditor deliberately does not own
-application history.
+An edit transaction captures its original value when editing starts. Escape restores that origin and emits `WhenCancel`. `Ctrl+Z` emits `WhenUndoRequest` so the host can invoke its own undo stack; PropertyEditor deliberately does not own application history.
