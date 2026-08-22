@@ -48,7 +48,6 @@ public:
         context.preset = UiThemePreset::Minimal;
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
-
         RegisterPropertyEditorV1Editors(factory_);
 
         Add(header_);
@@ -57,7 +56,7 @@ public:
 
         header_.SetTitle("UiRadioButton")
                .SetSubTitle("Exclusive selection, indicator geometry, local style and paste-ready usage code")
-               .SetMedia(ICON_DESIGN_RADIO_BUTTON_CHECKED_48())
+               .SetMedia(ICON_TOGGLE_RADIO_BUTTON_CHECKED_48())
                .SetMediaAutoFit(true)
                .ShowTitleLine(false)
                .SetContentInset(DPI(8))
@@ -65,7 +64,7 @@ public:
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
         theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark");
-        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
         header_actions_.Add(theme_button_).Fixed(DPI(34));
         header_actions_.Add(exit_button_).Fixed(DPI(34));
 
@@ -93,7 +92,8 @@ public:
                   .Add("Current changes", "changes")
                   .Add("Full explicit", "explicit");
         code_mode_.SelectByData("changes");
-        code_.SetEditable(false).SetAcceptsTabs(true);
+        code_.SetEditable(false);
+        code_.SetAcceptsTabs(true);
 
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
@@ -211,9 +211,9 @@ private:
                 ApplyProjection();
             }
         };
-        radio_a_.WhenAction = [=] { UpdateStatus(); };
-        radio_b_.WhenAction = [=] { UpdateStatus(); };
-        radio_c_.WhenAction = [=] { UpdateStatus(); };
+        radio_a_.WhenAction = [=] { UpdateStatus(); UpdateCode(); };
+        radio_b_.WhenAction = [=] { UpdateStatus(); UpdateCode(); };
+        radio_c_.WhenAction = [=] { UpdateStatus(); UpdateCode(); };
     }
 
     UiRadioButton::Style MakeStyle() const
@@ -276,8 +276,8 @@ private:
         properties_.Show(!on);
         code_mode_.Show(on);
         code_.Show(on);
-        if(on)
-            UpdateCode();
+        ApplyTheme();
+        if(on) UpdateCode();
     }
 
     void EmitStyle(String& out, bool only_changes) const
@@ -289,10 +289,9 @@ private:
                        Changed("indicator_face_enabled") || Changed("indicator_frame_enabled") || Changed("indicator_radius") ||
                        Changed("indicator_frame_width") || Changed("indicator_face") || Changed("indicator_frame") || Changed("indicator_ink") ||
                        Changed("indicator_size") || Changed("indicator_gap");
-            if(!any)
-                return;
+            if(!any) return;
         }
-        out << "\n// Local design changes. Keep these only when the theme default is not enough.\n";
+        out << "\n// Optional local design changes relative to UiTheme.\n";
         out << "UiRadioButton::Style style = UiTheme::ResolveRadioButton(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ");\n";
         if(changed("indicator_size")) out << "style.indicator_size = DPI(" << (int)Get("indicator_size") << ");\n";
         if(changed("indicator_gap")) out << "style.indicator_gap = DPI(" << (int)Get("indicator_gap") << ");\n";
@@ -322,7 +321,7 @@ private:
         String mode = AsString(code_mode_.GetSelectedData());
         String out;
         out << "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
-        out << "// Three sibling radios with the same group id are mutually exclusive.\n";
+        out << "// Shared group id makes these sibling radios mutually exclusive.\n";
         out << "UiRadioButton option_a, option_b, option_c;\n\n";
         out << "option_a.SetText(\"Option A\").SetGroup(1).SetChecked(true);\n";
         out << "option_b.SetText(\"Option B\").SetGroup(1);\n";
@@ -330,21 +329,19 @@ private:
         out << "option_a.SetVisual(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ");\n";
         out << "option_b.SetVisual(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ");\n";
         out << "option_c.SetVisual(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ");\n";
-        out << "option_a.SetIndicatorSide(UiAlign::" << (ParseSide(AsString(Get("indicator_side"))) == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";
-        out << "option_b.SetIndicatorSide(UiAlign::" << (ParseSide(AsString(Get("indicator_side"))) == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";
-        out << "option_c.SetIndicatorSide(UiAlign::" << (ParseSide(AsString(Get("indicator_side"))) == UiAlign::RIGHT ? "RIGHT" : "LEFT") << ");\n";
-        out << "option_a.Enable(" << CppBool((bool)Get("enabled")) << ");\n";
-        out << "option_b.Enable(" << CppBool((bool)Get("enabled")) << ");\n";
-        out << "option_c.Enable(" << CppBool((bool)Get("enabled")) << ");\n";
+        const char *side = ParseSide(AsString(Get("indicator_side"))) == UiAlign::RIGHT ? "UiAlign::RIGHT" : "UiAlign::LEFT";
+        out << "option_a.SetIndicatorSide(" << side << ");\n"
+            << "option_b.SetIndicatorSide(" << side << ");\n"
+            << "option_c.SetIndicatorSide(" << side << ");\n";
+        out << "option_a.Enable(" << CppBool((bool)Get("enabled")) << ");\n"
+            << "option_b.Enable(" << CppBool((bool)Get("enabled")) << ");\n"
+            << "option_c.Enable(" << CppBool((bool)Get("enabled")) << ");\n";
 
-        if(mode == "changes")
-            EmitStyle(out, true);
-        else if(mode == "explicit")
-            EmitStyle(out, false);
-        else
-            out << "\n// Usage mode intentionally relies on UiTheme defaults.\n";
+        if(mode == "changes") EmitStyle(out, true);
+        else if(mode == "explicit") EmitStyle(out, false);
+        else out << "\n// Usage mode intentionally relies on UiTheme defaults.\n";
 
-        out << "\noption_a.WhenAction = [=] { /* Option A selected */ };\n";
+        out << "\noption_a.WhenAction = [&] { /* Option A selected */ };\n";
         code_.SetTextUtf8(out);
     }
 
@@ -371,7 +368,8 @@ private:
         theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
         exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
+            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
     }
 
 private:
