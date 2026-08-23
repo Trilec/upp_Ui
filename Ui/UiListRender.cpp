@@ -77,12 +77,39 @@ void UiList::PrepareItemRenders()
         int index = range.first + slot_index;
         ItemRenderSlot& slot = item_render_pool_[slot_index];
         if(slot.index != index) {
+            const UiModelItem& item = model_->Get(index);
             UiItemRenderData data = list_owned_style
-                ? UiListOwnedItemRenderData(style, model_->Get(index))
-                : UiMakeItemRenderData(model_->Get(index));
+                ? UiListOwnedItemRenderData(style, item)
+                : UiMakeItemRenderData(item);
+            // right_text_as_badge gives the semantic value to List chrome; it
+            // must never remain a second renderer-owned text block.
+            if(style.right_text_as_badge)
+                data.right_text.Clear();
             slot.render->SetData(data);
-            if(list_owned_style)
-                slot.render->SetCustomStyle(UiListOwnedItemRenderStyle(style, index));
+
+            UiItemRenderStyle render_style = list_owned_style
+                ? UiListOwnedItemRenderStyle(style, index)
+                : item_render_->GetStyle();
+            Rect row = GetRowRect(index);
+
+            // External List chrome reserves its lane in the same renderer
+            // content-margin contract as internal checks/icons/metadata. Repeated
+            // reservations deliberately accumulate when several decorations share
+            // one side.
+            if(drag_reorder_enabled_ && style.show_drag_handle) {
+                Rect drag = GetDragRect(row);
+                if(!drag.IsEmpty())
+                    UiReserveItemRenderDecoration(render_style, style.drag_side,
+                                                  drag.GetWidth(), style.drag_gap);
+            }
+            if(style.right_text_as_badge && !item.right_text.IsEmpty()) {
+                Rect badge = GetRightTextRect(row, item);
+                if(!badge.IsEmpty())
+                    UiReserveItemRenderDecoration(render_style, UiAlign::RIGHT,
+                                                  badge.GetWidth(), style.right_gap);
+            }
+
+            slot.render->SetCustomStyle(render_style);
             slot.index = index;
         }
         if(slot.render->PrepareLayout(GetRowRect(index), UiDirection::H))
