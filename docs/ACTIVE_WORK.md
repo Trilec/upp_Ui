@@ -13,11 +13,71 @@ Detailed architecture/history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-23
 
-STATUS: **CONTROL HYGIENE + DEMO MODERNIZATION + SEMANTIC PROPERTYEDITOR SOURCE/BOOKKEEPING COMPLETE; COMBINED WINDOWS BUILD + VISUAL ACCEPTANCE PENDING.**
+STATUS: **ITEM-DECORATION LAYOUT REPAIR + CONTROL HYGIENE + DEMO MODERNIZATION + SEMANTIC PROPERTYEDITOR SOURCE/BOOKKEEPING COMPLETE; WINDOWS BUILD + VISUAL ACCEPTANCE PENDING.**
 
 Authoritative branch: `main`.
 
 Do not claim Windows acceptance until the exact current main line is built and exercised on Windows/U++.
+
+---
+
+## 0. ITEM-DECORATION LAYOUT REPAIR
+
+PlaylistLab exposed a shared presentation defect: control-owned decorations could paint over renderer-owned text instead of reserving geometry. A focused cross-control audit was therefore completed before further PlaylistLab work.
+
+Source base:
+
+- `ceb70739a97f5de25f23505114be24ff8607c359` — pre-repair `main`.
+
+Source checkpoint before this bookkeeping commit:
+
+- `537ad1d7e102d43f5ed8e7f80492d3075aa6583f` — `Use shared reservation for Table sort chrome`.
+
+### Contract
+
+- Every control-owned decoration must reserve its actual extent plus its authored gap before renderer text/content is laid out.
+- Reservations compose additively on left/right/top/bottom; one decoration must not overwrite another decoration's reservation.
+- The owning control remains the single paint/interaction authority for control-owned chrome; renderers receive only the remaining content geometry.
+- If an owning control paints a specialised presentation such as a List badge, the corresponding ordinary renderer presentation is suppressed to avoid double ownership.
+- Decoration-side changes and show/hide changes that alter geometry must invalidate prepared renderer layout.
+
+### Implemented
+
+- `UiItemRender`
+  - added a shared per-instance content-reservation contract used by owning controls without changing durable model data or renderer style configuration;
+  - clone/configuration remains independent while owner-applied reservations are transient prepared-layout state.
+
+- `UiList`
+  - left/right drag handles reserve `drag_size + drag_gap` before row renderer content;
+  - right-text badge mode reserves the measured badge lane and suppresses ordinary renderer right-text so the badge has one presentation owner;
+  - combined left drag + check + icon + metadata geometry now composes in sequence instead of later helpers overwriting the drag reservation;
+  - drag show/side changes reset prepared renderer geometry;
+  - row painting is clipped against the rounded inner List viewport so square row selection/hot fills cannot spill into rounded outer corners; frame/focus chrome is repainted as the final outer authority.
+
+- `UiTable`
+  - sortable column-header sort glyphs reserve their right-side lane through the same shared renderer reservation contract;
+  - custom header renderers retain their full header surface while only content moves away from sort chrome;
+  - sort glyph placement honours authored header padding and existing header updates already invalidate/reprepare the affected header renderer.
+
+### Audited without source change
+
+- `UiDropdown`, `UiTree`, `UiMenu`, and `UiAccordion` already reduce/reserve their own indicator/disclosure/check/submenu/header chrome before content presentation and did not justify parallel rewrites.
+
+### Deterministic coverage
+
+- `Utilities/UiListStyleContractTest` now checks additive left/right reservation semantics and single-owner badge data projection.
+- Existing `UiModelViewPerformanceTest` remains the scale/renderer-pool regression gate for List/Table prepared-layout behaviour.
+
+### Windows acceptance gate for this repair
+
+Gary should fetch current `main`, report exact HEAD, then:
+
+1. Build/run `Utilities/UiListStyleContractTest` under CLANGx64 Debug and Release; require `UILIST_STYLE_CONTRACT_SUMMARY ... failed=0`.
+2. Build/run `Utilities/UiModelViewPerformanceTest` under CLANGx64 Debug and Release; require its actual summary to report zero failures.
+3. Build `Utilities/UiTableRunTests` and `examples/UiListDemo` under CLANGx64 Debug and Release with zero compile/link errors.
+4. In a normal interactive Windows desktop, visually check `UiListDemo` with a rounded List: selected/hot rows must stay inside the rounded inner viewport; drag handle plus icon/check/metadata/text must not overlap; left and right drag sides must shift content by the authored gap; right-text badge mode must render one badge, not badge plus duplicate right text.
+5. Visually exercise a sortable `UiTable` header and confirm header text/custom renderer content does not overlap the sort glyph.
+6. Do not redesign controls during validation. Tiny obvious U++ compile/API corrections are acceptable; otherwise stop and report exact diagnostic and diff.
 
 ---
 
