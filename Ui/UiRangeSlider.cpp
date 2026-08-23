@@ -95,12 +95,14 @@ const UiRangeSlider::Style& UiRangeSlider::StyleDefault()
 
 UiRangeSlider::UiRangeSlider()
 {
+    WantFocus();
     SyncThemeStyle();
 }
 
 UiRangeSlider::UiRangeSlider(UiDirection dir)
     : dir_(dir)
 {
+    WantFocus();
     SyncThemeStyle();
 }
 
@@ -222,6 +224,12 @@ UiRangeSlider& UiRangeSlider::SetUpperValue(double v)
 
 UiRangeSlider& UiRangeSlider::SetActiveHandle(Handle h)
 {
+    if(!adjustable_bounds_) {
+        if(h == Handle::LowerBound)
+            h = Handle::Lower;
+        else if(h == Handle::UpperBound)
+            h = Handle::Upper;
+    }
     if(active_handle_ != h) {
         active_handle_ = h;
         Refresh();
@@ -244,13 +252,13 @@ UiRangeSlider& UiRangeSlider::EnableAdjustableBounds(bool on)
 {
     if(adjustable_bounds_ != on) {
         adjustable_bounds_ = on;
-        if(on) {
-            bound_lower_ = min_;
-            bound_upper_ = max_;
-        }
-        else {
-            bound_lower_ = min_;
-            bound_upper_ = max_;
+        bound_lower_ = min_;
+        bound_upper_ = max_;
+        if(!on) {
+            if(active_handle_ == Handle::LowerBound)
+                active_handle_ = Handle::Lower;
+            else if(active_handle_ == Handle::UpperBound)
+                active_handle_ = Handle::Upper;
         }
         SetValuesInternal(lower_, upper_, false, false);
         Refresh();
