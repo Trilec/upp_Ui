@@ -247,8 +247,12 @@ void UiTable::PrepareItemRenders()
             }
             Rect render_rect = GetColumnHeaderCellRect(col);
             Rect sort = GetSortIndicatorRect(UITABLE_COLUMN_AXIS, col, render_rect);
-            if(!sort.IsEmpty())
-                render_rect.right = max(render_rect.left, sort.left - max(0, style.sort_indicator_gap));
+            if(!sort.IsEmpty()) {
+                int right_margin = max(0, slot.render->GetStyle().metrics.content_margin.right);
+                int desired_content_right = sort.left - max(0, style.sort_indicator_gap);
+                render_rect.right = min(render_rect.right,
+                                        max(render_rect.left, desired_content_right + right_margin));
+            }
             if(slot.render->PrepareLayout(render_rect, UiDirection::H))
                 last_render_layout_count_++;
         }
