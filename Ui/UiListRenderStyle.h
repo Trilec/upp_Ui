@@ -83,6 +83,10 @@ inline UiItemRenderData UiListOwnedItemRenderData(const UiList::Style& list,
         data.icon = Image();
     if(!list.show_metadata_marker)
         data.has_metadata = false;
+    // Badge mode is List-owned chrome. Suppress renderer right text so the same
+    // semantic value is not laid out and painted twice.
+    if(list.right_text_as_badge)
+        data.right_text.Clear();
     return data;
 }
 
