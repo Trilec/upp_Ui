@@ -319,10 +319,25 @@ CONSOLE_APP_MAIN
     };
     Check(mouse_override_editor.SelectProperty("surface"),
           "select inherited row for mouse activation");
-    mouse_override_editor.LeftDown(Point(310, 75), 0);
+
+    // Derive the click from the live PropertyEditor geometry instead of a
+    // stale absolute Y coordinate. The filter/group spacing changed as the
+    // editor matured; the contract under test is the row interaction itself.
+    mouse_override_editor.Layout();
+    const PropertyEditorStyle& mouse_style = mouse_override_editor.GetStyle();
+    const int mouse_y = mouse_style.frame_width + mouse_style.filter_height +
+                        max(0, mouse_style.filter_gap) + mouse_style.group_height +
+                        mouse_style.row_height / 2;
+    const int mouse_override_x = mouse_override_editor.GetSize().cx -
+                                 mouse_style.frame_width -
+                                 max(1, mouse_style.override_width / 2);
+    const int mouse_body_x = max(mouse_style.frame_width + DPI(8),
+                                 mouse_override_x - mouse_style.override_width - DPI(24));
+
+    mouse_override_editor.LeftDown(Point(mouse_override_x, mouse_y), 0);
     Check(mouse_requests == 1,
           "mouse circle requests inherited activation exactly once");
-    mouse_override_editor.LeftDown(Point(120, 75), 0);
+    mouse_override_editor.LeftDown(Point(mouse_body_x, mouse_y), 0);
     Check(mouse_requests == 2,
           "mouse row body also requests inherited activation");
 
