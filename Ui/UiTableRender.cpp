@@ -243,17 +243,16 @@ void UiTable::PrepareItemRenders()
             if(slot.index != col) {
                 slot.render->SetData(UiMakeItemRenderData(model_->GetHeader(UITABLE_COLUMN_AXIS, col),
                                                          GetHeaderDisplayText(UITABLE_COLUMN_AXIS, col)));
+                UiItemRenderStyle header_style = header_render_->GetStyle();
+                Rect sort = GetSortIndicatorRect(UITABLE_COLUMN_AXIS, col,
+                                                 GetColumnHeaderCellRect(col));
+                if(!sort.IsEmpty())
+                    UiReserveItemRenderDecoration(header_style, UiAlign::RIGHT,
+                                                  sort.GetWidth(), style.sort_indicator_gap);
+                slot.render->SetCustomStyle(header_style);
                 slot.index = col;
             }
-            Rect render_rect = GetColumnHeaderCellRect(col);
-            Rect sort = GetSortIndicatorRect(UITABLE_COLUMN_AXIS, col, render_rect);
-            if(!sort.IsEmpty()) {
-                int right_margin = max(0, slot.render->GetStyle().metrics.content_margin.right);
-                int desired_content_right = sort.left - max(0, style.sort_indicator_gap);
-                render_rect.right = min(render_rect.right,
-                                        max(render_rect.left, desired_content_right + right_margin));
-            }
-            if(slot.render->PrepareLayout(render_rect, UiDirection::H))
+            if(slot.render->PrepareLayout(GetColumnHeaderCellRect(col), UiDirection::H))
                 last_render_layout_count_++;
         }
         for(int i = count; i < column_header_render_pool_.GetCount(); i++)
