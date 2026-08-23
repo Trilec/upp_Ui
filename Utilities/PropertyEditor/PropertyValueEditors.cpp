@@ -701,8 +701,16 @@ public:
             if(syncing_)
                 return;
             Value v = option_.GetData();
-            WhenPreview(v);
-            WhenCommit(v);
+            // Preview callbacks may rebuild the owning PropertyEditor and
+            // tear down this inline editor. Snapshot both callbacks before
+            // dispatch so that teardown cannot clear the commit callback
+            // between the preview and commit notifications.
+            Event<Value> preview = WhenPreview;
+            Event<Value> commit = WhenCommit;
+            if(preview)
+                preview(v);
+            if(commit)
+                commit(v);
         };
     }
 
