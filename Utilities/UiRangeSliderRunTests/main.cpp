@@ -130,6 +130,12 @@ static void TestInteractionContract(TestCtx& t)
     t.Expect(Near(s.GetLowerValue(), 5) && Near(s.GetUpperValue(), 5),
              "active lower handle cannot cross a coincident upper handle");
     t.Expect(changing == 0 && actions == 0, "blocked movement emits no value events");
+
+    s.Disable();
+    t.Expect(!s.Key(K_LEFT, 1), "disabled range slider rejects keyboard editing");
+    s.MouseWheel(Point(0, 0), 120, 0);
+    t.Expect(Near(s.GetLowerValue(), 5) && Near(s.GetUpperValue(), 5),
+             "disabled range slider rejects wheel editing");
 }
 
 static void TestAdjustableBounds(TestCtx& t)
@@ -138,6 +144,14 @@ static void TestAdjustableBounds(TestCtx& t)
 
     UiRangeSlider s;
     t.Expect(!s.HasAdjustableBounds(), "adjustable bounds are opt-in");
+
+    s.SetActiveHandle(UiRangeSlider::Handle::LowerBound);
+    t.Expect(s.GetActiveHandle() == UiRangeSlider::Handle::Lower,
+             "bound handle requests normalize to lower selection while bounds are disabled");
+    s.SetActiveHandle(UiRangeSlider::Handle::UpperBound);
+    t.Expect(s.GetActiveHandle() == UiRangeSlider::Handle::Upper,
+             "upper bound requests normalize to upper selection while bounds are disabled");
+
     s.SetRange(0, 1000).EnableAdjustableBounds().SetBounds(50, 900).SetValues(250, 680);
     t.Expect(s.HasAdjustableBounds(), "adjustable bounds can be enabled without changing default instances");
     t.Expect(Near(s.GetLowerBound(), 50) && Near(s.GetUpperBound(), 900),
@@ -152,7 +166,16 @@ static void TestAdjustableBounds(TestCtx& t)
     s.Key(K_LEFT, 1);
     t.Expect(Near(s.GetUpperBound(), 899), "keyboard interaction moves the upper bound handle");
 
-    s.SetBounds(400, 600);
+    s.SetActiveHandle(UiRangeSlider::Handle::LowerBound);
+    s.EnableAdjustableBounds(false);
+    t.Expect(s.GetActiveHandle() == UiRangeSlider::Handle::Lower,
+             "disabling bounds returns a lower-bound active handle to the lower selection");
+    const double lower_before = s.GetLowerValue();
+    s.Key(K_RIGHT, 1);
+    t.Expect(s.GetLowerValue() > lower_before,
+             "keyboard editing remains live after adjustable bounds are disabled");
+
+    s.EnableAdjustableBounds().SetBounds(400, 600).SetValues(400, 600);
     t.Expect(Near(s.GetLowerValue(), 400) && Near(s.GetUpperValue(), 600),
              "contracting bounds clamps the selected interval");
 }
