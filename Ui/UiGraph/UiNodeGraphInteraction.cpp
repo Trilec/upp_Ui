@@ -121,6 +121,9 @@ void UiNodeGraph::FlushBatchModelChanges()
     if(!have_changes)
         return;
 
+    bool reset_like = batch_reset_;
+    bool selection_changed = ReconcileModelState(reset_like);
+
     if(batch_reset_ || spatial_dirty_) {
         InvalidateSpatialIndex();
         EnsureSpatialIndex();
@@ -163,6 +166,8 @@ void UiNodeGraph::FlushBatchModelChanges()
     PrepareGeometry();
     UpdateAttachedCtrls();
     Refresh();
+    if(selection_changed)
+        WhenSelection();
 }
 
 void UiNodeGraph::BeginNodeDrag(Point p, UiGraphNodeRef primary)

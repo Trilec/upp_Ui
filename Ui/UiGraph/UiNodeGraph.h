@@ -47,6 +47,8 @@
       mutations can update retained spatial/prepared state once per transaction.
     - 2026-08: hardened external model observer identity against destroyed-model
       address reuse while preserving the canonical non-owning binding contract.
+    - 2026-08: reconciled selection, active gestures, hover and attached-control
+      bindings across model authority changes and authoritative object removal.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -404,6 +406,7 @@ private:
     static int VisualStateIndex(UiGraphVisualState state);
 
     void BindModel(UiGraphModel& model);
+    bool ReconcileModelState(bool reset_like);
     void HandleModelChange(const UiGraphChange& change);
     void RecordBatchModelChange(const UiGraphChange& change);
     void FlushBatchModelChanges();

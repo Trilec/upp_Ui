@@ -811,12 +811,99 @@ void UiNodeGraph::BindModel(UiGraphModel& model)
     };
 }
 
+bool UiNodeGraph::ReconcileModelState(bool reset_like)
+{
+    bool selection_changed = false;
+
+    for(int i = selected_nodes_.GetCount() - 1; i >= 0; --i)
+        if(!model_ || !model_->Contains(UiGraphNodeRef{selected_nodes_[i]})) {
+            selected_nodes_.Remove(i);
+            selection_changed = true;
+        }
+    for(int i = selected_edges_.GetCount() - 1; i >= 0; --i)
+        if(!model_ || !model_->Contains(UiGraphEdgeRef{selected_edges_[i]})) {
+            selected_edges_.Remove(i);
+            selection_changed = true;
+        }
+
+    if(reset_like) {
+        hot_node_ = UiGraphNodeRef();
+        hot_edge_ = UiGraphEdgeRef();
+        hot_port_ = UiGraphPortRef();
+    }
+    else {
+        if(hot_node_.IsValid()) {
+            const UiGraphNode* node = model_ ? model_->FindNode(hot_node_) : nullptr;
+            if(!node || !node->visible)
+                hot_node_ = UiGraphNodeRef();
+        }
+        if(hot_edge_.IsValid()) {
+            const UiGraphEdge* edge = model_ ? model_->FindEdge(hot_edge_) : nullptr;
+            if(!edge || !edge->visible)
+                hot_edge_ = UiGraphEdgeRef();
+        }
+        if(hot_port_.IsValid()) {
+            const UiGraphNode* node = model_ ? model_->FindNode(hot_port_.node) : nullptr;
+            const UiGraphPort* port = model_ ? model_->FindPort(hot_port_) : nullptr;
+            if(!node || !node->visible || !port || !port->visible)
+                hot_port_ = UiGraphPortRef();
+        }
+    }
+
+    for(int i = marquee_preview_nodes_.GetCount() - 1; i >= 0; --i)
+        if(!model_ || !model_->Contains(UiGraphNodeRef{marquee_preview_nodes_[i]}))
+            marquee_preview_nodes_.Remove(i);
+
+    bool cancel_interaction = reset_like &&
+                              (interaction_ == InteractionMode::NodeDrag ||
+                               interaction_ == InteractionMode::Connect ||
+                               interaction_ == InteractionMode::Marquee);
+
+    if(!cancel_interaction && interaction_ == InteractionMode::NodeDrag) {
+        for(int i = 0; i < drag_start_positions_.GetCount(); i++) {
+            UiGraphNodeRef ref{drag_start_positions_.GetKey(i)};
+            const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
+            Pointf start = drag_start_positions_[i];
+            if(!node || !node->visible || !node->movable ||
+               abs(node->position.x - start.x) > 1e-9 ||
+               abs(node->position.y - start.y) > 1e-9) {
+                cancel_interaction = true;
+                break;
+            }
+        }
+    }
+
+    if(!cancel_interaction && interaction_ == InteractionMode::Connect) {
+        const UiGraphPort* source = model_ ? model_->FindPort(connection_source_) : nullptr;
+        if(!source || !source->visible || !source->enabled || !source->ProvidesOutput())
+            cancel_interaction = true;
+        else if(connection_target_.IsValid()) {
+            const UiGraphPort* target = model_->FindPort(connection_target_);
+            if(!target || !target->visible || !target->enabled || !target->AcceptsInput()) {
+                connection_target_ = UiGraphPortRef();
+                connection_decision_ = UiGraphConnectionDecision();
+            }
+            else
+                connection_decision_ = model_->ValidateConnection(connection_source_, connection_target_);
+        }
+    }
+
+    if(cancel_interaction)
+        CancelMode();
+
+    return selection_changed;
+}
+
 void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
 {
     if(batch_update_depth_ > 0) {
         RecordBatchModelChange(change);
         return;
     }
+
+    bool reset_like = change.kind == UiGraphChangeKind::Reset ||
+                      change.kind == UiGraphChangeKind::Cleared;
+    bool selection_changed = ReconcileModelState(reset_like);
 
     EnsureSpatialIndex();
     switch(change.kind) {
@@ -854,6 +941,8 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
     UpdateAttachedCtrls();
     RefreshLayout();
     Refresh();
+    if(selection_changed)
+        WhenSelection();
 }
 
 UiNodeGraph& UiNodeGraph::SetModel(UiGraphModel& model)
@@ -863,6 +952,15 @@ UiNodeGraph& UiNodeGraph::SetModel(UiGraphModel& model)
     ASSERT(batch_update_depth_ == 0);
     if(batch_update_depth_ > 0)
         return *this;
+
+    if(interaction_ != InteractionMode::None || interaction_capture_owned_)
+        CancelMode();
+    if(!node_ctrls_.IsEmpty())
+        ClearNodeCtrls();
+    hot_node_ = UiGraphNodeRef();
+    hot_edge_ = UiGraphEdgeRef();
+    hot_port_ = UiGraphPortRef();
+
     model_ = &model;
     BindModel(model);
     model_revision_ = -1;

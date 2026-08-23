@@ -137,6 +137,15 @@ rebuilds only currently prepared users of that class plus their prepared inciden
 edges; it does not rebuild the world index or full prepared viewport. Empty hash
 cells are removed when their final occupant leaves.
 
+Graph view state is also scoped to its active model authority. Switching models
+cancels an in-progress gesture, clears committed selection/hover state and drops
+attached child-control bindings before the replacement model becomes active, so
+reused stable IDs cannot inherit view state from an unrelated model. Direct
+model removal/update reconciles selection and active drag/connect state before
+refresh; view-side batched mutations perform the same reconciliation at the
+outer flush and publish a selection change when authoritative removal invalidates
+selected objects.
+
 ### UiDoc
 
 Model: `UiDocCore`.
@@ -256,8 +265,9 @@ Rules:
 9. External models are non-owning and must outlive the period in which they are
    actively used by a view.
 10. Derived interaction state must remain valid after external mutation; when a
-    selected model object disappears, the view clears or clamps that transient
-    state rather than retaining a stale semantic reference.
+    selected or actively manipulated model object disappears, the view clears or
+    cancels that transient state and publishes the resulting selection change
+    rather than retaining a stale semantic reference.
 
 ## Performance result
 
@@ -318,6 +328,11 @@ Menu and NodeGraph, plus six weak-identity tests covering independent copy
 identity, assignment identity preservation, expiration, same-address helper reuse,
 List rebinding and NodeGraph rebinding.
 
+`Utilities/UiNodeGraphInteractionStateTest` covers Graph model-authority switching,
+reused node IDs, attached-control scoping, authoritative removal during node and
+connection gestures, immediate selected-edge reconciliation and the same
+selection contract through view-side batch coalescing.
+
 `Utilities/UiDocModelBindingTest` provides **22 checks** covering:
 
 - default internal ownership and retained internal data;
@@ -339,7 +354,7 @@ Light/Dark surface corrections.
 Existing scale/regression gates remain authoritative:
 
 - `UiModelViewPerformanceTest` — 52 checks;
-- `UiTreeScaleTest` — 11 checks;
+- `UiTreeScaleTest` — 12 checks;
 - `UiGalleryRegressionTest` — 11 checks;
 - `UiDropdownMenuRenderTest` — 11 checks;
 - `UiNodeGraphScaleTest` — **51 checks** after final spatial/local-update hardening;

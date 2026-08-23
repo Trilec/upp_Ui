@@ -19,6 +19,44 @@ Authoritative branch: `main`.
 
 Do not claim Windows acceptance until the exact current main line is built and exercised on Windows/U++.
 
+### UIGRAPH ACCEPTANCE CHECKPOINT — 2026-08-23
+
+BASE: `527859915efefa2c0ab918a7f9f8bb6bf6e7a939` — refreshed `main` immediately before carrying the reviewed Graph slice forward; the concurrent PropertyEditor-only advance from the original `d96f031...` inspection base is preserved unchanged.
+
+TASK: `UIGRAPH-ACCEPT-R1` — reconcile `UiNodeGraph` derived interaction state with the currently active `UiGraphModel` authority without adding AgentFlow/runtime semantics to generic Graph.
+
+TOUCHED:
+
+- `Ui/UiGraph/UiNodeGraph.h`
+- `Ui/UiGraph/UiNodeGraph.cpp`
+- `Ui/UiGraph/UiNodeGraphInteraction.cpp`
+- `Utilities/UiNodeGraphInteractionStateTest/UiNodeGraphInteractionStateTest.upp`
+- `Utilities/UiNodeGraphInteractionStateTest/main.cpp`
+- `docs/09_UI_MODEL_API_AUDIT.md`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+PUBLISHED: `d7f5e6902f906bac84c23e1a316775483096144c` — reviewed source/test checkpoint on the recovery branch before this bookkeeping commit. Final publication may legitimately advance the branch/main bookkeeping SHA.
+
+VALIDATION:
+
+- complete touched Graph source/header/test/package slice source-reviewed;
+- model authority switching now cancels old active gestures/capture, clears selection/hover, and drops attached node-control bindings before the replacement model becomes active, preventing reused IDs from inheriting view state;
+- authoritative removal/update now reconciles selected IDs plus active drag/connect state; outer Graph view batches perform the same reconciliation once at flush;
+- internal drag/keyboard/delete mutation paths retain their existing request-first and batch behaviour; no second semantic state or AgentFlow-specific status was added to `UiGraphModel`;
+- `Utilities/UiNodeGraphInteractionStateTest` adds deterministic coverage for model switching with reused IDs, attached-control scoping, node removal during drag, connection-source removal, selected-edge removal, and batched selected-node removal;
+- `docs/09_UI_MODEL_API_AUDIT.md` records the lifecycle contract and corrects the stale `UiTreeScaleTest` count from 11 to 12;
+- base-to-checkpoint review shows only the intended Graph/test/docs files; production package membership is unchanged because the touched production sources were already members of `Ui/Ui.upp`;
+- Windows CLANGx64 Debug/Release and interactive `UiGraphDemo` validation are not available in this supervisor environment and remain mandatory before final Graph acceptance;
+- local `git diff --check` could not be run without the Windows/local checkout; Gary must run it on the published range.
+
+NEXT ACTION:
+
+1. publish this checkpoint onto the newest `main` only after one final HEAD/touched-file conflict check;
+2. Gary validates the published Graph checkpoint on Windows Debug + Release, runs the focused Graph/model regression set, and performs the UiGraphDemo interaction smoke;
+3. architectural AgentFlowGraph/AgentFlowRuntime work may proceed in parallel; this is generic control lifecycle hardening, not another Graph redesign.
+
 ---
 
 ## 0. ITEM-DECORATION LAYOUT REPAIR
