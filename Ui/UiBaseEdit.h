@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiBaseEdit_h_
+#ifndef _Ui_UiBaseEdit_h_
 #define _Ui_UiBaseEdit_h_
 
 /*
@@ -8,7 +8,7 @@
     License
     - Apache License 2.0, matching this repository's LICENSE file.
     UiBaseEdit
-    ========== 
+    ==========
 
     Purpose
     - Shared styled text-edit foundation for the Ui edit control family.
@@ -69,7 +69,7 @@ namespace Upp {
 class UiBaseEdit; // forward
 
 // ---------------------------------------------------------------------------
-// SideHandle - lightweight proxy for UiBaseEdit ?side? items
+// SideHandle - lightweight proxy for UiBaseEdit side items
 // ---------------------------------------------------------------------------
 class SideHandle {
 public:
@@ -128,14 +128,14 @@ public:
         Color caret_color    = SColorText();
         int   caret_width    = DPI(1);
         bool  block_caret    = false;
-        
+
         Color selection_color = SColorHighlight();
         Color selection_ink   = SColorHighlightText();
         Color placeholder_ink = SColorDisabled(); // Ink for placeholder
-        
+
         Color whitespace_color = Blend(SColorLight, SColorHighlight);
         Color tab_char_color   = Blend(SColorLight, SColorHighlight, 150);
-        
+
         int  tab_size          = 4;
         bool show_tabs         = false;
         bool show_spaces       = false;
@@ -173,14 +173,14 @@ protected:
         String text; // Text in Utf8
         Ln() { len = 0; }
     };
-    
+
     struct UndoRec {
         int    serial;
         int64  pos;
         int64  size;
         String data; // Compressed WString
         bool   typing;
-        
+
         void   SetText(const WString& text);
         WString GetText() const;
     };
@@ -257,11 +257,11 @@ protected:
     // ------------------------------------------------------------------------
     // Internal Helpers
     // ------------------------------------------------------------------------
-    
+
     // Visual text for painting / hit testing.
     // Derived classes (like UiPasswordEdit) override this to mask text.
     virtual WString GetDisplayLine(int i) const { return GetWLine(i); }
-    
+
     int          GetVisualLineHeight() const;
     void         InvalidateStyleCache();
     Style&       StyleEdit();
@@ -278,7 +278,7 @@ protected:
     void    NextUndo();
     void    IncDirty();
     void    DecDirty();
- 
+
     // Core View/Layout Ops
     void    UpdateVisualState();
     void    SyncFont();
@@ -292,17 +292,16 @@ protected:
     int64   GetMousePos(Point p) const;
     Point   GetColumnLine(int64 pos) const; // (col, line_idx)
     int64   GetPos(int line, int col = 0) const;
-    int64   GetPos(int line) const;
     int     GetLine(int64 pos) const;
-    
+
     // Build full logical text (lines + '\n' between them).
     WString BuildFullText() const;
-    
+
     void    LayoutSides();          // compute side rects + text_rect_
     SideItem* FindSideById(int id);
     void    InvalidateTextMetricsCache();
     void    EnsureTextMetricsCache() const;
-    
+
     // Line Accessors
     int           GetLineCount() const           { return lin_.GetCount(); }
     const String& GetUtf8Line(int i) const       { return lin_[i].text; }
@@ -314,7 +313,7 @@ protected:
 
     WString GetW(int64 pos, int64 size) const;
     int     GetChar(int64 pos) const;
-    
+
     // Paint Helpers
     void    PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const;
     Point   GetContentArea() const;
@@ -329,7 +328,7 @@ public:
     // ------------------------------------------------------------------------
     // Configuration & Behavior
     // ------------------------------------------------------------------------
-    
+
     UiBaseEdit& SetPlaceholder(const String& s) {
         placeholder_text_ = s;
         Font fnt = GetEffectiveStyle().font;
@@ -340,27 +339,27 @@ public:
         Refresh();
         return *this;
     }
-    
+
     UiBaseEdit& SetAcceptsNewlines(bool b) { accepts_newlines_ = b; return *this; }
     bool        AcceptsNewlines() const    { return accepts_newlines_; }
-    
+
     UiBaseEdit& SetAcceptsTabs(bool b)     { accepts_tabs_ = b; return *this; }
     bool        AcceptsTabs() const        { return accepts_tabs_; }
-    
+
     UiBaseEdit& SetAcceptsDrop(bool b)     { accepts_drop_ = b; return *this; }
     bool        AcceptsDrop() const        { return accepts_drop_; }
-    
+
     UiBaseEdit& SetOverwriteMode(bool b)   { overwrite_ = b; PlaceCaret(); return *this; }
     bool        IsOverwriteMode() const    { return overwrite_; }
-    
+
     UiBaseEdit& ClickFocus(bool b = true)  { click_focus_ = b; return *this; }
-    
+
     void        SetTip(const String& tip)  { Ctrl::Tip(tip); }
 
     // ------------------------------------------------------------------------
     // Layout & Alignment
     // ------------------------------------------------------------------------
-    
+
     UiBaseEdit& SetTextAlign(UiAlign a) { StyleEdit().text_align = a; OnStyleChanged(); return *this; }
     UiAlign     GetTextAlign() const    { return GetEffectiveStyle().text_align; }
 
@@ -408,25 +407,25 @@ public:
     // ------------------------------------------------------------------------
     // Styling Interface (CtrlStyled)
     // ------------------------------------------------------------------------
-    
-    UiBaseEdit&     SetCustomStyle(const Style& s);
-    UiBaseEdit&     ClearCustomStyle();
-    bool            HasCustomStyle() const { return has_custom_style_; }
-    const Style&    GetStyle() const { return GetEffectiveStyle(); }
+
+    UiBaseEdit&  SetCustomStyle(const Style& s);
+    UiBaseEdit&  ClearCustomStyle();
+    bool         HasCustomStyle() const { return has_custom_style_; }
+    const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetCustomStyle() const { return style_; }
-    
-    StyledPalette&  StyledPaletteRef()  { return StyleEdit().palette; }
-    StyledMetrics&  StyledMetricsRef()  { return StyleEdit().metrics; }
-    StyledSkin&     StyledSkinRef()     { return StyleEdit().skin;    }
-    void            OnStyleChanged();
+
+    StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
+    StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
+    StyledSkin&    StyledSkinRef()    { return StyleEdit().skin; }
+    void           OnStyleChanged();
 
     // ------------------------------------------------------------------------
     // Data Access
     // ------------------------------------------------------------------------
-    
+
     virtual void  SetData(const Value& v) override;
     virtual Value GetData() const override;
-    
+
     void    SetText(const WString& s);
     WString GetText() const;
     // Explicit UTF-8 text API for app-level string handling.
@@ -441,7 +440,7 @@ public:
     // ------------------------------------------------------------------------
     // Selection & Caret
     // ------------------------------------------------------------------------
-    
+
     void    SetSelection(int64 l = 0, int64 h = INT_MAX);
     bool    GetSelection(int64& l, int64& h) const;
     WString GetSelectionW() const;
@@ -451,11 +450,11 @@ public:
 
     int64   GetCursor() const { return cursor_; }
     void    SetCursor(int64 c) { PlaceCaret(c, false); }
-    
+
     // ------------------------------------------------------------------------
     // Undo / Redo & Clipboard
     // ------------------------------------------------------------------------
-    
+
     void    Undo();
     void    Redo();
     bool    IsUndo() const { return undo_.GetCount(); }
@@ -469,7 +468,7 @@ public:
     // ------------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------------
-    
+
     // Paint hooks - mirror UiLabel / UiButton signatures
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
@@ -479,16 +478,16 @@ public:
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
           StyledState, bool> WhenPaintForeground;
 
-    Event<>   WhenAction;    // Fired on Enter (for LineEdit) or special event
-    Event<>   WhenChange;    // Fired on any text modification
+    Event<>   WhenAction;      // Fired on Enter (for LineEdit) or special event
+    Event<>   WhenChange;      // Fired on any text modification
     Event<>   WhenSelection;   // Fired on selection change
     Event<>   WhenScroll;
-    Event<Bar&> WhenBar;     // Context menu
+    Event<Bar&> WhenBar;       // Context menu
 
     // ------------------------------------------------------------------------
     // Ctrl Overrides
     // ------------------------------------------------------------------------
-    
+
     virtual void  Paint(Draw& w) override;
     virtual bool  Key(dword key, int count) override;
     virtual void  LeftDown(Point p, dword flags) override;
@@ -520,4 +519,3 @@ public:
 } // namespace Upp
 
 #endif
-
