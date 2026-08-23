@@ -122,15 +122,23 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
         DrawFatFrame(w, value_rect.Deflated(DPI(1)), SColorHighlight(), DPI(2));
 
     if(item.resettable && !item.overrideable) {
+        // Theme Studio and other resettable projections keep authored/inherited
+        // state separate from the value editor's own action affordance. An
+        // inherited row therefore shows a passive hollow state marker; once a
+        // value is authored the same right-hand slot becomes the normal Reset
+        // action. Numeric slider toggles, colour pickers, matrices, icons, etc.
+        // remain owned by their PropertyValueEditor inside the value cell.
         Rect reset = GetResetRect(display_index);
-        if(!style_.reset_icon.IsEmpty()) {
+        const Image icon = item.inherited ? ICON_DESIGN_CIRCLE_48()
+                                          : style_.reset_icon;
+        if(!icon.IsEmpty()) {
             const int size = min(DPI(16), reset.GetHeight() - DPI(6));
-            Rect icon(reset.left + (reset.GetWidth() - size) / 2,
-                     reset.top + (reset.GetHeight() - size) / 2,
-                     reset.left + (reset.GetWidth() - size) / 2 + size,
-                     reset.top + (reset.GetHeight() - size) / 2 + size);
+            Rect icon_rect(reset.left + (reset.GetWidth() - size) / 2,
+                           reset.top + (reset.GetHeight() - size) / 2,
+                           reset.left + (reset.GetWidth() - size) / 2 + size,
+                           reset.top + (reset.GetHeight() - size) / 2 + size);
             if(size > 0)
-                w.DrawImage(icon, style_.reset_icon);
+                w.DrawImage(icon_rect, icon);
         }
     }
 
