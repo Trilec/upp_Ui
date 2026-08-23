@@ -231,6 +231,7 @@ void UiTable::PrepareItemRenders()
     }
 
     if(GetEffectiveStyle().show_column_headers) {
+        const Style& style = GetEffectiveStyle();
         int count = prepared_columns_.GetCount();
         while(column_header_render_pool_.GetCount() < count) {
             HeaderRenderSlot& slot = column_header_render_pool_.Add();
@@ -244,7 +245,11 @@ void UiTable::PrepareItemRenders()
                                                          GetHeaderDisplayText(UITABLE_COLUMN_AXIS, col)));
                 slot.index = col;
             }
-            if(slot.render->PrepareLayout(GetColumnHeaderCellRect(col), UiDirection::H))
+            Rect render_rect = GetColumnHeaderCellRect(col);
+            Rect sort = GetSortIndicatorRect(UITABLE_COLUMN_AXIS, col, render_rect);
+            if(!sort.IsEmpty())
+                render_rect.right = max(render_rect.left, sort.left - max(0, style.sort_indicator_gap));
+            if(slot.render->PrepareLayout(render_rect, UiDirection::H))
                 last_render_layout_count_++;
         }
         for(int i = count; i < column_header_render_pool_.GetCount(); i++)
