@@ -18,6 +18,26 @@ const UiTableHeader& UiTableEmptyHeader_()
 
 }
 
+Rect UiTable::GetSortIndicatorRect(UiTableAxis axis, int index, const Rect& rect) const
+{
+    if(axis != UITABLE_COLUMN_AXIS || rect.IsEmpty() || !model_)
+        return Rect(0, 0, 0, 0);
+    const Style& style = GetEffectiveStyle();
+    if(!style.show_sort_indicator || index < 0 || index >= model_->GetColumnCount())
+        return Rect(0, 0, 0, 0);
+    const UiTableHeader& header = model_->GetHeader(axis, index);
+    if(header.sort == UITABLE_SORT_NONE)
+        return Rect(0, 0, 0, 0);
+
+    int right = max(rect.left, rect.right - max(0, style.header_padding_x));
+    int side = min(max(DPI(6), style.sort_indicator_size),
+                   max(0, min(rect.GetHeight() - DPI(4), right - rect.left)));
+    if(side <= 0)
+        return Rect(0, 0, 0, 0);
+    int y = rect.top + (rect.GetHeight() - side) / 2;
+    return RectC(right - side, y, side, side);
+}
+
 void UiTable::PaintHeaderCell(Draw& w, UiTableAxis axis, int index, const Rect& rect, bool hot) const
 {
     if(rect.IsEmpty())
@@ -36,16 +56,17 @@ void UiTable::PaintHeaderCell(Draw& w, UiTableAxis axis, int index, const Rect& 
         render->Paint(w, GetHeaderRenderState(axis, index, hot));
 
     Color ink = IsNull(header.custom_ink_color) ? style.header_ink : header.custom_ink_color;
-    if(axis == UITABLE_COLUMN_AXIS && style.show_sort_indicator && header.sort != UITABLE_SORT_NONE) {
-        int cx = rect.right - style.header_padding_x - DPI(8);
-        int cy = rect.CenterPoint().y;
+    Rect sort = GetSortIndicatorRect(axis, index, rect);
+    if(!sort.IsEmpty()) {
+        Point c = sort.CenterPoint();
+        int arm = max(2, min(sort.GetWidth(), sort.GetHeight()) / 3);
         if(header.sort == UITABLE_SORT_ASC) {
-            w.DrawLine(cx - 4, cy + 2, cx, cy - 2, 1, ink);
-            w.DrawLine(cx, cy - 2, cx + 4, cy + 2, 1, ink);
+            w.DrawLine(c.x - arm, c.y + arm / 2, c.x, c.y - arm / 2, 1, ink);
+            w.DrawLine(c.x, c.y - arm / 2, c.x + arm, c.y + arm / 2, 1, ink);
         }
         else {
-            w.DrawLine(cx - 4, cy - 2, cx, cy + 2, 1, ink);
-            w.DrawLine(cx, cy + 2, cx + 4, cy - 2, 1, ink);
+            w.DrawLine(c.x - arm, c.y - arm / 2, c.x, c.y + arm / 2, 1, ink);
+            w.DrawLine(c.x, c.y + arm / 2, c.x + arm, c.y - arm / 2, 1, ink);
         }
     }
 
