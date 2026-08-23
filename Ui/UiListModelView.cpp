@@ -205,6 +205,8 @@ Rect UiList::GetCheckRect(const Rect& row) const
     int size = min(style.check_size, row.GetHeight() - DPI(6));
     int y = row.top + (row.GetHeight() - size) / 2;
     int x = row.left + style.h_padding;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::LEFT)
+        x = GetDragRect(row).right + style.drag_gap;
     return RectC(x, y, size, size);
 }
 
@@ -214,6 +216,8 @@ Rect UiList::GetIconRect(const Rect& row, bool has_check) const
     int size = min(style.icon_size, row.GetHeight() - DPI(6));
     int y = row.top + (row.GetHeight() - size) / 2;
     int x = row.left + style.h_padding;
+    if(drag_reorder_enabled_ && style.show_drag_handle && style.drag_side == UiAlign::LEFT)
+        x = GetDragRect(row).right + style.drag_gap;
     if(has_check)
         x = GetCheckRect(row).right + style.content_gap;
     return RectC(x, y, size, size);
